@@ -533,13 +533,11 @@ async function readLiveStations(
 
 /** Light write used to see which baggage indexes actually stick. */
 const BAGGAGE_WRITABILITY_PROBE_LB = 150;
-/** High write to discover SimConnect clamp on a sticky hold. */
-const BAGGAGE_CLAMP_PROBE_LB = 4000;
 
 /**
  * Freighter baggage can appear in the profile but ignore SimConnect writes
- * (C408 Empty: S4/S5). Probe before the fill loop so Due is not painted across
- * ghost holds.
+ * (C408 Empty: S4/S5). One batch write + read before fill — no per-station
+ * clamp probe (most airframes accept any station weight; wizard dropped that).
  */
 async function probeFreighterBaggageStations(opts: {
   bridge: NamedPipeSimBridge;
@@ -552,20 +550,14 @@ async function probeFreighterBaggageStations(opts: {
   ) => Promise<unknown>;
   settleMs: number;
   delay: (ms: number) => Promise<void>;
-}): Promise<{
-  sticky: number[];
-  dead: number[];
-  /** Observed live ceiling when the sim clamps below a high probe. */
-  liveCapByIndex: Record<number, number>;
-}> {
+}): Promise<{ sticky: number[]; dead: number[] }> {
   const indexes = opts.baggageIndexes.filter(
     (n) => Number.isFinite(n) && n > 0,
   );
   const sticky: number[] = [];
   const dead: number[] = [];
-  const liveCapByIndex: Record<number, number> = {};
   if (indexes.length === 0) {
-    return { sticky, dead, liveCapByIndex };
+    return { sticky, dead };
   }
 
   const base: Record<number, number> = {};
@@ -586,37 +578,11 @@ async function probeFreighterBaggageStations(opts: {
     else dead.push(idx);
   }
 
-  // Restore crew floors / empty bags before clamp probes or cargo fill.
   const restoreTotal = Object.values(base).reduce((a, b) => a + b, 0);
   await opts.applyPayload(base, restoreTotal);
   await opts.delay(Math.min(400, opts.settleMs));
 
-  for (const idx of sticky) {
-    const hard =
-      opts.profile.payload.stations.find((s) => s.index === idx)?.maxLoad ?? 0;
-    const probeTo = Math.max(
-      BAGGAGE_WRITABILITY_PROBE_LB * 2,
-      Math.min(BAGGAGE_CLAMP_PROBE_LB, hard > 0 ? hard : BAGGAGE_CLAMP_PROBE_LB),
-    );
-    const highMap = { ...base, [idx]: probeTo };
-    const highTotal = Object.values(highMap).reduce((a, b) => a + b, 0);
-    await opts.applyPayload(highMap, highTotal);
-    await opts.delay(opts.settleMs);
-    const after = await readLiveStations(opts.bridge, opts.profile);
-    const got = after[idx] ?? 0;
-    if (got >= 20) {
-      // Clamp below probe (or below profile maxLoad) → usable ceiling.
-      if (got < probeTo - Math.max(50, probeTo * 0.05)) {
-        liveCapByIndex[idx] = Math.round(got);
-      } else if (hard > 0) {
-        liveCapByIndex[idx] = hard;
-      }
-    }
-    await opts.applyPayload(base, restoreTotal);
-    await opts.delay(Math.min(300, opts.settleMs));
-  }
-
-  return { sticky, dead, liveCapByIndex };
+  return { sticky, dead };
 }
 
 /** Station sum, or gross−empty−fuel when station SimVars under-read (Accu-Sim). */
@@ -2052,7 +2018,8 @@ async function applyMissionOfpLoadExclusive(
     }
 
     // Freighter: drop baggage indexes that ignore SimConnect before painting Due
-    // across them (C408 S4/S5). Also learn live clamp ceilings on sticky holds.
+    // across them (C408 S4/S5). Writability only — no clamp probe (stations often
+    // accept any weight; that wizard path was dropped for the same reason).
     if (!preferSeatFill && !paxAndCargoClassic && baggageStations.length > 0) {
       publishLiveProgress('balancing', 'Probing cargo stations for dead holds…');
       const probed = await probeFreighterBaggageStations({
@@ -2070,20 +2037,11 @@ async function applyMissionOfpLoadExclusive(
       watchDebugLog('inject', 'baggage writability probe', {
         sticky: probed.sticky,
         dead: probed.dead,
-        liveCapByIndex: probed.liveCapByIndex,
         priorBaggage: baggageStations,
       });
       if (probed.dead.length > 0) {
         baggageStations = probed.sticky;
         rebuildBaggageSoftMax();
-        for (const [idxStr, cap] of Object.entries(probed.liveCapByIndex)) {
-          const idx = Number(idxStr);
-          if (!Number.isFinite(idx) || !(cap > 0)) continue;
-          baggageSoftMaxByIndex[idx] = Math.min(
-            baggageSoftMaxByIndex[idx] ?? cap,
-            cap,
-          );
-        }
         const bagCap = baggageStations.reduce((sum, idx) => {
           return sum + (baggageSoftMaxByIndex[idx] ?? 0);
         }, 0);
@@ -2107,33 +2065,7 @@ async function applyMissionOfpLoadExclusive(
           stickyBaggage: probed.sticky,
           clampedCargoLb: Math.round(cargoTargetLb),
           originalCargoLb: Math.round(priorTarget),
-          liveCapByIndex: probed.liveCapByIndex,
         });
-      } else if (Object.keys(probed.liveCapByIndex).length > 0) {
-        for (const [idxStr, cap] of Object.entries(probed.liveCapByIndex)) {
-          const idx = Number(idxStr);
-          if (!Number.isFinite(idx) || !(cap > 0)) continue;
-          baggageSoftMaxByIndex[idx] = Math.min(
-            baggageSoftMaxByIndex[idx] ?? cap,
-            cap,
-          );
-        }
-        const bagCap = baggageStations.reduce((sum, idx) => {
-          return sum + (baggageSoftMaxByIndex[idx] ?? 0);
-        }, 0);
-        if (bagCap > 0 && bagCap < cargoTargetLb) {
-          watchDebugLog('inject', 'baggage live clamp', {
-            liveCapByIndex: probed.liveCapByIndex,
-            priorTarget: Math.round(cargoTargetLb),
-            bagCap: Math.round(bagCap),
-          });
-          cargoTargetLb = bagCap;
-          built = { ...built, cargoLb: cargoTargetLb };
-          publishLiveProgress(
-            'balancing',
-            `Station clamp · Due ${Math.round(cargoTargetLb)} lb (sim ceiling)`,
-          );
-        }
       }
       afterLive = {
         tanks: afterLive.tanks,

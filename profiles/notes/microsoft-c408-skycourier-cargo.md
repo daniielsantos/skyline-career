@@ -22,9 +22,8 @@
 - AUX deferred for v1.
 - Payload stations from writetest: 1, 2, 3, 4, 5 (use **Cargo - Empty** livery — Loaded only exposed crew).
 - S1–S2 crew; **S3** is the only sticky cargo hold. **S4/S5** accept profile indexes but SimConnect writes do not stick → `baggageStations: [3]`, `maxLoad` 0 on S4/S5.
-- S3 `maxLoad` 2500; live often clamps ~800 lb — inject pre-fill probe measures ceiling and clamps Due.
-- Catalog SKU `maxCargoKg` **1055** (~2325 lb) matches Passenger S5 hold; Cargo Empty still probe/Accept-cuts when S3 clamps lower.
-- Inject: pre-fill baggage writability + clamp probe; mid-fill ghost prune remains as safety net. Log: `baggage writability probe` / `dead stations pruned` in `profiles/career/watch-debug.log`.
+- S3 `maxLoad` 2500; live may sit lower — pack/S3-only + mid-fill sticky clamp; catalog `maxCargoKg` **1055** for Passenger S5.
+- Inject: pre-fill **writability** probe only (batch 150 lb — no per-station clamp; airframes often accept any weight). Mid-fill ghost prune remains. Log: `baggage writability probe` / `dead stations pruned` in `profiles/career/watch-debug.log`.
 - Homologated with interactive wizard.
 
 ## Homologated

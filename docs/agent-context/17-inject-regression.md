@@ -97,7 +97,7 @@ Legenda **tier**:
 | P0 | `microsoft-atr-72-600` | 11 stations, Highline merge, crew S1–S2 | `microsoft-atr-72-600-highline-03.json` | `microsoft-atr-72-600.json` |
 | P0 | `nextgensim-emb-110p1f-bandeirante` | TP freighter recente, family E110 | `nextgensim-emb-110p1f-bandeirante.json` | idem |
 | P1 | `microsoft-dhc-6-300-twin-otter-wheels` | AUX tanks — não inventar vars | `microsoft-dhc-6-300-twin-otter-wheels.json` | idem |
-| P1 | `microsoft-c408-skycourier-cargo` | Empty only; **S3 cargo** (S4/S5 dead); pre-fill writability+clamp probe | C408 profile | `microsoft-c408-skycourier-cargo.json` |
+| P1 | `microsoft-c408-skycourier-cargo` | Empty only; **S3 cargo** (S4/S5 dead); pre-fill writability probe (no clamp) | C408 profile | `microsoft-c408-skycourier-cargo.json` |
 | P1 | `microsoft-atr-42-600` | Stol vs Highline fingerprint | `microsoft-atr-42-600-stol.json` | `microsoft-atr-42-600.json` |
 | P2 | `workingtitle-tbm-930-passengers` | Single-engine jet-fuel TP | `workingtitle-tbm-930-passengers.json` | idem |
 | P2 | `microsoft-pc-12-ngx-passengers` | VIP/cargo family | `microsoft-pc-12-ngx-vip.json` | family paths |

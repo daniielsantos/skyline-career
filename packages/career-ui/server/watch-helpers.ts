@@ -19,6 +19,9 @@ import {
   evaluateOriginProximity,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
+  ENGINE_N1_OFF_PCT,
+  ENGINE_RPM_OFF,
+  PARKED_GROUND_SPEED_KT,
   inferEnginesRunning,
   isSimPlaybackFrozen,
   mergeAirborneClockOntoMission,
@@ -561,24 +564,35 @@ export async function sampleLiveFlight(
     gph: [flowGph1, flowGph2],
     general: [flowGeneral1, undefined],
   });
-  // Engines-running gate: ignore GPH. Sticky ~1 GPH on GA twins with cutoff
-  // still crossed ENGINE_FUEL_FLOW_ON_KG_H after lb→kg conversion; probe only
-  // reads PPH and was already correct. Cruise burn keeps GPH above.
   const enginesFuelFlowKgPerHour = sumFlightFuelFlowKgPerHour({
     numberOfEngines,
     combustion: combustionFlags,
     pph: [flowPph1, flowPph2],
     recip: [flowRecip1, flowRecip2],
+    // GPH + GENERAL stick after fuel inject / cutoff on GA twins (BN2) and
+    // falsely trip ENGINE_FUEL_FLOW_ON_KG_H. Probe uses PPH only; Accu-Sim
+    // running still shows RPM or RECIP.
     gph: [undefined, undefined],
-    general: [flowGeneral1, undefined],
+    general: [undefined, undefined],
   });
-  const enginesRunning = inferEnginesRunning({
+  let enginesRunning = inferEnginesRunning({
     snapshotRunning: snap.enginesRunning,
     n1Pct,
     rpm,
     combustion,
     fuelFlowKgPerHour: enginesFuelFlowKgPerHour,
   });
+  // Parked + dead spool: ignore residual flow after fuel inject settling.
+  const parkedStill =
+    snap.onGround === true &&
+    snap.parkingBrake === true &&
+    (groundSpeedKt == null || groundSpeedKt < PARKED_GROUND_SPEED_KT);
+  const spoolDead =
+    (n1Pct.length === 0 || n1Pct.every((n) => n < ENGINE_N1_OFF_PCT)) &&
+    (rpm.length === 0 || rpm.every((r) => r < ENGINE_RPM_OFF));
+  if (parkedStill && spoolDead) {
+    enginesRunning = false;
+  }
 
   return {
     onGround: snap.onGround,

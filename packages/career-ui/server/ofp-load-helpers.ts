@@ -1052,6 +1052,17 @@ async function applyMissionOfpLoadExclusive(
       onGround: snap.onGround,
       enginesRunning,
     };
+    // Probe returns lastProbeSnapshot while inject owns the pipe — keep the
+    // engines bit honest so the Aircraft tile does not flip to “running”.
+    if (lastProbeSnapshot) {
+      lastProbeSnapshot = {
+        ...lastProbeSnapshot,
+        onGround: snap.onGround,
+        enginesRunning,
+        parkingBrake: snap.parkingBrake ?? lastProbeSnapshot.parkingBrake,
+        checkedAtIso: new Date().toISOString(),
+      };
+    }
 
     // Same density as buildOfpLoadPlan — raw MSFS FUEL WEIGHT PER GALLON often
     // flickers to avgas ~6.0 on Accu-Sim while the plan used Jet-A 6.7 (Sim 672

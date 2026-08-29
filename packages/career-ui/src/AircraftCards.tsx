@@ -207,6 +207,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'microsoft-pc-12ngx-cargo': '/airframes/pc-12-ngx.png',
   'carenado-saab-340-passenger': '/airframes/saab-340.png',
   'microsoft-saab-340-cargo': '/airframes/saab-340.png',
+  'inibuilds-ys-11': '/airframes/ys-11.png',
   'blacksquare-tbm-850-feather-red': '/airframes/tbm-850.png',
 
   // --- medium_piston ---
@@ -229,6 +230,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'pmdg-738-bbj2-family': '/airframes/b738-bbj2.png',
   'pmdg-738-bcf-family': '/airframes/b738-bcf.png',
   'pmdg-738-pax-family': '/airframes/b738-pax.png',
+  'asobo-737-max-8-passengers': '/airframes/737-max-8.png',
   'inibuilds-boeing-b707-gns': '/airframes/b707-gns.png',
 
   // --- wide_freighter ---
@@ -241,6 +243,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'inibuilds-a350-900-default-cabin': '/airframes/a350-900.png',
   'inibuilds-a350-900-ulr': '/airframes/a350-900-ulr.png',
   'inibuilds-a350-1000-default-cabin': '/airframes/a350-1000.png',
+  'inibuilds-a330-200': '/airframes/a330-200.png',
+  'inibuilds-a330-300': '/airframes/a330-300.png',
   'toliss-toliss-a346-pro-preset-pax': '/airframes/a346.png',
 };
 

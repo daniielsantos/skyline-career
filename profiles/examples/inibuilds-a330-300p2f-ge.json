@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "inibuilds-a330-300p2f-ge",
+  "profileKey": "inibuilds/a330-300p2f-ge",
+  "semver": "1.0.0",
+  "displayName": "A330-300P2F (GE) (MSFS 2024)",
+  "match": {
+    "fingerprint": "444bf1c1c5c6b117648f78f842fcf40af116eb3e8258f2f0325fe0f722cd61aa",
+    "title": "A330-300P2F (GE)",
+    "publisher": "inibuilds",
+    "icao": "A333",
+    "liveTitles": [
+      "A330-300P2F (GE)"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 10848,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 10848,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Aux",
+        "capacity": 942,
+        "readVar": "FUEL TANK LEFT AUX QUANTITY",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Aux",
+        "capacity": 942,
+        "readVar": "FUEL TANK RIGHT AUX QUANTITY",
+        "readUnit": "gallons"
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "calibrated-live",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 50
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: A330-300P2F (GE).",
+    "ICAO type designator (catalog/SimBrief): A333.",
+    "Load method: native-simbrief (no Skyline inject).",
+    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Use compare-ofp + Career Loaded vs Due for validation.",
+    "See profiles/notes/inibuilds-a330-300p2f-ge.md"
+  ]
+}

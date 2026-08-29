@@ -1,0 +1,63 @@
+{
+  "source": "simbrief",
+  "icao": "A333",
+  "ofpId": "inibuilds-a330-300",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "A330-300 (GE)",
+    "A330-300 (RR)",
+    "A330-300 VIP (GE)",
+    "A330-300 VIP (RR)",
+    "A330-300P2F (GE)",
+    "A330-300P2F (RR)"
+  ],
+  "matchTitlePattern": "A330-300",
+  "notes": [
+    "iniBuilds A330-300 family — native-simbrief (EFB/tablet load)",
+    "Market SKU: inibuilds-a330-300 (wide_freighter)",
+    "SimBrief type: A333 Default",
+    "Homologated glasses: GE / RR / VIP / P2F",
+    "Fuel: classic L/R MAIN + L/R AUX (no CENTER in discovery); write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A333",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

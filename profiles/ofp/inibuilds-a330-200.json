@@ -1,0 +1,61 @@
+{
+  "source": "simbrief",
+  "icao": "A332",
+  "ofpId": "inibuilds-a330-200",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "A330-200 (GE)",
+    "A330-200 (RR)",
+    "A330-200 VIP (GE)",
+    "A330-200 VIP (RR)"
+  ],
+  "matchTitlePattern": "A330-200",
+  "notes": [
+    "iniBuilds A330-200 family — native-simbrief (EFB/tablet load)",
+    "Market SKU: inibuilds-a330-200 (wide_freighter)",
+    "SimBrief type: A332 Default",
+    "Homologated glasses: GE / RR / VIP GE / VIP RR",
+    "Fuel: classic L/R MAIN + CENTER + L/R AUX; write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A332",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

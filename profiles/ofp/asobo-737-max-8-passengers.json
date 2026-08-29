@@ -1,0 +1,57 @@
+{
+  "source": "simbrief",
+  "icao": "B38M",
+  "ofpId": "asobo-737-max-8-passengers",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "737 Max 8 Passengers"
+  ],
+  "matchTitlePattern": "737\\s*Max\\s*8",
+  "notes": [
+    "Asobo / Microsoft 737 Max 8 Passengers — native-simbrief (EFB/tablet load)",
+    "Market SKU: asobo-737-max-8-passengers (narrow_freighter)",
+    "SimBrief type: B38M Default",
+    "Homologated profile: asobo/737-max-8-passengers@1.0.0",
+    "Fuel: FUELSYSTEM tanks 1–3; write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["fuelsystem", "mass-balance", "classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "B38M",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

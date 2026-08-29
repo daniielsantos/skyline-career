@@ -765,6 +765,22 @@ CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e), re
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## YS-11
+- **typeId:** `inibuilds-ys-11`
+- **file:** `ys-11.png`
+
+```
+Stylized cartoon / clean vector illustration of a NAMC YS-11 twin turboprop regional airliner (YS11), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: low-wing twin turboprop Japanese regional, two large round wing nacelles with four-blade props, distinctive blunt / rounded YS-11 nose and cockpit, dense oval cabin window row, conventional tall tail (not T-tail), retractable tricycle gear down, 1960s airliner proportions longer than an EMB-110. Must read as YS-11 at a glance — not a Saab 340 (no T-tail), not a Bandeirante, not a Dash 8.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_turboprop: Fresh morning green-blue haze (#5a8f6e / #2f5c42), regional utility ramp / short-field asphalt, distant tree line. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ## TBM 850
 - **typeId:** `blacksquare-tbm-850-feather-red`
 - **file:** `tbm-850.png`
@@ -1061,9 +1077,57 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## Asobo 737 Max 8
+- **typeId:** `asobo-737-max-8-passengers`
+- **file:** `737-max-8.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 737 Max 8 passenger airliner (B38M), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: 737 Max 8 passenger, distinctive larger LEAP-style underwing engines with chevron nozzles, split-tip / Advanced Technology winglets, full passenger window row, conventional 737 tail, retractable gear down. Must read as 737 Max (not NG 737-800) — engines and winglets essential; not freighter.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ---
 
 # wide_freighter
+
+## iniBuilds A330-200
+- **typeId:** `inibuilds-a330-200`
+- **file:** `a330-200.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A330-200 widebody twinjet (A332), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: twin underwing engines, Airbus A330 nose and cockpit, dense passenger window row, tall A330 tail with bullet fairing, retractable gear down, shorter -200 fuselage vs A330-300. Must read as A330-200 at a glance — not A350, not A340 (only two engines), not freighter (windows present).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock / apron scale, oversized ramp atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## iniBuilds A330-300
+- **typeId:** `inibuilds-a330-300`
+- **file:** `a330-300.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A330-300 widebody twinjet (A333), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: twin underwing engines, Airbus A330 nose and cockpit, dense passenger window row, tall A330 tail with bullet fairing, retractable gear down, longer -300 fuselage vs A330-200. Must read as A330-300 at a glance — not A350, not A340 (only two engines), not freighter (windows present).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock / apron scale, oversized ramp atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
 
 ## TFDi MD-11F
 - **typeId:** `tfdi-md11f-family`

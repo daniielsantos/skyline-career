@@ -15,7 +15,7 @@
     "Homologated: 200QT Ansett + 200QC RAF CMk3 @1.0.0",
     "loadMethod: native-simbrief; injectCapable: false",
     "SimBrief airframe: Just Flight (MSFS) - BAe 146-200 QC/QT",
-    "EFB Side+FWD+AFT map to S3–S12; S13+ sticky/ghost — omit from Live vs Due (not serviceStations; those are summed)."
+    "EFB Side+FWD+AFT map to S3–S11; S12+ sticky/ghost — omit from Live vs Due."
   ],
   "fuel": {
     "unit": "lb"
@@ -40,8 +40,7 @@
         8,
         9,
         10,
-        11,
-        12
+        11
       ]
     }
   },
@@ -130,7 +129,7 @@
       "simVarIndex": 12,
       "cfgIndex": 11,
       "name": "Station 12",
-      "role": "baggage"
+      "role": "service"
     },
     {
       "simVarIndex": 13,

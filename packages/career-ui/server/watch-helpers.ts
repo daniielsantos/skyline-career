@@ -2297,6 +2297,14 @@ export class CareerWatchSession {
           const plannedPayloadLb = adjustPaxAndCargoDueForEfbPaxLb(
             clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, airframe),
             airframe,
+            {
+              // Career freighter legs stay pax=0; family SKUs still have efbPaxWeightLb
+              // for passenger glass — never invent cabin seats on QT/QC Due.
+              ofpPassengerCount:
+                typeof current.pax === 'number' && Number.isFinite(current.pax)
+                  ? current.pax
+                  : undefined,
+            },
           );
           const liveCrewLb =
             adjustedPayload?.crewOnStations && stationsForCrew

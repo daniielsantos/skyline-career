@@ -1244,6 +1244,26 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
     );
   });
 
+  it('skips EFB pax delta on freighter OFP (pax=0) so QT Due stays OFP cargo', () => {
+    const ofpCargoLb = 20_963;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(
+      ofpCargoLb,
+      {
+        typeId: 'justflight-146-200',
+        aircraftClassId: 'narrow_freighter',
+        label: 'BAe 146-200',
+        rolesPackRelPath: 'x',
+        simbriefIcao: 'B462',
+        simbriefAirframeMatch: 'Default',
+        loadLayout: 'pax_and_cargo',
+        maxPaxSeats: 112,
+        efbPaxWeightLb: 170,
+      },
+      { ofpPassengerCount: 0 },
+    );
+    assert.equal(due, ofpCargoLb);
+  });
+
   it('adds Fenix ~196 lb/pax vs SimBrief 175 on a 134-pax OFP', () => {
     const ofpPayloadLb = 30_768;
     const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {

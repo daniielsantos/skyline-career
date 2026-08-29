@@ -672,6 +672,18 @@ export function DispatchActivePanel(props: {
                       the board and{' '}
                       {mission.contractPilot ? 'pilot fee' : 'pay'} is reduced.
                     </p>
+                    <button
+                      type="button"
+                      className="accept"
+                      disabled={busy}
+                      onClick={() => props.onAcceptOfpCargo?.(mission)}
+                      title="Trim mission cargo and pay to match the SimBrief OFP"
+                    >
+                      Accept OFP cargo
+                      {ofpAcceptCargoKg
+                        ? ` (${formatMassExact(ofpAcceptCargoKg, weightSystem)})`
+                        : ''}
+                    </button>
                   </div>
                 ) : null}
                 {briefingItems.length > 0 ? (

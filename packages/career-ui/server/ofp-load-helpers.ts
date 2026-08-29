@@ -1144,6 +1144,7 @@ async function applyMissionOfpLoadExclusive(
       const clampedLb = adjustPaxAndCargoDueForEfbPaxLb(
         clampPaxAndCargoDueToHoldsLb(rawKg * KG_TO_LB, careerAirframe),
         careerAirframe,
+        { ofpPassengerCount: ofp.loadSheet?.passengerCount },
       );
       return clampedLb / KG_TO_LB;
     })();

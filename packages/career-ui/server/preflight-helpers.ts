@@ -491,6 +491,17 @@ export async function runMissionPreflight(
               careerAirframe,
             ),
             careerAirframe,
+            {
+              ofpPassengerCount:
+                typeof ofp.loadSheet?.passengerCount === 'number'
+                  ? ofp.loadSheet.passengerCount
+                  : (ofp.payload?.stationRoles?.passengerStations?.length ??
+                        0) === 0 &&
+                      (ofp.payload?.stationRoles?.baggageStations?.length ??
+                        0) > 0
+                    ? 0
+                    : undefined,
+            },
           )
         : undefined;
     const livePayloadLb = clearedStations

@@ -3071,11 +3071,14 @@ export function clampPaxAndCargoDueToHoldsLb(
 }
 
 /**
- * iniBuilds / similar EFBs apply a heavier standard pax than SimBrief 175 lb.
+ * iniBuilds / similar EFBs apply a heavier (or lighter) standard pax than
+ * SimBrief 175 lb. Pass {@link opts.ofpPassengerCount} when known — freighter
+ * OFPs (pax=0) must skip this or Due shrinks by a fake cabin estimate.
  */
 export function adjustPaxAndCargoDueForEfbPaxLb(
   plannedPayloadLb: number,
   airframe: CareerPlayerAirframe | undefined,
+  opts?: { ofpPassengerCount?: number },
 ): number {
   if (
     !Number.isFinite(plannedPayloadLb) ||
@@ -3098,13 +3101,25 @@ export function adjustPaxAndCargoDueForEfbPaxLb(
   }
   const delta = efb - SIMBRIEF_STANDARD_PAX_LB;
   if (Math.abs(delta) < 0.5) return plannedPayloadLb;
-  const pax = Math.min(
-    maxPax,
-    Math.max(
-      0,
-      Math.round(plannedPayloadLb / SIMBRIEF_STANDARD_PAX_WITH_BAG_LB),
-    ),
-  );
+  const ofpPax = opts?.ofpPassengerCount;
+  if (
+    typeof ofpPax === 'number' &&
+    Number.isFinite(ofpPax) &&
+    ofpPax <= 0
+  ) {
+    // QT/QC / cargo OFP — payload is freight only; do not invent cabin seats.
+    return plannedPayloadLb;
+  }
+  const pax =
+    typeof ofpPax === 'number' && Number.isFinite(ofpPax) && ofpPax > 0
+      ? Math.min(maxPax, Math.floor(ofpPax))
+      : Math.min(
+          maxPax,
+          Math.max(
+            0,
+            Math.round(plannedPayloadLb / SIMBRIEF_STANDARD_PAX_WITH_BAG_LB),
+          ),
+        );
   return plannedPayloadLb + pax * delta;
 }
 

@@ -102,8 +102,21 @@ describe('career player airframes', () => {
     assert.equal(s100?.simbriefIcao, 'B461');
     assert.equal(s200?.simbriefIcao, 'B462');
     assert.equal(s300?.simbriefIcao, 'B463');
-    assert.equal(s100?.loadLayout, 'pax_and_cargo');
-    assert.equal(s100?.injectCapable, false);
+    assert.equal(
+      s100?.simbriefAirframeMatch,
+      'Just Flight \\(MSFS\\) - BAe 146-100',
+    );
+    assert.equal(
+      s200?.simbriefAirframeMatch,
+      'Just Flight \\(MSFS\\) - BAe 146-200',
+    );
+    assert.equal(
+      s300?.simbriefAirframeMatch,
+      'Just Flight \\(MSFS\\) - BAe 146-300',
+    );
+    assert.equal(s100?.maxPaxSeats, 80);
+    assert.equal(s200?.maxPaxSeats, 112);
+    assert.equal(s300?.maxPaxSeats, 128);
     assert.deepEqual(
       [...careerPlayerAirframePackPaths(s100!)].sort(),
       [

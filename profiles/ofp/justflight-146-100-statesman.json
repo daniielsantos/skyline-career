@@ -12,7 +12,8 @@
     "Just Flight BAe 146-100 Statesman VIP — 17 stations",
     "Market SKU: justflight-146-100 (family pack)",
     "Homologated: justflight/just-flight-146-100-raf-ze701-statesman-new@1.0.0",
-    "loadMethod: native-simbrief; injectCapable: false"
+    "loadMethod: native-simbrief; injectCapable: false",
+    "SimBrief airframe: Just Flight (MSFS) - BAe 146-100 CC2"
   ],
   "fuel": {
     "unit": "lb"
@@ -60,7 +61,7 @@
     ]
   },
   "simbriefIcao": "B461",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-100 CC2",
   "stationMap": [
     {
       "simVarIndex": 1,

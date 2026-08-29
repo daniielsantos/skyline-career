@@ -13,7 +13,8 @@
     "Market SKU: justflight-146-200 (narrow_freighter, pax_and_cargo)",
     "Homologated: justflight/just-flight-146-200-air-cal@1.0.0",
     "Family: QC/QT freighter uses justflight-146-200-freighter.json (16 stations)",
-    "loadMethod: native-simbrief; injectCapable: false"
+    "loadMethod: native-simbrief; injectCapable: false",
+    "SimBrief airframe: Just Flight (MSFS) - BAe 146-200"
   ],
   "fuel": {
     "unit": "lb"
@@ -62,7 +63,7 @@
     ]
   },
   "simbriefIcao": "B462",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-200",
   "stationMap": [
     {
       "simVarIndex": 1,

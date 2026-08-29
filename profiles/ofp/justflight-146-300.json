@@ -13,7 +13,8 @@
     "Market SKU: justflight-146-300 (narrow_freighter, pax_and_cargo)",
     "Homologated: justflight/just-flight-146-300-aer-lingus@1.0.0",
     "Family: 300QT freighter uses justflight-146-300-freighter.json (17 stations)",
-    "loadMethod: native-simbrief; injectCapable: false"
+    "loadMethod: native-simbrief; injectCapable: false",
+    "SimBrief airframe: Just Flight (MSFS) - BAe 146-300"
   ],
   "fuel": {
     "unit": "lb"
@@ -62,7 +63,7 @@
     ]
   },
   "simbriefIcao": "B463",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-300",
   "stationMap": [
     {
       "simVarIndex": 1,

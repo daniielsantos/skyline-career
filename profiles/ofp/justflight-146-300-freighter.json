@@ -12,7 +12,8 @@
     "Just Flight BAe 146-300QT freighter — 17 stations",
     "Market SKU: justflight-146-300 (family pack)",
     "Homologated: justflight/just-flight-146-300qt-asl-airlines@1.0.0",
-    "loadMethod: native-simbrief; injectCapable: false"
+    "loadMethod: native-simbrief; injectCapable: false",
+    "SimBrief airframe: Just Flight (MSFS) - BAe 146-300 QT"
   ],
   "fuel": {
     "unit": "lb"
@@ -60,7 +61,7 @@
     ]
   },
   "simbriefIcao": "B463",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-300 QT",
   "stationMap": [
     {
       "simVarIndex": 1,

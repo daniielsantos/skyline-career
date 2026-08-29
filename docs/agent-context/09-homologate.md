@@ -48,9 +48,9 @@ Não criar um `typeId` de catálogo por Highline/Passenger/Stol. Um SKU + um (ou
 | `inibuilds-a330-200` | `wide_freighter` | `profiles/ofp/inibuilds-a330-200.json` (GE/RR/VIP) | **A332** Default |
 | `inibuilds-a330-300` | `wide_freighter` | `profiles/ofp/inibuilds-a330-300.json` (GE/RR/VIP/P2F) | **A333** Default |
 | `asobo-737-max-8-passengers` | `narrow_freighter` | `profiles/ofp/asobo-737-max-8-passengers.json` | **B38M** Default |
-| `justflight-146-100` | `narrow_freighter` | `justflight-146-100` + Statesman family | **B461** Default |
-| `justflight-146-200` | `narrow_freighter` | `justflight-146-200` + QC/QT freighter family | **B462** Default |
-| `justflight-146-300` | `narrow_freighter` | `justflight-146-300` + QT freighter family | **B463** Default |
+| `justflight-146-100` | `narrow_freighter` | `justflight-146-100` + Statesman family | **B461** JF MSFS (Statesman → CC2) |
+| `justflight-146-200` | `narrow_freighter` | `justflight-146-200` + QC/QT freighter family | **B462** JF MSFS (QT → QC/QT) |
+| `justflight-146-300` | `narrow_freighter` | `justflight-146-300` + QT freighter family | **B463** JF MSFS (QT → QT) |
 
 Vidros: `profiles/examples/microsoft-atr-*-highline-*.json` etc. + `matchTitles` no pack. Alias de typeId legado → família em `LEGACY_AIRFRAME_ALIASES`.
 

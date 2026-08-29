@@ -1069,17 +1069,18 @@
       "profiles/ofp/justflight-146-100-statesman.json"
     ],
     "simbriefIcao": "B461",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-100",
     "injectCapable": false,
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 82,
-    "oewKg": 23300,
-    "mtowKg": 38100,
-    "maxCargoKg": 8500,
+    "maxPaxSeats": 80,
+    "oewKg": 24108,
+    "mtowKg": 38102,
+    "maxCargoKg": 6963,
     "fuelCapacityKg": 10360,
     "maxRangeNm": 1600,
     "cruiseSpeedKt": 390,
-    "fuelBurnKgPerNm": 3.6
+    "fuelBurnKgPerNm": 3.6,
+    "mzfwKg": 31071
   },
   {
     "typeId": "justflight-146-200",
@@ -1091,17 +1092,18 @@
       "profiles/ofp/justflight-146-200-freighter.json"
     ],
     "simbriefIcao": "B462",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-200",
     "injectCapable": false,
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 100,
-    "oewKg": 23890,
-    "mtowKg": 42180,
-    "maxCargoKg": 9500,
+    "maxPaxSeats": 112,
+    "oewKg": 24966,
+    "mtowKg": 42184,
+    "maxCargoKg": 9779,
     "fuelCapacityKg": 10360,
     "maxRangeNm": 1600,
     "cruiseSpeedKt": 390,
-    "fuelBurnKgPerNm": 3.7
+    "fuelBurnKgPerNm": 3.7,
+    "mzfwKg": 34745
   },
   {
     "typeId": "justflight-146-300",
@@ -1113,17 +1115,18 @@
       "profiles/ofp/justflight-146-300-freighter.json"
     ],
     "simbriefIcao": "B463",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-300",
     "injectCapable": false,
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 112,
-    "oewKg": 24800,
-    "mtowKg": 44225,
-    "maxCargoKg": 10500,
+    "maxPaxSeats": 128,
+    "oewKg": 26009,
+    "mtowKg": 45132,
+    "maxCargoKg": 10505,
     "fuelCapacityKg": 10360,
     "maxRangeNm": 1600,
     "cruiseSpeedKt": 390,
-    "fuelBurnKgPerNm": 3.8
+    "fuelBurnKgPerNm": 3.8,
+    "mzfwKg": 36514
   },
   {
     "typeId": "leonardo-fly-the-maddog-x-md-82-20th",

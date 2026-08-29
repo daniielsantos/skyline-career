@@ -2986,7 +2986,18 @@ export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
     if (pax === 1) {
       const paxLike = payload - baggage;
       const oneStandardPax = paxLike >= 100 && paxLike <= 260;
-      value = oneStandardPax ? baggage : Math.max(baggage, payload);
+      if (oneStandardPax) {
+        // Dispatch freighters open SimBrief with pax=1 (EFB needs a pilot).
+        // Duke-style: Freight line is real cargo + one std pax in Payload
+        // (734 bag / 909 payload). Token bag (≤ default bagwgt): SimBrief parked
+        // the booked load in the pax line (BE36: 175 pax + 26 bag = 201 payload)
+        // — counting only baggage false-fails Intent and offers Accept OFP cargo.
+        const tokenBag =
+          baggage <= SIMBRIEF_STANDARD_BAG_PER_PAX_LB + 15;
+        value = tokenBag ? payload : baggage;
+      } else {
+        value = Math.max(baggage, payload);
+      }
     } else {
       // pax=0 freighter, or pax_and_cargo: career cargo is the larger line.
       value = Math.max(baggage, payload);

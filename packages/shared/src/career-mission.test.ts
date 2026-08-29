@@ -1563,6 +1563,40 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(isOfpCargoUnderOnlyFailure(check), true);
   });
 
+  it('uses payload when pax=1 and baggage is only a token SimBrief bag (BE36)', () => {
+    // Dispatch forces pax=1; BE36 OFP shows 175 pax + 26 bag = 201 payload while
+    // mission freight is the full payload — must not offer Accept OFP cargo @ 26 lb.
+    const ofp = matchingOfp({
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 249,
+        passengerCount: 1,
+        baggage: 26,
+        payload: 201,
+      },
+    });
+    assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 201);
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        cargoKg: Math.round(201 / KG_TO_LB),
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blacksquare-bonanza-professional',
+      }),
+      matchingOfp({
+        icao: 'BE36',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 249,
+          passengerCount: 1,
+          baggage: 26,
+          payload: 201,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
+  });
+
   it('pax=0 freighter prefers Payload over Freight even when the gap looks like one pax', () => {
     // Baron 58TC: Freight soft-cap 1264 vs Payload 1500 (Δ236) must not pick Freight.
     const ofp = matchingOfp({

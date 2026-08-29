@@ -16,19 +16,19 @@ Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./1
 
 ## Leitura de payload (Sim) — como funciona
 
-**Não existe um SimVar único confiável de “payload total”** no fluxo clássico. O Watch lê num batch:
+**Não existe um SimVar único confiável de “payload total”** no fluxo clássico. O Watch lê:
 
-- `PAYLOAD STATION WEIGHT:1` … `:16`
-- `PAYLOAD STATION COUNT` — limita a soma a 1..COUNT (batch cap 16)
+- Batch 1 (≤32 Host): fuel/empty/gross + `PAYLOAD STATION COUNT` + `PAYLOAD STATION WEIGHT:1` … `:16`
+- **Overflow batch** quando COUNT ou `keepStationIndexes` &gt; 16: `WEIGHT:17`…`N` (EMB-110 pax = 20)
 - `EMPTY WEIGHT`, `TOTAL WEIGHT`, fuel (tanques + `FUEL TOTAL QUANTITY WEIGHT`)
 
-Implementação: `sampleLiveLoadLb()` em `watch-helpers.ts` → policy em `resolveLivePayloadLb()` (`career-live-load.ts`).
+Implementação: `sampleLiveLoadLb()` em `watch-helpers.ts` → `mergeOverflowPayloadStations` / `resolveClassicPayloadStationNeedMax` em `career-live-load.ts`.
 
 ### Camadas (ordem conceitual)
 
 | Camada | O que é | Quando manda |
 |--------|---------|--------------|
-| **Soma bruta 1–16** | Σ todas as estações lidas | Base; UI schematic por station |
+| **Soma bruta stations** | Σ estações lidas (1–N, overflow se N&gt;16) | Base; UI schematic por station |
 | **`resolveLivePayloadLb`** | Escolhe **stations** vs **mass-balance** | Stations ~zero mas avião pesado → MB; stations infladas vs gross → MB; senão stations |
 | **Mass-balance** | `TOTAL WEIGHT − EMPTY WEIGHT − fuel` | Accu-Sim / tablet que não atualiza `PAYLOAD STATION WEIGHT`; PMDG ghost stations |
 | **Vendor** | TFDi EFB Lvars, A2A Accu-Sim Lvars | Perfil/pack pede `preferTfdiEfb` / `preferA2aLvars` |
@@ -45,6 +45,7 @@ Para **Preflight Loaded vs Due**:
 - **BN2 passenger tip-tanks fuel:** perfil tinha só LEFT/RIGHT_AUX — inject não enchia mains (Sim ~573 vs Due ~701). Alinhado ao cargo: mains 65+65 + tips 27.5+27.5.
 - **Engines running:** Preflight/`readLiveLoad` + inject `beforeLive` usam a mesma inferência N1/RPM/combustion/flow que Watch e o probe SimBridge (`inferEnginesRunning` / `ENGINE_RUNNING_PROBE_SIMVARS`). Host `ENG COMBUSTION:1` sozinho **não** manda — sem evidência positiva de spool/flow → `false`. Tile Aircraft no Dispatch: só Watch → probe (nunca o bit sticky guardado em `lastPreflightCheck`). Watch **não** usa `ENG FUEL FLOW GPH`/`GENERAL ENG FUEL FLOW` no gate de motores (BN2 gruda GPH após inject/cutoff); parked + parking brake + N1/RPM mortos → off (ignora spike de flow pós-inject). Cruise burn continua a ler GPH.
 - **Schematic sticky após zerar:** se Sim payload ≈ 0 e o sample de stations falha/omite, zerar as keys do último mapa (`schematicStationsForLivePayload`) — senão S1–S8 ficam no snapshot do inject com “Sim 0 lb”.
+- **Stations &gt;16 (EMB-110 pax):** primeiro batch Host para em 16; overflow lê 17…COUNT/`keepStationIndexes`. Sem overflow, Due planeja S17–S20 e Preflight mostra Sim curto (~4×200 lb).
 - **Freighter Sim:** bags (+ pax-as-cargo) + **excesso** em crew stations acima de 170 lb (lastro de CG no nariz). Não conta o floor 170 — senão Sim = bags+crew vs Due = bags (Bonanza: S1/S2 @ 295 → Due 1052 / Sim bags-only 802).
 - **Bonanza A36/A36TC tip-up:** sem bagageiro no nariz; simvar aft 32% ainda empina. Perfil pina CG `calibrated-live` maxMac **28** + S1/S2 maxLoad **750** para o inject empurrar lastro para a frente (não subir cap de S3–S7).
 - **Family packs + `liveTitle`:** Watch e inject devem passar o título MSFS em `resolveMissionRolesPack`. Sem isso o Due pode vir do pack Passengers (S3–S15) enquanto o Sim soma só o pack Cargo default (S3–S4 ≈ 300 lb no 404 Titan).
@@ -96,6 +97,7 @@ Legenda **tier**:
 | P0 | `sws-kodiak-100-commuter-cargopod-tundra-wheels` | 11 variant packs, combi/cargo | `sws-kodiak-100-cargo.json` | family under SKU |
 | P0 | `microsoft-atr-72-600` | 11 stations, Highline merge, crew S1–S2 | `microsoft-atr-72-600-highline-03.json` | `microsoft-atr-72-600.json` |
 | P0 | `nextgensim-emb-110p1f-bandeirante` | TP freighter recente, family E110 | `nextgensim-emb-110p1f-bandeirante.json` | idem |
+| P1 | `nextgensim-emb-110p2-bandeirante` | Pax **20 stations** — Watch overflow S17–S20 | `nextgensim-emb-110p2-bandeirante.json` | idem |
 | P1 | `microsoft-dhc-6-300-twin-otter-wheels` | Wing outers = LEFT/RIGHT MAIN (37 gal); not AUX | `microsoft-dhc-6-300-twin-otter-wheels.json` | idem |
 | P1 | `microsoft-c408-skycourier-cargo` | Empty only; **S3 cargo** (S4/S5 dead); pre-fill writability probe (no clamp) | C408 profile | `microsoft-c408-skycourier-cargo.json` |
 | P1 | `microsoft-atr-42-600` | Stol vs Highline fingerprint | `microsoft-atr-42-600-stol.json` | `microsoft-atr-42-600.json` |

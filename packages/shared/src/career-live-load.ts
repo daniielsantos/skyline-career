@@ -35,6 +35,28 @@ export type PayloadStationBatchSample = {
 };
 
 /**
+ * How many classic stations Watch should attempt to read (may exceed the first
+ * Host batch of {@link CLASSIC_PAYLOAD_STATION_BATCH_MAX}).
+ * Prefer SDK COUNT and profile keep-indexes (EMB-110 pax = 20).
+ */
+export function resolveClassicPayloadStationNeedMax(opts: {
+  payloadStationCount?: number | null;
+  keepStationIndexes?: readonly number[];
+  batchMax?: number;
+}): number {
+  const batchMax = opts.batchMax ?? CLASSIC_PAYLOAD_STATION_BATCH_MAX;
+  let need = batchMax;
+  const count = parsePayloadStationCount(opts.payloadStationCount ?? undefined);
+  if (count !== undefined && count > need) need = count;
+  for (const raw of opts.keepStationIndexes ?? []) {
+    if (!Number.isFinite(raw)) continue;
+    const idx = Math.floor(raw);
+    if (idx > need) need = idx;
+  }
+  return need;
+}
+
+/**
  * Parse classic station weights from a fixed Host batch (stations 1..batchMax).
  * When COUNT is known, only sums 1..min(COUNT, batchMax).
  */
@@ -66,6 +88,48 @@ export function samplePayloadStationsFromValues(
     stationsRead,
     stationLoopMax,
     ...(sdkCount !== undefined ? { payloadStationCount: sdkCount } : {}),
+  };
+}
+
+/**
+ * Merge PAYLOAD STATION WEIGHT:overflowStart..through from a second Host batch
+ * onto a first-batch sample (Watch overflow for EMB-110 pax S17–S20).
+ */
+export function mergeOverflowPayloadStations(
+  base: PayloadStationBatchSample,
+  opts: {
+    overflowStartIndex: number;
+    throughIndex: number;
+    values: readonly unknown[];
+  },
+): PayloadStationBatchSample {
+  const start = Math.max(1, Math.floor(opts.overflowStartIndex));
+  const through = Math.floor(opts.throughIndex);
+  if (through < start) {
+    return { ...base, stations: { ...base.stations } };
+  }
+  const stations = { ...base.stations };
+  let stationSum = base.stationSum;
+  let stationsRead = base.stationsRead;
+  for (let index = start; index <= through; index += 1) {
+    const w = finitePayloadLb(opts.values[index - start]);
+    if (w !== undefined && w >= 0) {
+      // Avoid double-count if caller retries an overlapping range.
+      if (stations[index] !== undefined) {
+        stationSum -= stations[index]!;
+        stationsRead -= 1;
+      }
+      stations[index] = w;
+      stationSum += w;
+      stationsRead += 1;
+    }
+  }
+  return {
+    ...base,
+    stations,
+    stationSum,
+    stationsRead,
+    stationLoopMax: Math.max(base.stationLoopMax, through),
   };
 }
 

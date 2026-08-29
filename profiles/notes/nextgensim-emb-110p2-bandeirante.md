@@ -18,8 +18,9 @@
 
 - Fuel via FUELSYSTEM where capacity >= 5 (no classic writetest hits).
 - AUX deferred for v1.
-- Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20.
+- Payload stations from writetest: 1–20.
 - Station maxLoad: 750 lb per station (SimBrief/in-sim headroom; cfg has no per-station cap).
+- Watch must read S17–S20 via overflow batch (classic first batch stops at 16) — otherwise Sim under-reads ~800 lb vs Due.
 - Homologated with interactive wizard.
 
 ## Homologated

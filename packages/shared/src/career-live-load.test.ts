@@ -13,6 +13,8 @@ import {
   resolveLivePayloadLb,
   parsePayloadStationCount,
   samplePayloadStationsFromValues,
+  mergeOverflowPayloadStations,
+  resolveClassicPayloadStationNeedMax,
   isClassicStationBatchIncomplete,
   schematicStationsForLivePayload,
   stationSampleIncomplete,
@@ -741,5 +743,51 @@ describe('payload station count batch', () => {
       }),
       true,
     );
+  });
+});
+
+describe('classic station overflow (EMB-110 pax)', () => {
+  it('resolveClassicPayloadStationNeedMax prefers COUNT and keep indexes', () => {
+    assert.equal(resolveClassicPayloadStationNeedMax({}), 16);
+    assert.equal(
+      resolveClassicPayloadStationNeedMax({ payloadStationCount: 20 }),
+      20,
+    );
+    assert.equal(
+      resolveClassicPayloadStationNeedMax({
+        payloadStationCount: 11,
+        keepStationIndexes: [1, 2, 18, 20],
+      }),
+      20,
+    );
+    assert.equal(
+      resolveClassicPayloadStationNeedMax({
+        keepStationIndexes: [3, 17],
+      }),
+      17,
+    );
+  });
+
+  it('mergeOverflowPayloadStations adds S17–S20 onto a 1–16 sample', () => {
+    const firstValues = Array.from({ length: 16 }, (_, i) =>
+      i < 2 ? 170 : 200,
+    );
+    const base = samplePayloadStationsFromValues(firstValues, {
+      stationValuesStart: 0,
+      payloadStationCountRaw: 20,
+    });
+    assert.equal(base.stationLoopMax, 16);
+    assert.equal(base.stations[17], undefined);
+    const merged = mergeOverflowPayloadStations(base, {
+      overflowStartIndex: 17,
+      throughIndex: 20,
+      values: [200, 200, 200, 200],
+    });
+    assert.equal(merged.stationLoopMax, 20);
+    assert.equal(merged.stationsRead, 20);
+    assert.equal(merged.stations[17], 200);
+    assert.equal(merged.stations[20], 200);
+    // 2×170 + 14×200 + 4×200 = 340 + 2800 + 800 = 3940
+    assert.equal(merged.stationSum, 3940);
   });
 });

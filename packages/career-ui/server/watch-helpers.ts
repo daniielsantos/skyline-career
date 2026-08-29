@@ -46,6 +46,9 @@ import {
   pushWeatherOpsTick,
   resolveLivePayloadLb,
   samplePayloadStationsFromValues,
+  mergeOverflowPayloadStations,
+  resolveClassicPayloadStationNeedMax,
+  CLASSIC_PAYLOAD_STATION_BATCH_MAX,
   isClassicStationBatchIncomplete,
   paxAndCargoLiveStationSumLb,
   pickPaxAndCargoDisplayedLiveLb,
@@ -646,7 +649,8 @@ async function sampleLiveWeatherAmbient(bridge: NamedPipeSimBridge): Promise<{
   };
 }
 
-/** Density, tanks, totals, empty/gross, stations 1–16 — one Host batch (≤32). */
+/** Density, tanks, totals, empty/gross, stations 1–16 — one Host batch (≤32).
+ * Stations 17+ use a second overflow batch in {@link sampleLiveLoadLb}. */
 const LOAD_SAMPLE_VARS = [
   { name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' },
   { name: 'FUEL TOTAL CAPACITY', unit: 'gallons' },
@@ -874,14 +878,53 @@ export async function sampleLiveLoadLb(
   }
 
   const payloadStationCountRaw = finiteNum(v[LOAD_SAMPLE_IDX.payloadStationCount]);
-  const stationBatch = samplePayloadStationsFromValues(v, {
+  let stationBatch = samplePayloadStationsFromValues(v, {
     stationValuesStart: LOAD_SAMPLE_IDX.payloadStation1,
     payloadStationCountRaw,
   });
+  const payloadStationCount = stationBatch.payloadStationCount ?? null;
+  let overflowSessionDied = false;
+  const needMax = resolveClassicPayloadStationNeedMax({
+    payloadStationCount,
+    keepStationIndexes: opts.keepStationIndexes,
+  });
+  // First batch stops at 16 (Host ≤32 with fuel/empty/gross). EMB-110 pax etc.
+  // need S17+ in a follow-up request.
+  if (needMax > CLASSIC_PAYLOAD_STATION_BATCH_MAX && !aborted()) {
+    const overflowStart = CLASSIC_PAYLOAD_STATION_BATCH_MAX + 1;
+    const HOST_BATCH_MAX = 32;
+    for (
+      let from = overflowStart;
+      from <= needMax && !aborted() && !overflowSessionDied;
+      from += HOST_BATCH_MAX
+    ) {
+      const through = Math.min(needMax, from + HOST_BATCH_MAX - 1);
+      const overflowVars: Array<{ name: string; unit: string }> = [];
+      for (let index = from; index <= through; index += 1) {
+        overflowVars.push({
+          name: `PAYLOAD STATION WEIGHT:${index}`,
+          unit: 'pounds',
+        });
+      }
+      try {
+        const overflowValues = await bridge.readSimVars(overflowVars);
+        stationBatch = mergeOverflowPayloadStations(stationBatch, {
+          overflowStartIndex: from,
+          throughIndex: through,
+          values: overflowValues,
+        });
+      } catch (err) {
+        if (simIpcSessionDied(err)) {
+          overflowSessionDied = true;
+          break;
+        }
+        throw err;
+      }
+    }
+  }
   const stations = stationBatch.stations;
   const stationSum = stationBatch.stationSum;
   const stationsRead = stationBatch.stationsRead;
-  const payloadStationCount = stationBatch.payloadStationCount ?? null;
 
   let fuelTankCapacity: FuelTankBreakdown | undefined;
   let capacitySessionDied = false;
@@ -898,13 +941,15 @@ export async function sampleLiveLoadLb(
       }
     }
   }
-  const stationsIncomplete = isClassicStationBatchIncomplete({
-    aborted: aborted(),
-    payloadStationCount: stationBatch.payloadStationCount,
-    stationLoopMax: stationBatch.stationLoopMax,
-    stationsRead,
-    previousStationSumLb,
-  });
+  const stationsIncomplete =
+    overflowSessionDied ||
+    isClassicStationBatchIncomplete({
+      aborted: aborted(),
+      payloadStationCount: stationBatch.payloadStationCount,
+      stationLoopMax: stationBatch.stationLoopMax,
+      stationsRead,
+      previousStationSumLb,
+    });
   const mbCollapsed =
     typeof massBalanceLb === 'number' &&
     (stationsIncomplete
@@ -1065,7 +1110,9 @@ export async function sampleLiveLoadLb(
     ...(stationsIncomplete && !vendorLivePayload
       ? { stationsIncomplete: true }
       : {}),
-    ...(capacitySessionDied ? { sessionDied: true } : {}),
+    ...(capacitySessionDied || overflowSessionDied
+      ? { sessionDied: true }
+      : {}),
   };
 }
 

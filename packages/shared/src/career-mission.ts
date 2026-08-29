@@ -2875,6 +2875,13 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
    * Dispatch still uses SimBrief B77F + PMDG 766,800 MTOW; only OFP ICAO alias.
    */
   B77F: ['B77F', 'B77L'],
+  /**
+   * C400 Corvalis: no COL4 in SimBrief — catalog dispatches as SR2T (Cirrus
+   * SR22T proxy). OFP icaocode may print S22T (official) or SR22T (UI type).
+   */
+  SR2T: ['SR2T', 'S22T', 'SR22T'],
+  S22T: ['S22T', 'SR2T', 'SR22T'],
+  SR22T: ['SR22T', 'SR2T', 'S22T'],
 };
 
 function normalizeIcao(code: string | undefined): string | undefined {

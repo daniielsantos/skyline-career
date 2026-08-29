@@ -134,7 +134,9 @@ export function formatWeightText(
         ? `${Math.round(kg * KG_TO_LB).toLocaleString('en-US')} lb`
         : _match;
     })
-    .replace(/(\d+(?:\.\d+)?)\s*t\b/gi, (_match, raw: string) => {
+    // Require whitespace before `t` so ICAO codes like SR2T / S22T are not
+    // read as “2 tonnes” / “22 tonnes”.
+    .replace(/(\d+(?:\.\d+)?)\s+t\b/gi, (_match, raw: string) => {
       const tonnes = Number(raw);
       return Number.isFinite(tonnes)
         ? `${(tonnes * KG_TO_LB).toFixed(1)} klb`

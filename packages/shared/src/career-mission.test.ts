@@ -1409,6 +1409,34 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
   });
 
+  it('accepts SimBrief S22T/SR22T OFP ICAO for Corvalis SR2T proxy', () => {
+    for (const icao of ['S22T', 'SR22T', 'SR2T'] as const) {
+      const check = compareMissionIntentToOfp(
+        baseMission({
+          aircraftClassId: 'light_ga',
+          airframeTypeId: 'microsoft-c400-corvalis',
+          cargoKg: 200,
+          rolesPackRelPath: 'profiles/ofp/microsoft-c400-corvalis.json',
+        }),
+        matchingOfp({
+          icao,
+          loadSheet: {
+            unit: 'lb',
+            blockFuel: 307,
+            passengerCount: 1,
+            baggage: 400,
+            payload: 575,
+          },
+        }),
+      );
+      assert.equal(
+        check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'),
+        false,
+        `expected ${icao} to match Corvalis SR2T proxy`,
+      );
+    }
+  });
+
   it('accepts PMDG 777F SimBrief OFP ICAO B77L (MSFS atc_model quirk)', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

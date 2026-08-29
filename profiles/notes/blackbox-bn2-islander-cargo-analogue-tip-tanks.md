@@ -21,7 +21,7 @@
 - Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).
 - AUX/Aft tanks included.
 - Payload stations from writetest: 1, 2, 3, 4.
-- Station maxLoad: placeholder until flight_model.cfg calibrate.
+- Station maxLoad: S1/S2 **750** (nose CG ballast), S3 **1500** (mid cargo — 1200 capped Due ~1.6 klb), S4 **500** (aft bay — keep tight; arm aft).
 - Homologated with interactive wizard.
 
 ## Homologated

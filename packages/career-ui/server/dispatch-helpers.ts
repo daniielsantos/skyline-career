@@ -483,17 +483,17 @@ export async function buildMissionDispatch(
   // airframe_passengers for pax_and_cargo.
   const careerAirframe = findCareerPlayerAirframe(mission.airframeTypeId);
   const icao = params.simbriefIcao.trim().toUpperCase();
-  // F28 has no SimBrief Default type (only JF Mk.xxxx internal IDs). ICAO
-  // type=F28 leaves Aircraft Type = None on Dispatch.
-  const needsSimBriefAirframeRow =
+  // F28 / BN2P: no Default type row - resolve curated internal id (type=ICAO is empty in UI).
+  const needsSimBriefAirframeLookup =
     isPaxAndCargoLoadLayout(careerAirframe) ||
     !isDefaultSimBriefMatch(params.simbriefAirframeMatch) ||
-    icao === 'F28';
+    icao === 'F28' ||
+    icao === 'BN2P';
 
   let type: string;
   let airframeLabel: string;
   let simBriefPassengers = 0;
-  if (!needsSimBriefAirframeRow) {
+  if (!needsSimBriefAirframeLookup) {
     type = icao;
     airframeLabel = params.titleHint || type;
   } else {

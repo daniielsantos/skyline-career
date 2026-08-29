@@ -28,7 +28,8 @@ describe('resolveClassMaxCargoKg', () => {
                     airframe_internal_id: 'bn2p_default',
                     airframe_list_type: 'BN2P',
                     airframe_icao: 'BN2P',
-                    airframe_comments: 'Default',
+                    airframe_comments:
+                      'Black Box Simulation (MSFS) - BN-2 Islander',
                     airframe_name: 'BN-2 Islander',
                     airframe_passengers: 9,
                     airframe_options: {
@@ -537,5 +538,53 @@ describe('buildMissionDispatch F28', () => {
     assert.equal(built.type, '624280_mk4000');
     assert.match(built.url, /[?&]type=624280_mk4000(?:&|$)/);
     assert.doesNotMatch(built.url, /[?&]type=F28(?:&|$)/);
+  });
+});
+
+describe('buildMissionDispatch BN2P', () => {
+  it('uses Black Box MSFS internal id, not type=BN2P', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_bn2',
+        status: 'dispatched',
+        originIcao: 'TJPS',
+        destIcao: 'TIST',
+        commodityId: 'general',
+        cargoKg: 400,
+        payUsd: 1,
+        urgency: 'normal',
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blackbox-bn2-islander-cargo-tip-tanks',
+        deadlineTick: 100,
+        reason: 'test',
+        pax: 0,
+      },
+      {
+        units: 'LBS',
+        liveTitle: 'BN2 Islander - Cargo / Analogue / Tip Tanks',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              BN2P: {
+                airframes: [
+                  {
+                    airframe_internal_id: '3_1744422973544',
+                    airframe_list_type: 'BN2P',
+                    airframe_icao: 'BN2P',
+                    airframe_comments:
+                      'Black Box Simulation (MSFS) - BN-2 Islander',
+                    airframe_name: 'BN-2 Islander',
+                    airframe_passengers: 9,
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(built.type, '3_1744422973544');
+    assert.match(built.url, /[?&]type=3_1744422973544(?:&|$)/);
+    assert.doesNotMatch(built.url, /[?&]type=BN2P(?:&|$)/);
   });
 });

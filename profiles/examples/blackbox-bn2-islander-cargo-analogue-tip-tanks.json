@@ -132,19 +132,19 @@
       {
         "index": 1,
         "name": "PILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 5.794683
       },
       {
         "index": 2,
         "name": "COPILOT",
-        "maxLoad": 500,
+        "maxLoad": 750,
         "arm": 5.79
       },
       {
         "index": 3,
         "name": "CARGO MID",
-        "maxLoad": 1200,
+        "maxLoad": 1500,
         "arm": 0.382792
       },
       {
@@ -238,7 +238,7 @@
     "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX).",
     "AUX/Aft tanks included.",
     "Payload stations from writetest: 1, 2, 3, 4.",
-    "Station maxLoad: placeholder until flight_model.cfg calibrate.",
+    "Station maxLoad: S3 CARGO MID 1500 (was soft-capping Due ~1630); S1/S2 750 for CG nose ballast near aft MAC.",
     "Homologated with interactive wizard.",
     "See profiles/notes/blackbox-bn2-islander-cargo-analogue-tip-tanks.md"
   ]

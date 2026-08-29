@@ -29,6 +29,24 @@
     "unit": "gallons",
     "tanks": [
       {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 65,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 65,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
         "id": "LEFT_AUX",
         "name": "Left Aux",
         "capacity": 27.5,
@@ -50,6 +68,18 @@
     "writePlan": [
       {
         "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 3.5"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 3.5"
+      },
+      {
+        "op": "simvar_set",
         "var": "FUEL TANK LEFT AUX QUANTITY",
         "unit": "gallons",
         "valueExpr": "{LEFT_AUX} + 0.8"
@@ -69,6 +99,18 @@
       "timeoutMs": 8000,
       "pollIntervalMs": 250,
       "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        },
         {
           "var": "FUEL TANK LEFT AUX QUANTITY",
           "unit": "gallons",
@@ -277,8 +319,8 @@
   "notes": [
     "Homologated via wizard: BN2 Islander - Passenger / Analogue / Tip Tanks.",
     "ICAO type designator (catalog/SimBrief): BN2P.",
-    "Fuel via classic FUEL TANK * from writetest (LEFT_AUX, RIGHT_AUX).",
-    "AUX/Aft tanks included.",
+    "Fuel via classic FUEL TANK * (LEFT_MAIN, RIGHT_MAIN, LEFT_AUX, RIGHT_AUX) — same as cargo tip-tanks.",
+    "AUX/Aft tip tanks included; mains required for OFP block fuel (tips alone under-fill Due).",
     "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11.",
     "Station maxLoad: placeholder until flight_model.cfg calibrate.",
     "Homologated with interactive wizard.",

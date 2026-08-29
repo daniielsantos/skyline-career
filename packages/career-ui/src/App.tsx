@@ -5020,11 +5020,11 @@ export function App() {
     }
 
     void pollOfp();
-    // 3s while waiting — 10s felt like the app froze after generating in SimBrief.
+    // 5s while waiting — shorter than 10s so Generate→confirm feels responsive.
     // Also re-check the moment the user returns to Skyline from the browser.
     const id = window.setInterval(() => {
       void pollOfp();
-    }, 3_000);
+    }, 5_000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') void pollOfp();
     };

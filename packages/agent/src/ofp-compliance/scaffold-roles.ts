@@ -805,7 +805,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     loadMethod: 'direct-injection',
     injectCapable: true,
     simbriefIcao: 'BN2P',
-    simbriefAirframeMatch: 'Default',
+    simbriefAirframeMatch: 'Black Box Simulation \\(MSFS\\) - BN-2 Islander',
     stationMap: [
       { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
       { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
@@ -817,7 +817,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'One Market SKU — live MSFS title picks cargo vs specialops roles pack',
       'Cargo tip-tank: same 4-station layout for steam vs G3000 panel',
       'liveSources: classic fuel tanks + classic stations/weights',
-      'SimBrief: Default BN2P',
+      'SimBrief: Black Box Simulation (MSFS) - BN-2 Islander (no Default type=BN2P)',
     ],
   },
   {

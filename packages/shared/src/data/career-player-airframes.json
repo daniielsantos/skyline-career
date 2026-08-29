@@ -122,7 +122,7 @@
       "profiles/ofp/blackbox-bn2-islander-specialops-analogue.json"
     ],
     "simbriefIcao": "BN2P",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Black Box Simulation \\(MSFS\\) - BN-2 Islander",
     "oewKg": 1923,
     "mtowKg": 2994,
     "maxCargoKg": 991,

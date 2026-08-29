@@ -422,14 +422,14 @@ export function dispatchStepStatusLine(input: {
       if (mission?.lastOfpCheck?.verdict === 'fail') {
         return input.ofpAutoStatus === 'checking'
           ? 'Checking for an updated OFP…'
-          : 'OFP does not match yet — update SimBrief; auto-check every 10s.';
+          : 'OFP does not match yet — update SimBrief; auto-check every 5s.';
       }
       if (input.ofpAutoStatus === 'checking') {
         return 'Checking SimBrief for OFP…';
       }
       return mission?.status === 'accepted'
-        ? 'Open SimBrief to generate the OFP. Auto-confirm runs every 10s after dispatch.'
-        : 'Waiting for OFP — generate the plan in SimBrief; auto-check every 10s.';
+        ? 'Open SimBrief to generate the OFP. Auto-confirm runs every 5s after dispatch.'
+        : 'Waiting for OFP — generate the plan in SimBrief; auto-check every 5s.';
     case 'fuel':
       if (input.missionFuelQuoteStatus === 'error') {
         return (

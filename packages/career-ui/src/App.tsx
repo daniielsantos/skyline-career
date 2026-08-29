@@ -7792,21 +7792,10 @@ export function App() {
     const airborne = mission.status === 'in_flight';
     const ok = await confirm({
       title: airborne ? 'Abort this flight?' : 'Cancel this flight?',
-      body: (
-        <>
-          <p>
-            <code>{mission.id}</code> · releases {mission.lots?.length ?? 1} lot
-            reservation(s) back to the market when still active.
-          </p>
-          {airborne ? (
-            <p>
-              You are already airborne — aborting ends the contract with no
-              payout. Cargo returns to the market.
-            </p>
-          ) : (
-            <p>No payout.</p>
-          )}
-        </>
+      body: airborne ? (
+        <p>No payout — cargo returns to the market.</p>
+      ) : (
+        <p>No payout. Reserved cargo returns to the market.</p>
       ),
       confirmLabel: airborne ? 'Yes, abort flight' : 'Yes, cancel flight',
       cancelLabel: 'Keep flying',

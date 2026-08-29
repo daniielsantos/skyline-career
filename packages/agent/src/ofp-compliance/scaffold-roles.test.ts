@@ -219,7 +219,7 @@ describe('scaffold-roles Black Square Duke', () => {
     const piston = matchHeuristic('Black Square B60 Duke')!;
     assert.equal(piston.loadMethod, 'direct-injection');
     assert.equal(piston.injectCapable, true);
-    assert.equal(piston.marketLabel, 'Beechcraft Duke BE60');
+    assert.equal(piston.marketLabel, 'Duke B60 / Grand Duke');
     assert.equal(piston.familyPackRel, 'blacksquare-b60-duke.json');
     // Station 1 is forward baggage — crew is 2–3, not 1–2.
     assert.deepEqual(piston.stationRoles.crewStations, [2, 3]);

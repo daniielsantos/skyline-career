@@ -1387,6 +1387,28 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
   });
 
+  it('accepts Duke BE6G OFP ICAO when mission catalog is BE60 (Grand Duke glass)', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blacksquare-b60-duke',
+        cargoKg: 500,
+        rolesPackRelPath: 'profiles/ofp/blacksquare-b60-duke.json',
+      }),
+      matchingOfp({
+        icao: 'BE6G',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 800,
+          passengerCount: 1,
+          baggage: 900,
+          payload: 1075,
+        },
+      }),
+    );
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('accepts PMDG 777F SimBrief OFP ICAO B77L (MSFS atc_model quirk)', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

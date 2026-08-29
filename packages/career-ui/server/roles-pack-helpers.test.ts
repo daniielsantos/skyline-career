@@ -420,4 +420,14 @@ describe('resolveDispatchSimBriefParams', () => {
     });
     assert.equal(params.simbriefIcao, 'B36T');
   });
+
+  it('Duke piston SKU: Grand Duke live title opens SimBrief BE6G not BE60', async () => {
+    const params = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'light_ga',
+      airframeTypeId: 'blacksquare-b60-duke',
+      rolesPackRelPath: 'profiles/ofp/blacksquare-b60-duke.json',
+      liveTitle: 'Black Square Grand Duke N18VK',
+    });
+    assert.equal(params.simbriefIcao, 'BE6G');
+  });
 });

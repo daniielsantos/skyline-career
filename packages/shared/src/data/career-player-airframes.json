@@ -98,7 +98,7 @@
   {
     "typeId": "blacksquare-b60-duke",
     "aircraftClassId": "light_ga",
-    "label": "Beechcraft Duke BE60",
+    "label": "Duke B60 / Grand Duke",
     "rolesPackRelPath": "profiles/ofp/blacksquare-b60-duke.json",
     "simbriefIcao": "BE60",
     "simbriefAirframeMatch": "Default",

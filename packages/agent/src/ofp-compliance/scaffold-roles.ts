@@ -1295,7 +1295,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     titlePattern: /Black Square (B60|Grand) Duke/i,
     familyPackRel: 'blacksquare-b60-duke.json',
     marketTypeId: 'blacksquare-b60-duke',
-    marketLabel: 'Beechcraft Duke BE60',
+    marketLabel: 'Duke B60 / Grand Duke',
     stationRoles: {
       passengerStations: [],
       // 1 forward bag + cabin + rear bag — career cargo (pax=0). Crew is 2–3.
@@ -1323,7 +1323,7 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Turbine Duke is a separate light_turboprop Market SKU',
       'Fuel capacities differ per variant profile (classic LEFT/RIGHT MAIN)',
       'liveSources: classic fuel tanks + classic stations/weights',
-      'SimBrief: Default BE60',
+      'SimBrief: B60 → BE60, Grand Duke → BE6G (from live title)',
     ],
   },
   {

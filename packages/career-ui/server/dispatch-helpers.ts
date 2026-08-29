@@ -34,6 +34,7 @@ import {
   liveTitleMatchesMarketSku,
   preferSimBriefAirframeMatch,
   resolveBonanzaSimBriefIcao,
+  resolveDukeSimBriefIcao,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
   isDefaultSimBriefMatch,
@@ -172,9 +173,14 @@ export async function resolveDispatchSimBriefParams(opts: {
 
   return {
     // Catalog ICAO first so a stale class pack cannot force BE36 over AEST.
-    // Bonanza piston SKU: live A36/A36TC → BE36/BT36. B36TP is a separate SKU.
+    // Bonanza / Duke piston SKUs: live glass picks BE36/BT36 or BE60/BE6G.
     simbriefIcao:
       resolveBonanzaSimBriefIcao({
+        airframeTypeId: typeId || undefined,
+        liveTitle: live || undefined,
+        catalogIcao: airframe?.simbriefIcao,
+      }) ||
+      resolveDukeSimBriefIcao({
         airframeTypeId: typeId || undefined,
         liveTitle: live || undefined,
         catalogIcao: airframe?.simbriefIcao,

@@ -12,10 +12,10 @@
   "notes": [
     "Black Square Duke piston family (B60 / Grand)",
     "Same 8-station layout: 1 forward bag, 2–3 crew, 4–7 cabin as baggage, 8 rear bag",
+    "SimBrief ICAO: B60 → BE60, Grand Duke → BE6G (dispatch picks from live title)",
     "Turbine Duke is a separate light_turboprop Market SKU",
     "Fuel capacities differ per variant profile (classic LEFT/RIGHT MAIN)",
     "liveSources: classic fuel tanks + classic stations/weights",
-    "SimBrief: Default BE60",
     "Homologated profile: blacksquare/b60-duke@1.0.0",
     "Title: Black Square B60 Duke",
     "Homologated profile: blacksquare/grand-duke@1.0.0",

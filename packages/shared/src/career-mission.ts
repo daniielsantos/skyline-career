@@ -2861,6 +2861,12 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
    */
   BE36: ['BE36', 'BT36', 'AC11', 'C182', 'C172', 'C152'],
   BT36: ['BT36', 'BE36'],
+  /**
+   * Black Square piston Duke SKU: B60 (BE60) and Grand Duke (BE6G) share one
+   * Market typeId. Turbine Duke (B60T) is a separate SKU — do not alias here.
+   */
+  BE60: ['BE60', 'BE6G'],
+  BE6G: ['BE6G', 'BE60'],
   C152: ['C152', 'C172', 'C182', 'BE36', 'AC11'],
   C172: ['C172', 'C152', 'C182', 'BE36', 'AC11'],
   /**

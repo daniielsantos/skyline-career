@@ -8,6 +8,7 @@ import {
   matchSimBriefAirframe,
   preferSimBriefAirframeMatch,
   resolveBonanzaSimBriefIcao,
+  resolveDukeSimBriefIcao,
   resolveSimBriefDispatchType,
   resolveSimBriefMaxCargoKg,
   type SimBriefAirframe,
@@ -253,6 +254,46 @@ describe('resolveBonanzaSimBriefIcao', () => {
         catalogIcao: 'C208',
       }),
       undefined,
+    );
+  });
+});
+
+describe('resolveDukeSimBriefIcao', () => {
+  it('maps B60 / Grand Duke on the piston Market SKU; ignores Turbine live', () => {
+    assert.equal(
+      resolveDukeSimBriefIcao({
+        airframeTypeId: 'blacksquare-b60-duke',
+        liveTitle: 'Black Square B60 Duke N43DH',
+        catalogIcao: 'BE60',
+      }),
+      'BE60',
+    );
+    assert.equal(
+      resolveDukeSimBriefIcao({
+        airframeTypeId: 'blacksquare-b60-duke',
+        liveTitle: 'Black Square Grand Duke N18VK',
+        catalogIcao: 'BE60',
+      }),
+      'BE6G',
+    );
+    assert.equal(
+      resolveDukeSimBriefIcao({
+        airframeTypeId: 'blacksquare-b60-duke',
+        liveTitle: 'Black Square Turbine Duke N6060X',
+        catalogIcao: 'BE60',
+      }),
+      'BE60',
+    );
+  });
+
+  it('maps Turbine Duke Market SKU to B60T', () => {
+    assert.equal(
+      resolveDukeSimBriefIcao({
+        airframeTypeId: 'blacksquare-turbine-duke',
+        liveTitle: 'Black Square Turbine Duke N6060X',
+        catalogIcao: 'B60T',
+      }),
+      'B60T',
     );
   });
 });

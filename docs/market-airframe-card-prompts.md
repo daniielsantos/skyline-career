@@ -106,7 +106,7 @@ CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphal
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## Beechcraft Duke BE60
+## Duke B60 / Grand Duke
 - **typeId:** `blacksquare-b60-duke`
 - **file:** `duke-be60.png`
 

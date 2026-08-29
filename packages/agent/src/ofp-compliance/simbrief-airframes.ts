@@ -255,6 +255,40 @@ export function resolveBonanzaSimBriefIcao(opts: {
   return catalog || 'BE36';
 }
 
+/**
+ * Black Square piston Duke SimBrief ICAO from Market SKU + live glass.
+ * SKU `blacksquare-b60-duke`: B60→BE60, Grand Duke→BE6G.
+ * Live Turbine Duke on that SKU is ignored (separate Market SKU).
+ * SKU `blacksquare-turbine-duke`: always B60T.
+ */
+export function resolveDukeSimBriefIcao(opts: {
+  airframeTypeId?: string | null;
+  liveTitle?: string | null;
+  catalogIcao?: string | null;
+}): string | undefined {
+  const id = opts.airframeTypeId?.trim() ?? '';
+  const live = opts.liveTitle?.trim() ?? '';
+  const catalog = opts.catalogIcao?.trim().toUpperCase() || undefined;
+  const isPistonSku = id === 'blacksquare-b60-duke';
+  const isTurbineSku = id === 'blacksquare-turbine-duke';
+  if (!isPistonSku && !isTurbineSku) return undefined;
+
+  if (isTurbineSku) {
+    if (/Black Square Turbine Duke/i.test(live) || /\bTurbine Duke\b/i.test(live)) {
+      return 'B60T';
+    }
+    return catalog || 'B60T';
+  }
+
+  if (/Black Square Grand Duke/i.test(live) || /\bGrand Duke\b/i.test(live)) {
+    return 'BE6G';
+  }
+  if (/Black Square B60 Duke/i.test(live) || /\bB60 Duke\b/i.test(live)) {
+    return 'BE60';
+  }
+  return catalog || 'BE60';
+}
+
 export function liveTitleMatchesMarketSku(
   liveTitle: string,
   airframeTypeId: string,
@@ -267,6 +301,12 @@ export function liveTitleMatchesMarketSku(
   }
   if (id === 'blacksquare-b36tp-bonanza-professional') {
     return /Black Square B36TP Bonanza Professional/i.test(t);
+  }
+  if (id === 'blacksquare-b60-duke') {
+    return /Black Square (?:B60|Grand) Duke/i.test(t);
+  }
+  if (id === 'blacksquare-turbine-duke') {
+    return /Black Square Turbine Duke/i.test(t);
   }
   if (id === 'justflight-f100') return /\bJust Flight F100\b/i.test(t);
   if (id === 'justflight-f70') return /\bJust Flight F70\b/i.test(t);

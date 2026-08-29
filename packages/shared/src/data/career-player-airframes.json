@@ -1060,6 +1060,72 @@
     "fuelBurnKgPerNm": 4.2
   },
   {
+    "typeId": "justflight-146-100",
+    "aircraftClassId": "narrow_freighter",
+    "label": "BAe 146-100",
+    "rolesPackRelPath": "profiles/ofp/justflight-146-100.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/justflight-146-100.json",
+      "profiles/ofp/justflight-146-100-statesman.json"
+    ],
+    "simbriefIcao": "B461",
+    "simbriefAirframeMatch": "Default",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 82,
+    "oewKg": 23300,
+    "mtowKg": 38100,
+    "maxCargoKg": 8500,
+    "fuelCapacityKg": 10360,
+    "maxRangeNm": 1600,
+    "cruiseSpeedKt": 390,
+    "fuelBurnKgPerNm": 3.6
+  },
+  {
+    "typeId": "justflight-146-200",
+    "aircraftClassId": "narrow_freighter",
+    "label": "BAe 146-200",
+    "rolesPackRelPath": "profiles/ofp/justflight-146-200.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/justflight-146-200.json",
+      "profiles/ofp/justflight-146-200-freighter.json"
+    ],
+    "simbriefIcao": "B462",
+    "simbriefAirframeMatch": "Default",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 100,
+    "oewKg": 23890,
+    "mtowKg": 42180,
+    "maxCargoKg": 9500,
+    "fuelCapacityKg": 10360,
+    "maxRangeNm": 1600,
+    "cruiseSpeedKt": 390,
+    "fuelBurnKgPerNm": 3.7
+  },
+  {
+    "typeId": "justflight-146-300",
+    "aircraftClassId": "narrow_freighter",
+    "label": "BAe 146-300",
+    "rolesPackRelPath": "profiles/ofp/justflight-146-300.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/justflight-146-300.json",
+      "profiles/ofp/justflight-146-300-freighter.json"
+    ],
+    "simbriefIcao": "B463",
+    "simbriefAirframeMatch": "Default",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 112,
+    "oewKg": 24800,
+    "mtowKg": 44225,
+    "maxCargoKg": 10500,
+    "fuelCapacityKg": 10360,
+    "maxRangeNm": 1600,
+    "cruiseSpeedKt": 390,
+    "fuelBurnKgPerNm": 3.8
+  },
+  {
     "typeId": "leonardo-fly-the-maddog-x-md-82-20th",
     "aircraftClassId": "narrow_freighter",
     "label": "MD-82 20th Anniversary",

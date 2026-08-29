@@ -67,6 +67,15 @@ const ADDONS_BY_TYPE_ID: Record<string, AirframeAddon[]> = {
       product: 'ATR 72-600 (Highline / Passenger / Cargo)',
     },
   ],
+  'justflight-146-100': [
+    { publisher: 'Just Flight', product: 'BAe 146 Professional (100 / Statesman)' },
+  ],
+  'justflight-146-200': [
+    { publisher: 'Just Flight', product: 'BAe 146 Professional (200 / QC / QT)' },
+  ],
+  'justflight-146-300': [
+    { publisher: 'Just Flight', product: 'BAe 146 Professional (300 / QT)' },
+  ],
 };
 
 function publisherFromStem(stem: string): string | null {

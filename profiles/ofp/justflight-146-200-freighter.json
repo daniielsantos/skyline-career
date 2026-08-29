@@ -1,0 +1,170 @@
+{
+  "source": "simbrief",
+  "icao": "B462",
+  "ofpId": "justflight-146-200-freighter",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "Just Flight 146-200QT Ansett Australia Cargo",
+    "Just Flight 146-200QC RAF CMk3"
+  ],
+  "matchTitlePattern": "Just Flight 146-200(?:QC|QT)",
+  "notes": [
+    "Just Flight BAe 146-200 QC/QT freighter — 16 stations",
+    "Market SKU: justflight-146-200 (family pack)",
+    "Homologated: 200QT Ansett + 200QC RAF CMk3 @1.0.0",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [
+        1,
+        2
+      ],
+      "baggageStations": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": [
+      "classic",
+      "mass-balance"
+    ],
+    "weights": [
+      "classic-weights"
+    ],
+    "payload": [
+      "classic-stations"
+    ]
+  },
+  "simbriefIcao": "B462",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    {
+      "simVarIndex": 1,
+      "cfgIndex": 0,
+      "name": "Station 1",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 2,
+      "cfgIndex": 1,
+      "name": "Station 2",
+      "role": "crew"
+    },
+    {
+      "simVarIndex": 3,
+      "cfgIndex": 2,
+      "name": "Station 3",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 4,
+      "cfgIndex": 3,
+      "name": "Station 4",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 5,
+      "cfgIndex": 4,
+      "name": "Station 5",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 6,
+      "cfgIndex": 5,
+      "name": "Station 6",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 7,
+      "cfgIndex": 6,
+      "name": "Station 7",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 8,
+      "cfgIndex": 7,
+      "name": "Station 8",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 9,
+      "cfgIndex": 8,
+      "name": "Station 9",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 10,
+      "cfgIndex": 9,
+      "name": "Station 10",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 11,
+      "cfgIndex": 10,
+      "name": "Station 11",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 12,
+      "cfgIndex": 11,
+      "name": "Station 12",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 13,
+      "cfgIndex": 12,
+      "name": "Station 13",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 14,
+      "cfgIndex": 13,
+      "name": "Station 14",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 15,
+      "cfgIndex": 14,
+      "name": "Station 15",
+      "role": "baggage"
+    },
+    {
+      "simVarIndex": 16,
+      "cfgIndex": 15,
+      "name": "Station 16",
+      "role": "baggage"
+    }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 700,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

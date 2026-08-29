@@ -1289,6 +1289,54 @@ CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## BAe 146-100
+- **typeId:** `justflight-146-100`
+- **file:** `bae-146-100.png`
+
+```
+Stylized cartoon / clean vector illustration of a BAe 146-100 regional jet (B461), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: short high-wing T-tail regional jet, FOUR podded engines under the high wing (two per side), stubby fuselage shorter than 146-200/300, tricycle gear down, passenger windows. Four underwing engines + high wing + T-tail essential — not a 737, not an F100.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / early night cargo ramp, purple-indigo sky wash echoing #7a6a9a / #42385c, container silhouettes, apron floodlights, industrial freighter atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## BAe 146-200
+- **typeId:** `justflight-146-200`
+- **file:** `bae-146-200.png`
+
+```
+Stylized cartoon / clean vector illustration of a BAe 146-200 regional jet (B462), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: high-wing T-tail regional jet mid-stretch, FOUR podded engines under the high wing, fuselage longer than 146-100 but shorter than 146-300, gear down, passenger windows. Four engines + high wing + T-tail essential.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / early night cargo ramp, purple-indigo sky wash echoing #7a6a9a / #42385c, container silhouettes, apron floodlights, industrial freighter atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## BAe 146-300
+- **typeId:** `justflight-146-300`
+- **file:** `bae-146-300.png`
+
+```
+Stylized cartoon / clean vector illustration of a BAe 146-300 regional jet (B463), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: longest BAe 146 stretch, high-wing T-tail, FOUR podded engines under the high wing, noticeably elongated passenger fuselage vs 146-100/200, gear down. Four engines + high wing + T-tail + stretch length essential.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / early night cargo ramp, purple-indigo sky wash echoing #7a6a9a / #42385c, container silhouettes, apron floodlights, industrial freighter atmosphere. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ---
 
 ## Checklist after generating

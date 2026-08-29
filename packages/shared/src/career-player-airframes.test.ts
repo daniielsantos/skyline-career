@@ -95,6 +95,38 @@ describe('career player airframes', () => {
     assert.equal(f70?.simbriefAirframeMatch, 'Just Flight \\(MSFS\\) - 70 Passengers');
   });
 
+  it('lists Just Flight BAe 146-100/200/300 as three Market SKUs with family packs', () => {
+    const s100 = findCareerPlayerAirframe('justflight-146-100');
+    const s200 = findCareerPlayerAirframe('justflight-146-200');
+    const s300 = findCareerPlayerAirframe('justflight-146-300');
+    assert.equal(s100?.simbriefIcao, 'B461');
+    assert.equal(s200?.simbriefIcao, 'B462');
+    assert.equal(s300?.simbriefIcao, 'B463');
+    assert.equal(s100?.loadLayout, 'pax_and_cargo');
+    assert.equal(s100?.injectCapable, false);
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(s100!)].sort(),
+      [
+        'profiles/ofp/justflight-146-100-statesman.json',
+        'profiles/ofp/justflight-146-100.json',
+      ].sort(),
+    );
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(s200!)].sort(),
+      [
+        'profiles/ofp/justflight-146-200-freighter.json',
+        'profiles/ofp/justflight-146-200.json',
+      ].sort(),
+    );
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(s300!)].sort(),
+      [
+        'profiles/ofp/justflight-146-300-freighter.json',
+        'profiles/ofp/justflight-146-300.json',
+      ].sort(),
+    );
+  });
+
   it('stages FSReborn Phenom 300E as pax_and_cargo (belly freight capped)', () => {
     const phenom = findCareerPlayerAirframe('fsreborn-phenom-300e');
     assert.equal(phenom?.loadLayout, 'pax_and_cargo');
@@ -363,7 +395,7 @@ describe('career player airframes', () => {
     );
     assert.equal(
       findCareerPlayerAirframe('blacksquare-commander-114')?.maxCargoKg,
-      551,
+      512,
     );
     assert.equal(
       findCareerPlayerAirframe('asobo-cessna-c152')?.simbriefIcao,

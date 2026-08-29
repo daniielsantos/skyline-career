@@ -16,10 +16,11 @@
   "notes": [
     "iniBuilds A330-300 family — native-simbrief (EFB/tablet load)",
     "Market SKU: inibuilds-a330-300 (wide_freighter)",
-    "SimBrief type: A333 Default",
+    "SimBrief type: A333 iniBuilds (MSFS) - A330-300 GE/RR (P2F → A330-300P2F rows)",
     "Homologated glasses: GE / RR / VIP / P2F",
     "Fuel: classic L/R MAIN + L/R AUX (no CENTER in discovery); write plans empty",
-    "loadMethod: native-simbrief; injectCapable: false"
+    "loadMethod: native-simbrief; injectCapable: false",
+    "Catalog maxPaxSeats 291 = airframe_passengers on iniBuilds GE/RR pax rows"
   ],
   "fuel": {
     "unit": "lb"

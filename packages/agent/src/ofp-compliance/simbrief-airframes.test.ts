@@ -450,6 +450,24 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       'Fenix Simulations \\(MSFS\\) - A319 IAE$',
     );
     assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A330-200 (GE)'),
+      'iniBuilds \\(MSFS\\) - A330-200 GE',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A330-200 VIP (RR)'),
+      'iniBuilds \\(MSFS\\) - A330-200 RR',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A330-300 (RR)'),
+      'iniBuilds \\(MSFS\\) - A330-300 RR',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A330-300P2F (GE)'),
+      'iniBuilds \\(MSFS\\) - A330-300P2F GE',
+    );
+    assert.equal(liveTitleMatchesMarketSku('A330-200 (GE)', 'inibuilds-a330-200'), true);
+    assert.equal(liveTitleMatchesMarketSku('A330-300P2F (RR)', 'inibuilds-a330-300'), true);
+    assert.equal(
       inferSimBriefAirframeMatchFromTitle('A350-900 (Default Cabin)'),
       'iniBuilds \\(MSFS\\) - A350-900$',
     );

@@ -8,17 +8,19 @@ SimBrief Dispatch usa **175+55 lb/assento** (`paxwgt`/`bagwgt`). O Due do Prefli
 
 **Não** usar Import Weights do MSFS SimBrief EFB em JF / iniBuilds — estraga CG. Load no **tablet do addon**.
 
-## Três mismatches (não misturar)
+## Quatro mismatches (não misturar)
 
 Medir **depois** do Import/APPLY LOAD no EFB, com OFP confirmado.
 
-| Sintoma | Causa | Campo no catálogo | Como medir |
-|---------|--------|-------------------|------------|
+| Sintoma | Causa | Campo / fix | Como medir |
+|---------|--------|-------------|------------|
 | Sim ≈ EFB ZFW−OEW, **mais pesado** que Payload SimBrief; pax count EFB = OFP | EFB usa pax **mais pesado** que 175 lb | `efbPaxWeightLb` | `(Sim − cargo_holds) / pax_efb`. Neo V2: ~187. Due += pax × (efb − 175) |
 | EFB pax **N**, estações clássicas somam **M×170** com M > N (fileiras 8/12 cheias) | SimConnect enche **slots** a mais | `simconnectCabinSeats` = M | Soma S_cabine / 170. F70: 80 vs OFP 70. Live − (M−maxPax)×170 |
 | Holds FWD+AFT **menores** que Bag/Cargo do OFP; cabine já no count certo | Tablet não cabe o freight | `simconnectCargoHoldMaxLb` = FWD+AFT live | F100: 5172+2612=7784 vs OFP 8940. Due clampa cargo ao teto |
+| Sim ≈ EFB ZFW−**Dry**; Due = Payload OFP; delta ≈ Empty_SB − Dry_EFB; ZFW live **bate** o OFP | SimBrief row **Default** (OEW alto) vs glass MSFS (OEW baixo). APPLY ZFW inchou estações | `simbriefAirframeMatch` → row vendor MSFS (ex. `iniBuilds (MSFS) - A330-200 GE`); `maxPaxSeats` = `airframe_passengers` dessa row | Empty OFP − Dry EFB. A330-200 Default: +~14.5k. **Não** usar `efbPaxWeightLb` / bias aqui |
+| Sim soma estações altas; EFB só cabine+holds | Sticky/ghost S13+ (JF 146) no pack | Omitir ghosts de `stationRoles` (só `stationMap` role `service`) | Soma S3–S12 ≈ ZFW−Dry; S13+ ≈ delta falso |
 
-`efbPaxWeightLb` **não** substitui os outros dois. F70 extra era 10 ocupantes, não 70 pax mais gordos. F100 overflow era hold, não 100×5 lb.
+`efbPaxWeightLb` **não** substitui os outros. F70 extra era 10 ocupantes, não 70 pax mais gordos. F100 overflow era hold, não 100×5 lb. A330 Default≠iniBuilds era OEW, não pax gordo.
 
 Watch **recalcula Due a partir de `cargoLb` (OFP)**, nunca do Due pintado — senão `efbPaxWeightLb` empilha a cada tick (43.9k → 46.0k → 48.2k).
 
@@ -50,6 +52,8 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mã
 | `justflight-fokker-f28` | 85 fallback; live Mk 65/79/65/85 | Nenhum extra (82×170 bateu) |
 | `microsoft-a320neo-v2` | 180 | `efbPaxWeightLb: 187` (zonas S3–S7, não fileiras 170) |
 | `microsoft-a321lr` | 220 | `efbPaxWeightLb: 188` (153 pax: Sim 37127 vs OFP 35164). **Fuel:** EFB APPLY **não** grava FOB (bug iniBuilds A321LR); usar EFB/slider **padrão do MSFS**. Watch C = CENTER+CENTER2; TOTAL pode ser > L+R+C |
+| `inibuilds-a330-200` | 257 | SimBrief **iniBuilds GE/RR** (OEW 116t = EFB Dry). Default OEW ~270k → APPLY ZFW inflates stations by ~14.5k vs OFP Payload |
+| `inibuilds-a330-300` | 291 | Same: iniBuilds GE/RR (P2F → P2F rows); not A333 Default |
 | `fenix-a320` | 180 | `simconnectEmptyPayloadBiasLb: 2591` — sem `efbPaxWeightLb` |
 | `fenix-a319` | 150 | `simconnectEmptyPayloadBiasLb: 2642` — sem `efbPaxWeightLb` |
 | `fenix-a321` | 230 | `simconnectEmptyPayloadBiasLb: 2201` — sem `efbPaxWeightLb`; 8 vidros CFM/IAE × SL/WF × TC/SC |

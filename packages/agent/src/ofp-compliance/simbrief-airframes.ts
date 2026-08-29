@@ -185,6 +185,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/A320neo\s*V2\b/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A320neo V2';
   }
+  const inibuildsA330 = inferIniBuildsA330SimBriefMatch(t);
+  if (inibuildsA330) return inibuildsA330;
   const inibuildsA350 = inferIniBuildsA350SimBriefMatch(t);
   if (inibuildsA350) return inibuildsA350;
   if (/\bA321LR\b/i.test(t) || /^A321$/i.test(t)) {
@@ -335,6 +337,12 @@ export function liveTitleMatchesMarketSku(
   if (id === 'leonardo-fly-the-maddog-x-md-88-20th') {
     return /Fly The Maddog X MD-88 20th/i.test(t);
   }
+  if (id === 'inibuilds-a330-200') {
+    return /\bA330-200\b/i.test(t);
+  }
+  if (id === 'inibuilds-a330-300') {
+    return /\bA330-300(?:P2F)?\b/i.test(t);
+  }
   if (id === 'inibuilds-a350-900-ulr') {
     return /\bA350-900\s*ULR\b/i.test(t) || /\bA350-900ULR\b/i.test(t);
   }
@@ -390,6 +398,23 @@ function inferPmdg777200erSimBriefMatch(title: string): string | undefined {
   }
   if (/\b777-200ER(?:\s+RR)?\b/i.test(title)) {
     return 'PMDG \\(MSFS\\) - Trent 892 - Default MTOW';
+  }
+  return undefined;
+}
+
+/** iniBuilds A330 — Default OEW is ~14.5k lb heavy vs EFB Dry; use MSFS GE/RR rows. */
+function inferIniBuildsA330SimBriefMatch(title: string): string | undefined {
+  if (/\bA330-300\s*P2F\b/i.test(title) || /\bA330-300P2F\b/i.test(title)) {
+    const eng = /\bRR\b/i.test(title) ? 'RR' : 'GE';
+    return `iniBuilds \\(MSFS\\) - A330-300P2F ${eng}`;
+  }
+  if (/\bA330-300\b/i.test(title)) {
+    const eng = /\bRR\b/i.test(title) ? 'RR' : 'GE';
+    return `iniBuilds \\(MSFS\\) - A330-300 ${eng}`;
+  }
+  if (/\bA330-200\b/i.test(title)) {
+    const eng = /\bRR\b/i.test(title) ? 'RR' : 'GE';
+    return `iniBuilds \\(MSFS\\) - A330-200 ${eng}`;
   }
   return undefined;
 }

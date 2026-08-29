@@ -14,10 +14,11 @@
   "notes": [
     "iniBuilds A330-200 family — native-simbrief (EFB/tablet load)",
     "Market SKU: inibuilds-a330-200 (wide_freighter)",
-    "SimBrief type: A332 Default",
+    "SimBrief type: A332 iniBuilds (MSFS) - A330-200 GE/RR (not Default — OEW matches EFB Dry ~255736 lb)",
     "Homologated glasses: GE / RR / VIP GE / VIP RR",
     "Fuel: classic L/R MAIN + CENTER + L/R AUX; write plans empty",
-    "loadMethod: native-simbrief; injectCapable: false"
+    "loadMethod: native-simbrief; injectCapable: false",
+    "Catalog maxPaxSeats 257 = airframe_passengers on iniBuilds GE/RR rows"
   ],
   "fuel": {
     "unit": "lb"

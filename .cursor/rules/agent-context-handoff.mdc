@@ -14,4 +14,14 @@ No início de trabalho Skyline Career / SimBridge / Twin Otter / hubs:
 3. Respeite `docs/agent-context/00-constraints.md`
 4. Economy/map detail: `.cursor/rules/career-economy-roadmap.mdc` / `career-map-expansion.mdc` (só se a tarefa for isso)
 
-Atualize esses arquivos ao fechar uma sessão longa (bullets curtos), em vez de deixar o contexto só no chat.
+## Gravar solução no mesmo turno
+
+Sempre que **fecharmos um diagnóstico** (Loaded≠Due, OFP fail, inject, fuel, SimBrief row, ghost stations, etc.):
+
+1. Atualize **no mesmo turno** o `.md` de tópico em `docs/agent-context/` (bullets curtos: sintoma → causa → fix/path)
+2. Payload / EFB / estações → `12-pax-efb-due.md` (+ linha na tabela SKUs se for airframe novo)
+3. Homologação Market / pack / SimBrief match → `09-homologate.md`
+4. Inject / freighter / Host → `17-inject-regression.md` ou o tópico certo do índice
+5. **Não** deixe a lição só no chat — o próximo agente deve recuperar pelo `.md`, não pelo transcript
+
+Atualize também ao fechar uma sessão longa (`01` / `06` se mudou estado ou backlog).

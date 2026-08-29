@@ -56,7 +56,7 @@ Tolérance READY: fuel ±50 lb; payload ±75 lb (ou % do Due) — `evaluateLoadV
 
 | Faixa | Status |
 |-------|--------|
-| **Inject direct + freighter + classic stations** (C172, Caravan, Kodiak, ATR, Bandeirante, BN2, Learjet cargo…) | **Sólido** — path principal; regressões Caravan/Kodiak/Bonanza pós-0.3.24 |
+| **Inject direct + freighter + classic stations** (C172, Caravan, Kodiak, ATR, Bandeirante, BN2, Learjet cargo…) | **Sólido** — path principal; **light_ga** revalidado live 2026-08-29 (engines sticky, Corvalis proxy, BN2) |
 | **Mass-balance fallback** | **Sólido com regras** — cobre under-read Accu-Sim e ghost stations; testes em `career-live-load.test.ts` |
 | **Watch no solo + edição EFB após inject** | **Sólido** — stations que andaram mandam; não gruda READY no snapshot do inject |
 | **`pax_and_cargo` + EFB nativo** (Phenom inject, CJ4/Longitude WT, PMDG pax…) | **Médio** — Due/Sim depende de roles + às veis ZFW; ver [`12-pax-efb-due.md`](./12-pax-efb-due.md) |

@@ -11086,6 +11086,22 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   gap: 0.75rem;
 }
 
+.payload-lab-payload-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.payload-lab-payload-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.payload-lab-payload-row button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .payload-lab-filters {
   display: grid;
   grid-template-columns: 1.4fr 1fr;

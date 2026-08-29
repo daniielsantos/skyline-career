@@ -358,7 +358,7 @@ function simBriefPrefillsPayloadNotFreight(
 export function flyableDispatchCargoKg(
   mission: Pick<
     MissionIntent,
-    'cargoKg' | 'aircraftClassId' | 'airframeTypeId'
+    'cargoKg' | 'aircraftClassId' | 'airframeTypeId' | 'payloadLab'
   >,
   distanceNm: number,
   structuralMaxCargoKg: number,
@@ -408,6 +408,20 @@ export function flyableDispatchCargoKg(
     },
   );
   const booked = Math.max(0, Math.floor(mission.cargoKg));
+  const structural = Math.max(0, Math.floor(structuralMaxCargoKg));
+  // Payload Lab: keep the chosen inject payload — do not silently trim to the
+  // Career route fuel+MTOW estimate (that cap is for economy booking).
+  if (mission.payloadLab) {
+    const cargoKg = Math.min(booked, structural || booked);
+    return {
+      cargoKg,
+      operationalMaxCargoKg: structural || cargoKg,
+      fuelFeasible: true,
+      estimatedBlockFuelKg: route.estimatedBlockFuelKg,
+      fuelCapacityKg: route.fuelCapacityKg,
+      fuelDeficitKg: route.fuelDeficitKg,
+    };
+  }
   const cap = route.fuelFeasible
     ? Math.max(0, Math.floor(route.operationalMaxCargoKg))
     : 0;

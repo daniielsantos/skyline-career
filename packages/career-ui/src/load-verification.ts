@@ -496,6 +496,46 @@ export function pickLivePayloadLb(
   return typeof next === 'number' && Number.isFinite(next) ? next : prev;
 }
 
+function sumStationMapLb(
+  stations: Record<number, number> | undefined,
+): number {
+  if (!stations) return 0;
+  let sum = 0;
+  for (const lb of Object.values(stations)) {
+    if (typeof lb === 'number' && Number.isFinite(lb)) sum += lb;
+  }
+  return sum;
+}
+
+/**
+ * Browser mirror of shared `schematicStationsForLivePayload` for the case where
+ * Watch omits stations after an empty sample — do not fall back to the inject
+ * snapshot while Sim already reads 0.
+ */
+export function schematicStationsForEmptyLive(opts: {
+  livePayloadLb: number | undefined;
+  watchStations?: Record<number, number>;
+  fallbackStations?: Record<number, number>;
+}): Record<number, number> | undefined {
+  const live = opts.livePayloadLb;
+  const liveEmpty =
+    typeof live === 'number' && Number.isFinite(live) && live < 50;
+  if (opts.watchStations) {
+    if (liveEmpty && sumStationMapLb(opts.watchStations) > 400) {
+      const out: Record<number, number> = {};
+      for (const key of Object.keys(opts.watchStations)) out[Number(key)] = 0;
+      return out;
+    }
+    return opts.watchStations;
+  }
+  if (!opts.fallbackStations) return undefined;
+  if (!liveEmpty) return opts.fallbackStations;
+  if (sumStationMapLb(opts.fallbackStations) <= 50) return opts.fallbackStations;
+  const out: Record<number, number> = {};
+  for (const key of Object.keys(opts.fallbackStations)) out[Number(key)] = 0;
+  return out;
+}
+
 /**
  * During inject: show tanks filling toward Due. Only hold the written total
  * when live *drops* after a completed fill (payload dump / ghost empty).

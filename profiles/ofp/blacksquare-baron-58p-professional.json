@@ -8,18 +8,14 @@
     "Black Square Baron 58P Professional",
     "Black Square Baron 58TC Professional"
   ],
-  "matchTitlePattern": "Black Square Baron 58P Professional",
+  "matchTitlePattern": "Black Square Baron 58(P|TC) Professional",
   "notes": [
-    "Black Square Baron 58P Professional — auto roles pack from homologated profile",
-    "Profile: blacksquare/baron-58p-professional@1.0.0",
+    "Black Square Baron 58P + 58TC Professional — one Market SKU (Baron 58TC/P Professional)",
+    "Profile: blacksquare/baron-58p-professional@1.0.0 (+ sibling 58tc profile)",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct",
-    "Black Square Baron 58TC Professional — auto roles pack from homologated profile",
-    "Profile: blacksquare/baron-58tc-professional@1.0.0",
-    "Joined Market family: Baron 58P Professional (blacksquare-baron-58p-professional)",
-    "Homologated profile: blacksquare/baron-58tc-professional@1.0.0",
-    "Title: Black Square Baron 58TC Professional"
+    "Homologated profiles: blacksquare/baron-58p-professional@1.0.0, blacksquare/baron-58tc-professional@1.0.0"
   ],
   "fuel": {
     "unit": "lb"

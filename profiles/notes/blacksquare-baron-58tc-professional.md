@@ -21,6 +21,7 @@
 - Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7, 8.
 - Station maxLoad: placeholder until flight_model.cfg calibrate.
 - Homologated with interactive wizard.
+- Joined Market family: **Baron 58TC/P Professional** (`blacksquare-baron-58p-professional`) — same OFP pack / B58T as 58P.
 
 ## Homologated
 

@@ -328,15 +328,31 @@ export function PayloadLabPanel(props: {
               ? ` · max ${formatLb(selectedMaxLb)}`
               : ''}
           </span>
-          <input
-            type="number"
-            min={1}
-            step={10}
-            max={selectedMaxLb}
-            value={cargoLb}
-            disabled={disabled}
-            onChange={(e) => setCargoLb(Number(e.target.value) || 0)}
-          />
+          <div className="payload-lab-payload-row">
+            <input
+              type="number"
+              min={1}
+              step={10}
+              max={selectedMaxLb}
+              value={cargoLb}
+              disabled={disabled}
+              onChange={(e) => setCargoLb(Number(e.target.value) || 0)}
+            />
+            <button
+              type="button"
+              disabled={disabled || selectedMaxLb === undefined}
+              title={
+                selectedMaxLb !== undefined
+                  ? `Set payload to max (${formatLb(selectedMaxLb)})`
+                  : 'Select an airframe with a known max cargo'
+              }
+              onClick={() => {
+                if (selectedMaxLb !== undefined) setCargoLb(selectedMaxLb);
+              }}
+            >
+              100%
+            </button>
+          </div>
         </label>
 
         <div className="payload-lab-od">

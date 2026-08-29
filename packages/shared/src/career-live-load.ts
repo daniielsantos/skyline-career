@@ -749,6 +749,72 @@ export function stationSampleIncomplete(
   return false;
 }
 
+function sumStationMapLb(
+  stations: Record<number, number> | undefined | null,
+): number {
+  if (!stations) return 0;
+  let sum = 0;
+  for (const lb of Object.values(stations)) {
+    if (typeof lb === 'number' && Number.isFinite(lb)) sum += lb;
+  }
+  return sum;
+}
+
+function zeroStationMap(
+  stations: Record<number, number>,
+): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const key of Object.keys(stations)) out[Number(key)] = 0;
+  return out;
+}
+
+/**
+ * Pick the station schematic for Loaded vs Due.
+ *
+ * When Sim payload is emptied (mass-balance / freighter bags ≈ 0) but the
+ * classic station sample is missing or truncated, do **not** keep painting
+ * the inject snapshot (Sim 0 lb with S1–S8 still full). Zero the last known
+ * keys instead. Keep an explicit full sample (e.g. crew-only after bag unload).
+ */
+export function schematicStationsForLivePayload(opts: {
+  livePayloadLb: number | undefined;
+  nextStations?: Record<number, number> | null;
+  prevStations?: Record<number, number> | null;
+  /** Loaded below this → treat as emptied (default 50 lb). */
+  emptyThresholdLb?: number;
+  /**
+   * Station-sum above this while live is empty → wipe sticky cargo paint.
+   * Default 400 lb keeps a 2×170 crew floor visible on freighters.
+   */
+  stickyCargoFloorLb?: number;
+}): Record<number, number> | undefined {
+  const emptyAt = opts.emptyThresholdLb ?? 50;
+  const stickyFloor = opts.stickyCargoFloorLb ?? 400;
+  const live = opts.livePayloadLb;
+  const liveEmpty =
+    typeof live === 'number' && Number.isFinite(live) && live < emptyAt;
+  const next = opts.nextStations ?? undefined;
+  const prev = opts.prevStations ?? undefined;
+  const incomplete = stationSampleIncomplete(prev ?? null, next ?? null);
+
+  if (next && !incomplete) {
+    if (liveEmpty && sumStationMapLb(next) > stickyFloor) {
+      return zeroStationMap(next);
+    }
+    return next;
+  }
+
+  if (liveEmpty) {
+    const base = next ?? prev;
+    if (!base) return undefined;
+    if (sumStationMapLb(base) <= emptyAt) return base;
+    return zeroStationMap(base);
+  }
+
+  if (incomplete) return prev;
+  return next ?? prev;
+}
+
 /** True when classic station weights moved enough to persist / paint. */
 export function stationWeightsDrifted(
   prev: Record<number, number> | undefined | null,

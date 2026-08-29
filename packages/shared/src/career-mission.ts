@@ -2971,16 +2971,19 @@ export function ofpCargoKg(ofp: OfpExpectation): number | undefined {
 
   let value: number | undefined;
   if (baggage !== undefined && payload !== undefined) {
-    // EFB pilot (pax≈1): Payload = Freight + one standard pax. Career freight is
-    // the baggage line — counting the pilot as cargo hid MTOW cuts (Turbine Duke:
-    // 734 bag / 909 payload vs ~1.1 klb mission → false OFP PASS, no Accept).
+    // EFB pilot (pax===1): Payload = Freight + one standard pax. Career freight
+    // is the baggage line — counting the pilot as cargo hid MTOW cuts (Turbine
+    // Duke: 734 bag / 909 payload vs ~1.1 klb mission → false OFP PASS).
     // ATR HighLine: Freight is a tiny maxcargo while Payload holds the load.
-    if (pax <= 1) {
+    // pax===0 freighter: never treat Payload−Freight≈175–236 as “one pax” —
+    // that wrongly preferred a low Freight soft-cap over Payload (Baron 58TC
+    // Due 1264 vs Sim/Cargo ~1.5 klb when the gap was ~236 lb).
+    if (pax === 1) {
       const paxLike = payload - baggage;
       const oneStandardPax = paxLike >= 100 && paxLike <= 260;
       value = oneStandardPax ? baggage : Math.max(baggage, payload);
     } else {
-      // pax_and_cargo OFPs: Freight= is leftover after seats; career cargo is Payload.
+      // pax=0 freighter, or pax_and_cargo: career cargo is the larger line.
       value = Math.max(baggage, payload);
     }
   } else {

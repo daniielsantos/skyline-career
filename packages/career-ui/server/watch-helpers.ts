@@ -28,7 +28,7 @@ import {
   fuelTankBreakdownSum,
   isUsableFuelTankBreakdown,
   loadVerificationDrifted,
-  stationSampleIncomplete,
+  schematicStationsForLivePayload,
   stationWeightsDrifted,
   mergeAirframePerfOverride,
   clampCruiseFuelFlowToCatalog,
@@ -2505,13 +2505,15 @@ export class CareerWatchSession {
             prevWatchFuel.tankCapacity,
           );
           // Prefer fresh station map (including explicit zeros) over a stale
-          // schematic — but never a truncated IPC pass (S1/S2 only).
-          const stations = stationSampleIncomplete(
-            prevWatchPayload.stations,
-            load.stations,
-          )
-            ? prevWatchPayload.stations
-            : (load.stations ?? prevWatchPayload.stations);
+          // schematic — but never a truncated IPC pass (S1/S2 only). When Sim
+          // payload is emptied and the sample is missing/truncated, zero the
+          // last keys so S1–S8 do not stay stuck at the inject snapshot.
+          const stations = schematicStationsForLivePayload({
+            livePayloadLb:
+              typeof livePayloadLb === 'number' ? livePayloadLb : undefined,
+            nextStations: load.stations,
+            prevStations: prevWatchPayload.stations,
+          });
           const stationMax = pickStationMax(
             freshStationMax,
             prevWatchPayload.stationMax,

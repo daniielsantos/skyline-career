@@ -7,6 +7,7 @@ import {
   matchFuelOk,
   payloadMatchToleranceLb,
   pickFuelTankBreakdown,
+  schematicStationsForEmptyLive,
   stabilizeDisplayedFuel,
 } from './load-verification.js';
 
@@ -199,6 +200,39 @@ describe('formatPayloadDueLine', () => {
         fmt,
       ),
       'Due 2804 lb · 2804 lb cargo',
+    );
+  });
+});
+
+describe('schematicStationsForEmptyLive', () => {
+  it('zeros inject fallback when Watch omits stations and Sim is 0', () => {
+    const fallback = {
+      1: 378,
+      2: 170,
+      3: 170,
+      4: 250,
+      5: 250,
+      6: 200,
+      7: 200,
+      8: 200,
+    };
+    const painted = schematicStationsForEmptyLive({
+      livePayloadLb: 0,
+      fallbackStations: fallback,
+    });
+    assert.ok(painted);
+    assert.equal(Object.values(painted!).every((lb) => lb === 0), true);
+  });
+
+  it('keeps Watch stations when present and light', () => {
+    const watch = { 1: 0, 2: 170, 3: 170, 4: 0 };
+    assert.deepEqual(
+      schematicStationsForEmptyLive({
+        livePayloadLb: 0,
+        watchStations: watch,
+        fallbackStations: { 1: 378, 2: 170, 3: 170, 4: 250 },
+      }),
+      watch,
     );
   });
 });

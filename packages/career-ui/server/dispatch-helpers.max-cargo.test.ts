@@ -133,6 +133,29 @@ describe('flyableDispatchCargoKg', () => {
     assert.equal(flyable.cargoKg, 400);
   });
 
+  it('does not trim Payload Lab cargo to route ops cap', () => {
+    const flyable = flyableDispatchCargoKg(
+      {
+        cargoKg: 651,
+        aircraftClassId: 'light_ga',
+        airframeTypeId: 'blacksquare-baron-58-professional',
+        payloadLab: true,
+      },
+      194,
+      651,
+      {
+        oewKg: 1_415,
+        mtowKg: 2_495,
+        fuelCapacityKg: 468,
+        fuelBurnKgPerNm: 0.458,
+        airframeTypeId: 'blacksquare-baron-58-professional',
+      },
+    );
+    assert.equal(flyable.cargoKg, 651);
+    assert.equal(flyable.operationalMaxCargoKg, 651);
+    assert.equal(flyable.fuelFeasible, true);
+  });
+
   it('prefers heavier catalog OEW over lighter SimBrief OEW (offline)', () => {
     // C90-class: SimBrief OEW ~2964 kg; catalog ~3207 kg ≈ MSFS empty.
     const lightSb = flyableDispatchCargoKg(

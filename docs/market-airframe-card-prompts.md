@@ -40,7 +40,7 @@ CLASS SCENE KIT — light_ga: Bright clear blue sky with a few fluffy stylized w
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## Baron 58TC Professional
+## Baron 58TC/P Professional
 - **typeId:** `blacksquare-baron-58p-professional`
 - **file:** `baron-58tc.png`
 

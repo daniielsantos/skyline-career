@@ -1519,6 +1519,20 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(isOfpCargoUnderOnlyFailure(check), true);
   });
 
+  it('pax=0 freighter prefers Payload over Freight even when the gap looks like one pax', () => {
+    // Baron 58TC: Freight soft-cap 1264 vs Payload 1500 (Δ236) must not pick Freight.
+    const ofp = matchingOfp({
+      loadSheet: {
+        unit: 'lb',
+        blockFuel: 561,
+        passengerCount: 0,
+        baggage: 1_264,
+        payload: 1_500,
+      },
+    });
+    assert.equal(Math.round(ofpCargoKg(ofp)! * KG_TO_LB), 1_500);
+  });
+
   it('does not accept SimBrief Freight leftover as the whole pax_and_cargo load', () => {
     const ofp = matchingOfp({
       loadSheet: {

@@ -36,7 +36,7 @@
   {
     "typeId": "blacksquare-baron-58p-professional",
     "aircraftClassId": "light_ga",
-    "label": "Baron 58TC Professional",
+    "label": "Baron 58TC/P Professional",
     "rolesPackRelPath": "profiles/ofp/blacksquare-baron-58p-professional.json",
     "simbriefIcao": "B58T",
     "simbriefAirframeMatch": "Default",

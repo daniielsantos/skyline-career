@@ -14,6 +14,7 @@ import {
   parsePayloadStationCount,
   samplePayloadStationsFromValues,
   isClassicStationBatchIncomplete,
+  schematicStationsForLivePayload,
   stationSampleIncomplete,
   stationWeightsDrifted,
 } from './career-live-load.js';
@@ -582,6 +583,48 @@ describe('stationSampleIncomplete', () => {
     }
     assert.equal(stationSampleIncomplete(prev, next), false);
     assert.equal(stationWeightsDrifted(prev, next, 5), true);
+  });
+});
+
+describe('schematicStationsForLivePayload', () => {
+  it('zeros sticky inject snapshot when Sim is emptied and sample is missing', () => {
+    const prev = {
+      1: 378,
+      2: 170,
+      3: 170,
+      4: 250,
+      5: 250,
+      6: 200,
+      7: 200,
+      8: 200,
+    };
+    const painted = schematicStationsForLivePayload({
+      livePayloadLb: 0,
+      nextStations: undefined,
+      prevStations: prev,
+    });
+    assert.ok(painted);
+    assert.equal(Object.values(painted!).every((lb) => lb === 0), true);
+    assert.equal(Object.keys(painted!).length, 8);
+  });
+
+  it('keeps crew-only stations when freighter bags Sim is 0', () => {
+    const next = { 1: 0, 2: 170, 3: 170, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 };
+    const painted = schematicStationsForLivePayload({
+      livePayloadLb: 0,
+      nextStations: next,
+      prevStations: {
+        1: 378,
+        2: 170,
+        3: 170,
+        4: 250,
+        5: 250,
+        6: 200,
+        7: 200,
+        8: 200,
+      },
+    });
+    assert.deepEqual(painted, next);
   });
 });
 

@@ -37,6 +37,8 @@ Implementação: `sampleLiveLoadLb()` em `watch-helpers.ts` → policy em `resol
 Para **Preflight Loaded vs Due**:
 
 - **Freighter / cargo clássico** (`careerFreighterLivePayloadLb`): Sim = bags (+ passenger stations usadas como cargo). **Crew stations ficam fora** — Due = freight OFP, não bags+crew.
+- **Freighter Due:** **não** re-clampa MTOW/EMPTY no Preflight (só `baggageCapacity`). O clamp MTOW fica no inject. Re-clamar com EMPTY live pós-inject encolhia Due abaixo do Sim (Baron 58TC: Sim≈Cargo ~1.5 klb, Due 1264). `ofpCargoKg`: `oneStandardPax` só com `pax===1`, nunca `pax===0`.
+- **Schematic sticky após zerar:** se Sim payload ≈ 0 e o sample de stations falha/omite, zerar as keys do último mapa (`schematicStationsForLivePayload`) — senão S1–S8 ficam no snapshot do inject com “Sim 0 lb”.
 - **Family packs + `liveTitle`:** Watch e inject devem passar o título MSFS em `resolveMissionRolesPack`. Sem isso o Due pode vir do pack Passengers (S3–S15) enquanto o Sim soma só o pack Cargo default (S3–S4 ≈ 300 lb no 404 Titan).
 - **`pax_and_cargo`** (`careerPaxAndCargoLivePayloadLb`): Sim = cabine+holds; opcional residual `ZFW − OFP empty` quando EFB injetou ZFW (PMDG/Fenix).
 
@@ -214,6 +216,8 @@ Cria missão sintética (`payloadLab` + `contractPilot`) **sem** comprar / ferry
 4. **Cancel flight** quando terminar  
 
 API: `GET|POST|DELETE /api/dev/payload-lab`. Requer nenhum outro Dispatch player ativo.
+
+**Não** aplica o clamp de route ops (fuel+MTOW Career) no Open SimBrief — o Lab mantém o payload escolhido (economia corta; Lab testa inject).
 
 ---
 

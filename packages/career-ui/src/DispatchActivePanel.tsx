@@ -26,6 +26,7 @@ import {
   payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   pickLivePayloadLb,
+  schematicStationsForEmptyLive,
   holdWrittenFuelLb,
   stabilizeDisplayedFuel,
   matchFuelOk,
@@ -449,9 +450,11 @@ export function DispatchActivePanel(props: {
           const routeOpsNote =
             opsCapKg !== null &&
             opsCapKg + 1 < structuralMaxKg
-              ? mission.cargoKg > opsCapKg + 1
-                ? `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate — SimBrief may allow more)`
-                : `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate)`
+              ? mission.payloadLab
+                ? `Route ops estimate ${props.formatTonnes(opsCapKg)} (Lab keeps booked payload)`
+                : mission.cargoKg > opsCapKg + 1
+                  ? `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate — SimBrief may allow more)`
+                  : `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate)`
               : undefined;
           const routeLabel =
             routeDistanceNm !== undefined
@@ -994,6 +997,11 @@ export function DispatchActivePanel(props: {
                       watchPayload.liveLb,
                       baseVerification.payload.liveLb,
                     );
+                    const paintedStations = schematicStationsForEmptyLive({
+                      livePayloadLb,
+                      watchStations: watchPayload.stations,
+                      fallbackStations: baseVerification.payload.stations,
+                    });
                     if (typeof liveFuelLb === 'number') {
                       stickyFuelRef.current.liveLb = liveFuelLb;
                     }
@@ -1051,13 +1059,8 @@ export function DispatchActivePanel(props: {
                         ...watchPayloadRest,
                         liveLb: livePayloadLb,
                         ok: payloadOk,
-                        ...(watchPayload.stations ||
-                        baseVerification.payload.stations
-                          ? {
-                              stations:
-                                watchPayload.stations ??
-                                baseVerification.payload.stations,
-                            }
+                        ...(paintedStations
+                          ? { stations: paintedStations }
                           : {}),
                         ...(stationMax ? { stationMax } : {}),
                       },

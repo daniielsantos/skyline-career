@@ -1,5 +1,17 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-30: **Micro-lot scraps (SBPV→SBEG $17 / 5 kg / 411 nm)** — resto pós-partial delivery abaixo de `SMALL_LOT_MIN_KG` (80) voltava `available` com pay pro-rata. Fix: `shrinkLotAfterDelivery(world)` + `pruneUnbookableMarketScraps` no expire/pós-NPC; Market esconde avail &lt; 80. UI 0.0 klb = arredondamento de ~5 kg.
+
+Atualizado 2026-08-30: **Day ~7 pulse `Dans` (tick 578)** — BR live **74%** (spoke fill ~25%); US live **70%** estável vs +2d, dead spoke ~65. Board ~7.3k, pay p50 ~$727. NPC util ~40% / ready ~11%. Ação feita: micro-lots. Ainda aberto: US spoke diluição, medium size mix, Hub Stats sampler.
+
+Atualizado 2026-08-30: **Hub Stats + economy samples** — **depois** de retunes de economia. Aba Stats no terminal (radar agora → histórico 7d/30d). Sampler diário por hub (fill/spot/lots/size bands) serve UI **e** diagnóstico global. Não implementar agora.
+
+Atualizado 2026-08-30: **Class board (Dans tick ~274)** — API viable ~96–100% em todas as classes (partial+range). **61% leftovers ≤450 kg**. Sweet 25–100% cap: GA ~49%, TP/LJ ~27–31% (kg p50 ainda ~450), **medium ~2.3%**, narrow ~12%, wide ~17%. Degrau fraco = medium / TP-full. JSON `economy-class-board-dans.json`; canvas `economy-class-board-dans.canvas.tsx`.
+
+Atualizado 2026-08-30: **Cold→warm +2d `Dans` (tick 1→194)** — BR live estável ~80%. **US live 89%→70%**, dead spoke **17→66** (diluição densify). Board **2.7k→8.1k**; electronics **0→2.3k** lots (~$34k p50); **general fill ~83%** (Dry sat). Não retunar `CARGO_FLOW_BALANCE` ainda — recheck +7d. Canvas: `economy-cold-vs-warm2d-dans.canvas.tsx`; JSON `economy-pulse-cold-vs-warm2d.json`.
+
+Atualizado 2026-08-30: **Cold pulse `Dans` (tick 1)** — BR live **81%** / US cargo-net **89%** (excl. 32 bushTripOnly); dead mostly spoke. Pay board p50 **$322** (loads ~450 kg) vs perishables p50 **~$5k**; electronics/machinery **0** lots no frio. Fill M/R/S ~45%. Não retunar ainda — repetir após 1–2 dias de economia. Artefato: `profiles/career/economy-pulse-cold-dans-diag.json`.
+
 Atualizado 2026-08-30: **Network Find hub** — combobox ICAO/nome no painel Network; `HubNetworkMap` `focusIcao`/`focusToken` faz `easeTo` no hub (anel azul); limpar o filtro volta ao fitBounds da rede. Home continua `is-home`.
 
 Atualizado 2026-08-30: **BR densify ICAO fix** — Carajás é **SBCJ** (não SBCI; SBCI = Carolina/MA no MSFS, ~168 nm off).

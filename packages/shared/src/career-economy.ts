@@ -12937,6 +12937,23 @@ function retireLotToOrigin(
   return refundKg;
 }
 
+/**
+ * Retire available market leftovers below the formation LTL floor.
+ * Cleans legacy scraps and any mid-tick remainder before the next expire pass.
+ */
+export function pruneUnbookableMarketScraps(world: CareerEconomyWorld): number {
+  let retired = 0;
+  for (const lot of world.lots) {
+    if (lot.status !== 'available') continue;
+    if (lot.reservedKg > 0) continue;
+    if (lot.quantityKg > 0 && lot.quantityKg < SMALL_LOT_MIN_KG) {
+      retireLotToOrigin(world, lot, 'recycled');
+      retired += 1;
+    }
+  }
+  return retired;
+}
+
 function expireLots(world: CareerEconomyWorld): void {
   for (const lot of world.lots) {
     // Only unbooked market remainder expires. Reserved / in_transit cargo is
@@ -12947,6 +12964,7 @@ function expireLots(world: CareerEconomyWorld): void {
       retireLotToOrigin(world, lot, 'expired');
     }
   }
+  pruneUnbookableMarketScraps(world);
   pruneDeadLots(world);
 }
 
@@ -13056,10 +13074,14 @@ function availableKg(lot: ShipmentLot): number {
  * After cargo leaves the lot (player or NPC delivery): shrink quantity +
  * reserved and **pro-rate payUsd / basePayUsd** so leftovers keep $/kg.
  * Without this, partial deliveries left tiny Loads with the full-lot Pay.
+ *
+ * Remainders below {@link SMALL_LOT_MIN_KG} are retired back to origin (same
+ * floor as formLots) so the board never lists micro scraps (e.g. 5 kg / $17).
  */
 export function shrinkLotAfterDelivery(
   lot: ShipmentLot,
   bookKg: number,
+  world?: CareerEconomyWorld,
 ): void {
   const delivered = Math.max(0, Math.floor(bookKg));
   if (delivered <= 0) return;
@@ -13086,6 +13108,9 @@ export function shrinkLotAfterDelivery(
   } else if (lot.reservedKg <= 0) {
     lot.reservedKg = 0;
     lot.status = 'available';
+    if (world && lot.quantityKg > 0 && lot.quantityKg < SMALL_LOT_MIN_KG) {
+      retireLotToOrigin(world, lot, 'recycled');
+    }
   } else {
     lot.status = 'reserved';
   }
@@ -14578,6 +14603,9 @@ function tickEconomyFinish(
   addTickPhaseMs(profile, 'npc', phaseAt);
   phaseAt = performance.now();
 
+  // NPC settles can leave sub-LTL scraps after expireLots already ran this tick.
+  pruneUnbookableMarketScraps(world);
+
   tickHubLevels(world);
   addTickPhaseMs(profile, 'hubLevels', phaseAt);
   phaseAt = performance.now();
@@ -14903,6 +14931,14 @@ export function listMarketLots(
     const avail = availableKg(lot);
     // Fully reserved crew-needed offers stay visible until accepted or timeout.
     if (avail <= 0 && !claim?.crewNeeded) {
+      continue;
+    }
+    // Below formation LTL floor — unflyable scraps (see pruneUnbookableMarketScraps).
+    if (
+      avail > 0 &&
+      avail < SMALL_LOT_MIN_KG &&
+      !claim?.crewNeeded
+    ) {
       continue;
     }
     if (opts.originIcao && lot.originIcao !== opts.originIcao.toUpperCase()) {

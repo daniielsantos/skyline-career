@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { shrinkLotAfterDelivery } from './career-economy.js';
+import {
+  createSeedEconomyWorld,
+  pruneUnbookableMarketScraps,
+  shrinkLotAfterDelivery,
+} from './career-economy.js';
 import type { ShipmentLot } from './types/career-economy.js';
 
 function sampleLot(overrides: Partial<ShipmentLot> = {}): ShipmentLot {
@@ -40,5 +44,47 @@ describe('shrinkLotAfterDelivery', () => {
     assert.equal(lot.status, 'delivered');
     assert.equal(lot.payUsd, 0);
     assert.equal(lot.basePayUsd, 0);
+  });
+
+  it('retires sub-LTL scraps to origin when world is passed', () => {
+    const world = createSeedEconomyWorld({ seed: 'lot-scrap-retire' });
+    const origin = world.airports.find((a) => a.icao === 'SBGR');
+    assert.ok(origin);
+    const pile = origin.inventory.electronics!;
+    const stockBefore = pile.stockKg;
+    // Partial claim: 95 kg reserved of a 100 kg lot; settle leaves 5 kg free.
+    const lot = sampleLot({
+      quantityKg: 100,
+      reservedKg: 95,
+      payUsd: 340,
+      basePayUsd: 340,
+    });
+    world.lots.push(lot);
+    shrinkLotAfterDelivery(lot, 95, world);
+    assert.equal(lot.status, 'expired');
+    assert.ok(lot.quantityKg < 80);
+    // Formation-reserve fraction of the unclaimed scrap returns to origin.
+    assert.ok(pile.stockKg > stockBefore);
+  });
+});
+describe('pruneUnbookableMarketScraps', () => {
+  it('recycles available leftovers below SMALL_LOT_MIN_KG', () => {
+    const world = createSeedEconomyWorld({ seed: 'lot-scrap-prune' });
+    world.lots.push(
+      sampleLot({
+        id: 'lot_scrap',
+        quantityKg: 5,
+        reservedKg: 0,
+        payUsd: 17,
+        basePayUsd: 16,
+        status: 'available',
+        originIcao: 'SBPV',
+        destIcao: 'SBEG',
+        commodityId: 'perishables',
+      }),
+    );
+    const retired = pruneUnbookableMarketScraps(world);
+    assert.equal(retired, 1);
+    assert.equal(world.lots.find((l) => l.id === 'lot_scrap')?.status, 'expired');
   });
 });

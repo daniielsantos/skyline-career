@@ -2582,7 +2582,7 @@ export function settleMission(
 
       const lot = world.lots.find((l) => l.id === line.shipmentLotId);
       if (lot) {
-        shrinkLotAfterDelivery(lot, line.cargoKg);
+        shrinkLotAfterDelivery(lot, line.cargoKg, world);
       }
 
       const isLast = i === working.lots.length - 1;

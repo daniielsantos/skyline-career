@@ -1958,7 +1958,7 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
     });
 
     if (lot) {
-      shrinkLotAfterDelivery(lot, flight.cargoKg);
+      shrinkLotAfterDelivery(lot, flight.cargoKg, world);
     }
   } else if (lot) {
     lot.quantityKg = 0;

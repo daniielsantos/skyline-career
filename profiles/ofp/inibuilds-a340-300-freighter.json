@@ -1,0 +1,64 @@
+{
+  "source": "simbrief",
+  "icao": "A343",
+  "ofpId": "inibuilds-a340-300-freighter",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "A340-300 Freighter EIS1",
+    "A340-300 Freighter EIS2"
+  ],
+  "matchTitlePattern": "A340-300.*Freighter",
+  "notes": [
+    "iniBuilds A340-300 Freighter EIS1/EIS2 — native-simbrief",
+    "Market SKU: inibuilds-a340-300 (family pack)",
+    "SimBrief row spelling: Preighter (iniBuilds (MSFS) - A340-300 Preighter), airframe_passengers=0",
+    "Homologated: inibuilds/a340-300-freighter-eis1@1.0.0, inibuilds/a340-300-freighter-eis2@1.0.0",
+    "Fuel: L/R MAIN + CENTER + CENTER2 + L/R AUX; write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A343",
+  "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A340-300 Preighter",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "baggage" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Station 12", "role": "baggage" },
+    { "simVarIndex": 13, "cfgIndex": 12, "name": "Station 13", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

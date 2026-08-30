@@ -254,7 +254,7 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
 
   // Cargo vs passenger / pax are distinct Market / OFP variants even when the
   // SimConnect tank/station fingerprint is identical (Learjet 35A, Saab 340, …).
-  const cargoRole = new Set(['cargo', 'freight', 'freighter', 'mail']);
+  const cargoRole = new Set(['cargo', 'freight', 'freighter', 'preighter', 'mail']);
   const paxRole = new Set(['passenger', 'passengers', 'pax', 'cabin']);
   const roleOf = (toks: string[]): 'cargo' | 'pax' | null => {
     if (toks.some((t) => cargoRole.has(t))) return 'cargo';
@@ -263,6 +263,10 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
   };
   const liveRole = roleOf(liveTokens);
   const profileRole = roleOf(profileTokenList);
+  // Cargo/freighter is explicit: unmarked pax titles ("A340-300 EIS1") must not
+  // alias onto "A340-300 Freighter EIS1" via shared model tokens + same tank hash.
+  if (profileRole === 'cargo' && liveRole !== 'cargo') return false;
+  if (liveRole === 'cargo' && profileRole !== 'cargo') return false;
   if (liveRole && profileRole && liveRole !== profileRole) {
     return false;
   }
@@ -311,6 +315,9 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     'vip',
     'exec',
     'executive',
+    // iniBuilds A340 EIS avionics suites — EIS1 must not alias onto EIS2.
+    'eis1',
+    'eis2',
     'combi',
     'commuter',
     'skydive',

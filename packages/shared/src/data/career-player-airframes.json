@@ -1240,6 +1240,30 @@
     "fuelBurnKgPerNm": 9
   },
   {
+    "typeId": "inibuilds-a340-300",
+    "aircraftClassId": "wide_freighter",
+    "label": "A340-300",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-a340-300.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/inibuilds-a340-300.json",
+      "profiles/ofp/inibuilds-a340-300-freighter.json",
+      "profiles/ofp/inibuilds-a340-300-vip.json"
+    ],
+    "simbriefIcao": "A343",
+    "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A340-300 Passenger",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 279,
+    "oewKg": 123000,
+    "mtowKg": 276424,
+    "mzfwKg": 183000,
+    "maxCargoKg": 60000,
+    "fuelCapacityKg": 113200,
+    "maxRangeNm": 7000,
+    "cruiseSpeedKt": 470,
+    "fuelBurnKgPerNm": 10
+  },
+  {
     "typeId": "inibuilds-a350-1000-default-cabin",
     "aircraftClassId": "wide_freighter",
     "label": "A350-1000 Default Cabin",

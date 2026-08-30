@@ -144,6 +144,29 @@ describe('titlesMatchForCatalog', () => {
     );
   });
 
+  it('does not alias unmarked A340 EIS onto Freighter (same structural hash)', () => {
+    assert.equal(
+      titlesMatchForCatalog('A340-300 EIS1', 'A340-300 Freighter EIS1'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('A340-300 EIS2', 'A340-300 Freighter EIS1'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('A340-300 Freighter EIS2', 'A340-300 Freighter EIS1'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('A340-300 Freighter EIS1', 'A340-300 Freighter EIS1'),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog('A340-300 VIP EIS1', 'A340-300 Freighter EIS1'),
+      false,
+    );
+  });
+
   it('does not alias BN2 Passenger Tip Tanks onto SpecialOps or Cargo', () => {
     assert.equal(
       titlesMatchForCatalog(

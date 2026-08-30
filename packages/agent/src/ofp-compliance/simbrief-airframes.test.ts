@@ -450,6 +450,23 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       'Fenix Simulations \\(MSFS\\) - A319 IAE$',
     );
     assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A340-300 EIS1'),
+      'iniBuilds \\(MSFS\\) - A340-300 Passenger',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A340-300 Freighter EIS2'),
+      'iniBuilds \\(MSFS\\) - A340-300 Preighter',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A340-300 VIP EIS1'),
+      'iniBuilds \\(MSFS\\) - A340-300 VIP',
+    );
+    assert.equal(liveTitleMatchesMarketSku('A340-300 EIS1', 'inibuilds-a340-300'), true);
+    assert.equal(
+      liveTitleMatchesMarketSku('A340-300 Freighter EIS1', 'inibuilds-a340-300'),
+      true,
+    );
+    assert.equal(
       inferSimBriefAirframeMatchFromTitle('A330-200 (GE)'),
       'iniBuilds \\(MSFS\\) - A330-200 GE',
     );

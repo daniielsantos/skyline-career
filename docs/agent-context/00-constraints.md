@@ -32,6 +32,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - Corvalis C400: SimBrief ICAO real **COL4** não existe no airframe list → proxy **`SR2T`**. OFP pode imprimir **S22T** / **SR22T** (alias Intent→OFP).
 - PMDG **738 BBJ2** fica **fora do Market** (`enabled: false`) até OEW bater com SimBrief Dual Class (empty live ~102.2 klb vs OEW ~93k).
 - Arte dos cards: `docs/market-airframe-card-prompts.md` + `AIRFRAME_CARD_ART` em `AircraftCards.tsx`. Um PNG por SKU de Market, não por vidro.
+- A340-300 iniBuilds: um SKU `inibuilds-a340-300`; SimBrief **Passenger / Preighter / VIP** (não Default). Freighter glass → Preighter. Fingerprint: freighter exige token cargo no título (mesmo `structuralHash` pax/VIP/EIS).
 - Jets `pax_and_cargo`: **não** empilhar todo mismatch em `efbPaxWeightLb`. Causas distintas (pax lb EFB, slots SimConnect, hold &lt; bag, OEW Default≠glass, ghosts) — playbook: `docs/agent-context/12-pax-efb-due.md`. Ao fechar um diagnóstico, **atualizar esse `.md` no mesmo turno**.
 - Homologação colaborativa: **não** implementar sem pedido. Esboço: `docs/agent-context/13-collaborative-homologation.md`. Formulário ≠ compra Hangar; captura ≠ listar Market.
 

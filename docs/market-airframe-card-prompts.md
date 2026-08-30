@@ -1273,6 +1273,38 @@ CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## iniBuilds A330-300
+- **typeId:** `inibuilds-a330-300`
+- **file:** `a330-300.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A330-300 widebody twinjet (A333), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: twin underwing engines, Airbus A330 nose and cockpit, dense passenger window row, tall A330 tail with bullet fairing, retractable gear down, longer -300 fuselage vs A330-200. Must read as A330-300 at a glance — not A350, not A340 (only two engines), not freighter (windows present).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## iniBuilds A340-300
+- **typeId:** `inibuilds-a340-300`
+- **file:** `a340-300.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A340-300 widebody quadjet (A343), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: FOUR underwing engines (two per side), Airbus A340 nose and cockpit, dense passenger window row, tall tail with bullet fairing, gear down, shorter -300 fuselage vs A340-600. Four engines essential — distinguishes from A330/A350 twinjet. Not freighter (windows present).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ## ToLiss A346 PRO Preset Pax
 - **typeId:** `toliss-toliss-a346-pro-preset-pax`
 - **file:** `a346.png`

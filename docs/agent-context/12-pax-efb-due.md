@@ -36,7 +36,26 @@ Watch **Sim** = soma **passenger + baggage** do pack (não todas as caixas). Air
 
 **Fenix:** o EFB (ZFW live) pode zerar pax/cargo enquanto `PAYLOAD STATION WEIGHT` fica cheio. Se `payloadSource` for mass-balance (gross−empty−fuel), Loaded vs Due usa esse número — não a soma S3–S16.
 
-LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mão; INSTANT LOAD. Due = payload OFP; **sem** `efbPaxWeightLb` no teto MZFW (pax EFB 185 come cargo). Família 82/83/88 = mesmo mapa S1–S4.
+### Maddog (MD-82/83/88) — “nunca batia” ≠ leitura Skyline
+
+Medição típica (Y162, LB): Due = Payload OFP (**40 792** = 162×175 + bags). Depois de LOAD OFP / IMPORT:
+
+| | lb |
+|--|--|
+| EFB ZFW − DOW (= Sim stations S1–S4) | **47 110** |
+| Due OFP | **40 792** |
+| Delta | **~6 318** |
+
+Decomposição do delta:
+
+1. **Cabine 185 vs SimBrief 175:** S1+S2 ≈ 162×185 = 29 970 vs 28 350 → **+1 620**
+2. **Bags empilhados no hold:** EFB FWD + AFT (= OFP bags) **e** AFT CGO Bags de novo → S4 ≈ AFT + bags (ex. 6221+4698=10 919) → **+~4 698**
+
+EFB mostra **CHECK ENTRIES** / ZFW acima do MZFW (122 000). **Não** é ghost station nem OEW Default: Skyline Sim = EFB; o tablet é que sobrou carga vs OFP.
+
+**Ritual verde:** `LOAD OFP` (não IMPORT FROM SIMBRIEF) → cortar cargo ao **MZFW** → **INSTANT LOAD** → CG à mão. Due fica no Payload OFP; **sem** `efbPaxWeightLb` (185 come room de cargo no teto MZFW). Live bom: ZFW EFB ≈ 122 000 → Sim ≈ Due (~40 793). Pack: S1/S2 cabine, S3/S4 holds, **S5 config fora**, S6/S7 crew fora.
+
+LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo mapa S1–S4.
 
 ## Checklist no ar (novo airframe)
 
@@ -62,6 +81,7 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Cortar ao MZFW e CG à mã
 | `microsoft-a321lr` | 220 | `efbPaxWeightLb: 188` (153 pax: Sim 37127 vs OFP 35164). **Fuel:** EFB APPLY **não** grava FOB (bug iniBuilds A321LR); usar EFB/slider **padrão do MSFS**. Watch C = CENTER+CENTER2; TOTAL pode ser > L+R+C |
 | `inibuilds-a330-200` | 257 | SimBrief **iniBuilds GE/RR** (OEW 116t = EFB Dry). Default OEW ~270k → APPLY ZFW inflates stations by ~14.5k vs OFP Payload |
 | `inibuilds-a330-300` | 291 | Same: iniBuilds GE/RR (P2F → P2F rows); not A333 Default |
+| `inibuilds-a340-300` | 279 (Passenger) | **A343** Passenger / Preighter / VIP — not Default. Freighter glass → Preighter (0 pax). Family packs pax/freighter/VIP |
 | `fenix-a320` | 180 | `simconnectEmptyPayloadBiasLb: 2591` — sem `efbPaxWeightLb` |
 | `fenix-a319` | 150 | `simconnectEmptyPayloadBiasLb: 2642` — sem `efbPaxWeightLb` |
 | `fenix-a321` | 230 | `simconnectEmptyPayloadBiasLb: 2201` — sem `efbPaxWeightLb`; 8 vidros CFM/IAE × SL/WF × TC/SC |

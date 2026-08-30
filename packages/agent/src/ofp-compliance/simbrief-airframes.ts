@@ -185,6 +185,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/A320neo\s*V2\b/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A320neo V2';
   }
+  const inibuildsA340 = inferIniBuildsA340SimBriefMatch(t);
+  if (inibuildsA340) return inibuildsA340;
   const inibuildsA330 = inferIniBuildsA330SimBriefMatch(t);
   if (inibuildsA330) return inibuildsA330;
   const inibuildsA350 = inferIniBuildsA350SimBriefMatch(t);
@@ -337,6 +339,9 @@ export function liveTitleMatchesMarketSku(
   if (id === 'leonardo-fly-the-maddog-x-md-88-20th') {
     return /Fly The Maddog X MD-88 20th/i.test(t);
   }
+  if (id === 'inibuilds-a340-300') {
+    return /\bA340-300\b/i.test(t);
+  }
   if (id === 'inibuilds-a330-200') {
     return /\bA330-200\b/i.test(t);
   }
@@ -400,6 +405,18 @@ function inferPmdg777200erSimBriefMatch(title: string): string | undefined {
     return 'PMDG \\(MSFS\\) - Trent 892 - Default MTOW';
   }
   return undefined;
+}
+
+/** iniBuilds A340-300 — Passenger / Preighter (freighter) / VIP; not Default OEW. */
+function inferIniBuildsA340SimBriefMatch(title: string): string | undefined {
+  if (!/\bA340-300\b/i.test(title)) return undefined;
+  if (/\bFreighter\b|\bPreighter\b/i.test(title)) {
+    return 'iniBuilds \\(MSFS\\) - A340-300 Preighter';
+  }
+  if (/\bVIP\b/i.test(title)) {
+    return 'iniBuilds \\(MSFS\\) - A340-300 VIP';
+  }
+  return 'iniBuilds \\(MSFS\\) - A340-300 Passenger';
 }
 
 /** iniBuilds A330 — Default OEW is ~14.5k lb heavy vs EFB Dry; use MSFS GE/RR rows. */

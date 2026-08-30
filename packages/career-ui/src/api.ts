@@ -1915,7 +1915,8 @@ export type PortsSnapshot = {
       fillPct: number;
       hubIcao: string;
     }>;
-    inbound?: {
+    /** Next factory discharge clock (always present; totalKg may be 0). */
+    inbound: {
       arrivesAtTick: number;
       ticksLeft: number;
       totalKg: number;
@@ -1924,7 +1925,7 @@ export type PortsSnapshot = {
         commodityName: string;
         kg: number;
       }>;
-    } | null;
+    };
     concession?: {
       status: 'vacant' | 'yours' | 'held';
       companyId: string | null;

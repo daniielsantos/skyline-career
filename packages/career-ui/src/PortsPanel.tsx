@@ -2315,18 +2315,20 @@ export function PortsPanel(props: {
                               );
                             })}
                           </div>
-                          {port.inbound && port.inbound.totalKg > 0 ? (
-                            <p className="muted ports-inbound-note">
-                              Next discharge
-                              {port.inbound.ticksLeft <= 0
-                                ? ' arriving with the next economy tick'
-                                : ` in ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
-                              {' · '}
-                              {props.formatTonnes(port.inbound.totalKg)}
-                            </p>
-                          ) : null}
                         </details>
                       ) : null}
+                      <p
+                        className="ports-discharge-strip muted"
+                        aria-label="Next factory discharge"
+                      >
+                        Next discharge
+                        {port.inbound.ticksLeft <= 0
+                          ? ' · with the next economy tick'
+                          : ` · ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
+                        {port.inbound.totalKg > 0
+                          ? ` · ~${props.formatTonnes(port.inbound.totalKg)} estimated`
+                          : ''}
+                      </p>
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead>
@@ -2345,10 +2347,8 @@ export function PortsPanel(props: {
                             <tr>
                               <td colSpan={7}>
                                 <p className="empty">
-                                  {port.inbound && port.inbound.ticksLeft > 0
-                                    ? `No open listings — next factory discharge in ~${ticksToHoursLabel(port.inbound.ticksLeft)} (economy tick). Not a bug — leave Career open or check back.`
-                                    : 'No open listings — wait for the next factory discharge on the economy tick (~15 min).'}
-
+                                  No open listings — they spawn from yard stock
+                                  after discharge.
                                 </p>
                               </td>
                             </tr>

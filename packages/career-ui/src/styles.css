@@ -6577,16 +6577,6 @@ table.contracts-table tbody tr.is-selected:hover td {
   font: inherit;
 }
 
-.airport-sat-map .maplibregl-ctrl-attrib {
-  background: rgba(12, 12, 14, 0.75) !important;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.65rem;
-}
-
-.airport-sat-map .maplibregl-ctrl-attrib a {
-  color: rgba(110, 168, 254, 0.8);
-}
-
 .airport-sat-map .maplibregl-ctrl-group {
   background: #16161a;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -8862,6 +8852,12 @@ textarea {
 }
 
 /* -- Network map (OpenFreeMap Dark / MapLibre) ------------- */
+/* Tile attribution lives in page help / About — keep map chrome clean. */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-logo {
+  display: none !important;
+}
+
 .network-map-panel {
   display: flex;
   flex-direction: column;
@@ -8887,16 +8883,6 @@ textarea {
 
 .hub-network-map .maplibregl-map {
   font: inherit;
-}
-
-.hub-network-map .maplibregl-ctrl-attrib {
-  background: rgba(12, 12, 14, 0.75) !important;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.65rem;
-}
-
-.hub-network-map .maplibregl-ctrl-attrib a {
-  color: rgba(240, 193, 75, 0.75);
 }
 
 .hub-network-map .maplibregl-ctrl-group {
@@ -9151,16 +9137,6 @@ span.dispatch-route-hub-dest {
 
 .dispatch-route-map .maplibregl-map {
   font: inherit;
-}
-
-.dispatch-route-map .maplibregl-ctrl-attrib {
-  background: rgba(12, 12, 14, 0.75) !important;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.65rem;
-}
-
-.dispatch-route-map .maplibregl-ctrl-attrib a {
-  color: rgba(110, 168, 254, 0.8);
 }
 
 .dispatch-route-map .maplibregl-ctrl-group {
@@ -10576,9 +10552,10 @@ span.dispatch-route-hub-dest {
   margin-top: 0.45rem;
 }
 
-.ports-inbound-note {
-  margin: 0.45rem 0 0;
-  font-size: 0.8rem;
+.ports-discharge-strip {
+  margin: 0.55rem 0.65rem 0.15rem;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .ports-concession-dialog {
@@ -10749,16 +10726,6 @@ span.dispatch-route-hub-dest {
 
 .ports-map .maplibregl-map {
   font: inherit;
-}
-
-.ports-map .maplibregl-ctrl-attrib {
-  background: rgba(12, 12, 14, 0.75) !important;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.65rem;
-}
-
-.ports-map .maplibregl-ctrl-attrib a {
-  color: rgba(240, 163, 90, 0.85);
 }
 
 .ports-map .maplibregl-ctrl-group {

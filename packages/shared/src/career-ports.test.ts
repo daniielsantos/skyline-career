@@ -917,6 +917,20 @@ describe('career ports', () => {
         (s) => s.commodityId === 'electronics' && s.balance === 'surplus',
       ),
     );
+    assert.ok(santos!.inbound);
+    assert.ok(Number.isFinite(santos!.inbound.arrivesAtTick));
+    assert.ok(santos!.inbound.ticksLeft >= 0);
+  });
+
+  it('always exposes next-discharge clock even when estimated inbound kg is 0', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-inbound-clock' });
+    const snap = portSnapshot(world, emptyMissionsStateV2());
+    for (const port of snap.ports) {
+      assert.ok(port.inbound, port.id);
+      assert.ok(port.inbound.arrivesAtTick >= world.tick, port.id);
+      assert.ok(port.inbound.ticksLeft >= 0, port.id);
+      assert.ok(Array.isArray(port.inbound.cargo), port.id);
+    }
   });
 
   it('migrateEconomyWorld keeps port listings', () => {

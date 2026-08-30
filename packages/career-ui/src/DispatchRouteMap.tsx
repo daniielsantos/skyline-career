@@ -348,7 +348,7 @@ export function DispatchRouteMap(props: {
       style: OPENFREEMAP_DARK,
       center: [props.origin.lon, props.origin.lat],
       zoom: 5,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;

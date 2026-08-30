@@ -150,7 +150,7 @@ export function PortsMap(props: {
       style: OPENFREEMAP_DARK,
       center: [-46.5, -24.5],
       zoom: 5.2,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;

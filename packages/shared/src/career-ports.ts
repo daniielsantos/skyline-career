@@ -2591,6 +2591,7 @@ export function portSnapshot(
       }>;
       /** Pickup-hub surplus / tight signals (Loop B UI). */
       marketSignals: PortMarketSignal[];
+      /** Next factory discharge clock (always set; totalKg may be 0). */
       inbound: {
         arrivesAtTick: number;
         ticksLeft: number;
@@ -2600,7 +2601,7 @@ export function portSnapshot(
           commodityName: string;
           kg: number;
         }>;
-      } | null;
+      };
       concession: {
         status: 'vacant' | 'yours' | 'held';
         companyId: string | null;
@@ -2739,18 +2740,15 @@ export function portSnapshot(
           commodityName: getCommodity(row.commodityId).name,
         })),
         marketSignals: portPickupMarketSignals(world, port.pickupHubs),
-        inbound:
-          inboundTotal > 0
-            ? {
-                arrivesAtTick,
-                ticksLeft: Math.max(0, arrivesAtTick - world.tick),
-                totalKg: inboundTotal,
-                cargo: inboundCargo.map((row) => ({
-                  ...row,
-                  commodityName: getCommodity(row.commodityId).name,
-                })),
-              }
-            : null,
+        inbound: {
+          arrivesAtTick,
+          ticksLeft: Math.max(0, arrivesAtTick - world.tick),
+          totalKg: inboundTotal,
+          cargo: inboundCargo.map((row) => ({
+            ...row,
+            commodityName: getCommodity(row.commodityId).name,
+          })),
+        },
         concession: {
           status: yours ? 'yours' : op ? 'held' : 'vacant',
           companyId: op?.companyId ?? null,

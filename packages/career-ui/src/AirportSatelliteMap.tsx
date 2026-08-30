@@ -100,7 +100,7 @@ function AirportSatelliteMapCanvas(props: {
       center: [props.lon, props.lat],
       zoom: 14.6,
       maxZoom: 18,
-      attributionControl: { compact: true },
+      attributionControl: false,
       transformRequest: (url) => ({
         url: withMapTilerSession(url, props.apiKey),
       }),

@@ -74,7 +74,7 @@ export function HubNetworkMap(props: {
       style: OPENFREEMAP_DARK,
       center: [-40, 10],
       zoom: 2.4,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;

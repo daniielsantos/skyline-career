@@ -1877,7 +1877,7 @@ export type PortMarketSignal = {
 };
 
 /**
- * Pickup-hub stock pressure for a port — drives surplus / tight chips (Loop B).
+ * Pickup-hub stock pressure for a port — drives Hub pressure line (Loop B).
  * Across multiple hubs, keeps the commodity row with the strongest imbalance.
  */
 export function portPickupMarketSignals(

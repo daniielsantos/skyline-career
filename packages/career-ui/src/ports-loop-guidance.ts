@@ -11,8 +11,20 @@ export type PortsLoopStep =
       kg: number;
       holdUsdPerDay: number;
     }
+  | {
+      kind: 'wait_inbound';
+      kg: number;
+      hubIcao: string;
+      /** Economy ticks until earliest arrival; 0 = due any moment. */
+      ticksLeft: number;
+    }
   | { kind: 'fulfill_demand'; matchCount: number }
-  | { kind: 'wait_demand'; stockKg: number }
+  | {
+      kind: 'wait_demand';
+      stockKg: number;
+      /** Open board rows (any filter) — drives CTA / empty copy. */
+      openDemandCount: number;
+    }
   | { kind: 'buy_port' };
 
 export type PortsLoopSection = 'catalog' | 'warehouse' | 'demand';
@@ -21,6 +33,7 @@ export function portsLoopTargetSection(step: PortsLoopStep): PortsLoopSection {
   switch (step.kind) {
     case 'buy_warehouse':
     case 'store_yard':
+    case 'wait_inbound':
       return 'warehouse';
     case 'fulfill_demand':
     case 'wait_demand':
@@ -42,6 +55,13 @@ export function derivePortsLoopStep(input: {
     holdUsdPerDay?: number;
   }>;
   demand: Array<{ commodityId: string; remainingKg: number }>;
+  /** Port→WH transfers not yet in stock. */
+  inboundTransfers?: Array<{
+    hubIcao: string;
+    kg: number;
+    readyAtTick: number;
+  }>;
+  economyTick?: number;
 }): PortsLoopStep {
   if (input.warehouseCount <= 0) {
     return { kind: 'buy_warehouse' };
@@ -67,6 +87,32 @@ export function derivePortsLoopStep(input: {
 
   const stockLots = input.stock.filter((s) => s.kg > 0);
   const stockKg = stockLots.reduce((sum, s) => sum + s.kg, 0);
+
+  const inbound = (input.inboundTransfers ?? []).filter((t) => t.kg > 0);
+  if (stockKg <= 0 && inbound.length > 0) {
+    const kg = inbound.reduce((sum, t) => sum + t.kg, 0);
+    const tick =
+      typeof input.economyTick === 'number' && Number.isFinite(input.economyTick)
+        ? input.economyTick
+        : 0;
+    let ticksLeft = Number.POSITIVE_INFINITY;
+    let hubIcao = inbound[0]!.hubIcao.trim().toUpperCase();
+    for (const t of inbound) {
+      const left = Math.max(0, Math.round(t.readyAtTick) - Math.round(tick));
+      if (left < ticksLeft) {
+        ticksLeft = left;
+        hubIcao = t.hubIcao.trim().toUpperCase();
+      }
+    }
+    if (!Number.isFinite(ticksLeft)) ticksLeft = 0;
+    return {
+      kind: 'wait_inbound',
+      kg,
+      hubIcao,
+      ticksLeft,
+    };
+  }
+
   if (stockKg <= 0) {
     return { kind: 'buy_port' };
   }
@@ -75,8 +121,10 @@ export function derivePortsLoopStep(input: {
     stockLots.map((s) => s.commodityId.trim().toLowerCase()),
   );
   let matchCount = 0;
+  let openDemandCount = 0;
   for (const order of input.demand) {
     if (order.remainingKg <= 0) continue;
+    openDemandCount += 1;
     if (stockCommodities.has(order.commodityId.trim().toLowerCase())) {
       matchCount += 1;
     }
@@ -84,5 +132,5 @@ export function derivePortsLoopStep(input: {
   if (matchCount > 0) {
     return { kind: 'fulfill_demand', matchCount };
   }
-  return { kind: 'wait_demand', stockKg };
+  return { kind: 'wait_demand', stockKg, openDemandCount };
 }

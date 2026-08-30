@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-29: **Ports buy modal** — surplus acima do free WH vai para **yard hold** (taxa/dia); só o que cabe entra em inbound. UI: input estilo `cargo-amount` (sem spinner nativo), presets Fill WH / 50% / Max, split WH vs yard na confirmação.
+
+Atualizado 2026-08-29: **Ports loop guidance slice 1** (career-ui) — `wait_inbound` quando WH vazio mas transfer em trânsito (não cair em `buy_port`); banner CTA após Store aponta Demand; hint na aba Demand + empty copy (tick / All destinations). Ver `ports-loop-guidance.ts`. Próximo slice: idle/discharge feel; Demand por porto depois.
+
 Atualizado 2026-08-29: Desktop **0.3.49** shipped — classes validadas, Market ~80 famílias (A340, etc.), Comanche maxLoad 500, MD-11F Due clamp, A330/A340 SimBrief rows. Installer: [v0.3.49](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.49). Próximo: economia que “respira” no solo (não frota).
 
 Atualizado 2026-08-29: **Todas as classes econômicas validadas** em live (inject / OFP / leituras). Catálogo Market ~80 famílias. Comanche Character maxLoad 500 (cap 300 → Sim~600 vs Due 800).

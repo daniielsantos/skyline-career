@@ -31,7 +31,7 @@ Surplus **não** infinito: cap buy/dia + restock lento (discharge %) + concorrê
 
 **Realização da revenda:** WH → **Demand board** (já existe). Não é listar de volta no porto.
 
-**UI (SP):** Ports mostra chips `surplus` / `tight` por commodity a partir do fill do pickup hub (`portPickupMarketSignals` em `career-ports.ts`).
+**UI (SP):** Ports mostra prosa `Hub pressure · ICAO commodity high|low` a partir do fill do pickup hub (`portPickupMarketSignals` em `career-ports.ts`).
 
 ### C) Revenda porto → porto (bolsa no terminal) — **CAI**
 

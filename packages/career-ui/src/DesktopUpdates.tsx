@@ -202,12 +202,12 @@ export function DesktopUpdatesCard() {
   );
 }
 
-/** Compact toast/banner when an update is available while playing. */
-export function DesktopUpdateBanner(props: {
+/** Compact topbar control when a desktop update is available or ready. */
+export function DesktopUpdateHeaderButton(props: {
   onOpenSettings: () => void;
 }) {
   const desktop = getDesktop();
-  const [notice, setNotice] = useState<string | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -215,32 +215,36 @@ export function DesktopUpdateBanner(props: {
     return desktop.onUpdateEvent((ev) => {
       if (ev.type === 'available') {
         setReady(false);
-        setNotice(`Update ${ev.version} available`);
+        setVersion(ev.version);
       } else if (ev.type === 'downloaded') {
         setReady(true);
-        setNotice(`Update ${ev.version} ready — open installer`);
+        setVersion(ev.version);
       }
     });
   }, [desktop]);
 
-  if (!desktop || !notice) return null;
+  if (!desktop || !version) return null;
+
+  const label = ready ? `Install ${version}` : `Update ${version}`;
+  const title = ready
+    ? `Version ${version} downloaded — open the installer`
+    : `Version ${version} available — open Settings to download`;
 
   return (
-    <p className="banner ok" role="status">
-      <span>{notice}</span>
-      <button
-        type="button"
-        className="action"
-        onClick={() => {
-          if (ready) {
-            void desktop.quitAndInstall();
-          } else {
-            props.onOpenSettings();
-          }
-        }}
-      >
-        {ready ? 'Install' : 'Settings'}
-      </button>
-    </p>
+    <button
+      type="button"
+      className={`topbar-update-btn${ready ? ' is-ready' : ''}`}
+      title={title}
+      aria-label={title}
+      onClick={() => {
+        if (ready) {
+          void desktop.quitAndInstall();
+        } else {
+          props.onOpenSettings();
+        }
+      }}
+    >
+      {label}
+    </button>
   );
 }

@@ -158,7 +158,7 @@ import { AirportNamesProvider, IcaoLink } from './IcaoLink';
 import { BusyBlock, BusyChip, TableSkeleton } from './Busy';
 import { CareerProfileManage, ProfileGate, ProfileGateLoading } from './ProfileGate';
 import {
-  DesktopUpdateBanner,
+  DesktopUpdateHeaderButton,
   DesktopUpdatesCard,
 } from './DesktopUpdates';
 import { CrewFlyControls } from './CrewFlyControls';
@@ -9322,6 +9322,9 @@ export function App() {
             <h1>
               {pageTitle}
               {pageHelp ? <PageHelpButton help={pageHelp} /> : null}
+              <DesktopUpdateHeaderButton
+                onOpenSettings={() => selectTab('settings')}
+              />
             </h1>
             <p className="lede">
               {pageLede}
@@ -9513,7 +9516,6 @@ export function App() {
           </span>
         </p>
       ) : null}
-      <DesktopUpdateBanner onOpenSettings={() => selectTab('settings')} />
 
       {!hubSelected ? (
         <section className="panel hub-picker" role="dialog" aria-labelledby="hub-picker-title">

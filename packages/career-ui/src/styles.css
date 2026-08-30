@@ -557,6 +557,40 @@ body {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
+.topbar-update-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  color: var(--ink);
+  font-family: var(--font-ui, inherit);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.topbar-update-btn:hover,
+.topbar-update-btn:focus-visible {
+  background: color-mix(in srgb, var(--accent) 32%, var(--surface));
+  border-color: var(--accent);
+}
+
+.topbar-update-btn.is-ready {
+  border-color: color-mix(in srgb, #6dca8a 60%, var(--line));
+  background: color-mix(in srgb, #6dca8a 22%, var(--surface));
+}
+
+.topbar-update-btn.is-ready:hover,
+.topbar-update-btn.is-ready:focus-visible {
+  background: color-mix(in srgb, #6dca8a 36%, var(--surface));
+}
+
 .page-help-dialog {
   width: min(100%, 28rem);
 }

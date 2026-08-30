@@ -248,6 +248,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'inibuilds-a350-1000-default-cabin': '/airframes/a350-1000.png',
   'inibuilds-a330-200': '/airframes/a330-200.png',
   'inibuilds-a330-300': '/airframes/a330-300.png',
+  'inibuilds-a340-300': '/airframes/a340-300.png',
   'toliss-toliss-a346-pro-preset-pax': '/airframes/a346.png',
 };
 

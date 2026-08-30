@@ -1,3 +1,7 @@
+# Current state (2026-08-29)
+
+`main` **4441b01** / desktop **0.3.49** shipped: Market ~80 famílias (A340-300 + packs), classes validadas inject/OFP, MD-11F Due vs discovery 500×N, A330/A340 iniBuilds SimBrief rows, Comanche Character maxLoad 500. Release: [v0.3.49](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.49).
+
 # Current state (2026-08-22)
 
 `main` **228d6c1** (não é release desktop): hours AF/ENG mexem MX + resale; hangar reconcilia missão fantasma; orphan cancel no write; cruise sample VS 200; Dispatch **Settling…** no auto-settle; Watch não espera persist de airborne nem 1,5s no próprio tick. Arquitetura persist/MP: `docs/agent-context/11-persist-commands.md`.
@@ -8,7 +12,8 @@
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.48** (latest) | [v0.3.48](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.48) | PMDG 777-200ER/LR/300ER Skyline CDU inject + pax packs; Fenix A321 fingerprint; manifest edit lot caps |
+| **0.3.49** (latest) | [v0.3.49](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.49) | Classes validadas; A340 Market; MD-11F Due clamp; Comanche 500; A330/A340 SimBrief |
+| **0.3.48** | [v0.3.48](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.48) | PMDG 777-200ER/LR/300ER Skyline CDU inject + pax packs; Fenix A321 fingerprint; manifest edit lot caps |
 | **0.3.47** | [v0.3.47](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.47) | Ground staff (5 perks + grades); WH T1/T2/T3; Ports shelf polish |
 | **0.3.46** | [v0.3.46](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.46) | Desktop icon zoomed to MD-11F nose (readable at small sizes) |
 | **0.3.45** | [v0.3.45](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.45) | MD-11F brand (hero lockup + sidebar mark) + desktop icon |

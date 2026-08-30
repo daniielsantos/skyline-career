@@ -1,6 +1,8 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-29: **Todas as classes econômicas validadas** em live (inject / OFP / leituras). Catálogo Market ~80 famílias. Próximo foco: polish de produto / retenção, não expandir frota à força. Comanche Character maxLoad 500 (cap 300 → Sim~600 vs Due 800).
+Atualizado 2026-08-29: Desktop **0.3.49** shipped — classes validadas, Market ~80 famílias (A340, etc.), Comanche maxLoad 500, MD-11F Due clamp, A330/A340 SimBrief rows. Installer: [v0.3.49](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.49). Próximo: economia que “respira” no solo (não frota).
+
+Atualizado 2026-08-29: **Todas as classes econômicas validadas** em live (inject / OFP / leituras). Catálogo Market ~80 famílias. Comanche Character maxLoad 500 (cap 300 → Sim~600 vs Due 800).
 
 Atualizado 2026-08-29: **iniBuilds A340-300** no Market (`inibuilds-a340-300`) — packs pax/freighter/VIP; SimBrief Passenger/Preighter/VIP; card `a340-300.png` linkado.
 

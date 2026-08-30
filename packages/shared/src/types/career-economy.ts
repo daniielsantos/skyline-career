@@ -1237,6 +1237,11 @@ export type DemandOrderStatus = 'open' | 'filled' | 'expired';
 
 export interface DemandOrder {
   id: string;
+  /**
+   * Seaport desk this buy-order belongs to (per-port Demand board).
+   * Missing on legacy rows — ensureDemandOrders expires those.
+   */
+  portId?: string;
   destIcao: string;
   commodityId: CommodityId;
   wantedKg: number;

@@ -194,11 +194,13 @@ export function ensureV5Ddl(db: SqliteDb): void {
       arrived_at_tick INTEGER NOT NULL,
       expires_at_tick INTEGER NOT NULL,
       status TEXT NOT NULL,
+      port_id TEXT,
       payload_json TEXT,
       PRIMARY KEY (world_id, id)
     );
     CREATE INDEX IF NOT EXISTS demand_orders_status_idx ON demand_orders(world_id, status);
     CREATE INDEX IF NOT EXISTS demand_orders_dest_idx ON demand_orders(world_id, dest_icao);
+    -- demand_orders_port_idx created after ALTER (existing saves lack port_id until then)
 
     CREATE TABLE IF NOT EXISTS port_listings (
       world_id TEXT NOT NULL,
@@ -240,6 +242,18 @@ export function ensureV5Ddl(db: SqliteDb): void {
     );
   } catch {
     /* column already exists */
+  }
+  try {
+    db.exec(`ALTER TABLE demand_orders ADD COLUMN port_id TEXT`);
+  } catch {
+    /* column already exists */
+  }
+  try {
+    db.exec(
+      `CREATE INDEX IF NOT EXISTS demand_orders_port_idx ON demand_orders(world_id, port_id, status)`,
+    );
+  } catch {
+    /* index already exists */
   }
 }
 
@@ -552,7 +566,7 @@ export function readDemandOrders(
   const rows = db
     .prepare(
       `SELECT id, dest_icao, commodity_id, wanted_kg, remaining_kg, max_unit_price_usd,
-              arrived_at_tick, expires_at_tick, status, payload_json
+              arrived_at_tick, expires_at_tick, status, port_id, payload_json
        FROM demand_orders WHERE world_id = ? ORDER BY expires_at_tick ASC, id ASC`,
     )
     .all(worldId) as Array<Record<string, unknown>>;
@@ -573,7 +587,13 @@ export function readDemandOrders(
       expiresAtTick: sqlNum(r.expires_at_tick),
       status,
     };
-    return { ...extra, ...order };
+    const portIdCol = sqlText(r.port_id);
+    if (portIdCol) order.portId = portIdCol;
+    const merged = { ...extra, ...order } as DemandOrder;
+    if (!merged.portId && typeof (extra as { portId?: string }).portId === 'string') {
+      merged.portId = (extra as { portId: string }).portId;
+    }
+    return merged;
   });
 }
 
@@ -587,10 +607,10 @@ export function replaceDemandOrders(
   const ins = db.prepare(
     `INSERT INTO demand_orders (
        world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
-       max_unit_price_usd, arrived_at_tick, expires_at_tick, status, payload_json
+       max_unit_price_usd, arrived_at_tick, expires_at_tick, status, port_id, payload_json
      ) VALUES (
        @world_id, @id, @dest_icao, @commodity_id, @wanted_kg, @remaining_kg,
-       @max_unit_price_usd, @arrived_at_tick, @expires_at_tick, @status, @payload_json
+       @max_unit_price_usd, @arrived_at_tick, @expires_at_tick, @status, @port_id, @payload_json
      )`,
   );
   for (const o of orders) {
@@ -604,6 +624,7 @@ export function replaceDemandOrders(
       arrivedAtTick,
       expiresAtTick,
       status,
+      portId,
       ...rest
     } = o;
     const extra = Object.keys(rest).length > 0 ? JSON.stringify(rest) : null;
@@ -618,6 +639,7 @@ export function replaceDemandOrders(
       arrived_at_tick: arrivedAtTick,
       expires_at_tick: expiresAtTick,
       status,
+      port_id: portId?.trim() ? portId.trim().toUpperCase() : null,
       payload_json: extra,
     });
   }
@@ -638,16 +660,17 @@ export function upsertDemandOrder(
     arrivedAtTick,
     expiresAtTick,
     status,
+    portId,
     ...rest
   } = order;
   const extra = Object.keys(rest).length > 0 ? JSON.stringify(rest) : null;
   db.prepare(
     `INSERT INTO demand_orders (
        world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
-       max_unit_price_usd, arrived_at_tick, expires_at_tick, status, payload_json
+       max_unit_price_usd, arrived_at_tick, expires_at_tick, status, port_id, payload_json
      ) VALUES (
        @world_id, @id, @dest_icao, @commodity_id, @wanted_kg, @remaining_kg,
-       @max_unit_price_usd, @arrived_at_tick, @expires_at_tick, @status, @payload_json
+       @max_unit_price_usd, @arrived_at_tick, @expires_at_tick, @status, @port_id, @payload_json
      )
      ON CONFLICT(world_id, id) DO UPDATE SET
        dest_icao = excluded.dest_icao,
@@ -658,6 +681,7 @@ export function upsertDemandOrder(
        arrived_at_tick = excluded.arrived_at_tick,
        expires_at_tick = excluded.expires_at_tick,
        status = excluded.status,
+       port_id = excluded.port_id,
        payload_json = excluded.payload_json`,
   ).run({
     world_id: worldId,
@@ -670,6 +694,7 @@ export function upsertDemandOrder(
     arrived_at_tick: arrivedAtTick,
     expires_at_tick: expiresAtTick,
     status,
+    port_id: portId?.trim() ? portId.trim().toUpperCase() : null,
     payload_json: extra,
   });
 }

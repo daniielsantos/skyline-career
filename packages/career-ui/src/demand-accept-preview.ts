@@ -186,6 +186,144 @@ export function demandOrderReachableFromOrigins(opts: {
   return false;
 }
 
+/** Demand Board origin scope: per-port desk (not global All/Mine). */
+export const DEMAND_ORIGIN_CORRIDOR = 'corridor';
+
+/** Keep in sync with DEMAND_CORRIDOR_NM_BY_LEVEL in shared career-port-corridor.ts */
+export const DEMAND_CORRIDOR_NM_BY_LEVEL: Record<1 | 2 | 3, number | null> = {
+  1: 500,
+  2: 1800,
+  3: null,
+};
+
+export function clampPortCorridorLevel(n: number): 1 | 2 | 3 {
+  if (n >= 3) return 3;
+  if (n >= 2) return 2;
+  return 1;
+}
+
+export function corridorNmForLevel(level: 1 | 2 | 3): number | null {
+  return DEMAND_CORRIDOR_NM_BY_LEVEL[clampPortCorridorLevel(level)];
+}
+
+export function formatPortCorridorReachLabel(
+  level: 1 | 2 | 3,
+  opts?: { source?: 'wh' | 'concession' | 'vacant' },
+): string {
+  const nm = corridorNmForLevel(level);
+  const src =
+    opts?.source === 'concession'
+      ? `P${level}`
+      : opts?.source === 'vacant'
+        ? 'Vacant'
+        : `WH T${level}`;
+  if (nm == null) return `Corridor · open · ${src}`;
+  return `Corridor · ${nm} nm · ${src}`;
+}
+
+export function resolveUiPortCorridorLevel(opts: {
+  concessionStatus?: string | null;
+  concessionLevel?: number | null;
+  warehouseTiersAtPort: readonly number[];
+}): { level: 1 | 2 | 3; source: 'wh' | 'concession' } {
+  if (
+    opts.concessionStatus === 'yours' &&
+    opts.concessionLevel != null &&
+    opts.concessionLevel >= 1
+  ) {
+    return {
+      level: clampPortCorridorLevel(opts.concessionLevel),
+      source: 'concession',
+    };
+  }
+  const maxTier = Math.max(1, ...opts.warehouseTiersAtPort, 1);
+  return { level: clampPortCorridorLevel(maxTier), source: 'wh' };
+}
+
+export function destWithinPortCorridorUi(opts: {
+  destLat?: number | null;
+  destLon?: number | null;
+  hubCoords: ReadonlyArray<{ lat: number; lon: number }>;
+  maxNm: number | null;
+}): boolean {
+  if (opts.hubCoords.length === 0) return false;
+  if (opts.maxNm == null) return true;
+  const lat = opts.destLat;
+  const lon = opts.destLon;
+  if (lat == null || lon == null || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return false;
+  }
+  const dest = { lat, lon };
+  let best = Number.POSITIVE_INFINITY;
+  for (const hub of opts.hubCoords) {
+    const nm = greatCircleDistanceNm(dest, hub);
+    if (nm < best) best = nm;
+  }
+  return best <= opts.maxNm;
+}
+
+/**
+ * Count open Demand rows on a port desk that match commodities / intl from
+ * pickup hubs (legacy helper — prefer filtering by order.portId in UI).
+ */
+export function countPortCorridorDemandMatches(opts: {
+  orders: ReadonlyArray<{
+    destIcao: string;
+    destCountryId?: string | null;
+    destLat?: number | null;
+    destLon?: number | null;
+    commodityId: string;
+    remainingKg: number;
+    status?: string;
+  }>;
+  portPickupOrigins: readonly DemandOriginHub[];
+  portCommodityIds: readonly string[];
+  pickupHubs: readonly string[];
+  hubCoords?: ReadonlyArray<{ lat: number; lon: number }>;
+  maxNm?: number | null;
+}): number {
+  const commodities = new Set(
+    opts.portCommodityIds.map((c) => c.trim().toLowerCase()).filter(Boolean),
+  );
+  if (opts.portPickupOrigins.length === 0) return 0;
+  const maxNm = opts.maxNm === undefined ? null : opts.maxNm;
+  const hubCoords = opts.hubCoords ?? [];
+  let n = 0;
+  for (const order of opts.orders) {
+    if (order.remainingKg <= 0) continue;
+    if (order.status && order.status !== 'open') continue;
+    if (
+      commodities.size > 0 &&
+      !commodities.has(order.commodityId.trim().toLowerCase())
+    ) {
+      continue;
+    }
+    if (
+      !demandOrderReachableFromOrigins({
+        destIcao: order.destIcao,
+        destCountryId: order.destCountryId,
+        origins: opts.portPickupOrigins,
+        pickupHubs: opts.pickupHubs,
+      })
+    ) {
+      continue;
+    }
+    if (
+      hubCoords.length > 0 &&
+      !destWithinPortCorridorUi({
+        destLat: order.destLat,
+        destLon: order.destLon,
+        hubCoords,
+        maxNm,
+      })
+    ) {
+      continue;
+    }
+    n += 1;
+  }
+  return n;
+}
+
 /** FIFO weighted-average cost for withdrawing needKg (non-mutating). */
 export function previewFifoWithdrawCost(
   lots: ReadonlyArray<DemandWithdrawLot>,

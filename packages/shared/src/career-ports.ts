@@ -49,6 +49,7 @@ import {
   tickPortConcessions,
 } from './career-port-concessions.js';
 import { demandSnapshot, ensureDemandOrders, expireDemandHolds } from './career-demand.js';
+import { bindPortCorridorLookups } from './career-port-corridor.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -1937,12 +1938,38 @@ export function getCareerPort(portId: string): CareerPortDef | undefined {
   return PORT_BY_ID.get(portId.trim().toUpperCase());
 }
 
+/** Pickup hubs for ports the local company currently operates (Demand soft slot). */
+export function localOperatorDemandCatchmentHubs(
+  world: CareerEconomyWorld,
+  companyId: string = LOCAL_COMPANY_ID,
+): string[] {
+  const hubs = new Set<string>();
+  for (const row of world.portConcessions ?? []) {
+    if (row.companyId !== companyId) continue;
+    if (row.leasePaidThroughTick <= world.tick) continue;
+    const port = getCareerPort(row.portId);
+    if (!port) continue;
+    for (const h of port.pickupHubs) {
+      const icao = h.trim().toUpperCase();
+      if (icao) hubs.add(icao);
+    }
+  }
+  return [...hubs];
+}
+
 export function careerPortIdForPickupHub(icao: string): string | undefined {
   const hub = icao.trim().toUpperCase();
   return CAREER_PORTS.find((p) =>
     p.pickupHubs.some((h) => h.trim().toUpperCase() === hub),
   )?.id;
 }
+
+bindPortCorridorLookups({
+  portIdForHub: careerPortIdForPickupHub,
+  portPickups: (portId) => getCareerPort(portId)?.pickupHubs,
+  listPorts: () =>
+    CAREER_PORTS.map((p) => ({ id: p.id, pickupHubs: p.pickupHubs })),
+});
 
 export function resolvePortPickupHub(
   port: CareerPortDef,
@@ -2644,7 +2671,9 @@ export function portSnapshot(
     syncWorldPortConcessions(world, state);
   }
   ensurePortListings(world);
-  ensureDemandOrders(world);
+  ensureDemandOrders(world, {
+    operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+  });
   const pickups = state ? ensurePlayerPortPickups(state) : [];
   const pickupViews = pickups.map((p) => {
     const holdUsdPerDay = portYardHoldUsdPerDay({

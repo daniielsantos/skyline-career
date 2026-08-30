@@ -213,6 +213,43 @@ describe('career store v5', () => {
     store.close();
   });
 
+  it('adds demand_orders.port_id on legacy tables that lack the column', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec(`
+      CREATE TABLE demand_orders (
+        world_id TEXT NOT NULL,
+        id TEXT NOT NULL,
+        dest_icao TEXT NOT NULL,
+        commodity_id TEXT NOT NULL,
+        wanted_kg REAL NOT NULL,
+        remaining_kg REAL NOT NULL,
+        max_unit_price_usd REAL NOT NULL,
+        arrived_at_tick INTEGER NOT NULL,
+        expires_at_tick INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        payload_json TEXT,
+        PRIMARY KEY (world_id, id)
+      );
+    `);
+    db.prepare(
+      `INSERT INTO demand_orders (
+         world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
+         max_unit_price_usd, arrived_at_tick, expires_at_tick, status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('local', 'legacy_1', 'SBCT', 'general', 1000, 1000, 2, 1, 100, 'open');
+
+    ensureV5Ddl(db);
+
+    const cols = db
+      .prepare(`PRAGMA table_info(demand_orders)`)
+      .all() as Array<{ name: string }>;
+    assert.ok(cols.some((c) => c.name === 'port_id'), 'expected port_id column');
+    const row = db
+      .prepare(`SELECT port_id FROM demand_orders WHERE id = ?`)
+      .get('legacy_1') as { port_id: string | null };
+    assert.equal(row.port_id, null);
+  });
+
   it('replacePortListings keeps the last row when ids collide', () => {
     const db = new DatabaseSync(':memory:');
     ensureV5Ddl(db);

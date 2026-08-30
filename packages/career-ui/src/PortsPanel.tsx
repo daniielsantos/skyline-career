@@ -49,6 +49,8 @@ import {
   previewDemandInternationalRoute,
   warehouseFreeCommodityKgClient,
   greatCircleDistanceNm,
+  formatPortCorridorReachLabel,
+  resolveUiPortCorridorLevel,
 } from './demand-accept-preview';
 import {
   displayToKg,
@@ -299,8 +301,8 @@ function portsLoopMessage(
         : `${step.matchCount} Demand orders match your warehouse stock — accept to stage a flight.`;
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? `${formatTonnes(step.stockKg)} in WH — open orders exist, but none match this commodity. Try All destinations or buy matching cargo.`
-        : `${formatTonnes(step.stockKg)} in WH — Demand posts when hub terminals run low (economy tick). Check back or browse All destinations.`;
+        ? `${formatTonnes(step.stockKg)} in WH — open orders exist, but none match this commodity in corridor reach. Buy matching cargo or upgrade WH / concession to extend range.`
+        : `${formatTonnes(step.stockKg)} in WH — Demand posts when hub terminals run low (economy tick). Check back after a tick.`;
     case 'buy_port':
       return 'Buy factory cargo at a seaport to start the loop.';
   }
@@ -359,8 +361,8 @@ function portsLoopSectionHint(
       return 'Next: accept a matching order to pull stock from your warehouse and stage a flight.';
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? 'Stock is ready — switch Warehouse filter to All destinations if nothing matches, or buy the commodity hubs are asking for.'
-        : 'Stock is ready — Demand appears after economy ticks when terminals run low. Switch to All destinations to scout the world board.';
+        ? 'Stock is ready — nothing in corridor reach for this commodity. Buy matching cargo or upgrade WH / concession to extend range.'
+        : 'Stock is ready — Demand appears after economy ticks when terminals run low. Check back soon.';
     case 'buy_port':
       return 'Next: pick a listing and buy into a warehouse (overflow goes to yard).';
   }
@@ -435,8 +437,6 @@ export function PortsPanel(props: {
   });
   const [demandPage, setDemandPage] = useState(1);
   const [demandCountryFilter, setDemandCountryFilter] = useState('');
-  /** `mine` = any owned WH, ICAO = that hub, empty = whole board. */
-  const [demandOriginFilter, setDemandOriginFilter] = useState('mine');
   const [worldPortsPage, setWorldPortsPage] = useState(1);
 
   const unit = massUnitLabel(props.weightSystem);
@@ -550,8 +550,20 @@ export function PortsPanel(props: {
   const acceptOriginOptions = useMemo(() => {
     if (!acceptOrder) return [];
     const dest = acceptOrder.destIcao.trim().toUpperCase();
+    const deskPortId = acceptOrder.portId?.trim().toUpperCase() ?? '';
+    const deskPort = deskPortId
+      ? snap?.ports.find((p) => p.id.trim().toUpperCase() === deskPortId)
+      : undefined;
+    const deskPickups = new Set(
+      (deskPort?.pickupHubs ?? []).map((h) => h.trim().toUpperCase()),
+    );
     const rows = (warehouses?.warehouses ?? [])
-      .filter((w) => w.icao.trim().toUpperCase() !== dest)
+      .filter((w) => {
+        const icao = w.icao.trim().toUpperCase();
+        if (icao === dest) return false;
+        if (deskPickups.size > 0 && !deskPickups.has(icao)) return false;
+        return true;
+      })
       .map((w) => {
         const lots = (warehouses?.stock ?? []).filter(
           (s) =>
@@ -592,7 +604,7 @@ export function PortsPanel(props: {
       if (a.stockKg > 0 !== b.stockKg > 0) return a.stockKg > 0 ? -1 : 1;
       return a.icao.localeCompare(b.icao);
     });
-  }, [acceptOrder, warehouses]);
+  }, [acceptOrder, warehouses, snap?.ports]);
 
   const acceptAircraftOptions = useMemo(() => {
     if (!acceptOrigin) return [];
@@ -1864,11 +1876,6 @@ export function PortsPanel(props: {
       setWhShelf('owned');
       setSelectedOwnedHubIcao(loopStep.hubIcao);
       setSelectedStockId(null);
-    } else if (
-      loopStep.kind === 'wait_demand' &&
-      loopStep.openDemandCount === 0
-    ) {
-      setDemandOriginFilter('');
     }
   }
 
@@ -1949,73 +1956,73 @@ export function PortsPanel(props: {
     }
   }
 
-  const demandOriginHubs = useMemo(() => {
-    const owned = warehouses?.warehouses ?? [];
-    const filter = demandOriginFilter.trim().toUpperCase();
-    const rows =
-      filter && filter !== 'MINE'
-        ? owned.filter((w) => w.icao.trim().toUpperCase() === filter)
-        : owned;
-    return rows.map((w) => ({
-      icao: w.icao.trim().toUpperCase(),
-      countryId: w.countryId ?? null,
-    }));
-  }, [warehouses?.warehouses, demandOriginFilter]);
+  const portCorridorLevel = useMemo(() => {
+    if (!port) return { level: 1 as const, source: 'wh' as const };
+    const hubSet = new Set(
+      (port.pickupHubs ?? []).map((h) => h.trim().toUpperCase()),
+    );
+    const tiers = (warehouses?.warehouses ?? [])
+      .filter((w) => hubSet.has(w.icao.trim().toUpperCase()))
+      .map((w) => w.tier);
+    return resolveUiPortCorridorLevel({
+      concessionStatus: port.concession?.status,
+      concessionLevel: port.concession?.level,
+      warehouseTiersAtPort: tiers,
+    });
+  }, [port, warehouses?.warehouses]);
+
+  const portOperatorChip = useMemo(() => {
+    const status = port?.concession?.status;
+    if (status === 'yours') return 'Operator · you';
+    if (status === 'held') return 'Operator · held';
+    return 'Vacant';
+  }, [port?.concession?.status]);
+
+  const portDeskOrders = useMemo(() => {
+    if (!port) return [] as DemandOrderView[];
+    const pid = port.id.trim().toUpperCase();
+    return demand.filter(
+      (o) =>
+        o.remainingKg > 0 &&
+        (!o.status || o.status === 'open') &&
+        (o.portId?.trim().toUpperCase() ?? '') === pid,
+    );
+  }, [demand, port]);
+
+  const portCorridorMatchCount = portDeskOrders.length;
+
+  function openPortCorridorDemand() {
+    setDemandCountryFilter('');
+    setSection('demand');
+  }
+
+  const demandPortsForSwitcher = useMemo(() => {
+    return snap?.ports ?? [];
+  }, [snap?.ports]);
 
   const sortedDemand = useMemo(() => {
     const seen = new Set<string>();
     const unique: DemandOrderView[] = [];
-    for (const order of demand) {
+    for (const order of portDeskOrders) {
       if (seen.has(order.id)) continue;
       seen.add(order.id);
       unique.push(order);
     }
-    const originMode = demandOriginFilter.trim().toLowerCase();
-    const reachable =
-      originMode === ''
-        ? unique
-        : unique.filter((o) =>
-            demandOrderReachableFromOrigins({
-              destIcao: o.destIcao,
-              destCountryId: o.destCountryId,
-              origins: demandOriginHubs,
-              pickupHubs: warehouses?.pickupHubs ?? [],
-            }),
-          );
     const country = demandCountryFilter.trim().toUpperCase();
     const filtered = country
-      ? reachable.filter((o) => demandDestCountryId(o) === country)
-      : reachable;
+      ? unique.filter((o) => demandDestCountryId(o) === country)
+      : unique;
     return filtered.sort((a, b) => compareDemandOrders(a, b, demandSort));
-  }, [
-    demand,
-    demandSort,
-    demandCountryFilter,
-    demandOriginFilter,
-    demandOriginHubs,
-    warehouses?.pickupHubs,
-  ]);
+  }, [portDeskOrders, demandSort, demandCountryFilter]);
 
   const demandCountryOptions = useMemo(() => {
-    const originMode = demandOriginFilter.trim().toLowerCase();
-    const pool =
-      originMode === ''
-        ? demand
-        : demand.filter((o) =>
-            demandOrderReachableFromOrigins({
-              destIcao: o.destIcao,
-              destCountryId: o.destCountryId,
-              origins: demandOriginHubs,
-              pickupHubs: warehouses?.pickupHubs ?? [],
-            }),
-          );
     const ids = new Set<string>();
-    for (const o of pool) {
+    for (const o of portDeskOrders) {
       const id = demandDestCountryId(o);
       if (id) ids.add(id);
     }
     return [...ids].sort((a, b) => a.localeCompare(b));
-  }, [demand, demandOriginFilter, demandOriginHubs, warehouses?.pickupHubs]);
+  }, [portDeskOrders]);
 
   const demandPageCount = Math.max(
     1,
@@ -2026,7 +2033,7 @@ export function PortsPanel(props: {
     const start = (safeDemandPage - 1) * DEMAND_PAGE_SIZE;
     return sortedDemand.slice(start, start + DEMAND_PAGE_SIZE);
   }, [sortedDemand, safeDemandPage]);
-  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${demandCountryFilter}:${demandOriginFilter}:${sortedDemand.length}`;
+  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${demandCountryFilter}:${port?.id ?? ''}:${portCorridorLevel.level}:${sortedDemand.length}`;
 
   useEffect(() => {
     if (demandPage > demandPageCount) setDemandPage(demandPageCount);
@@ -2034,7 +2041,7 @@ export function PortsPanel(props: {
 
   useEffect(() => {
     setDemandPage(1);
-  }, [demandCountryFilter, demandOriginFilter]);
+  }, [demandCountryFilter, port?.id, portCorridorLevel.level]);
 
   useEffect(() => {
     if (
@@ -2328,6 +2335,39 @@ export function PortsPanel(props: {
                         {port.inbound.totalKg > 0
                           ? ` · ~${props.formatTonnes(port.inbound.totalKg)} estimated`
                           : ''}
+                      </p>
+                      <p className="ports-corridor-strip" aria-label="Port corridor demand">
+                        <span className="ports-hub-pressure-label">
+                          Port desk
+                        </span>
+                        <span className="muted">
+                          {' '}
+                          · {portOperatorChip}
+                          {' · '}
+                          {formatPortCorridorReachLabel(portCorridorLevel.level, {
+                            source:
+                              port?.concession?.status === 'yours'
+                                ? 'concession'
+                                : port?.concession?.status === 'vacant' ||
+                                    !port?.concession?.status
+                                  ? 'vacant'
+                                  : portCorridorLevel.source,
+                          })}
+                          {' · '}
+                          {portCorridorMatchCount === 0
+                            ? 'no open Demand on this desk'
+                            : portCorridorMatchCount === 1
+                              ? '1 open Demand on this desk'
+                              : `${portCorridorMatchCount} open Demand on this desk`}
+                        </span>
+                        <button
+                          type="button"
+                          className="action ghost ports-corridor-cta"
+                          disabled={props.busy || loading}
+                          onClick={() => openPortCorridorDemand()}
+                        >
+                          Open Demand
+                        </button>
                       </p>
                     <div className="table-wrap">
                       <table className="data-table">
@@ -3804,23 +3844,42 @@ export function PortsPanel(props: {
               ) : null}
               <div className="ports-demand-filters">
                 <label className="ports-demand-origin-filter">
-                  <span>Warehouse</span>
+                  <span>Port</span>
                   <select
-                    value={demandOriginFilter}
-                    aria-label="Filter demand by warehouse origin"
-                    disabled={props.busy || loading}
-                    onChange={(e) => setDemandOriginFilter(e.target.value)}
+                    value={port?.id ?? ''}
+                    aria-label="Demand board port theater"
+                    disabled={props.busy || loading || demandPortsForSwitcher.length === 0}
+                    onChange={(e) => {
+                      const id = e.target.value.trim();
+                      if (id) setPortId(id);
+                    }}
                   >
-                    <option value="mine">My warehouses</option>
-                    {allOwnedWarehouses.map((w) => (
-                      <option key={w.id} value={w.icao.trim().toUpperCase()}>
-                        {w.icao.trim().toUpperCase()}
-                        {w.countryId ? ` ${w.countryId}` : ''}
+                    {demandPortsForSwitcher.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
                       </option>
                     ))}
-                    <option value="">All destinations</option>
                   </select>
                 </label>
+                <p className="ports-corridor-chip muted" aria-live="polite">
+                  {port ? (
+                    <>
+                      {portOperatorChip}
+                      {' · '}
+                      {formatPortCorridorReachLabel(portCorridorLevel.level, {
+                        source:
+                          port.concession?.status === 'yours'
+                            ? 'concession'
+                            : port?.concession?.status === 'vacant' ||
+                                !port.concession?.status
+                              ? 'vacant'
+                              : portCorridorLevel.source,
+                      })}
+                    </>
+                  ) : (
+                    'Select a port'
+                  )}
+                </p>
               </div>
               <div className="table-wrap ports-demand-table-wrap">
                 <table className="data-table ports-demand-table">
@@ -3920,29 +3979,14 @@ export function PortsPanel(props: {
                       <tr>
                         <td colSpan={7}>
                           <p className="empty">
-                            {demand.length === 0
-                              ? 'No open demand right now — hubs post when terminal stock runs low (economy tick, ~15 min). Leave Career open or check back; switch to All destinations to scout.'
-                              : demandOriginFilter.trim() !== '' &&
-                                  !demandCountryFilter
-                                ? allOwnedWarehouses.length === 0
-                                  ? 'Buy a warehouse at a pickup hub, or choose All destinations to browse the world board.'
-                                  : 'No demand you can fly from this warehouse — international pairs must be allowlisted. Try All destinations, or buy the commodity terminals are asking for.'
-                                : 'No demand in this country — clear the country filter or wait for new posts.'}
+                            {!port
+                              ? 'Select a port to open its Demand desk.'
+                              : portDeskOrders.length === 0 && demand.length === 0
+                                ? 'No open demand right now — desks post when hubs in the port catchment run low (economy tick, ~15 min).'
+                                : demandCountryFilter
+                                  ? 'No demand in this country on this desk — clear the country filter.'
+                                  : 'No Demand on this port’s desk yet — wait for catchment hubs to run low, or upgrade WH / concession to extend spawn range.'}
                           </p>
-                          {demand.length === 0 &&
-                          demandOriginFilter.trim().toLowerCase() ===
-                            'mine' ? (
-                            <p className="ports-loop-section-hint">
-                              <button
-                                type="button"
-                                className="action ghost"
-                                disabled={props.busy || loading}
-                                onClick={() => setDemandOriginFilter('')}
-                              >
-                                Browse All destinations
-                              </button>
-                            </p>
-                          ) : null}
                         </td>
                       </tr>
                     ) : (

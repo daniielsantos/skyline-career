@@ -1,6 +1,6 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-08-28. **Esboço de produto** — loops A/B + tiers 1–3 **decididos** na revisão ponto a ponto; não implementar schema/members/billing até existir slice MP/VA.
+Atualizado 2026-08-30. **Esboço de produto** — loops A/B + tiers 1–3 **decididos** na revisão ponto a ponto; não implementar schema/members/billing até existir slice MP/VA.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -31,7 +31,7 @@ Surplus **não** infinito: cap buy/dia + restock lento (discharge %) + concorrê
 
 **Realização da revenda:** WH → **Demand board** (já existe). Não é listar de volta no porto.
 
-**UI (SP):** Ports mostra prosa `Hub pressure · ICAO commodity high|low` a partir do fill do pickup hub (`portPickupMarketSignals` em `career-ports.ts`).
+**UI (SP):** Ports mostra prosa `Hub pressure · ICAO commodity high|low` + **Demand desk** do porto focado (`portId` no pedido; chip Vacant/Operator; alcance **500 / 1800 / open**). Spawn world-side na bacia do porto (vago = T1). **Sem backhaul por settle** — volta = achar rota no corridor, ferry, ou outro rumo (MP-safe). Bias porto→porto e **desenho do raio no mapa** = **backlog / talvez futuro**.
 
 ### C) Revenda porto → porto (bolsa no terminal) — **CAI**
 

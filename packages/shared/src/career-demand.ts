@@ -23,7 +23,17 @@ import {
   warehouseFreeCommodityKg,
   withdrawCargoFromWarehouse,
 } from './career-warehouse-stock.js';
-import { isPortPickupHub } from './career-warehouse.js';
+import { isPortPickupHub, listPortPickupHubIcaos } from './career-warehouse.js';
+import {
+  assertDemandPortCorridorReach,
+  DEMAND_PORT_CORRIDOR_NM,
+  corridorNmForLevel,
+  demandOrdersCapForPortDesk,
+  destNearAnyHub,
+  destWithinCorridorNm,
+  listBoundCareerPorts,
+  worldPortDeskCorridorLevel,
+} from './career-port-corridor.js';
 import { isBushHub, isBushTripOnlyHub } from './career-bush.js';
 import {
   estimateRouteCargoLimit,
@@ -61,8 +71,11 @@ export const DEMAND_COMMODITIES: readonly CommodityId[] = [
 /** Spawn when stock / capacity is below this fraction. */
 export const DEMAND_STOCK_FRAC_THRESHOLD = 0.25;
 
-/** Soft max open orders per destination hub. */
+/** Soft max open orders per destination hub (within a port desk). */
 export const DEMAND_ORDERS_PER_HUB = 2;
+
+/** Extra open slot at dests inside an active local operator’s port catchment. */
+export const DEMAND_ORDERS_OPERATOR_SOFT_EXTRA = 1;
 
 /**
  * Soft cap of open board rows worldwide (keeps Ports GET snappy).
@@ -372,6 +385,9 @@ export function holdDemandOrder(
   if (!order || order.status !== 'open' || order.remainingKg <= 0) {
     throw new Error('Demand order not available');
   }
+  if (!order.portId?.trim()) {
+    throw new Error('Demand order has no port desk — refresh the board');
+  }
   if (order.expiresAtTick <= world.tick) {
     order.status = 'expired';
     throw new Error('Demand order expired');
@@ -405,6 +421,9 @@ export function holdDemandOrder(
   }
 
   assertDemandInternationalAccept(world, origin, dest);
+  assertDemandPortCorridorReach(state, world, origin, dest, {
+    portId: order.portId,
+  });
 
   const stockAvail = warehouseFreeCommodityKg(state, origin, order.commodityId);
   let kg = Math.max(
@@ -715,17 +734,107 @@ function createDemandMission(
   return mission;
 }
 
-export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
+/** Keep aligned with PORT_HUB_SURPLUS_FILL in career-ports (avoid import cycle). */
+const PORT_PICKUP_SURPLUS_FILL = 0.58;
+
+export type EnsureDemandOrdersOpts = {
+  /**
+   * @deprecated Per-port desk spawn uses world.portConcessions; kept for call-site compat.
+   */
+  operatorCatchmentHubs?: readonly string[];
+};
+
+/**
+ * Port-pickup hubs with surplus fill for each demand commodity.
+ */
+export function portPickupSurplusHubsByCommodity(
+  world: CareerEconomyWorld,
+): Map<CommodityId, string[]> {
+  const out = new Map<CommodityId, string[]>();
+  for (const commodityId of DEMAND_COMMODITIES) {
+    const hubs: string[] = [];
+    for (const raw of listPortPickupHubIcaos()) {
+      const hub = raw.trim().toUpperCase();
+      const ap = airportByIcao(world, hub);
+      const pile = ap?.inventory?.[commodityId];
+      if (!pile || !(pile.capacityKg > 0)) continue;
+      const fill = Math.min(1, Math.max(0, pile.stockKg / pile.capacityKg));
+      if (fill >= PORT_PICKUP_SURPLUS_FILL) hubs.push(hub);
+    }
+    if (hubs.length > 0) out.set(commodityId, hubs);
+  }
+  return out;
+}
+
+export {
+  DEMAND_CORRIDOR_NM_BY_LEVEL,
+  DEMAND_ORDERS_PER_PORT_BASE,
+  DEMAND_ORDERS_PER_PORT_OPERATOR_EXTRA,
+  corridorNmForLevel,
+  clampPortCorridorLevel,
+  formatPortCorridorReachLabel,
+  resolvePlayerPortCorridorLevel,
+  destWithinCorridorNm,
+  minNmToHubs,
+  assertDemandPortCorridorReach,
+  worldPortDeskCorridorLevel,
+  demandOrdersCapForPortDesk,
+  listBoundCareerPorts,
+} from './career-port-corridor.js';
+export type { PortCorridorLevel, PortDeskDef } from './career-port-corridor.js';
+export { DEMAND_PORT_CORRIDOR_NM, destNearAnyHub };
+
+export function destInPortSurplusCorridor(
+  destIcao: string,
+  commodityId: CommodityId,
+  surplusByCommodity: Map<CommodityId, string[]>,
+  maxNm: number = DEMAND_PORT_CORRIDOR_NM,
+): boolean {
+  const hubs = surplusByCommodity.get(commodityId) ?? [];
+  return destNearAnyHub(destIcao, hubs, maxNm);
+}
+
+function portDeskCommodityOrder(
+  world: CareerEconomyWorld,
+  pickups: readonly string[],
+): CommodityId[] {
+  const preferred: CommodityId[] = [];
+  const rest: CommodityId[] = [];
+  for (const commodityId of DEMAND_COMMODITIES) {
+    let surplus = false;
+    for (const hub of pickups) {
+      const ap = airportByIcao(world, hub);
+      const pile = ap?.inventory?.[commodityId];
+      if (!pile || !(pile.capacityKg > 0)) continue;
+      if (pile.stockKg / pile.capacityKg >= PORT_PICKUP_SURPLUS_FILL) {
+        surplus = true;
+        break;
+      }
+    }
+    if (surplus) preferred.push(commodityId);
+    else rest.push(commodityId);
+  }
+  return [...preferred, ...rest];
+}
+
+export function ensureDemandOrders(
+  world: CareerEconomyWorld,
+  _opts: EnsureDemandOrdersOpts = {},
+): DemandOrder[] {
   if (!Array.isArray(world.demandOrders)) {
     world.demandOrders = [];
   }
   const orders = world.demandOrders;
 
-  // Expire past-due or bush/trip-only dests (SimBrief cannot plan those).
+  // Expire bush dests, due dates, and legacy rows without portId (pre per-port desk).
   for (const order of orders) {
     if (order.status !== 'open') continue;
     const dest = order.destIcao.trim().toUpperCase();
     if (isBushHub(dest) || isBushTripOnlyHub(dest)) {
+      order.status = 'expired';
+      continue;
+    }
+    if (!order.portId?.trim()) {
       order.status = 'expired';
       continue;
     }
@@ -740,13 +849,13 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
   const isOpen = (o: DemandOrder) =>
     o.status === 'open' &&
     o.remainingKg > 0 &&
-    o.expiresAtTick > world.tick;
+    o.expiresAtTick > world.tick &&
+    Boolean(o.portId?.trim());
 
   const quotas = demandCountryOpenQuotas(world);
   const boardCap = demandOrdersGlobalCap(world);
 
-  // Existing saves may already hold a BR-only full board. Trim countries that
-  // exceed their quota (oldest first) so under-served countries can spawn.
+  // Trim countries that exceed quota (oldest first).
   {
     const byCountry = new Map<string, DemandOrder[]>();
     for (const o of orders) {
@@ -760,11 +869,35 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
     for (const [country, list] of byCountry) {
       const quota = quotas.get(country) ?? 0;
       if (list.length <= quota) continue;
-      list.sort((a, b) => a.arrivedAtTick - b.arrivedAtTick || a.id.localeCompare(b.id));
+      list.sort(
+        (a, b) => a.arrivedAtTick - b.arrivedAtTick || a.id.localeCompare(b.id),
+      );
       const overflow = list.length - quota;
       for (let i = 0; i < overflow; i++) {
-        const o = list[i]!;
-        o.status = 'expired';
+        list[i]!.status = 'expired';
+      }
+    }
+  }
+
+  // Trim port desks over cap.
+  {
+    const byPort = new Map<string, DemandOrder[]>();
+    for (const o of orders) {
+      if (!isOpen(o)) continue;
+      const pid = o.portId!.trim().toUpperCase();
+      const list = byPort.get(pid) ?? [];
+      list.push(o);
+      byPort.set(pid, list);
+    }
+    for (const [portId, list] of byPort) {
+      const cap = demandOrdersCapForPortDesk(world, portId);
+      if (list.length <= cap) continue;
+      list.sort(
+        (a, b) => a.arrivedAtTick - b.arrivedAtTick || a.id.localeCompare(b.id),
+      );
+      const overflow = list.length - cap;
+      for (let i = 0; i < overflow; i++) {
+        list[i]!.status = 'expired';
       }
     }
   }
@@ -773,99 +906,120 @@ export function ensureDemandOrders(world: CareerEconomyWorld): DemandOrder[] {
 
   if (openGlobal() >= boardCap) {
     world.demandOrders = orders.filter(
-      (o) =>
-        o.status === 'open' ||
-        o.expiresAtTick > world.tick - 96,
+      (o) => o.status === 'open' || o.expiresAtTick > world.tick - 96,
     );
     return world.demandOrders;
   }
 
   const openByCountry = new Map<string, number>();
+  const openByPort = new Map<string, number>();
   for (const o of orders) {
     if (!isOpen(o)) continue;
     const c = demandHubCountryId(world, o.destIcao);
-    if (!c) continue;
-    openByCountry.set(c, (openByCountry.get(c) ?? 0) + 1);
+    if (c) openByCountry.set(c, (openByCountry.get(c) ?? 0) + 1);
+    const pid = o.portId!.trim().toUpperCase();
+    openByPort.set(pid, (openByPort.get(pid) ?? 0) + 1);
   }
 
-  const trySpawnAtAirport = (ap: (typeof world.airports)[number]): void => {
-    if (openGlobal() >= boardCap) return;
-    if (!isDemandBoardAirport(ap)) return;
-    const icao = ap.icao.trim().toUpperCase();
-    if (!CAREER_HUB_COORDS[icao]) return;
+  const boardAirports = world.airports.filter((ap) => isDemandBoardAirport(ap));
+  const ports = listBoundCareerPorts();
 
-    const country = demandAirportCountryId(ap);
-    if (!country) return;
-    const quota = quotas.get(country) ?? 0;
-    if ((openByCountry.get(country) ?? 0) >= quota) return;
+  for (const port of ports) {
+    if (openGlobal() >= boardCap) break;
+    const portId = port.id.trim().toUpperCase();
+    const pickups = port.pickupHubs
+      .map((h) => h.trim().toUpperCase())
+      .filter((h) => Boolean(h) && CAREER_HUB_COORDS[h]);
+    if (pickups.length === 0) continue;
 
-    const openHere = orders.filter(
-      (o) =>
-        o.destIcao === icao &&
-        o.status === 'open' &&
-        o.remainingKg > 0 &&
-        o.expiresAtTick > world.tick,
-    );
-    let slots = DEMAND_ORDERS_PER_HUB - openHere.length;
-    if (slots <= 0) return;
+    const portCap = demandOrdersCapForPortDesk(world, portId);
+    let portSlots = portCap - (openByPort.get(portId) ?? 0);
+    if (portSlots <= 0) continue;
 
-    for (const commodityId of DEMAND_COMMODITIES) {
-      if (slots <= 0) break;
-      if (openGlobal() >= boardCap) break;
-      if ((openByCountry.get(country) ?? 0) >= quota) break;
-      if (openHere.some((o) => o.commodityId === commodityId)) continue;
+    const { level } = worldPortDeskCorridorLevel(world, portId);
+    const maxNm = corridorNmForLevel(level);
+    const commodities = portDeskCommodityOrder(world, pickups);
 
-      const pile = ap.inventory[commodityId];
-      if (!pile || pile.capacityKg <= 0) continue;
-      const frac = pile.stockKg / pile.capacityKg;
-      if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
+    const catchmentAirports = boardAirports.filter((ap) => {
+      const icao = ap.icao.trim().toUpperCase();
+      if (!CAREER_HUB_COORDS[icao]) return false;
+      if (pickups.includes(icao)) return false; // no dest = own pickup
+      return destWithinCorridorNm(icao, pickups, maxNm);
+    });
 
-      const deficitKg = Math.max(
-        0,
-        Math.floor(pile.capacityKg * DEMAND_STOCK_FRAC_THRESHOLD - pile.stockKg),
+    for (const ap of catchmentAirports) {
+      if (openGlobal() >= boardCap || portSlots <= 0) break;
+      const icao = ap.icao.trim().toUpperCase();
+      const country = demandAirportCountryId(ap);
+      if (!country) continue;
+      const quota = quotas.get(country) ?? 0;
+      if ((openByCountry.get(country) ?? 0) >= quota) continue;
+
+      const openHere = orders.filter(
+        (o) =>
+          isOpen(o) &&
+          o.destIcao === icao &&
+          o.portId?.trim().toUpperCase() === portId,
       );
-      if (deficitKg < 200) continue;
+      let hubSlots = DEMAND_ORDERS_PER_HUB - openHere.length;
+      if (hubSlots <= 0) continue;
 
-      const { min: bandMin, max: bandMax } = demandWantedKgBand(commodityId);
-      const wantedKg = Math.min(
-        deficitKg,
-        bandMin + Math.floor(rng() * (bandMax - bandMin)),
-      );
-      if (wantedKg < bandMin) continue;
+      for (const commodityId of commodities) {
+        if (hubSlots <= 0 || portSlots <= 0) break;
+        if (openGlobal() >= boardCap) break;
+        if ((openByCountry.get(country) ?? 0) >= quota) break;
+        if (openHere.some((o) => o.commodityId === commodityId)) continue;
 
-      const spot = money(localUnitPriceUsd(commodityId, pile));
-      const premium =
-        DEMAND_PRICE_PREMIUM_MIN +
-        rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
-      const maxUnitPriceUsd = money(spot * premium);
+        const pile = ap.inventory[commodityId];
+        if (!pile || pile.capacityKg <= 0) continue;
+        const frac = pile.stockKg / pile.capacityKg;
+        if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
 
-      orders.push({
-        id: nextId('demand', world.tick),
-        destIcao: icao,
-        commodityId,
-        wantedKg,
-        remainingKg: wantedKg,
-        maxUnitPriceUsd,
-        arrivedAtTick: world.tick,
-        expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
-        status: 'open',
-      });
-      openHere.push(orders[orders.length - 1]!);
-      openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
-      slots -= 1;
+        const deficitKg = Math.max(
+          0,
+          Math.floor(
+            pile.capacityKg * DEMAND_STOCK_FRAC_THRESHOLD - pile.stockKg,
+          ),
+        );
+        if (deficitKg < 200) continue;
+
+        const { min: bandMin, max: bandMax } = demandWantedKgBand(commodityId);
+        const wantedKg = Math.min(
+          deficitKg,
+          bandMin + Math.floor(rng() * (bandMax - bandMin)),
+        );
+        if (wantedKg < bandMin) continue;
+
+        const spot = money(localUnitPriceUsd(commodityId, pile));
+        const premium =
+          DEMAND_PRICE_PREMIUM_MIN +
+          rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
+        const maxUnitPriceUsd = money(spot * premium);
+
+        const row: DemandOrder = {
+          id: nextId('demand', world.tick),
+          portId,
+          destIcao: icao,
+          commodityId,
+          wantedKg,
+          remainingKg: wantedKg,
+          maxUnitPriceUsd,
+          arrivedAtTick: world.tick,
+          expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
+          status: 'open',
+        };
+        orders.push(row);
+        openHere.push(row);
+        openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
+        openByPort.set(portId, (openByPort.get(portId) ?? 0) + 1);
+        hubSlots -= 1;
+        portSlots -= 1;
+      }
     }
-  };
-
-  // Respect per-country quotas so BR-first seed order cannot monopolize the board.
-  for (const ap of world.airports) {
-    trySpawnAtAirport(ap);
   }
 
-  // Prune filled/expired that are old enough (keep recent for UI briefly)
   world.demandOrders = orders.filter(
-    (o) =>
-      o.status === 'open' ||
-      o.expiresAtTick > world.tick - 96,
+    (o) => o.status === 'open' || o.expiresAtTick > world.tick - 96,
   );
   return world.demandOrders;
 }
@@ -907,6 +1061,9 @@ export function acceptDemandOrder(
   );
   if (!order || order.status !== 'open' || order.remainingKg <= 0) {
     throw new Error('Demand order not available');
+  }
+  if (!order.portId?.trim()) {
+    throw new Error('Demand order has no port desk — refresh the board');
   }
   if (order.expiresAtTick <= world.tick) {
     order.status = 'expired';
@@ -964,6 +1121,9 @@ export function acceptDemandOrder(
   }
 
   const intl = assertDemandInternationalAccept(world, origin, dest);
+  assertDemandPortCorridorReach(state, world, origin, dest, {
+    portId: order.portId,
+  });
 
   const distanceNm =
     hubDistanceNm(origin, dest) ?? routeDistanceNm(world, origin, dest);

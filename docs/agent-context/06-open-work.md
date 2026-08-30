@@ -1,10 +1,26 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-30: **Mapa Ports — desenhar raio do corridor** — backlog / talvez futuro. Círculo/anel ~500/1800 nm a partir dos pickup hubs do porto focado (esclarece mesa vazia vs bacia). Não implementar agora.
+
+Atualizado 2026-08-30: **Bias porto→porto** — **backlog / talvez futuro**. Mesa por `portId` + raio já shipped; não implementar agora.
+
+Atualizado 2026-08-30: **demand_orders.port_id migrate** — saves antigos sem coluna: `ensureV5Ddl` criava índice `port_id` *antes* do ALTER → abortava com `no such column: port_id`. Fix: índice só depois do ALTER. Não precisa de save novo.
+
+Atualizado 2026-08-30: **Demand per-port desk** — `DemandOrder.portId` obrigatório em pedidos novos; mesa = spawn na bacia do porto (vago = T1/500 nm); UI filtra por `portId` + chip Vacant/Operator; Accept/Hold exige WH nos pickups do porto + raio do player. Legacy open sem `portId` expira no ensure. Sem NPC fulfill; bias porto→porto fora deste slice.
+
+Atualizado 2026-08-30: **Sem backhaul spawn** — após Demand settle, não enviesar o board para “volta para casa” (manipula mercado; estranho no MP). Loop ida→ferry/outro rumo ou achar rota de volta no corridor. Highlight/scout de volta = só se for lente company-local no futuro; não soft-spawn.
+
+Atualizado 2026-08-30: **Demand corridor-only v1** — **superseded by per-port desk**. Era lente no pool global; agora pedido pertence ao porto.
+
+Atualizado 2026-08-29: **Demand corridor perf** — `ensureDemandOrders` não chama mais `hubDistanceNm` (rebuild ferry coords) por hub×aeroporto; pré-computa sets com `distanceNm` + `CAREER_HUB_COORDS`. Sintoma: open profile / Ports travava em “Loading career…”.
+
+Atualizado 2026-08-29: **Ports slice 3 — Demand port corridor** — UI `Port corridor` count+CTA no catálogo + filtro no Demand; spawn prioriza dests perto de pickup hub em surplus; operator +1 soft slot no catchment. Player-only fulfill. **Superseded by corridor-only v1 (2026-08-30).** Hire desk bugs já shipped (`3e61bd5`) — notas “uncommitted” abaixo estão obsoletas.
+
 Atualizado 2026-08-29: **Ports slice 2 (idle/discharge)** — snapshot sempre emite `inbound` (clock mesmo com totalKg 0); faixa `Next discharge` sempre visível no catálogo; empty board curto; sem ETA duplicado em Port stock.
 
 Atualizado 2026-08-29: **Ports buy modal** — surplus acima do free WH vai para **yard hold** (taxa/dia); só o que cabe entra em inbound. UI: input estilo `cargo-amount` (sem spinner nativo), presets Fill WH / 50% / Max, split WH vs yard na confirmação.
 
-Atualizado 2026-08-29: **Ports loop guidance slice 1** (career-ui) — `wait_inbound` quando WH vazio mas transfer em trânsito (não cair em `buy_port`); banner CTA após Store aponta Demand; hint na aba Demand + empty copy (tick / All destinations). Ver `ports-loop-guidance.ts`.
+Atualizado 2026-08-29: **Ports loop guidance slice 1** (career-ui) — `wait_inbound` quando WH vazio mas transfer em trânsito (não cair em `buy_port`); banner CTA após Store aponta Demand; hint na aba Demand + empty copy (tick). Ver `ports-loop-guidance.ts`. (CTA “All destinations” removido no corridor-only v1.)
 
 Atualizado 2026-08-29: Desktop **0.3.49** shipped — classes validadas, Market ~80 famílias (A340, etc.), Comanche maxLoad 500, MD-11F Due clamp, A330/A340 SimBrief rows. Installer: [v0.3.49](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.49). Próximo: economia que “respira” no solo (não frota).
 
@@ -92,8 +108,8 @@ Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). 
 4b. ~~**Schema v4 world tables**~~ — `worlds` / `economy_meta` / `airports` / `airport_stock` + `world_id`; terminal SQL; tick in-memory.
 4c. ~~**Schema v5 world ops tables**~~ — `npcs` / `fuel_trucks` / `fuel_hauls` / `demand_orders` / `port_listings` / `port_inventories` / `port_concessions` keyed by `world_id` (`local` in SP); stripped from `economy_json`. Tick still in-memory. Player WH/concessions stay on `company_state`. Next: Postgres / members (not now).
 5. ~~**Ground staff (Ports/WH)**~~ — shipped **0.3.47**: inbound + hire + grades + all 5 perks; WH T1/T2/T3.
-   - **Hire desk false-full (uncommitted):** empty T1 0/1 showed “slot full”. Skip empty same-day pool; UI `slotsFree` from WH tier when meta missing; `GET /api/ports` nests `groundStaff`.
-   - **Hire Unknown candidate (uncommitted):** desk IDs used `Math.random` and GET `/api/ports` did not `saveMissions`; Hire looked up a new pool. IDs now hub+day+slot; persist company on portMarket; Hire rerolls only on miss.
+   - ~~**Hire desk false-full**~~ — shipped `3e61bd5`: skip empty same-day pool; UI `slotsFree` fallback; `GET /api/ports` nests `groundStaff` + persist `portMarket`.
+   - ~~**Hire Unknown candidate**~~ — shipped `3e61bd5`: IDs hub+day+slot; persist company on portMarket; Hire rerolls only on miss.
 6. ~~**América do Sul completa (seed)**~~ — UY/PY/PE/BO/EC/CO/VE/GY/SR/GF + BR/AR/CL; ports costeiros; SimBrief allowlist regenerada.
 7. ~~**América Central completa (seed)**~~ — PA/CR/NI/HN/GT/SV/BZ; ports costeiros; lanes MX/US/CO.
 8. ~~**Caribe (seed, intl-first)**~~ — CU/DO/HT/JM/BS/TT/BB/LC/GD/AG; ring + KMIA/MMUN/CO/VE.

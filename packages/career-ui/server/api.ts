@@ -144,6 +144,7 @@ import {
   playerWarehouseSnapshot,
   quoteWarehouseBuyUsd,
   ensureDemandOrders,
+  localOperatorDemandCatchmentHubs,
   expireDemandHolds,
   demandSnapshot,
   acceptDemandOrder,
@@ -687,7 +688,9 @@ async function loadEconomyUnlocked(opts?: {
     ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
     expireDemandHolds(missions, caught);
-    ensureDemandOrders(caught);
+    ensureDemandOrders(caught, {
+      operatorCatchmentHubs: localOperatorDemandCatchmentHubs(caught),
+    });
     const crewDaily = settleCrewDailyOps(missions, caught, {
       fromTick: feeRange.fromTick,
       toTick: feeRange.toTick,
@@ -4186,7 +4189,9 @@ export function createCareerApiServer(port = 8787) {
         try {
           const result = await withCareerWrite((world, missions) => {
             expireDemandHolds(missions, world);
-            ensureDemandOrders(world);
+            ensureDemandOrders(world, {
+              operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+            });
             const warehouses = playerWarehouseSnapshot(missions, world);
             return {
               ...demandSnapshot(world, {
@@ -4931,7 +4936,9 @@ export function createCareerApiServer(port = 8787) {
           ensurePortInventoryRestock(world);
           ensurePortListings(world);
           expireDemandHolds(missions, world);
-          ensureDemandOrders(world);
+          ensureDemandOrders(world, {
+            operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+          });
           const crewDaily = settleCrewDailyOps(missions, world, {
             fromTick: world.tick - n,
             toTick: world.tick,

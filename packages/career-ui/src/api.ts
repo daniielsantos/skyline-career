@@ -2057,6 +2057,8 @@ export type PlayerWarehouseSnapshot = {
 
 export type DemandOrderView = {
   id: string;
+  /** Port desk this order belongs to (per-port Demand board). */
+  portId?: string;
   destIcao: string;
   /** Hub / airport display name for Dest tooltips. */
   destName?: string;

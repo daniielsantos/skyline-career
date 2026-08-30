@@ -12,8 +12,8 @@
     "A2A Piper PA-24-250 Comanche — auto roles pack from homologated profile",
     "Profile: a2a/piper-pa-24-250-comanche@1.0.0",
     "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
-    "Four-seat Accu-Sim cabin: stations 1–4 + baggage 7 (no Character5/6)",
+    "Cabin rear seats + baggage as freight (S3/S4/S7); S1/S2 crew with CG spill",
+    "Four-seat Accu-Sim cabin: Character1–4 maxLoad 500 + baggage 7 @ 200 (tablet Max. baggage)",
     "Fuel strategy: lvar-bridge",
     "CG: calibrated-live −10…30% MAC (not SimVar 0–100)",
     "liveSources: Accu-Sim LVars (PayloadWeight / Fuel* / Character*)"

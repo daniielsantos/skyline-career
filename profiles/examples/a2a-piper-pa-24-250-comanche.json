@@ -129,25 +129,25 @@
       {
         "index": 1,
         "name": "Character1Weight",
-        "maxLoad": 300,
+        "maxLoad": 500,
         "arm": 0.08
       },
       {
         "index": 2,
         "name": "Character2Weight",
-        "maxLoad": 300,
+        "maxLoad": 500,
         "arm": 0.08
       },
       {
         "index": 3,
         "name": "Character3Weight",
-        "maxLoad": 300,
+        "maxLoad": 500,
         "arm": -2.5
       },
       {
         "index": 4,
         "name": "Character4Weight",
-        "maxLoad": 300,
+        "maxLoad": 500,
         "arm": -2.5
       },
       {
@@ -270,7 +270,7 @@
     "Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, LEFT_TIP, RIGHT_TIP.",
     "See profiles/notes/a2a-accusim.md",
     "Homologated with interactive wizard (recipe lvar-bridge).",
-    "CG envelope calibrated-live (-10..30% MAC): CG PERCENT is negative empty (~-4.5) and disagrees with SimVar FWD/AFT 0–100%. Four-seat cabin (no Character5/6); baggage max 200 lb (tablet).",
+    "CG envelope calibrated-live (-10..30% MAC): CG PERCENT is negative empty (~-4.5) and disagrees with SimVar FWD/AFT 0–100%. Four-seat cabin (no Character5/6); Character1–4 maxLoad 500; baggage max 200 lb (tablet).",
     "CTRL+E after inject can wipe Seat 1 / Character1Weight on the Accu-Sim EFB; use manual engine start (or re-inject). See profiles/notes/a2a-accusim.md.",
     "See profiles/notes/a2a-piper-pa-24-250-comanche.md"
   ]

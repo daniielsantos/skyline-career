@@ -12,6 +12,8 @@ Perfis são isolados (`profiles/examples/*.json`); o risco real é **policy comp
 
 Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./12-pax-efb-due.md) (MD-11F: Due ≠ station maxLoad 500×N).
 
+**A2A Comanche (2026-08-29):** Character1–4 `maxLoad` **500** (era 300). Com 300, freighter fill + CG spill → Sim ~600 vs Due 800 (bags S3/S4/S7 + spill S1/S2 above 170; S7 muitas vezes 0). S7 fica 200 (tablet Max. baggage). Accu-Sim pode ainda limitar Character no EFB — validar write sticky.
+
 ---
 
 ## Leitura de payload (Sim) — como funciona

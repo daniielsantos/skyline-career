@@ -1,8 +1,10 @@
 # Open work / backlog curto
 
-Atualizado 2026-08-29: **iniBuilds A340-300** no Market (`inibuilds-a340-300`) — packs pax/freighter/VIP; SimBrief Passenger/Preighter/VIP (não Default). Card PNG ainda falta (`a340-300.png`).
+Atualizado 2026-08-29: **Todas as classes econômicas validadas** em live (inject / OFP / leituras). Catálogo Market ~80 famílias. Próximo foco: polish de produto / retenção, não expandir frota à força. Comanche Character maxLoad 500 (cap 300 → Sim~600 vs Due 800).
 
-Atualizado 2026-08-29: **light_ga** validado em live (inject/OFP/engines). Próximo: **light_turboprop**. Sessão endureceu engines sticky (Host/GPH/pós-inject), Corvalis `SR2T`↔`S22T`/`SR22T`, BN2 SimBrief/fuel/caps, cancel modal limpa. Proxies SimBrief leves → cargo under por MTOW é esperado (**Accept OFP cargo**).
+Atualizado 2026-08-29: **iniBuilds A340-300** no Market (`inibuilds-a340-300`) — packs pax/freighter/VIP; SimBrief Passenger/Preighter/VIP; card `a340-300.png` linkado.
+
+Atualizado 2026-08-29: **light_ga** validado em live (inject/OFP/engines). Sessão endureceu engines sticky (Host/GPH/pós-inject), Corvalis `SR2T`↔`S22T`/`SR22T`, BN2 SimBrief/fuel/caps, cancel modal limpa. Proxies SimBrief leves → cargo under por MTOW é esperado (**Accept OFP cargo**).
 
 Atualizado 2026-08-27: Loaded vs Due — **GA freighter** (`careerFreighterLivePayloadLb`: bags only) separado de Wide/Narrow `pax_and_cargo`. Watch resolve roles do pack (não `lastOfpCheck`). Inject stamp pós-write = bags, não soma com crew.
 

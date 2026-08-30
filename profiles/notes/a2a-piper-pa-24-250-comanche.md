@@ -23,9 +23,10 @@
 - Fuel strategy: lvar-bridge; tanks: LEFT_MAIN, RIGHT_MAIN, LEFT_TIP, RIGHT_TIP.
 - See profiles/notes/a2a-accusim.md
 - Homologated with interactive wizard (recipe lvar-bridge).
-- CG: `calibrated-live` −10…30% MAC (empty ~−4.5). Do **not** use SimVar FWD/AFT 0–100. Four-seat cabin: stations 1–4 + baggage 7 (no Character5/6). Tablet `Max. baggage` 200 lb.
+- CG: `calibrated-live` −10…30% MAC (empty ~−4.5). Do **not** use SimVar FWD/AFT 0–100. Four-seat cabin: stations 1–4 + baggage 7 (no Character5/6). Character1–4 **maxLoad 500** (was 300 — freighter fill was capping Sim ~600 vs Due 800). Tablet `Max. baggage` **200 lb** on S7 (unchanged).
 - Post-inject verify: Accu-Sim LVars (`a2a-lvars`); profile checks `L:Character1Weight` + `L:BaggageWeight`.
 - **CTRL+E after inject:** Accu-Sim can wipe Seat 1 / `Character1Weight` on the EFB (S1 blank). Manual engine start keeps the load. Skyline does not rewrite payload on engines-on — aircraft/CTRL+E side. See `profiles/notes/a2a-accusim.md`.
+- Loaded vs Due (freighter): Sim = bags S3/S4/S7 + crew spill above 170. Cap Character @ 300 left ~600 vs Due 800 when S7 stayed 0 — raise Character maxLoad to **500**.
 
 ## Homologated
 

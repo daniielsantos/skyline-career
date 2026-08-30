@@ -91,6 +91,9 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **AF-6 leftovers:** MR/MG/MU/SC/KM/LS/SZ; Nouakchott **GQNO** (not GQNN), Antananarivo **FMMI**, Toamasina **FMMT**, Mauritius **FIMP** (not FIMR), Seychelles **FSIA** (not FSPP), Moroni **FMCH**, Maseru **FXMM**, King Mswati **FDSK** (not FDMS); 5 coastal ports; Indian Ocean hops FMMI–FIMP–FSIA–FMCH–FMMI plus GQNO–GOOY / FMMI–FQMA / FXMM–FAOR / FDSK–FAOR; fuel trucks **1105**; seed **1130** airports / **213** ports / **183** countries. LS/SZ landlocked. Skip FLSK / Horn / GVNP / FPPR.
 - **AF-7 Horn of Africa:** SO/DJ/ER/SS; Mogadishu **HCMM**, Djibouti **HDAM**, Asmara **HHAS**, Juba **HJJJ** (not HSSJ); 3 coastal ports (Massawa pickup HHAS); hops HCMM–HKJK/HDAM, HDAM–HAAB/HHAS, HHAS–HAAB, HJJJ–HUEN/HSSK/HKJK; fuel trucks **1125**; seed **1134** airports / **216** ports / **187** countries. SS landlocked. Skip Hargeisa / Massawa airport / GQPP / FZNA / FGBT / GVNP / FLSK.
 - **EU-1 Macaronesia densify:** Madeira **LPMA**, Azores **LPPD**, Canaries **GCLP** (not LPPS / LPLA / GCTS); isolated regions **PT-M** / **PT-A** / **ES-CN** (no road to mainland); domestic air trunks LPMA/LPPD–LPPT, LPPD–LPMA, GCLP–LEMD/LEMG; island-neighbor hops LPMA–GCLP, LPPD–GCLP, GCLP–GMMN, LPMA–GMMN, GCLP–GQNO, GCLP–GVAC; 3 coastal ports (Funchal / Ponta Delgada / Las Palmas); fuel trucks **1140**; seed **1137** airports / **219** ports / **187** countries. Skip Tenerife / Porto Santo / Lajes this slice.
+- **US inland ports:** St. Louis / Memphis / Chicago / Pittsburgh / Duluth–Superior (Mississippi–Ohio → Gulf; Great Lakes → Seaway). Pickups KSTL/KMEM/KORD/KPIT/KDLH; +hubs KPIT/KDLH.
+- **US continental densify:** +108 commercial network hubs (MW/SC/SE/NE/W/MT) → **~230** continental network; regional Jet-A producers added.
+- **BR densify:** +35 commercial SB* hubs → **~95** BR network; seed **1281** airports / **224** ports.
 - **Pacific island-neighbor gap:** Nadi **NFFN**–Port Vila **NVVV** and Nadi–Nouméa **NWWW**; demand pairs FJ–VU / FJ–NC. Intl lanes >= **399**.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` feed listings from yard stock; operator buffs (~10% buy, ~15% inbound ETA, +1 listing slot); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
@@ -165,9 +168,12 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 53. ~~**AF-6 leftovers**~~ — MR/MG/MU/SC/KM/LS/SZ; seed **1130** / **213** ports / **1105** trucks. Island hops FMMI–FIMP–FSIA–FMCH. Homolog after rebuild.
 54. ~~**AF-7 Horn of Africa**~~ — SO/DJ/ER/SS; seed **1134** / **216** ports / **1125** trucks. Remap HSSJ→HJJJ. Homolog after rebuild.
 55. ~~**EU-1 Macaronesia densify**~~ — LPMA / LPPD / GCLP; seed **1137** / **219** ports / **1140** trucks. Island hops Madeira–Canaries–Azores plus Casablanca / Nouakchott / Sal. Homolog after rebuild.
-56. ~~**Pacific island-neighbor gap**~~ — NFFN–NVVV / NFFN–NWWW; demand FJ–VU / FJ–NC; intl lanes >= **399**.
-57. **Next map region:** MR **GQPP** / DRC **FZNA** / EG **FGBT** / CV **GVNP** / FLSK if homolog proves stock MSFS. Africa country coverage complete except those densify leftovers.
-58. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+56. ~~**US inland ports**~~ — USSTL/USMEM/USCHI/USPIT/USDLH; hubs KPIT/KDLH.
+57. ~~**US continental densify**~~ — +108 hubs → **~230** continental network.
+58. ~~**BR densify**~~ — +35 hubs → **~95** BR network; seed **1281** / **224** ports. Homolog SimBrief if OFP fails on new SB*.
+59. ~~**Pacific island-neighbor gap**~~ — NFFN–NVVV / NFFN–NWWW; demand FJ–VU / FJ–NC; intl lanes >= **399**.
+60. **Next map region:** MR **GQPP** / DRC **FZNA** / EG **FGBT** / CV **GVNP** / FLSK if homolog proves stock MSFS. Africa country coverage complete except those densify leftovers.
+61. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

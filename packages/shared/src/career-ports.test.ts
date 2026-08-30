@@ -136,7 +136,7 @@ describe('career ports', () => {
 
   it('catalogs Americas ocean-access ports with pickup hubs', () => {
     const ports = listCareerPorts();
-    assert.equal(ports.length, 219);
+    assert.equal(ports.length, 224);
     const expect: Array<{
       id: string;
       hub: string;
@@ -156,6 +156,11 @@ describe('career ports', () => {
       { id: 'USHOU', hub: 'KIAH' },
       { id: 'USLAX', hub: 'KLAX' },
       { id: 'USSEA', hub: 'KSEA' },
+      { id: 'USSTL', hub: 'KSTL' },
+      { id: 'USMEM', hub: 'KMEM' },
+      { id: 'USCHI', hub: 'KORD' },
+      { id: 'USPIT', hub: 'KPIT' },
+      { id: 'USDLH', hub: 'KDLH' },
       { id: 'CAVAN', hub: 'CYVR' },
       { id: 'CAHAL', hub: 'CYHZ' },
       { id: 'MXVER', hub: 'MMVR' },
@@ -434,6 +439,19 @@ describe('career ports', () => {
         (x) => x.warehouseId === bought.warehouse.id && x.kg > 0,
       ),
     );
+  });
+
+  it('allows warehouse buy at US inland river / Great Lakes pickup hubs', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-us-inland-wh' });
+    for (const icao of ['KSTL', 'KMEM', 'KORD', 'KPIT', 'KDLH'] as const) {
+      let state = selectStarterHub(emptyMissionsStateV2(), icao, {
+        pilotName: `Inland${icao}`,
+        airframeTypeId: 'asobo-c172sp-cargo',
+      });
+      state.walletUsd = 250_000;
+      const bought = buyWarehouseAtPickupHub(state, world, icao);
+      assert.equal(bought.warehouse.icao, icao);
+    }
   });
 
   it('allows warehouse buy at Manaus ocean-river pickup hub SBEG', () => {

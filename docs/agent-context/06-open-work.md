@@ -1,5 +1,15 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-30: **Network Find hub** — combobox ICAO/nome no painel Network; `HubNetworkMap` `focusIcao`/`focusToken` faz `easeTo` no hub (anel azul); limpar o filtro volta ao fitBounds da rede. Home continua `is-home`.
+
+Atualizado 2026-08-30: **BR densify ICAO fix** — Carajás é **SBCJ** (não SBCI; SBCI = Carolina/MA no MSFS, ~168 nm off).
+
+Atualizado 2026-08-30: **BR densify → ~95 rede** — +35 hubs comerciais SB* (MSFS+SimBrief) via `career-br-hubs-densify.ts` (SE/S/NE/N/CO). Seed **1281** airports; ports **224**. Sem bush novo.
+
+Atualizado 2026-08-30: **US continental densify → ~230 rede** — +108 hubs comerciais (MSFS+SimBrief) em MW/SC/SE/NE/W/MT via `career-us-hubs-densify.ts`. Seed **1246** airports; ports **224** inalterado. Fuel producers regionais adicionados (MSP/STL/DTW/MEM/EWR/…).
+
+Atualizado 2026-08-30: **US inland ports** — St. Louis / Memphis / Chicago / Pittsburgh / Duluth (rio→Golfo ou Great Lakes→Seaway). Hubs **KPIT** + **KDLH** novos; pickups KSTL/KMEM/KORD/KPIT/KDLH. Seed **1138** airports / **224** ports (superseded counts by densify acima).
+
 Atualizado 2026-08-30: **Mapa Ports — desenhar raio do corridor** — backlog / talvez futuro. Círculo/anel ~500/1800 nm a partir dos pickup hubs do porto focado (esclarece mesa vazia vs bacia). Não implementar agora.
 
 Atualizado 2026-08-30: **Bias porto→porto** — **backlog / talvez futuro**. Mesa por `portId` + raio já shipped; não implementar agora.

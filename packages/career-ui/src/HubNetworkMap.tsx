@@ -37,27 +37,46 @@ const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 
 function markerElement(
   hub: HubMapPoint,
-  highlighted: boolean,
+  isHome: boolean,
+  isFocus: boolean,
 ): HTMLButtonElement {
   const style = TIER_STYLE[hub.hubTier];
   const el = document.createElement('button');
   el.type = 'button';
-  el.className = `hub-map-marker${highlighted ? ' is-home' : ''}`;
+  el.className = [
+    'hub-map-marker',
+    isHome ? 'is-home' : '',
+    isFocus ? 'is-focus' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   el.title = `${hub.icao} ${hub.name}`;
   el.setAttribute('aria-label', `${hub.icao} ${hub.name}`);
-  const size = highlighted ? style.size + 4 : style.size;
+  const size = isHome || isFocus ? style.size + 4 : style.size;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
-  el.style.background = highlighted ? '#ffe08a' : style.color;
-  el.style.boxShadow = highlighted
-    ? '0 0 0 2px #fff4c8, 0 0 12px rgba(240,193,75,0.55)'
-    : `0 0 0 1px rgba(0,0,0,0.45), 0 0 8px ${style.color}55`;
+  if (isHome) {
+    el.style.background = '#ffe08a';
+    el.style.boxShadow =
+      '0 0 0 2px #fff4c8, 0 0 12px rgba(240,193,75,0.55)';
+  } else if (isFocus) {
+    el.style.background = style.color;
+    el.style.boxShadow =
+      '0 0 0 2px #7ec8ff, 0 0 14px rgba(96, 180, 255, 0.55)';
+  } else {
+    el.style.background = style.color;
+    el.style.boxShadow = `0 0 0 1px rgba(0,0,0,0.45), 0 0 8px ${style.color}55`;
+  }
   return el;
 }
 
 export function HubNetworkMap(props: {
   hubs: HubMapPoint[];
   highlightIcao?: string | null;
+  /** Selected hub from the Network find filter — camera flies here. */
+  focusIcao?: string | null;
+  /** Bump to re-run camera even when focusIcao is unchanged. */
+  focusToken?: number;
   onSelectHub?: (icao: string) => void;
   className?: string;
 }) {
@@ -96,11 +115,16 @@ export function HubNetworkMap(props: {
 
       if (props.hubs.length === 0) return;
 
-      const bounds = new LngLatBounds();
+      const home = props.highlightIcao?.trim().toUpperCase() ?? '';
+      const focus = props.focusIcao?.trim().toUpperCase() ?? '';
+
       for (const hub of props.hubs) {
-        const highlighted =
-          props.highlightIcao?.toUpperCase() === hub.icao.toUpperCase();
-        const el = markerElement(hub, highlighted);
+        const icao = hub.icao.toUpperCase();
+        const el = markerElement(
+          hub,
+          Boolean(home) && icao === home,
+          Boolean(focus) && icao === focus,
+        );
         el.addEventListener('click', (event) => {
           event.stopPropagation();
           onSelectRef.current?.(hub.icao);
@@ -120,19 +144,57 @@ export function HubNetworkMap(props: {
           )
           .addTo(map);
         markersRef.current.push(marker);
-        bounds.extend([hub.lon, hub.lat]);
-      }
-
-      if (props.hubs.length === 1) {
-        map.easeTo({ center: [props.hubs[0]!.lon, props.hubs[0]!.lat], zoom: 5 });
-      } else {
-        map.fitBounds(bounds, { padding: 56, maxZoom: 5, duration: 600 });
       }
     };
 
     if (map.isStyleLoaded()) paint();
     else map.once('load', paint);
-  }, [props.hubs, props.highlightIcao]);
+  }, [props.hubs, props.highlightIcao, props.focusIcao]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || props.hubs.length === 0) return;
+
+    const focusCamera = () => {
+      const focus = props.focusIcao?.trim().toUpperCase() ?? '';
+      if (focus) {
+        const hub = props.hubs.find((h) => h.icao.toUpperCase() === focus);
+        if (hub) {
+          try {
+            map.easeTo({
+              center: [hub.lon, hub.lat],
+              zoom: 5.5,
+              duration: 700,
+            });
+          } catch {
+            /* ignore camera errors */
+          }
+          return;
+        }
+      }
+
+      try {
+        if (props.hubs.length === 1) {
+          map.easeTo({
+            center: [props.hubs[0]!.lon, props.hubs[0]!.lat],
+            zoom: 5,
+            duration: 600,
+          });
+          return;
+        }
+        const bounds = new LngLatBounds();
+        for (const hub of props.hubs) {
+          bounds.extend([hub.lon, hub.lat]);
+        }
+        map.fitBounds(bounds, { padding: 56, maxZoom: 5, duration: 600 });
+      } catch {
+        /* ignore camera errors */
+      }
+    };
+
+    if (map.isStyleLoaded()) focusCamera();
+    else map.once('load', focusCamera);
+  }, [props.hubs, props.focusIcao, props.focusToken]);
 
   return (
     <div className={props.className ?? 'hub-network-map'}>

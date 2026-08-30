@@ -8865,6 +8865,31 @@ textarea {
   min-height: 0;
 }
 
+.network-map-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem 0.85rem;
+}
+
+.network-hub-filter {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, rgba(245, 242, 234, 0.65));
+}
+
+.network-hub-filter .ferry-hub-combobox {
+  min-width: 14rem;
+  max-width: 18rem;
+}
+
+.network-hub-filter .ferry-hub-combobox input {
+  text-transform: none;
+}
+
 .hub-network-map {
   position: relative;
   flex: 1;

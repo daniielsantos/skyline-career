@@ -218,6 +218,52 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     pickupHubs: ['KSEA'],
   },
   {
+    // Mississippi River → Gulf (ocean-linked inland).
+    id: 'USSTL',
+    name: 'Port of St. Louis',
+    countryId: 'US',
+    lat: 38.627,
+    lon: -90.184,
+    pickupHubs: ['KSTL'],
+  },
+  {
+    // Mississippi River → Gulf (ocean-linked inland).
+    id: 'USMEM',
+    name: 'Port of Memphis',
+    countryId: 'US',
+    lat: 35.123,
+    lon: -90.062,
+    pickupHubs: ['KMEM'],
+  },
+  {
+    // Great Lakes → St. Lawrence Seaway → Atlantic.
+    id: 'USCHI',
+    name: 'Port of Chicago',
+    countryId: 'US',
+    // Calumet Harbor / Lake Michigan terminals.
+    lat: 41.737,
+    lon: -87.539,
+    pickupHubs: ['KORD'],
+  },
+  {
+    // Ohio–Mississippi → Gulf (ocean-linked inland).
+    id: 'USPIT',
+    name: 'Port of Pittsburgh',
+    countryId: 'US',
+    lat: 40.443,
+    lon: -79.996,
+    pickupHubs: ['KPIT'],
+  },
+  {
+    // Great Lakes → St. Lawrence Seaway → Atlantic.
+    id: 'USDLH',
+    name: 'Port of Duluth–Superior',
+    countryId: 'US',
+    lat: 46.755,
+    lon: -92.1,
+    pickupHubs: ['KDLH'],
+  },
+  {
     id: 'CAVAN',
     name: 'Port of Vancouver',
     countryId: 'CA',

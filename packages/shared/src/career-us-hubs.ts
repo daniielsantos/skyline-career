@@ -11,6 +11,15 @@ import { US_HI_CAREER_HUBS } from './career-us-hi-hubs.js';
 import { US_GU_CAREER_HUBS } from './career-us-gu-hubs.js';
 import { US_AS_CAREER_HUBS } from './career-us-as-hubs.js';
 import { US_MP_CAREER_HUBS } from './career-us-mp-hubs.js';
+import {
+  US_DENSIFY_HUB_COUNT,
+  US_MT_DENSIFY_HUBS,
+  US_MW_DENSIFY_HUBS,
+  US_NE_DENSIFY_HUBS,
+  US_SC_DENSIFY_HUBS,
+  US_SE_DENSIFY_HUBS,
+  US_W_DENSIFY_HUBS,
+} from './career-us-hubs-densify.js';
 
 export type UsCareerRegion =
   | 'US-W'
@@ -98,11 +107,12 @@ const dryRegional = {
 };
 
 /**
- * 100 continental US hubs. Majors preserved; new entries fill Network map holes
- * with Dry-biased spokes/regionals for starter-friendly short-haul demand.
+ * Continental US hubs (network + densify + bush + bush-trip-only locals).
+ * Majors preserved; densify batch fills Demand catchment / short-haul gaps
+ * with commercial MSFS+SimBrief airports only.
  */
 export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
-  // ── US-W (18) ────────────────────────────────────────────────────────────
+  // ── US-W (18 core + densify) ─────────────────────────────────────────────
   {
     icao: 'KLAX',
     name: 'Los Angeles International',
@@ -275,8 +285,9 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -119.7681,
     ...drySpoke,
   },
+  ...US_W_DENSIFY_HUBS,
 
-  // ── US-MT (16) ───────────────────────────────────────────────────────────
+  // ── US-MT (16 core + densify) ────────────────────────────────────────────
   {
     icao: 'KDEN',
     name: 'Denver International',
@@ -425,8 +436,9 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -112.0708,
     ...drySpoke,
   },
+  ...US_MT_DENSIFY_HUBS,
 
-  // ── US-MW (20) ───────────────────────────────────────────────────────────
+  // ── US-MW (21 core + densify) ────────────────────────────────────────────
   {
     icao: 'KORD',
     name: "Chicago/O'Hare",
@@ -456,6 +468,16 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -93.2223,
     produce: { perishables: 1.3, general: 1.1 },
     consume: { electronics: 0.9, machinery: 1.0 },
+  },
+  {
+    icao: 'KDLH',
+    name: 'Duluth International',
+    region: 'US-MW',
+    hubTier: 'spoke',
+    lat: 46.8421,
+    lon: -92.1936,
+    produce: { machinery: 1.2, general: 1.15, supplies: 1.05 },
+    consume: { electronics: 0.85, perishables: 0.9 },
   },
   {
     icao: 'KSTL',
@@ -615,8 +637,9 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -86.3173,
     ...drySpoke,
   },
+  ...US_MW_DENSIFY_HUBS,
 
-  // ── US-SC (16) ───────────────────────────────────────────────────────────
+  // ── US-SC (16 core + densify) ────────────────────────────────────────────
   {
     icao: 'KIAH',
     name: 'Houston/Intercontinental',
@@ -767,8 +790,9 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -94.3674,
     ...drySpoke,
   },
+  ...US_SC_DENSIFY_HUBS,
 
-  // ── US-SE (16) ───────────────────────────────────────────────────────────
+  // ── US-SE (16 core + densify + tour spokes) ──────────────────────────────
   {
     icao: 'KMIA',
     name: 'Miami International',
@@ -922,8 +946,9 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     produce: { perishables: 1.2, general: 1.0, supplies: 0.95 },
     consume: { electronics: 0.9, machinery: 0.8 },
   },
+  ...US_SE_DENSIFY_HUBS,
 
-  // ── US-NE (14) ───────────────────────────────────────────────────────────
+  // ── US-NE (15 core + densify) ────────────────────────────────────────────
   {
     icao: 'KJFK',
     name: 'New York/JFK',
@@ -953,6 +978,16 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -74.1745,
     produce: { general: 1.3, machinery: 1.1 },
     consume: { electronics: 1.0, perishables: 1.0 },
+  },
+  {
+    icao: 'KPIT',
+    name: 'Pittsburgh International',
+    region: 'US-NE',
+    hubTier: 'regional',
+    lat: 40.4915,
+    lon: -80.2329,
+    produce: { machinery: 1.35, general: 1.2, supplies: 1.1 },
+    consume: { electronics: 0.95, perishables: 0.95 },
   },
   {
     icao: 'KBWI',
@@ -1055,6 +1090,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     lon: -70.3093,
     ...drySpoke,
   },
+  ...US_NE_DENSIFY_HUBS,
 
   // ── US bush-trip tour spokes (20) — K**** from Activities PLNs; normal spokes ──
   {
@@ -1285,7 +1321,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
   ...US_BUSH_TRIP_ONLY_HUBS,
 ];
 
-export const US_CAREER_HUB_COUNT = 166;
+export const US_CAREER_HUB_COUNT = 168 + US_DENSIFY_HUB_COUNT;
 
 function haversineNm(
   a: { lat: number; lon: number },

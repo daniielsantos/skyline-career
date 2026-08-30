@@ -6,6 +6,14 @@
 import type { CommodityId, HubTier } from './types/career-economy.js';
 import type { CareerCorridorEdge } from './career-us-hubs.js';
 import { buildCareerFeederCorridors } from './career-us-hubs.js';
+import {
+  BR_CO_DENSIFY_HUBS,
+  BR_DENSIFY_HUB_COUNT,
+  BR_N_DENSIFY_HUBS,
+  BR_NE_DENSIFY_HUBS,
+  BR_S_DENSIFY_HUBS,
+  BR_SE_DENSIFY_HUBS,
+} from './career-br-hubs-densify.js';
 
 export type BrCareerRegion = 'BR-S' | 'BR-SE' | 'BR-NE' | 'BR-N' | 'BR-CO';
 
@@ -201,8 +209,9 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     lon: -50.4247,
     ...agriSpoke,
   },
+  ...BR_SE_DENSIFY_HUBS,
 
-  // ── BR-S (11) ────────────────────────────────────────────────────────────
+  // ── BR-S (11 core + densify) ─────────────────────────────────────────────
   {
     icao: 'SBCT',
     name: 'Curitiba',
@@ -313,8 +322,9 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     lon: -52.3278,
     ...agriSpoke,
   },
+  ...BR_S_DENSIFY_HUBS,
 
-  // ── BR-NE (14) ───────────────────────────────────────────────────────────
+  // ── BR-NE (14 core + densify) ────────────────────────────────────────────
   {
     icao: 'SBSV',
     name: 'Salvador',
@@ -454,8 +464,9 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     lon: -47.4603,
     ...agriSpoke,
   },
+  ...BR_NE_DENSIFY_HUBS,
 
-  // ── BR-N (11) ────────────────────────────────────────────────────────────
+  // ── BR-N (11 core + densify + bush) ──────────────────────────────────────
   {
     icao: 'SBEG',
     name: 'Manaus',
@@ -562,6 +573,7 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     lon: -69.9358,
     ...amazonSpoke,
   },
+  ...BR_N_DENSIFY_HUBS,
 
   // ── BR-N bush soft-fields (2) — official ICAO; ferry blocked; OD vs BR gateways ──
   {
@@ -692,9 +704,10 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     lon: -54.9264,
     ...agriSpoke,
   },
+  ...BR_CO_DENSIFY_HUBS,
 ];
 
-export const BR_CAREER_HUB_COUNT = 62;
+export const BR_CAREER_HUB_COUNT = 62 + BR_DENSIFY_HUB_COUNT;
 
 /** Auto feeder corridors so every non-bush BR hub has ≥2 partners. */
 export function buildBrFeederCorridors(
@@ -726,11 +739,11 @@ export function assertBrCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<BrCareerRegion, number> = {
-    'BR-SE': 13,
-    'BR-S': 11,
-    'BR-NE': 14,
-    'BR-N': 13,
-    'BR-CO': 11,
+    'BR-SE': 21,
+    'BR-S': 18,
+    'BR-NE': 22,
+    'BR-N': 19,
+    'BR-CO': 17,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

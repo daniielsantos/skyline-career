@@ -3544,6 +3544,8 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [networkHubs, setNetworkHubs] = useState<NetworkHub[]>([]);
   const [networkHubsLoading, setNetworkHubsLoading] = useState(false);
+  const [networkMapFocusIcao, setNetworkMapFocusIcao] = useState('');
+  const [networkMapFocusToken, setNetworkMapFocusToken] = useState(0);
 
   useEffect(() => {
     setSelectedFboHoldId(null);
@@ -13224,19 +13226,42 @@ export function App() {
                 )}
               </p>
             </div>
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy || networkHubsLoading}
-              onClick={() => {
-                void refreshNetworkHubs().catch((err) => {
-                  setToastKind('fail');
-                  setToast(err instanceof Error ? err.message : String(err));
-                });
-              }}
-            >
-              Refresh
-            </button>
+            <div className="network-map-panel-actions">
+              <label className="network-hub-filter">
+                Find hub
+                <FerryHubCombobox
+                  id="network-find-hub"
+                  hubs={networkHubs.map((hub) => ({
+                    icao: hub.icao,
+                    name: hub.name,
+                    region: hub.region,
+                    detail: hub.hubTier,
+                  }))}
+                  value={networkMapFocusIcao}
+                  onChange={(icao) => {
+                    setNetworkMapFocusIcao(icao);
+                    setNetworkMapFocusToken((token) => token + 1);
+                  }}
+                  disabled={busy || networkHubsLoading || networkHubs.length === 0}
+                  plainText
+                  maxResults={16}
+                  placeholder="ICAO, city, or region…"
+                />
+              </label>
+              <button
+                type="button"
+                className="action ghost"
+                disabled={busy || networkHubsLoading}
+                onClick={() => {
+                  void refreshNetworkHubs().catch((err) => {
+                    setToastKind('fail');
+                    setToast(err instanceof Error ? err.message : String(err));
+                  });
+                }}
+              >
+                Refresh
+              </button>
+            </div>
           </div>
           {networkHubsLoading && networkHubs.length === 0 ? (
             <div className="hub-network-map" aria-busy="true">
@@ -13248,6 +13273,8 @@ export function App() {
             <HubNetworkMap
               hubs={networkHubs}
               highlightIcao={homeHubIcao}
+              focusIcao={networkMapFocusIcao || null}
+              focusToken={networkMapFocusToken}
               onSelectHub={(icao) => {
                 void openAirport(icao);
               }}

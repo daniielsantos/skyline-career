@@ -7,12 +7,12 @@ export const CONTRACT_PILOT_FEE_FRAC = 0.3;
 
 export const CONTRACT_PILOT_FEE_MIN_USD = 75;
 
-/** Soft $/nm floor — keep in sync with shared career-contract-pilot-fee.ts */
+/** Starter $/nm — keep in sync with shared career-contract-pilot-fee.ts */
 export const CONTRACT_PILOT_FEE_USD_PER_NM: Readonly<
   Partial<Record<string, number>>
 > = {
-  light_ga: 1.85,
-  light_turboprop: 2.05,
+  light_ga: 10.0,
+  light_turboprop: 10.75,
 };
 
 export function quoteContractPilotFeeUsd(

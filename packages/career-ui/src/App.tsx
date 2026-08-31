@@ -277,6 +277,7 @@ import {
   deriveDispatchStep,
   dispatchStepStatusLine,
   formatCargoOpsDebriefLine,
+  formatClassOpsDebriefLine,
   formatFlightDurationMs,
   formatLandingFpm,
   formatRunwayTouchdownDebriefLine,
@@ -4270,10 +4271,14 @@ export function App() {
               const cargoLine = formatCargoOpsDebriefLine(
                 debrief?.cargoOpsDeltas ?? status.settlement!.cargoOpsDeltas,
               );
+              const classLine = formatClassOpsDebriefLine(
+                debrief?.classOpsDeltas ?? status.settlement!.classOpsDeltas,
+              );
+              const opsLine = [cargoLine, classLine].filter(Boolean).join(' · ');
               setToast(
                 `Flight settled · net ${formatMoney(
                   debrief?.netUsd ?? status.settlement!.payoutUsd,
-                )}${cargoLine ? ` · ${cargoLine}` : ''}`,
+                )}${opsLine ? ` · ${opsLine}` : ''}`,
               );
               if (typeof status.walletUsd === 'number') {
                 setWallet(status.walletUsd);
@@ -8155,9 +8160,11 @@ export function App() {
       setFlightDebrief(debrief);
       setToastKind(result.settlement.onTime ? 'ok' : 'warn');
       const cargoLine = formatCargoOpsDebriefLine(debrief.cargoOpsDeltas);
+      const classLine = formatClassOpsDebriefLine(debrief.classOpsDeltas);
+      const opsLine = [cargoLine, classLine].filter(Boolean).join(' · ');
       setToast(
         `Flight settled · net ${formatMoney(debrief.netUsd)}${
-          cargoLine ? ` · ${cargoLine}` : ''
+          opsLine ? ` · ${opsLine}` : ''
         }`,
       );
       setStaging(null);
@@ -12367,6 +12374,17 @@ export function App() {
                         <p>
                           {formatCargoOpsDebriefLine(
                             flightDebrief.cargoOpsDeltas,
+                          )}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {flightDebrief.classOpsDeltas.length > 0 ? (
+                      <div className="cargo-ops-debrief" aria-label="Class Ops">
+                        <strong>Class Ops</strong>
+                        <p>
+                          {formatClassOpsDebriefLine(
+                            flightDebrief.classOpsDeltas,
                           )}
                         </p>
                       </div>

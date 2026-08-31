@@ -989,6 +989,15 @@ export type CargoOpsDelta = {
   clean: boolean;
 };
 
+export type ClassOpsDelta = {
+  classId: AircraftClass;
+  deltaHours: number;
+  hoursAfter: number;
+  clean: boolean;
+  cleansAfter: number;
+  unlockedNow: boolean;
+};
+
 export type CompanyCreditSnapshot = {
   principalUsd: number;
   limitUsd: number;
@@ -3134,6 +3143,8 @@ export type MissionSettlement = {
   runwayTouch?: RunwayTouchdownSnapshot | null;
   /** Cargo Ops ladder deltas from this settle. */
   cargoOpsDeltas?: CargoOpsDelta[];
+  /** Class Ops ladder deltas from this settle. */
+  classOpsDeltas?: ClassOpsDelta[];
 };
 
 export type WatchEvent =

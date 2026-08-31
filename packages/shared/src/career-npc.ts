@@ -2599,7 +2599,10 @@ export function acceptContractPilotOffer(
     }
     remainderKg = offerCargoKg - liftedKg;
     const liftFrac = liftedKg / offerCargoKg;
-    pilotFeeUsd = Math.max(CONTRACT_PILOT_FEE_MIN_USD, Math.round(offerFeeUsd * liftFrac));
+    pilotFeeUsd = Math.max(
+      CONTRACT_PILOT_FEE_MIN_USD,
+      Math.round(offerFeeUsd * liftFrac),
+    );
     grossPayUsd = Math.max(1, Math.round(offerPayUsd * liftFrac));
   }
 

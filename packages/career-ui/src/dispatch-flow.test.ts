@@ -330,6 +330,7 @@ describe('buildFlightDebrief', () => {
     assert.equal(debrief.flightScore?.pct, 86);
     assert.equal(debrief.flightScore?.earned, 44);
     assert.deepEqual(debrief.cargoOpsDeltas, []);
+    assert.deepEqual(debrief.classOpsDeltas, []);
   });
 
   it('includes cargo ops deltas when settlement provides them', () => {

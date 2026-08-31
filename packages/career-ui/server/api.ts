@@ -6965,6 +6965,7 @@ export function createCareerApiServer(port = 8787) {
               pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
               settlement: result.settlement,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
+              classOpsDeltas: result.classOpsDeltas ?? [],
             };
           }, {
             housekeeping: false,
@@ -6999,6 +7000,7 @@ export function createCareerApiServer(port = 8787) {
               weatherOps: settled.mission.settledWeatherOps ?? null,
               runwayTouch: settled.mission.settledRunwayTouch ?? null,
               cargoOpsDeltas: settled.cargoOpsDeltas,
+              classOpsDeltas: settled.classOpsDeltas,
             },
           });
         } catch (error) {

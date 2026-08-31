@@ -75,6 +75,7 @@ export function ensureV3Ddl(db: SqliteDb): void {
       hub_selected INTEGER NOT NULL DEFAULT 0,
       company_credit_json TEXT,
       cargo_ops_json TEXT,
+      class_ops_json TEXT,
       aircraft_market_json TEXT,
       aircraft_market_day INTEGER,
       aircraft_market_demand_day INTEGER,
@@ -216,6 +217,9 @@ export function ensureV3Ddl(db: SqliteDb): void {
     db.exec(
       `ALTER TABLE company_state ADD COLUMN player_port_concessions_json TEXT`,
     );
+  }
+  if (!columnExists(db, 'company_state', 'class_ops_json')) {
+    db.exec(`ALTER TABLE company_state ADD COLUMN class_ops_json TEXT`);
   }
   db.exec(`
     CREATE INDEX IF NOT EXISTS ledger_company_tick_idx ON ledger(company_id, at_tick);
@@ -1372,13 +1376,13 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
   db.prepare(
     `INSERT INTO company_state (
        company_id, wallet_usd, pilot_name, pilot_icao, hub_selected,
-       company_credit_json, cargo_ops_json, aircraft_market_json,
+       company_credit_json, cargo_ops_json, class_ops_json, aircraft_market_json,
        aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
        player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
        port_pickups_json, player_warehouses_json, player_port_concessions_json, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
-       @company_credit_json, @cargo_ops_json, @aircraft_market_json,
+       @company_credit_json, @cargo_ops_json, @class_ops_json, @aircraft_market_json,
        @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json,
        @player_fbos_json, @company_crew_json, @ground_staff_json, @active_bush_trip_json,
        @port_pickups_json, @player_warehouses_json, @player_port_concessions_json, @updated_at_ms
@@ -1390,6 +1394,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        hub_selected = excluded.hub_selected,
        company_credit_json = excluded.company_credit_json,
        cargo_ops_json = excluded.cargo_ops_json,
+       class_ops_json = excluded.class_ops_json,
        aircraft_market_json = excluded.aircraft_market_json,
        aircraft_market_day = excluded.aircraft_market_day,
        aircraft_market_demand_day = excluded.aircraft_market_demand_day,
@@ -1418,6 +1423,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
       ? JSON.stringify(state.companyCredit)
       : null,
     cargo_ops_json: state.cargoOps ? JSON.stringify(state.cargoOps) : null,
+    class_ops_json: state.classOps ? JSON.stringify(state.classOps) : null,
     aircraft_market_json: state.aircraftMarket
       ? JSON.stringify(state.aircraftMarket)
       : null,
@@ -1463,7 +1469,7 @@ export function readCompanyStateScalars(
   const row = db
     .prepare(
       `SELECT wallet_usd, pilot_name, pilot_icao, hub_selected, company_credit_json,
-              cargo_ops_json, aircraft_market_json, aircraft_market_day,
+              cargo_ops_json, class_ops_json, aircraft_market_json, aircraft_market_day,
               aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
               company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
               player_warehouses_json, player_port_concessions_json
@@ -1477,6 +1483,7 @@ export function readCompanyStateScalars(
         hub_selected: number;
         company_credit_json: string | null;
         cargo_ops_json: string | null;
+        class_ops_json: string | null;
         aircraft_market_json: string | null;
         aircraft_market_day: number | null;
         aircraft_market_demand_day: number | null;
@@ -1507,6 +1514,13 @@ export function readCompanyStateScalars(
   if (row.cargo_ops_json) {
     try {
       out.cargoOps = JSON.parse(row.cargo_ops_json);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (row.class_ops_json) {
+    try {
+      out.classOps = JSON.parse(row.class_ops_json);
     } catch {
       /* ignore */
     }

@@ -2,6 +2,10 @@
 
 Atualizado 2026-08-30: **OFP FAIL falso ATR curto** — Payload=missão (3757) partido em bag+pax EFB; Intent lia só bag. Fix `ofpFreightTowardMissionKg(+missionCargoKg)`.
 
+Atualizado 2026-08-31: **Class Ops não persistia** — `class_ops_json` em `company_state` (migrate + read/write). Sintoma: horas/cleans GA/TP crew (ex. ATR) ficavam 0/20 · 0/6 após settle/reload; Cargo Ops ok. Settle/Watch agora expõe `classOpsDeltas` no debrief.
+
+Atualizado 2026-08-30: **Crew fee GA/TP (progressão)** — **10.0 / 10.75 $/nm** só por distância (sem piso starter); min global **$75**. Alvo ~**30 voos** @ ~185 nm → C172 ~$55k. Pay espalha 163 nm ≈ **$1.6k** · 230 nm ≈ **$2.3k**. Ferry inalterado. Sem `CARGO_FLOW_BALANCE`.
+
 Atualizado 2026-08-30: **Crew fee GA/TP bump** — piso **1.85 / 2.05 $/nm** (era 1.4 / 1.65); min contract **$75** (era $50). Ainda abaixo ferry Hangar (~2.13 / 2.5). Sem `CARGO_FLOW_BALANCE`.
 
 Atualizado 2026-08-30: **Demand /porto 4→6** — `DEMAND_ORDERS_PER_PORT_BASE=6` (+1 P2+); hub dest ainda 2. Country/global inalterados. Rebuild + 1 tick para encher mesas.

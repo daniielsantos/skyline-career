@@ -210,59 +210,119 @@ body {
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.35rem;
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: auto;
+  padding: 0 0.1rem;
 }
 
 .sidebar-nav .tab {
+  --nav-accent: color-mix(in srgb, var(--muted) 35%, transparent);
   display: flex;
   align-items: center;
   width: 100%;
   text-align: left;
-  border: 0;
-  border-left: 3px solid transparent;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--nav-accent);
   border-radius: 0.2rem;
-  background: transparent;
-  color: color-mix(in srgb, var(--muted) 92%, var(--ink));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ink) 5%, var(--surface)),
+      var(--surface)
+    );
+  color: color-mix(in srgb, var(--muted) 88%, var(--ink));
   font-family: var(--font-display);
   font-size: 1.02rem;
   font-weight: 400;
-  letter-spacing: 0.05em;
-  text-transform: none;
-  padding: 0.58rem 0.8rem 0.58rem 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.75rem 0.55rem 0.68rem;
   cursor: pointer;
   transition:
     color 0.15s ease,
     background 0.15s ease,
-    border-color 0.15s ease;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .sidebar-nav .tab:hover:not(:disabled) {
+  --nav-accent: color-mix(in srgb, var(--accent) 55%, var(--muted));
   color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent) 10%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .sidebar-nav .tab.active {
+  --nav-accent: var(--accent);
   color: var(--ink);
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
-  border-left-color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent) 12%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.sidebar-nav .tab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, var(--ink));
+  outline-offset: 2px;
+}
+
+.sidebar-nav span.tab {
+  cursor: default;
 }
 
 .sidebar-nav .tab.tab-back {
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.15rem;
+  --nav-accent: color-mix(in srgb, var(--info) 50%, transparent);
   font-family: var(--font-body);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  text-transform: none;
   color: var(--info);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--info) 7%, var(--surface)),
+      var(--surface)
+    );
 }
 
 .sidebar-nav .tab.tab-back:hover:not(:disabled) {
+  --nav-accent: var(--info);
   color: color-mix(in srgb, var(--info) 85%, #fff);
-  background: color-mix(in srgb, var(--info) 9%, transparent);
-  border-left-color: color-mix(in srgb, var(--info) 45%, transparent);
+  border-color: color-mix(in srgb, var(--info) 35%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--info) 12%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 10%, transparent);
+}
+
+.sidebar-nav .tab.tab-back.active {
+  --nav-accent: var(--info);
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--info) 40%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--info) 14%, var(--surface)),
+      var(--surface)
+    );
 }
 
 .sidebar-nav .tab:disabled {
@@ -2116,6 +2176,102 @@ th {
   gap: 0.75rem;
 }
 
+.cargo-ops-lede {
+  margin: 0;
+  max-width: 52rem;
+  line-height: 1.45;
+}
+
+.cargo-ops-lede strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cargo-ops-next {
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-left: 3px solid var(--accent);
+  border-radius: 0.25rem;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 8%, var(--surface)),
+    var(--surface)
+  );
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cargo-ops-next-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cargo-ops-next-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+
+.cargo-ops-next-lede {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.cargo-ops-checklist {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.cargo-ops-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.cargo-ops-check.done {
+  color: var(--ink);
+}
+
+.cargo-ops-check-mark {
+  flex: 0 0 auto;
+  width: 1rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.cargo-ops-all-open {
+  margin: 0;
+}
+
+.cargo-ops-side-note {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed var(--line);
+  border-radius: 0.2rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.cargo-ops-side-note-label {
+  display: inline-block;
+  margin-right: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 85%, var(--ink));
+}
+
 .crew-panel {
   display: grid;
   gap: 1.25rem;
@@ -2471,14 +2627,48 @@ th {
   opacity: 0.72;
 }
 
-.cargo-ops-tier-head {
+.cargo-ops-tier.is-next {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel));
+}
+
+.cargo-ops-tier-title {
   display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+}
+
+.cargo-ops-tier-title strong {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   font-size: 0.78rem;
+}
+
+.cargo-ops-next-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.cargo-ops-tier-lede {
+  margin: 0.2rem 0 0;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.cargo-ops-commodity-locked {
+  opacity: 0.72;
+}
+
+.cargo-ops-tier-head {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .cargo-ops-lock {
@@ -4655,16 +4845,26 @@ tr.lot-locked {
   padding: 2rem 1.25rem;
   position: relative;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent),
+    radial-gradient(ellipse 90% 55% at 50% -15%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 58%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, color-mix(in srgb, var(--info) 8%, transparent), transparent),
     var(--bg);
 }
 
-.profile-gate {
+.panel.profile-gate {
   width: min(28rem, 100%);
   display: grid;
-  gap: 1.1rem;
+  gap: 1.35rem;
   position: relative;
-  padding: 1.5rem 1.35rem 1.35rem;
+  padding: 1.75rem 1.5rem 1.45rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 0.35rem;
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--accent) 7%, var(--panel)),
+      var(--panel) 42%
+    );
   animation: profile-gate-enter 280ms ease-out;
 }
 
@@ -4846,13 +5046,14 @@ tr.lot-locked {
 
 .profile-gate-hero {
   text-align: center;
+  padding-bottom: 0.15rem;
 }
 
 .profile-gate-hero h1 {
-  margin: 0.15rem 0 0;
-  font-size: 0.78rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -4861,37 +5062,125 @@ tr.lot-locked {
   margin: 0;
 }
 
+.profile-gate-section {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.profile-gate-section-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 90%, var(--accent));
+}
+
 .profile-gate-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.45rem;
+}
+
+.profile-gate-empty {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px dashed color-mix(in srgb, var(--line) 85%, var(--muted));
+  border-radius: 0.2rem;
+  font-size: 0.88rem;
+  text-align: center;
 }
 
 .profile-gate-play {
+  --nav-accent: color-mix(in srgb, var(--muted) 35%, transparent);
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.45rem 0.7rem;
+  gap: 0.75rem;
   width: 100%;
   text-align: left;
   font: inherit;
   color: inherit;
   cursor: pointer;
-  padding: 0.9rem 1rem;
+  padding: 0.85rem 0.9rem 0.85rem 0.75rem;
   border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel) 92%, var(--accent));
+  border-left: 3px solid var(--nav-accent);
+  border-radius: 0.2rem;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ink) 5%, var(--surface)),
+      var(--surface)
+    );
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.profile-gate-play-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  min-width: 0;
+}
+
+.profile-gate-play-hint {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  transform: translateX(-0.25rem);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    color 0.15s ease;
 }
 
 .profile-gate-play.is-last {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  --nav-accent: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent) 11%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.profile-gate-play.is-last .profile-gate-play-hint {
+  opacity: 1;
+  transform: none;
+  color: color-mix(in srgb, var(--accent) 75%, var(--ink));
 }
 
 .profile-gate-play:hover:not(:disabled),
 .profile-gate-play:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  --nav-accent: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent) 12%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.profile-gate-play:hover:not(:disabled) .profile-gate-play-hint,
+.profile-gate-play:focus-visible .profile-gate-play-hint {
+  opacity: 1;
+  transform: none;
+  color: var(--accent);
 }
 
 .profile-gate-play:disabled {
@@ -4900,20 +5189,44 @@ tr.lot-locked {
 }
 
 .profile-gate-play strong {
-  font-size: 1.05rem;
+  font-size: 1.08rem;
+  font-weight: 650;
 }
 
 .profile-gate-last {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent);
 }
 
 .profile-gate-create {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.55rem;
+  margin: 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line);
+}
+
+.profile-gate-field input {
+  border-radius: 0.2rem;
+  background: var(--surface);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.profile-gate-field input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.profile-gate-create .accept {
+  width: 100%;
+  margin-top: 0.15rem;
+  padding: 0.62rem 1rem;
 }
 
 .profile-manage-block {

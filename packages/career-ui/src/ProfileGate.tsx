@@ -32,30 +32,38 @@ export function ProfileGate(props: {
         </p>
       ) : null}
 
-      <ul className="profile-gate-list">
-        {props.profiles.length === 0 ? (
-          <li className="muted">No profiles yet.</li>
-        ) : (
-          props.profiles.map((p) => {
-            const isLast = p.id === props.lastActiveId;
-            return (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className={`profile-gate-play${isLast ? ' is-last' : ''}`}
-                  disabled={props.busy}
-                  onClick={() => props.onSelect(p.id)}
-                >
-                  <strong>{p.name}</strong>
-                  {isLast ? (
-                    <span className="profile-gate-last">Last played</span>
-                  ) : null}
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
+      <div className="profile-gate-section">
+        <p className="profile-gate-section-label">Saved profiles</p>
+        <ul className="profile-gate-list">
+          {props.profiles.length === 0 ? (
+            <li className="profile-gate-empty muted">No profiles yet — create one below.</li>
+          ) : (
+            props.profiles.map((p) => {
+              const isLast = p.id === props.lastActiveId;
+              return (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className={`profile-gate-play${isLast ? ' is-last' : ''}`}
+                    disabled={props.busy}
+                    onClick={() => props.onSelect(p.id)}
+                  >
+                    <span className="profile-gate-play-main">
+                      <strong>{p.name}</strong>
+                      {isLast ? (
+                        <span className="profile-gate-last">Last played</span>
+                      ) : null}
+                    </span>
+                    <span className="profile-gate-play-hint" aria-hidden>
+                      Continue →
+                    </span>
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      </div>
 
       <form
         className="profile-gate-create"
@@ -65,8 +73,9 @@ export function ProfileGate(props: {
           setNewName('');
         }}
       >
-        <label className="pilot-field">
-          New profile
+        <p className="profile-gate-section-label">New profile</p>
+        <label className="pilot-field profile-gate-field">
+          Pilot name
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}

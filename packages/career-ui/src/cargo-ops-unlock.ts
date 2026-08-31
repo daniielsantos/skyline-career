@@ -35,12 +35,34 @@ export const CARGO_OPS_FILTER_OPTIONS: readonly {
 export const CARGO_OPS_TIERS: readonly {
   id: CargoOpsTierId;
   label: string;
+  /** One line — tier is unlock path, not sorted by $/kg. */
+  lede: string;
   commodityIds: readonly CargoOpsCommodityId[];
 }[] = [
-  { id: 'dry', label: 'Dry', commodityIds: ['general', 'supplies'] },
-  { id: 'value', label: 'Value', commodityIds: ['electronics'] },
-  { id: 'time', label: 'Time', commodityIds: ['perishables'] },
-  { id: 'heavy', label: 'Heavy', commodityIds: ['machinery'] },
+  {
+    id: 'dry',
+    label: 'Dry',
+    lede: 'Starter freight — always open, forgiving on-time rules.',
+    commodityIds: ['general', 'supplies'],
+  },
+  {
+    id: 'value',
+    label: 'Value',
+    lede: 'High $/kg (electronics) — unlock after a solid Dry record.',
+    commodityIds: ['electronics'],
+  },
+  {
+    id: 'time',
+    label: 'Time',
+    lede: 'Perishables — tight deadlines, not “more valuable” than Value.',
+    commodityIds: ['perishables'],
+  },
+  {
+    id: 'heavy',
+    label: 'Heavy',
+    lede: 'Machinery — large loads, needs bigger aircraft.',
+    commodityIds: ['machinery'],
+  },
 ];
 
 /** Keep in sync with packages/shared/src/career-cargo-ops.ts */
@@ -71,6 +93,104 @@ export type CargoOpsUnlockProgress = {
   ready: boolean;
   summary: string;
 };
+
+export type CargoOpsUnlockCheck = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
+/** Checklist for the next locked tier (Hangar hero card). */
+export function cargoOpsNextUnlockChecks(
+  ops: CareerCargoOps,
+): { tierLabel: string; lede: string; checks: CargoOpsUnlockCheck[] } | null {
+  const e = ops.commodities.electronics;
+  if (!e?.unlocked) {
+    const g = ops.commodities.general;
+    const s = ops.commodities.supplies;
+    const {
+      dryCleansRequired,
+      peakRepRequired,
+      minCleanPerDryCommodity,
+    } = CARGO_OPS_VALUE_UNLOCK;
+    const cleans = (g?.settlesOk ?? 0) + (s?.settlesOk ?? 0);
+    const peak = Math.max(g?.rep ?? 0, s?.rep ?? 0);
+    return {
+      tierLabel: 'Value · Electronics',
+      lede: 'First step up from Dry — high $/kg, stricter flight score (80%+).',
+      checks: [
+        {
+          id: 'cleans',
+          label: `${cleans}/${dryCleansRequired} on-time Dry cleans (any mix)`,
+          done: cleans >= dryCleansRequired,
+        },
+        {
+          id: 'general',
+          label: `≥${minCleanPerDryCommodity} clean on General (${g?.settlesOk ?? 0}/${minCleanPerDryCommodity})`,
+          done: (g?.settlesOk ?? 0) >= minCleanPerDryCommodity,
+        },
+        {
+          id: 'supplies',
+          label: `≥${minCleanPerDryCommodity} clean on Supplies (${s?.settlesOk ?? 0}/${minCleanPerDryCommodity})`,
+          done: (s?.settlesOk ?? 0) >= minCleanPerDryCommodity,
+        },
+        {
+          id: 'peak',
+          label: `Peak Dry rep ${peak}/${peakRepRequired} (best of General or Supplies)`,
+          done: peak >= peakRepRequired,
+        },
+      ],
+    };
+  }
+
+  const p = ops.commodities.perishables;
+  if (!p?.unlocked) {
+    return {
+      tierLabel: 'Time · Perishables',
+      lede: 'Time-critical cargo — bigger urgency pay, harsher if late.',
+      checks: [
+        {
+          id: 'elec-rep',
+          label: `Electronics rep ${e.rep}/${CARGO_OPS_TIME_UNLOCK.electronicsRepRequired}`,
+          done: e.rep >= CARGO_OPS_TIME_UNLOCK.electronicsRepRequired,
+        },
+        {
+          id: 'elec-cleans',
+          label: `${e.settlesOk}/${CARGO_OPS_TIME_UNLOCK.electronicsCleansRequired} on-time Electronics cleans`,
+          done: e.settlesOk >= CARGO_OPS_TIME_UNLOCK.electronicsCleansRequired,
+        },
+      ],
+    };
+  }
+
+  const m = ops.commodities.machinery;
+  if (!m?.unlocked) {
+    const viaTime = timeReady(ops);
+    const viaShortcut = valueHeavyShortcut(ops);
+    return {
+      tierLabel: 'Heavy · Machinery',
+      lede: 'Bulk industrial freight — finish Time or grind Value for a shortcut.',
+      checks: [
+        {
+          id: 'time-path',
+          label: p.unlocked
+            ? `${p.settlesOk}/${CARGO_OPS_HEAVY_UNLOCK.perishablesCleansRequired} Perishables cleans · rep ${p.rep}/${CARGO_OPS_HEAVY_UNLOCK.perishablesRepRequired}`
+            : 'Unlock Perishables first',
+          done: viaTime,
+        },
+        {
+          id: 'value-shortcut',
+          label: e.unlocked
+            ? `Shortcut: ${e.settlesOk}/${CARGO_OPS_HEAVY_SHORTCUT.electronicsCleansRequired} Electronics cleans · rep ${e.rep}/${CARGO_OPS_HEAVY_SHORTCUT.electronicsRepRequired}`
+            : 'Value shortcut unavailable',
+          done: viaShortcut,
+        },
+      ],
+    };
+  }
+
+  return null;
+}
 
 function dryReady(ops: CareerCargoOps): boolean {
   const g = ops.commodities.general;

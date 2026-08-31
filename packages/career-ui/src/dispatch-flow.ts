@@ -5,6 +5,8 @@ import type {
   WeatherOpsSnapshot,
   RunwayTouchdownSnapshot,
   CargoOpsDelta,
+  ClassOpsDelta,
+  AircraftClass,
 } from './api';
 
 export type DispatchStepId =
@@ -58,6 +60,7 @@ export type FlightDebrief = {
   weatherOps: WeatherOpsSnapshot | null;
   runwayTouch: RunwayTouchdownSnapshot | null;
   cargoOpsDeltas: CargoOpsDelta[];
+  classOpsDeltas: ClassOpsDelta[];
   netUsd: number;
 };
 
@@ -81,6 +84,34 @@ export function formatCargoOpsDebriefLine(
       const unlock = d.unlockedNow ? ' · unlocked' : '';
       const clean = d.clean ? ' · clean' : '';
       return `${name} ${sign}${d.deltaRep}→${d.repAfter}${clean}${unlock}`;
+    })
+    .join(' · ');
+}
+
+const CLASS_OPS_LABELS: Record<AircraftClass, string> = {
+  light_ga: 'Light GA',
+  light_turboprop: 'Light TP',
+  light_jet: 'Light jet',
+  medium_piston: 'Medium',
+  narrow_freighter: 'Narrow',
+  wide_freighter: 'Wide',
+};
+
+/** Compact toast / debrief line for Class Ops hours + cleans. */
+export function formatClassOpsDebriefLine(
+  deltas: ClassOpsDelta[] | null | undefined,
+): string {
+  if (!deltas?.length) return '';
+  return deltas
+    .map((d) => {
+      const name = CLASS_OPS_LABELS[d.classId] ?? d.classId;
+      const h =
+        Number.isInteger(d.hoursAfter) ?
+          String(d.hoursAfter)
+        : d.hoursAfter.toFixed(1);
+      const clean = d.clean ? ' · clean' : '';
+      const unlock = d.unlockedNow ? ' · class unlocked' : '';
+      return `${name} +${d.deltaHours}h→${h}h${clean}${unlock}`;
     })
     .join(' · ');
 }
@@ -234,6 +265,7 @@ export function buildFlightDebrief(opts: {
     weatherOps,
     runwayTouch,
     cargoOpsDeltas: opts.settlement.cargoOpsDeltas ?? [],
+    classOpsDeltas: opts.settlement.classOpsDeltas ?? [],
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
   };
 }

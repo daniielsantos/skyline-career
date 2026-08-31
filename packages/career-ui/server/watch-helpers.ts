@@ -78,6 +78,7 @@ import {
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CargoOpsDelta,
+  type ClassOpsDelta,
   type CruiseSampleState,
   type CruiseSampleStatus,
   type FlightGroundSample,
@@ -214,6 +215,8 @@ export type WatchStatusPayload = {
     runwayTouch?: RunwayTouchdownSnapshot | null;
     /** Cargo Ops ladder deltas from this settle. */
     cargoOpsDeltas?: CargoOpsDelta[];
+    /** Class Ops ladder deltas from this settle. */
+    classOpsDeltas?: ClassOpsDelta[];
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -3888,6 +3891,7 @@ export class CareerWatchSession {
               weatherOps: result.mission.settledWeatherOps ?? null,
               runwayTouch: result.mission.settledRunwayTouch ?? null,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
+              classOpsDeltas: result.classOpsDeltas ?? [],
             };
             return true;
           },

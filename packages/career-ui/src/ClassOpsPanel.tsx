@@ -26,7 +26,7 @@ export function ClassOpsPanel(props: {
       <h3>Class Ops</h3>
       <p className="muted">
         Starters are open. Jet or Medium unlock Narrow; Narrow unlocks Wide.
-        Empty ferry legs do not count.
+        Contract crew flights count — empty ferry / reposition legs do not.
       </p>
       <ul className="cargo-ops-tiers">
         {CLASS_OPS_PROGRESS_IDS.map((id) => {

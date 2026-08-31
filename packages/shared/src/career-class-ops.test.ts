@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, it } from 'node:test';
 import {
   applyClassOpsOnSettle,
@@ -21,6 +22,11 @@ import {
   unlockAllCareerClassOps,
   wideReady,
 } from './career-class-ops.js';
+import { emptyMissionsStateV2 } from './career-fleet.js';
+import {
+  readCompanyStateScalars,
+  upsertCompanyState,
+} from './career-store-v3.js';
 
 const cleanScore = { earned: 40, max: 50, pct: 85, categories: [] as [] };
 
@@ -253,5 +259,62 @@ describe('career-class-ops', () => {
     assert.equal(open.classes.wide_freighter.unlocked, true);
     assert.equal(open.classes.light_ga.hours, 4);
     assert.equal(ops.classes.light_jet.unlocked, false);
+  });
+
+  it('persists class_ops_json through company_state (crew hours survive reload)', () => {
+    const db = new DatabaseSync(':memory:');
+    db.exec(`
+      CREATE TABLE companies (
+        id TEXT PRIMARY KEY NOT NULL,
+        display_name TEXT NOT NULL DEFAULT '',
+        home_hub_icao TEXT NOT NULL DEFAULT '',
+        home_country_id TEXT NOT NULL DEFAULT '',
+        created_at_ms INTEGER NOT NULL,
+        world_id TEXT NOT NULL DEFAULT 'local'
+      );
+      CREATE TABLE company_state (
+        company_id TEXT PRIMARY KEY NOT NULL,
+        wallet_usd REAL NOT NULL DEFAULT 0,
+        pilot_name TEXT NOT NULL DEFAULT '',
+        pilot_icao TEXT NOT NULL DEFAULT '',
+        hub_selected INTEGER NOT NULL DEFAULT 0,
+        company_credit_json TEXT,
+        cargo_ops_json TEXT,
+        class_ops_json TEXT,
+        aircraft_market_json TEXT,
+        aircraft_market_day INTEGER,
+        aircraft_market_demand_day INTEGER,
+        airframe_perf_json TEXT,
+        player_fbos_json TEXT,
+        company_crew_json TEXT,
+        ground_staff_json TEXT,
+        active_bush_trip_json TEXT,
+        port_pickups_json TEXT,
+        player_warehouses_json TEXT,
+        player_port_concessions_json TEXT,
+        updated_at_ms INTEGER NOT NULL
+      );
+    `);
+    let ops = emptyCareerClassOps();
+    ops = credit(ops, 'light_turboprop', 1.4);
+    const state = {
+      ...emptyMissionsStateV2(),
+      pilotName: 'Test',
+      homeHubIcao: 'RCSS',
+      hubSelected: true,
+      classOps: ops,
+    };
+    upsertCompanyState(db, state);
+    const loaded = readCompanyStateScalars(db, 'local');
+    assert.ok(loaded?.classOps);
+    assert.equal(loaded.classOps!.classes.light_turboprop.hours, 1.4);
+    assert.equal(loaded.classOps!.classes.light_turboprop.cleans, 1);
+    const progress = classOpsUnlockProgress(
+      loaded.classOps!,
+      'light_jet',
+    );
+    assert.match(progress.summary, /1\.4\/20 h/);
+    assert.match(progress.summary, /1\/6 cleans/);
+    db.close();
   });
 });

@@ -9,9 +9,12 @@ import {
   nextPipeBackoffMs,
   pingNeedsSessionReset,
   PIPE_BACKOFF_START_MS,
+  sanitizeSimBridgeUserMessage,
   shouldReopenSimSession,
   SIM_DOWN_BACKOFF_MAX_MS,
   SIM_DOWN_BACKOFF_START_MS,
+  SIM_OPEN_FAIL_USER,
+  SIM_OPEN_TIMEOUT_USER,
   simIpcSessionDied,
   simSessionDeadError,
   simSessionUnhealthy,
@@ -161,6 +164,39 @@ describe('shouldReopenSimSession', () => {
       ),
       true,
     );
+    assert.equal(
+      shouldReopenSimSession(
+        new IpcClientError('SIM_ERROR', SIM_OPEN_FAIL_USER),
+        1,
+      ),
+      true,
+    );
+  });
+});
+
+describe('sanitizeSimBridgeUserMessage', () => {
+  it('collapses verbose open failures and HRESULT Details', () => {
+    assert.equal(
+      sanitizeSimBridgeUserMessage(
+        'Failed to open SimConnect. Is MSFS 2024 running and in a flight? Details: Error HRESULT E_FAIL has been returned from a call to a COM component.',
+      ),
+      SIM_OPEN_FAIL_USER,
+    );
+    assert.equal(
+      sanitizeSimBridgeUserMessage(
+        'Timed out waiting for SimConnect open. Start MSFS 2024, load an aircraft, then retry.',
+      ),
+      SIM_OPEN_TIMEOUT_USER,
+    );
+    assert.equal(
+      formatIpcError(
+        new IpcClientError(
+          'SIM_ERROR',
+          'Failed to open SimConnect. Details: Error HRESULT E_FAIL has been returned from a call to a COM component.',
+        ),
+      ),
+      SIM_OPEN_FAIL_USER,
+    );
   });
 });
 
@@ -177,6 +213,10 @@ describe('isSimDownError', () => {
           'Timed out waiting for SimConnect open. Start MSFS 2024, load an aircraft, then retry.',
         ),
       ),
+      true,
+    );
+    assert.equal(
+      isSimDownError(new IpcClientError('SIM_ERROR', SIM_OPEN_TIMEOUT_USER)),
       true,
     );
   });

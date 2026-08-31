@@ -42,7 +42,10 @@ import {
   applyPmdg777CduPayloadOnce,
   isPmdg777CduProfile,
 } from './pmdg-777-cdu-inject.ts';
-import { simIpcSessionDied } from '../../agent/src/sim-session-health.ts';
+import {
+  formatIpcError,
+  simIpcSessionDied,
+} from '../../agent/src/sim-session-health.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
 import { fetchSimBriefLatestOfp } from '../../agent/src/ofp-compliance/simbrief-fetch.ts';
 import {
@@ -815,7 +818,7 @@ async function probeSimBridgeStatusUnlocked(opts: {
     lastProbeSnapshot = status;
     return status;
   } catch (error) {
-    const errMsg = error instanceof Error ? error.message : String(error);
+    const errMsg = formatIpcError(error);
     // Keep last-good live sample briefly so the status bar doesn't flicker
     // when Watch start / inject / concurrent polls contend for the pipe.
     if (lastProbeSnapshot?.connected) {

@@ -311,11 +311,12 @@ public sealed class SimConnectClient : ISimClient
             {
                 _sim = new SimConnect(appName, IntPtr.Zero, 0, _messageEvent, 0);
             }
-            catch (COMException ex)
+            catch (COMException)
             {
+                // Do not append COM HRESULT prose — UI footer shows this string as-is.
                 throw new SimClientException(
                     "SIM_ERROR",
-                    $"Failed to open SimConnect. Is MSFS 2024 running and in a flight? Details: {ex.Message}");
+                    "MSFS not connected — start MSFS 2024 and load a flight.");
             }
 
             _sim.OnRecvOpen += OnRecvOpen;
@@ -353,7 +354,7 @@ public sealed class SimConnectClient : ISimClient
                 await DisconnectAsync(CancellationToken.None).ConfigureAwait(false);
                 throw new SimClientException(
                     "SIM_ERROR",
-                    "Timed out waiting for SimConnect open. Start MSFS 2024, load an aircraft, then retry.");
+                    "MSFS not ready — start MSFS 2024, load an aircraft, then retry.");
             }
 
             await Task.Delay(50, ct).ConfigureAwait(false);

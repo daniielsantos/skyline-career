@@ -34,7 +34,8 @@
 - **Não** matar `SimBridgeHost.exe` no caminho quente. **Não** voltar probe `FUELSYSTEM TANK CAPACITY` no inject.
 - IPC `readSimVars` (0.3.22+): um `RequestDataOnSimObject` para ≤32 FLOAT64 (pad 8/16/24/32, slots extra = `SIM ON GROUND`). Sem `ClearDataDefinition`. Watch **e** inject/preflight usam isso. Host antigo responde `UNSUPPORTED` → Node lê sequential. TIMEOUT ainda throw. Listas >32 são fatiadas.
 - **Def cache (pós-0.3.24):** batches/singles idênticos reusam o mesmo `AddToDataDefinition` até `ConnectAsync` / tear-down. Log `cached batch def id=…`. Ainda sem `ClearDataDefinition`.
-- **MSFS quit:** `OnRecvQuit` faz `TearDownAfterRecvFailure` (dispose handle, zera cache). Watch espera 8s → 15s em `NOT_CONNECTED` / `Failed to open SimConnect` e tenta de novo quando o sim voltar. TIMEOUT hang-mole continua 2s→20s. Dual-client IPC **não** mudou.
+- **MSFS quit:** `OnRecvQuit` faz `TearDownAfterRecvFailure` (dispose handle, zera cache). Watch espera 8s → 15s em `NOT_CONNECTED` / open-fail e tenta de novo quando o sim voltar. TIMEOUT hang-mole continua 2s→20s. Dual-client IPC **não** mudou.
+- **Open-fail UX (2026-08-31):** Host não anexa HRESULT; mensagem curta `MSFS not connected — start MSFS 2024 and load a flight.` Node `sanitizeSimBridgeUserMessage` / `formatIpcError` colapsa builds antigos com `Details: Error HRESULT E_FAIL…` no footer.
 - **Pack:** `pack-desktop` **falha** se `dotnet build` do Host falhar (exe locked / bin stale). Não copia `bin/Release` velho. Feche `start:local` antes de `release:desktop`.
 
 Arquivo: `native/SimBridgeHost/Sim/SimConnectClient.cs`

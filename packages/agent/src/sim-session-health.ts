@@ -21,8 +21,36 @@ export const PIPE_BACKOFF_MAX_MS = 20_000;
 export const SIM_DOWN_BACKOFF_START_MS = 8_000;
 export const SIM_DOWN_BACKOFF_MAX_MS = 15_000;
 
+/** Short footer copy — Host used to append COM HRESULT Details: … */
+export const SIM_OPEN_FAIL_USER =
+  'MSFS not connected — start MSFS 2024 and load a flight.';
+export const SIM_OPEN_TIMEOUT_USER =
+  'MSFS not ready — start MSFS 2024, load an aircraft, then retry.';
+
 const SIM_DOWN_MESSAGE =
-  /Failed to open SimConnect|Is MSFS 2024 running|Timed out waiting for SimConnect open|Simulator quit/i;
+  /Failed to open SimConnect|Is MSFS 2024 running|Timed out waiting for SimConnect open|MSFS not connected|MSFS not ready|Simulator quit|Error HRESULT E_FAIL/i;
+
+/**
+ * Collapse Host / COM open failures into one short line for Watch footer.
+ * Keeps working against older Host builds that still append HRESULT Details.
+ */
+export function sanitizeSimBridgeUserMessage(message: string): string {
+  const text = message.trim();
+  if (!text) return text;
+  if (
+    /Failed to open SimConnect|Error HRESULT E_FAIL|MSFS not connected/i.test(
+      text,
+    )
+  ) {
+    return SIM_OPEN_FAIL_USER;
+  }
+  if (
+    /Timed out waiting for SimConnect open|MSFS not ready/i.test(text)
+  ) {
+    return SIM_OPEN_TIMEOUT_USER;
+  }
+  return text.replace(/\s*Details:\s*Error HRESULT E_FAIL[^.]*\.?/i, '').trim();
+}
 
 export type SimBridgeSessionPing = {
   pong?: boolean;
@@ -109,7 +137,12 @@ export function isIpcDisconnected(err: unknown): boolean {
 /** Persist `TIMEOUT: …` so later string checks still see the code. */
 export function formatIpcError(err: unknown): string {
   const code = ipcErrorCode(err);
-  const msg = err instanceof Error ? err.message : String(err);
+  const raw = err instanceof Error ? err.message : String(err);
+  const msg = sanitizeSimBridgeUserMessage(raw);
+  // Footer strip: keep open-fail as one short line (no SIM_ERROR: prefix).
+  if (msg === SIM_OPEN_FAIL_USER || msg === SIM_OPEN_TIMEOUT_USER) {
+    return msg;
+  }
   if (code && !msg.startsWith(`${code}:`)) return `${code}: ${msg}`;
   return msg;
 }

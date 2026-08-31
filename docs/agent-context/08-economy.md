@@ -13,6 +13,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **TP buy/lease anti-snowball (2026-08-27):** `light_turboprop` MSRP 450k; cargo mult 0.72–2.8; lease rate 2.2%/wk; fair/tired used + hours haircut menos agressivos; dealer lease weekly × condição leve (excellent≠fair). ATR/Saab ficam em TP — preço via curva, não `medium_piston`.
 - **GA buy/lease anti-snowball (2026-08-27):** `light_ga` MSRP 140k; lease rate 2.0%/wk. Titan/BN2/Duke sobem via curva de cargo; Titan permanece `light_ga` (não reclass TP).
 - **Light jet buy/lease anti-snowball (2026-08-27):** `light_jet` MSRP 1.05M; lease rate 1.9%/wk. Cruise/range ainda fora da fórmula (só cargo).
+- **Narrow buy/lease anti-snowball (2026-08-31):** `narrow_freighter` MSRP **2.8M**; lease **2.4%/wk**; dealer lease × horas. Metodologia: [`18-aircraft-pricing-balance.md`](./18-aircraft-pricing-balance.md).
+- **Wide buy/lease anti-snowball (2026-08-31):** `wide_freighter` MSRP **14M** (era 6.5M); lease **1.5%/wk** (era 1.2%); dealer lease × horas. Alvo ~**1.4 voos/sem** MD-11 @ 90t/3500nm; buy ~**107 voos**.
 - **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
 - **Schema v5:** NPC roster, fuel trucks/hauls, Demand board e port listings/inventory/concessions em tabelas (`world_id`); arrays stripped de `economy_json`. Tick ainda in-memory. WH/concessões do player ficam no `company_state`.
 - **Schema v6:** dealer pool (`aircraft_instances`) keyed by `world_id`; unique registration; stripped from `economy_json`. Tick still in-memory.

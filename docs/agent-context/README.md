@@ -35,6 +35,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [15-business-model.md](./15-business-model.md) | Produto: B2P único, SP+MP, sem paywall de mapa; extras opcionais |
 | [16-va-logistics.md](./16-va-logistics.md) | VA: ponte aérea WH→WH, desk auto-buy/scout (3 fases), tiers |
 | [17-inject-regression.md](./17-inject-regression.md) | Pack GA/TP/light jet + checklist inject/read; Payload Lab (dev); freighter vs pax_and_cargo; mission `airframeLabel` enrichment |
+| [18-aircraft-pricing-balance.md](./18-aircraft-pricing-balance.md) | Buy/lease: balancear por pay da classe (perna ref., voos/sem, voos p/ comprar) |
 
 ## Manutenção
 

@@ -12,8 +12,8 @@ export const AIRCRAFT_MSRP_USD: Record<FreighterClassId, number> = {
   light_turboprop: 450_000,
   light_jet: 1_050_000,
   medium_piston: 1_200_000,
-  narrow_freighter: 1_800_000,
-  wide_freighter: 6_500_000,
+  narrow_freighter: 2_800_000,
+  wide_freighter: 14_000_000,
 };
 
 /** Class cargo baselines — same numbers as CAREER_AIRCRAFT_CLASSES.maxCargoKg. */
@@ -41,15 +41,15 @@ export const CARGO_MSRP_CURVE_EXP = 0.65;
  * Baseline weekly lease ≈ MSRP × rate.
  * Charged every economy week; short terms (≤3 mo) so leasing is expensive
  * temporary access — not a cheap ladder skip vs buy.
- * (~1.2–2.2%/wk; light_ga/tp/jet elevated so Titan/ATR/Lear lease is not a cheap ladder).
+ * (~1.2–2.5%/wk; high-earning classes elevated so lease is not a cheap ladder skip).
  */
 export const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
   light_ga: 0.02,
   light_turboprop: 0.022,
   light_jet: 0.019,
   medium_piston: 0.0135,
-  narrow_freighter: 0.013,
-  wide_freighter: 0.012,
+  narrow_freighter: 0.024,
+  wide_freighter: 0.015,
 };
 
 /** @deprecated Use AIRCRAFT_LEASE_WEEKLY_RATE (installments are weekly). */
@@ -155,6 +155,31 @@ export function resolveAircraftLeaseWeeklyUsd(opts: {
   return Math.round(
     resolveAircraftMsrpUsd(opts) *
       AIRCRAFT_LEASE_WEEKLY_RATE[opts.aircraftClassId],
+  );
+}
+
+/**
+ * Dealer lease board weekly = catalog × condition × hours (same hours curve as buy).
+ */
+export function resolveDealerLeaseWeeklyUsd(opts: {
+  aircraftClassId: FreighterClassId;
+  maxCargoKg?: number | null;
+  condition: AirframeCondition;
+  hoursAirframe?: number | null;
+  hoursEngine?: number | null;
+}): number {
+  const catalog = resolveAircraftLeaseWeeklyUsd({
+    aircraftClassId: opts.aircraftClassId,
+    maxCargoKg: opts.maxCargoKg,
+  });
+  return Math.round(
+    catalog *
+      CONDITION_LEASE_WEEKLY_MULT[opts.condition] *
+      hoursValueMult({
+        aircraftClassId: opts.aircraftClassId,
+        hoursAirframe: opts.hoursAirframe,
+        hoursEngine: opts.hoursEngine,
+      }),
   );
 }
 

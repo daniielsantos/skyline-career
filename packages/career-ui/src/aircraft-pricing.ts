@@ -13,8 +13,8 @@ const AIRCRAFT_MSRP_USD: Record<FreighterClassId, number> = {
   light_turboprop: 280_000,
   light_jet: 750_000,
   medium_piston: 1_200_000,
-  narrow_freighter: 1_800_000,
-  wide_freighter: 6_500_000,
+  narrow_freighter: 2_800_000,
+  wide_freighter: 14_000_000,
 };
 
 const CLASS_BASELINE_CARGO_KG: Record<FreighterClassId, number> = {
@@ -138,8 +138,8 @@ const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
   light_turboprop: 0.015,
   light_jet: 0.014,
   medium_piston: 0.0135,
-  narrow_freighter: 0.013,
-  wide_freighter: 0.012,
+  narrow_freighter: 0.024,
+  wide_freighter: 0.015,
 };
 
 export function estimateLeaseMonthlyUsd(

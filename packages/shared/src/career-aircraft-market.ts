@@ -28,11 +28,11 @@ import {
 } from './career-aircraft-maintenance.js';
 import {
   AIRCRAFT_MSRP_USD,
-  CONDITION_LEASE_WEEKLY_MULT,
   CONDITION_PRICE_MULT,
   hoursValueMult,
   resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
+  resolveDealerLeaseWeeklyUsd,
 } from './career-aircraft-pricing.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import { applyWalletDelta } from './career-ledger.js';
@@ -574,10 +574,6 @@ function priceListing(
     aircraftClassId: classId,
     maxCargoKg,
   });
-  const monthly = resolveAircraftLeaseWeeklyUsd({
-    aircraftClassId: classId,
-    maxCargoKg,
-  });
   const spokeDiscount =
     hubTierOf(
       world.airports.find((a) => a.icao === basedIcao) ?? {
@@ -593,7 +589,13 @@ function priceListing(
     const entryWeeks = PLAYER_LEASE_DEPOSIT_WEEKS;
     const roll = rng();
     const termMonths = roll < 0.4 ? 1 : roll < 0.75 ? 2 : 3;
-    const weekly = Math.round(monthly * CONDITION_LEASE_WEEKLY_MULT[condition]);
+    const weekly = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: classId,
+      maxCargoKg,
+      condition,
+      hoursAirframe: hours?.hoursAirframe,
+      hoursEngine: hours?.hoursEngine,
+    });
     return {
       askingUsd: Math.round(weekly * entryWeeks),
       leaseMonthlyUsd: weekly,

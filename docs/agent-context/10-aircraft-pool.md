@@ -83,6 +83,8 @@ UI: fair / dealer 50% / ask. Ask clamp ~0.5–2.0× fair.
 
 **Lease out** — player escolhe `weeklyUsd` (campo legacy `monthlyUsd`) + `termMonths` 1–3 (listagem 0.6–1.8× catálogo). NPC só aceita faixa ~0.7–1.3× + termo 1–3. Cobrança / renda **semanal**. Depósito **4 semanas**. Delay 1–4 dias. 1 listing lease player por vez. Expire → parked.
 
+**Buy/lease balance** — earnings-based (perna ref. + voos/sem + voos p/ buy): [`18-aircraft-pricing-balance.md`](./18-aircraft-pricing-balance.md).
+
 **NPC** — compra/lease de **player listing** por preço vs `fairValue`. Dealer stock gerado não some no mesmo loop.
 
 **Spawn** — espalhar slots do país pelos hubs (SE mais, Norte não zero). Restock perto de onde vendeu.

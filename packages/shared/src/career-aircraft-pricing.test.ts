@@ -16,6 +16,7 @@ import {
   resolveAircraftLeaseMonthlyUsd,
   resolveAircraftLeaseWeeklyUsd,
   resolveAircraftMsrpUsd,
+  resolveDealerLeaseWeeklyUsd,
 } from './career-aircraft-pricing.js';
 
 describe('cargo-scaled aircraft MSRP', () => {
@@ -204,6 +205,132 @@ describe('cargo-scaled aircraft MSRP', () => {
         }),
     );
     assert.ok(tiredAged >= 400_000, `Lear tired+aged ${tiredAged}`);
+  });
+
+  it('prices narrow freighters above class floor (anti-snowball)', () => {
+    const baeFloor = resolveAircraftMsrpUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 9_800,
+    });
+    const b737 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 18_137,
+    });
+    const a320 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 19_958,
+    });
+    assert.ok(b737 > baeFloor);
+    assert.ok(a320 > b737);
+    assert.ok(b737 >= 2_500_000, `737 MSRP ${b737}`);
+    assert.ok(baeFloor >= 1_900_000, `BAE floor MSRP ${baeFloor}`);
+
+    const leaseFloor = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 9_800,
+    });
+    const lease737 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 18_137,
+    });
+    const leaseA320 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 19_958,
+    });
+    assert.ok(lease737 > leaseFloor);
+    assert.ok(leaseA320 > lease737);
+    assert.ok(lease737 >= 60_000, `737 lease ${lease737}`);
+    assert.ok(leaseFloor >= 45_000, `BAE floor lease ${leaseFloor}`);
+
+    const tiredAged = Math.round(
+      b737 *
+        CONDITION_PRICE_MULT.tired *
+        hoursValueMult({
+          aircraftClassId: 'narrow_freighter',
+          hoursAirframe: ECONOMIC_LIFE_HOURS.narrow_freighter,
+          hoursEngine: ECONOMIC_LIFE_HOURS.narrow_freighter,
+        }),
+    );
+    assert.ok(tiredAged >= 1_000_000, `737 tired+aged ${tiredAged}`);
+  });
+
+  it('discounts dealer lease weekly by condition and hours', () => {
+    const catalog = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 18_137,
+    });
+    const freshGood = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 18_137,
+      condition: 'good',
+      hoursAirframe: 1_500,
+      hoursEngine: 1_200,
+    });
+    const tiredHigh = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: 'narrow_freighter',
+      maxCargoKg: 18_137,
+      condition: 'tired',
+      hoursAirframe: 9_500,
+      hoursEngine: 8_000,
+    });
+    assert.ok(freshGood < catalog);
+    assert.ok(tiredHigh < freshGood);
+    assert.ok(tiredHigh <= Math.round(catalog * 0.85 * 0.88));
+  });
+
+  it('prices wide freighters above class floor (anti-snowball)', () => {
+    const a332 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 52_000,
+    });
+    const md11 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 90_000,
+    });
+    const b777f = resolveAircraftMsrpUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 104_115,
+    });
+    assert.ok(md11 > a332);
+    assert.ok(b777f > md11);
+    assert.ok(md11 >= 12_500_000, `MD-11 MSRP ${md11}`);
+    assert.ok(a332 >= 10_000_000, `A332 floor MSRP ${a332}`);
+
+    const leaseFloor = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 52_000,
+    });
+    const leaseMd11 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 90_000,
+    });
+    const lease777f = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 104_115,
+    });
+    assert.ok(leaseMd11 > leaseFloor);
+    assert.ok(lease777f > leaseMd11);
+    assert.ok(leaseMd11 >= 200_000, `MD-11 lease ${leaseMd11}`);
+
+    const fairMid = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: 'wide_freighter',
+      maxCargoKg: 90_000,
+      condition: 'fair',
+      hoursAirframe: 4_000,
+      hoursEngine: 3_500,
+    });
+    assert.ok(fairMid >= 170_000, `MD-11 fair/mid lease ${fairMid}`);
+
+    const tiredAged = Math.round(
+      md11 *
+        CONDITION_PRICE_MULT.tired *
+        hoursValueMult({
+          aircraftClassId: 'wide_freighter',
+          hoursAirframe: ECONOMIC_LIFE_HOURS.wide_freighter,
+          hoursEngine: ECONOMIC_LIFE_HOURS.wide_freighter,
+        }),
+    );
+    assert.ok(tiredAged >= 5_500_000, `MD-11 tired+aged ${tiredAged}`);
   });
 });
 

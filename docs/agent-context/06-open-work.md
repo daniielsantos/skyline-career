@@ -4,6 +4,10 @@ Atualizado 2026-08-30: **OFP FAIL falso ATR curto** — Payload=missão (3757) p
 
 Atualizado 2026-08-31: **Class Ops não persistia** — `class_ops_json` em `company_state` (migrate + read/write). Sintoma: horas/cleans GA/TP crew (ex. ATR) ficavam 0/20 · 0/6 após settle/reload; Cargo Ops ok. Settle/Watch agora expõe `classOpsDeltas` no debrief.
 
+Atualizado 2026-08-31: **Wide buy/lease anti-snowball** — MSRP **14M** + lease **1.5%/wk**; lease dealer × horas. MD-11 fair ~**$187k/wk** · depósito ~**$750k**; ~**1.4 voos/sem** @ 90t/3500nm. Playbook: `18-aircraft-pricing-balance.md`.
+
+Atualizado 2026-08-31: **Narrow buy/lease anti-snowball** — MSRP **2.8M** + lease **2.4%/wk**; lease dealer × horas (`resolveDealerLeaseWeeklyUsd`). Playbook earnings-based: `18-aircraft-pricing-balance.md`.
+
 Atualizado 2026-08-30: **Crew fee GA/TP (progressão)** — **10.0 / 10.75 $/nm** só por distância (sem piso starter); min global **$75**. Alvo ~**30 voos** @ ~185 nm → C172 ~$55k. Pay espalha 163 nm ≈ **$1.6k** · 230 nm ≈ **$2.3k**. Ferry inalterado. Sem `CARGO_FLOW_BALANCE`.
 
 Atualizado 2026-08-30: **Crew fee GA/TP bump** — piso **1.85 / 2.05 $/nm** (era 1.4 / 1.65); min contract **$75** (era $50). Ainda abaixo ferry Hangar (~2.13 / 2.5). Sem `CARGO_FLOW_BALANCE`.

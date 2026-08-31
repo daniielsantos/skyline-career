@@ -8,9 +8,10 @@ import {
 } from './career-contract-pilot-fee.js';
 
 describe('quoteContractPilotFeeUsd', () => {
-  it('takes 30% of freight pay with a $50 floor', () => {
+  it('takes 30% of freight pay with a $75 floor', () => {
     assert.equal(quoteContractPilotFeeUsd(1_000), 300);
     assert.equal(quoteContractPilotFeeUsd(100), CONTRACT_PILOT_FEE_MIN_USD);
+    assert.equal(CONTRACT_PILOT_FEE_MIN_USD, 75);
     assert.equal(CONTRACT_PILOT_FEE_FRAC, 0.3);
   });
 

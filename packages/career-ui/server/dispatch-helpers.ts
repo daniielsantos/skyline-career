@@ -699,8 +699,9 @@ export async function confirmMissionOfp(
       destIcao: expectation.destIcao,
       icao: expectation.icao,
       cargoKg:
-        ofpFreightTowardMissionKg(expectation, airframe) ??
-        ofpCargoKg(expectation),
+        ofpFreightTowardMissionKg(expectation, airframe, {
+          missionCargoKg: mission.cargoKg,
+        }) ?? ofpCargoKg(expectation),
       passengerCount: expectation.loadSheet?.passengerCount,
       blockFuel: expectation.loadSheet?.blockFuel,
       blockFuelKg:

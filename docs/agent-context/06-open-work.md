@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-30: **OFP FAIL falso ATR curto** — Payload=missão (3757) partido em bag+pax EFB; Intent lia só bag. Fix `ofpFreightTowardMissionKg(+missionCargoKg)`.
+
+Atualizado 2026-08-30: **Crew fee GA/TP bump** — piso **1.85 / 2.05 $/nm** (era 1.4 / 1.65); min contract **$75** (era $50). Ainda abaixo ferry Hangar (~2.13 / 2.5). Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-08-30: **Demand /porto 4→6** — `DEMAND_ORDERS_PER_PORT_BASE=6` (+1 P2+); hub dest ainda 2. Country/global inalterados. Rebuild + 1 tick para encher mesas.
+
 Atualizado 2026-08-30: **Crew board Freight/Net** — coluna Net em crew = **—** (não mostra lote do operador). Pay = fee. Sort Net em crew = fee. Sem inventar freight via fee÷0.3 (piso $/nm descasava).
 
 Atualizado 2026-08-30: **Crew fee Light GA/TP** — ainda **30%** do frete, mas piso **$/nm** (`light_ga` 1.4 · `light_turboprop` 1.65) para haul longo com pay fino não pagar menos que ferry curto. Abaixo do ferry Hangar (~2.1–2.5 $/nm). Sem `CARGO_FLOW_BALANCE`.

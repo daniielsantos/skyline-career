@@ -36,7 +36,7 @@ export const DEMAND_CORRIDOR_NM_BY_LEVEL: Record<
 export const DEMAND_PORT_CORRIDOR_NM = DEMAND_CORRIDOR_NM_BY_LEVEL[1]!;
 
 /** Open Demand rows per port desk (vacant / P1). */
-export const DEMAND_ORDERS_PER_PORT_BASE = 4;
+export const DEMAND_ORDERS_PER_PORT_BASE = 6;
 /** Extra open slots when world operator is P2+. */
 export const DEMAND_ORDERS_PER_PORT_OPERATOR_EXTRA = 1;
 

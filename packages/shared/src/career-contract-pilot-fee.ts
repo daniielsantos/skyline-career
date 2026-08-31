@@ -8,18 +8,19 @@ import type { FreighterClassId } from './types/career-economy.js';
 /** Share of reserved operator freight pay offered to a contract pilot. */
 export const CONTRACT_PILOT_FEE_FRAC = 0.3;
 
-export const CONTRACT_PILOT_FEE_MIN_USD = 50;
+export const CONTRACT_PILOT_FEE_MIN_USD = 75;
 
 /**
  * Soft $/nm floor for starter classes — long thin Dry/GA freights were paying
  * less crew fee than a shorter empty ferry (frac×soft freight pay).
- * Kept below Hangar/reposition ferry $/nm so empty reposition still pays more.
+ * Kept below Hangar/reposition ferry $/nm (~2.13 GA / 2.5 TP) so empty
+ * reposition still pays more per nm.
  */
 export const CONTRACT_PILOT_FEE_USD_PER_NM: Readonly<
   Partial<Record<FreighterClassId, number>>
 > = {
-  light_ga: 1.4,
-  light_turboprop: 1.65,
+  light_ga: 1.85,
+  light_turboprop: 2.05,
 };
 
 export type QuoteContractPilotFeeOpts = {

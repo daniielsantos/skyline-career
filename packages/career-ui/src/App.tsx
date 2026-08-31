@@ -9416,7 +9416,7 @@ export function App() {
             {careerReady && pilotIcao ? (
               <button
                 type="button"
-                className="metric metric--pilot pilot-chip"
+                className="metric pilot-chip"
                 disabled={busy}
                 title="Travel / reposition pilot"
                 onClick={() => setPilotTravelOpen(true)}
@@ -9425,12 +9425,12 @@ export function App() {
                 <strong>{pilotIcao}</strong>
               </button>
             ) : null}
-            <div className="metric metric--wallet">
+            <div className="metric">
               <span className="label">Wallet</span>
               <strong>{careerReady ? formatMoney(wallet) : '…'}</strong>
             </div>
             <div
-              className="metric metric--clock"
+              className="metric"
               title={
                 tickAdvance
                   ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} batches`

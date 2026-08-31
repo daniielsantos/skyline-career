@@ -658,7 +658,7 @@ body {
 }
 
 .topbar-metrics .metric {
-  --metric-accent: var(--muted);
+  --metric-accent: var(--accent);
   min-width: 5.5rem;
   padding: 0.4rem 0.65rem 0.4rem 0.7rem;
   border: 1px solid var(--line);
@@ -670,18 +670,6 @@ body {
       color-mix(in srgb, var(--metric-accent) 9%, var(--surface)),
       var(--surface)
     );
-}
-
-.topbar-metrics .metric--pilot {
-  --metric-accent: var(--info);
-}
-
-.topbar-metrics .metric--wallet {
-  --metric-accent: var(--accent);
-}
-
-.topbar-metrics .metric--clock {
-  --metric-accent: color-mix(in srgb, var(--info) 45%, var(--muted));
 }
 
 .topbar-metrics button.metric {
@@ -716,7 +704,7 @@ body {
   font-size: 0.6rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--metric-accent) 55%, var(--muted));
+  color: var(--muted);
 }
 
 .topbar-metrics .metric strong {
@@ -725,10 +713,6 @@ body {
   font-weight: 400;
   letter-spacing: 0.03em;
   color: var(--ink);
-}
-
-.topbar-metrics .metric--wallet strong {
-  color: color-mix(in srgb, var(--accent) 72%, var(--ink));
 }
 
 .topbar-actions {

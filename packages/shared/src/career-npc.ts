@@ -53,6 +53,7 @@ import {
 } from './career-player-airframes.js';
 import { noteLotClaimed, noteNpcLeg, noteNpcRest } from './career-economy-flow.js';
 import {
+  CONTRACT_PILOT_FEE_MIN_USD,
   quoteContractPilotFeeUsd,
 } from './career-contract-pilot-fee.js';
 import {
@@ -2598,7 +2599,7 @@ export function acceptContractPilotOffer(
     }
     remainderKg = offerCargoKg - liftedKg;
     const liftFrac = liftedKg / offerCargoKg;
-    pilotFeeUsd = Math.max(50, Math.round(offerFeeUsd * liftFrac));
+    pilotFeeUsd = Math.max(CONTRACT_PILOT_FEE_MIN_USD, Math.round(offerFeeUsd * liftFrac));
     grossPayUsd = Math.max(1, Math.round(offerPayUsd * liftFrac));
   }
 
@@ -2849,7 +2850,9 @@ export function listContractPilotPickAirframes(
       coversOffer: remainderKg <= 0 && liftKg > 0,
       routeLimited: operationalMaxCargoKg < structuralMax,
       pilotFeeUsd:
-        liftKg > 0 ? Math.max(50, Math.round(offerFee * liftFrac)) : 0,
+        liftKg > 0
+          ? Math.max(CONTRACT_PILOT_FEE_MIN_USD, Math.round(offerFee * liftFrac))
+          : 0,
     };
   });
 }

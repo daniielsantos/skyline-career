@@ -1633,6 +1633,30 @@ describe('compareMissionIntentToOfp', () => {
     assert.equal(isOfpCargoUnderOnlyFailure(check), true);
   });
 
+  it('passes when manualpayload split into EFB pax + bag still matches mission (ATR)', () => {
+    // RCTP→RCSS style: Payload 3757 = mission; bag 3536 + ~221 pax — not an MTOW cut.
+    const missionLb = 3_757;
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        cargoKg: Math.round(missionLb / KG_TO_LB),
+        aircraftClassId: 'light_turboprop',
+        airframeTypeId: 'microsoft-atr-42-600',
+      }),
+      matchingOfp({
+        icao: 'AT46',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 2_300,
+          passengerCount: 1,
+          baggage: 3_536,
+          payload: 3_757,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.equal(isOfpCargoUnderOnlyFailure(check), false);
+  });
+
   it('uses payload when pax=1 and baggage is only a token SimBrief bag (BE36)', () => {
     // Dispatch forces pax=1; BE36 OFP shows 175 pax + 26 bag = 201 payload while
     // mission freight is the full payload — must not offer Accept OFP cargo @ 26 lb.

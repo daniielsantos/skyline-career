@@ -3172,12 +3172,51 @@ export function isPaxAndCargoLoadLayout(
  * Freight the OFP contributes toward mission.cargoKg.
  * `pax_and_cargo`: prefer SimBrief payload (already pax×paxwgt + bags + cargo);
  * fallback baggage + pax×175 when payload is missing.
+ *
+ * Freighters (manualpayload=): SimBrief still prints pax=1 for EFB and splits
+ * Payload into one standard pax + bag. When Payload ≈ mission, count Payload —
+ * comparing bag alone false-fails short ATR/GA legs with no real MTOW cut.
+ * When Payload is well under mission (Duke-style cut), use the bag line.
  */
 export function ofpFreightTowardMissionKg(
   ofp: OfpExpectation,
   airframe?: { loadLayout?: string; maxPaxSeats?: number } | null,
+  opts?: { missionCargoKg?: number },
 ): number | undefined {
   if (!isPaxAndCargoLoadLayout(airframe)) {
+    const sheet = ofp.loadSheet;
+    const missionKg = opts?.missionCargoKg;
+    if (
+      sheet &&
+      typeof missionKg === 'number' &&
+      Number.isFinite(missionKg) &&
+      missionKg > 0
+    ) {
+      const pax = sheet.passengerCount ?? 0;
+      const baggage = sheet.baggage;
+      const payload = sheet.payload ?? ofp.payload?.total;
+      const unit = sheet.unit ?? ofp.fuel.unit ?? 'kg';
+      const toKg = (v: number) => (unit === 'kg' ? v : v / KG_TO_LB);
+      if (
+        pax === 1 &&
+        typeof baggage === 'number' &&
+        Number.isFinite(baggage) &&
+        typeof payload === 'number' &&
+        Number.isFinite(payload)
+      ) {
+        const bagKg = toKg(baggage);
+        const payloadKg = toKg(payload);
+        const paxLikeLb = (payloadKg - bagKg) * KG_TO_LB;
+        const oneStandardPax = paxLikeLb >= 100 && paxLikeLb <= 260;
+        if (oneStandardPax) {
+          const nearPayload =
+            Math.abs(payloadKg - missionKg) <=
+            Math.max(50, missionKg * 0.05);
+          if (nearPayload) return payloadKg;
+          return bagKg;
+        }
+      }
+    }
     return ofpCargoKg(ofp);
   }
   const sheet = ofp.loadSheet;
@@ -3275,7 +3314,9 @@ export function compareMissionIntentToOfp(
     });
   }
 
-  const ofpCargo = ofpFreightTowardMissionKg(ofp, airframe);
+  const ofpCargo = ofpFreightTowardMissionKg(ofp, airframe, {
+    missionCargoKg: mission.cargoKg,
+  });
   if (ofpCargo === undefined) {
     findings.push({
       code: 'INTENT_CARGO_MISSING',

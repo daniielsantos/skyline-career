@@ -1,0 +1,57 @@
+{
+  "source": "simbrief",
+  "icao": "BCS3",
+  "ofpId": "synaptic-a220-300",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "A220-300"
+  ],
+  "matchTitlePattern": "A220-300",
+  "notes": [
+    "Synaptic / iniBuilds A220-300 — native-simbrief (EFB/tablet load)",
+    "Market SKU: synaptic-a220-300 (narrow_freighter)",
+    "SimBrief type: BCS3 — airframe Synaptic / iniBuilds (MSFS) - A220-300 (not Default)",
+    "Homologated profile: synaptic/a220-300@1.0.0",
+    "Fuel: LEFT_MAIN / RIGHT_MAIN / CENTER classic tanks; write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false",
+    "loadLayout pax_and_cargo: cabin then leftover cargo; 6 payload stations"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "BCS3",
+  "simbriefAirframeMatch": "Synaptic / iniBuilds \\(MSFS\\) - A220-300",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

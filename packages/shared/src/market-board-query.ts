@@ -425,7 +425,20 @@ function compareBoardRow<T extends MarketBoardSortable>(
     case 'expires':
       return a.expiresAtTick - b.expiresAtTick;
     case 'pay':
-      return a.payUsd - b.payUsd;
+      return (
+        boardDisplayPayUsd({
+          lotPayUsd: a.payUsd,
+          quantityKg: a.quantityKg ?? a.availableKg,
+          crewNeeded: a.crewNeeded,
+          pilotFeeUsd: a.pilotFeeUsd,
+        }) -
+        boardDisplayPayUsd({
+          lotPayUsd: b.payUsd,
+          quantityKg: b.quantityKg ?? b.availableKg,
+          crewNeeded: b.crewNeeded,
+          pilotFeeUsd: b.pilotFeeUsd,
+        })
+      );
     case 'net':
       return (
         boardNetSortUsd(a, { hangarEmpty }) - boardNetSortUsd(b, { hangarEmpty })

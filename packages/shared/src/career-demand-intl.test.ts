@@ -213,11 +213,21 @@ describe('demand country quotas', () => {
     const quotas = demandCountryOpenQuotas(world);
     const cap = demandOrdersGlobalCap(world);
     assert.ok(cap >= DEMAND_ORDERS_GLOBAL_CAP);
+    assert.ok(cap >= 640, `expected densify global cap ≥640, got ${cap}`);
     assert.ok((quotas.get('BR') ?? 0) < cap);
     assert.ok((quotas.get('US') ?? 0) >= 1);
     assert.equal(
       [...quotas.values()].reduce((s, n) => s + n, 0),
       cap,
+    );
+    // Port-weighted: US densify desks get a larger share than a 0-port country.
+    assert.ok(
+      (quotas.get('US') ?? 0) > (quotas.get('LU') ?? 0),
+      `US quota ${quotas.get('US')} should beat thin-port LU ${quotas.get('LU')}`,
+    );
+    assert.ok(
+      (quotas.get('US') ?? 0) >= 8,
+      `US quota too thin after densify: ${quotas.get('US')}`,
     );
 
     const orders = ensureDemandOrders(world).filter(

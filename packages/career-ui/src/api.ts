@@ -1394,7 +1394,7 @@ export function fetchMissions() {
 }
 
 /** Advance economy batches; default one 15-min tick. */
-export function postTick(n = 1) {
+export function postTick(n = 1, opts?: { profile?: boolean }) {
   return api<{
     tick: number;
     availableLots: number;
@@ -1413,9 +1413,16 @@ export function postTick(n = 1) {
     creditPrincipalUsd?: number;
     companyCredit?: CompanyCreditSnapshot;
     walletUsd?: number;
+    tickWallMs?: number;
+    tickProfile?: {
+      ticks: number;
+      totalMs: number;
+      perTickMs: number;
+      top: Array<{ phase: string; ms: number; sharePct: number }>;
+    };
   }>('/api/tick', {
     method: 'POST',
-    body: JSON.stringify({ n }),
+    body: JSON.stringify({ n, profile: opts?.profile === true }),
   });
 }
 

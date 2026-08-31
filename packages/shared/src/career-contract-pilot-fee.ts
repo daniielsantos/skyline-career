@@ -3,27 +3,57 @@
  * career-npc can share it without import cycles.
  */
 
+import type { FreighterClassId } from './types/career-economy.js';
+
 /** Share of reserved operator freight pay offered to a contract pilot. */
 export const CONTRACT_PILOT_FEE_FRAC = 0.3;
 
 export const CONTRACT_PILOT_FEE_MIN_USD = 50;
 
-export function quoteContractPilotFeeUsd(payUsd: number): number {
+/**
+ * Soft $/nm floor for starter classes — long thin Dry/GA freights were paying
+ * less crew fee than a shorter empty ferry (frac×soft freight pay).
+ * Kept below Hangar/reposition ferry $/nm so empty reposition still pays more.
+ */
+export const CONTRACT_PILOT_FEE_USD_PER_NM: Readonly<
+  Partial<Record<FreighterClassId, number>>
+> = {
+  light_ga: 1.4,
+  light_turboprop: 1.65,
+};
+
+export type QuoteContractPilotFeeOpts = {
+  distanceNm?: number;
+  aircraftClassId?: FreighterClassId;
+};
+
+export function quoteContractPilotFeeUsd(
+  payUsd: number,
+  opts?: QuoteContractPilotFeeOpts,
+): number {
   const pay = Math.max(0, payUsd);
-  return Math.max(
-    CONTRACT_PILOT_FEE_MIN_USD,
-    Math.round(pay * CONTRACT_PILOT_FEE_FRAC),
-  );
+  const fromPay = Math.round(pay * CONTRACT_PILOT_FEE_FRAC);
+  const nm = opts?.distanceNm;
+  const cls = opts?.aircraftClassId;
+  const rate = cls ? CONTRACT_PILOT_FEE_USD_PER_NM[cls] : undefined;
+  const fromNm =
+    typeof nm === 'number' &&
+    Number.isFinite(nm) &&
+    nm > 0 &&
+    typeof rate === 'number'
+      ? Math.round(nm * rate)
+      : 0;
+  return Math.max(CONTRACT_PILOT_FEE_MIN_USD, fromPay, fromNm);
 }
 
-/** Operator lot pay implied by a quoted crew fee (display only). */
+/** Operator lot pay implied by a quoted crew fee (display only; ignores nm floor). */
 export function operatorFreightFromPilotFeeUsd(feeUsd: number): number {
   const fee = Math.max(0, feeUsd);
   if (!(CONTRACT_PILOT_FEE_FRAC > 0)) return fee;
   return Math.max(1, Math.round(fee / CONTRACT_PILOT_FEE_FRAC));
 }
 
-/** Value used when sorting the board NET / Freight column. */
+/** Value used when sorting the board NET column (aircraft net, or crew fee). */
 export function boardNetSortUsd(
   row: {
     estimatedNetUsd?: number | null;
@@ -31,13 +61,10 @@ export function boardNetSortUsd(
     crewReposition?: boolean;
     pilotFeeUsd?: number;
   },
-  opts: { hangarEmpty: boolean },
+  _opts?: { hangarEmpty?: boolean },
 ): number {
+  // Crew offers: sort by pilot fee. Never fee÷frac — nm floors desync that from the lot.
   if (row.crewNeeded && typeof row.pilotFeeUsd === 'number') {
-    if (row.crewReposition) return row.pilotFeeUsd;
-    if (opts.hangarEmpty) {
-      return operatorFreightFromPilotFeeUsd(row.pilotFeeUsd);
-    }
     return row.pilotFeeUsd;
   }
   if (

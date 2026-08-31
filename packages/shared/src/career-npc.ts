@@ -2283,7 +2283,10 @@ function claimLotForNpc(
   if (offerPilot) {
     const holdHours = awaitingPilotHoldHours(rng, { short: shortHold });
     const awaitingPilotUntilMs = batchNowMs + hoursToMs(holdHours);
-    const pilotFeeUsd = quoteContractPilotFeeUsd(reserved.payUsd);
+    const pilotFeeUsd = quoteContractPilotFeeUsd(reserved.payUsd, {
+      distanceNm: dist,
+      aircraftClassId: npc.aircraftClassId,
+    });
     const flight: NpcFlight = {
       id: `npcf-${world.tick}-${npc.id}-${lot.id.slice(0, 8)}`,
       npcId: npc.id,
@@ -2556,14 +2559,18 @@ export function acceptContractPilotOffer(
 
   const offerCargoKg = flight.cargoKg;
   const offerPayUsd = flight.payUsd;
-  const offerFeeUsd =
-    flight.pilotFeeUsd ??
-    (isRepo
-      ? quoteRepositionPilotFeeUsd(
-          routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? 0,
-          flight.aircraftClassId,
-        )
-      : quoteContractPilotFeeUsd(offerPayUsd));
+  const offerFeeUsd = isRepo
+    ? (flight.pilotFeeUsd ??
+      quoteRepositionPilotFeeUsd(
+        routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? 0,
+        flight.aircraftClassId,
+      ))
+    : quoteContractPilotFeeUsd(offerPayUsd, {
+        distanceNm:
+          routeDistanceNm(world, flight.originIcao, flight.destIcao) ??
+          undefined,
+        aircraftClassId: flight.aircraftClassId,
+      });
   const distanceNm =
     routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? undefined;
 
@@ -2655,7 +2662,10 @@ export function acceptContractPilotOffer(
     const remFrac = remainderKg / offerCargoKg;
     flight.cargoKg = remainderKg;
     flight.payUsd = Math.max(1, Math.round(offerPayUsd * remFrac));
-    flight.pilotFeeUsd = quoteContractPilotFeeUsd(flight.payUsd);
+    flight.pilotFeeUsd = quoteContractPilotFeeUsd(flight.payUsd, {
+      distanceNm,
+      aircraftClassId: flight.aircraftClassId,
+    });
     // Window / busy hold unchanged — do not promote to in_flight.
     if (lot.status === 'in_transit') {
       lot.status = 'reserved';
@@ -2768,14 +2778,17 @@ export function listContractPilotPickAirframes(
 ): ContractPilotPickAirframe[] {
   const isRepo = isNpcRepositionFlight(flight);
   const offerCargoKg = Math.max(0, Math.floor(flight.cargoKg));
-  const offerFee =
-    flight.pilotFeeUsd ??
-    (isRepo
-      ? quoteRepositionPilotFeeUsd(
-          opts?.distanceNm ?? 0,
-          flight.aircraftClassId,
-        )
-      : quoteContractPilotFeeUsd(flight.payUsd));
+  // Cargo fees re-quote from pay + nm (nm floor can change); ferry keeps frozen offer.
+  const offerFee = isRepo
+    ? (flight.pilotFeeUsd ??
+      quoteRepositionPilotFeeUsd(
+        opts?.distanceNm ?? 0,
+        flight.aircraftClassId,
+      ))
+    : quoteContractPilotFeeUsd(flight.payUsd, {
+        distanceNm: opts?.distanceNm,
+        aircraftClassId: flight.aircraftClassId,
+      });
   const distanceNm =
     typeof opts?.distanceNm === 'number' && Number.isFinite(opts.distanceNm)
       ? opts.distanceNm
@@ -2856,14 +2869,16 @@ export function contractPilotFeeRangeUsd(
   opts?: { distanceNm?: number },
 ): { minUsd: number; maxUsd: number } {
   const isRepo = isNpcRepositionFlight(flight);
-  const fullFee =
-    flight.pilotFeeUsd ??
-    (isRepo
-      ? quoteRepositionPilotFeeUsd(
-          opts?.distanceNm ?? 0,
-          flight.aircraftClassId,
-        )
-      : quoteContractPilotFeeUsd(flight.payUsd));
+  const fullFee = isRepo
+    ? (flight.pilotFeeUsd ??
+      quoteRepositionPilotFeeUsd(
+        opts?.distanceNm ?? 0,
+        flight.aircraftClassId,
+      ))
+    : quoteContractPilotFeeUsd(flight.payUsd, {
+        distanceNm: opts?.distanceNm,
+        aircraftClassId: flight.aircraftClassId,
+      });
   if (isRepo) {
     return { minUsd: fullFee, maxUsd: fullFee };
   }

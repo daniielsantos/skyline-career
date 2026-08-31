@@ -1093,6 +1093,22 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## Synaptic / iniBuilds A220-300
+- **typeId:** `synaptic-a220-300`
+- **file:** `a220-300.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A220-300 (Bombardier CSeries CS300 / BCS3), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: modern small narrowbody twinjet with distinctive A220 proportions — relatively short fuselage with large oval cabin windows, high aspect-ratio slender wing, two large Pratt & Whitney geared-turbofan underwing engines (PW1500G-style high bypass nacelles), conventional Airbus-style empennage with a tall fin, retractable tricycle gear down, clean pointed nose (not A320-family sharklets — A220 wingtip fences / small curved tips). Must read as A220-300 at a glance — longer than A220-100, clearly shorter and chunkier-nosed than an A320/A321, not a 737, not an Embraer E-Jet.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ---
 
 # wide_freighter

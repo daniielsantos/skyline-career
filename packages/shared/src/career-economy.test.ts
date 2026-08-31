@@ -23,7 +23,11 @@ import {
   LAST_MILE_MAX_NM,
   SMALL_LOT_MAX_NM,
   LAST_MILE_OPEN_LOTS_PER_ORIGIN,
-  SMALL_LOT_MIN_KG,
+  LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN,
+  LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET,
+  LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
+  BOARD_SMALL_MIN_VIABLE_KG,
+  boardLotMinViablePayUsd,
   SMALL_LOT_MAX_KG,
   BOARD_AVAILABLE_SOFT_CAP,
   BOARD_COVER_DAYS,
@@ -2674,6 +2678,44 @@ describe('tickEconomyN market formation', () => {
     assert.ok(profile.ms.npc >= 0);
   });
 
+  it('formLotsIntl hot-path stays deterministic (same seed → same lots)', () => {
+    const countryByIcao = (w: ReturnType<typeof createSeedEconomyWorld>) =>
+      new Map(
+        w.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
+      );
+    // Formed freight only — npc-repo / claim ids can drift with wall-clock RNG.
+    const fingerprint = (w: ReturnType<typeof createSeedEconomyWorld>) => {
+      const map = countryByIcao(w);
+      return w.lots
+        .filter(
+          (l) =>
+            l.id.startsWith('lot_') &&
+            lotBoardPartition(l, map) === INTL_BOARD_PARTITION,
+        )
+        .map((l) => [
+          l.id,
+          l.commodityId,
+          l.originIcao,
+          l.destIcao,
+          l.quantityKg,
+          l.payUsd,
+        ])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+    };
+    const a = createSeedEconomyWorld({ seed: 'intl-hot-path' });
+    const b = createSeedEconomyWorld({ seed: 'intl-hot-path' });
+    const profile = createEmptyTickPhaseProfile();
+    tickEconomyN(a, 4, { fromBatchAtMs: 1, advanceWallClock: false, profile });
+    tickEconomyN(b, 4, { fromBatchAtMs: 1, advanceWallClock: false });
+    assert.ok((a.internationalLanes?.length ?? 0) >= 399);
+    assert.ok(profile.ms.formLotsIntl >= 0);
+    assert.deepEqual(fingerprint(a), fingerprint(b));
+    assert.ok(
+      fingerprint(a).length > 0,
+      'expected international lots after warm ticks',
+    );
+  });
+
   it('ensureSeedMarketFormed warms an empty tick-0 board once', () => {
     const world = createSeedEconomyWorld({ seed: 'seed-warm' });
     assert.equal(world.tick, 0);
@@ -2773,6 +2815,23 @@ describe('tickEconomyN market formation', () => {
     );
   });
 
+  it('multi-tick cooperative fast-forward matches sync (no yield storm)', async () => {
+    const a = createSeedEconomyWorld({ seed: 'coop-ff' });
+    const b = createSeedEconomyWorld({ seed: 'coop-ff' });
+    a.lastBatchAtMs = 1;
+    b.lastBatchAtMs = 1;
+    tickEconomyN(a, 3, { fromBatchAtMs: 1, advanceWallClock: false });
+    await tickEconomyNCooperative(b, 3, {
+      fromBatchAtMs: 1,
+      advanceWallClock: false,
+    });
+    assert.equal(a.tick, b.tick);
+    assert.deepEqual(
+      a.lots.map((l) => [l.id, l.quantityKg, l.payUsd]),
+      b.lots.map((l) => [l.id, l.quantityKg, l.payUsd]),
+    );
+  });
+
   it('keeps US and international lots after large-country boards fill', () => {
     const world = createSeedEconomyWorld({ seed: 'partition-rng' });
     tickEconomyN(world, 12, { fromBatchAtMs: 1 });
@@ -2789,28 +2848,48 @@ describe('tickEconomyN market formation', () => {
     assert.ok(us.length > 0, 'expected US lots (not starved by BR skipAll)');
     assert.ok(intl.length > 0, 'expected international lots');
   });
-  it('spawns small LTL lots (80–2000 kg) alongside larger freight', () => {
+  it('spawns small LTL lots (viable GA–2000 kg) alongside larger freight', () => {
     const world = createSeedEconomyWorld({ seed: 'ltl-lots' });
     tickEconomyN(world, 48);
     const market = listMarketLots(world);
     assert.ok(market.length > 0);
     const small = market.filter(
       (row) =>
-        row.lot.quantityKg >= SMALL_LOT_MIN_KG &&
+        row.lot.quantityKg >= BOARD_SMALL_MIN_VIABLE_KG &&
         row.lot.quantityKg <= SMALL_LOT_MAX_KG &&
         /LTL/i.test(row.lot.reason),
     );
     const gaSized = small.filter((row) => row.lot.quantityKg <= GA_LTL_MAX_KG);
     const large = market.filter(
       (row) =>
-        row.lot.quantityKg >= 4_000 && row.lot.quantityKg < XL_LOT_MIN_KG,
+        row.lot.quantityKg >= 4_000 &&
+        row.lot.quantityKg <= LARGE_LOT_MAX_KG &&
+        !/ · XL/i.test(row.lot.reason),
     );
     assert.ok(small.length > 0, 'expected LTL lots for light turboprop fills');
-    assert.ok(gaSized.length > 0, 'expected Bonanza-sized LTL (≤450 kg)');
+    assert.ok(
+      gaSized.length > 0,
+      'expected Bonanza-sized LTL (viable GA band)',
+    );
     assert.ok(large.length > 0, 'expected large lots to remain');
+    const countryByIcao = new Map(
+      world.airports.map((a) => [
+        a.icao.toUpperCase(),
+        countryIdFromRegion(a.region ?? '') || '',
+      ]),
+    );
+    for (const row of gaSized) {
+      assert.ok(row.lot.quantityKg >= BOARD_SMALL_MIN_VIABLE_KG);
+      const nm = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
+      const international =
+        lotBoardPartition(row.lot, countryByIcao) === INTL_BOARD_PARTITION;
+      // Intl must not list GA-band at all after hold-to-viable.
+      assert.equal(international, false);
+      assert.ok(row.lot.payUsd >= boardLotMinViablePayUsd(nm ?? undefined));
+    }
     for (const row of small) {
       assert.ok(row.lot.quantityKg <= SMALL_LOT_MAX_KG);
-      assert.ok(row.lot.quantityKg >= SMALL_LOT_MIN_KG);
+      assert.ok(row.lot.quantityKg >= BOARD_SMALL_MIN_VIABLE_KG);
       const nm = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
       assert.ok(
         nm != null && nm <= SMALL_LOT_MAX_NM,
@@ -3014,7 +3093,15 @@ describe('tickEconomyN market formation', () => {
 
   it('keeps last-mile Dry on the board until late life', () => {
     const world = createSeedEconomyWorld({ seed: 'recycle-last-mile-wait' });
-    world.npcs = [];
+    // Park NPCs — clearing world.npcs reseeds via ensureNpcFleet on tick.
+    const parkUntil = (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+      npc.restUntilTick = world.tick + 99_999;
+      npc.currentFlightId = undefined;
+      npc.aggressiveness = 0;
+    }
     world.npcFlights = [];
     world.tick = 50;
     const planted: string[] = [];
@@ -3052,7 +3139,14 @@ describe('tickEconomyN market formation', () => {
 
   it('recycles last-mile Dry in late life instead of letting it expire', () => {
     const world = createSeedEconomyWorld({ seed: 'recycle-last-mile-late' });
-    world.npcs = [];
+    const parkUntil = (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+      npc.restUntilTick = world.tick + 99_999;
+      npc.currentFlightId = undefined;
+      npc.aggressiveness = 0;
+    }
     world.npcFlights = [];
     for (const lot of world.lots) {
       if (
@@ -3138,9 +3232,13 @@ describe('tickEconomyN market formation', () => {
     );
     for (const lot of homeDry) {
       assert.ok(lot.payUsd > 0, `${lot.id} payUsd=${lot.payUsd}`);
-      assert.ok(lot.quantityKg >= SMALL_LOT_MIN_KG);
+      assert.ok(lot.quantityKg >= BOARD_SMALL_MIN_VIABLE_KG);
       assert.ok(lot.quantityKg <= GA_LTL_MAX_KG);
       const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      assert.ok(
+        lot.payUsd >= boardLotMinViablePayUsd(nm ?? undefined),
+        `${lot.id} pay=${lot.payUsd} floor=${boardLotMinViablePayUsd(nm ?? undefined)}`,
+      );
       assert.ok(
         nm != null && nm >= 40 && nm <= LAST_MILE_MAX_NM,
         `${lot.originIcao}→${lot.destIcao} ${nm} nm`,
@@ -3159,12 +3257,10 @@ describe('tickEconomyN market formation', () => {
         l.quantityKg <= GA_LTL_MAX_KG,
     );
     assert.ok(usGaDry.length > 0, 'US majors should originate GA Dry');
-    const usGatewayLastMile = fromMajor.filter((l) =>
-      ['KJFK', 'KEWR', 'KMIA', 'KORD', 'KATL'].includes(l.originIcao),
-    );
+    const usMajorLastMile = fromMajor.filter((l) => usMajorIcaos.has(l.originIcao));
     assert.ok(
-      usGatewayLastMile.length > 0,
-      'US gateway majors should originate last-mile Dry',
+      usMajorLastMile.length > 0,
+      'US majors should originate last-mile Dry',
     );
   });
 
@@ -3205,16 +3301,323 @@ describe('tickEconomyN market formation', () => {
       fromSpoke.length > 0,
       'expected last-mile Dry originating at spokes',
     );
+    assert.equal(LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN, 2);
+    const openByOrigin = new Map<string, number>();
+    for (const lot of fromSpoke) {
+      const key = `${lot.originIcao}|${lot.commodityId}`;
+      openByOrigin.set(key, (openByOrigin.get(key) ?? 0) + 1);
+    }
+    for (const [key, n] of openByOrigin) {
+      assert.ok(
+        n <= LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN,
+        `${key} open=${n} exceeds spoke last-mile cap`,
+      );
+    }
     for (const lot of fromSpoke) {
       assert.ok(lot.payUsd > 0, `${lot.id} payUsd=${lot.payUsd}`);
-      assert.ok(lot.quantityKg >= SMALL_LOT_MIN_KG);
+      assert.ok(lot.quantityKg >= BOARD_SMALL_MIN_VIABLE_KG);
       assert.ok(lot.quantityKg <= GA_LTL_MAX_KG);
       const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      assert.ok(
+        lot.payUsd >= boardLotMinViablePayUsd(nm ?? undefined),
+        `${lot.id} pay=${lot.payUsd} floor=${boardLotMinViablePayUsd(nm ?? undefined)}`,
+      );
       assert.ok(
         nm != null && nm >= 40 && nm <= LAST_MILE_MAX_NM,
         `${lot.originIcao}→${lot.destIcao} ${nm} nm`,
       );
     }
+  });
+
+  it('forms last-mile Dry when dests are above soft 58% room (abs headroom)', () => {
+    // Postmortem: Dry sat ~85% zeroed soft roomKg / fill≤0.62 and killed hops.
+    // BR/US densify later sat ~93% — a 0.92 fill gate still blocked neighbors.
+    const world = createSeedEconomyWorld({ seed: 'last-mile-abs-room' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+    }
+    for (const ap of world.airports) {
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        // Near-full Dry (above old 0.92 fill gate) with ~6% absolute free.
+        pile.stockKg = Math.round(pile.capacityKg * 0.94);
+      }
+    }
+    // Majors need stock to break-bulk; spokes need origin fill for vitality.
+    for (const ap of world.airports) {
+      const tier = hubTierOf(ap);
+      if (tier !== 'major' && tier !== 'spoke') continue;
+      const pile = ap.inventory.general;
+      if (!pile) continue;
+      pile.stockKg = Math.max(pile.stockKg, Math.round(pile.capacityKg * 0.94));
+    }
+    ensureSeedMarketFormed(world);
+
+    const lastMile = world.lots.filter(
+      (l) =>
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        /last-mile/i.test(l.reason),
+    );
+    assert.ok(
+      lastMile.length > 0,
+      'expected last-mile Dry despite near-full dest warehouses',
+    );
+    const fromSpoke = lastMile.filter(
+      (l) =>
+        hubTierOf(
+          world.airports.find((a) => a.icao === l.originIcao) ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'spoke',
+    );
+    assert.ok(
+      fromSpoke.length > 0,
+      'expected spoke-origin last-mile Dry under abs headroom',
+    );
+  });
+
+  it('forms dead-spoke last-mile Dry under partition skipAll (vitality budget)', () => {
+    const world = createSeedEconomyWorld({ seed: 'last-mile-skipall-vitality' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+      npc.restUntilTick = world.tick + 99_999;
+      npc.currentFlightId = undefined;
+      npc.aggressiveness = 0;
+    }
+    world.npcFlights = [];
+    for (const ap of world.airports) {
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        pile.stockKg = Math.round(pile.capacityKg * 0.9);
+      }
+    }
+    // Pad BR Dry board past quota so last-mile starts under skipAll.
+    // ensureSeedMarketFormed no-ops when available lots already exist — tick.
+    const brQuota = partitionAvailableQuota(world, 'BR');
+    const padFor = (commodityId: 'general' | 'supplies') => {
+      const open = world.lots.filter(
+        (l) =>
+          l.status === 'available' &&
+          l.commodityId === commodityId &&
+          (world.airports.find((a) => a.icao === l.originIcao)?.region ?? '').startsWith(
+            'BR',
+          ),
+      ).length;
+      const padN = Math.max(0, brQuota - open + 8);
+      for (let i = 0; i < padN; i += 1) {
+        world.lots.push({
+          id: `lot_skipall_pad_${commodityId}_${i}`,
+          commodityId,
+          originIcao: 'SBGR',
+          destIcao: 'SBKP',
+          quantityKg: 2_500,
+          reservedKg: 0,
+          createdAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          payUsd: 4_000,
+          basePayUsd: 4_000,
+          urgency: 'normal',
+          reason: 'skipAll pad',
+          status: 'available',
+        });
+      }
+    };
+    padFor('general');
+    padFor('supplies');
+    tickEconomyN(world, 1);
+
+    const fromSpoke = world.lots.filter(
+      (l) =>
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        /last-mile/i.test(l.reason) &&
+        !l.reason.includes('skipAll pad') &&
+        hubTierOf(
+          world.airports.find((a) => a.icao === l.originIcao) ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'spoke' &&
+        (world.airports.find((a) => a.icao === l.originIcao)?.region ?? '').startsWith(
+          'BR',
+        ),
+    );
+    assert.ok(
+      fromSpoke.length > 0,
+      'expected BR spoke last-mile Dry despite skipAll',
+    );
+    assert.ok(
+      fromSpoke.length <= LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET * 2,
+      `vitality overshoot too large: ${fromSpoke.length}`,
+    );
+  });
+
+  it('forms dead-regional last-mile Dry under partition skipAll', () => {
+    const world = createSeedEconomyWorld({ seed: 'last-mile-skipall-regional' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+      npc.restUntilTick = world.tick + 99_999;
+      npc.currentFlightId = undefined;
+      npc.aggressiveness = 0;
+    }
+    world.npcFlights = [];
+    for (const ap of world.airports) {
+      const tier = hubTierOf(ap);
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        if (tier === 'regional') {
+          pile.stockKg = Math.round(pile.capacityKg * 0.9);
+        } else if (tier === 'spoke') {
+          // Keep spokes ineligible so regional vitality is what fires.
+          pile.stockKg = Math.round(pile.capacityKg * 0.05);
+        } else {
+          pile.stockKg = Math.round(pile.capacityKg * 0.4);
+        }
+      }
+    }
+    const brQuota = partitionAvailableQuota(world, 'BR');
+    const padFor = (commodityId: 'general' | 'supplies') => {
+      const open = world.lots.filter(
+        (l) =>
+          l.status === 'available' &&
+          l.commodityId === commodityId &&
+          (world.airports.find((a) => a.icao === l.originIcao)?.region ?? '').startsWith(
+            'BR',
+          ),
+      ).length;
+      const padN = Math.max(0, brQuota - open + 8);
+      for (let i = 0; i < padN; i += 1) {
+        world.lots.push({
+          id: `lot_skipall_reg_pad_${commodityId}_${i}`,
+          commodityId,
+          originIcao: 'SBGR',
+          destIcao: 'SBKP',
+          quantityKg: 2_500,
+          reservedKg: 0,
+          createdAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          payUsd: 4_000,
+          basePayUsd: 4_000,
+          urgency: 'normal',
+          reason: 'skipAll pad',
+          status: 'available',
+        });
+      }
+    };
+    padFor('general');
+    padFor('supplies');
+    tickEconomyN(world, 1);
+
+    const fromRegional = world.lots.filter(
+      (l) =>
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        /last-mile/i.test(l.reason) &&
+        !l.reason.includes('skipAll pad') &&
+        hubTierOf(
+          world.airports.find((a) => a.icao === l.originIcao) ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'regional' &&
+        (world.airports.find((a) => a.icao === l.originIcao)?.region ?? '').startsWith(
+          'BR',
+        ),
+    );
+    assert.ok(
+      fromRegional.length > 0,
+      'expected BR regional last-mile Dry despite skipAll',
+    );
+    assert.ok(
+      fromRegional.length <= LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET * 2,
+      `regional vitality overshoot too large: ${fromRegional.length}`,
+    );
+  });
+
+  it('spoke last-mile prefers feeder dests over curated corridor majors', () => {
+    const world = createSeedEconomyWorld({ seed: 'last-mile-spoke-feeder' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+      npc.restUntilTick = world.tick + 99_999;
+      npc.currentFlightId = undefined;
+      npc.aggressiveness = 0;
+    }
+    world.npcFlights = [];
+    for (const lot of world.lots) {
+      if (lot.status === 'available') lot.status = 'expired';
+    }
+    // Only SBPV is a Dry-eligible dead spoke; neighbors stay emptier sinks
+    // (price gap + absRoom). Avoids vitality rotation missing SBPV in 1 tick.
+    for (const ap of world.airports) {
+      if (!(ap.region ?? '').startsWith('BR')) continue;
+      const tier = hubTierOf(ap);
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        if (ap.icao === 'SBPV') {
+          pile.stockKg = Math.round(pile.capacityKg * 0.9);
+        } else if (
+          ap.icao === 'SBJI' ||
+          ap.icao === 'SBMY' ||
+          ap.icao === 'SBRB' ||
+          ap.icao === 'SBVH' ||
+          ap.icao === 'SBEG' ||
+          ap.icao === 'SBMQ'
+        ) {
+          pile.stockKg = Math.round(pile.capacityKg * 0.35);
+        } else if (tier === 'spoke') {
+          pile.stockKg = Math.round(pile.capacityKg * 0.05);
+        } else {
+          pile.stockKg = Math.round(pile.capacityKg * 0.55);
+        }
+      }
+    }
+    assert.ok(
+      world.airports.some((a) => a.icao === 'SBPV'),
+      'expected SBPV in seed',
+    );
+    tickEconomyN(world, 1);
+
+    const fromSbpv = world.lots.filter(
+      (l) =>
+        l.originIcao === 'SBPV' &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        /last-mile/i.test(l.reason),
+    );
+    assert.ok(fromSbpv.length > 0, 'expected SBPV last-mile Dry');
+    const feederDests = fromSbpv.filter((l) => {
+      const dest = world.airports.find((a) => a.icao === l.destIcao);
+      const tier = hubTierOf(dest ?? { icao: l.destIcao, hubTier: 'major' });
+      return tier === 'spoke' || tier === 'regional';
+    });
+    assert.ok(
+      feederDests.length > 0,
+      `expected SBPV→feeder last-mile, got ${fromSbpv
+        .map((l) => l.destIcao)
+        .join(',')}`,
+    );
+    assert.ok(
+      corridorWeight('SBPV', 'SBEG') > 1,
+      'fixture assumes curated SBPV↔SBEG corridor',
+    );
   });
 
   it('delivery only draws the share formation did not already commit', () => {

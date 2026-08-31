@@ -46,7 +46,7 @@ describe('shrinkLotAfterDelivery', () => {
     assert.equal(lot.basePayUsd, 0);
   });
 
-  it('retires sub-LTL scraps to origin when world is passed', () => {
+  it('retires sub-viable scraps to origin when world is passed', () => {
     const world = createSeedEconomyWorld({ seed: 'lot-scrap-retire' });
     const origin = world.airports.find((a) => a.icao === 'SBGR');
     assert.ok(origin);
@@ -62,13 +62,13 @@ describe('shrinkLotAfterDelivery', () => {
     world.lots.push(lot);
     shrinkLotAfterDelivery(lot, 95, world);
     assert.equal(lot.status, 'expired');
-    assert.ok(lot.quantityKg < 80);
+    assert.ok(lot.quantityKg < 180);
     // Formation-reserve fraction of the unclaimed scrap returns to origin.
     assert.ok(pile.stockKg > stockBefore);
   });
 });
 describe('pruneUnbookableMarketScraps', () => {
-  it('recycles available leftovers below SMALL_LOT_MIN_KG', () => {
+  it('recycles available leftovers below BOARD_SMALL_MIN_VIABLE_KG', () => {
     const world = createSeedEconomyWorld({ seed: 'lot-scrap-prune' });
     world.lots.push(
       sampleLot({
@@ -83,8 +83,25 @@ describe('pruneUnbookableMarketScraps', () => {
         commodityId: 'perishables',
       }),
     );
+    world.lots.push(
+      sampleLot({
+        id: 'lot_thin_ga',
+        quantityKg: 120,
+        reservedKg: 0,
+        payUsd: 48,
+        basePayUsd: 48,
+        status: 'available',
+        originIcao: 'EGLL',
+        destIcao: 'EGHH',
+        commodityId: 'general',
+      }),
+    );
     const retired = pruneUnbookableMarketScraps(world);
-    assert.equal(retired, 1);
+    assert.equal(retired, 2);
     assert.equal(world.lots.find((l) => l.id === 'lot_scrap')?.status, 'expired');
+    assert.equal(
+      world.lots.find((l) => l.id === 'lot_thin_ga')?.status,
+      'expired',
+    );
   });
 });

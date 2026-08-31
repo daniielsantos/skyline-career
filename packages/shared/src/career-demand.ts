@@ -79,13 +79,20 @@ export const DEMAND_ORDERS_OPERATOR_SOFT_EXTRA = 1;
 
 /**
  * Soft cap of open board rows worldwide (keeps Ports GET snappy).
- * Floor 192 (early-map size); scales with countries so a 80-country seed
- * is not stuck at ~2 rows per country. Split across countries so BR cannot
- * monopolize every slot.
+ * Floor 192 (early-map size); scales with countries so a dense seed
+ * is not stuck at ~2 rows per country. Split across countries (port-weighted)
+ * so BR/early ports cannot monopolize every slot while US desks stay empty.
  */
 export const DEMAND_ORDERS_GLOBAL_CAP_MIN = 192;
-export const DEMAND_ORDERS_GLOBAL_CAP_MAX = 640;
-export const DEMAND_ORDERS_PER_COUNTRY_TARGET = 6;
+/** Raised with world densify — equal-split of 640 left US at ~3–4 open total. */
+export const DEMAND_ORDERS_GLOBAL_CAP_MAX = 1280;
+/** Target open rows per country when sizing the global cap (nCountries × target). */
+export const DEMAND_ORDERS_PER_COUNTRY_TARGET = 12;
+/**
+ * Weight boost per bound career port when splitting the global cap.
+ * Countries with more desks (US densify) get a larger share than 1/n.
+ */
+export const DEMAND_ORDERS_PORT_WEIGHT = 2;
 /** Minimum floor — live board uses {@link demandOrdersGlobalCap}. */
 export const DEMAND_ORDERS_GLOBAL_CAP = DEMAND_ORDERS_GLOBAL_CAP_MIN;
 
@@ -195,7 +202,8 @@ export function demandOrdersGlobalCap(world: CareerEconomyWorld): number {
 
 /**
  * Equal-ish soft quotas per country so seed order (BR first) cannot fill
- * the live global cap alone. Remainder goes to sorted countries first.
+ * the live global cap alone. Countries with more bound ports get a larger
+ * share (US densify); remainder goes to highest fractional parts.
  */
 export function demandCountryOpenQuotas(
   world: CareerEconomyWorld,
@@ -203,13 +211,41 @@ export function demandCountryOpenQuotas(
 ): Map<string, number> {
   const list = demandBoardCountryIds(world);
   const n = Math.max(1, list.length);
-  const base = Math.floor(globalCap / n);
-  let rem = globalCap % n;
+  const portCount = new Map<string, number>();
+  for (const port of listBoundCareerPorts()) {
+    // PortDeskDef has no countryId — infer from first pickup hub region.
+    let country: string | null = null;
+    for (const hub of port.pickupHubs) {
+      country = demandHubCountryId(world, hub);
+      if (country) break;
+    }
+    if (!country) continue;
+    portCount.set(country, (portCount.get(country) ?? 0) + 1);
+  }
+  const weights = list.map((c) => {
+    const ports = portCount.get(c) ?? 0;
+    return { c, w: 1 + DEMAND_ORDERS_PORT_WEIGHT * ports };
+  });
+  const totalW = weights.reduce((s, x) => s + x.w, 0);
+  const exact = weights.map((x) => ({
+    c: x.c,
+    v: (globalCap * x.w) / totalW,
+  }));
+  const floors = exact.map((x) => ({
+    c: x.c,
+    n: Math.floor(x.v),
+    frac: x.v - Math.floor(x.v),
+  }));
+  let rem = globalCap - floors.reduce((s, x) => s + x.n, 0);
+  floors.sort((a, b) => b.frac - a.frac || a.c.localeCompare(b.c));
+  for (let i = 0; i < floors.length && rem > 0; i += 1) {
+    floors[i]!.n += 1;
+    rem -= 1;
+  }
   const quotas = new Map<string, number>();
   for (const c of list) {
-    const extra = rem > 0 ? 1 : 0;
-    if (rem > 0) rem -= 1;
-    quotas.set(c, base + extra);
+    const row = floors.find((f) => f.c === c);
+    quotas.set(c, row?.n ?? Math.floor(globalCap / n));
   }
   return quotas;
 }
@@ -922,7 +958,14 @@ export function ensureDemandOrders(
   }
 
   const boardAirports = world.airports.filter((ap) => isDemandBoardAirport(ap));
-  const ports = listBoundCareerPorts();
+  const portsAll = listBoundCareerPorts();
+  // Rotate which desks lead so densified US ports are not starved by MIA/EWR order.
+  const portRot =
+    portsAll.length > 0 ? world.tick % portsAll.length : 0;
+  const ports =
+    portRot === 0
+      ? portsAll
+      : [...portsAll.slice(portRot), ...portsAll.slice(0, portRot)];
 
   for (const port of ports) {
     if (openGlobal() >= boardCap) break;

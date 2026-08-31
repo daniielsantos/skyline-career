@@ -787,7 +787,7 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
-  it('net sort uses operator freight for crew offers when hangar is empty', () => {
+  it('net sort uses crew fee for crew offers (including empty hangar)', () => {
     const mixed = [
       row({
         payUsd: 300,

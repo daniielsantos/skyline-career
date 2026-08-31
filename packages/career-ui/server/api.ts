@@ -209,6 +209,8 @@ import {
   syncHomeCountryFromHub,
   stockTrend,
   tickEconomyNCooperative,
+  createEmptyTickPhaseProfile,
+  summarizeTickPhaseProfile,
   withMissionLoadPolicy,
   normalizeMissionIntent,
   missionLoadPolicy,
@@ -4910,10 +4912,16 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/tick') {
-        const body = (await readBody(req)) as { n?: number };
+        const body = (await readBody(req)) as { n?: number; profile?: boolean };
         const n = Math.max(1, Math.min(TICKS_PER_DAY * 7, Math.floor(body.n ?? TICKS_PER_DAY)));
+        const wantProfile = body.profile === true;
         const payload = await withCareerWrite(async (world, missions) => {
-          await tickEconomyNCooperative(world, n);
+          const profile = wantProfile
+            ? createEmptyTickPhaseProfile()
+            : undefined;
+          const tickStartedAt = performance.now();
+          await tickEconomyNCooperative(world, n, { profile });
+          const tickWallMs = performance.now() - tickStartedAt;
           const leaseOps = settleAircraftMarketOps(missions, world.tick, world);
           const hangarOps = settleHangarParkingFees(missions, world, {
             fromTick: world.tick - n,
@@ -4993,6 +5001,10 @@ export function createCareerApiServer(port = 8787) {
             playerFbos: playerFboSnapshot(missions, world),
             companyCrew: companyCrewSnapshot(missions, world),
             walletUsd: missions.walletUsd,
+            tickWallMs: Math.round(tickWallMs),
+            ...(profile
+              ? { tickProfile: summarizeTickPhaseProfile(profile) }
+              : {}),
           };
         }, { catchUp: true });
         send(res, 200, payload);
@@ -5204,7 +5216,10 @@ export function createCareerApiServer(port = 8787) {
                 crewReposition: flight.kind === 'reposition',
                 pilotFeeUsd:
                   flight.pilotFeeUsd ??
-                  quoteContractPilotFeeUsd(flight.payUsd),
+                  quoteContractPilotFeeUsd(flight.payUsd, {
+                    distanceNm,
+                    aircraftClassId: flight.aircraftClassId,
+                  }),
                 awaitingPilotUntilMs: flight.awaitingPilotUntilMs,
               },
               airframes,

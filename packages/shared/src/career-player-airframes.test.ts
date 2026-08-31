@@ -142,6 +142,22 @@ describe('career player airframes', () => {
     );
   });
 
+  it('stages Synaptic A220-300 as pax_and_cargo with Synaptic/iniBuilds SimBrief airframe', () => {
+    const a220 = findCareerPlayerAirframe('synaptic-a220-300');
+    assert.equal(a220?.simbriefIcao, 'BCS3');
+    assert.equal(
+      a220?.simbriefAirframeMatch,
+      'Synaptic / iniBuilds \\(MSFS\\) - A220-300',
+    );
+    assert.equal(a220?.injectCapable, false);
+    assert.equal(a220?.loadLayout, 'pax_and_cargo');
+    assert.equal(a220?.maxPaxSeats, 140);
+    assert.equal(
+      a220?.rolesPackRelPath,
+      'profiles/ofp/synaptic-a220-300.json',
+    );
+  });
+
   it('stages FSReborn Phenom 300E as pax_and_cargo (belly freight capped)', () => {
     const phenom = findCareerPlayerAirframe('fsreborn-phenom-300e');
     assert.equal(phenom?.loadLayout, 'pax_and_cargo');

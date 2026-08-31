@@ -126,7 +126,6 @@ import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimate
 import {
   boardNetSortUsd,
   contractPilotFeePctLabel,
-  operatorFreightFromPilotFeeUsd,
 } from './contract-pilot-fee';
 import { useConfirm } from './ConfirmDialog';
 import { PageHelpButton } from './PageHelpButton';
@@ -336,8 +335,16 @@ function compareAirportLot(
       return a.availableKg - b.availableKg;
     case 'expires':
       return a.expiresAtTick - b.expiresAtTick;
-    case 'pay':
-      return a.payUsd - b.payUsd;
+    case 'pay': {
+      const payOf = (lot: AirportLot) => {
+        const claim = lot.npcClaim;
+        if (claim?.crewNeeded && typeof claim.pilotFeeUsd === 'number') {
+          return claim.pilotFeeUsd;
+        }
+        return lot.payUsd;
+      };
+      return payOf(a) - payOf(b);
+    }
     case 'net':
       return (
         boardNetSortUsd(a, { hangarEmpty }) - boardNetSortUsd(b, { hangarEmpty })
@@ -2509,45 +2516,6 @@ function CrewFeeAmount(props: {
   return <span title={props.title}>{props.formatMoney(max)}</span>;
 }
 
-/** Operator-side freight lot pay (contract rows only — not your take-home). */
-function OperatorFreightAmount(props: {
-  claim: {
-    pilotFeeUsd?: number;
-    pilotFeeMinUsd?: number;
-    crewReposition?: boolean;
-  };
-  formatMoney: (n: number) => string;
-}) {
-  if (props.claim.crewReposition) {
-    return (
-      <span className="muted" title="Empty ferry — no freight lot">
-        —
-      </span>
-    );
-  }
-  if (typeof props.claim.pilotFeeUsd !== 'number') return null;
-  const maxFee = props.claim.pilotFeeUsd;
-  const minFee =
-    typeof props.claim.pilotFeeMinUsd === 'number'
-      ? props.claim.pilotFeeMinUsd
-      : maxFee;
-  const maxOp = operatorFreightFromPilotFeeUsd(maxFee);
-  const minOp = operatorFreightFromPilotFeeUsd(minFee);
-  const title = `Operator freight lot pay (your ${contractPilotFeePctLabel()} crew cut is in Pay)`;
-  if (minOp < maxOp) {
-    return (
-      <span className="pay-range muted" title={title}>
-        {props.formatMoney(minOp)}–{props.formatMoney(maxOp)}
-      </span>
-    );
-  }
-  return (
-    <span className="muted" title={title}>
-      {props.formatMoney(maxOp)}
-    </span>
-  );
-}
-
 function NpcTakenBadge(props: {
   claim?: NpcClaim | null;
   nowMs: number;
@@ -3300,7 +3268,7 @@ export function App() {
   const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [busy, setBusy] = useState(false);
-  /** Chunked time-advance progress (dev +1 day / large skips). */
+  /** Chunked time-advance progress (dev +1 day / +7 day / large skips). */
   const [tickAdvance, setTickAdvance] = useState<{
     done: number;
     total: number;
@@ -5807,7 +5775,9 @@ export function App() {
           ? '1 hour'
           : ticks === 96
             ? '1 day'
-            : `${ticks * 15} min`;
+            : ticks === 96 * 7
+              ? '7 days'
+              : `${ticks * 15} min`;
     // Chunk large advances so the clock/toast can update between Host round-trips.
     const chunkSize = ticks > 8 ? 8 : ticks;
     await run(async () => {
@@ -9046,21 +9016,23 @@ export function App() {
     return (
       <div className="app-shell profile-gate-shell">
         {toast && !isNeedsProfileMessage(toast) ? (
-          <p
-            className={`banner profile-gate-banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span>{toast}</span>
-            <button
-              type="button"
-              className="banner-close"
-              onClick={() => setToast(null)}
-              aria-label="Dismiss message"
+          <div className="app-toast-stack">
+            <p
+              className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
+              role="status"
+              aria-live="polite"
             >
-              ×
-            </button>
-          </p>
+              <span>{toast}</span>
+              <button
+                type="button"
+                className="banner-close"
+                onClick={() => setToast(null)}
+                aria-label="Dismiss message"
+              >
+                ×
+              </button>
+            </p>
+          </div>
         ) : null}
         <ProfileGate
           profiles={careerProfiles}
@@ -9311,6 +9283,76 @@ export function App() {
       </aside>
 
       <div className="main-column">
+        {((error && !isNeedsProfileMessage(error)) ||
+          toast ||
+          offlineFeeBanner ||
+          catchUpBanner) ? (
+          <div className="app-toast-stack">
+            {error && !isNeedsProfileMessage(error) ? (
+              <p className="banner error" role="alert">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  className="banner-close"
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss message"
+                >
+                  ×
+                </button>
+              </p>
+            ) : null}
+            {toast ? (
+              <p
+                className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
+                role="status"
+                aria-live="polite"
+              >
+                <span>{toast}</span>
+                <button
+                  type="button"
+                  className="banner-close"
+                  onClick={() => setToast(null)}
+                  aria-label="Dismiss message"
+                >
+                  ×
+                </button>
+              </p>
+            ) : null}
+            {offlineFeeBanner ? (
+              <p className="banner warn" role="status">
+                <span>
+                  {offlineFeeBanner.capped
+                    ? `Away ~${offlineFeeBanner.daysAway} economy days · passive fees charged for ${offlineFeeBanner.daysBilled} days (${formatMoney(offlineFeeBanner.passiveDebitUsd)} hangar/storage/staff).`
+                    : 'Welcome back.'}
+                  {(offlineFeeBanner.lease?.termEndedSoftIds.length ?? 0) > 0
+                    ? ' A lease term ended while away — return or buy out in Hangar.'
+                    : ''}
+                </span>
+                <button
+                  type="button"
+                  className="banner-close"
+                  onClick={() => setOfflineFeeBanner(null)}
+                  aria-label="Dismiss offline fee notice"
+                >
+                  ×
+                </button>
+              </p>
+            ) : null}
+            {catchUpBanner ? (
+              <p className="banner warn" role="status" aria-live="polite">
+                <span>
+                  {`Economy syncing · ${catchUpBanner.ticksBehind} batch${
+                    catchUpBanner.ticksBehind === 1 ? '' : 'es'
+                  } behind (~${
+                    catchUpBanner.elapsedHours < 1
+                      ? `${Math.max(1, Math.round(catchUpBanner.elapsedHours * 60))}m`
+                      : `${catchUpBanner.elapsedHours}h`
+                  } away). ~${catchUpBanner.etaMinutes} min left while Career stays open — Freights/NPC refill as batches run.`}
+                </span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <header className="topbar">
           <div className="topbar-title">
             <button
@@ -9434,6 +9476,17 @@ export function App() {
               </button>
               <button
                 type="button"
+                className="action"
+                onClick={() => void onTick(96 * 7)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 7 days (672 ticks)"
+              >
+                {tickAdvance && tickAdvance.total === 96 * 7
+                  ? `${tickAdvance.done}/${tickAdvance.total}`
+                  : '+7 day'}
+              </button>
+              <button
+                type="button"
                 className="action ghost"
                 onClick={() => void onDebugCreditWallet()}
                 disabled={busy}
@@ -9455,70 +9508,6 @@ export function App() {
         </header>
 
         <div className="main-content">
-      {error && !isNeedsProfileMessage(error) ? (
-        <p className="banner error" role="alert">
-          <span>{error}</span>
-          <button
-            type="button"
-            className="banner-close"
-            onClick={() => setError(null)}
-            aria-label="Dismiss message"
-          >
-            ×
-          </button>
-        </p>
-      ) : null}
-      {toast ? (
-        <p
-          className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
-          role="status"
-          aria-live="polite"
-        >
-          <span>{toast}</span>
-          <button
-            type="button"
-            className="banner-close"
-            onClick={() => setToast(null)}
-            aria-label="Dismiss message"
-          >
-            ×
-          </button>
-        </p>
-      ) : null}
-      {offlineFeeBanner ? (
-        <p className="banner warn" role="status">
-          <span>
-            {offlineFeeBanner.capped
-              ? `Away ~${offlineFeeBanner.daysAway} economy days · passive fees charged for ${offlineFeeBanner.daysBilled} days (${formatMoney(offlineFeeBanner.passiveDebitUsd)} hangar/storage/staff).`
-              : 'Welcome back.'}
-            {(offlineFeeBanner.lease?.termEndedSoftIds.length ?? 0) > 0
-              ? ' A lease term ended while away — return or buy out in Hangar.'
-              : ''}
-          </span>
-          <button
-            type="button"
-            className="banner-close"
-            onClick={() => setOfflineFeeBanner(null)}
-            aria-label="Dismiss offline fee notice"
-          >
-            ×
-          </button>
-        </p>
-      ) : null}
-      {catchUpBanner ? (
-        <p className="banner warn" role="status" aria-live="polite">
-          <span>
-            {`Economy syncing · ${catchUpBanner.ticksBehind} batch${
-              catchUpBanner.ticksBehind === 1 ? '' : 'es'
-            } behind (~${
-              catchUpBanner.elapsedHours < 1
-                ? `${Math.max(1, Math.round(catchUpBanner.elapsedHours * 60))}m`
-                : `${catchUpBanner.elapsedHours}h`
-            } away). ~${catchUpBanner.etaMinutes} min left while Career stays open — Freights/NPC refill as batches run.`}
-          </span>
-        </p>
-      ) : null}
-
       {!hubSelected ? (
         <section className="panel hub-picker" role="dialog" aria-labelledby="hub-picker-title">
           <div className="panel-head">
@@ -10796,7 +10785,7 @@ export function App() {
                                 className={`sort-header${contractsSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
                                 title={
                                   boardEstimateFleet.length === 0
-                                    ? 'Operator freight lot pay (not your take-home)'
+                                    ? 'Net needs an aircraft estimate — crew Pay is your fee'
                                     : boardAircraft
                                       ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
                                       : 'Select an aircraft above to estimate net (pay − Jet-A)'
@@ -10806,7 +10795,7 @@ export function App() {
                                   boardEstimateFleet.length > 0 && !boardAircraft
                                 }
                               >
-                                {boardEstimateFleet.length === 0 ? 'Freight' : 'Net'}{' '}
+                                Net{' '}
                                 <span>{contractsSortIndicator('net')}</span>
                               </button>
                             </th>
@@ -10986,9 +10975,7 @@ export function App() {
                                     'col-money',
                                     lot.npcClaim?.crewNeeded &&
                                     typeof lot.npcClaim.pilotFeeUsd === 'number'
-                                      ? lot.npcClaim.pilotFeeUsd > 0
-                                        ? 'net net-pos'
-                                        : 'net'
+                                      ? 'net'
                                       : typeof lot.estimatedNetUsd === 'number' &&
                                           lot.estimatedInRange !== false
                                         ? lot.estimatedNetUsd > 0
@@ -11004,17 +10991,12 @@ export function App() {
                               >
                                 {lot.npcClaim?.crewNeeded &&
                                 typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                                  boardEstimateFleet.length === 0 ? (
-                                    <OperatorFreightAmount
-                                      claim={lot.npcClaim}
-                                      formatMoney={formatMoney}
-                                    />
-                                  ) : (
-                                    <CrewFeeAmount
-                                      claim={lot.npcClaim}
-                                      formatMoney={formatMoney}
-                                    />
-                                  )
+                                  <span
+                                    className="muted"
+                                    title="Crew Pay is your fee — operator lot value is not shown"
+                                  >
+                                    —
+                                  </span>
                                 ) : boardAircraft &&
                                   lot.estimatedInRange === false ? (
                                   <small title="Beyond selected aircraft range">
@@ -11580,7 +11562,7 @@ export function App() {
                       className={`sort-header${marketSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
                       title={
                         fleet.length === 0
-                          ? 'Sort by operator freight lot pay (not your crew cut)'
+                          ? 'Net needs an aircraft estimate — crew Pay is your fee'
                           : boardAircraft
                             ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
                             : 'Select an aircraft above to estimate net (pay − Jet-A)'
@@ -11588,8 +11570,7 @@ export function App() {
                       onClick={() => toggleMarketSort('net')}
                       disabled={fleet.length > 0 && !boardAircraft}
                     >
-                      {fleet.length === 0 ? 'Freight' : 'Net'}{' '}
-                      <span>{sortIndicator('net')}</span>
+                      Net <span>{sortIndicator('net')}</span>
                     </button>
                   </th>
                   <th aria-sort={marketAriaSort('access')} className="col-access">
@@ -11959,9 +11940,7 @@ export function App() {
                           'col-money',
                           lot.npcClaim?.crewNeeded &&
                           typeof lot.npcClaim.pilotFeeUsd === 'number'
-                            ? lot.npcClaim.pilotFeeUsd > 0
-                              ? 'net net-pos'
-                              : 'net'
+                            ? 'net'
                             : typeof lot.estimatedNetUsd === 'number'
                               ? lot.estimatedNetUsd > 0
                                 ? 'net net-pos'
@@ -11976,17 +11955,12 @@ export function App() {
                     >
                       {lot.npcClaim?.crewNeeded &&
                       typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
-                        fleet.length === 0 ? (
-                          <OperatorFreightAmount
-                            claim={lot.npcClaim}
-                            formatMoney={formatMoney}
-                          />
-                        ) : (
-                          <CrewFeeAmount
-                            claim={lot.npcClaim}
-                            formatMoney={formatMoney}
-                          />
-                        )
+                        <span
+                          className="muted"
+                          title="Crew Pay is your fee — operator lot value is not shown"
+                        >
+                          —
+                        </span>
                       ) : boardAircraft &&
                         typeof lot.estimatedNetUsd === 'number' ? (
                         <span

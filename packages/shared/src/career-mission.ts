@@ -2046,7 +2046,10 @@ function returnContractSliceToOpenOffer(
 
   flight.cargoKg += addKg;
   flight.payUsd = Math.max(1, flight.payUsd + addPay);
-  flight.pilotFeeUsd = quoteContractPilotFeeUsd(flight.payUsd);
+  flight.pilotFeeUsd = quoteContractPilotFeeUsd(flight.payUsd, {
+    distanceNm: routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? undefined,
+    aircraftClassId: flight.aircraftClassId,
+  });
 
   const lot = world.lots.find((l) => l.id === line.shipmentLotId);
   if (lot && (lot.status === 'in_transit' || lot.status === 'available')) {

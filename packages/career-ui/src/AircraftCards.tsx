@@ -230,6 +230,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'justflight-146-300': '/airframes/bae-146-300.png',
   'microsoft-a320neo-v2': '/airframes/a320neo-v2.png',
   'microsoft-a321lr': '/airframes/a321lr.png',
+  'synaptic-a220-300': '/airframes/a220-300.png',
   'pmdg-738-bbj2-family': '/airframes/b738-bbj2.png',
   'pmdg-738-bcf-family': '/airframes/b738-bcf.png',
   'pmdg-738-pax-family': '/airframes/b738-pax.png',

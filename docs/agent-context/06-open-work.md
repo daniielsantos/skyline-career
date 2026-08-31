@@ -1,5 +1,49 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-30: **Crew board Freight/Net** — coluna Net em crew = **—** (não mostra lote do operador). Pay = fee. Sort Net em crew = fee. Sem inventar freight via fee÷0.3 (piso $/nm descasava).
+
+Atualizado 2026-08-30: **Crew fee Light GA/TP** — ainda **30%** do frete, mas piso **$/nm** (`light_ga` 1.4 · `light_turboprop` 1.65) para haul longo com pay fino não pagar menos que ferry curto. Abaixo do ferry Hangar (~2.1–2.5 $/nm). Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-08-30: **Pulse tick 2680 `Dans` (~DAY 28)** — pós +7d + quotas/regionals: spoke BR **93%** / US **98%** (Dry/LM ok). **Regional BR/US 100%** live+Dry+LM (era 15%/69%). Demand US **57** open (quota ~67); desks **15/16** com board (só HNL 0). Board **7.5k**; GA **46%** / med sweet **15%**; general fill ~85%. Majors US 67% live (Pacific/CHI/DEN quiet). Sem `CARGO_FLOW_BALANCE`. Diag: `economy-pulse-day28-dans-diag.json` + hub-tiers.
+
+Atualizado 2026-08-30: **Demand quota + regional LM** — global cap **640→1280**, target/país **6→12**, split **port-weighted** (+ rotação de desks). skipAll last-mile também para dead **regionals** (budget 8). Rebuild + 1–2d. Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-08-30: **US Demand desks vazios** — não é falta de hub. Quota por país ~**3–4** open (`globalCap/nCountries`, target 6) com **16** portos US; MIA/EWR/HOU/SJU comem os slots (iteração `CAREER_PORTS`). 10/16 US com **0** open (LAX/SEA/CHI…). Dest fill&lt;25% existe (electronics etc.). Próximo: quota proporcional a portos/hubs ou round-robin por porto. Sem Dry retune.
+
+Atualizado 2026-08-30: **Regionals pós-unlock (tick ~1912)** — spokes OK; **regionals fracos**: BR live **15%** (3/20), US **69%** mas **0** Dry/last-mile em regionals. deadEligible **17/20 BR** + **12/39 US** (stock ~88–93%). Unlock só cobre dead **spoke** sob skipAll — regionals/majors ainda cortados. Majors BR 100% live (pouco Dry GA). Sem `CARGO_FLOW_BALANCE`. Diag: `economy-hub-tiers-post-unlock.json`.
+
+Atualizado 2026-08-30: **Pulse tick 1896 pós-unlock (~DAY 20 / +2d)** — spoke live **BR 33%→97%**, **US 16%→98%**; liveSpokeDry/Lm quase = live. Board **7.4k**; general **1.6k→2.0k**, supplies **0.5k→1.0k**. SBPV agora last-mile spoke↔spoke (SBIH/SBCZ/SBAT…), **0** SBEG no sample recente. BR open spoke↔spoke **~140** (era ~26). Size: GA **44%** (↑ last-mile), med sweet **~15%** (era ~3%). Unlock OK; GA↑ é trade-off esperado. Sem `CARGO_FLOW_BALANCE`. Diag: `economy-spoke-vitality-post-unlock.json`.
+
+Atualizado 2026-08-30: **A220-300 Market** — SKU `synaptic-a220-300` (`narrow_freighter`, native-simbrief); SimBrief **BCS3** airframe `Synaptic / iniBuilds (MSFS) - A220-300`. Pack `profiles/ofp/synaptic-a220-300.json`. Card prompt `a220-300.png` em `docs/market-airframe-card-prompts.md` (PNG ainda a gerar).
+
+Atualizado 2026-08-30: **Spoke last-mile unlock** — (1) sob `skipAll`, vitality dead-spoke ainda forma até **12** GA Dry/país×SKU (não sobe soft cap); (2) sort dest de spoke: OD diversity → feeder (spoke/regional) antes de major → fill/nm → cw. Sem `CARGO_FLOW_BALANCE`. Rebuild + 1–2d; esperar Dry no spoke + menos SBPV→só-SBEG.
+
+Atualizado 2026-08-30: **Spoke vitality tick 1702 (~DAY 18)** — BR live spoke **32.9%** (24/73; era 35.6% @1510), US **16.3%** (31/190; era 15.3%). **0** live spoke com Dry / last-mile Dry em BR e US — “live” = só non-Dry. deadEligible ainda **~90% BR / ~97% US** (stock ok). Poucos contratos no spoke ≠ falta de hub próximo (SBPV tem vizinhos ≤600 nm); = formation Dry (skipAll/quota + bias corredor). Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-08-30: **SBPV→SBEG only (DAY ~18)** — spoke↔spoke **existe** (BR open ~26 spoke↔spoke vs ~6 spoke→major). SBPV histórico só SBEG/SBKP; last-mile sort **cw primeiro** + corredor `SBEG↔SBPV` **1.4** + formCap **2** → Manaus come os slots antes de SBJI/SBMY/… (cw=1). Bulk soft feeder spoke↔spoke morre sob Dry sat (surplus∧shortage). Próximo slice opcional: diversificar dest last-mile de spoke (não sempre major com cw>1). Diag: `_diag-sbpv.mjs`.
+
+Atualizado 2026-08-30: **Last-mile dest = só absRoom** — removido gate de fill% (0.92 ainda bloqueava BR/US a ~93%). Dest elegível se `cap−stock ≥ 180`; sort ainda prefere fill baixo. Spokes cheios passam a poder listar Dry.
+
+Atualizado 2026-08-30: **Pulse tick 1510 pós-absRoom (~15.7d)** — BR live **32%→42%**, US **22%→25%**; board **5.6k→6.6k**; general lots **~0.6k→1.5k** (maioria **fora** BR/US). Last-mile **global** ok (incl. hops 93%→92% fill = absRoom). **BR/US ainda ~0 last-mile Dry** no board (general avail BR=8/US=4) → próximo bloqueio: **skipAll / quota Dry** em países densificados, não dest room. Medium sweet ~3%.
+
+Atualizado 2026-08-30: **Last-mile dest sob Dry sat** — `LAST_MILE_MAX_DEST_FILL` 0.62→**0.92**; dest usa **absRoom** (`cap−stock`) ≥180 em vez de soft `roomKg` 58%; qty no absRoom; sort prefer fill baixo. Bulk inalterado. **Fuel Jet-A não gateia formLots** (só terminal/logística). Rebuild + re-pulse Dans.
+
+Atualizado 2026-08-30: **Spoke vitality postmortem (tick ~1318)** — rebuild OK; slice **não** era stock vazio. BR/US dead spokes **~86–98% eligible** (Dry fill p50 ~85–88%, dezenas de t) mas **0** lots last-mile Dry com origem spoke. Root: Dry saturado → `roomKg`/dest fill≤0.62 sem sink → last-mile não forma. Próximo: dest-side last-mile (room absoluto / dest fill) ou feeder spoke non-Dry — ainda sem `CARGO_FLOW_BALANCE`. Diag: `_diag-spoke-vitality.mjs` / `economy-spoke-vitality-day13.json`.
+
+Atualizado 2026-08-30: **Pulse tick 1222 `Dans` (~12.7d / “dia 13”)** — pós +2d: BR live **50%→32%**, US **26%→22%** (dead spoke 160→169). Board ~5.6k estável, pay p50 ~$4k, size mix ok (GA~25%, TP~29%, med sweet ~3%). Spoke vitality **não reverteu** a queda (confirmar rebuild do career server). Sem Dry retune. Próximo: diagnosticar se last-mile Dry nem chega no spoke (stock/skipAll) ou precisa de feeder non-Dry / flow.
+
+Atualizado 2026-08-30: **Spoke vitality / densify** — last-mile spoke open/form **2**, fill≥**0.14**, stock share **0.55**; até **16** spokes mortos/tick (rotação) antes de major/regional; soft feeder ~**52%**. Sem Dry/`CARGO_FLOW_BALANCE`. Re-pulse Dans após 1–2d (US live vs ~26%).
+
+Atualizado 2026-08-30: **Pulse tick 1029 `Dans` (~10.7d)** — BR live **50%** (era ~74% day7); US live **26%** (era ~70%), dead spoke **160**. Board **5.6k**, pay p50 **~$4k**. Size mix melhorou (GA≤450 **61%→25%**, TP **7%→30%**); medium sweet ainda **~3.5%**. general fill **~85%**. Sem retune Dry. Próximo: spoke vitality / densify. Canvas `economy-pulse-day11-dans`; JSON `economy-pulse-plus3d-dans-diag.json` + `economy-pulse-timeline-dans.json`.
+
+Atualizado 2026-08-30: **formLotsIntl hot-path** — lane inbound index (`laneSatOf`/`destInboundOf`); cw pré-computado; sets surplus/shortage antes do scan 561×2; skip se `min(surplus,room) < FEEDER_LTL_MIN_KG`; `break` em `skipAll`. Paridade RNG (intl cw≥2, sem spoke rng). Teste `intl-hot-path`. Sem sample lanes / Dry.
+
+Atualizado 2026-08-30: **Tick perf fast-forward** — bench: ~1.8s/tick quente; hot = `formLotsIntl` (561 lanes). `tickEconomyNCooperative(n>1)` usa sync (sem setImmediate/país). Cache `countryByIcao` no airport lookup. Intl loop pré-normaliza lanes. `POST /api/tick` opcional `{profile:true}` → `tickWallMs` + `tickProfile`. Sem mudar física/Dry.
+
+Atualizado 2026-08-30: **Hold-to-viable GA board** — não é só last-mile: todos os paths GA (machinery LTL, INTL scrap, etc.). ≥180 kg + pay floor; **INTL nunca posta GA-band** (espera feeder ≥500). Feeder thin também respeita trip floor (intl mais alto). `prune`/`shrink`/`listMarketLots` no mesmo gate. Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-08-30: **formLots size + spoke feeders (global)** — `sizeSmallLotKg` exportado: spoke OD não é mais 100% GA (GA chance ~16–32%; feeder LTL desde `FEEDER_LTL_MIN_KG` 500). `LARGE_LOT_MIN_KG=2200` fecha gap 2–4 t. Spoke tier `flowMult` 0.55→0.68, maxLots/maxSmall 2→3; filler spoke↔regional ~52% (era ~38%). Last-mile: spoke open/form caps **2**; spoke fill≥**0.14**. Smoke seed: bulk GA ~25%, med ~14%, spoke live origin ~92%. Testes last-mile: park NPCs (clear `npcs=[]` reseeds). Sem retune `CARGO_FLOW_BALANCE`.
+
 Atualizado 2026-08-30: **Micro-lot scraps (SBPV→SBEG $17 / 5 kg / 411 nm)** — resto pós-partial delivery abaixo de `SMALL_LOT_MIN_KG` (80) voltava `available` com pay pro-rata. Fix: `shrinkLotAfterDelivery(world)` + `pruneUnbookableMarketScraps` no expire/pós-NPC; Market esconde avail &lt; 80. UI 0.0 klb = arredondamento de ~5 kg.
 
 Atualizado 2026-08-30: **Day ~7 pulse `Dans` (tick 578)** — BR live **74%** (spoke fill ~25%); US live **70%** estável vs +2d, dead spoke ~65. Board ~7.3k, pay p50 ~$727. NPC util ~40% / ready ~11%. Ação feita: micro-lots. Ainda aberto: US spoke diluição, medium size mix, Hub Stats sampler.

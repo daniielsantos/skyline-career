@@ -97,6 +97,14 @@ import {
   persistAircraftInstancesIncremental,
   stripEconomyAircraftPool,
 } from './career-store-v6.js';
+import {
+  ensureV7Ddl,
+  flushPendingHubEconomySamples,
+  migrateV6toV7IfNeeded,
+  readHubEconomySamples as readHubEconomySamplesFromDb,
+  HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
+} from './career-store-v7.js';
+import type { HubEconomySample } from './types/career-economy.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
@@ -111,9 +119,10 @@ import type {
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '6';
-export { LOCAL_WORLD_ID };
+export const CAREER_STORE_SCHEMA_VERSION = '7';
+export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
+export type { HubEconomySample };
 
 export type EconomyLoadResult = {
   world: CareerEconomyWorld;
@@ -158,6 +167,11 @@ export interface CareerStore {
   persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void>;
   /** Dealer pool rows only (F7); blob stub no longer holds instances. */
   persistAircraftPool(world: CareerEconomyWorld): Promise<void>;
+  /** Daily Hub Stats samples for one ICAO (empty on JSON store). */
+  readHubEconomySamples(opts: {
+    icao: string;
+    sinceDay?: number;
+  }): HubEconomySample[];
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).
@@ -451,6 +465,13 @@ class JsonCareerStore implements CareerStore {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
+  readHubEconomySamples(_opts: {
+    icao: string;
+    sinceDay?: number;
+  }): HubEconomySample[] {
+    return [];
+  }
+
   async loadMissions(): Promise<CareerMissionsState> {
     const existing = await readJsonFile<Record<string, unknown>>(this.missionsPath);
     if (existing && Array.isArray(existing.missions)) {
@@ -573,6 +594,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV4Ddl(db);
   ensureV5Ddl(db);
   ensureV6Ddl(db);
+  ensureV7Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -610,7 +632,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV5 = Number.parseInt(afterV5?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV5) || verAfterV5 < 6) {
-    migrateV5toV6IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV5toV6IfNeeded(db, metaSet, '6');
+  }
+  const afterV6 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV6 = Number.parseInt(afterV6?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV6) || verAfterV6 < 7) {
+    migrateV6toV7IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -618,11 +647,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
 }
 
 function stripEconomyPersistBlob(world: CareerEconomyWorld): Record<string, unknown> {
-  return stripEconomyAircraftPool(
+  const stripped = stripEconomyAircraftPool(
     stripEconomyWorldOps(
       stripEconomyAirports(stripEconomyHotArrays(world)),
     ),
   );
+  // Ephemeral day samples — SQL only.
+  delete stripped.pendingHubEconomySamples;
+  return stripped;
 }
 
 function metaSet(db: SqliteDb, key: string, value: string): void {
@@ -932,6 +964,13 @@ class SqliteCareerStore implements CareerStore {
     return readAirportInventory(this.db, icao, LOCAL_WORLD_ID);
   }
 
+  readHubEconomySamples(opts: {
+    icao: string;
+    sinceDay?: number;
+  }): HubEconomySample[] {
+    return readHubEconomySamplesFromDb(this.db, opts);
+  }
+
   readAirportBoard(icao: string): AirportBoardSnapshot | null {
     return readAirportBoard(this.db, icao, LOCAL_WORLD_ID);
   }
@@ -1056,6 +1095,14 @@ class SqliteCareerStore implements CareerStore {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    // Preserve ephemeral day samples across migrate (also copied in migrate).
+    if (
+      (!toSave.pendingHubEconomySamples ||
+        toSave.pendingHubEconomySamples.length === 0) &&
+      world.pendingHubEconomySamples?.length
+    ) {
+      toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
+    }
     ensureHomeCountryId(toSave);
     const blob = stripEconomyPersistBlob(toSave);
     const json = JSON.stringify(blob);
@@ -1070,7 +1117,9 @@ class SqliteCareerStore implements CareerStore {
             )
             .run(json, now);
         }
+        flushPendingHubEconomySamples(this.db, toSave);
       });
+      world.pendingHubEconomySamples = undefined;
       this.ram = toSave;
       this.lastEconomyBlobJson = json;
       return;
@@ -1125,10 +1174,12 @@ class SqliteCareerStore implements CareerStore {
           this.lastAircraftSignatures,
         );
       }
+      flushPendingHubEconomySamples(this.db, toSave);
       stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');
       metaSet(this.db, 'economy_tick', String(toSave.tick));
     });
+    world.pendingHubEconomySamples = undefined;
     this.ram = toSave;
     this.rememberPersistedWorld(toSave, json);
   }

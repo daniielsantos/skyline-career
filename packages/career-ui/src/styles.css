@@ -11833,3 +11833,228 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.hub-stats-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  margin-top: 0.5rem;
+}
+
+.hub-stats-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: rgba(20, 32, 51, 0.03);
+}
+
+.hub-stats-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hub-stats-card-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.hub-stats-history {
+  grid-column: 1 / -1;
+}
+
+.hub-stats-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.hub-stats-history-head h3 {
+  margin: 0;
+}
+
+.hub-stats-window {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.hub-stats-window button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.hub-stats-window button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.hub-stats-commodity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.hub-stats-commodity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+}
+
+.hub-stats-commodity-list .fill-bar {
+  width: 100%;
+}
+
+.hub-stats-dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.75rem;
+  margin: 0;
+}
+
+.hub-stats-dl dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.hub-stats-dl dd {
+  margin: 0.1rem 0 0;
+  font-weight: 650;
+}
+
+.hub-stats-size-mix {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.8rem;
+}
+
+.hub-stats-spark-wait {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.hub-stats-commodity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
+.hub-stats-commodity-chips button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.hub-stats-commodity-chips button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.hub-stats-price-chart {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(8, 14, 24, 0.55);
+}
+
+.hub-stats-price-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.hub-stats-price-now {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.hub-stats-price-svg {
+  width: 100%;
+  height: 16.5rem;
+  display: block;
+}
+
+.hub-stats-price-grid {
+  stroke: rgba(255, 255, 255, 0.06);
+  stroke-width: 1;
+}
+
+.hub-stats-price-axis {
+  fill: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-stats-price-line {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hub-stats-price-dot {
+  fill: var(--accent);
+}
+
+.hub-stats-price-anno {
+  fill: #fff;
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-stats-price-anno-sub {
+  fill: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.hub-stats-price-range {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+}
+
+.hub-stats-th-sort {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.hub-stats-th-sort:hover {
+  color: var(--accent);
+}
+
+.hub-stats-pagination {
+  padding-top: 0.65rem;
+}
+

@@ -35,6 +35,34 @@ export interface StockPile {
   capacityKg: number;
 }
 
+/** One commodity row inside a daily hub economy sample. */
+export type HubEconomyCommoditySample = {
+  id: CommodityId;
+  /** 0–1 warehouse fill. */
+  fill: number;
+  spotUsd: number;
+};
+
+/** Daily hub snapshot for Hub Stats history (SQLite hub_economy_samples). */
+export type HubEconomySample = {
+  icao: string;
+  dayIndex: number;
+  tick: number;
+  activityScore: number;
+  hubLevel: number;
+  quiet: boolean;
+  jetAFill: number;
+  outboundLots: number;
+  outboundKg: number;
+  payP50Usd: number | null;
+  kgGa: number;
+  kgTp: number;
+  kgMedium: number;
+  kgNarrow: number;
+  kgWide: number;
+  commodities: HubEconomyCommoditySample[];
+};
+
 export interface AirportTerminal {
   icao: string;
   name: string;
@@ -425,6 +453,11 @@ export interface CareerEconomyWorld {
   aircraftInstances?: AircraftInstance[];
   /** Hash of enabled player-airframe catalog; triggers incremental backfill. */
   aircraftPoolCatalogHash?: string;
+  /**
+   * Ephemeral: day-boundary hub samples waiting for saveEconomy → SQL.
+   * Never persisted in economy_json.
+   */
+  pendingHubEconomySamples?: HubEconomySample[];
 }
 
 /** Dealer-owned airframe in the world pool (one physical tail number). */

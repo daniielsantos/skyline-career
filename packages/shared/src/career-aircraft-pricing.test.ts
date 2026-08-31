@@ -207,6 +207,51 @@ describe('cargo-scaled aircraft MSRP', () => {
     assert.ok(tiredAged >= 400_000, `Lear tired+aged ${tiredAged}`);
   });
 
+  it('prices medium piston DC-6 class above jet floor (anti-snowball)', () => {
+    const lean = resolveAircraftMsrpUsd({
+      aircraftClassId: 'medium_piston',
+      maxCargoKg: 7_000,
+    });
+    const dc6 = resolveAircraftMsrpUsd({
+      aircraftClassId: 'medium_piston',
+      maxCargoKg: 10_000,
+    });
+    assert.ok(dc6 > lean);
+    assert.ok(dc6 >= 1_700_000, `DC-6 MSRP ${dc6}`);
+    assert.ok(lean >= 1_300_000, `medium lean MSRP ${lean}`);
+
+    const leaseLean = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'medium_piston',
+      maxCargoKg: 7_000,
+    });
+    const leaseDc6 = resolveAircraftLeaseWeeklyUsd({
+      aircraftClassId: 'medium_piston',
+      maxCargoKg: 10_000,
+    });
+    assert.ok(leaseDc6 > leaseLean);
+    assert.ok(leaseDc6 >= 34_000, `DC-6 lease ${leaseDc6}`);
+
+    const fairMid = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: 'medium_piston',
+      maxCargoKg: 10_000,
+      condition: 'fair',
+      hoursAirframe: 4_000,
+      hoursEngine: 3_500,
+    });
+    assert.ok(fairMid >= 28_000, `DC-6 fair/mid lease ${fairMid}`);
+
+    const tiredAged = Math.round(
+      dc6 *
+        CONDITION_PRICE_MULT.tired *
+        hoursValueMult({
+          aircraftClassId: 'medium_piston',
+          hoursAirframe: ECONOMIC_LIFE_HOURS.medium_piston,
+          hoursEngine: ECONOMIC_LIFE_HOURS.medium_piston,
+        }),
+    );
+    assert.ok(tiredAged >= 700_000, `DC-6 tired+aged ${tiredAged}`);
+  });
+
   it('prices narrow freighters above class floor (anti-snowball)', () => {
     const baeFloor = resolveAircraftMsrpUsd({
       aircraftClassId: 'narrow_freighter',

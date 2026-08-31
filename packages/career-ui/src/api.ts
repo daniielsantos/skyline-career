@@ -1382,6 +1382,70 @@ export function fetchAirport(
   );
 }
 
+export type HubStatsCommodityNow = {
+  id: string;
+  name: string;
+  kind?: string;
+  fillPct: number;
+  unitPriceUsd: number;
+  stockKg: number;
+  capacityKg: number;
+};
+
+export type HubStatsHistorySample = {
+  icao: string;
+  dayIndex: number;
+  tick: number;
+  activityScore: number;
+  hubLevel: number;
+  quiet: boolean;
+  jetAFill: number;
+  outboundLots: number;
+  outboundKg: number;
+  payP50Usd: number | null;
+  kgGa: number;
+  kgTp: number;
+  kgMedium: number;
+  kgNarrow: number;
+  kgWide: number;
+  commodities: Array<{ id: string; fill: number; spotUsd: number }>;
+};
+
+export type HubStatsView = ClockSync & {
+  airport: AirportView['airport'];
+  hubLevel?: AirportView['hubLevel'];
+  now: {
+    commodities: HubStatsCommodityNow[];
+    hubLevel?: AirportView['hubLevel'];
+    outboundLots: number;
+    outboundKg: number;
+    payP50Usd: number | null;
+    sizeMixKg: {
+      ga: number;
+      tp: number;
+      medium: number;
+      narrow: number;
+      wide: number;
+    };
+    jetAFillPct: number;
+    softFill: {
+      stockKg: number;
+      inboundKg: number;
+      softFillKg: number;
+      capacityKg: number;
+      fillPct: number;
+    };
+  };
+  history: HubStatsHistorySample[];
+  retentionDays: number;
+};
+
+export function fetchAirportStats(icao: string) {
+  return api<HubStatsView>(
+    `/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}?part=stats`,
+  );
+}
+
 export type NetworkHub = {
   icao: string;
   name: string;

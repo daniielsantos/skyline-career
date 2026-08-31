@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchAirport,
+  fetchAirportStats,
   fetchCargoLimit,
   fetchMarket,
   fetchMissions,
@@ -102,6 +103,7 @@ import {
   type CompanyCrewSnapshot,
   type OfflineFeeSummary,
   type EconomyCatchUpStatus,
+  type HubStatsView,
   type RegionPressure,
   type SimBridgeStatus,
   type StarterHubOption,
@@ -291,11 +293,18 @@ import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
 import { PayloadLabPanel } from './PayloadLabPanel';
 import { CargoLotCards } from './CargoLotCards';
 import { TerminalAirportPanel } from './TerminalAirportPanel';
+import { TerminalHubStatsPanel } from './TerminalHubStatsPanel';
 import { WatchStatusFooter } from './WatchStatusFooter';
 import { mxFuelBurnFromAircraft } from './mx-fuel-burn';
 
 type Tab = CareerTab;
-type TerminalSection = 'airport' | 'inventory' | 'contracts' | 'movements' | 'fbo';
+type TerminalSection =
+  | 'airport'
+  | 'inventory'
+  | 'contracts'
+  | 'movements'
+  | 'fbo'
+  | 'stats';
 type ContractsLane = 'outbound' | 'inbound';
 type MarketSortKey =
   | 'distance'
@@ -3182,6 +3191,8 @@ export function App() {
   const [airportHydrating, setAirportHydrating] = useState(false);
   const [terminalSection, setTerminalSection] =
     useState<TerminalSection>('inventory');
+  const [hubStats, setHubStats] = useState<HubStatsView | null>(null);
+  const [hubStatsLoading, setHubStatsLoading] = useState(false);
   const [contractsLane, setContractsLane] =
     useState<ContractsLane>('outbound');
   const [contractsOffer, setContractsOffer] = useState<'aircraft' | 'crew'>(
@@ -3274,7 +3285,9 @@ export function App() {
     done: number;
     total: number;
     label: string;
+    startedAtMs: number;
   } | null>(null);
+  const [tickAdvanceClockMs, setTickAdvanceClockMs] = useState(0);
   /** Local lock for Crew fly — avoids app-wide busy flash on every button. */
   const [crewDispatchBusy, setCrewDispatchBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3521,6 +3534,27 @@ export function App() {
     setSelectedFboMissionId(null);
     setSplitHoldId(null);
   }, [airportIcao, terminalSection]);
+
+  useEffect(() => {
+    if (terminalSection !== 'stats' || !airportIcao) {
+      return;
+    }
+    let cancelled = false;
+    setHubStatsLoading(true);
+    void fetchAirportStats(airportIcao)
+      .then((stats) => {
+        if (!cancelled) setHubStats(stats);
+      })
+      .catch(() => {
+        if (!cancelled) setHubStats(null);
+      })
+      .finally(() => {
+        if (!cancelled) setHubStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [terminalSection, airportIcao]);
 
   useEffect(() => {
     if (!BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush') {
@@ -4738,6 +4772,31 @@ export function App() {
     saveWeightSystem(weightSystem);
   }, [weightSystem]);
 
+  useEffect(() => {
+    if (!tickAdvance) {
+      setTickAdvanceClockMs(0);
+      return;
+    }
+    setTickAdvanceClockMs(Date.now());
+    const id = window.setInterval(() => setTickAdvanceClockMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [tickAdvance]);
+
+  const tickAdvanceElapsedSec = tickAdvance
+    ? Math.max(
+        0,
+        Math.floor(
+          ((tickAdvanceClockMs || Date.now()) - tickAdvance.startedAtMs) / 1000,
+        ),
+      )
+    : 0;
+
+  const formatTickAdvanceButton = (total: number, idleLabel: string) => {
+    if (!tickAdvance || tickAdvance.total !== total) return idleLabel;
+    if (tickAdvance.done <= 0) return `…${tickAdvanceElapsedSec}s`;
+    return `${tickAdvance.done}/${tickAdvance.total}`;
+  };
+
   const loadFilterSteps = useMemo(
     () => loadFilterOptions(weightSystem),
     [weightSystem],
@@ -5783,8 +5842,11 @@ export function App() {
             : ticks === 96 * 7
               ? '7 days'
               : `${ticks * 15} min`;
-    // Chunk large advances so the clock/toast can update between Host round-trips.
-    const chunkSize = ticks > 8 ? 8 : ticks;
+    // Progress every ≤¼ day so +1d isn't stuck at 0/96 for minutes on one POST.
+    // Still 4 saves/day vs the old 12 (chunk=8). Hub Stats sample = 1×/day boundary only.
+    const ticksPerDay = 96;
+    const chunkSize = ticks <= 8 ? ticks : Math.min(ticks, 24);
+    const startedAtMs = Date.now();
     await run(async () => {
       let done = 0;
       let leasePaidUsd = 0;
@@ -5799,10 +5861,15 @@ export function App() {
       let lastWallet: number | undefined;
       let lastCredit: CompanyCreditSnapshot | undefined;
 
-      if (ticks > chunkSize) {
-        setTickAdvance({ done: 0, total: ticks, label: hoursLabel });
+      if (ticks > chunkSize || ticks >= ticksPerDay) {
+        setTickAdvance({
+          done: 0,
+          total: ticks,
+          label: hoursLabel,
+          startedAtMs,
+        });
         setToastKind('ok');
-        setToast(`Advancing ${hoursLabel}… 0/${ticks}`);
+        setToast(`Advancing ${hoursLabel}…`);
       }
 
       try {
@@ -5839,9 +5906,16 @@ export function App() {
             creditOverdue = result.creditOverdueDays;
           }
 
-          if (ticks > chunkSize) {
-            setTickAdvance({ done, total: ticks, label: hoursLabel });
-            setToast(`Advancing ${hoursLabel}… ${done}/${ticks}`);
+          if (ticks > chunkSize || ticks >= ticksPerDay) {
+            setTickAdvance({
+              done,
+              total: ticks,
+              label: hoursLabel,
+              startedAtMs,
+            });
+            setToast(
+              `Advancing ${hoursLabel}… ${done}/${ticks}`,
+            );
             // Let React paint progress before the next Host write.
             await new Promise<void>((resolve) => {
               window.setTimeout(resolve, 0);
@@ -9440,12 +9514,16 @@ export function App() {
               className="metric"
               title={
                 tickAdvance
-                  ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} batches`
+                  ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} batches · ${tickAdvanceElapsedSec}s`
                   : '1 economy tick = 15 simulated minutes'
               }
             >
               <span className="label">
-                {tickAdvance ? `Clock · ${tickAdvance.done}/${tickAdvance.total}` : 'Clock'}
+                {tickAdvance
+                  ? tickAdvance.done <= 0
+                    ? `Clock · ${tickAdvanceElapsedSec}s`
+                    : `Clock · ${tickAdvance.done}/${tickAdvance.total}`
+                  : 'Clock'}
               </span>
               <strong>{formatClock(continuousHours)}</strong>
             </div>
@@ -9477,9 +9555,7 @@ export function App() {
                 disabled={busy}
                 title="Advance economy + crew wall-clock by 1 day (96 ticks)"
               >
-                {tickAdvance && tickAdvance.total === 96
-                  ? `${tickAdvance.done}/${tickAdvance.total}`
-                  : '+1 day'}
+                {formatTickAdvanceButton(96, '+1 day')}
               </button>
               <button
                 type="button"
@@ -9488,9 +9564,7 @@ export function App() {
                 disabled={busy}
                 title="Advance economy + crew wall-clock by 7 days (672 ticks)"
               >
-                {tickAdvance && tickAdvance.total === 96 * 7
-                  ? `${tickAdvance.done}/${tickAdvance.total}`
-                  : '+7 day'}
+                {formatTickAdvanceButton(96 * 7, '+7 day')}
               </button>
               <button
                 type="button"
@@ -9694,6 +9768,18 @@ export function App() {
             >
               Movements ({terminalMovementCount})
             </button>
+            <button
+              type="button"
+              className={
+                terminalSection === 'stats'
+                  ? 'terminal-section active'
+                  : 'terminal-section'
+              }
+              onClick={() => setTerminalSection('stats')}
+              disabled={busy}
+            >
+              Stats
+            </button>
             {airportIcao ? (
               <button
                 type="button"
@@ -9721,6 +9807,15 @@ export function App() {
                     homeHubIcao={airportView.homeHubIcao}
                     hydrating={airportHydrating}
                     regionDisplay={regionLabel(airportView.airport.region)}
+                  />
+                ) : null}
+
+                {terminalSection === 'stats' && airportIcao ? (
+                  <TerminalHubStatsPanel
+                    icao={airportIcao}
+                    stats={hubStats}
+                    loading={hubStatsLoading}
+                    weightSystem={weightSystem}
                   />
                 ) : null}
 

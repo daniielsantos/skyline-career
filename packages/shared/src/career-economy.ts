@@ -1104,6 +1104,7 @@ export {
   regionAverageHubLevel,
   tickHubLevels,
 } from './career-hub-level.js';
+import { maybeQueueHubEconomyDaySample } from './career-hub-economy-sample.js';
 
 export {
   countFuelHaulsEnroute,
@@ -12452,6 +12453,16 @@ export function migrateEconomyWorld(
     ...(typeof aircraftPoolCatalogHashRaw === 'string'
       ? { aircraftPoolCatalogHash: aircraftPoolCatalogHashRaw.trim() }
       : {}),
+    ...(() => {
+      const pending = (base as { pendingHubEconomySamples?: unknown })
+        .pendingHubEconomySamples;
+      return Array.isArray(pending) && pending.length > 0
+        ? {
+            pendingHubEconomySamples:
+              pending as CareerEconomyWorld['pendingHubEconomySamples'],
+          }
+        : {};
+    })(),
   };
 
   remapMislabelledClHubs(migrated);
@@ -15005,6 +15016,8 @@ function tickEconomyFinish(
 
   tickPortInboundShips(world);
   addTickPhaseMs(profile, 'portRestock', phaseAt);
+
+  maybeQueueHubEconomyDaySample(world);
 
   if (profile) {
     profile.ticks += 1;

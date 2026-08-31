@@ -11,7 +11,7 @@ export const AIRCRAFT_MSRP_USD: Record<FreighterClassId, number> = {
   light_ga: 140_000,
   light_turboprop: 450_000,
   light_jet: 1_050_000,
-  medium_piston: 1_200_000,
+  medium_piston: 1_800_000,
   narrow_freighter: 2_800_000,
   wide_freighter: 14_000_000,
 };
@@ -47,7 +47,7 @@ export const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
   light_ga: 0.02,
   light_turboprop: 0.022,
   light_jet: 0.019,
-  medium_piston: 0.0135,
+  medium_piston: 0.02,
   narrow_freighter: 0.024,
   wide_freighter: 0.015,
 };

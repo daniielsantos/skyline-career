@@ -216,6 +216,8 @@ import {
   missionLoadPolicy,
   careerAllowsDirectInject,
   economyDayIndex,
+  HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
+  buildHubEconomySampleForAirport,
   effectiveFeeTickRange,
   buildOfflineFeeSummary,
   type OfflineFeeSummary,
@@ -232,6 +234,7 @@ import {
   type CareerStore,
   type CommodityId,
   type FreighterClassId,
+  type HubEconomySample,
   type MissionIntent,
   type PlayerAircraft,
 } from '@msfs-compat/shared';
@@ -1307,6 +1310,88 @@ function mapAirportStockPayload(
     playerFbos: null,
     homeHubIcao: null,
     runways: getAirportRunways(snap.airport.icao),
+  };
+}
+
+function hubInboundPendingKg(
+  world: CareerEconomyWorld,
+  icao: string,
+): number {
+  let kg = 0;
+  for (const row of world.inboundPending ?? []) {
+    if (row.destIcao?.toUpperCase() !== icao) continue;
+    kg += Math.max(0, row.cargoKg ?? 0);
+  }
+  for (const flight of world.npcFlights ?? []) {
+    if (flight.status !== 'in_flight' && flight.status !== 'awaiting_pilot') {
+      continue;
+    }
+    if (flight.destIcao?.toUpperCase() !== icao) continue;
+    kg += Math.max(0, flight.cargoKg ?? 0);
+  }
+  return kg;
+}
+
+function mapHubStatsPayload(
+  world: CareerEconomyWorld,
+  airport: CareerEconomyWorld['airports'][number],
+  history: HubEconomySample[],
+  nowMs: number,
+) {
+  const icao = airport.icao.toUpperCase();
+  const outbound = (world.lots ?? []).filter(
+    (lot) => lot.originIcao === icao && lot.status === 'available',
+  );
+  const sample = buildHubEconomySampleForAirport(world, airport, outbound);
+  const commodities = mapAirportCommodities(airport);
+  const cargoStockKg = commodities
+    .filter((c) => c.kind !== 'fuel' && c.kind !== 'mro')
+    .reduce((sum, c) => sum + c.stockKg, 0);
+  const cargoCapKg = commodities
+    .filter((c) => c.kind !== 'fuel' && c.kind !== 'mro')
+    .reduce((sum, c) => sum + c.capacityKg, 0);
+  const inboundKg = hubInboundPendingKg(world, icao);
+  const softFillKg = cargoStockKg + inboundKg;
+  const chrome = mapAirportTerminalChrome(airport);
+  return {
+    ...clockPayload(world, nowMs),
+    ...chrome,
+    now: {
+      commodities: commodities.map((c) => ({
+        id: c.commodityId,
+        name: c.name,
+        kind: c.kind,
+        // UI expects 0–100 (same as softFill.fillPct); mapAirportCommodities is 0–1.
+        fillPct: Math.round(c.fillPct * 1000) / 10,
+        unitPriceUsd: c.unitPriceUsd,
+        stockKg: c.stockKg,
+        capacityKg: c.capacityKg,
+      })),
+      hubLevel: chrome.hubLevel,
+      outboundLots: sample?.outboundLots ?? 0,
+      outboundKg: sample?.outboundKg ?? 0,
+      payP50Usd: sample?.payP50Usd ?? null,
+      sizeMixKg: {
+        ga: sample?.kgGa ?? 0,
+        tp: sample?.kgTp ?? 0,
+        medium: sample?.kgMedium ?? 0,
+        narrow: sample?.kgNarrow ?? 0,
+        wide: sample?.kgWide ?? 0,
+      },
+      jetAFillPct: Math.round((sample?.jetAFill ?? 0) * 100),
+      softFill: {
+        stockKg: cargoStockKg,
+        inboundKg,
+        softFillKg,
+        capacityKg: cargoCapKg,
+        fillPct:
+          cargoCapKg > 0
+            ? Math.round((softFillKg / cargoCapKg) * 1000) / 10
+            : 0,
+      },
+    },
+    history,
+    retentionDays: HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
   };
 }
 
@@ -3482,6 +3567,40 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           send(res, 200, mapAirportStockPayload(snap, nowMs));
+          return;
+        }
+        if (url.searchParams.get('part') === 'stats') {
+          const loaded = await withCareerLock(async () => {
+            const active = requireStore();
+            if (!active.peekEconomyWorld()) {
+              await loadEconomyUnlocked({ skipCatchUp: true });
+            }
+            const cached = active.peekEconomyWorld();
+            if (!cached) return null;
+            const airport = cached.airports.find((a) => a.icao === icao);
+            if (!airport) return { missing: true as const };
+            const day = economyDayIndex(cached.tick);
+            const sinceDay = Math.max(
+              0,
+              day - HUB_ECONOMY_SAMPLE_RETENTION_DAYS + 1,
+            );
+            const history = active.readHubEconomySamples({ icao, sinceDay });
+            return { world: cached, airport, history };
+          });
+          if (!loaded || 'missing' in loaded) {
+            send(res, 404, { error: `Unknown airport ${icao}` });
+            return;
+          }
+          send(
+            res,
+            200,
+            mapHubStatsPayload(
+              loaded.world,
+              loaded.airport,
+              loaded.history,
+              nowMs,
+            ),
+          );
           return;
         }
         const loaded = await withCareerLock(async () => {

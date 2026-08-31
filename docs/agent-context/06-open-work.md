@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-31: **Medium piston buy/lease anti-snowball** — MSRP **1.8M** + lease **2.0%/wk** (era 1.2M / 1.35%). DC-6 @ 10t/1200nm ~**1.3 voos/sem** · buy ~**66**. Playbook: `18-aircraft-pricing-balance.md`.
+
+Atualizado 2026-08-31: **Hub Stats shipped** — aba Stats no terminal + `hub_economy_samples` (schema v7); sampler no day boundary; 7d/30d. Ver `19-hub-stats.md`.
+
 Atualizado 2026-08-30: **OFP FAIL falso ATR curto** — Payload=missão (3757) partido em bag+pax EFB; Intent lia só bag. Fix `ofpFreightTowardMissionKg(+missionCargoKg)`.
 
 Atualizado 2026-08-31: **Class Ops não persistia** — `class_ops_json` em `company_state` (migrate + read/write). Sintoma: horas/cleans GA/TP crew (ex. ATR) ficavam 0/20 · 0/6 após settle/reload; Cargo Ops ok. Settle/Watch agora expõe `classOpsDeltas` no debrief.
@@ -52,6 +56,12 @@ Atualizado 2026-08-30: **Pulse tick 1029 `Dans` (~10.7d)** — BR live **50%** (
 
 Atualizado 2026-08-30: **formLotsIntl hot-path** — lane inbound index (`laneSatOf`/`destInboundOf`); cw pré-computado; sets surplus/shortage antes do scan 561×2; skip se `min(surplus,room) < FEEDER_LTL_MIN_KG`; `break` em `skipAll`. Paridade RNG (intl cw≥2, sem spoke rng). Teste `intl-hot-path`. Sem sample lanes / Dry.
 
+Atualizado 2026-08-31: **Hub Stats UX** — Terminal inventory (= hub Dry stock); History spot **por commodity** (chips + SVG anotado, ≥2 samples); unidades via `weightSystem`. Ver `19-hub-stats.md`.
+
+Atualizado 2026-08-31: **Tick advance UI** — chunk ≤24 (progress a cada ~¼ dia; +1d = 4 POSTs). Botão mostra `…Ns` enquanto o 1º chunk roda (antes 0/96 parecia travado). Hot = `formLotsIntl`, não Hub Stats (1 sample/day boundary).
+
+Atualizado 2026-08-31: **Tick advance UI chunks** — `onTick` agora 1 POST/dia (`chunkSize` ≤96; +7d = 7×96). Antes chunk=8 → +1d 12 saves / +7d 84. Física/`CARGO_FLOW_BALANCE` intactos; settle já cobre range/lease while. Progress toast por dia no +7d.
+
 Atualizado 2026-08-30: **Tick perf fast-forward** — bench: ~1.8s/tick quente; hot = `formLotsIntl` (561 lanes). `tickEconomyNCooperative(n>1)` usa sync (sem setImmediate/país). Cache `countryByIcao` no airport lookup. Intl loop pré-normaliza lanes. `POST /api/tick` opcional `{profile:true}` → `tickWallMs` + `tickProfile`. Sem mudar física/Dry.
 
 Atualizado 2026-08-30: **Hold-to-viable GA board** — não é só last-mile: todos os paths GA (machinery LTL, INTL scrap, etc.). ≥180 kg + pay floor; **INTL nunca posta GA-band** (espera feeder ≥500). Feeder thin também respeita trip floor (intl mais alto). `prune`/`shrink`/`listMarketLots` no mesmo gate. Sem `CARGO_FLOW_BALANCE`.
@@ -60,9 +70,9 @@ Atualizado 2026-08-30: **formLots size + spoke feeders (global)** — `sizeSmall
 
 Atualizado 2026-08-30: **Micro-lot scraps (SBPV→SBEG $17 / 5 kg / 411 nm)** — resto pós-partial delivery abaixo de `SMALL_LOT_MIN_KG` (80) voltava `available` com pay pro-rata. Fix: `shrinkLotAfterDelivery(world)` + `pruneUnbookableMarketScraps` no expire/pós-NPC; Market esconde avail &lt; 80. UI 0.0 klb = arredondamento de ~5 kg.
 
-Atualizado 2026-08-30: **Day ~7 pulse `Dans` (tick 578)** — BR live **74%** (spoke fill ~25%); US live **70%** estável vs +2d, dead spoke ~65. Board ~7.3k, pay p50 ~$727. NPC util ~40% / ready ~11%. Ação feita: micro-lots. Ainda aberto: US spoke diluição, medium size mix, Hub Stats sampler.
+Atualizado 2026-08-30: **Day ~7 pulse `Dans` (tick 578)** — BR live **74%** (spoke fill ~25%); US live **70%** estável vs +2d, dead spoke ~65. Board ~7.3k, pay p50 ~$727. NPC util ~40% / ready ~11%. Ação feita: micro-lots. Ainda aberto então: US spoke diluição, medium size mix (Hub Stats shipped 2026-08-31).
 
-Atualizado 2026-08-30: **Hub Stats + economy samples** — **depois** de retunes de economia. Aba Stats no terminal (radar agora → histórico 7d/30d). Sampler diário por hub (fill/spot/lots/size bands) serve UI **e** diagnóstico global. Não implementar agora.
+Atualizado 2026-08-30: **Hub Stats + economy samples** — **shipped** (2026-08-31): aba Stats + SQLite v7. Ver `19-hub-stats.md`.
 
 Atualizado 2026-08-30: **Class board (Dans tick ~274)** — API viable ~96–100% em todas as classes (partial+range). **61% leftovers ≤450 kg**. Sweet 25–100% cap: GA ~49%, TP/LJ ~27–31% (kg p50 ainda ~450), **medium ~2.3%**, narrow ~12%, wide ~17%. Degrau fraco = medium / TP-full. JSON `economy-class-board-dans.json`; canvas `economy-class-board-dans.canvas.tsx`.
 

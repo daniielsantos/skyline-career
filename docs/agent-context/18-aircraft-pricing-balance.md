@@ -46,6 +46,7 @@ flights_per_week = lease_weekly_usd / pay_per_reference_leg
 | `light_ga` | ~4–6 | C172 / progressão starter |
 | `light_turboprop` | ~1.2–1.5 | ATR72 @ 7.5t/1200nm |
 | `light_jet` | ~4–6 | Lear @ 1.4t/800nm |
+| `medium_piston` | ~1.2–1.4 | DC-6 good/mid-hours @ 10t/1200nm |
 | `narrow_freighter` | ~1.2–1.4 | 737 good/mid-hours @ 18t/1200nm |
 | `wide_freighter` | ~1.2–1.5 | MD-11 fair/mid-hours @ 90t/3500nm |
 
@@ -62,6 +63,7 @@ flights_to_buy = msrp_usd / net_pay_per_leg   // net opcional depois de fuel/MX
 | `light_ga` | ~30 voos (C172 usado tired) |
 | `light_turboprop` | ~50–80 voos no ATR72 |
 | `light_jet` | ~150–250 voos |
+| `medium_piston` | ~60–70 voos no DC-6 baseline |
 | `narrow_freighter` | ~55–65 voos no 737 baseline |
 | `wide_freighter` | ~100–115 voos no MD-11 baseline |
 
@@ -120,6 +122,7 @@ Testes de regressão: `packages/shared/src/career-aircraft-pricing.test.ts` (ant
 | 2026-08-27 | Light jet | MSRP 1.05M, lease 1.9%/wk |
 | 2026-08-31 | Narrow | MSRP 2.8M, lease 2.4%/wk; lease dealer passa a usar horas |
 | 2026-08-31 | Wide | MSRP 14M (era 6.5M), lease 1.5%/wk (era 1.2%); dealer lease × horas |
+| 2026-08-31 | Medium piston | MSRP 1.8M (era 1.2M), lease 2.0%/wk (era 1.35%); DC-6 @ 10t/1200nm ~1.3 voos/sem · ~66 buy |
 
 **Próximo:** opcional net pay (fuel + parking + MX) nos alvos.
 

@@ -105,6 +105,7 @@ import {
   economyTicksBehind,
   CATCH_UP_PULSE_MS,
   CATCH_UP_TICKS_PER_PULSE,
+  MAX_LOAD_CATCH_UP_TICKS,
   TICKS_PER_DAY,
   listNpcHomeRegions,
   targetNpcFleetSize,
@@ -371,7 +372,7 @@ let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
 /** Defer MSFS hub coord stamp until after profile-select responds. */
 let msfsStampNeeded = false;
-let msfsStampInFlight = false;
+let backgroundPulseInFlight = false;
 /** One-shot banner after long wall-clock catch-up; cleared on /api/state. */
 let pendingOfflineFeeSummary: OfflineFeeSummary | null = null;
 
@@ -399,31 +400,42 @@ async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
   }
 }
 
-async function runMsfsStampBackground(): Promise<void> {
-  if (!msfsStampNeeded || !store || msfsStampInFlight) return;
-  msfsStampInFlight = true;
+async function runBackgroundEconomyPulse(
+  catchUpTicks: number = CATCH_UP_TICKS_PER_PULSE,
+): Promise<void> {
+  if (!store || backgroundPulseInFlight) return;
+  backgroundPulseInFlight = true;
   const t0 = performance.now();
   try {
-    await withCareerLock(async () => {
-      if (!store || !msfsStampNeeded) return;
-      await stampMsfsOverridesOnStore(store);
-      msfsStampNeeded = false;
+    if (msfsStampNeeded) {
+      await withCareerLock(async () => {
+        if (!store || !msfsStampNeeded) return;
+        await stampMsfsOverridesOnStore(store);
+        msfsStampNeeded = false;
+      });
+    }
+    if (!store) return;
+    await withCareerWrite(() => undefined, {
+      catchUp: true,
+      catchUpTicks,
     });
     console.log(
-      `[career] msfs-stamp ok ${Math.round(performance.now() - t0)}ms`,
+      `[career] economy-pulse ok ticks=${catchUpTicks} ${Math.round(performance.now() - t0)}ms`,
     );
   } catch (error) {
     console.error(
-      `[career] msfs-stamp fail ${Math.round(performance.now() - t0)}ms:`,
+      `[career] economy-pulse fail ticks=${catchUpTicks} ${Math.round(performance.now() - t0)}ms:`,
       error instanceof Error ? error.message : error,
     );
   } finally {
-    msfsStampInFlight = false;
+    backgroundPulseInFlight = false;
   }
 }
 
-function scheduleMsfsStampBackground(): void {
-  void runMsfsStampBackground();
+function scheduleBackgroundEconomyPulse(
+  catchUpTicks: number = CATCH_UP_TICKS_PER_PULSE,
+): void {
+  void runBackgroundEconomyPulse(catchUpTicks);
 }
 
 function resetMsfsStampState(): void {
@@ -1784,7 +1796,6 @@ async function readBody(req: import('node:http').IncomingMessage): Promise<unkno
 
 export function createCareerApiServer(port = 8787) {
   let catchUpTimer: ReturnType<typeof setInterval> | undefined;
-  let catchUpInFlight = false;
   const watchSession = new CareerWatchSession({
     withCareerRead,
     withCareerWrite,
@@ -1914,7 +1925,7 @@ export function createCareerApiServer(port = 8787) {
           console.log(
             `[career] profile-select ok id=${id} ${Math.round(performance.now() - selectT0)}ms`,
           );
-          scheduleMsfsStampBackground();
+          scheduleBackgroundEconomyPulse(MAX_LOAD_CATCH_UP_TICKS);
           send(res, 200, {
             activeId: id,
             profile,
@@ -7681,19 +7692,7 @@ export function createCareerApiServer(port = 8787) {
         server.listen(port, '127.0.0.1', () => {
           // Keep wall-clock economy moving while the API is open.
           catchUpTimer = setInterval(() => {
-            void (async () => {
-              if (!store || catchUpInFlight) return;
-              catchUpInFlight = true;
-              try {
-                await runMsfsStampBackground();
-                if (!store) return;
-                await withCareerWrite(() => undefined, { catchUp: true });
-              } catch {
-                /* ignore background catch-up errors */
-              } finally {
-                catchUpInFlight = false;
-              }
-            })();
+            scheduleBackgroundEconomyPulse(CATCH_UP_TICKS_PER_PULSE);
           }, CATCH_UP_PULSE_MS);
           resolveListen();
         });

@@ -2,7 +2,7 @@
 
 Atualizado 2026-09-01: **Profile gate erro** — falha em `profiles/select` → banner `.error` fixo acima do painel (toast stack, dismiss ×), não some com overlay.
 
-Atualizado 2026-09-01: **Login rápido** — `profiles/select` só abre SQLite + `activeId` (sem catch-up, sem `stampMsfsOverrides`); MSFS stamp + catch-up no timer background; log `profile-select start/ok/fail` com ms. Ícone ⟳ catch-up: 4 batches / 25s.
+Atualizado 2026-09-01: **Login rápido** — `profiles/select` responde sem await; **1 economy-pulse** em background (stamp MSFS + 1 batch) para Crew needed/NPC; timer segue 4 batches / 25s. Log `profile-select` + `economy-pulse ok/fail`.
 
 Atualizado 2026-09-01: **Catch-up UX** — banner grande → ícone ⟳ no topbar (tooltip); drenagem **4 batches / 25s** (timer, simulação completa). Constantes: `CATCH_UP_TICKS_PER_PULSE` / `CATCH_UP_PULSE_MS` em `career-clock.ts`.
 

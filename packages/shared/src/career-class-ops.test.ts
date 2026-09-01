@@ -292,6 +292,7 @@ describe('career-class-ops', () => {
         port_pickups_json TEXT,
         player_warehouses_json TEXT,
         player_port_concessions_json TEXT,
+        last_seen_tick INTEGER NOT NULL DEFAULT 0,
         updated_at_ms INTEGER NOT NULL
       );
     `);

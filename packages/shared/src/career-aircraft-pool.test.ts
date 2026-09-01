@@ -37,11 +37,11 @@ describe('aircraft pool', () => {
     assert.ok(countryScaleFactor(21) < 0.4);
   });
 
-  it('BR GA cap covers every enabled SKU (18)', () => {
+  it('BR GA cap covers every enabled SKU', () => {
     const gaSkus = listSkus('light_ga').length;
-    assert.equal(gaSkus, 18);
-    assert.equal(countryAircraftClassCap(60, 'light_ga', gaSkus), 18);
-    assert.equal(countryAircraftClassCap(62, 'light_ga', gaSkus), 18);
+    assert.ok(gaSkus >= 18);
+    assert.equal(countryAircraftClassCap(60, 'light_ga', gaSkus), gaSkus);
+    assert.equal(countryAircraftClassCap(62, 'light_ga', gaSkus), gaSkus);
   });
 
   it('seeds BR with one of each GA and equal global SKU counts', () => {

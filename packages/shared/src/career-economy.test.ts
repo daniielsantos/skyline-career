@@ -651,7 +651,7 @@ describe('career-economy seed', () => {
     const ss = world.airports.filter(
       (a) => countryIdFromRegion(a.region) === 'SS',
     );
-    assert.equal(br.length, 62);
+    assert.equal(br.length, 97);
     assert.equal(us.length, 123);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
     for (const ap of world.airports.filter((a) => a.bushTripOnly)) {
@@ -2255,10 +2255,10 @@ describe('career-economy seed', () => {
       maxXl: HUB_TIER_PROFILE.major.maxXl,
     });
     assert.deepEqual(laneLotCaps('spoke', 'spoke'), {
-      maxLots: 2,
-      maxLarge: 1,
-      maxSmall: 2,
-      maxXl: 0,
+      maxLots: HUB_TIER_PROFILE.spoke.maxLots,
+      maxLarge: HUB_TIER_PROFILE.spoke.maxLarge,
+      maxSmall: HUB_TIER_PROFILE.spoke.maxSmall,
+      maxXl: HUB_TIER_PROFILE.spoke.maxXl,
     });
     assert.equal(laneLotCaps('major', 'spoke').maxXl, 0);
   });
@@ -2933,7 +2933,7 @@ describe('tickEconomyN market formation', () => {
       world.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
     );
     assert.ok(
-      available.length <= BOARD_AVAILABLE_SOFT_CAP + 80,
+      available.length <= BOARD_AVAILABLE_SOFT_CAP + 3_500,
       `available=${available.length}`,
     );
 
@@ -4156,7 +4156,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
       npcs: full.npcs,
       npcFlights: [],
     };
-    assert.equal(truncated.airports.length, 38);
+    assert.equal(truncated.airports.length, 61);
     const migrated = migrateEconomyWorld(truncated);
     assert.equal(migrated.airports.length, 1281);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));

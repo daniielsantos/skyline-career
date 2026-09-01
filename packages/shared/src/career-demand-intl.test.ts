@@ -111,6 +111,7 @@ describe('demand international accept', () => {
     world.demandOrders = [
       {
         id: 'demand_intl_ksea',
+        portId: 'CAVAN',
         destIcao: 'KSEA',
         commodityId: 'general',
         wantedKg: 500,
@@ -166,6 +167,7 @@ describe('demand international accept', () => {
     world.demandOrders = [
       {
         id: 'demand_intl_kiah',
+        portId: 'MXVER',
         destIcao: 'KIAH',
         commodityId: 'general',
         wantedKg: 400,

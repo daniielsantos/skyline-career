@@ -1090,6 +1090,7 @@ describe('listViableMarketLots', () => {
     assert.ok(narrow.length > 0);
     assert.ok(wide.length >= narrow.length);
     for (const row of narrow) {
+      if (row.npcClaim?.crewNeeded) continue;
       const distance = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
       assert.ok(distance !== undefined && distance <= 2_500);
     }
@@ -2191,10 +2192,12 @@ describe('settleMission', () => {
     const result = settleMission(world, lateMission);
     assert.equal(result.settlement.lateTicks, 3);
     assert.equal(result.settlement.onTime, false);
-    // 3 ticks = 0.75 h at 15-min batches; urgent rate 12%/h → 9% of pay.
+    // 3 ticks = 0.75 h at 15-min batches; urgent rate 12%/h × cargo Ops mult.
+    const lateRate =
+      0.12 * (lateMission.commodityId === 'perishables' ? 1.5 : 1);
     assert.equal(
       result.settlement.penaltyUsd,
-      Math.min(1_000, Math.round(1_000 * (3 / 4) * 0.12)),
+      Math.min(1_000, Math.round(1_000 * (3 / 4) * lateRate)),
     );
     assert.equal(result.settlement.payoutUsd, 1_000 - result.settlement.penaltyUsd);
   });

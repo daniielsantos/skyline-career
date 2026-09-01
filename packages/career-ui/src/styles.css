@@ -775,6 +775,46 @@ body {
   color: var(--ink);
 }
 
+.economy-sync-chip {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 85%, var(--ink));
+  font: inherit;
+  cursor: help;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.economy-sync-chip:hover,
+.economy-sync-chip:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+  outline: none;
+}
+
+.economy-sync-chip-icon {
+  display: block;
+  font-size: 1.05rem;
+  line-height: 1;
+  animation: economy-sync-spin 2.4s linear infinite;
+}
+
+@keyframes economy-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .topbar-actions {
   display: flex;
   flex-wrap: wrap;

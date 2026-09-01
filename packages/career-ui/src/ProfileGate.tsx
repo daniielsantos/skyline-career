@@ -9,7 +9,6 @@ export function ProfileGate(props: {
   busy: boolean;
   /** Shown while busy (default: Working…). */
   busyLabel?: string;
-  error: string | null;
   onSelect: (id: string) => void;
   onCreate: (name: string) => void;
 }) {
@@ -25,12 +24,6 @@ export function ProfileGate(props: {
         />
         <h1>Select a profile</h1>
       </div>
-
-      {props.error ? (
-        <p className="error" role="alert">
-          {props.error}
-        </p>
-      ) : null}
 
       <div className="profile-gate-section">
         <p className="profile-gate-section-label">Saved profiles</p>

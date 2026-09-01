@@ -1,5 +1,13 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-01: **Profile gate erro** — falha em `profiles/select` → banner `.error` fixo acima do painel (toast stack, dismiss ×), não some com overlay.
+
+Atualizado 2026-09-01: **Login rápido** — `profiles/select` só abre SQLite + `activeId` (sem catch-up, sem `stampMsfsOverrides`); MSFS stamp + catch-up no timer background; log `profile-select start/ok/fail` com ms. Ícone ⟳ catch-up: 4 batches / 25s.
+
+Atualizado 2026-09-01: **Catch-up UX** — banner grande → ícone ⟳ no topbar (tooltip); drenagem **4 batches / 25s** (timer, simulação completa). Constantes: `CATCH_UP_TICKS_PER_PULSE` / `CATCH_UP_PULSE_MS` em `career-clock.ts`.
+
+Atualizado 2026-09-01: **Desktop 0.3.50** shipped — pause-aware airborne clock; cruise burn lb/h; Pulse/Stats v8; formLotsIntl perf; pricing balance. Installer: [v0.3.50](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.50).
+
 Atualizado 2026-08-31: **Hub Stats network pulse** — schema **v8** (country/tier/stock/inbound/lot counts/pay bands); `GET /api/debug/hub-economy-history`; card Network history na aba Stats. Ver `19-hub-stats.md`.
 
 Atualizado 2026-08-31: **Light jet buy/lease** — MSRP **750k** (era 1.05M) + lease **2.3%/wk** (era 1.9%). Lear @ 1.4t/800nm ~**4.8 voos/sem** · buy ~**214**. **Light TP (ATR72)** já estava no alvo (~1.23/sem · buy ~58) — sem retune. Testes playbook earnings. UI mirror sync GA/TP/jet rates.

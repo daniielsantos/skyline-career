@@ -103,6 +103,8 @@ import {
   MS_PER_TICK,
   msToHours,
   economyTicksBehind,
+  CATCH_UP_PULSE_MS,
+  CATCH_UP_TICKS_PER_PULSE,
   TICKS_PER_DAY,
   listNpcHomeRegions,
   targetNpcFleetSize,
@@ -367,12 +369,13 @@ const bootSourceStamp = await serverSourceStamp();
 const careerRoot = await resolveCareerRoot();
 let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
+/** Defer MSFS hub coord stamp until after profile-select responds. */
+let msfsStampNeeded = false;
+let msfsStampInFlight = false;
 /** One-shot banner after long wall-clock catch-up; cleared on /api/state. */
 let pendingOfflineFeeSummary: OfflineFeeSummary | null = null;
 
-/** Catch-up timer interval — keep in sync with listen() setInterval. */
-const CATCH_UP_PULSE_MS = 60_000;
-/** Banner when ≥2 batches owed (~30 min wall) so normal 15-min gaps stay quiet. */
+/** Icon/tooltip when ≥2 batches owed (~30 min wall) so normal 15-min gaps stay quiet. */
 const CATCH_UP_BANNER_MIN_TICKS = 2;
 
 await ensureCareerProfilesLayout(careerRoot);
@@ -394,6 +397,37 @@ async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
       );
     }
   }
+}
+
+async function runMsfsStampBackground(): Promise<void> {
+  if (!msfsStampNeeded || !store || msfsStampInFlight) return;
+  msfsStampInFlight = true;
+  const t0 = performance.now();
+  try {
+    await withCareerLock(async () => {
+      if (!store || !msfsStampNeeded) return;
+      await stampMsfsOverridesOnStore(store);
+      msfsStampNeeded = false;
+    });
+    console.log(
+      `[career] msfs-stamp ok ${Math.round(performance.now() - t0)}ms`,
+    );
+  } catch (error) {
+    console.error(
+      `[career] msfs-stamp fail ${Math.round(performance.now() - t0)}ms:`,
+      error instanceof Error ? error.message : error,
+    );
+  } finally {
+    msfsStampInFlight = false;
+  }
+}
+
+function scheduleMsfsStampBackground(): void {
+  void runMsfsStampBackground();
+}
+
+function resetMsfsStampState(): void {
+  msfsStampNeeded = false;
 }
 
 function requireStore(): CareerStore {
@@ -652,11 +686,16 @@ async function updateOpenMission(
 
 async function loadEconomyUnlocked(opts?: {
   skipCatchUp?: boolean;
+  maxCatchUpTicks?: number;
 }): Promise<CareerEconomyWorld> {
   const activeStore = requireStore();
-  const { world: caught, advancedTicks, dirty } = await activeStore.loadEconomy(
-    opts?.skipCatchUp ? { maxCatchUpTicks: 0 } : undefined,
-  );
+  const loadOpts = opts?.skipCatchUp
+    ? { maxCatchUpTicks: 0 }
+    : opts?.maxCatchUpTicks != null
+      ? { maxCatchUpTicks: opts.maxCatchUpTicks }
+      : undefined;
+  const { world: caught, advancedTicks, dirty } =
+    await activeStore.loadEconomy(loadOpts);
   const missions = await loadMissions();
   let needsSave = dirty;
   // Home partition follows the player's chosen hub (KMIA → US), including legacy saves.
@@ -773,6 +812,8 @@ type CareerWriteOpts = {
   housekeeping?: boolean;
   /** Default false — only the timer / POST /api/tick should pass true. */
   catchUp?: boolean;
+  /** Batches per catch-up write (default CATCH_UP_TICKS_PER_PULSE). */
+  catchUpTicks?: number;
   /** Skip saveEconomy when the handler only mutates company/missions. */
   persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound' | 'npcLive';
   persistDemandOrderId?: string;
@@ -802,6 +843,10 @@ async function withCareerWrite<T>(
     const activeStore = requireStore();
     const missions = await loadMissions();
     const skipCatchUp = opts?.catchUp !== true;
+    const catchUpTicks =
+      opts?.catchUp === true
+        ? (opts.catchUpTicks ?? CATCH_UP_TICKS_PER_PULSE)
+        : undefined;
     const persistCompany = opts?.persist === 'company';
     const persistBlob = opts?.persist === 'blob';
     const persistPortMarket = opts?.persist === 'portMarket';
@@ -910,7 +955,10 @@ async function withCareerWrite<T>(
       }
     }
     if (!world) {
-      world = await loadEconomyUnlocked({ skipCatchUp });
+      world = await loadEconomyUnlocked({
+        skipCatchUp,
+        maxCatchUpTicks: catchUpTicks,
+      });
     }
     if (sliceLotIdsOpt.length > 0 && !useCommandPersist) {
       for (const id of sliceLotIdsOpt) {
@@ -1191,11 +1239,13 @@ function catchUpPayload(world: CareerEconomyWorld, nowMs: number) {
   const ticksBehind = economyTicksBehind(last, nowMs);
   if (ticksBehind < CATCH_UP_BANNER_MIN_TICKS) return null;
   const elapsedMs = Math.max(0, nowMs - last);
+  const pulsesRemaining = Math.ceil(ticksBehind / CATCH_UP_TICKS_PER_PULSE);
+  const etaMinutes = Math.ceil((pulsesRemaining * CATCH_UP_PULSE_MS) / 60_000);
   return {
     ticksBehind,
     elapsedHours: Math.round((elapsedMs / MS_PER_HOUR) * 10) / 10,
-    /** ~1 batch per CATCH_UP_PULSE_MS while the API is open. */
-    etaMinutes: ticksBehind,
+    etaMinutes,
+    ticksPerPulse: CATCH_UP_TICKS_PER_PULSE,
     pulseMs: CATCH_UP_PULSE_MS,
     msPerTick: MS_PER_TICK,
   };
@@ -1734,6 +1784,7 @@ async function readBody(req: import('node:http').IncomingMessage): Promise<unkno
 
 export function createCareerApiServer(port = 8787) {
   let catchUpTimer: ReturnType<typeof setInterval> | undefined;
+  let catchUpInFlight = false;
   const watchSession = new CareerWatchSession({
     withCareerRead,
     withCareerWrite,
@@ -1834,6 +1885,8 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'id required' });
           return;
         }
+        const selectT0 = performance.now();
+        console.log(`[career] profile-select start id=${id}`);
         try {
           if (watchSession.getStatus().running) await watchSession.stop();
           if (bushWatchSession.getStatus().running) {
@@ -1849,26 +1902,29 @@ export function createCareerApiServer(port = 8787) {
               store = null;
               activeProfileId = null;
             }
+            resetMsfsStampState();
             const next = await openCareerProfileStore(careerRoot, id);
-            await stampMsfsOverridesOnStore(next);
             store = next;
             activeProfileId = id;
             await setActiveCareerProfile(careerRoot, id);
+            msfsStampNeeded = true;
           });
-          // Start draining wall-clock backlog immediately (capped per pulse).
-          try {
-            await withCareerWrite(() => undefined, { catchUp: true });
-          } catch {
-            /* ignore — state banner still shows ticks behind */
-          }
           const file = await readProfilesFile(careerRoot);
           const profile = file.profiles.find((p) => p.id === id) ?? null;
+          console.log(
+            `[career] profile-select ok id=${id} ${Math.round(performance.now() - selectT0)}ms`,
+          );
+          scheduleMsfsStampBackground();
           send(res, 200, {
             activeId: id,
             profile,
             profiles: file.profiles,
           });
         } catch (error) {
+          console.error(
+            `[career] profile-select fail id=${id} ${Math.round(performance.now() - selectT0)}ms:`,
+            error instanceof Error ? error.message : error,
+          );
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
           });
@@ -1892,6 +1948,7 @@ export function createCareerApiServer(port = 8787) {
               store = null;
               activeProfileId = null;
             }
+            resetMsfsStampState();
             await clearActiveCareerProfile(careerRoot);
           });
           const file = await readProfilesFile(careerRoot);
@@ -1946,6 +2003,7 @@ export function createCareerApiServer(port = 8787) {
                 store = null;
                 activeProfileId = null;
               }
+              resetMsfsStampState();
             });
           }
           const file = await deleteCareerProfile(careerRoot, id);
@@ -7621,14 +7679,19 @@ export function createCareerApiServer(port = 8787) {
     listen(): Promise<void> {
       return new Promise((resolveListen) => {
         server.listen(port, '127.0.0.1', () => {
-          // Keep wall-clock economy moving while the API is up (~every minute).
+          // Keep wall-clock economy moving while the API is open.
           catchUpTimer = setInterval(() => {
             void (async () => {
-              if (!store) return;
+              if (!store || catchUpInFlight) return;
+              catchUpInFlight = true;
               try {
+                await runMsfsStampBackground();
+                if (!store) return;
                 await withCareerWrite(() => undefined, { catchUp: true });
               } catch {
                 /* ignore background catch-up errors */
+              } finally {
+                catchUpInFlight = false;
               }
             })();
           }, CATCH_UP_PULSE_MS);

@@ -1081,8 +1081,9 @@ export type OfflineFeeSummary = {
 export type EconomyCatchUpStatus = {
   ticksBehind: number;
   elapsedHours: number;
-  /** Approximate wall minutes left at 1 batch per API catch-up pulse. */
+  /** Approximate wall minutes left at the current catch-up pulse rate. */
   etaMinutes: number;
+  ticksPerPulse: number;
   pulseMs: number;
   msPerTick: number;
 };

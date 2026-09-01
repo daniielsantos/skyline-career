@@ -162,6 +162,7 @@ import {
   DesktopUpdateHeaderButton,
   DesktopUpdatesCard,
 } from './DesktopUpdates';
+import { EconomySyncIndicator } from './EconomySyncIndicator';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
   AIRCRAFT_CLASS_FILTERS,
@@ -9126,25 +9127,42 @@ export function App() {
   }
 
   if (showProfileGate || !activeCareerProfile) {
+    const gateError =
+      error && !isNeedsProfileMessage(error) ? error : null;
     return (
       <div className="app-shell profile-gate-shell">
-        {toast && !isNeedsProfileMessage(toast) ? (
-          <div className="app-toast-stack">
-            <p
-              className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
-              role="status"
-              aria-live="polite"
-            >
-              <span>{toast}</span>
-              <button
-                type="button"
-                className="banner-close"
-                onClick={() => setToast(null)}
-                aria-label="Dismiss message"
+        {gateError || (toast && !isNeedsProfileMessage(toast)) ? (
+          <div className="app-toast-stack profile-gate-toast-stack">
+            {gateError ? (
+              <p className="banner error" role="alert" aria-live="assertive">
+                <span>{gateError}</span>
+                <button
+                  type="button"
+                  className="banner-close"
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss error"
+                >
+                  ×
+                </button>
+              </p>
+            ) : null}
+            {toast && !isNeedsProfileMessage(toast) ? (
+              <p
+                className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
+                role="status"
+                aria-live="polite"
               >
-                ×
-              </button>
-            </p>
+                <span>{toast}</span>
+                <button
+                  type="button"
+                  className="banner-close"
+                  onClick={() => setToast(null)}
+                  aria-label="Dismiss message"
+                >
+                  ×
+                </button>
+              </p>
+            ) : null}
           </div>
         ) : null}
         <ProfileGate
@@ -9152,7 +9170,6 @@ export function App() {
           lastActiveId={activeCareerProfile?.id ?? null}
           busy={busy}
           busyLabel="Opening career…"
-          error={error && !isNeedsProfileMessage(error) ? error : null}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
         />
@@ -9409,8 +9426,7 @@ export function App() {
       <div className="main-column">
         {((error && !isNeedsProfileMessage(error)) ||
           toast ||
-          offlineFeeBanner ||
-          catchUpBanner) ? (
+          offlineFeeBanner) ? (
           <div className="app-toast-stack">
             {error && !isNeedsProfileMessage(error) ? (
               <p className="banner error" role="alert">
@@ -9460,19 +9476,6 @@ export function App() {
                 >
                   ×
                 </button>
-              </p>
-            ) : null}
-            {catchUpBanner ? (
-              <p className="banner warn" role="status" aria-live="polite">
-                <span>
-                  {`Economy syncing · ${catchUpBanner.ticksBehind} batch${
-                    catchUpBanner.ticksBehind === 1 ? '' : 'es'
-                  } behind (~${
-                    catchUpBanner.elapsedHours < 1
-                      ? `${Math.max(1, Math.round(catchUpBanner.elapsedHours * 60))}m`
-                      : `${catchUpBanner.elapsedHours}h`
-                  } away). ~${catchUpBanner.etaMinutes} min left while Career stays open — Freights/NPC refill as batches run.`}
-                </span>
               </p>
             ) : null}
           </div>
@@ -9537,6 +9540,9 @@ export function App() {
             </p>
           </div>
           <div className="topbar-metrics">
+            {catchUpBanner ? (
+              <EconomySyncIndicator status={catchUpBanner} />
+            ) : null}
             {careerReady && pilotIcao ? (
               <button
                 type="button"

@@ -348,7 +348,8 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 ## Feito (shipped 0.3.35)
 
 - **EN ROUTE layout v2:** briefing cards no topo; Cargo com nome; Live load no fim; ROUTE no header do mapa; technical details colapsados por padrão.
-- **Watch footer:** fora da área de scroll (sem invadir scrollbar); cruise burn kg/h de volta.
+- **Watch footer:** fora da área de scroll; cruise burn via `formatFuelFlow` + `weightSystem` (imperial → lb/h). Interno sempre kg/h → `airframePerfOverrides` no settle.
+- **Airborne clock:** pause/slew/menu (`IS PAUSED`) congela `airborneElapsedMs` (chip + settle gate); ver `tickAirbornePlaybackClock` / `11-persist-commands.md`.
 
 
 

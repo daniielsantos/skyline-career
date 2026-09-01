@@ -282,13 +282,24 @@ export interface MissionFlightWatchState {
    * Used when GS/AGL are missing so a one-tick flicker cannot depart.
    */
   airborneConfirmTicks?: number;
-  /** Wall-clock when the aircraft first left the ground (or watch saw airborne). */
+  /**
+   * Depart wall-clock stamp (or Watch first airborne). Elapsed for the settle
+   * gate prefers {@link airborneElapsedMs} (pause-aware); this remains the
+   * ETA / resume anchor and may be re-based on Watch resume.
+   */
   airborneAtMs?: number;
   /**
    * Wall-clock when wheels touched down after airborne.
    * Freezes the airborne elapsed clock for the settle gate / UI.
    */
   airborneEndedAtMs?: number;
+  /**
+   * Sim-active airborne time (ms). Does not advance while IS PAUSED / slew.
+   * Source of truth for the settle gate and flight-time chip.
+   */
+  airborneElapsedMs?: number;
+  /** Last Watch tick that updated {@link airborneElapsedMs}. */
+  lastAirborneClockAtMs?: number;
   /** Planned route duration in wall-clock ms (OFP air time; may tighten after cruise TAS). */
   expectedRouteMs?: number;
   /** Route distance (nm) used to pick short-hop vs normal airborne ratio. */
@@ -359,10 +370,117 @@ export function createMissionFlightWatchState(
     airborneConfirmTicks: seed.airborneConfirmTicks,
     airborneAtMs: seed.airborneAtMs,
     airborneEndedAtMs: seed.airborneEndedAtMs,
+    airborneElapsedMs: seed.airborneElapsedMs,
+    lastAirborneClockAtMs: seed.lastAirborneClockAtMs,
     expectedRouteMs: seed.expectedRouteMs,
     routeDistanceNm: seed.routeDistanceNm,
     lastAirborneVsFpm: seed.lastAirborneVsFpm,
     landingFpm: seed.landingFpm,
+  };
+}
+
+/**
+ * Live sim-active airborne elapsed for UI / settle gate.
+ * While paused or slew, holds the last accumulated value (no wall creep).
+ */
+export function resolveLiveAirborneElapsedMs(
+  state: Pick<
+    MissionFlightWatchState,
+    | 'airborneAtMs'
+    | 'airborneEndedAtMs'
+    | 'airborneElapsedMs'
+    | 'lastAirborneClockAtMs'
+  >,
+  nowMs: number,
+  frozen: boolean,
+): number | null {
+  if (
+    typeof state.airborneAtMs !== 'number' ||
+    !Number.isFinite(state.airborneAtMs)
+  ) {
+    return null;
+  }
+  const ended =
+    typeof state.airborneEndedAtMs === 'number' &&
+    Number.isFinite(state.airborneEndedAtMs);
+  if (
+    typeof state.airborneElapsedMs === 'number' &&
+    Number.isFinite(state.airborneElapsedMs)
+  ) {
+    if (frozen && !ended) return Math.max(0, state.airborneElapsedMs);
+    const last =
+      typeof state.lastAirborneClockAtMs === 'number' &&
+      Number.isFinite(state.lastAirborneClockAtMs)
+        ? state.lastAirborneClockAtMs
+        : state.airborneAtMs;
+    const endMs = ended ? state.airborneEndedAtMs! : nowMs;
+    // Open interval since last tick (or up to touchdown). Pause samples never
+    // reach touchdown edge-detect, so this gap is always sim-active.
+    return Math.max(
+      0,
+      state.airborneElapsedMs + Math.max(0, endMs - last),
+    );
+  }
+  const endMs = ended ? state.airborneEndedAtMs! : nowMs;
+  return Math.max(0, endMs - state.airborneAtMs);
+}
+
+/**
+ * Advance (or freeze) sim-active airborne elapsed for one Watch sample.
+ * Does not rewrite airborneAtMs (depart stamp / ETA anchor stays put).
+ */
+export function tickAirbornePlaybackClock(
+  state: MissionFlightWatchState,
+  opts: { nowMs: number; frozen: boolean },
+): MissionFlightWatchState {
+  const airborneAtMs = state.airborneAtMs;
+  if (typeof airborneAtMs !== 'number' || !Number.isFinite(airborneAtMs)) {
+    return state;
+  }
+  const nowMs = opts.nowMs;
+  const ended =
+    typeof state.airborneEndedAtMs === 'number' &&
+    Number.isFinite(state.airborneEndedAtMs);
+
+  if (ended) {
+    const endMs = state.airborneEndedAtMs!;
+    const last =
+      typeof state.lastAirborneClockAtMs === 'number' &&
+      Number.isFinite(state.lastAirborneClockAtMs)
+        ? state.lastAirborneClockAtMs
+        : airborneAtMs;
+    const base =
+      typeof state.airborneElapsedMs === 'number' &&
+      Number.isFinite(state.airborneElapsedMs)
+        ? Math.max(0, state.airborneElapsedMs)
+        : 0;
+    const elapsed =
+      last < endMs ? base + (endMs - last) : base > 0 ? base : Math.max(0, endMs - airborneAtMs);
+    return {
+      ...state,
+      airborneElapsedMs: elapsed,
+      lastAirborneClockAtMs: nowMs,
+    };
+  }
+
+  const last =
+    typeof state.lastAirborneClockAtMs === 'number' &&
+    Number.isFinite(state.lastAirborneClockAtMs)
+      ? state.lastAirborneClockAtMs
+      : nowMs;
+  const dt = Math.max(0, nowMs - last);
+  let elapsed =
+    typeof state.airborneElapsedMs === 'number' &&
+    Number.isFinite(state.airborneElapsedMs)
+      ? Math.max(0, state.airborneElapsedMs)
+      : Math.max(0, last - airborneAtMs);
+  if (!opts.frozen) {
+    elapsed += dt;
+  }
+  return {
+    ...state,
+    airborneElapsedMs: elapsed,
+    lastAirborneClockAtMs: nowMs,
   };
 }
 
@@ -651,6 +769,11 @@ export function evaluateMinAirborneElapsed(opts: {
   nowMs: number;
   /** When set (touchdown), freeze elapsed instead of counting taxi-in. */
   airborneEndedAtMs?: number;
+  /**
+   * Sim-active elapsed (excludes pause / slew). When set, overrides wall
+   * `now − airborneAtMs` so menu time does not unlock the settle gate.
+   */
+  airborneElapsedMs?: number;
   /** Route distance (nm) — short hops use a lower airborne fraction. */
   distanceNm?: number;
 }):
@@ -674,7 +797,12 @@ export function evaluateMinAirborneElapsed(opts: {
     Number.isFinite(opts.airborneEndedAtMs)
       ? opts.airborneEndedAtMs
       : opts.nowMs;
-  const elapsedMs = Math.max(0, endMs - opts.airborneAtMs);
+  const wallElapsedMs = Math.max(0, endMs - opts.airborneAtMs);
+  const elapsedMs =
+    typeof opts.airborneElapsedMs === 'number' &&
+    Number.isFinite(opts.airborneElapsedMs)
+      ? Math.max(0, opts.airborneElapsedMs)
+      : wallElapsedMs;
   const ratioRequired = minAirborneTimeRatio(opts.distanceNm);
   const requiredMs = minRequiredAirborneMs(
     opts.expectedRouteMs,
@@ -723,6 +851,12 @@ function gateSettleByMinAirborne(
     expectedRouteMs,
     nowMs: opts.nowMs ?? Date.now(),
     airborneEndedAtMs: state.airborneEndedAtMs,
+    airborneElapsedMs:
+      resolveLiveAirborneElapsedMs(
+        state,
+        opts.nowMs ?? Date.now(),
+        false,
+      ) ?? undefined,
     distanceNm: opts.distanceNm ?? state.routeDistanceNm,
   });
   if (check.ok) return null;
@@ -795,6 +929,8 @@ function withAirborneClock(
   return {
     ...state,
     airborneAtMs: nowMs,
+    airborneElapsedMs: 0,
+    lastAirborneClockAtMs: nowMs,
     expectedRouteMs,
     routeDistanceNm:
       typeof opts.distanceNm === 'number' && Number.isFinite(opts.distanceNm)
@@ -845,6 +981,8 @@ export function evaluateMissionFlightTransition(
     airborneConfirmTicks: confirmTicks,
     airborneAtMs: state.airborneAtMs,
     airborneEndedAtMs: state.airborneEndedAtMs,
+    airborneElapsedMs: state.airborneElapsedMs,
+    lastAirborneClockAtMs: state.lastAirborneClockAtMs,
     expectedRouteMs: state.expectedRouteMs,
     routeDistanceNm:
       typeof opts.distanceNm === 'number' && Number.isFinite(opts.distanceNm)

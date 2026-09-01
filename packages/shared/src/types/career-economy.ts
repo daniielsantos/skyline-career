@@ -790,8 +790,8 @@ export interface MissionIntent {
    */
   airborneAtMs?: number;
   /**
-   * Accumulated airborne elapsed (ms) at last Watch flush / stop.
-   * Lets the airborne % resume after app restart without counting closed time.
+   * Accumulated sim-active airborne elapsed (ms) at last Watch flush / stop.
+   * Excludes pause / slew / menu; also skips offline gap on resume.
    */
   airborneElapsedMs?: number;
   /**

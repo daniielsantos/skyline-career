@@ -44,6 +44,7 @@ Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 
 - Cruise EMA / `airframePerfOverrides`: no mesmo `saveMissions` do settle (um objeto pequeno). Sem job.
 - Relógio airborne após settle: **não** persistir de novo (Watch `228d6c1`).
+- **Pause/menu:** `airborneElapsedMs` só avança com sim “vivo” (`IS PAUSED` / slew congelam o chip + gate); wall `airborneAtMs` continua âncora de ETA/resume.
 - Crew ops due / orphan cancel: **não** no settle; próximo write de company que já abra missões, ou o timer de 60s.
 - Tick NPC, port discharge, dealer pool, `persistWorldAirports` full rewrite.
 

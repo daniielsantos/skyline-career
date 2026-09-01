@@ -16,6 +16,8 @@ import {
   resumeAirborneAtMs,
   pickActiveMission,
   resolveExpectedRouteMs,
+  resolveLiveAirborneElapsedMs,
+  tickAirbornePlaybackClock,
   type MissionIntent,
 } from './index.js';
 
@@ -788,6 +790,54 @@ describe('evaluateMissionFlightTransition', () => {
       airborneEndedAtMs: down.nextState.airborneEndedAtMs,
     });
     assert.equal(later.elapsedMs, 20 * 60_000);
+  });
+
+  it('does not count pause / slew toward airborne elapsed', () => {
+    const plannedMs = 40 * 60_000;
+    const t0 = 1_000_000;
+    let state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: t0,
+      airborneElapsedMs: 0,
+      lastAirborneClockAtMs: t0,
+      expectedRouteMs: plannedMs,
+    });
+    state = tickAirbornePlaybackClock(state, {
+      nowMs: t0 + 10 * 60_000,
+      frozen: false,
+    });
+    assert.equal(state.airborneElapsedMs, 10 * 60_000);
+
+    state = tickAirbornePlaybackClock(state, {
+      nowMs: t0 + 40 * 60_000,
+      frozen: true,
+    });
+    assert.equal(state.airborneElapsedMs, 10 * 60_000);
+
+    state = tickAirbornePlaybackClock(state, {
+      nowMs: t0 + 50 * 60_000,
+      frozen: false,
+    });
+    assert.equal(state.airborneElapsedMs, 20 * 60_000);
+
+    const liveFrozen = resolveLiveAirborneElapsedMs(
+      state,
+      t0 + 55 * 60_000,
+      true,
+    );
+    assert.equal(liveFrozen, 20 * 60_000);
+
+    const gate = evaluateMinAirborneElapsed({
+      airborneAtMs: t0,
+      expectedRouteMs: plannedMs,
+      nowMs: t0 + 55 * 60_000,
+      airborneElapsedMs: liveFrozen ?? undefined,
+      distanceNm: 200,
+    });
+    // Wall would be 55m (≥70% of 40m) but sim-active is only 20m → blocked.
+    assert.equal(gate.ok, false);
+    assert.equal(gate.elapsedMs, 20 * 60_000);
   });
 
   it('uses 50% airborne gate for routes under 100 nm', () => {

@@ -25,7 +25,9 @@ import {
   inferEnginesRunning,
   isSimPlaybackFrozen,
   mergeAirborneClockOntoMission,
+  resolveLiveAirborneElapsedMs,
   resumeAirborneAtMs,
+  tickAirbornePlaybackClock,
   finalizeFlightScore,
   finalizeWeatherOpsScore,
   fuelTankBreakdownSum,
@@ -1548,11 +1550,18 @@ export class CareerWatchSession {
       Number.isFinite(expectedRouteMs) &&
       expectedRouteMs > 0
     ) {
+      const frozen = this.lastSample
+        ? isSimPlaybackFrozen(this.lastSample)
+        : false;
+      const airborneElapsedMs =
+        resolveLiveAirborneElapsedMs(this.watchState, nowMs, frozen) ??
+        undefined;
       const check = evaluateMinAirborneElapsed({
         airborneAtMs,
         expectedRouteMs,
         nowMs,
         airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+        airborneElapsedMs,
         distanceNm: this.watchState.routeDistanceNm,
       });
       flightTime = {
@@ -1747,6 +1756,14 @@ export class CareerWatchSession {
       // Never inherit leftover stamps from accepted/dispatched (false SIM ON GROUND).
       sawAirborne: mission.status === 'in_flight' || hasPersistedAirborne,
       airborneAtMs: resumedAirborneAtMs,
+      ...(typeof mission.airborneElapsedMs === 'number' &&
+      Number.isFinite(mission.airborneElapsedMs) &&
+      resumeClock
+        ? {
+            airborneElapsedMs: Math.max(0, mission.airborneElapsedMs),
+            lastAirborneClockAtMs: nowMs,
+          }
+        : {}),
       expectedRouteMs:
         mission.expectedRouteMs ??
         (mission.status === 'in_flight' || hasPersistedAirborne
@@ -2004,6 +2021,13 @@ export class CareerWatchSession {
       return;
     }
     const nowMs = Date.now();
+    const frozen = this.lastSample
+      ? isSimPlaybackFrozen(this.lastSample)
+      : false;
+    const airborneElapsedMs =
+      typeof airborneAtMs === 'number' && Number.isFinite(airborneAtMs)
+        ? resolveLiveAirborneElapsedMs(this.watchState, nowMs, frozen)
+        : null;
     const check =
       typeof airborneAtMs === 'number' && Number.isFinite(airborneAtMs)
         ? evaluateMinAirborneElapsed({
@@ -2014,6 +2038,7 @@ export class CareerWatchSession {
                 : 1,
             nowMs,
             airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+            airborneElapsedMs: airborneElapsedMs ?? undefined,
             distanceNm: this.watchState.routeDistanceNm,
           })
         : null;
@@ -2023,7 +2048,8 @@ export class CareerWatchSession {
         async (freshMissions, openMission, openIdx) => {
           const merged = mergeAirborneClockOntoMission(openMission, {
             airborneAtMs,
-            airborneElapsedMs: check?.elapsedMs,
+            airborneElapsedMs:
+              airborneElapsedMs ?? check?.elapsedMs ?? undefined,
             expectedRouteMs,
           });
           if (!merged) return false;
@@ -3046,6 +3072,12 @@ export class CareerWatchSession {
         this.watchState,
         transitionOpts,
       );
+      // Pause / slew: transition ignores the sample, but still freeze the
+      // airborne flight-time clock so menu time does not count.
+      nextState = tickAirbornePlaybackClock(nextState, {
+        nowMs,
+        frozen: isSimPlaybackFrozen(sample),
+      });
       // Drop premature airborne stamps while still preparing at origin
       // (accepted/dispatched on the ground, not near dest). A SIM ON GROUND
       // flicker must not leave "settle unlocked" on the ramp.
@@ -3441,10 +3473,18 @@ export class CareerWatchSession {
 
       // Persist airborne clock as soon as Watch stamps it (accepted/dispatched/
       // in_flight) so closing the app mid-climb does not reset progress to 0%.
+      // Sim-active elapsed: flush about every 30s of progress (not every tick).
+      const elapsedBucket = Math.floor(
+        (nextState.airborneElapsedMs ?? 0) / 30_000,
+      );
+      const prevElapsedBucket = Math.floor(
+        (current.airborneElapsedMs ?? 0) / 30_000,
+      );
       if (
         nextState.airborneAtMs !== undefined &&
         (current.airborneAtMs !== nextState.airborneAtMs ||
-          current.expectedRouteMs !== nextState.expectedRouteMs)
+          current.expectedRouteMs !== nextState.expectedRouteMs ||
+          elapsedBucket !== prevElapsedBucket)
       ) {
         await this.persistAirborneClock();
       }
@@ -3642,6 +3682,12 @@ export class CareerWatchSession {
                 expectedRouteMs: expectedMs,
                 nowMs,
                 airborneEndedAtMs: nextState.airborneEndedAtMs,
+                airborneElapsedMs:
+                  resolveLiveAirborneElapsedMs(
+                    nextState,
+                    nowMs,
+                    isSimPlaybackFrozen(sample),
+                  ) ?? undefined,
                 distanceNm,
               })
             : null;
@@ -3713,6 +3759,12 @@ export class CareerWatchSession {
           airborneAtMs: nextState.airborneAtMs,
           expectedRouteMs: nextState.expectedRouteMs,
           nowMs,
+          airborneElapsedMs:
+            resolveLiveAirborneElapsedMs(
+              nextState,
+              nowMs,
+              isSimPlaybackFrozen(sample),
+            ) ?? undefined,
           distanceNm,
         });
         if (airborneCheck.ok) {
@@ -3720,8 +3772,10 @@ export class CareerWatchSession {
             0.05,
             Math.min(0.9, 1 - liveDistToDestNm / distanceNm),
           );
-          const correctedAtMs =
-            nowMs - Math.round(nextState.expectedRouteMs * flownFrac);
+          const correctedElapsedMs = Math.round(
+            nextState.expectedRouteMs * flownFrac,
+          );
+          const correctedAtMs = nowMs - correctedElapsedMs;
           if (correctedAtMs > nextState.airborneAtMs + 60_000) {
             watchDebugLog('watch', 'airborne clock sanity rebase', {
               missionId: current.id,
@@ -3734,6 +3788,8 @@ export class CareerWatchSession {
             this.watchState = {
               ...nextState,
               airborneAtMs: correctedAtMs,
+              airborneElapsedMs: correctedElapsedMs,
+              lastAirborneClockAtMs: nowMs,
             };
             nextState = this.watchState;
             await this.persistAirborneClock();
@@ -3840,12 +3896,19 @@ export class CareerWatchSession {
                     touchdownHeadingTrueDeg,
                   )
                 : undefined;
+            const settleNowMs = Date.now();
             const executed = executeSettleFlight(worldFresh, freshMissions, {
               missionId: this.missionId,
               residualFuelKg,
               landingFpm,
               airborneEndedAtMs: this.watchState.airborneEndedAtMs,
-              nowMs: Date.now(),
+              airborneElapsedMs:
+                resolveLiveAirborneElapsedMs(
+                  this.watchState,
+                  settleNowMs,
+                  false,
+                ) ?? undefined,
+              nowMs: settleNowMs,
               flightScore,
               weatherOps,
               touchdownLat,

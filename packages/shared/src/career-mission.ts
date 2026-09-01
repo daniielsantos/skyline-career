@@ -2245,9 +2245,14 @@ export interface SettleMissionOpts {
   landingFpm?: number;
   /**
    * Wall-clock when airborne ended (touchdown). Used with airborneAtMs for
-   * settled flight duration.
+   * settled flight duration when sim-active elapsed is unavailable.
    */
   airborneEndedAtMs?: number;
+  /**
+   * Sim-active airborne elapsed (ms) — excludes pause / slew / menu.
+   * Preferred for the min-airborne settle gate and debrief duration.
+   */
+  airborneElapsedMs?: number;
   /** Finalized Watch flight scorecard (envelope / taxi / landing). */
   flightScore?: FlightScoreSnapshot;
   /** Live weather-ops score from Watch ambient samples. */
@@ -2382,6 +2387,14 @@ export function settleMission(
       expectedRouteMs: priorExpectedRouteMs,
       nowMs: opts.nowMs ?? Date.now(),
       airborneEndedAtMs: opts.airborneEndedAtMs,
+      airborneElapsedMs:
+        typeof opts.airborneElapsedMs === 'number' &&
+        Number.isFinite(opts.airborneElapsedMs)
+          ? opts.airborneElapsedMs
+          : typeof working.airborneElapsedMs === 'number' &&
+              Number.isFinite(working.airborneElapsedMs)
+            ? working.airborneElapsedMs
+            : undefined,
       distanceNm: routeDistanceNm(
         world,
         working.originIcao,
@@ -2611,6 +2624,18 @@ export function settleMission(
   }
 
   const settledFlightDurationMs = (() => {
+    if (
+      typeof opts.airborneElapsedMs === 'number' &&
+      Number.isFinite(opts.airborneElapsedMs)
+    ) {
+      return Math.max(0, Math.round(opts.airborneElapsedMs));
+    }
+    if (
+      typeof working.airborneElapsedMs === 'number' &&
+      Number.isFinite(working.airborneElapsedMs)
+    ) {
+      return Math.max(0, Math.round(working.airborneElapsedMs));
+    }
     const start = working.airborneAtMs;
     if (typeof start !== 'number' || !Number.isFinite(start)) {
       return working.settledFlightDurationMs;

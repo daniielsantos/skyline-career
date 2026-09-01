@@ -14116,6 +14116,7 @@ export function App() {
         watchAutoStatus={watchAutoStatus}
         watchAutoPaused={watchAutoPaused}
         loadOfpAutoStatus={loadOfpAutoStatus}
+        weightSystem={weightSystem}
       />
       </div>
       {pilotTravelOpen && pilotIcao ? (

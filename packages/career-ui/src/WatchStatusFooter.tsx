@@ -1,4 +1,5 @@
 import type { SimBridgeStatus, WatchStatus } from './api';
+import { formatFuelFlow, type WeightSystem } from './weight-units';
 
 const FLIGHT_PHASE_LABEL: Record<string, string> = {
   ground: 'On ground',
@@ -43,6 +44,8 @@ type Props = {
   loadOfpAutoStatus: 'idle' | 'waiting' | 'loading' | 'done' | 'failed';
   /** When set, prefer Watch live samples for this mission only. */
   activeMissionId?: string | null;
+  /** Matches Career mass toggle (Market cards already use this for burn). */
+  weightSystem?: WeightSystem;
 };
 
 /** App-shell SimConnect / Watch strip (phase, mission, airborne clock). */
@@ -229,9 +232,10 @@ export function WatchStatusFooter(props: Props) {
                 : null;
           const burnLabel =
             burnKgH != null
-              ? ` · ${burnKgH.toLocaleString(undefined, {
-                  maximumFractionDigits: 1,
-                })} kg/h`
+              ? ` · ${formatFuelFlow(
+                  burnKgH,
+                  props.weightSystem ?? 'metric',
+                )}`
               : '';
           const label =
             cruiseChip.phase === 'locked'

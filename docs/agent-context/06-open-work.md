@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-01: **Crew needed rota impossível (starter)** — sintoma: Light TP (YS-11) em KLAX→SCEL ~4850 nm com lift/fee. Causa: `contractPilotHasFlyableAirframe` só checava fuel/MTOW, não `maxRangeNm` do catálogo; floor starter podia pegar lot intl longo. Fix: gate de alcance em `listContractPilotPickAirframes` / `contractPilotLiftKg` + cap no `pickStarterFloorLot`.
+
 Atualizado 2026-09-01: **Crew needed vazio pós-offline** — sintoma: tab Crew 0 linhas sem filtro. Causa: (1) `awaiting_pilot` sem `lots` correspondente (prune SQLite) → `listMarketLots` ignora; (2) catch-up deixa ~3800 NPC `in_flight` → floor US (10) não abre. Fix: `healAwaitingPilotBoardLots` + `topUpStarterContractPilotFloor` em `migrateEconomyWorld` / `ensureEconomyCaughtUp` (`career-npc.ts`).
 
 Atualizado 2026-09-01: **Profile gate erro** — falha em `profiles/select` → banner `.error` fixo acima do painel (toast stack, dismiss ×), não some com overlay.

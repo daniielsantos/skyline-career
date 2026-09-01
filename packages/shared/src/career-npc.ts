@@ -2568,7 +2568,9 @@ function pickStarterFloorLot(
     }
     if (lotHasOpenAwaitingPilot(world, lot.id)) return false;
     const distanceNm = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
+    if (distanceNm > starterContractPilotMaxRangeNm()) return false;
     for (const classId of STARTER_CONTRACT_PILOT_CLASSES) {
+      if (distanceNm > getAircraftClass(classId).maxRangeNm) continue;
       if (
         contractPilotHasFlyableAirframe(
           {
@@ -2970,6 +2972,9 @@ export function contractPilotLiftKg(
   let cap = structural;
   const distanceNm = opts?.distanceNm;
   if (typeof distanceNm === 'number' && Number.isFinite(distanceNm) && distanceNm > 0) {
+    if (!contractPilotDistanceWithinRange(distanceNm, perf.maxRangeNm)) {
+      return 0;
+    }
     const route = estimateRouteCargoLimit(
       aircraftClassId,
       distanceNm,
@@ -2986,6 +2991,26 @@ export function contractPilotLiftKg(
     cap = Math.max(0, Math.floor(route.operationalMaxCargoKg));
   }
   return Math.max(0, Math.min(Math.floor(offerCargoKg), cap));
+}
+
+function contractPilotDistanceWithinRange(
+  distanceNm: number | undefined,
+  maxRangeNm: number,
+): boolean {
+  return (
+    typeof distanceNm === 'number' &&
+    Number.isFinite(distanceNm) &&
+    distanceNm > 0 &&
+    distanceNm <= maxRangeNm
+  );
+}
+
+function starterContractPilotMaxRangeNm(): number {
+  let max = 0;
+  for (const classId of STARTER_CONTRACT_PILOT_CLASSES) {
+    max = Math.max(max, getAircraftClass(classId).maxRangeNm);
+  }
+  return max;
 }
 
 export type ContractPilotPickAirframe = {
@@ -3035,16 +3060,22 @@ export function listContractPilotPickAirframes(
       ? opts.distanceNm
       : undefined;
   return listCareerPlayerAirframes(flight.aircraftClassId).map((airframe) => {
-    const structuralMax = resolveAirframePerfForUi(
+    const perf = resolveAirframePerfForUi(
       airframe.typeId,
       airframe.aircraftClassId,
       {
         maxCargoKg: getAircraftClass(airframe.aircraftClassId).maxCargoKg,
         maxRangeNm: getAircraftClass(airframe.aircraftClassId).maxRangeNm,
       },
-    ).maxCargoKg;
+    );
+    const structuralMax = perf.maxCargoKg;
+    const outOfRange =
+      typeof distanceNm === 'number' &&
+      Number.isFinite(distanceNm) &&
+      distanceNm > 0 &&
+      !contractPilotDistanceWithinRange(distanceNm, perf.maxRangeNm);
     let operationalMaxCargoKg = structuralMax;
-    if (typeof distanceNm === 'number' && distanceNm > 0) {
+    if (!outOfRange && typeof distanceNm === 'number' && distanceNm > 0) {
       const catalog = findCareerPlayerAirframe(airframe.typeId);
       operationalMaxCargoKg = estimateRouteCargoLimit(
         flight.aircraftClassId,
@@ -3065,18 +3096,22 @@ export function listContractPilotPickAirframes(
         label: airframe.label,
         aircraftClassId: airframe.aircraftClassId,
         maxCargoKg: structuralMax,
-        operationalMaxCargoKg,
+        operationalMaxCargoKg: outOfRange ? 0 : operationalMaxCargoKg,
         liftKg: 0,
         remainderKg: 0,
-        coversOffer: true,
-        routeLimited: operationalMaxCargoKg < structuralMax,
-        pilotFeeUsd: Math.max(REPOSITION_PILOT_FEE_MIN_USD, offerFee),
+        coversOffer: !outOfRange,
+        routeLimited: !outOfRange && operationalMaxCargoKg < structuralMax,
+        pilotFeeUsd: outOfRange
+          ? 0
+          : Math.max(REPOSITION_PILOT_FEE_MIN_USD, offerFee),
       };
     }
-    const liftKg = Math.max(
-      0,
-      Math.min(offerCargoKg, Math.floor(operationalMaxCargoKg)),
-    );
+    const liftKg = outOfRange
+      ? 0
+      : Math.max(
+          0,
+          Math.min(offerCargoKg, Math.floor(operationalMaxCargoKg)),
+        );
     const remainderKg = Math.max(0, offerCargoKg - liftKg);
     const liftFrac = offerCargoKg > 0 ? liftKg / offerCargoKg : 0;
     return {

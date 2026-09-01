@@ -2513,6 +2513,26 @@ describe('NPC freighter fleet', () => {
     );
   });
 
+  it('marks starter turboprop crew offers beyond airframe range unflyable', () => {
+    const lift = contractPilotLiftKg('inibuilds-ys-11', 'light_turboprop', 15_000, {
+      distanceNm: 4852,
+    });
+    assert.equal(lift, 0);
+    assert.equal(
+      contractPilotHasFlyableAirframe(
+        {
+          aircraftClassId: 'light_turboprop',
+          cargoKg: 15_000,
+          payUsd: 82_184,
+          originIcao: 'KLAX',
+          destIcao: 'SCEL',
+        },
+        { distanceNm: 4852 },
+      ),
+      false,
+    );
+  });
+
   it('heals awaiting_pilot flights whose board lot was pruned', () => {
     const world = createSeedEconomyWorld({ seed: 'crew-heal-lot' });
     const nowMs = world.lastBatchAtMs ?? Date.now();

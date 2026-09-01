@@ -99,9 +99,12 @@ import {
 } from './career-store-v6.js';
 import {
   ensureV7Ddl,
+  ensureV8HubSampleColumns,
   flushPendingHubEconomySamples,
   migrateV6toV7IfNeeded,
+  migrateV7toV8IfNeeded,
   readHubEconomySamples as readHubEconomySamplesFromDb,
+  readHubEconomySamplesSince as readHubEconomySamplesSinceFromDb,
   HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
 } from './career-store-v7.js';
 import type { HubEconomySample } from './types/career-economy.js';
@@ -119,7 +122,7 @@ import type {
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '7';
+export const CAREER_STORE_SCHEMA_VERSION = '8';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
 export type { HubEconomySample };
@@ -171,6 +174,11 @@ export interface CareerStore {
   readHubEconomySamples(opts: {
     icao: string;
     sinceDay?: number;
+  }): HubEconomySample[];
+  /** All hubs for days ≥ sinceDay (network history pulse). */
+  readHubEconomySamplesSince(opts?: {
+    sinceDay?: number;
+    untilDay?: number;
   }): HubEconomySample[];
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
@@ -472,6 +480,13 @@ class JsonCareerStore implements CareerStore {
     return [];
   }
 
+  readHubEconomySamplesSince(_opts?: {
+    sinceDay?: number;
+    untilDay?: number;
+  }): HubEconomySample[] {
+    return [];
+  }
+
   async loadMissions(): Promise<CareerMissionsState> {
     const existing = await readJsonFile<Record<string, unknown>>(this.missionsPath);
     if (existing && Array.isArray(existing.missions)) {
@@ -595,6 +610,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV5Ddl(db);
   ensureV6Ddl(db);
   ensureV7Ddl(db);
+  ensureV8HubSampleColumns(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -639,7 +655,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV6 = Number.parseInt(afterV6?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV6) || verAfterV6 < 7) {
-    migrateV6toV7IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV6toV7IfNeeded(db, metaSet, '7');
+  }
+  const afterV7 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV7 = Number.parseInt(afterV7?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV7) || verAfterV7 < 8) {
+    migrateV7toV8IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -969,6 +992,13 @@ class SqliteCareerStore implements CareerStore {
     sinceDay?: number;
   }): HubEconomySample[] {
     return readHubEconomySamplesFromDb(this.db, opts);
+  }
+
+  readHubEconomySamplesSince(opts?: {
+    sinceDay?: number;
+    untilDay?: number;
+  }): HubEconomySample[] {
+    return readHubEconomySamplesSinceFromDb(this.db, opts ?? {});
   }
 
   readAirportBoard(icao: string): AirportBoardSnapshot | null {

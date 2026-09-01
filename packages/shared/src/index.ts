@@ -216,6 +216,7 @@ export * from './career-fuel.js';
 export * from './career-fuel-logistics.js';
 export * from './career-hub-level.js';
 export * from './career-hub-economy-sample.js';
+export * from './career-hub-economy-history-pulse.js';
 export * from './career-aircraft-registration.js';
 export * from './career-aircraft-market.js';
 export * from './career-aircraft-pool.js';

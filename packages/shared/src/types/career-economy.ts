@@ -41,6 +41,8 @@ export type HubEconomyCommoditySample = {
   /** 0–1 warehouse fill. */
   fill: number;
   spotUsd: number;
+  stockKg?: number;
+  capacityKg?: number;
 };
 
 /** Daily hub snapshot for Hub Stats history (SQLite hub_economy_samples). */
@@ -48,6 +50,10 @@ export type HubEconomySample = {
   icao: string;
   dayIndex: number;
   tick: number;
+  /** ISO-ish country id from region (BR, US, …). */
+  countryId: string;
+  region: string;
+  hubTier: HubTier;
   activityScore: number;
   hubLevel: number;
   quiet: boolean;
@@ -55,11 +61,25 @@ export type HubEconomySample = {
   outboundLots: number;
   outboundKg: number;
   payP50Usd: number | null;
+  /** Board pay dispersion (null when &lt;2 paying lots). */
+  payP10Usd?: number | null;
+  payP90Usd?: number | null;
   kgGa: number;
   kgTp: number;
   kgMedium: number;
   kgNarrow: number;
   kgWide: number;
+  /** Lot counts by size band (alongside kg*). */
+  lotsGa: number;
+  lotsTp: number;
+  lotsMedium: number;
+  lotsNarrow: number;
+  lotsWide: number;
+  /** Cargo terminal stock (excludes fuel / MRO). */
+  cargoStockKg: number;
+  cargoCapacityKg: number;
+  /** Inbound pending + NPC enroute to this hub (kg). */
+  inboundKg: number;
   commodities: HubEconomyCommoditySample[];
 };
 

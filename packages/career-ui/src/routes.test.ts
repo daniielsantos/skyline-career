@@ -13,6 +13,8 @@ describe('career UI routes', () => {
     assert.equal(pathForLocation({ tab: 'map', airportIcao: null }), '/network');
     assert.equal(pathForLocation({ tab: 'ports', airportIcao: null }), '/ports');
     assert.equal(pathForLocation({ tab: 'missions', airportIcao: null }), '/logbook');
+    assert.equal(pathForLocation({ tab: 'lab', airportIcao: null }), '/lab');
+    assert.equal(pathForLocation({ tab: 'pulse', airportIcao: null }), '/pulse');
     assert.equal(pathForLocation({ tab: 'settings', airportIcao: null }), '/settings');
     assert.equal(
       pathForLocation({ tab: 'market', airportIcao: 'sbgl' }),
@@ -79,6 +81,18 @@ describe('career UI routes', () => {
     });
     assert.deepEqual(parseCareerPath('/missions'), {
       tab: 'missions',
+      airportIcao: null,
+    });
+    assert.deepEqual(parseCareerPath('/lab'), {
+      tab: 'lab',
+      airportIcao: null,
+    });
+    assert.deepEqual(parseCareerPath('/pulse'), {
+      tab: 'pulse',
+      airportIcao: null,
+    });
+    assert.deepEqual(parseCareerPath('/economy-pulse'), {
+      tab: 'pulse',
       airportIcao: null,
     });
     assert.deepEqual(parseCareerPath('/airport/sbct'), {

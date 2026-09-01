@@ -1396,6 +1396,9 @@ export type HubStatsHistorySample = {
   icao: string;
   dayIndex: number;
   tick: number;
+  countryId?: string;
+  region?: string;
+  hubTier?: 'major' | 'regional' | 'spoke';
   activityScore: number;
   hubLevel: number;
   quiet: boolean;
@@ -1403,12 +1406,28 @@ export type HubStatsHistorySample = {
   outboundLots: number;
   outboundKg: number;
   payP50Usd: number | null;
+  payP10Usd?: number | null;
+  payP90Usd?: number | null;
   kgGa: number;
   kgTp: number;
   kgMedium: number;
   kgNarrow: number;
   kgWide: number;
-  commodities: Array<{ id: string; fill: number; spotUsd: number }>;
+  lotsGa?: number;
+  lotsTp?: number;
+  lotsMedium?: number;
+  lotsNarrow?: number;
+  lotsWide?: number;
+  cargoStockKg?: number;
+  cargoCapacityKg?: number;
+  inboundKg?: number;
+  commodities: Array<{
+    id: string;
+    fill: number;
+    spotUsd: number;
+    stockKg?: number;
+    capacityKg?: number;
+  }>;
 };
 
 export type HubStatsView = ClockSync & {
@@ -1443,6 +1462,59 @@ export type HubStatsView = ClockSync & {
 export function fetchAirportStats(icao: string) {
   return api<HubStatsView>(
     `/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}?part=stats`,
+  );
+}
+
+export type HubEconomyHistoryBucket = {
+  hubs: number;
+  liveHubs: number;
+  liveHubPct: number;
+  quietHubs: number;
+  quietHubPct: number;
+  outboundLots: number;
+  outboundKg: number;
+  payP50Usd: number | null;
+  avgCargoFillPct: number | null;
+  jetAFillPct: number | null;
+  softFillPct: number | null;
+  inboundKg: number;
+  sizeMixKg: {
+    ga: number;
+    tp: number;
+    medium: number;
+    narrow: number;
+    wide: number;
+  };
+  sizeMixLots: {
+    ga: number;
+    tp: number;
+    medium: number;
+    narrow: number;
+    wide: number;
+  };
+  spotGeneralUsd: number | null;
+  spotElectronicsUsd: number | null;
+};
+
+export type HubEconomyHistoryPulseView = {
+  windowDays: number;
+  retentionDays: number;
+  sampleDays: number;
+  hubSamples: number;
+  focusCountries: string[];
+  days: Array<{
+    dayIndex: number;
+    tick: number;
+    world: HubEconomyHistoryBucket;
+    byCountry: Record<string, HubEconomyHistoryBucket>;
+    byTier: Record<'major' | 'regional' | 'spoke', HubEconomyHistoryBucket>;
+  }>;
+};
+
+/** Saved network pulse from hub_economy_samples (7d / 30d). */
+export function fetchHubEconomyHistory(days: 7 | 30 = 7) {
+  return api<HubEconomyHistoryPulseView>(
+    `/api/debug/hub-economy-history?days=${days}`,
   );
 }
 

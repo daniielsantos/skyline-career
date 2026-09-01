@@ -12058,3 +12058,25 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   padding-top: 0.65rem;
 }
 
+.hub-stats-network-meta {
+  margin: 0.35rem 0 0.65rem;
+  font-size: 0.78rem;
+}
+
+.hub-economy-pulse-panel .hub-economy-pulse-body {
+  margin-top: 0.25rem;
+}
+
+.hub-economy-pulse-toolbar {
+  margin-bottom: 0.75rem;
+}
+
+.hub-economy-pulse-toolbar .hub-stats-card-hint {
+  margin: 0;
+  flex: 1;
+}
+
+.hub-economy-pulse-toolbar code {
+  font-size: 0.85em;
+}
+

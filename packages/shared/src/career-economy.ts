@@ -14108,56 +14108,57 @@ function* formLotsFromImbalances(
       capacityKgPerDay?: number;
       allowSpokeFiller: boolean;
       originHasOpenCorridor: boolean;
+      /** Caller already computed laneSatOf — skip duplicate index lookup. */
+      precomputedLaneSat?: number;
     },
-  ): void => {
-    if (origin.ap.icao === dest.ap.icao) return;
-    if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) return;
+  ): boolean => {
+    if (origin.ap.icao === dest.ap.icao) return false;
+    if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) return false;
     if (!opts.international && !isDomesticOd(origin.ap.region, dest.ap.region)) {
-      return;
+      return false;
     }
 
     const boardPressure = boardPressureOf(commodity.id, opts.partitionId);
-    if (boardPressure.skipAll) return;
+    if (boardPressure.skipAll) return false;
     const rng = lotRng(opts.partitionId, commodity.id);
 
     if (cw <= 1) {
-      if (!opts.allowSpokeFiller) return;
+      if (!opts.allowSpokeFiller) return false;
       // Soft feeder pairs (no curated corridor): spoke↔spoke and spoke↔regional.
       // Prior: ~38% accept — densified spoke maps stayed quiet under skipAll.
       const feederPair =
         (origin.tier === 'spoke' && dest.tier === 'spoke') ||
         (origin.tier === 'spoke' && dest.tier === 'regional') ||
         (origin.tier === 'regional' && dest.tier === 'spoke');
-      if (!feederPair) return;
-      if (opts.originHasOpenCorridor || rng() > 0.48) return;
+      if (!feederPair) return false;
+      if (opts.originHasOpenCorridor || rng() > 0.48) return false;
     }
 
     // Cheap reject before saturation / inbound work.
     const priceGap = dest.price - origin.price;
     const minGapMult = opts.international ? 0.12 : cw >= 1.5 ? 0.15 : 0.22;
-    if (priceGap < commodity.basePricePerKg * minGapMult) return;
+    if (priceGap < commodity.basePricePerKg * minGapMult) return false;
 
     const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
-    let caps = laneLotCaps(origin.tier, dest.tier, {
+    // laneLotCaps always returns a fresh object — bump in place (no second alloc).
+    const caps = laneLotCaps(origin.tier, dest.tier, {
       originLevel: origin.ap.level,
       destLevel: dest.ap.level,
     });
     if (cw >= 1.8) {
-      caps = {
-        maxLots: caps.maxLots + 1,
-        maxLarge: caps.maxLarge + 1,
-        maxSmall: caps.maxSmall,
-        maxXl: caps.maxXl,
-      };
+      caps.maxLots += 1;
+      caps.maxLarge += 1;
     }
-    const laneSat = laneSatOf(origin.ap.icao, dest.ap.icao, commodity.id);
-    if (laneSat >= 1) return;
+    const laneSat =
+      opts.precomputedLaneSat ??
+      laneSatOf(origin.ap.icao, dest.ap.icao, commodity.id);
+    if (laneSat >= 1) return false;
     const satPenalty = laneSat >= 0.5 ? 1 : 0;
-    if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) return;
+    if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) return false;
 
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
       if (activeKgOnOd(origin.ap.icao, dest.ap.icao) >= opts.capacityKgPerDay) {
-        return;
+        return false;
       }
     }
 
@@ -14166,6 +14167,7 @@ function* formLotsFromImbalances(
     const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
     let qty = Math.min(surplusKg, roomKg);
     qty = Math.floor(qty / 100) * 100;
+    let formed = false;
 
     if (
       !boardPressure.skipHeavy &&
@@ -14192,6 +14194,7 @@ function* formLotsFromImbalances(
         opts,
       );
       if (formedXl) {
+        formed = true;
         const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
         const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
         qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
@@ -14206,59 +14209,73 @@ function* formLotsFromImbalances(
       (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
     ) {
       const largeQty = Math.min(qty, LARGE_LOT_MAX_KG);
-      pushLot(
-        key,
-        commodity,
-        origin,
-        dest,
-        largeQty,
-        'large',
-        laneSat,
-        inboundKg,
-        cw,
-        opts,
-      );
+      if (
+        pushLot(
+          key,
+          commodity,
+          origin,
+          dest,
+          largeQty,
+          'large',
+          laneSat,
+          inboundKg,
+          cw,
+          opts,
+        )
+      ) {
+        formed = true;
+      }
       const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
       const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
       qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
     }
 
     // Small lots need a starter-class hop. Long-haul intl (GRU→MIA) is trunk;
-    // intl never forms GA-band — wait for feeder LTL+.
-    const nm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
-    const inSmallRange =
-      nm != null && nm >= LAST_MILE_MIN_NM && nm <= SMALL_LOT_MAX_NM;
-    const canFormGa =
-      !opts.international && nm != null && nm <= GA_LTL_MAX_NM;
-    const minSmallKg = opts.international
+    // intl never forms GA-band — wait for feeder LTL+. Defer routeDistanceNm
+    // until a small lot is still plausible (avoids dead nm on long intl trunks).
+    const minQtyForSmallProbe = opts.international
       ? FEEDER_LTL_MIN_KG
-      : canFormGa
-        ? BOARD_SMALL_MIN_VIABLE_KG
-        : Math.max(FEEDER_LTL_MIN_KG, GA_LTL_MAX_KG + 50);
+      : BOARD_SMALL_MIN_VIABLE_KG;
     if (
       !boardPressure.skipAll &&
-      inSmallRange &&
-      qty >= minSmallKg &&
+      qty >= minQtyForSmallProbe &&
       caps.maxSmall > 0 &&
       (smallCounts.get(key) ?? 0) < caps.maxSmall &&
       (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots
     ) {
-      const sized = sizeSmallLotKg(qty, origin.tier, dest.tier, rng, nm, {
-        international: opts.international,
-      });
-      pushLot(
-        key,
-        commodity,
-        origin,
-        dest,
-        sized,
-        'small',
-        laneSat,
-        inboundKg,
-        cw,
-        opts,
-      );
+      const nm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
+      const inSmallRange =
+        nm != null && nm >= LAST_MILE_MIN_NM && nm <= SMALL_LOT_MAX_NM;
+      const canFormGa =
+        !opts.international && nm != null && nm <= GA_LTL_MAX_NM;
+      const minSmallKg = opts.international
+        ? FEEDER_LTL_MIN_KG
+        : canFormGa
+          ? BOARD_SMALL_MIN_VIABLE_KG
+          : Math.max(FEEDER_LTL_MIN_KG, GA_LTL_MAX_KG + 50);
+      if (inSmallRange && qty >= minSmallKg) {
+        const sized = sizeSmallLotKg(qty, origin.tier, dest.tier, rng, nm, {
+          international: opts.international,
+        });
+        if (
+          pushLot(
+            key,
+            commodity,
+            origin,
+            dest,
+            sized,
+            'small',
+            laneSat,
+            inboundKg,
+            cw,
+            opts,
+          )
+        ) {
+          formed = true;
+        }
+      }
     }
+    return formed;
   };
 
   const rankAirports = (
@@ -14746,7 +14763,8 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
   );
   for (const commodity of CAREER_CARGO_COMMODITIES) {
     // Intl cw is always ≥ INTERNATIONAL_CORRIDOR_WEIGHT (2) — no spoke rng.
-    if (boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll) continue;
+    let skipAll = boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll;
+    if (skipAll) continue;
     const rankedAll = rankAirports(intlAirports, commodity);
     const rankedByIcao = new Map(
       rankedAll.map((r) => [r.ap.icao.toUpperCase(), r]),
@@ -14761,33 +14779,59 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
     }
     if (surplusOrigins.size === 0 || shortageDests.size === 0) continue;
 
-    const minGap = commodity.basePricePerKg * 0.12;
+    // Only lanes where at least one direction can pass surplus∩shortage.
+    // Preserve normIntlLanes order (and OD then DO within each lane).
+    const candidateLanes: typeof normIntlLanes = [];
     for (const lane of normIntlLanes) {
-      if (boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll) break;
-      const pairs: Array<[string, string]> = [
-        [lane.originIcao, lane.destIcao],
-        [lane.destIcao, lane.originIcao],
-      ];
-      for (const [oIcao, dIcao] of pairs) {
-        if (!surplusOrigins.has(oIcao) || !shortageDests.has(dIcao)) continue;
-        const origin = rankedByIcao.get(oIcao);
-        const dest = rankedByIcao.get(dIcao);
-        if (!origin || !dest) continue;
-        if (dest.price - origin.price < minGap) continue;
-        // Intl never forms GA-band; below feeder floor nothing can list.
-        if (Math.min(origin.surplusKg, dest.roomKg) < FEEDER_LTL_MIN_KG) {
-          continue;
-        }
-        const laneSat = laneSatOf(oIcao, dIcao, commodity.id);
-        if (laneSat >= 1) continue;
-        tryFormPair(commodity, origin, dest, lane.cw, {
-          international: true,
-          partitionId: INTL_BOARD_PARTITION,
-          capacityKgPerDay: lane.capacityKgPerDay,
-          allowSpokeFiller: false,
-          originHasOpenCorridor: false,
-        });
+      const a = lane.originIcao;
+      const b = lane.destIcao;
+      if (
+        (surplusOrigins.has(a) && shortageDests.has(b)) ||
+        (surplusOrigins.has(b) && shortageDests.has(a))
+      ) {
+        candidateLanes.push(lane);
       }
+    }
+    if (candidateLanes.length === 0) continue;
+
+    const minGap = commodity.basePricePerKg * 0.12;
+    const intlOpts: {
+      international: boolean;
+      partitionId: string;
+      capacityKgPerDay?: number;
+      allowSpokeFiller: boolean;
+      originHasOpenCorridor: boolean;
+      precomputedLaneSat?: number;
+    } = {
+      international: true,
+      partitionId: INTL_BOARD_PARTITION,
+      allowSpokeFiller: false,
+      originHasOpenCorridor: false,
+    };
+
+    const tryIntlDir = (oIcao: string, dIcao: string, lane: (typeof normIntlLanes)[number]) => {
+      if (!surplusOrigins.has(oIcao) || !shortageDests.has(dIcao)) return;
+      const origin = rankedByIcao.get(oIcao);
+      const dest = rankedByIcao.get(dIcao);
+      if (!origin || !dest) return;
+      if (dest.price - origin.price < minGap) return;
+      // Intl never forms GA-band; below feeder floor nothing can list.
+      if (Math.min(origin.surplusKg, dest.roomKg) < FEEDER_LTL_MIN_KG) return;
+      const laneSat = laneSatOf(oIcao, dIcao, commodity.id);
+      if (laneSat >= 1) return;
+      intlOpts.capacityKgPerDay = lane.capacityKgPerDay;
+      intlOpts.precomputedLaneSat = laneSat;
+      if (tryFormPair(commodity, origin, dest, lane.cw, intlOpts)) {
+        skipAll = boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll;
+      }
+    };
+
+    for (const lane of candidateLanes) {
+      // skipAll only at lane boundary (same as prior loop) so both dirs still run.
+      if (skipAll) break;
+      // Unrolled: origin→dest then dest→origin (same order as prior pairs array).
+      tryIntlDir(lane.originIcao, lane.destIcao, lane);
+      tryIntlDir(lane.destIcao, lane.originIcao, lane);
     }
   }
   addTickPhaseMs(profile, 'formLotsIntl', lotsPhaseAt);

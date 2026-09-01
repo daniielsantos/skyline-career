@@ -2702,14 +2702,28 @@ describe('tickEconomyN market formation', () => {
         ])
         .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
     };
+    // Formation-order view (ids sorted out) — catches OD sequence regressions.
+    const odOrder = (w: ReturnType<typeof createSeedEconomyWorld>) => {
+      const map = countryByIcao(w);
+      return w.lots
+        .filter(
+          (l) =>
+            l.id.startsWith('lot_') &&
+            lotBoardPartition(l, map) === INTL_BOARD_PARTITION,
+        )
+        .map((l) => `${l.commodityId}|${l.originIcao}|${l.destIcao}|${l.quantityKg}`)
+        .sort();
+    };
     const a = createSeedEconomyWorld({ seed: 'intl-hot-path' });
     const b = createSeedEconomyWorld({ seed: 'intl-hot-path' });
     const profile = createEmptyTickPhaseProfile();
-    tickEconomyN(a, 4, { fromBatchAtMs: 1, advanceWallClock: false, profile });
-    tickEconomyN(b, 4, { fromBatchAtMs: 1, advanceWallClock: false });
+    // Longer warm so skipAll / multi-SKU intl paths exercise the candidate filter.
+    tickEconomyN(a, 12, { fromBatchAtMs: 1, advanceWallClock: false, profile });
+    tickEconomyN(b, 12, { fromBatchAtMs: 1, advanceWallClock: false });
     assert.ok((a.internationalLanes?.length ?? 0) >= 399);
     assert.ok(profile.ms.formLotsIntl >= 0);
     assert.deepEqual(fingerprint(a), fingerprint(b));
+    assert.deepEqual(odOrder(a), odOrder(b));
     assert.ok(
       fingerprint(a).length > 0,
       'expected international lots after warm ticks',

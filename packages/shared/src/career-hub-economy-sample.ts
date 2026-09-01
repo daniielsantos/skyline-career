@@ -1,6 +1,6 @@
 /**
  * Daily hub economy samples for Hub Stats (UI + diagnostics).
- * Pure snapshot — persistence lives in career-store-v7.
+ * Pure snapshot — persistence lives in career-store-v7 (+ v8 columns).
  */
 
 import { CLASS_BASELINE_CARGO_KG } from './career-aircraft-pricing.js';
@@ -11,11 +11,13 @@ import {
   localUnitPriceUsd,
 } from './career-economy.js';
 import { hubLevelXpProgress } from './career-hub-level.js';
+import { countryIdFromRegion } from './career-partition.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   CareerEconomyWorld,
   HubEconomyCommoditySample,
   HubEconomySample,
+  HubTier,
   ShipmentLot,
 } from './types/career-economy.js';
 
@@ -43,10 +45,12 @@ function percentileSorted(sorted: number[], p: number): number | null {
   return sorted[idx] ?? null;
 }
 
-function sizeBandKg(quantityKg: number): keyof Pick<
+type SizeBand = keyof Pick<
   HubEconomySample,
   'kgGa' | 'kgTp' | 'kgMedium' | 'kgNarrow' | 'kgWide'
-> {
+>;
+
+function sizeBandKg(quantityKg: number): SizeBand {
   if (quantityKg <= GA_LTL_MAX_KG) return 'kgGa';
   if (quantityKg <= CLASS_BASELINE_CARGO_KG.light_turboprop) return 'kgTp';
   if (quantityKg <= CLASS_BASELINE_CARGO_KG.medium_piston) return 'kgMedium';
@@ -59,6 +63,14 @@ function isCargoHub(ap: {
   bushTripOnly?: boolean;
 }): boolean {
   return !(ap.bushTripOnly === true || isBushTripOnlyHub(ap.icao));
+}
+
+function resolveHubTier(
+  airport: CareerEconomyWorld['airports'][number],
+): HubTier {
+  const t = airport.hubTier;
+  if (t === 'major' || t === 'regional' || t === 'spoke') return t;
+  return 'spoke';
 }
 
 /** Index available outbound lots by origin ICAO. */
@@ -77,8 +89,29 @@ function outboundLotsByOrigin(
   return map;
 }
 
+/** Pending inbound transfers + NPC cargo headed to ICAO. */
+export function hubInboundCargoKg(
+  world: Pick<CareerEconomyWorld, 'inboundPending' | 'npcFlights'>,
+  icao: string,
+): number {
+  const dest = icao.trim().toUpperCase();
+  let kg = 0;
+  for (const row of world.inboundPending ?? []) {
+    if (row.destIcao?.trim().toUpperCase() !== dest) continue;
+    kg += Math.max(0, row.cargoKg ?? 0);
+  }
+  for (const flight of world.npcFlights ?? []) {
+    if (flight.status !== 'in_flight' && flight.status !== 'awaiting_pilot') {
+      continue;
+    }
+    if (flight.destIcao?.trim().toUpperCase() !== dest) continue;
+    kg += Math.max(0, flight.cargoKg ?? 0);
+  }
+  return kg;
+}
+
 export function buildHubEconomySampleForAirport(
-  world: Pick<CareerEconomyWorld, 'tick' | 'lots'>,
+  world: Pick<CareerEconomyWorld, 'tick' | 'lots' | 'inboundPending' | 'npcFlights'>,
   airport: CareerEconomyWorld['airports'][number],
   outbound?: ShipmentLot[],
 ): HubEconomySample | null {
@@ -92,29 +125,51 @@ export function buildHubEconomySampleForAirport(
   let kgMedium = 0;
   let kgNarrow = 0;
   let kgWide = 0;
+  let lotsGa = 0;
+  let lotsTp = 0;
+  let lotsMedium = 0;
+  let lotsNarrow = 0;
+  let lotsWide = 0;
   for (const lot of lots) {
     const kg = Math.max(0, lot.quantityKg ?? 0);
     outboundKg += kg;
     const band = sizeBandKg(kg);
-    if (band === 'kgGa') kgGa += kg;
-    else if (band === 'kgTp') kgTp += kg;
-    else if (band === 'kgMedium') kgMedium += kg;
-    else if (band === 'kgNarrow') kgNarrow += kg;
-    else kgWide += kg;
+    if (band === 'kgGa') {
+      kgGa += kg;
+      lotsGa += 1;
+    } else if (band === 'kgTp') {
+      kgTp += kg;
+      lotsTp += 1;
+    } else if (band === 'kgMedium') {
+      kgMedium += kg;
+      lotsMedium += 1;
+    } else if (band === 'kgNarrow') {
+      kgNarrow += kg;
+      lotsNarrow += 1;
+    } else {
+      kgWide += kg;
+      lotsWide += 1;
+    }
     if (typeof lot.payUsd === 'number' && Number.isFinite(lot.payUsd)) {
       pays.push(lot.payUsd);
     }
   }
   pays.sort((a, b) => a - b);
 
+  let cargoStockKg = 0;
+  let cargoCapacityKg = 0;
   const commodities: HubEconomyCommoditySample[] = CAREER_CARGO_COMMODITIES.map(
     (c) => {
       const pile = airport.inventory?.[c.id];
       const stock = pile ?? { stockKg: 0, capacityKg: 0 };
+      cargoStockKg += Math.max(0, stock.stockKg ?? 0);
+      cargoCapacityKg += Math.max(0, stock.capacityKg ?? 0);
       return {
         id: c.id,
         fill: fillOf(stock),
         spotUsd: localUnitPriceUsd(c.id, stock),
+        stockKg: Math.max(0, stock.stockKg ?? 0),
+        capacityKg: Math.max(0, stock.capacityKg ?? 0),
       };
     },
   );
@@ -125,11 +180,15 @@ export function buildHubEconomySampleForAirport(
       ? airport.activityScore
       : 40;
   const levelInfo = hubLevelXpProgress(airport);
+  const region = (airport.region ?? '').trim();
 
   return {
     icao,
     dayIndex: economyDayIndex(world.tick),
     tick: world.tick,
+    countryId: countryIdFromRegion(region) || 'XX',
+    region: region || 'XX',
+    hubTier: resolveHubTier(airport),
     activityScore,
     hubLevel: levelInfo.level,
     quiet: activityScore < HUB_STATS_QUIET_ACTIVITY_SCORE,
@@ -137,11 +196,21 @@ export function buildHubEconomySampleForAirport(
     outboundLots: lots.length,
     outboundKg,
     payP50Usd: percentileSorted(pays, 0.5),
+    payP10Usd: pays.length >= 2 ? percentileSorted(pays, 0.1) : null,
+    payP90Usd: pays.length >= 2 ? percentileSorted(pays, 0.9) : null,
     kgGa,
     kgTp,
     kgMedium,
     kgNarrow,
     kgWide,
+    lotsGa,
+    lotsTp,
+    lotsMedium,
+    lotsNarrow,
+    lotsWide,
+    cargoStockKg,
+    cargoCapacityKg,
+    inboundKg: hubInboundCargoKg(world, icao),
     commodities,
   };
 }

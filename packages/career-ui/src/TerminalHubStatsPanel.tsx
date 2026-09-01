@@ -40,25 +40,27 @@ function formatSpotPerUnit(
 }
 
 function avgCargoFillPct(
-  commodities: Array<{ id: string; fill: number }>,
+  commodities: Array<{ id: string; fill: number }> | null | undefined,
 ): number {
-  const cargo = commodities.filter(
+  const cargo = (commodities ?? []).filter(
     (c) => c.id !== 'fuel' && c.id !== 'mro_parts',
   );
   if (cargo.length === 0) return 0;
-  return (cargo.reduce((s, c) => s + c.fill, 0) / cargo.length) * 100;
+  const sum = cargo.reduce(
+    (s, c) => s + (Number.isFinite(c.fill) ? c.fill : 0),
+    0,
+  );
+  return (sum / cargo.length) * 100;
 }
 
 /** Fixed-length window (oldest → newest); null = no sample that day. */
-function padSeries(
-  history: Array<{ dayIndex: number }>,
+function padSeries<T extends { dayIndex: number }>(
+  history: T[],
   windowDays: number,
   lastDay: number,
-  pick: (row: (typeof history)[number]) => number | null,
+  pick: (row: T) => number | null,
 ): Array<{ dayIndex: number; value: number | null }> {
-  const byDay = new Map(
-    history.map((h) => [h.dayIndex, pick(h)] as const),
-  );
+  const byDay = new Map(history.map((h) => [h.dayIndex, pick(h)] as const));
   const out: Array<{ dayIndex: number; value: number | null }> = [];
   for (let d = lastDay - windowDays + 1; d <= lastDay; d++) {
     const v = byDay.has(d) ? byDay.get(d)! : null;
@@ -272,6 +274,7 @@ function SpotPriceChart(props: {
 export function TerminalHubStatsPanel(props: {
   stats: HubStatsView | null;
   loading?: boolean;
+  error?: string | null;
   icao: string;
   weightSystem: WeightSystem;
 }) {
@@ -376,11 +379,11 @@ export function TerminalHubStatsPanel(props: {
   );
 
   const sizeTotal =
-    (now?.sizeMixKg.ga ?? 0) +
-    (now?.sizeMixKg.tp ?? 0) +
-    (now?.sizeMixKg.medium ?? 0) +
-    (now?.sizeMixKg.narrow ?? 0) +
-    (now?.sizeMixKg.wide ?? 0);
+    (now?.sizeMixKg?.ga ?? 0) +
+    (now?.sizeMixKg?.tp ?? 0) +
+    (now?.sizeMixKg?.medium ?? 0) +
+    (now?.sizeMixKg?.narrow ?? 0) +
+    (now?.sizeMixKg?.wide ?? 0);
 
   const showPriceChart = history.length >= PRICE_CHART_MIN_DAYS;
   const formatSpot = (usdPerKg: number) =>
@@ -424,6 +427,10 @@ export function TerminalHubStatsPanel(props: {
 
       {props.loading && !now ? (
         <p className="muted">Loading hub stats…</p>
+      ) : props.error && !now ? (
+        <p className="muted" role="alert">
+          Could not load hub stats: {props.error}
+        </p>
       ) : !now ? (
         <p className="muted">No stats for this hub yet.</p>
       ) : (
@@ -476,11 +483,11 @@ export function TerminalHubStatsPanel(props: {
                 ? '—'
                 : (
                     [
-                      ['GA', now.sizeMixKg.ga],
-                      ['TP', now.sizeMixKg.tp],
-                      ['Med', now.sizeMixKg.medium],
-                      ['Nar', now.sizeMixKg.narrow],
-                      ['Wide', now.sizeMixKg.wide],
+                      ['GA', now.sizeMixKg?.ga ?? 0],
+                      ['TP', now.sizeMixKg?.tp ?? 0],
+                      ['Med', now.sizeMixKg?.medium ?? 0],
+                      ['Nar', now.sizeMixKg?.narrow ?? 0],
+                      ['Wide', now.sizeMixKg?.wide ?? 0],
                     ] as const
                   )
                     .filter(([, kg]) => kg > 0)
@@ -491,9 +498,9 @@ export function TerminalHubStatsPanel(props: {
                     .join(' · ')}
             </p>
             <p className="muted">
-              Soft-fill {pct(now.softFill.fillPct)} (
-              {formatMass(now.softFill.stockKg, system)} stock +{' '}
-              {formatMass(now.softFill.inboundKg, system)} inbound)
+              Soft-fill {pct(now.softFill?.fillPct ?? 0)} (
+              {formatMass(now.softFill?.stockKg ?? 0, system)} stock +{' '}
+              {formatMass(now.softFill?.inboundKg ?? 0, system)} inbound)
             </p>
           </section>
 

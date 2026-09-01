@@ -18,6 +18,15 @@ import {
   resolveAircraftMsrpUsd,
   resolveDealerLeaseWeeklyUsd,
 } from './career-aircraft-pricing.js';
+import { quoteFreightLotPay } from './career-economy.js';
+
+function refGap() {
+  const pile = (f: number) => ({
+    capacityKg: 80_000,
+    stockKg: Math.round(80_000 * f),
+  });
+  return { originStock: pile(1), destStock: pile(0) };
+}
 
 describe('cargo-scaled aircraft MSRP', () => {
   it('returns 1 when cargo is missing or invalid', () => {
@@ -182,7 +191,8 @@ describe('cargo-scaled aircraft MSRP', () => {
       maxCargoKg: 1_423,
     });
     assert.ok(lear > hondaFloor);
-    assert.ok(lear >= 950_000, `Lear MSRP ${lear}`);
+    assert.ok(lear >= 700_000, `Lear MSRP ${lear}`);
+    assert.ok(lear <= 780_000, `Lear MSRP ceiling ${lear}`);
 
     const leaseFloor = resolveAircraftLeaseWeeklyUsd({
       aircraftClassId: 'light_jet',
@@ -193,7 +203,7 @@ describe('cargo-scaled aircraft MSRP', () => {
       maxCargoKg: 1_423,
     });
     assert.ok(leaseLear > leaseFloor);
-    assert.ok(leaseLear >= 18_000, `Lear lease ${leaseLear}`);
+    assert.ok(leaseLear >= 16_000, `Lear lease ${leaseLear}`);
 
     const tiredAged = Math.round(
       lear *
@@ -204,7 +214,7 @@ describe('cargo-scaled aircraft MSRP', () => {
           hoursEngine: ECONOMIC_LIFE_HOURS.light_jet,
         }),
     );
-    assert.ok(tiredAged >= 400_000, `Lear tired+aged ${tiredAged}`);
+    assert.ok(tiredAged >= 300_000, `Lear tired+aged ${tiredAged}`);
   });
 
   it('prices medium piston DC-6 class above jet floor (anti-snowball)', () => {
@@ -376,6 +386,72 @@ describe('cargo-scaled aircraft MSRP', () => {
         }),
     );
     assert.ok(tiredAged >= 5_500_000, `MD-11 tired+aged ${tiredAged}`);
+  });
+});
+
+describe('playbook earnings balance (buy/lease)', () => {
+  const gap = refGap();
+
+  it('ATR72 light_turboprop stays ~1.2–1.5 flights/week and ~50–80 to buy', () => {
+    const kg = 7_500;
+    const pay = quoteFreightLotPay({
+      commodityId: 'general',
+      quantityKg: kg,
+      ...gap,
+      distanceNm: 1_200,
+    }).payUsd;
+    const msrp = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: kg,
+    });
+    const lease = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: kg,
+      condition: 'good',
+      hoursAirframe: 1_500,
+      hoursEngine: 1_200,
+    });
+    const flightsPerWeek = lease / pay;
+    const flightsToBuy = msrp / pay;
+    assert.ok(
+      flightsPerWeek >= 1.15 && flightsPerWeek <= 1.55,
+      `ATR72 flights/week ${flightsPerWeek.toFixed(2)} (lease ${Math.round(lease)} / pay ${Math.round(pay)})`,
+    );
+    assert.ok(
+      flightsToBuy >= 50 && flightsToBuy <= 85,
+      `ATR72 flights-to-buy ${flightsToBuy.toFixed(0)} (msrp ${Math.round(msrp)} / pay ${Math.round(pay)})`,
+    );
+  });
+
+  it('Lear light_jet stays ~4–6 flights/week and ~150–250 to buy', () => {
+    const kg = 1_423;
+    const pay = quoteFreightLotPay({
+      commodityId: 'general',
+      quantityKg: kg,
+      ...gap,
+      distanceNm: 800,
+    }).payUsd;
+    const msrp = resolveAircraftMsrpUsd({
+      aircraftClassId: 'light_jet',
+      maxCargoKg: kg,
+    });
+    const lease = resolveDealerLeaseWeeklyUsd({
+      aircraftClassId: 'light_jet',
+      maxCargoKg: kg,
+      condition: 'good',
+      hoursAirframe: 1_500,
+      hoursEngine: 1_200,
+    });
+    const flightsPerWeek = lease / pay;
+    const flightsToBuy = msrp / pay;
+    assert.ok(
+      flightsPerWeek >= 4 && flightsPerWeek <= 6.2,
+      `Lear flights/week ${flightsPerWeek.toFixed(2)} (lease ${Math.round(lease)} / pay ${Math.round(pay)})`,
+    );
+    assert.ok(
+      flightsToBuy >= 150 && flightsToBuy <= 250,
+      `Lear flights-to-buy ${flightsToBuy.toFixed(0)} (msrp ${Math.round(msrp)} / pay ${Math.round(pay)})`,
+    );
   });
 });
 

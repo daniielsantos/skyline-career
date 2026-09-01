@@ -291,6 +291,7 @@ import {
 import { RunwayTouchdownDiagram } from './RunwayTouchdownDiagram';
 import { DispatchActivePanel, DispatchStepper } from './DispatchActivePanel';
 import { PayloadLabPanel } from './PayloadLabPanel';
+import { HubEconomyPulsePage } from './HubEconomyPulsePage';
 import { CargoLotCards } from './CargoLotCards';
 import { TerminalAirportPanel } from './TerminalAirportPanel';
 import { TerminalHubStatsPanel } from './TerminalHubStatsPanel';
@@ -3193,6 +3194,7 @@ export function App() {
     useState<TerminalSection>('inventory');
   const [hubStats, setHubStats] = useState<HubStatsView | null>(null);
   const [hubStatsLoading, setHubStatsLoading] = useState(false);
+  const [hubStatsError, setHubStatsError] = useState<string | null>(null);
   const [contractsLane, setContractsLane] =
     useState<ContractsLane>('outbound');
   const [contractsOffer, setContractsOffer] = useState<'aircraft' | 'crew'>(
@@ -3540,13 +3542,27 @@ export function App() {
       return;
     }
     let cancelled = false;
+    const icao = airportIcao.trim().toUpperCase();
     setHubStatsLoading(true);
-    void fetchAirportStats(airportIcao)
+    setHubStatsError(null);
+    // Drop stale other-hub payload so we don't flash wrong ICAO while loading.
+    setHubStats((prev) =>
+      prev && prev.airport?.icao?.toUpperCase() === icao ? prev : null,
+    );
+    void fetchAirportStats(icao)
       .then((stats) => {
-        if (!cancelled) setHubStats(stats);
+        if (!cancelled) {
+          setHubStats(stats);
+          setHubStatsError(null);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setHubStats(null);
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setHubStats(null);
+          setHubStatsError(
+            err instanceof Error ? err.message : 'Failed to load hub stats',
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setHubStatsLoading(false);
@@ -4820,6 +4836,14 @@ export function App() {
   useEffect(() => {
     saveDevMode(devMode);
   }, [devMode]);
+
+  // Lab / Economy pulse are dev-only — leave those tabs if Dev Mode is off.
+  useEffect(() => {
+    if (devMode) return;
+    if (tab !== 'lab' && tab !== 'pulse') return;
+    setTab('market');
+    writeCareerLocation({ tab: 'market', airportIcao: null }, { replace: true });
+  }, [devMode, tab]);
 
   const activeCount = useMemo(
     () => missions.filter((m) => isActiveMissionStatus(m.status)).length,
@@ -8973,6 +8997,8 @@ export function App() {
                   ? 'Logbook'
                   : tab === 'lab'
                     ? 'Payload Lab'
+                    : tab === 'pulse'
+                      ? 'Economy pulse'
                   : tab === 'settings'
                     ? 'Settings'
                     : 'Freights';
@@ -9012,6 +9038,10 @@ export function App() {
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
                   : tab === 'missions'
                   ? 'Past flights — aircraft, cargo, distance, and payout.'
+                  : tab === 'lab'
+                    ? 'Inject Due vs Sim without buy/ferry (dev).'
+                    : tab === 'pulse'
+                      ? 'Saved network economy samples — world / BR / US pulse (dev).'
                   : tab === 'settings'
                     ? 'SimBrief, weight units, and local career preferences.'
                     : freightsBoard === 'bush' && BUSH_TRIPS_BOARD_ENABLED
@@ -9277,15 +9307,26 @@ export function App() {
             Logbook
           </button>
           {devMode ? (
-            <button
-              type="button"
-              className={!showAirport && tab === 'lab' ? 'tab active' : 'tab'}
-              onClick={() => selectTab('lab')}
-              disabled={busy}
-              title="Payload Lab — inject Due vs Sim without buy/ferry"
-            >
-              Lab
-            </button>
+            <>
+              <button
+                type="button"
+                className={!showAirport && tab === 'lab' ? 'tab active' : 'tab'}
+                onClick={() => selectTab('lab')}
+                disabled={busy}
+                title="Payload Lab — inject Due vs Sim without buy/ferry"
+              >
+                Lab
+              </button>
+              <button
+                type="button"
+                className={!showAirport && tab === 'pulse' ? 'tab active' : 'tab'}
+                onClick={() => selectTab('pulse')}
+                disabled={busy}
+                title="Economy pulse — network hub samples (dev)"
+              >
+                Pulse
+              </button>
+            </>
           ) : null}
 
           {showAirport && terminalSection !== 'fbo' ? (
@@ -9815,6 +9856,7 @@ export function App() {
                     icao={airportIcao}
                     stats={hubStats}
                     loading={hubStatsLoading}
+                    error={hubStatsError}
                     weightSystem={weightSystem}
                   />
                 ) : null}
@@ -13177,6 +13219,11 @@ export function App() {
           }
           onOpenDispatch={() => selectTab('staging')}
           onMissionsUpdated={(next) => setMissions(next)}
+        />
+      ) : hubSelected && tab === 'pulse' && devMode ? (
+        <HubEconomyPulsePage
+          weightSystem={weightSystem}
+          refreshToken={tick}
         />
       ) : hubSelected && tab === 'settings' ? (
         <section className="panel settings-panel">

@@ -91,6 +91,12 @@ describe('buildHubEconomySamples', () => {
     assert.equal(sample.kgTp, 1_200);
     assert.equal(sample.kgMedium, 5_000);
     assert.ok(sample.payP50Usd != null);
+    assert.equal(sample.countryId, 'BR');
+    assert.equal(sample.hubTier, 'major');
+    assert.ok(sample.cargoCapacityKg > 0);
+    assert.equal(sample.lotsGa, 1);
+    assert.equal(sample.lotsTp, 1);
+    assert.equal(sample.lotsMedium, 1);
     assert.ok(sample.jetAFill > 0.4 && sample.jetAFill < 0.6);
     const general = sample.commodities.find((c) => c.id === 'general');
     assert.ok(general);

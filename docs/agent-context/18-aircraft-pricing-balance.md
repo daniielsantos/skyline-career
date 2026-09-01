@@ -2,6 +2,8 @@
 
 Atualizado 2026-08-31: playbook para **não** tunar MSRP/lease só olhando o card do Market. Fonte da verdade de pay: `quoteFreightLotPay` em `packages/shared/src/career-economy.ts`. Preços: `packages/shared/src/career-aircraft-pricing.ts` + board em `career-aircraft-market.ts` / `career-aircraft-pool.ts`.
 
+Atualizado 2026-08-31: **light_jet** MSRP **750k** / lease **2.3%/wk** (Lear ~4.8/sem · buy ~214). **light_turboprop** ATR72 ref. já no alvo (~1.23/sem · buy ~58) — sem retune neste slice.
+
 ---
 
 ## Princípio

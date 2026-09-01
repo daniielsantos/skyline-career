@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-08-31: **Hub Stats network pulse** — schema **v8** (country/tier/stock/inbound/lot counts/pay bands); `GET /api/debug/hub-economy-history`; card Network history na aba Stats. Ver `19-hub-stats.md`.
+
+Atualizado 2026-08-31: **Light jet buy/lease** — MSRP **750k** (era 1.05M) + lease **2.3%/wk** (era 1.9%). Lear @ 1.4t/800nm ~**4.8 voos/sem** · buy ~**214**. **Light TP (ATR72)** já estava no alvo (~1.23/sem · buy ~58) — sem retune. Testes playbook earnings. UI mirror sync GA/TP/jet rates.
+
 Atualizado 2026-08-31: **Medium piston buy/lease anti-snowball** — MSRP **1.8M** + lease **2.0%/wk** (era 1.2M / 1.35%). DC-6 @ 10t/1200nm ~**1.3 voos/sem** · buy ~**66**. Playbook: `18-aircraft-pricing-balance.md`.
 
 Atualizado 2026-08-31: **Hub Stats shipped** — aba Stats no terminal + `hub_economy_samples` (schema v7); sampler no day boundary; 7d/30d. Ver `19-hub-stats.md`.
@@ -32,7 +36,7 @@ Atualizado 2026-08-30: **Regionals pós-unlock (tick ~1912)** — spokes OK; **r
 
 Atualizado 2026-08-30: **Pulse tick 1896 pós-unlock (~DAY 20 / +2d)** — spoke live **BR 33%→97%**, **US 16%→98%**; liveSpokeDry/Lm quase = live. Board **7.4k**; general **1.6k→2.0k**, supplies **0.5k→1.0k**. SBPV agora last-mile spoke↔spoke (SBIH/SBCZ/SBAT…), **0** SBEG no sample recente. BR open spoke↔spoke **~140** (era ~26). Size: GA **44%** (↑ last-mile), med sweet **~15%** (era ~3%). Unlock OK; GA↑ é trade-off esperado. Sem `CARGO_FLOW_BALANCE`. Diag: `economy-spoke-vitality-post-unlock.json`.
 
-Atualizado 2026-08-30: **A220-300 Market** — SKU `synaptic-a220-300` (`narrow_freighter`, native-simbrief); SimBrief **BCS3** airframe `Synaptic / iniBuilds (MSFS) - A220-300`. Pack `profiles/ofp/synaptic-a220-300.json`. Card prompt `a220-300.png` em `docs/market-airframe-card-prompts.md` (PNG ainda a gerar).
+Atualizado 2026-08-30: **A220-300 Market** — SKU `synaptic-a220-300` (`narrow_freighter`, native-simbrief); SimBrief **BCS3** airframe `Synaptic / iniBuilds (MSFS) - A220-300`. Pack `profiles/ofp/synaptic-a220-300.json`. Card PNG em `packages/career-ui/public/airframes/a220-300.png`.
 
 Atualizado 2026-08-30: **Spoke last-mile unlock** — (1) sob `skipAll`, vitality dead-spoke ainda forma até **12** GA Dry/país×SKU (não sobe soft cap); (2) sort dest de spoke: OD diversity → feeder (spoke/regional) antes de major → fill/nm → cw. Sem `CARGO_FLOW_BALANCE`. Rebuild + 1–2d; esperar Dry no spoke + menos SBPV→só-SBEG.
 
@@ -53,6 +57,12 @@ Atualizado 2026-08-30: **Pulse tick 1222 `Dans` (~12.7d / “dia 13”)** — p�
 Atualizado 2026-08-30: **Spoke vitality / densify** — last-mile spoke open/form **2**, fill≥**0.14**, stock share **0.55**; até **16** spokes mortos/tick (rotação) antes de major/regional; soft feeder ~**52%**. Sem Dry/`CARGO_FLOW_BALANCE`. Re-pulse Dans após 1–2d (US live vs ~26%).
 
 Atualizado 2026-08-30: **Pulse tick 1029 `Dans` (~10.7d)** — BR live **50%** (era ~74% day7); US live **26%** (era ~70%), dead spoke **160**. Board **5.6k**, pay p50 **~$4k**. Size mix melhorou (GA≤450 **61%→25%**, TP **7%→30%**); medium sweet ainda **~3.5%**. general fill **~85%**. Sem retune Dry. Próximo: spoke vitality / densify. Canvas `economy-pulse-day11-dans`; JSON `economy-pulse-plus3d-dans-diag.json` + `economy-pulse-timeline-dans.json`.
+
+Atualizado 2026-08-31: **Economy pulse → tab Pulse (dev)** — Network history saiu da Stats; `/pulse` só com Dev Mode (junto do Lab). Ver `19-hub-stats.md`.
+
+Atualizado 2026-08-31: **Stats UI day-1** — “No stats…” / Network vazio: fetch falhava em silêncio + pulse JSON com todos os países. Erro visível; keep pulse; aggregate só BR/US; render defensivo. Ver `19-hub-stats.md`.
+
+Atualizado 2026-08-31: **formLotsIntl micro-opts** — +Nd lento = scan 561×SKU×2. Candidate lanes (só OD com surplus∩shortage), dirs unrolled, `precomputedLaneSat`, caps in-place, defer `routeDistanceNm`, hoist `skipAll`. Paridade `intl-hot-path` (12 ticks). Sem Dry/`CARGO_FLOW_BALANCE`.
 
 Atualizado 2026-08-30: **formLotsIntl hot-path** — lane inbound index (`laneSatOf`/`destInboundOf`); cw pré-computado; sets surplus/shortage antes do scan 561×2; skip se `min(surplus,room) < FEEDER_LTL_MIN_KG`; `break` em `skipAll`. Paridade RNG (intl cw≥2, sem spoke rng). Teste `intl-hot-path`. Sem sample lanes / Dry.
 

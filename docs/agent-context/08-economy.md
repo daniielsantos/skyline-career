@@ -12,14 +12,14 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Aircraft pool (design locked, 2026-08-19; cota SKU 2026-08-20):** cap por país (BR=62 hubs=1.0, teto 1.5×); **cota igual por SKU** + mínimo mundial por modelo (leves 1 / medium 2 / narrow+wide **3**); BR/US 1-de-cada nas leves; dealer **50%** vs listar; NPC compra por fair. **Lease:** taxa semanal ↑, cobrança /wk, termo máx **3 mo**, depósito 4 semanas. Roadmap F0–F7: [`10-aircraft-pool.md`](./10-aircraft-pool.md).
 - **TP buy/lease anti-snowball (2026-08-27):** `light_turboprop` MSRP 450k; cargo mult 0.72–2.8; lease rate 2.2%/wk; fair/tired used + hours haircut menos agressivos; dealer lease weekly × condição leve (excellent≠fair). ATR/Saab ficam em TP — preço via curva, não `medium_piston`.
 - **GA buy/lease anti-snowball (2026-08-27):** `light_ga` MSRP 140k; lease rate 2.0%/wk. Titan/BN2/Duke sobem via curva de cargo; Titan permanece `light_ga` (não reclass TP).
-- **Light jet buy/lease anti-snowball (2026-08-27):** `light_jet` MSRP 1.05M; lease rate 1.9%/wk. Cruise/range ainda fora da fórmula (só cargo).
+- **Light jet buy/lease anti-snowball (2026-08-31):** `light_jet` MSRP **750k** (era 1.05M); lease **2.3%/wk** (era 1.9%). Lear @ 1.4t/800nm ~**4.8 voos/sem** · buy ~**214**. Cruise/range ainda fora da fórmula (só cargo).
 - **Medium piston buy/lease anti-snowball (2026-08-31):** `medium_piston` MSRP **1.8M** (era 1.2M); lease **2.0%/wk** (era 1.35%). Alvo ~**1.3 voos/sem** DC-6 @ 10t/1200nm; buy ~**66 voos**. Metodologia: [`18-aircraft-pricing-balance.md`](./18-aircraft-pricing-balance.md).
 - **Narrow buy/lease anti-snowball (2026-08-31):** `narrow_freighter` MSRP **2.8M**; lease **2.4%/wk**; dealer lease × horas. Metodologia: [`18-aircraft-pricing-balance.md`](./18-aircraft-pricing-balance.md).
 - **Wide buy/lease anti-snowball (2026-08-31):** `wide_freighter` MSRP **14M** (era 6.5M); lease **1.5%/wk** (era 1.2%); dealer lease × horas. Alvo ~**1.4 voos/sem** MD-11 @ 90t/3500nm; buy ~**107 voos**.
 - **Schema v4:** hubs + stock em tabelas (`airports` / `airport_stock`) com `world_id`; tick ainda in-memory; terminal Inventory usa `GET /api/airport?part=stock` (SQL, sem lock); payload completo (lots/NPC) hidrata depois.
 - **Schema v5:** NPC roster, fuel trucks/hauls, Demand board e port listings/inventory/concessions em tabelas (`world_id`); arrays stripped de `economy_json`. Tick ainda in-memory. WH/concessões do player ficam no `company_state`.
 - **Schema v6:** dealer pool (`aircraft_instances`) keyed by `world_id`; unique registration; stripped from `economy_json`. Tick still in-memory.
-- **Schema v7:** `hub_economy_samples` — daily Hub Stats history (fill/spot/lots/size bands); 30d prune; see [`19-hub-stats.md`](./19-hub-stats.md).
+- **Schema v7→v8:** `hub_economy_samples` — daily Hub Stats + network pulse dims (country/tier/stock/inbound/lot counts); 30d prune; see [`19-hub-stats.md`](./19-hub-stats.md).
 - Partição por país (`homeCountryId` / região `XX-YY` → país `XX`).
 - **América do Sul completa** no seed: BR/AR/CL + UY/PY/PE/BO/EC/CO/VE/GY/SR/GF.
 - **América Central completa** no seed: PA/CR/NI/HN/GT/SV/BZ.
@@ -88,6 +88,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Hold-to-viable GA (2026-08-30):** vale para last-mile **e** bulk/INTL GA scraps. `BOARD_SMALL_MIN_VIABLE_KG=180` + pay floor; **intl nunca lista ≤450 kg** (só feeder+); feeder thin também usa trip floor (intl base/cap mais altos). `prune`/`shrink`/Market iguais. Sem inflar $/kg.
 - **Tick bench / event loop:** `tickEconomy` síncrono (testes, catch-up load, **fast-forward n&gt;1**). `tickEconomyCooperative` / `tickEconomyNCooperative(n=1)` cede entre países (`setImmediate`); `POST /api/tick` multi-tick usa sync. Profile: `createEmptyTickPhaseProfile` / `summarizeTickPhaseProfile`; API `{profile:true}` → `tickWallMs`+`tickProfile`. Hot atual: formLotsIntl. Sem workers / Dry.
 - **Tick perf (2026-08-30):** country cache no airport lookup; intl lanes pré-normalizadas. Persist do `/api/tick` já é 1× no fim do write.
+- **formLotsIntl micro-opts (2026-08-31):** candidate lanes (surplus∩shortage) + dirs unrolled; `precomputedLaneSat`; caps bump in-place; `routeDistanceNm` só se small ainda plausível; `skipAll` hoisted (refresh pós-form). Sem Dry/`CARGO_FLOW_BALANCE`. Teste `intl-hot-path` (12 ticks + odOrder).
 - **Tick advance UI (2026-08-31):** career-ui `onTick` chunk ≤24 ticks/POST (+1d = 4; progress + `…Ns` enquanto o 1º chunk). Antes chunk=8 (muitos saves) ou 96 (0/96 “travado”). Sem retune Dry. Hub Stats sample ≠ hot path.
 - **formLotsIntl hot-path (2026-08-30):** `ensureLaneInboundIndex` + helpers; filtro surplus/shortage + feeder floor antes de `tryFormPair`; `skipAll` quebra o scan. Mesmo seed → mesmos lots intl (sem retune física).
 - Freights domésticos por país; intl só via `CAREER_INTERNATIONAL_LANES`.

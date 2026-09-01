@@ -10,7 +10,8 @@ import type { AirframeCondition, FreighterClassId } from './types/career-economy
 export const AIRCRAFT_MSRP_USD: Record<FreighterClassId, number> = {
   light_ga: 140_000,
   light_turboprop: 450_000,
-  light_jet: 1_050_000,
+  /** Lear-band buy grind ~200 ref legs @ 1.4t/800nm (was 1.05M → ~300). */
+  light_jet: 750_000,
   medium_piston: 1_800_000,
   narrow_freighter: 2_800_000,
   wide_freighter: 14_000_000,
@@ -46,7 +47,8 @@ export const CARGO_MSRP_CURVE_EXP = 0.65;
 export const AIRCRAFT_LEASE_WEEKLY_RATE: Record<FreighterClassId, number> = {
   light_ga: 0.02,
   light_turboprop: 0.022,
-  light_jet: 0.019,
+  /** With 750k MSRP keeps Lear ~4.5–5.5 flights/week on the playbook leg. */
+  light_jet: 0.023,
   medium_piston: 0.02,
   narrow_freighter: 0.024,
   wide_freighter: 0.015,

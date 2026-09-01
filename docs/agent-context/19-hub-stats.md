@@ -1,5 +1,7 @@
 # Hub Stats + histórico econômico
 
+Atualizado 2026-08-31: **Pulse lenses** — World/BR/US/Spoke; Spoke dead (0 lots) + Quiet N absolutos; sparklines seguem a lente.
+
 Atualizado 2026-08-31: **Retenção samples 90d** — `HUB_ECONOMY_SAMPLE_RETENTION_DAYS=90`; Pulse toggle **90d**. Stats hub continua 7d/30d.
 
 Atualizado 2026-08-31: **Pulse page denser** — spoke live + quiet; soft-fill/inbound; electronics spot; size mix GA/TP/Med/Nar/Wide; pay p10–p90 band; sparklines. Quiet = `activityScore < 8` (não zero lots).

@@ -13,9 +13,9 @@ export function HubEconomyPulsePage(props: {
         <div>
           <h2>Economy pulse</h2>
           <p>
-            Dev-only network history from saved daily hub samples (world / BR /
-            US / tiers, size mix, soft-fill, pay band). Not shown on Terminal
-            Stats.
+            Dev-only network history from saved daily hub samples. Lenses: World /
+            BR / US / Spoke — with dead-spoke counts, size mix, soft-fill, pay
+            band. Not shown on Terminal Stats.
           </p>
         </div>
       </div>

@@ -210,6 +210,8 @@ import {
   aggregateHubEconomyHistoryPulse,
   syncHomeCountryFromHub,
   stockTrend,
+  companySessionFromTick,
+  settleCompanyPassiveFeesForTickRange,
   ensureEconomyCaughtUpCooperative,
   tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
@@ -221,8 +223,6 @@ import {
   economyDayIndex,
   HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
   buildHubEconomySampleForAirport,
-  effectiveFeeTickRange,
-  buildOfflineFeeSummary,
   type OfflineFeeSummary,
   fuelBurnMultFromAircraft,
   padOfpBlockFuelKgForMx,
@@ -731,29 +731,7 @@ async function loadEconomyUnlocked(opts?: {
     await activeStore.saveEconomy(caught);
   }
   if (advancedTicks > 0) {
-    const rawFrom = caught.tick - advancedTicks;
-    const feeRange = effectiveFeeTickRange(rawFrom, caught.tick);
-    const leaseOps = settleAircraftMarketOps(missions, caught.tick, caught, {
-      maxInstallments: feeRange.capped ? 1 : undefined,
-      deferTermRepossess: feeRange.capped,
-    });
-    const hangarOps = settleHangarParkingFees(missions, caught, {
-      fromTick: feeRange.fromTick,
-      toTick: feeRange.toTick,
-    });
-    const fboOps = settleFboOps(missions, caught, {
-      fromTick: feeRange.fromTick,
-      toTick: feeRange.toTick,
-    });
-    const whOps = settleWarehouseStorageFees(missions, {
-      fromTick: feeRange.fromTick,
-      toTick: feeRange.toTick,
-    });
     settleWarehouseInboundTransfers(missions, caught);
-    const yardOps = settlePortYardHoldFees(missions, {
-      fromTick: feeRange.fromTick,
-      toTick: feeRange.toTick,
-    });
     tickPortConcessions(missions, caught);
     ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
@@ -761,48 +739,30 @@ async function loadEconomyUnlocked(opts?: {
     ensureDemandOrders(caught, {
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(caught),
     });
-    const crewDaily = settleCrewDailyOps(missions, caught, {
-      fromTick: feeRange.fromTick,
-      toTick: feeRange.toTick,
-    });
-    const groundStaffDaily = settleGroundStaffDailyOps(missions, caught, {
-      fromTick: feeRange.fromTick,
-      toTick: feeRange.toTick,
-    });
-    settleCrewOpsDue(missions, caught, Date.now());
-    listAircraftMarket(missions, caught);
-
-    const passiveDebitUsd =
-      hangarOps.debitUsd +
-      (fboOps.storage?.debitUsd ?? 0) +
-      whOps.debitUsd +
-      yardOps.debitUsd +
-      (crewDaily.salary?.debitUsd ?? 0) +
-      (groundStaffDaily.salary?.debitUsd ?? 0);
-    const summary = buildOfflineFeeSummary({
-      feeRange,
-      passiveDebitUsd,
-      debitUsdByKind: {
-        hangar: hangarOps.debitUsd,
-        warehouse: whOps.debitUsd,
-        yard: yardOps.debitUsd,
-        fboStorage: fboOps.storage?.debitUsd ?? 0,
-        crewSalary: crewDaily.salary?.debitUsd ?? 0,
-        groundStaffSalary: groundStaffDaily.salary?.debitUsd ?? 0,
-      },
-      lease: {
-        installmentsPaid: leaseOps.installmentsPaid,
-        overdueIds: leaseOps.overdueIds,
-        termEndedSoftIds: leaseOps.termEndedSoft,
-        repossessedIds: leaseOps.repossessed,
-      },
-    });
-    if (summary) pendingOfflineFeeSummary = summary;
-
     await saveMissions(missions);
     await persistEconomyUnlocked(caught);
   }
   return caught;
+}
+
+/** Passive company fees after a catch-up write (MP-shaped session settlement). */
+async function applyCompanySessionSettlement(opts: {
+  fromTick: number;
+  toTick: number;
+}): Promise<OfflineFeeSummary | undefined> {
+  const missions = await loadMissions();
+  const world = requireStore().peekEconomyWorld();
+  if (!world) return undefined;
+  const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
+  const summary = settleCompanyPassiveFeesForTickRange(
+    missions,
+    world,
+    fromTick,
+    opts.toTick,
+  );
+  missions.lastSeenTick = opts.toTick;
+  await saveMissions(missions);
+  return summary ?? undefined;
 }
 
 async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> {
@@ -1811,6 +1771,21 @@ export function createCareerApiServer(port = 8787) {
         catchUpTicks,
         cooperative,
       });
+      await withCareerLock(async () => {
+        const world = store?.peekEconomyWorld();
+        if (!world) return;
+        const toTick = world.tick;
+        const summary = await applyCompanySessionSettlement({
+          fromTick: toTick - catchUpTicks,
+          toTick,
+        });
+        if (summary) pendingOfflineFeeSummary = summary;
+      });
+    },
+    applyCompanySessionSettlement: async ({ fromTick, toTick }) => {
+      return withCareerLock(async () =>
+        applyCompanySessionSettlement({ fromTick, toTick }),
+      );
     },
   });
   const watchSession = new CareerWatchSession({

@@ -7,11 +7,13 @@ import type {
   CareerEconomyWorld,
   CareerMissionsState,
   CareerStore,
+  OfflineFeeSummary,
 } from '@msfs-compat/shared';
 import {
   CATCH_UP_LOCK_CHUNK_TICKS,
   CATCH_UP_PULSE_MS,
   CATCH_UP_TICKS_PER_PULSE,
+  companySessionFromTick,
   economyTicksBehind,
   LOCAL_WORLD_ID,
   LOGIN_CATCH_UP_TICKS,
@@ -45,15 +47,12 @@ export type LocalWorldTickDeps = {
   }): Promise<void>;
 
   /**
-   * Company settlement on session open — today inside `loadEconomyUnlocked` when
-   * `advancedTicks > 0`; MP moves this to `openCompanySession` only (no client tick).
+   * Company passive fee settlement + lastSeenTick persist (MP session/open path).
    */
-  settleCompanyOfflineFees?(args: {
-    world: CareerEconomyWorld;
-    missions: CareerMissionsState;
+  applyCompanySessionSettlement(opts: {
     fromTick: number;
     toTick: number;
-  }): Promise<CompanySessionOpenResult['offlineFeeSummary']>;
+  }): Promise<OfflineFeeSummary | undefined>;
 
   peekWorld(): CareerEconomyWorld | undefined;
 
@@ -198,17 +197,19 @@ export class LocalWorldTickService implements WorldTickService {
     this.assertWorld(opts.worldId);
     const nowMs = opts.serverNowMs ?? Date.now();
     const worldClock = await this.getClock(opts.worldId, nowMs);
-    const tickDelta = Math.max(0, worldClock.tick - opts.lastSeenTick);
-    let offlineFeeSummary: CompanySessionOpenResult['offlineFeeSummary'];
-    if (tickDelta > 0 && this.deps.settleCompanyOfflineFees) {
-      const store = this.deps.requireStore();
-      const { world } = await store.loadEconomy({ maxCatchUpTicks: 0 });
-      const missions = await this.deps.loadMissions();
-      offlineFeeSummary = await this.deps.settleCompanyOfflineFees({
-        world,
-        missions,
-        fromTick: opts.lastSeenTick,
-        toTick: worldClock.tick,
+    const missions = await this.deps.loadMissions();
+    const fallbackFrom =
+      typeof opts.lastSeenTick === 'number' && Number.isFinite(opts.lastSeenTick)
+        ? opts.lastSeenTick
+        : worldClock.tick;
+    const fromTick = companySessionFromTick(missions, fallbackFrom, worldClock.tick);
+    const toTick = worldClock.tick;
+    const tickDelta = Math.max(0, toTick - fromTick);
+    let offlineFeeSummary: OfflineFeeSummary | undefined;
+    if (tickDelta > 0) {
+      offlineFeeSummary = await this.deps.applyCompanySessionSettlement({
+        fromTick,
+        toTick,
       });
     }
     return { worldClock, tickDelta, offlineFeeSummary };

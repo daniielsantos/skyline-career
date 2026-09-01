@@ -1167,6 +1167,11 @@ export interface CareerMissionsState {
   ferrySoftNmUsed?: number;
   /** Active Activities-style bush trip (parallel to Market missions). */
   activeBushTrip?: ActiveBushTrip;
+  /**
+   * Last economy tick this company was billed against (MP session watermark).
+   * SP: updated after each catch-up fee settlement.
+   */
+  lastSeenTick?: number;
 };
 
 /** Player FBO ownership + bonded warehouse holds. */

@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-01: **Company session settlement** — `lastSeenTick` em `company_state`; fees via `settleCompanyPassiveFeesForTickRange` após cada catch-up chunk (`applyCompanySessionSettlement` / `openCompanySession`). World housekeeping permanece no tick; passive fees desacoplados (MP path).
+
 Atualizado 2026-09-01: **WorldTickService wired** — `LocalWorldTickService` em `createCareerApiServer`; pulse/login/catch-up chip via service; `nextPulseAtMs` no `/api/state`. Ver `14-mp-world-clock.md`.
 
 Atualizado 2026-09-01: **Catch-up acelerado (SP)** — sintoma: login pós-offline demora minutos; Crew/Freights vazios enquanto pulse monopoliza lock 4–10s. Fix: login burst **12 batches** (`LOGIN_CATCH_UP_TICKS`); timer **8 batches / 15s**; pulse usa `ensureEconomyCaughtUpCooperative` + lock chunk **2** (`CATCH_UP_LOCK_CHUNK_TICKS`) com `setImmediate` entre chunks. Constantes: `career-clock.ts`; cooperative: `ensureEconomyCaughtUpCooperative` em `career-economy.ts`; pulse: `runBackgroundEconomyPulse` em `api.ts`.

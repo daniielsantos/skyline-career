@@ -179,10 +179,11 @@ interface WorldTickService {
 2. `schedulePostLoginEconomyWork(worldTick)` → `startBackgroundPulse('local')`; clear/delete para o pulse.
 3. `/api/state`: `worldTick.getCatchUpProgress` + `clockPayload` via `worldClockFromEconomy` (`nextPulseAtMs`).
 4. GETs mantêm `skipCatchUp: true`.
+5. **`lastSeenTick`** em `company_state` + `settleCompanyPassiveFeesForTickRange` após cada catch-up chunk (`applyCompanySessionSettlement`).
 
 ### Wiring SP (próximo)
 
-1. Extrair settlement de company para `worldTick.openCompanySession` (`lastSeenTick` na company row).
+1. MP: `RemoteWorldTickService` + `POST /companies/:id/session/open`.
 
 ### MP client stub
 

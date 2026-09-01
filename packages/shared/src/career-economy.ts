@@ -12494,18 +12494,21 @@ export function migrateEconomyWorld(
  * When `maxTicks` caps the run, the wall-clock anchor advances only by the
  * simulated ticks so a later pulse can drain the remainder (no silent skip).
  */
-export function ensureEconomyCaughtUp(
-  world: CareerEconomyWorld | CareerEconomyWorldV1 | Record<string, unknown>,
-  nowMs = Date.now(),
-  opts: { maxTicks?: number } = {},
-): {
-  advancedTicks: number;
-  wantedTicks: number;
-  elapsedMs: number;
+type EconomyCatchUpPrep = {
+  w: CareerEconomyWorld;
+  last: number;
+  hours: number;
   capped: boolean;
+  wantedTicks: number;
+  elapsed: number;
   settledFlights: number;
-  world: CareerEconomyWorld;
-} {
+};
+
+function prepareEconomyForCatchUp(
+  world: CareerEconomyWorld | CareerEconomyWorldV1 | Record<string, unknown>,
+  nowMs: number,
+  maxTicks: number,
+): EconomyCatchUpPrep {
   const migrated = migrateEconomyWorld(world, { nowMs });
   const w = world as CareerEconomyWorld;
   w.version = 3;
@@ -12574,7 +12577,6 @@ export function ensureEconomyCaughtUp(
   }
 
   const elapsed = Math.max(0, nowMs - last);
-  const maxTicks = opts.maxTicks ?? MAX_CATCH_UP_TICKS;
   const wantedTicks = Math.floor(elapsed / MS_PER_TICK);
   const hours = Math.min(maxTicks, wantedTicks);
   const capped = wantedTicks > hours;
@@ -12586,9 +12588,22 @@ export function ensureEconomyCaughtUp(
       ).toFixed(1)}h elapsed; backlog kept for next pulse)`,
     );
   }
-  if (hours > 0) {
-    tickEconomyN(w, hours, { advanceWallClock: true, fromBatchAtMs: last });
-  }
+  return { w, last, hours, capped, wantedTicks, elapsed, settledFlights };
+}
+
+function finishEconomyCatchUp(
+  prep: EconomyCatchUpPrep,
+  nowMs: number,
+): {
+  advancedTicks: number;
+  wantedTicks: number;
+  elapsedMs: number;
+  capped: boolean;
+  settledFlights: number;
+  world: CareerEconomyWorld;
+} {
+  const { w, last, hours, capped, wantedTicks, elapsed } = prep;
+  let { settledFlights } = prep;
   if (capped) {
     // Drain later: do not snap past the unpaid batches.
     w.lastBatchAtMs = last + hours * MS_PER_TICK;
@@ -12611,6 +12626,54 @@ export function ensureEconomyCaughtUp(
     settledFlights,
     world: w,
   };
+}
+
+export function ensureEconomyCaughtUp(
+  world: CareerEconomyWorld | CareerEconomyWorldV1 | Record<string, unknown>,
+  nowMs = Date.now(),
+  opts: { maxTicks?: number } = {},
+): {
+  advancedTicks: number;
+  wantedTicks: number;
+  elapsedMs: number;
+  capped: boolean;
+  settledFlights: number;
+  world: CareerEconomyWorld;
+} {
+  const maxTicks = opts.maxTicks ?? MAX_CATCH_UP_TICKS;
+  const prep = prepareEconomyForCatchUp(world, nowMs, maxTicks);
+  if (prep.hours > 0) {
+    tickEconomyN(prep.w, prep.hours, {
+      advanceWallClock: true,
+      fromBatchAtMs: prep.last,
+    });
+  }
+  return finishEconomyCatchUp(prep, nowMs);
+}
+
+/** Like ensureEconomyCaughtUp; tick batches yield between countries (background pulse). */
+export async function ensureEconomyCaughtUpCooperative(
+  world: CareerEconomyWorld | CareerEconomyWorldV1 | Record<string, unknown>,
+  nowMs = Date.now(),
+  opts: { maxTicks?: number } = {},
+): Promise<{
+  advancedTicks: number;
+  wantedTicks: number;
+  elapsedMs: number;
+  capped: boolean;
+  settledFlights: number;
+  world: CareerEconomyWorld;
+}> {
+  const maxTicks = opts.maxTicks ?? MAX_CATCH_UP_TICKS;
+  const prep = prepareEconomyForCatchUp(world, nowMs, maxTicks);
+  if (prep.hours > 0) {
+    await tickEconomyNCooperative(prep.w, prep.hours, {
+      advanceWallClock: true,
+      fromBatchAtMs: prep.last,
+      forceCooperative: true,
+    });
+  }
+  return finishEconomyCatchUp(prep, nowMs);
 }
 
 function baseProdOf(ap: AirportTerminal, commodityId: CommodityId): number {

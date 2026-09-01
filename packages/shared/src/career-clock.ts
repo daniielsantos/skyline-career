@@ -21,13 +21,25 @@ export const MAX_CATCH_UP_TICKS = TICKS_PER_DAY * 14;
 export const MAX_LOAD_CATCH_UP_TICKS = 1;
 
 /**
+ * First background pulse after profile login (store-warm). Larger burst drains
+ * multi-day backlog faster without blocking profile-select.
+ */
+export const LOGIN_CATCH_UP_TICKS = 12;
+
+/**
  * Background drain while the Career API is open: batches simulated per pulse
  * (full tickEconomyN — nothing skipped). Keep pulseMs above typical pulse wall
  * time on a large save so pulses do not pile up on the career lock.
  */
-export const CATCH_UP_TICKS_PER_PULSE = 4;
+export const CATCH_UP_TICKS_PER_PULSE = 8;
 /** Wall ms between background catch-up pulses (see CATCH_UP_TICKS_PER_PULSE). */
-export const CATCH_UP_PULSE_MS = 25_000;
+export const CATCH_UP_PULSE_MS = 15_000;
+
+/**
+ * Release the career write lock every N batches during a pulse so /api/state
+ * reads can slip in between chunks (cooperative tick yields within each chunk).
+ */
+export const CATCH_UP_LOCK_CHUNK_TICKS = 2;
 
 /**
  * Whole economy batches still owed vs wall clock (0 when within the current

@@ -9,6 +9,7 @@ import {
   DEAD_LOT_RETENTION_TICKS,
   ensureCareerHubCoverage,
   ensureEconomyCaughtUp,
+  ensureEconomyCaughtUpCooperative,
   ensureSeedMarketFormed,
   escalateIdleLots,
   hubTierOf,
@@ -4510,6 +4511,24 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.equal(world.lastBatchAtMs, start + MS_PER_TICK);
     const again = ensureEconomyCaughtUp(world, later, { maxTicks: 1 });
     assert.equal(again.advancedTicks, 1);
+    assert.equal(world.tick, 2);
+    assert.equal(world.lastBatchAtMs, start + 2 * MS_PER_TICK);
+  });
+
+  it('ensureEconomyCaughtUpCooperative matches sync cap semantics', async () => {
+    const world = createSeedEconomyWorld({ seed: 'catch-up-coop' });
+    const start = 1_700_000_000_000;
+    world.lastBatchAtMs = start;
+    world.tick = 0;
+    const later = start + 7 * MS_PER_HOUR;
+    const { advancedTicks, wantedTicks, capped } = await ensureEconomyCaughtUpCooperative(
+      world,
+      later,
+      { maxTicks: 2 },
+    );
+    assert.equal(advancedTicks, 2);
+    assert.equal(wantedTicks, 28);
+    assert.equal(capped, true);
     assert.equal(world.tick, 2);
     assert.equal(world.lastBatchAtMs, start + 2 * MS_PER_TICK);
   });

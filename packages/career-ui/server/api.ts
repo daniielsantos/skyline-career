@@ -30,7 +30,6 @@ import {
   repairAircraftConditionWithParts,
   hoursUntilInspection,
   inspectionCostUsd,
-  continuousEconomyHours,
   createSeedEconomyWorld,
   emptyMissionsStateV2,
   ensureSeedMarketFormed,
@@ -102,10 +101,9 @@ import {
   MS_PER_HOUR,
   MS_PER_TICK,
   msToHours,
-  economyTicksBehind,
-  CATCH_UP_PULSE_MS,
   CATCH_UP_TICKS_PER_PULSE,
-  MAX_LOAD_CATCH_UP_TICKS,
+  LOCAL_WORLD_ID,
+  worldClockFromEconomy,
   TICKS_PER_DAY,
   listNpcHomeRegions,
   targetNpcFleetSize,
@@ -212,6 +210,7 @@ import {
   aggregateHubEconomyHistoryPulse,
   syncHomeCountryFromHub,
   stockTrend,
+  ensureEconomyCaughtUpCooperative,
   tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
   summarizeTickPhaseProfile,
@@ -285,6 +284,7 @@ import {
   setActiveCareerProfile,
 } from './career-profiles.ts';
 import { createPromiseLock } from './career-write-lock.ts';
+import { LocalWorldTickService } from './local-world-tick-service.ts';
 import {
   loadMaptilerEnvFiles,
   maptilerKeyFromEnv,
@@ -372,12 +372,8 @@ let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
 /** Defer MSFS hub coord stamp until after profile-select responds. */
 let msfsStampNeeded = false;
-let backgroundPulseInFlight = false;
 /** One-shot banner after long wall-clock catch-up; cleared on /api/state. */
 let pendingOfflineFeeSummary: OfflineFeeSummary | null = null;
-
-/** Icon/tooltip when ≥2 batches owed (~30 min wall) so normal 15-min gaps stay quiet. */
-const CATCH_UP_BANNER_MIN_TICKS = 2;
 
 await ensureCareerProfilesLayout(careerRoot);
 await loadProfileMsfsBushHubOverrides(careerRoot);
@@ -400,44 +396,6 @@ async function stampMsfsOverridesOnStore(target: CareerStore): Promise<void> {
   }
 }
 
-async function runBackgroundEconomyPulse(
-  catchUpTicks: number = CATCH_UP_TICKS_PER_PULSE,
-): Promise<void> {
-  if (!store || backgroundPulseInFlight) return;
-  backgroundPulseInFlight = true;
-  const t0 = performance.now();
-  try {
-    if (msfsStampNeeded) {
-      await withCareerLock(async () => {
-        if (!store || !msfsStampNeeded) return;
-        await stampMsfsOverridesOnStore(store);
-        msfsStampNeeded = false;
-      });
-    }
-    if (!store) return;
-    await withCareerWrite(() => undefined, {
-      catchUp: true,
-      catchUpTicks,
-    });
-    console.log(
-      `[career] economy-pulse ok ticks=${catchUpTicks} ${Math.round(performance.now() - t0)}ms`,
-    );
-  } catch (error) {
-    console.error(
-      `[career] economy-pulse fail ticks=${catchUpTicks} ${Math.round(performance.now() - t0)}ms:`,
-      error instanceof Error ? error.message : error,
-    );
-  } finally {
-    backgroundPulseInFlight = false;
-  }
-}
-
-function scheduleBackgroundEconomyPulse(
-  catchUpTicks: number = CATCH_UP_TICKS_PER_PULSE,
-): void {
-  void runBackgroundEconomyPulse(catchUpTicks);
-}
-
 /** Hydrate SQLite → RAM once so the first /api/state avoids a cold parse. */
 async function warmCareerStoreCache(): Promise<void> {
   if (!store) return;
@@ -451,7 +409,7 @@ async function warmCareerStoreCache(): Promise<void> {
   );
 }
 
-function schedulePostLoginEconomyWork(): void {
+function schedulePostLoginEconomyWork(tickService: LocalWorldTickService): void {
   void (async () => {
     try {
       await warmCareerStoreCache();
@@ -461,7 +419,7 @@ function schedulePostLoginEconomyWork(): void {
         error instanceof Error ? error.message : error,
       );
     }
-    scheduleBackgroundEconomyPulse(MAX_LOAD_CATCH_UP_TICKS);
+    tickService.startBackgroundPulse(LOCAL_WORLD_ID);
   })();
 }
 
@@ -726,15 +684,43 @@ async function updateOpenMission(
 async function loadEconomyUnlocked(opts?: {
   skipCatchUp?: boolean;
   maxCatchUpTicks?: number;
+  /** Background pulse: yield between countries and use lock chunks in caller. */
+  cooperative?: boolean;
 }): Promise<CareerEconomyWorld> {
   const activeStore = requireStore();
-  const loadOpts = opts?.skipCatchUp
-    ? { maxCatchUpTicks: 0 }
-    : opts?.maxCatchUpTicks != null
-      ? { maxCatchUpTicks: opts.maxCatchUpTicks }
-      : undefined;
-  const { world: caught, advancedTicks, dirty } =
-    await activeStore.loadEconomy(loadOpts);
+  let caught: CareerEconomyWorld;
+  let advancedTicks: number;
+  let dirty: boolean;
+
+  const useCooperative =
+    opts?.cooperative === true &&
+    !opts?.skipCatchUp &&
+    opts?.maxCatchUpTicks != null &&
+    opts.maxCatchUpTicks > 0;
+
+  if (useCooperative) {
+    const loaded = await activeStore.loadEconomy({ maxCatchUpTicks: 0 });
+    const coop = await ensureEconomyCaughtUpCooperative(loaded.world, Date.now(), {
+      maxTicks: opts.maxCatchUpTicks,
+    });
+    caught = coop.world;
+    advancedTicks = coop.advancedTicks;
+    dirty =
+      loaded.dirty ||
+      coop.advancedTicks > 0 ||
+      coop.settledFlights > 0 ||
+      ensureSeedMarketFormed(caught);
+  } else {
+    const loadOpts = opts?.skipCatchUp
+      ? { maxCatchUpTicks: 0 }
+      : opts?.maxCatchUpTicks != null
+        ? { maxCatchUpTicks: opts.maxCatchUpTicks }
+        : undefined;
+    const loaded = await activeStore.loadEconomy(loadOpts);
+    caught = loaded.world;
+    advancedTicks = loaded.advancedTicks;
+    dirty = loaded.dirty;
+  }
   const missions = await loadMissions();
   let needsSave = dirty;
   // Home partition follows the player's chosen hub (KMIA → US), including legacy saves.
@@ -853,6 +839,8 @@ type CareerWriteOpts = {
   catchUp?: boolean;
   /** Batches per catch-up write (default CATCH_UP_TICKS_PER_PULSE). */
   catchUpTicks?: number;
+  /** Background pulse: cooperative tick via LocalWorldTickService. */
+  cooperative?: boolean;
   /** Skip saveEconomy when the handler only mutates company/missions. */
   persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound' | 'npcLive';
   persistDemandOrderId?: string;
@@ -997,6 +985,7 @@ async function withCareerWrite<T>(
       world = await loadEconomyUnlocked({
         skipCatchUp,
         maxCatchUpTicks: catchUpTicks,
+        cooperative: opts?.cooperative,
       });
     }
     if (sliceLotIdsOpt.length > 0 && !useCommandPersist) {
@@ -1258,35 +1247,16 @@ function stockBalance(fill: number): 'surplus' | 'shortage' | 'balanced' {
 }
 
 function clockPayload(world: CareerEconomyWorld, nowMs = Date.now()) {
+  const clock = worldClockFromEconomy(world, LOCAL_WORLD_ID, nowMs);
   return {
-    serverNowMs: nowMs,
-    lastBatchAtMs: world.lastBatchAtMs,
-    lastSyncedAtMs: world.lastBatchAtMs,
-    tick: world.tick,
-    continuousHours: continuousEconomyHours(world, nowMs),
-    msPerTick: MS_PER_TICK,
+    serverNowMs: clock.serverNowMs,
+    lastBatchAtMs: clock.lastBatchAtMs,
+    lastSyncedAtMs: clock.lastBatchAtMs,
+    tick: clock.tick,
+    continuousHours: clock.continuousHours,
+    msPerTick: clock.msPerTick,
+    nextPulseAtMs: clock.nextPulseAtMs,
     fuelHaulsEnroute: countFuelHaulsEnroute(world),
-  };
-}
-
-/** Progress for catch-up UX while lastBatch lags wall clock. */
-function catchUpPayload(world: CareerEconomyWorld, nowMs: number) {
-  const last =
-    typeof world.lastBatchAtMs === 'number' && Number.isFinite(world.lastBatchAtMs)
-      ? world.lastBatchAtMs
-      : nowMs;
-  const ticksBehind = economyTicksBehind(last, nowMs);
-  if (ticksBehind < CATCH_UP_BANNER_MIN_TICKS) return null;
-  const elapsedMs = Math.max(0, nowMs - last);
-  const pulsesRemaining = Math.ceil(ticksBehind / CATCH_UP_TICKS_PER_PULSE);
-  const etaMinutes = Math.ceil((pulsesRemaining * CATCH_UP_PULSE_MS) / 60_000);
-  return {
-    ticksBehind,
-    elapsedHours: Math.round((elapsedMs / MS_PER_HOUR) * 10) / 10,
-    etaMinutes,
-    ticksPerPulse: CATCH_UP_TICKS_PER_PULSE,
-    pulseMs: CATCH_UP_PULSE_MS,
-    msPerTick: MS_PER_TICK,
   };
 }
 
@@ -1822,7 +1792,27 @@ async function readBody(req: import('node:http').IncomingMessage): Promise<unkno
 }
 
 export function createCareerApiServer(port = 8787) {
-  let catchUpTimer: ReturnType<typeof setInterval> | undefined;
+  const worldTick = new LocalWorldTickService({
+    requireStore,
+    loadMissions,
+    peekWorld: () => store?.peekEconomyWorld() ?? undefined,
+    isReady: () => store != null,
+    beforeAdvance: async () => {
+      if (!store || !msfsStampNeeded) return;
+      await withCareerLock(async () => {
+        if (!store || !msfsStampNeeded) return;
+        await stampMsfsOverridesOnStore(store);
+        msfsStampNeeded = false;
+      });
+    },
+    runCatchUpWrite: async ({ catchUpTicks, cooperative }) => {
+      await withCareerWrite(() => undefined, {
+        catchUp: true,
+        catchUpTicks,
+        cooperative,
+      });
+    },
+  });
   const watchSession = new CareerWatchSession({
     withCareerRead,
     withCareerWrite,
@@ -1930,6 +1920,7 @@ export function createCareerApiServer(port = 8787) {
           if (bushWatchSession.getStatus().running) {
             await bushWatchSession.stop();
           }
+          worldTick.stopBackgroundPulse();
           await withCareerLock(async () => {
             if (store) {
               try {
@@ -1952,7 +1943,7 @@ export function createCareerApiServer(port = 8787) {
           console.log(
             `[career] profile-select ok id=${id} ${Math.round(performance.now() - selectT0)}ms`,
           );
-          schedulePostLoginEconomyWork();
+          schedulePostLoginEconomyWork(worldTick);
           send(res, 200, {
             activeId: id,
             profile,
@@ -1976,6 +1967,7 @@ export function createCareerApiServer(port = 8787) {
           if (bushWatchSession.getStatus().running) {
             await bushWatchSession.stop();
           }
+          worldTick.stopBackgroundPulse();
           await withCareerLock(async () => {
             if (store) {
               try {
@@ -2031,6 +2023,7 @@ export function createCareerApiServer(port = 8787) {
             if (bushWatchSession.getStatus().running) {
               await bushWatchSession.stop();
             }
+            worldTick.stopBackgroundPulse();
             await withCareerLock(async () => {
               if (store) {
                 try {
@@ -2067,12 +2060,12 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        const nowMs = Date.now();
+        const catchUp = await worldTick.getCatchUpProgress(LOCAL_WORLD_ID, nowMs);
         const payload = await withCareerRead((world, missions) => {
-          const nowMs = Date.now();
           const npcBusy = (world.npcs ?? []).filter((n) => n.status === 'busy').length;
           const offlineFeeSummary = pendingOfflineFeeSummary;
           pendingOfflineFeeSummary = null;
-          const catchUp = catchUpPayload(world, nowMs);
           return {
             needsProfile: false,
             activeProfileId,
@@ -7717,19 +7710,12 @@ export function createCareerApiServer(port = 8787) {
     listen(): Promise<void> {
       return new Promise((resolveListen) => {
         server.listen(port, '127.0.0.1', () => {
-          // Keep wall-clock economy moving while the API is open.
-          catchUpTimer = setInterval(() => {
-            scheduleBackgroundEconomyPulse(CATCH_UP_TICKS_PER_PULSE);
-          }, CATCH_UP_PULSE_MS);
           resolveListen();
         });
       });
     },
     async close(): Promise<void> {
-      if (catchUpTimer) {
-        clearInterval(catchUpTimer);
-        catchUpTimer = undefined;
-      }
+      worldTick.stopBackgroundPulse();
       await watchSession.stop();
       await bushWatchSession.stop();
       await new Promise<void>((resolveClose, reject) => {

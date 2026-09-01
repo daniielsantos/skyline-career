@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-01: **WorldTickService wired** — `LocalWorldTickService` em `createCareerApiServer`; pulse/login/catch-up chip via service; `nextPulseAtMs` no `/api/state`. Ver `14-mp-world-clock.md`.
+
+Atualizado 2026-09-01: **Catch-up acelerado (SP)** — sintoma: login pós-offline demora minutos; Crew/Freights vazios enquanto pulse monopoliza lock 4–10s. Fix: login burst **12 batches** (`LOGIN_CATCH_UP_TICKS`); timer **8 batches / 15s**; pulse usa `ensureEconomyCaughtUpCooperative` + lock chunk **2** (`CATCH_UP_LOCK_CHUNK_TICKS`) com `setImmediate` entre chunks. Constantes: `career-clock.ts`; cooperative: `ensureEconomyCaughtUpCooperative` em `career-economy.ts`; pulse: `runBackgroundEconomyPulse` em `api.ts`.
+
 Atualizado 2026-09-01: **Login lento / Freights loading** — `/api/state` ~8s cold SQLite; pulse + lock fila. Fix: `store-warm` pós login; `topUp`/`heal` só no catch-up (não em read); UI `careerStateReady` pinta wallet após state; Freights boot loader sem tabela/scroll fantasma.
 
 Atualizado 2026-09-01: **Crew needed rota impossível (starter)** — sintoma: Light TP (YS-11) em KLAX→SCEL ~4850 nm com lift/fee. Causa: `contractPilotHasFlyableAirframe` só checava fuel/MTOW, não `maxRangeNm` do catálogo; floor starter podia pegar lot intl longo. Fix: gate de alcance em `listContractPilotPickAirframes` / `contractPilotLiftKg` + cap no `pickStarterFloorLot`.
@@ -8,9 +12,9 @@ Atualizado 2026-09-01: **Crew needed vazio pós-offline** — sintoma: tab Crew 
 
 Atualizado 2026-09-01: **Profile gate erro** — falha em `profiles/select` → banner `.error` fixo acima do painel (toast stack, dismiss ×), não some com overlay.
 
-Atualizado 2026-09-01: **Login rápido** — `profiles/select` responde sem await; **1 economy-pulse** em background (stamp MSFS + 1 batch) para Crew needed/NPC; timer segue 4 batches / 25s. Log `profile-select` + `economy-pulse ok/fail`.
+Atualizado 2026-09-01: **Login rápido** — `profiles/select` responde sem await; **12-batch login pulse** em background (stamp MSFS + cooperative catch-up); timer **8 batches / 15s**. Log `profile-select` + `economy-pulse ok/fail`.
 
-Atualizado 2026-09-01: **Catch-up UX** — banner grande → ícone ⟳ no topbar (tooltip); drenagem **4 batches / 25s** (timer, simulação completa). Constantes: `CATCH_UP_TICKS_PER_PULSE` / `CATCH_UP_PULSE_MS` em `career-clock.ts`.
+Atualizado 2026-09-01: **Catch-up UX** — banner grande → ícone ⟳ no topbar (tooltip); drenagem **8 batches / 15s** (timer, simulação completa). Constantes: `CATCH_UP_TICKS_PER_PULSE` / `CATCH_UP_PULSE_MS` / `LOGIN_CATCH_UP_TICKS` em `career-clock.ts`.
 
 Atualizado 2026-09-01: **Desktop 0.3.50** shipped — pause-aware airborne clock; cruise burn lb/h; Pulse/Stats v8; formLotsIntl perf; pricing balance. Installer: [v0.3.50](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.50).
 

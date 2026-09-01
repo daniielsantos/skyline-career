@@ -151,6 +151,53 @@ SP local pode continuar mapeando isso para `127.0.0.1:8787` com `world_id = 'loc
 | Debug time skip | `POST /api/tick` **só** admin/server; nunca client MP |
 | Watch / SimBridge | Inalterado: physics local; settle é comando para server |
 
+## WorldTickService (esboço de código)
+
+Contrato TypeScript (shared):
+
+- `packages/shared/src/career-world-tick-service.ts` — interface + helpers
+  `worldClockFromEconomy`, `catchUpProgressFromEconomy`
+- `packages/career-ui/server/local-world-tick-service.ts` — SP impl (**wired** em `createCareerApiServer`)
+
+### Interface resumida
+
+```typescript
+interface WorldTickService {
+  mode: 'sp-local' | 'mp-remote';
+  getClock(worldId): Promise<WorldClockSnapshot>;
+  advance(worldId, { n?, cooperative? }): Promise<WorldTickAdvanceResult>; // MP client: proibido
+  getCatchUpProgress(worldId): Promise<WorldCatchUpProgress | null>; // SP only
+  startBackgroundPulse(worldId): void; // SP timer; MP server cron
+  stopBackgroundPulse(): void;
+  openCompanySession({ companyId, lastSeenTick }): Promise<CompanySessionOpenResult>;
+}
+```
+
+### Wiring SP (feito)
+
+1. `createCareerApiServer` instancia `LocalWorldTickService` com deps (`runCatchUpWrite`, `beforeAdvance`, …).
+2. `schedulePostLoginEconomyWork(worldTick)` → `startBackgroundPulse('local')`; clear/delete para o pulse.
+3. `/api/state`: `worldTick.getCatchUpProgress` + `clockPayload` via `worldClockFromEconomy` (`nextPulseAtMs`).
+4. GETs mantêm `skipCatchUp: true`.
+
+### Wiring SP (próximo)
+
+1. Extrair settlement de company para `worldTick.openCompanySession` (`lastSeenTick` na company row).
+
+### MP client stub
+
+```typescript
+class RemoteWorldTickService implements WorldTickService {
+  mode = 'mp-remote' as const;
+  async getClock(worldId) { return fetch(`/worlds/${worldId}/clock`).then(r => r.json()); }
+  async advance() { throw new Error('MP client cannot advance world'); }
+  getCatchUpProgress() { return null; }
+  startBackgroundPulse() { /* poll clock only */ }
+  stopBackgroundPulse() {}
+  openCompanySession(opts) { return fetch(`/companies/${opts.companyId}/session/open`, …); }
+}
+```
+
 ## Migração SP → MP (incremental)
 
 1. **Extrair** `WorldTickService` interface: `advance(worldId, n)`, `getClock(worldId)`.
@@ -183,7 +230,7 @@ SP local pode continuar mapeando isso para `127.0.0.1:8787` com `world_id = 'loc
 | `MS_PER_TICK`, `MAX_LOAD_CATCH_UP_TICKS` | `packages/shared/src/career-clock.ts` |
 | `catchUpEconomyWallClock` | `packages/shared/src/career-economy.ts` |
 | Timer 60s + `catchUp: true` | `packages/career-ui/server/api.ts` |
-| `tickEconomyCooperative` | `packages/shared/src/career-economy.ts` |
+| `WorldTickService` / `LocalWorldTickService` | `career-world-tick-service.ts`, `local-world-tick-service.ts` |
 | Offline fee cap | `packages/shared/src/career-offline-fees.ts` |
 | Crew hold wall-clock | `packages/shared/src/career-npc.ts` (`AWAITING_PILOT_*_HOURS`) |
 

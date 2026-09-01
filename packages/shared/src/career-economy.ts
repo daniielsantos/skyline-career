@@ -12484,8 +12484,6 @@ export function migrateEconomyWorld(
   ensureWorldHubLevels(migrated);
   ensureHomeCountryId(migrated);
   pruneDeadLots(migrated);
-  healAwaitingPilotBoardLots(migrated, nowMs);
-  topUpStarterContractPilotFloor(migrated, nowMs);
 
   return migrated;
 }
@@ -12602,7 +12600,9 @@ export function ensureEconomyCaughtUp(
 
   settledFlights += settleNpcOpsDue(w, nowMs).settledFlights;
   settledFlights += settleFuelHaulsDue(w, nowMs).settledHauls;
-  topUpStarterContractPilotFloor(w, nowMs);
+  if (hours > 0) {
+    topUpStarterContractPilotFloor(w, nowMs);
+  }
   return {
     advancedTicks: hours,
     wantedTicks,

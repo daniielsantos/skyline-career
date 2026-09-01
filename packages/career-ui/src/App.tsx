@@ -3266,6 +3266,9 @@ export function App() {
   const careerReadyRef = useRef(false);
   /** False until the first scoped refresh after profile select finishes. */
   const [careerReady, setCareerReady] = useState(false);
+  /** True once /api/state has painted wallet, clock, and fleet (before missions/NPC). */
+  const careerStateReadyRef = useRef(false);
+  const [careerStateReady, setCareerStateReady] = useState(false);
   /** Avoid double bootstrap refresh (profile select + Strict Mode). */
   const bootProfileKeyRef = useRef<string | null>(null);
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
@@ -3702,6 +3705,8 @@ export function App() {
       setShowProfileGate(true);
       setCareerReady(false);
       careerReadyRef.current = false;
+      careerStateReadyRef.current = false;
+      setCareerStateReady(false);
       return;
     }
     const full = scope == null;
@@ -3761,6 +3766,8 @@ export function App() {
     if (state.companyCredit) setCompanyCredit(state.companyCredit);
     if (state.playerFbos) setPlayerFbos(state.playerFbos);
     if (state.companyCrew) setCompanyCrew(state.companyCrew);
+    careerStateReadyRef.current = true;
+    setCareerStateReady(true);
 
     const [market, missionState, npcState, acMarket] = await Promise.all([
       wantMarket
@@ -3956,6 +3963,8 @@ export function App() {
       bootProfileKeyRef.current = null;
       careerReadyRef.current = false;
       setCareerReady(false);
+      careerStateReadyRef.current = false;
+      setCareerStateReady(false);
       return;
     }
     if (!activeCareerProfile) return;
@@ -3963,6 +3972,8 @@ export function App() {
     bootProfileKeyRef.current = activeCareerProfile.id;
     careerReadyRef.current = false;
     setCareerReady(false);
+    careerStateReadyRef.current = false;
+    setCareerStateReady(false);
     void refreshRef.current().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       if (!isNeedsProfileMessage(message)) setError(message);
@@ -3973,8 +3984,8 @@ export function App() {
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
     if (tab !== 'market' && !airportIcao) return;
-    if (!careerReadyRef.current) {
-      setMarketBoardLoading(true);
+    if (!careerStateReadyRef.current) {
+      setMarketBoardLoading(false);
       return;
     }
     const boardAcf = fleet.find((a) => a.id === boardAircraftId);
@@ -4120,6 +4131,7 @@ export function App() {
     tab,
     airportIcao,
     careerReady,
+    careerStateReady,
   ]);
 
   useEffect(() => {
@@ -9402,15 +9414,17 @@ export function App() {
         <div className="sidebar-footer">
           <span className="who">{pilotName || 'Skyline'}</span>
           <span className="wallet">
-            {careerReady ? formatMoney(wallet) : '…'}
+            {careerStateReady ? formatMoney(wallet) : '…'}
           </span>
           <span className="meta">
-            {!careerReady
+            {!careerStateReady
               ? 'Loading career…'
-              : pilotIcao
-                ? `Pilot at ${pilotIcao}`
-                : 'Pilot location —'}
-            {careerReady && homeHubIcao ? ` · home ${homeHubIcao}` : ''}
+              : !careerReady
+                ? 'Syncing missions…'
+                : pilotIcao
+                  ? `Pilot at ${pilotIcao}`
+                  : 'Pilot location —'}
+            {careerStateReady && homeHubIcao ? ` · home ${homeHubIcao}` : ''}
           </span>
           <button
             type="button"
@@ -9557,7 +9571,7 @@ export function App() {
             ) : null}
             <div className="metric">
               <span className="label">Wallet</span>
-              <strong>{careerReady ? formatMoney(wallet) : '…'}</strong>
+              <strong>{careerStateReady ? formatMoney(wallet) : '…'}</strong>
             </div>
             <div
               className="metric"
@@ -11552,6 +11566,21 @@ export function App() {
                 </table>
               </div>
             </>
+          ) : !careerStateReady ? (
+            <div
+              className="freights-boot-loading"
+              role="status"
+              aria-live="polite"
+            >
+              <span className="busy-spinner busy-spinner-lg" aria-hidden="true" />
+              <div>
+                <h2>Loading freights…</h2>
+                <p className="muted">
+                  Restoring economy snapshot — wallet and board load in a few
+                  seconds after offline time.
+                </p>
+              </div>
+            </div>
           ) : (
             <>
           <div className="panel-head">
@@ -11644,11 +11673,11 @@ export function App() {
           ) : null}
           <div
             className={`table-wrap freights-board-table${
-              marketBoardLoading ? ' is-loading' : ''
+              marketBoardLoading && pagedLots.length > 0 ? ' is-loading' : ''
             }`}
             aria-busy={marketBoardLoading}
           >
-            {marketBoardLoading ? (
+            {marketBoardLoading && pagedLots.length > 0 ? (
               <BusyChip
                 className="freights-board-loading"
                 label="Updating freights"
@@ -12187,7 +12216,7 @@ export function App() {
                   <tr>
                     <td colSpan={8} className="empty">
                       {marketBoardLoading
-                        ? 'Updating freights…'
+                        ? 'Loading freights…'
                         : marketTotalLots === 0 &&
                             !hasMarketFilters &&
                             marketSorts.length === 0

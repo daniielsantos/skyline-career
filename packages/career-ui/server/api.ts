@@ -438,6 +438,33 @@ function scheduleBackgroundEconomyPulse(
   void runBackgroundEconomyPulse(catchUpTicks);
 }
 
+/** Hydrate SQLite → RAM once so the first /api/state avoids a cold parse. */
+async function warmCareerStoreCache(): Promise<void> {
+  if (!store) return;
+  const t0 = performance.now();
+  await withCareerLock(async () => {
+    if (!store) return;
+    await store.loadEconomy({ maxCatchUpTicks: 0 });
+  });
+  console.log(
+    `[career] store-warm ok ${Math.round(performance.now() - t0)}ms`,
+  );
+}
+
+function schedulePostLoginEconomyWork(): void {
+  void (async () => {
+    try {
+      await warmCareerStoreCache();
+    } catch (error) {
+      console.error(
+        `[career] store-warm fail:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+    scheduleBackgroundEconomyPulse(MAX_LOAD_CATCH_UP_TICKS);
+  })();
+}
+
 function resetMsfsStampState(): void {
   msfsStampNeeded = false;
 }
@@ -1925,7 +1952,7 @@ export function createCareerApiServer(port = 8787) {
           console.log(
             `[career] profile-select ok id=${id} ${Math.round(performance.now() - selectT0)}ms`,
           );
-          scheduleBackgroundEconomyPulse(MAX_LOAD_CATCH_UP_TICKS);
+          schedulePostLoginEconomyWork();
           send(res, 200, {
             activeId: id,
             profile,

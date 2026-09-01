@@ -608,8 +608,8 @@ function mxFuelBurnFindingForAircraft(
     message:
       `This airframe burns about +${excessPct}% more fuel than healthy ` +
       `(condition ${Math.round(mxBurn.conditionPct)}%). ` +
-      `Due still matches the SimBrief OFP — repair before long legs or you may ` +
-      `run short; Watch can drain the excess burn in flight.`,
+      `Due still matches the SimBrief OFP — repair before long legs or settle ` +
+      `will debit the excess burn from your hangar tank.`,
   };
 }
 
@@ -7104,6 +7104,10 @@ export function createCareerApiServer(port = 8787) {
             watchSession.getStatus().missionId === body.missionId
               ? watchSession.getCapturedWeatherOps() ?? undefined
               : undefined;
+          const mxFuelDrain =
+            watchSession.getStatus().missionId === body.missionId
+              ? watchSession.getCapturedMxFuelDrain()
+              : { unsettledKg: 0, totalKg: 0 };
           let touchdownLat: number | undefined;
           let touchdownLon: number | undefined;
           let touchdownHeadingTrueDeg: number | undefined;
@@ -7149,6 +7153,8 @@ export function createCareerApiServer(port = 8787) {
             const executed = executeSettleFlight(world, missions, {
               missionId: body.missionId,
               residualFuelKg,
+              mxFuelDrainUnsettledKg: mxFuelDrain.unsettledKg,
+              mxFuelDrainTotalKg: mxFuelDrain.totalKg,
               landingFpm,
               airborneEndedAtMs,
               flightScore,

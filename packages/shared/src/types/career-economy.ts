@@ -897,6 +897,8 @@ export interface MissionIntent {
   tripFuelBurnKg?: number;
   /** Actual fuel remaining in MSFS when the mission settled. */
   settledFuelKg?: number;
+  /** MX wear excess fuel debited on settle (ledger + sim gap). */
+  settledMxFuelDrainKg?: number;
   /**
    * Vertical speed at first touchdown (feet per minute).
    * Typically negative for a descent (e.g. -220).

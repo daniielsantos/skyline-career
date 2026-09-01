@@ -7,6 +7,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 ## Em poucas linhas
 
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
+- **MX fuel settle-only (2026-09-01):** wear &lt;90% → Watch **accrue** excess burn in flight (no sim writes); settle debita do tank career (`settledMxFuelDrainKg`). Inject e clássico iguais. Offline: `estimateMxFuelDrainKgForSettle`.
 - Lots / Market / NPC / fuel trucks / hub levels / aircraft market / wear / ledger / SQLite store.
 - **Crew needed (starter):** global cap `~0.4×regiões` (GA/TP) stays; **piso local** `10` (+4/company, máx 40 no gancho MP) no `homeCountryId` — overflow do cap global enquanto o país-home está abaixo do piso (sem teto duro local); hold **0.5–2 h** abaixo do piso, **3–8 h** acima. Banda jet+ sem piso.
 - **Aircraft pool (design locked, 2026-08-19; cota SKU 2026-08-20):** cap por país (BR=62 hubs=1.0, teto 1.5×); **cota igual por SKU** + mínimo mundial por modelo (leves 1 / medium 2 / narrow+wide **3**); BR/US 1-de-cada nas leves; dealer **50%** vs listar; NPC compra por fair. **Lease:** taxa semanal ↑, cobrança /wk, termo máx **3 mo**, depósito 4 semanas. Roadmap F0–F7: [`10-aircraft-pool.md`](./10-aircraft-pool.md).

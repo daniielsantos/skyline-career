@@ -16,6 +16,7 @@ import {
   quoteFerry,
   releaseAircraftOnCancel,
   relocateAircraftOnSettle,
+  resolveSettledAircraftFuelKg,
   selectStarterHub,
   STARTER_WALLET_USD,
   isContractPilotCareer,
@@ -396,5 +397,58 @@ describe('career fleet hangar', () => {
       purchase.mission,
     );
     assert.equal(departFuel.fuelDebitUsd, 0);
+  });
+
+  it('settle debits accrued MX drain from live residual fuel', () => {
+    const world = createSeedEconomyWorld({ seed: 'mx-drain-live' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    aircraft.fuelKg = 120;
+    const mission = {
+      id: 'msn_mx_live',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'in_flight',
+      tripFuelBurnKg: 40,
+    } as never;
+    state.missions.push(mission);
+    assignAircraftToMission(state, aircraft.id, 'msn_mx_live', 'SBGR');
+
+    const resolved = resolveSettledAircraftFuelKg(aircraft, mission, world, {
+      residualFuelKg: 80,
+      mxFuelDrainTotalKg: 45.2,
+    });
+    assert.equal(resolved.fuelKg, 35);
+    assert.equal(resolved.mxFuelDrainAppliedKg, 45.2);
+  });
+
+  it('settle debits estimated MX drain when live residual is unavailable', () => {
+    const world = createSeedEconomyWorld({ seed: 'mx-drain-fallback' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    aircraft.fuelKg = 120;
+    aircraft.airframeConditionPct = 40;
+    aircraft.engineConditionPct = 40;
+    const mission = {
+      id: 'msn_mx_fallback',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'in_flight',
+      tripFuelBurnKg: 40,
+      expectedRouteMs: 3_600_000,
+    } as never;
+    state.missions.push(mission);
+
+    const resolved = resolveSettledAircraftFuelKg(aircraft, mission, world, {});
+    assert.ok(resolved.mxFuelDrainAppliedKg > 0);
+    assert.ok(resolved.fuelKg < 80);
+    assert.equal(
+      resolved.fuelKg,
+      Math.round(120 - 40 - resolved.mxFuelDrainAppliedKg),
+    );
   });
 });

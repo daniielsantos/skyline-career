@@ -2238,6 +2238,12 @@ export interface SettleMissionOpts {
   fleet?: CareerMissionsState;
   /** Actual fuel remaining in MSFS; falls back to estimated burn when unavailable. */
   residualFuelKg?: number;
+  /** MX wear excess fuel accrued this flight (Watch); debited on settle. */
+  mxFuelDrainTotalKg?: number;
+  /**
+   * @deprecated Same as mxFuelDrainTotalKg (settle-only ledger; no in-flight sim drain).
+   */
+  mxFuelDrainUnsettledKg?: number;
   /**
    * Touchdown vertical speed (fpm). Typically negative.
    * Captured by Flight Watch at first wheels-down.
@@ -2412,14 +2418,24 @@ export function settleMission(
     typeof opts.residualFuelKg === 'number' && Number.isFinite(opts.residualFuelKg)
       ? Math.max(0, Math.round(opts.residualFuelKg))
       : undefined;
+  let settledFleetFuelKg: number | undefined;
+  let settledMxFuelDrainKg: number | undefined;
   if (opts.fleet) {
-    const aircraft = relocateAircraftOnSettle(
+    const relocated = relocateAircraftOnSettle(
       opts.fleet,
       working,
       world,
-      residualFuelKg,
+      {
+        residualFuelKg,
+        mxFuelDrainUnsettledKg: opts.mxFuelDrainUnsettledKg,
+        mxFuelDrainTotalKg: opts.mxFuelDrainTotalKg,
+      },
     );
-    if (aircraft) {
+    if (relocated) {
+      const { aircraft, mxFuelDrainAppliedKg } = relocated;
+      settledFleetFuelKg = aircraft.fuelKg;
+      settledMxFuelDrainKg =
+        mxFuelDrainAppliedKg > 0 ? mxFuelDrainAppliedKg : undefined;
       const blockHours = estimateMissionBlockHours(
         world,
         working.originIcao,
@@ -2654,7 +2670,8 @@ export function settleMission(
     ...working,
     status: 'settled',
     settledAtTick: settleTick,
-    settledFuelKg: residualFuelKg,
+    settledFuelKg: settledFleetFuelKg ?? residualFuelKg,
+    settledMxFuelDrainKg,
     settledLandingFpm:
       typeof opts.landingFpm === 'number' && Number.isFinite(opts.landingFpm)
         ? Math.round(opts.landingFpm)

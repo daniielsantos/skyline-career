@@ -55,6 +55,6 @@ export function mxFuelBurnAlertText(alert: MxFuelBurnAlert): string {
   return (
     `This airframe burns about +${alert.excessPct}% more fuel than healthy ` +
     `(condition ${Math.round(alert.conditionPct)}%). ` +
-    `Due still matches SimBrief — repair or you may run short in flight.`
+    `Due still matches SimBrief — repair or settle will debit excess burn.`
   );
 }

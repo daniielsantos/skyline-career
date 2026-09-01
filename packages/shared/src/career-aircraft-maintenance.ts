@@ -6,12 +6,18 @@ import {
   hoursMxCostMult,
   resolveAircraftMsrpUsd,
 } from './career-aircraft-pricing.js';
-import { findCareerPlayerAirframe } from './career-player-airframes.js';
+import { estimateMissionBlockHours } from './career-aircraft-market.js';
+import type { CareerEconomyWorld } from './career-economy.js';
+import {
+  findCareerPlayerAirframe,
+  resolveAirframeCruiseFuelFlowKgPerHour,
+} from './career-player-airframes.js';
 import { applyWalletDelta } from './career-ledger.js';
 import type {
   AirframeCondition,
   CareerMissionsState,
   FreighterClassId,
+  MissionIntent,
   PlayerAircraft,
 } from './types/career-economy.js';
 
@@ -130,8 +136,8 @@ export function fuelBurnMultFromAircraft(
 
 /**
  * Due / purchase / inject always match the SimBrief OFP block fuel.
- * Wear only surfaces as advisory (`excessPct`); Watch may still drain the
- * excess burn in flight if the pilot skips repair.
+ * Wear surfaces as advisory (`excessPct`); Watch accrues excess burn and
+ * debits it on settle (no in-flight sim tank writes).
  */
 export function padOfpBlockFuelKgForMx(
   ofpBlockFuelKg: number,
@@ -176,6 +182,69 @@ export function padOfpBlockFuelKgForMx(
     conditionPct: burn.conditionPct,
     cappedByTank: capacity > 0 && ofpKg > capacity,
   };
+}
+
+/**
+ * Estimate MX excess fuel burned when Watch did not pass a live ledger
+ * (offline settle, manual settle, or fallback without residual sim read).
+ */
+export function estimateMxFuelDrainKgForSettle(opts: {
+  aircraft: Pick<
+    PlayerAircraft,
+    | 'aircraftClassId'
+    | 'airframeTypeId'
+    | 'airframeConditionPct'
+    | 'engineConditionPct'
+  >;
+  mission: Pick<
+    MissionIntent,
+    | 'originIcao'
+    | 'destIcao'
+    | 'airborneElapsedMs'
+    | 'settledFlightDurationMs'
+    | 'expectedRouteMs'
+  >;
+  world?: CareerEconomyWorld;
+  cruiseFuelFlowKgPerHour?: number;
+  flightHours?: number;
+}): number {
+  const burn = fuelBurnMultFromAircraft(opts.aircraft);
+  if (burn.excessFrac < 0.01) return 0;
+
+  const hours = (() => {
+    if (typeof opts.flightHours === 'number' && opts.flightHours > 0) {
+      return opts.flightHours;
+    }
+    const ms =
+      opts.mission.settledFlightDurationMs ??
+      opts.mission.airborneElapsedMs ??
+      opts.mission.expectedRouteMs;
+    if (typeof ms === 'number' && Number.isFinite(ms) && ms > 0) {
+      return ms / 3_600_000;
+    }
+    if (opts.world) {
+      return estimateMissionBlockHours(
+        opts.world,
+        opts.mission.originIcao,
+        opts.mission.destIcao,
+        opts.aircraft.aircraftClassId,
+      );
+    }
+    return 0;
+  })();
+  if (!(hours > 0)) return 0;
+
+  const flow =
+    (typeof opts.cruiseFuelFlowKgPerHour === 'number' &&
+    Number.isFinite(opts.cruiseFuelFlowKgPerHour) &&
+    opts.cruiseFuelFlowKgPerHour > 0
+      ? opts.cruiseFuelFlowKgPerHour
+      : undefined) ??
+    resolveAirframeCruiseFuelFlowKgPerHour(opts.aircraft.airframeTypeId) ??
+    0;
+  if (!(flow > 0)) return 0;
+
+  return Math.round(flow * burn.excessFrac * hours * 10) / 10;
 }
 
 const AF_WEAR_SHARE = 0.7;

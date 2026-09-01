@@ -1462,8 +1462,8 @@ export class CareerWatchSession {
   private lastMxFuelDrainAtMs = 0;
   /** Last mx drain skip log (rate-limited). */
   private lastMxFuelDrainSkipLogAtMs = 0;
-  /** Accumulated MX excess kg waiting to write (GA flows are tiny per tick). */
-  private pendingMxDrainKg = 0;
+  /** Accumulated MX excess kg accrued this flight (settle-only debit). */
+  private mxFuelDrainAccruedKg = 0;
 
   constructor(private readonly cb: WatchCallbacks) {}
 
@@ -1532,6 +1532,15 @@ export class CareerWatchSession {
       };
     }
     return undefined;
+  }
+
+  /** MX wear excess fuel ledger for settle (capture before stop()). */
+  getCapturedMxFuelDrain(): {
+    unsettledKg: number;
+    totalKg: number;
+  } {
+    const totalKg = Math.round(this.mxFuelDrainAccruedKg * 1000) / 1000;
+    return { unsettledKg: totalKg, totalKg };
   }
 
   getStatus(): WatchStatusPayload {
@@ -1705,7 +1714,7 @@ export class CareerWatchSession {
     this.lastAirborneLon = null;
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
-    this.pendingMxDrainKg = 0;
+    this.mxFuelDrainAccruedKg = 0;
     this.paxAndCargoCrewCache = null;
     this.freighterRolesCache = null;
     this.stationMaxCache = null;
@@ -1962,7 +1971,7 @@ export class CareerWatchSession {
     this.lastAirborneLon = null;
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
-    this.pendingMxDrainKg = 0;
+    this.mxFuelDrainAccruedKg = 0;
     this.paxAndCargoCrewCache = null;
     this.freighterRolesCache = null;
     this.stationMaxCache = null;
@@ -3456,17 +3465,15 @@ export class CareerWatchSession {
         landingVsFpm: nextState.landingFpm,
       });
 
-      // Soft MX burn: drain only the excess above healthy (announced at preflight).
+      // Accrue MX excess burn for settle (no in-flight sim writes).
       if (
         current.status === 'in_flight' &&
         !sample.onGround &&
-        this.bridge &&
         !this.pendingSimConnectReset
       ) {
-        await this.maybeDrainMxFuelExcess(
+        this.maybeAccrueMxFuelExcess(
           snap.missions,
           current,
-          sample,
           nowMs,
         );
       }
@@ -3801,6 +3808,7 @@ export class CareerWatchSession {
         this.settling = true;
         // Let GET /api/watch/status serve the overlay before SimVar / persist.
         await new Promise<void>((resolve) => setImmediate(resolve));
+        const mxFuelDrain = this.getCapturedMxFuelDrain();
         let residualFuelKg: number | undefined;
         try {
           residualFuelKg = await readLiveResidualFuelKg(this.bridge);
@@ -3900,6 +3908,8 @@ export class CareerWatchSession {
             const executed = executeSettleFlight(worldFresh, freshMissions, {
               missionId: this.missionId,
               residualFuelKg,
+              mxFuelDrainUnsettledKg: mxFuelDrain.unsettledKg,
+              mxFuelDrainTotalKg: mxFuelDrain.totalKg,
               landingFpm,
               airborneEndedAtMs: this.watchState.airborneEndedAtMs,
               airborneElapsedMs:
@@ -4062,29 +4072,24 @@ export class CareerWatchSession {
   }
 
   /**
-   * Drain only MX excess burn (mult−1) while airborne.
-   * Uses classic L/R main tanks; fails soft (logs + backs off) on SimConnect errors.
-   * GA flows are small — accumulate until ≥0.05 gal, and fall back to catalog
-   * cruise flow when the live cruise sampler has not locked yet.
+   * Accrue MX excess burn (mult−1) while airborne. Debited on settle only —
+   * no in-flight SimVar tank writes (inject or classic).
    */
-  private async maybeDrainMxFuelExcess(
+  private maybeAccrueMxFuelExcess(
     missions: CareerMissionsState,
     mission: MissionIntent,
-    sample: FlightGroundSample,
     nowMs: number,
-  ): Promise<void> {
-    const MX_DRAIN_INTERVAL_MS = 30_000;
+  ): void {
+    const MX_ACCRUE_INTERVAL_MS = 30_000;
     const MX_SKIP_LOG_MS = 60_000;
-    const MX_MIN_WRITE_KG = 0.08; // ~0.05 gal Jet-A
     if (isOfpLoadActive()) return;
-    if (!this.bridge?.isPipeConnected) return;
     if (!mission.aircraftId) return;
-    if (nowMs - this.lastMxFuelDrainAtMs < MX_DRAIN_INTERVAL_MS) return;
+    if (nowMs - this.lastMxFuelDrainAtMs < MX_ACCRUE_INTERVAL_MS) return;
 
     const logSkip = (reason: string, extra?: Record<string, unknown>) => {
       if (nowMs - this.lastMxFuelDrainSkipLogAtMs < MX_SKIP_LOG_MS) return;
       this.lastMxFuelDrainSkipLogAtMs = nowMs;
-      watchDebugLog('watch', 'mx fuel drain skip', {
+      watchDebugLog('watch', 'mx fuel accrue skip', {
         missionId: mission.id,
         reason,
         ...extra,
@@ -4136,86 +4141,10 @@ export class CareerWatchSession {
     const dtMs =
       this.lastMxFuelDrainAtMs > 0
         ? nowMs - this.lastMxFuelDrainAtMs
-        : MX_DRAIN_INTERVAL_MS;
+        : MX_ACCRUE_INTERVAL_MS;
     const dtHours = Math.min(0.05, Math.max(0, dtMs / 3_600_000));
     const stepKg = flowKgPerHour * burn.excessFrac * dtHours;
-    this.pendingMxDrainKg += stepKg;
-    // Always advance the interval clock so we accumulate over wall time.
+    this.mxFuelDrainAccruedKg += stepKg;
     this.lastMxFuelDrainAtMs = nowMs;
-
-    if (this.pendingMxDrainKg < MX_MIN_WRITE_KG) {
-      logSkip('accumulating', {
-        pendingKg: Math.round(this.pendingMxDrainKg * 1000) / 1000,
-        stepKg: Math.round(stepKg * 1000) / 1000,
-        flowKgPerHour: Math.round(flowKgPerHour * 10) / 10,
-        excessPct: Math.round(burn.excessFrac * 100),
-        flowSource:
-          typeof liveFlow === 'number' && liveFlow > 0
-            ? 'live'
-            : typeof overrideFlow === 'number' && overrideFlow > 0
-              ? 'override'
-              : 'catalog',
-      });
-      return;
-    }
-
-    const drainKg = this.pendingMxDrainKg;
-    const drainLb = drainKg * KG_TO_LB;
-    const drainGal = drainLb / DEFAULT_JET_A_LB_PER_GAL;
-    if (!(drainGal > 0.02)) {
-      logSkip('drain_too_small_gal', { drainKg, drainGal });
-      return;
-    }
-
-    try {
-      const left = await this.bridge.readSimVar({
-        name: 'FUEL TANK LEFT MAIN QUANTITY',
-        unit: 'gallons',
-      });
-      const right = await this.bridge.readSimVar({
-        name: 'FUEL TANK RIGHT MAIN QUANTITY',
-        unit: 'gallons',
-      });
-      const total = Math.max(0, left) + Math.max(0, right);
-      if (total < 1) {
-        logSkip('tanks_empty', { left, right });
-        return;
-      }
-      const leftShare = Math.max(0, left) / total;
-      const nextLeft = Math.max(0, left - drainGal * leftShare);
-      const nextRight = Math.max(0, right - drainGal * (1 - leftShare));
-      await this.bridge.writeSimVar({
-        name: 'FUEL TANK LEFT MAIN QUANTITY',
-        unit: 'gallons',
-        value: nextLeft,
-      });
-      await this.bridge.writeSimVar({
-        name: 'FUEL TANK RIGHT MAIN QUANTITY',
-        unit: 'gallons',
-        value: nextRight,
-      });
-      this.pendingMxDrainKg = 0;
-      this.lastMxFuelDrainSkipLogAtMs = 0;
-      watchDebugLog('watch', 'mx fuel drain', {
-        missionId: mission.id,
-        excessPct: Math.round(burn.excessFrac * 100),
-        drainKg: Math.round(drainKg * 100) / 100,
-        drainGal: Math.round(drainGal * 100) / 100,
-        flowKgPerHour: Math.round(flowKgPerHour * 10) / 10,
-        flowSource:
-          typeof liveFlow === 'number' && liveFlow > 0
-            ? 'live'
-            : typeof overrideFlow === 'number' && overrideFlow > 0
-              ? 'override'
-              : 'catalog',
-        gsKt: sample.groundSpeedKt,
-      });
-    } catch (err) {
-      watchDebugLog('watch', 'mx fuel drain failed', {
-        missionId: mission.id,
-        error: err instanceof Error ? err.message : String(err),
-        pendingKg: Math.round(this.pendingMxDrainKg * 100) / 100,
-      });
-    }
   }
 }

@@ -12884,7 +12884,7 @@ export function App() {
                       ? ')'
                       : ''}
                   . Dispatch still uses SimBrief OFP for Due — repair before long
-                  legs or Watch may drain the excess burn in flight.
+                  legs; excess wear burn is debited on settle.
                 </p>
               ) : null}
 

@@ -22,6 +22,7 @@ import {
 import { fboServiceCostMult } from './career-fbo-perks.js';
 import {
   ensureAircraftConditionPcts,
+  estimateMxFuelDrainKgForSettle,
   INSPECTION_INTERVAL_HOURS,
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
@@ -841,33 +842,105 @@ export function releaseAircraftOnCancel(
   return aircraft;
 }
 
+export type SettleFleetFuelOpts = {
+  residualFuelKg?: number;
+  /** MX wear excess accrued this flight (Watch); debited on settle. */
+  mxFuelDrainTotalKg?: number;
+  /** @deprecated Alias of mxFuelDrainTotalKg. */
+  mxFuelDrainUnsettledKg?: number;
+  cruiseFuelFlowKgPerHour?: number;
+};
+
+function normalizeSettleFleetFuelArg(
+  fuel?: number | SettleFleetFuelOpts,
+): SettleFleetFuelOpts {
+  if (typeof fuel === 'number' && Number.isFinite(fuel)) {
+    return { residualFuelKg: fuel };
+  }
+  if (fuel && typeof fuel === 'object') {
+    return fuel;
+  }
+  return {};
+}
+
+/** Resolve persisted tank fuel after settle, including MX wear excess ledger. */
+export function resolveSettledAircraftFuelKg(
+  aircraft: PlayerAircraft,
+  mission: MissionIntent,
+  world: CareerEconomyWorld | undefined,
+  opts: SettleFleetFuelOpts,
+): { fuelKg: number; mxFuelDrainAppliedKg: number } {
+  const capacity = Math.max(0, Math.floor(aircraft.fuelCapacityKg));
+  const clamp = (kg: number) =>
+    Math.round(Math.max(0, Math.min(capacity, kg)));
+
+  const mxTotal = Math.max(
+    0,
+    opts.mxFuelDrainTotalKg ?? opts.mxFuelDrainUnsettledKg ?? 0,
+  );
+  const hasWatchMx = mxTotal > 0;
+
+  const estimateMx = () =>
+    estimateMxFuelDrainKgForSettle({
+      aircraft,
+      mission,
+      world,
+      cruiseFuelFlowKgPerHour: opts.cruiseFuelFlowKgPerHour,
+    });
+
+  if (
+    typeof opts.residualFuelKg === 'number' &&
+    Number.isFinite(opts.residualFuelKg)
+  ) {
+    const mxLedger = hasWatchMx ? mxTotal : estimateMx();
+    return {
+      fuelKg: clamp(opts.residualFuelKg - mxLedger),
+      mxFuelDrainAppliedKg: Math.round(mxLedger * 10) / 10,
+    };
+  }
+
+  let tripBurn = mission.tripFuelBurnKg;
+  if (!(typeof tripBurn === 'number' && tripBurn > 0) && world) {
+    const distanceNm =
+      routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
+    tripBurn = estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
+  }
+  const mxTotalFallback = hasWatchMx ? mxTotal : estimateMx();
+  let fuel = aircraft.fuelKg;
+  if (typeof tripBurn === 'number' && tripBurn > 0) fuel -= tripBurn;
+  fuel -= mxTotalFallback;
+  return {
+    fuelKg: clamp(fuel),
+    mxFuelDrainAppliedKg: Math.round(mxTotalFallback * 10) / 10,
+  };
+}
+
+export type RelocateAircraftOnSettleResult = {
+  aircraft: PlayerAircraft;
+  mxFuelDrainAppliedKg: number;
+};
+
 export function relocateAircraftOnSettle(
   state: CareerMissionsState,
   mission: MissionIntent,
   world?: CareerEconomyWorld,
-  residualFuelKg?: number,
-): PlayerAircraft | undefined {
+  fuel?: number | SettleFleetFuelOpts,
+): RelocateAircraftOnSettleResult | undefined {
   const aircraft = findMissionAircraft(state, mission);
   if (!aircraft) return undefined;
 
-  if (typeof residualFuelKg === 'number' && Number.isFinite(residualFuelKg)) {
-    aircraft.fuelKg = Math.round(
-      Math.max(0, Math.min(aircraft.fuelCapacityKg, residualFuelKg)),
-    );
-  } else {
-    let appliedBurn = mission.tripFuelBurnKg;
-    if (!(typeof appliedBurn === 'number' && appliedBurn > 0) && world) {
-      const distanceNm =
-        routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
-      appliedBurn = estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
-    }
-    if (typeof appliedBurn === 'number' && appliedBurn > 0) {
-      aircraft.fuelKg = Math.max(
-        0,
-        Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg - appliedBurn),
-      );
-    }
-  }
+  const fuelOpts = normalizeSettleFleetFuelArg(fuel);
+  const cruiseFlow =
+    aircraft.airframeTypeId &&
+    state.airframePerfOverrides?.[aircraft.airframeTypeId]
+      ?.cruiseFuelFlowKgPerHour;
+  const resolved = resolveSettledAircraftFuelKg(aircraft, mission, world, {
+    ...fuelOpts,
+    cruiseFuelFlowKgPerHour:
+      fuelOpts.cruiseFuelFlowKgPerHour ??
+      (typeof cruiseFlow === 'number' && cruiseFlow > 0 ? cruiseFlow : undefined),
+  });
+  aircraft.fuelKg = resolved.fuelKg;
 
   aircraft.locationIcao = mission.destIcao.toUpperCase();
   aircraft.assignedMissionId = undefined;
@@ -883,7 +956,10 @@ export function relocateAircraftOnSettle(
   } else {
     aircraft.status = 'parked';
   }
-  return aircraft;
+  return {
+    aircraft,
+    mxFuelDrainAppliedKg: resolved.mxFuelDrainAppliedKg,
+  };
 }
 
 /**

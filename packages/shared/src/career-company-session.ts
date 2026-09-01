@@ -20,7 +20,7 @@ import { settleWarehouseStorageFees } from './career-warehouse.js';
 export function companySessionFromTick(
   missions: Pick<CareerMissionsState, 'lastSeenTick'>,
   fallbackFromTick: number,
-  toTick: number,
+  _toTick: number,
 ): number {
   const persisted =
     typeof missions.lastSeenTick === 'number' && Number.isFinite(missions.lastSeenTick)

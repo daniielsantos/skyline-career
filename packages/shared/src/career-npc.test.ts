@@ -71,9 +71,9 @@ import {
   quoteRepositionPilotFeeUsd,
   isDomesticOd,
   isInternationalOdAllowed,
-  healAwaitingPilotBoardLots,
   topUpStarterContractPilotFloor,
 } from './career-economy.js';
+import { healAwaitingPilotBoardLots } from './career-npc.js';
 import { invalidateLaneInboundIndex } from './career-lane-index.js';
 
 type SeedWorld = ReturnType<typeof createSeedEconomyWorld>;

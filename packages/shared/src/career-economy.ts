@@ -973,7 +973,6 @@ import {
 import { tickPortInboundShips } from './career-port-concessions.js';
 import {
   ensureNpcFleet,
-  healAwaitingPilotBoardLots,
   listNpcActivity,
   listNpcHomeRegions,
   npcClaimForLot,
@@ -1141,7 +1140,6 @@ export {
   estimateNpcBlockHours,
   contractPilotMissionDeadlineTick,
   findNpcAirframe,
-  healAwaitingPilotBoardLots,
   isNpcRepositionFlight,
   listHomologatedNpcAirframesForClass,
   listNpcAirframesForClass,

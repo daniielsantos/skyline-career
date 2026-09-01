@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-01: **Crew needed vazio pós-offline** — sintoma: tab Crew 0 linhas sem filtro. Causa: (1) `awaiting_pilot` sem `lots` correspondente (prune SQLite) → `listMarketLots` ignora; (2) catch-up deixa ~3800 NPC `in_flight` → floor US (10) não abre. Fix: `healAwaitingPilotBoardLots` + `topUpStarterContractPilotFloor` em `migrateEconomyWorld` / `ensureEconomyCaughtUp` (`career-npc.ts`).
+
 Atualizado 2026-09-01: **Profile gate erro** — falha em `profiles/select` → banner `.error` fixo acima do painel (toast stack, dismiss ×), não some com overlay.
 
 Atualizado 2026-09-01: **Login rápido** — `profiles/select` responde sem await; **1 economy-pulse** em background (stamp MSFS + 1 batch) para Crew needed/NPC; timer segue 4 batches / 25s. Log `profile-select` + `economy-pulse ok/fail`.

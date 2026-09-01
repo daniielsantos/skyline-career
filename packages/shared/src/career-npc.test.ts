@@ -71,6 +71,8 @@ import {
   quoteRepositionPilotFeeUsd,
   isDomesticOd,
   isInternationalOdAllowed,
+  healAwaitingPilotBoardLots,
+  topUpStarterContractPilotFloor,
 } from './career-economy.js';
 import { invalidateLaneInboundIndex } from './career-lane-index.js';
 
@@ -2508,6 +2510,62 @@ describe('NPC freighter fleet', () => {
           rng: () => 0.25,
         }),
       /Failed to create reposition offer/,
+    );
+  });
+
+  it('heals awaiting_pilot flights whose board lot was pruned', () => {
+    const world = createSeedEconomyWorld({ seed: 'crew-heal-lot' });
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    const flight = createNpcRepositionOffer(world, 'npc-1', 'SBGR', {
+      nowMs,
+      rng: () => 0.2,
+    });
+    world.lots = world.lots.filter((l) => l.id !== flight.lotId);
+    assert.equal(npcClaimForLot(world, flight.lotId, nowMs)?.crewNeeded, true);
+    assert.equal(
+      listMarketLots(world, { nowMs }).some(
+        (row) => row.lot.id === flight.lotId && row.npcClaim?.crewNeeded,
+      ),
+      false,
+    );
+    assert.equal(healAwaitingPilotBoardLots(world, nowMs), 1);
+    assert.ok(
+      listMarketLots(world, { nowMs }).some(
+        (row) => row.lot.id === flight.lotId && row.npcClaim?.crewNeeded,
+      ),
+    );
+  });
+
+  it('tops up the home-country starter crew floor while NPCs are in flight', () => {
+    const world = createSeedEconomyWorld({ seed: 'crew-floor-topup' });
+    world.homeCountryId = 'US';
+    const nowMs = world.lastBatchAtMs ?? Date.now();
+    for (const npc of world.npcs) {
+      npc.status = 'busy';
+      npc.currentFlightId = 'busy-placeholder';
+    }
+    const resting = world.npcs.find(
+      (n) =>
+        isStarterContractPilotClass(n.aircraftClassId) &&
+        npcCanOfferContractPilot(n),
+    );
+    assert.ok(resting);
+    resting!.status = 'resting';
+    resting!.currentFlightId = undefined;
+    world.npcFlights = world.npcFlights.filter(
+      (f) => f.status !== 'awaiting_pilot',
+    );
+    assert.equal(
+      countOpenContractPilotOffersInCountry(world, 'US', 'starter'),
+      0,
+    );
+    const added = topUpStarterContractPilotFloor(world, nowMs);
+    assert.ok(added > 0);
+    assert.ok(
+      countOpenContractPilotOffersInCountry(world, 'US', 'starter') > 0,
+    );
+    assert.ok(
+      listMarketLots(world, { nowMs }).some((row) => row.npcClaim?.crewNeeded),
     );
   });
 });

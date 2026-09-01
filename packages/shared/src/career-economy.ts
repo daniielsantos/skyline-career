@@ -973,6 +973,7 @@ import {
 import { tickPortInboundShips } from './career-port-concessions.js';
 import {
   ensureNpcFleet,
+  healAwaitingPilotBoardLots,
   listNpcActivity,
   listNpcHomeRegions,
   npcClaimForLot,
@@ -983,6 +984,7 @@ import {
   seedNpcFleet,
   settleNpcOpsDue,
   tickNpcFreighters,
+  topUpStarterContractPilotFloor,
   ensureLaneInboundIndex,
   LANE_BUSY_SATURATION,
   LANE_BUSY_PAY_SLOPE,
@@ -1139,6 +1141,7 @@ export {
   estimateNpcBlockHours,
   contractPilotMissionDeadlineTick,
   findNpcAirframe,
+  healAwaitingPilotBoardLots,
   isNpcRepositionFlight,
   listHomologatedNpcAirframesForClass,
   listNpcAirframesForClass,
@@ -1157,6 +1160,7 @@ export {
   isNpcReadyToBid,
   NPC_MIN_BID_KG,
   scoreLotForNpc,
+  topUpStarterContractPilotFloor,
   CONTRACT_PILOT_FEE_FRAC,
   CONTRACT_PILOT_OFFER_CHANCE,
   AWAITING_PILOT_MIN_HOURS,
@@ -12480,6 +12484,8 @@ export function migrateEconomyWorld(
   ensureWorldHubLevels(migrated);
   ensureHomeCountryId(migrated);
   pruneDeadLots(migrated);
+  healAwaitingPilotBoardLots(migrated, nowMs);
+  topUpStarterContractPilotFloor(migrated, nowMs);
 
   return migrated;
 }
@@ -12596,6 +12602,7 @@ export function ensureEconomyCaughtUp(
 
   settledFlights += settleNpcOpsDue(w, nowMs).settledFlights;
   settledFlights += settleFuelHaulsDue(w, nowMs).settledHauls;
+  topUpStarterContractPilotFloor(w, nowMs);
   return {
     advancedTicks: hours,
     wantedTicks,

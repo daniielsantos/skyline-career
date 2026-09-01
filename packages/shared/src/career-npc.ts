@@ -2013,6 +2013,81 @@ function releaseTurnaroundIfDue(world: CareerEconomyWorld, nowMs: number): void 
   }
 }
 
+function awaitingPilotLotOnBoard(lot: ShipmentLot | undefined): boolean {
+  return (
+    lot != null && (lot.status === 'available' || lot.status === 'reserved')
+  );
+}
+
+function recreateAwaitingPilotLot(
+  world: CareerEconomyWorld,
+  flight: NpcFlight,
+  nowMs: number,
+): ShipmentLot {
+  const until =
+    flight.awaitingPilotUntilMs ??
+    flight.arrivesAtMs ??
+    nowMs + hoursToMs(AWAITING_PILOT_MIN_HOURS);
+  const holdMs = Math.max(hoursToMs(AWAITING_PILOT_SHORT_MIN_HOURS), until - nowMs);
+  const holdHours = msToHours(holdMs);
+  const holdTicks = Math.max(1, hoursToTicks(holdHours) + 1);
+  const isRepo = isNpcRepositionFlight(flight);
+  const npc = world.npcs.find((n) => n.id === flight.npcId);
+  const distanceNm =
+    routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? 0;
+  const pilotFeeUsd =
+    flight.pilotFeeUsd ??
+    (isRepo
+      ? quoteRepositionPilotFeeUsd(distanceNm, flight.aircraftClassId)
+      : quoteContractPilotFeeUsd(flight.payUsd, {
+          distanceNm,
+          aircraftClassId: flight.aircraftClassId,
+        }));
+  const payUsd = isRepo ? pilotFeeUsd : flight.payUsd;
+  const qty = isRepo ? 1 : Math.max(1, flight.cargoKg);
+  return {
+    id: flight.lotId,
+    commodityId: isRepo ? 'general' : flight.commodityId,
+    originIcao: flight.originIcao,
+    destIcao: flight.destIcao,
+    quantityKg: qty,
+    reservedKg: qty,
+    createdAtTick: world.tick,
+    expiresAtTick: world.tick + holdTicks,
+    payUsd,
+    basePayUsd: payUsd,
+    urgency: 'normal',
+    reason: isRepo
+      ? `Reposition · ${npc?.name ?? flight.npcId} home (${npc?.homeRegion ?? '?'})`
+      : 'Crew needed · contract hold',
+    status: 'reserved',
+  };
+}
+
+/**
+ * Recreate board lots for awaiting_pilot flights whose shipment row was pruned
+ * or expired — listMarketLots only walks lots, so orphans render as empty Crew.
+ */
+export function healAwaitingPilotBoardLots(
+  world: CareerEconomyWorld,
+  nowMs = Date.now(),
+): number {
+  let healed = 0;
+  for (const flight of world.npcFlights) {
+    if (flight.status !== 'awaiting_pilot') continue;
+    const existing = findLot(world, flight.lotId);
+    if (awaitingPilotLotOnBoard(existing)) continue;
+    const rebuilt = recreateAwaitingPilotLot(world, flight, nowMs);
+    if (existing) {
+      Object.assign(existing, rebuilt);
+    } else {
+      world.lots.push(rebuilt);
+    }
+    healed += 1;
+  }
+  return healed;
+}
+
 /**
  * Settle NPC flights whose arrivesAtMs <= nowMs and free turnarounds / rest.
  * Idempotent — safe to call on every load / poll.
@@ -2022,6 +2097,7 @@ function settleNpcOpsDueCore(
   world: CareerEconomyWorld,
   nowMs: number,
 ): { settledFlights: number; promotedPilotOffers: number } {
+  healAwaitingPilotBoardLots(world, nowMs);
   let settledFlights = 0;
   const promoteRng = mulberry32(
     hashSeed(`${world.seed}:awaiting-pilot-promote:${world.tick}:${nowMs}`),
@@ -2449,6 +2525,167 @@ export function createNpcRepositionOffer(
     );
   }
   return flight;
+}
+
+function lotHasOpenAwaitingPilot(
+  world: CareerEconomyWorld,
+  lotId: string,
+): boolean {
+  return world.npcFlights.some(
+    (f) => f.lotId === lotId && f.status === 'awaiting_pilot',
+  );
+}
+
+function npcReadyForStarterFloorOffer(npc: NpcFreighter): boolean {
+  if (!npcCanOfferContractPilot(npc)) return false;
+  if (!isStarterContractPilotClass(npc.aircraftClassId)) return false;
+  if (npc.status === 'idle' || npc.status === 'resting') return true;
+  if (npc.status === 'busy' && !npc.currentFlightId) return true;
+  return false;
+}
+
+function prepareNpcForFloorOffer(npc: NpcFreighter, originIcao: string): void {
+  npc.status = 'idle';
+  npc.locationIcao = originIcao;
+  npc.currentFlightId = undefined;
+  npc.busyUntilMs = undefined;
+  npc.busyUntilTick = undefined;
+}
+
+function pickStarterFloorLot(
+  world: CareerEconomyWorld,
+  countryId: string,
+  rng: () => number,
+  opts?: { preferRegions?: string[] },
+): ShipmentLot | undefined {
+  const candidates = world.lots.filter((lot) => {
+    if (lot.status !== 'available') return false;
+    if (lot.reservedKg > 0) return false;
+    const avail = lotAvailableKg(lot);
+    if (avail < NPC_MIN_BID_KG) return false;
+    if (contractPilotOriginCountry(world, lot.originIcao) !== countryId) {
+      return false;
+    }
+    if (lotHasOpenAwaitingPilot(world, lot.id)) return false;
+    const distanceNm = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
+    for (const classId of STARTER_CONTRACT_PILOT_CLASSES) {
+      if (
+        contractPilotHasFlyableAirframe(
+          {
+            aircraftClassId: classId,
+            cargoKg: Math.min(avail, 1_000),
+            payUsd: lot.payUsd,
+            originIcao: lot.originIcao,
+            destIcao: lot.destIcao,
+          },
+          { distanceNm },
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  });
+  if (candidates.length === 0) return undefined;
+  const prefer = opts?.preferRegions?.filter(Boolean) ?? [];
+  if (prefer.length > 0) {
+    const regional = candidates.filter((lot) => {
+      const region = airportRegion(world, lot.originIcao);
+      return region != null && prefer.includes(region);
+    });
+    if (regional.length > 0) {
+      return regional[Math.floor(rng() * regional.length)];
+    }
+  }
+  return candidates[Math.floor(rng() * candidates.length)];
+}
+
+function pickStarterFloorNpc(
+  world: CareerEconomyWorld,
+  lot: ShipmentLot,
+  rng: () => number,
+): NpcFreighter | undefined {
+  const originRegion = airportRegion(world, lot.originIcao);
+  const distanceNm = routeDistanceNm(world, lot.originIcao, lot.destIcao) ?? 0;
+  const avail = lotAvailableKg(lot);
+  const candidates = world.npcs.filter((npc) => {
+    if (!npcReadyForStarterFloorOffer(npc)) return false;
+    const cargoKg = Math.min(avail, npcMaxCargoKg(npc));
+    return contractPilotHasFlyableAirframe(
+      {
+        aircraftClassId: npc.aircraftClassId,
+        cargoKg,
+        payUsd: lot.payUsd,
+        originIcao: lot.originIcao,
+        destIcao: lot.destIcao,
+      },
+      { distanceNm },
+    );
+  });
+  if (candidates.length === 0) return undefined;
+  const homeMatch = originRegion
+    ? candidates.filter((npc) => npc.homeRegion === originRegion)
+    : [];
+  const pool = homeMatch.length > 0 ? homeMatch : candidates;
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+function preferStarterFloorRegions(
+  world: CareerEconomyWorld,
+  countryId: string,
+): string[] {
+  const regions = new Set<string>();
+  for (const npc of world.npcs) {
+    const region = (npc.homeRegion ?? '').trim();
+    if (!region) continue;
+    if (countryIdFromRegion(region) === countryId) regions.add(region);
+  }
+  return [...regions];
+}
+
+/**
+ * When the home-country starter crew floor is empty but NPCs are mid catch-up
+ * (all busy in flight), open contract holds on live market lots so empty-hangar
+ * players see Crew needed without waiting for the backlog to drain.
+ */
+export function topUpStarterContractPilotFloor(
+  world: CareerEconomyWorld,
+  nowMs = Date.now(),
+): number {
+  healAwaitingPilotBoardLots(world, nowMs);
+  let added = 0;
+  const rng = mulberry32(
+    hashSeed(`${world.seed}:crew-floor:${world.tick}:${nowMs}`),
+  );
+  for (const countryId of activeContractPilotCountries(world)) {
+    let need =
+      starterContractPilotCountryFloor(1) -
+      countOpenContractPilotOffersInCountry(world, countryId, 'starter');
+    if (need <= 0) continue;
+    const preferRegions = preferStarterFloorRegions(world, countryId);
+    while (need > 0) {
+      const lot = pickStarterFloorLot(world, countryId, rng, {
+        preferRegions,
+      });
+      if (!lot) break;
+      const npc = pickStarterFloorNpc(world, lot, rng);
+      if (!npc) break;
+      prepareNpcForFloorOffer(npc, lot.originIcao);
+      try {
+        createNpcContractPilotOffer(world, npc.id, lot.id, {
+          nowMs,
+          rng,
+          forceAwaitingPilot: true,
+          respectCaps: false,
+        });
+        added += 1;
+        need -= 1;
+      } catch {
+        break;
+      }
+    }
+  }
+  return added;
 }
 
 /**

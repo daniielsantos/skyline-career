@@ -5,7 +5,7 @@
 
 import type { HubEconomySample, HubTier } from './types/career-economy.js';
 
-export type HubEconomyHistoryWindow = 7 | 30;
+export type HubEconomyHistoryWindow = 7 | 30 | 90;
 
 export type HubEconomyHistoryBucket = {
   hubs: number;
@@ -15,8 +15,10 @@ export type HubEconomyHistoryBucket = {
   quietHubPct: number;
   outboundLots: number;
   outboundKg: number;
-  /** Median of per-hub pay p50 (hubs with a board). */
+  /** Across hubs that posted a board: p10 / median / p90 of each hub's pay p50. */
+  payP10Usd: number | null;
   payP50Usd: number | null;
+  payP90Usd: number | null;
   avgCargoFillPct: number | null;
   jetAFillPct: number | null;
   softFillPct: number | null;
@@ -62,9 +64,23 @@ function median(nums: number[]): number | null {
   const sorted = [...nums].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 0) {
-    return ((sorted[mid - 1]! + sorted[mid]!) / 2);
+    return (sorted[mid - 1]! + sorted[mid]!) / 2;
   }
   return sorted[mid]!;
+}
+
+/** Linear-interpolated percentile on a copy (p in 0..1). */
+function percentile(nums: number[], p: number): number | null {
+  if (nums.length === 0) return null;
+  if (nums.length === 1) return nums[0]!;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const clamped = Math.min(1, Math.max(0, p));
+  const idx = (sorted.length - 1) * clamped;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo]!;
+  const t = idx - lo;
+  return sorted[lo]! * (1 - t) + sorted[hi]! * t;
 }
 
 function emptyBucket(): HubEconomyHistoryBucket {
@@ -76,7 +92,9 @@ function emptyBucket(): HubEconomyHistoryBucket {
     quietHubPct: 0,
     outboundLots: 0,
     outboundKg: 0,
+    payP10Usd: null,
     payP50Usd: null,
+    payP90Usd: null,
     avgCargoFillPct: null,
     jetAFillPct: null,
     softFillPct: null,
@@ -151,7 +169,9 @@ function finalizeBucket(
 
   b.liveHubPct = b.hubs > 0 ? b.liveHubs / b.hubs : 0;
   b.quietHubPct = b.hubs > 0 ? b.quietHubs / b.hubs : 0;
+  b.payP10Usd = percentile(pays, 0.1);
   b.payP50Usd = median(pays);
+  b.payP90Usd = percentile(pays, 0.9);
   b.avgCargoFillPct =
     fills.length === 0
       ? null
@@ -184,7 +204,7 @@ export function aggregateHubEconomyHistoryPulse(
   samples: HubEconomySample[],
   opts?: { retentionDays?: number; focusCountries?: string[] },
 ): HubEconomyHistoryPulse {
-  const retentionDays = opts?.retentionDays ?? 30;
+  const retentionDays = opts?.retentionDays ?? 90;
   const focusCountries = opts?.focusCountries ?? [...FOCUS_COUNTRIES];
   const byDay = new Map<number, HubEconomySample[]>();
   for (const s of samples) {

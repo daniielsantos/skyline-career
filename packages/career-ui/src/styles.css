@@ -12080,3 +12080,61 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font-size: 0.85em;
 }
 
+.hub-pulse-sparks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0.35rem 0 0.85rem;
+}
+
+.hub-pulse-spark {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0.15rem 0.5rem;
+  align-items: end;
+  font-size: 0.75rem;
+}
+
+.hub-pulse-spark .muted {
+  grid-column: 1 / -1;
+}
+
+.hub-pulse-spark-svg {
+  width: 100%;
+  height: 1.75rem;
+  display: block;
+}
+
+.hub-pulse-spark-svg polyline {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.hub-pulse-spark strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+}
+
+.hub-pulse-table-wrap {
+  overflow-x: auto;
+}
+
+.hub-pulse-table {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.hub-pulse-table th[title] {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.15em;
+}
+
+.hub-pulse-size-mix code,
+.hub-pulse-pay-band {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.76rem;
+}
+

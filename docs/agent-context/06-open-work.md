@@ -58,6 +58,10 @@ Atualizado 2026-08-30: **Spoke vitality / densify** — last-mile spoke open/for
 
 Atualizado 2026-08-30: **Pulse tick 1029 `Dans` (~10.7d)** — BR live **50%** (era ~74% day7); US live **26%** (era ~70%), dead spoke **160**. Board **5.6k**, pay p50 **~$4k**. Size mix melhorou (GA≤450 **61%→25%**, TP **7%→30%**); medium sweet ainda **~3.5%**. general fill **~85%**. Sem retune Dry. Próximo: spoke vitality / densify. Canvas `economy-pulse-day11-dans`; JSON `economy-pulse-plus3d-dans-diag.json` + `economy-pulse-timeline-dans.json`.
 
+Atualizado 2026-08-31: **hub_economy_samples retenção 90d** + Pulse **90d**. Ver `19-hub-stats.md`.
+
+Atualizado 2026-08-31: **Pulse denser** — spoke live/quiet, soft-fill, inbound, electronics, size mix, pay band, sparklines. Quiet = activityScore &lt; 8.
+
 Atualizado 2026-08-31: **Economy pulse → tab Pulse (dev)** — Network history saiu da Stats; `/pulse` só com Dev Mode (junto do Lab). Ver `19-hub-stats.md`.
 
 Atualizado 2026-08-31: **Stats UI day-1** — “No stats…” / Network vazio: fetch falhava em silêncio + pulse JSON com todos os países. Erro visível; keep pulse; aggregate só BR/US; render defensivo. Ver `19-hub-stats.md`.

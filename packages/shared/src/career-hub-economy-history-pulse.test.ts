@@ -99,5 +99,17 @@ describe('aggregateHubEconomyHistoryPulse', () => {
     assert.equal(pulse.days[0]!.byTier.major.liveHubs, 2);
     assert.equal(pulse.days[1]!.world.hubs, 1);
     assert.ok(pulse.days[0]!.world.spotGeneralUsd != null);
+    // Two hubs with pay → p10/p50/p90 of {1000, 2000}.
+    assert.equal(pulse.days[0]!.world.payP50Usd, 1500);
+    assert.ok(pulse.days[0]!.world.payP10Usd != null);
+    assert.ok(pulse.days[0]!.world.payP90Usd != null);
+    assert.ok(
+      (pulse.days[0]!.world.payP10Usd as number) <=
+        (pulse.days[0]!.world.payP50Usd as number),
+    );
+    assert.ok(
+      (pulse.days[0]!.world.payP90Usd as number) >=
+        (pulse.days[0]!.world.payP50Usd as number),
+    );
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Career store schema v7/v8 — daily hub economy samples (Hub Stats + network pulse).
  *
- * SP uses `LOCAL_WORLD_ID`. Samples are append-only per day; prune keeps 30 days.
+ * SP uses `LOCAL_WORLD_ID`. Samples are append-only per day; prune keeps 90 days.
  * Never stored in economy_json.
  *
  * v8 adds country/tier/stock/inbound/lot-count/pay-band columns (ALTER on upgrade).
@@ -17,7 +17,7 @@ export const CAREER_STORE_SCHEMA_V7 = '7';
 export const CAREER_STORE_SCHEMA_V8 = '8';
 
 /** Keep this many economy days of samples (inclusive of today). */
-export const HUB_ECONOMY_SAMPLE_RETENTION_DAYS = 30;
+export const HUB_ECONOMY_SAMPLE_RETENTION_DAYS = 90;
 
 export type SqliteDb = DatabaseSync;
 

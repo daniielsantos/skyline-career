@@ -5164,7 +5164,7 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/debug/hub-economy-history') {
         const q = url.searchParams;
         const daysRaw = Number.parseInt(q.get('days') ?? '7', 10);
-        const days = daysRaw === 30 ? 30 : 7;
+        const days = daysRaw === 90 ? 90 : daysRaw === 30 ? 30 : 7;
         const payload = await withCareerRead((world) => {
           const active = requireStore();
           const today = economyDayIndex(world.tick);

@@ -1,5 +1,9 @@
 # Hub Stats + histórico econômico
 
+Atualizado 2026-08-31: **Retenção samples 90d** — `HUB_ECONOMY_SAMPLE_RETENTION_DAYS=90`; Pulse toggle **90d**. Stats hub continua 7d/30d.
+
+Atualizado 2026-08-31: **Pulse page denser** — spoke live + quiet; soft-fill/inbound; electronics spot; size mix GA/TP/Med/Nar/Wide; pay p10–p90 band; sparklines. Quiet = `activityScore < 8` (não zero lots).
+
 Atualizado 2026-08-31: **Economy pulse = página dev** — Network history saiu da aba Stats; tab **Pulse** (`/pulse`, só Dev Mode) ao lado de Lab. Stats do hub = só ICAO (live + history local).
 
 Atualizado 2026-08-31: **Stats empty / crash day-1** — fetch falhava em silêncio → “No stats…”; Network history race limpava pulse. Fix: erro visível; keep last pulse; payload pulse só BR/US (sem todos os países); render defensivo (`sizeMixLots`/`softFill`).
@@ -10,7 +14,7 @@ Atualizado 2026-08-31: UI — **Terminal inventory** (= stock Dry deste ICAO, n�
 
 Atualizado 2026-08-31: History table **4/page** + sort Day/Lots/Pay/Fill/Spot; chart **16.5rem** + viewBox alto (menos letterbox); labels no SVG só **High** (atual no header; range embaixo; tooltip nos dots).
 
-Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples` (mundo / BR·US / major·regional·spoke) por dia. API `GET /api/debug/hub-economy-history?days=7|30`. UI: tab **Pulse** (dev). Schema **v8** cols: country/tier/region, cargo stock/cap, inbound, lot counts, pay p10/p90.
+Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples` (mundo / BR·US / major·regional·spoke) por dia. API `GET /api/debug/hub-economy-history?days=7|30|90`. UI: tab **Pulse** (dev). Schema **v8** cols: country/tier/region, cargo stock/cap, inbound, lot counts, pay p10/p90.
 
 ## O quê
 
@@ -22,7 +26,7 @@ Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples
 
 ## Persistência
 
-Tabela `hub_economy_samples` (`world_id`, `icao`, `day_index` PK). Retenção **30** dias (`HUB_ECONOMY_SAMPLE_RETENTION_DAYS`).
+Tabela `hub_economy_samples` (`world_id`, `icao`, `day_index` PK). Retenção **90** dias (`HUB_ECONOMY_SAMPLE_RETENTION_DAYS`).
 
 - DDL / I/O: [`packages/shared/src/career-store-v7.ts`](../../packages/shared/src/career-store-v7.ts) (`ensureV8HubSampleColumns`)
 - Schema bump: `CAREER_STORE_SCHEMA_VERSION = '8'` em [`career-store.ts`](../../packages/shared/src/career-store.ts)
@@ -53,10 +57,10 @@ Tabela `hub_economy_samples` (`world_id`, `icao`, `day_index` PK). Retenção **
 ## API / UI
 
 - `GET /api/airport/:icao?part=stats` → `{ now, history, retentionDays }`
-- `GET /api/debug/hub-economy-history?days=7|30` → pulse agregado
+- `GET /api/debug/hub-economy-history?days=7|30|90` → pulse agregado
 - Client: `fetchAirportStats` / `fetchHubEconomyHistory`
-- Aba **Stats** → [`TerminalHubStatsPanel.tsx`](../../packages/career-ui/src/TerminalHubStatsPanel.tsx) (hub only)
-- Dev **Pulse** → [`HubEconomyPulsePage.tsx`](../../packages/career-ui/src/HubEconomyPulsePage.tsx) + [`HubEconomyNetworkHistory.tsx`](../../packages/career-ui/src/HubEconomyNetworkHistory.tsx)
+- Aba **Stats** → [`TerminalHubStatsPanel.tsx`](../../packages/career-ui/src/TerminalHubStatsPanel.tsx) (hub only; janelas 7d/30d)
+- Dev **Pulse** → [`HubEconomyPulsePage.tsx`](../../packages/career-ui/src/HubEconomyPulsePage.tsx) + [`HubEconomyNetworkHistory.tsx`](../../packages/career-ui/src/HubEconomyNetworkHistory.tsx) (7d/30d/**90d**)
 
 ## Diagnóstico
 

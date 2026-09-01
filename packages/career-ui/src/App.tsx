@@ -5865,7 +5865,9 @@ export function App() {
             ? '1 day'
             : ticks === 96 * 7
               ? '7 days'
-              : `${ticks * 15} min`;
+              : ticks === 96 * 14
+                ? '14 days'
+                : `${ticks * 15} min`;
     // Progress every ≤¼ day so +1d isn't stuck at 0/96 for minutes on one POST.
     // Still 4 saves/day vs the old 12 (chunk=8). Hub Stats sample = 1×/day boundary only.
     const ticksPerDay = 96;
@@ -9574,15 +9576,6 @@ export function App() {
               <button
                 type="button"
                 className="action"
-                onClick={() => void onTick(1)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 15 minutes (1 tick)"
-              >
-                +15 min
-              </button>
-              <button
-                type="button"
-                className="action"
                 onClick={() => void onTick(4)}
                 disabled={busy}
                 title="Advance economy + crew wall-clock by 1 hour (4 ticks)"
@@ -9606,6 +9599,15 @@ export function App() {
                 title="Advance economy + crew wall-clock by 7 days (672 ticks)"
               >
                 {formatTickAdvanceButton(96 * 7, '+7 day')}
+              </button>
+              <button
+                type="button"
+                className="action"
+                onClick={() => void onTick(96 * 14)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
+              >
+                {formatTickAdvanceButton(96 * 14, '+14 day')}
               </button>
               <button
                 type="button"

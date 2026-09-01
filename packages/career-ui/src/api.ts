@@ -1473,7 +1473,9 @@ export type HubEconomyHistoryBucket = {
   quietHubPct: number;
   outboundLots: number;
   outboundKg: number;
+  payP10Usd: number | null;
   payP50Usd: number | null;
+  payP90Usd: number | null;
   avgCargoFillPct: number | null;
   jetAFillPct: number | null;
   softFillPct: number | null;
@@ -1512,7 +1514,7 @@ export type HubEconomyHistoryPulseView = {
 };
 
 /** Saved network pulse from hub_economy_samples (7d / 30d). */
-export function fetchHubEconomyHistory(days: 7 | 30 = 7) {
+export function fetchHubEconomyHistory(days: 7 | 30 | 90 = 7) {
   return api<HubEconomyHistoryPulseView>(
     `/api/debug/hub-economy-history?days=${days}`,
   );

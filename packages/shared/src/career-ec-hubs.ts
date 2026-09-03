@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { EC_DENSIFY_HUBS, EC_DENSIFY_HUB_COUNT } from './career-ec-hubs-densify.js';
 
 export type EcCareerRegion = 'EC-C' | 'EC-S';
 
@@ -134,9 +135,10 @@ export const EC_CAREER_HUBS: readonly EcCareerHubDef[] = [
     lon: -80.9889,
     ...agroSpoke,
   },
+  ...EC_DENSIFY_HUBS,
 ];
 
-export const EC_CAREER_HUB_COUNT = 9;
+export const EC_CAREER_HUB_COUNT = 9 + EC_DENSIFY_HUB_COUNT;
 
 export function buildEcFeederCorridors(
   hubs: readonly EcCareerHubDef[] = EC_CAREER_HUBS,
@@ -166,8 +168,8 @@ export function assertEcCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<EcCareerRegion, number> = {
-    'EC-C': 5,
-    'EC-S': 4,
+    'EC-C': 8,
+    'EC-S': 12,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

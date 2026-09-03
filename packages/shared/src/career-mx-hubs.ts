@@ -1,5 +1,5 @@
 /**
- * Mexico career hub catalog (45 airports).
+ * Mexico career hub catalog (46 curated + densify).
  * Consumed by career-economy seed, coords, tiers, and feeder corridor generation.
  */
 
@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { MX_DENSIFY_HUBS, MX_DENSIFY_HUB_COUNT } from './career-mx-hubs-densify.js';
 
 export type MxCareerRegion = 'MX-N' | 'MX-C' | 'MX-S' | 'MX-Y';
 
@@ -535,6 +536,8 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
     lon: -110.3617,
   },
 
+  ...MX_DENSIFY_HUBS,
+
   // ── MX bush soft-fields — OA soft+ICAO is scarce; MMCG gravel (MM68 GPS ident removed — not in SimBrief)
   {
     icao: 'MMCG',
@@ -548,7 +551,7 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
   },
 ];
 
-export const MX_CAREER_HUB_COUNT = 46;
+export const MX_CAREER_HUB_COUNT = 46 + MX_DENSIFY_HUB_COUNT;
 
 /** Auto feeder corridors so every non-bush MX hub has ≥2 partners. */
 export function buildMxFeederCorridors(
@@ -579,10 +582,10 @@ export function assertMxCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<MxCareerRegion, number> = {
-    'MX-N': 15,
-    'MX-C': 14,
-    'MX-S': 9,
-    'MX-Y': 8,
+    'MX-N': 32,
+    'MX-C': 25,
+    'MX-S': 17,
+    'MX-Y': 9,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

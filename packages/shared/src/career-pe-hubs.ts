@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { PE_DENSIFY_HUBS, PE_DENSIFY_HUB_COUNT } from './career-pe-hubs-densify.js';
 
 export type PeCareerRegion = 'PE-C' | 'PE-S';
 
@@ -182,9 +183,10 @@ export const PE_CAREER_HUBS: readonly PeCareerHubDef[] = [
     lon: -73.3503,
     ...agroSpoke,
   },
+  ...PE_DENSIFY_HUBS,
 ];
 
-export const PE_CAREER_HUB_COUNT = 14;
+export const PE_CAREER_HUB_COUNT = 14 + PE_DENSIFY_HUB_COUNT;
 
 export function buildPeFeederCorridors(
   hubs: readonly PeCareerHubDef[] = PE_CAREER_HUBS,
@@ -214,8 +216,8 @@ export function assertPeCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<PeCareerRegion, number> = {
-    'PE-C': 8,
-    'PE-S': 6,
+    'PE-C': 22,
+    'PE-S': 10,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

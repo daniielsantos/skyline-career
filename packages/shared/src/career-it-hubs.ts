@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { IT_DENSIFY_HUBS, IT_DENSIFY_HUB_COUNT } from './career-it-hubs-densify.js';
 
 export type ItCareerRegion = 'IT-N' | 'IT-C' | 'IT-S';
 
@@ -157,9 +158,10 @@ export const IT_CAREER_HUBS: readonly ItCareerHubDef[] = [
     lon: 16.7606,
     ...agro,
   },
+  ...IT_DENSIFY_HUBS,
 ];
 
-export const IT_CAREER_HUB_COUNT = 12;
+export const IT_CAREER_HUB_COUNT = 12 + IT_DENSIFY_HUB_COUNT;
 
 export function buildItFeederCorridors(
   hubs: readonly ItCareerHubDef[] = IT_CAREER_HUBS,

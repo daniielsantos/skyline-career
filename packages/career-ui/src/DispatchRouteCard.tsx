@@ -6,7 +6,7 @@ import {
   type DispatchRouteWaypoint,
 } from './DispatchRouteMap';
 import { resolveAirportEndpoint } from './resolve-airport-endpoint';
-import { BusyBlock } from './Busy';
+import { BusyBlock, BusySpinner } from './Busy';
 
 /** Highlight origin/dest ICAO tokens (incl. runway suffix like SAVN/12) in the OFP route. */
 function highlightOfpRoute(
@@ -157,7 +157,13 @@ export function DispatchRouteCard(props: {
                   disabled={props.busy || refreshing}
                   onClick={() => void refreshNavlog()}
                 >
-                  {refreshing ? 'Loading navlog…' : 'Load navlog from OFP'}
+                  {refreshing ? (
+                    <>
+                      <BusySpinner size="sm" /> Loading navlog…
+                    </>
+                  ) : (
+                    'Load navlog from OFP'
+                  )}
                 </button>
               ) : null}
               {refreshError ? (

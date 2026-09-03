@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { JM_DENSIFY_HUBS, JM_DENSIFY_HUB_COUNT } from './career-jm-hubs-densify.js';
 
 export type JmCareerRegion = 'JM-C';
 
@@ -89,9 +90,10 @@ export const JM_CAREER_HUBS: readonly JmCareerHubDef[] = [
     lon: -76.9692,
     ...agroSpoke,
   },
+  ...JM_DENSIFY_HUBS,
 ];
 
-export const JM_CAREER_HUB_COUNT = 5;
+export const JM_CAREER_HUB_COUNT = 5 + JM_DENSIFY_HUB_COUNT;
 
 export function buildJmFeederCorridors(
   hubs: readonly JmCareerHubDef[] = JM_CAREER_HUBS,
@@ -120,5 +122,7 @@ export function assertJmCareerHubCatalog(): void {
     }
     if (h.region === 'JM-C') n += 1;
   }
-  if (n !== 5) throw new Error(`JM-C has ${n} hubs, expected 5`);
+  if (n !== JM_CAREER_HUB_COUNT) {
+    throw new Error(`JM-C has ${n} hubs, expected ${JM_CAREER_HUB_COUNT}`);
+  }
 }

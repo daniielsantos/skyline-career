@@ -156,7 +156,7 @@ import {
   writePersistedStagingDraft,
 } from './staging-draft-persist';
 import { AirportNamesProvider, IcaoLink } from './IcaoLink';
-import { BusyBlock, BusyChip, TableSkeleton } from './Busy';
+import { BusyBlock, BusyBoot, BusyChip, BusyStatus, TableSkeleton } from './Busy';
 import { CareerProfileManage, ProfileGate, ProfileGateLoading } from './ProfileGate';
 import {
   DesktopUpdateHeaderButton,
@@ -9417,13 +9417,15 @@ export function App() {
             {careerStateReady ? formatMoney(wallet) : '…'}
           </span>
           <span className="meta">
-            {!careerStateReady
-              ? 'Loading career…'
-              : !careerReady
-                ? 'Syncing missions…'
-                : pilotIcao
-                  ? `Pilot at ${pilotIcao}`
-                  : 'Pilot location —'}
+            {!careerStateReady ? (
+              <BusyStatus label="Loading career…" />
+            ) : !careerReady ? (
+              <BusyStatus label="Syncing missions…" />
+            ) : pilotIcao ? (
+              `Pilot at ${pilotIcao}`
+            ) : (
+              'Pilot location —'
+            )}
             {careerStateReady && homeHubIcao ? ` · home ${homeHubIcao}` : ''}
           </span>
           <button
@@ -11567,20 +11569,10 @@ export function App() {
               </div>
             </>
           ) : !careerStateReady ? (
-            <div
-              className="freights-boot-loading"
-              role="status"
-              aria-live="polite"
-            >
-              <span className="busy-spinner busy-spinner-lg" aria-hidden="true" />
-              <div>
-                <h2>Loading freights…</h2>
-                <p className="muted">
-                  Restoring economy snapshot — wallet and board load in a few
-                  seconds after offline time.
-                </p>
-              </div>
-            </div>
+            <BusyBoot
+              title="Loading freights…"
+              detail="Restoring economy snapshot — wallet and board load in a few seconds after offline time."
+            />
           ) : (
             <>
           <div className="panel-head">
@@ -11673,14 +11665,18 @@ export function App() {
           ) : null}
           <div
             className={`table-wrap freights-board-table${
-              marketBoardLoading && pagedLots.length > 0 ? ' is-loading' : ''
+              marketBoardLoading ? ' is-loading' : ''
             }`}
             aria-busy={marketBoardLoading}
           >
-            {marketBoardLoading && pagedLots.length > 0 ? (
+            {marketBoardLoading ? (
               <BusyChip
                 className="freights-board-loading"
-                label="Updating freights"
+                label={
+                  pagedLots.length === 0
+                    ? 'Loading freights'
+                    : 'Updating freights'
+                }
               />
             ) : null}
             <table>
@@ -12011,6 +12007,10 @@ export function App() {
                 </tr>
               </thead>
               <tbody>
+                {marketBoardLoading && pagedLots.length === 0 ? (
+                  <TableSkeleton rows={8} cols={8} />
+                ) : (
+                  <>
                 {pagedLots.map((lot) => {
                   const meta = lotPressureMeta(lot);
                   const idlePct = idleUptickPct(lot);
@@ -12215,9 +12215,7 @@ export function App() {
                 {pagedLots.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="empty">
-                      {marketBoardLoading
-                        ? 'Loading freights…'
-                        : marketTotalLots === 0 &&
+                      {marketTotalLots === 0 &&
                             !hasMarketFilters &&
                             marketSorts.length === 0
                           ? freightsBoard === 'crew'
@@ -12231,19 +12229,19 @@ export function App() {
                     </td>
                   </tr>
                 ) : null}
+                  </>
+                )}
               </tbody>
             </table>
           </div>
           <nav className="pagination" aria-label="Freight pages">
             <p>
-              {marketBoardLoading
-                ? 'Updating…'
-                : marketTotalLots === 0
-                  ? '0 records'
-                  : `${(safeMarketPage - 1) * MARKET_PAGE_SIZE + 1}–${Math.min(
-                      safeMarketPage * MARKET_PAGE_SIZE,
-                      marketTotalLots,
-                    )} of ${marketTotalLots}`}
+              {marketTotalLots === 0
+                ? '0 records'
+                : `${(safeMarketPage - 1) * MARKET_PAGE_SIZE + 1}–${Math.min(
+                    safeMarketPage * MARKET_PAGE_SIZE,
+                    marketTotalLots,
+                  )} of ${marketTotalLots}`}
             </p>
             <div>
               <button
@@ -12275,15 +12273,11 @@ export function App() {
       ) : hubSelected && showStaging ? (
         <section className="panel staging-panel">
           {!careerReady ? (
-            <div className="dispatch-boot-loading" role="status" aria-live="polite">
-              <span className="busy-spinner busy-spinner-lg" aria-hidden="true" />
-              <div>
-                <h2>Loading dispatch…</h2>
-                <p className="muted">
-                  Restoring wallet, fleet, and any active flight for this profile.
-                </p>
-              </div>
-            </div>
+            <BusyBoot
+              align="center"
+              title="Loading dispatch…"
+              detail="Restoring wallet, fleet, and any active flight for this profile."
+            />
           ) : activeBushTrip ? (
             <>
               <div className="debrief-card">

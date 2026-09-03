@@ -4,6 +4,7 @@ import {
   type ContractPilotOptions,
   type ContractPilotPickAirframe,
 } from './api';
+import { BusyStatus } from './Busy';
 
 export function flyableContractPilotAirframes(
   airframes: readonly ContractPilotPickAirframe[],
@@ -117,19 +118,19 @@ export function ContractPilotPick(props: {
       </p>
       <label className="contract-pilot-pick-label">
         Aircraft
+        {loading ? (
+          <BusyStatus className="contract-pilot-pick-loading" label="Loading airframes…" />
+        ) : (
         <select
           className="contract-pilot-pick-select"
           key={preferred?.typeId ?? 'loading'}
           defaultValue={preferred?.typeId}
-          disabled={loading || flyable.length === 0}
-          aria-busy={loading || undefined}
+          disabled={flyable.length === 0}
           onChange={(event) => {
             props.selectedRef.current = event.target.value;
           }}
         >
-          {loading ? (
-            <option value="">Loading airframes…</option>
-          ) : flyable.length === 0 ? (
+          {flyable.length === 0 ? (
             <option value="">No flyable airframe</option>
           ) : (
             flyable.map((a) => (
@@ -144,6 +145,7 @@ export function ContractPilotPick(props: {
             ))
           )}
         </select>
+        )}
       </label>
       {error ? <p className="contract-pilot-pick-error">{error}</p> : null}
     </div>

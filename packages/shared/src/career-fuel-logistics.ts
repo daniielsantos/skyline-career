@@ -787,9 +787,15 @@ function fillOf(ap: AirportTerminal): number {
   return clamp(pile.stockKg / pile.capacityKg, 0, 1);
 }
 
+/** Cached neighbor sets — REGION_NEIGHBORS is static. */
+const REGIONS_REACHABLE_CACHE = new Map<string, Set<string>>();
+
 function regionsReachable(from: string): Set<string> {
+  let cached = REGIONS_REACHABLE_CACHE.get(from);
+  if (cached) return cached;
   const out = new Set<string>([from]);
   for (const n of REGION_NEIGHBORS[from] ?? []) out.add(n);
+  REGIONS_REACHABLE_CACHE.set(from, out);
   return out;
 }
 
@@ -890,21 +896,55 @@ function topUpFuelTruckFleet(world: CareerEconomyWorld, regions: string[]): void
   }
 }
 
+function fuelFleetNeedsTopUp(trucks: FuelTruck[]): boolean {
+  if (trucks.length < FUEL_TRUCK_FLEET_SIZE) return true;
+  const have = new Map<FuelTruckClassId, number>();
+  for (const t of trucks) {
+    have.set(t.truckClassId, (have.get(t.truckClassId) ?? 0) + 1);
+  }
+  for (const slot of FUEL_TRUCK_COMPOSITION) {
+    if ((have.get(slot.truckClassId) ?? 0) < slot.count) return true;
+  }
+  return false;
+}
+
 /** Ensure save has a fuel-truck fleet; seeds / tops up composition. */
 export function ensureFuelTruckFleet(world: CareerEconomyWorld): void {
   if (!Array.isArray(world.fuelHauls)) {
     world.fuelHauls = [];
   }
-  const regions = world.airports.map((a) => a.region);
   if (!Array.isArray(world.fuelTrucks) || world.fuelTrucks.length === 0) {
+    const regions = world.airports.map((a) => a.region);
     world.fuelTrucks = seedFuelTruckFleet({ seed: world.seed, regions });
     return;
   }
-  topUpFuelTruckFleet(world, regions);
+  // Hot path: fleet already at composition — skip O(airports) region scan.
+  if (!fuelFleetNeedsTopUp(world.fuelTrucks)) return;
+  topUpFuelTruckFleet(
+    world,
+    world.airports.map((a) => a.region),
+  );
 }
 
-function creditDestFuel(world: CareerEconomyWorld, destIcao: string, kg: number): number {
-  const dest = world.airports.find((a) => a.icao === destIcao.toUpperCase());
+function airportByIcaoMap(
+  world: CareerEconomyWorld,
+): Map<string, AirportTerminal> {
+  const map = new Map<string, AirportTerminal>();
+  for (const ap of world.airports) {
+    map.set(ap.icao.toUpperCase(), ap);
+  }
+  return map;
+}
+
+function creditDestFuel(
+  world: CareerEconomyWorld,
+  destIcao: string,
+  kg: number,
+  byIcao?: Map<string, AirportTerminal>,
+): number {
+  const dest = byIcao
+    ? byIcao.get(destIcao.toUpperCase())
+    : world.airports.find((a) => a.icao === destIcao.toUpperCase());
   if (!dest || !(kg > 0)) return 0;
   const pile = dest.inventory.fuel;
   if (!pile) return 0;
@@ -913,8 +953,15 @@ function creditDestFuel(world: CareerEconomyWorld, destIcao: string, kg: number)
   return pile.stockKg - before;
 }
 
-function debitHubFuel(world: CareerEconomyWorld, originIcao: string, kg: number): number {
-  const origin = world.airports.find((a) => a.icao === originIcao.toUpperCase());
+function debitHubFuel(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  kg: number,
+  byIcao?: Map<string, AirportTerminal>,
+): number {
+  const origin = byIcao
+    ? byIcao.get(originIcao.toUpperCase())
+    : world.airports.find((a) => a.icao === originIcao.toUpperCase());
   if (!origin || !(kg > 0)) return 0;
   const pile = origin.inventory.fuel;
   if (!pile) return 0;
@@ -932,14 +979,16 @@ export function settleFuelHaulsDue(
 ): { settledHauls: number } {
   ensureFuelTruckFleet(world);
   let settledHauls = 0;
+  const byIcao = airportByIcaoMap(world);
+  const truckById = new Map(world.fuelTrucks!.map((t) => [t.id, t] as const));
   for (const haul of world.fuelHauls!) {
     if (haul.status !== 'enroute') continue;
     if (nowMs < haul.arrivesAtMs) continue;
-    creditDestFuel(world, haul.destIcao, haul.cargoKg);
+    creditDestFuel(world, haul.destIcao, haul.cargoKg, byIcao);
     haul.status = 'completed';
     settledHauls += 1;
     recordFuelTruckDeliveryActivity(world, haul.destIcao);
-    const truck = world.fuelTrucks!.find((t) => t.id === haul.truckId);
+    const truck = truckById.get(haul.truckId);
     if (truck) {
       const turnH =
         TURNAROUND_MIN_H +
@@ -976,6 +1025,40 @@ type DispatchCandidate = {
   roadNm: number;
   cargoKg: number;
 };
+
+/** Per-dispatch snapshot — rebuilt once per batch, not once per idle truck. */
+type FuelDispatchBoard = {
+  hubs: AirportTerminal[];
+  /** Shortage spokes sorted by fill↑ (world order ties). Dest fill is stable during dispatch. */
+  shortageSpokes: AirportTerminal[];
+  inboundEnroute: Map<string, number>;
+  byIcao: Map<string, AirportTerminal>;
+};
+
+function buildFuelDispatchBoard(world: CareerEconomyWorld): FuelDispatchBoard {
+  const hubs: AirportTerminal[] = [];
+  const shortageSpokes: AirportTerminal[] = [];
+  const byIcao = new Map<string, AirportTerminal>();
+  for (const ap of world.airports) {
+    byIcao.set(ap.icao.toUpperCase(), ap);
+    if (FUEL_HUB_ICAOS.has(ap.icao)) {
+      hubs.push(ap);
+      continue;
+    }
+    if (ap.bushTripOnly) continue;
+    if (fillOf(ap) < DEST_SHORTAGE_FILL) shortageSpokes.push(ap);
+  }
+  shortageSpokes.sort((a, b) => fillOf(a) - fillOf(b));
+
+  const inboundEnroute = new Map<string, number>();
+  for (const haul of world.fuelHauls ?? []) {
+    if (haul.status !== 'enroute') continue;
+    const code = haul.destIcao.toUpperCase();
+    inboundEnroute.set(code, (inboundEnroute.get(code) ?? 0) + 1);
+  }
+
+  return { hubs, shortageSpokes, inboundEnroute, byIcao };
+}
 
 function buildDispatchCandidate(
   world: CareerEconomyWorld,
@@ -1025,39 +1108,37 @@ function buildDispatchCandidate(
   };
 }
 
-function inboundEnrouteCount(world: CareerEconomyWorld, destIcao: string): number {
-  const code = destIcao.toUpperCase();
-  return (world.fuelHauls ?? []).filter(
-    (h) => h.status === 'enroute' && h.destIcao === code,
-  ).length;
-}
-
 function pickBestCandidate(
   world: CareerEconomyWorld,
   truck: FuelTruck,
+  board: FuelDispatchBoard,
 ): DispatchCandidate | undefined {
-  const hubs = world.airports.filter((a) => FUEL_HUB_ICAOS.has(a.icao));
-  const spokes = world.airports
-    .filter(
-      (a) =>
-        !a.bushTripOnly &&
-        !FUEL_HUB_ICAOS.has(a.icao) &&
-        fillOf(a) < DEST_SHORTAGE_FILL,
-    )
-    .filter((a) => inboundEnrouteCount(world, a.icao) < MAX_INBOUND_HAULS)
-    .sort((a, b) => fillOf(a) - fillOf(b));
-
-  if (hubs.length === 0 || spokes.length === 0) return undefined;
+  const { hubs, shortageSpokes, inboundEnroute } = board;
+  if (hubs.length === 0 || shortageSpokes.length === 0) return undefined;
 
   const homeReach = regionsReachable(truck.homeRegion);
-  const rankedSpokes = [
-    ...spokes.filter((s) => homeReach.has(s.region)),
-    ...spokes.filter((s) => !homeReach.has(s.region)),
-  ];
+  // Same order as filter(inbound) → sort → home-partition → slice(0,8):
+  // walk home then non-home shortage list, skip saturated inbound.
+  const tryDests: AirportTerminal[] = [];
+  const pushEligible = (spoke: AirportTerminal) => {
+    if (tryDests.length >= 8) return;
+    if ((inboundEnroute.get(spoke.icao.toUpperCase()) ?? 0) >= MAX_INBOUND_HAULS) {
+      return;
+    }
+    tryDests.push(spoke);
+  };
+  for (const s of shortageSpokes) {
+    if (homeReach.has(s.region)) pushEligible(s);
+  }
+  for (const s of shortageSpokes) {
+    if (!homeReach.has(s.region)) pushEligible(s);
+  }
+  if (tryDests.length === 0) return undefined;
 
   let best: DispatchCandidate | undefined;
-  for (const dest of rankedSpokes.slice(0, 8)) {
+  for (const dest of tryDests) {
     const destReach = regionsReachable(dest.region);
+    // Preserve hubs array order (world.airports order among fuel hubs).
     const localHubs = hubs.filter(
       (h) => h.region === dest.region || destReach.has(h.region),
     );
@@ -1102,16 +1183,27 @@ export function dispatchFuelTrucks(
     [idle[i], idle[j]] = [idle[j]!, idle[i]!];
   }
 
+  if (idle.length === 0) return { dispatched: 0 };
+
+  const board = buildFuelDispatchBoard(world);
+
   for (const truck of idle) {
     truck.status = 'idle';
     truck.busyUntilMs = undefined;
-    const pick = pickBestCandidate(world, truck);
+    const pick = pickBestCandidate(world, truck, board);
     if (!pick) continue;
 
-    const taken = debitHubFuel(world, pick.origin.icao, pick.cargoKg);
+    const taken = debitHubFuel(
+      world,
+      pick.origin.icao,
+      pick.cargoKg,
+      board.byIcao,
+    );
     if (taken < MIN_HAUL_KG) {
       // Roll back partial — shouldn't happen with pre-check, but stay safe.
-      if (taken > 0) creditDestFuel(world, pick.origin.icao, taken);
+      if (taken > 0) {
+        creditDestFuel(world, pick.origin.icao, taken, board.byIcao);
+      }
       continue;
     }
 
@@ -1134,6 +1226,11 @@ export function dispatchFuelTrucks(
     truck.status = 'enroute';
     truck.currentHaulId = haul.id;
     truck.busyUntilMs = arrivesAtMs;
+    const destCode = pick.dest.icao.toUpperCase();
+    board.inboundEnroute.set(
+      destCode,
+      (board.inboundEnroute.get(destCode) ?? 0) + 1,
+    );
     dispatched += 1;
   }
 
@@ -1144,9 +1241,20 @@ export function dispatchFuelTrucks(
 export function tickFuelLogistics(
   world: CareerEconomyWorld,
   rng: () => number,
-  opts: { batchNowMs: number },
+  opts: {
+    batchNowMs: number;
+    /**
+     * When false, skip settle (caller already ran `settleFuelHaulsDue` this
+     * batch — e.g. tickEconomy settle phase). Default true for standalone use.
+     */
+    settle?: boolean;
+  },
 ): { settledHauls: number; dispatched: number } {
-  const settled = settleFuelHaulsDue(world, opts.batchNowMs);
+  const doSettle = opts.settle !== false;
+  const settled = doSettle
+    ? settleFuelHaulsDue(world, opts.batchNowMs)
+    : { settledHauls: 0 };
+  if (!doSettle) ensureFuelTruckFleet(world);
   const dispatched = dispatchFuelTrucks(world, {
     batchNowMs: opts.batchNowMs,
     rng,

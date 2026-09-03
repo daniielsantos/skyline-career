@@ -20,10 +20,12 @@ import {
   describeLotMarketPressure,
   isNpcReadyToBid,
   listNpcHomeRegions,
+  npcClaimForLot,
   resolveNpcFleetComposition,
   targetNpcFleetSize,
   THIN_FLEET_CAPACITY,
 } from './career-npc.js';
+import { isBushTripOnlyHub } from './career-bush.js';
 import {
   countryIdFromRegion,
   isDomesticOd,
@@ -174,6 +176,17 @@ export interface EconomyPulseNpc {
   byClass: EconomyPulseNpcClass[];
 }
 
+/** Player-aircraft bookable board (no crew contract; available leftover kg). */
+export interface EconomyPulseBoard {
+  playerBookableLots: number;
+  playerBookablePayUsdP50: number | null;
+  /** Share of player-bookable general lots tagged last-mile. */
+  generalLastMilePct: number;
+  generalBookablePayPerKgP50: number | null;
+  /** Focus countries + homeCountryId when set. */
+  bookableGeneralPayPerKgP50: Record<string, number | null>;
+}
+
 export interface EconomyPulse {
   tick: number;
   homeCountryId: string | null;
@@ -189,6 +202,7 @@ export interface EconomyPulse {
   commodities: EconomyPulseCommodity[];
   countries: EconomyPulseCountry[];
   npc: EconomyPulseNpc;
+  board: EconomyPulseBoard;
   /** Cumulative flow counters — diff two samples to get throughput rates. */
   flow: EconomyFlowStats;
   notes: string[];
@@ -332,6 +346,11 @@ function lotBucketId(
   }
   if (originRegion) return countryIdFromRegion(originRegion);
   return countryIdFromRegion(destRegion || 'XX');
+}
+
+/** Match hub_economy_samples — trip-only strips have no cargo board. */
+function isCargoEconomyHub(ap: AirportTerminal): boolean {
+  return !(ap.bushTripOnly === true || isBushTripOnlyHub(ap.icao));
 }
 
 function emptyCountry(countryId: string, hubs: number): EconomyPulseCountry {
@@ -767,6 +786,13 @@ export function computeEconomyPulse(
     }
   }
 
+  const playerBookablePayUsd: number[] = [];
+  let playerBookableLots = 0;
+  const generalBookablePayPerKg: number[] = [];
+  let generalBookableLots = 0;
+  let generalLastMileLots = 0;
+  const bookableGeneralByCountry = new Map<string, number[]>();
+
   for (const lot of world.lots ?? []) {
     switch (lot.status) {
       case 'available':
@@ -815,7 +841,43 @@ export function computeEconomyPulse(
         cAcc.marginPct.push(net.marginPct);
       }
     }
+
+    if (lot.status === 'available' && left > 0) {
+      const claim = npcClaimForLot(world, lot.id, nowMs);
+      if (!claim?.crewNeeded) {
+        playerBookableLots += 1;
+        playerBookablePayUsd.push(lot.payUsd);
+        if (lot.commodityId === 'general' && qty > 0) {
+          const pkg = lot.payUsd / qty;
+          generalBookableLots += 1;
+          generalBookablePayPerKg.push(pkg);
+          if (/last-mile/i.test(lot.reason)) generalLastMileLots += 1;
+          const countryId = lotBucketId(lot, byIcao);
+          if (countryId !== 'INTL') {
+            const list = bookableGeneralByCountry.get(countryId) ?? [];
+            list.push(pkg);
+            bookableGeneralByCountry.set(countryId, list);
+          }
+        }
+      }
+    }
   }
+
+  const bookableGeneralPayPerKgP50: Record<string, number | null> = {};
+  for (const countryId of ['BR', 'US', world.homeCountryId ?? '']) {
+    if (!countryId) continue;
+    bookableGeneralPayPerKgP50[countryId] = median(
+      bookableGeneralByCountry.get(countryId) ?? [],
+    );
+  }
+  const board: EconomyPulseBoard = {
+    playerBookableLots,
+    playerBookablePayUsdP50: median(playerBookablePayUsd),
+    generalLastMilePct:
+      generalBookableLots > 0 ? generalLastMileLots / generalBookableLots : 0,
+    generalBookablePayPerKgP50: median(generalBookablePayPerKg),
+    bookableGeneralPayPerKgP50,
+  };
 
   const commodities: EconomyPulseCommodity[] = CAREER_CARGO_COMMODITIES.map(
     (def) => {
@@ -845,24 +907,25 @@ export function computeEconomyPulse(
 
   for (const countryId of countryIds) {
     const hubs = countryHubs.get(countryId) ?? [];
+    const cargoHubs = hubs.filter(isCargoEconomyHub);
     const acc = lotAcc.get(countryId) ?? { lots: [], payPerKg: [], busy: 0 };
-    const fills = hubs.map(airportMeanFill);
-    const liveHubs = hubs.filter(
+    const fills = cargoHubs.map(airportMeanFill);
+    const liveHubs = cargoHubs.filter(
       (ap) => (originLotCount.get(ap.icao.toUpperCase()) ?? 0) > 0,
     ).length;
-    const deadIcaos = hubs
+    const deadIcaos = cargoHubs
       .filter((ap) => (originLotCount.get(ap.icao.toUpperCase()) ?? 0) === 0)
       .map((ap) => ap.icao)
       .sort();
-    const quietHubs = hubs.filter(
+    const quietHubs = cargoHubs.filter(
       (ap) => (ap.activityScore ?? 40) < QUIET_ACTIVITY_SCORE,
     ).length;
     const n = acc.lots.length;
     countries.push({
       countryId,
-      hubs: hubs.length,
+      hubs: cargoHubs.length,
       availableLots: n,
-      liveHubPct: hubs.length > 0 ? liveHubs / hubs.length : 0,
+      liveHubPct: cargoHubs.length > 0 ? liveHubs / cargoHubs.length : 0,
       fillP50: median(fills),
       payPerKgP50: median(acc.payPerKg),
       laneBusyPct: n > 0 ? acc.busy / n : 0,
@@ -901,6 +964,7 @@ export function computeEconomyPulse(
     commodities,
     countries,
     npc,
+    board,
     flow: cloneFlowStats(ensureFlowStats(world)),
   };
 

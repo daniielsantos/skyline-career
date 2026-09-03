@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { BS_DENSIFY_HUBS, BS_DENSIFY_HUB_COUNT } from './career-bs-hubs-densify.js';
 
 export type BsCareerRegion = 'BS-C';
 
@@ -80,9 +81,10 @@ export const BS_CAREER_HUBS: readonly BsCareerHubDef[] = [
     lon: -77.7959,
     ...agroSpoke,
   },
+  ...BS_DENSIFY_HUBS,
 ];
 
-export const BS_CAREER_HUB_COUNT = 5;
+export const BS_CAREER_HUB_COUNT = 5 + BS_DENSIFY_HUB_COUNT;
 
 export function buildBsFeederCorridors(
   hubs: readonly BsCareerHubDef[] = BS_CAREER_HUBS,
@@ -111,5 +113,7 @@ export function assertBsCareerHubCatalog(): void {
     }
     if (h.region === 'BS-C') n += 1;
   }
-  if (n !== 5) throw new Error(`BS-C has ${n} hubs, expected 5`);
+  if (n !== BS_CAREER_HUB_COUNT) {
+    throw new Error(`BS-C has ${n} hubs, expected ${BS_CAREER_HUB_COUNT}`);
+  }
 }

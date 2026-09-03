@@ -1,5 +1,6 @@
 import type { AirportView, CareerRunway, CareerRunwaySurface } from './api';
 import { AirportSatelliteMap } from './AirportSatelliteMap';
+import { BusyBlock } from './Busy';
 
 function hubTierLabel(tier: NonNullable<AirportView['airport']['hubTier']>): string {
   switch (tier) {
@@ -153,7 +154,7 @@ export function TerminalAirportPanel(props: {
         <div className="airport-runways">
           <h3>Runways</h3>
           {hydrating && runways.length === 0 ? (
-            <p className="muted">Loading runway plate…</p>
+            <BusyBlock label="Loading runway plate" />
           ) : runways.length === 0 ? (
             <p className="muted">No runway data on file for this hub.</p>
           ) : (

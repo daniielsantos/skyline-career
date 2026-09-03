@@ -1,5 +1,35 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-03: **NPC ensure/settle opt shipped** — skip fleet maintain + settle 1×/tick; bid indexes + compact@48. Live ~**0.70s/tick** (era 4.4s). Hot restante: **npc bid ~67%** (scan idle×board). Next: bid redesign or bulk. Sem Dry.
+
+Atualizado 2026-09-03: **Board-pressure/intl opt shipped** — cache tick + INTL 1-pass fleet; live tick ~**2.1s→~0.76s**. Hot agora **npc ~61%**. Next: npc bid index. Sem Dry.
+
+Atualizado 2026-09-03: **Fuel tick opt shipped** — board 1×/batch + maps; fuel **~1.1s→~12ms**/tick; live tick ~**4.4s→~2.1s**. Next: formLotsIntl → npc → bulk. Sem parallel / Dry.
+
+Atualizado 2026-09-03: **Economy measure dia 154 + tick profile** — Wave A live **93.5%** (gate OK); EU **98.6%**; US **89%**; BR **75%** (oscila, &lt;85%); CL **79%**. Board ~9.1k. Perfil ~**4.4s/tick**: intl 31% / **fuel 25%** / npc 19% / bulk 12%. **Next opt (sem parallel):** (1) fuel dispatch maps/indexes (2) formLotsIntl residual (3) NPC board index (4) bulk. Replay bit-identical. Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-09-02: **Wave C densify catalogs (partial)** — +**126** hubs appended to SA/CA/Caribe densify files (AR20/CL13/PE11/BO7/EC7/CO16/VE11/GY3/SR1/GF1/PA3/CR4/NI3/HN4/GT4/BZ3/CU6/DO2/HT2/BS4/GP1). PA **MPCE** already Wave A (requested +4 → net +3). Skips: MPSA/MRQP/MGHT/SAZC/SYKA/SETR/SVBI/SPJJ/SLSU/SLYG/MGTK/MGAV/MHNJ/MZCZ/MZBG/TGCC/SMBN. GT/BZ/SR empty densify replaced. Dupe-check clean. **Next:** rebuild + SimBrief allowlist + homolog; seed count TBD.
+
+Atualizado 2026-09-02: **Wave C homolog fix** — drop KYUM/MHJU/MHRC/MMDM/MZBP/MZPB/MZPG (absent MSFS); seed **1679**; Americas cargo **~990**.
+
+Atualizado 2026-09-02: **World densify Wave C shipped** — Americas cargo **~786→~990** (+204 net pós-homolog; US+44 CA+26 MX+13 SA/Central/Caribe+121). Sem BR. Seed **1475→1679**; SimBrief **1638**. **User: rebuild → career-hubs → measure 7–14d**. Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-09-02: **Wave A homolog fix 2** — drop SAZC (MSFS=Zarate≠Coronel Suarez) + SYKA (no coords); seed **1475**.
+
+Atualizado 2026-09-02: **Wave A homolog fix** — 32 MSFS fails (wrong ICAO / missing). Fixed remaps + dropped absent/dupes; seed **1477** (era 1490). Re-run `npm run career-hubs`.
+
+Atualizado 2026-09-02: **World densify Wave A shipped** — Americas +130 net pós-homolog (CA27/MX24/…) → seed **1477**; SimBrief 1436. No BR/US deep; no flow retune. Script `analyze-americas-economy.mjs`. **User: rebuild → measure 7–14d** (Wave A live ≥85%) before Wave B (Asia+EU). Waves B–D registered in roadmap only.
+
+Atualizado 2026-09-02: **CA/Caribbean densify** — +29 hubs (PA2/CR3/NI1/HN3/GT2/BZ2/CU4/DO2/HT1/JM1/BS5/GP2/GD1); skip SV/MSSA + tiny deps; seed **1490**. Files `career-{pa,cr,ni,hn,gt,bz,cu,do,ht,jm,bs,gp,gd}-hubs-densify.ts`. GP: TFFM Marie-Galante already seeded → densify **TFFA** + **TFFS** Saint-Francois.
+
+Atualizado 2026-09-02: **SA densify Andes/Norte** — +60 (AR12/CL8/PE8/BO6/EC4/CO10/VE7/GY2/SR1/GF2); totals AR53/CL29/PE22/BO15/EC13/CO26/VE20/GY7/SR6/GF5.
+
+Atualizado 2026-09-02: **CA/MX densify catalogs** — +27 CA / +27 MX commercial hubs (`career-ca-hubs-densify.ts` / `career-mx-hubs-densify.ts`); totals **CA 80** / **MX 73**. No bush in densify.
+
+Atualizado 2026-09-02: **BR/US skipAll vitality scale shipped** — form/cap last-mile sob skipAll escalam com spokes (US 32/47, BR 12/18). Baseline dia 132: BR ~77% / US ~79% live. Rebuild + gate 7d ≥85%. Script `analyze-br-us-vitality.mjs`. Sem flow retune. EU densify já no gate (~99%).
+
+Atualizado 2026-09-02: **EU-1 West densify shipped** — +66 hubs (NL10/BE8/DE24/GB22/FR24/IT22/ES23/PT14); seed **1347**. Pulse lente EU + `analyze-eu-west-economy.mjs`. Gate 7–14d: live% ≥85%, lots↑. Sem `CARGO_FLOW_BALANCE`.
+
 Atualizado 2026-09-01: **Company session settlement** — `lastSeenTick` em `company_state`; fees via `settleCompanyPassiveFeesForTickRange` após cada catch-up chunk (`applyCompanySessionSettlement` / `openCompanySession`). World housekeeping permanece no tick; passive fees desacoplados (MP path).
 
 Atualizado 2026-09-01: **WorldTickService wired** — `LocalWorldTickService` em `createCareerApiServer`; pulse/login/catch-up chip via service; `nextPulseAtMs` no `/api/state`. Ver `14-mp-world-clock.md`.

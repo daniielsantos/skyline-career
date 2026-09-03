@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { BZ_DENSIFY_HUBS, BZ_DENSIFY_HUB_COUNT } from './career-bz-hubs-densify.js';
 
 export type BzCareerRegion = 'BZ-C';
 
@@ -81,9 +82,10 @@ export const BZ_CAREER_HUBS: readonly BzCareerHubDef[] = [
     lon: -87.9711,
     ...agroSpoke,
   },
+  ...BZ_DENSIFY_HUBS,
 ];
 
-export const BZ_CAREER_HUB_COUNT = 4;
+export const BZ_CAREER_HUB_COUNT = 4 + BZ_DENSIFY_HUB_COUNT;
 
 export function buildBzFeederCorridors(
   hubs: readonly BzCareerHubDef[] = BZ_CAREER_HUBS,
@@ -112,7 +114,9 @@ export function assertBzCareerHubCatalog(): void {
     }
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
-  if (byRegion['BZ-C'] !== 4) {
-    throw new Error(`BZ-C has ${byRegion['BZ-C'] ?? 0} hubs, expected 4`);
+  if (byRegion['BZ-C'] !== BZ_CAREER_HUB_COUNT) {
+    throw new Error(
+      `BZ-C has ${byRegion['BZ-C'] ?? 0} hubs, expected ${BZ_CAREER_HUB_COUNT}`,
+    );
   }
 }

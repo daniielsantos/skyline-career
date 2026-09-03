@@ -112,4 +112,40 @@ describe('aggregateHubEconomyHistoryPulse', () => {
         (pulse.days[0]!.world.payP50Usd as number),
     );
   });
+
+  it('aggregates synthetic EU from EU-1 Western core samples', () => {
+    const samples: HubEconomySample[] = [
+      sample({
+        icao: 'EDDF',
+        dayIndex: 1,
+        countryId: 'DE',
+        hubTier: 'major',
+        outboundLots: 2,
+        payP50Usd: 900,
+      }),
+      sample({
+        icao: 'LFPG',
+        dayIndex: 1,
+        countryId: 'FR',
+        hubTier: 'major',
+        outboundLots: 3,
+        payP50Usd: 1_100,
+      }),
+      sample({
+        icao: 'KJFK',
+        dayIndex: 1,
+        countryId: 'US',
+        hubTier: 'major',
+        outboundLots: 1,
+      }),
+    ];
+    const pulse = aggregateHubEconomyHistoryPulse(samples, {
+      focusCountries: ['BR', 'US', 'EU', 'DE'],
+    });
+    assert.equal(pulse.days[0]!.byCountry.EU?.hubs, 2);
+    assert.equal(pulse.days[0]!.byCountry.EU?.liveHubs, 2);
+    assert.equal(pulse.days[0]!.byCountry.DE?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.US?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.BR?.hubs, 0);
+  });
 });

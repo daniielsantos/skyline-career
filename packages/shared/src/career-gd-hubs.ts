@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GD_DENSIFY_HUBS, GD_DENSIFY_HUB_COUNT } from './career-gd-hubs-densify.js';
 
 export type GdCareerRegion = 'GD-C';
 
@@ -22,7 +23,7 @@ export type GdCareerHubDef = {
   bush?: true;
 };
 
-/** 1 curated Grenada hub — Maurice Bishop International. */
+/** 1 curated + densify Grenada hubs — Maurice Bishop + Carriacou. */
 export const GD_CAREER_HUBS: readonly GdCareerHubDef[] = [
   {
     icao: 'TGPY',
@@ -34,9 +35,10 @@ export const GD_CAREER_HUBS: readonly GdCareerHubDef[] = [
     produce: { general: 1.3, electronics: 1.05, machinery: 1.05 },
     consume: { perishables: 1.15, general: 1.05, supplies: 1.0 },
   },
+  ...GD_DENSIFY_HUBS,
 ];
 
-export const GD_CAREER_HUB_COUNT = 1;
+export const GD_CAREER_HUB_COUNT = 1 + GD_DENSIFY_HUB_COUNT;
 
 export function buildGdFeederCorridors(
   hubs: readonly GdCareerHubDef[] = GD_CAREER_HUBS,
@@ -54,8 +56,7 @@ export function assertGdCareerHubCatalog(): void {
       `GD_CAREER_HUBS length ${GD_CAREER_HUBS.length} !== ${GD_CAREER_HUB_COUNT}`,
     );
   }
-  const h = GD_CAREER_HUBS[0]!;
-  if (h.icao !== 'TGPY' || h.region !== 'GD-C') {
-    throw new Error('GD catalog must be TGPY / GD-C');
+  if (!GD_CAREER_HUBS.some((h) => h.icao === 'TGPY' && h.region === 'GD-C')) {
+    throw new Error('GD catalog must include TGPY / GD-C');
   }
 }

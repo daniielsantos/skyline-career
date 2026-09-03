@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GP_DENSIFY_HUBS, GP_DENSIFY_HUB_COUNT } from './career-gp-hubs-densify.js';
 
 export type GpCareerRegion = 'GP-C';
 
@@ -22,7 +23,7 @@ export type GpCareerHubDef = {
   bush?: true;
 };
 
-/** 2 curated Guadeloupe hubs — Pointe-a-Pitre + Marie-Galante. */
+/** 2 curated + densify Guadeloupe hubs — Pointe-a-Pitre + out-islands. */
 export const GP_CAREER_HUBS: readonly GpCareerHubDef[] = [
   {
     icao: 'TFFR',
@@ -44,9 +45,10 @@ export const GP_CAREER_HUBS: readonly GpCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.05, supplies: 0.95 },
     consume: { electronics: 0.85, machinery: 0.85, fuel: 0.9 },
   },
+  ...GP_DENSIFY_HUBS,
 ];
 
-export const GP_CAREER_HUB_COUNT = 2;
+export const GP_CAREER_HUB_COUNT = 2 + GP_DENSIFY_HUB_COUNT;
 
 export function buildGpFeederCorridors(
   hubs: readonly GpCareerHubDef[] = GP_CAREER_HUBS,

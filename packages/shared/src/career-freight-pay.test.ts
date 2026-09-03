@@ -3,7 +3,10 @@ import { describe, it } from 'node:test';
 import {
   FREIGHT_PAY_CAP_MULT,
   FREIGHT_TOTAL_CAP_MULT,
+  dryFormationMinGapMult,
+  destRoomKg,
   freightTonnagePayMult,
+  LAST_MILE_MIN_PAY_GAP_MULT,
   quoteFreightLotPay,
 } from './career-economy.js';
 import type { StockPile } from './types/career-economy.js';
@@ -319,6 +322,37 @@ describe('quoteFreightLotPay', () => {
     assert.ok(
       q.haulUsdPerKg <= q.totalCapUsdPerKg * 0.5 + 1e-9,
       `haul ${q.haulUsdPerKg} should leave arb headroom under ${q.totalCapUsdPerKg}`,
+    );
+  });
+
+  it('requires wider dry gap into filling destinations', () => {
+    assert.equal(dryFormationMinGapMult('general', 0.5, 0.22), 0.22);
+    assert.ok(dryFormationMinGapMult('general', 0.85, 0.22) > 0.3);
+    assert.equal(dryFormationMinGapMult('electronics', 0.9, 0.22), 0.22);
+  });
+
+  it('shrinks dry bulk dest room below default soft fill', () => {
+    const stock = pile(0.55);
+    assert.ok(destRoomKg(stock, 'general') < destRoomKg(stock, 'electronics'));
+  });
+
+  it('last-mile minPayGapMult lifts pay on flat dry spreads', () => {
+    const stock = pile(0.5);
+    const base = {
+      commodityId: 'general' as const,
+      quantityKg: 400,
+      originStock: stock,
+      destStock: stock,
+      distanceNm: 200,
+    };
+    const low = quoteFreightLotPay({ ...base, minPayGapMult: 0.2 });
+    const lastMile = quoteFreightLotPay({
+      ...base,
+      minPayGapMult: LAST_MILE_MIN_PAY_GAP_MULT,
+    });
+    assert.ok(
+      lastMile.payUsd > low.payUsd,
+      `last-mile gap floor should pay more (${lastMile.payUsd} vs ${low.payUsd})`,
     );
   });
 });

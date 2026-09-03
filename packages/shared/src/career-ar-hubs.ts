@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { AR_DENSIFY_HUBS, AR_DENSIFY_HUB_COUNT } from './career-ar-hubs-densify.js';
 
 export type ArCareerRegion = 'AR-BA' | 'AR-CO' | 'AR-NO' | 'AR-PA';
 
@@ -455,9 +456,10 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     produce: { general: 0.95, supplies: 0.9 },
     consume: { perishables: 1.2, supplies: 1.15, electronics: 0.9 },
   },
+  ...AR_DENSIFY_HUBS,
 ];
 
-export const AR_CAREER_HUB_COUNT = 41;
+export const AR_CAREER_HUB_COUNT = 41 + AR_DENSIFY_HUB_COUNT;
 
 export function buildArFeederCorridors(
   hubs: readonly ArCareerHubDef[] = AR_CAREER_HUBS,
@@ -487,10 +489,10 @@ export function assertArCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<ArCareerRegion, number> = {
-    'AR-BA': 13,
-    'AR-CO': 9,
-    'AR-NO': 9,
-    'AR-PA': 10,
+    'AR-BA': 23,
+    'AR-CO': 13,
+    'AR-NO': 16,
+    'AR-PA': 18,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

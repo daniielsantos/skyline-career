@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GT_DENSIFY_HUBS, GT_DENSIFY_HUB_COUNT } from './career-gt-hubs-densify.js';
 
 export type GtCareerRegion = 'GT-C';
 
@@ -100,9 +101,10 @@ export const GT_CAREER_HUBS: readonly GtCareerHubDef[] = [
     lon: -91.6973,
     ...drySpoke,
   },
+  ...GT_DENSIFY_HUBS,
 ];
 
-export const GT_CAREER_HUB_COUNT = 6;
+export const GT_CAREER_HUB_COUNT = 6 + GT_DENSIFY_HUB_COUNT;
 
 export function buildGtFeederCorridors(
   hubs: readonly GtCareerHubDef[] = GT_CAREER_HUBS,
@@ -131,7 +133,9 @@ export function assertGtCareerHubCatalog(): void {
     }
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
-  if (byRegion['GT-C'] !== 6) {
-    throw new Error(`GT-C has ${byRegion['GT-C'] ?? 0} hubs, expected 6`);
+  if (byRegion['GT-C'] !== GT_CAREER_HUB_COUNT) {
+    throw new Error(
+      `GT-C has ${byRegion['GT-C'] ?? 0} hubs, expected ${GT_CAREER_HUB_COUNT}`,
+    );
   }
 }

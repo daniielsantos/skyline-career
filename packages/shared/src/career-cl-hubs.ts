@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CL_DENSIFY_HUBS, CL_DENSIFY_HUB_COUNT } from './career-cl-hubs-densify.js';
 
 export type ClCareerRegion = 'CL-C' | 'CL-S';
 
@@ -256,9 +257,10 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     produce: { general: 1.0, supplies: 1.05 },
     consume: { perishables: 1.15, supplies: 1.1, electronics: 0.9 },
   },
+  ...CL_DENSIFY_HUBS,
 ];
 
-export const CL_CAREER_HUB_COUNT = 21;
+export const CL_CAREER_HUB_COUNT = 21 + CL_DENSIFY_HUB_COUNT;
 
 /**
  * MSFS / a leftover catalog used SCCD for Carriel Sur. Real + SimBrief ident
@@ -329,6 +331,26 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   FVJN: 'FVBU',
   // AF-7: Juba stock ident is HJJJ (not legacy HSSJ)
   HSSJ: 'HJJJ',
+  // Americas Wave A densify ICAO traps (MSFS Facilities)
+  MMCX: 'MMCN', // Ciudad Obregon
+  MMCR: 'MMCC', // Ciudad Acuna
+  SAZU: 'SATU', // Curuzu Cuatia
+  SARL: 'SATR', // Reconquista
+  SAHR: 'SAZW', // Cutral Co
+  SAHS: 'SANR', // Termas (already seeded)
+  SAOS: 'SAAV', // Sauce Viejo (already seeded)
+  // SAHC Coronel Suarez / SAZC dropped — stock MSFS SAZC is Zarate (~242 nm)
+  // SYKM/SYKA Kaieteur dropped — no MSFS facility coords
+  MRCH: 'MRCR', // Carrillo
+  MRTR: 'MRBT', // Tortuguero
+  SETR: 'SENL', // Lago Agrio (SETR is Tarapoa)
+  SVBI: 'SVCB', // Ciudad Bolivar
+  SMBN: 'SMWA', // Albina already seeded
+  SPJJ: 'SPJI', // Juanjui already seeded
+  SLSU: 'SLPO', // Potosi already seeded
+  SLYG: 'SLYA', // Yacuiba
+  TGCC: 'TGPZ', // Carriacou Lauriston
+  MGTK: 'MGMM', // Mundo Maya already seeded
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([
@@ -427,8 +449,8 @@ export function assertClCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<ClCareerRegion, number> = {
-    'CL-C': 13,
-    'CL-S': 8,
+    'CL-C': 27,
+    'CL-S': 15,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

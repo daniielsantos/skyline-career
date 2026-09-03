@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { HT_DENSIFY_HUBS, HT_DENSIFY_HUB_COUNT } from './career-ht-hubs-densify.js';
 
 export type HtCareerRegion = 'HT-C';
 
@@ -62,9 +63,10 @@ export const HT_CAREER_HUBS: readonly HtCareerHubDef[] = [
     lon: -73.7883,
     ...agroSpoke,
   },
+  ...HT_DENSIFY_HUBS,
 ];
 
-export const HT_CAREER_HUB_COUNT = 3;
+export const HT_CAREER_HUB_COUNT = 3 + HT_DENSIFY_HUB_COUNT;
 
 export function buildHtFeederCorridors(
   hubs: readonly HtCareerHubDef[] = HT_CAREER_HUBS,
@@ -93,5 +95,7 @@ export function assertHtCareerHubCatalog(): void {
     }
     if (h.region === 'HT-C') n += 1;
   }
-  if (n !== 3) throw new Error(`HT-C has ${n} hubs, expected 3`);
+  if (n !== HT_CAREER_HUB_COUNT) {
+    throw new Error(`HT-C has ${n} hubs, expected ${HT_CAREER_HUB_COUNT}`);
+  }
 }

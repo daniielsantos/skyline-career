@@ -141,4 +141,57 @@ describe('fuel truck logistics', () => {
       `expected SBPV fuel to recover above 5%, got ${(fill * 100).toFixed(1)}%`,
     );
   });
+
+  it('dispatch board cache stays deterministic (same seed → same hauls)', () => {
+    const snap = (world: ReturnType<typeof createSeedEconomyWorld>) =>
+      JSON.stringify({
+        hauls: (world.fuelHauls ?? [])
+          .map((h) => ({
+            id: h.id,
+            truckId: h.truckId,
+            originIcao: h.originIcao,
+            destIcao: h.destIcao,
+            cargoKg: h.cargoKg,
+            status: h.status,
+            // Relative duration only — wall stamps depend on lastBatchAtMs.
+            tripMs: h.arrivesAtMs - h.departedAtMs,
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+        fuel: world.airports
+          .map((a) => [a.icao, Math.round(a.inventory.fuel?.stockKg ?? 0)] as const)
+          .sort((a, b) => a[0].localeCompare(b[0])),
+        trucks: (world.fuelTrucks ?? [])
+          .map((t) => ({
+            id: t.id,
+            status: t.status,
+            currentHaulId: t.currentHaulId ?? null,
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id)),
+      });
+
+    const run = () => {
+      const world = createSeedEconomyWorld({ seed: 'fuel-dispatch-parity' });
+      world.lastBatchAtMs = 1_700_000_000_000;
+      // Dry spokes + full hubs so dispatch has work without a full economy tick.
+      for (const ap of world.airports) {
+        if (!ap.inventory.fuel) continue;
+        if (FUEL_HUB_ICAOS.has(ap.icao)) {
+          ap.inventory.fuel.stockKg = ap.inventory.fuel.capacityKg;
+        } else if (!ap.bushTripOnly) {
+          ap.inventory.fuel.stockKg = 0;
+        }
+      }
+      let batchNowMs = world.lastBatchAtMs;
+      for (let i = 0; i < 6; i++) {
+        world.tick += 1;
+        batchNowMs += MS_PER_TICK;
+        const rng = () => 0.37;
+        tickFuelLogistics(world, rng, { batchNowMs });
+        settleFuelHaulsDue(world, batchNowMs + 48 * MS_PER_TICK);
+      }
+      return world;
+    };
+
+    assert.equal(snap(run()), snap(run()));
+  });
 });

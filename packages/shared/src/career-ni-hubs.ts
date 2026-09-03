@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { NI_DENSIFY_HUBS, NI_DENSIFY_HUB_COUNT } from './career-ni-hubs-densify.js';
 
 export type NiCareerRegion = 'NI-C';
 
@@ -91,9 +92,10 @@ export const NI_CAREER_HUBS: readonly NiCareerHubDef[] = [
     lon: -86.5114,
     ...drySpoke,
   },
+  ...NI_DENSIFY_HUBS,
 ];
 
-export const NI_CAREER_HUB_COUNT = 5;
+export const NI_CAREER_HUB_COUNT = 5 + NI_DENSIFY_HUB_COUNT;
 
 export function buildNiFeederCorridors(
   hubs: readonly NiCareerHubDef[] = NI_CAREER_HUBS,
@@ -122,7 +124,9 @@ export function assertNiCareerHubCatalog(): void {
     }
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
-  if (byRegion['NI-C'] !== 5) {
-    throw new Error(`NI-C has ${byRegion['NI-C'] ?? 0} hubs, expected 5`);
+  if (byRegion['NI-C'] !== NI_CAREER_HUB_COUNT) {
+    throw new Error(
+      `NI-C has ${byRegion['NI-C'] ?? 0} hubs, expected ${NI_CAREER_HUB_COUNT}`,
+    );
   }
 }

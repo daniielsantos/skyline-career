@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { PA_DENSIFY_HUBS, PA_DENSIFY_HUB_COUNT } from './career-pa-hubs-densify.js';
 
 export type PaCareerRegion = 'PA-C';
 
@@ -41,7 +42,7 @@ const agroSpoke = {
   >,
 };
 
-/** 7 curated Panama hubs — Canal corridor + interior / Bocas. */
+/** 7 curated + densify Panama hubs — Canal corridor + interior / Bocas. */
 export const PA_CAREER_HUBS: readonly PaCareerHubDef[] = [
   {
     icao: 'MPTO',
@@ -109,9 +110,10 @@ export const PA_CAREER_HUBS: readonly PaCareerHubDef[] = [
     lon: -82.5168,
     ...agroSpoke,
   },
+  ...PA_DENSIFY_HUBS,
 ];
 
-export const PA_CAREER_HUB_COUNT = 7;
+export const PA_CAREER_HUB_COUNT = 7 + PA_DENSIFY_HUB_COUNT;
 
 export function buildPaFeederCorridors(
   hubs: readonly PaCareerHubDef[] = PA_CAREER_HUBS,
@@ -140,7 +142,9 @@ export function assertPaCareerHubCatalog(): void {
     }
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
-  if (byRegion['PA-C'] !== 7) {
-    throw new Error(`PA-C has ${byRegion['PA-C'] ?? 0} hubs, expected 7`);
+  if (byRegion['PA-C'] !== PA_CAREER_HUB_COUNT) {
+    throw new Error(
+      `PA-C has ${byRegion['PA-C'] ?? 0} hubs, expected ${PA_CAREER_HUB_COUNT}`,
+    );
   }
 }

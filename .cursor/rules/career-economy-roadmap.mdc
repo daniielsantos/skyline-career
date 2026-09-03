@@ -94,6 +94,13 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **US inland ports:** St. Louis / Memphis / Chicago / Pittsburgh / Duluth–Superior (Mississippi–Ohio → Gulf; Great Lakes → Seaway). Pickups KSTL/KMEM/KORD/KPIT/KDLH; +hubs KPIT/KDLH.
 - **US continental densify:** +108 commercial network hubs (MW/SC/SE/NE/W/MT) → **~230** continental network; regional Jet-A producers added.
 - **BR densify:** +35 commercial SB* hubs → **~95** BR network; seed **1281** airports / **224** ports.
+- **EU-1 West densify:** +66 commercial hubs (NL/BE/DE → GB/FR/IT → ES/PT light) via `career-*-hubs-densify.ts`; EU-1 **~147** hubs; seed **1347** airports / **224** ports. Skip LPPS/LPLA/GCTS/EDDT.
+- **CA/MX densify (Wave A):** +27 CA / +27 MX → **CA 80** / **MX 73** via `career-ca-hubs-densify.ts` / `career-mx-hubs-densify.ts`. Fuel anchors: CYQT/CYMM/CYZF/CYXY/CYQX, MMMZ/MMSM/MMBT.
+- **CA/Caribbean densify (Wave A):** +29 commercial hubs (PA/CR/NI/HN/GT/BZ/CU/DO/HT/JM/BS/GP/GD) via `career-*-hubs-densify.ts`. Skip SV/MSSA, MNCE/MNRR, MDJB, tiny deps. GP: TFFA + TFFS (TFFM already seeded).
+- **SA densify (Wave A):** +60 commercial hubs (AR12/CL8/PE8/BO6/EC4/CO10/VE7/GY2/SR1/GF2) via `career-*-hubs-densify.ts`. Skip SCCD/SCSN/SCST/SCTC, SPIM/SPMS, SLRI/SLET, SEQM, SVCP.
+- **World densify Wave A (Americas 655→~787):** +130 hubs net after homolog ICAO cleanup; seed **1475** airports / **224** ports; SimBrief allowlist **1434** cargo ICAOs. No BR/US deep densify; no `CARGO_FLOW_BALANCE`. Script `scripts/analyze-americas-economy.mjs`. Gate 7–14d: Wave A country live ≥85% (or stable) before Wave B.
+- **World densify Wave C (Americas →~1000):** +204 hubs net (US+44 CA+26 MX+13 SA/Central/Caribe+121); Americas cargo **~990**; seed **1679**; SimBrief **1638**. No BR. Dropped KYUM/MHJU/MHRC/MMDM/MZ* densify (no stock MSFS). Measure 7–14d before Asia Wave B / Africa Wave D.
+- **BR/US skipAll vitality scale:** spoke/regional last-mile form+cap scale with cargo hub counts (`lastMileSkipAllSpokeFormBudget` / `lastMileDeadSpokeVitalityCap`); US form **32**/cap **~47**, BR form **12**/cap **18**. No `CARGO_FLOW_BALANCE` / soft-cap bump.
 - **Pacific island-neighbor gap:** Nadi **NFFN**–Port Vila **NVVV** and Nadi–Nouméa **NWWW**; demand pairs FJ–VU / FJ–NC. Intl lanes >= **399**.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
 - **Port concession v1:** company-owned renewable lease (CAPEX + daily×7 lease); 1 concession/company; claim gates = T3 WH at pickup + 25k `lifetimeShippedKg` + cash; world `portInventories` feed listings from yard stock; operator buffs (~10% buy, ~15% inbound ETA, +1 listing slot); non-operators still buy + own WH; no NPC operators / fee-to-operator in v1.
@@ -172,8 +179,17 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 57. ~~**US continental densify**~~ — +108 hubs → **~230** continental network.
 58. ~~**BR densify**~~ — +35 hubs → **~95** BR network; seed **1281** / **224** ports. Homolog SimBrief if OFP fails on new SB*.
 59. ~~**Pacific island-neighbor gap**~~ — NFFN–NVVV / NFFN–NWWW; demand FJ–VU / FJ–NC; intl lanes >= **399**.
-60. **Next map region:** MR **GQPP** / DRC **FZNA** / EG **FGBT** / CV **GVNP** / FLSK if homolog proves stock MSFS. Africa country coverage complete except those densify leftovers.
-61. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+60. ~~**EU-1 West densify**~~ — +66 hubs (NL10/BE8/DE24/GB22/FR24/IT22/ES23/PT14); seed **1347** / **224** ports. Pulse EU lens + `analyze-eu-west-economy.mjs`. Homolog SimBrief if OFP fails on new ICAOs.
+61. ~~**BR/US skipAll vitality scale**~~ — densify-aware last-mile budgets; script `analyze-br-us-vitality.mjs`. Gate 7d: BR/US live ≥85%. No flow retune.
+62. ~~**SA densify (Wave A)**~~ — +60 hubs (AR12/CL8/PE8/BO6/EC4/CO10/VE7/GY2/SR1/GF2); seed **1490** / **224** ports (with CA densify). Homolog SimBrief if OFP fails on new ICAOs.
+63. ~~**CA/MX densify (Wave A)**~~ — +27 CA / +27 MX → CA 80 / MX 73; fuel CYQT/CYMM/…/MMMZ/MMSM/MMBT.
+64. ~~**CA/Caribbean densify (Wave A)**~~ — +29 hubs (PA2/CR3/NI1/HN3/GT2/BZ2/CU4/DO2/HT1/JM1/BS5/GP2/GD1); seed **1490**. Skip SV/tiny deps. Homolog SimBrief if OFP fails on new ICAOs.
+65. ~~**World densify Wave A**~~ — Americas **~655→~787** (+130); seed **1475**; `analyze-americas-economy.mjs`; pulse focus +CA/MX/AR/CO.
+66. ~~**World densify Wave C (Americas→~1000)**~~ — +204 net; seed **1679**; Americas cargo **~990**. No BR. **Measure 7–14d** (live ≥85% affected; vigiar US GA/skipAll) before Wave B/D.
+67. **Next — World densify Wave B (Asia + Europe ~+150):** Asia +75–90 (CN inland / IN / SE Asia spokes); Europe +60–75 (EU-2/3/4 thin — Nordics/Baltics/Balkans/PL; EU-1 West light gaps only). Measure BR/US/EU/Asia live after. Do **not** start until Wave A/C gate passes.
+68. **Later — World densify Wave D (Africa + Oceania ~+70):** Africa +50–65; Oceania +5–10; polish network toward **~2000** hubs. Optional BR light densify if live ≥85%.
+69. Leftover Africa densify if homolog proves stock: MR **GQPP** / DRC **FZNA** / EG **FGBT** / CV **GVNP** / FLSK.
+70. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

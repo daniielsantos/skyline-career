@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CO_DENSIFY_HUBS, CO_DENSIFY_HUB_COUNT } from './career-co-hubs-densify.js';
 
 export type CoCareerRegion = 'CO-C' | 'CO-N' | 'CO-W';
 
@@ -203,9 +204,10 @@ export const CO_CAREER_HUBS: readonly CoCareerHubDef[] = [
     produce: { perishables: 1.2, general: 1.05, supplies: 1.1 },
     consume: { electronics: 0.95, perishables: 1.15, supplies: 1.1 },
   },
+  ...CO_DENSIFY_HUBS,
 ];
 
-export const CO_CAREER_HUB_COUNT = 16;
+export const CO_CAREER_HUB_COUNT = 16 + CO_DENSIFY_HUB_COUNT;
 
 export function buildCoFeederCorridors(
   hubs: readonly CoCareerHubDef[] = CO_CAREER_HUBS,
@@ -235,9 +237,9 @@ export function assertCoCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<CoCareerRegion, number> = {
-    'CO-C': 6,
-    'CO-N': 5,
-    'CO-W': 5,
+    'CO-C': 19,
+    'CO-N': 10,
+    'CO-W': 13,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

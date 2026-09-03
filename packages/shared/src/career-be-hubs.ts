@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { BE_DENSIFY_HUBS, BE_DENSIFY_HUB_COUNT } from './career-be-hubs-densify.js';
 
 export type BeCareerRegion = 'BE-C';
 
@@ -22,7 +23,7 @@ export type BeCareerHubDef = {
   bush?: true;
 };
 
-/** 3 curated Belgium hubs. */
+/** 3 curated + densify Belgium hubs. */
 export const BE_CAREER_HUBS: readonly BeCareerHubDef[] = [
   {
     icao: 'EBBR',
@@ -54,9 +55,10 @@ export const BE_CAREER_HUBS: readonly BeCareerHubDef[] = [
     produce: { general: 1.2, electronics: 1.1, perishables: 1.05 },
     consume: { machinery: 0.95, supplies: 1.0 },
   },
+  ...BE_DENSIFY_HUBS,
 ];
 
-export const BE_CAREER_HUB_COUNT = 3;
+export const BE_CAREER_HUB_COUNT = 3 + BE_DENSIFY_HUB_COUNT;
 
 export function buildBeFeederCorridors(
   hubs: readonly BeCareerHubDef[] = BE_CAREER_HUBS,

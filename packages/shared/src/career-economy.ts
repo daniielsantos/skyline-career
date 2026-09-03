@@ -989,6 +989,9 @@ import {
   LANE_BUSY_PAY_SLOPE,
   LANE_SATURATION_KG,
   THIN_FLEET_PAY_SLOPE,
+  HEAVY_FREIGHTER_CLASSES,
+  npcMaxCargoKg,
+  NPC_LEGS_PER_DAY_EST,
 } from './career-npc.js';
 export { laneInboundKg, npcLaneSaturation } from './career-npc.js';
 import {
@@ -1300,13 +1303,72 @@ const LAST_MILE_MIN_SPOKE_ORIGIN_FILL = 0.14;
  * When the partition is already at skipAll, still allow this many new GA Dry
  * last-mile lots from dead spokes (per country×SKU per tick). Soft overshoot
  * only — does not raise {@link COMMODITY_AVAILABLE_SOFT_CAP}.
+ * Floor for {@link lastMileSkipAllSpokeFormBudget}.
  */
 export const LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET = 12;
 /**
  * Under skipAll, budgeted GA Dry last-mile from dead regionals (per country×SKU).
  * Separate from spoke budget so redistributors are not starved by spoke vitality.
+ * Floor for {@link lastMileSkipAllRegionalFormBudget}.
  */
 export const LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET = 8;
+/**
+ * Under skipAll, budgeted GA Dry last-mile from dead majors (per country×SKU).
+ * Small slice so JFK/ORD still post GA Dry when the bulk pass is capped.
+ */
+export const LAST_MILE_SKIPALL_MAJOR_FORM_BUDGET = 4;
+/** Floor for {@link lastMileDeadSpokeVitalityCap} — how many zero-open spokes lead. */
+export const LAST_MILE_DEAD_SPOKE_VITALITY_CAP_MIN = 16;
+/** Floor for dead-regional vitality lead set. */
+export const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP_MIN = 8;
+
+function clampInt(lo: number, hi: number, n: number): number {
+  return Math.max(lo, Math.min(hi, Math.trunc(n)));
+}
+
+/**
+ * Densify-aware skipAll spoke form budget (per country×Dry SKU / tick).
+ * US ~180 spokes → 30; BR ~70 → 12 (floor).
+ */
+export function lastMileSkipAllSpokeFormBudget(cargoSpokeCount: number): number {
+  return clampInt(
+    LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET,
+    32,
+    Math.ceil(Math.max(0, cargoSpokeCount) / 6),
+  );
+}
+
+/** How many dead spokes get first crack per country×SKU / tick. */
+export function lastMileDeadSpokeVitalityCap(cargoSpokeCount: number): number {
+  return clampInt(
+    LAST_MILE_DEAD_SPOKE_VITALITY_CAP_MIN,
+    48,
+    Math.ceil(Math.max(0, cargoSpokeCount) / 4),
+  );
+}
+
+export function lastMileSkipAllRegionalFormBudget(
+  cargoRegionalCount: number,
+): number {
+  return clampInt(
+    LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
+    16,
+    Math.ceil(Math.max(0, cargoRegionalCount) / 3),
+  );
+}
+
+export function lastMileDeadRegionalVitalityCap(
+  cargoRegionalCount: number,
+): number {
+  return clampInt(
+    LAST_MILE_DEAD_REGIONAL_VITALITY_CAP_MIN,
+    16,
+    Math.ceil(Math.max(0, cargoRegionalCount) / 2),
+  );
+}
+
+/** Floor on arbitrage gap for GA Dry last-mile only (× basePricePerKg). Bulk keeps 0. */
+export const LAST_MILE_MIN_PAY_GAP_MULT = 0.35;
 /**
  * Soft bulk uses ~58% room — under Dry sat (~85% fill) that is zero everywhere.
  * Last-mile only needs physical warehouse headroom for a GA hop.
@@ -2057,12 +2119,26 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'EDDM', b: 'EDDS', weight: 1.7 },
   { a: 'EHAM', b: 'EHRD', weight: 1.6 },
   { a: 'EHAM', b: 'EHEH', weight: 1.5 },
+  { a: 'EHAM', b: 'EHBK', weight: 1.5 },
   { a: 'EBBR', b: 'EBAW', weight: 1.5 },
   { a: 'EBBR', b: 'EBCI', weight: 1.4 },
+  { a: 'EBBR', b: 'EBLG', weight: 1.5 },
+  { a: 'EDDF', b: 'EDDG', weight: 1.6 },
+  { a: 'EDDL', b: 'EDLW', weight: 1.5 },
+  { a: 'EDDF', b: 'EDFH', weight: 1.5 },
+  { a: 'EGLL', b: 'EGFF', weight: 1.6 },
+  { a: 'EGPH', b: 'EGPK', weight: 1.5 },
+  { a: 'EGCC', b: 'EGAA', weight: 1.55 },
+  { a: 'LFPG', b: 'LFQQ', weight: 1.6 },
+  { a: 'LFML', b: 'LFMT', weight: 1.5 },
+  { a: 'LIMC', b: 'LIMF', weight: 1.5 },
   { a: 'LIRF', b: 'LIMC', weight: 2.1 },
   { a: 'LIRF', b: 'LIRN', weight: 1.9 },
   { a: 'LIMC', b: 'LIPE', weight: 1.7 },
   { a: 'LIRN', b: 'LICC', weight: 1.6 },
+  { a: 'LIRN', b: 'LIEE', weight: 1.5 },
+  { a: 'LEMD', b: 'LEVC', weight: 1.6 },
+  { a: 'LPPT', b: 'LPBJ', weight: 1.5 },
   // EU-2 Nordics + Alps + IE domestic trunks
   { a: 'EIDW', b: 'EINN', weight: 1.9 },
   { a: 'EIDW', b: 'EICK', weight: 1.7 },
@@ -7826,16 +7902,56 @@ export const CARGO_FLOW_BALANCE: Readonly<
   // omit/consumer hubs are slight net sinks; explicit producers stay exporters.
   electronics: { production: 2.0, consumption: 0.7 },
   machinery: { production: 2.05, consumption: 0.68 },
-  // Dry equilibrium is bistable: hubs pin near cap until prod/cons crosses a knee,
-  // then fill drops sharply into a smooth "flowing" band. These land general,
-  // supplies, and perishables just past their knees at ~45–60% p50 with balanced
-  // surplus/shortage hubs across seeds (see profiles/career calibration sweeps).
-  // General responds to the consumption dial; supplies/perishables plateau on
-  // consumption and need a production cut instead.
-  general: { production: 0.84, consumption: 1.21 },
-  supplies: { production: 0.3, consumption: 1.15 },
+  // Dry equilibrium target ~55–65% p50. Slice 2 (2026-09): flow-only — no pay floors.
+  general: { production: 0.64, consumption: 1.38 },
+  supplies: { production: 0.26, consumption: 1.28 },
   perishables: { production: 0.45, consumption: 1.2 },
 };
+
+/** Bulk formation: dry dest soft-fill cap (lower = route away from saturated hubs). */
+export const DRY_BULK_DEST_SOFT_FILL = 0.5;
+export const DEFAULT_BULK_DEST_SOFT_FILL = 0.58;
+export const DRY_SURPLUS_ORIGIN_FILL = 0.48;
+
+export function destSoftFillForCommodity(commodityId: CommodityId): number {
+  return commodityId === 'general' || commodityId === 'supplies'
+    ? DRY_BULK_DEST_SOFT_FILL
+    : DEFAULT_BULK_DEST_SOFT_FILL;
+}
+
+export function destRoomKg(
+  stock: StockPile,
+  commodityId: CommodityId,
+): number {
+  if (stock.capacityKg <= 0) return 0;
+  return Math.max(
+    0,
+    stock.capacityKg * destSoftFillForCommodity(commodityId) - stock.stockKg,
+  );
+}
+
+export function surplusKgAboveSoftOrigin(
+  stock: StockPile,
+  softFill = DRY_SURPLUS_ORIGIN_FILL,
+): number {
+  if (stock.capacityKg <= 0) return 0;
+  return Math.max(0, stock.stockKg - stock.capacityKg * softFill);
+}
+
+/** Require wider price gap before listing dry freight into a filling dest. */
+export function dryFormationMinGapMult(
+  commodityId: CommodityId,
+  destFill: number,
+  baseMult: number,
+): number {
+  if (
+    (commodityId !== 'general' && commodityId !== 'supplies') ||
+    destFill < 0.58
+  ) {
+    return baseMult;
+  }
+  return baseMult + ((destFill - 0.58) / 0.42) * 0.18;
+}
 
 function cargoFlowBalance(commodityId: CommodityId): {
   production: number;
@@ -7857,7 +7973,7 @@ const DEFAULT_CARGO_PROD_BIAS: Readonly<Partial<Record<CommodityId, number>>> = 
 const DEFAULT_CARGO_CONS_BIAS: Readonly<Partial<Record<CommodityId, number>>> = {
   electronics: 0.55,
   machinery: 0.55,
-  general: 0.3,
+  general: 0.34,
   perishables: 0.25,
   supplies: 0.25,
 };
@@ -7937,6 +8053,18 @@ export const FUEL_HUB_ICAOS = new Set([
   'CYWG',
   'CYOW',
   'CYHZ',
+  // Canada densify producers
+  'CYQT',
+  'CYMM',
+  'CYZF',
+  'CYXY',
+  'CYQX',
+  // Canada Wave C densify producers
+  'CYYR',
+  'CYVO',
+  'CYYQ',
+  'CYRT',
+  'CYEV',
   // Mexico Jet-A producers
   'MMMX',
   'MMMY',
@@ -7946,6 +8074,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'MMHO',
   'MMVR',
   'MMSD',
+  // Mexico densify producers
+  'MMMZ',
+  'MMSM',
+  'MMBT',
+  // Mexico Wave C densify producers
+  'MMPA',
+  'MMLC',
+  'MMCY',
   // Argentina / Chile Jet-A producers (were missing — spokes starved)
   'SAEZ',
   'SABE',
@@ -7955,6 +8091,27 @@ export const FUEL_HUB_ICAOS = new Set([
   'SCTE',
   'SCDA',
   'SCCI',
+  // Andes densify producers
+  'SARI',
+  'SCIP',
+  'SPTU',
+  'SKSP',
+  'SKMD',
+  'MYAM',
+  // Wave C densify producers
+  'KSDF',
+  'KICT',
+  'KBZN',
+  'KAFW',
+  'SPUR',
+  'SLAL',
+  'SETN',
+  'SKUI',
+  'MPEJ',
+  'MHPR',
+  'MGPB',
+  'MUCC',
+  'SAVE',
   // Uruguay / Paraguay
   'SUMU',
   'SGAS',
@@ -8037,6 +8194,21 @@ export const FUEL_HUB_ICAOS = new Set([
   'LIRF',
   'LIMC',
   'LIRN',
+  // EU-1 densify producers (regional anchors; ~1 per 2–3 new hubs)
+  'EHBK',
+  'EBLG',
+  'EDLW',
+  'EDFH',
+  'EDDG',
+  'EGPK',
+  'EGAA',
+  'EGFF',
+  'LFQQ',
+  'LFMT',
+  'LIMF',
+  'LIEE',
+  'LEVC',
+  'LPBJ',
   // EU-2 Nordics + Alps + IE
   'EIDW',
   'EINN',
@@ -9906,6 +10078,8 @@ type AirportLookupCache = {
   byIcao: Map<string, AirportTerminal>;
   /** Country id from region prefix (BR, US, …). */
   countryByIcao: Map<string, string>;
+  /** Hub counts per country id (same pass as countryByIcao). */
+  hubsByCountry: Map<string, number>;
   routeNm: Map<string, number | undefined>;
   /** Same-country dests in the last-mile NM band, lazy per origin. */
   lastMileByOrigin: Map<string, Array<{ destIcao: string; nm: number }>>;
@@ -9923,16 +10097,21 @@ function airportLookup(
   if (!cache || cache.len !== airports.length) {
     const byIcao = new Map<string, AirportTerminal>();
     const countryByIcao = new Map<string, string>();
+    const hubsByCountry = new Map<string, number>();
     for (const airport of airports) {
       const code = airport.icao.toUpperCase();
       byIcao.set(code, airport);
       const id = countryIdFromRegion(airport.region ?? '');
-      if (id) countryByIcao.set(code, id);
+      if (id) {
+        countryByIcao.set(code, id);
+        hubsByCountry.set(id, (hubsByCountry.get(id) ?? 0) + 1);
+      }
     }
     cache = {
       len: airports.length,
       byIcao,
       countryByIcao,
+      hubsByCountry,
       routeNm: new Map(),
       lastMileByOrigin: new Map(),
     };
@@ -10037,7 +10216,25 @@ export function localPriceMultiplier(stock: StockPile): number {
   }
   const fill = stock.stockKg / stock.capacityKg;
   // 0% fill → ~2.2×, 50% → ~1.0×, 100% → ~0.45×
-  return clamp(0.45 + (1 - fill) * 1.75, 0.4, 2.4);
+  let mult = clamp(0.45 + (1 - fill) * 1.75, 0.4, 2.4);
+  // Dry oversupply: steeper spot discount above 65% fill (inventory glut).
+  if (fill >= 0.65) {
+    mult *= clamp(1 - ((fill - 0.65) / 0.35) * 0.32, 0.65, 1);
+  }
+  return mult;
+}
+
+/**
+ * High warehouse fill → extra consumption (clearance / carrying-cost pressure).
+ * Applied on dry SKUs only; existing saves pick up on next tick.
+ */
+export function dryInventoryClearanceMult(
+  fill: number,
+  commodityId: CommodityId,
+): number {
+  if (commodityId !== 'general' && commodityId !== 'supplies') return 1;
+  if (fill < 0.55) return 1;
+  return 1 + ((fill - 0.55) / 0.45) * 0.55;
 }
 
 export function localUnitPriceUsd(commodityId: CommodityId, stock: StockPile): number {
@@ -12998,8 +13195,13 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
       const baseCons = baseConsOf(ap, c.id);
 
       // Production nearly stops at a full warehouse instead of creating a
-      // permanent 100%-fill pressure source.
-      const prodSaturation = fill >= 0.7 ? 1 - ((fill - 0.7) / 0.3) * 0.95 : 1;
+      // permanent 100%-fill pressure source. Dry SKUs throttle earlier.
+      const prodSatStart =
+        c.id === 'general' || c.id === 'supplies' ? 0.62 : 0.7;
+      const prodSaturation =
+        fill >= prodSatStart
+          ? 1 - ((fill - prodSatStart) / (1 - prodSatStart)) * 0.95
+          : 1;
       const consStarvation = fill <= 0.15 ? Math.max(0.15, fill / 0.15) : 1;
       const season = seasonalFactor(c.id, world.tick);
       const noise = 0.88 + rng() * 0.24;
@@ -13008,6 +13210,7 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
 
       const health = hubLevelHealthMult(ap);
       const bal = cargoFlowBalance(c.id);
+      const clearance = dryInventoryClearanceMult(fill, c.id);
       const prod = Math.max(
         0,
         Math.round(
@@ -13025,6 +13228,7 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
         Math.round(
           baseCons *
             consStarvation *
+            clearance *
             season *
             evCons *
             (0.9 + rng() * 0.2) *
@@ -13444,21 +13648,52 @@ export function intlCommodityQuota(): number {
   );
 }
 
+/**
+ * Fleet / hub-count metrics are stable within a tick (formLots does not
+ * recruit NPCs or add hubs). Cache so boardPressure invalidate after each
+ * formed lot does not rescan 3.8k NPCs × 180 countries.
+ */
+type PartitionMetricsCache = {
+  tick: number;
+  quota: Map<string, number>;
+  boardKg: Map<string, number>;
+};
+
+const partitionMetricsByWorld = new WeakMap<
+  CareerEconomyWorld,
+  PartitionMetricsCache
+>();
+
+function partitionMetricsCache(
+  world: CareerEconomyWorld,
+): PartitionMetricsCache {
+  let cache = partitionMetricsByWorld.get(world);
+  if (!cache || cache.tick !== world.tick) {
+    cache = { tick: world.tick, quota: new Map(), boardKg: new Map() };
+    partitionMetricsByWorld.set(world, cache);
+  }
+  return cache;
+}
+
 /** Available-lot quota for one commodity in a country or INTL. */
 export function partitionAvailableQuota(
   world: CareerEconomyWorld,
   partitionId: string,
 ): number {
   if (partitionId === INTL_BOARD_PARTITION) return intlCommodityQuota();
+  const cache = partitionMetricsCache(world);
+  const hit = cache.quota.get(partitionId);
+  if (hit !== undefined) return hit;
   const totalHubs = Math.max(1, world.airports.length);
-  const countryHubs = world.airports.filter(
-    (ap) => countryIdFromRegion(ap.region ?? '') === partitionId,
-  ).length;
+  const countryHubs =
+    airportLookup(world.airports).hubsByCountry.get(partitionId) ?? 0;
   const pool = Math.max(0, COMMODITY_AVAILABLE_SOFT_CAP - intlCommodityQuota());
-  return Math.max(
+  const quota = Math.max(
     COUNTRY_AVAILABLE_FLOOR,
     Math.round((pool * countryHubs) / totalHubs),
   );
+  cache.quota.set(partitionId, quota);
+  return quota;
 }
 
 function partitionLargeQuota(
@@ -13595,25 +13830,41 @@ export function partitionBoardKgTarget(
   opts: { heavyOnly?: boolean } = {},
 ): number {
   const heavyOnly = opts.heavyOnly === true;
+  const cache = partitionMetricsCache(world);
+  const cacheKey = `${partitionId}:${heavyOnly ? 'h' : 'a'}`;
+  const hit = cache.boardKg.get(cacheKey);
+  if (hit !== undefined) return hit;
+
   const floor = heavyOnly
     ? PARTITION_MIN_HEAVY_BOARD_KG
     : PARTITION_MIN_BOARD_KG;
+  let target: number;
   if (partitionId === INTL_BOARD_PARTITION) {
-    // International rides on the same fleets; give it the INTL board share.
-    const domestic = listWorldCountryIds(world).reduce(
-      (sum, id) => sum + partitionLiftableKgPerDay(world, id, { heavyOnly }),
-      0,
-    );
-    return Math.max(
+    // Same Σ as reduce(listWorldCountryIds, partitionLiftableKgPerDay), but
+    // one pass over the fleet instead of countries × NPCs each invalidate.
+    const countries = new Set(listWorldCountryIds(world));
+    let liftKg = 0;
+    for (const npc of world.npcs ?? []) {
+      const id = countryIdFromRegion(npc.homeRegion ?? '');
+      if (!countries.has(id)) continue;
+      if (heavyOnly && !HEAVY_FREIGHTER_CLASSES.has(npc.aircraftClassId)) {
+        continue;
+      }
+      liftKg += npcMaxCargoKg(npc);
+    }
+    target = Math.max(
       floor,
-      domestic * INTL_AVAILABLE_SHARE * BOARD_COVER_DAYS,
+      liftKg * NPC_LEGS_PER_DAY_EST * INTL_AVAILABLE_SHARE * BOARD_COVER_DAYS,
+    );
+  } else {
+    target = Math.max(
+      floor,
+      partitionLiftableKgPerDay(world, partitionId, { heavyOnly }) *
+        BOARD_COVER_DAYS,
     );
   }
-  return Math.max(
-    floor,
-    partitionLiftableKgPerDay(world, partitionId, { heavyOnly }) *
-      BOARD_COVER_DAYS,
-  );
+  cache.boardKg.set(cacheKey, target);
+  return target;
 }
 
 function commodityBoardBloated(
@@ -14204,7 +14455,16 @@ function* formLotsFromImbalances(
 
     // Cheap reject before saturation / inbound work.
     const priceGap = dest.price - origin.price;
-    const minGapMult = opts.international ? 0.12 : cw >= 1.5 ? 0.15 : 0.22;
+    const destFill =
+      dest.stock.capacityKg > 0
+        ? dest.stock.stockKg / dest.stock.capacityKg
+        : 0;
+    const baseGapMult = opts.international ? 0.12 : cw >= 1.5 ? 0.15 : 0.22;
+    const minGapMult = dryFormationMinGapMult(
+      commodity.id,
+      destFill,
+      baseGapMult,
+    );
     if (priceGap < commodity.basePricePerKg * minGapMult) return false;
 
     const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
@@ -14231,8 +14491,8 @@ function* formLotsFromImbalances(
     }
 
     const inboundKg = destInboundOf(dest.ap.icao, commodity.id);
-    const surplusKg = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
-    const roomKg = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
+    const surplusKg = surplusKgAboveSoftOrigin(origin.stock);
+    const roomKg = destRoomKg(dest.stock, commodity.id);
     let qty = Math.min(surplusKg, roomKg);
     qty = Math.floor(qty / 100) * 100;
     let formed = false;
@@ -14263,8 +14523,8 @@ function* formLotsFromImbalances(
       );
       if (formedXl) {
         formed = true;
-        const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
-        const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
+        const surplusAfter = surplusKgAboveSoftOrigin(origin.stock);
+        const roomAfter = destRoomKg(dest.stock, commodity.id);
         qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
       }
     }
@@ -14293,8 +14553,8 @@ function* formLotsFromImbalances(
       ) {
         formed = true;
       }
-      const surplusAfter = origin.stock.stockKg - origin.stock.capacityKg * 0.48;
-      const roomAfter = dest.stock.capacityKg * 0.58 - dest.stock.stockKg;
+      const surplusAfter = surplusKgAboveSoftOrigin(origin.stock);
+      const roomAfter = destRoomKg(dest.stock, commodity.id);
       qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
     }
 
@@ -14358,8 +14618,8 @@ function* formLotsFromImbalances(
         stock,
         fill,
         price: localUnitPriceUsd(commodity.id, stock),
-        surplusKg: Math.max(0, stock.stockKg - stock.capacityKg * 0.48),
-        roomKg: Math.max(0, stock.capacityKg * 0.58 - stock.stockKg),
+        surplusKg: surplusKgAboveSoftOrigin(stock),
+        roomKg: destRoomKg(stock, commodity.id),
         tier: hubTierOf(ap),
       };
     });
@@ -14539,13 +14799,26 @@ function* formLotsFromImbalances(
   // bulk to nearby spokes so a starter at GRU/JFK has a GA Dry contract.
   // After every country's bulk (openGaDry sees the full board). Not parallel
   // with bulk: last-mile reads stock drained in that country's bulk pass.
-/** Per country×Dry SKU per tick: how many zero-open spokes get first crack. */
-const LAST_MILE_DEAD_SPOKE_VITALITY_CAP = 16;
-/** Dead regionals under skipAll — smaller set than spokes. */
-const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
+  /** Dead majors under skipAll — smallest slice (bulk prefers heavy lanes). */
+  const LAST_MILE_DEAD_MAJOR_VITALITY_CAP = 4;
 
   const runLastMileForCountry = (countryId: string): void => {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
+    let cargoSpokeCount = 0;
+    let cargoRegionalCount = 0;
+    for (const ap of countryAirports) {
+      if (ap.bushTripOnly === true || ap.bush === true) continue;
+      const tier = hubTierOf(ap);
+      if (tier === 'spoke') cargoSpokeCount += 1;
+      else if (tier === 'regional') cargoRegionalCount += 1;
+    }
+    const spokeFormBudget = lastMileSkipAllSpokeFormBudget(cargoSpokeCount);
+    const spokeVitalityCap = lastMileDeadSpokeVitalityCap(cargoSpokeCount);
+    const regionalFormBudget =
+      lastMileSkipAllRegionalFormBudget(cargoRegionalCount);
+    const regionalVitalityCap =
+      lastMileDeadRegionalVitalityCap(cargoRegionalCount);
+
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       if (!LAST_MILE_DRY_IDS.has(commodity.id)) continue;
       // Under skipAll, still run budgeted dead-spoke + dead-regional vitality.
@@ -14555,6 +14828,7 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
 
       const deadSpokes: RankedAirport[] = [];
       const deadRegionals: RankedAirport[] = [];
+      const deadMajors: RankedAirport[] = [];
       const hubOrigins: RankedAirport[] = [];
       const otherSpokes: RankedAirport[] = [];
       const otherRegionals: RankedAirport[] = [];
@@ -14574,6 +14848,8 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
           deadRegionals.push(origin);
         } else if (origin.tier === 'regional') {
           otherRegionals.push(origin);
+        } else if (origin.tier === 'major' && open === 0) {
+          deadMajors.push(origin);
         } else {
           hubOrigins.push(origin);
         }
@@ -14589,14 +14865,20 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
       };
       const rotatedDead = rotate(deadSpokes);
       const rotatedDeadRegional = rotate(deadRegionals);
-      const vitality = rotatedDead.slice(0, LAST_MILE_DEAD_SPOKE_VITALITY_CAP);
-      const deferredDead = rotatedDead.slice(LAST_MILE_DEAD_SPOKE_VITALITY_CAP);
+      const rotatedDeadMajor = rotate(deadMajors);
+      const vitality = rotatedDead.slice(0, spokeVitalityCap);
+      const deferredDead = rotatedDead.slice(spokeVitalityCap);
       const regionalVitality = rotatedDeadRegional.slice(
         0,
-        LAST_MILE_DEAD_REGIONAL_VITALITY_CAP,
+        regionalVitalityCap,
       );
-      const deferredRegionals = rotatedDeadRegional.slice(
-        LAST_MILE_DEAD_REGIONAL_VITALITY_CAP,
+      const deferredRegionals = rotatedDeadRegional.slice(regionalVitalityCap);
+      const majorVitality = rotatedDeadMajor.slice(
+        0,
+        LAST_MILE_DEAD_MAJOR_VITALITY_CAP,
+      );
+      const deferredDeadMajor = rotatedDeadMajor.slice(
+        LAST_MILE_DEAD_MAJOR_VITALITY_CAP,
       );
       const byFillThenOpen = (a: RankedAirport, b: RankedAirport) => {
         const openA = countOpenGaDryFrom(a.ap.icao, commodity.id);
@@ -14606,26 +14888,31 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
       };
       vitality.sort(byFillThenOpen);
       regionalVitality.sort(byFillThenOpen);
+      majorVitality.sort(byFillThenOpen);
       hubOrigins.sort(byFillThenOpen);
       otherSpokes.sort(byFillThenOpen);
       otherRegionals.sort(byFillThenOpen);
       deferredDead.sort(byFillThenOpen);
       deferredRegionals.sort(byFillThenOpen);
-      // Dead-spoke + dead-regional first under skipAll; majors only when board has room.
+      deferredDeadMajor.sort(byFillThenOpen);
+      // Dead-spoke + dead-regional (+ dead-major) under skipAll; full board when room.
       const lastMileOrigins = vitalityOnly
-        ? [...vitality, ...regionalVitality]
+        ? [...vitality, ...regionalVitality, ...majorVitality]
         : [
             ...vitality,
             ...regionalVitality,
+            ...majorVitality,
             ...hubOrigins,
             ...deferredDead,
             ...deferredRegionals,
+            ...deferredDeadMajor,
             ...otherRegionals,
             ...otherSpokes,
           ];
 
       let skipAllSpokeFormed = 0;
       let skipAllRegionalFormed = 0;
+      let skipAllMajorFormed = 0;
       for (const origin of lastMileOrigins) {
         // Surplus majors already export in the bulk pass, but that pass prefers
         // large lots — keep a GA Dry floor either way so a starter at JFK/LAX
@@ -14638,13 +14925,19 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
         if (vitalityOnly) {
           if (
             origin.tier === 'spoke' &&
-            skipAllSpokeFormed >= LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET
+            skipAllSpokeFormed >= spokeFormBudget
           ) {
             continue;
           }
           if (
             origin.tier === 'regional' &&
-            skipAllRegionalFormed >= LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET
+            skipAllRegionalFormed >= regionalFormBudget
+          ) {
+            continue;
+          }
+          if (
+            origin.tier === 'major' &&
+            skipAllMajorFormed >= LAST_MILE_SKIPALL_MAJOR_FORM_BUDGET
           ) {
             continue;
           }
@@ -14704,13 +14997,19 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
           if (vitalityOnly) {
             if (
               origin.tier === 'spoke' &&
-              skipAllSpokeFormed >= LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET
+              skipAllSpokeFormed >= spokeFormBudget
             ) {
               break;
             }
             if (
               origin.tier === 'regional' &&
-              skipAllRegionalFormed >= LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET
+              skipAllRegionalFormed >= regionalFormBudget
+            ) {
+              break;
+            }
+            if (
+              origin.tier === 'major' &&
+              skipAllMajorFormed >= LAST_MILE_SKIPALL_MAJOR_FORM_BUDGET
             ) {
               break;
             }
@@ -14774,7 +15073,7 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
             {
               international: false,
               partitionId: countryId,
-              minPayGapMult: 0.2,
+              minPayGapMult: LAST_MILE_MIN_PAY_GAP_MULT,
               lastMile: true,
             },
           );
@@ -14784,6 +15083,7 @@ const LAST_MILE_DEAD_REGIONAL_VITALITY_CAP = 8;
             if (vitalityOnly) {
               if (origin.tier === 'spoke') skipAllSpokeFormed += 1;
               else if (origin.tier === 'regional') skipAllRegionalFormed += 1;
+              else if (origin.tier === 'major') skipAllMajorFormed += 1;
             }
           }
         }
@@ -15062,7 +15362,7 @@ function tickEconomyPrepare(
     }
   }
 
-  ensureNpcFleet(world);
+  ensureNpcFleet(world, { heal: false });
   ensureFuelTruckFleet(world);
   ensureWorldHubLevels(world);
   ensureInternationalLanes(world);
@@ -15073,7 +15373,7 @@ function tickEconomyPrepare(
   const batchNowMs =
     opts.batchNowMs ??
     (world.lastBatchAtMs ?? Date.now()) + MS_PER_TICK;
-  settleNpcOpsDue(world, batchNowMs);
+  settleNpcOpsDue(world, batchNowMs, { skipEnsure: true });
   settleFuelHaulsDue(world, batchNowMs);
   addTickPhaseMs(profile, 'settle', phaseAt);
   phaseAt = performance.now();
@@ -15086,7 +15386,7 @@ function tickEconomyPrepare(
   addTickPhaseMs(profile, 'production', phaseAt);
   phaseAt = performance.now();
 
-  tickFuelLogistics(world, rng, { batchNowMs });
+  tickFuelLogistics(world, rng, { batchNowMs, settle: false });
   addTickPhaseMs(profile, 'fuel', phaseAt);
   phaseAt = performance.now();
 

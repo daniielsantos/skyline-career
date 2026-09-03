@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { FR_DENSIFY_HUBS, FR_DENSIFY_HUB_COUNT } from './career-fr-hubs-densify.js';
 
 export type FrCareerRegion = 'FR-N' | 'FR-C' | 'FR-S' | 'FR-E';
 
@@ -184,9 +185,10 @@ export const FR_CAREER_HUBS: readonly FrCareerHubDef[] = [
     lon: 2.11278,
     ...city,
   },
+  ...FR_DENSIFY_HUBS,
 ];
 
-export const FR_CAREER_HUB_COUNT = 14;
+export const FR_CAREER_HUB_COUNT = 14 + FR_DENSIFY_HUB_COUNT;
 
 export function buildFrFeederCorridors(
   hubs: readonly FrCareerHubDef[] = FR_CAREER_HUBS,

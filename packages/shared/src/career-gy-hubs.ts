@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GY_DENSIFY_HUBS, GY_DENSIFY_HUB_COUNT } from './career-gy-hubs-densify.js';
 
 export type GyCareerRegion = 'GY-C';
 
@@ -102,9 +103,10 @@ export const GY_CAREER_HUBS: readonly GyCareerHubDef[] = [
     lon: -59.8333,
     ...drySpoke,
   },
+  ...GY_DENSIFY_HUBS,
 ];
 
-export const GY_CAREER_HUB_COUNT = 5;
+export const GY_CAREER_HUB_COUNT = 5 + GY_DENSIFY_HUB_COUNT;
 
 export function buildGyFeederCorridors(
   hubs: readonly GyCareerHubDef[] = GY_CAREER_HUBS,
@@ -134,7 +136,7 @@ export function assertGyCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<GyCareerRegion, number> = {
-    'GY-C': 5,
+    'GY-C': GY_CAREER_HUB_COUNT,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

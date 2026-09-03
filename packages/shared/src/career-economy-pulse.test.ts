@@ -12,6 +12,8 @@ import {
   percentile,
   sweepEconomyPulse,
 } from './career-economy-pulse.js';
+import { isBushTripOnlyHub } from './career-bush.js';
+import { countryIdFromRegion } from './career-partition.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import type { CareerEconomyWorld, ShipmentLot } from './types/career-economy.js';
 
@@ -176,6 +178,37 @@ describe('computeEconomyPulse', () => {
     assert.ok(br);
     assert.equal(br!.deadHubs, br!.hubs);
     assert.equal(br!.liveHubPct, 0);
+  });
+
+  it('excludes bushTripOnly from country dead hub metrics', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-bush-dead' });
+    const pulse = computeEconomyPulse(world);
+    const us = pulse.countries.find((c) => c.countryId === 'US');
+    assert.ok(us);
+    const cargoUs = world.airports.filter(
+      (ap) =>
+        countryIdFromRegion(ap.region ?? '') === 'US' &&
+        !(ap.bushTripOnly === true || isBushTripOnlyHub(ap.icao)),
+    );
+    assert.equal(us!.hubs, cargoUs.length);
+    assert.ok(cargoUs.length < world.airports.filter(
+      (ap) => countryIdFromRegion(ap.region ?? '') === 'US',
+    ).length);
+  });
+
+  it('includes player-bookable board metrics', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-board' });
+    ensureSeedMarketFormed(world);
+    const pulse = computeEconomyPulse(world);
+    assert.ok(pulse.board);
+    assert.equal(typeof pulse.board.playerBookableLots, 'number');
+    assert.ok(pulse.board.generalLastMilePct >= 0);
+    assert.ok(pulse.board.generalLastMilePct <= 1);
+    assert.ok('BR' in pulse.board.bookableGeneralPayPerKgP50);
+    tickEconomyN(world, 1);
+    const after = computeEconomyPulse(world);
+    assert.ok(after.board.playerBookableLots > 0);
+    assert.ok(after.board.playerBookablePayUsdP50 != null);
   });
 
   it('buckets cross-country lots as INTL', () => {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { BusyBlock } from './Busy';
 import type { HubStatsCommodityNow, HubStatsHistorySample, HubStatsView } from './api';
 import {
   formatMass,
@@ -426,7 +427,7 @@ export function TerminalHubStatsPanel(props: {
       </div>
 
       {props.loading && !now ? (
-        <p className="muted">Loading hub stats…</p>
+        <BusyBlock label="Loading hub stats" />
       ) : props.error && !now ? (
         <p className="muted" role="alert">
           Could not load hub stats: {props.error}

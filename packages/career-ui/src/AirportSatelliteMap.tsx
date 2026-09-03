@@ -10,6 +10,7 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { fetchSatelliteMapStyle } from './api';
+import { BusyBlock } from './Busy';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -250,7 +251,7 @@ export function AirportSatelliteMap(props: {
   if (apiKey === undefined) {
     return (
       <div className="airport-sat-map-card">
-        <p className="muted">Loading satellite map…</p>
+        <BusyBlock label="Loading satellite map" />
       </div>
     );
   }

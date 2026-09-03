@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { NL_DENSIFY_HUBS, NL_DENSIFY_HUB_COUNT } from './career-nl-hubs-densify.js';
 
 export type NlCareerRegion = 'NL-C';
 
@@ -22,7 +23,7 @@ export type NlCareerHubDef = {
   bush?: true;
 };
 
-/** 4 curated Netherlands hubs. */
+/** 4 curated + densify Netherlands hubs. */
 export const NL_CAREER_HUBS: readonly NlCareerHubDef[] = [
   {
     icao: 'EHAM',
@@ -64,9 +65,10 @@ export const NL_CAREER_HUBS: readonly NlCareerHubDef[] = [
     produce: { general: 1.15, perishables: 1.15, supplies: 1.05 },
     consume: { electronics: 0.95, machinery: 0.9 },
   },
+  ...NL_DENSIFY_HUBS,
 ];
 
-export const NL_CAREER_HUB_COUNT = 4;
+export const NL_CAREER_HUB_COUNT = 4 + NL_DENSIFY_HUB_COUNT;
 
 export function buildNlFeederCorridors(
   hubs: readonly NlCareerHubDef[] = NL_CAREER_HUBS,

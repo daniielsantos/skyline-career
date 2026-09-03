@@ -29,8 +29,13 @@
 ## Europe seed (EU-1 … EU-8) — complete for countries with civil hubs
 
 - **EU-1…EU-7:** Western / Nordics / Baltics / Balkans / Iceland / TR / UA
+- **EU-1 West densify (2026-09-02):** NL/BE/DE → GB/FR/IT → ES/PT light (+66); seed **1347** airports. Files: `career-{nl,be,de,gb,fr,it,es,pt}-hubs-densify.ts`.
+- **CA/Caribbean densify (2026-09-02):** +29 then homolog cleanup (drop MZCZ/MZBG/MGAV/MGTK/MHNJ/TGCC→TGPZ); seed **1477**. Skip MSSA/MNCE/MNRR. GP densify TFFA Desireade + TFFS Les Saintes (not Saint-Francois). Regenerate allowlist: `npm run generate:simbrief-dispatch`.
+- **Wave A ICAO traps:** MMCN Obregon / MMDA Constitucion / MMCC Acuna; SATU/SAZC/SATR/SAZW; SENL (not SETR); SKFL Florencia; SKPV Providencia; SVCB; SYKA; SLYA; MRCR/MRBT; MNWP Waspam; TGPZ Carriacou.
+- **Wave C densify (2026-09-02):** +126 hubs in `career-*-hubs-densify.ts` (SA/CA/Caribe). Skip MPSA/MRQP/MGHT + Wave A traps. GP TFFC Saint-Francois. Rebuild → `npm run generate:simbrief-dispatch` + homolog.
+- **EU-1 ICAO traps:** Madeira **LPMA** (not **LPPS** Porto Santo); Azores **LPPD** (not **LPLA** Lajes this slice); Canaries **GCLP** (not **GCTS** Tenerife); Viseu **LPVZ** (not **LPVL** Vilar de Luz); Portimão **LPPM** (not **LPSI** Sines); DE spoke belt prefer **EDDG/EDLW/EDFH** (skip closed/conflict **EDDT** unless curated).
 - **EU-8 gaps:** BY / MD / GE / AM / AZ / LU / MT / CY / XK
-- World seed: **778** airports; **84** ports; fuel trucks **158**; **~142** regions
+- World seed (historical EU-8 baseline): **778** airports; **84** ports; fuel trucks **158**; **~142** regions
 - EU-8 ports: Batumi / Baku / Marsaxlokk / Limassol
 - Homologation: **UBBG** (not UBGN), **UDSG** (not UDLS); **UGKO** omitted (absent in stock MSFS)
 - Microstates without civil hubs (AD/MC/SM/VA/LI) intentionally omitted

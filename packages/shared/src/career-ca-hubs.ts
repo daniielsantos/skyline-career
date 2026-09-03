@@ -1,5 +1,5 @@
 /**
- * Canada career hub catalog (50 airports).
+ * Canada career hub catalog (53 curated + densify).
  * Consumed by career-economy seed, coords, tiers, and feeder corridor generation.
  */
 
@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CA_DENSIFY_HUBS, CA_DENSIFY_HUB_COUNT } from './career-ca-hubs-densify.js';
 
 export type CaCareerRegion = 'CA-W' | 'CA-PR' | 'CA-ON' | 'CA-QC' | 'CA-AT';
 
@@ -586,6 +587,8 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
     ...fisherySpoke,
   },
 
+  ...CA_DENSIFY_HUBS,
+
   // ── CA bush soft-fields (3) — official ICAO; ferry blocked; OD vs CA gateways ──
   {
     icao: 'CYHE',
@@ -619,7 +622,7 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
   },
 ];
 
-export const CA_CAREER_HUB_COUNT = 53;
+export const CA_CAREER_HUB_COUNT = 53 + CA_DENSIFY_HUB_COUNT;
 
 /** Auto feeder corridors so every non-bush CA hub has ≥2 partners. */
 export function buildCaFeederCorridors(
@@ -650,11 +653,11 @@ export function assertCaCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<CaCareerRegion, number> = {
-    'CA-W': 13,
-    'CA-PR': 13,
-    'CA-ON': 12,
-    'CA-QC': 9,
-    'CA-AT': 6,
+    'CA-W': 24,
+    'CA-PR': 24,
+    'CA-ON': 22,
+    'CA-QC': 22,
+    'CA-AT': 14,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { PT_DENSIFY_HUBS, PT_DENSIFY_HUB_COUNT } from './career-pt-hubs-densify.js';
 
 export type PtCareerRegion = 'PT-N' | 'PT-C' | 'PT-S' | 'PT-M' | 'PT-A';
 
@@ -128,9 +129,10 @@ export const PT_CAREER_HUBS: readonly PtCareerHubDef[] = [
     produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.2 },
   },
+  ...PT_DENSIFY_HUBS,
 ];
 
-export const PT_CAREER_HUB_COUNT = 9;
+export const PT_CAREER_HUB_COUNT = 9 + PT_DENSIFY_HUB_COUNT;
 
 export function buildPtFeederCorridors(
   hubs: readonly PtCareerHubDef[] = PT_CAREER_HUBS,
@@ -162,5 +164,11 @@ export function assertPtCareerHubCatalog(): void {
   }
   if (PT_CAREER_HUBS.some((h) => h.icao === 'LPLA')) {
     throw new Error('PT catalog must use LPPD for Azores cargo, not LPLA Lajes');
+  }
+  if (PT_CAREER_HUBS.some((h) => h.icao === 'LPVL')) {
+    throw new Error('PT catalog must use LPVZ for Viseu, not LPVL Vilar de Luz');
+  }
+  if (PT_CAREER_HUBS.some((h) => h.icao === 'LPSI')) {
+    throw new Error('PT catalog must use LPPM for Portimao, not LPSI Sines');
   }
 }

@@ -1521,6 +1521,57 @@ export function fetchHubEconomyHistory(days: 7 | 30 | 90 = 7) {
   );
 }
 
+export type EconomyPulseCommodityView = {
+  commodityId: string;
+  availableLots: number;
+  fillP50: number | null;
+  fillP10: number | null;
+  fillP90: number | null;
+  payPerKgP50: number | null;
+  payUsdP50: number | null;
+  hubsSurplus: number;
+  hubsShortage: number;
+};
+
+export type EconomyPulseCountryView = {
+  countryId: string;
+  hubs: number;
+  liveHubPct: number;
+  deadHubs: number;
+  payPerKgP50: number | null;
+};
+
+export type EconomyPulseBoardView = {
+  playerBookableLots: number;
+  playerBookablePayUsdP50: number | null;
+  generalLastMilePct: number;
+  generalBookablePayPerKgP50: number | null;
+  bookableGeneralPayPerKgP50: Record<string, number | null>;
+};
+
+export type EconomyPulseView = {
+  tick: number;
+  homeCountryId: string | null;
+  availableLots: number;
+  intlSharePct: number;
+  payUsdP50: number | null;
+  commodities: EconomyPulseCommodityView[];
+  countries: EconomyPulseCountryView[];
+  npc: {
+    readyPct: number;
+    fleetSize: number;
+    targetFleetSize: number;
+    thinRegions: number;
+  };
+  board: EconomyPulseBoardView;
+  notes: string[];
+};
+
+/** Live world scan (dev). */
+export function fetchEconomyPulse() {
+  return api<EconomyPulseView>('/api/debug/economy-pulse');
+}
+
 export type NetworkHub = {
   icao: string;
   name: string;

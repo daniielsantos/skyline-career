@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { DO_DENSIFY_HUBS, DO_DENSIFY_HUB_COUNT } from './career-do-hubs-densify.js';
 
 export type DoCareerRegion = 'DO-C';
 
@@ -99,9 +100,10 @@ export const DO_CAREER_HUBS: readonly DoCareerHubDef[] = [
     lon: -69.742,
     ...drySpoke,
   },
+  ...DO_DENSIFY_HUBS,
 ];
 
-export const DO_CAREER_HUB_COUNT = 6;
+export const DO_CAREER_HUB_COUNT = 6 + DO_DENSIFY_HUB_COUNT;
 
 export function buildDoFeederCorridors(
   hubs: readonly DoCareerHubDef[] = DO_CAREER_HUBS,
@@ -130,5 +132,7 @@ export function assertDoCareerHubCatalog(): void {
     }
     if (h.region === 'DO-C') n += 1;
   }
-  if (n !== 6) throw new Error(`DO-C has ${n} hubs, expected 6`);
+  if (n !== DO_CAREER_HUB_COUNT) {
+    throw new Error(`DO-C has ${n} hubs, expected ${DO_CAREER_HUB_COUNT}`);
+  }
 }

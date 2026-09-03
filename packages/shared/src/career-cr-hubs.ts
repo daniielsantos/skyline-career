@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CR_DENSIFY_HUBS, CR_DENSIFY_HUB_COUNT } from './career-cr-hubs-densify.js';
 
 export type CrCareerRegion = 'CR-C';
 
@@ -41,7 +42,7 @@ const agroSpoke = {
   >,
 };
 
-/** 7 curated Costa Rica hubs — Valle Central + coasts. */
+/** 7 curated + densify Costa Rica hubs — Valle Central + coasts. */
 export const CR_CAREER_HUBS: readonly CrCareerHubDef[] = [
   {
     icao: 'MROC',
@@ -109,9 +110,10 @@ export const CR_CAREER_HUBS: readonly CrCareerHubDef[] = [
     lon: -83.4686,
     ...drySpoke,
   },
+  ...CR_DENSIFY_HUBS,
 ];
 
-export const CR_CAREER_HUB_COUNT = 7;
+export const CR_CAREER_HUB_COUNT = 7 + CR_DENSIFY_HUB_COUNT;
 
 export function buildCrFeederCorridors(
   hubs: readonly CrCareerHubDef[] = CR_CAREER_HUBS,
@@ -140,7 +142,9 @@ export function assertCrCareerHubCatalog(): void {
     }
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
-  if (byRegion['CR-C'] !== 7) {
-    throw new Error(`CR-C has ${byRegion['CR-C'] ?? 0} hubs, expected 7`);
+  if (byRegion['CR-C'] !== CR_CAREER_HUB_COUNT) {
+    throw new Error(
+      `CR-C has ${byRegion['CR-C'] ?? 0} hubs, expected ${CR_CAREER_HUB_COUNT}`,
+    );
   }
 }

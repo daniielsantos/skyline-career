@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { HN_DENSIFY_HUBS, HN_DENSIFY_HUB_COUNT } from './career-hn-hubs-densify.js';
 
 export type HnCareerRegion = 'HN-C';
 
@@ -100,9 +101,10 @@ export const HN_CAREER_HUBS: readonly HnCareerHubDef[] = [
     lon: -87.4759,
     ...drySpoke,
   },
+  ...HN_DENSIFY_HUBS,
 ];
 
-export const HN_CAREER_HUB_COUNT = 6;
+export const HN_CAREER_HUB_COUNT = 6 + HN_DENSIFY_HUB_COUNT;
 
 export function buildHnFeederCorridors(
   hubs: readonly HnCareerHubDef[] = HN_CAREER_HUBS,
@@ -131,7 +133,9 @@ export function assertHnCareerHubCatalog(): void {
     }
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
-  if (byRegion['HN-C'] !== 6) {
-    throw new Error(`HN-C has ${byRegion['HN-C'] ?? 0} hubs, expected 6`);
+  if (byRegion['HN-C'] !== HN_CAREER_HUB_COUNT) {
+    throw new Error(
+      `HN-C has ${byRegion['HN-C'] ?? 0} hubs, expected ${HN_CAREER_HUB_COUNT}`,
+    );
   }
 }

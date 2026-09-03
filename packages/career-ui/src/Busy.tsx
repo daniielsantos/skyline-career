@@ -16,6 +16,24 @@ export function BusySpinner(props: { size?: BusySize; className?: string }) {
   );
 }
 
+/** Inline spinner + visible label (pagination, muted panels, sidebar). */
+export function BusyStatus(props: {
+  label: string;
+  size?: BusySize;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`busy-status${props.className ? ` ${props.className}` : ''}`}
+      role="status"
+      aria-live="polite"
+    >
+      <BusySpinner size={props.size ?? 'sm'} />
+      <span>{props.label}</span>
+    </span>
+  );
+}
+
 /** Frosted spinner chip for table/board overlays. Label is for assistive tech. */
 export function BusyChip(props: { label: string; className?: string }) {
   return (
@@ -40,6 +58,31 @@ export function BusyBlock(props: { label: string; className?: string }) {
       aria-label={props.label}
     >
       <BusySpinner size="lg" />
+      <p className="busy-block-label">{props.label}</p>
+    </div>
+  );
+}
+
+/** Boot splash while career state hydrates (freights, dispatch, etc.). */
+export function BusyBoot(props: {
+  title: string;
+  detail?: string;
+  align?: 'start' | 'center';
+  className?: string;
+}) {
+  const align = props.align ?? 'start';
+  return (
+    <div
+      className={`busy-boot busy-boot--${align}${props.className ? ` ${props.className}` : ''}`}
+      role="status"
+      aria-live="polite"
+      aria-label={props.title}
+    >
+      <BusySpinner size="lg" />
+      <div>
+        <h2>{props.title}</h2>
+        {props.detail ? <p className="muted">{props.detail}</p> : null}
+      </div>
     </div>
   );
 }

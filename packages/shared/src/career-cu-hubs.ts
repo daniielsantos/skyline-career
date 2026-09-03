@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CU_DENSIFY_HUBS, CU_DENSIFY_HUB_COUNT } from './career-cu-hubs-densify.js';
 
 export type CuCareerRegion = 'CU-C';
 
@@ -108,9 +109,10 @@ export const CU_CAREER_HUBS: readonly CuCareerHubDef[] = [
     lon: -80.4142,
     ...drySpoke,
   },
+  ...CU_DENSIFY_HUBS,
 ];
 
-export const CU_CAREER_HUB_COUNT = 7;
+export const CU_CAREER_HUB_COUNT = 7 + CU_DENSIFY_HUB_COUNT;
 
 export function buildCuFeederCorridors(
   hubs: readonly CuCareerHubDef[] = CU_CAREER_HUBS,
@@ -139,5 +141,7 @@ export function assertCuCareerHubCatalog(): void {
     }
     if (h.region === 'CU-C') n += 1;
   }
-  if (n !== 7) throw new Error(`CU-C has ${n} hubs, expected 7`);
+  if (n !== CU_CAREER_HUB_COUNT) {
+    throw new Error(`CU-C has ${n} hubs, expected ${CU_CAREER_HUB_COUNT}`);
+  }
 }

@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { VE_DENSIFY_HUBS, VE_DENSIFY_HUB_COUNT } from './career-ve-hubs-densify.js';
 
 export type VeCareerRegion = 'VE-C' | 'VE-W';
 
@@ -181,9 +182,10 @@ export const VE_CAREER_HUBS: readonly VeCareerHubDef[] = [
     lon: -67.444,
     ...agroSpoke,
   },
+  ...VE_DENSIFY_HUBS,
 ];
 
-export const VE_CAREER_HUB_COUNT = 13;
+export const VE_CAREER_HUB_COUNT = 13 + VE_DENSIFY_HUB_COUNT;
 
 export function buildVeFeederCorridors(
   hubs: readonly VeCareerHubDef[] = VE_CAREER_HUBS,
@@ -213,8 +215,8 @@ export function assertVeCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<VeCareerRegion, number> = {
-    'VE-C': 7,
-    'VE-W': 6,
+    'VE-C': 20,
+    'VE-W': 11,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

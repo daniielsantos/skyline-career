@@ -1626,26 +1626,6 @@ th {
   gap: 1.1rem;
 }
 
-.dispatch-boot-loading {
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 1.1rem;
-  min-height: 14rem;
-  padding: 2rem 1rem;
-  text-align: center;
-}
-
-.dispatch-boot-loading h2 {
-  margin: 0 0 0.35rem;
-  font-size: 1.15rem;
-}
-
-.dispatch-boot-loading .muted {
-  margin: 0;
-  max-width: 28rem;
-}
-
 .dispatch-stepper {
   list-style: none;
   margin: 0;
@@ -5001,11 +4981,64 @@ tr.lot-locked {
   pointer-events: none;
 }
 
+.busy-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+}
+
 .busy-block {
   display: grid;
   place-content: center;
+  justify-items: center;
+  gap: 0.75rem;
   min-height: 10rem;
   padding: 1.5rem;
+}
+
+.busy-block-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.busy-boot {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 12rem;
+  padding: 2rem 1.5rem;
+  text-align: left;
+}
+
+.busy-boot--center {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1.1rem;
+  min-height: 14rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.busy-boot h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.busy-boot--center h2 {
+  font-size: 1.15rem;
+}
+
+.busy-boot .muted {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .skel {
@@ -8599,6 +8632,10 @@ button.linkish {
   color: var(--muted);
 }
 
+.contract-pilot-pick-loading {
+  padding: 0.35rem 0;
+}
+
 .contract-pilot-pick-select {
   width: 100%;
   padding: 0.45rem 0.55rem;
@@ -9063,7 +9100,7 @@ button.linkish {
   position: relative;
 }
 
-.freights-board-table.is-loading tbody {
+.freights-board-table.is-loading tbody:not(:has(.skel-row)) {
   opacity: 0.45;
   transition: opacity 120ms ease;
 }
@@ -9076,28 +9113,9 @@ button.linkish {
   transform: translateX(-50%);
 }
 
-.freights-boot-loading {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  min-height: 12rem;
-  padding: 2rem 1.5rem;
-  text-align: left;
-}
-
-.freights-boot-loading h2 {
-  margin: 0 0 0.35rem;
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-.freights-boot-loading .muted {
-  margin: 0;
-  max-width: 28rem;
-  font-size: 0.88rem;
-  line-height: 1.45;
+.freights-board-table.is-loading:has(.skel-row) .freights-board-loading {
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .freights-panel:not(:has(.freights-board-table)) {
@@ -12202,6 +12220,165 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .hub-pulse-table-wrap {
   overflow-x: auto;
+}
+
+.hub-pulse-live {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
+}
+
+.hub-pulse-live-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.hub-pulse-live-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.hub-pulse-live-head p {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.hub-pulse-live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12.5rem, 1fr));
+  gap: 0.55rem 0.75rem;
+}
+
+.hub-pulse-live-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: var(--panel);
+  font-size: 0.78rem;
+}
+
+.hub-pulse-live-card strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.88rem;
+}
+
+.hub-pulse-live-card .muted {
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.hub-pulse-live-warn {
+  border-color: color-mix(in srgb, var(--warn, #c9a227) 55%, var(--line));
+}
+
+.hub-pulse-live-sat {
+  border-color: color-mix(in srgb, var(--accent, #e8a838) 45%, var(--line));
+}
+
+.hub-pulse-live-warn-label {
+  font-size: 0.72rem;
+  color: var(--warn, #c9a227);
+}
+
+.hub-pulse-commodity-fill {
+  margin-top: 0.75rem;
+}
+
+.hub-pulse-commodity-fill-head {
+  margin-bottom: 0.45rem;
+}
+
+.hub-pulse-commodity-fill-head h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.hub-pulse-commodity-fill-head p {
+  margin: 0;
+  font-size: 0.72rem;
+}
+
+.hub-pulse-commodity-table-wrap {
+  overflow-x: auto;
+}
+
+.hub-pulse-commodity-table {
+  width: 100%;
+  font-size: 0.76rem;
+  border-collapse: collapse;
+}
+
+.hub-pulse-commodity-table th,
+.hub-pulse-commodity-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.hub-pulse-commodity-table thead th {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.hub-pulse-commodity-table tbody th[scope='row'] {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hub-pulse-commodity-row.hub-pulse-live-warn {
+  background: color-mix(in srgb, var(--warn, #c9a227) 8%, transparent);
+}
+
+.hub-pulse-commodity-row.hub-pulse-live-sat {
+  background: color-mix(in srgb, var(--accent, #e8a838) 8%, transparent);
+}
+
+.hub-pulse-commodity-alert {
+  font-size: 0.72rem;
+  color: var(--warn, #c9a227);
+}
+
+.hub-pulse-commodity-row.hub-pulse-live-sat .hub-pulse-commodity-alert {
+  color: var(--accent, #e8a838);
+}
+
+.hub-pulse-live-commodities .hub-pulse-live-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+}
+
+.hub-pulse-live-chip {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+}
+
+.hub-pulse-live-chip code {
+  font-size: 0.85em;
+  opacity: 0.85;
+}
+
+.hub-pulse-live-notes {
+  margin: 0.65rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.76rem;
+}
+
+.hub-pulse-live-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
 }
 
 .hub-pulse-table {

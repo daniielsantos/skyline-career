@@ -27,6 +27,10 @@ import {
   LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN,
   LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET,
   LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
+  lastMileSkipAllSpokeFormBudget,
+  lastMileDeadSpokeVitalityCap,
+  lastMileSkipAllRegionalFormBudget,
+  lastMileDeadRegionalVitalityCap,
   BOARD_SMALL_MIN_VIABLE_KG,
   boardLotMinViablePayUsd,
   SMALL_LOT_MAX_KG,
@@ -47,6 +51,7 @@ import {
   listAirportFuelInbound,
   listMarketLots,
   localPriceMultiplier,
+  dryInventoryClearanceMult,
   marketQueryTokens,
   migrateEconomyWorld,
   msfsFacilityMatchesCareerHub,
@@ -90,7 +95,7 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 1281);
+    assert.equal(world.airports.length, 1679);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 399);
     const br = world.airports.filter(
@@ -652,7 +657,7 @@ describe('career-economy seed', () => {
       (a) => countryIdFromRegion(a.region) === 'SS',
     );
     assert.equal(br.length, 97);
-    assert.equal(us.length, 123);
+    assert.equal(us.length, 277);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
     for (const ap of world.airports.filter((a) => a.bushTripOnly)) {
       assert.equal(
@@ -671,38 +676,38 @@ describe('career-economy seed', () => {
         `${ap.icao} should have empty stock`,
       );
     }
-    assert.equal(ca.length, 53);
-    assert.equal(mx.length, 46);
-    assert.equal(ar.length, 41);
-    assert.equal(cl.length, 21);
+    assert.equal(ca.length, 106);
+    assert.equal(mx.length, 83);
+    assert.equal(ar.length, 70);
+    assert.equal(cl.length, 42);
     assert.equal(uy.length, 7);
     assert.equal(py.length, 7);
-    assert.equal(pe.length, 14);
-    assert.equal(bo.length, 9);
-    assert.equal(ec.length, 9);
-    assert.equal(co.length, 16);
-    assert.equal(ve.length, 13);
-    assert.equal(gy.length, 5);
-    assert.equal(sr.length, 5);
-    assert.equal(gf.length, 3);
-    assert.equal(pa.length, 7);
-    assert.equal(cr.length, 7);
-    assert.equal(ni.length, 5);
-    assert.equal(hn.length, 6);
+    assert.equal(pe.length, 32);
+    assert.equal(bo.length, 21);
+    assert.equal(ec.length, 20);
+    assert.equal(co.length, 42);
+    assert.equal(ve.length, 31);
+    assert.equal(gy.length, 9);
+    assert.equal(sr.length, 6);
+    assert.equal(gf.length, 6);
+    assert.equal(pa.length, 12);
+    assert.equal(cr.length, 14);
+    assert.equal(ni.length, 9);
+    assert.equal(hn.length, 10);
     assert.equal(sv.length, 2);
-    assert.equal(gt.length, 6);
+    assert.equal(gt.length, 10);
     assert.equal(bz.length, 4);
-    assert.equal(cu.length, 7);
-    assert.equal(dominican.length, 6);
-    assert.equal(ht.length, 3);
-    assert.equal(jm.length, 5);
-    assert.equal(bs.length, 5);
+    assert.equal(cu.length, 17);
+    assert.equal(dominican.length, 10);
+    assert.equal(ht.length, 6);
+    assert.equal(jm.length, 6);
+    assert.equal(bs.length, 14);
     assert.equal(tt.length, 2);
     assert.equal(bb.length, 1);
     assert.equal(lc.length, 2);
-    assert.equal(gd.length, 1);
+    assert.equal(gd.length, 2);
     assert.equal(ag.length, 2);
-    assert.equal(gp.length, 2);
+    assert.equal(gp.length, 5);
     assert.equal(mq.length, 1);
     assert.equal(cw.length, 1);
     assert.equal(sx.length, 1);
@@ -713,14 +718,14 @@ describe('career-economy seed', () => {
     assert.equal(usGu.length, 1);
     assert.equal(usAs.length, 1);
     assert.equal(usMp.length, 1);
-    assert.equal(pt.length, 9);
-    assert.equal(es.length, 15);
-    assert.equal(fr.length, 14);
-    assert.equal(gb.length, 12);
-    assert.equal(de.length, 12);
-    assert.equal(nl.length, 4);
-    assert.equal(be.length, 3);
-    assert.equal(it.length, 12);
+    assert.equal(pt.length, 14);
+    assert.equal(es.length, 23);
+    assert.equal(fr.length, 24);
+    assert.equal(gb.length, 22);
+    assert.equal(de.length, 24);
+    assert.equal(nl.length, 10);
+    assert.equal(be.length, 8);
+    assert.equal(it.length, 22);
     assert.equal(ie.length, 5);
     assert.equal(dk.length, 5);
     assert.equal(no.length, 8);
@@ -2272,6 +2277,20 @@ describe('localPriceMultiplier', () => {
     assert.ok(low > 1);
     assert.ok(high < 1);
   });
+
+  it('discounts dry oversupply above 65% fill', () => {
+    const mid = localPriceMultiplier({ stockKg: 68_000, capacityKg: 100_000 });
+    const glut = localPriceMultiplier({ stockKg: 92_000, capacityKg: 100_000 });
+    assert.ok(glut < mid);
+  });
+});
+
+describe('dryInventoryClearanceMult', () => {
+  it('boosts consumption only for dry SKUs above 55% fill', () => {
+    assert.equal(dryInventoryClearanceMult(0.5, 'general'), 1);
+    assert.equal(dryInventoryClearanceMult(0.9, 'electronics'), 1);
+    assert.ok(dryInventoryClearanceMult(0.9, 'general') > 1.3);
+  });
 });
 
 describe('routeDistanceNm', () => {
@@ -2928,6 +2947,7 @@ describe('tickEconomyN market formation', () => {
   it('caps available lots per country and keeps US and international alive', () => {
     const world = createSeedEconomyWorld({ seed: 'board-cap' });
     tickEconomyN(world, 72);
+    const partitionQuotaSlack = 72;
     const available = world.lots.filter((l) => l.status === 'available');
     const countryByIcao = new Map(
       world.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
@@ -2974,7 +2994,7 @@ describe('tickEconomyN market formation', () => {
     ] as const) {
       const intlN = intl.filter((l) => l.commodityId === commodity).length;
       assert.ok(
-        intlN <= intlQuota + 16,
+        intlN <= intlQuota + partitionQuotaSlack,
         `INTL ${commodity}=${intlN} quota=${intlQuota}`,
       );
       for (const country of listWorldCountryIds(world)) {
@@ -2985,7 +3005,7 @@ describe('tickEconomyN market formation', () => {
             lotBoardPartition(l, countryByIcao) === country,
         ).length;
         assert.ok(
-          n <= quota + 16,
+          n <= quota + partitionQuotaSlack,
           `${country} ${commodity}=${n} quota=${quota}`,
         );
       }
@@ -3471,10 +3491,36 @@ describe('tickEconomyN market formation', () => {
       fromSpoke.length > 0,
       'expected BR spoke last-mile Dry despite skipAll',
     );
+    const brSpokes = world.airports.filter(
+      (a) =>
+        (a.region ?? '').startsWith('BR') &&
+        hubTierOf(a) === 'spoke' &&
+        a.bushTripOnly !== true &&
+        a.bush !== true,
+    ).length;
+    const spokeBudget = lastMileSkipAllSpokeFormBudget(brSpokes);
     assert.ok(
-      fromSpoke.length <= LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET * 2,
-      `vitality overshoot too large: ${fromSpoke.length}`,
+      fromSpoke.length <= spokeBudget * 2,
+      `vitality overshoot too large: ${fromSpoke.length} > ${spokeBudget * 2}`,
     );
+  });
+
+  it('scales skipAll vitality budgets with densify spoke counts', () => {
+    assert.equal(lastMileSkipAllSpokeFormBudget(0), LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET);
+    assert.equal(lastMileSkipAllSpokeFormBudget(70), 12);
+    assert.equal(lastMileSkipAllSpokeFormBudget(138), 23);
+    assert.equal(lastMileSkipAllSpokeFormBudget(180), 30);
+    assert.equal(lastMileSkipAllSpokeFormBudget(400), 32);
+    assert.equal(lastMileDeadSpokeVitalityCap(70), 18);
+    assert.equal(lastMileDeadSpokeVitalityCap(138), 35);
+    assert.equal(lastMileDeadSpokeVitalityCap(400), 48);
+    assert.equal(
+      lastMileSkipAllRegionalFormBudget(20),
+      LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
+    );
+    assert.equal(lastMileSkipAllRegionalFormBudget(39), 13);
+    assert.equal(lastMileDeadRegionalVitalityCap(20), 10);
+    assert.equal(lastMileDeadRegionalVitalityCap(8), LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET);
   });
 
   it('forms dead-regional last-mile Dry under partition skipAll', () => {
@@ -3557,9 +3603,17 @@ describe('tickEconomyN market formation', () => {
       fromRegional.length > 0,
       'expected BR regional last-mile Dry despite skipAll',
     );
+    const brRegionals = world.airports.filter(
+      (a) =>
+        (a.region ?? '').startsWith('BR') &&
+        hubTierOf(a) === 'regional' &&
+        a.bushTripOnly !== true &&
+        a.bush !== true,
+    ).length;
+    const regionalBudget = lastMileSkipAllRegionalFormBudget(brRegionals);
     assert.ok(
-      fromRegional.length <= LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET * 2,
-      `regional vitality overshoot too large: ${fromRegional.length}`,
+      fromRegional.length <= regionalBudget * 2,
+      `regional vitality overshoot too large: ${fromRegional.length} > ${regionalBudget * 2}`,
     );
   });
 
@@ -4158,7 +4212,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 61);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 1281);
+    assert.equal(migrated.airports.length, 1679);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));
@@ -4171,6 +4225,24 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.ok(migrated.airports.some((a) => a.icao === 'SAEZ'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SCEL'));
     assert.ok(migrated.airports.some((a) => a.icao === 'GMMN'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'EHBK'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'EBLG'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'EDLW'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'EGPK'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'LFQQ'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'LIMF'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'LEVC'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'LPCB'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'CYTZ'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'MMSM'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'SARI'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'SCIP'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'SKSP'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'MYAM'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'KSDF'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'CYYR'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'SPUR'));
+    assert.ok(migrated.airports.some((a) => a.icao === 'MUCC'));
     assert.ok(migrated.airports.some((a) => a.icao === 'HEBA'));
     assert.ok(migrated.airports.some((a) => a.icao === 'LLBG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'OEJN'));

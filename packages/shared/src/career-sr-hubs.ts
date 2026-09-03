@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { SR_DENSIFY_HUBS, SR_DENSIFY_HUB_COUNT } from './career-sr-hubs-densify.js';
 
 export type SrCareerRegion = 'SR-C';
 
@@ -93,9 +94,10 @@ export const SR_CAREER_HUBS: readonly SrCareerHubDef[] = [
     lon: -56.6733,
     ...drySpoke,
   },
+  ...SR_DENSIFY_HUBS,
 ];
 
-export const SR_CAREER_HUB_COUNT = 5;
+export const SR_CAREER_HUB_COUNT = 5 + SR_DENSIFY_HUB_COUNT;
 
 export function buildSrFeederCorridors(
   hubs: readonly SrCareerHubDef[] = SR_CAREER_HUBS,
@@ -125,7 +127,7 @@ export function assertSrCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<SrCareerRegion, number> = {
-    'SR-C': 5,
+    'SR-C': SR_CAREER_HUB_COUNT,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

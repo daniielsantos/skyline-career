@@ -196,6 +196,20 @@ function clamp01(n: number): number {
 
 const FOCUS_COUNTRIES = ['BR', 'US'] as const;
 
+/** EU-1 Western core — used for synthetic `EU` history aggregate. */
+export const EU1_WEST_COUNTRY_IDS = [
+  'PT',
+  'ES',
+  'FR',
+  'GB',
+  'DE',
+  'NL',
+  'BE',
+  'IT',
+] as const;
+
+const EU1_WEST_SET = new Set<string>(EU1_WEST_COUNTRY_IDS);
+
 /**
  * Collapse flat hub samples into one row per economy day with world /
  * country / tier buckets.
@@ -229,10 +243,19 @@ export function aggregateHubEconomyHistoryPulse(
       else byCountrySamples.set(cid, [s]);
       byTierSamples[s.hubTier].push(s);
     }
-    // UI pulse only needs focus countries (BR/US) — dumping every ISO bloated
+    // UI pulse only needs focus countries — dumping every ISO bloated
     // the JSON (~80KB+/day) and made Network history flaky under lock contention.
+    // Synthetic `EU` merges EU-1 Western core samples without listing every ISO.
     const byCountry: Record<string, HubEconomyHistoryBucket> = {};
     for (const id of focusCountries) {
+      if (id === 'EU') {
+        const euSamples: HubEconomySample[] = [];
+        for (const [cid, list] of byCountrySamples) {
+          if (EU1_WEST_SET.has(cid)) euSamples.push(...list);
+        }
+        byCountry.EU = finalizeBucket(euSamples);
+        continue;
+      }
       byCountry[id] = finalizeBucket(byCountrySamples.get(id) ?? []);
     }
     return {

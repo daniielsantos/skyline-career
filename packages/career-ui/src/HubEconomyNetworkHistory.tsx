@@ -4,9 +4,13 @@ import {
   type HubEconomyHistoryBucket,
   type HubEconomyHistoryPulseView,
 } from './api';
+import { BusyBlock, BusyStatus } from './Busy';
+import { HubEconomyLiveStrip } from './HubEconomyLiveStrip';
 import { formatMass, KG_TO_LB, massUnitLabel, type WeightSystem } from './weight-units';
 
-type PulseLens = 'world' | 'BR' | 'US' | 'spoke';
+const HISTORY_PAGE_SIZE = 14;
+
+type PulseLens = 'world' | 'BR' | 'US' | 'EU' | 'DE' | 'FR' | 'GB' | 'spoke';
 
 function pct01(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -96,14 +100,14 @@ function bucketForLens(
   lens: PulseLens,
 ): HubEconomyHistoryBucket | null {
   if (lens === 'world') return day.world ?? null;
-  if (lens === 'BR') return day.byCountry?.BR ?? null;
-  if (lens === 'US') return day.byCountry?.US ?? null;
-  return day.byTier?.spoke ?? null;
+  if (lens === 'spoke') return day.byTier?.spoke ?? null;
+  return day.byCountry?.[lens] ?? null;
 }
 
 function lensLabel(lens: PulseLens): string {
   if (lens === 'world') return 'World';
   if (lens === 'spoke') return 'Spoke';
+  if (lens === 'EU') return 'EU-West';
   return lens;
 }
 
@@ -192,6 +196,11 @@ export function HubEconomyNetworkHistory(props: {
   const [pulse, setPulse] = useState<HubEconomyHistoryPulseView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [windowDays, lens]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,6 +227,12 @@ export function HubEconomyNetworkHistory(props: {
 
   const sampleDays = pulse?.sampleDays ?? pulse?.days?.length ?? 0;
   const rows = [...(pulse?.days ?? [])].reverse();
+  const historyPageCount = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
+  const safeHistoryPage = Math.min(historyPage, historyPageCount);
+  const pagedRows = rows.slice(
+    (safeHistoryPage - 1) * HISTORY_PAGE_SIZE,
+    safeHistoryPage * HISTORY_PAGE_SIZE,
+  );
   const chrono = pulse?.days ?? [];
 
   const sparkSeries = useMemo(() => {
@@ -263,16 +278,18 @@ export function HubEconomyNetworkHistory(props: {
   const lensToggle =
     layout === 'page' ? (
       <div className="hub-stats-window" role="group" aria-label="Pulse lens">
-        {(['world', 'BR', 'US', 'spoke'] as const).map((id) => (
-          <button
-            key={id}
-            type="button"
-            className={lens === id ? 'active' : ''}
-            onClick={() => setLens(id)}
-          >
-            {lensLabel(id)}
-          </button>
-        ))}
+        {(['world', 'BR', 'US', 'EU', 'DE', 'FR', 'GB', 'spoke'] as const).map(
+          (id) => (
+            <button
+              key={id}
+              type="button"
+              className={lens === id ? 'active' : ''}
+              onClick={() => setLens(id)}
+            >
+              {lensLabel(id)}
+            </button>
+          ),
+        )}
       </div>
     ) : null;
 
@@ -299,7 +316,7 @@ export function HubEconomyNetworkHistory(props: {
         </p>
       ) : null}
       {loading && !pulse ? (
-        <p className="muted">Loading network history…</p>
+        <BusyBlock label="Loading network history" />
       ) : error && !pulse ? (
         <p className="muted" role="alert">
           {error}
@@ -319,7 +336,12 @@ export function HubEconomyNetworkHistory(props: {
             <p className="muted hub-stats-network-meta">
               {sampleDays} day{sampleDays === 1 ? '' : 's'} ·{' '}
               {(pulse?.hubSamples ?? 0).toLocaleString('en-US')} hub-rows
-              {loading ? ' · updating…' : ''}
+              {loading ? (
+                <>
+                  {' · '}
+                  <BusyStatus label="Updating…" />
+                </>
+              ) : null}
               {layout === 'page'
                 ? ` · Lens ${lensLabel(lens)} · Dead = hubs with 0 outbound lots · Quiet = activityScore < 8`
                 : ''}
@@ -350,7 +372,11 @@ export function HubEconomyNetworkHistory(props: {
                 format={(n) => `${Math.round(n)}%`}
               />
               <Sparkline
-                label={lens === 'BR' || lens === 'US' ? 'Dead hubs' : 'Spoke dead'}
+                label={
+                  lens === 'spoke' || lens === 'world'
+                    ? 'Spoke dead'
+                    : 'Dead hubs'
+                }
                 values={sparkSeries.dead}
                 format={(n) => Math.round(n).toLocaleString('en-US')}
               />
@@ -365,6 +391,7 @@ export function HubEconomyNetworkHistory(props: {
                     <th>Live</th>
                     <th>BR live</th>
                     <th>US live</th>
+                    <th>EU live</th>
                     <th title="Spoke hubs with outbound lots > 0">Spoke live</th>
                     <th title="Spoke hubs with activityScore below 8">
                       Spoke quiet%
@@ -388,10 +415,11 @@ export function HubEconomyNetworkHistory(props: {
                 )}
               </thead>
               <tbody>
-                {rows.map((d) => {
+                {pagedRows.map((d) => {
                   const focus = bucketForLens(d, lens);
                   const br = d.byCountry?.BR;
                   const us = d.byCountry?.US;
+                  const eu = d.byCountry?.EU;
                   const spoke = d.byTier?.spoke;
                   if (lens === 'world') {
                     return (
@@ -403,6 +431,9 @@ export function HubEconomyNetworkHistory(props: {
                         </td>
                         <td>
                           {us && us.hubs > 0 ? pct01(us.liveHubPct) : '—'}
+                        </td>
+                        <td>
+                          {eu && eu.hubs > 0 ? pct01(eu.liveHubPct) : '—'}
                         </td>
                         <td>
                           {spoke && spoke.hubs > 0
@@ -461,6 +492,42 @@ export function HubEconomyNetworkHistory(props: {
               </tbody>
             </table>
           </div>
+          {rows.length > HISTORY_PAGE_SIZE ? (
+            <nav
+              className="pagination hub-stats-pagination"
+              aria-label="Network history pages"
+            >
+              <p>
+                {rows.length === 0
+                  ? '0 days'
+                  : `${(safeHistoryPage - 1) * HISTORY_PAGE_SIZE + 1}–${Math.min(
+                      safeHistoryPage * HISTORY_PAGE_SIZE,
+                      rows.length,
+                    )} of ${rows.length} days`}
+              </p>
+              <div>
+                <button
+                  type="button"
+                  disabled={safeHistoryPage <= 1}
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {safeHistoryPage} of {historyPageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={safeHistoryPage >= historyPageCount}
+                  onClick={() =>
+                    setHistoryPage((p) => Math.min(historyPageCount, p + 1))
+                  }
+                >
+                  Next
+                </button>
+              </div>
+            </nav>
+          ) : null}
           {layout === 'page' ? (
             <p className="muted hub-stats-network-meta">
               Dead ≠ quiet: dead = 0 outbound lots; quiet = activityScore below 8.
@@ -490,6 +557,10 @@ export function HubEconomyNetworkHistory(props: {
   if (layout === 'page') {
     return (
       <div className="hub-economy-pulse-body">
+        <HubEconomyLiveStrip
+          weightSystem={props.weightSystem}
+          refreshToken={props.refreshToken}
+        />
         <div className="hub-stats-history-head hub-economy-pulse-toolbar">
           <p className="muted hub-stats-card-hint">
             Source: <code>hub_economy_samples</code> · API{' '}

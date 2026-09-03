@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { BO_DENSIFY_HUBS, BO_DENSIFY_HUB_COUNT } from './career-bo-hubs-densify.js';
 
 export type BoCareerRegion = 'BO-W' | 'BO-E';
 
@@ -142,9 +143,10 @@ export const BO_CAREER_HUBS: readonly BoCareerHubDef[] = [
     lon: -65.3456,
     ...drySpoke,
   },
+  ...BO_DENSIFY_HUBS,
 ];
 
-export const BO_CAREER_HUB_COUNT = 9;
+export const BO_CAREER_HUB_COUNT = 9 + BO_DENSIFY_HUB_COUNT;
 
 export function buildBoFeederCorridors(
   hubs: readonly BoCareerHubDef[] = BO_CAREER_HUBS,
@@ -174,8 +176,8 @@ export function assertBoCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<BoCareerRegion, number> = {
-    'BO-W': 5,
-    'BO-E': 4,
+    'BO-W': 7,
+    'BO-E': 14,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

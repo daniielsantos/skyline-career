@@ -5239,7 +5239,7 @@ export function createCareerApiServer(port = 8787) {
             windowDays: days,
             ...aggregateHubEconomyHistoryPulse(samples, {
               retentionDays: HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
-              focusCountries: ['BR', 'US'],
+              focusCountries: ['BR', 'US', 'EU', 'DE', 'FR', 'GB', 'CA', 'MX', 'AR', 'CO'],
             }),
           };
         });

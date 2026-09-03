@@ -28,7 +28,7 @@ import { applyNpcFuelUplift } from './career-fuel.js';
 import { assertClassOpsUnlocked } from './career-class-ops.js';
 import {
   hubLevelNpcBidMult,
-  regionAverageHubLevel,
+  clampHubLevel,
 } from './career-hub-level.js';
 import {
   bumpLaneInboundIndex,
@@ -1245,12 +1245,19 @@ export function ensureNpcAirframes(
   seed = world.seed,
 ): number {
   let assigned = 0;
+  const homologCountByClass = new Map<string, number>();
   for (let i = 0; i < world.npcs.length; i++) {
     const npc = world.npcs[i]!;
     const needsAssign = !npc.airframeTypeId;
+    let homologCount = homologCountByClass.get(npc.aircraftClassId);
+    if (homologCount === undefined) {
+      homologCount = listHomologatedNpcAirframesForClass(npc.aircraftClassId)
+        .length;
+      homologCountByClass.set(npc.aircraftClassId, homologCount);
+    }
     const needsHomologation =
       Boolean(npc.airframeTypeId) &&
-      listHomologatedNpcAirframesForClass(npc.aircraftClassId).length > 0 &&
+      homologCount > 0 &&
       !npcAirframeIsHomologated(npc.airframeTypeId);
     if (!needsAssign && !needsHomologation) continue;
     const rng = mulberry32(
@@ -1272,27 +1279,86 @@ export function ensureNpcAirframes(
 }
 
 /** Ensure save has a fleet; seeds when missing / empty; tops up and prunes to target. */
-export function ensureNpcFleet(world: CareerEconomyWorld): void {
+export function ensureNpcFleet(
+  world: CareerEconomyWorld,
+  opts: { heal?: boolean } = {},
+): void {
   if (!Array.isArray(world.npcFlights)) {
     world.npcFlights = [];
   }
-  const regions = world.airports.map((a) => a.region);
+  const heal = opts.heal !== false;
   if (!Array.isArray(world.npcs) || world.npcs.length === 0) {
+    const regions = world.airports.map((a) => a.region);
     world.npcs = seedNpcFleet({ seed: world.seed, regions });
     world.npcFlights = world.npcFlights ?? [];
+    if (heal) {
+      const healNow = world.lastBatchAtMs ?? Date.now();
+      settleNpcOpsDueCore(world, healNow);
+      desyncClusteredTurnarounds(world);
+    }
     return;
   }
-  topUpNpcFleetComposition(world, regions);
-  pruneNpcFleetComposition(world, regions);
-  ensureNpcRegionCoverage(world, regions);
-  rebalanceNpcHomeRegions(world, regions);
+
+  // Hot path: fleet already at composition / coverage / balance — skip
+  // topUp/prune/rebalance (dominant cost with ~3.8k NPCs).
+  if (!npcFleetStructureFresh(world)) {
+    const regions = world.airports.map((a) => a.region);
+    topUpNpcFleetComposition(world, regions);
+    pruneNpcFleetComposition(world, regions);
+    ensureNpcRegionCoverage(world, regions);
+    rebalanceNpcHomeRegions(world, regions);
+  }
   ensureNpcAirframes(world);
   backfillNpcDutyFromFlights(world);
   // Heal tick/ms drift before cosmetic desync so poisoned far-future holds
   // cannot fan out across a turnaround cluster.
-  const healNow = world.lastBatchAtMs ?? Date.now();
-  settleNpcOpsDueCore(world, healNow);
-  desyncClusteredTurnarounds(world);
+  if (heal) {
+    const healNow = world.lastBatchAtMs ?? Date.now();
+    settleNpcOpsDueCore(world, healNow);
+    desyncClusteredTurnarounds(world);
+  }
+}
+
+/**
+ * True when topUp/prune/coverage/rebalance would no-op for this world.
+ * Class counts match region-scaled composition; every home region has ≥1 NPC;
+ * richest−thinnest ≤ 1.
+ */
+function npcFleetStructureFresh(world: CareerEconomyWorld): boolean {
+  const regionList = listNpcHomeRegions([
+    ...new Set(
+      world.airports.map((a) => a.region).filter((r): r is string => Boolean(r)),
+    ),
+  ]);
+  if (regionList.length === 0) return true;
+  const composition = resolveNpcFleetComposition(regionList.length);
+  const classCounts = new Map<string, number>();
+  const homeCounts = new Map<string, number>();
+  for (const region of regionList) homeCounts.set(region, 0);
+  for (const npc of world.npcs) {
+    classCounts.set(
+      npc.aircraftClassId,
+      (classCounts.get(npc.aircraftClassId) ?? 0) + 1,
+    );
+    const home = (npc.homeRegion ?? '').trim();
+    if (homeCounts.has(home)) {
+      homeCounts.set(home, (homeCounts.get(home) ?? 0) + 1);
+    }
+  }
+  for (const slot of composition) {
+    if ((classCounts.get(slot.aircraftClassId) ?? 0) !== slot.count) {
+      return false;
+    }
+  }
+  let min = Number.POSITIVE_INFINITY;
+  let max = -1;
+  for (const region of regionList) {
+    const count = homeCounts.get(region) ?? 0;
+    if (count === 0) return false;
+    if (count < min) min = count;
+    if (count > max) max = count;
+  }
+  return max - min <= 1;
 }
 
 /**
@@ -2130,11 +2196,17 @@ function settleNpcOpsDueCore(
 export function settleNpcOpsDue(
   world: CareerEconomyWorld,
   nowMs = Date.now(),
+  opts: { skipEnsure?: boolean } = {},
 ): { settledFlights: number; promotedPilotOffers: number } {
-  ensureNpcFleet(world);
+  // Default: ensure structure without nested heal settle (we settle once below).
+  if (!opts.skipEnsure) {
+    ensureNpcFleet(world, { heal: false });
+  }
   // Flights leave in_flight here — drop lane index so the next formLots/bid rebuilds.
   invalidateLaneInboundIndex(world);
-  return settleNpcOpsDueCore(world, nowMs);
+  const result = settleNpcOpsDueCore(world, nowMs);
+  desyncClusteredTurnarounds(world);
+  return result;
 }
 
 /** Route ops cargo ceiling for an NPC (fuel/MTOW), not structural max alone. */
@@ -3183,6 +3255,7 @@ function pushRegionBucket(
   else buckets.set(key, [row]);
 }
 
+/** Drop dead rows in place; preserves relative order of live candidates. */
 function compactLiveRows(rows: BidCandidate[]): void {
   let write = 0;
   for (let i = 0; i < rows.length; i++) {
@@ -3258,11 +3331,36 @@ function npcBidOnMarket(
     world.npcFlights.filter(isNpcFlightHoldingLot).map((f) => f.lotId),
   );
   const laneIndex = ensureLaneInboundIndex(world);
+
+  // One pass each — regionCapacity / hub-level used to re-filter the full
+  // fleet or airport list on every distinct homeRegion.
+  const npcsByHomeRegion = new Map<string, NpcFreighter[]>();
+  for (const n of world.npcs) {
+    const list = npcsByHomeRegion.get(n.homeRegion);
+    if (list) list.push(n);
+    else npcsByHomeRegion.set(n.homeRegion, [n]);
+  }
+  const airportsByRegion = new Map<string, typeof world.airports>();
+  for (const ap of world.airports) {
+    const list = airportsByRegion.get(ap.region);
+    if (list) list.push(ap);
+    else airportsByRegion.set(ap.region, [ap]);
+  }
+
   const regionCapacityCache = new Map<string, number>();
   const regionCapacity = (region: string): number => {
     let cached = regionCapacityCache.get(region);
     if (cached === undefined) {
-      cached = npcRegionBidCapacity(world, region, batchNowMs);
+      const home = npcsByHomeRegion.get(region) ?? [];
+      if (home.length === 0) {
+        cached = 1;
+      } else {
+        let ready = 0;
+        for (const npc of home) {
+          if (isNpcReadyToBid(npc, batchNowMs, world.tick)) ready += 1;
+        }
+        cached = ready / home.length;
+      }
       regionCapacityCache.set(region, cached);
     }
     return cached;
@@ -3271,7 +3369,14 @@ function npcBidOnMarket(
   const levelBidFor = (region: string): number => {
     let cached = levelBidCache.get(region);
     if (cached === undefined) {
-      cached = hubLevelNpcBidMult(regionAverageHubLevel(world, region));
+      const list = airportsByRegion.get(region) ?? [];
+      let avg = 1;
+      if (list.length > 0) {
+        let sum = 0;
+        for (const a of list) sum += clampHubLevel(a.level ?? 1);
+        avg = sum / list.length;
+      }
+      cached = hubLevelNpcBidMult(avg);
       levelBidCache.set(region, cached);
     }
     return cached;
@@ -3353,6 +3458,7 @@ function npcBidOnMarket(
   };
 
   let visitGen = 1;
+  let claimsSinceCompact = 0;
   for (const npc of idle) {
     const regionCap = regionCapacity(npc.homeRegion);
     const wx = regionalWeatherIndex(world, npc.homeRegion);
@@ -3451,7 +3557,15 @@ function npcBidOnMarket(
     if (flight) {
       claimedLotIds.add(best.lot.id);
       best.row.dead = true;
-      compactLiveRows(classBoard.rows);
+      // Compact periodically — every claim was O(board×claims); never compacting
+      // left later NPCs walking thousands of dead rows. Batch keeps live order.
+      claimsSinceCompact += 1;
+      if (claimsSinceCompact >= 48) {
+        for (const board of candidatesByClass.values()) {
+          compactLiveRows(board.rows);
+        }
+        claimsSinceCompact = 0;
+      }
     }
   }
 }

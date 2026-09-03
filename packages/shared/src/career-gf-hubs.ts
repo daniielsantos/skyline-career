@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GF_DENSIFY_HUBS, GF_DENSIFY_HUB_COUNT } from './career-gf-hubs-densify.js';
 
 export type GfCareerRegion = 'GF-C';
 
@@ -74,9 +75,10 @@ export const GF_CAREER_HUBS: readonly GfCareerHubDef[] = [
     lon: -54.0372,
     ...drySpoke,
   },
+  ...GF_DENSIFY_HUBS,
 ];
 
-export const GF_CAREER_HUB_COUNT = 3;
+export const GF_CAREER_HUB_COUNT = 3 + GF_DENSIFY_HUB_COUNT;
 
 export function buildGfFeederCorridors(
   hubs: readonly GfCareerHubDef[] = GF_CAREER_HUBS,
@@ -106,7 +108,7 @@ export function assertGfCareerHubCatalog(): void {
     byRegion[h.region] = (byRegion[h.region] ?? 0) + 1;
   }
   const expected: Record<GfCareerRegion, number> = {
-    'GF-C': 3,
+    'GF-C': GF_CAREER_HUB_COUNT,
   };
   for (const [region, n] of Object.entries(expected)) {
     if (byRegion[region] !== n) {

@@ -10,6 +10,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { KR_DENSIFY_HUBS, KR_DENSIFY_HUB_COUNT } from './career-kr-hubs-densify.js';
 
 export type KrCareerRegion = 'KR-C' | 'KR-S' | 'KR-J';
 
@@ -57,9 +58,10 @@ export const KR_CAREER_HUBS: readonly KrCareerHubDef[] = [
     produce: { general: 1.25, perishables: 1.2, electronics: 1.1 },
     consume: { supplies: 1.15, machinery: 1.0, fuel: 1.2 },
   },
+  ...KR_DENSIFY_HUBS,
 ];
 
-export const KR_CAREER_HUB_COUNT = 3;
+export const KR_CAREER_HUB_COUNT = 3 + KR_DENSIFY_HUB_COUNT;
 
 export function buildKrFeederCorridors(
   hubs: readonly KrCareerHubDef[] = KR_CAREER_HUBS,

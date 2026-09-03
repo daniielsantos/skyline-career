@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { MZ_DENSIFY_HUBS, MZ_DENSIFY_HUB_COUNT } from './career-mz-hubs-densify.js';
 
 export type MzCareerRegion = 'MZ-S' | 'MZ-C';
 
@@ -44,9 +45,10 @@ export const MZ_CAREER_HUBS: readonly MzCareerHubDef[] = [
     produce: { machinery: 1.25, general: 1.3, perishables: 1.2 },
     consume: { electronics: 0.95, supplies: 1.1, fuel: 1.1 },
   },
+  ...MZ_DENSIFY_HUBS,
 ];
 
-export const MZ_CAREER_HUB_COUNT = 2;
+export const MZ_CAREER_HUB_COUNT = 2 + MZ_DENSIFY_HUB_COUNT;
 
 export function buildMzFeederCorridors(
   hubs: readonly MzCareerHubDef[] = MZ_CAREER_HUBS,

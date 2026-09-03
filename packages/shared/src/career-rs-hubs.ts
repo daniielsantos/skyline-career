@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { RS_DENSIFY_HUBS, RS_DENSIFY_HUB_COUNT } from './career-rs-hubs-densify.js';
 
 export type RsCareerRegion = 'RS-C';
 
@@ -54,9 +55,10 @@ export const RS_CAREER_HUBS: readonly RsCareerHubDef[] = [
     produce: { general: 1.15, perishables: 1.15, supplies: 1.0 },
     consume: { electronics: 0.95, machinery: 0.9 },
   },
+  ...RS_DENSIFY_HUBS,
 ];
 
-export const RS_CAREER_HUB_COUNT = 3;
+export const RS_CAREER_HUB_COUNT = 3 + RS_DENSIFY_HUB_COUNT;
 
 export function buildRsFeederCorridors(
   hubs: readonly RsCareerHubDef[] = RS_CAREER_HUBS,

@@ -48,24 +48,6 @@ const amazonSpoke = {
   >,
 };
 
-/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
-const bushSpoke = {
-  produce: {
-    electronics: 1.35,
-    general: 0.35,
-    supplies: 0.3,
-    perishables: 0.55,
-    machinery: 0.2,
-  } as Partial<Record<CommodityId, number>>,
-  consume: {
-    supplies: 2.4,
-    general: 2.1,
-    perishables: 1.2,
-    electronics: 0.35,
-    machinery: 0.55,
-  } as Partial<Record<CommodityId, number>>,
-};
-
 const dryRegional = {
   produce: { general: 1.25, supplies: 1.1, perishables: 1.05 } as Partial<
     Record<CommodityId, number>
@@ -575,7 +557,7 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
   },
   ...BR_N_DENSIFY_HUBS,
 
-  // ── BR-N bush soft-fields (2) — official ICAO; ferry blocked; OD vs BR gateways ──
+  // ── BR-N soft-field spokes (2) — former bush strips, now normal cargo spokes ──
   {
     icao: 'SNYA',
     name: 'Almeirim',
@@ -583,8 +565,7 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     hubTier: 'spoke',
     lat: -1.4795,
     lon: -52.5782,
-    bush: true,
-    ...bushSpoke,
+    ...amazonSpoke,
   },
   {
     icao: 'SWTP',
@@ -593,8 +574,7 @@ export const BR_CAREER_HUBS: readonly BrCareerHubDef[] = [
     hubTier: 'spoke',
     lat: -0.3786,
     lon: -64.9926,
-    bush: true,
-    ...bushSpoke,
+    ...amazonSpoke,
   },
 
   // ── BR-CO (11) ───────────────────────────────────────────────────────────
@@ -753,7 +733,7 @@ export function assertBrCareerHubCatalog(): void {
     }
   }
   const bushN = BR_CAREER_HUBS.filter((h) => h.bush).length;
-  if (bushN !== 2) {
-    throw new Error(`Expected 2 bush hubs, got ${bushN}`);
+  if (bushN !== 0) {
+    throw new Error(`Expected 0 bush hubs (feature removed), got ${bushN}`);
   }
 }

@@ -4,7 +4,6 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
-import { US_BUSH_TRIP_ONLY_HUBS } from './career-us-bush-trip-hubs.js';
 import { US_PR_CAREER_HUBS } from './career-us-pr-hubs.js';
 import { US_VI_CAREER_HUBS } from './career-us-vi-hubs.js';
 import { US_HI_CAREER_HUBS } from './career-us-hi-hubs.js';
@@ -53,24 +52,6 @@ export type UsCareerHubDef = {
   bushTripOnly?: true;
   /** Coords/name confirmed against MSFS (panel or parked sample), not OurAirports. */
   msfsValidated?: true;
-};
-
-/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
-const bushSpoke = {
-  produce: {
-    electronics: 1.35,
-    general: 0.35,
-    supplies: 0.3,
-    perishables: 0.55,
-    machinery: 0.2,
-  } as Partial<Record<CommodityId, number>>,
-  consume: {
-    supplies: 2.4,
-    general: 2.1,
-    perishables: 1.2,
-    electronics: 0.35,
-    machinery: 0.55,
-  } as Partial<Record<CommodityId, number>>,
 };
 
 export type CareerCorridorEdge = {
@@ -1274,7 +1255,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     ...drySpoke,
   },
 
-  // ── US bush soft-fields (3) — official ICAO; ferry blocked; OD vs US gateways ──
+  // ── US soft-field spokes (3) — former bush strips, now normal cargo spokes ──
   {
     icao: 'KESW',
     name: 'Easton State',
@@ -1282,8 +1263,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 47.2542,
     lon: -121.186,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
   {
     icao: 'KTCS',
@@ -1292,8 +1272,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 33.2369,
     lon: -107.272,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
   {
     icao: 'KTAD',
@@ -1302,8 +1281,7 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 37.2594,
     lon: -104.341,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
   // Puerto Rico (US territory — region US-PR)
   ...US_PR_CAREER_HUBS,
@@ -1317,11 +1295,9 @@ export const US_CAREER_HUBS: readonly UsCareerHubDef[] = [
   ...US_AS_CAREER_HUBS,
   // Northern Mariana Islands (US territory — region US-MP)
   ...US_MP_CAREER_HUBS,
-  // FAA locals / trip-only endpoints (Activities PLN Airport nodes)
-  ...US_BUSH_TRIP_ONLY_HUBS,
 ];
 
-export const US_CAREER_HUB_COUNT = 168 + US_DENSIFY_HUB_COUNT;
+export const US_CAREER_HUB_COUNT = 136 + US_DENSIFY_HUB_COUNT;
 
 function haversineNm(
   a: { lat: number; lon: number },

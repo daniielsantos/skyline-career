@@ -9,6 +9,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { MR_DENSIFY_HUBS, MR_DENSIFY_HUB_COUNT } from './career-mr-hubs-densify.js';
 
 export type MrCareerRegion = 'MR-W';
 
@@ -36,9 +37,10 @@ export const MR_CAREER_HUBS: readonly MrCareerHubDef[] = [
     produce: { general: 1.3, supplies: 1.2, machinery: 1.1 },
     consume: { perishables: 1.15, electronics: 0.95, fuel: 1.15 },
   },
+  ...MR_DENSIFY_HUBS,
 ];
 
-export const MR_CAREER_HUB_COUNT = 1;
+export const MR_CAREER_HUB_COUNT = 1 + MR_DENSIFY_HUB_COUNT;
 
 export function buildMrFeederCorridors(
   hubs: readonly MrCareerHubDef[] = MR_CAREER_HUBS,

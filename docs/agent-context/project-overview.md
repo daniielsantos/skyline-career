@@ -31,7 +31,7 @@ Draft/calibração: agent CLI (`draft-profile`, `calibrate`, `writetest`, `smoke
 
 | Package | Papel |
 |---------|--------|
-| `@msfs-compat/shared` | Tipos, hubs, economy, SimBrief airports, bush trips, etc. |
+| `@msfs-compat/shared` | Tipos, hubs, economy, SimBrief airports, etc. |
 | `@msfs-compat/runtime` | Engine de apply/verify do load plan |
 | `@msfs-compat/agent` | Pipe client + CLI de probe/homologate |
 | `@msfs-compat/career-ui` | Skyline Career UI + API (Market, Staging, Preflight, Watch) |
@@ -40,7 +40,7 @@ Draft/calibração: agent CLI (`draft-profile`, `calibrate`, `writetest`, `smoke
 
 ## Loop de carreira (player)
 
-1. **Market** — lots / bush trips  
+1. **Market** — lots / freights  
 2. **Prepare / Staging** — escolher airframe, payload, Accept & Dispatch  
 3. **SimBrief OFP** — dispatch + inject fuel/payload (perfil)  
 4. **Preflight** — Due vs Sim (fuel, payload, CG, gates)  
@@ -57,7 +57,7 @@ Ship: desktop installer (`npm run pack:desktop` / `release:desktop`).
 - **SimBridge exclusive gate** — serializa probe/watch start/inject no Node (`simbridge-gate.ts`).  
 - **Economy** — ticks 15 min (`TICKS_PER_DAY=96`), hubs por país/região, NPC, fuel trucks, SQLite store. Detalhe: `.cursor/rules/career-economy-roadmap.mdc`.  
 - **Map expansion** — checklist obrigatório: `.cursor/rules/career-map-expansion.mdc`.  
-- **Bush trips** — soft-field / tours; **board temporarily disabled** (`BUSH_TRIPS_BOARD_ENABLED=false`); não misturar com Market freights.  
+- **Bush trips** — **removed** 2026-09-03 (APIs `410`; soft hubs = normal spokes).
 - **Homologate hubs** — facility MSFS deve bater ICAO catalog e ≤25 nm.
 
 ## Persistência

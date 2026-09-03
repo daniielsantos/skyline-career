@@ -25,23 +25,6 @@ export type MxCareerHubDef = {
   bush?: true;
 };
 
-/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
-const bushSpoke = {
-  produce: {
-    electronics: 1.35,
-    general: 0.35,
-    supplies: 0.3,
-    perishables: 0.55,
-    machinery: 0.2,
-  } as Partial<Record<CommodityId, number>>,
-  consume: {
-    supplies: 2.4,
-    general: 2.1,
-    perishables: 1.2,
-    electronics: 0.35,
-    machinery: 0.55,
-  } as Partial<Record<CommodityId, number>>,
-};
 
 const drySpoke = {
   produce: { general: 1.1, supplies: 1.0, perishables: 0.9 } as Partial<
@@ -538,7 +521,7 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
 
   ...MX_DENSIFY_HUBS,
 
-  // ── MX bush soft-fields — OA soft+ICAO is scarce; MMCG gravel (MM68 GPS ident removed — not in SimBrief)
+  // ── MX soft-field spoke — former bush strip, now normal cargo spoke ──
   {
     icao: 'MMCG',
     name: 'Nuevo Casas Grandes Municipal',
@@ -546,8 +529,7 @@ export const MX_CAREER_HUBS: readonly MxCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 30.3974,
     lon: -107.875,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
 ];
 

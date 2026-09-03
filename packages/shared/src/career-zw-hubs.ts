@@ -11,6 +11,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { ZW_DENSIFY_HUBS, ZW_DENSIFY_HUB_COUNT } from './career-zw-hubs-densify.js';
 
 export type ZwCareerRegion = 'ZW-C' | 'ZW-S';
 
@@ -48,9 +49,10 @@ export const ZW_CAREER_HUBS: readonly ZwCareerHubDef[] = [
     produce: { general: 1.25, machinery: 1.2, supplies: 1.1 },
     consume: { perishables: 1.1, electronics: 0.95, fuel: 1.1 },
   },
+  ...ZW_DENSIFY_HUBS,
 ];
 
-export const ZW_CAREER_HUB_COUNT = 2;
+export const ZW_CAREER_HUB_COUNT = 2 + ZW_DENSIFY_HUB_COUNT;
 
 export function buildZwFeederCorridors(
   hubs: readonly ZwCareerHubDef[] = ZW_CAREER_HUBS,

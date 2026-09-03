@@ -11,6 +11,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { SN_DENSIFY_HUBS, SN_DENSIFY_HUB_COUNT } from './career-sn-hubs-densify.js';
 
 export type SnCareerRegion = 'SN-W' | 'SN-E';
 
@@ -48,9 +49,10 @@ export const SN_CAREER_HUBS: readonly SnCareerHubDef[] = [
     produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
     consume: { electronics: 0.9, machinery: 0.9, fuel: 1.1 },
   },
+  ...SN_DENSIFY_HUBS,
 ];
 
-export const SN_CAREER_HUB_COUNT = 2;
+export const SN_CAREER_HUB_COUNT = 2 + SN_DENSIFY_HUB_COUNT;
 
 export function buildSnFeederCorridors(
   hubs: readonly SnCareerHubDef[] = SN_CAREER_HUBS,

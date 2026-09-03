@@ -11,6 +11,8 @@ const INTL_SHARE = 80; // intlCommodityQuota floor-ish; matches seed ~80
 const COUNTRY_FLOOR = 50;
 const SPOKE_FILL_MIN = 0.14;
 const VIABLE_KG = 180;
+const SKIPALL_SPOKE_FILL_MIN = 0.1;
+const SKIPALL_VIABLE_KG = 120;
 const FIXED_FORM_BUDGET = 12;
 const FIXED_VITALITY_CAP = 16;
 const US_TERRITORY_REGIONS = new Set([
@@ -116,7 +118,7 @@ async function analyzeCountry({
   }
 
   // Stock check only for candidates (cap fetch count).
-  async function countEligible(sku) {
+  async function countEligible(sku, { fillMin, viableKg }) {
     const list = candidates[sku].slice(0, 80);
     const eligible = [];
     const chunk = 16;
@@ -138,8 +140,8 @@ async function analyzeCountry({
       );
       for (const row of rows) {
         if (!row) continue;
-        if (row.fill < SPOKE_FILL_MIN) continue;
-        if (row.stockKg < VIABLE_KG) continue;
+        if (row.fill < fillMin) continue;
+        if (row.stockKg < viableKg) continue;
         eligible.push(row.icao);
       }
     }
@@ -151,8 +153,22 @@ async function analyzeCountry({
     };
   }
 
-  const eligG = await countEligible('general');
-  const eligS = await countEligible('supplies');
+  const eligG = await countEligible('general', {
+    fillMin: SPOKE_FILL_MIN,
+    viableKg: VIABLE_KG,
+  });
+  const eligS = await countEligible('supplies', {
+    fillMin: SPOKE_FILL_MIN,
+    viableKg: VIABLE_KG,
+  });
+  const softG = await countEligible('general', {
+    fillMin: SKIPALL_SPOKE_FILL_MIN,
+    viableKg: SKIPALL_VIABLE_KG,
+  });
+  const softS = await countEligible('supplies', {
+    fillMin: SKIPALL_SPOKE_FILL_MIN,
+    viableKg: SKIPALL_VIABLE_KG,
+  });
 
   console.log(`\n=== ${id} ===`);
   console.log(
@@ -185,6 +201,11 @@ async function analyzeCountry({
     `supplies ${eligS.eligible}/${eligS.candidates} (sampled ${eligS.sampled})`,
   );
   console.log(
+    'eligible soft under skipAll (fill≥10%, stock≥120):',
+    `general ${softG.eligible}/${softG.candidates}`,
+    `supplies ${softS.eligible}/${softS.candidates}`,
+  );
+  console.log(
     'vs fixed budget form',
     FIXED_FORM_BUDGET,
     '/ cap',
@@ -197,11 +218,18 @@ async function analyzeCountry({
     scaledRegionalForm(regionals.length),
   );
   const eligMax = Math.max(eligG.eligible, eligS.eligible);
+  const softMax = Math.max(softG.eligible, softS.eligible);
   const gate =
     (skipAll.general || skipAll.supplies) && eligMax > FIXED_FORM_BUDGET;
+  const softGate =
+    (skipAll.general || skipAll.supplies) && softMax > FIXED_FORM_BUDGET;
   console.log('Fase1 gate (skipAll && eligible ≫ 12):', gate ? 'PASS' : 'FAIL');
-  if (eligG.sampleIcaos.length) {
-    console.log('  sample general eligible:', eligG.sampleIcaos.join(', '));
+  console.log(
+    'Soft skipAll gate (skipAll && soft-eligible ≫ 12):',
+    softGate ? 'PASS' : 'FAIL',
+  );
+  if (softG.sampleIcaos.length) {
+    console.log('  sample soft general eligible:', softG.sampleIcaos.join(', '));
   }
 }
 

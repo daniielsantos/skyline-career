@@ -39,6 +39,7 @@ import type {
   FreighterClassId,
   ShipmentLot,
   StockPile,
+  RegionalRecoveryState,
 } from './types/career-economy.js';
 
 /** Same quiet threshold as airport API / hub-level soft neglect. */
@@ -203,6 +204,18 @@ export interface EconomyPulse {
   countries: EconomyPulseCountry[];
   npc: EconomyPulseNpc;
   board: EconomyPulseBoard;
+  regionalRecovery: {
+    activeRegions: number;
+    regions: Array<{
+      region: string;
+      active: boolean;
+      enteredDay?: number;
+      lowLiveStreak: number;
+      recoveredStreak: number;
+      lastLivePct: number;
+      lastDeadSpokeShare: number;
+    }>;
+  };
   /** Cumulative flow counters — diff two samples to get throughput rates. */
   flow: EconomyFlowStats;
   notes: string[];
@@ -700,6 +713,25 @@ function buildNotes(
     }
   }
 
+  if (pulse.regionalRecovery.activeRegions > 0) {
+    const active = pulse.regionalRecovery.regions
+      .filter((r) => r.active)
+      .slice(0, 6);
+    const labels = active
+      .map(
+        (r) =>
+          `${r.region} live ${(r.lastLivePct * 100).toFixed(0)}% / dead-spoke ${(r.lastDeadSpokeShare * 100).toFixed(0)}%`,
+      )
+      .join(', ');
+    const extra =
+      pulse.regionalRecovery.activeRegions > active.length
+        ? ` (+${pulse.regionalRecovery.activeRegions - active.length})`
+        : '';
+    notes.push(
+      `Regional recovery active in ${pulse.regionalRecovery.activeRegions} region(s): ${labels}${extra}`,
+    );
+  }
+
   return notes;
 }
 
@@ -952,6 +984,22 @@ export function computeEconomyPulse(
 
   const intlSharePct = availableLots > 0 ? intlLots / availableLots : 0;
   const npc = computeNpcPulse(world, nowMs);
+  const recoveryRows = Object.entries(
+    (world.regionalRecovery ?? {}) as Record<string, RegionalRecoveryState>,
+  )
+    .map(([region, s]) => ({
+      region,
+      active: s.active === true,
+      enteredDay: s.enteredDay,
+      lowLiveStreak: s.lowLiveStreak ?? 0,
+      recoveredStreak: s.recoveredStreak ?? 0,
+      lastLivePct: s.lastLivePct ?? 0,
+      lastDeadSpokeShare: s.lastDeadSpokeShare ?? 0,
+    }))
+    .sort((a, b) => {
+      if (a.active !== b.active) return Number(b.active) - Number(a.active);
+      return a.region.localeCompare(b.region);
+    });
   const base: Omit<EconomyPulse, 'notes'> = {
     tick: world.tick,
     homeCountryId: world.homeCountryId ?? null,
@@ -965,6 +1013,10 @@ export function computeEconomyPulse(
     countries,
     npc,
     board,
+    regionalRecovery: {
+      activeRegions: recoveryRows.filter((r) => r.active).length,
+      regions: recoveryRows,
+    },
     flow: cloneFlowStats(ensureFlowStats(world)),
   };
 

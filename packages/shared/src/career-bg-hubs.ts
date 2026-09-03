@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { BG_DENSIFY_HUBS, BG_DENSIFY_HUB_COUNT } from './career-bg-hubs-densify.js';
 
 export type BgCareerRegion = 'BG-C';
 
@@ -64,9 +65,10 @@ export const BG_CAREER_HUBS: readonly BgCareerHubDef[] = [
     produce: { general: 1.15, machinery: 1.1, perishables: 1.1 },
     consume: { electronics: 0.95, supplies: 1.0 },
   },
+  ...BG_DENSIFY_HUBS,
 ];
 
-export const BG_CAREER_HUB_COUNT = 4;
+export const BG_CAREER_HUB_COUNT = 4 + BG_DENSIFY_HUB_COUNT;
 
 export function buildBgFeederCorridors(
   hubs: readonly BgCareerHubDef[] = BG_CAREER_HUBS,

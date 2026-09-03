@@ -10,6 +10,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { TW_DENSIFY_HUBS, TW_DENSIFY_HUB_COUNT } from './career-tw-hubs-densify.js';
 
 export type TwCareerRegion = 'TW-N' | 'TW-S' | 'TW-C';
 
@@ -77,9 +78,10 @@ export const TW_CAREER_HUBS: readonly TwCareerHubDef[] = [
     produce: { electronics: 1.2, general: 1.25, supplies: 1.05 },
     consume: { perishables: 1.1, machinery: 0.95, fuel: 1.1 },
   },
+  ...TW_DENSIFY_HUBS,
 ];
 
-export const TW_CAREER_HUB_COUNT = 5;
+export const TW_CAREER_HUB_COUNT = 5 + TW_DENSIFY_HUB_COUNT;
 
 export function buildTwFeederCorridors(
   hubs: readonly TwCareerHubDef[] = TW_CAREER_HUBS,

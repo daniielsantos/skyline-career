@@ -1,5 +1,38 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-03: **Bush trips product removed** — catalog/mission/pln/GFP/watch APIs gone (`410`); `career-bush.ts` stubs; soft hubs = normal spokes; `activeBushTrip` cleared on load/normalize; `/api/bush-hubs/homologate*` kept for MSFS overrides. `msfs-bush-hub-overrides.json` still used.
+
+Atualizado 2026-09-03: **Pay transparency UI** — Terminal + Freights: idle `↑N%` no Pay + tooltip formação/nm/urgent; airport lots passam `basePayUsd`+`pressure`. Sem Dry.
+
+Atualizado 2026-09-03: **Economy measure dia 229** (~dia 230): Wave A Americas live **91.8%** (OK); EU-1 **98.6%**; US **91.7%**; BR **82.5%** ainda oscilando (janela ~74–89). CL **73.8%** segue soft spot; last-mile ~**84.7%**. Fill/pay estáveis: general ~**67.7%**, pay ~**$1.42/kg**, board playerBookableLots **8888**. Sem cliff; observar CL/SR e se BR precisa de ajuste fino de skipAll+eligible.
+Atualizado 2026-09-03: **CL focus (dia 229)** — `skipAll` CL está **false** (general 47/quota 50), então live baixo não vem do gate skipAll. Dead hubs CL concentram em **spokes** (10 de 11 dead; 0 major). Elegibilidade vitality entre dead spokes é baixa (general 1/12, supplies 0/27; sample SCKP). Hipótese atual: baixa pressão/elegibilidade local por spoke, não orçamento fixo.
+Atualizado 2026-09-03: **CL sub-região focus (dia 229)** — gargalo principal em **CL-C** (live 70.4%, 8 dead/27; CL-S 80%, 3/15). `skipAll` segue false nas duas; dead continuam majoritariamente spokes e com pouca elegibilidade (CL-C general 1/7; CL-S 0/3). Fill local general+supplies p50 baixo (~12–14%) com pay/kg CL-C mais alto (~2.31), reforçando hipótese de desequilíbrio local de spoke.
+Atualizado 2026-09-03: **Regional recovery controller shipped (genérico)** — auto-detect por `XX-*` (live baixo + dead spoke share por dias), recovery temporário com histerese/timeout; relaxa spoke gates last-mile (fill/kg) e `formCap` +1 só na região ativa. Telemetria no pulse (`regionalRecovery`) + note. Próximo measure: rodar 7–14 dias e validar CL-C >=80 sem regressão BR/US/EU.
+Atualizado 2026-09-03: **Measure +14d (dia 243)** — objetivo CL atingido: CL **73.8%→83.3%**, com **CL-C 70.4%→81.5%** (CL-S ~80%). Wave A **92.2%** e EU-1 **98.6%** estáveis; board ~9.1k e general fill/pay flat (~68% / ~$1.42/kg). Snapshot mostrou `regionalRecovery.activeRegions=0` (inativo no tick). Atenção: BR pulse **79.4%** e US **90.3%** no recorte; monitorar 7d para separar oscilação vs regressão.
+Atualizado 2026-09-03: **Monitor BR/US 7d adicionado** — script `scripts/analyze-br-us-7d-monitor.mjs` (status OK/WATCH/RISK + live avg/min/max, lots e payP50 diário). Baseline dia 243: BR **WATCH** (84.2% avg, 81.4% min), US **WATCH** (89.2% avg, 87.5% min), sem recovery regional ativo.
+
+Atualizado 2026-09-03: **BR focus dia 257** — pulse **89.7%** (ok pontual) mas hist 7d ainda RISK (avg 80%, min 72%). Causa: `skipAll` general on + elegíveis spoke baixos (2/33 general, 0/63 supplies) → gate budget **FAIL**. Dead só spokes, **espalhados** (CO/NE/S/SE 2 cada; N 100%). Recovery regional não dispara (nenhuma BR-* no entry). Hipótese: oscilação país por stock/fill local, não soft spot regional nem orçamento.
+
+Atualizado 2026-09-03: **skipAll spoke soft gates shipped** — sob skipAll, last-mile spoke fill/kg **14%/180 → 10%/120** (sem subir budget). Teste soft-fill ok. Rebuild + measure 7d (BR avg≥82%, min≥75%). Sem Dry/flow.
+
+Atualizado 2026-09-03: **Densify → seed 1999 shipped** — Wave B (EU+Asia) + Wave D (AF+OC) + polish; seed **1679→1999** (2000−LBHS); SimBrief allowlist regen; sem densify BR. Scripts `gen-wave-b-d-densify.mjs` / `analyze-wave-b-economy.mjs`. **User: rebuild → measure 7–14d** (EU-2/3/4 + Asia-B + Africa live ≥85%). Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-09-03: **Homolog densify fail=12** — remaps: FLHN→**FLSW** Solwezi; GOSM→**GOSS**; LBHT→**LBHS**; RPSP→**RPVT**; VOTR→**VOTP**; WAMP→**WAML**; WIKN→**WIDN**. RPVE rename Caticlan. Drop ID absent: WARQ/WAJW/WARS/WIPT (+WICC/WIJJ/WALR/WABB/WIHH/WIPB). Rebuild + `career-hubs` retry.
+
+Atualizado 2026-09-03: **Homolog densify fail=4** — drop **LBHS** (absent MSFS); WALR→**WAQQ**; WAML→**WAFF**; WIPB→**WIPK**. Seed **1999**.
+
+Atualizado 2026-09-03: **Homolog fail=1 WIPK** — Pangkal Pinang stock MSFS is **WIKK** (AIP); WIPK absent. Remap WIPK→WIKK.
+
+Atualizado 2026-09-03: **Major balance audit** — guideline 1 major/25–40 cargo hubs. UNDER: **CL**, **CO** (1→2). SOFT: PE, VE. BR/US/CA/MX/AR OK. Script `analyze-major-balance.mjs`. Sem promote ainda.
+
+Atualizado 2026-09-03: **Measure dia 278 (~14d)** — Wave B gate PASS; BR/US 7d **OK**; CL 93%; CO/PE/VE 100%. Sem cliff. Watch: pulse SE 292 hubs (métrica). Sem `CARGO_FLOW_BALANCE`.
+
+Atualizado 2026-09-03: **SE hub inflation root cause** — save vivo tinha **ESMQ×645** (não densify SE). Causa: remap errado `ESMX→ESMQ` (Växjö≠Kalmar) + `remapRetired` dedupe usava `find(to)` **depois** de reescrever `fromAp.icao`. Fix: drop remap; find `toAp` antes rewrite; `dedupeCareerAirportsByIcao` no migrate. Rebuild → restart career-ui limpa clones.
+
+Atualizado 2026-09-03: **Bush trips removed** — drop 32 `bushTripOnly` FAA locals; promote 9 soft-bush (SNYA/SWTP/KESW/KTCS/KTAD/CYHE/CYJA/CYHH/MMCG) → normal spokes; board/API trips → 410; seed **1999→1967**; SimBrief regen. Overrides MSFS kept for homolog network.
+
+Atualizado 2026-09-03: **Economy measure dia 185** (~+31d vs 154) — Wave A live **92%** (gate OK); EU **97%**; US **92%** (↑); BR **84–86%** (↑, ainda oscila); CL **74%** (↓ soft); SR fraco n=6. Board ~9.1k; gen fill 68% flat; last-mile 84%. Sem cliff / sem retune. Soft spots: CL (+SR). Wave B ainda gated por Wave A ≥85% (OK). Sem Dry.
+
 Atualizado 2026-09-03: **NPC ensure/settle opt shipped** — skip fleet maintain + settle 1×/tick; bid indexes + compact@48. Live ~**0.70s/tick** (era 4.4s). Hot restante: **npc bid ~67%** (scan idle×board). Next: bid redesign or bulk. Sem Dry.
 
 Atualizado 2026-09-03: **Board-pressure/intl opt shipped** — cache tick + INTL 1-pass fleet; live tick ~**2.1s→~0.76s**. Hot agora **npc ~61%**. Next: npc bid index. Sem Dry.
@@ -420,7 +453,7 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 - **Airport tab:** field plate + MapLibre Hybrid satellite + runways beside the map. `MAPTILER_KEY` via `GET /api/map/satellite-style` (do not commit the key; SDK unused — MapLibre 5 vs UI 6 whitescreen).
 - **Contracts map:** taller canvas (`min(50vh, 34rem)`).
 - **Market board:** debounce ICAO typing; skip unfiltered bootstrap `/api/market` when the board owns the fetch.
-- **Bush trips board off:** `BUSH_TRIPS_BOARD_ENABLED=false` (shared + UI flag) — aba Freights→Bush trips escondida; Accept API 503; abandon/active ainda ok.
+- **Bush trips board off:** product **removed** (was `BUSH_TRIPS_BOARD_ENABLED=false`) — see top of this file.
 - **Demand warehouse holds:** pledge WH kg + decrement world `remainingKg` without a flight; Dispatch = today’s Fly now; TTL T1/T2/T3 48/72/96 ticks; cancel/expire restores remaining. Several holds OK; one active Demand mission.
 - **Demand Edit cargo:** reduzir devolve kg à WH + restaura `remainingKg` do pedido; aumentar retira da WH (UI `demandEditMaxKg`).
 - **Ports yard lock:** buy split (free→WH / rest→yard); partial Store; Abandon oversized yard (no refund). T1 WH = **5 klb** (2268 kg); T2/T3 = 10/15 klb.

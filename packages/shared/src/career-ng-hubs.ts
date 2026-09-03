@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { NG_DENSIFY_HUBS, NG_DENSIFY_HUB_COUNT } from './career-ng-hubs-densify.js';
 
 export type NgCareerRegion = 'NG-SW' | 'NG-C' | 'NG-N';
 
@@ -64,9 +65,10 @@ export const NG_CAREER_HUBS: readonly NgCareerHubDef[] = [
     produce: { perishables: 1.25, general: 1.3, supplies: 1.15 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  ...NG_DENSIFY_HUBS,
 ];
 
-export const NG_CAREER_HUB_COUNT = 4;
+export const NG_CAREER_HUB_COUNT = 4 + NG_DENSIFY_HUB_COUNT;
 
 export function buildNgFeederCorridors(
   hubs: readonly NgCareerHubDef[] = NG_CAREER_HUBS,

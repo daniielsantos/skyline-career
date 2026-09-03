@@ -984,7 +984,7 @@ export function ensureDemandOrders(
     const commodities = portDeskCommodityOrder(world, pickups);
 
     const catchmentAirports = boardAirports.filter((ap) => {
-      const icao = ap.icao.trim().toUpperCase();
+    const icao = ap.icao.trim().toUpperCase();
       if (!CAREER_HUB_COORDS[icao]) return false;
       if (pickups.includes(icao)) return false; // no dest = own pickup
       return destWithinCorridorNm(icao, pickups, maxNm);
@@ -993,15 +993,15 @@ export function ensureDemandOrders(
     for (const ap of catchmentAirports) {
       if (openGlobal() >= boardCap || portSlots <= 0) break;
       const icao = ap.icao.trim().toUpperCase();
-      const country = demandAirportCountryId(ap);
+    const country = demandAirportCountryId(ap);
       if (!country) continue;
-      const quota = quotas.get(country) ?? 0;
+    const quota = quotas.get(country) ?? 0;
       if ((openByCountry.get(country) ?? 0) >= quota) continue;
 
-      const openHere = orders.filter(
-        (o) =>
+    const openHere = orders.filter(
+      (o) =>
           isOpen(o) &&
-          o.destIcao === icao &&
+        o.destIcao === icao &&
           o.portId?.trim().toUpperCase() === portId,
       );
       let hubSlots = DEMAND_ORDERS_PER_HUB - openHere.length;
@@ -1010,50 +1010,50 @@ export function ensureDemandOrders(
       for (const commodityId of commodities) {
         if (hubSlots <= 0 || portSlots <= 0) break;
         if (openGlobal() >= boardCap) break;
-        if ((openByCountry.get(country) ?? 0) >= quota) break;
-        if (openHere.some((o) => o.commodityId === commodityId)) continue;
+      if ((openByCountry.get(country) ?? 0) >= quota) break;
+      if (openHere.some((o) => o.commodityId === commodityId)) continue;
 
-        const pile = ap.inventory[commodityId];
-        if (!pile || pile.capacityKg <= 0) continue;
-        const frac = pile.stockKg / pile.capacityKg;
-        if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
+      const pile = ap.inventory[commodityId];
+      if (!pile || pile.capacityKg <= 0) continue;
+      const frac = pile.stockKg / pile.capacityKg;
+      if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
 
-        const deficitKg = Math.max(
-          0,
+      const deficitKg = Math.max(
+        0,
           Math.floor(
             pile.capacityKg * DEMAND_STOCK_FRAC_THRESHOLD - pile.stockKg,
           ),
-        );
-        if (deficitKg < 200) continue;
+      );
+      if (deficitKg < 200) continue;
 
         const { min: bandMin, max: bandMax } = demandWantedKgBand(commodityId);
-        const wantedKg = Math.min(
-          deficitKg,
-          bandMin + Math.floor(rng() * (bandMax - bandMin)),
-        );
-        if (wantedKg < bandMin) continue;
+      const wantedKg = Math.min(
+        deficitKg,
+        bandMin + Math.floor(rng() * (bandMax - bandMin)),
+      );
+      if (wantedKg < bandMin) continue;
 
-        const spot = money(localUnitPriceUsd(commodityId, pile));
-        const premium =
-          DEMAND_PRICE_PREMIUM_MIN +
-          rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
-        const maxUnitPriceUsd = money(spot * premium);
+      const spot = money(localUnitPriceUsd(commodityId, pile));
+      const premium =
+        DEMAND_PRICE_PREMIUM_MIN +
+        rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
+      const maxUnitPriceUsd = money(spot * premium);
 
         const row: DemandOrder = {
-          id: nextId('demand', world.tick),
+        id: nextId('demand', world.tick),
           portId,
-          destIcao: icao,
-          commodityId,
-          wantedKg,
-          remainingKg: wantedKg,
-          maxUnitPriceUsd,
-          arrivedAtTick: world.tick,
-          expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
-          status: 'open',
+        destIcao: icao,
+        commodityId,
+        wantedKg,
+        remainingKg: wantedKg,
+        maxUnitPriceUsd,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
+        status: 'open',
         };
         orders.push(row);
         openHere.push(row);
-        openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
+      openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
         openByPort.set(portId, (openByPort.get(portId) ?? 0) + 1);
         hubSlots -= 1;
         portSlots -= 1;

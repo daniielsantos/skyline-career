@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { AT_DENSIFY_HUBS, AT_DENSIFY_HUB_COUNT } from './career-at-hubs-densify.js';
 
 export type AtCareerRegion = 'AT-E' | 'AT-W';
 
@@ -98,9 +99,10 @@ export const AT_CAREER_HUBS: readonly AtCareerHubDef[] = [
     lon: 14.3377,
     ...alpine,
   },
+  ...AT_DENSIFY_HUBS,
 ];
 
-export const AT_CAREER_HUB_COUNT = 6;
+export const AT_CAREER_HUB_COUNT = 6 + AT_DENSIFY_HUB_COUNT;
 
 export function buildAtFeederCorridors(
   hubs: readonly AtCareerHubDef[] = AT_CAREER_HUBS,

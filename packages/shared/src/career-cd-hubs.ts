@@ -11,6 +11,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CD_DENSIFY_HUBS, CD_DENSIFY_HUB_COUNT } from './career-cd-hubs-densify.js';
 
 export type CdCareerRegion = 'CD-W' | 'CD-S' | 'CD-N';
 
@@ -58,9 +59,10 @@ export const CD_CAREER_HUBS: readonly CdCareerHubDef[] = [
     produce: { general: 1.25, perishables: 1.2, supplies: 1.15 },
     consume: { electronics: 0.95, machinery: 0.95, fuel: 1.15 },
   },
+  ...CD_DENSIFY_HUBS,
 ];
 
-export const CD_CAREER_HUB_COUNT = 3;
+export const CD_CAREER_HUB_COUNT = 3 + CD_DENSIFY_HUB_COUNT;
 
 export function buildCdFeederCorridors(
   hubs: readonly CdCareerHubDef[] = CD_CAREER_HUBS,

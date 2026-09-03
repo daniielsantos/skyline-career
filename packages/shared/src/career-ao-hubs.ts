@@ -10,6 +10,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { AO_DENSIFY_HUBS, AO_DENSIFY_HUB_COUNT } from './career-ao-hubs-densify.js';
 
 export type AoCareerRegion = 'AO-N';
 
@@ -37,9 +38,10 @@ export const AO_CAREER_HUBS: readonly AoCareerHubDef[] = [
     produce: { machinery: 1.35, general: 1.4, supplies: 1.2 },
     consume: { perishables: 1.15, electronics: 1.0, fuel: 1.2 },
   },
+  ...AO_DENSIFY_HUBS,
 ];
 
-export const AO_CAREER_HUB_COUNT = 1;
+export const AO_CAREER_HUB_COUNT = 1 + AO_DENSIFY_HUB_COUNT;
 
 export function buildAoFeederCorridors(
   hubs: readonly AoCareerHubDef[] = AO_CAREER_HUBS,

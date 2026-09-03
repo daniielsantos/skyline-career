@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { ZA_DENSIFY_HUBS, ZA_DENSIFY_HUB_COUNT } from './career-za-hubs-densify.js';
 
 export type ZaCareerRegion = 'ZA-G' | 'ZA-W' | 'ZA-E';
 
@@ -57,9 +58,10 @@ export const ZA_CAREER_HUBS: readonly ZaCareerHubDef[] = [
     produce: { machinery: 1.25, general: 1.3, supplies: 1.15 },
     consume: { perishables: 1.1, electronics: 0.95, fuel: 1.1 },
   },
+  ...ZA_DENSIFY_HUBS,
 ];
 
-export const ZA_CAREER_HUB_COUNT = 3;
+export const ZA_CAREER_HUB_COUNT = 3 + ZA_DENSIFY_HUB_COUNT;
 
 export function buildZaFeederCorridors(
   hubs: readonly ZaCareerHubDef[] = ZA_CAREER_HUBS,

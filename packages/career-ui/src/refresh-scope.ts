@@ -1,5 +1,4 @@
 import type { CareerTab } from './routes';
-import { BUSH_TRIPS_BOARD_ENABLED } from './feature-flags';
 
 export type CareerRefreshScope = {
   market?: boolean;
@@ -29,7 +28,7 @@ export function liveRefreshScope(
         market: true,
         npc: true,
         missions: true,
-        bushTrips: BUSH_TRIPS_BOARD_ENABLED,
+        bushTrips: false,
       };
     case 'aircraft':
       return { aircraftMarket: true, missions: true };
@@ -40,3 +39,4 @@ export function liveRefreshScope(
       return { missions: true };
   }
 }
+

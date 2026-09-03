@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { IE_DENSIFY_HUBS, IE_DENSIFY_HUB_COUNT } from './career-ie-hubs-densify.js';
 
 export type IeCareerRegion = 'IE-E' | 'IE-W';
 
@@ -90,9 +91,10 @@ export const IE_CAREER_HUBS: readonly IeCareerHubDef[] = [
     lon: -8.81111,
     ...city,
   },
+  ...IE_DENSIFY_HUBS,
 ];
 
-export const IE_CAREER_HUB_COUNT = 5;
+export const IE_CAREER_HUB_COUNT = 5 + IE_DENSIFY_HUB_COUNT;
 
 export function buildIeFeederCorridors(
   hubs: readonly IeCareerHubDef[] = IE_CAREER_HUBS,

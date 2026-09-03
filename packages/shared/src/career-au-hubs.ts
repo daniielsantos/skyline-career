@@ -11,6 +11,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { AU_DENSIFY_HUBS, AU_DENSIFY_HUB_COUNT } from './career-au-hubs-densify.js';
 
 export type AuCareerRegion = 'AU-E' | 'AU-S' | 'AU-Q' | 'AU-W' | 'AU-NT' | 'AU-T';
 
@@ -118,9 +119,10 @@ export const AU_CAREER_HUBS: readonly AuCareerHubDef[] = [
     produce: { perishables: 1.25, general: 1.2, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.15 },
   },
+  ...AU_DENSIFY_HUBS,
 ];
 
-export const AU_CAREER_HUB_COUNT = 9;
+export const AU_CAREER_HUB_COUNT = 9 + AU_DENSIFY_HUB_COUNT;
 
 export function buildAuFeederCorridors(
   hubs: readonly AuCareerHubDef[] = AU_CAREER_HUBS,

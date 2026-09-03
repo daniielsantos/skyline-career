@@ -68,21 +68,13 @@ import {
   listMarketLots,
   listNpcFleetStatus,
   listRegionMarketPressure,
+  describeLotMarketPressure,
+  idleLotPayMult,
+  laneDemandShock,
+  isDomesticOd,
   listViableMarketLots,
   isBushHub,
   isBushTripOnlyHub,
-  acceptBushTrip,
-  abandonBushTrip,
-  BUSH_TRIPS_BOARD_ENABLED,
-  bushTripToBoardRow,
-  bushTripMapNodes,
-  getBushTrip,
-  isBushTripActive,
-  listBushTrips,
-  bushTripActivitiesPlnFile,
-  gfpDownloadFilename,
-  gfpCoordsByIcao,
-  msfsPlnXmlToGfp,
   estimateBoardLotEconomics,
   parseMarketBoardAccessFilter,
   parseMarketBoardLaneFilter,
@@ -265,7 +257,6 @@ import {
   probeLiveResidualFuelKg,
 } from './watch-helpers.ts';
 import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
-import { BushTripWatchSession } from './bush-watch-helpers.ts';
 import {
   homologateBushHub,
   homologateBushHubBatch,
@@ -1454,6 +1445,48 @@ function overlayAirportBoard(
   };
 }
 
+/** Board pressure + idle flags — same shape as Freights market rows. */
+function mapLotPayPressure(
+  world: Awaited<ReturnType<typeof loadEconomy>>,
+  lot: (typeof world.lots)[number],
+  nowMs = Date.now(),
+) {
+  const pressure = describeLotMarketPressure(world, lot, nowMs);
+  const idlePayMult = idleLotPayMult(lot, world.tick);
+  const originRegion = pressure.originRegion ?? '';
+  const destRegion =
+    world.airports.find((a) => a.icao === lot.destIcao.toUpperCase())?.region ??
+    '';
+  const shock = laneDemandShock(world, {
+    originRegion,
+    destRegion,
+    commodityId: lot.commodityId,
+  });
+  return {
+    originRegion: pressure.originRegion,
+    originRegionCapacity: pressure.originRegionCapacity,
+    laneSaturation: pressure.laneSaturation,
+    thinFleet: pressure.thinFleet,
+    laneBusy: pressure.laneBusy,
+    weather: pressure.weather,
+    idlePayMult,
+    idleEscalated: idlePayMult > 1.02,
+    demandShock: shock.labels.length > 0,
+    shockLabels: shock.labels,
+    shockPayMult: shock.payMult,
+    international: !isDomesticOd(originRegion, destRegion),
+  };
+}
+
+function lotBasePayUsd(lot: {
+  payUsd: number;
+  basePayUsd?: number;
+}): number {
+  return typeof lot.basePayUsd === 'number' && Number.isFinite(lot.basePayUsd)
+    ? Math.round(lot.basePayUsd)
+    : Math.round(lot.payUsd);
+}
+
 function mapLotSummary(
   world: Awaited<ReturnType<typeof loadEconomy>>,
   lot: (typeof world.lots)[number],
@@ -1462,6 +1495,7 @@ function mapLotSummary(
   const commodity = getCommodity(lot.commodityId);
   const availableKg = Math.max(0, lot.quantityKg - lot.reservedKg);
   const npcClaim = npcClaimForLot(world, lot.id, nowMs);
+  const pressure = mapLotPayPressure(world, lot, nowMs);
   return {
     id: lot.id,
     originIcao: lot.originIcao,
@@ -1472,6 +1506,7 @@ function mapLotSummary(
     quantityKg: lot.quantityKg,
     reservedKg: lot.reservedKg,
     payUsd: lot.payUsd,
+    basePayUsd: lotBasePayUsd(lot),
     urgency: lot.urgency,
     reason: lot.reason,
     status: lot.status,
@@ -1481,7 +1516,11 @@ function mapLotSummary(
     expired: world.tick >= lot.expiresAtTick,
     perishable: Boolean(commodity.perishable),
     bush: isBushHub(lot.originIcao) || isBushHub(lot.destIcao),
+    lastMile: /last-mile/i.test(lot.reason),
     distanceNm: routeDistanceNm(world, lot.originIcao, lot.destIcao),
+    idleEscalated: pressure.idleEscalated,
+    international: pressure.international,
+    pressure,
     npcClaim: npcClaim
       ? {
           npcName: npcClaim.npcName,
@@ -1793,17 +1832,6 @@ export function createCareerApiServer(port = 8787) {
     withCareerWrite,
     updateOpenMission,
   });
-  const bushWatchSession = new BushTripWatchSession({
-    withCareerRead,
-    withCareerWrite,
-    stopMarketWatch: async () => {
-      if (watchSession.getStatus().running) {
-        await watchSession.stop({ reset: true });
-      } else if (watchSession.getStatus().missionId) {
-        watchSession.resetSession();
-      }
-    },
-  });
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
     const path = url.pathname;
@@ -1892,9 +1920,6 @@ export function createCareerApiServer(port = 8787) {
         console.log(`[career] profile-select start id=${id}`);
         try {
           if (watchSession.getStatus().running) await watchSession.stop();
-          if (bushWatchSession.getStatus().running) {
-            await bushWatchSession.stop();
-          }
           worldTick.stopBackgroundPulse();
           await withCareerLock(async () => {
             if (store) {
@@ -1939,9 +1964,6 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'POST' && path === '/api/profiles/clear') {
         try {
           if (watchSession.getStatus().running) await watchSession.stop();
-          if (bushWatchSession.getStatus().running) {
-            await bushWatchSession.stop();
-          }
           worldTick.stopBackgroundPulse();
           await withCareerLock(async () => {
             if (store) {
@@ -1995,9 +2017,6 @@ export function createCareerApiServer(port = 8787) {
         try {
           if (activeProfileId === id) {
             if (watchSession.getStatus().running) await watchSession.stop();
-            if (bushWatchSession.getStatus().running) {
-              await bushWatchSession.stop();
-            }
             worldTick.stopBackgroundPulse();
             await withCareerLock(async () => {
               if (store) {
@@ -3270,6 +3289,8 @@ export function createCareerApiServer(port = 8787) {
           quantityKg: number;
           availableKg: number;
           payUsd: number;
+          /** Formation pay before idle escalation (freight board transparency). */
+          basePayUsd?: number;
           urgency: string;
           reason: string;
           createdAtTick: number;
@@ -3330,6 +3351,7 @@ export function createCareerApiServer(port = 8787) {
               claimCargoKg: row.npcClaim?.cargoKg,
               pilotFeeUsd: row.npcClaim?.pilotFeeUsd,
             }),
+            basePayUsd: lotBasePayUsd(row.lot),
             urgency: row.lot.urgency,
             reason: row.lot.reason,
             createdAtTick: row.lot.createdAtTick,
@@ -6079,193 +6101,14 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
-      if (req.method === 'GET' && path === '/api/bush-trips') {
-        const payload = await withCareerRead((world, missions) => {
-          const trips = listBushTrips().map(bushTripToBoardRow);
-          const active = isBushTripActive(missions);
-          let activeView: {
-            tripId: string;
-            title: string;
-            legIndex: number;
-            fromIcao: string;
-            toIcao: string;
-            legs: number;
-            payUsd: number;
-            aircraftId: string;
-            status: 'accepted' | 'in_progress';
-            mapNodes: ReturnType<typeof bushTripMapNodes>;
-            startIcao: string;
-            endIcao: string;
-            hasPln: boolean;
-            cruisingAltFt?: number;
-            legStatus: 'ready' | 'departed';
-          } | null = null;
-          if (active) {
-            const trip = getBushTrip(active.tripId);
-            const leg = trip?.legs[active.legIndex];
-            if (trip && leg) {
-              activeView = {
-                tripId: trip.id,
-                title: trip.title,
-                legIndex: active.legIndex,
-                fromIcao: leg.fromIcao.toUpperCase(),
-                toIcao: leg.toIcao.toUpperCase(),
-                legs: trip.legs.length,
-                payUsd: typeof trip.payUsd === 'number' ? trip.payUsd : 0,
-                aircraftId: active.aircraftId,
-                status: active.status === 'in_progress' ? 'in_progress' : 'accepted',
-                mapNodes: bushTripMapNodes(trip),
-                startIcao: trip.legs[0]!.fromIcao.toUpperCase(),
-                endIcao: trip.legs[trip.legs.length - 1]!.toIcao.toUpperCase(),
-                hasPln: Boolean(bushTripActivitiesPlnFile(trip.id)),
-                ...(typeof trip.cruisingAltFt === 'number' &&
-                Number.isFinite(trip.cruisingAltFt) &&
-                trip.cruisingAltFt > 0
-                  ? { cruisingAltFt: Math.round(trip.cruisingAltFt) }
-                  : {}),
-                legStatus: active.legStatus ?? 'ready',
-              };
-            }
-          }
-          return {
-            trips,
-            active: activeView,
-            boardEnabled: BUSH_TRIPS_BOARD_ENABLED,
-            walletUsd: missions.walletUsd,
-            tick: world.tick,
-            ...fleetPayload(missions, world),
-          };
-        });
-        send(res, 200, payload);
-        return;
-      }
-
-
-      const bushPlnMatch = path.match(/^\/api\/bush-trips\/([a-z0-9-]+)\/pln$/i);
-      if (req.method === 'GET' && bushPlnMatch) {
-        const tripId = bushPlnMatch[1]!;
-        const fileName = bushTripActivitiesPlnFile(tripId);
-        if (!fileName) {
-          send(res, 404, { error: 'No Activities PLN for this trip' });
-          return;
-        }
-        const plnPath = join(careerRoot, 'bush_PLN', fileName);
-        try {
-          const { readFile } = await import('node:fs/promises');
-          const xml = await readFile(plnPath, 'utf8');
-          const safeName = fileName.replace(/[^\w.\- ]+/g, '_');
-          res.writeHead(200, {
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': `attachment; filename="${safeName}"`,
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Cache-Control': 'no-store',
-          });
-          res.end(xml);
-        } catch {
-          send(res, 404, { error: `PLN file missing: ${fileName}` });
-        }
-        return;
-      }
-
-      const bushGfpMatch = path.match(/^\/api\/bush-trips\/([a-z0-9-]+)\/gfp$/i);
-      if (req.method === 'GET' && bushGfpMatch) {
-        const tripId = bushGfpMatch[1]!;
-        const fileName = bushTripActivitiesPlnFile(tripId);
-        if (!fileName) {
-          send(res, 404, { error: 'No Activities PLN to convert for this trip' });
-          return;
-        }
-        const plnPath = join(careerRoot, 'bush_PLN', fileName);
-        try {
-          const { readFile } = await import('node:fs/promises');
-          const xml = await readFile(plnPath, 'utf8');
-          const trip = getBushTrip(tripId);
-          const gfp = msfsPlnXmlToGfp(xml, {
-            title: trip?.title,
-            // MSFS homologation overrides win over PLN User-WP stand-ins.
-            coordsByIcao: gfpCoordsByIcao(),
-          });
-          const safeName = gfpDownloadFilename(
-            gfp.title,
-            gfp.departureId,
-            gfp.destinationId,
-          );
-          res.writeHead(200, {
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': `attachment; filename="${safeName}"`,
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Cache-Control': 'no-store',
-            'X-Skyline-Gfp-Waypoints': String(gfp.waypointCount),
-            'X-Skyline-Gfp-Thinned': gfp.thinned ? '1' : '0',
-          });
-          res.end(gfp.body);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          send(res, 500, { error: `GFP convert failed: ${message}` });
-        }
-        return;
-      }
-
-      if (req.method === 'POST' && path === '/api/bush-trips/accept') {
-        if (!BUSH_TRIPS_BOARD_ENABLED) {
-          send(res, 503, { error: 'Bush trips are temporarily disabled' });
-          return;
-        }
-        const body = (await readBody(req)) as {
-          tripId?: string;
-          aircraftId?: string;
-        };
-        if (!body.tripId || !body.aircraftId) {
-          send(res, 400, { error: 'tripId and aircraftId required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            const accepted = acceptBushTrip(missions, {
-              tripId: body.tripId!,
-              aircraftId: body.aircraftId!,
-              tick: world.tick,
-            });
-            return {
-              active: accepted.active,
-              trip: bushTripToBoardRow(accepted.trip),
-              walletUsd: missions.walletUsd,
-              ...fleetPayload(missions, world),
-            };
-          }, { persist: 'company' });
-          send(res, 200, result);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          const notFound =
-            message.startsWith('Unknown bush trip') ||
-            message.startsWith('Unknown aircraft');
-          send(res, notFound ? 404 : 400, { error: message });
-        }
-        return;
-      }
-
-      if (req.method === 'POST' && path === '/api/bush-trips/abandon') {
-        try {
-          if (bushWatchSession.getStatus().running) {
-            await bushWatchSession.stop();
-          }
-          const result = await withCareerWrite((world, missions) => {
-            const abandoned = abandonBushTrip(missions, { tick: world.tick });
-            return {
-              active: abandoned.active,
-              walletUsd: missions.walletUsd,
-              ...fleetPayload(missions, world),
-            };
-          }, { persist: 'company' });
-          send(res, 200, result);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          send(res, 400, { error: message });
-        }
+      if (
+        path === '/api/bush-trips' ||
+        path.startsWith('/api/bush-trips/') ||
+        path === '/api/bush-watch/status' ||
+        path === '/api/bush-watch/start' ||
+        path === '/api/bush-watch/stop'
+      ) {
+        send(res, 410, { error: 'bush trips removed' });
         return;
       }
 
@@ -7337,10 +7180,6 @@ export function createCareerApiServer(port = 8787) {
             await watchSession.stop();
             stoppedPipe = true;
           }
-          if (bushWatchSession.getStatus().running) {
-            await bushWatchSession.stop();
-            stoppedPipe = true;
-          }
           if (stoppedPipe) {
             await new Promise((r) => setTimeout(r, 150));
           }
@@ -7524,9 +7363,6 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          if (bushWatchSession.getStatus().running) {
-            await bushWatchSession.stop();
-          }
           const status = await watchSession.start({
             missionId: body.missionId,
             intervalSec: body.intervalSec,
@@ -7558,11 +7394,6 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
-
-      if (req.method === 'GET' && path === '/api/bush-watch/status') {
-        send(res, 200, bushWatchSession.getStatus());
-        return;
-      }
 
       if (req.method === 'POST' && path === '/api/bush-hubs/homologate') {
         const body = (await readBody(req)) as {
@@ -7632,46 +7463,6 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
-      if (req.method === 'POST' && path === '/api/bush-watch/start') {
-        const body = (await readBody(req)) as {
-          intervalSec?: number;
-          autoDepart?: boolean;
-          autoSettle?: boolean;
-          requireEnginesOff?: boolean;
-          settleRadiusNm?: number;
-          pipeName?: string;
-        };
-        if (isOfpLoadActive()) {
-          send(res, 409, {
-            error: 'OFP inject in progress — bush Watch start blocked',
-            code: 'ofp_inject_active',
-          });
-          return;
-        }
-        try {
-          const status = await bushWatchSession.start({
-            intervalSec: body.intervalSec,
-            autoDepart: body.autoDepart,
-            autoSettle: body.autoSettle,
-            requireEnginesOff: body.requireEnginesOff,
-            settleRadiusNm: body.settleRadiusNm,
-            pipeName: body.pipeName,
-          });
-          send(res, 200, status);
-        } catch (error) {
-          send(res, 503, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-        return;
-      }
-
-      if (req.method === 'POST' && path === '/api/bush-watch/stop') {
-        const status = await bushWatchSession.stop();
-        send(res, 200, status);
-        return;
-      }
-
       if (await tryServeStatic(req, res, path)) {
         return;
       }
@@ -7698,7 +7489,6 @@ export function createCareerApiServer(port = 8787) {
     async close(): Promise<void> {
       worldTick.stopBackgroundPulse();
       await watchSession.stop();
-      await bushWatchSession.stop();
       await new Promise<void>((resolveClose, reject) => {
         server.close((err) => (err ? reject(err) : resolveClose()));
       });

@@ -126,6 +126,37 @@ export const IT_DENSIFY_HUBS: readonly ItDensifyHub[] = [
     produce: { perishables: 1.15, general: 1.0, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9 },
   },
+  {
+    icao: 'LIPR',
+    name: "Federico Fellini International Airport",
+    region: 'IT-N',
+    hubTier: 'regional',
+    lat: 44.02002,
+    lon: 12.6122,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'LIMJ',
+    name: "Genoa Cristoforo Colombo Airport",
+    region: 'IT-N',
+    hubTier: 'regional',
+    lat: 44.41204,
+    lon: 8.84073,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'LIEO',
+    name: "Olbia Costa Smeralda Airport",
+    region: 'IT-C',
+    hubTier: 'regional',
+    lat: 40.89895,
+    lon: 9.51846,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+
 ];
 
 export const IT_DENSIFY_HUB_COUNT = IT_DENSIFY_HUBS.length;

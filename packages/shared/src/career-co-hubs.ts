@@ -160,7 +160,7 @@ export const CO_CAREER_HUBS: readonly CoCareerHubDef[] = [
     icao: 'SKRG',
     name: 'Medellín José María Córdova',
     region: 'CO-W',
-    hubTier: 'regional',
+    hubTier: 'major',
     lat: 6.1645,
     lon: -75.4231,
     produce: { general: 1.35, electronics: 1.15, machinery: 1.1 },

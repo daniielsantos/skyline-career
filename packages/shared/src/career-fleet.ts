@@ -8,7 +8,6 @@ import {
   type CareerEconomyWorld,
 } from './career-economy.js';
 import { assertFerryNotBush, isBushHub, isBushTripOnlyHub } from './career-bush.js';
-import { isBushTripActive, normalizeActiveBushTrip } from './career-bush-mission.js';
 import {
   deliverFuelUplift,
   estimateUpliftKg,
@@ -275,9 +274,6 @@ export function normalizeMissionsState(
     typeof ferrySoftRaw === 'number' && Number.isFinite(ferrySoftRaw)
       ? Math.max(0, Math.round(ferrySoftRaw))
       : 0;
-  const activeBushTrip = normalizeActiveBushTripField(
-    (raw as CareerMissionsState).activeBushTrip,
-  );
   const result: CareerMissionsState = {
     version: 2,
     walletUsd,
@@ -302,7 +298,7 @@ export function normalizeMissionsState(
       ? (raw as CareerMissionsState).portPickups
       : [],
     playerWarehouses,
-    ...(activeBushTrip ? { activeBushTrip } : {}),
+    // Bush trips removed — clear any persisted activeBushTrip on normalize.
     ...(airframePerfOverrides
       ? { airframePerfOverrides }
       : {}),
@@ -314,14 +310,13 @@ export function normalizeMissionsState(
 
 const OPEN_MISSION_STATUSES = new Set(['accepted', 'dispatched', 'in_flight']);
 
-/** Drop hangar ASSIGNED when the mission/bush trip is gone (cancel/settle/prune). */
+/** Drop hangar ASSIGNED when the mission is gone (cancel/settle/prune). */
 export function reconcileFleetAssignments(state: CareerMissionsState): void {
-  const bush = isBushTripActive(state);
   for (const aircraft of state.fleet) {
     if (aircraft.status !== 'assigned' && !aircraft.assignedMissionId) {
       continue;
     }
-    if (holdsOpenAssignment(state, aircraft, bush)) continue;
+    if (holdsOpenAssignment(state, aircraft)) continue;
     aircraft.status =
       aircraft.status === 'maintenance' ||
       aircraft.status === 'listed' ||
@@ -335,13 +330,10 @@ export function reconcileFleetAssignments(state: CareerMissionsState): void {
 function holdsOpenAssignment(
   state: CareerMissionsState,
   aircraft: PlayerAircraft,
-  bush: ReturnType<typeof isBushTripActive>,
 ): boolean {
-  if (bush && bush.aircraftId === aircraft.id) return true;
   const mid = aircraft.assignedMissionId?.trim();
-  if (mid?.startsWith('bush:')) {
-    return Boolean(bush && bush.aircraftId === aircraft.id);
-  }
+  // Legacy bush:* assignment ids — release (bush trips removed).
+  if (mid?.startsWith('bush:')) return false;
   const byId = mid
     ? state.missions.find((m) => m.id === mid)
     : undefined;
@@ -352,12 +344,6 @@ function holdsOpenAssignment(
   if (!mission || !OPEN_MISSION_STATUSES.has(mission.status)) return false;
   if (mission.aircraftId && mission.aircraftId !== aircraft.id) return false;
   return true;
-}
-
-function normalizeActiveBushTripField(
-  raw: CareerMissionsState['activeBushTrip'] | unknown,
-): CareerMissionsState['activeBushTrip'] {
-  return normalizeActiveBushTrip(raw);
 }
 
 function normalizeAirframePerfOverrides(

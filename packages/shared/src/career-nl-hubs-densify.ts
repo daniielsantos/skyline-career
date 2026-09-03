@@ -83,6 +83,27 @@ export const NL_DENSIFY_HUBS: readonly NlDensifyHub[] = [
     lon: 5.60139,
     ...drySpoke,
   },
+  {
+    icao: 'EHKD',
+    name: "De Kooy Airfield / Den Helder Naval Air Station",
+    region: 'NL-C',
+    hubTier: 'regional',
+    lat: 52.9234,
+    lon: 4.78062,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'EHDL',
+    name: "Deelen Air Base",
+    region: 'NL-C',
+    hubTier: 'regional',
+    lat: 52.0606,
+    lon: 5.87306,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+
 ];
 
 export const NL_DENSIFY_HUB_COUNT = NL_DENSIFY_HUBS.length;

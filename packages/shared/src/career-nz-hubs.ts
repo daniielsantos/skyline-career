@@ -10,6 +10,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { NZ_DENSIFY_HUBS, NZ_DENSIFY_HUB_COUNT } from './career-nz-hubs-densify.js';
 
 export type NzCareerRegion = 'NZ-N' | 'NZ-S' | 'NZ-W';
 
@@ -57,9 +58,10 @@ export const NZ_CAREER_HUBS: readonly NzCareerHubDef[] = [
     produce: { general: 1.25, electronics: 1.15, supplies: 1.1 },
     consume: { perishables: 1.1, machinery: 0.95, fuel: 1.15 },
   },
+  ...NZ_DENSIFY_HUBS,
 ];
 
-export const NZ_CAREER_HUB_COUNT = 3;
+export const NZ_CAREER_HUB_COUNT = 3 + NZ_DENSIFY_HUB_COUNT;
 
 export function buildNzFeederCorridors(
   hubs: readonly NzCareerHubDef[] = NZ_CAREER_HUBS,

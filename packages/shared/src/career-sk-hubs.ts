@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { SK_DENSIFY_HUBS, SK_DENSIFY_HUB_COUNT } from './career-sk-hubs-densify.js';
 
 export type SkCareerRegion = 'SK-C';
 
@@ -64,9 +65,10 @@ export const SK_CAREER_HUBS: readonly SkCareerHubDef[] = [
     produce: { general: 1.15, perishables: 1.1, supplies: 1.0 },
     consume: { electronics: 0.95, machinery: 0.9 },
   },
+  ...SK_DENSIFY_HUBS,
 ];
 
-export const SK_CAREER_HUB_COUNT = 4;
+export const SK_CAREER_HUB_COUNT = 4 + SK_DENSIFY_HUB_COUNT;
 
 export function buildSkFeederCorridors(
   hubs: readonly SkCareerHubDef[] = SK_CAREER_HUBS,

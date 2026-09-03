@@ -12,6 +12,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { ID_DENSIFY_HUBS, ID_DENSIFY_HUB_COUNT } from './career-id-hubs-densify.js';
 
 export type IdCareerRegion = 'ID-J' | 'ID-S' | 'ID-B' | 'ID-K' | 'ID-U';
 
@@ -89,9 +90,10 @@ export const ID_CAREER_HUBS: readonly IdCareerHubDef[] = [
     produce: { general: 1.3, perishables: 1.2, supplies: 1.15 },
     consume: { electronics: 1.0, machinery: 1.0, fuel: 1.15 },
   },
+  ...ID_DENSIFY_HUBS,
 ];
 
-export const ID_CAREER_HUB_COUNT = 6;
+export const ID_CAREER_HUB_COUNT = 6 + ID_DENSIFY_HUB_COUNT;
 
 export function buildIdFeederCorridors(
   hubs: readonly IdCareerHubDef[] = ID_CAREER_HUBS,

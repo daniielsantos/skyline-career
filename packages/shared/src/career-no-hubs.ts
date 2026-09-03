@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { NO_DENSIFY_HUBS, NO_DENSIFY_HUB_COUNT } from './career-no-hubs-densify.js';
 
 export type NoCareerRegion = 'NO-S' | 'NO-N';
 
@@ -118,9 +119,10 @@ export const NO_CAREER_HUBS: readonly NoCareerHubDef[] = [
     lon: 6.1197,
     ...coastal,
   },
+  ...NO_DENSIFY_HUBS,
 ];
 
-export const NO_CAREER_HUB_COUNT = 8;
+export const NO_CAREER_HUB_COUNT = 8 + NO_DENSIFY_HUB_COUNT;
 
 export function buildNoFeederCorridors(
   hubs: readonly NoCareerHubDef[] = NO_CAREER_HUBS,

@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { CM_DENSIFY_HUBS, CM_DENSIFY_HUB_COUNT } from './career-cm-hubs-densify.js';
 
 export type CmCareerRegion = 'CM-L' | 'CM-C';
 
@@ -44,9 +45,10 @@ export const CM_CAREER_HUBS: readonly CmCareerHubDef[] = [
     produce: { general: 1.25, supplies: 1.15, perishables: 1.15 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  ...CM_DENSIFY_HUBS,
 ];
 
-export const CM_CAREER_HUB_COUNT = 2;
+export const CM_CAREER_HUB_COUNT = 2 + CM_DENSIFY_HUB_COUNT;
 
 export function buildCmFeederCorridors(
   hubs: readonly CmCareerHubDef[] = CM_CAREER_HUBS,

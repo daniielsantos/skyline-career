@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GR_DENSIFY_HUBS, GR_DENSIFY_HUB_COUNT } from './career-gr-hubs-densify.js';
 
 export type GrCareerRegion = 'GR-N' | 'GR-S';
 
@@ -108,9 +109,10 @@ export const GR_CAREER_HUBS: readonly GrCareerHubDef[] = [
     lon: 27.0917,
     ...island,
   },
+  ...GR_DENSIFY_HUBS,
 ];
 
-export const GR_CAREER_HUB_COUNT = 8;
+export const GR_CAREER_HUB_COUNT = 8 + GR_DENSIFY_HUB_COUNT;
 
 export function buildGrFeederCorridors(
   hubs: readonly GrCareerHubDef[] = GR_CAREER_HUBS,

@@ -8,6 +8,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { BW_DENSIFY_HUBS, BW_DENSIFY_HUB_COUNT } from './career-bw-hubs-densify.js';
 
 export type BwCareerRegion = 'BW-C';
 
@@ -35,9 +36,10 @@ export const BW_CAREER_HUBS: readonly BwCareerHubDef[] = [
     produce: { general: 1.3, electronics: 1.15, machinery: 1.15 },
     consume: { perishables: 1.15, supplies: 1.1, fuel: 1.15 },
   },
+  ...BW_DENSIFY_HUBS,
 ];
 
-export const BW_CAREER_HUB_COUNT = 1;
+export const BW_CAREER_HUB_COUNT = 1 + BW_DENSIFY_HUB_COUNT;
 
 export function buildBwFeederCorridors(
   hubs: readonly BwCareerHubDef[] = BW_CAREER_HUBS,

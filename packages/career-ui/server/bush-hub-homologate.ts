@@ -9,7 +9,6 @@ import {
   applyMsfsBushHubOverrideToTerminal,
   filterMsfsBushHubOverridesToIcaos,
   isCareerHubIcao,
-  listBushTripOnlyIcaos,
   listCareerHubIcaos,
   listMsfsBushHubOverrides,
   msfsFacilityMatchesCareerHub,
@@ -268,7 +267,7 @@ export async function homologateBushHubBatch(
     icaos?: string[];
     /** All career hubs (BR/US/CA/MX). Default when no icaos list. */
     all?: boolean;
-    /** Only bushTripOnly locals (subset of career hubs). */
+    /** @deprecated bushTripOnly catalog removed — empty when set. */
     bushOnly?: boolean;
     pipeName?: string;
   },
@@ -281,7 +280,7 @@ export async function homologateBushHubBatch(
     opts.icaos?.length
       ? opts.icaos.map((c) => c.trim().toUpperCase()).filter(Boolean)
       : opts.bushOnly
-        ? listBushTripOnlyIcaos()
+        ? []
         : listCareerHubIcaos()
   ).filter((icao, i, arr) => arr.indexOf(icao) === i);
 

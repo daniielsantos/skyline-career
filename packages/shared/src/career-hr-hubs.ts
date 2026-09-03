@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { HR_DENSIFY_HUBS, HR_DENSIFY_HUB_COUNT } from './career-hr-hubs-densify.js';
 
 export type HrCareerRegion = 'HR-N' | 'HR-S';
 
@@ -79,9 +80,10 @@ export const HR_CAREER_HUBS: readonly HrCareerHubDef[] = [
     lon: 15.3467,
     ...coastal,
   },
+  ...HR_DENSIFY_HUBS,
 ];
 
-export const HR_CAREER_HUB_COUNT = 5;
+export const HR_CAREER_HUB_COUNT = 5 + HR_DENSIFY_HUB_COUNT;
 
 export function buildHrFeederCorridors(
   hubs: readonly HrCareerHubDef[] = HR_CAREER_HUBS,

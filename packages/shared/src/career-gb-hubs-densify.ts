@@ -120,6 +120,37 @@ export const GB_DENSIFY_HUBS: readonly GbDensifyHub[] = [
     lon: -1.66057,
     ...city,
   },
+  {
+    icao: 'EGPD',
+    name: "Aberdeen Dyce",
+    region: 'GB-N',
+    hubTier: 'regional',
+    lat: 57.2019,
+    lon: -2.19778,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'EGGW',
+    name: "London Luton Airport",
+    region: 'GB-S',
+    hubTier: 'regional',
+    lat: 51.8747,
+    lon: -0.36833,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'EGPR',
+    name: "Barra Airport",
+    region: 'GB-N',
+    hubTier: 'regional',
+    lat: 57.0228,
+    lon: -7.44306,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+
 ];
 
 export const GB_DENSIFY_HUB_COUNT = GB_DENSIFY_HUBS.length;

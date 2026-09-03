@@ -11,6 +11,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { JP_DENSIFY_HUBS, JP_DENSIFY_HUB_COUNT } from './career-jp-hubs-densify.js';
 
 export type JpCareerRegion = 'JP-E' | 'JP-W' | 'JP-S' | 'JP-N';
 
@@ -78,9 +79,10 @@ export const JP_CAREER_HUBS: readonly JpCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.25, supplies: 1.1 },
     consume: { electronics: 1.05, machinery: 1.0, fuel: 1.2 },
   },
+  ...JP_DENSIFY_HUBS,
 ];
 
-export const JP_CAREER_HUB_COUNT = 5;
+export const JP_CAREER_HUB_COUNT = 5 + JP_DENSIFY_HUB_COUNT;
 
 export function buildJpFeederCorridors(
   hubs: readonly JpCareerHubDef[] = JP_CAREER_HUBS,

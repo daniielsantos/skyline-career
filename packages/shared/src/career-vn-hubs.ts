@@ -10,6 +10,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { VN_DENSIFY_HUBS, VN_DENSIFY_HUB_COUNT } from './career-vn-hubs-densify.js';
 
 export type VnCareerRegion = 'VN-N' | 'VN-S';
 
@@ -77,9 +78,10 @@ export const VN_CAREER_HUBS: readonly VnCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.25, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  ...VN_DENSIFY_HUBS,
 ];
 
-export const VN_CAREER_HUB_COUNT = 5;
+export const VN_CAREER_HUB_COUNT = 5 + VN_DENSIFY_HUB_COUNT;
 
 export function buildVnFeederCorridors(
   hubs: readonly VnCareerHubDef[] = VN_CAREER_HUBS,

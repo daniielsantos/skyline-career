@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { EE_DENSIFY_HUBS, EE_DENSIFY_HUB_COUNT } from './career-ee-hubs-densify.js';
 
 export type EeCareerRegion = 'EE-C';
 
@@ -54,9 +55,10 @@ export const EE_CAREER_HUBS: readonly EeCareerHubDef[] = [
     produce: { perishables: 1.2, general: 1.1, supplies: 1.0 },
     consume: { electronics: 0.95, machinery: 0.9 },
   },
+  ...EE_DENSIFY_HUBS,
 ];
 
-export const EE_CAREER_HUB_COUNT = 3;
+export const EE_CAREER_HUB_COUNT = 3 + EE_DENSIFY_HUB_COUNT;
 
 export function buildEeFeederCorridors(
   hubs: readonly EeCareerHubDef[] = EE_CAREER_HUBS,

@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { LT_DENSIFY_HUBS, LT_DENSIFY_HUB_COUNT } from './career-lt-hubs-densify.js';
 
 export type LtCareerRegion = 'LT-C';
 
@@ -64,9 +65,10 @@ export const LT_CAREER_HUBS: readonly LtCareerHubDef[] = [
     produce: { general: 1.15, machinery: 1.1, supplies: 1.0 },
     consume: { perishables: 1.05, electronics: 0.95 },
   },
+  ...LT_DENSIFY_HUBS,
 ];
 
-export const LT_CAREER_HUB_COUNT = 4;
+export const LT_CAREER_HUB_COUNT = 4 + LT_DENSIFY_HUB_COUNT;
 
 export function buildLtFeederCorridors(
   hubs: readonly LtCareerHubDef[] = LT_CAREER_HUBS,

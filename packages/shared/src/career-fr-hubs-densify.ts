@@ -125,6 +125,37 @@ export const FR_DENSIFY_HUBS: readonly FrDensifyHub[] = [
     lon: 6.14603,
     ...drySpoke,
   },
+  {
+    icao: 'LFKB',
+    name: "Bastia Poretta",
+    region: 'FR-S',
+    hubTier: 'regional',
+    lat: 42.5527,
+    lon: 9.48373,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'LFKF',
+    name: "Figari Sud-Corse Airport",
+    region: 'FR-S',
+    hubTier: 'regional',
+    lat: 41.50185,
+    lon: 9.09709,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'LFKJ',
+    name: "Ajaccio Napoléon Bonaparte airport",
+    region: 'FR-S',
+    hubTier: 'regional',
+    lat: 41.9236,
+    lon: 8.80292,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+
 ];
 
 export const FR_DENSIFY_HUB_COUNT = FR_DENSIFY_HUBS.length;

@@ -14,7 +14,6 @@ import {
   isBushHub,
   isBushTripOnlyHub,
 } from './career-bush.js';
-import { assertBushTripCatalog } from './career-bush-trips.js';
 import {
   assertCaCareerHubCatalog,
   buildCaFeederCorridors,
@@ -1040,6 +1039,7 @@ import type {
   NpcFlight,
   NpcFreighter,
   PartitionTickResult,
+  RegionalRecoveryState,
   ShipmentLot,
   StockPile,
 } from './types/career-economy.js';
@@ -1300,6 +1300,13 @@ const LAST_MILE_MIN_ORIGIN_FILL = 0.05;
 /** Spoke last-mile floor — below this the hub is empty of Dry, not “diluted”. */
 const LAST_MILE_MIN_SPOKE_ORIGIN_FILL = 0.14;
 /**
+ * Under skipAll vitality, spokes often sit at fill 10–13% with enough kg for a
+ * GA hop — the normal 14%/180 gate starves the form budget (eligible ≪ budget).
+ * Match regional-recovery soft gates; still capped by {@link lastMileSkipAllSpokeFormBudget}.
+ */
+const LAST_MILE_SKIPALL_SPOKE_MIN_FILL = 0.1;
+const LAST_MILE_SKIPALL_MIN_VIABLE_KG = 120;
+/**
  * When the partition is already at skipAll, still allow this many new GA Dry
  * last-mile lots from dead spokes (per country×SKU per tick). Soft overshoot
  * only — does not raise {@link COMMODITY_AVAILABLE_SOFT_CAP}.
@@ -1379,6 +1386,23 @@ const LAST_MILE_MAX_FORM_PER_TICK = 2;
 const LAST_MILE_MAX_FORM_PER_SPOKE_TICK = 2;
 /** Fraction of spoke stock offered on a last-mile hop (still capped at GA_LTL_MAX_KG). */
 const LAST_MILE_SPOKE_STOCK_SHARE = 0.55;
+/**
+ * Adaptive regional recovery (generic): if a region stays with low live hubs
+ * and many dead spokes, temporarily relax spoke gates there.
+ */
+const REGIONAL_RECOVERY_ENABLED = true;
+const REGIONAL_RECOVERY_ENTRY_LIVE_PCT = 0.8;
+const REGIONAL_RECOVERY_EXIT_LIVE_PCT = 0.85;
+const REGIONAL_RECOVERY_ENTRY_DAYS = 3;
+const REGIONAL_RECOVERY_EXIT_DAYS = 3;
+const REGIONAL_RECOVERY_MIN_HUBS = 10;
+const REGIONAL_RECOVERY_MIN_SPOKES = 6;
+const REGIONAL_RECOVERY_ENTRY_DEAD_SPOKE_SHARE = 0.55;
+const REGIONAL_RECOVERY_EXIT_DEAD_SPOKE_SHARE = 0.35;
+const REGIONAL_RECOVERY_MAX_ACTIVE_DAYS = 21;
+const REGIONAL_RECOVERY_SPOKE_MIN_FILL = 0.1;
+const REGIONAL_RECOVERY_MIN_VIABLE_KG = 120;
+const REGIONAL_RECOVERY_SPOKE_FORM_CAP_BONUS = 1;
 
 /** Absolute kg the dest warehouse can still physically accept. */
 function lastMileAbsRoomKg(dest: {
@@ -1397,6 +1421,110 @@ function lastMileFormCap(tier: HubTier): number {
   return tier === 'spoke'
     ? LAST_MILE_MAX_FORM_PER_SPOKE_TICK
     : LAST_MILE_MAX_FORM_PER_TICK;
+}
+
+type RegionalRecoverySnapshot = {
+  region: string;
+  hubCount: number;
+  spokeCount: number;
+  livePct: number;
+  deadSpokeShare: number;
+};
+
+function buildRegionalRecoverySnapshots(
+  world: CareerEconomyWorld,
+  openByOrigin: Map<string, number>,
+): RegionalRecoverySnapshot[] {
+  const byRegion = new Map<
+    string,
+    { hubs: number; spokes: number; deadSpokes: number; live: number }
+  >();
+  for (const ap of world.airports) {
+    if (ap.bushTripOnly === true || ap.bush === true) continue;
+    const region = ap.region ?? '';
+    if (!region) continue;
+    const code = ap.icao.toUpperCase();
+    let acc = byRegion.get(region);
+    if (!acc) {
+      acc = { hubs: 0, spokes: 0, deadSpokes: 0, live: 0 };
+      byRegion.set(region, acc);
+    }
+    acc.hubs += 1;
+    if ((openByOrigin.get(code) ?? 0) > 0) acc.live += 1;
+    if (hubTierOf(ap) === 'spoke') {
+      acc.spokes += 1;
+      if ((openByOrigin.get(code) ?? 0) === 0) acc.deadSpokes += 1;
+    }
+  }
+  return [...byRegion.entries()].map(([region, acc]) => ({
+    region,
+    hubCount: acc.hubs,
+    spokeCount: acc.spokes,
+    livePct: acc.hubs > 0 ? acc.live / acc.hubs : 0,
+    deadSpokeShare: acc.spokes > 0 ? acc.deadSpokes / acc.spokes : 0,
+  }));
+}
+
+function updateRegionalRecoveryController(
+  world: CareerEconomyWorld,
+  snapshots: RegionalRecoverySnapshot[],
+): ReadonlyMap<string, RegionalRecoveryState> {
+  if (!REGIONAL_RECOVERY_ENABLED) return new Map();
+  const day = Math.floor(world.tick / TICKS_PER_DAY);
+  const table = (world.regionalRecovery ??= {});
+  for (const snap of snapshots) {
+    const prev = table[snap.region];
+    const state: RegionalRecoveryState = prev ?? {
+      active: false,
+      lowLiveStreak: 0,
+      recoveredStreak: 0,
+      lastEvalDay: day - 1,
+      lastLivePct: snap.livePct,
+      lastDeadSpokeShare: snap.deadSpokeShare,
+    };
+    if (state.lastEvalDay >= day) continue;
+    const lowEligible =
+      snap.hubCount >= REGIONAL_RECOVERY_MIN_HUBS &&
+      snap.spokeCount >= REGIONAL_RECOVERY_MIN_SPOKES &&
+      snap.livePct < REGIONAL_RECOVERY_ENTRY_LIVE_PCT &&
+      snap.deadSpokeShare >= REGIONAL_RECOVERY_ENTRY_DEAD_SPOKE_SHARE;
+    if (state.active) {
+      const recovered =
+        snap.livePct >= REGIONAL_RECOVERY_EXIT_LIVE_PCT ||
+        snap.deadSpokeShare <= REGIONAL_RECOVERY_EXIT_DEAD_SPOKE_SHARE;
+      state.recoveredStreak = recovered ? state.recoveredStreak + 1 : 0;
+      const activeDays = day - (state.enteredDay ?? day);
+      if (
+        state.recoveredStreak >= REGIONAL_RECOVERY_EXIT_DAYS ||
+        activeDays >= REGIONAL_RECOVERY_MAX_ACTIVE_DAYS
+      ) {
+        state.active = false;
+        state.enteredDay = undefined;
+        state.lowLiveStreak = 0;
+        state.recoveredStreak = 0;
+      }
+    } else {
+      state.lowLiveStreak = lowEligible ? state.lowLiveStreak + 1 : 0;
+      state.recoveredStreak = 0;
+      if (state.lowLiveStreak >= REGIONAL_RECOVERY_ENTRY_DAYS) {
+        state.active = true;
+        state.enteredDay = day;
+      }
+    }
+    state.lastEvalDay = day;
+    state.lastLivePct = snap.livePct;
+    state.lastDeadSpokeShare = snap.deadSpokeShare;
+    table[snap.region] = state;
+  }
+  return new Map(Object.entries(table));
+}
+
+function isRegionalRecoveryActive(
+  recoveryByRegion: ReadonlyMap<string, RegionalRecoveryState>,
+  region: string | undefined,
+): boolean {
+  if (!region) return false;
+  return recoveryByRegion.get(region)?.active === true;
 }
 /** Classic feeder LTL band min (turboprop fills). */
 export const FEEDER_LTL_MIN_KG = 500;
@@ -1914,7 +2042,7 @@ const CAREER_CARGO_CORRIDORS_MANUAL: ReadonlyArray<{
   { a: 'SAZN', b: 'SAVN', weight: 1.4 },
   { a: 'SCEL', b: 'SCTE', weight: 1.8 },
   { a: 'SCEL', b: 'SCIE', weight: 1.7 },
-  { a: 'SCEL', b: 'SCFA', weight: 1.7 },
+  { a: 'SCEL', b: 'SCFA', weight: 2.0 },
   { a: 'SCEL', b: 'SCDA', weight: 1.6 },
   { a: 'SCEL', b: 'SCCI', weight: 1.5 },
   { a: 'SCTE', b: 'SCBA', weight: 1.4 },
@@ -8089,6 +8217,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'SAME',
   'SCEL',
   'SCTE',
+  'SCFA',
   'SCDA',
   'SCCI',
   // Andes densify producers
@@ -8119,6 +8248,7 @@ export const FUEL_HUB_ICAOS = new Set([
   'SPJC',
   'SPZO',
   'SPQT',
+  'SPQU',
   'SLLP',
   'SLVR',
   'SEQU',
@@ -8226,6 +8356,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'LSGG',
   'LOWW',
   'LOWI',
+  // EU-2 Wave B densify producers
+  'EIKY',
+  'EKEB',
+  'ENBO',
+  'ESMS',
+  'EFOU',
+  'LSZG',
+  'LOAN',
   // EU-3 Central-East + Baltics
   'EPWA',
   'EPGD',
@@ -8241,6 +8379,14 @@ export const FUEL_HUB_ICAOS = new Set([
   'EVRA',
   'EYVI',
   'EYKA',
+  // EU-3 Wave B densify producers
+  'EPMO',
+  'LKCS',
+  'LZZI',
+  'LHKE',
+  'EEKE',
+  'EVDA',
+  'EYPN',
   // EU-4 Balkans
   'LDZA',
   'LDSP',
@@ -8253,6 +8399,13 @@ export const FUEL_HUB_ICAOS = new Set([
   'LGTS',
   'LYBE',
   'LYNI',
+  // EU-4 Wave B densify producers
+  'LDRI',
+  'LJPZ',
+  'LRCK',
+  'LBGO',
+  'LGKL',
+  'LYBT',
   // EU-5 Iceland
   'BIKF',
   'BIAR',
@@ -8434,6 +8587,25 @@ export const FUEL_HUB_ICAOS = new Set([
   'ZYTX',
   'ZGHA',
   'ZJHK',
+  // Wave B Asia densify producers
+  'ZSOF',
+  'ZSYT',
+  'ZSCN',
+  'VANP',
+  'VILK',
+  'VOCB',
+  'WADL',
+  'WAFF',
+  'RJFT',
+  'RJFK',
+  'RKJJ',
+  'VTSM',
+  'VVCR',
+  'WMKL',
+  'RPVB',
+  'VYKG',
+  'RCYU',
+  'YBCG',
   // RU-1 Russia
   'UUEE',
   'ULLI',
@@ -8509,6 +8681,25 @@ export const FUEL_HUB_ICAOS = new Set([
   'HDAM',
   'HHAS',
   'HJJJ',
+  // Wave D Africa densify producers
+  'DNEN',
+  'FABL',
+  'HKEL',
+  'HADR',
+  'HTAR',
+  'DGTK',
+  'GOSS',
+  'DIYO',
+  'FNHU',
+  'FKKL',
+  'HUAR',
+  'HRYG',
+  'FYRU',
+  'FBKE',
+  'FLLI',
+  'FVFA',
+  'FZWA',
+  'FMNA',
 ]);
 
 /** Trip-only strips: no cargo economy (coords/runways for bush trips only). */
@@ -8689,6 +8880,8 @@ export function ensureWorldSuppliesInventory(world: CareerEconomyWorld): void {
 /**
  * Stamp curated hubTier on legacy airports. First time only: rescale cargo
  * warehouses/flows toward the tier profile so flat ~70t seeds become majors vs spokes.
+ * Later catalog edits (regional→major) apply a relative rescale so live saves
+ * pick up capacity/flow without waiting for a new seed.
  */
 export function ensureAirportHubTier(terminal: AirportTerminal): void {
   const icao = terminal.icao.toUpperCase();
@@ -8727,7 +8920,11 @@ export function ensureAirportHubTier(terminal: AirportTerminal): void {
     }
   }
   if (alreadyStamped) {
+    const prev = terminal.hubTier as HubTier;
     // Keep map as source of truth if ICAO map was updated.
+    if (prev !== tier) {
+      rescaleTerminalCargoForTierChange(terminal, prev, tier);
+    }
     terminal.hubTier = HUB_TIER_BY_ICAO[icao] ?? terminal.hubTier;
     freezeBushTripOnlyTerminal(terminal);
     return;
@@ -8751,6 +8948,43 @@ export function ensureAirportHubTier(terminal: AirportTerminal): void {
     terminal.baseConsumption[c.id] = Math.round(baseCons * profile.flowMult);
   }
   freezeBushTripOnlyTerminal(terminal);
+}
+
+/** Relative warehouse/flow rescale when curated hubTier changes on a live terminal. */
+export function rescaleTerminalCargoForTierChange(
+  terminal: AirportTerminal,
+  fromTier: HubTier,
+  toTier: HubTier,
+): void {
+  if (fromTier === toTier) return;
+  if (isBushTripOnlyHub(terminal.icao) || terminal.bushTripOnly === true) return;
+  const from = HUB_TIER_PROFILE[fromTier];
+  const to = HUB_TIER_PROFILE[toTier];
+  if (!from || !to) return;
+  const capRatio = to.capacityMult / from.capacityMult;
+  const flowRatio = to.flowMult / from.flowMult;
+  if (!Number.isFinite(capRatio) || !Number.isFinite(flowRatio)) return;
+  if (Math.abs(capRatio - 1) < 1e-9 && Math.abs(flowRatio - 1) < 1e-9) return;
+
+  if (!terminal.baseProduction) terminal.baseProduction = { ...(terminal.production ?? {}) };
+  if (!terminal.baseConsumption) terminal.baseConsumption = { ...(terminal.consumption ?? {}) };
+
+  for (const c of CAREER_CARGO_COMMODITIES) {
+    const stock = terminal.inventory[c.id];
+    if (stock && stock.capacityKg > 0) {
+      const fill = stock.stockKg / stock.capacityKg;
+      stock.capacityKg = Math.max(1_000, Math.round(stock.capacityKg * capRatio));
+      stock.stockKg = clamp(Math.round(stock.capacityKg * fill), 0, stock.capacityKg);
+    }
+    const scaleFlow = (bag: Partial<Record<CommodityId, number>> | undefined) => {
+      if (!bag || bag[c.id] == null) return;
+      bag[c.id] = Math.round((bag[c.id] as number) * flowRatio);
+    };
+    scaleFlow(terminal.baseProduction);
+    scaleFlow(terminal.baseConsumption);
+    scaleFlow(terminal.production);
+    scaleFlow(terminal.consumption);
+  }
 }
 
 export function ensureWorldHubTiers(world: CareerEconomyWorld): void {
@@ -10457,7 +10691,6 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
   assertErCareerHubCatalog();
   assertSsCareerHubCatalog();
   assertDispatchHubsAreSimBriefKnown();
-  assertBushTripCatalog();
 
   const hubs: Array<{
     icao: string;
@@ -12431,6 +12664,12 @@ export function remapRetiredCareerAirportIdents(
     const fromAp = world.airports.find(
       (ap) => ap.icao.trim().toUpperCase() === from,
     );
+    // Resolve the destination hub BEFORE rewriting `fromAp.icao`, otherwise
+    // `find(to)` can return the remapped row and skip the dedupe filter
+    // (ESMX→ESMQ cloned Kalmar once per migrate).
+    const toApBefore = world.airports.find(
+      (ap) => ap.icao.trim().toUpperCase() === to,
+    );
     const refsFrom =
       Boolean(fromAp) ||
       world.lots.some(
@@ -12451,10 +12690,7 @@ export function remapRetiredCareerAirportIdents(
     if (!refsFrom) continue;
 
     rewriteCareerIcaoFields(world, from, to);
-    const toAp = world.airports.find(
-      (ap) => ap.icao.trim().toUpperCase() === to,
-    );
-    if (fromAp && toAp && fromAp !== toAp) {
+    if (fromAp && toApBefore && fromAp !== toApBefore) {
       world.airports = world.airports.filter((ap) => ap !== fromAp);
     } else if (fromAp) {
       fromAp.icao = to;
@@ -12466,7 +12702,22 @@ export function remapRetiredCareerAirportIdents(
     }
     changed = true;
   }
+  if (dedupeCareerAirportsByIcao(world)) changed = true;
   return changed;
+}
+
+/** Keep first row per ICAO — repairs clone storms from bad remaps. */
+export function dedupeCareerAirportsByIcao(world: CareerEconomyWorld): boolean {
+  const seen = new Set<string>();
+  const before = world.airports.length;
+  world.airports = world.airports.filter((ap) => {
+    const icao = ap.icao.trim().toUpperCase();
+    if (!icao) return false;
+    if (seen.has(icao)) return false;
+    seen.add(icao);
+    return true;
+  });
+  return world.airports.length !== before;
 }
 
 /**
@@ -14155,6 +14406,16 @@ function* formLotsFromImbalances(
     openGaDryByOrigin.set(gaKey, (openGaDryByOrigin.get(gaKey) ?? 0) + 1);
   };
   for (const existing of world.lots) noteOpenGaDryLot(existing);
+  const openLotsByOrigin = new Map<string, number>();
+  for (const lot of world.lots) {
+    if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+    const code = lot.originIcao.trim().toUpperCase();
+    openLotsByOrigin.set(code, (openLotsByOrigin.get(code) ?? 0) + 1);
+  }
+  const recoveryByRegion = updateRegionalRecoveryController(
+    world,
+    buildRegionalRecoverySnapshots(world, openLotsByOrigin),
+  );
 
   const bulkLotsByCountry = new Map<string, ShipmentLot[]>();
   let bufferDomesticLots = true;
@@ -14834,12 +15095,27 @@ function* formLotsFromImbalances(
       const otherRegionals: RankedAirport[] = [];
       for (const origin of ranked) {
         if (!LAST_MILE_ORIGIN_TIERS.has(origin.tier)) continue;
+        const recoveryActive = isRegionalRecoveryActive(
+          recoveryByRegion,
+          origin.ap.region,
+        );
+        const spokeMinFill = recoveryActive
+          ? REGIONAL_RECOVERY_SPOKE_MIN_FILL
+          : vitalityOnly
+            ? LAST_MILE_SKIPALL_SPOKE_MIN_FILL
+            : LAST_MILE_MIN_SPOKE_ORIGIN_FILL;
+        const minViableKg =
+          (recoveryActive || vitalityOnly) && origin.tier === 'spoke'
+            ? recoveryActive
+              ? REGIONAL_RECOVERY_MIN_VIABLE_KG
+              : LAST_MILE_SKIPALL_MIN_VIABLE_KG
+            : BOARD_SMALL_MIN_VIABLE_KG;
         if (origin.tier === 'spoke') {
-          if (origin.fill < LAST_MILE_MIN_SPOKE_ORIGIN_FILL) continue;
+          if (origin.fill < spokeMinFill) continue;
         } else if (origin.fill < LAST_MILE_MIN_ORIGIN_FILL) {
           continue;
         }
-        if (origin.stock.stockKg < BOARD_SMALL_MIN_VIABLE_KG) continue;
+        if (origin.stock.stockKg < minViableKg) continue;
         const open = countOpenGaDryFrom(origin.ap.icao, commodity.id);
         if (open >= lastMileOpenLotsCap(origin.tier)) continue;
         if (origin.tier === 'spoke' && open === 0) deadSpokes.push(origin);
@@ -14920,7 +15196,21 @@ function* formLotsFromImbalances(
         // still form a short hop when they hold enough stock (not every empty spoke).
         let open = countOpenGaDryFrom(origin.ap.icao, commodity.id);
         const openCap = lastMileOpenLotsCap(origin.tier);
-        const formCap = lastMileFormCap(origin.tier);
+        const recoveryActive = isRegionalRecoveryActive(
+          recoveryByRegion,
+          origin.ap.region,
+        );
+        const minViableKg =
+          (recoveryActive || vitalityOnly) && origin.tier === 'spoke'
+            ? recoveryActive
+              ? REGIONAL_RECOVERY_MIN_VIABLE_KG
+              : LAST_MILE_SKIPALL_MIN_VIABLE_KG
+            : BOARD_SMALL_MIN_VIABLE_KG;
+        const formCap =
+          lastMileFormCap(origin.tier) +
+          (recoveryActive && origin.tier === 'spoke'
+            ? REGIONAL_RECOVERY_SPOKE_FORM_CAP_BONUS
+            : 0);
         if (open >= openCap) continue;
         if (vitalityOnly) {
           if (
@@ -14957,7 +15247,7 @@ function* formLotsFromImbalances(
           // Spokes may still feed a nearby major (the home-hub short hop).
           if (origin.tier === 'major' && dest.tier === 'major') continue;
           // Absolute headroom only — do not use soft roomKg / fill% under Dry sat.
-          if (lastMileAbsRoomKg(dest) < BOARD_SMALL_MIN_VIABLE_KG) continue;
+          if (lastMileAbsRoomKg(dest) < minViableKg) continue;
           if (!isBushFreightOdAllowed(origin.ap.icao, dest.ap.icao)) continue;
           dests.push({
             row: dest,
@@ -15037,7 +15327,7 @@ function* formLotsFromImbalances(
 
           // Recompute headroom — prior hops this tick may have filled dest.
           const liveAbsRoom = lastMileAbsRoomKg(dest);
-          if (liveAbsRoom < BOARD_SMALL_MIN_VIABLE_KG) continue;
+          if (liveAbsRoom < minViableKg) continue;
 
           const share =
             origin.tier === 'spoke' ? LAST_MILE_SPOKE_STOCK_SHARE : 0.08;
@@ -15057,7 +15347,7 @@ function* formLotsFromImbalances(
                   GA_LTL_MAX_KG,
                 );
           const qty = Math.floor(take / 10) * 10;
-          if (qty < BOARD_SMALL_MIN_VIABLE_KG) continue;
+          if (qty < minViableKg) continue;
 
           const inboundKg = destInboundOf(dest.ap.icao, commodity.id);
           const formed = pushLot(

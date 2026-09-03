@@ -1,0 +1,223 @@
+/**
+ * Australia densify — Wave B/D commercial hubs (MSFS + SimBrief).
+ * Merged into AU_CAREER_HUBS. No bush strips.
+ */
+import type { CommodityId, HubTier } from './types/career-economy.js';
+import type { AuCareerRegion } from './career-au-hubs.js';
+
+type AuDensifyHub = {
+  icao: string;
+  name: string;
+  region: AuCareerRegion;
+  hubTier: HubTier;
+  lat: number;
+  lon: number;
+  produce: Partial<Record<CommodityId, number>>;
+  consume: Partial<Record<CommodityId, number>>;
+};
+
+/** AU densify (+20). */
+export const AU_DENSIFY_HUBS: readonly AuDensifyHub[] = [
+  {
+    icao: 'YBRM',
+    name: "Broome International Airport",
+    region: 'AU-W',
+    hubTier: 'regional',
+    lat: -17.94919,
+    lon: 122.2283,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'YBCG',
+    name: "Gold Coast Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -28.16596,
+    lon: 153.50664,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'YBHI',
+    name: "Broken Hill Airport",
+    region: 'AU-E',
+    hubTier: 'regional',
+    lat: -32.0014,
+    lon: 141.472,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YWLM',
+    name: "Newcastle Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -32.79611,
+    lon: 151.83503,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'YPPD',
+    name: "Port Hedland International Airport",
+    region: 'AU-W',
+    hubTier: 'regional',
+    lat: -20.38279,
+    lon: 118.62979,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'YBSU',
+    name: "Sunshine Coast Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -26.59332,
+    lon: 153.08319,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'YBWW',
+    name: "Toowoomba Wellcamp Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -27.55833,
+    lon: 151.79334,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'YABA',
+    name: "Albany Airport",
+    region: 'AU-W',
+    hubTier: 'regional',
+    lat: -34.94333,
+    lon: 117.80889,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YMAY',
+    name: "Albury Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -36.06676,
+    lon: 146.95915,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBAS',
+    name: "Alice Springs Airport",
+    region: 'AU-E',
+    hubTier: 'regional',
+    lat: -23.80659,
+    lon: 133.90343,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YARM',
+    name: "Armidale Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -30.5281,
+    lon: 151.617,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YAYE',
+    name: "Ayers Rock Connellan Airport",
+    region: 'AU-E',
+    hubTier: 'regional',
+    lat: -25.18591,
+    lon: 130.97703,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBNA',
+    name: "Ballina Byron Gateway Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -28.83324,
+    lon: 153.56147,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBAR',
+    name: "Barcaldine Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -23.56627,
+    lon: 145.30209,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBTH',
+    name: "Bathurst Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -33.40682,
+    lon: 149.65116,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBIE',
+    name: "Bedourie Airport",
+    region: 'AU-E',
+    hubTier: 'regional',
+    lat: -24.3461,
+    lon: 139.46001,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBDV',
+    name: "Birdsville Airport",
+    region: 'AU-E',
+    hubTier: 'regional',
+    lat: -25.8975,
+    lon: 139.34801,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBCK',
+    name: "Blackall Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -24.43168,
+    lon: 145.42972,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBOU',
+    name: "Boulia Airport",
+    region: 'AU-E',
+    hubTier: 'regional',
+    lat: -22.9133,
+    lon: 139.89999,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'YBKE',
+    name: "Bourke Airport",
+    region: 'AU-Q',
+    hubTier: 'regional',
+    lat: -30.0392,
+    lon: 145.952,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+];
+
+export const AU_DENSIFY_HUB_COUNT = AU_DENSIFY_HUBS.length;

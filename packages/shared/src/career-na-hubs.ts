@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { NA_DENSIFY_HUBS, NA_DENSIFY_HUB_COUNT } from './career-na-hubs-densify.js';
 
 export type NaCareerRegion = 'NA-C' | 'NA-W';
 
@@ -47,9 +48,10 @@ export const NA_CAREER_HUBS: readonly NaCareerHubDef[] = [
     produce: { machinery: 1.3, general: 1.3, supplies: 1.15 },
     consume: { perishables: 1.1, electronics: 0.95, fuel: 1.1 },
   },
+  ...NA_DENSIFY_HUBS,
 ];
 
-export const NA_CAREER_HUB_COUNT = 2;
+export const NA_CAREER_HUB_COUNT = 2 + NA_DENSIFY_HUB_COUNT;
 
 export function buildNaFeederCorridors(
   hubs: readonly NaCareerHubDef[] = NA_CAREER_HUBS,

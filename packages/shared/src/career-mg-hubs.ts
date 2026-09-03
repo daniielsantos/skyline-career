@@ -9,6 +9,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { MG_DENSIFY_HUBS, MG_DENSIFY_HUB_COUNT } from './career-mg-hubs-densify.js';
 
 export type MgCareerRegion = 'MG-C' | 'MG-E';
 
@@ -46,9 +47,10 @@ export const MG_CAREER_HUBS: readonly MgCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.25, supplies: 1.15 },
     consume: { electronics: 0.9, machinery: 0.9, fuel: 1.1 },
   },
+  ...MG_DENSIFY_HUBS,
 ];
 
-export const MG_CAREER_HUB_COUNT = 2;
+export const MG_CAREER_HUB_COUNT = 2 + MG_DENSIFY_HUB_COUNT;
 
 export function buildMgFeederCorridors(
   hubs: readonly MgCareerHubDef[] = MG_CAREER_HUBS,

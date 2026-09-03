@@ -11,6 +11,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { TH_DENSIFY_HUBS, TH_DENSIFY_HUB_COUNT } from './career-th-hubs-densify.js';
 
 export type ThCareerRegion = 'TH-C' | 'TH-N' | 'TH-S';
 
@@ -108,9 +109,10 @@ export const TH_CAREER_HUBS: readonly ThCareerHubDef[] = [
     produce: { general: 1.25, perishables: 1.2, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  ...TH_DENSIFY_HUBS,
 ];
 
-export const TH_CAREER_HUB_COUNT = 8;
+export const TH_CAREER_HUB_COUNT = 8 + TH_DENSIFY_HUB_COUNT;
 
 export function buildThFeederCorridors(
   hubs: readonly ThCareerHubDef[] = TH_CAREER_HUBS,

@@ -377,6 +377,8 @@ export type MarketLot = {
   quantityKg?: number;
   availableKg: number;
   payUsd: number;
+  /** Pay at formation; idle escalation multiplies from this. */
+  basePayUsd?: number;
   /** Jet-A estimate for the board-selected aircraft (pay − fuel = net). */
   estimatedFuelCostUsd?: number | null;
   /** Pro-rated pay minus estimated Jet-A for the selected aircraft. */
@@ -643,6 +645,8 @@ export type AirportLot = {
   quantityKg?: number;
   reservedKg?: number;
   payUsd: number;
+  /** Pay at formation; idle escalation multiplies from this. */
+  basePayUsd?: number;
   /** Jet-A estimate for the board-selected aircraft (pay − fuel = net). */
   estimatedFuelCostUsd?: number | null;
   /** Pro-rated pay minus estimated Jet-A for the selected aircraft. */
@@ -659,8 +663,12 @@ export type AirportLot = {
   expired: boolean;
   perishable: boolean;
   bush?: boolean;
+  lastMile?: boolean;
   distanceNm?: number;
   reason: string;
+  idleEscalated?: boolean;
+  international?: boolean;
+  pressure?: LotPressure | null;
   npcClaim?: NpcClaim | null;
 };
 
@@ -3142,17 +3150,24 @@ export function postBushHubHomologateBatch(body?: {
   });
 }
 
-export function fetchBushTrips() {
-  return api<{
-    trips: BushTripBoardRow[];
-    active: ActiveBushTripView | null;
-    walletUsd: number;
-    tick: number;
-    fleet: PlayerAircraft[];
-    hubSelected: boolean;
-    pilotIcao?: string;
-    homeHubIcao?: string;
-  }>('/api/bush-trips');
+export async function fetchBushTrips(): Promise<{
+  trips: BushTripBoardRow[];
+  active: ActiveBushTripView | null;
+  walletUsd: number;
+  tick: number;
+  fleet: PlayerAircraft[];
+  hubSelected: boolean;
+  pilotIcao?: string;
+  homeHubIcao?: string;
+}> {
+  return {
+    trips: [],
+    active: null,
+    walletUsd: 0,
+    tick: 0,
+    fleet: [],
+    hubSelected: false,
+  };
 }
 
 export function postBushTripAccept(opts: {

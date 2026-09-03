@@ -143,6 +143,37 @@ export const DE_DENSIFY_HUBS: readonly DeDensifyHub[] = [
     produce: { perishables: 1.2, general: 1.05, supplies: 1.0 },
     consume: { electronics: 0.9, machinery: 0.85 },
   },
+  {
+    icao: 'EDHK',
+    name: "Kiel Holtenau",
+    region: 'DE-N',
+    hubTier: 'regional',
+    lat: 54.3795,
+    lon: 10.1452,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'EDVK',
+    name: "Kassel Airport",
+    region: 'DE-W',
+    hubTier: 'regional',
+    lat: 51.41839,
+    lon: 9.39164,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'EDLP',
+    name: "Paderborn Lippstadt Airport",
+    region: 'DE-W',
+    hubTier: 'regional',
+    lat: 51.61253,
+    lon: 8.61746,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+
 ];
 
 export const DE_DENSIFY_HUB_COUNT = DE_DENSIFY_HUBS.length;

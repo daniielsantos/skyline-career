@@ -80,7 +80,7 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     icao: 'SCFA',
     name: 'Antofagasta Andrés Sabella',
     region: 'CL-C',
-    hubTier: 'regional',
+    hubTier: 'major',
     lat: -23.4445,
     lon: -70.4451,
     ...miningSpoke,
@@ -283,7 +283,7 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SLET: 'SLGY',
   SPMS: 'SPJI',
   SVCP: 'SVMT',
-  ESMX: 'ESMQ',
+  // ESMX = Växjö Kronoberg (real densify hub). Do NOT remap to ESMQ (Kalmar).
   // EU-8 MSFS Facilities corrections
   UBGN: 'UBBG',
   UDLS: 'UDSG',

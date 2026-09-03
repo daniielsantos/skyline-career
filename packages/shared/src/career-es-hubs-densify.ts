@@ -102,6 +102,37 @@ export const ES_DENSIFY_HUBS: readonly EsDensifyHub[] = [
     lon: -1.86352,
     ...drySpoke,
   },
+  {
+    icao: 'GCRR',
+    name: "César Manrique-Lanzarote Airport",
+    region: 'ES-S',
+    hubTier: 'regional',
+    lat: 28.9455,
+    lon: -13.6052,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'GCFV',
+    name: "Fuerteventura Airport",
+    region: 'ES-S',
+    hubTier: 'regional',
+    lat: 28.4527,
+    lon: -13.8638,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  {
+    icao: 'LEGE',
+    name: "Girona-Costa Brava Airport",
+    region: 'ES-N',
+    hubTier: 'regional',
+    lat: 41.90464,
+    lon: 2.76177,
+    produce: {"general":1.2,"electronics":1.1,"supplies":1},
+    consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+
 ];
 
 export const ES_DENSIFY_HUB_COUNT = ES_DENSIFY_HUBS.length;

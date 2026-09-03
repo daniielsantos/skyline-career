@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { RO_DENSIFY_HUBS, RO_DENSIFY_HUB_COUNT } from './career-ro-hubs-densify.js';
 
 export type RoCareerRegion = 'RO-W' | 'RO-E';
 
@@ -90,9 +91,10 @@ export const RO_CAREER_HUBS: readonly RoCareerHubDef[] = [
     lon: 23.8886,
     ...industrial,
   },
+  ...RO_DENSIFY_HUBS,
 ];
 
-export const RO_CAREER_HUB_COUNT = 6;
+export const RO_CAREER_HUB_COUNT = 6 + RO_DENSIFY_HUB_COUNT;
 
 export function buildRoFeederCorridors(
   hubs: readonly RoCareerHubDef[] = RO_CAREER_HUBS,

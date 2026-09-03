@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { GH_DENSIFY_HUBS, GH_DENSIFY_HUB_COUNT } from './career-gh-hubs-densify.js';
 
 export type GhCareerRegion = 'GH-C';
 
@@ -44,9 +45,10 @@ export const GH_CAREER_HUBS: readonly GhCareerHubDef[] = [
     produce: { perishables: 1.25, general: 1.25, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  ...GH_DENSIFY_HUBS,
 ];
 
-export const GH_CAREER_HUB_COUNT = 2;
+export const GH_CAREER_HUB_COUNT = 2 + GH_DENSIFY_HUB_COUNT;
 
 export function buildGhFeederCorridors(
   hubs: readonly GhCareerHubDef[] = GH_CAREER_HUBS,

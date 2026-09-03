@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { HU_DENSIFY_HUBS, HU_DENSIFY_HUB_COUNT } from './career-hu-hubs-densify.js';
 
 export type HuCareerRegion = 'HU-C';
 
@@ -81,9 +82,10 @@ export const HU_CAREER_HUBS: readonly HuCareerHubDef[] = [
     lon: 21.6923,
     ...agro,
   },
+  ...HU_DENSIFY_HUBS,
 ];
 
-export const HU_CAREER_HUB_COUNT = 5;
+export const HU_CAREER_HUB_COUNT = 5 + HU_DENSIFY_HUB_COUNT;
 
 export function buildHuFeederCorridors(
   hubs: readonly HuCareerHubDef[] = HU_CAREER_HUBS,

@@ -1452,9 +1452,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
     ground_staff_json: state.groundStaff
       ? JSON.stringify(state.groundStaff)
       : null,
-    active_bush_trip_json: state.activeBushTrip
-      ? JSON.stringify(state.activeBushTrip)
-      : null,
+    active_bush_trip_json: null as string | null,
     port_pickups_json: JSON.stringify(state.portPickups ?? []),
     player_warehouses_json: JSON.stringify(
       state.playerWarehouses ?? {
@@ -1589,13 +1587,8 @@ export function readCompanyStateScalars(
       /* ignore */
     }
   }
-  if (row.active_bush_trip_json) {
-    try {
-      out.activeBushTrip = JSON.parse(row.active_bush_trip_json);
-    } catch {
-      /* ignore */
-    }
-  }
+  // Column kept for migrate; bush trips removed — never hydrate activeBushTrip.
+  void row.active_bush_trip_json;
   if (row.port_pickups_json) {
     try {
       const parsed = JSON.parse(row.port_pickups_json);

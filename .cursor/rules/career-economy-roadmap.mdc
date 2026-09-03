@@ -18,7 +18,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - Player inbound soft-shadow: accept/depart publishes `inboundPending`; soft fill / lane sat = NPC + player.
 - Hub tiers (`major`/`regional`/`spoke`): curated offline from BR cargo roles; capacity/flow scale + lane lot caps; formLots ranks by absolute kg.
 - Brazil map: 62 hubs across BR-N / BR-NE / BR-CO / BR-SE / BR-S (catalog `career-br-hubs.ts`; Manaus major, Brasília redistributor; +2 soft-field bush with official ICAO).
-- **Soft-field bush hubs + unified bush trips:** `bush` flag on BR/US/CA/MX hubs (ferry blocked, light_ga). Market freights no longer form on bush ODs — payload rides on **bush trip** arcs ([`career-bush-trips.ts`](packages/shared/src/career-bush-trips.ts)): BR round-trip or US Activities **one-way** tours, `msfsValidated` gate. US PLNs: `K****` as normal spokes (+20); FAA locals as `bushTripOnly` (+32) — trip endpoints/map only (no Market/ferry/home). Freights → **Bush trips** board: accept/abandon + route map ([`career-bush-mission.ts`](packages/shared/src/career-bush-mission.ts)); fly/settle = later.
+- **Soft-field bush hubs + bush trips (removed 2026-09-03):** former soft-field ICAOs (SNYA/SWTP/KESW/KTCS/KTAD/CYHE/CYJA/CYHH/MMCG) are **normal spokes**. FAA `bushTripOnly` locals (+32) dropped. Bush trips board/missions/PLN catalog deleted; `/api/bush-trips*` → 410. MSFS overrides file kept for network homolog. Seed **1967**.
 - Cargo corridors: curated OD weights bias `formLots` formation + mild pay; BR+US auto feeders (≥2 partners/hub); legacy saves gain missing hubs via `ensureCareerHubCoverage`.
 - Idle-lot escalation: available lots raise pay from `basePayUsd` after 25% of life (cap +40%); flip urgent late; Market shows Idle +N% chip.
 - Demand shocks: regional events (harvest/outage/congestion/festival/strike) affect prod/cons + freight pay/urgency/life; Market banner + lot chips.
@@ -100,6 +100,7 @@ Ship realism in **measurable slices**. Avoid opaque full-economy redesigns.
 - **SA densify (Wave A):** +60 commercial hubs (AR12/CL8/PE8/BO6/EC4/CO10/VE7/GY2/SR1/GF2) via `career-*-hubs-densify.ts`. Skip SCCD/SCSN/SCST/SCTC, SPIM/SPMS, SLRI/SLET, SEQM, SVCP.
 - **World densify Wave A (Americas 655→~787):** +130 hubs net after homolog ICAO cleanup; seed **1475** airports / **224** ports; SimBrief allowlist **1434** cargo ICAOs. No BR/US deep densify; no `CARGO_FLOW_BALANCE`. Script `scripts/analyze-americas-economy.mjs`. Gate 7–14d: Wave A country live ≥85% (or stable) before Wave B.
 - **World densify Wave C (Americas →~1000):** +204 hubs net (US+44 CA+26 MX+13 SA/Central/Caribe+121); Americas cargo **~990**; seed **1679**; SimBrief **1638**. No BR. Dropped KYUM/MHJU/MHRC/MMDM/MZ* densify (no stock MSFS). Measure 7–14d before Asia Wave B / Africa Wave D.
+- **World densify Waves B/D + polish:** seed **1967** (era 1679→1999 densify then −32 bushTripOnly). Wave B EU+Asia, Wave D AF+OC, polish. Generator: `scripts/gen-wave-b-d-densify.mjs`; analyze: `scripts/analyze-wave-b-economy.mjs`. No BR. Homolog remaps WAQQ/WAFF/WIKK. SimBrief allowlist ~1967.
 - **BR/US skipAll vitality scale:** spoke/regional last-mile form+cap scale with cargo hub counts (`lastMileSkipAllSpokeFormBudget` / `lastMileDeadSpokeVitalityCap`); US form **32**/cap **~47**, BR form **12**/cap **18**. No `CARGO_FLOW_BALANCE` / soft-cap bump.
 - **Pacific island-neighbor gap:** Nadi **NFFN**–Port Vila **NVVV** and Nadi–Nouméa **NWWW**; demand pairs FJ–VU / FJ–NC. Intl lanes >= **399**.
 - **Port dynamic factory price:** listing `unitPriceUsd` frozen at spawn from allocated-hub spot × 0.48 ±12% jitter × stock scarcity, clamped to [35% base, 70% hub spot]; WH deposits keep separate cost lots (merge only within ±3%).
@@ -186,10 +187,11 @@ Not near-term blockers. `PlayerPortConcession.level` is already `1|2|3` (always 
 64. ~~**CA/Caribbean densify (Wave A)**~~ — +29 hubs (PA2/CR3/NI1/HN3/GT2/BZ2/CU4/DO2/HT1/JM1/BS5/GP2/GD1); seed **1490**. Skip SV/tiny deps. Homolog SimBrief if OFP fails on new ICAOs.
 65. ~~**World densify Wave A**~~ — Americas **~655→~787** (+130); seed **1475**; `analyze-americas-economy.mjs`; pulse focus +CA/MX/AR/CO.
 66. ~~**World densify Wave C (Americas→~1000)**~~ — +204 net; seed **1679**; Americas cargo **~990**. No BR. **Measure 7–14d** (live ≥85% affected; vigiar US GA/skipAll) before Wave B/D.
-67. **Next — World densify Wave B (Asia + Europe ~+150):** Asia +75–90 (CN inland / IN / SE Asia spokes); Europe +60–75 (EU-2/3/4 thin — Nordics/Baltics/Balkans/PL; EU-1 West light gaps only). Measure BR/US/EU/Asia live after. Do **not** start until Wave A/C gate passes.
-68. **Later — World densify Wave D (Africa + Oceania ~+70):** Africa +50–65; Oceania +5–10; polish network toward **~2000** hubs. Optional BR light densify if live ≥85%.
-69. Leftover Africa densify if homolog proves stock: MR **GQPP** / DRC **FZNA** / EG **FGBT** / CV **GVNP** / FLSK.
-70. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
+67. ~~**World densify Wave B (Asia + Europe)**~~ — Asia +85; prior EU +58; EU-1 polish +20 inside the final polish batch.
+68. ~~**World densify Wave D + polish → ~2000**~~ — Africa+Oceania +70; polish + top-up; seed **1999** then **1967** after bushTripOnly drop. No BR/US. Measure 7–14d live ≥85%.
+69. ~~**Bush trips removed**~~ — drop 32 FAA trip-only locals; soft-bush → normal spokes; trips API 410.
+70. Leftover Africa densify if homolog proves stock: MR **GQPP** / DRC **FZNA** / EG **FGBT** / CV **GVNP** / FLSK.
+71. Optional indexed market SQL reads once lots SoT (v3) is trusted in the wild.
 
 Do **not** start Postgres or multi-server partition until single-player SQLite + one extra country proves the lane contract.
 

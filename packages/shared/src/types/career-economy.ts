@@ -411,6 +411,23 @@ export interface FuelHaulView {
   phase: 'enroute' | 'arriving' | 'delivered';
 }
 
+export interface RegionalRecoveryState {
+  /** Auto-recovery active for this region. */
+  active: boolean;
+  /** Economy day when recovery was entered. */
+  enteredDay?: number;
+  /** Consecutive low-live days while inactive. */
+  lowLiveStreak: number;
+  /** Consecutive recovered days while active. */
+  recoveredStreak: number;
+  /** Last evaluated economy day (0-based). */
+  lastEvalDay: number;
+  /** Last sampled live hub ratio in this region. */
+  lastLivePct: number;
+  /** Last sampled dead spoke share in this region. */
+  lastDeadSpokeShare: number;
+}
+
 export interface CareerEconomyWorld {
   version: 3;
   seed: string;
@@ -478,6 +495,11 @@ export interface CareerEconomyWorld {
    * Never persisted in economy_json.
    */
   pendingHubEconomySamples?: HubEconomySample[];
+  /**
+   * Adaptive regional recovery controller memory.
+   * Keeps low-live streaks and active windows per `XX-*` region.
+   */
+  regionalRecovery?: Record<string, RegionalRecoveryState>;
 }
 
 /** Dealer-owned airframe in the world pool (one physical tail number). */

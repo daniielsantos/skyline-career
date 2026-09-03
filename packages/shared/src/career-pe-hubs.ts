@@ -141,7 +141,7 @@ export const PE_CAREER_HUBS: readonly PeCareerHubDef[] = [
     icao: 'SPQU',
     name: 'Arequipa Rodríguez Ballón',
     region: 'PE-S',
-    hubTier: 'regional',
+    hubTier: 'major',
     lat: -16.3411,
     lon: -71.5831,
     produce: { perishables: 1.25, general: 1.15, machinery: 1.05 },

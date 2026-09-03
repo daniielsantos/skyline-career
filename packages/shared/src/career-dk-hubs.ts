@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { DK_DENSIFY_HUBS, DK_DENSIFY_HUB_COUNT } from './career-dk-hubs-densify.js';
 
 export type DkCareerRegion = 'DK-E' | 'DK-W';
 
@@ -81,9 +82,10 @@ export const DK_CAREER_HUBS: readonly DkCareerHubDef[] = [
     lon: 10.619,
     ...agro,
   },
+  ...DK_DENSIFY_HUBS,
 ];
 
-export const DK_CAREER_HUB_COUNT = 5;
+export const DK_CAREER_HUB_COUNT = 5 + DK_DENSIFY_HUB_COUNT;
 
 export function buildDkFeederCorridors(
   hubs: readonly DkCareerHubDef[] = DK_CAREER_HUBS,

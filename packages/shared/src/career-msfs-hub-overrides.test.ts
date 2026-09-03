@@ -12,7 +12,6 @@ import {
   filterMsfsBushHubOverridesToIcaos,
   pruneRuntimeMsfsBushHubOverrides,
 } from './career-msfs-hub-overrides.js';
-import { US_CAREER_HUBS } from './career-us-hubs.js';
 import { ensureAirportHubTier, resolveAirportCoords } from './career-economy.js';
 import { SIMBRIEF_DISPATCH_DENY_ICAOS } from './career-simbrief-airports.js';
 import { listCareerHubIcaos } from './career-fleet.js';
@@ -32,14 +31,12 @@ describe('MSFS bush hub overrides', () => {
     assert.ok(Math.abs(shipped['57NC']!.lon - -83.4582) < 0.001);
   });
 
-  it('catalog embeds MSFS-validated O67 Manzanar coords', () => {
-    const hub = US_CAREER_HUBS.find((h) => h.icao === 'O67');
-    assert.ok(hub);
-    assert.match(hub!.name, /Manzanar/i);
-    assert.ok(Math.abs(hub!.lat - 36.737) < 0.01);
-    assert.ok(Math.abs(hub!.lon - -118.145) < 0.01);
-    assert.equal(hub!.msfsValidated, true);
-    assert.equal(hub!.bushTripOnly, true);
+  it('ships MSFS-validated O67 Manzanar coords in overrides', () => {
+    const shipped = getShippedMsfsBushHubOverrides();
+    assert.ok(shipped.O67);
+    assert.match(shipped.O67!.name, /Manzanar/i);
+    assert.ok(Math.abs(shipped.O67!.lat - 36.737) < 0.01);
+    assert.ok(Math.abs(shipped.O67!.lon - -118.145) < 0.01);
   });
 
   it('merge prefers later layers; resolveAirportCoords uses override', () => {

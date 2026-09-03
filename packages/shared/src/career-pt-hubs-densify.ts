@@ -76,6 +76,37 @@ export const PT_DENSIFY_HUBS: readonly PtDensifyHub[] = [
     lon: -7.44139,
     ...drySpoke,
   },
+  {
+    icao: 'LPSO',
+    name: "Ponte de Sor",
+    region: 'PT-C',
+    hubTier: 'regional',
+    lat: 39.2116,
+    lon: -8.05654,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'LPBG',
+    name: "Bragança Airport",
+    region: 'PT-N',
+    hubTier: 'regional',
+    lat: 41.8578,
+    lon: -6.70713,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+  {
+    icao: 'LPFL',
+    name: "Flores Airport",
+    region: 'PT-C',
+    hubTier: 'regional',
+    lat: 39.4553,
+    lon: -31.1314,
+    produce: {"general":1.1,"supplies":1,"perishables":1.05},
+    consume: {"electronics":0.9,"machinery":0.85},
+  },
+
 ];
 
 export const PT_DENSIFY_HUB_COUNT = PT_DENSIFY_HUBS.length;

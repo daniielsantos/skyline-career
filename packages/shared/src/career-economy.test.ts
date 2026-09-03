@@ -8,6 +8,7 @@ import {
   createSeedEconomyWorld,
   DEAD_LOT_RETENTION_TICKS,
   ensureCareerHubCoverage,
+  ensureAirportHubTier,
   ensureEconomyCaughtUp,
   ensureEconomyCaughtUpCooperative,
   ensureSeedMarketFormed,
@@ -95,7 +96,7 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 1679);
+    assert.equal(world.airports.length, 1967);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 399);
     const br = world.airports.filter(
@@ -657,25 +658,8 @@ describe('career-economy seed', () => {
       (a) => countryIdFromRegion(a.region) === 'SS',
     );
     assert.equal(br.length, 97);
-    assert.equal(us.length, 277);
-    assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 32);
-    for (const ap of world.airports.filter((a) => a.bushTripOnly)) {
-      assert.equal(
-        Object.values(ap.production).every((v) => v === 0),
-        true,
-        `${ap.icao} should have zero production`,
-      );
-      assert.equal(
-        Object.values(ap.consumption).every((v) => v === 0),
-        true,
-        `${ap.icao} should have zero consumption`,
-      );
-      assert.equal(
-        Object.values(ap.inventory).every((pile) => pile.stockKg === 0),
-        true,
-        `${ap.icao} should have empty stock`,
-      );
-    }
+    assert.equal(us.length, 245);
+    assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 0);
     assert.equal(ca.length, 106);
     assert.equal(mx.length, 83);
     assert.equal(ar.length, 70);
@@ -2267,6 +2251,26 @@ describe('career-economy seed', () => {
     });
     assert.equal(laneLotCaps('major', 'spoke').maxXl, 0);
   });
+
+  it('promotes SA majors for densify balance (CL/CO/PE/VE)', () => {
+    const world = createSeedEconomyWorld({ seed: 'sa-major-balance' });
+    assert.equal(hubTierOf(world.airports.find((a) => a.icao === 'SCFA')!), 'major');
+    assert.equal(hubTierOf(world.airports.find((a) => a.icao === 'SKRG')!), 'major');
+    assert.equal(hubTierOf(world.airports.find((a) => a.icao === 'SPQU')!), 'major');
+    assert.equal(hubTierOf(world.airports.find((a) => a.icao === 'SVMC')!), 'major');
+  });
+
+  it('rescales cargo when curated hubTier changes on a live terminal', () => {
+    const world = createSeedEconomyWorld({ seed: 'tier-rescale' });
+    const ap = world.airports.find((a) => a.icao === 'SCFA')!;
+    ap.hubTier = 'regional';
+    const beforeCap = ap.inventory.general?.capacityKg ?? 0;
+    const beforeFlow = ap.baseProduction?.general ?? 0;
+    ensureAirportHubTier(ap);
+    assert.equal(ap.hubTier, 'major');
+    assert.ok((ap.inventory.general?.capacityKg ?? 0) > beforeCap);
+    assert.ok((ap.baseProduction?.general ?? 0) > beforeFlow);
+  });
 });
 
 describe('localPriceMultiplier', () => {
@@ -3505,6 +3509,108 @@ describe('tickEconomyN market formation', () => {
     );
   });
 
+  it('forms skipAll dead-spoke last-mile at soft fill/kg (10%/120)', () => {
+    const world = createSeedEconomyWorld({
+      seed: 'last-mile-skipall-soft-fill',
+    });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+      npc.restUntilTick = world.tick + 99_999;
+      npc.currentFlightId = undefined;
+      npc.aggressiveness = 0;
+    }
+    world.npcFlights = [];
+    // Clear Dry stock, then set BR spokes to the soft band (would fail 14%/180).
+    for (const ap of world.airports) {
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        pile.stockKg = 0;
+      }
+    }
+    const brSpokes = world.airports.filter(
+      (a) =>
+        (a.region ?? '').startsWith('BR') &&
+        hubTierOf(a) === 'spoke' &&
+        a.bushTripOnly !== true &&
+        a.bush !== true,
+    );
+    assert.ok(brSpokes.length > 0, 'expected BR spokes in seed');
+    for (const ap of brSpokes) {
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        pile.stockKg = Math.max(120, Math.round(pile.capacityKg * 0.11));
+      }
+    }
+    // Dest majors need abs room for the hop.
+    for (const ap of world.airports) {
+      if (!(ap.region ?? '').startsWith('BR')) continue;
+      if (hubTierOf(ap) === 'spoke') continue;
+      for (const id of ['general', 'supplies'] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        pile.stockKg = Math.round(pile.capacityKg * 0.4);
+      }
+    }
+    const brQuota = partitionAvailableQuota(world, 'BR');
+    const padFor = (commodityId: 'general' | 'supplies') => {
+      const open = world.lots.filter(
+        (l) =>
+          l.status === 'available' &&
+          l.commodityId === commodityId &&
+          (world.airports.find((a) => a.icao === l.originIcao)?.region ?? '').startsWith(
+            'BR',
+          ),
+      ).length;
+      const padN = Math.max(0, brQuota - open + 8);
+      for (let i = 0; i < padN; i += 1) {
+        world.lots.push({
+          id: `lot_softfill_pad_${commodityId}_${i}`,
+          commodityId,
+          originIcao: 'SBGR',
+          destIcao: 'SBKP',
+          quantityKg: 2_500,
+          reservedKg: 0,
+          createdAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          payUsd: 4_000,
+          basePayUsd: 4_000,
+          urgency: 'normal',
+          reason: 'skipAll soft-fill pad',
+          status: 'available',
+        });
+      }
+    };
+    padFor('general');
+    padFor('supplies');
+    tickEconomyN(world, 1);
+
+    const fromSpoke = world.lots.filter(
+      (l) =>
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        /last-mile/i.test(l.reason) &&
+        !l.reason.includes('pad') &&
+        hubTierOf(
+          world.airports.find((a) => a.icao === l.originIcao) ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'spoke' &&
+        (world.airports.find((a) => a.icao === l.originIcao)?.region ?? '').startsWith(
+          'BR',
+        ),
+    );
+    assert.ok(
+      fromSpoke.length > 0,
+      'expected BR spoke last-mile under skipAll at ~11% fill / ≥120kg',
+    );
+  });
+
   it('scales skipAll vitality budgets with densify spoke counts', () => {
     assert.equal(lastMileSkipAllSpokeFormBudget(0), LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET);
     assert.equal(lastMileSkipAllSpokeFormBudget(70), 12);
@@ -4212,7 +4318,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 61);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 1679);
+    assert.equal(migrated.airports.length, 1967);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));
@@ -4488,6 +4594,34 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
       after.npcFlights.some((row) => row.originIcao === 'MPPA'),
       true,
     );
+  });
+
+  it('keeps ESMX (Vaxjo) distinct from ESMQ and collapses ESMQ clones', () => {
+    const world = createSeedEconomyWorld({ seed: 'esmx-dedupe' });
+    const esmq = world.airports.find((a) => a.icao === 'ESMQ');
+    const esmx = world.airports.find((a) => a.icao === 'ESMX');
+    assert.ok(esmq, 'Kalmar ESMQ in seed');
+    assert.ok(esmx, 'Vaxjo ESMX in seed');
+    // Simulate the old remap clone storm: many ESMQ rows, no ESMX.
+    world.airports = world.airports.filter((a) => a.icao !== 'ESMX');
+    for (let i = 0; i < 5; i += 1) {
+      world.airports.push({
+        ...structuredClone(esmq!),
+        name: `ESMQ clone ${i}`,
+      });
+    }
+    assert.equal(
+      world.airports.filter((a) => a.icao === 'ESMQ').length,
+      6,
+    );
+    assert.equal(remapRetiredCareerAirportIdents(world), true);
+    assert.equal(world.airports.filter((a) => a.icao === 'ESMQ').length, 1);
+    // Coverage restores Växjö; must not be remapped away.
+    assert.equal(ensureCareerHubCoverage(world), true);
+    assert.ok(world.airports.some((a) => a.icao === 'ESMX'));
+    assert.equal(world.airports.filter((a) => a.icao === 'ESMQ').length, 1);
+    assert.equal(remapRetiredCareerAirportIdents(world), false);
+    assert.ok(world.airports.some((a) => a.icao === 'ESMX'));
   });
 
   it('refuses MSFS Facilities when ident/coords mismatch the catalog', () => {

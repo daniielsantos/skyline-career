@@ -130,7 +130,7 @@ export const VE_CAREER_HUBS: readonly VeCareerHubDef[] = [
     icao: 'SVMC',
     name: 'Maracaibo La Chinita',
     region: 'VE-W',
-    hubTier: 'regional',
+    hubTier: 'major',
     lat: 10.5582,
     lon: -71.7278,
     produce: { machinery: 1.3, general: 1.2, electronics: 1.05 },

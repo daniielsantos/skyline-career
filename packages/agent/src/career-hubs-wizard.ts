@@ -10,7 +10,6 @@ import {
   CAREER_HUB_COORDS,
   filterMsfsBushHubOverridesToIcaos,
   isCareerHubIcao,
-  listBushTripOnlyIcaos,
   listCareerHubIcaos,
   listMsfsBushHubOverrides,
   lookupMsfsBushHubOverride,
@@ -34,8 +33,8 @@ import { isSimDownError } from './sim-session-health.js';
 export type CareerHubsWizardOpts = {
   bridge: NamedPipeSimBridge;
   repoRoot: string;
-  /** Optional non-interactive scope: all | bush | missing | icao */
-  scope?: 'all' | 'bush' | 'missing' | string;
+  /** Optional non-interactive scope: all | missing | icao */
+  scope?: 'all' | 'missing' | string;
   /** Skip prompts when scope is set. */
   yes?: boolean;
   /** Re-fetch even when an msfs_facility override already exists. */
@@ -264,7 +263,6 @@ async function pickScope(
   opts: CareerHubsWizardOpts,
 ): Promise<string[]> {
   if (opts.scope === 'all') return listCareerHubIcaos();
-  if (opts.scope === 'bush') return listBushTripOnlyIcaos();
   if (opts.scope === 'missing') {
     return filterMissingFacilityOverrides(listCareerHubIcaos());
   }
@@ -277,7 +275,6 @@ async function pickScope(
   }
 
   const allCount = listCareerHubIcaos().length;
-  const bushCount = listBushTripOnlyIcaos().length;
   const missingCount = filterMissingFacilityOverrides(listCareerHubIcaos())
     .length;
   printSection('MSFS hub Facilities homologation');
@@ -286,17 +283,13 @@ async function pickScope(
   console.log('  Facility lookups use a 30s IPC timeout (host may warm the airport list).');
   console.log('');
   console.log(`  1. All career hubs (${allCount})`);
-  console.log(`  2. Bush-trip-only locals (${bushCount})`);
-  console.log(`  3. Missing only — no msfs_facility override yet (${missingCount})`);
-  console.log('  4. Single ICAO');
-  const choice = (await ask('Choice', '3')).trim();
-  if (choice === '2' || choice.toLowerCase() === 'bush') {
-    return listBushTripOnlyIcaos();
-  }
-  if (choice === '3' || choice.toLowerCase() === 'missing') {
+  console.log(`  2. Missing only — no msfs_facility override yet (${missingCount})`);
+  console.log('  3. Single ICAO');
+  const choice = (await ask('Choice', '2')).trim();
+  if (choice === '2' || choice.toLowerCase() === 'missing') {
     return filterMissingFacilityOverrides(listCareerHubIcaos());
   }
-  if (choice === '4' || choice.toLowerCase() === 'icao') {
+  if (choice === '3' || choice.toLowerCase() === 'icao') {
     const raw = (await ask('ICAO')).trim().toUpperCase();
     if (!isCareerHubIcao(raw)) {
       throw new Error(`${raw || '(empty)'} is not a career hub`);
@@ -331,9 +324,7 @@ export async function runCareerHubsWizard(
     const label =
       list.length === 1
         ? list[0]!
-        : list.length === listBushTripOnlyIcaos().length
-          ? `${list.length} bushTripOnly hubs`
-          : `${list.length} career hubs`;
+        : `${list.length} career hubs`;
     const ok = await confirm(
       ask,
       `Look up ${label} via SimConnect Facilities and write overrides?`,
@@ -484,39 +475,6 @@ export async function runCareerHubsWizard(
     store.close();
   }
 
-  // Refresh bushTripOnly catalog + shipped seed from MSFS overrides (no PLN edits).
-  let catalogUpdated = false;
-  try {
-    const { spawnSync } = await import('node:child_process');
-    const genScript = join(
-      opts.repoRoot,
-      'packages',
-      'shared',
-      'scripts',
-      'gen-bush-trip-only-hubs.mjs',
-    );
-    const gen = spawnSync(process.execPath, [genScript], {
-      cwd: opts.repoRoot,
-      encoding: 'utf8',
-      env: process.env,
-    });
-    if (gen.status === 0) {
-      catalogUpdated = true;
-    } else {
-      console.log(
-        `  warn: gen-bush-trip-only-hubs exited ${gen.status}: ${
-          gen.stderr || gen.stdout || ''
-        }`.trim(),
-      );
-    }
-  } catch (error) {
-    console.log(
-      `  warn: could not regen bushTripOnly catalog: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
-
   const okCount = rows.filter((r) => r.ok).length;
   const failCount = rows.filter((r) => !r.ok).length;
   printSection('Done');
@@ -525,14 +483,6 @@ export async function runCareerHubsWizard(
   console.log(
     `  economy (sqlite) stamped ${stampedAirports} airport(s) and saved`,
   );
-  if (catalogUpdated) {
-    console.log(
-      '  bushTripOnly catalog regenerated from MSFS overrides (PLN files untouched)',
-    );
-    console.log(
-      '  Rebuild shared if career-ui is running: npm run build -w @msfs-compat/shared',
-    );
-  }
   if (failCount > 0) {
     console.log('  Failures:');
     for (const row of rows) {

@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { FI_DENSIFY_HUBS, FI_DENSIFY_HUB_COUNT } from './career-fi-hubs-densify.js';
 
 export type FiCareerRegion = 'FI-S' | 'FI-N';
 
@@ -90,9 +91,10 @@ export const FI_CAREER_HUBS: readonly FiCareerHubDef[] = [
     lon: 27.7978,
     ...forest,
   },
+  ...FI_DENSIFY_HUBS,
 ];
 
-export const FI_CAREER_HUB_COUNT = 6;
+export const FI_CAREER_HUB_COUNT = 6 + FI_DENSIFY_HUB_COUNT;
 
 export function buildFiFeederCorridors(
   hubs: readonly FiCareerHubDef[] = FI_CAREER_HUBS,

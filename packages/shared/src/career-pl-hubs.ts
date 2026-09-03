@@ -7,6 +7,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { PL_DENSIFY_HUBS, PL_DENSIFY_HUB_COUNT } from './career-pl-hubs-densify.js';
 
 export type PlCareerRegion = 'PL-N' | 'PL-C' | 'PL-S';
 
@@ -135,9 +136,10 @@ export const PL_CAREER_HUBS: readonly PlCareerHubDef[] = [
     lon: 22.019,
     ...agro,
   },
+  ...PL_DENSIFY_HUBS,
 ];
 
-export const PL_CAREER_HUB_COUNT = 10;
+export const PL_CAREER_HUB_COUNT = 10 + PL_DENSIFY_HUB_COUNT;
 
 export function buildPlFeederCorridors(
   hubs: readonly PlCareerHubDef[] = PL_CAREER_HUBS,

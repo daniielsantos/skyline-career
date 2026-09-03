@@ -178,6 +178,9 @@
 
 - Countries: ID / PH. East Malaysia regions **MY-E** (Sabah) / **MY-K** (Sarawak) added to existing MY. Brunei / Papua / Batam deferred
 - ICAO traps: Jakarta **WIII** (not **WIHH** Halim); Medan **WIMM** (not **WIMK** Polonia); Bali **WADD**; Cagayan **RPMY** (not **RPML** Lumbia); skip Semarang WARS/WAHS, Yogyakarta WAHI, Subic RPLB
+- **Densify homolog (2026-09-03):** Solwezi **FLSW** (not FLHN=Livingstone); Saint-Louis **GOSS**; Bohol **RPVT**; Tirupati **VOTP**; Tanjung Pinang **WIDN**; RPVE=Caticlan. Drop WARQ/WAJW/WARS/WIPT + **LBHS** (absent). Palu **WAFF** (not WAML); Tarakan **WAQQ** (not WALR); Pangkal Pinang **WIKK** (not WIPB/WIPK — MSFS/AIP). Seed **1999**.
+- **SE metric clone (2026-09-03):** pulse SE hundreds of hubs = **ESMQ duplicates**. Bad remap **ESMX→ESMQ** (Växjö vs Kalmar) + remap dedupe order bug. Fixed; keep both ICAOs.
+- **Bush trips removed (2026-09-03):** seed **1967**; soft strips kept as spokes; FAA trip-only dropped.
 - Ports: Tanjung Priok → WIII; Tanjung Perak → WARR; Belawan → WIMM; Kota Kinabalu → WBKK; Kuching → WBGG; Manila → RPLL; Cebu → RPVM
 - World seed: **948** airports; **128** ports; fuel trucks **470**; **+10** ID/MY-east/PH regions
 - Remaps: `WIMK→WIMM`, `WRRR→WADD`, `RPML→RPMY`

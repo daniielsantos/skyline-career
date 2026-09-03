@@ -25,24 +25,6 @@ export type CaCareerHubDef = {
   bush?: true;
 };
 
-/** Soft-field bush: chronic supplies/general sink + weak electronics source. */
-const bushSpoke = {
-  produce: {
-    electronics: 1.35,
-    general: 0.35,
-    supplies: 0.3,
-    perishables: 0.55,
-    machinery: 0.2,
-  } as Partial<Record<CommodityId, number>>,
-  consume: {
-    supplies: 2.4,
-    general: 2.1,
-    perishables: 1.2,
-    electronics: 0.35,
-    machinery: 0.55,
-  } as Partial<Record<CommodityId, number>>,
-};
-
 const drySpoke = {
   produce: { general: 1.1, supplies: 1.0, perishables: 0.9 } as Partial<
     Record<CommodityId, number>
@@ -589,7 +571,7 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
 
   ...CA_DENSIFY_HUBS,
 
-  // ── CA bush soft-fields (3) — official ICAO; ferry blocked; OD vs CA gateways ──
+  // ── CA soft-field spokes (3) — former bush strips, now normal cargo spokes ──
   {
     icao: 'CYHE',
     name: 'Hope / FVRD Regional Airpark',
@@ -597,8 +579,7 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 49.3689,
     lon: -121.495,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
   {
     icao: 'CYJA',
@@ -607,8 +588,7 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 52.9964,
     lon: -118.0602,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
   {
     icao: 'CYHH',
@@ -617,8 +597,7 @@ export const CA_CAREER_HUBS: readonly CaCareerHubDef[] = [
     hubTier: 'spoke',
     lat: 51.6911,
     lon: -76.1356,
-    bush: true,
-    ...bushSpoke,
+    ...drySpoke,
   },
 ];
 

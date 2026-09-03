@@ -91,6 +91,7 @@ import {
   type EconomyEvent,
   type FuelHaulView,
   type MarketLot,
+  type LotPressure,
   type MissionFuelQuote,
   type OfpLoadProgress,
   type Mission,
@@ -144,7 +145,6 @@ import {
   type AircraftMarketCountryOption,
 } from './AircraftMarketCountryCombobox';
 import { marketCountryLabel } from './market-country-label';
-import { BushTripMapCard } from './BushTripMapCard';
 import { BrandMark } from './BrandMark';
 import { SidebarFlightStrip } from './SidebarFlightStrip';
 import { StagingLotReason } from './StagingLotReason';
@@ -653,9 +653,48 @@ function LotLoadCell(props: {
 }
 
 /** Contract/Ferry Pay: pilot fee (what you earn). Normal lots: freight pay. */
+function freightPayExplainTitle(
+  lot: {
+    payUsd: number;
+    basePayUsd?: number;
+    distanceNm?: number;
+    urgency?: string;
+  },
+  idlePct: number | null | undefined,
+): string {
+  const parts: string[] = [];
+  const base =
+    typeof lot.basePayUsd === 'number' && Number.isFinite(lot.basePayUsd)
+      ? Math.round(lot.basePayUsd)
+      : null;
+  if (idlePct != null && idlePct > 0) {
+    if (base != null) {
+      parts.push(
+        `Formation ${formatMoney(base)} · now +${idlePct}% idle (sat on the board)`,
+      );
+    } else {
+      parts.push(
+        `Pay is up ${idlePct}% vs formation — freight sat on the board`,
+      );
+    }
+  } else if (base != null && Math.abs(base - Math.round(lot.payUsd)) > 1) {
+    parts.push(`Formation ${formatMoney(base)}`);
+  }
+  if (lot.distanceNm != null && Number.isFinite(lot.distanceNm) && lot.distanceNm > 0) {
+    parts.push(`${Math.round(lot.distanceNm).toLocaleString()} nm haul`);
+  }
+  if (lot.urgency === 'urgent') parts.push('Urgent');
+  return parts.length > 0
+    ? parts.join(' · ')
+    : 'Freight pay for the full available load';
+}
+
 function LotPayCell(props: {
   lot: {
     payUsd: number;
+    basePayUsd?: number;
+    distanceNm?: number;
+    urgency?: string;
     quantityKg?: number;
     availableKg?: number;
     npcClaim?: {
@@ -666,7 +705,7 @@ function LotPayCell(props: {
       pilotFeeMinUsd?: number;
     } | null;
   };
-  /** Idle ↑ badge — only for normal freights (Contracts use fee, not lot pay). */
+  /** Idle ↑ badge — only for freight pay (not crew fee). */
   idlePct?: number | null;
 }) {
   const claim = props.lot.npcClaim;
@@ -683,18 +722,16 @@ function LotPayCell(props: {
       />
     );
   }
+  const title = freightPayExplainTitle(props.lot, props.idlePct);
   return (
-    <>
+    <span title={title}>
       {formatMoney(props.lot.payUsd)}
       {props.idlePct != null ? (
-        <span
-          className="idle-uptick"
-          title={`Freight has sat on the board — pay is up ${props.idlePct}% vs formation`}
-        >
+        <span className="idle-uptick" aria-label={`Idle +${props.idlePct}%`}>
           ↑{props.idlePct}%
         </span>
       ) : null}
-    </>
+    </span>
   );
 }
 
@@ -1782,7 +1819,9 @@ function MarketEventsSummary(props: {
 }
 
 /** Secondary lot signals as one muted line (not a pill stack). Cap at 2. */
-function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null {
+function lotPressureMeta(lot: {
+  pressure?: LotPressure | null;
+}): { text: string; title: string } | null {
   const tokens: string[] = [];
   const titles: string[] = [];
   const p = lot.pressure;
@@ -1825,7 +1864,17 @@ function lotPressureMeta(lot: MarketLot): { text: string; title: string } | null
   };
 }
 
-function idleUptickPct(lot: MarketLot): number | null {
+function idleUptickPct(lot: {
+  pressure?: LotPressure | null;
+  npcClaim?: { crewNeeded?: boolean; pilotFeeUsd?: number } | null;
+}): number | null {
+  // Crew fee is not lot pay — idle % would mislead.
+  if (
+    lot.npcClaim?.crewNeeded &&
+    typeof lot.npcClaim.pilotFeeUsd === 'number'
+  ) {
+    return null;
+  }
   if (!lot.pressure?.idleEscalated) return null;
   const pct = Math.round(((lot.pressure.idlePayMult || 1) - 1) * 100);
   return pct > 0 ? pct : null;
@@ -2321,6 +2370,7 @@ function marketLotToAirportLot(lot: MarketLot): AirportLot {
     availableKg: lot.availableKg,
     quantityKg: lot.quantityKg,
     payUsd: lot.payUsd,
+    basePayUsd: lot.basePayUsd,
     estimatedFuelCostUsd: lot.estimatedFuelCostUsd,
     estimatedNetUsd: lot.estimatedNetUsd,
     estimatedLiftKg: lot.estimatedLiftKg,
@@ -2335,8 +2385,12 @@ function marketLotToAirportLot(lot: MarketLot): AirportLot {
     expired: false,
     perishable: Boolean(lot.perishable),
     bush: lot.bush,
+    lastMile: lot.lastMile,
     distanceNm: lot.distanceNm,
     reason: lot.reason,
+    idleEscalated: lot.idleEscalated,
+    international: lot.international,
+    pressure: lot.pressure,
     npcClaim: lot.npcClaim,
   };
 }
@@ -3286,7 +3340,7 @@ export function App() {
   const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [busy, setBusy] = useState(false);
-  /** Chunked time-advance progress (dev +1 day / +7 day / large skips). */
+  /** Chunked time-advance progress (dev +1 / +7 / +14 / +30 day skips). */
   const [tickAdvance, setTickAdvance] = useState<{
     done: number;
     total: number;
@@ -5872,14 +5926,14 @@ export function App() {
     const hoursLabel =
       ticks === 1
         ? '15 min'
-        : ticks === 4
-          ? '1 hour'
-          : ticks === 96
-            ? '1 day'
-            : ticks === 96 * 7
-              ? '7 days'
-              : ticks === 96 * 14
-                ? '14 days'
+        : ticks === 96
+          ? '1 day'
+          : ticks === 96 * 7
+            ? '7 days'
+            : ticks === 96 * 14
+              ? '14 days'
+              : ticks === 96 * 30
+                ? '30 days'
                 : `${ticks * 15} min`;
     // Progress every ≤¼ day so +1d isn't stuck at 0/96 for minutes on one POST.
     // Still 4 saves/day vs the old 12 (chunk=8). Hub Stats sample = 1×/day boundary only.
@@ -9598,15 +9652,6 @@ export function App() {
               <button
                 type="button"
                 className="action"
-                onClick={() => void onTick(4)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 1 hour (4 ticks)"
-              >
-                +1 h
-              </button>
-              <button
-                type="button"
-                className="action"
                 onClick={() => void onTick(96)}
                 disabled={busy}
                 title="Advance economy + crew wall-clock by 1 day (96 ticks)"
@@ -9630,6 +9675,15 @@ export function App() {
                 title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
               >
                 {formatTickAdvanceButton(96 * 14, '+14 day')}
+              </button>
+              <button
+                type="button"
+                className="action"
+                onClick={() => void onTick(96 * 30)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 30 days (2880 ticks)"
+              >
+                {formatTickAdvanceButton(96 * 30, '+30 day')}
               </button>
               <button
                 type="button"
@@ -11032,6 +11086,11 @@ export function App() {
                             const cargoLocked = isCargoOpsCommodityLocked(
                               lot.commodityId,
                             );
+                            const meta = lotPressureMeta(lot);
+                            const idlePct = idleUptickPct(lot);
+                            const lastMile =
+                              lot.lastMile === true ||
+                              /last-mile/i.test(lot.reason ?? '');
                             return (
                             <tr
                               key={lot.id}
@@ -11074,12 +11133,29 @@ export function App() {
                                       XL
                                     </span>
                                   ) : null}
+                                  {lot.international ||
+                                  lot.pressure?.international ? (
+                                    <span
+                                      className="tag"
+                                      title="International lane freight"
+                                    >
+                                      intl
+                                    </span>
+                                  ) : null}
                                   {lot.bush ? (
                                     <span
                                       className="tag"
                                       title="Bush soft-field — light GA only, no ferry"
                                     >
                                       bush
+                                    </span>
+                                  ) : null}
+                                  {lastMile ? (
+                                    <span
+                                      className="tag"
+                                      title="Last-mile Dry — short GA hop from a hub"
+                                    >
+                                      last-mile
                                     </span>
                                   ) : null}
                                   {cargoLocked ? (
@@ -11091,6 +11167,18 @@ export function App() {
                                     </span>
                                   ) : null}
                                 </div>
+                                {meta ? (
+                                  <small className="lot-meta" title={meta.title}>
+                                    {meta.text}
+                                  </small>
+                                ) : (
+                                  <small
+                                    className="lot-meta lot-meta-empty"
+                                    aria-hidden="true"
+                                  >
+                                    {'\u00a0'}
+                                  </small>
+                                )}
                                 <div className="npc-badge-slot">
                                   <NpcTakenBadge
                                     claim={lot.npcClaim}
@@ -11135,7 +11223,7 @@ export function App() {
                                 ) : null}
                               </td>
                               <td className="pay col-money">
-                                <LotPayCell lot={lot} />
+                                <LotPayCell lot={lot} idlePct={idlePct} />
                               </td>
                               <td
                                 className={
@@ -12354,28 +12442,7 @@ export function App() {
                   )}
                 </div>
               </div>
-              <BushTripMapCard
-                tripId={activeBushTrip.tripId}
-                title={activeBushTrip.title}
-                startIcao={activeBushTrip.startIcao ?? activeBushTrip.fromIcao}
-                endIcao={activeBushTrip.endIcao ?? activeBushTrip.toIcao}
-                currentFromIcao={activeBushTrip.fromIcao}
-                currentToIcao={activeBushTrip.toIcao}
-                legIndex={activeBushTrip.legIndex}
-                legs={activeBushTrip.legs}
-                mapNodes={activeBushTrip.mapNodes ?? EMPTY_BUSH_MAP_NODES}
-                hasPln={activeBushTrip.hasPln === true}
-                cruisingAltFt={activeBushTrip.cruisingAltFt}
-                aircraftIcao={activeBushTrip.fromIcao}
-                liveAircraft={
-                  bushWatch?.running ? (bushWatch.position ?? null) : null
-                }
-                aircraftLabel={
-                  fleet.find((a) => a.id === activeBushTrip.aircraftId)?.label ??
-                  'Aircraft'
-                }
-                onOpenAirport={(icao) => void openAirport(icao)}
-              />
+              {null /* bush trips removed */}
             </>
           ) : stagingMode === 'debrief' && flightDebrief ? (
             <>

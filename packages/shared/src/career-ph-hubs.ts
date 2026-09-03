@@ -10,6 +10,7 @@ import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
 } from './career-us-hubs.js';
+import { PH_DENSIFY_HUBS, PH_DENSIFY_HUB_COUNT } from './career-ph-hubs-densify.js';
 
 export type PhCareerRegion = 'PH-L' | 'PH-V' | 'PH-M';
 
@@ -77,9 +78,10 @@ export const PH_CAREER_HUBS: readonly PhCareerHubDef[] = [
     produce: { general: 1.2, perishables: 1.2, supplies: 1.1 },
     consume: { electronics: 0.95, machinery: 0.9, fuel: 1.1 },
   },
+  ...PH_DENSIFY_HUBS,
 ];
 
-export const PH_CAREER_HUB_COUNT = 5;
+export const PH_CAREER_HUB_COUNT = 5 + PH_DENSIFY_HUB_COUNT;
 
 export function buildPhFeederCorridors(
   hubs: readonly PhCareerHubDef[] = PH_CAREER_HUBS,

@@ -4,6 +4,8 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 
 **`.cursor/rules/career-economy-roadmap.mdc`**
 
+Measure backlog (não é retune): recovery time após shock + soak 30d NPC-only — [`20-economy-recovery-soak.md`](./20-economy-recovery-soak.md). Reusa `career pulse --days` / `sweepEconomyPulse`. Sem `CARGO_FLOW_BALANCE`.
+
 ## Em poucas linhas
 
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.

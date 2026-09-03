@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-03: **Recovery + soak spec** — measure-only: shock recovery time + 30d NPC-only soak. Reuse `sweepEconomyPulse` / `career pulse --days`. Sem Dry / `CARGO_FLOW_BALANCE`. Spec: [`20-economy-recovery-soak.md`](./20-economy-recovery-soak.md).
+
 Atualizado 2026-09-03: **NPC ensure/settle opt shipped** — skip fleet maintain + settle 1×/tick; bid indexes + compact@48. Live ~**0.70s/tick** (era 4.4s). Hot restante: **npc bid ~67%** (scan idle×board). Next: bid redesign or bulk. Sem Dry.
 
 Atualizado 2026-09-03: **Board-pressure/intl opt shipped** — cache tick + INTL 1-pass fleet; live tick ~**2.1s→~0.76s**. Hot agora **npc ~61%**. Next: npc bid index. Sem Dry.

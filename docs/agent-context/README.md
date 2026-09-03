@@ -37,6 +37,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [17-inject-regression.md](./17-inject-regression.md) | Pack GA/TP/light jet + checklist inject/read; Payload Lab (dev); freighter vs pax_and_cargo; mission `airframeLabel` enrichment |
 | [18-aircraft-pricing-balance.md](./18-aircraft-pricing-balance.md) | Buy/lease: balancear por pay da classe (perna ref., voos/sem, voos p/ comprar) |
 | [19-hub-stats.md](./19-hub-stats.md) | Aba Stats (hub) + Economy pulse tab (dev); samples SQLite v7/v8 |
+| [20-economy-recovery-soak.md](./20-economy-recovery-soak.md) | Spec: recovery time pós-shock + soak 30d NPC-only (medida; sem retune Dry) |
 
 ## Manutenção
 

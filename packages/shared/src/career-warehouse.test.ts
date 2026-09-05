@@ -22,8 +22,10 @@ import {
   WAREHOUSE_T1_CAPACITY_KG,
   WAREHOUSE_T2_CAPACITY_KG,
   WAREHOUSE_T3_CAPACITY_KG,
+  WAREHOUSE_T4_CAPACITY_KG,
   WAREHOUSE_T2_SHIPPED_KG,
   WAREHOUSE_T3_SHIPPED_KG,
+  WAREHOUSE_T4_SHIPPED_KG,
 } from './career-warehouse.js';
 import {
   acceptDemandOrder,
@@ -42,18 +44,19 @@ import {
   holdWarehouseBridge,
 } from './career-warehouse-bridge.js';
 import {
+  acceptWarehouseHaul,
+  cancelWarehouseHaulHold,
+  holdWarehouseHaul,
+} from './career-warehouse-haul.js';
+import {
   buyPortListing,
   depositPortPickupToWarehouse,
   ensurePortListings,
   listPortListings,
 } from './career-ports.js';
+import { cancelMission, departMission, settleMission } from './career-mission.js';
 import { createSeedEconomyWorld, migrateEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
-import {
-  cancelMission,
-  departMission,
-  settleMission,
-} from './career-mission.js';
 import { applyWalletDelta } from './career-ledger.js';
 import { normalizePlayerFboState } from './career-fbo.js';
 
@@ -323,6 +326,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
       {
         id: 'demand_pin_sbkp',
@@ -334,6 +338,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     assert.ok(
@@ -392,6 +397,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 100,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     const aircraft = state.fleet.find((a) => a.status === 'parked')!;
@@ -439,6 +445,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     const order = listOpenDemandOrders(world, {
@@ -548,6 +555,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     const order = listOpenDemandOrders(world, {
@@ -705,7 +713,15 @@ describe('career warehouse + demand', () => {
     assert.equal(upgraded.warehouse.capacityKg, WAREHOUSE_T3_CAPACITY_KG);
     assert.throws(
       () => upgradeWarehouse(state, world, whId),
-      /already Tier 3/i,
+      /Ship .* kg from SBGR/i,
+    );
+    row().lifetimeShippedKg = WAREHOUSE_T4_SHIPPED_KG;
+    const toT4 = upgradeWarehouse(state, world, whId);
+    assert.equal(toT4.warehouse.tier, 4);
+    assert.equal(toT4.warehouse.capacityKg, WAREHOUSE_T4_CAPACITY_KG);
+    assert.throws(
+      () => upgradeWarehouse(state, world, whId),
+      /already Tier 4/i,
     );
   });
 
@@ -774,6 +790,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     const migrated = migrateEconomyWorld(structuredClone(world));
@@ -857,6 +874,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     const held = holdDemandOrder(state, world, {
@@ -902,6 +920,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     const held = holdDemandOrder(state, world, {
@@ -949,6 +968,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
       {
         id: 'demand_hold_b',
@@ -960,6 +980,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     holdDemandOrder(state, world, {
@@ -1227,6 +1248,7 @@ describe('career warehouse + demand', () => {
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 200,
         status: 'open',
+        portId: 'BRSSZ',
       },
     ];
     holdDemandOrder(state, world, {
@@ -1248,5 +1270,70 @@ describe('career warehouse + demand', () => {
       350,
     );
     assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 450);
+  });
+
+  it('warehouse haul pays freight and settles dest terminal + shipped kg', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-haul-wide' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'HaulWide',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    wh.tier = 4;
+    wh.capacityKg = WAREHOUSE_T4_CAPACITY_KG;
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 1.5,
+      tick: world.tick,
+    });
+    const held = holdWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      kg: 200,
+    });
+    assert.equal(held.hold.kind, 'haul');
+    assert.ok(held.payUsd > 0);
+    cancelWarehouseHaulHold(state, world, { holdId: held.hold.id });
+
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const dest = world.airports.find((a) => a.icao === 'SBSP')!;
+    const destPile = dest.inventory.general ?? {
+      stockKg: 0,
+      capacityKg: 80_000,
+    };
+    dest.inventory.general = destPile;
+    const beforeStock = destPile.stockKg;
+    const accepted = acceptWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 150,
+    });
+    assert.equal(accepted.mission.warehouseHaul, true);
+    assert.ok(accepted.payUsd > 0);
+    assert.equal(accepted.mission.payUsd, accepted.payUsd);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
+
+    const departed = departMission(world, accepted.mission, { fleet: state });
+    const walletBeforeSettle = state.walletUsd;
+    const settled = settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(settled.mission.status, 'settled');
+    assert.ok(settled.walletCreditUsd > 0);
+    assert.ok(state.walletUsd >= walletBeforeSettle);
+    assert.equal(destPile.stockKg, beforeStock + 150);
+    assert.equal(
+      state.playerWarehouses!.warehouses[0]!.lifetimeShippedKg ?? 0,
+      150,
+    );
   });
 });

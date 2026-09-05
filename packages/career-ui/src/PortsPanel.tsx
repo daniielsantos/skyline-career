@@ -22,6 +22,10 @@ import {
   postWarehouseBridgeHoldCancel,
   postWarehouseBridgeAccept,
   postWarehouseBridgeDispatchHold,
+  postWarehouseHaulHold,
+  postWarehouseHaulHoldCancel,
+  postWarehouseHaulAccept,
+  postWarehouseHaulDispatchHold,
   type CareerCargoOps,
   type DemandOrderView,
   type GroundStaffSnapshot,
@@ -69,6 +73,14 @@ function warehouseStaffSlotsUnlocked(tier: number): number {
 const WH_T1_CAPACITY_KG = 2_268;
 const WH_T2_CAPACITY_KG = 4_536;
 const WH_T3_CAPACITY_KG = 6_804;
+const WH_T4_CAPACITY_KG = 45_000;
+
+function warehouseCapForTier(tier: number): number {
+  if (tier >= 4) return WH_T4_CAPACITY_KG;
+  if (tier === 3) return WH_T3_CAPACITY_KG;
+  if (tier === 2) return WH_T2_CAPACITY_KG;
+  return WH_T1_CAPACITY_KG;
+}
 /** Mirror of shared port→WH inbound transfer ticks. */
 const INBOUND_BASE_TICKS = 4;
 const INBOUND_MAX_TICKS = 8;
@@ -414,6 +426,13 @@ export function PortsPanel(props: {
   const [bridgeDest, setBridgeDest] = useState('');
   const [bridgeMode, setBridgeMode] = useState<'hold' | 'fly'>('hold');
   const [bridgeAircraftId, setBridgeAircraftId] = useState('');
+  const [haulDraft, setHaulDraft] = useState<{
+    originIcao: string;
+    commodityId: string;
+  } | null>(null);
+  const [haulDest, setHaulDest] = useState('');
+  const [haulMode, setHaulMode] = useState<'hold' | 'fly'>('hold');
+  const [haulAircraftId, setHaulAircraftId] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
@@ -1187,10 +1206,9 @@ export function PortsPanel(props: {
   async function onUpgradeWarehouse(warehouseId: string, icao: string) {
     if (props.busy || loading) return;
     const wh = (warehouses?.warehouses ?? []).find((w) => w.id === warehouseId);
-    const nextTier = wh?.nextTier ?? (wh?.tier === 1 ? 2 : wh?.tier === 2 ? 3 : null);
+    const nextTier = wh?.nextTier ?? (wh?.tier === 1 ? 2 : wh?.tier === 2 ? 3 : wh?.tier === 3 ? 4 : null);
     if (!nextTier) return;
-    const nextCap =
-      nextTier === 3 ? WH_T3_CAPACITY_KG : WH_T2_CAPACITY_KG;
+    const nextCap = warehouseCapForTier(nextTier);
     const price =
       wh?.upgradeUsd != null ? props.formatMoney(wh.upgradeUsd) : 'upgrade';
     const ok = await confirm({
@@ -1386,6 +1404,22 @@ export function PortsPanel(props: {
           `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
         );
         props.onStaged?.(result.mission);
+      } else if (dispatchHold.kind === 'haul') {
+        const result = await postWarehouseHaulDispatchHold({
+          holdId: dispatchHold.id,
+          aircraftId: dispatchAircraftId,
+        });
+        props.onWallet?.(result.walletUsd);
+        props.onFleet?.(result.fleet);
+        props.onMissions?.(result.missions.slice().reverse());
+        setWarehouses(result.warehouses);
+        setDispatchHold(null);
+        setDispatchAircraftId('');
+        props.onToast?.(
+          'ok',
+          `Haul ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
+        );
+        props.onStaged?.(result.mission);
       } else {
         const result = await postDemandDispatchHold({
           holdId: dispatchHold.id,
@@ -1423,6 +1457,13 @@ export function PortsPanel(props: {
         props.onToast?.(
           'ok',
           `Released ${props.formatTonnes(result.kg)} bridge hold`,
+        );
+      } else if (hold.kind === 'haul') {
+        const result = await postWarehouseHaulHoldCancel({ holdId: hold.id });
+        setWarehouses(result.warehouses);
+        props.onToast?.(
+          'ok',
+          `Released ${props.formatTonnes(result.kg)} haul hold`,
         );
       } else {
         const result = await postDemandHoldCancel({ holdId: hold.id });
@@ -1475,6 +1516,52 @@ export function PortsPanel(props: {
         props.onToast?.(
           'ok',
           `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
+        );
+        props.onStaged?.(result.mission);
+      }
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onConfirmHaul() {
+    if (!haulDraft || !haulDest.trim() || props.busy || loading) return;
+    if (haulMode === 'fly' && !haulAircraftId) return;
+    setLoading(true);
+    try {
+      const dest = haulDest.trim().toUpperCase();
+      if (haulMode === 'hold') {
+        const result = await postWarehouseHaulHold({
+          originIcao: haulDraft.originIcao,
+          destIcao: dest,
+          commodityId: haulDraft.commodityId,
+        });
+        setWarehouses(result.warehouses);
+        setHaulDraft(null);
+        props.onToast?.(
+          'ok',
+          `Held ${props.formatTonnes(result.kg)} haul ${result.hold.originIcao}→${result.hold.destIcao} · ${props.formatMoney(result.payUsd)}`,
+        );
+      } else {
+        const result = await postWarehouseHaulAccept({
+          originIcao: haulDraft.originIcao,
+          destIcao: dest,
+          commodityId: haulDraft.commodityId,
+          aircraftId: haulAircraftId,
+        });
+        props.onWallet?.(result.walletUsd);
+        props.onFleet?.(result.fleet);
+        props.onMissions?.(result.missions.slice().reverse());
+        setWarehouses(result.warehouses);
+        setHaulDraft(null);
+        props.onToast?.(
+          'ok',
+          `Haul ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
         );
         props.onStaged?.(result.mission);
       }
@@ -1646,7 +1733,10 @@ export function PortsPanel(props: {
       new Set(
         (warehouses?.demandHolds ?? [])
           .filter(
-            (h) => (h.kind ?? 'demand') !== 'bridge' && Boolean(h.orderId),
+            (h) =>
+              (h.kind ?? 'demand') !== 'bridge' &&
+              h.kind !== 'haul' &&
+              Boolean(h.orderId),
           )
           .map((h) => h.orderId!),
       ),
@@ -1758,6 +1848,15 @@ export function PortsPanel(props: {
         a.locationIcao.trim().toUpperCase() === hub,
     );
   }, [props.fleet, bridgeDraft, bridgeMode]);
+  const haulAircraftOptions = useMemo(() => {
+    if (!haulDraft || haulMode !== 'fly') return [];
+    const hub = haulDraft.originIcao.trim().toUpperCase();
+    return props.fleet.filter(
+      (a) =>
+        a.status === 'parked' &&
+        a.locationIcao.trim().toUpperCase() === hub,
+    );
+  }, [props.fleet, haulDraft, haulMode]);
   const selectedStock = useMemo(() => {
     if (!selectedStockId) return null;
     return allWarehouseStock.find((s) => s.id === selectedStockId) ?? null;
@@ -1944,6 +2043,19 @@ export function PortsPanel(props: {
         a.locationIcao.trim().toUpperCase() === origin,
     );
     setBridgeAircraftId(parked[0]?.id ?? '');
+  }
+
+  function openHaulFromLot(originIcao: string, commodityId: string) {
+    const origin = originIcao.trim().toUpperCase();
+    setHaulDraft({ originIcao: origin, commodityId });
+    setHaulDest('');
+    setHaulMode('hold');
+    const parked = props.fleet.filter(
+      (a) =>
+        a.status === 'parked' &&
+        a.locationIcao.trim().toUpperCase() === origin,
+    );
+    setHaulAircraftId(parked[0]?.id ?? '');
   }
 
   function selectBuyHub(icao: string) {
@@ -3021,7 +3133,9 @@ export function PortsPanel(props: {
                                     </div>
                                   ) : (
                                     <p className="ports-wh-upgrade-hint">
-                                      Tier 3 · max capacity
+                                      {wh.tier >= 4
+                                        ? 'Tier 4 Port Bonded · max capacity'
+                                        : 'Tier 3 · max capacity'}
                                     </p>
                                   )}
                                 </div>
@@ -3101,6 +3215,21 @@ export function PortsPanel(props: {
                                             ) : null}
                                             <button
                                               type="button"
+                                              className="accept"
+                                              disabled={props.busy || loading}
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                openHaulFromLot(
+                                                  icao,
+                                                  s.commodityId,
+                                                );
+                                              }}
+                                              title="Dispatch WH stock to a destination terminal (Wide when kg allows)"
+                                            >
+                                              Haul
+                                            </button>
+                                            <button
+                                              type="button"
                                               className="action ghost"
                                               disabled={props.busy || loading}
                                               onClick={(event) => {
@@ -3125,6 +3254,7 @@ export function PortsPanel(props: {
                                     {hubHolds.map((h) => {
                                       const isBridge =
                                         (h.kind ?? 'demand') === 'bridge';
+                                      const isHaul = h.kind === 'haul';
                                       return (
                                         <li key={h.id} className="ports-wh-lot">
                                           <div className="ports-wh-lot-main">
@@ -3139,12 +3269,16 @@ export function PortsPanel(props: {
                                                     className={
                                                       isBridge
                                                         ? 'ports-wh-hold-kind is-transfer'
-                                                        : 'ports-wh-hold-kind is-demand'
+                                                        : isHaul
+                                                          ? 'ports-wh-hold-kind is-transfer'
+                                                          : 'ports-wh-hold-kind is-demand'
                                                     }
                                                   >
                                                     {isBridge
                                                       ? 'Transfer'
-                                                      : 'Demand'}
+                                                      : isHaul
+                                                        ? 'Haul'
+                                                        : 'Demand'}
                                                   </span>
                                                   <span className="ports-wh-hold-dest">
                                                     → {h.destIcao}
@@ -4463,6 +4597,23 @@ export function PortsPanel(props: {
         />
       ) : null}
 
+      {haulDraft ? (
+        <WarehouseHaulDialog
+          originIcao={haulDraft.originIcao}
+          commodityId={haulDraft.commodityId}
+          destIcao={haulDest}
+          mode={haulMode}
+          aircraftId={haulAircraftId}
+          aircraftOptions={haulAircraftOptions}
+          busy={Boolean(props.busy || loading)}
+          onDestChange={setHaulDest}
+          onModeChange={setHaulMode}
+          onAircraftChange={setHaulAircraftId}
+          onCancel={() => setHaulDraft(null)}
+          onConfirm={() => void onConfirmHaul()}
+        />
+      ) : null}
+
       {confirmDialog}
     </section>
   );
@@ -5103,7 +5254,11 @@ function DemandDispatchHoldDialog(props: {
         aria-labelledby={titleId}
       >
         <p className="confirm-kicker">
-          {props.hold.kind === 'bridge' ? 'Warehouse bridge' : 'Warehouse hold'}
+          {props.hold.kind === 'bridge'
+            ? 'Warehouse bridge'
+            : props.hold.kind === 'haul'
+              ? 'Warehouse haul'
+              : 'Warehouse hold'}
         </p>
         <h2 id={titleId} className="confirm-title">
           Dispatch {props.hold.originIcao}→{props.hold.destIcao}?
@@ -5114,7 +5269,9 @@ function DemandDispatchHoldDialog(props: {
             pick a parked aircraft at {props.hold.originIcao}
             {props.hold.kind === 'bridge'
               ? '. No payout — cargo lands in the dest warehouse.'
-              : '.'}
+              : props.hold.kind === 'haul'
+                ? '. Paid trunk freight — cargo fills the dest terminal.'
+                : '.'}
           </p>
           <div className="demand-accept-section">
             <span className="demand-accept-label">Aircraft</span>
@@ -5254,6 +5411,155 @@ function WarehouseBridgeDialog(props: {
               {props.commodityId}
             </p>
           ) : null}
+          <div className="demand-accept-section">
+            <span className="demand-accept-label">When</span>
+            <div className="demand-accept-picks" role="listbox" aria-label="Hold or fly">
+              <button
+                type="button"
+                role="option"
+                aria-selected={props.mode === 'hold'}
+                className={`demand-accept-pick${props.mode === 'hold' ? ' is-active' : ''}`}
+                disabled={props.busy}
+                onClick={() => props.onModeChange('hold')}
+              >
+                <strong>Hold at WH</strong>
+                <span>Reserve kg — fly later</span>
+              </button>
+              <button
+                type="button"
+                role="option"
+                aria-selected={props.mode === 'fly'}
+                className={`demand-accept-pick${props.mode === 'fly' ? ' is-active' : ''}`}
+                disabled={props.busy}
+                onClick={() => props.onModeChange('fly')}
+              >
+                <strong>Fly now</strong>
+                <span>Stage Dispatch</span>
+              </button>
+            </div>
+          </div>
+          {props.mode === 'fly' ? (
+            <div className="demand-accept-section">
+              <span className="demand-accept-label">Aircraft</span>
+              {props.aircraftOptions.length === 0 ? (
+                <p className="demand-accept-hint">
+                  No parked aircraft at {props.originIcao} — ferry one there.
+                </p>
+              ) : (
+                <div
+                  className="demand-accept-picks"
+                  role="listbox"
+                  aria-label="Aircraft"
+                >
+                  {props.aircraftOptions.map((a) => {
+                    const active = a.id === props.aircraftId;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        className={`demand-accept-pick${active ? ' is-active' : ''}`}
+                        disabled={props.busy}
+                        onClick={() => props.onAircraftChange(a.id)}
+                      >
+                        <strong>{a.label ?? a.id}</strong>
+                        <span>{a.locationIcao}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+        <div className="confirm-actions">
+          <button
+            type="button"
+            className="action ghost"
+            disabled={props.busy}
+            onClick={props.onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="accept"
+            disabled={!canConfirm}
+            onClick={props.onConfirm}
+          >
+            {props.mode === 'hold' ? 'Hold' : 'Fly now'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WarehouseHaulDialog(props: {
+  originIcao: string;
+  commodityId: string;
+  destIcao: string;
+  mode: 'hold' | 'fly';
+  aircraftId: string;
+  aircraftOptions: PlayerAircraft[];
+  busy: boolean;
+  onDestChange: (icao: string) => void;
+  onModeChange: (mode: 'hold' | 'fly') => void;
+  onAircraftChange: (id: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const titleId = useId();
+  const destOk = /^[A-Z0-9]{3,4}$/.test(props.destIcao.trim().toUpperCase());
+  const canConfirm =
+    destOk &&
+    !props.busy &&
+    (props.mode === 'hold' ||
+      (Boolean(props.aircraftId) && props.aircraftOptions.length > 0));
+  return (
+    <div
+      className="confirm-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) props.onCancel();
+      }}
+    >
+      <div
+        className="confirm-dialog demand-accept-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <p className="confirm-kicker">Warehouse haul</p>
+        <h2 id={titleId} className="confirm-title">
+          {props.originIcao}→{props.destIcao.trim().toUpperCase() || '…'}?
+        </h2>
+        <div className="confirm-body">
+          <p>
+            Fly stock from your warehouse to a destination terminal. Pay is
+            trunk freight (Wide tonnage when the load is XL-sized) — not a
+            Demand Board order.
+          </p>
+          <div className="demand-accept-section">
+            <span className="demand-accept-label">Destination ICAO</span>
+            <input
+              type="text"
+              className="ports-haul-dest-input"
+              value={props.destIcao}
+              maxLength={4}
+              placeholder="e.g. SBSP"
+              disabled={props.busy}
+              onChange={(event) =>
+                props.onDestChange(event.target.value.toUpperCase())
+              }
+              aria-label="Destination ICAO"
+            />
+            <p className="demand-accept-hint">
+              Commodity {props.commodityId} · uses all free WH stock of that
+              type (capped by aircraft ops when flying).
+            </p>
+          </div>
           <div className="demand-accept-section">
             <span className="demand-accept-label">When</span>
             <div className="demand-accept-picks" role="listbox" aria-label="Hold or fly">

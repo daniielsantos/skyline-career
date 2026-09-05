@@ -219,7 +219,7 @@ export const CL_CAREER_HUBS: readonly ClCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'SCPQ',
+    icao: 'SCGZ',
     name: 'Puerto Williams',
     region: 'CL-S',
     hubTier: 'spoke',
@@ -337,8 +337,17 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SAZU: 'SATU', // Curuzu Cuatia
   SARL: 'SATR', // Reconquista
   SAHR: 'SAZW', // Cutral Co
-  SAHS: 'SANR', // Termas (already seeded)
+  // SAHS is Rincon de los Sauces (OA) — do not map to SANR (Termas).
+  // SANR→SANE migrates mis-seeded Santiago; Termas densify later (do not seed
+  // Termas as SANR while SANR→SANE remains).
   SAOS: 'SAAV', // Sauce Viejo (already seeded)
+  // Order matters for remapRetiredCareerAirportIdents (Object insert order):
+  // San Rafael SAOU→SAMR must run before San Luis SANL→SAOU.
+  SAOU: 'SAMR', // San Rafael (stock MSFS SAOU is San Luis)
+  SANL: 'SAOU', // San Luis Ojeda (stock MSFS SANL is La Rioja)
+  SAMA: 'SAMM', // Malargüe (stock MSFS SAMA is General Alvear)
+  SANR: 'SANE', // Santiago del Estero (stock MSFS SANR is Termas)
+  SCPQ: 'SCGZ', // Puerto Williams (stock MSFS SCPQ is Mocopulli)
   // SAHC Coronel Suarez / SAZC dropped — stock MSFS SAZC is Zarate (~242 nm)
   // SYKM/SYKA Kaieteur dropped — no MSFS facility coords
   MRCH: 'MRCR', // Carrillo

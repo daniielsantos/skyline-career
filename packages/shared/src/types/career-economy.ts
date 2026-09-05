@@ -885,6 +885,11 @@ export interface MissionIntent {
    * overflow goes to that hub's port yard. Cancel restores origin WH.
    */
   warehouseBridge?: boolean;
+  /**
+   * Wide/trunk haul from player WH → dest terminal (paid freight).
+   * Settle fills dest inventory + credits lifetimeShippedKg; cancel restores WH.
+   */
+  warehouseHaul?: boolean;
   /** Dest warehouse id for a bridge mission. */
   destWarehouseId?: string;
   /** Warehouse id cargo was drawn from (restore on cancel). */
@@ -1251,10 +1256,10 @@ export interface PlayerWarehouse {
   id: string;
   icao: string;
   capacityKg: number;
-  tier: 1 | 2 | 3;
+  tier: 1 | 2 | 3 | 4;
   /**
    * Lifetime kg delivered from this warehouse via Demand Board settle.
-   * Used to unlock T1→T2 / T2→T3 upgrades (hybrid money + throughput).
+   * Used to unlock T1→T2 / T2→T3 / T3→T4 upgrades (hybrid money + throughput).
    */
   lifetimeShippedKg?: number;
 }
@@ -1288,8 +1293,8 @@ export interface WarehouseInboundTransfer {
 /** Demand Board kg pledged at a warehouse without starting a flight. */
 export interface PlayerDemandHold {
   id: string;
-  /** `demand` claims world remainingKg; `bridge` is company WH→WH only. */
-  kind?: 'demand' | 'bridge';
+  /** `demand` claims world remainingKg; `bridge` WH→WH; `haul` WH→terminal Wide. */
+  kind?: 'demand' | 'bridge' | 'haul';
   /** Demand Board order id (`demand` holds). */
   orderId?: string;
   warehouseId: string;

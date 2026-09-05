@@ -1953,6 +1953,22 @@ export function cancelMission(
           // Warehouse may be gone — cancel still succeeds.
         }
       }
+    } else if (normalized.warehouseHaul) {
+      const line = normalized.lots[0];
+      const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
+      if (kg > 0) {
+        try {
+          depositCargoToWarehouse(opts.fleet, {
+            icao: normalized.originIcao,
+            commodityId: line?.commodityId ?? normalized.commodityId,
+            kg,
+            avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
+            tick: normalized.acceptedAtTick ?? world.tick,
+          });
+        } catch {
+          // Warehouse may be gone — cancel still succeeds.
+        }
+      }
     } else if (normalized.demandOrderId) {
       const line = normalized.lots[0];
       const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
@@ -2081,7 +2097,8 @@ export function revertFalseDepartMission(
         line.shipmentLotId.startsWith('empty_') ||
         line.shipmentLotId.startsWith('portpk_') ||
         line.shipmentLotId.startsWith('demand_') ||
-        line.shipmentLotId.startsWith('whbridge_')
+        line.shipmentLotId.startsWith('whbridge_') ||
+        line.shipmentLotId.startsWith('whhaul_')
       ) {
         continue;
       }
@@ -2133,7 +2150,8 @@ export function departMission(
         line.shipmentLotId.startsWith('empty_') ||
         line.shipmentLotId.startsWith('portpk_') ||
         line.shipmentLotId.startsWith('demand_') ||
-        line.shipmentLotId.startsWith('whbridge_')
+        line.shipmentLotId.startsWith('whbridge_') ||
+        line.shipmentLotId.startsWith('whhaul_')
       ) {
         continue;
       }
@@ -2517,10 +2535,12 @@ export function settleMission(
         });
         continue;
       }
-      // Demand Board: company warehouse cargo — fill dest only (no origin debit).
+      // Demand Board / WH haul: company warehouse cargo — fill dest only (no origin debit).
       if (
         working.demandOrderId ||
-        line.shipmentLotId.startsWith('demand_')
+        working.warehouseHaul ||
+        line.shipmentLotId.startsWith('demand_') ||
+        line.shipmentLotId.startsWith('whhaul_')
       ) {
         const byIcao = new Map(
           world.airports.map((a) => [a.icao.toUpperCase(), a] as const),

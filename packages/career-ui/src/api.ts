@@ -831,7 +831,7 @@ export type GroundStaffSnapshot = {
     {
       warehouseId: string;
       hubIcao: string;
-      tier: 1 | 2 | 3;
+      tier: 1 | 2 | 3 | 4;
       slotsUnlocked: number;
       slotsUsed: number;
       slotsFree: number;
@@ -2201,7 +2201,7 @@ export type PlayerWarehouseView = {
   id: string;
   icao: string;
   capacityKg: number;
-  tier: 1 | 2 | 3;
+  tier: 1 | 2 | 3 | 4;
   usedKg: number;
   freeKg: number;
   /** Kg reserved in port→WH inbound transfers. */
@@ -2212,7 +2212,7 @@ export type PlayerWarehouseView = {
   /** @deprecated Prefer shippedNeededForNextTierKg. */
   shippedNeededForT2Kg?: number;
   shippedNeededForNextTierKg?: number;
-  nextTier?: 2 | 3 | null;
+  nextTier?: 2 | 3 | 4 | null;
   upgradeUsd?: number | null;
   canUpgrade?: boolean;
   hubTier?: 'spoke' | 'regional' | 'major';
@@ -2246,7 +2246,7 @@ export type WarehouseInboundTransferView = {
 
 export type PlayerDemandHoldView = {
   id: string;
-  kind?: 'demand' | 'bridge';
+  kind?: 'demand' | 'bridge' | 'haul';
   orderId?: string;
   warehouseId: string;
   originIcao: string;
@@ -2416,7 +2416,7 @@ export function postWarehouseBuy(opts: { icao: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;
-    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 };
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 | 4 };
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/buy', {
@@ -2429,7 +2429,7 @@ export function postWarehouseUpgrade(opts: { warehouseId: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;
-    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 };
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 | 4 };
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/upgrade', {
@@ -2511,6 +2511,72 @@ export function postWarehouseBridgeDispatchHold(opts: {
     fleet: PlayerAircraft[];
     missions: Mission[];
   }>('/api/warehouses/bridge/dispatch-hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseHaulHold(opts: {
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  kg?: number;
+}) {
+  return api<{
+    hold: PlayerDemandHoldView;
+    kg: number;
+    payUsd: number;
+    warehouses: PlayerWarehouseSnapshot;
+  }>('/api/warehouses/haul/hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseHaulHoldCancel(opts: { holdId: string }) {
+  return api<{ kg: number; warehouses: PlayerWarehouseSnapshot }>(
+    '/api/warehouses/haul/hold/cancel',
+    {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    },
+  );
+}
+
+export function postWarehouseHaulAccept(opts: {
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  aircraftId: string;
+  kg?: number;
+}) {
+  return api<{
+    walletUsd: number;
+    mission: Mission;
+    kg: number;
+    payUsd: number;
+    warehouses: PlayerWarehouseSnapshot;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/warehouses/haul/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postWarehouseHaulDispatchHold(opts: {
+  holdId: string;
+  aircraftId: string;
+}) {
+  return api<{
+    walletUsd: number;
+    mission: Mission;
+    kg: number;
+    payUsd: number;
+    warehouses: PlayerWarehouseSnapshot;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/warehouses/haul/dispatch-hold', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

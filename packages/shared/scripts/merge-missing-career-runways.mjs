@@ -3,6 +3,12 @@
  * Does NOT wipe curated existing rows (unlike full generate-career-runways.mjs).
  *
  *   node packages/shared/scripts/merge-missing-career-runways.mjs
+ *   npm run generate:runways:missing -w @msfs-compat/shared
+ *
+ * Fallbacks when OA has no usable geometry:
+ *  1. Career ICAO → OA local-ident aliases (closed / renamed fields)
+ *  2. Runway rows with length but no ends → airport lat/lon + heading from RWY number
+ *  3. Synthetic strip at CAREER_HUB_COORDS (tier-based length)
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -20,6 +26,26 @@ const AIRPORTS_URL =
 const RUNWAYS_URL =
   'https://davidmegginson.github.io/ourairports-data/runways.csv';
 const FT_TO_M = 0.3048;
+
+/** Career ICAO → OurAirports airport_ident when gps_code/ident diverge (closed / rename). */
+const OA_AIRPORT_ALIASES = {
+  EGCN: 'GB-1212', // Doncaster Sheffield (closed)
+  EVDA: 'LV-8040', // Daugavpils (closed)
+  LKHO: 'CZ-0268', // Holešov (closed)
+  RPVT: 'PH-0683', // Tagbilaran (closed)
+  SAAJ: 'AR-0743', // Junín (closed)
+  SACT: 'AR-0744', // Chamical
+  SBQV: 'BR-1961', // Vitória da Conquista Pedro Otacílio (closed)
+  SEQU: 'SEQM', // Quito Mariscal Sucre (new field; career keeps SEQU)
+  MZSP: 'BZ-SPR', // San Pedro John Greif II
+};
+
+/** Synthetic length when OA has zero runway rows (meters). */
+const SYNTH_LENGTH_M = {
+  spoke: 1_200,
+  regional: 1_800,
+  major: 2_800,
+};
 
 function mapSurface(surface) {
   const s = String(surface ?? '')
@@ -130,7 +156,23 @@ async function ensureCsv(name, url) {
   }
 }
 
-function buildRunway(row) {
+/** RWY 06 → 60°, RWY 36 → 360°→0° for heading math (normalize to 0–360). */
+function headingFromIdent(ident) {
+  const m = String(ident ?? '')
+    .trim()
+    .toUpperCase()
+    .match(/^(\d{1,2})/);
+  if (!m) return null;
+  let n = Number(m[1]);
+  if (!Number.isFinite(n) || n < 1 || n > 36) return null;
+  return (n * 10) % 360;
+}
+
+/**
+ * @param {Record<string, string>} row
+ * @param {{ lat: number; lon: number } | null} airportFallback
+ */
+function buildRunway(row, airportFallback) {
   const lengthFt = Number(row.length_ft);
   const widthFt = Number(row.width_ft);
   if (!(lengthFt > 0)) return null;
@@ -140,7 +182,27 @@ function buildRunway(row) {
   const heLon = Number(row.he_longitude_deg);
   let lat = Number.isFinite(leLat) ? leLat : heLat;
   let lon = Number.isFinite(leLon) ? leLon : heLon;
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (
+    Number.isFinite(leLat) &&
+    Number.isFinite(leLon) &&
+    Number.isFinite(heLat) &&
+    Number.isFinite(heLon)
+  ) {
+    lat = (leLat + heLat) / 2;
+    lon = (leLon + heLon) / 2;
+  }
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    if (
+      airportFallback &&
+      Number.isFinite(airportFallback.lat) &&
+      Number.isFinite(airportFallback.lon)
+    ) {
+      lat = airportFallback.lat;
+      lon = airportFallback.lon;
+    } else {
+      return null;
+    }
+  }
   let heading = null;
   if (
     Number.isFinite(leLat) &&
@@ -154,7 +216,6 @@ function buildRunway(row) {
     heading =
       ((Math.atan2(dLon * Math.cos(latMid), dLat) * 180) / Math.PI + 360) % 360;
   }
-  if (heading == null) return null;
   const ident = String(row.le_ident ?? '')
     .trim()
     .toUpperCase();
@@ -162,6 +223,10 @@ function buildRunway(row) {
     .trim()
     .toUpperCase();
   if (!ident) return null;
+  if (heading == null) {
+    heading =
+      headingFromIdent(ident) ?? headingFromIdent(identReciprocal) ?? 90;
+  }
   const widthM =
     widthFt != null && widthFt > 0 ? Math.round(widthFt * FT_TO_M * 10) / 10 : 45;
   const lightedRaw = String(row.lighted ?? '')
@@ -182,11 +247,43 @@ function buildRunway(row) {
   };
 }
 
+function synthesizeRunway(icao, coords, tier) {
+  const lengthM = SYNTH_LENGTH_M[tier] ?? SYNTH_LENGTH_M.regional;
+  const heading = 90;
+  return {
+    ident: '09',
+    identReciprocal: '27',
+    headingTrueDeg: heading,
+    lengthM,
+    widthM: 30,
+    lat: Math.round(coords.lat * 1e6) / 1e6,
+    lon: Math.round(coords.lon * 1e6) / 1e6,
+    surface: 'asphalt',
+    lighted: false,
+  };
+}
+
+function dedupeSort(list) {
+  const seen = new Set();
+  return list
+    .filter((r) => {
+      const key = `${r.ident}|${r.identReciprocal ?? ''}|${r.lengthM}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => b.lengthM - a.lengthM || a.ident.localeCompare(b.ident));
+}
+
 async function main() {
   const existing = JSON.parse(await readFile(outPath, 'utf8'));
   const { listCareerHubIcaos } = await import(
     pathToFileURL(join(sharedRoot, 'dist', 'career-fleet.js')).href
   );
+  const { CAREER_HUB_COORDS, hubTierOf } = await import(
+    pathToFileURL(join(sharedRoot, 'dist', 'career-economy.js')).href
+  );
+
   const hubs = listCareerHubIcaos().filter((icao) => {
     const row = existing[icao];
     return !Array.isArray(row) || row.length === 0;
@@ -206,8 +303,30 @@ async function main() {
     parseCsv(await readFile(runwaysPath, 'utf8')),
   );
 
+  /** @type {Map<string, { lat: number; lon: number }>} */
+  const airportCoordsByIdent = new Map();
+  for (const a of airportRows) {
+    const lat = Number(a.latitude_deg);
+    const lon = Number(a.longitude_deg);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const gps = String(a.gps_code ?? '')
+      .trim()
+      .toUpperCase();
+    const ident = String(a.ident ?? '')
+      .trim()
+      .toUpperCase();
+    const coords = { lat, lon };
+    if (ident) airportCoordsByIdent.set(ident, coords);
+    if (gps) airportCoordsByIdent.set(gps, coords);
+  }
+
   const hubIdents = new Map();
-  for (const icao of hubs) hubIdents.set(icao, new Set([icao]));
+  for (const icao of hubs) {
+    const set = new Set([icao]);
+    const alias = OA_AIRPORT_ALIASES[icao];
+    if (alias) set.add(alias);
+    hubIdents.set(icao, set);
+  }
   for (const a of airportRows) {
     const gps = String(a.gps_code ?? '')
       .trim()
@@ -231,36 +350,57 @@ async function main() {
 
   const added = {};
   for (const icao of hubs) added[icao] = [];
+  let fromGeom = 0;
+  let fromAirportCenter = 0;
   for (const row of runwayRows) {
     const airportIdent = String(row.airport_ident ?? '')
       .trim()
       .toUpperCase();
     const hub = identToHub.get(airportIdent);
     if (!hub) continue;
-    const rwy = buildRunway(row);
+    const leLat = Number(row.le_latitude_deg);
+    const heLat = Number(row.he_latitude_deg);
+    const hasEnds = Number.isFinite(leLat) || Number.isFinite(heLat);
+    const fallback = airportCoordsByIdent.get(airportIdent) ?? null;
+    const rwy = buildRunway(row, fallback);
     if (!rwy) continue;
+    if (hasEnds) fromGeom += 1;
+    else fromAirportCenter += 1;
     added[hub].push(rwy);
   }
+
+  let fromAliasGeom = 0;
   for (const icao of Object.keys(added)) {
-    const seen = new Set();
-    added[icao] = added[icao]
-      .filter((r) => {
-        const key = `${r.ident}|${r.identReciprocal ?? ''}|${r.lengthM}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort(
-        (a, b) => b.lengthM - a.lengthM || a.ident.localeCompare(b.ident),
-      );
-    if (added[icao].length > 0) existing[icao] = added[icao];
+    added[icao] = dedupeSort(added[icao]);
+    if (added[icao].length > 0) {
+      existing[icao] = added[icao];
+      if (OA_AIRPORT_ALIASES[icao]) fromAliasGeom += 1;
+    }
+  }
+
+  let synth = 0;
+  const stillAfterOa = hubs.filter(
+    (i) => !Array.isArray(existing[i]) || existing[i].length === 0,
+  );
+  for (const icao of stillAfterOa) {
+    const coords = CAREER_HUB_COORDS[icao];
+    if (
+      !coords ||
+      !Number.isFinite(coords.lat) ||
+      !Number.isFinite(coords.lon)
+    ) {
+      continue;
+    }
+    const tier = hubTierOf({ icao });
+    existing[icao] = [synthesizeRunway(icao, coords, tier)];
+    synth += 1;
   }
 
   const stillMissing = hubs.filter(
     (i) => !Array.isArray(existing[i]) || existing[i].length === 0,
   );
   console.log(
-    `Merged ${hubs.length - stillMissing.length}; still missing: ${stillMissing.join(', ') || 'none'}`,
+    `Merged OA ${hubs.length - stillAfterOa.length} (ends ${fromGeom}, airport-center ${fromAirportCenter}, alias hubs ${fromAliasGeom}); synth ${synth}; still missing: ${stillMissing.join(', ') || 'none'}`,
   );
   await writeFile(outPath, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
   console.log(`Wrote ${outPath}`);

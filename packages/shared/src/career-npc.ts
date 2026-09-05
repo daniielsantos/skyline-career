@@ -18,6 +18,7 @@ import {
   routeDistanceNm,
   shrinkLotAfterDelivery,
   SMALL_LOT_MAX_KG,
+  LARGE_LOT_MIN_KG,
 } from './career-economy.js';
 import {
   bushRequiresLightGa,
@@ -542,6 +543,10 @@ function npcBidScore(args: {
   noise: number;
   busyPenalty: number;
   aggressiveness: number;
+  /** Value/Heavy large-lot lift (electronics/machinery). */
+  liftBonus?: number;
+  /** Phase E2: heavy freighters deprioritize Value LTL. */
+  ltlPenalty?: number;
 }): number {
   const urgencyScore = args.urgencyHot
     ? 0.55 * args.aggressiveness
@@ -554,9 +559,49 @@ function npcBidScore(args: {
     urgencyScore +
     expiryScore +
     regionScore +
+    (args.liftBonus ?? 0) +
     args.noise -
-    args.busyPenalty
+    args.busyPenalty -
+    (args.ltlPenalty ?? 0)
   );
+}
+
+/**
+ * Prefer clearing large electronics/machinery (Phase D, strengthened in E2).
+ */
+export function valueHeavyNpcLiftBonus(
+  lot: Pick<
+    ShipmentLot,
+    'commodityId' | 'quantityKg' | 'createdAtTick' | 'expiresAtTick'
+  >,
+  tick: number,
+  aircraftClassId: FreighterClassId,
+): number {
+  if (lot.commodityId !== 'electronics' && lot.commodityId !== 'machinery') {
+    return 0;
+  }
+  if (lot.quantityKg < LARGE_LOT_MIN_KG) return 0;
+  const life = Math.max(1, lot.expiresAtTick - lot.createdAtTick);
+  const expiryFrac = 1 - Math.max(0, lot.expiresAtTick - tick) / life;
+  let bonus = 0.55 + expiryFrac * 0.75;
+  if (HEAVY_FREIGHTER_CLASSES.has(aircraftClassId)) bonus *= 1.35;
+  return bonus;
+}
+
+/**
+ * Phase E2: Narrow/Wide leave Value LTL for light classes / player so their
+ * payload clears large lots (claimShare stuck ~0.33 with D lift alone).
+ */
+export function valueHeavyNpcLtlPenalty(
+  lot: Pick<ShipmentLot, 'commodityId' | 'quantityKg'>,
+  aircraftClassId: FreighterClassId,
+): number {
+  if (lot.commodityId !== 'electronics' && lot.commodityId !== 'machinery') {
+    return 0;
+  }
+  if (lot.quantityKg >= LARGE_LOT_MIN_KG) return 0;
+  if (!HEAVY_FREIGHTER_CLASSES.has(aircraftClassId)) return 0;
+  return 0.55;
 }
 
 function lotAvailableKg(lot: ShipmentLot): number {
@@ -2351,6 +2396,8 @@ export function scoreLotForNpc(
     noise,
     busyPenalty,
     aggressiveness: npc.aggressiveness,
+    liftBonus: valueHeavyNpcLiftBonus(lot, world.tick, npc.aircraftClassId),
+    ltlPenalty: valueHeavyNpcLtlPenalty(lot, npc.aircraftClassId),
   });
 }
 
@@ -3491,6 +3538,8 @@ function npcBidOnMarket(
       busyPenalty: 0,
       aggressiveness: npc.aggressiveness,
       fillRatio: 1,
+      liftBonus: 0,
+      ltlPenalty: 0,
     };
     const busyPenaltyOf = (row: BidCandidate): number => {
       const inboundKg = laneIndex.byOd.get(row.odKey) ?? 0;
@@ -3505,6 +3554,15 @@ function npcBidOnMarket(
       scoreArgs.noise = maxNoise;
       scoreArgs.busyPenalty = busyPenaltyOf(row);
       scoreArgs.fillRatio = 1;
+      scoreArgs.liftBonus = valueHeavyNpcLiftBonus(
+        row.lot,
+        world.tick,
+        npc.aircraftClassId,
+      );
+      scoreArgs.ltlPenalty = valueHeavyNpcLtlPenalty(
+        row.lot,
+        npc.aircraftClassId,
+      );
       return npcBidScore(scoreArgs);
     };
 
@@ -3533,6 +3591,15 @@ function npcBidOnMarket(
       scoreArgs.noise = noise;
       scoreArgs.busyPenalty = busyPenaltyOf(row);
       scoreArgs.fillRatio = cargoKg / maxCargoKg;
+      scoreArgs.liftBonus = valueHeavyNpcLiftBonus(
+        lot,
+        world.tick,
+        npc.aircraftClassId,
+      );
+      scoreArgs.ltlPenalty = valueHeavyNpcLtlPenalty(
+        lot,
+        npc.aircraftClassId,
+      );
       const score = npcBidScore(scoreArgs);
       if (score < threshold) return;
       if (!best || score > best.score) {

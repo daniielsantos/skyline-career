@@ -4,6 +4,14 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 
 **`.cursor/rules/career-economy-roadmap.mdc`**
 
+Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-recovery-soak.md`](./20-economy-recovery-soak.md) (`career recovery` / `career soak --copy`). Sem `CARGO_FLOW_BALANCE`.
+
+**Heavy shelf:** slice **CLOSED** (G2b+H1 PASS). [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+**Supplies shelf:** slice **CLOSED** (Phase A PASS — fill ~83%, flow 0.82/0.92). A2 dial-back só com ask. [`22-supplies-shelf.md`](./22-supplies-shelf.md).
+
+**Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
+
 ## Em poucas linhas
 
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
@@ -85,6 +93,7 @@ Não duplicar o roadmap aqui — a fonte da verdade é:
 - **Homolog densify traps (2026-09-03):** FLHN≠Solwezi→**FLSW**; GOSM≠Saint-Louis→**GOSS**; LBHT→**LBHS**; RPSP Panglao→**RPVT**; VOTR≠Tirupati→**VOTP**; WAMP≠Palu→**WAML**; WIKN→**WIDN**; RPVE=Caticlan (not Kalibo). Drop no-stock ID: WARQ/WAJW/WARS/WIPT.
 - **World densify Wave A (2026-09-02):** Americas **~655→~787** (+130 after homolog ICAO cleanup); seed **1347→1475**; SimBrief **1434** cargo ICAOs. No BR/US deep densify; no `CARGO_FLOW_BALANCE`. Script `scripts/analyze-americas-economy.mjs`; history focus +CA/MX/AR/CO. **Gate 7–14d** live ≥85% (Wave A countries) before Wave B (Asia+EU).
 - **Wave A homolog ICAO traps (2026-09-02):** MMCN Obregon (not MMCX); MMDA Constitucion; MMCC Acuna; drop MMHC/MMTL/MMBG; SATU/SATR/SAZW (not SAZU/SARL/SAHR); drop densify SANR/SAAV dupes; **drop SAZC** (stock MSFS=Zarate ≠ Coronel Suarez); SENL Lago Agrio (not SETR Tarapoa); SKFL Florencia / SKPV Providencia; SVCB; SLYA; MRCR/MRBT; MNWP=Waspam; TFFA Desireade / TFFS Les Saintes; TGPZ Carriacou (not TGCC); drop MGTK(dupe MGMM)/MGAV/MHNJ/MZCZ/MZBG/SMBN/SPJJ/SLSU/**SYKA** (no MSFS coords). Seed **1475**.
+- **AR/CL stock ICAO traps (2026-09-05):** SAMM/SAOU/SAMR/SANE/SCGZ (not SAMA/SANL/SAOU-as-Rafael/SANR/SCPQ). Remaps in `CAREER_AIRPORT_ICAO_REMAP`. KPBI unchanged. See `04-hubs-simbrief.md`.
 - **Wave C densify catalogs (2026-09-02):** +**126** hubs (AR70/CL42/PE32/BO21/EC20/CO42/VE31/GY9/SR6/GF6/PA12/CR14/NI9/HN12/GT10/BZ7/CU17/DO10/HT6/BS14/GP5). Skip remaps MPSA/MRQP/MGHT + traps SAZC/SYKA/SETR/SVBI/SPJJ/SLSU/SLYG/MGTK/MGAV/MHNJ/MZCZ/MZBG/TGCC/SMBN. PA MPCE already seeded. GP **TFFC** Saint-Francois. Homolog + seed recount pending rebuild.
 - **EU-1 pós-densify seed measure (2026-09-02):** catálogo **147** hubs EU-1 (era 81). Fuel producers/país: PT5 ES6 FR6 GB6 DE7 NL2 BE2 IT5. Save vivo dia ~118 ainda **81** hubs / 100% live / lots BE12 DE62 NL31 (pré-migrate). Após rebuild: esperar hubs↑; vigiar live% 7–14d (gate ≥85%).
 - **Pacific island-neighbor gap:** Nadi **NFFN** hops to Port Vila **NVVV** and Nouméa **NWWW** (was AU/NZ-only). Demand pairs FJ–VU / FJ–NC. Intl lanes >= **399**.

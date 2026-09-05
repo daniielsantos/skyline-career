@@ -32,6 +32,7 @@
 - **EU-1 West densify (2026-09-02):** NL/BE/DE → GB/FR/IT → ES/PT light (+66); seed **1347** airports. Files: `career-{nl,be,de,gb,fr,it,es,pt}-hubs-densify.ts`.
 - **CA/Caribbean densify (2026-09-02):** +29 then homolog cleanup (drop MZCZ/MZBG/MGAV/MGTK/MHNJ/TGCC→TGPZ); seed **1477**. Skip MSSA/MNCE/MNRR. GP densify TFFA Desireade + TFFS Les Saintes (not Saint-Francois). Regenerate allowlist: `npm run generate:simbrief-dispatch`.
 - **Wave A ICAO traps:** MMCN Obregon / MMDA Constitucion / MMCC Acuna; SATU/SAZC/SATR/SAZW; SENL (not SETR); SKFL Florencia; SKPV Providencia; SVCB; SYKA; SLYA; MRCR/MRBT; MNWP Waspam; TGPZ Carriacou.
+- **AR/CL stock ICAO traps (2026-09-05):** Malargüe **SAMM** (not SAMA Alvear); San Luis **SAOU** (not SANL La Rioja); San Rafael **SAMR** (not SAOU); Santiago del Estero **SANE** (not SANR Termas); Puerto Williams **SCGZ** (not SCPQ Mocopulli). Remaps: `SAOU→SAMR` **before** `SANL→SAOU`; `SAMA→SAMM`; `SANR→SANE`; `SCPQ→SCGZ`. Do **not** seed Termas as SANR while `SANR→SANE` lives. **KPBI** stays (MSFS Facilities OK; OA `gps_code` KDJT is rename-only — not a career remap).
 - **Wave C densify (2026-09-02):** +126 hubs in `career-*-hubs-densify.ts` (SA/CA/Caribe). Skip MPSA/MRQP/MGHT + Wave A traps. GP TFFC Saint-Francois. Rebuild → `npm run generate:simbrief-dispatch` + homolog.
 - **EU-1 ICAO traps:** Madeira **LPMA** (not **LPPS** Porto Santo); Azores **LPPD** (not **LPLA** Lajes this slice); Canaries **GCLP** (not **GCTS** Tenerife); Viseu **LPVZ** (not **LPVL** Vilar de Luz); Portimão **LPPM** (not **LPSI** Sines); DE spoke belt prefer **EDDG/EDLW/EDFH** (skip closed/conflict **EDDT** unless curated).
 - **EU-8 gaps:** BY / MD / GE / AM / AZ / LU / MT / CY / XK
@@ -320,6 +321,8 @@
 
 - Recusar facility MSFS se ident ≠ catalog **ou** distância **> 25 nm** (`msfsFacilityMatchesCareerHub`).
 - Persistir só ICAOs do catalog; prune deny-list de overrides.
+- `npm run career-hubs -- missing` = lat/lon/nome (+ `runways` no **override** MSFS se Facilities devolver). **Não** regenera `career-runways.json`.
+- Diagrama de debrief / `evaluateRunwayTouchdown`: catálogo OurAirports `packages/shared/src/data/career-runways.json`. Após densify: `npm run generate:runways:missing -w @msfs-compat/shared` (merge; não wipe). Full regen: `generate:runways`. Fallbacks no merge: aliases fechados/renomeados (ex. SEQU→SEQM, EGCN→GB-1212); strip sintético no `CAREER_HUB_COORDS` se OA sem geometria.
 - `pruneOrphanCareerHubs` no migrate/boot (também dropa `npcFlights` órfãos).
 - `remapRetiredCareerAirportIdents` aplica `CAREER_AIRPORT_ICAO_REMAP` (ex. MPPB→MPPA) **antes** do prune — evita `Unknown origin airport` no settle.
 - NI spoke: **MNMR** Montelimar (MNCE Costa Esmeralda não está no scenery default).

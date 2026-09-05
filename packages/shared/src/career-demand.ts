@@ -117,11 +117,12 @@ export const DEMAND_PRICE_PREMIUM_MAX = 1.15;
  */
 export const DEMAND_INTL_PAY_MULT = 1.28;
 
-/** Hold TTL by warehouse tier (economy ticks). T1 ~12h, T2 ~18h, T3 ~1d. */
-export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3, number> = {
+/** Hold TTL by warehouse tier (economy ticks). T1 ~12h, T2 ~18h, T3 ~1d, T4 ~1.25d. */
+export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3 | 4, number> = {
   1: TICKS_PER_DAY / 2,
   2: (TICKS_PER_DAY * 3) / 4,
   3: TICKS_PER_DAY,
+  4: (TICKS_PER_DAY * 5) / 4,
 };
 
 /** Bidirectional country pairs for international Demand (not Market lanes). */
@@ -353,7 +354,7 @@ export function demandEffectiveUnitPriceUsd(
   return money(unit);
 }
 
-export function demandHoldTtlTicks(tier: 1 | 2 | 3): number {
+export function demandHoldTtlTicks(tier: 1 | 2 | 3 | 4): number {
   return DEMAND_HOLD_TTL_TICKS_BY_TIER[tier] ?? DEMAND_HOLD_TTL_TICKS_BY_TIER[1];
 }
 
@@ -514,8 +515,8 @@ export function cancelDemandHold(
   const idx = holds.findIndex((h) => h.id === opts.holdId.trim());
   if (idx < 0) throw new Error('Demand hold not found');
   const hold = holds[idx]!;
-  if ((hold.kind ?? 'demand') === 'bridge') {
-    throw new Error('Use warehouse bridge cancel for this hold');
+  if ((hold.kind ?? 'demand') === 'bridge' || hold.kind === 'haul') {
+    throw new Error('Use warehouse bridge/haul cancel for this hold');
   }
   const orderId = hold.orderId?.trim();
   if (!orderId) throw new Error('Demand hold is missing an order');

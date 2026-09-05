@@ -41,29 +41,31 @@ export const WAREHOUSE_LOT_MERGE_REL_BAND = 0.03;
 
 /**
  * Bonded storage capacity by warehouse tier (literal klb → kg).
- * T1 5 klb · T2 10 klb · T3 15 klb.
+ * T1 5 klb · T2 10 klb · T3 15 klb · T4 Port Bonded ~99 klb (45 t).
  */
-export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3, number> = {
+export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3 | 4, number> = {
   1: 2_268,
   2: 4_536,
   3: 6_804,
+  4: 45_000,
 };
 
 /** Legacy caps before klb-literal T1/T2/T3 (5 t / 12 t). */
 const LEGACY_WAREHOUSE_T1_CAP_KG = 5_000;
 const LEGACY_WAREHOUSE_T2_CAP_KG = 12_000;
 
-export type WarehouseTier = 1 | 2 | 3;
+export type WarehouseTier = 1 | 2 | 3 | 4;
 
 export function warehouseTierOf(tier: unknown): WarehouseTier {
+  if (tier === 4) return 4;
   if (tier === 3) return 3;
   if (tier === 2) return 2;
   return 1;
 }
 
 /**
- * Remap saved WH row to current T1/T2/T3.
- * Old T1 (~5 t) → T2; old T2 (~12 t) → T3; new klb caps keep declared tier.
+ * Remap saved WH row to current T1–T4.
+ * Old T1 (~5 t) → T2; old T2 (~12 t) → T3; new caps keep declared tier.
  * `capacityKg = max(usedKg, tierCap)` so stock is never truncated.
  */
 export function migrateWarehouseTierAndCapacity(opts: {
@@ -80,7 +82,9 @@ export function migrateWarehouseTierAndCapacity(opts: {
     Math.abs(rawCap - WAREHOUSE_CAPACITY_KG[t]) <= 2;
 
   let tier: WarehouseTier;
-  if (matchesNewCap(1)) {
+  if (matchesNewCap(4) || (declared === 4 && rawCap >= 40_000)) {
+    tier = 4;
+  } else if (matchesNewCap(1)) {
     tier = 1;
   } else if (matchesNewCap(2)) {
     tier = 2;
@@ -96,7 +100,7 @@ export function migrateWarehouseTierAndCapacity(opts: {
     // Legacy T1 (~5 t) or odd mid-cap T2 → T2.
     tier = 2;
   } else {
-    tier = declared === 3 ? 3 : declared;
+    tier = declared === 4 ? 4 : declared === 3 ? 3 : declared;
   }
 
   return {
@@ -253,8 +257,8 @@ export function normalizePlayerWarehouseState(
       const h = row as Record<string, unknown>;
       const id = typeof h.id === 'string' ? h.id.trim() : '';
       const kindRaw = typeof h.kind === 'string' ? h.kind.trim() : '';
-      const kind: 'demand' | 'bridge' =
-        kindRaw === 'bridge' ? 'bridge' : 'demand';
+      const kind: 'demand' | 'bridge' | 'haul' =
+        kindRaw === 'bridge' ? 'bridge' : kindRaw === 'haul' ? 'haul' : 'demand';
       const orderId = typeof h.orderId === 'string' ? h.orderId.trim() : '';
       const destWarehouseId =
         typeof h.destWarehouseId === 'string' ? h.destWarehouseId.trim() : '';

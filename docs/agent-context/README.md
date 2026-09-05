@@ -37,6 +37,10 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [17-inject-regression.md](./17-inject-regression.md) | Pack GA/TP/light jet + checklist inject/read; Payload Lab (dev); freighter vs pax_and_cargo; mission `airframeLabel` enrichment |
 | [18-aircraft-pricing-balance.md](./18-aircraft-pricing-balance.md) | Buy/lease: balancear por pay da classe (perna ref., voos/sem, voos p/ comprar) |
 | [19-hub-stats.md](./19-hub-stats.md) | Aba Stats (hub) + Economy pulse tab (dev); samples SQLite v7/v8 |
+| [20-economy-recovery-soak.md](./20-economy-recovery-soak.md) | Measure: recovery time pós-shock + soak NPC-only (`career recovery` / `career soak`) |
+| [21-value-heavy-shelf.md](./21-value-heavy-shelf.md) | Value/Heavy shelf — **CLOSED** PASS (G2b+H1) |
+| [22-supplies-shelf.md](./22-supplies-shelf.md) | Supplies shelf — **CLOSED** PASS (Phase A flow) |
+| [23-port-xl-warehouse.md](./23-port-xl-warehouse.md) | Port XL + WH T4 Port Bonded (porto→WH→Wide) |
 
 ## Manutenção
 

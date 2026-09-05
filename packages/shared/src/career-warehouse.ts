@@ -83,6 +83,7 @@ export function warehouseInboundTransferTicks(
 export const WAREHOUSE_T1_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[1];
 export const WAREHOUSE_T2_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[2];
 export const WAREHOUSE_T3_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[3];
+export const WAREHOUSE_T4_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[4];
 
 /** CAPEX by hub tier (cheaper than FBO — storage only). */
 export const WAREHOUSE_T1_BUY_USD: Record<HubTier, number> = {
@@ -105,6 +106,13 @@ export const WAREHOUSE_T3_UPGRADE_USD: Record<HubTier, number> = {
   major: 27_200,
 };
 
+/** CAPEX to upgrade T3 → T4 Port Bonded (~2× T3 table). */
+export const WAREHOUSE_T4_UPGRADE_USD: Record<HubTier, number> = {
+  spoke: 18_000,
+  regional: 32_000,
+  major: 55_000,
+};
+
 /**
  * Lifetime Demand Board kg that must leave this warehouse (settle) before T2
  * upgrade is purchasable.
@@ -114,222 +122,19 @@ export const WAREHOUSE_T2_SHIPPED_KG = 5_000;
 /** Lifetime shipped kg gate for T2 → T3. */
 export const WAREHOUSE_T3_SHIPPED_KG = 12_000;
 
+/** Lifetime shipped kg gate for T3 → T4 Port Bonded. */
+export const WAREHOUSE_T4_SHIPPED_KG = 25_000;
+
 /** Mirror FBO bonded storage rates. */
 export const WAREHOUSE_STORAGE_USD_PER_KG_DAY = 0.02;
 export const WAREHOUSE_STORAGE_VALUE_MULT = 2;
 
-/** Must match CAREER_PORTS[*].pickupHubs (avoid career-ports import cycle). */
-const PICKUP_HUB_SET = new Set([
-  'SBGR',
-  'SBKP',
-  'SBCT',
-  'SBRF',
-  'SBEG',
-  'SBPA',
-  'SBBE',
-  'SAEZ',
-  'SAVC',
-  'SCEL',
-  'SCTE',
-  'KMIA',
-  'KEWR',
-  'KIAH',
-  'KLAX',
-  'KSEA',
-  'KSTL',
-  'KMEM',
-  'KORD',
-  'KPIT',
-  'KDLH',
-  'CYVR',
-  'CYHZ',
-  'MMVR',
-  'MMZO',
-  'MMUN',
-  'SUMU',
-  'SPJC',
-  'SEGU',
-  'SKCG',
-  'SKBQ',
-  'SKCL',
-  'SKBU',
-  'SVMI',
-  'SYCJ',
-  'SYEC',
-  'SMJP',
-  'SMZO',
-  'SOCA',
-  'MPTO',
-  'MPMG',
-  'MRLM',
-  'MROC',
-  'MNMG',
-  'MHLM',
-  'MSLP',
-  'MGGT',
-  'MGSJ',
-  'MZBZ',
-  'MUHA',
-  'MDSD',
-  'MTPP',
-  'MKJP',
-  'MYNN',
-  'TTPP',
-  'TBPB',
-  'TLPL',
-  'TLPC',
-  'TGPY',
-  'TAPA',
-  'TJSJ',
-  'TFFR',
-  'TFFF',
-  'TNCC',
-  'TNCM',
-  'TNCA',
-  'TIST',
-  'LPPT',
-  'LPMA',
-  'LPPD',
-  'LEBL',
-  'GCLP',
-  'LFML',
-  'EGHI',
-  'EDDH',
-  'EHRD',
-  'EBAW',
-  'LIRN',
-  'GMTT',
-  'DAAG',
-  'DTTA',
-  'HEBA',
-  'LLHA',
-  'OEJN',
-  'OEDF',
-  'OMDB',
-  'OMAA',
-  'OTHH',
-  'OBBI',
-  'OKKK',
-  'OOMS',
-  'ORMM',
-  'OIKB',
-  'OJAQ',
-  'OLBA',
-  'OSLK',
-  'HLMS',
-  'HSPN',
-  'OYAA',
-  'OYHD',
-  'OPKC',
-  'VABB',
-  'VOMM',
-  'VECC',
-  'VCBI',
-  'UATE',
-  'UTAK',
-  'VGEG',
-  'VYYY',
-  'VTBU',
-  'VTSP',
-  'VVCI',
-  'VVTS',
-  'WMKK',
-  'WSSS',
-  'WIII',
-  'WARR',
-  'WIMM',
-  'WBKK',
-  'WBGG',
-  'RPLL',
-  'RPVM',
-  'ZSPD',
-  'ZGSZ',
-  'RJTT',
-  'RJBB',
-  'RKSI',
-  'RKPK',
-  'RCTP',
-  'RCKH',
-  'YSSY',
-  'YMML',
-  'YBBN',
-  'YPPH',
-  'YPDN',
-  'WBSB',
-  'ZSQD',
-  'ZSNB',
-  'ZJHK',
-  'ULLI',
-  'ULMM',
-  'ULAA',
-  'UHSS',
-  'UMKK',
-  'UNKL',
-  'URRP',
-  'UHWW',
-  'NZAA',
-  'ZYTL',
-  'ZSAM',
-  'PHNL',
-  'NFFN',
-  'AYPY',
-  'NWWW',
-  'PGUM',
-  'PGSN',
-  'NTAA',
-  'NTTB',
-  'PTRO',
-  'ANG',
-  'NSTU',
-  'NSFA',
-  'NSAU',
-  'NFTF',
-  'NFTV',
-  'NVVV',
-  'NVSS',
-  'AGGH',
-  'AGGM',
-  'NCRG',
-  'NCAI',
-  'NGTA',
-  'PLCH',
-  'DNMM',
-  'DNPO',
-  'DGAA',
-  'GOOY',
-  'DIAP',
-  'HKMO',
-  'FACT',
-  'FALE',
-  'HTDA',
-  'FNLU',
-  'FKKD',
-  'FQMA',
-  'FQBR',
-  'FYWB',
-  'FZAA',
-  'FCPP',
-  'FOOL',
-  'FOOG',
-  'FGSL',
-  'DBBB',
-  'DXXX',
-  'GUCY',
-  'GFLL',
-  'GLRB',
-  'GBYD',
-  'GGOV',
-  'GVAC',
-  'FPST',
-  'GQNO',
-  'FMMT',
-  'FIMP',
-  'FSIA',
-  'FMCH',
-  'HCMM',
-  'HDAM',
-  'HHAS',
-]);
+import {
+  isPortPickupHub,
+  listPortPickupHubIcaos,
+} from './career-port-pickup-hubs.js';
+
+export { isPortPickupHub, listPortPickupHubIcaos };
 
 function money(n: number): number {
   return Math.round(n * 100) / 100;
@@ -337,14 +142,6 @@ function money(n: number): number {
 
 function nextId(prefix: string, tick: number): string {
   return `${prefix}_${tick}_${Math.floor(Math.random() * 1e6)}`;
-}
-
-export function listPortPickupHubIcaos(): string[] {
-  return [...PICKUP_HUB_SET].sort();
-}
-
-export function isPortPickupHub(icao: string): boolean {
-  return PICKUP_HUB_SET.has(icao.trim().toUpperCase());
 }
 
 export function quoteWarehouseBuyUsd(
@@ -421,6 +218,16 @@ export function quoteWarehouseTier3UpgradeUsd(
   return WAREHOUSE_T3_UPGRADE_USD[hubTierOf(ap ?? { icao })];
 }
 
+export function quoteWarehouseTier4UpgradeUsd(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+  icao: string,
+): number {
+  const ap = world.airports.find(
+    (a) => a.icao.toUpperCase() === icao.trim().toUpperCase(),
+  );
+  return WAREHOUSE_T4_UPGRADE_USD[hubTierOf(ap ?? { icao })];
+}
+
 export function quoteWarehouseUpgradeUsd(
   world: Pick<CareerEconomyWorld, 'airports'>,
   warehouse: Pick<PlayerWarehouse, 'tier' | 'icao' | 'id'>,
@@ -431,6 +238,8 @@ export function quoteWarehouseUpgradeUsd(
     base = quoteWarehouseTier2UpgradeUsd(world, warehouse.icao);
   } else if (warehouse.tier === 2) {
     base = quoteWarehouseTier3UpgradeUsd(world, warehouse.icao);
+  } else if (warehouse.tier === 3) {
+    base = quoteWarehouseTier4UpgradeUsd(world, warehouse.icao);
   } else {
     return null;
   }
@@ -444,7 +253,7 @@ export function warehouseUpgradeProgress(wh: PlayerWarehouse): {
   shippedKg: number;
   neededKg: number;
   unlocked: boolean;
-  nextTier: 2 | 3 | null;
+  nextTier: 2 | 3 | 4 | null;
 } {
   const shippedKg = Math.max(0, Math.floor(wh.lifetimeShippedKg ?? 0));
   if (wh.tier === 1) {
@@ -463,9 +272,17 @@ export function warehouseUpgradeProgress(wh: PlayerWarehouse): {
       nextTier: 3,
     };
   }
+  if (wh.tier === 3) {
+    return {
+      shippedKg,
+      neededKg: WAREHOUSE_T4_SHIPPED_KG,
+      unlocked: shippedKg >= WAREHOUSE_T4_SHIPPED_KG,
+      nextTier: 4,
+    };
+  }
   return {
     shippedKg,
-    neededKg: WAREHOUSE_T3_SHIPPED_KG,
+    neededKg: WAREHOUSE_T4_SHIPPED_KG,
     unlocked: false,
     nextTier: null,
   };
@@ -486,8 +303,8 @@ export function warehouseTier2Progress(wh: PlayerWarehouse): {
 }
 
 /**
- * Upgrade an owned warehouse T1 → T2 or T2 → T3 (same ICAO).
- * Requires lifetime Demand Board shipped kg + CAPEX.
+ * Upgrade an owned warehouse T1→T2, T2→T3, or T3→T4 Port Bonded (same ICAO).
+ * Requires lifetime Demand Board shipped kg + CAPEX. Buy/upgrade only at pickup hubs.
  */
 export function upgradeWarehouse(
   state: CareerMissionsState,
@@ -497,7 +314,7 @@ export function upgradeWarehouse(
   const whs = ensurePlayerWarehouses(state);
   const warehouse = whs.warehouses.find((w) => w.id === warehouseId.trim());
   if (!warehouse) throw new Error(`Unknown warehouse ${warehouseId}`);
-  if (warehouse.tier >= 3) {
+  if (warehouse.tier >= 4) {
     throw new Error(`Warehouse at ${warehouse.icao} is already Tier ${warehouse.tier}`);
   }
   const progress = warehouseUpgradeProgress(warehouse);
@@ -519,12 +336,16 @@ export function upgradeWarehouse(
 
   const nextTier = progress.nextTier;
   const nextCap = WAREHOUSE_CAPACITY_KG[nextTier];
+  const tierNote =
+    nextTier === 4
+      ? `Warehouse T4 Port Bonded · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`
+      : `Warehouse T${nextTier} upgrade · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`;
   applyWalletDelta(state, {
     amountUsd: -debitUsd,
     kind: 'warehouse_upgrade',
     atTick: world.tick,
     icao: warehouse.icao,
-    note: `Warehouse T${nextTier} upgrade · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`,
+    note: tierNote,
   });
   warehouse.tier = nextTier;
   warehouse.capacityKg = Math.max(warehouse.capacityKg, nextCap);
@@ -532,7 +353,7 @@ export function upgradeWarehouse(
 }
 
 /**
- * @deprecated Prefer upgradeWarehouse (T1→T2 or T2→T3).
+ * @deprecated Prefer upgradeWarehouse (T1→T2 / T2→T3 / T3→T4).
  */
 export function upgradeWarehouseToTier2(
   state: CareerMissionsState,
@@ -676,7 +497,7 @@ export function playerWarehouseSnapshot(
       /** @deprecated Prefer shippedNeededForNextTierKg. */
       shippedNeededForT2Kg: number;
       shippedNeededForNextTierKg: number;
-      nextTier: 2 | 3 | null;
+      nextTier: 2 | 3 | 4 | null;
       upgradeUsd: number | null;
       canUpgrade: boolean;
       hubTier: HubTier;

@@ -1,5 +1,65 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-05: **AR/CL ICAO traps shipped** — remaps `SAMA→SAMM`, `SAOU→SAMR` then `SANL→SAOU`, `SANR→SANE`, `SCPQ→SCGZ`; KPBI keep. SimBrief + runways regen OK. Next: rebuild app → `npm run career-hubs -- SAMM SAMR SANE SAOU SCGZ --force --yes` (ou `all`). Detail: `04-hubs-simbrief.md`.
+
+Atualizado 2026-09-05: **Runway catalog merge** — `career-hubs -- missing` = lat/lon/nome (+ pistas no *override* MSFS se Facilities devolver). Diagrama de debrief usa `career-runways.json` (OurAirports). Após densify: `npm run generate:runways:missing -w @msfs-compat/shared`. Merge: OA geom → aliases fechados/renomeados (EGCN→GB-1212, SEQU→SEQM, …) → strip sintético no hub coords se OA sem length/ends. Meta: **0** hubs sem runway no catalog.
+
+Atualizado 2026-09-04: **Port XL + WH T4 shipped** — T4 Port Bonded 45 t (pickup hubs); deposit/split yard; Market Port XL bias; Wide haul WH→terminal. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
+
+Atualizado 2026-09-03: **Recovery + soak shipped** — `career recovery` / `career soak --copy`; shared `career-economy-recovery-probe.ts`. Measure-only; sem Dry. Spec: [`20-economy-recovery-soak.md`](./20-economy-recovery-soak.md).
+
+Atualizado 2026-09-03: **Heavy shelf diag (soak+recovery)** — elec/mach fill ~9% sticky / general OK; causa barbell + form≫claim + soft-origin trava pós-outage. Sem retune. Detail: [`20-economy-recovery-soak.md`](./20-economy-recovery-soak.md).
+
+Atualizado 2026-09-04: **Supplies slice CLOSED (E3)** — Phase A PASS; flow **0.82/0.92**. A2 dial-back só com ask. [`22-supplies-shelf.md`](./22-supplies-shelf.md).
+
+Atualizado 2026-09-04: **Supplies Phase A PASS** — fill **12%→83%**, surplus/shortage invertido; general/Value OK; lots supplies ↑. Next: E3 fechar / A2 dial-back. [`22-supplies-shelf.md`](./22-supplies-shelf.md).
+
+Atualizado 2026-09-04: **Supplies shelf Phase A shipped** — flow **0.82/0.92** (era 0.26/1.28). Measure soak 7d. [`22-supplies-shelf.md`](./22-supplies-shelf.md).
+
+Atualizado 2026-09-04: **Value/Heavy slice CLOSED (E3)** — G2b+H1 PASS; sem mais knobs. G2c dial-back só com ask. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-04: **Value/Heavy G2b+H1 PASS** — elec fill **65%**, lots **520**, claimShare **0.49**, recovery **128** ticks (min 14%). Slice fechável (E3) ou dial-back cosmético G2c. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-04: **Value/Heavy G2b+H1 shipped** — flow elec **2.5/0.45** mach **2.55/0.45**; soft-origin steady **0.62** / origin min **0.66**. Measure. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-04: **Value/Heavy G0+G2 PARTIAL** — fill end **14.6%** (↑ vs ~11%); lots **520**, claimShare **0.45**; recovery **148** ticks (melhor). Next: G2b / E3 / H1. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy G0+G2 shipped** — revert G1; flow elec **2.35/0.52** mach **2.4/0.5**. Measure soak/recovery. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase G FAIL** — fill 11.4% flat; lots **2846** / claimShare **0.32** (regrediu vs F). Recovery OK. Next: G0 revert / E3 fechar em F / G2 flow ask. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase G shipped** — G1 dest soft **0.72** + deep-shortage form bypass ≤18% + pool 20. Measure soak/recovery. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase F PARTIAL** — lots **522**, claimShare **0.44**, recovery PASS; fill ainda **10.8%**. Next: E3 fechar / G1 redistrib / G2 flow ask. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase F shipped** — F1 skipSmall Value board + F2 steady soft-origin **0.58** / origin min **0.62**. Measure soak/recovery. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase E PARTIAL** — claimShare **0.41** PASS; elec lots **2269** (↓); fill ainda **10.9%**. Recovery PASS. Next: E3 fechar / F1 small throttle / F2 soft-origin. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase E shipped** — E1 global large soft-cap **520** + recycle; E2 lift↑ + LTL penalty heavy. Measure soak/recovery. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase D FAIL** — soak elec **11.4%**, lots ~3k, claimShare **0.33** (igual C); recovery ainda PASS (196 ticks). Next: E1 form throttle / E2 claim duro / E3 aceitar player window. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase D shipped** — NPC lift bonus large elec/mach + idle heavy **1.32** + soft cap **900**. Measure soak 7d + recovery. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase C PASS** — recovery BR-SE **recovered** (31→7→27% em 216 ticks). Soak general/live OK; elec fill steady ainda ~11%. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase C shipped** — flow elec/mach nudge + post-outage prod×1.45/cons×0.75 + deep soft **0.20**. Measure recovery+soak 7d. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy B2 measure FAIL** — recovery ainda 30.8→5.5→8.6% timeout. Soft-origin não sobe fill warehouse (formação drena). Next: **C** flow ou redefinir gate recovery. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy B2 shipped** — deep relief (soft/origin **0.10**, surplus min 200) quando fill regional &lt;15% pós-outage. Measure: `career recovery` BR-SE. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase B measure FAIL** — recovery ainda timeout; max fill pós-outage **~8.6%** &lt; relief 0.30/0.32 (no-op). Next: **B2** deep relief ou **C** flow. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase B shipped** — soft-origin relief pós-outage (0.30 / origin min 0.32 / 2d) elec+mach só na região. Measure: recovery BR-SE + soak 7d. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase A measure FAIL** — soak 7d: elec fill ainda **9.2%**, lots **~3.1k**, claimShare **0.33**; recovery BR-SE ainda **timeout**. General/live OK. **Next: Phase B** soft-origin. [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy Phase A shipped** — idle heavy **1.08→1.25**; stale large recycle **0.4→0.34** / max **4→7**. Sem Dry/flow. Measure: soak 7d + recovery BR-SE. Spec: [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md).
+
+Atualizado 2026-09-03: **Value/Heavy slice esboçado** — Phase A idle/recycle lift → Phase B soft-origin rebound → C flow só com ask. Spec: [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md). Sem knobs ainda.
+
 Atualizado 2026-09-03: **Bush trips product removed** — catalog/mission/pln/GFP/watch APIs gone (`410`); `career-bush.ts` stubs; soft hubs = normal spokes; `activeBushTrip` cleared on load/normalize; `/api/bush-hubs/homologate*` kept for MSFS overrides. `msfs-bush-hub-overrides.json` still used.
 
 Atualizado 2026-09-03: **Pay transparency UI** — Terminal + Freights: idle `↑N%` no Pay + tooltip formação/nm/urgent; airport lots passam `basePayUsd`+`pressure`. Sem Dry.

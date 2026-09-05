@@ -2136,8 +2136,8 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
       }
       const wantedKg =
         commodityId === 'machinery' || commodityId === 'electronics'
-          ? 8_000 + Math.floor(rng() * 22_000)
-          : 20_000 + Math.floor(rng() * 80_000);
+          ? 8_000 + Math.floor(rng() * 37_000) // Value: 8–45 t (fits T4 Port Bonded)
+          : 20_000 + Math.floor(rng() * 80_000); // Dry: ocean can exceed WH
       const taken = debitPortInventory(world, port.id, commodityId, wantedKg);
       if (taken < 2_000) {
         if (taken > 0) {
@@ -2428,7 +2428,9 @@ export function depositPortPickupToWarehouse(
   }
   const free = warehouseFreeKg(state, wh.id);
   if (free <= 0) {
-    throw new Error(`Warehouse at ${hub} has no free capacity`);
+    throw new Error(
+      `Warehouse at ${hub} has no free capacity — split the lot or keep cargo in the yard`,
+    );
   }
   const want =
     opts.kg != null && Number.isFinite(opts.kg)

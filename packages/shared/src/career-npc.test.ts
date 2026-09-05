@@ -40,6 +40,8 @@ import {
   LANE_SATURATION_KG,
   NPC_MIN_BID_KG,
   scoreLotForNpc,
+  valueHeavyNpcLiftBonus,
+  valueHeavyNpcLtlPenalty,
   npcRegionBidCapacity,
   isNpcReadyToBid,
   routeDistanceNm,
@@ -607,6 +609,145 @@ describe('NPC freighter fleet', () => {
     assert.ok(
       busy! < clear!,
       `busy score ${busy} should be below clear ${clear}`,
+    );
+  });
+
+  it('Phase D/E: large electronics/machinery get Value lift; general does not', () => {
+    const tick = 100;
+    const base = {
+      quantityKg: 8_000,
+      createdAtTick: tick - 24,
+      expiresAtTick: tick + 24,
+    };
+    assert.equal(
+      valueHeavyNpcLiftBonus(
+        { ...base, commodityId: 'general' },
+        tick,
+        'narrow_freighter',
+      ),
+      0,
+    );
+    assert.equal(
+      valueHeavyNpcLiftBonus(
+        { ...base, commodityId: 'electronics', quantityKg: 500 },
+        tick,
+        'narrow_freighter',
+      ),
+      0,
+    );
+    const elecLight = valueHeavyNpcLiftBonus(
+      { ...base, commodityId: 'electronics' },
+      tick,
+      'light_turboprop',
+    );
+    const elecWide = valueHeavyNpcLiftBonus(
+      { ...base, commodityId: 'electronics' },
+      tick,
+      'wide_freighter',
+    );
+    const mach = valueHeavyNpcLiftBonus(
+      { ...base, commodityId: 'machinery' },
+      tick,
+      'light_turboprop',
+    );
+    assert.ok(elecLight > 0.55, `expected lift, got ${elecLight}`);
+    assert.ok(mach > 0.55);
+    assert.ok(
+      elecWide > elecLight,
+      `heavy class should lift more (${elecWide} vs ${elecLight})`,
+    );
+    assert.equal(
+      valueHeavyNpcLtlPenalty(
+        { commodityId: 'electronics', quantityKg: 500 },
+        'wide_freighter',
+      ),
+      0.55,
+    );
+    assert.equal(
+      valueHeavyNpcLtlPenalty(
+        { commodityId: 'electronics', quantityKg: 8_000 },
+        'wide_freighter',
+      ),
+      0,
+    );
+    assert.equal(
+      valueHeavyNpcLtlPenalty(
+        { commodityId: 'electronics', quantityKg: 500 },
+        'light_turboprop',
+      ),
+      0,
+    );
+
+    const world = createSeedEconomyWorld({ seed: 'npc-value-lift' });
+    const npc = world.npcs.find((n) => n.aircraftClassId === 'narrow_freighter');
+    assert.ok(npc);
+    npc!.status = 'idle';
+    npc!.locationIcao = 'SBGR';
+    npc!.feeBias = 0.5;
+    npc!.aggressiveness = 0.5;
+    npc!.reliability = 1;
+    const shared = {
+      originIcao: 'SBGR' as const,
+      destIcao: 'SBGL' as const,
+      quantityKg: 8_000,
+      reservedKg: 0,
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 48,
+      urgency: 'normal' as const,
+      status: 'available' as const,
+    };
+    const rng = () => 0.5;
+    const general = scoreLotForNpc(
+      world,
+      npc!,
+      {
+        ...shared,
+        id: 'lot-lift-gen',
+        commodityId: 'general',
+        payUsd: 20_000,
+        basePayUsd: 20_000,
+        reason: 'test general',
+      },
+      rng,
+    );
+    // Electronics basePricePerKg is high — pay must clear feeBias floor.
+    const elec = scoreLotForNpc(
+      world,
+      npc!,
+      {
+        ...shared,
+        id: 'lot-lift-elec',
+        commodityId: 'electronics',
+        payUsd: 120_000,
+        basePayUsd: 120_000,
+        reason: 'test electronics',
+      },
+      rng,
+    );
+    assert.ok(general != null && elec != null);
+    assert.ok(
+      elec! > general!,
+      `elec score ${elec} should beat general ${general}`,
+    );
+
+    const smallElec = scoreLotForNpc(
+      world,
+      npc!,
+      {
+        ...shared,
+        id: 'lot-lift-elec-ltl',
+        commodityId: 'electronics',
+        quantityKg: 900,
+        payUsd: 18_000,
+        basePayUsd: 18_000,
+        reason: 'test elec LTL',
+      },
+      rng,
+    );
+    assert.ok(smallElec != null);
+    assert.ok(
+      elec! > smallElec!,
+      `large elec ${elec} should beat LTL ${smallElec} after E2 penalty`,
     );
   });
 

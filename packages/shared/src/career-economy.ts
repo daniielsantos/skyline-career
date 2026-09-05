@@ -1021,6 +1021,7 @@ import {
   isDomesticOd,
   listWorldCountryIds,
 } from './career-partition.js';
+import { isPortPickupHub } from './career-port-pickup-hubs.js';
 import type {
   AirportTerminal,
   CareerEconomyWorld,
@@ -1161,6 +1162,8 @@ export {
   isNpcReadyToBid,
   NPC_MIN_BID_KG,
   scoreLotForNpc,
+  valueHeavyNpcLiftBonus,
+  valueHeavyNpcLtlPenalty,
   topUpStarterContractPilotFloor,
   CONTRACT_PILOT_FEE_FRAC,
   CONTRACT_PILOT_OFFER_CHANCE,
@@ -1613,18 +1616,20 @@ export const INTL_AVAILABLE_SHARE = 0.12;
 export const COUNTRY_AVAILABLE_FLOOR = 50;
 /**
  * Extra brake on large (≥4 t) electronics/machinery that NPCs were not clearing.
- * Applied per partition (same share as the available quota).
+ * Applied per partition (same share as the available quota) **and** as a global
+ * hard stop in `commodityBoardBloated` (Phase E1 — partition quota alone left
+ * ~3k elec lots on the world board).
  */
 export const COMMODITY_LARGE_AVAILABLE_SOFT_CAP: Partial<
   Record<CommodityId, number>
 > = {
-  electronics: 1_100,
-  machinery: 1_100,
+  electronics: 520,
+  machinery: 520,
 };
 /** Idle life progress at which an unclaimed large lot can be recycled. */
-export const STALE_LARGE_RECYCLE_PROGRESS = 0.4;
+export const STALE_LARGE_RECYCLE_PROGRESS = 0.28;
 /** Max stale large lots recycled per commodity per formation pass. */
-export const STALE_LARGE_RECYCLE_MAX_PER_COMMODITY = 4;
+export const STALE_LARGE_RECYCLE_MAX_PER_COMMODITY = 10;
 /**
  * Unclaimed GA-LTL / LTL recycle after idle-pay has had time to work
  * (past IDLE_LOT_URGENT_PROGRESS). Earlier than expiry so they do not
@@ -1650,6 +1655,14 @@ export const XL_CORRIDOR_MIN_WEIGHT = 1.8;
 export const XL_INTL_MIN_CAPACITY_KG_PER_DAY = 70_000;
 /** XL pay/kg vs otherwise-identical large formation (~tonnage without jackpot). */
 export const XL_LOT_PAY_MULT = 0.88;
+/** Port-origin XL may form from this surplus floor (still major↔major). */
+export const PORT_XL_LOT_MIN_KG = 35_000;
+/** Soft ceiling on open XL lots worldwide (formation skips XL above this). */
+export const XL_BOARD_SOFT_CAP = 80;
+/** Domestic corridor weight for port-pickup XL (slightly below trunk floor). */
+export const PORT_XL_CORRIDOR_MIN_WEIGHT = 1.5;
+/** Intl OD daily cap alternate gate for port-pickup XL. */
+export const PORT_XL_INTL_MIN_CAPACITY_KG_PER_DAY = 55_000;
 
 /**
  * Static cargo-role profile per hub tier.
@@ -1920,17 +1933,25 @@ export function xlLotOdEligible(
   originTier: HubTier,
   destTier: HubTier,
   corridorW: number,
-  opts: { international?: boolean; capacityKgPerDay?: number } = {},
+  opts: {
+    international?: boolean;
+    capacityKgPerDay?: number;
+    /** Origin is a seaport pickup hub — slightly softer trunk gates. */
+    portPickupOrigin?: boolean;
+  } = {},
 ): boolean {
   if (originTier !== 'major' || destTier !== 'major') return false;
+  const corridorMin = opts.portPickupOrigin
+    ? PORT_XL_CORRIDOR_MIN_WEIGHT
+    : XL_CORRIDOR_MIN_WEIGHT;
+  const intlCapMin = opts.portPickupOrigin
+    ? PORT_XL_INTL_MIN_CAPACITY_KG_PER_DAY
+    : XL_INTL_MIN_CAPACITY_KG_PER_DAY;
   if (opts.international === true) {
     const cap = opts.capacityKgPerDay ?? 0;
-    return (
-      corridorW >= XL_CORRIDOR_MIN_WEIGHT ||
-      cap >= XL_INTL_MIN_CAPACITY_KG_PER_DAY
-    );
+    return corridorW >= corridorMin || cap >= intlCapMin;
   }
-  return corridorW >= XL_CORRIDOR_MIN_WEIGHT;
+  return corridorW >= corridorMin;
 }
 
 /**
@@ -8028,11 +8049,17 @@ export const CARGO_FLOW_BALANCE: Readonly<
 > = {
   // Value: paired with DEFAULT biases (~0.15 prod / ~0.55 cons) so typical
   // omit/consumer hubs are slight net sinks; explicit producers stay exporters.
-  electronics: { production: 2.0, consumption: 0.7 },
-  machinery: { production: 2.05, consumption: 0.68 },
+  // Phase C (2026-09-03): slight net rebuild vs prior 2.0/0.7 & 2.05/0.68.
+  // Phase G2 (2026-09-03): stronger rebuild — fill p50 stuck ~11% after shelf work.
+  // Phase G2b (2026-09-04): one more step — end-of-week fill drifted 18%→14.6%.
+  electronics: { production: 2.5, consumption: 0.45 },
+  machinery: { production: 2.55, consumption: 0.45 },
   // Dry equilibrium target ~55–65% p50. Slice 2 (2026-09): flow-only — no pay floors.
   general: { production: 0.64, consumption: 1.38 },
-  supplies: { production: 0.26, consumption: 1.28 },
+  // Supplies shelf Phase A (2026-09-04): day-337 live fill ~12% / surplus≪shortage —
+  // global cons≫prod under prior 0.26/1.28 (distinct from Value barbell). Flow-only;
+  // do not retune general. Target fill band ~45–60% after soak measure.
+  supplies: { production: 0.82, consumption: 0.92 },
   perishables: { production: 0.45, consumption: 1.2 },
 };
 
@@ -8040,6 +8067,190 @@ export const CARGO_FLOW_BALANCE: Readonly<
 export const DRY_BULK_DEST_SOFT_FILL = 0.5;
 export const DEFAULT_BULK_DEST_SOFT_FILL = 0.58;
 export const DRY_SURPLUS_ORIGIN_FILL = 0.48;
+
+/**
+ * Value/Heavy Phase B/B2: after a regional `factory_outage` ends, temporarily
+ * lower the soft-origin threshold so drained elec/mach hubs can form freight
+ * again (baseline 0.48 left every hub sub-threshold → sticky shortage).
+ * Relief applies **only after** `endsAtTick` (shock peak keeps the premium).
+ *
+ * B2: when regional fill p50 is still &lt; {@link VALUE_HEAVY_DEEP_RELIEF_FILL_P50},
+ * use a deeper soft/origin band — Phase C raised the floor from 0.10→0.20 so
+ * warehouse fill is not hard-capped near the recovery plateau (~8%).
+ *
+ * Phase C: mild {@link CARGO_FLOW_BALANCE} nudge + post-outage prod/cons mult
+ * during the relief window (region×elec/mach only).
+ *
+ * Phase F2: steady-state soft-origin / origin-min **higher** than Dry so surplus
+ * hubs stop dumping earlier (fill p50 was stuck ~11% after E); relief still
+ * overrides post-outage.
+ */
+export const VALUE_HEAVY_SOFT_ORIGIN_RELIEF_FILL = 0.3;
+/** Bulk origin fill gate during standard relief (normal gate is 0.55). */
+export const VALUE_HEAVY_ORIGIN_FILL_RELIEF_MIN = 0.32;
+/** Regional fill p50 below this → deep relief (B2). */
+export const VALUE_HEAVY_DEEP_RELIEF_FILL_P50 = 0.15;
+/** Phase C: was 0.10 — that capped warehouse fill ~8–10% (recovery FAIL). */
+export const VALUE_HEAVY_SOFT_ORIGIN_DEEP_RELIEF_FILL = 0.2;
+export const VALUE_HEAVY_ORIGIN_FILL_DEEP_RELIEF_MIN = 0.2;
+/** Min surplus kg to pair as origin during deep relief (normal 400). */
+export const VALUE_HEAVY_DEEP_RELIEF_MIN_SURPLUS_KG = 200;
+/** Ticks of soft-origin relief after outage end (2 economy days). */
+export const VALUE_HEAVY_SOFT_ORIGIN_RELIEF_AFTER_TICKS = TICKS_PER_DAY * 2;
+/** Phase C: extra production while post-outage relief window is open. */
+export const VALUE_HEAVY_POST_OUTAGE_PROD_MULT = 1.45;
+/** Phase C: consumption cut during the same window (rebuild stock). */
+export const VALUE_HEAVY_POST_OUTAGE_CONS_MULT = 0.75;
+/**
+ * Phase F2/H1: steady soft-origin for elec/mach (Dry default 0.48). Higher =
+ * less WH→board dump on surplus hubs. H1 raised 0.58→0.62 to hold end-of-week
+ * fill after G2 still drifted 18%→14.6%.
+ */
+export const VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL = 0.62;
+/** Phase F2/H1: steady bulk origin fill gate (normal 0.55; was 0.62 in F2). */
+export const VALUE_HEAVY_STEADY_ORIGIN_FILL_MIN = 0.66;
+/**
+ * Phase F1: world available-lot soft cap for Value SKUs — above this, skip
+ * small/LTL formation so LTL cannot keep draining WH after large is capped.
+ */
+export const VALUE_HEAVY_BOARD_AVAILABLE_SOFT_CAP = 1_800;
+
+const VALUE_HEAVY_RELIEF_COMMODITIES: ReadonlySet<CommodityId> = new Set([
+  'electronics',
+  'machinery',
+]);
+
+export type ValueHeavyReliefTier = 'none' | 'standard' | 'deep';
+
+type ValueHeavyReliefCache = { tick: number; tiers: Map<string, ValueHeavyReliefTier> };
+const valueHeavyReliefCache = new WeakMap<CareerEconomyWorld, ValueHeavyReliefCache>();
+
+function regionCommodityWarehouseFillP50(
+  world: CareerEconomyWorld,
+  region: string,
+  commodityId: CommodityId,
+): number | null {
+  const want = region.trim().toUpperCase();
+  const fills: number[] = [];
+  for (const ap of world.airports ?? []) {
+    if (ap.bushTripOnly === true || isBushTripOnlyHub(ap.icao)) continue;
+    if ((ap.region ?? '').toUpperCase() !== want) continue;
+    const pile = ap.inventory?.[commodityId];
+    if (!pile || pile.capacityKg <= 0) continue;
+    fills.push(fillPct(pile));
+  }
+  if (fills.length === 0) return null;
+  fills.sort((a, b) => a - b);
+  const mid = Math.floor(fills.length / 2);
+  return fills.length % 2 === 1
+    ? fills[mid]!
+    : (fills[mid - 1]! + fills[mid]!) / 2;
+}
+
+/** True while post-outage soft-origin relief window is open for region×SKU. */
+export function valueHeavySoftOriginReliefActive(
+  world: CareerEconomyWorld,
+  region: string,
+  commodityId: CommodityId,
+  tick = world.tick,
+): boolean {
+  if (!VALUE_HEAVY_RELIEF_COMMODITIES.has(commodityId)) return false;
+  const want = region.trim().toUpperCase();
+  if (!want) return false;
+  for (const ev of world.events ?? []) {
+    if (ev.kind !== 'factory_outage') continue;
+    if ((ev.region ?? '').toUpperCase() !== want) continue;
+    if (ev.commodityId && ev.commodityId !== commodityId) continue;
+    if (tick < ev.endsAtTick) continue;
+    if (tick < ev.endsAtTick + VALUE_HEAVY_SOFT_ORIGIN_RELIEF_AFTER_TICKS) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** `none` | `standard` (B) | `deep` (B2 when regional fill still crushed). */
+export function valueHeavyReliefTier(
+  world: CareerEconomyWorld,
+  region: string,
+  commodityId: CommodityId,
+  tick = world.tick,
+): ValueHeavyReliefTier {
+  if (!valueHeavySoftOriginReliefActive(world, region, commodityId, tick)) {
+    return 'none';
+  }
+  const key = `${region.trim().toUpperCase()}|${commodityId}`;
+  let cache = valueHeavyReliefCache.get(world);
+  if (!cache || cache.tick !== tick) {
+    cache = { tick, tiers: new Map() };
+    valueHeavyReliefCache.set(world, cache);
+  }
+  const hit = cache.tiers.get(key);
+  if (hit) return hit;
+  const fill = regionCommodityWarehouseFillP50(world, region, commodityId);
+  const tier: ValueHeavyReliefTier =
+    fill !== null && fill < VALUE_HEAVY_DEEP_RELIEF_FILL_P50
+      ? 'deep'
+      : 'standard';
+  cache.tiers.set(key, tier);
+  return tier;
+}
+
+export function softOriginFillForFormation(
+  world: CareerEconomyWorld,
+  opts: { region: string; commodityId: CommodityId; tick?: number },
+): number {
+  const tier = valueHeavyReliefTier(
+    world,
+    opts.region,
+    opts.commodityId,
+    opts.tick,
+  );
+  if (tier === 'deep') return VALUE_HEAVY_SOFT_ORIGIN_DEEP_RELIEF_FILL;
+  if (tier === 'standard') return VALUE_HEAVY_SOFT_ORIGIN_RELIEF_FILL;
+  if (VALUE_HEAVY_RELIEF_COMMODITIES.has(opts.commodityId)) {
+    return VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL;
+  }
+  return DRY_SURPLUS_ORIGIN_FILL;
+}
+
+export function bulkOriginMinFillForFormation(
+  world: CareerEconomyWorld,
+  opts: { region: string; commodityId: CommodityId; tick?: number },
+): number {
+  const tier = valueHeavyReliefTier(
+    world,
+    opts.region,
+    opts.commodityId,
+    opts.tick,
+  );
+  if (tier === 'deep') return VALUE_HEAVY_ORIGIN_FILL_DEEP_RELIEF_MIN;
+  if (tier === 'standard') return VALUE_HEAVY_ORIGIN_FILL_RELIEF_MIN;
+  if (VALUE_HEAVY_RELIEF_COMMODITIES.has(opts.commodityId)) {
+    return VALUE_HEAVY_STEADY_ORIGIN_FILL_MIN;
+  }
+  return 0.55;
+}
+
+function isBulkSurplusOriginRow(
+  world: CareerEconomyWorld,
+  row: { fill: number; surplusKg: number; ap: Pick<AirportTerminal, 'region'> },
+  commodityId: CommodityId,
+): boolean {
+  const tier = valueHeavyReliefTier(
+    world,
+    row.ap.region ?? '',
+    commodityId,
+  );
+  const minSurplus =
+    tier === 'deep' ? VALUE_HEAVY_DEEP_RELIEF_MIN_SURPLUS_KG : 400;
+  if (row.surplusKg < minSurplus) return false;
+  const minFill = bulkOriginMinFillForFormation(world, {
+    region: row.ap.region ?? '',
+    commodityId,
+  });
+  return row.fill >= minFill;
+}
 
 export function destSoftFillForCommodity(commodityId: CommodityId): number {
   return commodityId === 'general' || commodityId === 'supplies'
@@ -13462,6 +13673,15 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
       const health = hubLevelHealthMult(ap);
       const bal = cargoFlowBalance(c.id);
       const clearance = dryInventoryClearanceMult(fill, c.id);
+      const postOutageRelief =
+        VALUE_HEAVY_RELIEF_COMMODITIES.has(c.id) &&
+        valueHeavySoftOriginReliefActive(world, ap.region ?? '', c.id);
+      const postOutageProd = postOutageRelief
+        ? VALUE_HEAVY_POST_OUTAGE_PROD_MULT
+        : 1;
+      const postOutageCons = postOutageRelief
+        ? VALUE_HEAVY_POST_OUTAGE_CONS_MULT
+        : 1;
       const prod = Math.max(
         0,
         Math.round(
@@ -13471,7 +13691,8 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
             evProd *
             noise *
             health *
-            bal.production,
+            bal.production *
+            postOutageProd,
         ),
       );
       const cons = Math.max(
@@ -13484,7 +13705,8 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
             evCons *
             (0.9 + rng() * 0.2) *
             health *
-            bal.consumption,
+            bal.consumption *
+            postOutageCons,
         ),
       );
 
@@ -13654,8 +13876,8 @@ function expireLots(world: CareerEconomyWorld): void {
 export const IDLE_LOT_ESCALATION_START = 0.25;
 /** Max pay multiplier vs formation base for LTL + perishables. */
 export const IDLE_LOT_PAY_MAX_MULT = 1.4;
-/** Large electronics/machinery — keep idle bump mild after pay retune. */
-export const IDLE_LOT_PAY_MAX_MULT_HEAVY = 1.08;
+/** Large electronics/machinery — Value/Heavy Phase A/D: idle signal for NPC lift. */
+export const IDLE_LOT_PAY_MAX_MULT_HEAVY = 1.32;
 /** Other large bulk (general/supplies). */
 export const IDLE_LOT_PAY_MAX_MULT_BULK = 1.25;
 /** Life progress at which a lingering lot flips to urgent. */
@@ -14123,7 +14345,7 @@ function commodityBoardBloated(
   counts: AvailableLotCounts,
   commodityId: CommodityId,
   partitionId: string,
-): { skipHeavy: boolean; skipAll: boolean } {
+): { skipHeavy: boolean; skipAll: boolean; skipSmall: boolean } {
   const quota = partitionAvailableQuota(world, partitionId);
   const n =
     counts.byCommodityPartition.get(partitionKey(commodityId, partitionId)) ?? 0;
@@ -14150,9 +14372,29 @@ function commodityBoardBloated(
   const heavyOverCapacity =
     heavyKg >= partitionBoardKgTarget(world, partitionId, { heavyOnly: true });
 
+  // Phase E1: global large shelf for Value SKUs — per-partition share alone
+  // never stopped world-wide dump (form ≫ claim).
+  const globalLargeCap = COMMODITY_LARGE_AVAILABLE_SOFT_CAP[commodityId];
+  const globalLargeN = counts.largeByCommodity.get(commodityId) ?? 0;
+  const globalLargeFull =
+    globalLargeCap != null && globalLargeN >= globalLargeCap;
+
   const skipHeavy =
-    skipAll || heavyOverCapacity || (largeQuota != null && largeN >= largeQuota);
-  return { skipHeavy, skipAll };
+    skipAll ||
+    heavyOverCapacity ||
+    globalLargeFull ||
+    (largeQuota != null && largeN >= largeQuota);
+
+  // Phase F1: Value LTL kept draining WH after large skipHeavy — throttle
+  // small when the world Value board is already deep.
+  const globalAvail = counts.byCommodity.get(commodityId) ?? 0;
+  const skipSmall =
+    globalLargeCap != null &&
+    (globalLargeFull ||
+      globalLargeN >= Math.ceil(globalLargeCap * 0.7) ||
+      globalAvail >= VALUE_HEAVY_BOARD_AVAILABLE_SOFT_CAP);
+
+  return { skipHeavy, skipAll, skipSmall };
 }
 
 function recycleStaleLargeLots(
@@ -14179,9 +14421,12 @@ function recycleStaleLargeLots(
       counts.largeByCommodityPartition.get(
         partitionKey(lot.commodityId, partitionId),
       ) ?? 0;
+    const globalCap = COMMODITY_LARGE_AVAILABLE_SOFT_CAP[lot.commodityId];
+    const globalN = counts.largeByCommodity.get(lot.commodityId) ?? 0;
     const crowded =
-      largeQuota != null && largeN >= Math.ceil(largeQuota * 0.5);
-    // Crowded shelf turns over from 40% life; thin markets wait until 70%.
+      (largeQuota != null && largeN >= Math.ceil(largeQuota * 0.5)) ||
+      (globalCap != null && globalN >= Math.ceil(globalCap * 0.55));
+    // Crowded shelf turns over from recycle floor; thin markets wait until 70%.
     if (!crowded && progress < 0.7) continue;
     stale.push(lot);
   }
@@ -14343,6 +14588,7 @@ function* formLotsFromImbalances(
   const largeCounts = new Map<string, number>();
   const smallCounts = new Map<string, number>();
   const availableCounts = countAvailableLots(world, countryByIcao);
+  let openXlBoardLots = 0;
   /** Undirected OD → active lot kg (same semantics as activeLaneKg). */
   const activeLaneKgByOd = new Map<string, number>();
   const undirectedOdKey = (a: string, b: string): string => {
@@ -14361,6 +14607,7 @@ function* formLotsFromImbalances(
     activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
     if (l.quantityKg >= XL_LOT_MIN_KG) {
       xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
+      if (l.status === 'available') openXlBoardLots += 1;
     } else if (l.quantityKg >= LARGE_LOT_MIN_KG) {
       largeCounts.set(key, (largeCounts.get(key) ?? 0) + 1);
     } else {
@@ -14470,7 +14717,7 @@ function* formLotsFromImbalances(
   };
   const boardPressureCache = new Map<
     string,
-    { skipHeavy: boolean; skipAll: boolean }
+    { skipHeavy: boolean; skipAll: boolean; skipSmall: boolean }
   >();
   const boardPressureOf = (commodityId: CommodityId, partitionId: string) => {
     const key = `${commodityId}:${partitionId}`;
@@ -14752,21 +14999,30 @@ function* formLotsFromImbalances(
     }
 
     const inboundKg = destInboundOf(dest.ap.icao, commodity.id);
-    const surplusKg = surplusKgAboveSoftOrigin(origin.stock);
+    const originSoft = softOriginFillForFormation(world, {
+      region: origin.ap.region ?? '',
+      commodityId: commodity.id,
+    });
+    const surplusKg = surplusKgAboveSoftOrigin(origin.stock, originSoft);
     const roomKg = destRoomKg(dest.stock, commodity.id);
     let qty = Math.min(surplusKg, roomKg);
     qty = Math.floor(qty / 100) * 100;
     let formed = false;
 
+    const portOrigin = isPortPickupHub(origin.ap.icao);
+    const xlMinKg = portOrigin ? PORT_XL_LOT_MIN_KG : XL_LOT_MIN_KG;
+    const xlLaneCap = caps.maxXl + (portOrigin && caps.maxXl > 0 ? 1 : 0);
     if (
       !boardPressure.skipHeavy &&
-      qty >= XL_LOT_MIN_KG &&
-      caps.maxXl > 0 &&
-      (xlCounts.get(key) ?? 0) < caps.maxXl &&
+      openXlBoardLots < XL_BOARD_SOFT_CAP &&
+      qty >= xlMinKg &&
+      xlLaneCap > 0 &&
+      (xlCounts.get(key) ?? 0) < xlLaneCap &&
       (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots &&
       xlLotOdEligible(origin.tier, dest.tier, cw, {
         international: opts.international,
         capacityKgPerDay: opts.capacityKgPerDay,
+        portPickupOrigin: portOrigin,
       })
     ) {
       const xlQty = Math.min(qty, XL_LOT_MAX_KG);
@@ -14784,7 +15040,8 @@ function* formLotsFromImbalances(
       );
       if (formedXl) {
         formed = true;
-        const surplusAfter = surplusKgAboveSoftOrigin(origin.stock);
+        openXlBoardLots += 1;
+        const surplusAfter = surplusKgAboveSoftOrigin(origin.stock, originSoft);
         const roomAfter = destRoomKg(dest.stock, commodity.id);
         qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
       }
@@ -14814,7 +15071,7 @@ function* formLotsFromImbalances(
       ) {
         formed = true;
       }
-      const surplusAfter = surplusKgAboveSoftOrigin(origin.stock);
+      const surplusAfter = surplusKgAboveSoftOrigin(origin.stock, originSoft);
       const roomAfter = destRoomKg(dest.stock, commodity.id);
       qty = Math.floor(Math.min(surplusAfter, roomAfter) / 100) * 100;
     }
@@ -14827,6 +15084,7 @@ function* formLotsFromImbalances(
       : BOARD_SMALL_MIN_VIABLE_KG;
     if (
       !boardPressure.skipAll &&
+      !boardPressure.skipSmall &&
       qty >= minQtyForSmallProbe &&
       caps.maxSmall > 0 &&
       (smallCounts.get(key) ?? 0) < caps.maxSmall &&
@@ -14874,12 +15132,16 @@ function* formLotsFromImbalances(
     airports.map((ap) => {
       const stock = ensurePile(ap, commodity.id);
       const fill = fillPct(stock);
+      const soft = softOriginFillForFormation(world, {
+        region: ap.region ?? '',
+        commodityId: commodity.id,
+      });
       return {
         ap,
         stock,
         fill,
         price: localUnitPriceUsd(commodity.id, stock),
-        surplusKg: surplusKgAboveSoftOrigin(stock),
+        surplusKg: surplusKgAboveSoftOrigin(stock, soft),
         roomKg: destRoomKg(stock, commodity.id),
         tier: hubTierOf(ap),
       };
@@ -14904,7 +15166,7 @@ function* formLotsFromImbalances(
         .sort((a, b) => a.fill - b.fill)
         .slice(0, 12);
       const origins = ranked
-        .filter((r) => r.fill >= 0.55 && r.surplusKg >= 400)
+        .filter((r) => isBulkSurplusOriginRow(world, r, commodity.id))
         .sort((a, b) => b.fill - a.fill)
         .slice(0, 12);
 
@@ -14939,7 +15201,7 @@ function* formLotsFromImbalances(
       for (const dest of [...destinations]) {
         for (const partner of corridorPartners(dest.ap.icao)) {
           const row = byIcao.get(partner);
-          if (row && row.fill >= 0.55 && row.surplusKg >= 400) {
+          if (row && isBulkSurplusOriginRow(world, row, commodity.id)) {
             mergeUnique(origins, row);
           }
         }
@@ -15432,7 +15694,9 @@ function* formLotsFromImbalances(
     const shortageDests = new Set<string>();
     for (const row of rankedAll) {
       const code = row.ap.icao.toUpperCase();
-      if (row.fill >= 0.55 && row.surplusKg >= 400) surplusOrigins.add(code);
+      if (isBulkSurplusOriginRow(world, row, commodity.id)) {
+        surplusOrigins.add(code);
+      }
       if (row.fill <= 0.45 && row.roomKg >= 400) shortageDests.add(code);
     }
     if (surplusOrigins.size === 0 || shortageDests.size === 0) continue;
@@ -15598,6 +15862,8 @@ export type TickEconomyOpts = {
   rngSeed?: string;
   batchNowMs?: number;
   profile?: TickPhaseProfile;
+  /** Skip RNG event spawn (recovery probe / controlled measure windows). */
+  skipEventSpawn?: boolean;
 };
 
 type TickEconomyRun = {
@@ -15606,6 +15872,7 @@ type TickEconomyRun = {
   phaseAt: number;
   batchNowMs: number;
   tickKey: string;
+  skipEventSpawn: boolean;
 };
 
 function tickEconomyPrepare(
@@ -15688,11 +15955,20 @@ function tickEconomyPrepare(
   addTickPhaseMs(profile, 'escalate', phaseAt);
   phaseAt = performance.now();
 
-  maybeSpawnEvents(world, rng);
+  if (!opts.skipEventSpawn) {
+    maybeSpawnEvents(world, rng);
+  }
   addTickPhaseMs(profile, 'events', phaseAt);
   phaseAt = performance.now();
 
-  return { profile, tickStartedAt, phaseAt, batchNowMs, tickKey };
+  return {
+    profile,
+    tickStartedAt,
+    phaseAt,
+    batchNowMs,
+    tickKey,
+    skipEventSpawn: opts.skipEventSpawn === true,
+  };
 }
 
 function tickEconomyFinish(
@@ -15813,6 +16089,7 @@ export function tickEconomyN(
     advanceWallClock?: boolean;
     fromBatchAtMs?: number;
     profile?: TickPhaseProfile;
+    skipEventSpawn?: boolean;
   } = {},
 ): CareerEconomyWorld {
   const steps = Math.max(0, Math.floor(n));
@@ -15836,7 +16113,11 @@ export function tickEconomyN(
 
   for (let i = 0; i < steps; i++) {
     const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
-    tickEconomy(world, { batchNowMs, profile: opts.profile });
+    tickEconomy(world, {
+      batchNowMs,
+      profile: opts.profile,
+      skipEventSpawn: opts.skipEventSpawn,
+    });
   }
 
   if (advanceWall && steps > 0) {
@@ -15856,6 +16137,7 @@ export async function tickEconomyNCooperative(
     advanceWallClock?: boolean;
     fromBatchAtMs?: number;
     profile?: TickPhaseProfile;
+    skipEventSpawn?: boolean;
     /**
      * Force cooperative yields even for multi-tick runs (default: sync when
      * n&gt;1 — Dev day-skip was paying ~200 setImmediate/tick for no sim change).
@@ -15890,7 +16172,11 @@ export async function tickEconomyNCooperative(
 
   for (let i = 0; i < steps; i++) {
     const batchNowMs = startBatch + (i + 1) * MS_PER_TICK;
-    await tickEconomyCooperative(world, { batchNowMs, profile: opts.profile });
+    await tickEconomyCooperative(world, {
+      batchNowMs,
+      profile: opts.profile,
+      skipEventSpawn: opts.skipEventSpawn,
+    });
   }
 
   if (advanceWall && steps > 0) {

@@ -7,6 +7,8 @@ Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.
 
 VA (ou company solo) compra barato no porto → guarda no WH → **ponte aérea WH→WH** → realiza no Demand do destino. Desk pode ser humano ou **automação paga/comodidade** (nunca pay-to-win de mercado).
 
+**Port XL / T4 (solo+VA):** WH **T4 Port Bonded** (45 t) só em pickup hubs fecha a fantasia oceânica → tronco; saída gorda = **Wide haul** a partir do WH (não Demand 90 t). Market XL enviesado em origins de porto. Ver [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
+
 ## Loops de economia
 
 ### A) Ponte aérea WH → WH — **DECIDIDO · Tier 1**

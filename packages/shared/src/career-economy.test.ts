@@ -46,6 +46,24 @@ import {
   STALE_SMALL_RECYCLE_MAX_PER_COMMODITY,
   STALE_SMALL_RECYCLE_PROGRESS,
   STALE_LAST_MILE_RECYCLE_PROGRESS,
+  DRY_SURPLUS_ORIGIN_FILL,
+  CARGO_FLOW_BALANCE,
+  VALUE_HEAVY_SOFT_ORIGIN_RELIEF_FILL,
+  VALUE_HEAVY_ORIGIN_FILL_RELIEF_MIN,
+  VALUE_HEAVY_SOFT_ORIGIN_DEEP_RELIEF_FILL,
+  VALUE_HEAVY_ORIGIN_FILL_DEEP_RELIEF_MIN,
+  VALUE_HEAVY_DEEP_RELIEF_FILL_P50,
+  VALUE_HEAVY_POST_OUTAGE_PROD_MULT,
+  VALUE_HEAVY_POST_OUTAGE_CONS_MULT,
+  VALUE_HEAVY_SOFT_ORIGIN_RELIEF_AFTER_TICKS,
+  VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL,
+  VALUE_HEAVY_STEADY_ORIGIN_FILL_MIN,
+  VALUE_HEAVY_BOARD_AVAILABLE_SOFT_CAP,
+  valueHeavySoftOriginReliefActive,
+  valueHeavyReliefTier,
+  softOriginFillForFormation,
+  bulkOriginMinFillForFormation,
+  surplusKgAboveSoftOrigin,
   laneDemandShock,
   laneLotCaps,
   listActiveEconomyEvents,
@@ -2439,6 +2457,214 @@ describe('cargo corridors', () => {
   });
 });
 
+describe('value-heavy soft-origin relief (Phase B/B2)', () => {
+  function worldWithOutage(opts: {
+    tick: number;
+    startsAtTick: number;
+    endsAtTick: number;
+    commodityId?: 'electronics' | 'machinery';
+  }): ReturnType<typeof createSeedEconomyWorld> {
+    const world = createSeedEconomyWorld({ seed: 'value-heavy-relief' });
+    world.tick = opts.tick;
+    world.events = [
+      {
+        id: 'evt_outage_relief',
+        kind: 'factory_outage',
+        region: 'BR-SE',
+        commodityId: opts.commodityId ?? 'electronics',
+        startsAtTick: opts.startsAtTick,
+        endsAtTick: opts.endsAtTick,
+        label: 'recovery-probe',
+      },
+    ];
+    return world;
+  }
+
+  function setRegionElectronicsFill(
+    world: ReturnType<typeof createSeedEconomyWorld>,
+    region: string,
+    fill: number,
+  ): void {
+    for (const ap of world.airports) {
+      if (ap.region !== region) continue;
+      const pile = ap.inventory?.electronics;
+      if (!pile || pile.capacityKg <= 0) continue;
+      pile.stockKg = Math.round(pile.capacityKg * fill);
+    }
+  }
+
+  it('stays off during the outage and on for 2d after endsAtTick', () => {
+    const during = worldWithOutage({
+      tick: 50,
+      startsAtTick: 0,
+      endsAtTick: 96,
+    });
+    assert.equal(
+      valueHeavySoftOriginReliefActive(during, 'BR-SE', 'electronics'),
+      false,
+    );
+    assert.equal(
+      softOriginFillForFormation(during, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL,
+    );
+
+    const after = worldWithOutage({
+      tick: 100,
+      startsAtTick: 0,
+      endsAtTick: 96,
+    });
+    // Mid-band regional fill → standard B relief (not deep).
+    setRegionElectronicsFill(after, 'BR-SE', 0.35);
+    assert.equal(
+      valueHeavySoftOriginReliefActive(after, 'BR-SE', 'electronics'),
+      true,
+    );
+    assert.equal(valueHeavyReliefTier(after, 'BR-SE', 'electronics'), 'standard');
+    assert.equal(
+      softOriginFillForFormation(after, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_SOFT_ORIGIN_RELIEF_FILL,
+    );
+    assert.equal(
+      bulkOriginMinFillForFormation(after, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_ORIGIN_FILL_RELIEF_MIN,
+    );
+
+    const expired = worldWithOutage({
+      tick: 96 + VALUE_HEAVY_SOFT_ORIGIN_RELIEF_AFTER_TICKS,
+      startsAtTick: 0,
+      endsAtTick: 96,
+    });
+    assert.equal(
+      valueHeavySoftOriginReliefActive(expired, 'BR-SE', 'electronics'),
+      false,
+    );
+    assert.equal(
+      softOriginFillForFormation(expired, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL,
+    );
+    assert.equal(
+      bulkOriginMinFillForFormation(expired, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_STEADY_ORIGIN_FILL_MIN,
+    );
+  });
+
+  it('uses deep relief when regional fill p50 is still crushed', () => {
+    const world = worldWithOutage({
+      tick: 100,
+      startsAtTick: 0,
+      endsAtTick: 96,
+    });
+    setRegionElectronicsFill(world, 'BR-SE', 0.08);
+    assert.ok(0.08 < VALUE_HEAVY_DEEP_RELIEF_FILL_P50);
+    assert.equal(valueHeavyReliefTier(world, 'BR-SE', 'electronics'), 'deep');
+    assert.equal(
+      softOriginFillForFormation(world, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_SOFT_ORIGIN_DEEP_RELIEF_FILL,
+    );
+    assert.equal(
+      bulkOriginMinFillForFormation(world, {
+        region: 'BR-SE',
+        commodityId: 'electronics',
+      }),
+      VALUE_HEAVY_ORIGIN_FILL_DEEP_RELIEF_MIN,
+    );
+    const pile = { stockKg: 5_000, capacityKg: 20_000 }; // 25%
+    assert.ok(
+      surplusKgAboveSoftOrigin(pile, VALUE_HEAVY_SOFT_ORIGIN_DEEP_RELIEF_FILL) >=
+        200,
+    );
+  });
+
+  it('does not relieve other regions or Dry SKUs', () => {
+    const world = worldWithOutage({
+      tick: 100,
+      startsAtTick: 0,
+      endsAtTick: 96,
+    });
+    assert.equal(
+      valueHeavySoftOriginReliefActive(world, 'BR-S', 'electronics'),
+      false,
+    );
+    assert.equal(
+      valueHeavySoftOriginReliefActive(world, 'BR-SE', 'general'),
+      false,
+    );
+    assert.equal(
+      softOriginFillForFormation(world, {
+        region: 'BR-SE',
+        commodityId: 'general',
+      }),
+      DRY_SURPLUS_ORIGIN_FILL,
+    );
+  });
+
+  it('Phase F2: steady Value soft-origin sits above Dry; board soft cap is set', () => {
+    assert.ok(VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL > DRY_SURPLUS_ORIGIN_FILL);
+    assert.ok(VALUE_HEAVY_STEADY_ORIGIN_FILL_MIN > 0.55);
+    // World-wide Value board brake (not per-partition COMMODITY_AVAILABLE_SOFT_CAP).
+    assert.ok(VALUE_HEAVY_BOARD_AVAILABLE_SOFT_CAP >= 1_500);
+    assert.ok(VALUE_HEAVY_BOARD_AVAILABLE_SOFT_CAP <= 2_200);
+  });
+
+  it('Phase G2: Value flow balance rebuilds harder than Phase C', () => {
+    assert.ok(CARGO_FLOW_BALANCE.electronics!.production >= 2.45);
+    assert.ok(CARGO_FLOW_BALANCE.electronics!.consumption <= 0.48);
+    assert.ok(CARGO_FLOW_BALANCE.machinery!.production >= 2.5);
+    assert.ok(CARGO_FLOW_BALANCE.machinery!.consumption <= 0.48);
+  });
+
+  it('Phase H1: steady Value soft-origin sits above F2 band', () => {
+    assert.ok(VALUE_HEAVY_STEADY_SOFT_ORIGIN_FILL >= 0.6);
+    assert.ok(VALUE_HEAVY_STEADY_ORIGIN_FILL_MIN >= 0.64);
+  });
+
+  it('Supplies shelf Phase A: flow rebuilds vs chronic 0.26/1.28 sink', () => {
+    assert.ok(CARGO_FLOW_BALANCE.supplies!.production >= 0.75);
+    assert.ok(CARGO_FLOW_BALANCE.supplies!.consumption <= 1.0);
+    assert.ok(
+      CARGO_FLOW_BALANCE.supplies!.production >
+        CARGO_FLOW_BALANCE.supplies!.consumption * 0.7,
+    );
+    // Do not drag general with this slice.
+    assert.equal(CARGO_FLOW_BALANCE.general!.production, 0.64);
+    assert.equal(CARGO_FLOW_BALANCE.general!.consumption, 1.38);
+  });
+
+  it('applies post-outage prod boost only inside the relief window', () => {
+    const world = worldWithOutage({
+      tick: 100,
+      startsAtTick: 0,
+      endsAtTick: 96,
+    });
+    setRegionElectronicsFill(world, 'BR-SE', 0.08);
+    assert.equal(
+      valueHeavySoftOriginReliefActive(world, 'BR-SE', 'electronics'),
+      true,
+    );
+    assert.equal(VALUE_HEAVY_POST_OUTAGE_PROD_MULT, 1.45);
+    assert.equal(VALUE_HEAVY_POST_OUTAGE_CONS_MULT, 0.75);
+    assert.ok(VALUE_HEAVY_SOFT_ORIGIN_DEEP_RELIEF_FILL >= 0.18);
+  });
+});
+
 describe('demand shocks', () => {
   it('raises lane freight pay and urgency under festival demand at dest', () => {
     const world = createSeedEconomyWorld({ seed: 'shock-fest' });
@@ -2646,13 +2872,15 @@ describe('idle lot escalation', () => {
     assert.equal(world.lots[0]!.urgency, 'urgent');
   });
 
-  it('keeps full idle ramp on LTL and perishables; mutes large electronics', () => {
+  it('keeps full idle ramp on LTL and perishables; Value heavy caps below LTL', () => {
     const ltl = makeIdleLot({ quantityKg: 1_200 });
     const perish = makeIdleLot({ commodityId: 'perishables', quantityKg: 8_000 });
     const elec = makeIdleLot({ commodityId: 'electronics', quantityKg: 18_000 });
     assert.equal(idleLotPayMaxMultForLot(ltl), IDLE_LOT_PAY_MAX_MULT);
     assert.equal(idleLotPayMaxMultForLot(perish), IDLE_LOT_PAY_MAX_MULT);
     assert.equal(idleLotPayMaxMultForLot(elec), IDLE_LOT_PAY_MAX_MULT_HEAVY);
+    assert.ok(IDLE_LOT_PAY_MAX_MULT_HEAVY > 1.2);
+    assert.ok(IDLE_LOT_PAY_MAX_MULT_HEAVY < IDLE_LOT_PAY_MAX_MULT);
     assert.equal(idleLotPayMult(ltl, 20), IDLE_LOT_PAY_MAX_MULT);
     assert.equal(idleLotPayMult(elec, 20), IDLE_LOT_PAY_MAX_MULT_HEAVY);
   });
@@ -3031,7 +3259,7 @@ describe('tickEconomyN market formation', () => {
     }
     world.tick = 40;
     const planted: string[] = [];
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 10; i += 1) {
       const id = `lot_stale_electronics_${i}`;
       world.lots.push({
         id,
@@ -4001,6 +4229,14 @@ describe('tickEconomyN market formation', () => {
         international: true,
         capacityKgPerDay: 40_000,
       }),
+      false,
+    );
+    assert.equal(
+      xlLotOdEligible('major', 'major', 1.6, { portPickupOrigin: true }),
+      true,
+    );
+    assert.equal(
+      xlLotOdEligible('major', 'major', 1.6, { portPickupOrigin: false }),
       false,
     );
   });

@@ -211,7 +211,7 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     consume: { electronics: 0.95, machinery: 0.95 },
   },
   {
-    icao: 'SANL',
+    icao: 'SAOU',
     name: 'San Luis Brigadier Mayor D. César Raúl Ojeda',
     region: 'AR-CO',
     hubTier: 'spoke',
@@ -247,7 +247,7 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     ...drySpoke,
   },
   {
-    icao: 'SAOU',
+    icao: 'SAMR',
     name: 'San Rafael',
     region: 'AR-CO',
     hubTier: 'spoke',
@@ -265,7 +265,7 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     ...agroSpoke,
   },
   {
-    icao: 'SAMA',
+    icao: 'SAMM',
     name: 'Malargüe',
     region: 'AR-CO',
     hubTier: 'spoke',
@@ -314,7 +314,7 @@ export const AR_CAREER_HUBS: readonly ArCareerHubDef[] = [
     ...miningSpoke,
   },
   {
-    icao: 'SANR',
+    icao: 'SANE',
     name: 'Santiago del Estero',
     region: 'AR-NO',
     hubTier: 'spoke',

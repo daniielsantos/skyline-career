@@ -89,6 +89,9 @@ import {
   createSeedEconomyWorld,
   computeEconomyPulse,
   sweepEconomyPulse,
+  cloneEconomyWorld,
+  runRecoveryProbe,
+  buildNpcOnlySoakReport,
   departMission,
   evaluateMissionFlightTransition,
   findOpenManifestForRoute,
@@ -143,7 +146,7 @@ function usage(): never {
   msfs-compat-agent generate-ofp --orig ICAO --dest ICAO [--type airframeId] [--roles pack.json] [--pax n] [--cargo thousands | --cargo-weight n] [--payload thousands | --payload-weight n] [--units kg|lb] [--simbrief-user ALIAS] [--airline XX] [--fltnum n] [--route …] [--altn ICAO] [--static-id id] [--list-airframes ICAO] [--no-open] [--compare] [--pipe <name>]
   msfs-compat-agent compare-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] [--ofp path.json] [--block-fuel n] … [--lock] [--json] [--pipe <name>]
   msfs-compat-agent monitor-ofp [--simbrief-user ALIAS | --simbrief-userid ID] [--roles path.json] … [--interval sec] [--lock] [--json] [--pipe <name>]
-  msfs-compat-agent career init|tick|market|accept|missions|cancel|dispatch|depart|settle|watch [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--interval sec] [--json]
+  msfs-compat-agent career init|tick|pulse|recovery|soak|market|accept|missions|cancel|dispatch|depart|settle|watch [--save path] [--missions path] [--lot id] [--mission id] [--kg n] [--aircraft class] [--simbrief-user ALIAS] [--n ticks] [--interval sec] [--json]
 
 Notes:
   resolve / apply-auto: fingerprint → catalog API → cache → local examples
@@ -1946,6 +1949,8 @@ async function main(): Promise<void> {
   career pulse [--save path] [--json]
   career pulse --days 7 [--every-days 1] [--write] [--out path] [--save path] [--json]
   career pulse --ticks 672 [--every 96] [--write] [--out path] [--save path] [--json]
+  career recovery --region BR-SE [--kind factory_outage] [--commodity electronics] [--duration-days 1] [--save path] [--copy] [--out path] [--json]
+  career soak --days 30 [--every-days 1] [--save path] --copy [--out path] [--json]
   career market [--origin ICAO] [--dest ICAO] [--commodity id] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--json]
   career accept --lot <id> [--kg n] [--aircraft narrow_freighter|wide_freighter|medium_piston|light_jet|light_turboprop|light_ga] [--save path] [--missions path] [--json]
   career missions [--missions path] [--json]
@@ -2296,6 +2301,142 @@ async function main(): Promise<void> {
         for (const note of report.last.notes) {
           console.log(`    · ${note}`);
         }
+      }
+      return;
+    }
+
+    if (sub === 'recovery') {
+      const region = getFlag(subArgs, '--region');
+      if (!region) {
+        console.error('career recovery requires --region (e.g. BR-SE)');
+        process.exit(1);
+      }
+      const wantCopy = hasFlag(subArgs, '--copy');
+      const loaded = await loadOrCreateCareerEconomy(savePath, {
+        seed: getFlag(subArgs, '--seed'),
+      });
+      const world = wantCopy ? cloneEconomyWorld(loaded) : loaded;
+      if (!wantCopy) {
+        console.error(
+          'Warning: running recovery without --copy mutates the in-memory world from --save; prefer --copy (report-only; does not write economy unless you add --write later).',
+        );
+      }
+      const kindRaw = getFlag(subArgs, '--kind') ?? 'factory_outage';
+      const kinds = [
+        'harvest_boost',
+        'port_congestion',
+        'factory_outage',
+        'festival_demand',
+        'labor_strike',
+      ] as const;
+      if (!(kinds as readonly string[]).includes(kindRaw)) {
+        console.error(`Unknown kind: ${kindRaw}`);
+        process.exit(1);
+      }
+      const commodityRaw = getFlag(subArgs, '--commodity');
+      const durationDays = getNumberFlag(subArgs, '--duration-days') ?? 1;
+      const report = runRecoveryProbe(world, {
+        region,
+        kind: kindRaw as (typeof kinds)[number],
+        commodityId: commodityRaw as CommodityId | undefined,
+        durationTicks: Math.round(durationDays * TICKS_PER_DAY),
+        fromBatchAtMs: world.lastBatchAtMs,
+      });
+      const reportPath = resolve(
+        getFlag(subArgs, '--out') ??
+          join(dirname(savePath), 'economy-recovery.json'),
+      );
+      await writeFile(
+        reportPath,
+        `${JSON.stringify(
+          {
+            generatedAtIso: new Date().toISOString(),
+            economySave: savePath,
+            copiedInMemory: wantCopy,
+            ...report,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      console.error(`Wrote recovery report → ${reportPath}`);
+      if (asJson) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      const pct = (n: number | null) =>
+        n === null ? '—' : `${(n * 100).toFixed(1)}%`;
+      console.log(
+        `Recovery probe  region=${report.region}  kind=${report.kind}  commodity=${report.commodityId ?? '—'}`,
+      );
+      console.log(
+        `  baseline=${pct(report.baselineFill)}  min=${pct(report.minFill)}  last=${pct(report.lastFill)}  shortageHubs=${report.lastShortageHubs}`,
+      );
+      console.log(
+        `  recovered=${report.recovered}  noEffect=${report.noEffect}  timeout=${report.timeout}  recoveryTicks=${report.recoveryTicks ?? '—'}  elapsed=${report.elapsedTicks}`,
+      );
+      if (report.spokeRecoveryEverActive) {
+        console.log('  note: spoke regionalRecovery was active during the window (separate from fill recovery)');
+      }
+      return;
+    }
+
+    if (sub === 'soak') {
+      if (!hasFlag(subArgs, '--copy')) {
+        console.error(
+          'career soak requires --copy (works on an in-memory clone; never writes the live economy save)',
+        );
+        process.exit(1);
+      }
+      const days = getNumberFlag(subArgs, '--days') ?? 30;
+      const everyDays = getNumberFlag(subArgs, '--every-days') ?? 1;
+      const loaded = await loadOrCreateCareerEconomy(savePath, {
+        seed: getFlag(subArgs, '--seed'),
+      });
+      const world = cloneEconomyWorld(loaded);
+      const report = buildNpcOnlySoakReport(world, { days, everyDays });
+      const reportPath = resolve(
+        getFlag(subArgs, '--out') ??
+          join(dirname(savePath), `economy-soak-${days}d.json`),
+      );
+      await writeFile(
+        reportPath,
+        `${JSON.stringify(
+          {
+            generatedAtIso: new Date().toISOString(),
+            economySave: savePath,
+            copiedInMemory: true,
+            wroteEconomy: false,
+            ...report,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      console.error(`Wrote soak report → ${reportPath}`);
+      if (asJson) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+      }
+      const pct = (n: number | null) =>
+        n === null ? '—' : `${(n * 100).toFixed(1)}%`;
+      console.log(
+        `NPC-only soak  days=${report.days}  samples=${report.sweep.sampleCount}  ticks=${report.sweep.ticksAdvanced}`,
+      );
+      console.log(
+        `  demand  open ${report.demandStart.openOrders}→${report.demandEnd.openOrders}  remainingKg ${Math.round(report.demandStart.remainingKg)}→${Math.round(report.demandEnd.remainingKg)}`,
+      );
+      console.log(
+        `  board  lots ${report.sweep.first.availableLots}→${report.sweep.last.availableLots}  general fill ${pct(report.sweep.first.commodities.find((c) => c.commodityId === 'general')?.fillP50 ?? null)}→${pct(report.sweep.last.commodities.find((c) => c.commodityId === 'general')?.fillP50 ?? null)}`,
+      );
+      console.log('  gates:');
+      for (const g of report.gateNotes) {
+        console.log(`    [${g.level}] ${g.signal}: ${g.detail}`);
+      }
+      for (const note of report.notes) {
+        console.log(`  · ${note}`);
       }
       return;
     }

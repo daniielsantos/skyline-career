@@ -148,6 +148,10 @@ import {
   cancelWarehouseBridgeHold,
   acceptWarehouseBridge,
   dispatchWarehouseBridgeHold,
+  holdWarehouseHaul,
+  cancelWarehouseHaulHold,
+  acceptWarehouseHaul,
+  dispatchWarehouseHaulHold,
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
   ensurePortListings,
@@ -4376,6 +4380,172 @@ export function createCareerApiServer(port = 8787) {
                   dispatched.mission,
                 ),
                 kg: dispatched.kg,
+                warehouses: playerWarehouseSnapshot(missions, world),
+                fleet: missions.fleet,
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+              };
+            });
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/haul/hold') {
+        const body = (await readBody(req)) as {
+          originIcao?: string;
+          destIcao?: string;
+          commodityId?: string;
+          kg?: number;
+        };
+        if (!body.originIcao || !body.destIcao || !body.commodityId) {
+          send(res, 400, {
+            error: 'originIcao, destIcao and commodityId required',
+          });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const held = holdWarehouseHaul(missions, world, {
+                originIcao: body.originIcao!,
+                destIcao: body.destIcao!,
+                commodityId: body.commodityId as CommodityId,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              return {
+                hold: held.hold,
+                kg: held.kg,
+                payUsd: held.payUsd,
+                warehouses: playerWarehouseSnapshot(missions, world),
+              };
+            });
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/haul/hold/cancel') {
+        const body = (await readBody(req)) as { holdId?: string };
+        if (!body.holdId) {
+          send(res, 400, { error: 'holdId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const cancelled = cancelWarehouseHaulHold(missions, world, {
+              holdId: body.holdId!,
+            });
+            return {
+              kg: cancelled.kg,
+              warehouses: playerWarehouseSnapshot(missions, world),
+            };
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/haul/accept') {
+        const body = (await readBody(req)) as {
+          originIcao?: string;
+          destIcao?: string;
+          commodityId?: string;
+          aircraftId?: string;
+          kg?: number;
+        };
+        if (
+          !body.originIcao ||
+          !body.destIcao ||
+          !body.commodityId ||
+          !body.aircraftId
+        ) {
+          send(res, 400, {
+            error: 'originIcao, destIcao, commodityId and aircraftId required',
+          });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const accepted = acceptWarehouseHaul(missions, world, {
+                originIcao: body.originIcao!,
+                destIcao: body.destIcao!,
+                commodityId: body.commodityId as CommodityId,
+                aircraftId: body.aircraftId!,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                mission: withMissionClientView(
+                  world,
+                  missions,
+                  accepted.mission,
+                ),
+                kg: accepted.kg,
+                payUsd: accepted.payUsd,
+                warehouses: playerWarehouseSnapshot(missions, world),
+                fleet: missions.fleet,
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+              };
+            });
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/haul/dispatch-hold') {
+        const body = (await readBody(req)) as {
+          holdId?: string;
+          aircraftId?: string;
+        };
+        if (!body.holdId || !body.aircraftId) {
+          send(res, 400, {
+            error: 'holdId and aircraftId required',
+          });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            return withDevCargoOpsUnlock(req, missions, () => {
+              const dispatched = dispatchWarehouseHaulHold(missions, world, {
+                holdId: body.holdId!,
+                aircraftId: body.aircraftId!,
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                mission: withMissionClientView(
+                  world,
+                  missions,
+                  dispatched.mission,
+                ),
+                kg: dispatched.kg,
+                payUsd: dispatched.payUsd,
                 warehouses: playerWarehouseSnapshot(missions, world),
                 fleet: missions.fleet,
                 missions: missions.missions.map((m) =>

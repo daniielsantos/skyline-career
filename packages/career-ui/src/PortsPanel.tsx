@@ -12,6 +12,8 @@ import {
   postPortBuy,
   postPortAutoBuy,
   postPortStevedore,
+  postPortScout,
+  postPortShuttle,
   postPortConcessionClaim,
   postPortConcessionRenew,
   postPortConcessionUpgrade,
@@ -36,6 +38,10 @@ import {
   type PlayerDemandHoldView,
   type PlayerWarehouseSnapshot,
   type PortListingView,
+  type PortScoutBridgeSuggestion,
+  type PortScoutDemandSuggestion,
+  type PortScoutHaulSuggestion,
+  type PortShuttleQuote,
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
@@ -426,6 +432,10 @@ export function PortsPanel(props: {
     null,
   );
   const [dispatchAircraftId, setDispatchAircraftId] = useState('');
+  const [dispatchMode, setDispatchMode] = useState<'fly' | 'shuttle'>('fly');
+  const [shuttleQuote, setShuttleQuote] = useState<PortShuttleQuote | null>(
+    null,
+  );
   const [bridgeDraft, setBridgeDraft] = useState<{
     originIcao: string;
     commodityId: string;
@@ -433,6 +443,15 @@ export function PortsPanel(props: {
   const [bridgeDest, setBridgeDest] = useState('');
   const [bridgeMode, setBridgeMode] = useState<'hold' | 'fly'>('hold');
   const [bridgeAircraftId, setBridgeAircraftId] = useState('');
+  const [scoutSuggestions, setScoutSuggestions] = useState<
+    PortScoutBridgeSuggestion[]
+  >([]);
+  const [scoutDemandSuggestions, setScoutDemandSuggestions] = useState<
+    PortScoutDemandSuggestion[]
+  >([]);
+  const [scoutHaulSuggestions, setScoutHaulSuggestions] = useState<
+    PortScoutHaulSuggestion[]
+  >([]);
   const [haulDraft, setHaulDraft] = useState<{
     originIcao: string;
     commodityId: string;
@@ -491,10 +510,113 @@ export function PortsPanel(props: {
         nextPorts.groundStaff ?? nextPorts.warehouses?.groundStaff ?? null,
       );
       if (!portId && nextPorts.ports[0]) setPortId(nextPorts.ports[0].id);
+      try {
+        const scout = await postPortScout({ action: 'list' });
+        setScoutSuggestions(scout.suggestions ?? []);
+        setScoutDemandSuggestions(scout.demandSuggestions ?? []);
+        setScoutHaulSuggestions(scout.haulSuggestions ?? []);
+      } catch {
+        setScoutSuggestions([]);
+        setScoutDemandSuggestions([]);
+        setScoutHaulSuggestions([]);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setLoadError(message);
       props.onToast?.('fail', message);
+    }
+  }
+
+  async function onScoutConfirm(s: PortScoutBridgeSuggestion) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortScout({
+        action: 'confirm',
+        kind: 'bridge',
+        originIcao: s.originIcao,
+        destIcao: s.destIcao,
+        commodityId: s.commodityId,
+        kg: s.kg,
+      });
+      if (result.ports) setSnap(result.ports);
+      if (result.warehouses) setWarehouses(result.warehouses);
+      setScoutSuggestions(result.suggestions ?? []);
+      setScoutDemandSuggestions(result.demandSuggestions ?? []);
+      setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      props.onToast?.(
+        'ok',
+        `Scout bridge hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} — Dispatch when ready`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onScoutDemandConfirm(s: PortScoutDemandSuggestion) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortScout({
+        action: 'confirm',
+        kind: 'demand',
+        orderId: s.orderId,
+        originIcao: s.originIcao,
+        kg: s.kg,
+      });
+      if (result.ports) setSnap(result.ports);
+      if (result.warehouses) setWarehouses(result.warehouses);
+      if (result.demand?.orders) setDemand(result.demand.orders);
+      setScoutSuggestions(result.suggestions ?? []);
+      setScoutDemandSuggestions(result.demandSuggestions ?? []);
+      setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      props.onToast?.(
+        'ok',
+        `Scout Demand hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(s.payUsd)} — Dispatch when ready`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onScoutHaulConfirm(s: PortScoutHaulSuggestion) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortScout({
+        action: 'confirm',
+        kind: 'haul',
+        originIcao: s.originIcao,
+        destIcao: s.destIcao,
+        commodityId: s.commodityId,
+        kg: s.kg,
+      });
+      if (result.ports) setSnap(result.ports);
+      if (result.warehouses) setWarehouses(result.warehouses);
+      setScoutSuggestions(result.suggestions ?? []);
+      setScoutDemandSuggestions(result.demandSuggestions ?? []);
+      setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      props.onToast?.(
+        'ok',
+        `Scout Haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)} — Dispatch when ready`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -1525,7 +1647,25 @@ export function PortsPanel(props: {
     if (!dispatchHold || !dispatchAircraftId || props.busy || loading) return;
     setLoading(true);
     try {
-      if (dispatchHold.kind === 'bridge') {
+      if (dispatchHold.kind === 'bridge' && dispatchMode === 'shuttle') {
+        const result = await postPortShuttle({
+          action: 'dispatch',
+          holdId: dispatchHold.id,
+          aircraftId: dispatchAircraftId,
+        });
+        if (result.walletUsd != null) props.onWallet?.(result.walletUsd);
+        if (result.fleet) props.onFleet?.(result.fleet);
+        if (result.missions) props.onMissions?.(result.missions.slice().reverse());
+        if (result.warehouses) setWarehouses(result.warehouses);
+        setDispatchHold(null);
+        setDispatchAircraftId('');
+        setDispatchMode('fly');
+        setShuttleQuote(null);
+        props.onToast?.(
+          'ok',
+          `Port shuttle ${result.mission?.originIcao}→${result.mission?.destIcao} · ${props.formatTonnes(result.kg ?? 0)} · fee ${props.formatMoney(result.feeUsd ?? 0)}`,
+        );
+      } else if (dispatchHold.kind === 'bridge') {
         const result = await postWarehouseBridgeDispatchHold({
           holdId: dispatchHold.id,
           aircraftId: dispatchAircraftId,
@@ -1536,6 +1676,8 @@ export function PortsPanel(props: {
         setWarehouses(result.warehouses);
         setDispatchHold(null);
         setDispatchAircraftId('');
+        setDispatchMode('fly');
+        setShuttleQuote(null);
         props.onToast?.(
           'ok',
           `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
@@ -1963,12 +2105,56 @@ export function PortsPanel(props: {
   const dispatchAircraftOptions = useMemo(() => {
     if (!dispatchHold) return [];
     const hub = dispatchHold.originIcao.trim().toUpperCase();
-    return props.fleet.filter(
-      (a) =>
-        a.status === 'parked' &&
-        a.locationIcao.trim().toUpperCase() === hub,
-    );
-  }, [props.fleet, dispatchHold]);
+    return props.fleet.filter((a) => {
+      if (
+        a.status !== 'parked' ||
+        a.locationIcao.trim().toUpperCase() !== hub
+      ) {
+        return false;
+      }
+      if (dispatchMode === 'shuttle') {
+        return (
+          a.aircraftClassId === 'light_ga' ||
+          a.aircraftClassId === 'light_turboprop'
+        );
+      }
+      return true;
+    });
+  }, [props.fleet, dispatchHold, dispatchMode]);
+
+  useEffect(() => {
+    if (
+      !dispatchHold ||
+      (dispatchHold.kind ?? 'demand') !== 'bridge' ||
+      dispatchMode !== 'shuttle'
+    ) {
+      setShuttleQuote(null);
+      return;
+    }
+    let cancelled = false;
+    void postPortShuttle({ action: 'quote', holdId: dispatchHold.id })
+      .then((res) => {
+        if (!cancelled) setShuttleQuote(res.quote ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setShuttleQuote(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatchHold, dispatchMode]);
+
+  useEffect(() => {
+    if (!dispatchHold || dispatchAircraftOptions.length === 0) return;
+    if (
+      dispatchAircraftId &&
+      dispatchAircraftOptions.some((a) => a.id === dispatchAircraftId)
+    ) {
+      return;
+    }
+    setDispatchAircraftId(dispatchAircraftOptions[0]?.id ?? '');
+  }, [dispatchHold, dispatchMode, dispatchAircraftOptions, dispatchAircraftId]);
+
   const bridgeDestOptions = useMemo(() => {
     if (!bridgeDraft) return [];
     const origin = bridgeDraft.originIcao.trim().toUpperCase();
@@ -2538,6 +2724,115 @@ export function PortsPanel(props: {
                           </p>
                         );
                       })()}
+                      {scoutSuggestions.length > 0 ||
+                      scoutDemandSuggestions.length > 0 ||
+                      scoutHaulSuggestions.length > 0 ? (
+                        <div
+                          className="ports-scout-desk"
+                          aria-label="Port FBO scout suggestions"
+                        >
+                          {scoutDemandSuggestions.length > 0 ? (
+                            <>
+                              <p className="ports-scout-title">
+                                Scout · Demand fills (confirm → hold; you fly)
+                              </p>
+                              <ul className="ports-scout-list">
+                                {scoutDemandSuggestions.map((s) => (
+                                  <li key={s.id} className="ports-scout-row">
+                                    <span>
+                                      {s.originIcao}→{s.destIcao} ·{' '}
+                                      {commodityLabel({
+                                        commodityId: s.commodityId,
+                                      })}{' '}
+                                      · {props.formatTonnes(s.kg)} ·{' '}
+                                      {props.formatMoney(s.payUsd)}
+                                      {s.distanceNm > 0
+                                        ? ` · ${s.distanceNm} nm`
+                                        : ''}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="accept"
+                                      disabled={props.busy || loading}
+                                      onClick={() =>
+                                        void onScoutDemandConfirm(s)
+                                      }
+                                    >
+                                      Hold Demand
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          ) : null}
+                          {scoutHaulSuggestions.length > 0 ? (
+                            <>
+                              <p className="ports-scout-title">
+                                Scout · Hauls (confirm → hold; trunk pay; you
+                                fly)
+                              </p>
+                              <ul className="ports-scout-list">
+                                {scoutHaulSuggestions.map((s) => (
+                                  <li key={s.id} className="ports-scout-row">
+                                    <span>
+                                      {s.originIcao}→{s.destIcao} ·{' '}
+                                      {commodityLabel({
+                                        commodityId: s.commodityId,
+                                      })}{' '}
+                                      · {props.formatTonnes(s.kg)} ·{' '}
+                                      {props.formatMoney(s.payUsd)}
+                                      {s.distanceNm > 0
+                                        ? ` · ${s.distanceNm} nm`
+                                        : ''}
+                                      {` · dest ${s.destFillPct}%`}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="accept"
+                                      disabled={props.busy || loading}
+                                      onClick={() => void onScoutHaulConfirm(s)}
+                                    >
+                                      Hold Haul
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          ) : null}
+                          {scoutSuggestions.length > 0 ? (
+                            <>
+                              <p className="ports-scout-title">
+                                Scout · WH bridges (confirm → hold; you fly or
+                                shuttle)
+                              </p>
+                              <ul className="ports-scout-list">
+                                {scoutSuggestions.map((s) => (
+                                  <li key={s.id} className="ports-scout-row">
+                                    <span>
+                                      {s.originIcao}→{s.destIcao} ·{' '}
+                                      {commodityLabel({
+                                        commodityId: s.commodityId,
+                                      })}{' '}
+                                      · {props.formatTonnes(s.kg)}
+                                      {s.distanceNm > 0
+                                        ? ` · ${s.distanceNm} nm`
+                                        : ''}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="accept"
+                                      disabled={props.busy || loading}
+                                      onClick={() => void onScoutConfirm(s)}
+                                    >
+                                      Hold bridge
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {(port.inventory?.length ?? 0) > 0 ? (
                         <details className="ports-stock-details">
                           <summary>Port stock</summary>
@@ -3443,6 +3738,8 @@ export function PortsPanel(props: {
                                               disabled={props.busy || loading}
                                               onClick={() => {
                                                 setDispatchHold(h);
+                                                setDispatchMode('fly');
+                                                setShuttleQuote(null);
                                                 const aircraft =
                                                   props.fleet.filter(
                                                     (a) =>
@@ -4863,12 +5160,22 @@ export function PortsPanel(props: {
           hold={dispatchHold}
           aircraftId={dispatchAircraftId}
           aircraftOptions={dispatchAircraftOptions}
+          mode={
+            (dispatchHold.kind ?? 'demand') === 'bridge'
+              ? dispatchMode
+              : 'fly'
+          }
+          shuttleQuote={shuttleQuote}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
+          formatMoney={props.formatMoney}
           onAircraftChange={setDispatchAircraftId}
+          onModeChange={setDispatchMode}
           onCancel={() => {
             setDispatchHold(null);
             setDispatchAircraftId('');
+            setDispatchMode('fly');
+            setShuttleQuote(null);
           }}
           onConfirm={() => void onConfirmDispatchHold()}
         />
@@ -5527,13 +5834,18 @@ function DemandDispatchHoldDialog(props: {
   hold: PlayerDemandHoldView;
   aircraftId: string;
   aircraftOptions: PlayerAircraft[];
+  mode: 'fly' | 'shuttle';
+  shuttleQuote: PortShuttleQuote | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
   onAircraftChange: (id: string) => void;
+  onModeChange: (mode: 'fly' | 'shuttle') => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const titleId = useId();
+  const isBridge = (props.hold.kind ?? 'demand') === 'bridge';
   const canConfirm =
     Boolean(props.aircraftId) &&
     props.aircraftOptions.length > 0 &&
@@ -5553,30 +5865,75 @@ function DemandDispatchHoldDialog(props: {
         aria-labelledby={titleId}
       >
         <p className="confirm-kicker">
-          {props.hold.kind === 'bridge'
-            ? 'Warehouse bridge'
+          {isBridge
+            ? props.mode === 'shuttle'
+              ? 'Port shuttle'
+              : 'Warehouse bridge'
             : props.hold.kind === 'haul'
               ? 'Warehouse haul'
               : 'Warehouse hold'}
         </p>
         <h2 id={titleId} className="confirm-title">
-          Dispatch {props.hold.originIcao}→{props.hold.destIcao}?
+          {props.mode === 'shuttle' && isBridge
+            ? `Shuttle ${props.hold.originIcao}→${props.hold.destIcao}?`
+            : `Dispatch ${props.hold.originIcao}→${props.hold.destIcao}?`}
         </h2>
         <div className="confirm-body">
+          {isBridge ? (
+            <div className="demand-accept-section">
+              <span className="demand-accept-label">How</span>
+              <div className="demand-accept-picks" role="listbox" aria-label="Dispatch mode">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={props.mode === 'fly'}
+                  className={`demand-accept-pick${props.mode === 'fly' ? ' is-active' : ''}`}
+                  disabled={props.busy}
+                  onClick={() => props.onModeChange('fly')}
+                >
+                  <strong>You fly</strong>
+                  <span>Watch / Dispatch</span>
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={props.mode === 'shuttle'}
+                  className={`demand-accept-pick${props.mode === 'shuttle' ? ' is-active' : ''}`}
+                  disabled={props.busy}
+                  onClick={() => props.onModeChange('shuttle')}
+                >
+                  <strong>Port shuttle</strong>
+                  <span>Fee + fuel · wall-clock</span>
+                </button>
+              </div>
+            </div>
+          ) : null}
           <p>
             {props.formatTonnes(props.hold.kg)} pledged at the warehouse —
             pick a parked aircraft at {props.hold.originIcao}
-            {props.hold.kind === 'bridge'
-              ? '. No payout — cargo lands in the dest warehouse.'
+            {isBridge
+              ? props.mode === 'shuttle'
+                ? '. NPC flies Light GA / Light TP only — cargo lands in dest WH; no freight pay.'
+                : '. No payout — cargo lands in the dest warehouse.'
               : props.hold.kind === 'haul'
                 ? '. Paid trunk freight — cargo fills the dest terminal.'
                 : '.'}
           </p>
+          {props.mode === 'shuttle' && isBridge && props.shuttleQuote ? (
+            <p className="demand-accept-hint">
+              Shuttle fee {props.formatMoney(props.shuttleQuote.feeUsd)} ·{' '}
+              {props.shuttleQuote.distanceNm} nm · active{' '}
+              {props.shuttleQuote.activeShuttles}/
+              {props.shuttleQuote.maxActive}
+            </p>
+          ) : null}
           <div className="demand-accept-section">
             <span className="demand-accept-label">Aircraft</span>
             {props.aircraftOptions.length === 0 ? (
               <p className="demand-accept-hint">
-                No parked aircraft at {props.hold.originIcao} — ferry one there.
+                {props.mode === 'shuttle'
+                  ? `No Light GA / Light TP parked at ${props.hold.originIcao}.`
+                  : `No parked aircraft at ${props.hold.originIcao} — ferry one there.`}
               </p>
             ) : (
               <div className="demand-accept-picks" role="listbox" aria-label="Aircraft">
@@ -5616,7 +5973,7 @@ function DemandDispatchHoldDialog(props: {
             disabled={!canConfirm}
             onClick={props.onConfirm}
           >
-            Fly now
+            {props.mode === 'shuttle' && isBridge ? 'Launch shuttle' : 'Fly now'}
           </button>
         </div>
       </div>

@@ -1,5 +1,13 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-06: **Port Scout Haul Phase 10 shipped** — WH → short-fill terminal (`listPortScoutHaulSuggestions` / confirm → `holdWarehouseHaul`); Ports desk **Hold Haul**. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port Scout Demand Phase 9 shipped** — WH stock → Demand board matches (`listPortScoutDemandSuggestions` / confirm → `holdDemandOrder`); Ports desk **Hold Demand**. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port shuttle Phase 8 shipped** — NPC wall-clock WH→WH bridge only (`career-port-shuttle` / `POST /api/ports/shuttle`); fee + fuel; Light GA/TP; max 1; no freight pay. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port Scout Phase 7 shipped** — WH→WH suggestions (`career-port-scout` / `POST /api/ports/scout`); confirm → bridge hold; player flies or Port shuttle. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
 Atualizado 2026-09-06: **Port FBO Phase 6 shipped** — company crew **off** (`COMPANY_CREW_ENABLED`; hire/dispatch/split 410; UI hidden). Base = parking/Jet-A/MRO only. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 Atualizado 2026-09-06: **Port FBO Phase 5 shipped** — new Base bonded holds off (`FBO_BONDED_HOLD_ENABLED`; `/api/fbo/hold` 410; Hold at Base hidden). Existing holds grandfather. Full Market→WH redirect backlog. Spec: [`24-port-fbo.md`](./24-port-fbo.md).

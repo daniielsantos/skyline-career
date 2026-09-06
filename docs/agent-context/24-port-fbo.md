@@ -1,11 +1,11 @@
 # Port FBO — chão, não ar
 
-Atualizado 2026-09-06. **Phase 0–6 shipped** (lease-out off; Port FBO desk; stevedore; Base slim; bonded holds off; **company crew off**). Market→WH redirect backlog.
+Atualizado 2026-09-06. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle).
 Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md), [`10-aircraft-pool.md`](./10-aircraft-pool.md) (lease-out).
 
 ## Fantasia (uma frase)
 
-Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mile terrestre e **você** (ou piloto VA humano) voa a saída. Nenhum NPC completa frete aéreo na sua frota.
+Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mile terrestre e **você** (ou piloto VA humano) voa frete pago. Exceção: **Port shuttle** só move WH→WH bridge (custo, sem payout).
 
 ## Diagnóstico
 
@@ -23,7 +23,7 @@ Conclusão: o desconforto não é “ter FBO”; é **dinheiro de avião sem sen
 
 ## Princípio (travado nesta proposta)
 
-1. **Ar = humano** (player SP, ou membro VA no futuro). Desk/NPC/company crew **não** settle frete da frota player.
+1. **Ar = humano** para frete pago (player SP, ou membro VA). Exceção: Port shuttle só bridge interno (custo, sem payout).
 2. **Chão = pode automatizar** (auto-buy, discharge, truck) — comodidade, não pay-to-win de preço ([`16`](./16-va-logistics.md)).
 3. **Um FBO de verdade = porto** (concession). Hub “FBO” vira **company base** (perks), não logística paralela.
 4. **Não** retunar Dry / `CARGO_FLOW_BALANCE` neste trilho.
@@ -69,7 +69,8 @@ UI/copy: chip **Port FBO · P1/P2/P3** (mesmo schema `concession`) — **Phase 1
 | **P0 Ground** | Buffs atuais (buy, ETA, listings, restock, lease×throughput) | Já shipped |
 | **P1 Desk buy** | Auto-buy limit order porto → WH/yard (igual Fase 1 de [`16`](./16-va-logistics.md)) | **Phase 2 shipped** |
 | **P2 Stevedore** | Last-mile **terrestre** porto/yard → WH pickup hub (taxa + ETA ticks; sem missão aérea) | **Phase 3 shipped** |
-| **P3 Scout** | Sugere Demand / haul WH→WH; humano confirma | Alinha Fase 2 VA; SP opcional |
+| **P3 Scout** | Sugere Demand / haul / WH→WH; humano confirma | **Bridge + Demand + Haul shipped** (Phase 7/9/10) |
+| **P3b Shuttle** | NPC wall-clock só em bridge hold (fee+fuel; $0 freight) | **Phase 8 shipped** |
 
 **Non-goals Port FBO**
 
@@ -87,8 +88,8 @@ Buy surplus (manual ou desk P1)
     → inbound / yard
     → Store WH (T1–T4)
     → [opcional P2 truck até outro pickup]
-    → Demand Hold / Fly  OU  Wide haul / Internal haul
-    → VOCÊ voa → settle
+    → Demand Hold / Fly  OU  Wide haul / Internal haul / Port shuttle (bridge)
+    → VOCÊ voa → settle   (ou shuttle wall-clock no bridge)
 ```
 
 Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-out.
@@ -106,6 +107,38 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 | **4** | Airport FBO slim | **DONE** 2026-09-06 |
 | **5** | New Base bonded holds off | **DONE** 2026-09-06 |
 | **6** | Company crew off | **DONE** 2026-09-06 |
+| **7** | Scout WH→WH (confirm → bridge hold) | **DONE** 2026-09-06 |
+| **8** | Port shuttle NPC (bridge only) | **DONE** 2026-09-06 |
+| **9** | Scout Demand (WH stock → Demand hold) | **DONE** 2026-09-06 |
+| **10** | Scout Haul (WH → short-fill terminal) | **DONE** 2026-09-06 |
+
+### Phase 10 — shipped (Port Scout Haul)
+
+- `listPortScoutHaulSuggestions` / `confirmPortScoutHaul` → `holdWarehouseHaul` (trunk pay; dest fill ≤40%; ≤1800 nm).
+- Caps: max **8**; min **200 kg**; Port FBO on origin; score by pay − nm − fill.
+- API `POST /api/ports/scout` returns `haulSuggestions`; confirm `kind: 'haul'`.
+- Ports desk: **Hold Haul**. Player flies (not shuttle).
+
+### Phase 9 — shipped (Port Scout Demand)
+
+- `listPortScoutDemandSuggestions` / `confirmPortScoutDemand` → `holdDemandOrder` (same gates: corridor, intl, Cargo Ops).
+- Caps: max **8**; min **200 kg**; Port FBO on origin; score by pay − mild nm.
+- API `POST /api/ports/scout` returns `demandSuggestions`; confirm `kind: 'demand'`.
+- Ports desk: **Hold Demand** + bridge rows. Player flies (shuttle = bridge only).
+
+### Phase 8 — shipped (Port shuttle)
+
+- `career-port-shuttle.ts`: dispatch bridge hold → `crewOperated` + `portShuttle` wall-clock; settle via existing `settleCrewOpsDue`.
+- Caps: max **1** active; classes **light_ga / light_turboprop** only; active Port FBO on origin pickup.
+- Costs: ledger `port_shuttle` fee (floor $100 + $/kg + $/nm) + Jet-A; **payUsd = 0** (no Demand/Market). No `crewRoundTrip` deadhead.
+- API `POST /api/ports/shuttle` (`quote` | `dispatch`); Ports Dispatch dialog **You fly** / **Port shuttle**.
+- **Não** reabre company crew Hangar/Market.
+
+### Phase 7 — shipped (Port Scout bridge)
+
+- `career-port-scout.ts`: lista sugestões WH→WH (≥200 kg, Port FBO no origin pickup, dest room); confirm → `holdWarehouseBridge` (sem payout).
+- API `POST /api/ports/scout` (`list` | `confirm`); Ports UI desk **Hold bridge**.
+- Player Dispatch **ou** Phase 8 Port shuttle.
 
 ### Phase 6 — shipped (company crew off)
 

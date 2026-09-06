@@ -2395,6 +2395,115 @@ export function postPortStevedore(opts: {
   });
 }
 
+export type PortScoutBridgeSuggestion = {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  originWarehouseId: string;
+  destWarehouseId: string;
+  commodityId: string;
+  kg: number;
+  distanceNm: number;
+  reason: string;
+  score: number;
+};
+
+export type PortScoutDemandSuggestion = {
+  id: string;
+  orderId: string;
+  originIcao: string;
+  destIcao: string;
+  originWarehouseId: string;
+  commodityId: string;
+  kg: number;
+  distanceNm: number;
+  unitPriceUsd: number;
+  payUsd: number;
+  reason: string;
+  score: number;
+};
+
+export type PortScoutHaulSuggestion = {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  originWarehouseId: string;
+  commodityId: string;
+  kg: number;
+  distanceNm: number;
+  unitPriceUsd: number;
+  payUsd: number;
+  destFillPct: number;
+  reason: string;
+  score: number;
+};
+
+export function postPortScout(opts: {
+  action?: 'list' | 'confirm';
+  kind?: 'bridge' | 'demand' | 'haul';
+  orderId?: string;
+  originIcao?: string;
+  destIcao?: string;
+  commodityId?: string;
+  kg?: number;
+}) {
+  return api<{
+    suggestions?: PortScoutBridgeSuggestion[];
+    demandSuggestions?: PortScoutDemandSuggestion[];
+    haulSuggestions?: PortScoutHaulSuggestion[];
+    hold?: {
+      id: string;
+      kind?: string;
+      originIcao: string;
+      destIcao: string;
+      commodityId: string;
+      kg: number;
+      orderId?: string;
+    };
+    kg?: number;
+    payUsd?: number;
+    ports?: PortsSnapshot;
+    warehouses?: PlayerWarehouseSnapshot;
+    demand?: { orders: DemandOrderView[] };
+  }>('/api/ports/scout', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type PortShuttleQuote = {
+  holdId: string;
+  originIcao: string;
+  destIcao: string;
+  kg: number;
+  distanceNm: number;
+  feeUsd: number;
+  activeShuttles: number;
+  maxActive: number;
+};
+
+export function postPortShuttle(opts: {
+  action?: 'quote' | 'dispatch';
+  holdId: string;
+  aircraftId?: string;
+}) {
+  return api<{
+    quote?: PortShuttleQuote;
+    mission?: Mission;
+    kg?: number;
+    feeUsd?: number;
+    fuelDebitUsd?: number;
+    walletUsd?: number;
+    ports?: PortsSnapshot;
+    warehouses?: PlayerWarehouseSnapshot;
+    fleet?: PlayerAircraft[];
+    missions?: Mission[];
+  }>('/api/ports/shuttle', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export function postPortConcessionClaim(opts: { portId: string }) {
   return api<{
     walletUsd: number;

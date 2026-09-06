@@ -168,6 +168,14 @@ import {
   quotePortStevedoreHaul,
   startPortStevedoreHaul,
   listPortStevedoreDestinations,
+  listPortScoutBridgeSuggestions,
+  confirmPortScoutBridge,
+  listPortScoutDemandSuggestions,
+  confirmPortScoutDemand,
+  listPortScoutHaulSuggestions,
+  confirmPortScoutHaul,
+  quotePortShuttleBridgeHold,
+  dispatchPortShuttleBridgeHold,
   FERRY_SOFT_NM_BUDGET,
   cancelFboHold,
   releaseFboHoldToMission,
@@ -4121,6 +4129,212 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
             };
           }, { persist: 'company', persistPortConcessions: true });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/scout') {
+        const body = (await readBody(req)) as {
+          action?: 'list' | 'confirm';
+          kind?: 'bridge' | 'demand' | 'haul';
+          orderId?: string;
+          originIcao?: string;
+          destIcao?: string;
+          commodityId?: string;
+          kg?: number;
+        };
+        const action = body.action ?? 'list';
+        const kind =
+          body.kind ??
+          (body.orderId ? 'demand' : 'bridge');
+        try {
+          if (action === 'list') {
+            const missions = await loadMissions();
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            send(res, 200, {
+              suggestions: listPortScoutBridgeSuggestions(missions, world),
+              demandSuggestions: listPortScoutDemandSuggestions(
+                missions,
+                world,
+              ),
+              haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+            });
+            return;
+          }
+          if (kind === 'demand') {
+            if (!body.orderId?.trim() || !body.originIcao?.trim()) {
+              send(res, 400, {
+                error: 'orderId and originIcao required for Demand scout',
+              });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              const confirmed = confirmPortScoutDemand(missions, world, {
+                orderId: body.orderId!,
+                originIcao: body.originIcao!,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              return {
+                hold: confirmed.hold,
+                kg: confirmed.kg,
+                suggestions: listPortScoutBridgeSuggestions(missions, world),
+                demandSuggestions: listPortScoutDemandSuggestions(
+                  missions,
+                  world,
+                ),
+                haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+                ports: portSnapshot(world, missions),
+                warehouses: playerWarehouseSnapshot(missions, world),
+                demand: demandSnapshot(world, {
+                  warehouseIcaos: (missions.playerWarehouses?.warehouses ?? []).map(
+                    (w) => w.icao,
+                  ),
+                }),
+              };
+            }, { persist: 'company' });
+            send(res, 200, result);
+            return;
+          }
+          if (kind === 'haul') {
+            if (
+              !body.originIcao?.trim() ||
+              !body.destIcao?.trim() ||
+              !body.commodityId?.trim()
+            ) {
+              send(res, 400, {
+                error:
+                  'originIcao, destIcao, and commodityId required for Haul scout',
+              });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              const confirmed = confirmPortScoutHaul(missions, world, {
+                originIcao: body.originIcao!,
+                destIcao: body.destIcao!,
+                commodityId: body.commodityId!.trim() as Parameters<
+                  typeof confirmPortScoutHaul
+                >[2]['commodityId'],
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              return {
+                hold: confirmed.hold,
+                kg: confirmed.kg,
+                payUsd: confirmed.payUsd,
+                suggestions: listPortScoutBridgeSuggestions(missions, world),
+                demandSuggestions: listPortScoutDemandSuggestions(
+                  missions,
+                  world,
+                ),
+                haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+                ports: portSnapshot(world, missions),
+                warehouses: playerWarehouseSnapshot(missions, world),
+              };
+            }, { persist: 'company' });
+            send(res, 200, result);
+            return;
+          }
+          if (
+            !body.originIcao?.trim() ||
+            !body.destIcao?.trim() ||
+            !body.commodityId?.trim()
+          ) {
+            send(res, 400, {
+              error: 'originIcao, destIcao, and commodityId required',
+            });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const confirmed = confirmPortScoutBridge(missions, world, {
+              originIcao: body.originIcao!,
+              destIcao: body.destIcao!,
+              commodityId: body.commodityId!.trim() as Parameters<
+                typeof confirmPortScoutBridge
+              >[2]['commodityId'],
+              kg: body.kg != null ? Number(body.kg) : undefined,
+            });
+            return {
+              hold: confirmed.hold,
+              kg: confirmed.kg,
+              suggestions: listPortScoutBridgeSuggestions(missions, world),
+              demandSuggestions: listPortScoutDemandSuggestions(
+                missions,
+                world,
+              ),
+              haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+              ports: portSnapshot(world, missions),
+              warehouses: playerWarehouseSnapshot(missions, world),
+            };
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/shuttle') {
+        const body = (await readBody(req)) as {
+          action?: 'quote' | 'dispatch';
+          holdId?: string;
+          aircraftId?: string;
+        };
+        const action = body.action ?? 'dispatch';
+        if (!body.holdId?.trim()) {
+          send(res, 400, { error: 'holdId required' });
+          return;
+        }
+        try {
+          if (action === 'quote') {
+            const missions = await loadMissions();
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            send(res, 200, {
+              quote: quotePortShuttleBridgeHold(missions, world, {
+                holdId: body.holdId,
+              }),
+            });
+            return;
+          }
+          if (!body.aircraftId?.trim()) {
+            send(res, 400, { error: 'aircraftId required' });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const dispatched = dispatchPortShuttleBridgeHold(missions, world, {
+              holdId: body.holdId!,
+              aircraftId: body.aircraftId!,
+              nowMs: Date.now(),
+            });
+            return {
+              mission: dispatched.mission,
+              kg: dispatched.kg,
+              feeUsd: dispatched.feeUsd,
+              fuelDebitUsd: dispatched.fuelDebitUsd,
+              walletUsd: missions.walletUsd,
+              ports: portSnapshot(world, missions),
+              warehouses: playerWarehouseSnapshot(missions, world),
+              fleet: missions.fleet ?? [],
+              missions: listActivePlayerMissions(missions.missions ?? []),
+            };
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {

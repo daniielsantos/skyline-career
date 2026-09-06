@@ -886,6 +886,11 @@ export interface MissionIntent {
    */
   warehouseBridge?: boolean;
   /**
+   * Port FBO shuttle: NPC wall-clock bridge (crewOperated). Fee + fuel only;
+   * payUsd stays 0 — not company Market/Demand crew.
+   */
+  portShuttle?: boolean;
+  /**
    * Wide/trunk haul from player WH → dest terminal (paid freight).
    * Settle fills dest inventory + credits lifetimeShippedKg; cancel restores WH.
    */
@@ -1647,6 +1652,7 @@ export type CareerLedgerKind =
   | 'port_buy'
   | 'port_yard_hold'
   | 'port_drayage'
+  | 'port_shuttle'
   | 'port_concession_claim'
   | 'port_concession_lease'
   | 'port_concession_upgrade'

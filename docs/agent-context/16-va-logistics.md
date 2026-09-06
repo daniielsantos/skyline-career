@@ -9,7 +9,7 @@ VA (ou company solo) compra barato no porto → guarda no WH → **ponte aérea 
 
 **Port XL / T4 (solo+VA):** WH **T4 Port Bonded** (45 t) só em pickup hubs fecha a fantasia oceânica → tronco; saída gorda = **Wide haul** a partir do WH (não Demand 90 t). Market XL enviesado em origins de porto. Ver [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
-**Port FBO (solo first):** Phase 0–6 shipped — concession = FBO de **chão**; airport **Base** = parking/Jet-A/MRO (crew **off**, bonded holds off). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+**Port FBO (solo first):** Phase 0–10 shipped — chão desk + Scout (bridge+Demand+Haul) + Port shuttle; Base = perks; crew off. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 ## Loops de economia
 
@@ -70,16 +70,17 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 
 ### Fase 2 — Scout sugere pontes
 
-**Status:** fechada; depende de A (internal haul) + sinais B (surplus/deficit).
+**Status:** **shipped solo** (Port FBO Phase 7/9/10, 2026-09-06) — `career-port-scout.ts` + Ports desk; confirm → bridge / Demand / Haul hold.
 
 | | |
 |--|--|
-| **O que** | Desk lista oportunidades: “WH A → WH B · machinery · spread ~+X% · kg disponível” |
-| **Ação** | Player / Dispatcher humano **confirma** → cria Internal Haul (não auto-cria nesta fase) |
-| **Staff** | Novo perk/role `scout` (não misturar com `demand_desk`) |
-| **Caps** | N sugestões/dia; spread mínimo configurável; ignora rotas sem WH B / sem capacidade |
-| **Monetização** | Hire in-game; VA tools / seat = mais filtros, multi-região |
-| **Não faz** | Criar haul sozinho; reservar stock sem confirmação; priorizar lots NPC do board público |
+| **O que** | Desk lista WH→WH (room), WH→Demand (pay), WH→terminal short-fill (trunk pay) |
+| **Ação** | Humano **confirma** → hold; player Dispatch / fly (shuttle só bridge) |
+| **Staff** | Desk Port FBO (sem hire `scout` ainda) |
+| **Caps** | Max 8 por lista; min 200 kg; Port FBO no origin; haul dest fill ≤40% / ≤1800 nm |
+| **Não faz** | Criar haul sozinho sem confirm; voar Demand/Market/Haul via NPC |
+
+**Next:** VA Fase 3 auto-haul (só com members). Market→WH redirect continua backlog ([`24`](./24-port-fbo.md)).
 
 ### Fase 3 — Desk AI cria hauls (VA)
 
@@ -125,6 +126,6 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [ ] `InternalHaul` como missão company-scoped (settle: WH A −kg → WH B +kg + payout pilot)  
 - [ ] UI surplus/tight por commodity no Ports / região  
 - [x] Fase 1: tabela/ordens auto-buy + tick executor (`career-port-auto-buy.ts`, Port FBO Phase 2)
-- [ ] Fase 2: scout report → confirm → haul  
+- [x] Fase 2: scout report → confirm → bridge / Demand / Haul (`career-port-scout`)  
 - [ ] Fase 3: só com VA; caps AI vs humano Dispatcher  
 - [x] Testes: auto não compra acima do max; day cap / wallet floor / sem FBO

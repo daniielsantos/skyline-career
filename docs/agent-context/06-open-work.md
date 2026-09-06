@@ -1,5 +1,21 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-06: **Port FBO Phase 6 shipped** — company crew **off** (`COMPANY_CREW_ENABLED`; hire/dispatch/split 410; UI hidden). Base = parking/Jet-A/MRO only. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO Phase 5 shipped** — new Base bonded holds off (`FBO_BONDED_HOLD_ENABLED`; `/api/fbo/hold` 410; Hold at Base hidden). Existing holds grandfather. Full Market→WH redirect backlog. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO Phase 4 shipped** — airport Base slim: max **2** bases; reroute off (410); UI FBO→Base (Port FBO intacto); perks keep. Bonded→WH migrate depois. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO Phase 3 shipped** — stevedore yard→WH cross-hub (`career-port-stevedore` / `POST /api/ports/stevedore` / Truck→ICAO); fee + ETA inbound; ledger `port_drayage`. Same-hub Store free. Next: Phase 4 airport FBO slim (pedir). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO Phase 2 shipped** — desk auto-buy limit orders (`portAutoBuyOrders` / `tickPortAutoBuyOrders` via `buyPortListing`); max 3 active; Port FBO required; UI no dialog Port FBO. Next: Phase 3 stevedore (pedir). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO Phase 1 shipped** — UI/copy Operator→**Port FBO · P#**; dialog/button/catalog/ledger/tooltips; schema/API intactos. Next: Phase 2 auto-buy desk (pedir). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO Phase 0 shipped** — `PLAYER_LEASE_OUT_ENABLED=false`; Hangar list-lease off; NPC não toma `player_lease`; settle force-return + 0 income. Dealer lease-in intacto. Next: Phase 1 rename concession → Port FBO (pedir). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Port FBO esboço** — concession = FBO de chão; Phase 0 disable/nerf lease-out; desk auto-buy / stevedore depois; airport FBO slim. Spec: [`24-port-fbo.md`](./24-port-fbo.md). Sem código até pedir fatia.
+
 Atualizado 2026-09-05: **Inject 150 lb probe** — freighter cabin-as-baggage only (não todo inject); Accu-Sim também passa e pisca no tablet; Skyline não pinta intermediário. Mantido (C408 dead holds). Sem skip Accu-Sim.
 
 Atualizado 2026-09-05: **Settle UX** — overlay só com missão `in_flight`; ao settle marca completed local + limpa sticky (Back to Freights não reabre loading). Server 250ms `settling=true` pra poll.

@@ -1,6 +1,6 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-08-30. **Esboço de produto** — loops A/B + tiers 1–3 **decididos** na revisão ponto a ponto; não implementar schema/members/billing até existir slice MP/VA.
+Atualizado 2026-09-06. **Port FBO desk auto-buy (VA Fase 1) shipped solo** — ver [`24-port-fbo.md`](./24-port-fbo.md) Phase 2. Loops A/B + tiers 1–3 **decididos**; schema members/billing ainda não.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -8,6 +8,8 @@ Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.
 VA (ou company solo) compra barato no porto → guarda no WH → **ponte aérea WH→WH** → realiza no Demand do destino. Desk pode ser humano ou **automação paga/comodidade** (nunca pay-to-win de mercado).
 
 **Port XL / T4 (solo+VA):** WH **T4 Port Bonded** (45 t) só em pickup hubs fecha a fantasia oceânica → tronco; saída gorda = **Wide haul** a partir do WH (não Demand 90 t). Market XL enviesado em origins de porto. Ver [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
+
+**Port FBO (solo first):** Phase 0–6 shipped — concession = FBO de **chão**; airport **Base** = parking/Jet-A/MRO (crew **off**, bonded holds off). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 ## Loops de economia
 
@@ -55,7 +57,7 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 
 ### Fase 1 — Auto-buy (limit order porto → WH)
 
-**Status:** fechada como MVP de automação.
+**Status:** **shipped solo** (Port FBO Phase 2, 2026-09-06) — `career-port-auto-buy.ts` + tick + Ports desk UI.
 
 | | |
 |--|--|
@@ -122,7 +124,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 - [ ] `InternalHaul` como missão company-scoped (settle: WH A −kg → WH B +kg + payout pilot)  
 - [ ] UI surplus/tight por commodity no Ports / região  
-- [ ] Fase 1: tabela/ordens auto-buy + tick executor  
+- [x] Fase 1: tabela/ordens auto-buy + tick executor (`career-port-auto-buy.ts`, Port FBO Phase 2)
 - [ ] Fase 2: scout report → confirm → haul  
 - [ ] Fase 3: só com VA; caps AI vs humano Dispatcher  
-- [ ] Testes: auto não compra acima do max; dois buyers no mesmo tick justos  
+- [x] Testes: auto não compra acima do max; day cap / wallet floor / sem FBO

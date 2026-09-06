@@ -3,7 +3,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   buyFboTier1,
   cancelFboHold,
@@ -15,10 +15,9 @@ import {
   playerFboSnapshot,
   quoteFboBuyUsd,
   quoteFboTier1BuyUsd,
-  quoteFboRerouteUsd,
-  quoteFboReroutePayAfterUsd,
   releaseFboHoldToMission,
   rerouteFboHold,
+  setFboBondedHoldEnabledForTests,
   splitFboHold,
   returnMissionToFboHold,
   settleFboHoldExpiries,
@@ -27,6 +26,7 @@ import {
   buyFboSpot,
   sellFboSpot,
 } from './career-fbo.js';
+import { setCompanyCrewEnabledForTests } from './career-crew.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
 import { quoteHangarParkingUsdPerDay, resolveHangarParkingUsdPerDay } from './career-hangar-fees.js';
 import {
@@ -68,6 +68,45 @@ function primeSbgrDryLot(
 }
 
 describe('player FBO', () => {
+  beforeEach(() => {
+    // Legacy hold / split lifecycle tests still exercise holdLotAtFbo + crew split.
+    setFboBondedHoldEnabledForTests(true);
+    setCompanyCrewEnabledForTests(true);
+  });
+  afterEach(() => {
+    setFboBondedHoldEnabledForTests(null);
+    setCompanyCrewEnabledForTests(null);
+  });
+
+  it('rejects new bonded holds when Phase 5 slim disables them', () => {
+    setFboBondedHoldEnabledForTests(null);
+    const world = createSeedEconomyWorld({ seed: 'fbo-hold-off' });
+    ensureSeedMarketFormed(world);
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'HoldOff',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyFboTier1(state, world, 'SBGR');
+    primeSbgrDryLot(world);
+    const lot = world.lots.find(
+      (l) =>
+        l.originIcao === 'SBGR' &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies') &&
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg - l.reservedKg >= 100,
+    );
+    assert.ok(lot);
+    assert.throws(
+      () =>
+        holdLotAtFbo(state, world, {
+          lotId: lot!.id,
+          cargoKg: 100,
+        }),
+      /bonded holds removed/i,
+    );
+  });
+
   it('buys T1 only at home hub and rejects a second purchase', () => {
     const world = createSeedEconomyWorld({ seed: 'fbo-buy' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
@@ -329,35 +368,14 @@ describe('player FBO', () => {
     assert.equal(state.playerFbos!.fbos.length, 2);
     assert.ok(second.debitUsd > quoteFboTier1BuyUsd(world, 'SBPA'));
 
-    // Third FBO gates: T2 + 3 owned aircraft + Cargo Ops Time
+    // Third base removed (Phase 4 slim — max 2)
     assert.throws(
       () => buyFboTier1(state, world, 'SBGL'),
-      /Tier 2|owned aircraft|perishables|Time/i,
-    );
-
-    upgradeFboToTier2(state, world, state.playerFbos!.fbos[0]!.id);
-    state.fleet.push({
-      ...state.fleet[0]!,
-      id: 'acf_third',
-      ownership: 'owned',
-      status: 'parked',
-      locationIcao: 'SBGL',
-    });
-    assert.throws(() => buyFboTier1(state, world, 'SBGL'), /Time|perishables/i);
-
-    state.cargoOps.commodities.perishables.unlocked = true;
-    const third = buyFboTier1(state, world, 'SBGL');
-    assert.equal(third.fbo.icao, 'SBGL');
-    assert.equal(state.playerFbos!.fbos.length, 3);
-    assert.ok(third.debitUsd > second.debitUsd);
-
-    assert.throws(
-      () => buyFboTier1(state, world, 'SBSV'),
-      /already owns 3/i,
+      /already owns 2 bases/i,
     );
   });
 
-  it('reroutes a hold for a fee; haircut only when not longer', () => {
+  it('rejects bonded hold reroute when Phase 4 slim disables it', () => {
     const world = createSeedEconomyWorld({ seed: 'fbo-reroute' });
     ensureSeedMarketFormed(world);
     tickEconomyN(world, 48);
@@ -376,43 +394,20 @@ describe('player FBO', () => {
         (l.status === 'available' || l.status === 'reserved') &&
         l.quantityKg - l.reservedKg >= 100,
     );
-    assert.ok(lot, 'expected a Dry lot at SBGR to reroute');
+    assert.ok(lot, 'expected a Dry lot at SBGR');
     const { hold } = holdLotAtFbo(state, world, {
       lotId: lot!.id,
       cargoKg: Math.min(300, lot!.quantityKg - lot!.reservedKg),
     });
-    const payBefore = hold.payUsd;
-    const oldNm = routeDistanceNm(world, hold.originIcao, hold.destIcao) ?? 0;
-    const newNm = routeDistanceNm(world, hold.originIcao, 'SBPA') ?? 0;
-    const longer = newNm > oldNm;
-    const fee = quoteFboRerouteUsd(world, hold, 'SBPA');
-    const payQuote = quoteFboReroutePayAfterUsd(world, hold, 'SBPA');
-    assert.ok(fee >= 75);
-    assert.equal(payQuote.haircutApplied, !longer);
-    if (longer) {
-      assert.equal(payQuote.bumpApplied, payQuote.bumpFrac > 0);
-      assert.ok(payQuote.payAfterUsd >= payBefore);
-      if (newNm - oldNm > 0) {
-        assert.ok(payQuote.payAfterUsd > payBefore);
-      }
-    } else {
-      assert.equal(payQuote.bumpApplied, false);
-      assert.ok(payQuote.payAfterUsd < payBefore);
-    }
-    const walletBefore = state.walletUsd;
-    const result = rerouteFboHold(state, world, {
-      holdId: hold.id,
-      destIcao: 'SBPA',
-    });
-    assert.equal(result.hold.destIcao, 'SBPA');
-    assert.equal(result.haircutApplied, !longer);
-    assert.equal(result.bumpApplied, longer && payQuote.bumpFrac > 0);
-    assert.equal(result.hold.payUsd, payQuote.payAfterUsd);
-    assert.ok(
-      result.hold.distanceNm !== undefined && result.hold.distanceNm > 0,
+    assert.throws(
+      () =>
+        rerouteFboHold(state, world, {
+          holdId: hold.id,
+          destIcao: 'SBPA',
+        }),
+      /reroute removed/i,
     );
-    assert.equal(state.walletUsd, walletBefore - fee);
-    assert.ok((state.ledger ?? []).some((e) => e.kind === 'fbo_reroute'));
+    assert.equal(hold.destIcao, lot!.destIcao);
   });
 
   it('splits a hold into sister missions and leaves remainder bonded', () => {

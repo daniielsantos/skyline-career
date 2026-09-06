@@ -29,9 +29,9 @@ import {
   LEASE_UNLOCK_CLEAN_DRY_SETTLES,
   aircraftLeaseUnlockProgress,
   aircraftLeaseMonthlyUsd,
-  unlistAircraftForLease,
   fairValueUsd,
   sellBackValueUsd,
+  PLAYER_LEASE_OUT_ENABLED,
 } from './career-aircraft-market.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { ensureWorldAircraftPool } from './career-aircraft-pool.js';
@@ -450,15 +450,14 @@ describe('aircraft market', () => {
     );
   });
 
-  it('lists spare for lease and unlists back to parked', () => {
+  it('Phase 0: listAircraftForLease throws when lease-out is disabled', () => {
+    assert.equal(PLAYER_LEASE_OUT_ENABLED, false);
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-list' });
-    let state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
       pilotName: 'Lessor',
       airframeTypeId: 'asobo-c172sp-cargo',
     });
     const starter = state.fleet[0]!;
-    assert.throws(() => listAircraftForLease(state, starter.id, world.tick));
-
     state.fleet.push({
       ...starter,
       id: 'acf_bonanza_2',
@@ -467,63 +466,24 @@ describe('aircraft market', () => {
       ownership: 'owned',
       status: 'parked',
     });
-    const { listing } = listAircraftForLease(state, 'acf_bonanza_2', world.tick);
-    assert.equal(listing.source, 'player_lease');
-    assert.equal(listing.kind, 'lease');
-    assert.equal(listing.leaseTermMonths, 3);
-    assert.ok((listing.leaseMonthlyUsd ?? 0) > 0);
-    assert.equal(
-      listing.askingUsd,
-      Math.round((listing.leaseMonthlyUsd ?? 0) * 4),
-    );
-    const listed = state.fleet.find((a) => a.id === 'acf_bonanza_2')!;
-    assert.equal(listed.status, 'listed');
-
-    unlistAircraftForLease(state, 'acf_bonanza_2');
-    assert.equal(listed.status, 'parked');
-    assert.equal(
-      state.aircraftMarket?.find((l) => l.id === listing.id)?.status,
-      'expired',
+    assert.throws(
+      () => listAircraftForLease(state, 'acf_bonanza_2', world.tick),
+      /Lease-out is disabled/,
     );
   });
 
-  it('lists a custom weekly and term within catalog bounds', () => {
-    const world = createSeedEconomyWorld({ seed: 'acf-mkt-flex-lease' });
-    const state = selectStarterHub(emptyMissionsStateV2(), 'SBCT', {
-      pilotName: 'Flex',
-      airframeTypeId: 'asobo-c172sp-cargo',
-    });
-    const starter = state.fleet[0]!;
-    state.fleet.push({
-      ...starter,
-      id: 'acf_flex',
-      status: 'parked',
-      ownership: 'owned',
-    });
-    const catalogWeekly = aircraftLeaseMonthlyUsd('light_ga', {
-      airframeTypeId: starter.airframeTypeId,
-    });
-    const { listing } = listAircraftForLease(state, 'acf_flex', world.tick, {
-      monthlyUsd: Math.round(catalogWeekly * 0.9),
-      termMonths: 2,
-    });
-    assert.equal(listing.leaseTermMonths, 2);
+  it('Phase 0: clamp helpers still bound weekly/term for catalog math', () => {
+    const catalogWeekly = aircraftLeaseMonthlyUsd('light_ga');
     assert.equal(
-      listing.leaseMonthlyUsd,
-      clampPlayerLeaseMonthlyUsd(
-        Math.round(catalogWeekly * 0.9),
-        catalogWeekly,
-      ),
-    );
-    assert.equal(
-      listing.askingUsd,
-      Math.round((listing.leaseMonthlyUsd ?? 0) * 4),
+      clampPlayerLeaseMonthlyUsd(Math.round(catalogWeekly * 0.9), catalogWeekly),
+      Math.round(catalogWeekly * 0.9),
     );
     assert.equal(clampPlayerLeaseTermMonths(0), 1);
     assert.equal(clampPlayerLeaseTermMonths(99), 3);
   });
 
-  it('NPC refuses a player lease outside weekly/term band', () => {
+  it('Phase 0: NPC demand skips player_lease listings', () => {
+    assert.equal(PLAYER_LEASE_OUT_ENABLED, false);
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-lease-refuse' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
       pilotName: 'Greedy',
@@ -541,18 +501,35 @@ describe('aircraft market', () => {
     });
     assert.equal(
       npcPlayerLeaseAcceptChance({
-        monthlyUsd: Math.round(catalogMonthly * 1.8),
+        monthlyUsd: Math.round(catalogMonthly * 1.0),
         termMonths: 1,
         catalogMonthlyUsd: catalogMonthly,
-      }),
-      0,
+      }) > 0,
+      true,
     );
-    state.aircraftMarket = [];
+    // Seed a player_lease listing without going through listAircraftForLease.
+    state.aircraftMarket = [
+      {
+        id: 'acfl_lease_seed',
+        kind: 'lease',
+        aircraftClassId: 'light_ga',
+        airframeTypeId: starter.airframeTypeId,
+        label: 'Seed lease',
+        basedIcao: 'SBRF',
+        askingUsd: Math.round(catalogMonthly * 4),
+        leaseMonthlyUsd: catalogMonthly,
+        leaseTermMonths: 1,
+        condition: 'good',
+        hoursAirframe: 0,
+        hoursEngine: 0,
+        expiresAtTick: world.tick + 96 * 7,
+        status: 'available',
+        source: 'player_lease',
+        sellerAircraftId: 'acf_greedy',
+      },
+    ];
+    state.fleet.find((a) => a.id === 'acf_greedy')!.status = 'listed';
     state.aircraftMarketDay = economyDayIndex(world.tick);
-    listAircraftForLease(state, 'acf_greedy', world.tick, {
-      monthlyUsd: Math.round(catalogMonthly * 1.8),
-      termMonths: 1,
-    });
     let taken = 0;
     for (let d = 0; d < 30 && taken === 0; d++) {
       world.tick += 96;
@@ -562,49 +539,89 @@ describe('aircraft market', () => {
     assert.equal(state.fleet.find((a) => a.id === 'acf_greedy')?.status, 'listed');
   });
 
-  it('NPC demand can take a player lease and start lease-out income', () => {
-    const world = createSeedEconomyWorld({ seed: 'acf-mkt-npc' });
-    let state = selectStarterHub(emptyMissionsStateV2(), 'SBRF', {
-      pilotName: 'NpcTake',
+  it('Phase 0: settle force-returns leased_out with zero income', () => {
+    assert.equal(PLAYER_LEASE_OUT_ENABLED, false);
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-wear' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
+      pilotName: 'WearLease',
       airframeTypeId: 'asobo-c172sp-cargo',
     });
     const starter = state.fleet[0]!;
+    ensureAircraftConditionPcts(starter);
+    const afBefore = starter.airframeConditionPct!;
+    const engBefore = starter.engineConditionPct!;
+    const hoursBefore = starter.hoursAirframe ?? 0;
+    const walletBefore = state.walletUsd;
+
     state.fleet.push({
       ...starter,
-      id: 'acf_bonanza_3',
-      aircraftClassId: 'light_ga',
-      label: 'Lease Me',
-      ownership: 'owned',
+      id: 'acf_spare_wear',
+      label: 'Spare',
       status: 'parked',
-      condition: 'fair',
     });
-    // Empty board so demand must pick the player lease.
-    state.aircraftMarket = [];
-    state.aircraftMarketDay = economyDayIndex(world.tick);
-    const { listing } = listAircraftForLease(state, 'acf_bonanza_3', world.tick, {
-      termMonths: 3,
-    });
-    const walletBefore = state.walletUsd;
-    // Force demand to run; with only this listing it should take it when takeCount > 0.
-    // Retry across days until demand takes at least one (seed may roll 0).
-    let taken = 0;
-    for (let d = 0; d < 20 && taken === 0; d++) {
-      world.tick += 24;
-      taken = __testApplyNpcDemand(state, world, economyDayIndex(world.tick));
-    }
-    assert.ok(taken >= 1, 'expected NPC demand to take the player lease');
-    const acf = state.fleet.find((a) => a.id === 'acf_bonanza_3')!;
-    assert.equal(acf.status, 'leased_out');
-    assert.ok(acf.leaseOut);
-    assert.ok(acf.leaseOut?.lesseeNpcId, 'expected named NPC lessee');
-    assert.ok(acf.leaseOut?.lesseeName);
-    const lessee = world.npcs.find((n) => n.id === acf.leaseOut!.lesseeNpcId);
-    assert.ok(lessee);
-    assert.equal(lessee!.leasedPlayerAircraftId, acf.id);
-    assert.equal(state.walletUsd, walletBefore + listing.askingUsd);
+
+    const lessee = world.npcs.find((n) => !n.leasedPlayerAircraftId) ?? world.npcs[0]!;
+    const startedAtTick = world.tick - 96 * 14;
+    starter.status = 'leased_out';
+    starter.leaseOut = {
+      monthlyUsd: 500,
+      nextDueTick: world.tick - 96 * 7,
+      termEndsTick: world.tick + 96 * 60,
+      depositUsd: 2000,
+      listingId: 'acfl_fake',
+      lesseeNpcId: lessee.id,
+      lesseeName: lessee.name ?? 'NPC',
+      startedAtTick,
+      lastWearTick: startedAtTick,
+    };
+    lessee.leasedPlayerAircraftId = starter.id;
+
+    // Open listing should also expire on settle.
+    state.aircraftMarket = [
+      {
+        id: 'acfl_open',
+        kind: 'lease',
+        aircraftClassId: 'light_ga',
+        airframeTypeId: starter.airframeTypeId,
+        label: 'Open listing',
+        basedIcao: 'SBPA',
+        askingUsd: 2000,
+        leaseMonthlyUsd: 500,
+        leaseTermMonths: 1,
+        condition: 'good',
+        hoursAirframe: 0,
+        hoursEngine: 0,
+        expiresAtTick: world.tick + 96 * 7,
+        status: 'available',
+        source: 'player_lease',
+        sellerAircraftId: 'acf_spare_wear',
+      },
+    ];
+    state.fleet.find((a) => a.id === 'acf_spare_wear')!.status = 'listed';
+
+    const ops = settleAircraftMarketOps(state, world.tick, world);
+    assert.equal(ops.leaseOutEarnedUsd, 0);
+    assert.ok(ops.leaseOutReturned.includes(starter.id));
+    assert.equal(state.walletUsd, walletBefore);
+
+    const returned = state.fleet.find((a) => a.id === starter.id)!;
+    assert.ok(
+      returned.status === 'parked' || returned.status === 'maintenance',
+      `expected parked or maintenance, got ${returned.status}`,
+    );
+    assert.equal(returned.leaseOut, undefined);
+    assert.ok((returned.hoursAirframe ?? 0) > hoursBefore);
+    assert.ok((returned.airframeConditionPct ?? 100) < afBefore);
+    assert.ok((returned.engineConditionPct ?? 100) < engBefore);
+    assert.equal(lessee.leasedPlayerAircraftId, undefined);
+    assert.ok(
+      !(state.aircraftMarket ?? []).some(
+        (l) => l.id === 'acfl_open' && l.status === 'available',
+      ),
+    );
     assert.equal(
-      state.aircraftMarket?.find((l) => l.id === listing.id)?.status,
-      'sold',
+      state.fleet.find((a) => a.id === 'acf_spare_wear')?.status,
+      'parked',
     );
   });
 
@@ -676,56 +693,6 @@ describe('aircraft market', () => {
       (i) => i.status === 'available' && i.countryId === 'BR',
     ).length;
     assert.equal(poolAfter, poolBefore + 1);
-  });
-
-  it('lease-out return applies utilization wear and may AOG', () => {
-    const world = createSeedEconomyWorld({ seed: 'acf-mkt-wear' });
-    let state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
-      pilotName: 'WearLease',
-      airframeTypeId: 'asobo-c172sp-cargo',
-    });
-    const starter = state.fleet[0]!;
-    ensureAircraftConditionPcts(starter);
-    const afBefore = starter.airframeConditionPct!;
-    const engBefore = starter.engineConditionPct!;
-    const hoursBefore = starter.hoursAirframe ?? 0;
-
-    // Second owned airframe so we can list the starter.
-    state.fleet.push({
-      ...starter,
-      id: 'acf_spare_wear',
-      label: 'Spare',
-      status: 'parked',
-    });
-    state.aircraftMarket = [];
-    state.aircraftMarketDay = economyDayIndex(world.tick);
-    listAircraftForLease(state, starter.id, world.tick, { termMonths: 3 });
-
-    let taken = 0;
-    for (let d = 0; d < 20 && taken === 0; d++) {
-      world.tick += 24;
-      taken = __testApplyNpcDemand(state, world, economyDayIndex(world.tick));
-    }
-    assert.ok(taken >= 1);
-    assert.equal(starter.status, 'leased_out');
-    const lesseeId = starter.leaseOut!.lesseeNpcId!;
-    const termEnd = starter.leaseOut!.termEndsTick;
-
-    // Advance past term and settle.
-    world.tick = termEnd + 1;
-    settleAircraftMarketOps(state, world.tick, world);
-
-    const returned = state.fleet.find((a) => a.id === starter.id)!;
-    assert.ok(
-      returned.status === 'parked' || returned.status === 'maintenance',
-      `expected parked or maintenance, got ${returned.status}`,
-    );
-    assert.equal(returned.leaseOut, undefined);
-    assert.ok((returned.hoursAirframe ?? 0) > hoursBefore);
-    assert.ok((returned.airframeConditionPct ?? 100) < afBefore);
-    assert.ok((returned.engineConditionPct ?? 100) < engBefore);
-    const lessee = world.npcs.find((n) => n.id === lesseeId);
-    assert.equal(lessee?.leasedPlayerAircraftId, undefined);
   });
 
   it('maintenance gate blocks until paid', () => {
@@ -845,35 +812,56 @@ describe('aircraft market', () => {
     }
   });
 
-  it('includes player lease listings when browsing WORLD', () => {
+  it('Phase 0: ensureAircraftMarket expires leftover player_lease listings', () => {
+    assert.equal(PLAYER_LEASE_OUT_ENABLED, false);
     const world = createSeedEconomyWorld({ seed: 'acf-mkt-world-player-lease' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'WorldLease',
       airframeTypeId: 'asobo-c172sp-cargo',
     });
-    // Need a second owned parked airframe to list for lease.
     state.fleet.push({
       ...state.fleet[0]!,
       id: 'acf_lease_spare',
       label: 'Spare for lease',
-      status: 'parked',
+      status: 'listed',
       ownership: 'owned',
       locationIcao: 'SBGR',
+      listedListingId: 'acfl_leftover',
     });
+    state.aircraftMarket = [
+      {
+        id: 'acfl_leftover',
+        kind: 'lease',
+        aircraftClassId: 'light_ga',
+        airframeTypeId: state.fleet[0]!.airframeTypeId,
+        label: 'Leftover lease',
+        basedIcao: 'SBGR',
+        askingUsd: 2000,
+        leaseMonthlyUsd: 500,
+        leaseTermMonths: 1,
+        condition: 'good',
+        hoursAirframe: 0,
+        hoursEngine: 0,
+        expiresAtTick: world.tick + 96 * 7,
+        status: 'available',
+        source: 'player_lease',
+        sellerAircraftId: 'acf_lease_spare',
+      },
+    ];
     ensureAircraftMarket(state, world);
-    const { listing } = listAircraftForLease(
-      state,
-      'acf_lease_spare',
-      world.tick,
+    assert.ok(
+      !(state.aircraftMarket ?? []).some(
+        (l) => l.id === 'acfl_leftover' && l.status === 'available',
+      ),
     );
-    assert.equal(listing.source, 'player_lease');
+    assert.equal(
+      state.fleet.find((a) => a.id === 'acf_lease_spare')?.status,
+      'parked',
+    );
     const worldwide = listAircraftMarket(state, world, {
       browseCountryId: 'WORLD',
     });
-    assert.ok(
-      worldwide.some((l) => l.id === listing.id),
-      'player lease must appear on Worldwide board',
-    );
+    assert.ok(!worldwide.some((l) => l.id === 'acfl_leftover'));
   });
 
   it('cross-border lease with import parks at home', () => {

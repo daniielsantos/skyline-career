@@ -213,7 +213,7 @@ export function formatPortCorridorReachLabel(
   const nm = corridorNmForLevel(level);
   const src =
     opts?.source === 'concession'
-      ? `P${level}`
+      ? `Port FBO · P${level}`
       : opts?.source === 'vacant'
         ? 'Vacant'
         : `WH T${level}`;

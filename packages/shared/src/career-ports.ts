@@ -2243,6 +2243,27 @@ export function ensurePlayerPortPickups(
 }
 
 /**
+ * Effective $/kg for a port listing after procurement + Port FBO discount + soft floor.
+ * Same math as `buyPortListing` — desk auto-buy must use this (no extra discount).
+ */
+export function effectivePortBuyUnitPriceUsd(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  listing: Pick<PortListing, 'unitPriceUsd' | 'allocatedHubIcao' | 'portId'>,
+  companyId = LOCAL_COMPANY_ID,
+): number {
+  const hub = listing.allocatedHubIcao.trim().toUpperCase();
+  const rawUnit = money(
+    listing.unitPriceUsd *
+      procurementMultForHub(state, hub) *
+      (isPortOperator(world, listing.portId, companyId)
+        ? PORT_OPERATOR_PRICE_MULT
+        : 1),
+  );
+  return money(Math.max(rawUnit, listing.unitPriceUsd * 0.75));
+}
+
+/**
  * Buy kg from a port listing → inbound WH transfer and/or yard pickup.
  * Cargo does not teleport into WH stock; it arrives after transfer ticks.
  */
@@ -2304,16 +2325,11 @@ export function buyPortListing(
     throw new Error(`Unknown pickup hub ${hub}`);
   }
 
-  const rawUnit = money(
-    listing.unitPriceUsd *
-      procurementMultForHub(state, hub) *
-      (isPortOperator(world, listing.portId, LOCAL_COMPANY_ID)
-        ? PORT_OPERATOR_PRICE_MULT
-        : 1),
-  );
-  // Soft floor: stacked discounts cannot drop below 75% of listing unit.
-  const unitPriceUsd = money(
-    Math.max(rawUnit, listing.unitPriceUsd * 0.75),
+  const unitPriceUsd = effectivePortBuyUnitPriceUsd(
+    state,
+    world,
+    listing,
+    LOCAL_COMPANY_ID,
   );
   const debitUsd = money(unitPriceUsd * qty);
   if (state.walletUsd < debitUsd) {
@@ -2712,6 +2728,7 @@ export function portSnapshot(
     tier: number;
   }>;
   concessions: NonNullable<CareerMissionsState['playerPortConcessions']>;
+  autoBuyOrders: NonNullable<CareerMissionsState['portAutoBuyOrders']>;
 } {
   if (state) {
     expireDemandHolds(state, world);
@@ -2863,5 +2880,6 @@ export function portSnapshot(
     demand,
     ownedFbos,
     concessions: state?.playerPortConcessions ?? [],
+    autoBuyOrders: state?.portAutoBuyOrders ?? [],
   };
 }

@@ -81,7 +81,7 @@ UI: fair / dealer 50% / ask. Ask clamp ~0.5–2.0× fair.
 
 **NPC compra listing (Option B, travado)** — cash = ask do player; **mesma** instância (matrícula/horas) vai para **dealer pool** do país e volta ao Market. **Não** vira frota NPC permanente. **Não** restock +1 extra (cap estável). Chance por ask÷fair (≤0.9 alto … ≥1.2 quase 0). Min **1 dia** no board antes do NPC olhar.
 
-**Lease out** — player escolhe `weeklyUsd` (campo legacy `monthlyUsd`) + `termMonths` 1–3 (listagem 0.6–1.8× catálogo). NPC só aceita faixa ~0.7–1.3× + termo 1–3. Cobrança / renda **semanal**. Depósito **4 semanas**. Delay 1–4 dias. 1 listing lease player por vez. Expire → parked.
+**Lease out** — **DISABLED** Port FBO Phase 0 (`PLAYER_LEASE_OUT_ENABLED=false`). Hangar não lista; NPC não toma; settle force-return sem `lease_out_income`. Dealer lease-in intacto. Spec legado (se reativar): weekly 0.6–1.8× catálogo, termo 1–3, depósito 4 semanas, 1 listing.
 
 **Buy/lease balance** — earnings-based (perna ref. + voos/sem + voos p/ buy): [`18-aircraft-pricing-balance.md`](./18-aircraft-pricing-balance.md).
 

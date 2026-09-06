@@ -49,7 +49,7 @@ export const PAGE_HELP = {
       'Aircraft must be at the mission origin with you. Travel moves the pilot; ferry moves the airframe (often empty).',
       'Inspect, then repair. Hours raise MX cost and cut resale. Parked frames pay daily parking (assigned and leased-out do not).',
       'Cargo Ops (sub-tab here) unlocks Market commodities and freighter classes. Dry/Light starters are open; Medium and Jet climb the ladder.',
-      'Crew lives at your FBO. Cashflow is the ledger — freights, fuel, leases, shop, parking.',
+      'Company home (Base) unlocks parking and Jet-A/MRO perks. Cashflow is the ledger — freights, fuel, leases, shop, parking.',
     ],
   },
   airframes: {
@@ -68,7 +68,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Home hub, name, and company snapshot live here. Progression follows traffic, fleet, and Cargo Ops — not a separate XP bar on this page.',
-      'You need an FBO and cash to grow; the Hangar cashflow tab is the detailed ledger.',
+      'You need a Base and cash to grow; the Hangar cashflow tab is the detailed ledger.',
     ],
   },
   network: {
@@ -112,7 +112,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Stock, contracts, and fuel for this ICAO. Hub level rises with traffic through here (capacity and flow scale).',
-      'Contracts are lots tied to this field. FBO, if built, is crew and parking at this hub.',
+      'Contracts are lots tied to this field. Base, if built, is crew and parking at this hub.',
       'Fuel trucks restock Jet-A in the background — a dry tank here is a logistics problem, not a missing OFP.',
     ],
   },

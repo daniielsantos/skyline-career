@@ -2195,6 +2195,19 @@ export type PortsSnapshot = {
     leasePaidThroughTick: number;
     lifetimeThroughputKg: number;
   }>;
+  autoBuyOrders?: Array<{
+    id: string;
+    portId: string;
+    commodityId: string;
+    maxPriceUsdPerKg: number;
+    maxKgPerDay: number;
+    warehouseId: string;
+    walletFloorUsd: number;
+    paused: boolean;
+    boughtKgToday: number;
+    boughtDayIndex: number;
+    createdAtTick: number;
+  }>;
 };
 
 export type PlayerWarehouseView = {
@@ -2317,6 +2330,66 @@ export function postPortBuy(opts: { listingId: string; kg: number }) {
     ports: PortsSnapshot;
     warehouses: PlayerWarehouseSnapshot;
   }>('/api/ports/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortAutoBuy(opts: {
+  action?: 'upsert' | 'pause' | 'remove';
+  id?: string;
+  portId?: string;
+  commodityId?: string;
+  maxPriceUsdPerKg?: number;
+  maxKgPerDay?: number;
+  warehouseId?: string;
+  walletFloorUsd?: number;
+  paused?: boolean;
+}) {
+  return api<{
+    walletUsd: number;
+    maxActive: number;
+    ports: PortsSnapshot;
+  }>('/api/ports/auto-buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortStevedore(opts: {
+  action?: 'quote' | 'start' | 'destinations';
+  pickupId: string;
+  destWarehouseId?: string;
+  kg?: number;
+}) {
+  return api<{
+    walletUsd?: number;
+    quote?: {
+      pickupId: string;
+      portId: string;
+      fromHubIcao: string;
+      destWarehouseId: string;
+      destHubIcao: string;
+      commodityId: string;
+      kg: number;
+      distanceNm: number;
+      feeUsd: number;
+      unitFeeUsd: number;
+      transferTicks: number;
+      readyAtTick: number;
+      remainingYardKg: number;
+    };
+    destinations?: Array<{
+      warehouseId: string;
+      hubIcao: string;
+      inboundFreeKg: number;
+      distanceNm: number;
+      feeUsdPerKg: number;
+    }>;
+    remainingYardKg?: number;
+    ports?: PortsSnapshot;
+    warehouses?: PlayerWarehouseSnapshot;
+  }>('/api/ports/stevedore', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

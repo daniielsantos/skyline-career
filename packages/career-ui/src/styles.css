@@ -11185,6 +11185,67 @@ span.dispatch-route-hub-dest {
   margin-left: 0.15rem;
 }
 
+.ports-desk-panel {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.ports-desk-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.92rem;
+}
+
+.ports-desk-hint {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+}
+
+.ports-desk-orders {
+  list-style: none;
+  margin: 0 0 0.65rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ports-desk-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.ports-desk-order-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.ports-desk-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.45rem 0.55rem;
+  align-items: end;
+}
+
+.ports-desk-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+}
+
+.ports-desk-form input,
+.ports-desk-form select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.35rem;
+}
+
 .ports-stock-details {
   margin: 0.55rem 0.65rem 0;
   padding-bottom: 0.45rem;

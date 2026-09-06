@@ -122,10 +122,10 @@ export function FboRouteMapCard(props: {
       : '';
   const headline = showRoute
     ? `${originCode} → ${destCode}${distLabel}${progressLabel}`
-    : (props.idleHeadline ?? `${baseCode} · FBO base`);
+    : (props.idleHeadline ?? `${baseCode} · company base`);
 
   return (
-    <section className="fbo-route-map-card" aria-label="FBO route map">
+    <section className="fbo-route-map-card" aria-label="Company base route map">
       <div className="dispatch-route-map-head">
         {props.showTitle === false ? null : <strong>Map</strong>}
         <small>{headline}</small>

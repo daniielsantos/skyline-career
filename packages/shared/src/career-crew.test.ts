@@ -3,7 +3,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   CREW_FEE_FRAC,
   CREW_RETURN_FEE_FRAC,
@@ -19,11 +19,13 @@ import {
   settleCrewDailyOps,
   settleCrewOpsDue,
   assignCrewMemberToMission,
+  setCompanyCrewEnabledForTests,
 } from './career-crew.js';
 import {
   buyFboTier1,
   holdLotAtFbo,
   releaseFboHoldToMission,
+  setFboBondedHoldEnabledForTests,
   upgradeFboToTier2,
 } from './career-fbo.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
@@ -36,6 +38,35 @@ import {
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 
 describe('company crew', () => {
+  beforeEach(() => {
+    setCompanyCrewEnabledForTests(true);
+    setFboBondedHoldEnabledForTests(true);
+  });
+  afterEach(() => {
+    setCompanyCrewEnabledForTests(null);
+    setFboBondedHoldEnabledForTests(null);
+  });
+
+  it('rejects hire and dispatch when company crew is disabled', () => {
+    setCompanyCrewEnabledForTests(null);
+    const world = createSeedEconomyWorld({ seed: 'crew-off' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'CrewOff',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyFboTier1(state, world, 'SBGR');
+    assert.equal(companyCrewSnapshot(state, world).slotsUnlocked, 0);
+    assert.throws(() => hireCrewCandidate(state, world, 'x'), /crew removed/i);
+    assert.throws(
+      () =>
+        dispatchCrewMission(state, world, {
+          missionId: 'missing',
+        }),
+      /crew removed/i,
+    );
+  });
+
   function setupWithFbo() {
     const world = createSeedEconomyWorld({ seed: 'crew-ops' });
     ensureSeedMarketFormed(world);

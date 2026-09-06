@@ -17,6 +17,7 @@ import {
   formatMassExact,
   type WeightSystem,
 } from './weight-units';
+import { PLAYER_LEASE_OUT_ENABLED } from './feature-flags';
 
 export type AircraftCatalogEntry = {
   id: AircraftClass;
@@ -802,6 +803,7 @@ export function HangarAircraftCard(props: {
   const registration = formatAircraftRegistration(acf.registration);
   const hoursMxMult = estimateHoursMxCostMult(acf);
   const canList =
+    PLAYER_LEASE_OUT_ENABLED &&
     (acf.ownership ?? 'owned') === 'owned' &&
     acf.status === 'parked' &&
     props.ownedCount >= 2 &&

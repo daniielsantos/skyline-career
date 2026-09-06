@@ -1185,6 +1185,8 @@ export interface CareerMissionsState {
   playerWarehouses?: PlayerWarehouseState;
   /** Endgame seaport concessions (company-owned leases). */
   playerPortConcessions?: PlayerPortConcession[];
+  /** Port FBO desk auto-buy limit orders (company-scoped). */
+  portAutoBuyOrders?: PortAutoBuyOrder[];
   /** Company crew roster (AI slots based at an FBO). */
   companyCrew?: CompanyCrewState;
   /** Ground staff at player warehouses (ports / WH ops — not flight crew). */
@@ -1288,6 +1290,8 @@ export interface WarehouseInboundTransfer {
   unitCostUsd: number;
   purchasedAtTick: number;
   readyAtTick: number;
+  /** Omit / port_buy = surplus buy; stevedore = Port FBO yard→WH truck. */
+  source?: 'port_buy' | 'stevedore';
 }
 
 /** Demand Board kg pledged at a warehouse without starting a flight. */
@@ -1395,6 +1399,28 @@ export interface PlayerPortConcession {
   throughputWindowDay?: number;
   /** Last 7 economy days of port throughput, `[today, yesterday, …]`. */
   throughputWindowKg?: number[];
+}
+
+/**
+ * Port FBO desk — persistent limit order (porto → WH/yard via buyPortListing).
+ * Same price/fila as manual buy; no extra discount.
+ */
+export interface PortAutoBuyOrder {
+  id: string;
+  portId: string;
+  commodityId: CommodityId;
+  /** Skip listing when effective unit price exceeds this. */
+  maxPriceUsdPerKg: number;
+  maxKgPerDay: number;
+  /** Must be a player WH at a pickup hub of `portId`. */
+  warehouseId: string;
+  /** Skip buy when wallet − debit would fall below this. */
+  walletFloorUsd: number;
+  paused: boolean;
+  boughtKgToday: number;
+  /** `economyDayIndex(tick)` when `boughtKgToday` last applied. */
+  boughtDayIndex: number;
+  createdAtTick: number;
 }
 
 /**
@@ -1620,6 +1646,7 @@ export type CareerLedgerKind =
   | 'fbo_spot_sale'
   | 'port_buy'
   | 'port_yard_hold'
+  | 'port_drayage'
   | 'port_concession_claim'
   | 'port_concession_lease'
   | 'port_concession_upgrade'

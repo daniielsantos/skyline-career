@@ -178,7 +178,7 @@ function endpointMarker(
   const el = document.createElement('button');
   el.type = 'button';
   el.className = `dispatch-route-marker dispatch-route-marker-${kind}`;
-  const label = kind === 'dep' ? 'DEP' : kind === 'arr' ? 'ARR' : 'FBO';
+  const label = kind === 'dep' ? 'DEP' : kind === 'arr' ? 'ARR' : 'BASE';
   el.title = `${label} ${endpoint.icao}${endpoint.name ? ` · ${endpoint.name}` : ''}`;
   el.setAttribute(
     'aria-label',
@@ -416,7 +416,7 @@ export function DispatchRouteMap(props: {
               ? 'Departure'
               : kind === 'arr'
                 ? 'Arrival'
-                : 'FBO base';
+                : 'Company base';
           const marker = new Marker({ element: el, anchor: 'bottom' })
             .setLngLat([endpoint.lon, endpoint.lat])
             .setPopup(

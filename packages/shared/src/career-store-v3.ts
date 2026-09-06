@@ -87,6 +87,7 @@ export function ensureV3Ddl(db: SqliteDb): void {
       port_pickups_json TEXT,
       player_warehouses_json TEXT,
       player_port_concessions_json TEXT,
+      port_auto_buy_orders_json TEXT,
       updated_at_ms INTEGER NOT NULL,
       FOREIGN KEY (company_id) REFERENCES companies(id)
     );
@@ -216,6 +217,11 @@ export function ensureV3Ddl(db: SqliteDb): void {
   if (!columnExists(db, 'company_state', 'player_port_concessions_json')) {
     db.exec(
       `ALTER TABLE company_state ADD COLUMN player_port_concessions_json TEXT`,
+    );
+  }
+  if (!columnExists(db, 'company_state', 'port_auto_buy_orders_json')) {
+    db.exec(
+      `ALTER TABLE company_state ADD COLUMN port_auto_buy_orders_json TEXT`,
     );
   }
   if (!columnExists(db, 'company_state', 'class_ops_json')) {
@@ -1385,6 +1391,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
        player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
        port_pickups_json, player_warehouses_json, player_port_concessions_json,
+       port_auto_buy_orders_json,
        last_seen_tick, updated_at_ms
      ) VALUES (
        @company_id, @wallet_usd, @pilot_name, @pilot_icao, @hub_selected,
@@ -1392,6 +1399,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        @aircraft_market_day, @aircraft_market_demand_day, @airframe_perf_json,
        @player_fbos_json, @company_crew_json, @ground_staff_json, @active_bush_trip_json,
        @port_pickups_json, @player_warehouses_json, @player_port_concessions_json,
+       @port_auto_buy_orders_json,
        @last_seen_tick, @updated_at_ms
      )
      ON CONFLICT(company_id) DO UPDATE SET
@@ -1419,6 +1427,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        port_pickups_json = excluded.port_pickups_json,
        player_warehouses_json = excluded.player_warehouses_json,
        player_port_concessions_json = excluded.player_port_concessions_json,
+       port_auto_buy_orders_json = excluded.port_auto_buy_orders_json,
        last_seen_tick = excluded.last_seen_tick,
        updated_at_ms = excluded.updated_at_ms`,
   ).run({
@@ -1464,6 +1473,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
     player_port_concessions_json: JSON.stringify(
       state.playerPortConcessions ?? [],
     ),
+    port_auto_buy_orders_json: JSON.stringify(state.portAutoBuyOrders ?? []),
     last_seen_tick:
       typeof state.lastSeenTick === 'number' && Number.isFinite(state.lastSeenTick)
         ? Math.max(0, Math.floor(state.lastSeenTick))
@@ -1482,7 +1492,8 @@ export function readCompanyStateScalars(
               cargo_ops_json, class_ops_json, aircraft_market_json, aircraft_market_day,
               aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
               company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
-              player_warehouses_json, player_port_concessions_json, last_seen_tick
+              player_warehouses_json, player_port_concessions_json,
+              port_auto_buy_orders_json, last_seen_tick
        FROM company_state WHERE company_id = ?`,
     )
     .get(companyId) as
@@ -1505,6 +1516,7 @@ export function readCompanyStateScalars(
         port_pickups_json: string | null;
         player_warehouses_json: string | null;
         player_port_concessions_json: string | null;
+        port_auto_buy_orders_json: string | null;
         last_seen_tick: number;
       }
     | undefined;
@@ -1643,6 +1655,16 @@ export function readCompanyStateScalars(
     }
   } else {
     out.playerPortConcessions = [];
+  }
+  if (row.port_auto_buy_orders_json) {
+    try {
+      const parsed = JSON.parse(row.port_auto_buy_orders_json);
+      out.portAutoBuyOrders = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      out.portAutoBuyOrders = [];
+    }
+  } else {
+    out.portAutoBuyOrders = [];
   }
   return out;
 }

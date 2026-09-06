@@ -1,6 +1,7 @@
 /**
  * Company crew ops — AI flies accepted/hold missions on the player's airframe.
  * Phase 4a: roster + wall-clock settle. Phase 4b: hire pool, salary, perks.
+ * Phase 6 (Port FBO track): disabled — air income without the player in the sim.
  */
 
 import { estimateMissionBlockHours } from './career-aircraft-market.js';
@@ -27,6 +28,33 @@ import type {
   PlayerAircraft,
 } from './types/career-economy.js';
 
+/**
+ * Company crew (wall-clock freight on player airframes) — off.
+ * Snowballs harder than lease-out: large contracts × parallel slots.
+ * Base keeps parking / Jet-A / MRO perks. In-flight crew legs still settle.
+ */
+export const COMPANY_CREW_ENABLED = false;
+
+/** Test-only override (`null` = use `COMPANY_CREW_ENABLED`). */
+let companyCrewEnabledOverride: boolean | null = null;
+
+/** @internal node:test — do not call from product code. */
+export function setCompanyCrewEnabledForTests(enabled: boolean | null): void {
+  companyCrewEnabledOverride = enabled;
+}
+
+function companyCrewEnabled(): boolean {
+  return companyCrewEnabledOverride ?? COMPANY_CREW_ENABLED;
+}
+
+/** Product + UI gate (respects test override). */
+export function isCompanyCrewEnabled(): boolean {
+  return companyCrewEnabled();
+}
+
+const COMPANY_CREW_DISABLED_MSG =
+  'Company crew removed — fly freights yourself (Base keeps parking / Jet-A / MRO perks)';
+
 /** Fraction of mission pay charged as crew fee at dispatch. */
 export const CREW_FEE_FRAC = 0.12;
 
@@ -50,6 +78,7 @@ export function crewSlotsFromFboTier(tier: number): number {
 export function companyCrewSlotsUnlocked(
   state: Pick<CareerMissionsState, 'playerFbos'>,
 ): number {
+  if (!companyCrewEnabled()) return 0;
   const fbos = state.playerFbos?.fbos ?? [];
   if (fbos.length === 0) return 0;
   let sum = 0;
@@ -471,6 +500,14 @@ export function reconcileCompanyCrew(
   state: CareerMissionsState,
 ): CompanyCrewState {
   const roster = ensureCompanyCrew(state);
+  if (!companyCrewEnabled()) {
+    // Drop idle hires (no salary burn); leave airborne until mission settles.
+    roster.hirePool = [];
+    roster.hirePoolDay = undefined;
+    roster.hirePoolIcao = undefined;
+    roster.members = roster.members.filter((m) => m.status === 'airborne');
+    state.companyCrew = roster;
+  }
   const airborneMissions = listCrewInFlightMissions(state);
   const claimed = new Set<string>();
 
@@ -572,10 +609,13 @@ export function hireCrewCandidate(
   world: Pick<CareerEconomyWorld, 'tick'> & { seed?: string },
   candidateId: string,
 ): { member: CompanyCrewMember; debitUsd: number } {
+  if (!companyCrewEnabled()) {
+    throw new Error(COMPANY_CREW_DISABLED_MSG);
+  }
   refreshCrewHirePool(state, world);
   const roster = ensureCompanyCrew(state);
   if (companyCrewRosterSlotsFree(state) <= 0) {
-    throw new Error('No free crew slots — fire someone or upgrade FBO tiers');
+    throw new Error('No free crew slots — fire someone or upgrade Base tiers');
   }
   const pool = roster.hirePool ?? [];
   const idx = pool.findIndex((c) => c.id === candidateId);
@@ -664,6 +704,9 @@ export function assignCrewMemberToMission(
   state: CareerMissionsState,
   opts: { missionId: string; crewMemberId: string },
 ): MissionIntent {
+  if (!companyCrewEnabled()) {
+    throw new Error(COMPANY_CREW_DISABLED_MSG);
+  }
   const idx = state.missions.findIndex((m) => m.id === opts.missionId);
   if (idx < 0) throw new Error(`Unknown mission ${opts.missionId}`);
   const mission = state.missions[idx]!;
@@ -941,9 +984,12 @@ export function dispatchCrewMission(
     nowMs?: number;
   },
 ): DispatchCrewMissionResult {
+  if (!companyCrewEnabled()) {
+    throw new Error(COMPANY_CREW_DISABLED_MSG);
+  }
   const slotsUnlocked = companyCrewSlotsUnlocked(state);
   if (slotsUnlocked <= 0) {
-    throw new Error('Company crew requires an owned FBO');
+    throw new Error('Company crew requires an owned Base');
   }
   ensureCompanyCrew(state, { tick: world.tick });
   if (companyCrewSlotsInUse(state) >= slotsUnlocked) {

@@ -92,7 +92,7 @@ Depósito = **4 semanas** (`PLAYER_LEASE_DEPOSIT_WEEKS`). Termo 1–3 meses.
 
 ### Player lease-out
 
-Player escolhe weekly dentro da banda NPC; não passa por esta metodologia automática.
+**Off** (Port FBO Phase 0 / `PLAYER_LEASE_OUT_ENABLED`). Não usa esta banda enquanto o flag estiver false.
 
 ---
 

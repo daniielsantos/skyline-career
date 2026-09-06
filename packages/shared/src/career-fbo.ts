@@ -1,6 +1,7 @@
 /**
- * Player FBO — company base + bonded contract warehouse.
- * Spot inventory removed (Warehouses + Demand Board).
+ * Player company Base (airport FBO) — parking/fuel/MRO perks + legacy bonded holds.
+ * Spot inventory removed (Warehouses + Demand Board). Phase 4 slim: max 2 bases, reroute off.
+ * Phase 5: new Market→bonded holds off (grandfather existing).
  */
 
 import {
@@ -20,7 +21,7 @@ import {
   FBO_SERVICE_COST_MULT,
   findPlayerFboAtIcao,
 } from './career-fbo-perks.js';
-import { ensureCompanyCrew, refreshCrewHirePool } from './career-crew.js';
+import { ensureCompanyCrew, refreshCrewHirePool, isCompanyCrewEnabled } from './career-crew.js';
 import { applyWalletDelta } from './career-ledger.js';
 import {
   getAircraftClass,
@@ -65,23 +66,50 @@ export const FBO_CAPACITY_KG: Record<PlayerFboTier, number> = {
 /** @deprecated use FBO_CAPACITY_KG[1] */
 export const FBO_T1_CAPACITY_KG = FBO_CAPACITY_KG[1];
 
-/** Max owned FBOs (Phase 4c: three bases). */
-export const FBO_MAX_OWNED = 3;
+/**
+ * Max owned company bases (airport FBO).
+ * Phase 4 slim: home + optional 2nd with hard gates — no third empire.
+ */
+export const FBO_MAX_OWNED = 2;
 
 /** @deprecated alias */
 export const FBO_PHASE1_MAX_OWNED = FBO_MAX_OWNED;
 
-/** Premium on base T1 CAPEX for a second (non-home) FBO. */
+/** Premium on base T1 CAPEX for a second (non-home) base. */
 export const FBO_SECOND_BUY_MULT = 1.4;
 
-/** Premium on base T1 CAPEX for a third FBO. */
+/** @deprecated Phase 4 slim — third base removed (`FBO_MAX_OWNED = 2`). */
 export const FBO_THIRD_BUY_MULT = 1.8;
 
-/** Owned airframes required before buying a second FBO. */
+/** Owned airframes required before buying a second base. */
 export const FBO_SECOND_MIN_OWNED_AIRCRAFT = 2;
 
-/** Owned airframes required before buying a third FBO. */
+/** @deprecated Phase 4 slim — third base removed. */
 export const FBO_THIRD_MIN_OWNED_AIRCRAFT = 3;
+
+/**
+ * Airport Base Phase 4 — destination shopping on bonded holds disabled.
+ * Hold still needs player/crew flight via release/split.
+ */
+export const FBO_REROUTE_ENABLED = false;
+
+/**
+ * Airport Base Phase 5 — new Market→bonded holds disabled.
+ * Existing holds keep cancel / release / split / expire. Storage story → WH + Demand.
+ */
+export const FBO_BONDED_HOLD_ENABLED = false;
+
+/** Test-only override (`null` = use `FBO_BONDED_HOLD_ENABLED`). */
+let fboBondedHoldEnabledOverride: boolean | null = null;
+
+/** @internal vitest/node:test — do not call from product code. */
+export function setFboBondedHoldEnabledForTests(enabled: boolean | null): void {
+  fboBondedHoldEnabledOverride = enabled;
+}
+
+function fboBondedHoldEnabled(): boolean {
+  return fboBondedHoldEnabledOverride ?? FBO_BONDED_HOLD_ENABLED;
+}
 
 /** CAPEX for T1 by hub tier. */
 export const FBO_T1_BUY_USD: Record<HubTier, number> = {
@@ -282,7 +310,7 @@ export function quoteFboTier1BuyUsd(
   return FBO_T1_BUY_USD[hubTierOf(ap ?? { icao })];
 }
 
-/** CAPEX for buying a T1 FBO here (1st = base; 2nd/3rd = progressive premium). */
+/** CAPEX for buying a T1 base here (1st = home; 2nd = premium). */
 export function quoteFboBuyUsd(
   state: CareerMissionsState,
   world: Pick<CareerEconomyWorld, 'airports'>,
@@ -291,8 +319,7 @@ export function quoteFboBuyUsd(
   const base = quoteFboTier1BuyUsd(world, icao);
   const owned = ensurePlayerFbos(state).fbos.length;
   if (owned === 0) return base;
-  if (owned === 1) return Math.round(base * FBO_SECOND_BUY_MULT);
-  return Math.round(base * FBO_THIRD_BUY_MULT);
+  return Math.round(base * FBO_SECOND_BUY_MULT);
 }
 
 function ownedAircraftCount(state: CareerMissionsState): number {
@@ -304,17 +331,8 @@ function cargoOpsAllowsSecondFbo(state: CareerMissionsState): boolean {
   return ops.commodities.electronics.unlocked === true;
 }
 
-function cargoOpsAllowsThirdFbo(state: CareerMissionsState): boolean {
-  const ops = normalizeCareerCargoOps(state.cargoOps);
-  return ops.commodities.perishables.unlocked === true;
-}
-
-function hasTier2Fbo(state: CareerMissionsState): boolean {
-  return ensurePlayerFbos(state).fbos.some((f) => f.tier >= 2);
-}
-
 /**
- * Whether the company may purchase a T1 FBO at this ICAO (and why not).
+ * Whether the company may purchase a T1 base at this ICAO (and why not).
  */
 export function canBuyFboAtIcao(
   state: CareerMissionsState,
@@ -331,12 +349,12 @@ export function canBuyFboAtIcao(
   }
   const fbos = ensurePlayerFbos(state);
   if (fbos.fbos.some((f) => f.icao === hub)) {
-    return { ok: false, reason: `FBO already owned at ${hub}`, buyUsd: null };
+    return { ok: false, reason: `Base already owned at ${hub}`, buyUsd: null };
   }
   if (fbos.fbos.length >= FBO_MAX_OWNED) {
     return {
       ok: false,
-      reason: `Company already owns ${FBO_MAX_OWNED} FBOs`,
+      reason: `Company already owns ${FBO_MAX_OWNED} bases`,
       buyUsd: null,
     };
   }
@@ -344,7 +362,7 @@ export function canBuyFboAtIcao(
   if (fbos.fbos.length === 0 && hub !== home) {
     return {
       ok: false,
-      reason: `First FBO must be at home hub ${home}`,
+      reason: `First base must be at home hub ${home}`,
       buyUsd: null,
     };
   }
@@ -353,37 +371,14 @@ export function canBuyFboAtIcao(
     if (ownedAircraftCount(state) < FBO_SECOND_MIN_OWNED_AIRCRAFT) {
       return {
         ok: false,
-        reason: `Need at least ${FBO_SECOND_MIN_OWNED_AIRCRAFT} owned aircraft for a second FBO`,
+        reason: `Need at least ${FBO_SECOND_MIN_OWNED_AIRCRAFT} owned aircraft for a second base`,
         buyUsd,
       };
     }
     if (!cargoOpsAllowsSecondFbo(state)) {
       return {
         ok: false,
-        reason: 'Unlock Cargo Ops Value (electronics) before a second FBO',
-        buyUsd,
-      };
-    }
-  }
-  if (fbos.fbos.length === 2) {
-    if (ownedAircraftCount(state) < FBO_THIRD_MIN_OWNED_AIRCRAFT) {
-      return {
-        ok: false,
-        reason: `Need at least ${FBO_THIRD_MIN_OWNED_AIRCRAFT} owned aircraft for a third FBO`,
-        buyUsd,
-      };
-    }
-    if (!hasTier2Fbo(state)) {
-      return {
-        ok: false,
-        reason: 'Upgrade one FBO to Tier 2 before a third base',
-        buyUsd,
-      };
-    }
-    if (!cargoOpsAllowsThirdFbo(state)) {
-      return {
-        ok: false,
-        reason: 'Unlock Cargo Ops Time (perishables) before a third FBO',
+        reason: 'Unlock Cargo Ops Value (electronics) before a second base',
         buyUsd,
       };
     }
@@ -483,7 +478,7 @@ export function buyFboTier1(
   const debitUsd = gate.buyUsd ?? quoteFboBuyUsd(state, world, hub);
   if (state.walletUsd < debitUsd) {
     throw new Error(
-      `FBO purchase $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
+      `Base purchase $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
 
@@ -499,7 +494,7 @@ export function buyFboTier1(
     kind: 'fbo_buy',
     atTick: world.tick,
     icao: hub,
-    note: `FBO T1 · ${hub}`,
+    note: `Base T1 · ${hub}`,
   });
   fbos.fbos.push(fbo);
   ensureCompanyCrew(state, { tick: world.tick });
@@ -520,13 +515,13 @@ export function upgradeFboToTier2(
   const fbo = fbos.fbos.find((f) => f.id === fboId);
   if (!fbo) throw new Error(`Unknown FBO ${fboId}`);
   if (fbo.tier >= 2) {
-    throw new Error(`FBO at ${fbo.icao} is already Tier ${fbo.tier}`);
+    throw new Error(`Base at ${fbo.icao} is already Tier ${fbo.tier}`);
   }
 
   const debitUsd = quoteFboTier2UpgradeUsd(world, fbo.icao);
   if (state.walletUsd < debitUsd) {
     throw new Error(
-      `FBO upgrade $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
+      `Base upgrade $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
 
@@ -535,7 +530,7 @@ export function upgradeFboToTier2(
     kind: 'fbo_buy',
     atTick: world.tick,
     icao: fbo.icao,
-    note: `FBO T2 upgrade · ${fbo.icao}`,
+    note: `Base T2 upgrade · ${fbo.icao}`,
   });
   fbo.tier = 2;
   fbo.capacityKg = Math.max(fbo.capacityKg, FBO_CAPACITY_KG[2]);
@@ -544,12 +539,18 @@ export function upgradeFboToTier2(
 
 /**
  * Reserve a market lot into bonded FBO storage (no inboundPending).
+ * Phase 5 slim: new holds disabled (`FBO_BONDED_HOLD_ENABLED`).
  */
 export function holdLotAtFbo(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
   opts: { lotId: string; cargoKg?: number },
 ): { state: CareerMissionsState; hold: PlayerFboHold } {
+  if (!fboBondedHoldEnabled()) {
+    throw new Error(
+      'Base bonded holds removed — buy WH at a port pickup hub and use Demand Hold, or Accept the Market lot',
+    );
+  }
   const lot = world.lots.find((l) => l.id === opts.lotId);
   if (!lot) throw new Error(`Unknown lot ${opts.lotId}`);
   if (lot.status !== 'available' && lot.status !== 'reserved') {
@@ -570,7 +571,7 @@ export function holdLotAtFbo(
   const fbo = findPlayerFboAtIcao(state, lot.originIcao);
   if (!fbo) {
     throw new Error(
-      `No FBO at ${lot.originIcao} — buy an FBO at your home hub first`,
+      `No base at ${lot.originIcao} — buy a Base at your home hub first`,
     );
   }
   if (lot.originIcao.toUpperCase() !== fbo.icao) {
@@ -584,7 +585,7 @@ export function holdLotAtFbo(
   const room = Math.max(0, fbo.capacityKg - used);
   if (room <= 0) {
     throw new Error(
-      `FBO at ${fbo.icao} is full (${fbo.capacityKg.toLocaleString()} kg)`,
+      `Base at ${fbo.icao} is full (${fbo.capacityKg.toLocaleString()} kg)`,
     );
   }
 
@@ -592,7 +593,7 @@ export function holdLotAtFbo(
     opts.cargoKg !== undefined ? Math.floor(opts.cargoKg) : Math.min(avail, room);
   if (opts.cargoKg !== undefined && requested > room) {
     throw new Error(
-      `FBO at ${fbo.icao} is full (${used.toLocaleString()}/${fbo.capacityKg.toLocaleString()} kg) — need ${requested} kg free`,
+      `Base at ${fbo.icao} is full (${used.toLocaleString()}/${fbo.capacityKg.toLocaleString()} kg) — need ${requested} kg free`,
     );
   }
   const cargoKg = Math.min(requested, avail, room);
@@ -745,6 +746,8 @@ export function quoteFboReroutePayAfterUsd(
  * Amend bonded hold destination for a fee.
  * Same/shorter leg: mild pay haircut. Longer leg: capped pay bump for extra nm.
  * Lot reservation stays; delivery OD follows the hold on release/settle.
+ * Phase 4 slim: disabled (`FBO_REROUTE_ENABLED`) — not a no-fly shortcut, but
+ * destination shopping expands the airport-FBO product; keep hold→Dispatch fly.
  */
 export function rerouteFboHold(
   state: CareerMissionsState,
@@ -758,6 +761,11 @@ export function rerouteFboHold(
   haircutApplied: boolean;
   bumpApplied: boolean;
 } {
+  if (!FBO_REROUTE_ENABLED) {
+    throw new Error(
+      'Base hold reroute removed — cancel and re-hold, or Dispatch the current destination',
+    );
+  }
   const fbos = ensurePlayerFbos(state);
   const hold = fbos.holds.find((h) => h.id === opts.holdId);
   if (!hold) throw new Error(`Unknown FBO hold ${opts.holdId}`);
@@ -932,6 +940,11 @@ export function splitFboHold(
   allocatedKg: number;
   remainingKg: number;
 } {
+  if (!isCompanyCrewEnabled()) {
+    throw new Error(
+      'Company crew removed — Dispatch the hold yourself (Crew fly / split disabled)',
+    );
+  }
   const fbos = ensurePlayerFbos(state);
   const idx = fbos.holds.findIndex((h) => h.id === opts.holdId);
   if (idx < 0) throw new Error(`Unknown FBO hold ${opts.holdId}`);
@@ -1165,14 +1178,14 @@ export function returnMissionToFboHold(
   const dest = mission.destIcao.trim().toUpperCase();
   const fbo = findPlayerFboAtIcao(state, origin);
   if (!fbo) {
-    throw new Error(`No FBO at ${origin} — cannot rebond this cargo`);
+    throw new Error(`No base at ${origin} — cannot rebond this cargo`);
   }
 
   const used = fboUsedKg(state, fbo.id);
   const room = Math.max(0, fbo.capacityKg - used);
   if (cargoKg > room) {
     throw new Error(
-      `FBO at ${fbo.icao} is full (${used.toLocaleString()}/${fbo.capacityKg.toLocaleString()} kg) — need ${cargoKg.toLocaleString()} kg free`,
+      `Base at ${fbo.icao} is full (${used.toLocaleString()}/${fbo.capacityKg.toLocaleString()} kg) — need ${cargoKg.toLocaleString()} kg free`,
     );
   }
 

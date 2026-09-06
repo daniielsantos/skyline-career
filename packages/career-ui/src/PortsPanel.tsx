@@ -10,6 +10,8 @@ import {
   postGroundStaffFire,
   postGroundStaffHire,
   postPortBuy,
+  postPortAutoBuy,
+  postPortStevedore,
   postPortConcessionClaim,
   postPortConcessionRenew,
   postPortConcessionUpgrade,
@@ -313,7 +315,7 @@ function portsLoopMessage(
         : `${step.matchCount} Demand orders match your warehouse stock — accept to stage a flight.`;
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? `${formatTonnes(step.stockKg)} in WH — open orders exist, but none match this commodity in corridor reach. Buy matching cargo or upgrade WH / concession to extend range.`
+        ? `${formatTonnes(step.stockKg)} in WH — open orders exist, but none match this commodity in corridor reach. Buy matching cargo or upgrade WH / Port FBO to extend range.`
         : `${formatTonnes(step.stockKg)} in WH — Demand posts when hub terminals run low (economy tick). Check back after a tick.`;
     case 'buy_port':
       return 'Buy factory cargo at a seaport to start the loop.';
@@ -373,7 +375,7 @@ function portsLoopSectionHint(
       return 'Next: accept a matching order to pull stock from your warehouse and stage a flight.';
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? 'Stock is ready — nothing in corridor reach for this commodity. Buy matching cargo or upgrade WH / concession to extend range.'
+        ? 'Stock is ready — nothing in corridor reach for this commodity. Buy matching cargo or upgrade WH / Port FBO to extend range.'
         : 'Stock is ready — Demand appears after economy ticks when terminals run low. Check back soon.';
     case 'buy_port':
       return 'Next: pick a listing and buy into a warehouse (overflow goes to yard).';
@@ -410,6 +412,11 @@ export function PortsPanel(props: {
   const [mapFocusToken, setMapFocusToken] = useState(0);
   const [buyListing, setBuyListing] = useState<PortListingView | null>(null);
   const [concessionOpen, setConcessionOpen] = useState(false);
+  const [deskCommodity, setDeskCommodity] = useState('general');
+  const [deskMaxPrice, setDeskMaxPrice] = useState('2');
+  const [deskMaxKgDay, setDeskMaxKgDay] = useState('5000');
+  const [deskWalletFloor, setDeskWalletFloor] = useState('5000');
+  const [deskWarehouseId, setDeskWarehouseId] = useState('');
   const [amountText, setAmountText] = useState('1000');
   const [acceptOrder, setAcceptOrder] = useState<DemandOrderView | null>(null);
   const [acceptOrigin, setAcceptOrigin] = useState('');
@@ -949,7 +956,7 @@ export function PortsPanel(props: {
       );
       props.onToast?.(
         'ok',
-        `Claimed port concession · operator rates active`,
+        `Claimed Port FBO · operator rates active`,
       );
       setConcessionOpen(false);
     } catch (err) {
@@ -965,10 +972,10 @@ export function PortsPanel(props: {
   async function onRenewConcession(portIdToRenew: string, leaseUsd: number) {
     if (props.busy || loading) return;
     const ok = await confirm({
-      title: 'Renew port lease?',
+      title: 'Renew Port FBO lease?',
       body: (
         <p>
-          Extend the concession lease by 7 economy days for{' '}
+          Extend the Port FBO lease by 7 economy days for{' '}
           <strong>{props.formatMoney(leaseUsd)}</strong>.
         </p>
       ),
@@ -987,7 +994,7 @@ export function PortsPanel(props: {
           result.ports.warehouses?.groundStaff ??
           groundStaff,
       );
-      props.onToast?.('ok', 'Port lease renewed');
+      props.onToast?.('ok', 'Port FBO lease renewed');
       setConcessionOpen(false);
     } catch (err) {
       props.onToast?.(
@@ -1039,6 +1046,136 @@ export function PortsPanel(props: {
       );
       props.onToast?.('ok', p3 ? 'P3 terminal unlocked' : 'P2 yard unlocked');
       setConcessionOpen(false);
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onDeskUpsert(portIdForDesk: string) {
+    if (props.busy || loading) return;
+    const warehouseId =
+      deskWarehouseId ||
+      (warehouses?.warehouses ?? []).find((w) =>
+        (port?.pickupHubs ?? [])
+          .map((h) => h.toUpperCase())
+          .includes(w.icao.toUpperCase()),
+      )?.id;
+    if (!warehouseId) {
+      props.onToast?.('fail', 'Need a warehouse at a pickup hub for this port');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await postPortAutoBuy({
+        action: 'upsert',
+        portId: portIdForDesk,
+        commodityId: deskCommodity,
+        maxPriceUsdPerKg: Number(deskMaxPrice),
+        maxKgPerDay: Number(deskMaxKgDay),
+        warehouseId,
+        walletFloorUsd: Number(deskWalletFloor),
+        paused: false,
+      });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      setWarehouses(result.ports.warehouses ?? warehouses);
+      props.onToast?.('ok', 'Port FBO desk order saved');
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onDeskPause(orderId: string, paused: boolean) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortAutoBuy({
+        action: 'pause',
+        id: orderId,
+        paused,
+      });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      props.onToast?.('ok', paused ? 'Desk order paused' : 'Desk order resumed');
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onDeskRemove(orderId: string) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortAutoBuy({ action: 'remove', id: orderId });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      props.onToast?.('ok', 'Desk order removed');
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onStevedoreTruck(
+    pickupId: string,
+    destWarehouseId: string,
+    destHubIcao: string,
+  ) {
+    if (props.busy || loading) return;
+    try {
+      const quoted = await postPortStevedore({
+        action: 'quote',
+        pickupId,
+        destWarehouseId,
+      });
+      const q = quoted.quote;
+      if (!q) throw new Error('No stevedore quote');
+      const ok = await confirm({
+        title: `Truck to ${destHubIcao}?`,
+        body: (
+          <p>
+            Move <strong>{props.formatTonnes(q.kg)}</strong> by stevedore (
+            {q.distanceNm} nm) for{' '}
+            <strong>{props.formatMoney(q.feeUsd)}</strong> · ETA ~
+            {q.transferTicks} ticks. Same-hub Store stays free.
+          </p>
+        ),
+        confirmLabel: 'Dispatch truck',
+        cancelLabel: 'Cancel',
+      });
+      if (!ok) return;
+      setLoading(true);
+      const result = await postPortStevedore({
+        action: 'start',
+        pickupId,
+        destWarehouseId,
+      });
+      if (result.walletUsd != null) props.onWallet?.(result.walletUsd);
+      if (result.ports) setSnap(result.ports);
+      setWarehouses(result.warehouses ?? result.ports?.warehouses ?? warehouses);
+      props.onToast?.(
+        'ok',
+        `Stevedore ${props.formatTonnes(q.kg)} → ${destHubIcao} · ${props.formatMoney(q.feeUsd)}`,
+      );
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -2085,8 +2222,8 @@ export function PortsPanel(props: {
 
   const portOperatorChip = useMemo(() => {
     const status = port?.concession?.status;
-    if (status === 'yours') return 'Operator · you';
-    if (status === 'held') return 'Operator · held';
+    if (status === 'yours') return 'Port FBO · you';
+    if (status === 'held') return 'Port FBO · held';
     return 'Vacant';
   }, [port?.concession?.status]);
 
@@ -2334,10 +2471,10 @@ export function PortsPanel(props: {
                           ? 'tag ports-concession-status'
                           : 'tag muted ports-concession-status'
                     }
-                    title="Port concession status"
+                    title="Port FBO status"
                   >
                     {port.concession?.status === 'yours'
-                      ? `Operator P${port.concession.level ?? 1}`
+                      ? `Port FBO · P${port.concession.level ?? 1}`
                       : port.concession?.status === 'held'
                         ? 'Held'
                         : 'Vacant'}
@@ -2348,7 +2485,7 @@ export function PortsPanel(props: {
                     disabled={props.busy}
                     onClick={() => setConcessionOpen(true)}
                   >
-                    Concession
+                    Port FBO
                   </button>
                 </h3>
               ) : (
@@ -2615,7 +2752,7 @@ export function PortsPanel(props: {
                         <th>Port</th>
                         <th>Pickup</th>
                         <th>Open</th>
-                        <th>Concession</th>
+                        <th>Port FBO</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2632,7 +2769,7 @@ export function PortsPanel(props: {
                             p.id.toUpperCase();
                           const conc =
                             p.concession?.status === 'yours'
-                              ? 'Yours'
+                              ? `Yours · P${p.concession.level ?? 1}`
                               : p.concession?.status === 'held'
                                 ? 'Held'
                                 : 'Vacant';
@@ -3846,6 +3983,28 @@ export function PortsPanel(props: {
                           yardMeta != null &&
                           groundStaff?.byWarehouse[yardMeta.id]?.yardActive ===
                             true;
+                        const portDef = snap?.ports.find(
+                          (row) =>
+                            row.id.toUpperCase() === p.portId.toUpperCase(),
+                        );
+                        const stevedoreOk =
+                          portDef?.concession?.status === 'yours';
+                        const stevedoreDests = stevedoreOk
+                          ? (warehouses?.warehouses ?? []).filter((w) => {
+                              const hub = w.icao.trim().toUpperCase();
+                              if (hub === p.hubIcao.trim().toUpperCase()) {
+                                return false;
+                              }
+                              if (
+                                !(portDef?.pickupHubs ?? [])
+                                  .map((h) => h.toUpperCase())
+                                  .includes(hub)
+                              ) {
+                                return false;
+                              }
+                              return (w.inboundFreeKg ?? 0) > 0;
+                            })
+                          : [];
                         const aging =
                           heldDays >= YARD_HOLD_WARN_DAYS
                             ? 'ports-yard-aging'
@@ -3939,6 +4098,24 @@ export function PortsPanel(props: {
                                     : `Buy warehouse at ${p.hubIcao}`}
                                 </span>
                               )}
+                              {stevedoreDests.map((w) => (
+                                <button
+                                  key={w.id}
+                                  type="button"
+                                  className="action ghost"
+                                  disabled={props.busy || loading}
+                                  title="Port FBO stevedore truck (fee + ETA)"
+                                  onClick={() =>
+                                    void onStevedoreTruck(
+                                      p.id,
+                                      w.id,
+                                      w.icao,
+                                    )
+                                  }
+                                >
+                                  Truck → {w.icao}
+                                </button>
+                              ))}
                               <button
                                 type="button"
                                 className="action ghost"
@@ -4119,7 +4296,7 @@ export function PortsPanel(props: {
                                 ? 'No open demand right now — desks post when hubs in the port catchment run low (economy tick, ~15 min).'
                                 : demandCountryFilter
                                   ? 'No demand in this country on this desk — clear the country filter.'
-                                  : 'No Demand on this port’s desk yet — wait for catchment hubs to run low, or upgrade WH / concession to extend spawn range.'}
+                                  : 'No Demand on this port’s desk yet — wait for catchment hubs to run low, or upgrade WH / Port FBO to extend spawn range.'}
                           </p>
                         </td>
                       </tr>
@@ -4355,11 +4532,11 @@ export function PortsPanel(props: {
             aria-labelledby="ports-concession-title"
           >
             <p className="confirm-kicker">Endgame</p>
-            <h3 id="ports-concession-title">{port.name} · Concession</h3>
+            <h3 id="ports-concession-title">{port.name} · Port FBO</h3>
             {port.concession?.status === 'yours' ? (
               <>
                 <p className="muted">
-                  P{port.concession.level ?? 1} operator: ~10% cheaper buys
+                  Port FBO · P{port.concession.level ?? 1}: ~10% cheaper buys
                   {(port.concession.level ?? 1) >= 3
                     ? ', ~22% faster inbound, +2 listings, faster restock'
                     : ', ~15% faster inbound, +1 listing'}
@@ -4378,6 +4555,128 @@ export function PortsPanel(props: {
                     ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
                     : null}
                 </p>
+                <div className="ports-desk-panel">
+                  <h4 className="ports-desk-title">Desk auto-buy</h4>
+                  <p className="muted ports-desk-hint">
+                    Limit orders run on the economy tick at the same price as
+                    manual buy (max {3} active). Overflow goes to yard.
+                  </p>
+                  <ul className="ports-desk-orders">
+                    {(snap?.autoBuyOrders ?? [])
+                      .filter(
+                        (o) =>
+                          o.portId.toUpperCase() === port.id.toUpperCase(),
+                      )
+                      .map((o) => (
+                        <li key={o.id} className="ports-desk-order">
+                          <span>
+                            {o.commodityId}
+                            {o.paused ? ' · paused' : ''} · max $
+                            {o.maxPriceUsdPerKg}/kg · {o.maxKgPerDay} kg/day ·
+                            today {o.boughtKgToday} kg · floor $
+                            {o.walletFloorUsd}
+                          </span>
+                          <span className="ports-desk-order-actions">
+                            <button
+                              type="button"
+                              className="action ghost"
+                              disabled={props.busy || loading}
+                              onClick={() =>
+                                void onDeskPause(o.id, !o.paused)
+                              }
+                            >
+                              {o.paused ? 'Resume' : 'Pause'}
+                            </button>
+                            <button
+                              type="button"
+                              className="action ghost"
+                              disabled={props.busy || loading}
+                              onClick={() => void onDeskRemove(o.id)}
+                            >
+                              Remove
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                  <div className="ports-desk-form">
+                    <label>
+                      Commodity
+                      <select
+                        value={deskCommodity}
+                        onChange={(e) => setDeskCommodity(e.target.value)}
+                        disabled={props.busy || loading}
+                      >
+                        <option value="general">General</option>
+                        <option value="supplies">Supplies</option>
+                        <option value="machinery">Machinery</option>
+                        <option value="electronics">Electronics</option>
+                      </select>
+                    </label>
+                    <label>
+                      Max $/kg
+                      <input
+                        type="number"
+                        min={0.01}
+                        step={0.01}
+                        value={deskMaxPrice}
+                        onChange={(e) => setDeskMaxPrice(e.target.value)}
+                        disabled={props.busy || loading}
+                      />
+                    </label>
+                    <label>
+                      Max kg/day
+                      <input
+                        type="number"
+                        min={1}
+                        step={100}
+                        value={deskMaxKgDay}
+                        onChange={(e) => setDeskMaxKgDay(e.target.value)}
+                        disabled={props.busy || loading}
+                      />
+                    </label>
+                    <label>
+                      Wallet floor $
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={deskWalletFloor}
+                        onChange={(e) => setDeskWalletFloor(e.target.value)}
+                        disabled={props.busy || loading}
+                      />
+                    </label>
+                    <label>
+                      Warehouse
+                      <select
+                        value={deskWarehouseId}
+                        onChange={(e) => setDeskWarehouseId(e.target.value)}
+                        disabled={props.busy || loading}
+                      >
+                        <option value="">Pickup WH…</option>
+                        {(warehouses?.warehouses ?? [])
+                          .filter((w) =>
+                            (port.pickupHubs ?? [])
+                              .map((h) => h.toUpperCase())
+                              .includes(w.icao.toUpperCase()),
+                          )
+                          .map((w) => (
+                            <option key={w.id} value={w.id}>
+                              {w.icao} · T{w.tier}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className="action"
+                      disabled={props.busy || loading}
+                      onClick={() => void onDeskUpsert(port.id)}
+                    >
+                      Add desk order
+                    </button>
+                  </div>
+                </div>
                 <div className="confirm-actions">
                   <button
                     type="button"
@@ -4445,7 +4744,7 @@ export function PortsPanel(props: {
             ) : port.concession?.status === 'held' ? (
               <>
                 <p className="muted">
-                  Another company holds this concession. You can still buy
+                  Another company holds this Port FBO. You can still buy
                   listings and own a warehouse at pickup hubs.
                 </p>
                 <div className="confirm-actions">

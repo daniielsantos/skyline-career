@@ -236,6 +236,14 @@ export function normalizePlayerWarehouseState(
       if (!id || !warehouseId || !hubIcao || !portId || !commodityId || kg <= 0) {
         continue;
       }
+      const sourceRaw =
+        typeof t.source === 'string' ? t.source.trim() : '';
+      const source =
+        sourceRaw === 'stevedore'
+          ? ('stevedore' as const)
+          : sourceRaw === 'port_buy'
+            ? ('port_buy' as const)
+            : undefined;
       inboundTransfers.push({
         id,
         warehouseId,
@@ -247,6 +255,7 @@ export function normalizePlayerWarehouseState(
         unitCostUsd,
         purchasedAtTick,
         readyAtTick: Math.max(readyAtTick, purchasedAtTick),
+        ...(source ? { source } : {}),
       });
     }
   }

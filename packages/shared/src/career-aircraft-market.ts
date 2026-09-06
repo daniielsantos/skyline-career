@@ -355,6 +355,12 @@ export function clampPlayerSaleAskingUsd(
   return Math.min(hi, Math.max(lo, Math.round(askingUsd)));
 }
 
+/**
+ * Port FBO Phase 0: player lease-out (NPC rents your owned airframe) is off.
+ * Keep buy/sell + dealer lease-in. Flip only for tests / future product revisit.
+ */
+export const PLAYER_LEASE_OUT_ENABLED = false;
+
 /** Player may list lease weekly 0.6–1.8× catalog; term 1–3 months. */
 export const PLAYER_LEASE_WEEKLY_MIN_MULT = 0.6;
 export const PLAYER_LEASE_WEEKLY_MAX_MULT = 1.8;
@@ -834,6 +840,17 @@ function applyNpcTakeListing(
     return;
   }
   if (src === 'player_lease') {
+    if (!PLAYER_LEASE_OUT_ENABLED) {
+      listing.status = 'expired';
+      if (listing.sellerAircraftId) {
+        const listed = state.fleet.find((a) => a.id === listing.sellerAircraftId);
+        if (listed && listed.status === 'listed') {
+          listed.status = 'parked';
+          listed.listedListingId = undefined;
+        }
+      }
+      return;
+    }
     const aircraft = state.fleet.find((a) => a.id === listing.sellerAircraftId);
     if (
       !aircraft ||
@@ -931,7 +948,7 @@ function applyNpcDemand(
   }
 
   const leaseBudget = takeBudget - taken;
-  if (leaseBudget > 0) {
+  if (PLAYER_LEASE_OUT_ENABLED && leaseBudget > 0) {
     const leases = (state.aircraftMarket ?? []).filter(
       (l) =>
         l.status === 'available' && listingSource(l) === 'player_lease',
@@ -957,11 +974,75 @@ function applyNpcDemand(
   return taken;
 }
 
+/** Expire open Hangar lease-out listings and park sellers (Phase 0 disable). */
+function expireOpenPlayerLeaseListings(state: CareerMissionsState): void {
+  for (const listing of state.aircraftMarket ?? []) {
+    if (listing.status !== 'available' || listingSource(listing) !== 'player_lease') {
+      continue;
+    }
+    listing.status = 'expired';
+    if (!listing.sellerAircraftId) continue;
+    const aircraft = state.fleet.find((a) => a.id === listing.sellerAircraftId);
+    if (aircraft && aircraft.status === 'listed') {
+      aircraft.status = 'parked';
+      aircraft.listedListingId = undefined;
+    }
+  }
+}
+
+function returnLeaseOutAircraft(
+  aircraft: PlayerAircraft,
+  lease: NonNullable<PlayerAircraft['leaseOut']>,
+  world: CareerEconomyWorld | undefined,
+  wearToTick: number,
+): number {
+  const wearHours = applyLeaseOutWear(aircraft, lease.lastWearTick, wearToTick);
+  lease.lastWearTick = wearToTick;
+  if (world) {
+    syncLeaseOutLocation(aircraft, world, lease.lesseeNpcId);
+    if (lease.lesseeNpcId) {
+      const npc = world.npcs.find((n) => n.id === lease.lesseeNpcId);
+      if (npc && npc.leasedPlayerAircraftId === aircraft.id) {
+        npc.leasedPlayerAircraftId = undefined;
+      }
+    }
+  }
+  aircraft.leaseOut = undefined;
+  aircraft.status = 'parked';
+  evaluateAircraftMaintenanceGate(aircraft);
+  return wearHours;
+}
+
 function settleLeaseOutIncome(
   state: CareerMissionsState,
   economyTick: number,
   world?: CareerEconomyWorld,
 ): { earnedUsd: number; returned: string[]; wearHours: number } {
+  if (!PLAYER_LEASE_OUT_ENABLED) {
+    expireOpenPlayerLeaseListings(state);
+    let wearHours = 0;
+    const returned: string[] = [];
+    for (const aircraft of state.fleet) {
+      if (aircraft.status !== 'leased_out' || !aircraft.leaseOut) continue;
+      const lease = aircraft.leaseOut;
+      if (typeof lease.startedAtTick !== 'number') {
+        lease.startedAtTick = lease.nextDueTick - TICKS_PER_WEEK;
+      }
+      if (typeof lease.lastWearTick !== 'number') {
+        lease.lastWearTick = lease.startedAtTick;
+      }
+      // No weekly income — force-return with wear for time already out.
+      wearHours += returnLeaseOutAircraft(
+        aircraft,
+        lease,
+        world,
+        economyTick,
+      );
+      returned.push(aircraft.id);
+    }
+    return { earnedUsd: 0, returned, wearHours };
+  }
+
   let earnedUsd = 0;
   let wearHours = 0;
   const returned: string[] = [];
@@ -995,20 +1076,12 @@ function settleLeaseOutIncome(
     }
 
     if (economyTick >= lease.termEndsTick) {
-      wearHours += applyLeaseOutWear(aircraft, lease.lastWearTick, lease.termEndsTick);
-      lease.lastWearTick = lease.termEndsTick;
-      if (world) {
-        syncLeaseOutLocation(aircraft, world, lease.lesseeNpcId);
-        if (lease.lesseeNpcId) {
-          const npc = world.npcs.find((n) => n.id === lease.lesseeNpcId);
-          if (npc && npc.leasedPlayerAircraftId === aircraft.id) {
-            npc.leasedPlayerAircraftId = undefined;
-          }
-        }
-      }
-      aircraft.leaseOut = undefined;
-      aircraft.status = 'parked';
-      evaluateAircraftMaintenanceGate(aircraft);
+      wearHours += returnLeaseOutAircraft(
+        aircraft,
+        lease,
+        world,
+        lease.termEndsTick,
+      );
       returned.push(aircraft.id);
     }
   }
@@ -1052,9 +1125,16 @@ export function ensureAircraftMarket(
       : listing;
   });
 
-  // Expire stale player listings.
+  // Expire stale player listings; Phase 0 also kills open lease-out listings immediately.
   listings = listings.map((l) => {
-    if (l.status === 'available' && tick >= l.expiresAtTick) {
+    const killLeaseOut =
+      !PLAYER_LEASE_OUT_ENABLED &&
+      l.status === 'available' &&
+      listingSource(l) === 'player_lease';
+    if (
+      (l.status === 'available' && tick >= l.expiresAtTick) ||
+      killLeaseOut
+    ) {
       if (isPlayerListing(l) && l.sellerAircraftId) {
         const acf = state.fleet.find((a) => a.id === l.sellerAircraftId);
         if (acf && acf.status === 'listed') {
@@ -1924,6 +2004,9 @@ export function listAircraftForLease(
   economyTick: number,
   opts?: { termMonths?: number; monthlyUsd?: number },
 ): { state: CareerMissionsState; listing: AircraftListing } {
+  if (!PLAYER_LEASE_OUT_ENABLED) {
+    throw new Error('Lease-out is disabled');
+  }
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
   if ((aircraft.ownership ?? 'owned') !== 'owned') {

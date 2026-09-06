@@ -569,10 +569,10 @@ export function evaluatePortConcessionClaim(
   const shippedKg = best?.lifetimeShippedKg ?? 0;
 
   if (alreadyHoldsConcession) {
-    reasons.push('Company already holds an active port concession');
+    reasons.push('Company already holds an active Port FBO');
   }
   if (portOccupied) {
-    reasons.push('Port already has an active operator');
+    reasons.push('Port already has an active Port FBO operator');
   }
   if (!hasTier3Warehouse) {
     reasons.push(
@@ -618,7 +618,7 @@ export function claimPortConcession(
   if (!port) throw new Error('Unknown port');
   const gate = evaluatePortConcessionClaim(state, world, port.id, companyId);
   if (!gate.ok) {
-    throw new Error(gate.reasons[0] ?? 'Cannot claim port concession');
+    throw new Error(gate.reasons[0] ?? 'Cannot claim Port FBO');
   }
 
   applyWalletDelta(state, {
@@ -626,7 +626,7 @@ export function claimPortConcession(
     kind: 'port_concession_claim',
     atTick: world.tick,
     icao: port.pickupHubs[0],
-    note: `Claim concession · ${port.name}`,
+    note: `Claim Port FBO · ${port.name}`,
   });
   applyWalletDelta(state, {
     amountUsd: -gate.leaseUsd,
@@ -673,7 +673,7 @@ export function renewPortConcession(
       c.leasePaidThroughTick > world.tick,
   );
   if (!conc) {
-    throw new Error('No active concession to renew on this port');
+    throw new Error('No active Port FBO to renew on this port');
   }
   const leaseUsd = concessionLeaseUsdForDays(
     conc,
@@ -690,7 +690,7 @@ export function renewPortConcession(
     kind: 'port_concession_lease',
     atTick: world.tick,
     icao: port.pickupHubs[0],
-    note: `Renew lease ${days}d · ${port.name}`,
+    note: `Renew Port FBO lease ${days}d · ${port.name}`,
   });
   const base = Math.max(conc.leasePaidThroughTick, world.tick);
   conc.leasePaidThroughTick = base + days * 96;
@@ -732,7 +732,7 @@ export function evaluatePortConcessionUpgrade(
         ? PORT_P3_THROUGHPUT_KG
         : PORT_P3_THROUGHPUT_KG;
   if (!port) reasons.push('Unknown port');
-  if (!conc) reasons.push('No active concession on this port');
+  if (!conc) reasons.push('No active Port FBO on this port');
   if (conc && fromLevel >= 3) reasons.push('Port is already at P3');
   if (conc && fromLevel < 3 && shippedKg < neededKg) {
     reasons.push(
@@ -767,7 +767,7 @@ export function upgradePortConcession(
   if (!port) throw new Error('Unknown port');
   const gate = evaluatePortConcessionUpgrade(state, world, port.id, companyId);
   if (!gate.ok) {
-    throw new Error(gate.reasons[0] ?? 'Cannot upgrade port concession');
+    throw new Error(gate.reasons[0] ?? 'Cannot upgrade Port FBO');
   }
   const conc = ensurePlayerPortConcessions(state).find(
     (c) =>
@@ -775,13 +775,13 @@ export function upgradePortConcession(
       c.companyId === companyId &&
       c.leasePaidThroughTick > world.tick,
   );
-  if (!conc) throw new Error('No active concession on this port');
+  if (!conc) throw new Error('No active Port FBO on this port');
   applyWalletDelta(state, {
     amountUsd: -gate.upgradeUsd,
     kind: 'port_concession_upgrade',
     atTick: world.tick,
     icao: port.pickupHubs[0],
-    note: `P${gate.toLevel} · ${port.name}`,
+    note: `Port FBO · P${gate.toLevel} · ${port.name}`,
   });
   conc.level = gate.toLevel;
   syncWorldPortConcessions(world, state);

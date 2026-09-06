@@ -59,7 +59,6 @@ import {
   postFboRelease,
   postFboSplit,
   postFboReturnMission,
-  postFboReroute,
   postCrewAssign,
   postCrewDispatch,
   postCrewHire,
@@ -134,12 +133,12 @@ import { useConfirm } from './ConfirmDialog';
 import { PageHelpButton } from './PageHelpButton';
 import { resolvePageHelp } from './page-help';
 import { ContractPilotPick } from './ContractPilotPick';
-import { FboRerouteDialog } from './FboRerouteDialog';
 import { PilotTravelDialog } from './PilotTravelDialog';
 import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { FerryHubCombobox } from './FerryHubCombobox';
+import { BUSH_TRIPS_BOARD_ENABLED, FBO_BONDED_HOLD_ENABLED, COMPANY_CREW_ENABLED } from './feature-flags';
 import {
   AircraftMarketCountryCombobox,
   type AircraftMarketCountryOption,
@@ -192,7 +191,6 @@ import {
   logbookPayoutUsd,
   logbookStatusLabel,
 } from './logbook';
-import { BUSH_TRIPS_BOARD_ENABLED } from './feature-flags';
 import {
   liveRefreshScope,
   type CareerRefreshScope,
@@ -526,10 +524,10 @@ function HoldFboAmountFields(props: {
     <div className="fbo-hold-amount">
       <p>
         Bond {props.lot.commodityName} {props.lot.originIcao}→{props.lot.destIcao} at
-        your FBO. Destination soft-fill waits until you send to Dispatch.
+        your Base. Destination soft-fill waits until you send to Dispatch.
       </p>
       <p className="muted">
-        Lot {formatTonnes(props.lot.availableKg, props.weightSystem)} available · FBO room{' '}
+        Lot {formatTonnes(props.lot.availableKg, props.weightSystem)} available · Base room{' '}
         {formatTonnes(props.roomKg, props.weightSystem)} · max this hold{' '}
         {formatTonnes(props.maxKg, props.weightSystem)}
       </p>
@@ -3516,7 +3514,6 @@ export function App() {
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
   const [playerFbos, setPlayerFbos] = useState<PlayerFboSnapshot | null>(null);
-  const [rerouteHoldId, setRerouteHoldId] = useState<string | null>(null);
   const [splitHoldId, setSplitHoldId] = useState<string | null>(null);
   const [selectedFboHoldId, setSelectedFboHoldId] = useState<string | null>(
     null,
@@ -5937,7 +5934,7 @@ export function App() {
     else if (home) target = home;
     if (!target) {
       setToastKind('warn');
-      setToast('Set a home hub before opening FBO');
+      setToast('Set a home hub before opening Base');
       return;
     }
     void openAirport(target, { section: 'fbo' });
@@ -6718,13 +6715,13 @@ export function App() {
     const isSecond = ownedCount === 1;
     const isThird = ownedCount === 2;
     const ok = await confirm({
-      title: `Buy FBO at ${target}?`,
+      title: `Buy Base at ${target}?`,
       body: isThird
         ? `Third base · Tier-1 (${formatTonnes(3000)}). Late-game CAPEX ${price != null ? formatMoney(price) : ''} — needs T2 + 3 owned aircraft + Cargo Ops Time.`
         : isSecond
           ? `Second base · Tier-1 (${formatTonnes(3000)}). Premium CAPEX ${price != null ? formatMoney(price) : ''}. Same storage + parking/Jet-A perks at this hub.`
           : `Tier-1 bonded warehouse (${formatTonnes(3000)} capacity). Pays ${price != null ? formatMoney(price) : 'the listed CAPEX'} — 15% parking discount and 5% Jet-A/MRO discount at this hub.`,
-      confirmLabel: 'Buy FBO',
+      confirmLabel: 'Buy Base',
     });
     if (!ok) return;
     await run(async () => {
@@ -6734,7 +6731,11 @@ export function App() {
       if (result.companyCrew) setCompanyCrew(result.companyCrew);
       setToastKind('ok');
       setToast(
-        `FBO T1 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${result.companyCrew ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)` : ''}`,
+        `Base T1 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${
+          COMPANY_CREW_ENABLED && result.companyCrew
+            ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)`
+            : ''
+        }`,
       );
       if (airportIcao) {
         const view = await fetchAirportView(airportIcao);
@@ -6748,7 +6749,7 @@ export function App() {
     const fbo = playerFbos?.fbos.find((f) => f.id === fboId);
     if (!fbo?.canUpgradeToTier2) return;
     const ok = await confirm({
-      title: `Upgrade FBO at ${fbo.icao} to Tier 2?`,
+      title: `Upgrade Base at ${fbo.icao} to Tier 2?`,
       body: `Raises capacity to ${formatTonnes(8000)}, parking discount to 30%, Jet-A/MRO discount to 10%, and +1 crew roster slot. Pays ${fbo.upgradeUsd != null ? formatMoney(fbo.upgradeUsd) : 'the listed CAPEX'}.`,
       confirmLabel: 'Upgrade to T2',
     });
@@ -6761,7 +6762,11 @@ export function App() {
       if (result.fleet) setFleet(result.fleet);
       setToastKind('ok');
       setToast(
-        `FBO T2 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${result.companyCrew ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)` : ''}`,
+        `Base T2 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${
+          COMPANY_CREW_ENABLED && result.companyCrew
+            ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)`
+            : ''
+        }`,
       );
       if (airportIcao) {
         const view = await fetchAirportView(airportIcao);
@@ -6777,7 +6782,7 @@ export function App() {
     );
     if (!fbo) {
       setToastKind('fail');
-      setToast(`No FBO at ${lot.originIcao}`);
+      setToast(`No base at ${lot.originIcao}`);
       return;
     }
     const roomKg = Math.max(0, fbo.capacityKg - fbo.usedKg);
@@ -6786,7 +6791,7 @@ export function App() {
       setToastKind('fail');
       setToast(
         roomKg <= 0
-          ? `FBO at ${fbo.icao} is full`
+          ? `Base at ${fbo.icao} is full`
           : 'No cargo left on this contract',
       );
       return;
@@ -6794,7 +6799,7 @@ export function App() {
 
     const amountRef = { current: defaultStagingKg(maxKg) };
     const ok = await confirm({
-      title: `Hold at FBO ${fbo.icao}?`,
+      title: `Hold at Base ${fbo.icao}?`,
       body: (
         <HoldFboAmountFields
           maxKg={maxKg}
@@ -6804,7 +6809,7 @@ export function App() {
           valueRef={amountRef}
         />
       ),
-      confirmLabel: 'Hold at FBO',
+      confirmLabel: 'Hold at Base',
     });
     if (!ok) return;
 
@@ -6816,7 +6821,7 @@ export function App() {
       setPlayerFbos(result.playerFbos);
       setToastKind('ok');
       setToast(
-        `Held at FBO · ${formatTonnes(result.hold.cargoKg)} → ${result.hold.destIcao} (no inbound until Dispatch)`,
+        `Held at Base · ${formatTonnes(result.hold.cargoKg)} → ${result.hold.destIcao} (no inbound until Dispatch)`,
       );
       if (airportIcao) {
         const view = await fetchAirportView(airportIcao);
@@ -6829,7 +6834,7 @@ export function App() {
   async function onCancelFboHold(holdId: string) {
     const hold = playerFbos?.holds.find((h) => h.id === holdId);
     const ok = await confirm({
-      title: 'Cancel FBO hold?',
+      title: 'Cancel Base hold?',
       body: hold
         ? `Releases ${formatTonnes(hold.cargoKg)} ${hold.commodityId} back to the board. No payout.`
         : 'Releases the bonded reservation back to the board.',
@@ -6847,33 +6852,6 @@ export function App() {
         setAirportView(view);
       }
     }, { sync: { market: true } });
-  }
-
-  async function onRerouteFboHold(holdId: string) {
-    const hold = playerFbos?.holds.find((h) => h.id === holdId);
-    if (!hold) return;
-    setSelectedFboHoldId(holdId);
-    setRerouteHoldId(holdId);
-  }
-
-  async function confirmRerouteFboHold(destIcao: string) {
-    const holdId = rerouteHoldId;
-    if (!holdId) return;
-    await run(async () => {
-      const result = await postFboReroute({ holdId, destIcao });
-      setPlayerFbos(result.playerFbos);
-      setWallet(result.walletUsd);
-      setRerouteHoldId(null);
-      setToastKind('ok');
-      setToast(
-        `Rerouted ${result.previousDestIcao}→${result.destIcao} · fee ${formatMoney(result.feeUsd)}`,
-      );
-      if (airportIcao) {
-        const view = await fetchAirportView(airportIcao);
-        setAirportView(view);
-        if (view.playerFbos) setPlayerFbos(view.playerFbos);
-      }
-    });
   }
 
   async function onReleaseFboHold(holdId: string) {
@@ -6927,9 +6905,9 @@ export function App() {
 
   async function onReturnMissionToFbo(mission: Mission) {
     const ok = await confirm({
-      title: 'Return cargo to FBO?',
-      body: `Cancels ${mission.originIcao}→${mission.destIcao} (${formatTonnes(mission.cargoKg)}) and bonds it back at the FBO. Soft-fill stops; aircraft is freed.`,
-      confirmLabel: 'Return to FBO',
+      title: 'Return cargo to Base?',
+      body: `Cancels ${mission.originIcao}→${mission.destIcao} (${formatTonnes(mission.cargoKg)}) and bonds it back at the Base. Soft-fill stops; aircraft is freed.`,
+      confirmLabel: 'Return to Base',
     });
     if (!ok) return;
     await run(async () => {
@@ -6940,7 +6918,7 @@ export function App() {
       setWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
-        `Returned ${formatTonnes(mission.cargoKg)} to FBO` +
+        `Returned ${formatTonnes(mission.cargoKg)} to Base` +
           (result.merged ? ' · merged into existing hold' : ''),
       );
       if (airportIcao) {
@@ -7033,7 +7011,7 @@ export function App() {
       title: cand ? `Hire ${cand.displayName}?` : 'Hire crew?',
       body: cand
         ? `${cand.perkLabel} — ${cand.perkHint}. Signing ${formatMoney(cand.hireUsd)} · salary ${formatMoney(cand.salaryUsdPerDay)}/day.`
-        : 'Signs the candidate onto your FBO roster.',
+        : 'Signs the candidate onto your Base roster.',
       confirmLabel: 'Hire',
     });
     if (!ok) return;
@@ -9426,13 +9404,13 @@ export function App() {
             disabled={busy}
             title={
               playerFbos?.fbos.length
-                ? `FBO · ${playerFbos.fbos.map((f) => f.icao).join(', ')}`
+                ? `Base · ${playerFbos.fbos.map((f) => f.icao).join(', ')}`
                 : homeHubIcao
-                  ? `Buy FBO at home · ${homeHubIcao}`
-                  : 'Hold contracts at your hubs'
+                  ? `Buy Base at home · ${homeHubIcao}`
+                  : 'Company home — parking & Jet-A/MRO perks'
             }
           >
-            FBO
+            Base
           </button>
           <button
             type="button"
@@ -10006,7 +9984,7 @@ export function App() {
                 onClick={() => setTerminalSection('fbo')}
                 disabled={busy}
               >
-                FBO
+                Base
                 {playerFbos?.holds.length
                   ? ` (${playerFbos.holds.filter((h) => h.originIcao.toUpperCase() === airportIcao.toUpperCase()).length})`
                   : ''}
@@ -10039,13 +10017,11 @@ export function App() {
                   <>
                     <div className="panel-head">
                       <div>
-                        <h2>FBO</h2>
+                        <h2>Base</h2>
                         <p>
-                          Hold contracts at your hubs without soft-filling the
-                          destination until you Dispatch.
-                          {(playerFbos?.fbos.length ?? 0) > 1
-                            ? ' Sister FBOs can reroute bonded cargo; crew round-trips until you stage the reverse leg.'
-                            : ' Crew can fly empty legs back to this base.'}
+                          Company home at this hub: cheaper parking and Jet-A/MRO
+                          while your airframes are here. Fly freights yourself —
+                          Ports WH holds the cargo loop.
                         </p>
                         {(playerFbos?.fbos.length ?? 0) > 1 ? (
                           <div
@@ -10090,7 +10066,7 @@ export function App() {
                           disabled={busy}
                           onClick={() => void onBuyFbo(airportIcao ?? homeHubIcao)}
                         >
-                          Buy FBO T1
+                          Buy Base T1
                           {(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd) !=
                           null
                             ? ` · ${formatMoney(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd!)}`
@@ -10112,13 +10088,13 @@ export function App() {
                       if (!localFbo) {
                         return (
                           <p className="empty">
-                            No FBO here yet
+                            No Base here yet
                             {playerFbos?.buyAtIcaoReason
                               ? ` — ${playerFbos.buyAtIcaoReason}.`
                               : airportIcao?.toUpperCase() ===
                                   homeHubIcao.toUpperCase()
-                                ? ' — purchase Tier 1 to hold contracts here.'
-                                : ' — expand here after your home-hub FBO (needs 2 owned aircraft + Cargo Ops Value).'}
+                                ? ' — purchase Tier 1 for parking and Jet-A/MRO perks here.'
+                                : ' — expand here after your home-hub Base (needs 2 owned aircraft + Cargo Ops Value).'}
                           </p>
                         );
                       }
@@ -10271,8 +10247,10 @@ export function App() {
                           />
                           {localHolds.length === 0 ? (
                             <p className="empty">
-                              No bonded holds — use Hold at FBO on an outbound
-                              contract.
+                              No bonded holds
+                              {FBO_BONDED_HOLD_ENABLED
+                                ? ' — use Hold at Base on an outbound contract.'
+                                : ' — Accept Market lots here, or buy WH at a port pickup hub and Demand Hold on Ports.'}
                             </p>
                           ) : (
                             <table className="data-table fbo-holds-table">
@@ -10357,6 +10335,7 @@ export function App() {
                                       >
                                         Dispatch
                                       </button>
+                                      {COMPANY_CREW_ENABLED ? (
                                       <button
                                         type="button"
                                         className="action"
@@ -10366,16 +10345,7 @@ export function App() {
                                       >
                                         Crew fly
                                       </button>
-                                      <button
-                                        type="button"
-                                        className="action ghost"
-                                        disabled={busy}
-                                        onClick={() =>
-                                          void onRerouteFboHold(hold.id)
-                                        }
-                                      >
-                                        Reroute
-                                      </button>
+                                      ) : null}
                                       <button
                                         type="button"
                                         className="action ghost"
@@ -10598,7 +10568,7 @@ export function App() {
                                                   type="button"
                                                   className="action ghost"
                                                   disabled={busy}
-                                                  title="Cancel this leg and bond cargo back at the FBO"
+                                                  title="Cancel this leg and bond cargo back at the Base"
                                                   onClick={() =>
                                                     void onReturnMissionToFbo(m)
                                                   }
@@ -10982,7 +10952,7 @@ export function App() {
                           disabled={busy}
                           title={`Destinations: ${sisterFboIcaos.join(', ')}`}
                         >
-                          → sister FBO
+                          → sister Base
                         </button>
                       ) : null}
                       {contractsSorts.length > 0 ||
@@ -11421,12 +11391,13 @@ export function App() {
                                             : 'Fly'
                                           : 'Prepare'}
                                   </button>
-                                  {(playerFbos?.fbos.some(
+                                  {                                  (playerFbos?.fbos.some(
                                     (f) =>
                                       f.icao.toUpperCase() ===
                                       lot.originIcao.toUpperCase(),
                                   ) ??
                                     false) &&
+                                  FBO_BONDED_HOLD_ENABLED &&
                                   !lot.npcClaim?.crewNeeded &&
                                   !lot.perishable &&
                                   lot.commodityId !== 'perishables' ? (
@@ -11443,9 +11414,9 @@ export function App() {
                                         e.stopPropagation();
                                         void onHoldAtFbo(lot);
                                       }}
-                                      title="Bond a chosen quantity at FBO without soft-filling destination"
+                                      title="Bond a chosen quantity at Base without soft-filling destination"
                                     >
-                                      Hold at FBO
+                                      Hold at Base
                                     </button>
                                   ) : null}
                                   </div>
@@ -12008,7 +11979,7 @@ export function App() {
                         <div
                           className="fbo-icao-switcher"
                           role="group"
-                          aria-label="Sister FBO destinations"
+                          aria-label="Sister Base destinations"
                         >
                           {ownedFboIcaos.map((icao) => (
                             <button
@@ -13387,9 +13358,8 @@ export function App() {
               <div>
                 <h2>Dispatch</h2>
                 <p className="muted">
-                  No personal flight in progress. Crew fly / crew legs live on the
-                  FBO — use Crew fly there. Accept a freight or send a hold with
-                  Dispatch to start your own OFP here.
+                  No personal flight in progress. Accept a freight and Dispatch
+                  to start your OFP here.
                 </p>
               </div>
               <button
@@ -13953,8 +13923,8 @@ export function App() {
                 ? 'Aircraft must be at the mission origin and you must be with it. Travel repositions the pilot; ferry moves the airframe.'
                 : hangarPane === 'cargo'
                   ? 'Unlock freights by commodity and freighter class. Dry and Light starters are open; Medium is optional beside Jet.'
-                  : hangarPane === 'crew'
-                    ? 'Company crew is based at your FBO. Send them on holds or accepted missions — they settle on wall-clock ETA.'
+                  : hangarPane === 'crew' && COMPANY_CREW_ENABLED
+                    ? 'Company crew is based at your Base. Send them on holds or accepted missions — they settle on wall-clock ETA.'
                     : 'Company income, expenses, and revolving credit — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
             </p>
             <div className="hangar-head-actions">
@@ -13997,6 +13967,7 @@ export function App() {
                 >
                   Cargo Ops
                 </button>
+                {COMPANY_CREW_ENABLED ? (
                 <button
                   type="button"
                   role="tab"
@@ -14009,6 +13980,7 @@ export function App() {
                     ? ` (${companyCrew.slotsInUse}/${companyCrew.slotsUnlocked})`
                     : ''}
                 </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -14052,7 +14024,7 @@ export function App() {
               />
               <ClassOpsPanel classOps={classOps} />
             </>
-          ) : hangarPane === 'crew' ? (
+          ) : hangarPane === 'crew' && COMPANY_CREW_ENABLED ? (
             <CrewPanel
               companyCrew={companyCrew}
               formatMoney={formatMoney}
@@ -14351,29 +14323,6 @@ export function App() {
           onTravel={onPilotTravel}
         />
       ) : null}
-      {rerouteHoldId
-        ? (() => {
-            const hold = playerFbos?.holds.find((h) => h.id === rerouteHoldId);
-            if (!hold) return null;
-            return (
-              <FboRerouteDialog
-                hold={hold}
-                hubs={networkCargoHubs(hubOptions).map((hub) => ({
-                  icao: hub.icao,
-                  name: hub.name,
-                }))}
-                sisterFboIcaos={ownedFboIcaos.filter(
-                  (icao) => icao !== hold.originIcao.toUpperCase(),
-                )}
-                formatMoney={formatMoney}
-                formatTonnes={formatTonnes}
-                busy={busy}
-                onCancel={() => setRerouteHoldId(null)}
-                onConfirm={(dest) => void confirmRerouteFboHold(dest)}
-              />
-            );
-          })()
-        : null}
       {splitHoldId
         ? (() => {
             const hold = playerFbos?.holds.find((h) => h.id === splitHoldId);

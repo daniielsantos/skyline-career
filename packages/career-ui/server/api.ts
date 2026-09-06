@@ -160,24 +160,24 @@ import {
   upgradePortConcession,
   tickPortConcessions,
   ensurePortInventoryRestock,
-  holdLotAtFbo,
+  tickPortAutoBuyOrders,
+  upsertPortAutoBuyOrder,
+  setPortAutoBuyOrderPaused,
+  removePortAutoBuyOrder,
+  PORT_AUTO_BUY_MAX_ACTIVE,
+  quotePortStevedoreHaul,
+  startPortStevedoreHaul,
+  listPortStevedoreDestinations,
   FERRY_SOFT_NM_BUDGET,
   cancelFboHold,
   releaseFboHoldToMission,
-  rerouteFboHold,
-  splitFboHold,
   returnMissionToFboHold,
-  quoteFboRerouteUsd,
-  quoteFboReroutePayAfterUsd,
   playerFboSnapshot,
   playerFboSnapshotAtIcao,
   fboServiceCostMult,
-  dispatchCrewMission,
-  assignCrewMemberToMission,
   settleCrewOpsDue,
   settleCrewDailyOps,
   companyCrewSnapshot,
-  hireCrewCandidate,
   fireCrewMember,
   settleGroundStaffDailyOps,
   groundStaffSnapshot,
@@ -730,6 +730,7 @@ async function loadEconomyUnlocked(opts?: {
     tickPortConcessions(missions, caught);
     ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
+    tickPortAutoBuyOrders(missions, caught);
     expireDemandHolds(missions, caught);
     ensureDemandOrders(caught, {
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(caught),
@@ -3980,6 +3981,73 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/ports/auto-buy') {
+        const body = (await readBody(req)) as {
+          action?: 'upsert' | 'pause' | 'remove';
+          id?: string;
+          portId?: string;
+          commodityId?: string;
+          maxPriceUsdPerKg?: number;
+          maxKgPerDay?: number;
+          warehouseId?: string;
+          walletFloorUsd?: number;
+          paused?: boolean;
+        };
+        const action = body.action ?? 'upsert';
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            if (action === 'remove') {
+              if (!body.id) throw new Error('id required');
+              removePortAutoBuyOrder(missions, body.id);
+            } else if (action === 'pause') {
+              if (!body.id) throw new Error('id required');
+              setPortAutoBuyOrderPaused(
+                missions,
+                body.id,
+                body.paused !== false,
+              );
+            } else {
+              if (
+                !body.portId ||
+                !body.commodityId ||
+                body.maxPriceUsdPerKg == null ||
+                body.maxKgPerDay == null ||
+                !body.warehouseId
+              ) {
+                throw new Error(
+                  'portId, commodityId, maxPriceUsdPerKg, maxKgPerDay, warehouseId required',
+                );
+              }
+              upsertPortAutoBuyOrder(missions, world, {
+                id: body.id,
+                portId: body.portId,
+                commodityId: body.commodityId,
+                maxPriceUsdPerKg: Number(body.maxPriceUsdPerKg),
+                maxKgPerDay: Number(body.maxKgPerDay),
+                warehouseId: body.warehouseId,
+                walletFloorUsd:
+                  body.walletFloorUsd != null
+                    ? Number(body.walletFloorUsd)
+                    : undefined,
+                paused: body.paused === true,
+              });
+            }
+            return {
+              walletUsd: missions.walletUsd,
+              maxActive: PORT_AUTO_BUY_MAX_ACTIVE,
+              ports: portSnapshot(world, missions),
+            };
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/ports/concession/claim') {
         const body = (await readBody(req)) as { portId?: string };
         if (!body.portId) {
@@ -4053,6 +4121,78 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
             };
           }, { persist: 'company', persistPortConcessions: true });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/stevedore') {
+        const body = (await readBody(req)) as {
+          action?: 'quote' | 'start' | 'destinations';
+          pickupId?: string;
+          destWarehouseId?: string;
+          kg?: number;
+        };
+        const action = body.action ?? 'start';
+        if (!body.pickupId) {
+          send(res, 400, { error: 'pickupId required' });
+          return;
+        }
+        try {
+          if (action === 'destinations' || action === 'quote') {
+            const missions = await loadMissions();
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            if (action === 'destinations') {
+              send(res, 200, {
+                destinations: listPortStevedoreDestinations(
+                  missions,
+                  world,
+                  body.pickupId,
+                ),
+              });
+              return;
+            }
+            if (!body.destWarehouseId) {
+              send(res, 400, { error: 'destWarehouseId required' });
+              return;
+            }
+            send(res, 200, {
+              quote: quotePortStevedoreHaul(missions, world, {
+                pickupId: body.pickupId,
+                destWarehouseId: body.destWarehouseId,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              }),
+            });
+            return;
+          }
+          if (!body.destWarehouseId) {
+            send(res, 400, { error: 'destWarehouseId required' });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const started = startPortStevedoreHaul(missions, world, {
+              pickupId: body.pickupId!,
+              destWarehouseId: body.destWarehouseId!,
+              kg: body.kg != null ? Number(body.kg) : undefined,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              quote: started.quote,
+              inboundTransfer: started.inboundTransfer,
+              remainingYardKg: started.remainingYardKg,
+              ports: portSnapshot(world, missions),
+              warehouses: playerWarehouseSnapshot(missions, world),
+            };
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4769,35 +4909,10 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/hold') {
-        const body = (await readBody(req)) as {
-          lotId?: string;
-          cargoKg?: number;
-        };
-        if (!body.lotId) {
-          send(res, 400, { error: 'lotId required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            assertCompanyCreditAllowsOps(missions);
-            return withDevCargoOpsUnlock(req, missions, () => {
-              const held = holdLotAtFbo(missions, world, {
-                lotId: body.lotId!,
-                cargoKg: body.cargoKg,
-              });
-              return {
-                hold: held.hold,
-                playerFbos: playerFboSnapshot(missions, world),
-                walletUsd: missions.walletUsd,
-              };
-            });
-          }, { commandSliceLotIds: [body.lotId] });
-          send(res, 200, result);
-        } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        send(res, 410, {
+          error:
+            'Base bonded holds removed — buy WH at a port pickup hub and use Demand Hold, or Accept the Market lot',
+        });
         return;
       }
 
@@ -4826,68 +4941,10 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/reroute') {
-        const body = (await readBody(req)) as {
-          holdId?: string;
-          destIcao?: string;
-          quoteOnly?: boolean;
-        };
-        if (!body.holdId || !body.destIcao?.trim()) {
-          send(res, 400, { error: 'holdId and destIcao required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            const hold = (missions.playerFbos?.holds ?? []).find(
-              (h) => h.id === body.holdId,
-            );
-            if (!hold) throw new Error(`Unknown FBO hold ${body.holdId}`);
-            const feeUsd = quoteFboRerouteUsd(world, hold, body.destIcao!);
-            if (body.quoteOnly) {
-              const payQuote = quoteFboReroutePayAfterUsd(
-                world,
-                hold,
-                body.destIcao!,
-              );
-              return {
-                quoteOnly: true as const,
-                feeUsd,
-                payAfterUsd: payQuote.payAfterUsd,
-                haircutApplied: payQuote.haircutApplied,
-                bumpApplied: payQuote.bumpApplied,
-                bumpFrac: payQuote.bumpFrac,
-                previousDestIcao: hold.destIcao,
-                destIcao: body.destIcao!.trim().toUpperCase(),
-                walletUsd: missions.walletUsd,
-                playerFbos: playerFboSnapshot(missions, world),
-              };
-            }
-            assertCompanyCreditAllowsOps(missions);
-            const rerouted = rerouteFboHold(missions, world, {
-              holdId: body.holdId!,
-              destIcao: body.destIcao!,
-            });
-            return {
-              quoteOnly: false as const,
-              debitUsd: rerouted.debitUsd,
-              feeUsd: rerouted.debitUsd,
-              hold: rerouted.hold,
-              previousDestIcao: rerouted.previousDestIcao,
-              destIcao: rerouted.hold.destIcao,
-              haircutApplied: rerouted.haircutApplied,
-              bumpApplied: rerouted.bumpApplied,
-              payAfterUsd: rerouted.hold.payUsd,
-              playerFbos: playerFboSnapshot(missions, world),
-              walletUsd: missions.walletUsd,
-            };
-          }, body.quoteOnly
-            ? { persist: 'company' }
-            : { commandSliceHoldId: body.holdId });
-          send(res, 200, result);
-        } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        send(res, 410, {
+          error:
+            'Base hold reroute removed — cancel and re-hold, or Dispatch the current destination',
+        });
         return;
       }
 
@@ -4955,49 +5012,10 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/split') {
-        const body = (await readBody(req)) as {
-          holdId?: string;
-          legs?: Array<{ aircraftId?: string; cargoKg?: number }>;
-        };
-        if (!body.holdId) {
-          send(res, 400, { error: 'holdId required' });
-          return;
-        }
-        if (!Array.isArray(body.legs) || body.legs.length === 0) {
-          send(res, 400, { error: 'legs required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            assertCompanyCreditAllowsOps(missions);
-            const split = splitFboHold(missions, world, {
-              holdId: body.holdId!,
-              legs: body.legs!.map((leg) => ({
-                aircraftId: String(leg.aircraftId ?? ''),
-                cargoKg: Number(leg.cargoKg),
-              })),
-            });
-            return {
-              missions: split.missions.map((m) =>
-                withMissionClientView(world, missions, m),
-              ),
-              hold: split.hold,
-              allocatedKg: split.allocatedKg,
-              remainingKg: split.remainingKg,
-              playerFbos: playerFboSnapshot(missions, world),
-              fleet: withParkingRates(missions.fleet, world, missions),
-              walletUsd: missions.walletUsd,
-              allMissions: missions.missions.map((m) =>
-                withMissionClientView(world, missions, m),
-              ),
-            };
-          }, { commandSliceHoldId: body.holdId });
-          send(res, 200, result);
-        } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        send(res, 410, {
+          error:
+            'Company crew removed — Dispatch the hold yourself (Crew fly / split disabled)',
+        });
         return;
       }
 
@@ -5036,146 +5054,26 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/crew/assign') {
-        const body = (await readBody(req)) as {
-          missionId?: string;
-          crewMemberId?: string;
-        };
-        if (!body.missionId?.trim() || !body.crewMemberId?.trim()) {
-          send(res, 400, { error: 'missionId and crewMemberId required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            const mission = assignCrewMemberToMission(missions, {
-              missionId: body.missionId!.trim(),
-              crewMemberId: body.crewMemberId!.trim(),
-            });
-            return {
-              mission: withMissionClientView(world, missions, mission),
-              companyCrew: companyCrewSnapshot(missions, world),
-              missions: missions.missions.map((m) =>
-                withMissionClientView(world, missions, m),
-              ),
-            };
-          }, { persist: 'company' });
-          send(res, 200, result);
-        } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        send(res, 410, {
+          error:
+            'Company crew removed — fly freights yourself (Base keeps parking / Jet-A / MRO perks)',
+        });
         return;
       }
 
       if (req.method === 'POST' && path === '/api/crew/dispatch') {
-        const body = (await readBody(req)) as {
-          missionId?: string;
-          holdId?: string;
-          aircraftId?: string;
-          crewMemberId?: string;
-        };
-        if (!body.missionId && !body.holdId) {
-          send(res, 400, { error: 'missionId or holdId required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            assertCompanyCreditAllowsOps(missions);
-            let missionId = body.missionId?.trim();
-            if (!missionId && body.holdId) {
-              const hold = (missions.playerFbos?.holds ?? []).find(
-                (h) => h.id === body.holdId,
-              );
-              if (!hold) throw new Error(`Unknown hold ${body.holdId}`);
-              let aircraftClassId: FreighterClassId = 'light_ga';
-              let maxCargoKg: number | undefined;
-              if (body.aircraftId) {
-                const acf = findPlayerAircraft(missions, body.aircraftId);
-                if (!acf) throw new Error(`Unknown aircraft ${body.aircraftId}`);
-                aircraftClassId = acf.aircraftClassId;
-                const catalog = acf.airframeTypeId
-                  ? findCareerPlayerAirframe(acf.airframeTypeId)
-                  : undefined;
-                if (catalog?.maxCargoKg) maxCargoKg = catalog.maxCargoKg;
-              } else {
-                const parked = missions.fleet.find(
-                  (a) =>
-                    a.status === 'parked' &&
-                    a.locationIcao.toUpperCase() ===
-                      hold.originIcao.toUpperCase(),
-                );
-                if (parked) {
-                  aircraftClassId = parked.aircraftClassId;
-                  const catalog = parked.airframeTypeId
-                    ? findCareerPlayerAirframe(parked.airframeTypeId)
-                    : undefined;
-                  if (catalog?.maxCargoKg) maxCargoKg = catalog.maxCargoKg;
-                }
-              }
-              const released = releaseFboHoldToMission(missions, world, {
-                holdId: body.holdId!,
-                aircraftClassId,
-                maxCargoKg,
-              });
-              missionId = released.mission.id;
-            }
-            const dispatched = dispatchCrewMission(missions, world, {
-              missionId: missionId!,
-              aircraftId: body.aircraftId,
-              crewMemberId: body.crewMemberId,
-              nowMs: Date.now(),
-            });
-            return {
-              mission: withMissionClientView(world, missions, dispatched.mission),
-              crewFeeUsd: dispatched.crewFeeUsd,
-              returnFeeUsd: dispatched.returnFeeUsd,
-              totalRoundTripFeeUsd: dispatched.totalRoundTripFeeUsd,
-              fuelDebitUsd: dispatched.fuelDebitUsd,
-              walletUsd: missions.walletUsd,
-              fleet: withParkingRates(missions.fleet, world, missions),
-              playerFbos: playerFboSnapshot(missions, world),
-              companyCrew: companyCrewSnapshot(missions, world),
-              missions: missions.missions.map((m) =>
-                withMissionClientView(world, missions, m),
-              ),
-            };
-          }, {
-            commandSliceHoldId: body.holdId,
-            commandSliceMissionId: body.missionId,
-            commandSliceAircraftId: body.aircraftId,
-          });
-          send(res, 200, result);
-        } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        send(res, 410, {
+          error:
+            'Company crew removed — fly freights yourself (Base keeps parking / Jet-A / MRO perks)',
+        });
         return;
       }
 
       if (req.method === 'POST' && path === '/api/crew/hire') {
-        const body = (await readBody(req)) as { candidateId?: string };
-        if (!body.candidateId?.trim()) {
-          send(res, 400, { error: 'candidateId required' });
-          return;
-        }
-        try {
-          const result = await withCareerWrite((world, missions) => {
-            assertCompanyCreditAllowsOps(missions);
-            const hired = hireCrewCandidate(missions, world, body.candidateId!.trim());
-            return {
-              member: hired.member,
-              debitUsd: hired.debitUsd,
-              walletUsd: missions.walletUsd,
-              companyCrew: companyCrewSnapshot(missions, world),
-            };
-          }, { persist: 'company' });
-          send(res, 200, result);
-        } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        send(res, 410, {
+          error:
+            'Company crew removed — fly freights yourself (Base keeps parking / Jet-A / MRO perks)',
+        });
         return;
       }
 
@@ -5190,7 +5088,6 @@ export function createCareerApiServer(port = 8787) {
             const fired = fireCrewMember(missions, body.memberId!.trim());
             return {
               member: fired,
-              walletUsd: missions.walletUsd,
               companyCrew: companyCrewSnapshot(missions, world),
             };
           }, { persist: 'company' });
@@ -5319,6 +5216,7 @@ export function createCareerApiServer(port = 8787) {
           tickPortConcessions(missions, world);
           ensurePortInventoryRestock(world);
           ensurePortListings(world);
+          tickPortAutoBuyOrders(missions, world);
           expireDemandHolds(missions, world);
           ensureDemandOrders(world, {
             operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),

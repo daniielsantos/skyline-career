@@ -113,7 +113,7 @@ export function CrewPanel(props: {
         <header className="crew-panel-head">
           <h3>Crew</h3>
           <p className="muted">
-            Buy an FBO to unlock a company crew slot. Hire from the short desk
+            Buy a Base to unlock a company crew slot. Hire from the short desk
             here — not a pilot market. Crew flies your airframes on wall-clock
             ETA (fee per leg + daily salary).
           </p>
@@ -241,7 +241,7 @@ export function CrewPanel(props: {
                           type="button"
                           className="action ghost"
                           disabled={props.busy}
-                          title="Cancel this leg and bond cargo back at the FBO"
+                          title="Cancel this leg and bond cargo back at the Base"
                           onClick={() => props.onReturnToFbo?.(mission)}
                         >
                           Return
@@ -353,7 +353,7 @@ export function CrewPanel(props: {
         <h4 className="crew-section-title">Hire desk</h4>
         <p className="muted crew-section-lede">
           {hirePool.length} candidate{hirePool.length === 1 ? '' : 's'} at{' '}
-          {crew.baseIcao ?? 'FBO'} — refreshes each economy day.
+          {crew.baseIcao ?? 'Base'} — refreshes each economy day.
           {!canHire && members.length >= crew.slotsUnlocked
             ? ' Slot full — fire to hire someone else.'
             : ''}

@@ -3430,6 +3430,8 @@ export function App() {
   >('idle');
   const [watchAutoPaused, setWatchAutoPaused] = useState(false);
   const [flightDebrief, setFlightDebrief] = useState<FlightDebrief | null>(null);
+  /** Keep Settling overlay until debrief paints (server clears `settling` on stop). */
+  const [settleOverlaySticky, setSettleOverlaySticky] = useState(false);
   const activeMissionRef = useRef<Mission | undefined>(undefined);
   /** One-shot: reopen mid-flight → Dispatch so settle UI is visible. */
   const airborneResumeNavDoneRef = useRef(false);
@@ -4373,32 +4375,66 @@ export function App() {
             !status.running &&
             Boolean(status.settlement) &&
             Boolean(status.missionId);
+          // Arm overlay as soon as we see settle intent — don't wait for a
+          // second poll (settle can block the server for seconds).
+          const missionLive =
+            activeMissionRef.current?.status === 'in_flight' &&
+            (!status.missionId ||
+              activeMissionRef.current.id === status.missionId);
+          const settleIntent =
+            missionLive &&
+            (Boolean(status.settling) ||
+              status.lastEvent?.type === 'settle' ||
+              (status.sawAirborne &&
+                status.onGround === true &&
+                (status.enginesRunning === false ||
+                  status.parkingBrake === true) &&
+                status.lastEvent?.type !== 'settle_blocked'));
+          if (settleIntent && !justSettled) {
+            queueMicrotask(() => setSettleOverlaySticky(true));
+          }
           if (justSettled && status.settlement && status.missionId) {
             const settledMission = activeMissionRef.current;
+            const settledId = status.missionId;
             const debrief =
-              settledMission && settledMission.id === status.missionId
+              settledMission && settledMission.id === settledId
                 ? buildFlightDebrief({
                     mission: settledMission,
                     settlement: status.settlement,
                   })
                 : null;
             queueMicrotask(() => {
+              setSettleOverlaySticky(false);
+              // Drop in_flight locally so dismissing debrief cannot re-arm overlay
+              // from a stale Watch lastEvent=settle / engines-off sample.
+              setMissions((current) =>
+                current.map((m) =>
+                  m.id === settledId && isActiveMissionStatus(m.status)
+                    ? { ...m, status: 'completed' }
+                    : m,
+                ),
+              );
               if (debrief) setFlightDebrief(debrief);
-              setToastKind(status.settlement!.onTime ? 'ok' : 'warn');
-              const cargoLine = formatCargoOpsDebriefLine(
-                debrief?.cargoOpsDeltas ?? status.settlement!.cargoOpsDeltas,
-              );
-              const classLine = formatClassOpsDebriefLine(
-                debrief?.classOpsDeltas ?? status.settlement!.classOpsDeltas,
-              );
-              const opsLine = [cargoLine, classLine].filter(Boolean).join(' · ');
-              setToast(
-                `Flight settled · net ${formatMoney(
-                  debrief?.netUsd ?? status.settlement!.payoutUsd,
-                )}${opsLine ? ` · ${opsLine}` : ''}`,
-              );
               if (typeof status.walletUsd === 'number') {
                 setWallet(status.walletUsd);
+              }
+              // Debrief sheet carries P&L — only toast when we could not build it.
+              if (!debrief) {
+                setToastKind(status.settlement!.onTime ? 'ok' : 'warn');
+                const cargoLine = formatCargoOpsDebriefLine(
+                  status.settlement!.cargoOpsDeltas,
+                );
+                const classLine = formatClassOpsDebriefLine(
+                  status.settlement!.classOpsDeltas,
+                );
+                const opsLine = [cargoLine, classLine]
+                  .filter(Boolean)
+                  .join(' · ');
+                setToast(
+                  `Flight settled · net ${formatMoney(
+                    status.settlement!.payoutUsd,
+                  )}${opsLine ? ` · ${opsLine}` : ''}`,
+                );
               }
               goToTab('staging');
               void refresh().catch(() => {
@@ -4765,8 +4801,13 @@ export function App() {
       void pollWatch();
     }, watch?.settling ||
       watch?.lastEvent?.type === 'settle' ||
+      settleOverlaySticky ||
+      (watch?.onGround === true &&
+        watch?.sawAirborne &&
+        (watch?.enginesRunning === false || watch?.parkingBrake === true) &&
+        inFlight) ||
       (watch?.onGround === true && inFlight)
-      ? 800
+      ? 250
       : watch?.onGround === false
         ? 5_000
         : 3_000);
@@ -4774,8 +4815,58 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [watch?.running, watch?.onGround, watch?.settling, watch?.lastEvent?.type, refresh]);
+  }, [
+    watch?.running,
+    watch?.onGround,
+    watch?.settling,
+    watch?.lastEvent?.type,
+    watch?.enginesRunning,
+    watch?.sawAirborne,
+    watch?.parkingBrake,
+    settleOverlaySticky,
+    refresh,
+  ]);
 
+  // Global Settling overlay: only while an in-flight mission is settling.
+  useEffect(() => {
+    const mission = activeMissionRef.current;
+    const settleBlocked = watch?.lastEvent?.type === 'settle_blocked';
+    const liveInFlight = mission?.status === 'in_flight';
+    const optimisticLandedSettle =
+      liveInFlight &&
+      !flightDebrief &&
+      !settleBlocked &&
+      Boolean(watch?.sawAirborne) &&
+      watch?.onGround === true &&
+      (watch?.enginesRunning === false ||
+        watch?.parkingBrake === true ||
+        watch?.lastEvent?.type === 'settle' ||
+        Boolean(watch?.settling));
+    if (liveInFlight && (watch?.settling || optimisticLandedSettle)) {
+      setSettleOverlaySticky(true);
+      return;
+    }
+    // Debrief open, mission gone, or settle finished — never leave sticky on.
+    setSettleOverlaySticky(false);
+  }, [
+    watch?.settling,
+    watch?.onGround,
+    watch?.enginesRunning,
+    watch?.parkingBrake,
+    watch?.sawAirborne,
+    watch?.lastEvent?.type,
+    flightDebrief,
+    missions,
+  ]);
+
+  useEffect(() => {
+    if (!settleOverlaySticky && !watch?.settling) return;
+    if (activeMissionRef.current?.status !== 'in_flight') return;
+    if (tab !== 'staging' || airportIcao) {
+      setAirportIcao(null);
+      setTab('staging');
+    }
+  }, [settleOverlaySticky, watch?.settling, tab, airportIcao]);
   // Independent SimBridge probe — does not require Watch to be running.
   // When Watch is already sampling, skip probing entirely (server would only
   // mirror Watch anyway, and the extra poll re-rendered the status bar).
@@ -6103,6 +6194,7 @@ export function App() {
     setActiveBushTrip(null);
     setBushWatch(null);
     setFlightDebrief(null);
+    setSettleOverlaySticky(false);
     setWatch(null);
   }
 
@@ -8325,17 +8417,10 @@ export function App() {
         settlement: result.settlement,
       });
       setFlightDebrief(debrief);
-      setToastKind(result.settlement.onTime ? 'ok' : 'warn');
-      const cargoLine = formatCargoOpsDebriefLine(debrief.cargoOpsDeltas);
-      const classLine = formatClassOpsDebriefLine(debrief.classOpsDeltas);
-      const opsLine = [cargoLine, classLine].filter(Boolean).join(' · ');
-      setToast(
-        `Flight settled · net ${formatMoney(debrief.netUsd)}${
-          opsLine ? ` · ${opsLine}` : ''
-        }`,
-      );
+      setSettleOverlaySticky(false);
       setStaging(null);
       goToTab('staging');
+      // Debrief sheet is the settle summary — skip the duplicate toast.
     }, { sync: { missions: true } });
   }
 
@@ -8878,11 +8963,21 @@ export function App() {
 
   const stagingMode: 'empty' | 'draft' | 'active' | 'debrief' = staging
     ? 'draft'
-    : activeMission
-      ? 'active'
-      : flightDebrief
-        ? 'debrief'
+    : flightDebrief
+      ? 'debrief'
+      : activeMission
+        ? 'active'
         : 'empty';
+  const showSettleBusyOverlay =
+    !flightDebrief &&
+    activeMission?.status === 'in_flight' &&
+    (Boolean(watch?.settling) ||
+      settleOverlaySticky ||
+      watch?.lastEvent?.type === 'settle' ||
+      (Boolean(watch?.sawAirborne) &&
+        watch?.onGround === true &&
+        (watch?.enginesRunning === false || watch?.parkingBrake === true) &&
+        watch?.lastEvent?.type !== 'settle_blocked'));
   const dispatchStep = deriveDispatchStep({
     hasDraft: Boolean(staging),
     hasDebrief: stagingMode === 'debrief',
@@ -8925,6 +9020,7 @@ export function App() {
         ? watch.enginesRunning
         : (simBridge?.enginesRunning ?? null),
     watchSawAirborne: Boolean(watch?.sawAirborne),
+    watchSettling: Boolean(watch?.settling) || settleOverlaySticky,
     watchSettleBlockedReason:
       watch?.lastEvent?.type === 'settle_blocked'
         ? watch.lastEvent.reason
@@ -12634,6 +12730,7 @@ export function App() {
                     disabled={busy}
                     onClick={() => {
                       setFlightDebrief(null);
+                      setSettleOverlaySticky(false);
                       selectTab('market');
                     }}
                   >
@@ -12645,6 +12742,7 @@ export function App() {
                     disabled={busy}
                     onClick={() => {
                       setFlightDebrief(null);
+                      setSettleOverlaySticky(false);
                       selectTab('missions');
                     }}
                   >
@@ -12654,7 +12752,10 @@ export function App() {
                     type="button"
                     className="action ghost"
                     disabled={busy}
-                    onClick={() => setFlightDebrief(null)}
+                    onClick={() => {
+                      setFlightDebrief(null);
+                      setSettleOverlaySticky(false);
+                    }}
                   >
                     Dismiss
                   </button>
@@ -14215,6 +14316,20 @@ export function App() {
         weightSystem={weightSystem}
       />
       </div>
+      {showSettleBusyOverlay ? (
+        <div
+          className="confirm-overlay settle-busy-overlay"
+          role="status"
+          aria-live="assertive"
+          aria-busy="true"
+        >
+          <div className="settle-busy-card">
+            <span className="busy-spinner busy-spinner-lg" aria-hidden="true" />
+            <strong>Settling flight…</strong>
+            <span>Saving payout and flight log — debrief opens next.</span>
+          </div>
+        </div>
+      ) : null}
       {pilotTravelOpen && pilotIcao ? (
         <PilotTravelDialog
           pilotIcao={pilotIcao}

@@ -2030,6 +2030,8 @@ async function applyMissionOfpLoadExclusive(
     // Freighter: drop baggage indexes that ignore SimConnect before painting Due
     // across them (C408 S4/S5). Writability only — no clamp probe (stations often
     // accept any weight; that wizard path was dropped for the same reason).
+    // Accu-Sim also runs this: classic station mirrors flash 150 lb on the tablet
+    // briefly; Skyline UI does not paint that intermediate (plan stations only).
     if (!preferSeatFill && !paxAndCargoClassic && baggageStations.length > 0) {
       publishLiveProgress('balancing', 'Probing cargo stations for dead holds…');
       const probed = await probeFreighterBaggageStations({

@@ -3487,6 +3487,8 @@ export type WatchStatus = {
   pipeConnected?: boolean;
   /** Auto-settle is sampling residual fuel / writing payout. */
   settling?: boolean;
+  /** Live parking-brake latch from MSFS (settle trigger). */
+  parkingBrake?: boolean | null;
   settlement: MissionSettlement | null;
   walletUsd: number | null;
   autoDepart: boolean;

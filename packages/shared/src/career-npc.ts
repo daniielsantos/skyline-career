@@ -227,9 +227,9 @@ export const AWAITING_PILOT_SHORT_MAX_HOURS = 2;
  */
 export const CONTRACT_PILOT_OFFER_CHANCE = 0.9;
 /**
- * Classes a brand-new contract pilot can sit (Class Ops starters).
- * The global crew-needed cap used to be one bucket — Narrow/Wide filled it
- * and the empty-hangar starter stared at 737s they cannot fly.
+ * Only these classes open Crew needed offers (freight + reposition).
+ * Jet+ / medium / narrow / wide claim and depart solo — keeps heavy pay on
+ * owned/leased metal so contract pilot does not delay Hangar buys.
  */
 export const STARTER_CONTRACT_PILOT_CLASSES: ReadonlySet<FreighterClassId> =
   new Set(['light_ga', 'light_turboprop']);
@@ -243,19 +243,18 @@ export function isStarterContractPilotClass(
 export type ContractPilotOfferBand = 'starter' | 'other' | 'all';
 
 /**
- * Cap concurrent crew-needed freight holds per region, per band.
+ * Cap concurrent crew-needed freight holds (starter GA/TP only).
  *
  * Each hold parks its NPC *and* its lot for 3–8h before the leg even departs.
  * Uncapped at a 0.9 offer chance this swallowed most of the fleet's duty time.
- * Starter and jet+ bands are counted separately so loosening GA contracts
- * does not re-park the heavy fleet.
+ * Jet+ band cap is 0 — heavies never await a contract pilot.
  */
 export const STARTER_CONTRACT_PILOT_OFFERS_PER_REGION = 0.4;
 export const MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS = 8;
-/** Jet / medium / narrow / wide band. */
-export const MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION = 0.35;
-/** Floor so small maps still show a live crew-needed board. */
-export const MIN_OPEN_CONTRACT_PILOT_OFFERS = 4;
+/** @deprecated Jet+ crew-needed disabled; kept for band API / save heal. */
+export const MAX_OPEN_CONTRACT_PILOT_OFFERS_PER_REGION = 0;
+/** @deprecated Jet+ crew-needed disabled; kept for band API / save heal. */
+export const MIN_OPEN_CONTRACT_PILOT_OFFERS = 0;
 
 /**
  * Starter crew floor for the player's home country (SP) / company homes (MP).
@@ -371,8 +370,8 @@ export function starterContractPilotCountryNeedsFloor(
 export const REPOSITION_AWAITING_MIN_HOURS = 0.5;
 /** Max wall-clock hours a reposition crew offer stays open. */
 export const REPOSITION_AWAITING_MAX_HOURS = 1.5;
-/** Cap open jet+ reposition crew offers so the freight board isn't ferry spam. */
-export const MAX_OPEN_REPOSITION_OFFERS = 3;
+/** Jet+ empty-return crew offers disabled (solo ferry). */
+export const MAX_OPEN_REPOSITION_OFFERS = 0;
 /** Reserved empty-return holds for light GA / turboprop (starter ferry). */
 export const MAX_OPEN_STARTER_REPOSITION_OFFERS = 3;
 /** Floor for empty-home ferry pilot fee (matches hangar ferry floor band). */
@@ -1855,11 +1854,11 @@ function tryCreateNpcRepositionOffer(
   rng: () => number,
 ): NpcFlight | undefined {
   if (!npcCanOfferContractPilot(npc)) return undefined;
+  // Jet+ ferry home solo — no Crew needed · reposition on the board.
+  if (!isStarterContractPilotClass(npc.aircraftClassId)) return undefined;
   if (npc.currentFlightId) return undefined;
   if (needsShopMx(npc)) return undefined;
-  const repoBand = isStarterContractPilotClass(npc.aircraftClassId)
-    ? 'starter'
-    : 'other';
+  const repoBand = 'starter' as const;
   if (countOpenRepositionOffers(world, repoBand) >= maxOpenRepositionOffers(repoBand)) {
     return undefined;
   }
@@ -1948,14 +1947,13 @@ function shouldOfferContractPilot(
   if (force === true) return npcCanOfferContractPilot(npc);
   if (force === false) return false;
   if (!npcCanOfferContractPilot(npc)) return false;
-  const band = isStarterContractPilotClass(npc.aircraftClassId)
-    ? 'starter'
-    : 'other';
+  // Live path: only Light GA / Light TP. Force remains for tests / helpers.
+  if (!isStarterContractPilotClass(npc.aircraftClassId)) return false;
+  const band = 'starter' as const;
   // Active home country below floor: open even when the global starter cap
   // is full. Above the floor, fall through to the normal global cap — no
   // hard country ceiling (crew-needed is unpaid deadhead for the player).
   if (
-    band === 'starter' &&
     opts?.originIcao &&
     starterContractPilotCountryNeedsFloor(
       world,
@@ -2047,7 +2045,9 @@ function promoteAwaitingPilotsDue(
     const unflyable =
       !isNpcRepositionFlight(flight) &&
       !contractPilotHasFlyableAirframe(flight, { distanceNm });
-    if (!unflyable && until > 0 && nowMs < until) continue;
+    // Legacy jet+ crew/repo holds: promote to solo departure immediately.
+    const retiredClass = !isStarterContractPilotClass(flight.aircraftClassId);
+    if (!unflyable && !retiredClass && until > 0 && nowMs < until) continue;
     promoteAwaitingPilotFlight(world, flight, nowMs, rng);
     promoted += 1;
   }

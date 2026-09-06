@@ -88,6 +88,7 @@ export function WatchStatusFooter(props: Props) {
       bridgeGs >= 5;
     if (watchRunning) {
       if (props.watch?.settling) return 'Settling flight';
+      if (props.watch?.lastEvent?.type === 'settle') return 'Settling flight';
       if (bridgePhase === 'taxi_in') return 'Taxi in';
       if (bridgePhase === 'taxi_out' || bridgePhase === 'taxi') {
         return phaseLabel !== '—' ? phaseLabel : 'Taxiing';
@@ -113,7 +114,7 @@ export function WatchStatusFooter(props: Props) {
   const statusLabel =
     props.loadOfpAutoStatus === 'loading'
       ? 'INJECTING…'
-      : props.watch?.settling
+      : props.watch?.settling || props.watch?.lastEvent?.type === 'settle'
         ? 'SETTLING…'
         : watchPipeLive
         ? 'MSFS'

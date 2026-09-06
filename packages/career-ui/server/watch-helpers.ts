@@ -177,6 +177,8 @@ export type WatchStatusPayload = {
   phase: string | null;
   onGround: boolean | null;
   enginesRunning: boolean | null;
+  /** Live parking-brake latch (settle trigger). */
+  parkingBrake?: boolean | null;
   groundSpeedKt: number | null;
   position: { lat: number; lon: number } | null;
   /** Live fuel total (lb) sampled on the Watch pipe. */
@@ -1592,6 +1594,7 @@ export class CareerWatchSession {
       phase: this.lastPhase,
       onGround: this.lastSample?.onGround ?? null,
       enginesRunning: this.lastSample?.enginesRunning ?? null,
+      parkingBrake: this.lastSample?.parkingBrake ?? null,
       groundSpeedKt:
         typeof this.lastSample?.groundSpeedKt === 'number'
           ? this.lastSample.groundSpeedKt
@@ -3806,8 +3809,9 @@ export class CareerWatchSession {
 
       if (event.type === 'settle' && this.opts.autoSettle) {
         this.settling = true;
-        // Let GET /api/watch/status serve the overlay before SimVar / persist.
-        await new Promise<void>((resolve) => setImmediate(resolve));
+        // Give the UI at least one /api/watch/status poll with settling=true
+        // before SimVar reads + withCareerWrite block the event loop (~10s).
+        await new Promise<void>((resolve) => setTimeout(resolve, 250));
         const mxFuelDrain = this.getCapturedMxFuelDrain();
         let residualFuelKg: number | undefined;
         try {

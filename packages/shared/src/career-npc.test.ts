@@ -49,7 +49,6 @@ import {
   tickEconomyN,
   MAX_OPEN_REPOSITION_OFFERS,
   MAX_OPEN_STARTER_REPOSITION_OFFERS,
-  MIN_OPEN_CONTRACT_PILOT_OFFERS,
   MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS,
   MIN_STARTER_CREW_OFFERS_PER_ACTIVE_COUNTRY,
   STARTER_CREW_OFFERS_PER_EXTRA_COMPANY,
@@ -1372,7 +1371,7 @@ describe('NPC freighter fleet', () => {
     const countryFloor = activeContractPilotCountries(world).includes(home)
       ? starterContractPilotCountryFloor(1)
       : 0;
-    assert.ok(cap >= MIN_OPEN_CONTRACT_PILOT_OFFERS);
+    assert.ok(cap >= MIN_OPEN_STARTER_CONTRACT_PILOT_OFFERS);
     // Home-country starter floor may overflow the global starter bucket by ≤ floor.
     assert.ok(
       open <= cap + countryFloor,
@@ -1382,10 +1381,8 @@ describe('NPC freighter fleet', () => {
       countOpenContractPilotOffers(world, 'starter') <=
         maxOpenContractPilotOffers(world, 'starter') + countryFloor,
     );
-    assert.ok(
-      countOpenContractPilotOffers(world, 'other') <=
-        maxOpenContractPilotOffers(world, 'other'),
-    );
+    assert.equal(maxOpenContractPilotOffers(world, 'other'), 0);
+    assert.equal(countOpenContractPilotOffers(world, 'other'), 0);
     // The cap exists to keep freighters flying rather than parked on a hold.
     const airborne = world.npcFlights.filter(
       (f) => f.status === 'in_flight',
@@ -1730,45 +1727,17 @@ describe('NPC freighter fleet', () => {
     );
   });
 
-  it('does not use the country floor bypass for jet+ crew holds', () => {
+  it('never opens live jet+ crew holds (heavies depart solo)', () => {
     const world = createSeedEconomyWorld({ seed: 'npc-crew-other-cap' });
     tickEconomyN(world, 24);
     world.homeCountryId = 'BR';
-    const otherCap = maxOpenContractPilotOffers(world, 'other');
-    const brHub =
-      world.airports.find((a) => a.icao === 'SBGR') ??
-      world.airports.find(
-        (a) => contractPilotOriginCountry(world, a.icao) === 'BR',
-      );
-    assert.ok(brHub);
+    assert.equal(maxOpenContractPilotOffers(world, 'other'), 0);
     const heavyNpc = world.npcs.find(
       (n) =>
         npcCanOfferContractPilot(n) &&
         !isStarterContractPilotClass(n.aircraftClassId),
     );
     assert.ok(heavyNpc);
-    for (let i = 0; i < otherCap; i++) {
-      world.npcFlights.push({
-        id: `fill-other-${i}`,
-        npcId: heavyNpc!.id,
-        lotId: `fill-other-lot-${i}`,
-        originIcao: brHub!.icao,
-        destIcao: brHub!.icao,
-        commodityId: 'general',
-        cargoKg: 5_000,
-        payUsd: 5_000,
-        aircraftClassId: 'narrow_freighter',
-        departedAtTick: world.tick,
-        arrivesAtTick: world.tick,
-        departedAtMs: world.lastBatchAtMs ?? Date.now(),
-        arrivesAtMs: (world.lastBatchAtMs ?? Date.now()) + 3_600_000,
-        status: 'awaiting_pilot',
-        awaitingPilotUntilMs: (world.lastBatchAtMs ?? Date.now()) + 3_600_000,
-      });
-    }
-    assert.ok(
-      countOpenContractPilotOffers(world, 'other') >= otherCap,
-    );
 
     const heldLots = new Set(
       world.npcFlights
@@ -1792,6 +1761,13 @@ describe('NPC freighter fleet', () => {
         respectCaps: true,
       }),
     );
+    const liveOther = world.npcFlights.filter(
+      (f) =>
+        f.status === 'awaiting_pilot' &&
+        f.kind !== 'reposition' &&
+        !isStarterContractPilotClass(f.aircraftClassId),
+    );
+    assert.equal(liveOther.length, 0);
   });
 
   it('never opens a crew offer on an abstract (non-homologated) NPC', () => {
@@ -2588,7 +2564,8 @@ describe('NPC freighter fleet', () => {
       (n) => !isStarterContractPilotClass(n.aircraftClassId),
     );
     assert.ok(starters.length >= MAX_OPEN_STARTER_REPOSITION_OFFERS);
-    assert.ok(others.length >= MAX_OPEN_REPOSITION_OFFERS);
+    assert.ok(others.length > 0);
+    assert.equal(MAX_OPEN_REPOSITION_OFFERS, 0);
     const nowMs = world.lastBatchAtMs ?? Date.now();
 
     const fillBand = (
@@ -2609,16 +2586,11 @@ describe('NPC freighter fleet', () => {
       return used;
     };
     const starterUsed = fillBand(starters, MAX_OPEN_STARTER_REPOSITION_OFFERS);
-    const otherUsed = fillBand(others, MAX_OPEN_REPOSITION_OFFERS);
     assert.equal(starterUsed.length, MAX_OPEN_STARTER_REPOSITION_OFFERS);
-    assert.equal(otherUsed.length, MAX_OPEN_REPOSITION_OFFERS);
     const open = world.npcFlights.filter(
       (f) => f.status === 'awaiting_pilot' && f.kind === 'reposition',
     );
-    assert.equal(
-      open.length,
-      MAX_OPEN_STARTER_REPOSITION_OFFERS + MAX_OPEN_REPOSITION_OFFERS,
-    );
+    assert.equal(open.length, MAX_OPEN_STARTER_REPOSITION_OFFERS);
 
     const extraStarter = starters.find(
       (n) =>
@@ -2636,17 +2608,13 @@ describe('NPC freighter fleet', () => {
         }),
       /Failed to create reposition offer/,
     );
-    const extraOther = others.find(
-      (n) =>
-        !open.some((f) => f.npcId === n.id) &&
-        Boolean(findReachableAwayPad(world, n)),
-    );
-    assert.ok(extraOther);
-    const awayOther = findReachableAwayPad(world, extraOther!);
-    assert.ok(awayOther);
+    const heavy = others.find((n) => Boolean(findReachableAwayPad(world, n)));
+    assert.ok(heavy);
+    const awayHeavy = findReachableAwayPad(world, heavy!);
+    assert.ok(awayHeavy);
     assert.throws(
       () =>
-        createNpcRepositionOffer(world, extraOther!.id, awayOther!.icao, {
+        createNpcRepositionOffer(world, heavy!.id, awayHeavy!.icao, {
           nowMs,
           rng: () => 0.25,
         }),

@@ -240,6 +240,20 @@ describe('dispatchStepStatusLine en_route', () => {
     );
   });
 
+  it('shows settling copy while Watch persists the flight', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchEnginesRunning: false,
+        watchSawAirborne: true,
+        watchSettling: true,
+      }),
+      /Settling flight/i,
+    );
+  });
+
   it('says Watch is reconnecting when landed but Watch is down', () => {
     assert.match(
       dispatchStepStatusLine({

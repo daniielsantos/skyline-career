@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-05: **Inject 150 lb probe** — freighter cabin-as-baggage only (não todo inject); Accu-Sim também passa e pisca no tablet; Skyline não pinta intermediário. Mantido (C408 dead holds). Sem skip Accu-Sim.
+
+Atualizado 2026-09-05: **Settle UX** — overlay só com missão `in_flight`; ao settle marca completed local + limpa sticky (Back to Freights não reabre loading). Server 250ms `settling=true` pra poll.
+
+Atualizado 2026-09-05: **Crew needed só GA/TP** — jet+ partem solo (sem board). Reposition crew idem. Incentivo Hangar. Detail: `08-economy.md`.
+
 Atualizado 2026-09-05: **AR/CL ICAO traps shipped** — remaps `SAMA→SAMM`, `SAOU→SAMR` then `SANL→SAOU`, `SANR→SANE`, `SCPQ→SCGZ`; KPBI keep. SimBrief + runways regen OK. Next: rebuild app → `npm run career-hubs -- SAMM SAMR SANE SAOU SCGZ --force --yes` (ou `all`). Detail: `04-hubs-simbrief.md`.
 
 Atualizado 2026-09-05: **Runway catalog merge** — `career-hubs -- missing` = lat/lon/nome (+ pistas no *override* MSFS se Facilities devolver). Diagrama de debrief usa `career-runways.json` (OurAirports). Após densify: `npm run generate:runways:missing -w @msfs-compat/shared`. Merge: OA geom → aliases fechados/renomeados (EGCN→GB-1212, SEQU→SEQM, …) → strip sintético no hub coords se OA sem length/ends. Meta: **0** hubs sem runway no catalog.

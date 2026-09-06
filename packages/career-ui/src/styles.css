@@ -3668,6 +3668,33 @@ tr.lot-locked {
   color: var(--muted);
 }
 
+.settle-busy-overlay {
+  z-index: 130;
+}
+
+.settle-busy-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  width: min(100%, 22rem);
+  padding: 1.4rem 1.5rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--panel), var(--surface));
+  text-align: center;
+  animation: confirm-rise 180ms ease-out;
+}
+
+.settle-busy-card strong {
+  font-size: 1.08rem;
+}
+
+.settle-busy-card span:last-child {
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 .dispatch-active .dispatch-step-current .dispatch-step-mark {
   background: color-mix(in srgb, var(--dispatch-accent) 18%, var(--bg-deep));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dispatch-accent) 14%, transparent);

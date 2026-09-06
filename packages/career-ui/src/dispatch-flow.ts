@@ -441,6 +441,7 @@ export function dispatchStepStatusLine(input: {
   watchOnGround?: boolean | null;
   watchEnginesRunning?: boolean | null;
   watchSawAirborne?: boolean;
+  watchSettling?: boolean;
   watchSettleBlockedReason?: string | null;
 }): string {
   const { step, mission } = input;
@@ -552,6 +553,9 @@ export function dispatchStepStatusLine(input: {
       }
       if (input.watchSettleBlockedReason) {
         return `Landed — settle blocked: ${input.watchSettleBlockedReason}`;
+      }
+      if (input.watchSettling) {
+        return 'Settling flight — saving payout and flight log…';
       }
       if (input.watchOnGround === true) {
         if (!input.watchRunning) {

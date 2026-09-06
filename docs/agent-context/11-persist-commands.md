@@ -103,5 +103,6 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 ## Como validar a fatia 1–2
 
 - Settle live: overlay Settling → debrief; save ainda consistente no reload (missão completed, wallet, dest stock, tail no dest).
+- **UI (2026-09-05):** overlay `Settling…` arma no brake/engines-off/`lastEvent=settle`; server **250ms** com `settling=true` antes do persist (poll consegue pintar); debrief imediato; toast só fallback.
 - Log/tempo: `saveEconomy` no settle **sem** `DELETE FROM airports` (watch-debug ou timer no store).
 - Teste unitário: segundo `SettleFlight` no mesmo `missionId` não duplica payout.

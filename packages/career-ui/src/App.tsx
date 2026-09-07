@@ -110,6 +110,7 @@ import {
   type BaseDispatchTourReturnMode,
   type ActiveTourView,
   type BaseDispatcherSnapshot,
+  describeTourFerry,
   type CompanyCrewSnapshot,
   type OfflineFeeSummary,
   type EconomyCatchUpStatus,
@@ -3571,9 +3572,10 @@ export function App() {
   >(null);
   const [dispatchTourAircraftId, setDispatchTourAircraftId] = useState('');
   const [dispatchTourOrigin, setDispatchTourOrigin] = useState('');
-  const [dispatchTourLegs, setDispatchTourLegs] = useState<2 | 3>(2);
+  const [dispatchTourLegs, setDispatchTourLegs] = useState<2 | 3 | 4>(2);
   const [dispatchTourMinNm, setDispatchTourMinNm] = useState('');
   const [dispatchTourMaxNm, setDispatchTourMaxNm] = useState('');
+  const [dispatchTourMaxFerryNm, setDispatchTourMaxFerryNm] = useState('200');
   const [dispatchTourReturnMode, setDispatchTourReturnMode] =
     useState<BaseDispatchTourReturnMode>('none');
   const [splitHoldId, setSplitHoldId] = useState<string | null>(null);
@@ -3725,6 +3727,34 @@ export function App() {
       cancelled = true;
     };
   }, [terminalSection, airportIcao]);
+
+  /** Keep Accept/resume gates alive — raw /api/state tour has no view fields. */
+  useEffect(() => {
+    if (terminalSection !== 'fbo' || !airportIcao) return;
+    if (!activeTour || activeTour.status !== 'active') return;
+    if (activeTour.resumeState != null || activeTour.canAcceptNextLeg != null) {
+      return;
+    }
+    let cancelled = false;
+    void postBaseDispatchTours({ action: 'status' })
+      .then((tours) => {
+        if (cancelled) return;
+        setActiveTour(tours.activeTour ?? null);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    terminalSection,
+    airportIcao,
+    activeTour?.id,
+    activeTour?.status,
+    activeTour?.resumeState,
+    activeTour?.canAcceptNextLeg,
+  ]);
 
   useEffect(() => {
     if (!BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush') {
@@ -3918,10 +3948,24 @@ export function App() {
     if (state.companyCredit) setCompanyCredit(state.companyCredit);
     if (state.playerFbos) {
       setPlayerFbos(state.playerFbos);
-      if (state.playerFbos.activeTour) {
-        setActiveTour(state.playerFbos.activeTour);
-      } else if (state.playerFbos.activeTour === null) {
+      // Raw persist snapshot has no canAcceptNextLeg / resumeState. Never
+      // overwrite a rich ActiveTourView with it — that made Accept flicker off
+      // on every /api/state poll after Base Refresh.
+      const snapTour = state.playerFbos.activeTour;
+      if (!snapTour || snapTour.status !== 'active') {
         setActiveTour(null);
+      } else {
+        setActiveTour((prev) => {
+          if (
+            prev &&
+            prev.id === snapTour.id &&
+            prev.status === 'active' &&
+            (prev.resumeState != null || prev.canAcceptNextLeg != null)
+          ) {
+            return prev;
+          }
+          return snapTour as ActiveTourView;
+        });
       }
     }
     if (state.companyCrew) setCompanyCrew(state.companyCrew);
@@ -5276,6 +5320,31 @@ export function App() {
       ),
     [fleet, activeMission?.aircraftId],
   );
+  /** Active Tour context while a tour leg is the current Dispatch flight. */
+  const activeTourOnDispatch = useMemo(() => {
+    if (!activeTour || activeTour.status !== 'active') return null;
+    const missionId = activeMission?.id;
+    const flyingLeg =
+      (missionId
+        ? activeTour.legs.find((l) => l.missionId === missionId)
+        : undefined) ??
+      activeTour.legs.find((l) => l.status === 'active') ??
+      null;
+    if (!flyingLeg) return null;
+    const nextAfter = activeTour.legs.find(
+      (l) =>
+        l.index > flyingLeg.index &&
+        (l.status === 'planned' || l.status === 'lost'),
+    );
+    return {
+      legIndex: flyingLeg.index,
+      legCount: activeTour.legs.length,
+      nextOrigin: nextAfter?.originIcao ?? null,
+      nextDest: nextAfter?.destIcao ?? null,
+      nextFerryNm: nextAfter?.ferryNm ?? 0,
+      hubIcao: activeTour.hubIcao,
+    };
+  }, [activeTour, activeMission?.id]);
   const playerDispatchMission = useMemo(
     () => findPlayerDispatchMission(missions),
     [missions],
@@ -6963,6 +7032,13 @@ export function App() {
         maxNmRaw && Number.isFinite(Number(maxNmRaw)) && Number(maxNmRaw) > 0
           ? Number(maxNmRaw)
           : null;
+      const maxFerryRaw = dispatchTourMaxFerryNm.trim();
+      const maxFerryNm =
+        maxFerryRaw &&
+        Number.isFinite(Number(maxFerryRaw)) &&
+        Number(maxFerryRaw) > 0
+          ? Number(maxFerryRaw)
+          : 200;
       const result = await postBaseDispatchTours({
         action: 'list',
         hubIcao: hub,
@@ -6971,6 +7047,7 @@ export function App() {
         legs: dispatchTourLegs,
         minNm,
         maxNm,
+        maxFerryNm,
         returnMode: dispatchTourReturnMode,
       });
       setDispatchTours(result.tours ?? []);
@@ -6983,9 +7060,22 @@ export function App() {
       setSelectedDispatchScoutId(null);
       if ((result.tours ?? []).length === 0) {
         setToastKind('fail');
-        setToast(
-          'No 2–3 leg chains near that origin — try Min nm 40, Any parked, or Scan single freights first.',
-        );
+        const base = hub;
+        if (dispatchTourReturnMode === 'base') {
+          setToast(
+            `No tours ending at Base ${base} — need a last cargo leg into ${base} (not a ferry home). Try Any end, more Legs, or Max ferry.`,
+          );
+        } else if (dispatchTourReturnMode === 'origin') {
+          const origin =
+            dispatchTourOrigin.trim().toUpperCase() || 'origin';
+          setToast(
+            `No tours ending at ${origin} — need a last cargo leg home. Try Any end or raise Max ferry.`,
+          );
+        } else {
+          setToast(
+            'No 2–4 leg chains near that origin — try Min nm 40, Any parked, or Scan single freights first.',
+          );
+        }
       }
     } catch (err) {
       setToastKind('fail');
@@ -7279,6 +7369,51 @@ export function App() {
     } finally {
       setDispatchTourLoading(false);
     }
+  }
+
+  /**
+   * Sidebar Resume tour click:
+   * - Manifest open → Manifest
+   * - Flight already accepted → Flight plan (Dispatch)
+   * - After cancel Manifest/flight → Base (Accept / Drop)
+   */
+  function openActiveTourResume() {
+    if (!activeTour || activeTour.status !== 'active') return;
+
+    if (staging) {
+      closeAirport();
+      goToTab('staging');
+      return;
+    }
+
+    if (activeMission) {
+      closeAirport();
+      goToTab('staging');
+      return;
+    }
+
+    const pending = pendingActiveTourRef.current;
+    if (pending) {
+      const nextLeg =
+        activeTour.legs.find((l) => l.index === pending.legIndex) ??
+        activeTour.legs.find((l) => l.index === activeTour.nextLegIndex) ??
+        activeTour.legs.find(
+          (l) => l.status === 'planned' || l.status === 'lost',
+        ) ??
+        null;
+      if (nextLeg) {
+        enterStagingForTourLeg(
+          marketLotFromTourLeg(nextLeg),
+          pending.aircraftId || activeTour.aircraftId,
+        );
+        return;
+      }
+    }
+
+    const hub =
+      activeTour.hubIcao.trim().toUpperCase() ||
+      homeHubIcao.trim().toUpperCase();
+    if (hub) void openAirport(hub, { section: 'fbo' });
   }
 
   async function onHireBaseDispatcher(fboId: string, candidateId: string) {
@@ -7992,7 +8127,6 @@ export function App() {
 
   function exitStaging() {
     if (busy) return;
-    const hadPendingTour = pendingActiveTourRef.current != null;
     setPendingActiveTour(null);
     setStagingFerryOpen(false);
     if (staging?.replaceManifest) {
@@ -8007,16 +8141,7 @@ export function App() {
       clearPersistedStagingDraft(activeCareerProfile.id);
     }
     setStaging(null);
-    if (hadPendingTour) {
-      void postBaseDispatchTours({ action: 'drop-unbound' })
-        .then((result) => {
-          setActiveTour(result.activeTour ?? null);
-          if (result.playerFbos) setPlayerFbos(result.playerFbos);
-        })
-        .catch(() => {
-          /* keep desk state; status refresh heals */
-        });
-    }
+    // Keep Active Tour after Discard Manifest — Resume card → Base until Drop.
     if (airportReturn) {
       void returnToAirport();
       return;
@@ -8425,8 +8550,7 @@ export function App() {
             }
           }
         } catch (err) {
-          setToastKind('fail');
-          setToast(err instanceof Error ? err.message : String(err));
+          // `run()` already paints `error` — do not also toast the same string.
           throw err;
         }
       },
@@ -8704,12 +8828,32 @@ export function App() {
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
       setWallet(result.walletUsd);
-      setToastKind(result.warning ? 'warn' : 'ok');
-      setToast(
-        result.returnedToMarket
-          ? `Cancelled · ${formatTonnes(result.releasedKg)} released to market`
-          : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
-      );
+      if (result.activeTour !== undefined) {
+        setActiveTour(result.activeTour ?? null);
+      }
+      const tourHint =
+        result.activeTour?.status === 'active'
+          ? result.activeTour.resumeHint
+          : null;
+      if (tourHint) {
+        setToastKind(
+          result.activeTour?.resumeState === 'stranded' || result.warning
+            ? 'warn'
+            : 'ok',
+        );
+        setToast(
+          result.returnedToMarket
+            ? `Cancelled · ${formatTonnes(result.releasedKg)} released · ${tourHint}`
+            : `Cancelled · ${tourHint}`,
+        );
+      } else {
+        setToastKind(result.warning ? 'warn' : 'ok');
+        setToast(
+          result.returnedToMarket
+            ? `Cancelled · ${formatTonnes(result.releasedKg)} released to market`
+            : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
+        );
+      }
       goToTab('staging');
     }, { sync: { market: true } });
   }
@@ -10176,7 +10320,16 @@ export function App() {
             label="Active flight"
             originIcao={activeMission.originIcao}
             destIcao={activeMission.destIcao}
-            detail={activeMission.status.replace(/_/g, ' ')}
+            detail={
+              activeTourOnDispatch
+                ? `Tour L${activeTourOnDispatch.legIndex}/${activeTourOnDispatch.legCount} · ${activeMission.status.replace(/_/g, ' ')}${
+                    activeTourOnDispatch.nextOrigin &&
+                    activeTourOnDispatch.nextDest
+                      ? ` · next ${activeTourOnDispatch.nextOrigin}→${activeTourOnDispatch.nextDest}`
+                      : ''
+                  }`
+                : activeMission.status.replace(/_/g, ' ')
+            }
             busy={busy}
             onOpen={() => selectTab('staging')}
           />
@@ -10185,7 +10338,15 @@ export function App() {
           activeTour.nextLegIndex != null ? (
           <SidebarFlightStrip
             kind="draft"
-            label="Active tour"
+            label={
+              activeTour.resumeState === 'stranded'
+                ? 'Tour stranded'
+                : staging || pendingActiveTour
+                  ? 'Resume tour'
+                  : activeTour.resumeState === 'ready'
+                    ? 'Resume tour'
+                    : 'Active tour'
+            }
             originIcao={
               activeTour.legs.find(
                 (l) => l.index === activeTour.nextLegIndex,
@@ -10196,14 +10357,17 @@ export function App() {
                 (l) => l.index === activeTour.nextLegIndex,
               )?.destIcao ?? activeTour.routeLabel
             }
-            detail={`L${activeTour.nextLegIndex}/${activeTour.legs.length} · Continue → Base`}
+            detail={
+              activeTour.resumeState === 'stranded'
+                ? `L${activeTour.nextLegIndex}/${activeTour.legs.length} · Drop → Base`
+                : staging || pendingActiveTour
+                  ? `L${activeTour.nextLegIndex}/${activeTour.legs.length} · Resume → Manifest`
+                  : activeMission
+                    ? `L${activeTour.nextLegIndex}/${activeTour.legs.length} · Resume → Flight plan`
+                    : `L${activeTour.nextLegIndex}/${activeTour.legs.length} · Resume → Base`
+            }
             busy={busy}
-            onOpen={() => {
-              const hub =
-                activeTour.hubIcao.trim().toUpperCase() ||
-                homeHubIcao.trim().toUpperCase();
-              if (hub) void openAirport(hub, { section: 'fbo' });
-            }}
+            onOpen={() => openActiveTourResume()}
           />
         ) : activeBushTrip ? (
           <SidebarFlightStrip
@@ -10272,7 +10436,7 @@ export function App() {
 
       <div className="main-column">
         {((error && !isNeedsProfileMessage(error)) ||
-          toast ||
+          (toast && toast !== error) ||
           offlineFeeBanner) ? (
           <div className="app-toast-stack">
             {error && !isNeedsProfileMessage(error) ? (
@@ -10288,7 +10452,7 @@ export function App() {
                 </button>
               </p>
             ) : null}
-            {toast ? (
+            {toast && toast !== error ? (
               <p
                 className={`banner ${toastKind === 'ok' ? 'ok' : toastKind}`}
                 role="status"
@@ -10948,9 +11112,14 @@ export function App() {
                                             Tour
                                           </h4>
                                           <p className="muted crew-section-lede">
-                                            {activeTour.routeLabel}
+                                            {activeTour.legs
+                                              .map(
+                                                (l) =>
+                                                  `${l.originIcao}→${l.destIcao}`,
+                                              )
+                                              .join(' · ')}
                                             {activeTour.aircraftLocationIcao
-                                              ? ` · ${activeTour.aircraftLocationIcao}`
+                                              ? ` · acf ${activeTour.aircraftLocationIcao}`
                                               : ''}
                                           </p>
                                         </div>
@@ -10977,6 +11146,39 @@ export function App() {
                                           </button>
                                         </div>
                                       </div>
+                                      {activeTour.resumeHint &&
+                                      activeTour.resumeState !==
+                                        'in_progress' ? (
+                                        <p
+                                          className={
+                                            activeTour.resumeState ===
+                                            'stranded'
+                                              ? 'banner warn base-tour-resume-banner'
+                                              : activeTour.resumeState ===
+                                                  'ready'
+                                                ? 'banner ok base-tour-resume-banner'
+                                                : 'banner base-tour-resume-banner'
+                                          }
+                                          role="status"
+                                        >
+                                          <span>{activeTour.resumeHint}</span>
+                                          {activeTour.resumeState ===
+                                          'stranded' ? (
+                                            <button
+                                              type="button"
+                                              className="linkish"
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                              onClick={() =>
+                                                void onDropActiveTour()
+                                              }
+                                            >
+                                              Drop tour
+                                            </button>
+                                          ) : null}
+                                        </p>
+                                      ) : null}
                                       <div className="table-wrap">
                                         <table className="data base-active-tour-table">
                                           <thead>
@@ -10989,7 +11191,7 @@ export function App() {
                                             </tr>
                                           </thead>
                                           <tbody>
-                                            {activeTour.legs.map((leg) => {
+                                            {activeTour.legs.map((leg, i) => {
                                               const isNext =
                                                 activeTour.nextLegIndex ===
                                                 leg.index;
@@ -10997,6 +11199,12 @@ export function App() {
                                                 Boolean(
                                                   activeTour.canAcceptNextLeg,
                                                 ) && isNext;
+                                              const prevDest =
+                                                i > 0
+                                                  ? activeTour.legs[
+                                                      i - 1
+                                                    ]!.destIcao
+                                                  : null;
                                               return (
                                                 <tr
                                                   key={`${activeTour.id}-${leg.index}`}
@@ -11008,17 +11216,23 @@ export function App() {
                                                 >
                                                   <td>L{leg.index}</td>
                                                   <td>
-                                                    {leg.originIcao}→
-                                                    {leg.destIcao}
+                                                    <span className="route">
+                                                      {leg.originIcao}→
+                                                      {leg.destIcao}
+                                                    </span>
                                                     {leg.ferryNm > 0.5 ? (
-                                                      <small className="muted">
-                                                        {' '}
-                                                        ·{' '}
+                                                      <span className="base-dispatch-ferry-tag">
+                                                        Ferry{' '}
                                                         {Math.round(
                                                           leg.ferryNm,
                                                         )}{' '}
-                                                        nm ferry
-                                                      </small>
+                                                        nm
+                                                        {prevDest &&
+                                                        prevDest !==
+                                                          leg.originIcao
+                                                          ? ` · ${prevDest}→${leg.originIcao}`
+                                                          : ''}
+                                                      </span>
                                                     ) : null}
                                                   </td>
                                                   <td>
@@ -11133,19 +11347,19 @@ export function App() {
                                             <span>Legs</span>
                                             <select
                                               value={dispatchTourLegs}
-                                              onChange={(e) =>
+                                              onChange={(e) => {
+                                                const n = Number(e.target.value);
                                                 setDispatchTourLegs(
-                                                  Number(e.target.value) === 3
-                                                    ? 3
-                                                    : 2,
-                                                )
-                                              }
+                                                  n === 4 ? 4 : n === 3 ? 3 : 2,
+                                                );
+                                              }}
                                               disabled={
                                                 busy || dispatchDeskBusy
                                               }
                                             >
                                               <option value={2}>2</option>
                                               <option value={3}>3</option>
+                                              <option value={4}>4</option>
                                             </select>
                                           </label>
                                           <label>
@@ -11196,6 +11410,24 @@ export function App() {
                                               value={dispatchTourMaxNm}
                                               onChange={(e) =>
                                                 setDispatchTourMaxNm(
+                                                  e.target.value,
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            <span>Max ferry</span>
+                                            <input
+                                              type="number"
+                                              min={40}
+                                              max={800}
+                                              step={20}
+                                              value={dispatchTourMaxFerryNm}
+                                              onChange={(e) =>
+                                                setDispatchTourMaxFerryNm(
                                                   e.target.value,
                                                 )
                                               }
@@ -11386,15 +11618,30 @@ export function App() {
                                                     <span className="route">
                                                       {tour.routeLabel}
                                                     </span>
-                                                    {tour.totalFerryNm > 0.5 ? (
-                                                      <span className="base-dispatch-ferry-tag">
-                                                        Ferry{' '}
-                                                        {Math.round(
-                                                          tour.totalFerryNm,
-                                                        )}{' '}
-                                                        nm
-                                                      </span>
-                                                    ) : null}
+                                                    {(() => {
+                                                      const ferry = describeTourFerry(
+                                                        tour.legs,
+                                                        tour.aircraftLocationIcao,
+                                                      );
+                                                      if (
+                                                        !ferry &&
+                                                        !(tour.totalFerryNm > 0.5)
+                                                      ) {
+                                                        return null;
+                                                      }
+                                                      return (
+                                                        <span
+                                                          className="base-dispatch-ferry-tag"
+                                                          title={
+                                                            ferry?.detail ??
+                                                            undefined
+                                                          }
+                                                        >
+                                                          {ferry?.label ??
+                                                            `Ferry · ${Math.round(tour.totalFerryNm)} nm`}
+                                                        </span>
+                                                      );
+                                                    })()}
                                                     {filterMatch ? (
                                                       <span className="base-dispatch-match-tag">
                                                         {dispatchTourReturnMode ===
@@ -14834,6 +15081,35 @@ export function App() {
               </div>
             </>
           ) : activeMission ? (
+            <>
+              {activeTourOnDispatch ? (
+                <p className="banner ok base-tour-dispatch-banner" role="status">
+                  <span>
+                    Tour L{activeTourOnDispatch.legIndex}/
+                    {activeTourOnDispatch.legCount}
+                    {activeTourOnDispatch.nextOrigin &&
+                    activeTourOnDispatch.nextDest
+                      ? ` · next ${activeTourOnDispatch.nextOrigin}→${activeTourOnDispatch.nextDest}`
+                      : ' · last leg'}
+                    {activeTourOnDispatch.nextFerryNm > 0.5
+                      ? ` · ferry ${Math.round(activeTourOnDispatch.nextFerryNm)} nm`
+                      : ''}
+                  </span>
+                  <button
+                    type="button"
+                    className="linkish"
+                    disabled={busy}
+                    onClick={() => {
+                      const hub =
+                        activeTourOnDispatch.hubIcao.trim().toUpperCase() ||
+                        homeHubIcao.trim().toUpperCase();
+                      if (hub) void openAirport(hub, { section: 'fbo' });
+                    }}
+                  >
+                    Base
+                  </button>
+                </p>
+              ) : null}
             <DispatchActivePanel
               mission={activeMission}
               step={dispatchStep}
@@ -14904,22 +15180,83 @@ export function App() {
               }
               onRefreshOfpBriefing={onRefreshOfpBriefing}
             />
+            </>
           ) : (
             <div className="panel-head">
               <div>
                 <h2>Dispatch</h2>
-                <p className="muted">
-                  No personal flight in progress. Accept a freight and Dispatch
-                  to start your OFP here.
-                </p>
+                {activeTour &&
+                activeTour.status === 'active' &&
+                activeTour.resumeState !== 'in_progress' ? (
+                  <p
+                    className={
+                      activeTour.resumeState === 'stranded'
+                        ? 'banner warn base-tour-dispatch-banner'
+                        : 'banner ok base-tour-dispatch-banner'
+                    }
+                    role="status"
+                  >
+                    <span>
+                      {activeTour.resumeHint ??
+                        `Tour L${activeTour.nextLegIndex ?? '?'}/${activeTour.legs.length} still active`}
+                    </span>
+                    <span className="base-tour-resume-actions">
+                      <button
+                        type="button"
+                        className="linkish"
+                        disabled={busy}
+                        onClick={() => openActiveTourResume()}
+                      >
+                        {staging || pendingActiveTour
+                          ? 'Manifest'
+                          : activeMission
+                            ? 'Flight plan'
+                            : 'Base'}
+                      </button>
+                      {activeTour.resumeState === 'stranded' ? (
+                        <button
+                          type="button"
+                          className="linkish"
+                          disabled={busy || dispatchDeskBusy}
+                          onClick={() => void onDropActiveTour()}
+                        >
+                          Drop
+                        </button>
+                      ) : null}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="muted">
+                    No personal flight in progress. Accept a freight and Dispatch
+                    to start your OFP here.
+                  </p>
+                )}
               </div>
               <button
                 type="button"
                 className="action"
                 disabled={busy}
-                onClick={() => selectTab('market')}
+                onClick={() => {
+                  if (
+                    activeTour &&
+                    activeTour.status === 'active' &&
+                    activeTour.resumeState !== 'in_progress'
+                  ) {
+                    openActiveTourResume();
+                    return;
+                  }
+                  selectTab('market');
+                }}
               >
-                Open Freights
+                {activeTour &&
+                activeTour.status === 'active' &&
+                activeTour.resumeState !== 'in_progress'
+                  ? staging || pendingActiveTour
+                    ? 'Open Manifest'
+                    : activeMission
+                      ? 'Open Flight plan'
+                      : 'Open Base'
+                  : 'Open Freights'}
               </button>
             </div>
           )}

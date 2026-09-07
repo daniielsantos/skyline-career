@@ -4236,6 +4236,7 @@ export function createCareerApiServer(port = 8787) {
           legs?: number;
           minNm?: number;
           maxNm?: number | null;
+          maxFerryNm?: number | null;
           minKg?: number;
           returnMode?: 'none' | 'origin' | 'base';
           excludeLastMile?: boolean;
@@ -4275,6 +4276,8 @@ export function createCareerApiServer(port = 8787) {
             }
             const maxNmRaw =
               body.maxNm == null ? null : Number(body.maxNm);
+            const maxFerryNmRaw =
+              body.maxFerryNm == null ? null : Number(body.maxFerryNm);
             const policy = resolveBaseDispatchScoutPolicy(missions);
             syncActiveTour(missions, world);
             send(res, 200, {
@@ -4288,6 +4291,12 @@ export function createCareerApiServer(port = 8787) {
                   maxNmRaw != null && Number.isFinite(maxNmRaw) && maxNmRaw > 0
                     ? maxNmRaw
                     : null,
+                maxFerryNm:
+                  maxFerryNmRaw != null &&
+                  Number.isFinite(maxFerryNmRaw) &&
+                  maxFerryNmRaw > 0
+                    ? maxFerryNmRaw
+                    : undefined,
                 minKg: body.minKg != null ? Number(body.minKg) : undefined,
                 returnMode: body.returnMode,
                 excludeLastMile: body.excludeLastMile,
@@ -6990,6 +6999,7 @@ export function createCareerApiServer(port = 8787) {
                 ? Math.max(0, reservedBefore - reservedAfter)
                 : 0;
             const returnedToMarket = releasedKg > 0 && anyReturned;
+            syncActiveTour(missions, world);
             return {
               kind: 'ok' as const,
               cancelled: executed.mission,
@@ -6997,6 +7007,7 @@ export function createCareerApiServer(port = 8787) {
               releasedKg,
               returnedToMarket,
               foundBefore,
+              activeTour: activeTourView(missions, world),
             };
           }, { commandSliceMissionId: body.missionId, housekeeping: false });
           if (result.kind === 'missing') {
@@ -7012,6 +7023,7 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: result.walletUsd,
             releasedKg: result.releasedKg,
             returnedToMarket: result.returnedToMarket,
+            activeTour: result.activeTour ?? null,
             warning:
               result.foundBefore > 0
                 ? result.returnedToMarket

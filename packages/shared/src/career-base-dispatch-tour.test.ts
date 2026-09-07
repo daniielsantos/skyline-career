@@ -18,7 +18,10 @@ import {
   dropPreparedActiveTourIfUnbound,
   listBaseDispatchTours,
   prepareActiveTour,
+  tourPassesQualityGate,
+  describeTourFerry,
 } from './career-base-dispatch-tour.js';
+import { cancelMission } from './career-mission.js';
 import { buyFboTier1 } from './career-fbo.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
@@ -348,6 +351,78 @@ describe('base dispatch tours', () => {
     );
   });
 
+  it('prefer return returns empty when no tour ends at target', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-return-empty' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBSP', {
+      pilotName: 'TourReturnEmpty',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBSP');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBSP';
+
+    primeLot(world, {
+      id: 're_out',
+      originIcao: 'SBSP',
+      destIcao: 'SBCT',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'outbound',
+    });
+    primeLot(world, {
+      id: 're_away',
+      originIcao: 'SBCT',
+      destIcao: 'SBFL',
+      quantityKg: 400,
+      payUsd: 8_000,
+      reason: 'away only',
+    });
+
+    const open = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBSP',
+      aircraftId: aircraft.id,
+      originIcao: 'SBSP',
+      legs: 2,
+      minNm: 40,
+      returnMode: 'none',
+    });
+    assert.ok(open.length >= 1);
+
+    const home = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBSP',
+      aircraftId: aircraft.id,
+      originIcao: 'SBSP',
+      legs: 2,
+      minNm: 40,
+      returnMode: 'base',
+    });
+    assert.equal(home.length, 0, 'no open-end fallback when End at Base');
+  });
+
+  it('describeTourFerry short label + leg detail', () => {
+    assert.deepEqual(
+      describeTourFerry(
+        [
+          {
+            originIcao: 'SBFL',
+            destIcao: 'SBCT',
+            ferryNm: 0,
+          },
+          {
+            originIcao: 'SBKP',
+            destIcao: 'SBCT',
+            ferryNm: 188,
+          },
+        ],
+        'SBFL',
+      ),
+      {
+        label: 'Ferry · 188 nm',
+        detail: 'L2 SBCT→SBKP 188 nm',
+      },
+    );
+  });
+
   it('persists Active Tour on L1 and accepts L2 after settle + reposition', () => {
     const world = createSeedEconomyWorld({ seed: 'dispatch-tour-active' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
@@ -424,6 +499,144 @@ describe('base dispatch tours', () => {
 
     dropActiveTour(state);
     assert.equal(activeTourView(state, world), null);
+  });
+
+  it('cancel L1 returns tour to resume-ready (orphan recovery)', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-orphan' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'TourOrphan',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    primeLot(world, {
+      id: 'orp_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'orphan L1',
+    });
+    primeLot(world, {
+      id: 'orp_l2',
+      originIcao: 'SBGL',
+      destIcao: 'SBSP',
+      quantityKg: 350,
+      payUsd: 4_200,
+      reason: 'orphan L2',
+    });
+
+    const tours = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      originIcao: 'SBGR',
+      legs: 2,
+      minNm: 40,
+    });
+    const tour = tours.find(
+      (t) =>
+        t.legs[0]?.lotId === 'orp_l1' && t.legs[1]?.lotId === 'orp_l2',
+    );
+    assert.ok(tour);
+
+    const confirmed = confirmBaseDispatchTour(state, world, {
+      aircraftId: aircraft.id,
+      firstLotId: tour!.legs[0]!.lotId,
+      hubIcao: 'SBGR',
+      tourLegs: tour!.legs,
+      routeLabel: tour!.routeLabel,
+    });
+    const mission = state.missions.find((m) => m.id === confirmed.mission.id)!;
+    cancelMission(world, mission, { fleet: state });
+    const idx = state.missions.findIndex((m) => m.id === mission.id);
+    state.missions[idx] = { ...mission, status: 'cancelled' };
+
+    const view = activeTourView(state, world);
+    assert.ok(view);
+    assert.equal(view!.status, 'active');
+    assert.equal(view!.legs[0]!.status, 'planned');
+    assert.equal(view!.resumeState, 'ready');
+    assert.equal(view!.canAcceptNextLeg, true);
+    assert.equal(view!.nextLegIndex, 1);
+    assert.match(view!.resumeHint ?? '', /Resume L1/);
+  });
+
+  it('settled non-tour mission does not mark a later leg done', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-false-done' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'TourFalseDone',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    primeLot(world, {
+      id: 'fd_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'false-done L1',
+    });
+    primeLot(world, {
+      id: 'fd_l2',
+      originIcao: 'SBGL',
+      destIcao: 'SBSP',
+      quantityKg: 350,
+      payUsd: 4_200,
+      reason: 'false-done L2',
+    });
+
+    const tours = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      originIcao: 'SBGR',
+      legs: 2,
+      minNm: 40,
+    });
+    const tour = tours.find(
+      (t) =>
+        t.legs[0]?.lotId === 'fd_l1' && t.legs[1]?.lotId === 'fd_l2',
+    );
+    assert.ok(tour);
+
+    confirmBaseDispatchTour(state, world, {
+      aircraftId: aircraft.id,
+      firstLotId: tour!.legs[0]!.lotId,
+      hubIcao: 'SBGR',
+      tourLegs: tour!.legs,
+      routeLabel: tour!.routeLabel,
+    });
+
+    // Orphan settled mission on L2's lot must not flip L2 to done.
+    const template = state.missions[0]!;
+    state.missions.push({
+      ...template,
+      id: 'settled_other_l2',
+      status: 'settled',
+      shipmentLotId: 'fd_l2',
+      lots: template.lots.map((line) => ({
+        ...line,
+        shipmentLotId: 'fd_l2',
+      })),
+      originIcao: 'SBGL',
+      destIcao: 'SBSP',
+    });
+
+    const fbos = state.playerFbos!;
+    const active = fbos.activeTour!;
+    active.legs[0]!.status = 'planned';
+    active.legs[0]!.missionId = undefined;
+    active.legs[1]!.status = 'planned';
+    active.legs[1]!.missionId = undefined;
+
+    const view = activeTourView(state, world);
+    assert.ok(view);
+    assert.equal(view!.legs[1]!.status, 'planned');
+    assert.notEqual(view!.legs[1]!.status, 'done');
   });
 
   it('prepareActiveTour persists itinerary; sync binds in-flight L1 without attach', () => {
@@ -751,5 +964,114 @@ describe('base dispatch tours', () => {
     assert.equal(l2.rebound, true);
     assert.equal(l2.mission.originIcao, 'SBGL');
     assert.equal(l2.mission.destIcao, 'SBSP');
+  });
+
+  it('tourPassesQualityGate rejects ferry-heavy / thin-net chains', () => {
+    assert.equal(
+      tourPassesQualityGate({
+        totalDistanceNm: 400,
+        totalFerryNm: 0,
+        totalNetUsd: 1_200,
+      }),
+      true,
+    );
+    assert.equal(
+      tourPassesQualityGate({
+        totalDistanceNm: 200,
+        totalFerryNm: 180,
+        totalNetUsd: 800,
+      }),
+      false,
+      'ferry > 85% of cargo nm',
+    );
+    assert.equal(
+      tourPassesQualityGate({
+        totalDistanceNm: 400,
+        totalFerryNm: 100,
+        totalNetUsd: 400,
+      }),
+      false,
+      'net per ferry nm < $6',
+    );
+    assert.equal(
+      tourPassesQualityGate({
+        totalDistanceNm: 400,
+        totalFerryNm: 80,
+        totalNetUsd: 600,
+      }),
+      true,
+    );
+    assert.equal(
+      tourPassesQualityGate({
+        totalDistanceNm: 300,
+        totalFerryNm: 40,
+        totalNetUsd: 0,
+      }),
+      false,
+      'non-positive net',
+    );
+  });
+
+  it('maxFerryNm filter caps inter-leg reposition', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-ferry-cap' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'TourFerryCap',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    // SBGR→SBSP (~45nm) then need a far second origin that only fits a high ferry budget.
+    primeLot(world, {
+      id: 'fc_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'ferry cap L1',
+    });
+    // SBKP is near SBSP; SBCT is farther — use a tight maxFerry so chains still exist at default.
+    primeLot(world, {
+      id: 'fc_l2_near',
+      originIcao: 'SBSP',
+      destIcao: 'SBKP',
+      quantityKg: 380,
+      payUsd: 4_800,
+      reason: 'ferry cap L2 near',
+    });
+    primeLot(world, {
+      id: 'fc_l2_far',
+      originIcao: 'SBRJ',
+      destIcao: 'SBGL',
+      quantityKg: 380,
+      payUsd: 9_000,
+      reason: 'ferry cap L2 far',
+    });
+
+    const tight = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      legs: 2,
+      returnMode: 'none',
+      maxFerryNm: 40,
+    });
+    for (const tour of tight) {
+      for (let i = 1; i < tour.legs.length; i++) {
+        assert.ok(
+          tour.legs[i]!.ferryNm <= 40.5,
+          `inter-leg ferry ${tour.legs[i]!.ferryNm} exceeds maxFerryNm 40`,
+        );
+      }
+    }
+
+    const open = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      legs: 2,
+      returnMode: 'none',
+      maxFerryNm: 200,
+    });
+    assert.ok(open.length >= tight.length);
   });
 });

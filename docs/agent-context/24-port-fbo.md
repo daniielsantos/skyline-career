@@ -1,6 +1,6 @@
 # Port FBO — chão, não ar
 
-Atualizado 2026-09-06. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + **fleet Market scout** (single-leg) + **tour Search** (2–3 Market legs) + **Active Tour** (Accept L2/L3, no multi-reserve).
+Atualizado 2026-09-07. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + **fleet Market scout** (single-leg) + **tour Search** (2–4 Market legs) + **Active Tour** (Accept L2+, no multi-reserve).
 Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md), [`10-aircraft-pool.md`](./10-aircraft-pool.md) (lease-out).
 
 ## Fantasia (uma frase)
@@ -184,10 +184,11 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 
 ### Base Dispatcher tour Search — shipped (multi-option table)
 
-- `career-base-dispatch-tour.ts`: chains **2–3 real Market lots** (region lens, ferry between legs ≤180 nm, soft return Base/origin). Cap **8** options. Requires hired Dispatcher (`policy.mode === 'fleet'`).
+- `career-base-dispatch-tour.ts`: chains **2–4 real Market lots** (region lens, ferry between legs ≤**200 nm** default / UI **Max ferry** filter, soft return Base/origin). Cap **8** options. Requires hired Dispatcher (`policy.mode === 'fleet'`).
+- **Legs cap (2026-09-07):** Search UI + `BASE_DISPATCH_TOUR_LEGS_MAX` = **4** (was 3).
 - Filters (desk): aircraft, legs, origin ICAO, min/max nm, return prefer. UI button **Search** (busca no board — não soft-spawn).
 - **Empty Min nm** → tour floors (`BASE_DISPATCH_TOUR_MIN_NM`, light_jet **120**), **not** Scout’s 400 — otherwise BR-SE Citation chains almost never match.
-- **Region lens:** 1ª perna usa region do **Origin** (fallback Base); pernas seguintes sem lock de region (só ferry ≤180 nm) — evita matar cadeias SBSP(`BR-SE`)→SBCT(`BR-S`).
+- **Region lens:** 1ª perna usa region do **Origin** (fallback Base); pernas seguintes sem lock de region (só ferry ≤ Max ferry, default 200 nm, cap 800) — evita matar cadeias SBSP(`BR-SE`)→SBCT(`BR-S`).
 - Confirm → **leg 1 only** via `confirmBaseDispatchScout` / `executeAcceptLot` + **persist Active Tour** (`playerFbos.activeTour`) when `tourLegs` ≥ 2.
 - API `POST /api/base/dispatch-tours` (`list` | `confirm` | `status` | `accept-leg` | `drop`); UI Search + tour table + **Active Tour** panel.
 - **Active Tour (2026-09-06):** no hard-reserve of L2+. After L1 settle + aircraft at next origin → **Accept L2** (rebind same OD if lot gone). Sidebar “Active tour · Continue → Base”. Persist via `player_fbos_json` (same pitfall as dispatchers — keep on normalize/load).
@@ -196,9 +197,15 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - **Active Tour persist (2026-09-07):** Accept into Manifest calls `prepare` → writes `playerFbos.activeTour` immediately (legs `planned`). Refresh/rebuild no longer wipes the tour. Sync auto-binds L1 when a matching mission is in flight; Manifest cancel uses `drop-unbound`.
 - **prepare bug (2026-09-07):** API passava `tourLegs` mas `prepareActiveTour` espera `legs` → “Active Tour needs at least 2 legs” no Accept. Fix: `legs: body.tourLegs`. Route column mostra tag **Ferry N nm** quando `totalFerryNm > 0`.
 - **UI Base (2026-09-07):** cortou prosa/labels de tutorial — header só **Base** + tier/perks; Dispatcher card limpo; Freights sem lede; filters sem caixa “explicativa”.
+- **Tour quality + Dispatch UX (2026-09-07):** `tourPassesQualityGate` — net>0, ferry ≤85% cargo nm, net/ferry ≥ $6/nm; sort tie-break less ferry then net. Mid-flight: sidebar Active flight shows `Tour Lx/y · next OD`; Dispatch banner + Base link while flying a tour leg.
+- **Max ferry filter (2026-09-07):** Search default **200 nm** between legs (was 180); desk field **Max ferry** (40–800); first-leg reposition still allows 2× that value.
+- **Return / ferry tag (2026-09-07):** End at Base/origin sem fallback open-end. Tag curta `Ferry · 188 nm`; hover mostra `L2 SBCT→SBKP 188 nm`.
+- **Tour orphan pós-cancel (2026-09-07):** cancel synca Active Tour; `resumeState` ready/blocked/stranded + `resumeHint`. Toast, sidebar Resume/Drop, banner no Dispatch vazio e no painel Base.
+- **Accept flicker (2026-09-07):** `/api/state` `playerFbos.activeTour` é snapshot cru (sem `canAcceptNextLeg`) e sobrescrevia a view do Refresh → Accept sumia. Fix: não overwrite view rica; soft-match de missão só live (não settled) pra não marcar L2 `done` com L1 `planned`.
+- **Resume tour card (2026-09-07):** Discard Manifest **mantém** o Active Tour (Drop limpa). Clique no card: Manifest se staging; Flight plan se missão aceita; Base após cancel Manifest/flight.
 - **Off-origin Manifest (2026-09-07):** combo lists all parked fleet (`@ hub` / `ferry from`); Ferry → `FerryJourneyDialog` to lot origin; Accept blocked until airframe arrives.
 - **Route label:** inclui hop de ferry (`SBKP→SBCT→SBFL→SBCT`), não só dests de carga (`SBKP→SBCT→SBCT`) — alinha tabela/header com o mapa.
-- **Return filter:** “End at origin/Base” — last hop busca destinando ao target; se existir cadeia que volta, a tabela só mostra essas. Se não houver lot de volta no board (sem soft-spawn), cai no open-end.
+- **Return filter:** “End at origin/Base” — last **cargo** dest must equal target (não acrescenta ferry home). Sem cadeias que voltem → **lista vazia** + toast (sem fallback open-end).
 - **Perf (2026-09-06):** Search was O(lots × branching × econ) — now economics **once**/lot, index by origin, ferry only for nearby origins; Scan skips O(lots×flights) NPC claim lookups.
 - Map: selected tour draws **cargo legs solid** + **ferry dashed**; headline = cargo routeLabel + ferry nm (2 legs ≠ 2 map segments when reposition needed).
 - UI: Search/Scan loading states separated (Search no longer flips Scan to “Scanning…”).
@@ -208,6 +215,8 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - Soft-hold curto em L2+ (opcional; v1 é plan-only + Accept Ln).
 - Preferência “sai da Base ICAO” (mais apertado que region) vs corridor vizinho.
 - Ferry-first CTA quando suggestion/tour tem ferryNm &gt; 0 (link Ferry → origin).
+- Unificar Scan vs Search na UI (Tour default; Scan = single).
+- Clareza multi-Base (hire/scout por hub) quando 2ª Base existir.
 - Não reabrir company Hangar crew fly (`COMPANY_CREW_ENABLED = false`).
 
 ### Phase 3 — shipped

@@ -727,6 +727,12 @@ export type ActiveTourLeg = {
   missionId?: string;
 };
 
+export type ActiveTourResumeState =
+  | 'in_progress'
+  | 'ready'
+  | 'blocked'
+  | 'stranded';
+
 export type ActiveTourView = {
   id: string;
   tourTemplateId?: string;
@@ -745,6 +751,8 @@ export type ActiveTourView = {
   acceptBlockedReason?: string | null;
   nextLegLotAvailable?: boolean;
   nextLegNeedsRebind?: boolean;
+  resumeState?: ActiveTourResumeState;
+  resumeHint?: string | null;
 };
 
 export type PlayerFboSnapshot = {
@@ -2639,6 +2647,36 @@ export type BaseDispatchTour = {
   reason: string;
 };
 
+/** Browser-safe mirror of shared describeTourFerry. */
+export function describeTourFerry(
+  legs: Array<{ originIcao: string; destIcao: string; ferryNm: number }>,
+  fromIcao?: string | null,
+): { label: string; detail: string } | null {
+  const hops: string[] = [];
+  let total = 0;
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i]!;
+    if (!(leg.ferryNm > 0.5)) continue;
+    const prev =
+      i > 0
+        ? legs[i - 1]!.destIcao.trim().toUpperCase()
+        : (fromIcao ?? '').trim().toUpperCase() || null;
+    const origin = leg.originIcao.trim().toUpperCase();
+    const nm = Math.round(leg.ferryNm);
+    total += leg.ferryNm;
+    if (prev && prev !== origin) {
+      hops.push(`L${i + 1} ${prev}→${origin} ${nm} nm`);
+    } else {
+      hops.push(`L${i + 1} ${nm} nm`);
+    }
+  }
+  if (!hops.length) return null;
+  return {
+    label: `Ferry · ${Math.round(total)} nm`,
+    detail: hops.join(' · '),
+  };
+}
+
 export function postBaseDispatchTours(opts: {
   action?:
     | 'list'
@@ -2656,6 +2694,7 @@ export function postBaseDispatchTours(opts: {
   legs?: number;
   minNm?: number;
   maxNm?: number | null;
+  maxFerryNm?: number | null;
   minKg?: number;
   returnMode?: BaseDispatchTourReturnMode;
   excludeLastMile?: boolean;
@@ -3441,6 +3480,7 @@ export function postCancel(opts: { missionId: string }) {
     releasedKg: number;
     returnedToMarket: boolean;
     warning?: string | null;
+    activeTour?: ActiveTourView | null;
   }>('/api/cancel', {
     method: 'POST',
     body: JSON.stringify(opts),

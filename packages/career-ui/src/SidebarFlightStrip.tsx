@@ -31,7 +31,7 @@ export function SidebarFlightStrip(props: {
   busy: boolean;
   onOpen: () => void;
 }) {
-  const openLabel = `Open Dispatch — ${props.label}, ${props.originIcao} to ${props.destIcao}`;
+  const openLabel = `Open ${props.label}, ${props.originIcao} to ${props.destIcao}`;
 
   return (
     <button
@@ -40,7 +40,7 @@ export function SidebarFlightStrip(props: {
       disabled={props.busy}
       onClick={props.onOpen}
       aria-label={openLabel}
-      title="Open Dispatch"
+      title={openLabel}
     >
       <div className="sidebar-flight-strip-head">
         <span className="sidebar-flight-strip-badge">{props.label}</span>

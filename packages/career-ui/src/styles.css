@@ -11446,6 +11446,27 @@ span.dispatch-route-hub-dest {
   display: none;
 }
 
+.base-tour-dispatch-banner {
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.base-tour-dispatch-banner .linkish {
+  flex: none;
+  white-space: nowrap;
+}
+
+.base-tour-resume-banner {
+  align-items: center;
+  margin: 0 0 0.65rem;
+}
+
+.base-tour-resume-actions {
+  display: inline-flex;
+  gap: 0.65rem;
+  flex: none;
+}
+
 .base-active-tour {
   margin-bottom: 0.25rem;
 }
@@ -11554,16 +11575,17 @@ span.dispatch-route-hub-dest {
 .base-dispatch-ferry-tag {
   display: inline-block;
   margin-left: 0.35rem;
-  padding: 0.08rem 0.35rem;
+  padding: 0.06rem 0.3rem;
   border-radius: 3px;
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.65rem;
+  font-weight: 550;
   letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--accent) 85%, var(--ink));
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  background: transparent;
   vertical-align: middle;
   white-space: nowrap;
+  cursor: help;
 }
 
 .base-dispatcher-desk .empty {

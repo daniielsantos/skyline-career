@@ -47,11 +47,14 @@ import { assignAircraftToMission } from './career-fleet.js';
 /** Max tours returned to the desk table. */
 export const BASE_DISPATCH_TOUR_MAX = 8;
 
-/** Soft cap on legs (UI 2–3). */
-export const BASE_DISPATCH_TOUR_LEGS_MAX = 3;
+/** Soft cap on legs (UI 2–4). */
+export const BASE_DISPATCH_TOUR_LEGS_MAX = 4;
 
-/** Allow a short reposition between chained lots. */
-export const BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM = 180;
+/** Allow a short reposition between chained lots (Search default / UI floor). */
+export const BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM = 200;
+
+/** Hard ceiling for the Max ferry filter (keeps Search tractable). */
+export const BASE_DISPATCH_TOUR_CHAIN_FERRY_CAP_NM = 800;
 
 /**
  * Tour floors are softer than single-leg Scout — multi-leg chains need
@@ -369,6 +372,69 @@ function tourScore(
   return money(score);
 }
 
+function resolveTourMaxFerryNm(raw: number | undefined | null): number {
+  if (raw == null || !Number.isFinite(raw)) {
+    return BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM;
+  }
+  return Math.max(
+    40,
+    Math.min(BASE_DISPATCH_TOUR_CHAIN_FERRY_CAP_NM, Math.floor(raw)),
+  );
+}
+
+/**
+ * Drop tours where ferry dominates revenue flying or net can't cover reposition.
+ * Soft Search already ranks by ferry penalty — this is the hard floor.
+ */
+export function tourPassesQualityGate(tour: {
+  totalDistanceNm: number;
+  totalFerryNm: number;
+  totalNetUsd: number;
+}): boolean {
+  if (!(tour.totalNetUsd > 0)) return false;
+  if (!(tour.totalDistanceNm > 0)) return false;
+  const ferry = Math.max(0, tour.totalFerryNm);
+  if (ferry <= 0.5) return true;
+  // Ferry must not eat most of the flown cargo distance.
+  if (ferry > tour.totalDistanceNm * 0.85) return false;
+  // At least ~$6 net per ferry nm (below that, reposition eats the deal).
+  if (tour.totalNetUsd / ferry < 6) return false;
+  return true;
+}
+
+/**
+ * Search-table ferry chip: short label + tooltip detail of each reposition hop.
+ * Label e.g. "Ferry · 188 nm"; detail e.g. "L2 SBCT→SBKP · 188 nm".
+ */
+export function describeTourFerry(
+  legs: Array<{ originIcao: string; destIcao: string; ferryNm: number }>,
+  fromIcao?: string | null,
+): { label: string; detail: string } | null {
+  const hops: string[] = [];
+  let total = 0;
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i]!;
+    if (!(leg.ferryNm > 0.5)) continue;
+    const prev =
+      i > 0
+        ? legs[i - 1]!.destIcao.trim().toUpperCase()
+        : (fromIcao ?? '').trim().toUpperCase() || null;
+    const origin = leg.originIcao.trim().toUpperCase();
+    const nm = Math.round(leg.ferryNm);
+    total += leg.ferryNm;
+    if (prev && prev !== origin) {
+      hops.push(`L${i + 1} ${prev}→${origin} ${nm} nm`);
+    } else {
+      hops.push(`L${i + 1} ${nm} nm`);
+    }
+  }
+  if (!hops.length) return null;
+  return {
+    label: `Ferry · ${Math.round(total)} nm`,
+    detail: hops.join(' · '),
+  };
+}
+
 function formatTourRouteLabel(
   legs: Array<{ originIcao: string; destIcao: string }>,
 ): string {
@@ -463,6 +529,8 @@ export function listBaseDispatchTours(
     legs?: number;
     minNm?: number;
     maxNm?: number | null;
+    /** Max ferry nm between legs (default 200; first-leg reposition allows 2×). */
+    maxFerryNm?: number | null;
     minKg?: number;
     returnMode?: BaseDispatchTourReturnMode;
     max?: number;
@@ -491,6 +559,7 @@ export function listBaseDispatchTours(
   );
   const minKg = Math.max(0, opts.minKg ?? BASE_DISPATCH_SCOUT_MIN_KG);
   const returnMode = opts.returnMode ?? 'none';
+  const chainFerryMaxNm = resolveTourMaxFerryNm(opts.maxFerryNm);
 
   const fleet = (state.fleet ?? []).filter((a) => {
     if (a.status !== 'parked') return false;
@@ -538,7 +607,7 @@ export function listBaseDispatchTours(
     const byOrigin = indexCoresByOrigin(cores);
     const allOrigins = [...byOrigin.keys()];
 
-    const firstFerryMax = BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM * 2;
+    const firstFerryMax = chainFerryMaxNm * 2;
     const firstOrigins = firstLegRegion
       ? allOrigins.filter((icao) => regionByIcao.get(icao) === firstLegRegion)
       : allOrigins;
@@ -578,7 +647,7 @@ export function listBaseDispatchTours(
             world,
             node.atIcao,
             allOrigins,
-            BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM,
+            chainFerryMaxNm,
             distCache,
           );
           const contenders: EvalLeg[] = [];
@@ -589,7 +658,7 @@ export function listBaseDispatchTours(
                 world,
                 core,
                 node.atIcao,
-                BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM,
+                chainFerryMaxNm,
                 distCache,
               );
               if (ev) contenders.push(ev);
@@ -648,6 +717,7 @@ export function listBaseDispatchTours(
           returnMode,
           returnTarget,
         );
+        if (!tourPassesQualityGate(tour)) continue;
         if (seen.has(tour.id)) continue;
         seen.add(tour.id);
         tours.push(tour);
@@ -655,9 +725,14 @@ export function listBaseDispatchTours(
     }
   }
 
-  tours.sort((a, b) => b.score - a.score || b.totalNetUsd - a.totalNetUsd);
+  tours.sort(
+    (a, b) =>
+      b.score - a.score ||
+      a.totalFerryNm - b.totalFerryNm ||
+      b.totalNetUsd - a.totalNetUsd,
+  );
 
-  // Prefer return: if any tour actually ends at the target, only show those.
+  // Prefer return: only show tours that end at the target (no open-end fallback).
   if (returnMode !== 'none') {
     const wantOrigin = (opts.originIcao ?? '').trim().toUpperCase();
     const returning = tours.filter((t) => {
@@ -667,9 +742,7 @@ export function listBaseDispatchTours(
       const want = wantOrigin || t.legs[0]?.originIcao || '';
       return want.length > 0 && last === want;
     });
-    if (returning.length > 0) {
-      return returning.slice(0, maxTours);
-    }
+    return returning.slice(0, maxTours);
   }
 
   return tours.slice(0, maxTours);
@@ -677,7 +750,7 @@ export function listBaseDispatchTours(
 
 /**
  * Accept a tour → commit leg 1 only (same as Freights Accept).
- * When `tourLegs` has 2+ legs, persists Active Tour for Accept L2/L3.
+ * When `tourLegs` has 2+ legs, persists Active Tour for Accept L2+.
  */
 export function confirmBaseDispatchTour(
   state: CareerMissionsState,
@@ -798,10 +871,15 @@ function findMissionForLeg(
     const byId = state.missions.find((m) => m.id === leg.missionId);
     if (byId) return byId;
   }
+  // Soft-match only live missions. Settled/cancelled lots must not mark a
+  // later tour leg "done" (causes L2 done while L1 still planned after cancel).
   return state.missions.find(
     (m) =>
-      m.shipmentLotId === leg.lotId ||
-      m.lots.some((line) => line.shipmentLotId === leg.lotId),
+      (m.status === 'accepted' ||
+        m.status === 'dispatched' ||
+        m.status === 'in_flight') &&
+      (m.shipmentLotId === leg.lotId ||
+        m.lots.some((line) => line.shipmentLotId === leg.lotId)),
   );
 }
 
@@ -1042,17 +1120,20 @@ export function attachActiveTourFromMission(
 
 /**
  * Drop Active Tour only when nothing was ever bound to a mission
- * (Manifest cancel after prepare).
+ * (Manifest cancel after prepare). Planned/lost without missionId counts as unbound.
  */
 export function dropPreparedActiveTourIfUnbound(
   state: CareerMissionsState,
 ): boolean {
   const tour = getActiveTour(state);
   if (!tour || tour.status !== 'active') return false;
-  const unbound = tour.legs.every(
-    (leg) => leg.status === 'planned' && !leg.missionId,
+  const anyBound = tour.legs.some(
+    (leg) =>
+      Boolean(leg.missionId) ||
+      leg.status === 'active' ||
+      leg.status === 'done',
   );
-  if (!unbound) return false;
+  if (anyBound) return false;
   dropActiveTour(state);
   return true;
 }
@@ -1140,6 +1221,12 @@ export function rebindActiveTourLeg(
   return best ? { lotId: best.lotId, liftKg: best.liftKg } : null;
 }
 
+export type ActiveTourResumeState =
+  | 'in_progress'
+  | 'ready'
+  | 'blocked'
+  | 'stranded';
+
 export type ActiveTourView = ActiveTour & {
   aircraftLocationIcao?: string;
   nextLegIndex: number | null;
@@ -1147,6 +1234,10 @@ export type ActiveTourView = ActiveTour & {
   acceptBlockedReason: string | null;
   nextLegLotAvailable: boolean;
   nextLegNeedsRebind: boolean;
+  /** How the desk should present post-cancel / idle recovery. */
+  resumeState: ActiveTourResumeState;
+  /** Short player-facing line for toast / Dispatch empty banner. */
+  resumeHint: string | null;
 };
 
 export function activeTourView(
@@ -1174,11 +1265,15 @@ export function activeTourView(
   } else if (next) {
     nextLegIndex = next.index;
     // Prior legs must be done.
-    const priorOk = tour.legs
-      .filter((l) => l.index < next.index)
-      .every((l) => l.status === 'done');
+    const priors = tour.legs.filter((l) => l.index < next.index);
+    const priorOk = priors.every((l) => l.status === 'done');
     if (!priorOk) {
-      reason = 'Finish earlier tour legs first';
+      const lostPriors = priors.filter((l) => l.status === 'lost');
+      if (lostPriors.length > 0 && lostPriors.length === priors.filter((l) => l.status !== 'done').length) {
+        reason = `L${lostPriors[0]!.index} cancelled/lost — Drop tour or Search again`;
+      } else {
+        reason = 'Finish earlier tour legs first';
+      }
     } else if (!acf || acf.status !== 'parked') {
       reason = 'Parked tour aircraft required';
     } else if ((acf.locationIcao ?? '').trim().toUpperCase() !== next.originIcao) {
@@ -1202,6 +1297,35 @@ export function activeTourView(
     }
   }
 
+  let resumeState: ActiveTourResumeState;
+  let resumeHint: string | null = null;
+  if (activeLeg) {
+    resumeState = 'in_progress';
+    resumeHint = `Tour L${activeLeg.index}/${tour.legs.length} in progress`;
+  } else if (canAccept && nextLegIndex != null) {
+    resumeState = 'ready';
+    const leg = tour.legs.find((l) => l.index === nextLegIndex);
+    resumeHint = leg
+      ? `Tour still active — Resume L${nextLegIndex} ${leg.originIcao}→${leg.destIcao}`
+      : `Tour still active — Resume L${nextLegIndex}`;
+  } else if (
+    nextLegIndex != null &&
+    (next?.status === 'lost' || /Drop tour/i.test(reason ?? ''))
+  ) {
+    resumeState = 'stranded';
+    resumeHint =
+      reason ??
+      `Tour L${nextLegIndex} cannot continue — Drop tour or Search again`;
+  } else if (nextLegIndex != null) {
+    resumeState = 'blocked';
+    resumeHint = reason
+      ? `Tour L${nextLegIndex} waiting — ${reason}`
+      : `Tour L${nextLegIndex} waiting — open Base`;
+  } else {
+    resumeState = 'stranded';
+    resumeHint = 'Tour has no remaining legs — Drop tour';
+  }
+
   return {
     ...tour,
     aircraftLocationIcao: loc,
@@ -1210,6 +1334,8 @@ export function activeTourView(
     acceptBlockedReason: canAccept && needsRebind ? reason : canAccept ? null : reason,
     nextLegLotAvailable: lotAvailable,
     nextLegNeedsRebind: needsRebind,
+    resumeState,
+    resumeHint,
   };
 }
 

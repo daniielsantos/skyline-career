@@ -72,6 +72,7 @@ import {
   idleLotPayMult,
   laneDemandShock,
   isDomesticOd,
+  countryIdFromRegion,
   listViableMarketLots,
   isBushHub,
   isBushTripOnlyHub,
@@ -3308,6 +3309,15 @@ export function createCareerApiServer(port = 8787) {
           }
           return true;
         });
+        const countryByIcao = new Map(
+          world.airports.map((airport) => [
+            airport.icao.toUpperCase(),
+            countryIdFromRegion(airport.region),
+          ]),
+        );
+        const pilotCountryId = countryByIcao.get(
+          (missionsState.pilotIcao ?? '').trim().toUpperCase(),
+        );
         type MarketBoardRow = {
           id: string;
           originIcao: string;
@@ -3337,6 +3347,7 @@ export function createCareerApiServer(port = 8787) {
           originFromFocusNm?: number;
           idleEscalated: boolean;
           international: boolean;
+          originCountryId: string | undefined;
           pressure: unknown;
           npcClaim: unknown;
           estimatedLiftKg?: number | null;
@@ -3415,6 +3426,7 @@ export function createCareerApiServer(port = 8787) {
               : undefined,
             idleEscalated: Boolean(row.pressure?.idleEscalated),
             international: Boolean(row.pressure?.international),
+            originCountryId: countryByIcao.get(row.lot.originIcao.toUpperCase()),
             pressure: row.pressure
               ? {
                   originRegion: row.pressure.originRegion,
@@ -3580,6 +3592,7 @@ export function createCareerApiServer(port = 8787) {
             url.searchParams.get('access'),
           ),
           laneFilter: parseMarketBoardLaneFilter(url.searchParams.get('lane')),
+          pilotCountryId,
           crewFilter: parseMarketBoardCrewFilter(url.searchParams.get('crew')),
           // Sticky unlocked-first unless client sends access:desc.
           sorts: requestedSorts,
@@ -4280,8 +4293,8 @@ export function createCareerApiServer(port = 8787) {
               body.maxFerryNm == null ? null : Number(body.maxFerryNm);
             const policy = resolveBaseDispatchScoutPolicy(missions);
             syncActiveTour(missions, world);
-            send(res, 200, {
-              tours: listBaseDispatchTours(missions, world, {
+            const tours = withDevProgressionUnlock(req, missions, () =>
+              listBaseDispatchTours(missions, world, {
                 hubIcao,
                 aircraftId: body.aircraftId,
                 originIcao: body.originIcao,
@@ -4301,6 +4314,9 @@ export function createCareerApiServer(port = 8787) {
                 returnMode: body.returnMode,
                 excludeLastMile: body.excludeLastMile,
               }),
+            );
+            send(res, 200, {
+              tours,
               activeTour: activeTourView(missions, world),
               policy,
               dispatcher: baseDispatcherSnapshot(missions, world),
@@ -6044,13 +6060,17 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
-      // Temporary test aid — remove before release.
+      // Dev-only test aid.
       if (req.method === 'POST' && path === '/api/debug/credit-wallet') {
+        if (!requestDevMode(req)) {
+          send(res, 403, { error: 'Dev Mode is required' });
+          return;
+        }
         const body = (await readBody(req)) as { amountUsd?: number };
         const amountUsd =
           typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
             ? Math.round(body.amountUsd * 100) / 100
-            : 1_000_000;
+            : 5_000;
         if (amountUsd === 0) {
           send(res, 400, { error: 'amountUsd must be non-zero' });
           return;

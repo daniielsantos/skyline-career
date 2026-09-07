@@ -1272,8 +1272,8 @@ export function fetchMarket(
     nearMaxNm?: number | string;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';
-    /** Route scope: intl = cross-country, domestic = same country. */
-    lane?: 'intl' | 'domestic' | 'bush' | '';
+    /** Route scope; pilot-domestic uses the pilot's current country. */
+    lane?: 'intl' | 'domestic' | 'pilot-domestic' | 'bush' | '';
     /** Crew needed vs own-aircraft freights. */
     crew?: 'crew' | 'aircraft' | '';
   } = {},
@@ -1311,7 +1311,13 @@ export function fetchMarket(
   const access = String(opts.access ?? '').trim();
   if (access === 'open' || access === 'locked') params.set('access', access);
   const lane = String(opts.lane ?? '').trim();
-  if (lane === 'intl' || lane === 'domestic') params.set('lane', lane);
+  if (
+    lane === 'intl' ||
+    lane === 'domestic' ||
+    lane === 'pilot-domestic'
+  ) {
+    params.set('lane', lane);
+  }
   const crew = String(opts.crew ?? '').trim();
   if (crew === 'crew' || crew === 'aircraft') params.set('crew', crew);
   const qs = params.toString();
@@ -1611,6 +1617,15 @@ export type EconomyPulseView = {
   homeCountryId: string | null;
   availableLots: number;
   intlSharePct: number;
+  internationalLanes: {
+    day: number;
+    active: number;
+    carryOver: number;
+    connectedCountries: number;
+    minPerCountry: number;
+    maxPerCountry: number;
+    maxPerCountryPair: number;
+  };
   payUsdP50: number | null;
   commodities: EconomyPulseCommodityView[];
   countries: EconomyPulseCountryView[];
@@ -1682,13 +1697,12 @@ export function postTick(n = 1, opts?: { profile?: boolean }) {
   });
 }
 
-/** Temporary test aid — credits the career wallet (default +$1M). */
-export function postDebugCreditWallet(amountUsd = 1_000_000) {
+/** Dev-only test aid — credits the career wallet by $5,000. */
+export function postDebugCreditWallet() {
   return api<{ walletUsd: number; creditedUsd: number }>(
     '/api/debug/credit-wallet',
     {
       method: 'POST',
-      body: JSON.stringify({ amountUsd }),
     },
   );
 }

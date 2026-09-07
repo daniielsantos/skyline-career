@@ -22,6 +22,7 @@ import {
   IDLE_LOT_PAY_MAX_MULT_HEAVY,
   IDLE_LOT_PAY_MAX_MULT_BULK,
   GA_LTL_MAX_KG,
+  INTL_LIGHT_JET_LTL_MAX_NM,
   LAST_MILE_MAX_NM,
   SMALL_LOT_MAX_NM,
   LAST_MILE_OPEN_LOTS_PER_ORIGIN,
@@ -3157,9 +3158,14 @@ describe('tickEconomyN market formation', () => {
       assert.ok(row.lot.quantityKg <= SMALL_LOT_MAX_KG);
       assert.ok(row.lot.quantityKg >= BOARD_SMALL_MIN_VIABLE_KG);
       const nm = routeDistanceNm(world, row.lot.originIcao, row.lot.destIcao);
+      const international =
+        lotBoardPartition(row.lot, countryByIcao) === INTL_BOARD_PARTITION;
+      const maxNm = international
+        ? INTL_LIGHT_JET_LTL_MAX_NM
+        : SMALL_LOT_MAX_NM;
       assert.ok(
-        nm != null && nm <= SMALL_LOT_MAX_NM,
-        `${row.lot.originIcao}→${row.lot.destIcao} LTL ${nm} nm over ${SMALL_LOT_MAX_NM}`,
+        nm != null && nm <= maxNm,
+        `${row.lot.originIcao}→${row.lot.destIcao} LTL ${nm} nm over ${maxNm}`,
       );
       if (/last-mile/i.test(row.lot.reason)) {
         assert.ok(
@@ -3209,7 +3215,7 @@ describe('tickEconomyN market formation', () => {
 
     for (const lot of intl) {
       const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
-      if (nm == null || nm <= SMALL_LOT_MAX_NM) continue;
+      if (nm == null || nm <= INTL_LIGHT_JET_LTL_MAX_NM) continue;
       assert.ok(
         !/LTL|last-mile/i.test(lot.reason),
         `long-haul INTL ${lot.originIcao}→${lot.destIcao} ${nm}nm ${lot.quantityKg}kg should be trunk`,

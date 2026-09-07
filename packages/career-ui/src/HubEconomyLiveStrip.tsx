@@ -242,7 +242,12 @@ export function HubEconomyLiveStrip(props: {
             {book.playerBookableLots.toLocaleString('en-US')} lots)
           </span>
           <span className="muted">
-            Intl {(pulse.intlSharePct * 100).toFixed(1)}%
+            Intl {(pulse.intlSharePct * 100).toFixed(1)}% ·{' '}
+            {pulse.internationalLanes.active.toLocaleString('en-US')} daily lanes ·{' '}
+            {pulse.internationalLanes.connectedCountries} countries
+            {pulse.internationalLanes.carryOver > 0
+              ? ` · ${pulse.internationalLanes.carryOver} carry-over`
+              : null}
           </span>
         </div>
         <div className="hub-pulse-live-card">

@@ -19,7 +19,7 @@ export type PortDeskDef = {
   pickupHubs: readonly string[];
 };
 
-/** T1/P1 regional · T2/P2 continental · T3/P3 open (allowlist only). */
+/** T1/P1 regional · T2/P2 continental · T3/P3 open (port pickup origin only). */
 export const DEMAND_CORRIDOR_NM_BY_LEVEL: Record<
   PortCorridorLevel,
   number | null

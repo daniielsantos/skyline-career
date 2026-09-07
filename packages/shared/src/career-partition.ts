@@ -87,7 +87,7 @@ export function listWorldCountryIds(
   return [...set].sort();
 }
 
-/** Bidirectional OD match against a curated international lane. */
+/** Bidirectional OD match against an active international lane. */
 export function laneMatchesOd(
   lane: Pick<InternationalLane, 'originIcao' | 'destIcao'>,
   originIcao: string,
@@ -114,7 +114,7 @@ export function findInternationalLane(
   );
 }
 
-/** Cross-country OD is allowed only when a seeded international lane exists. */
+/** Cross-country OD is allowed only when the current daily lane graph contains it. */
 export function isInternationalOdAllowed(
   world: Pick<CareerEconomyWorld, 'internationalLanes'>,
   originIcao: string,

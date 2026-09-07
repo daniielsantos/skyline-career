@@ -2,8 +2,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
+  DYNAMIC_INTL_LONG_HAUL_MIN_NM,
+  DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
+  DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
+  DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
   ensureCareerHubCoverage,
+  ensureInternationalLanes,
   migrateEconomyWorld,
+  routeDistanceNm,
+  selectDynamicInternationalLanes,
   tickEconomyN,
 } from './career-economy.js';
 import {
@@ -286,15 +293,148 @@ describe('career partition', () => {
     assert.equal(isDomesticOd('BR-SE', 'US-SE'), false);
   });
 
-  it('gates cross-country ODs to the lane table', () => {
+  it('gates cross-country ODs to the current daily lane graph', () => {
     const world = createSeedEconomyWorld({ seed: 'lane-gate' });
-    assert.equal(isInternationalOdAllowed(world, 'SBGR', 'KMIA'), true);
-    assert.equal(isInternationalOdAllowed(world, 'KMIA', 'SBGR'), true);
-    assert.equal(isInternationalOdAllowed(world, 'SBGR', 'SAEZ'), true);
-    assert.equal(isInternationalOdAllowed(world, 'SAEZ', 'SCEL'), true);
-    assert.equal(isInternationalOdAllowed(world, 'KMIA', 'SBCT'), false);
-    assert.ok(findInternationalLane(world, 'SBEG', 'KMIA'));
-    assert.ok(findInternationalLane(world, 'SBGR', 'SCEL'));
+    const lane = world.internationalLanes?.[0];
+    assert.ok(lane);
+    assert.match(lane!.id, /^dyn_d0_/);
+    assert.equal(
+      isInternationalOdAllowed(world, lane!.originIcao, lane!.destIcao),
+      true,
+    );
+    assert.equal(
+      isInternationalOdAllowed(world, lane!.destIcao, lane!.originIcao),
+      true,
+    );
+    assert.ok(findInternationalLane(world, lane!.originIcao, lane!.destIcao));
+    assert.equal(
+      isInternationalOdAllowed(world, lane!.originIcao, 'SBCT'),
+      lane!.destIcao === 'SBCT',
+    );
+  });
+
+  it('bounds daily lanes fairly by country and country pair', () => {
+    const world = createSeedEconomyWorld({ seed: 'lane-fairness' });
+    const lanes = world.internationalLanes ?? [];
+    const byCountry = new Map<string, number>();
+    const byPair = new Map<string, number>();
+    let longHaul = 0;
+    for (const lane of lanes) {
+      byCountry.set(
+        lane.originCountryId,
+        (byCountry.get(lane.originCountryId) ?? 0) + 1,
+      );
+      byCountry.set(
+        lane.destCountryId,
+        (byCountry.get(lane.destCountryId) ?? 0) + 1,
+      );
+      const pair = [lane.originCountryId, lane.destCountryId].sort().join('|');
+      byPair.set(pair, (byPair.get(pair) ?? 0) + 1);
+      const nm = routeDistanceNm(world, lane.originIcao, lane.destIcao) ?? 0;
+      if (nm >= DYNAMIC_INTL_LONG_HAUL_MIN_NM) longHaul += 1;
+    }
+    for (const country of listWorldCountryIds(world)) {
+      const n = byCountry.get(country) ?? 0;
+      assert.ok(
+        n >= DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
+        `${country} should have at least ${DYNAMIC_INTL_MIN_LANES_PER_COUNTRY} lanes, got ${n}`,
+      );
+      assert.ok(
+        n <= DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
+        `${country} exceeds country lane cap: ${n}`,
+      );
+    }
+    for (const [pair, n] of byPair) {
+      assert.ok(
+        n <= DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
+        `${pair} exceeds pair lane cap: ${n}`,
+      );
+    }
+    assert.ok(longHaul > 0, 'expected a long-haul slice');
+  });
+
+  it('replays the exact lane set for the same seed and economy day', () => {
+    const a = createSeedEconomyWorld({ seed: 'lane-day-replay' });
+    const b = createSeedEconomyWorld({ seed: 'lane-day-replay' });
+    const fingerprint = (lanes: typeof a.internationalLanes) =>
+      (lanes ?? [])
+        .map(
+          (lane) =>
+            `${lane.id}|${lane.originIcao}|${lane.destIcao}|${lane.capacityKgPerDay}`,
+        )
+        .sort();
+    const day0 = fingerprint(a.internationalLanes);
+    assert.deepEqual(day0, fingerprint(b.internationalLanes));
+
+    a.tick = 96;
+    b.tick = 96;
+    ensureInternationalLanes(a);
+    ensureInternationalLanes(b);
+    assert.deepEqual(
+      fingerprint(a.internationalLanes),
+      fingerprint(b.internationalLanes),
+    );
+    assert.notDeepEqual(fingerprint(a.internationalLanes), day0);
+
+    a.tick = 0;
+    assert.deepEqual(fingerprint(selectDynamicInternationalLanes(a)), day0);
+  });
+
+  it('rotates lanes daily and carries active freight ODs across midnight', () => {
+    const world = createSeedEconomyWorld({ seed: 'lane-daily-refresh' });
+    const day0 = world.internationalLanes ?? [];
+    assert.ok(day0.length > 0);
+    const carried = day0[0]!;
+    for (const [index, lane] of day0.slice(0, 250).entries()) {
+      world.lots.push({
+        id: `lot_lane_carry_${index}`,
+        commodityId: 'general',
+        originIcao: lane.originIcao,
+        destIcao: lane.destIcao,
+        quantityKg: 1_000,
+        reservedKg: 0,
+        createdAtTick: 0,
+        expiresAtTick: 200,
+        payUsd: 2_000,
+        basePayUsd: 2_000,
+        urgency: 'normal',
+        reason: 'daily lane carry test',
+        status: 'available',
+      });
+    }
+    world.tick = 96;
+    assert.equal(ensureInternationalLanes(world), true);
+    assert.ok(world.internationalLanes?.some((lane) => /^dyn_d1_/.test(lane.id)));
+    assert.ok(
+      findInternationalLane(world, carried.originIcao, carried.destIcao),
+      'active freight OD must remain legal after the refresh',
+    );
+    assert.ok(
+      (world.internationalLanes?.length ?? 0) <= 480,
+      'carry-over must consume the bounded daily graph instead of growing it',
+    );
+    const countryCounts = new Map<string, number>();
+    for (const lane of world.internationalLanes ?? []) {
+      countryCounts.set(
+        lane.originCountryId,
+        (countryCounts.get(lane.originCountryId) ?? 0) + 1,
+      );
+      countryCounts.set(
+        lane.destCountryId,
+        (countryCounts.get(lane.destCountryId) ?? 0) + 1,
+      );
+    }
+    assert.ok(
+      Math.max(...countryCounts.values()) <= DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
+      'carry-over must count against the per-country cap',
+    );
+    assert.notDeepEqual(
+      (world.internationalLanes ?? [])
+        .filter((lane) => lane.id.startsWith('dyn_'))
+        .map((lane) => lane.id)
+        .sort(),
+      day0.map((lane) => lane.id).sort(),
+    );
   });
 
   it('adds US/CA/MX/AR/CL hubs and lanes to a Brazil-only legacy save', () => {
@@ -312,7 +452,10 @@ describe('career partition', () => {
       npcFlights: [],
       internationalLanes: [],
     };
-    assert.equal(brOnly.airports.length, 62);
+    assert.equal(
+      brOnly.airports.length,
+      full.airports.filter((a) => countryIdFromRegion(a.region) === 'BR').length,
+    );
     assert.equal(ensureCareerHubCoverage(brOnly as typeof full), true);
     assert.equal(brOnly.airports.length, full.airports.length);
     assert.ok(brOnly.airports.some((a) => a.icao === 'KMIA'));
@@ -377,21 +520,6 @@ describe('career partition', () => {
       usDom > 0 || otherDom > 0 || intl > 0,
       'expected US/CA/MX domestic or intl lots',
     );
-    assert.equal(
-      active.some((l) => l.originIcao === 'KMIA' && l.destIcao === 'SBCT'),
-      false,
-    );
-    assert.ok(
-      active.some(
-        (l) =>
-          (l.originIcao === 'SBGR' && l.destIcao === 'KMIA') ||
-          (l.originIcao === 'KMIA' && l.destIcao === 'SBGR') ||
-          (l.originIcao === 'SBKP' && l.destIcao === 'KMIA') ||
-          (l.originIcao === 'KMIA' && l.destIcao === 'SBKP') ||
-          (l.originIcao === 'SBEG' && l.destIcao === 'KMIA') ||
-          (l.originIcao === 'KMIA' && l.destIcao === 'SBEG'),
-      ),
-      'expected at least one curated BR↔US lane lot',
-    );
+    assert.ok(intl > 0, 'expected at least one dynamic international lot');
   });
 });

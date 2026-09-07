@@ -3,6 +3,8 @@
 Atualizado 2026-09-07. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + unified **Search** (1 freight ou tour 2–4 legs) + **Active Tour** (Accept L2+, no multi-reserve).
 Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md), [`10-aircraft-pool.md`](./10-aircraft-pool.md) (lease-out).
 
+- **Base Dispatcher flexível por lot (2026-09-07):** `Any parked` = aeronaves realmente `parked`, mas **tamanho/tipo do lot não fixa classe**: aceita lift parcial (ex.: C680 em lot 20.000 kg) e deixa payload operacional/range/fuel/net/ferry decidirem. Removida exclusão automática de `last-mile` para não-GA, inclusive no rebind. Dev Mode agora abre Cargo/Class Ops também no `dispatch-tours` list (antes Market mostrava aberto e Dispatcher usava progresso real). Toast vazio explicita gates. Teste `lets a light jet take a profitable partial last-mile lot`; smoke save Daniel/SBMO passou com 5 sugestões.
+
 ## Fantasia (uma frase)
 
 Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mile terrestre e **você** (ou piloto VA humano) voa frete pago. Exceção: **Port shuttle** só move WH→WH bridge (custo, sem payout).
@@ -207,6 +209,7 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - **bind-leg after rebind (2026-09-07):** `setPendingActiveTour(fn)` guardava a *função* no ref → `legIndex` undefined → `missionId and legIndex required`. Fix: resolver functional update no wrapper; attach aceita OD match pós-rebind.
 - **Tour vanish after L1 settle (2026-09-07):** L1 rebind same-OD stole L2's `lotId` → both legs shared one `missionId` → settle marked both `done` → `status: completed` → Base empty. Fix: rebind/client alternate exclude sibling lotIds; sync repairs duplicate mission/lot claims and re-opens false completes; settle syncs Active Tour.
 - **Off-origin Manifest (2026-09-07):** combo lists all parked fleet (`@ hub` / `ferry from`); Ferry → `FerryJourneyDialog` to lot origin; Accept blocked until airframe arrives.
+- **Market Prepare off-origin (2026-09-07):** `Prepare` no Freights/Terminal não redireciona mais ao Hangar. Cria o Manifest com a aeronave parked selecionada (fallback qualquer parked), abre `FerryJourneyDialog` ali e mantém `Accept & Dispatch` bloqueado até chegar à origem — mesmo fluxo do Base Dispatcher.
 - **Route label:** inclui hop de ferry (`SBKP→SBCT→SBFL→SBCT`), não só dests de carga (`SBKP→SBCT→SBCT`) — alinha tabela/header com o mapa.
 - **Return filter:** “End at origin/Base” — last **cargo** dest must equal target (não acrescenta ferry home). Sem cadeias que voltem → **lista vazia** + toast (sem fallback open-end).
 - **Perf (2026-09-06):** Search was O(lots × branching × econ) — now economics **once**/lot, index by origin, ferry only for nearby origins.

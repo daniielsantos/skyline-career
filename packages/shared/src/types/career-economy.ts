@@ -467,8 +467,8 @@ export interface CareerEconomyWorld {
   /** Active / recently completed fuel road hauls. */
   fuelHauls?: FuelHaul[];
   /**
-   * Sparse hub↔hub international OD overlay (bidirectional match).
-   * Domestic lot formation never crosses countries except via these lanes.
+   * Bounded daily hub↔hub international OD overlay (bidirectional match).
+   * Domestic lot formation never crosses countries except via active lanes.
    */
   internationalLanes?: InternationalLane[];
   /** Monotonic freight flow counters (throughput instrumentation). */
@@ -589,7 +589,7 @@ export interface EconomyFlowStats {
 }
 
 /**
- * Sparse hub↔hub OD between countries.
+ * Active daily hub↔hub OD between countries.
  * Country partitions share this contract instead of fully simulating each other.
  */
 export interface InternationalLane {

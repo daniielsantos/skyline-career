@@ -286,6 +286,43 @@ describe('base dispatch tours', () => {
     );
   });
 
+  it('lets a light jet take a profitable partial last-mile lot', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-jet-last-mile' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBSP', {
+      pilotName: 'JetLastMile',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBSP');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBSP';
+    aircraft.aircraftClassId = 'light_jet';
+    aircraft.airframeTypeId = 'skyward-cessna-c680';
+    aircraft.label = 'Cessna Citation Sovereign C680';
+
+    primeLot(world, {
+      id: 'jet_last_mile_partial',
+      originIcao: 'SBSP',
+      destIcao: 'SBCT',
+      quantityKg: 20_000,
+      payUsd: 80_000,
+      reason: 'LTL · last-mile',
+    });
+
+    const freights = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBSP',
+      aircraftId: aircraft.id,
+      originIcao: 'SBSP',
+      legs: 1,
+      minNm: 40,
+    });
+    const result = freights.find(
+      (row) => row.legs[0]?.lotId === 'jet_last_mile_partial',
+    );
+    assert.ok(result);
+    assert.ok(result.legs[0]!.liftKg < 20_000);
+    assert.equal(result.legs[0]!.lastMile, true);
+  });
+
   it('routeLabel includes ferry hop between lots', () => {
     const world = createSeedEconomyWorld({ seed: 'dispatch-tour-ferry-label' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBKP', {

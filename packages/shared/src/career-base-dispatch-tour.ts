@@ -150,10 +150,6 @@ function assertOwnsBase(state: CareerMissionsState): void {
   }
 }
 
-function defaultExcludeLastMile(cls: FreighterClassId): boolean {
-  return cls !== 'light_ga';
-}
-
 function defaultTourMinNm(cls: FreighterClassId): number {
   return (
     BASE_DISPATCH_TOUR_MIN_NM[cls] ??
@@ -581,8 +577,9 @@ export function listBaseDispatchTours(
 
   for (const acf of fleet) {
     const cls = acf.aircraftClassId as FreighterClassId;
-    const excludeLastMile =
-      opts.excludeLastMile ?? defaultExcludeLastMile(cls);
+    // Lot labels do not dictate aircraft class: partial lift + physical/economic
+    // gates decide viability, including last-mile freight on jets.
+    const excludeLastMile = opts.excludeLastMile ?? false;
     const minNm = opts.minNm ?? defaultTourMinNm(cls);
     const maxNm =
       opts.maxNm != null && Number.isFinite(opts.maxNm) && opts.maxNm > 0
@@ -1273,7 +1270,6 @@ export function rebindActiveTourLeg(
   const origin = leg.originIcao.trim().toUpperCase();
   const dest = leg.destIcao.trim().toUpperCase();
   const targetKg = Math.max(1, Math.floor(leg.liftKg));
-  const cls = aircraft.aircraftClassId as FreighterClassId;
   const maxCargo = resolveAirframePerfForUi(
     aircraft.airframeTypeId,
     aircraft.aircraftClassId,
@@ -1296,7 +1292,6 @@ export function rebindActiveTourLeg(
     if (!cargoOpsIsUnlocked(state.cargoOps, lot.commodityId)) continue;
     if (lot.originIcao.toUpperCase() !== origin) continue;
     if (lot.destIcao.toUpperCase() !== dest) continue;
-    if (isLastMileLot(lot) && defaultExcludeLastMile(cls)) continue;
     const avail = lotAvailableKg(lot);
     if (avail < BASE_DISPATCH_SCOUT_MIN_KG) continue;
     const liftKg = Math.min(avail, maxCargo, targetKg);

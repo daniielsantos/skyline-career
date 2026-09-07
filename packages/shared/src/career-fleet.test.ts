@@ -123,6 +123,13 @@ describe('career fleet hangar', () => {
     assert.equal(migrated.playerFbos?.dispatcherHirePoolDayByHub?.SBKP, 1);
   });
 
+  it('preserves the passive-fee watermark on normalizeMissionsState', () => {
+    const state = emptyMissionsStateV2();
+    state.lastSeenTick = 36_000;
+    const migrated = normalizeMissionsState(state);
+    assert.equal(migrated.lastSeenTick, 36_000);
+  });
+
   it('preserves Active Tour on normalizeMissionsState', () => {
     const state = emptyMissionsStateV2();
     state.playerFbos = {

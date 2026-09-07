@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-07: **Mercado internacional dinâmico implementado + soak PASS (local, sem commit/release)** — static Market lanes + Demand country-pair JSON removidos. Market seleciona por dia estoque/gateways com bounds 96–480, fairness 2–6 lanes/país e 2/par, long-haul floor e carry-over de lotes ativos; intl board segue 12%. Demand abre qualquer país mapeado, ainda gated por Port/WH + corridor/range. Soak 2d: 421 lanes / 230 carry / 187 países / intl 3.57%; BR/US 100%/98.6%. Próximo: commit só se pedido. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-07: **Manifest off-origin ferry** — Tour Accept stays on Manifest; fleet combo lists all parked (`ferry from ICAO`); Ferry opens `FerryJourneyDialog`; Accept blocked until at lot origin. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 Atualizado 2026-09-07: **Tour Accept → Manifest** — Accept L1/L2 opens staging (pick aircraft @ origin); Active Tour attaches on Accept & Dispatch (`attach` / `bind-leg`). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
@@ -345,7 +347,7 @@ Atualizado 2026-08-24: Demand warehouse holds — pledge WH kg + claim board rem
 
 Atualizado 2026-08-23: MM68 (Mina Hércules, GPS) saiu do catálogo — remap MMCU. Demand Board não posta em bush / bushTripOnly (SimBrief OFP). FAA locals US Activities continuam no PLN.
 
-Atualizado 2026-08-23: Demand Board filtra por WH (default My warehouses) — dest só se domestic ou par intl allowlisted a partir daquele hub.
+Atualizado 2026-08-23 (superseded 2026-09-07): Demand Board filtra por WH; cross-border agora aceita qualquer país mapeado quando a origem é pickup Port/WH e passa corridor/range.
 
 Atualizado 2026-08-23: Demand Board cap escala com países (192–640, ~6/país); wanted até 12 t / 8 t. Pedidos já abertos só mudam no expire/trim.
 

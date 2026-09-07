@@ -328,7 +328,7 @@ type MarketSortKey =
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 type AccessFilter = '' | 'open' | 'locked';
-type LaneFilter = '' | 'intl' | 'domestic' | 'bush';
+type LaneFilter = '' | 'intl' | 'domestic' | 'pilot-domestic' | 'bush';
 
 const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [];
 
@@ -3275,7 +3275,7 @@ export function App() {
   const [selectedContractLotId, setSelectedContractLotId] = useState<
     string | null
   >(null);
-  /** When Hangar was opened to ferry for a contract, Back restores this terminal. */
+  /** Return target after Manifest (or legacy Hangar ferry) opened from a terminal. */
   const [airportReturn, setAirportReturn] = useState<{
     icao: string;
     section: TerminalSection;
@@ -6288,7 +6288,7 @@ export function App() {
 
   async function onDebugCreditWallet() {
     await run(async () => {
-      const result = await postDebugCreditWallet(1_000_000);
+      const result = await postDebugCreditWallet();
       setWallet(result.walletUsd);
       setToastKind('ok');
       setToast(`Debug credit +${formatMoney(result.creditedUsd)}`);
@@ -7112,8 +7112,8 @@ export function App() {
         } else {
           setToast(
             dispatchTourLegs === 1
-              ? 'No single freights near that origin — try Min nm 40, Any parked, or raise Max ferry.'
-              : 'No 2–4 leg chains near that origin — try Min nm 40, Any parked, or raise Max ferry.',
+              ? 'No executable freight found — Search allows partial loads, then checks parked-aircraft range, fuel, Cargo Ops, positive net, and ferry limits.'
+              : 'No executable 2–4 leg chain — Search allows partial loads, then checks parked-aircraft range, fuel, Cargo Ops, positive net, and ferry limits.',
           );
         }
       }
@@ -8147,30 +8147,25 @@ export function App() {
       return;
     }
     const parkedHere = fleetTailAtOrigin(lot.originIcao, boardAircraftId);
-    if (!parkedHere) {
-      const parked = fleet.find((a) => a.status === 'parked');
-      setError(
-        parked
-          ? `Your ${parked.label} is at ${parked.locationIcao}. Ferry to ${lot.originIcao} from Hangar first.`
-          : `No parked aircraft available for ${lot.originIcao}`,
-      );
-      setAirportReturn({
-        icao: lot.originIcao,
-        section:
-          airportIcao === lot.originIcao ? terminalSection : 'contracts',
-      });
-      setFerrySeed({
-        dest: lot.originIcao.trim().toUpperCase(),
-        token: Date.now(),
-      });
-      goToTab('hangar');
+    const selectedParked = boardAircraftId
+      ? fleet.find(
+          (a) => a.id === boardAircraftId && a.status === 'parked',
+        )
+      : undefined;
+    const selectedAircraft =
+      parkedHere ?? selectedParked ?? fleet.find((a) => a.status === 'parked');
+    if (!selectedAircraft) {
+      setError(`No parked aircraft available for ${lot.originIcao}`);
       return;
     }
+    const atOrigin =
+      selectedAircraft.locationIcao.trim().toUpperCase() ===
+      lot.originIcao.trim().toUpperCase();
     const busyMission = missions.find(
       (m) =>
         ['accepted', 'dispatched', 'in_flight'].includes(m.status) &&
-        (m.aircraftId === parkedHere.id ||
-          parkedHere.assignedMissionId === m.id),
+        (m.aircraftId === selectedAircraft.id ||
+          selectedAircraft.assignedMissionId === m.id),
     );
     if (
       busyMission &&
@@ -8178,13 +8173,20 @@ export function App() {
         busyMission.destIcao !== lot.destIcao)
     ) {
       setError(
-        `Your ${parkedHere.label} is already on ${busyMission.originIcao}→${busyMission.destIcao}. Finish or cancel it in Dispatch, or ferry another aircraft to ${lot.originIcao}.`,
+        `Your ${selectedAircraft.label} is already on ${busyMission.originIcao}→${busyMission.destIcao}. Finish or cancel it in Dispatch, or ferry another aircraft to ${lot.originIcao}.`,
       );
       goToTab('staging');
       return;
     }
-    const aircraft = parkedHere.aircraftClassId;
-    const openFlight = openFlightForRoute(lot.originIcao, lot.destIcao, aircraft, parkedHere.id);
+    const aircraft = selectedAircraft.aircraftClassId;
+    const openFlight = atOrigin
+      ? openFlightForRoute(
+          lot.originIcao,
+          lot.destIcao,
+          aircraft,
+          selectedAircraft.id,
+        )
+      : undefined;
     const existingLots = openFlight?.lots?.length ?? 0;
     if (existingLots >= MAX_STAGING_LOTS) {
       setError(`Flight ${openFlight!.id} already has ${MAX_STAGING_LOTS} lots`);
@@ -8196,7 +8198,7 @@ export function App() {
       originName: lot.originName,
       destName: lot.destName,
       aircraft,
-      aircraftId: parkedHere.id,
+      aircraftId: selectedAircraft.id,
       intoMissionId: openFlight?.id,
       lines: [],
     };
@@ -8208,6 +8210,7 @@ export function App() {
       },
     ];
     setFlightDebrief(null);
+    setStagingFerryOpen(!atOrigin);
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
@@ -8218,6 +8221,12 @@ export function App() {
     // closeAirport clears airportReturn — restore after so Back can reopen the terminal.
     setAirportReturn(restoreAirport);
     goToTab('staging');
+    if (!atOrigin) {
+      setToastKind('warn');
+      setToast(
+        `Manifest · ${selectedAircraft.label} is at ${selectedAircraft.locationIcao} — ferry to ${lot.originIcao} before Accept & Dispatch`,
+      );
+    }
   }
 
   function isCargoOpsCommodityLocked(commodityId: string): boolean {
@@ -10814,9 +10823,9 @@ export function App() {
                 className="action ghost"
                 onClick={() => void onDebugCreditWallet()}
                 disabled={busy}
-                title="Temporary test aid — add $1,000,000 to the wallet"
+                title="Dev Mode — add $5,000 to the wallet"
               >
-                +$1M
+                +$5K
               </button>
               <button
                 type="button"
@@ -13750,6 +13759,7 @@ export function App() {
                             setLaneFilter(
                               next === 'intl' ||
                                 next === 'domestic' ||
+                                next === 'pilot-domestic' ||
                                 next === 'bush'
                                 ? next
                                 : '',
@@ -13760,6 +13770,9 @@ export function App() {
                           <option value="">Any route</option>
                           <option value="intl">Intl</option>
                           <option value="domestic">Domestic</option>
+                          <option value="pilot-domestic">
+                            Domestic · pilot country
+                          </option>
                         </select>
                       </div>
                       {nearMe && boardNearIcao && !originFilter.trim() ? (

@@ -351,6 +351,40 @@ describe('queryMarketBoardPage', () => {
     );
   });
 
+  it("filters domestic routes by the pilot's current country", () => {
+    const mixed = [
+      row({
+        payUsd: 100,
+        commodityId: 'br',
+        international: false,
+        originCountryId: 'BR',
+      }),
+      row({
+        payUsd: 200,
+        commodityId: 'ar',
+        international: false,
+        originCountryId: 'AR',
+      }),
+      row({
+        payUsd: 300,
+        commodityId: 'intl',
+        international: true,
+        originCountryId: 'BR',
+      }),
+    ];
+    const result = queryMarketBoardPage(mixed, {
+      currentTick: 0,
+      laneFilter: 'pilot-domestic',
+      pilotCountryId: 'BR',
+      page: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      result.rows.map((r) => r.commodityId),
+      ['br'],
+    );
+  });
+
   it('applies filters before sort so totals are global', () => {
     const result = queryMarketBoardPage(rows, {
       currentTick: 0,

@@ -195,6 +195,15 @@ export interface EconomyPulse {
   availableLots: number;
   /** International available lots / all available. */
   intlSharePct: number;
+  internationalLanes: {
+    day: number;
+    active: number;
+    carryOver: number;
+    connectedCountries: number;
+    minPerCountry: number;
+    maxPerCountry: number;
+    maxPerCountryPair: number;
+  };
   /** Median contract payUsd across bookable leftovers. */
   payUsdP50: number | null;
   /** Mean contract payUsd across bookable leftovers. */
@@ -983,6 +992,25 @@ export function computeEconomyPulse(
   });
 
   const intlSharePct = availableLots > 0 ? intlLots / availableLots : 0;
+  const activeInternationalLanes = world.internationalLanes ?? [];
+  const laneCountByCountry = new Map<string, number>();
+  const laneCountByPair = new Map<string, number>();
+  let carryOverLanes = 0;
+  for (const lane of activeInternationalLanes) {
+    if (lane.id.startsWith('carry_')) carryOverLanes += 1;
+    laneCountByCountry.set(
+      lane.originCountryId,
+      (laneCountByCountry.get(lane.originCountryId) ?? 0) + 1,
+    );
+    laneCountByCountry.set(
+      lane.destCountryId,
+      (laneCountByCountry.get(lane.destCountryId) ?? 0) + 1,
+    );
+    const pair = [lane.originCountryId, lane.destCountryId].sort().join('|');
+    laneCountByPair.set(pair, (laneCountByPair.get(pair) ?? 0) + 1);
+  }
+  const countryLaneCounts = [...laneCountByCountry.values()];
+  const pairLaneCounts = [...laneCountByPair.values()];
   const npc = computeNpcPulse(world, nowMs);
   const recoveryRows = Object.entries(
     (world.regionalRecovery ?? {}) as Record<string, RegionalRecoveryState>,
@@ -1006,6 +1034,18 @@ export function computeEconomyPulse(
     airportCount: world.airports?.length ?? 0,
     availableLots,
     intlSharePct,
+    internationalLanes: {
+      day: Math.floor(world.tick / TICKS_PER_DAY),
+      active: activeInternationalLanes.length,
+      carryOver: carryOverLanes,
+      connectedCountries: laneCountByCountry.size,
+      minPerCountry:
+        countryLaneCounts.length > 0 ? Math.min(...countryLaneCounts) : 0,
+      maxPerCountry:
+        countryLaneCounts.length > 0 ? Math.max(...countryLaneCounts) : 0,
+      maxPerCountryPair:
+        pairLaneCounts.length > 0 ? Math.max(...pairLaneCounts) : 0,
+    },
     payUsdP50: median(boardPayUsd),
     payUsdAvg: mean(boardPayUsd),
     lotStatus,

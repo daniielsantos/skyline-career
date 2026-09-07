@@ -59,7 +59,6 @@ import type {
   MissionIntent,
   PlayerDemandHold,
 } from './types/career-economy.js';
-import demandIntlCountryPairsRaw from './data/demand-intl-country-pairs.json' with { type: 'json' };
 
 export const DEMAND_COMMODITIES: readonly CommodityId[] = [
   'general',
@@ -124,16 +123,6 @@ export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3 | 4, number> = {
   3: TICKS_PER_DAY,
   4: (TICKS_PER_DAY * 5) / 4,
 };
-
-/** Bidirectional country pairs for international Demand (not Market lanes). */
-export const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> =
-  demandIntlCountryPairsRaw as unknown as ReadonlyArray<
-    readonly [string, string]
-  >;
-
-const DEMAND_INTL_PAIR_SET = new Set(
-  DEMAND_INTL_COUNTRY_PAIRS.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
-);
 
 const DEMAND_TTL_TICKS = 96 * 2.5; // ~2.5 economy days
 
@@ -268,13 +257,10 @@ export function isDemandInternationalCountryPair(
 ): boolean {
   const a = originCountryId.trim().toUpperCase();
   const b = destCountryId.trim().toUpperCase();
-  if (!a || !b || a === b) return false;
-  return DEMAND_INTL_PAIR_SET.has(`${a}|${b}`);
+  return /^[A-Z]{2}$/.test(a) && /^[A-Z]{2}$/.test(b) && a !== b;
 }
 
-/**
- * Soft mult for pay (1 = domestic). Does not enforce port-WH / allowlist errors.
- */
+/** Soft mult for pay (1 = domestic). Port-WH eligibility is enforced separately. */
 export function demandInternationalUnitPriceMult(
   world: CareerEconomyWorld,
   originIcao: string,
@@ -285,14 +271,11 @@ export function demandInternationalUnitPriceMult(
   if (!originCountry || !destCountry || originCountry === destCountry) {
     return 1;
   }
-  if (!isDemandInternationalCountryPair(originCountry, destCountry)) {
-    return 1;
-  }
   return DEMAND_INTL_PAY_MULT;
 }
 
 /**
- * Gate cross-border Demand accept: allowlisted country pair + port pickup WH origin.
+ * Gate cross-border Demand accept: any mapped country pair + port pickup WH origin.
  * Domestic (same country) always passes with mult 1.
  */
 export function assertDemandInternationalAccept(
@@ -314,11 +297,6 @@ export function assertDemandInternationalAccept(
       originCountryId,
       destCountryId,
     };
-  }
-  if (!isDemandInternationalCountryPair(originCountryId, destCountryId)) {
-    throw new Error(
-      `International demand ${originCountryId}→${destCountryId} is not on the allowed country pairs`,
-    );
   }
   if (!isPortPickupHub(origin)) {
     throw new Error(

@@ -21,7 +21,7 @@ describe('demandOrderReachableFromOrigins', () => {
     );
   });
 
-  it('hides GE dests from a US warehouse (not an allowlisted pair)', () => {
+  it('allows GE dests from a US port warehouse', () => {
     assert.equal(
       demandOrderReachableFromOrigins({
         destIcao: 'UGTB',
@@ -29,7 +29,7 @@ describe('demandOrderReachableFromOrigins', () => {
         origins: [{ icao: 'KMIA', countryId: 'US' }],
         pickupHubs: ['KMIA'],
       }),
-      false,
+      true,
     );
   });
 
@@ -42,6 +42,18 @@ describe('demandOrderReachableFromOrigins', () => {
         pickupHubs: ['LPPT'],
       }),
       true,
+    );
+  });
+
+  it('still rejects international staging from a non-pickup warehouse', () => {
+    assert.equal(
+      demandOrderReachableFromOrigins({
+        destIcao: 'UGTB',
+        destCountryId: 'GE',
+        origins: [{ icao: 'KATL', countryId: 'US' }],
+        pickupHubs: ['KMIA'],
+      }),
+      false,
     );
   });
 

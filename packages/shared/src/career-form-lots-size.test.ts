@@ -5,7 +5,9 @@ import {
   BOARD_SMALL_MIN_VIABLE_KG,
   FEEDER_LTL_MIN_KG,
   GA_LTL_MAX_KG,
+  INTL_LIGHT_JET_LTL_MAX_NM,
   LARGE_LOT_MIN_KG,
+  SMALL_LOT_MAX_NM,
   SMALL_LOT_MAX_KG,
   SMALL_LOT_MIN_KG,
   boardLotMinViablePayUsd,
@@ -53,6 +55,13 @@ describe('sizeSmallLotKg', () => {
       { international: true },
     );
     assert.ok(kg >= FEEDER_LTL_MIN_KG, `expected feeder on intl, got ${kg}`);
+  });
+
+  it('opens international feeder range to light jets without changing domestic TP range', () => {
+    assert.equal(FEEDER_LTL_MIN_KG, 500);
+    assert.equal(SMALL_LOT_MAX_NM, 900);
+    assert.equal(INTL_LIGHT_JET_LTL_MAX_NM, 2_000);
+    assert.ok(INTL_LIGHT_JET_LTL_MAX_NM > SMALL_LOT_MAX_NM);
   });
 });
 

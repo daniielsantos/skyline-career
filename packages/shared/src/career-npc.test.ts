@@ -526,23 +526,37 @@ describe('NPC freighter fleet', () => {
     assert.ok(wide);
     assert.ok(ga);
     assert.ok(narrow);
-    assert.equal(isInternationalOdAllowed(world, 'SBGR', 'KMIA'), true);
-    const dist = routeDistanceNm(world, 'SBGR', 'KMIA');
-    assert.ok(dist != null && dist > 2500, `GRU→MIA should be long-haul (${dist} nm)`);
-    assert.ok(dist < 6000, `GRU→MIA should be in wide range (${dist} nm)`);
+    const lane = (world.internationalLanes ?? []).find((candidate) => {
+      const nm = routeDistanceNm(
+        world,
+        candidate.originIcao,
+        candidate.destIcao,
+      );
+      return nm != null && nm > 2_500 && nm < 6_000;
+    });
+    assert.ok(lane, 'expected a flyable long-haul lane');
+    const originIcao = lane!.originIcao;
+    const destIcao = lane!.destIcao;
+    assert.equal(isInternationalOdAllowed(world, originIcao, destIcao), true);
+    const dist = routeDistanceNm(world, originIcao, destIcao);
+    assert.ok(dist != null && dist > 2_500, `lane should be long-haul (${dist} nm)`);
+    assert.ok(dist < 6_000, `lane should be in wide range (${dist} nm)`);
     wide!.status = 'idle';
+    wide!.locationIcao = originIcao;
     wide!.feeBias = 0.5;
     wide!.aggressiveness = 0.5;
     wide!.reliability = 1;
     ga!.status = 'idle';
+    ga!.locationIcao = originIcao;
     ga!.feeBias = 0.5;
     narrow!.status = 'idle';
+    narrow!.locationIcao = originIcao;
     narrow!.feeBias = 0.5;
     const lot: ShipmentLot = {
-      id: 'lot-intl-gru-mia',
+      id: 'lot-intl-dynamic-long-haul',
       commodityId: 'general',
-      originIcao: 'SBGR',
-      destIcao: 'KMIA',
+      originIcao,
+      destIcao,
       quantityKg: 20_000,
       reservedKg: 0,
       createdAtTick: world.tick,

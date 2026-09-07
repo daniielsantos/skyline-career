@@ -65,13 +65,19 @@ export type MarketBoardSortable = {
   idleEscalated?: boolean;
   /** Cross-country lane freight (from lot pressure). */
   international?: boolean;
+  /** ISO-like country id resolved from the lot origin airport. */
+  originCountryId?: string;
   /** Soft-field Amazon bush OD. */
   bush?: boolean;
 };
 
 export type MarketBoardAccessFilter = 'open' | 'locked';
-/** Freights route scope: international lanes vs domestic vs Amazon bush. */
-export type MarketBoardLaneFilter = 'intl' | 'domestic' | 'bush';
+/** Freights route scope, including domestic origins in the pilot's current country. */
+export type MarketBoardLaneFilter =
+  | 'intl'
+  | 'domestic'
+  | 'pilot-domestic'
+  | 'bush';
 /** Split Freights: crew = fly NPC airframe; aircraft = haul with your plane. */
 export type MarketBoardCrewFilter = 'crew' | 'aircraft';
 
@@ -192,6 +198,8 @@ export type MarketBoardQueryOpts = {
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
   laneFilter?: MarketBoardLaneFilter;
+  /** Country containing the pilot's current airport, for `pilot-domestic`. */
+  pilotCountryId?: string;
   /** Crew needed vs own-aircraft freights. */
   crewFilter?: MarketBoardCrewFilter;
   /** Current economy tick (integer batches). */
@@ -394,7 +402,14 @@ export function parseMarketBoardLaneFilter(
   raw: string | null | undefined,
 ): MarketBoardLaneFilter | undefined {
   const v = raw?.trim().toLowerCase();
-  if (v === 'intl' || v === 'domestic' || v === 'bush') return v;
+  if (
+    v === 'intl' ||
+    v === 'domestic' ||
+    v === 'pilot-domestic' ||
+    v === 'bush'
+  ) {
+    return v;
+  }
   return undefined;
 }
 
@@ -481,6 +496,7 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
     | 'hangarEmpty'
     | 'accessFilter'
     | 'laneFilter'
+    | 'pilotCountryId'
     | 'crewFilter'
     | 'nearMaxNm'
     | 'currentTick'
@@ -605,6 +621,14 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   if (opts.accessFilter === 'locked' && !row.cargoLocked) return false;
   if (opts.laneFilter === 'intl' && !row.international) return false;
   if (opts.laneFilter === 'domestic' && row.international) return false;
+  if (
+    opts.laneFilter === 'pilot-domestic' &&
+    (row.international ||
+      !opts.pilotCountryId ||
+      row.originCountryId !== opts.pilotCountryId)
+  ) {
+    return false;
+  }
   if (opts.laneFilter === 'bush' && !row.bush) return false;
   if (opts.crewFilter === 'crew' && row.crewNeeded !== true) return false;
   if (opts.crewFilter === 'aircraft' && row.crewNeeded === true) return false;

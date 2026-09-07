@@ -1,3 +1,7 @@
+# Current state (2026-09-07)
+
+Local `main` (ainda sem commit/release): Market internacional agora usa grafo diário dinâmico e bounded por pressão/gateways; tabela estática de ~399 lanes removida. Cobertura seed: **187 países / 421 lanes**, piso **2** e cap **6** por país, cap **2** por par; active-lot OD faz carry-over. Demand intl aceita qualquer par mapeado, mantendo Port/WH + corridor/range e premium ×1.28. Pulse dev expõe métricas do grafo. Detail: [`08-economy.md`](./08-economy.md).
+
 # Current state (2026-09-01)
 
 `main` **c66e55e** / desktop **0.3.50** shipped: pause-aware airborne clock; cruise burn lb/h no footer; Hub Economy Pulse (dev); Stats schema v8; formLotsIntl perf; narrow/wide/medium/jet pricing balance; Class Ops persist. Release: [v0.3.50](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.50).

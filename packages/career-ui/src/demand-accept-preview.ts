@@ -3,8 +3,6 @@
  * Career UI must not import @msfs-compat/shared.
  */
 
-import demandIntlCountryPairsRaw from '../../shared/src/data/demand-intl-country-pairs.json' with { type: 'json' };
-
 export type DemandWithdrawLot = {
   kg: number;
   avgCostUsdPerKg: number;
@@ -22,15 +20,6 @@ export type DemandAcceptPullPreview = {
 
 /** Keep in sync with DEMAND_INTL_PAY_MULT in packages/shared career-demand.ts */
 export const DEMAND_INTL_PAY_MULT = 1.28;
-
-const DEMAND_INTL_COUNTRY_PAIRS: ReadonlyArray<readonly [string, string]> =
-  demandIntlCountryPairsRaw as unknown as ReadonlyArray<
-    readonly [string, string]
-  >;
-
-const DEMAND_INTL_PAIR_SET = new Set(
-  DEMAND_INTL_COUNTRY_PAIRS.flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`]),
-);
 
 function money(n: number): number {
   return Math.round(n * 100) / 100;
@@ -59,8 +48,7 @@ export function isDemandInternationalCountryPair(
 ): boolean {
   const a = originCountryId?.trim().toUpperCase() ?? '';
   const b = destCountryId?.trim().toUpperCase() ?? '';
-  if (!a || !b || a === b) return false;
-  return DEMAND_INTL_PAIR_SET.has(`${a}|${b}`);
+  return /^[A-Z]{2}$/.test(a) && /^[A-Z]{2}$/.test(b) && a !== b;
 }
 
 export type DemandIntlRoutePreview = {
@@ -122,17 +110,6 @@ export function previewDemandInternationalRoute(opts: {
     };
   }
 
-  if (!isDemandInternationalCountryPair(originCountryId, destCountryId)) {
-    return {
-      international: true,
-      allowed: false,
-      unitPriceMult: 1,
-      blockReason: `International ${originCountryId}→${destCountryId} is not on the allowed country pairs`,
-      originCountryId,
-      destCountryId,
-    };
-  }
-
   const pickup = new Set(
     opts.pickupHubs.map((h) => h.trim().toUpperCase()).filter(Boolean),
   );
@@ -162,7 +139,7 @@ export type DemandOriginHub = {
   countryId?: string | null;
 };
 
-/** True if at least one warehouse can legally stage this dest (domestic or allowlisted intl). */
+/** True if at least one warehouse can legally stage this dest. */
 export function demandOrderReachableFromOrigins(opts: {
   destIcao: string;
   destCountryId?: string | null;

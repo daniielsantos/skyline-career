@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
+  DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
+  DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
+  DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
   ensureSeedMarketFormed,
   tickEconomyN,
 } from './career-economy.js';
@@ -78,6 +81,27 @@ describe('computeEconomyPulse', () => {
     assert.equal(pulse.availableLots, sumLots);
     assert.ok(Number.isFinite(pulse.intlSharePct));
     assert.ok(pulse.intlSharePct >= 0 && pulse.intlSharePct <= 1);
+    assert.equal(
+      pulse.internationalLanes.day,
+      Math.floor(world.tick / TICKS_PER_DAY),
+    );
+    assert.equal(
+      pulse.internationalLanes.active,
+      world.internationalLanes?.length ?? 0,
+    );
+    assert.ok(pulse.internationalLanes.connectedCountries > 0);
+    assert.ok(
+      pulse.internationalLanes.minPerCountry >=
+        DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
+    );
+    assert.ok(
+      pulse.internationalLanes.maxPerCountry <=
+        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
+    );
+    assert.ok(
+      pulse.internationalLanes.maxPerCountryPair <=
+        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
+    );
 
     assert.ok(pulse.commodities.length >= 5);
     const commodityLots = pulse.commodities.reduce(

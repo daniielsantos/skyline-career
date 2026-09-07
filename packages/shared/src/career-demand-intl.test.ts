@@ -1,5 +1,5 @@
 /**
- * International Demand Board: country-pair allowlist + port pickup WH origin.
+ * International Demand Board: open country pairs + port pickup WH origin.
  */
 
 import assert from 'node:assert/strict';
@@ -28,13 +28,14 @@ import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import type { PlayerWarehouse } from './types/career-economy.js';
 
 describe('demand international accept', () => {
-  it('allowlists expected country pairs bidirectionally', () => {
+  it('opens every valid cross-country pair bidirectionally', () => {
     assert.equal(isDemandInternationalCountryPair('BR', 'US'), true);
     assert.equal(isDemandInternationalCountryPair('US', 'BR'), true);
     assert.equal(isDemandInternationalCountryPair('AR', 'CL'), true);
     assert.equal(isDemandInternationalCountryPair('US', 'MX'), true);
     assert.equal(isDemandInternationalCountryPair('BR', 'BR'), false);
-    assert.equal(isDemandInternationalCountryPair('CL', 'CA'), false);
+    assert.equal(isDemandInternationalCountryPair('CL', 'CA'), true);
+    assert.equal(isDemandInternationalCountryPair('?', 'CA'), false);
   });
 
   it('resolves hub countries from seed airports', () => {
@@ -78,13 +79,13 @@ describe('demand international accept', () => {
     );
   });
 
-  it('rejects country pairs outside the allowlist', () => {
+  it('allows any mapped pair from a port pickup warehouse', () => {
     const world = createSeedEconomyWorld({ seed: 'demand-intl-pair' });
-    // CL ↔ CA is not listed.
-    assert.throws(
-      () => assertDemandInternationalAccept(world, 'SCEL', 'CYVR'),
-      /not on the allowed country pairs/i,
-    );
+    const gate = assertDemandInternationalAccept(world, 'SCEL', 'CYVR');
+    assert.equal(gate.international, true);
+    assert.equal(gate.originCountryId, 'CL');
+    assert.equal(gate.destCountryId, 'CA');
+    assert.equal(gate.unitPriceMult, DEMAND_INTL_PAY_MULT);
   });
 
   it('accepts short intl CYVR → KSEA from port WH with premium pay', () => {

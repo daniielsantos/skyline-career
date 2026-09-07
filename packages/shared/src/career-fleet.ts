@@ -295,6 +295,13 @@ export function normalizeMissionsState(
     typeof ferrySoftRaw === 'number' && Number.isFinite(ferrySoftRaw)
       ? Math.max(0, Math.round(ferrySoftRaw))
       : 0;
+  const lastSeenTickRaw = (raw as CareerMissionsState).lastSeenTick;
+  const lastSeenTick =
+    typeof lastSeenTickRaw === 'number' &&
+    Number.isFinite(lastSeenTickRaw) &&
+    lastSeenTickRaw >= 0
+      ? Math.floor(lastSeenTickRaw)
+      : undefined;
   const result: CareerMissionsState = {
     version: 2,
     walletUsd,
@@ -315,6 +322,7 @@ export function normalizeMissionsState(
     companyCrew,
     groundStaff,
     ferrySoftNmUsed,
+    ...(lastSeenTick !== undefined ? { lastSeenTick } : {}),
     portPickups: Array.isArray((raw as CareerMissionsState).portPickups)
       ? (raw as CareerMissionsState).portPickups
       : [],

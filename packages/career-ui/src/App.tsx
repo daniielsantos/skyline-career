@@ -3548,7 +3548,7 @@ export function App() {
   const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
   const [activeTour, setActiveTour] = useState<ActiveTourView | null>(null);
   /** Tour itinerary to attach after Manifest Accept & Dispatch. */
-  const [pendingActiveTour, setPendingActiveTour] = useState<{
+  const [pendingActiveTour, setPendingActiveTourState] = useState<{
     kind: 'start' | 'bind';
     hubIcao: string;
     aircraftId: string;
@@ -3557,6 +3557,13 @@ export function App() {
     tourLegs: BaseDispatchTourLeg[];
     legIndex: number;
   } | null>(null);
+  const pendingActiveTourRef = useRef(pendingActiveTour);
+  function setPendingActiveTour(
+    next: typeof pendingActiveTour,
+  ) {
+    pendingActiveTourRef.current = next;
+    setPendingActiveTourState(next);
+  }
   /** FerryJourneyDialog from Manifest when selected airframe is off-origin. */
   const [stagingFerryOpen, setStagingFerryOpen] = useState(false);
   const [selectedDispatchTourId, setSelectedDispatchTourId] = useState<
@@ -7034,17 +7041,36 @@ export function App() {
       );
       return;
     }
-    setPendingActiveTour({
-      kind: 'start',
-      hubIcao: hub,
-      aircraftId: tour.aircraftId,
-      tourId: tour.id,
-      routeLabel: tour.routeLabel,
-      tourLegs: tour.legs,
-      legIndex: 1,
-    });
-    setSelectedDispatchTourId(null);
-    enterStagingForTourLeg(lot, tour.aircraftId);
+    setDispatchTourLoading(true);
+    try {
+      // Persist itinerary before Manifest so refresh/rebuild cannot wipe Active Tour.
+      const prepared = await postBaseDispatchTours({
+        action: 'prepare',
+        aircraftId: tour.aircraftId,
+        hubIcao: hub,
+        tourId: tour.id,
+        routeLabel: tour.routeLabel,
+        tourLegs: tour.legs,
+      });
+      setActiveTour(prepared.activeTour ?? null);
+      if (prepared.playerFbos) setPlayerFbos(prepared.playerFbos);
+      setPendingActiveTour({
+        kind: 'start',
+        hubIcao: hub,
+        aircraftId: tour.aircraftId,
+        tourId: tour.id,
+        routeLabel: tour.routeLabel,
+        tourLegs: tour.legs,
+        legIndex: 1,
+      });
+      setSelectedDispatchTourId(null);
+      enterStagingForTourLeg(lot, tour.aircraftId);
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
   }
 
   async function onAcceptActiveTourLeg(legIndex: number) {
@@ -7966,6 +7992,7 @@ export function App() {
 
   function exitStaging() {
     if (busy) return;
+    const hadPendingTour = pendingActiveTourRef.current != null;
     setPendingActiveTour(null);
     setStagingFerryOpen(false);
     if (staging?.replaceManifest) {
@@ -7980,6 +8007,16 @@ export function App() {
       clearPersistedStagingDraft(activeCareerProfile.id);
     }
     setStaging(null);
+    if (hadPendingTour) {
+      void postBaseDispatchTours({ action: 'drop-unbound' })
+        .then((result) => {
+          setActiveTour(result.activeTour ?? null);
+          if (result.playerFbos) setPlayerFbos(result.playerFbos);
+        })
+        .catch(() => {
+          /* keep desk state; status refresh heals */
+        });
+    }
     if (airportReturn) {
       void returnToAirport();
       return;
@@ -8344,7 +8381,7 @@ export function App() {
           }
           // Mission appears on Dispatch — no success toast / mission-id noise.
           goToTab('staging');
-          const pending = pendingActiveTour;
+          const pending = pendingActiveTourRef.current;
           if (pending && result.mission?.id) {
             setPendingActiveTour(null);
             try {
@@ -10047,8 +10084,8 @@ export function App() {
               playerFbos?.fbos.length
                 ? `Base · ${playerFbos.fbos.map((f) => f.icao).join(', ')}`
                 : homeHubIcao
-                  ? `Buy Base at home · ${homeHubIcao}`
-                  : 'Company home — parking & Jet-A/MRO perks'
+                  ? `Buy Base · ${homeHubIcao}`
+                  : 'Base'
             }
           >
             Base
@@ -10684,11 +10721,6 @@ export function App() {
                     <div className="panel-head">
                       <div>
                         <h2>Base</h2>
-                        <p>
-                          Company home at this hub: cheaper parking and Jet-A/MRO
-                          while your airframes are here. Fly freights yourself —
-                          Ports WH holds the cargo loop.
-                        </p>
                         {(playerFbos?.fbos.length ?? 0) > 1 ? (
                           <div
                             className="fbo-icao-switcher"
@@ -10732,7 +10764,7 @@ export function App() {
                           disabled={busy}
                           onClick={() => void onBuyFbo(airportIcao ?? homeHubIcao)}
                         >
-                          Buy Base T1
+                          Buy T1
                           {(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd) ===
                           0
                             ? ' · Free'
@@ -10757,13 +10789,9 @@ export function App() {
                       if (!localFbo) {
                         return (
                           <p className="empty">
-                            No Base here yet
                             {playerFbos?.buyAtIcaoReason
-                              ? ` — ${playerFbos.buyAtIcaoReason}.`
-                              : airportIcao?.toUpperCase() ===
-                                  homeHubIcao.toUpperCase()
-                                ? ' — claim your free home Base for parking, Jet-A/MRO perks, and Dispatcher scout.'
-                                : ' — expand here after your home-hub Base (needs 2 owned aircraft + Cargo Ops Value).'}
+                              ? playerFbos.buyAtIcaoReason
+                              : 'No Base at this hub'}
                           </p>
                         );
                       }
@@ -10775,26 +10803,12 @@ export function App() {
                       );
                       return (
                         <>
-                          <div className="panel-head">
-                            <div>
-                              <p className="muted">
-                                T{localFbo.tier}
-                                {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
-                                {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
-                              </p>
-                              {companyCrew && companyCrew.slotsUnlocked > 0 ? (
-                                <p className="hint">
-                                  Crew {companyCrew.slotsInUse}/
-                                  {companyCrew.slotsUnlocked}
-                                  {companyCrew.slotsFree > 0
-                                    ? ` · ${companyCrew.slotsFree} idle`
-                                    : ''}
-                                  {companyCrew.members?.[0]
-                                    ? ` · ${companyCrew.members[0].displayName} @ ${companyCrew.members[0].status === 'airborne' && companyCrew.members[0].originIcao && companyCrew.members[0].destIcao ? `${companyCrew.members[0].originIcao}→${companyCrew.members[0].destIcao}` : companyCrew.members[0].locationIcao}`
-                                    : ''}
-                                </p>
-                              ) : null}
-                            </div>
+                          <div className="panel-head base-tier-head">
+                            <p className="muted base-tier-line">
+                              T{localFbo.tier}
+                              {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
+                              {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
+                            </p>
                             {localFbo.canUpgradeToTier2 ? (
                               <button
                                 type="button"
@@ -10802,7 +10816,7 @@ export function App() {
                                 disabled={busy}
                                 onClick={() => void onUpgradeFbo(localFbo.id)}
                               >
-                                Upgrade to T2
+                                Upgrade T2
                                 {localFbo.upgradeUsd != null
                                   ? ` · ${formatMoney(localFbo.upgradeUsd)}`
                                   : ''}
@@ -10810,7 +10824,6 @@ export function App() {
                             ) : null}
                           </div>
                           <div className="base-dispatcher-desk ports-desk-block">
-                            <p className="muted">Dispatcher desk</p>
                             {(() => {
                               const seat =
                                 (baseDispatcher?.members ?? []).find(
@@ -10825,14 +10838,11 @@ export function App() {
                               return (
                                 <>
                                   <div className="crew-section">
-                                    <h4 className="crew-section-title">
-                                      {seat ? 'On duty' : 'Hire desk'}
-                                    </h4>
-                                    <p className="muted crew-section-lede">
-                                      {seat
-                                        ? seat.perkHint
-                                        : '1 seat · unlocks fleet scout + ferry ranking'}
-                                    </p>
+                                    {!seat ? (
+                                      <h4 className="crew-section-title">
+                                        Dispatcher
+                                      </h4>
+                                    ) : null}
                                     {seat ? (
                                       <ul className="crew-person-grid">
                                         <li className="crew-person-card">
@@ -10847,18 +10857,10 @@ export function App() {
                                               <strong className="crew-person-name">
                                                 {seat.displayName}
                                               </strong>
-                                              <span className="crew-status idle">
-                                                On duty
-                                              </span>
-                                            </div>
-                                            <p className="crew-person-perk">
                                               <span className="crew-perk-tag">
                                                 {seat.gradeLabel}
                                               </span>
-                                              <span className="crew-perk-tag">
-                                                Dispatcher
-                                              </span>
-                                            </p>
+                                            </div>
                                             <p className="crew-card-meta">
                                               {formatMoney(seat.salaryUsdPerDay)}
                                               /day
@@ -10886,9 +10888,7 @@ export function App() {
                                         </li>
                                       </ul>
                                     ) : pool.length === 0 ? (
-                                      <p className="empty">
-                                        No candidates today — try Scan.
-                                      </p>
+                                      <p className="empty">No candidates</p>
                                     ) : (
                                       <ul className="crew-person-grid">
                                         {pool.map((c) => (
@@ -10912,10 +10912,6 @@ export function App() {
                                                 </span>
                                               </div>
                                               <p className="crew-card-meta">
-                                                {c.perkHint}
-                                              </p>
-                                              <p className="crew-card-meta">
-                                                Salary{' '}
                                                 {formatMoney(c.salaryUsdPerDay)}
                                                 /day
                                               </p>
@@ -10949,12 +10945,12 @@ export function App() {
                                       <div className="base-dispatcher-scout-head">
                                         <div>
                                           <h4 className="crew-section-title">
-                                            Active Tour
+                                            Tour
                                           </h4>
                                           <p className="muted crew-section-lede">
                                             {activeTour.routeLabel}
                                             {activeTour.aircraftLocationIcao
-                                              ? ` · aircraft @ ${activeTour.aircraftLocationIcao}`
+                                              ? ` · ${activeTour.aircraftLocationIcao}`
                                               : ''}
                                           </p>
                                         </div>
@@ -10977,7 +10973,7 @@ export function App() {
                                               void onDropActiveTour()
                                             }
                                           >
-                                            Drop tour
+                                            Drop
                                           </button>
                                         </div>
                                       </div>
@@ -11017,11 +11013,11 @@ export function App() {
                                                     {leg.ferryNm > 0.5 ? (
                                                       <small className="muted">
                                                         {' '}
-                                                        · ferry{' '}
+                                                        ·{' '}
                                                         {Math.round(
                                                           leg.ferryNm,
                                                         )}{' '}
-                                                        nm
+                                                        nm ferry
                                                       </small>
                                                     ) : null}
                                                   </td>
@@ -11054,9 +11050,6 @@ export function App() {
                                                         }
                                                       >
                                                         Accept L{leg.index}
-                                                        {activeTour.nextLegNeedsRebind
-                                                          ? ' · rebind'
-                                                          : ''}
                                                       </button>
                                                     ) : isNext &&
                                                       activeTour.acceptBlockedReason ? (
@@ -11073,32 +11066,14 @@ export function App() {
                                           </tbody>
                                         </table>
                                       </div>
-                                      <p className="muted base-dispatch-tour-lede">
-                                        Finish the current leg, ferry to the
-                                        next origin if needed, then Accept L
-                                        {activeTour.nextLegIndex ?? 'n'} to open
-                                        Manifest — lots are not reserved ahead
-                                        of time.
-                                      </p>
                                     </div>
                                   ) : null}
 
                                   <div className="crew-section base-dispatcher-scout">
                                     <div className="base-dispatcher-scout-head">
-                                      <div>
-                                        <h4 className="crew-section-title">
-                                          Market freights
-                                        </h4>
-                                        <p className="muted crew-section-lede">
-                                          {dispatchTourLoading
-                                            ? 'Searching tours…'
-                                            : dispatchScoutLoading
-                                              ? 'Scanning board…'
-                                              : mode === 'fleet'
-                                                ? `Fleet scout · ${localFbo.icao} region · Scan or Search tour`
-                                                : `Manual · ${localFbo.icao} region · at-origin · max 3`}
-                                        </p>
-                                      </div>
+                                      <h4 className="crew-section-title">
+                                        Freights
+                                      </h4>
                                       <div className="base-dispatcher-scout-actions">
                                         <button
                                           type="button"
@@ -11117,15 +11092,6 @@ export function App() {
 
                                     {mode === 'fleet' ? (
                                       <div className="base-dispatch-tour-filters">
-                                        <p className="muted base-dispatch-tour-lede">
-                                          Search multi-leg tours from open
-                                          Market lots (up to 8 options). Empty
-                                          Min/Max use tour defaults (softer than
-                                          Scan). Accept L1 opens Manifest so
-                                          you can pick the aircraft at origin;
-                                          Accept &amp; Dispatch starts Active
-                                          Tour.
-                                        </p>
                                         <div className="base-dispatch-tour-grid">
                                           <label>
                                             <span>Aircraft</span>
@@ -11208,7 +11174,7 @@ export function App() {
                                               type="number"
                                               min={0}
                                               step={10}
-                                              placeholder="auto ~120 jet"
+                                              placeholder="auto"
                                               value={dispatchTourMinNm}
                                               onChange={(e) =>
                                                 setDispatchTourMinNm(
@@ -11226,7 +11192,7 @@ export function App() {
                                               type="number"
                                               min={0}
                                               step={50}
-                                              placeholder="none"
+                                              placeholder="—"
                                               value={dispatchTourMaxNm}
                                               onChange={(e) =>
                                                 setDispatchTourMaxNm(
@@ -11281,19 +11247,14 @@ export function App() {
                                           </div>
                                         </div>
                                       </div>
-                                    ) : (
-                                      <p className="muted base-dispatch-tour-lede">
-                                        Hire a Dispatcher to unlock Search
-                                        tour (2–3 Market legs).
-                                      </p>
-                                    )}
+                                    ) : null}
 
                                     {dispatchDeskMode === 'tours' ? (
                                       dispatchTours.length === 0 ? (
                                         <p className="empty">
                                           {dispatchTourLoading
-                                            ? 'Chaining Market lots…'
-                                            : 'No chained tours — set Min nm to 40, widen Origin, or use Scan for single freights.'}
+                                            ? 'Searching…'
+                                            : 'No tours'}
                                         </p>
                                       ) : (
                                         <table className="data-table base-dispatch-freight-table">
@@ -11345,7 +11306,6 @@ export function App() {
                                                       },
                                                     ).length
                                                   : 0;
-                                              // Only mark rows when the list is mixed — all-match is already the filter.
                                               const highlightMatches =
                                                 matchCount > 0 &&
                                                 matchCount <
@@ -11426,18 +11386,23 @@ export function App() {
                                                     <span className="route">
                                                       {tour.routeLabel}
                                                     </span>
+                                                    {tour.totalFerryNm > 0.5 ? (
+                                                      <span className="base-dispatch-ferry-tag">
+                                                        Ferry{' '}
+                                                        {Math.round(
+                                                          tour.totalFerryNm,
+                                                        )}{' '}
+                                                        nm
+                                                      </span>
+                                                    ) : null}
                                                     {filterMatch ? (
                                                       <span className="base-dispatch-match-tag">
                                                         {dispatchTourReturnMode ===
                                                         'base'
-                                                          ? 'Ends Base'
-                                                          : 'Ends origin'}
+                                                          ? 'Base'
+                                                          : 'Origin'}
                                                       </span>
                                                     ) : null}
-                                                    <small className="muted">
-                                                      {' '}
-                                                      {tour.reason}
-                                                    </small>
                                                   </td>
                                                   <td>{tour.legCount}</td>
                                                   <td>
@@ -11503,10 +11468,8 @@ export function App() {
                                       0 ? (
                                       <p className="empty">
                                         {dispatchScoutLoading
-                                          ? 'Scanning open freights…'
-                                          : mode === 'fleet'
-                                            ? 'No positive-net matches for parked fleet — ferry in range, Scan, or Search.'
-                                            : 'No matches at origin — park there and Scan, or hire a Dispatcher.'}
+                                          ? 'Scanning…'
+                                          : 'No freights'}
                                       </p>
                                     ) : (
                                       <table className="data-table base-dispatch-freight-table">
@@ -11736,8 +11699,8 @@ export function App() {
                             })()}
                             idleHint={
                               dispatchDeskMode === 'tours'
-                                ? 'Select a tour row — solid cargo legs, dashed ferry between lots.'
-                                : 'Select a Market freight row above to preview the route.'
+                                ? 'Select a tour'
+                                : 'Select a freight'
                             }
                             routeProgress={(() => {
                               if (!selectedFboMissionId) return null;
@@ -11787,10 +11750,7 @@ export function App() {
                           />
                           {localHolds.length === 0 ? (
                             FBO_BONDED_HOLD_ENABLED ? (
-                              <p className="empty">
-                                No bonded holds — use Hold at Base on an outbound
-                                contract.
-                              </p>
+                              <p className="empty">No holds</p>
                             ) : null
                           ) : (
                             <table className="data-table fbo-holds-table">

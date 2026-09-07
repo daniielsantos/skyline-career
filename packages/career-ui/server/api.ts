@@ -182,9 +182,11 @@ import {
   activeTourView,
   acceptActiveTourLeg,
   dropActiveTour,
+  dropPreparedActiveTourIfUnbound,
   syncActiveTour,
   attachActiveTourFromMission,
   bindActiveTourLegToMission,
+  prepareActiveTour,
   resolveBaseDispatchScoutPolicy,
   baseDispatcherSnapshot,
   hireBaseDispatcherCandidate,
@@ -4227,7 +4229,7 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'POST' && path === '/api/base/dispatch-tours') {
         const body = (await readBody(req)) as {
-          action?: 'list' | 'confirm' | 'status' | 'accept-leg' | 'drop' | 'attach' | 'bind-leg';
+          action?: 'list' | 'confirm' | 'status' | 'accept-leg' | 'drop' | 'drop-unbound' | 'prepare' | 'attach' | 'bind-leg';
           hubIcao?: string;
           aircraftId?: string;
           originIcao?: string;
@@ -4316,6 +4318,51 @@ export function createCareerApiServer(port = 8787) {
                 activeTour: null as null,
                 policy: resolveBaseDispatchScoutPolicy(missions),
                 dispatcher: baseDispatcherSnapshot(missions, world),
+              };
+            }, { persist: 'company', housekeeping: false });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'prepare') {
+            if (
+              !body.aircraftId?.trim() ||
+              !Array.isArray(body.tourLegs) ||
+              body.tourLegs.length < 2
+            ) {
+              send(res, 400, {
+                error: 'aircraftId and tourLegs (2+) required',
+              });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              prepareActiveTour(missions, world, {
+                aircraftId: body.aircraftId!,
+                hubIcao:
+                  hubIcao ||
+                  body.tourLegs![0]!.originIcao.trim().toUpperCase(),
+                tourId: body.tourId,
+                routeLabel: body.routeLabel,
+                legs: body.tourLegs!,
+              });
+              return {
+                activeTour: activeTourView(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, { persist: 'company', housekeeping: false });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'drop-unbound') {
+            const result = await withCareerWrite((world, missions) => {
+              dropPreparedActiveTourIfUnbound(missions);
+              return {
+                activeTour: activeTourView(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
               };
             }, { persist: 'company', housekeeping: false });
             send(res, 200, result);

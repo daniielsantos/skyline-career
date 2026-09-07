@@ -20,6 +20,8 @@ const ROUTE_SOURCE_ID = 'dispatch-route';
 const ROUTE_LAYER_ID = 'dispatch-route-line';
 const FERRY_SOURCE_ID = 'dispatch-route-ferry';
 const FERRY_LAYER_ID = 'dispatch-route-ferry-line';
+/** Match `.base-dispatch-ferry-tag` accent (`--accent`). */
+const FERRY_LINE_COLOR = '#f0a35a';
 
 export type DispatchRouteEndpoint = {
   icao: string;
@@ -261,29 +263,35 @@ function ensureRouteLayer(map: Map): void {
 }
 
 function ensureFerryLayer(map: Map): void {
-  if (map.getSource(FERRY_SOURCE_ID)) return;
-  map.addSource(FERRY_SOURCE_ID, {
-    type: 'geojson',
-    data: {
-      type: 'FeatureCollection',
-      features: [],
-    },
-  });
-  map.addLayer({
-    id: FERRY_LAYER_ID,
-    type: 'line',
-    source: FERRY_SOURCE_ID,
-    layout: {
-      'line-cap': 'round',
-      'line-join': 'round',
-    },
-    paint: {
-      'line-color': '#9aa4b2',
-      'line-width': 2,
-      'line-opacity': 0.75,
-      'line-dasharray': [1.2, 1.8],
-    },
-  });
+  if (!map.getSource(FERRY_SOURCE_ID)) {
+    map.addSource(FERRY_SOURCE_ID, {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [],
+      },
+    });
+    map.addLayer({
+      id: FERRY_LAYER_ID,
+      type: 'line',
+      source: FERRY_SOURCE_ID,
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round',
+      },
+      paint: {
+        'line-color': FERRY_LINE_COLOR,
+        'line-width': 2,
+        'line-opacity': 0.9,
+        'line-dasharray': [1.2, 1.8],
+      },
+    });
+    return;
+  }
+  if (map.getLayer(FERRY_LAYER_ID)) {
+    map.setPaintProperty(FERRY_LAYER_ID, 'line-color', FERRY_LINE_COLOR);
+    map.setPaintProperty(FERRY_LAYER_ID, 'line-opacity', 0.9);
+  }
 }
 
 function emptyLineFeature() {

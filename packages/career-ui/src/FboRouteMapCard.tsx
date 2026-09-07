@@ -285,10 +285,6 @@ export function FboRouteMapCard(props: {
     ? `${props.routeHeadline?.trim() || cargoLabel}${distLabel}${ferryLabel}${progressLabel}`
     : (props.idleHeadline ?? `${baseCode} · company base`);
 
-  const hasFerrySegment = Boolean(
-    segments?.some((s) => s.kind === 'ferry'),
-  );
-
   return (
     <section className="fbo-route-map-card" aria-label="Company base route map">
       <div className="dispatch-route-map-head">
@@ -329,11 +325,6 @@ export function FboRouteMapCard(props: {
           {destCode && missing.includes(destCode)
             ? `Missing coords for ${destCode}.`
             : 'Drawing route…'}
-        </p>
-      ) : null}
-      {showRoute && hasFerrySegment ? (
-        <p className="fbo-route-map-hint">
-          Solid = cargo legs · dashed = ferry between lots (still 2 revenue legs).
         </p>
       ) : null}
       {showRoute && aircraft && props.aircraftLabel ? (

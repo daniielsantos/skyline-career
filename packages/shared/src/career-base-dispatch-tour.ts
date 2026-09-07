@@ -844,11 +844,16 @@ export function syncActiveTour(
       }
       continue;
     }
+    // Prepared tour (all planned) or mid-leg after cancel: no matching mission.
     if (leg.status === 'active') {
       leg.status = lotStillOpen(state, world, leg.lotId) ? 'planned' : 'lost';
       leg.missionId = undefined;
     } else if (leg.status === 'planned' && !lotStillOpen(state, world, leg.lotId)) {
-      leg.status = 'lost';
+      // Lot may be reserved/in_transit on the player's mission — do not mark lost.
+      const lot = world.lots.find((l) => l.id === leg.lotId);
+      if (!lot || lot.status === 'expired' || lot.status === 'delivered') {
+        leg.status = 'lost';
+      }
     } else if (leg.status === 'lost' && lotStillOpen(state, world, leg.lotId)) {
       leg.status = 'planned';
     }
@@ -921,6 +926,61 @@ export function dropActiveTour(state: CareerMissionsState): void {
 }
 
 /**
+ * Persist the Search itinerary as Active Tour before Manifest commit.
+ * Legs stay `planned` until attach/bind (or sync finds a matching mission).
+ * Survives refresh/rebuild — unlike React-only pendingActiveTour.
+ */
+export function prepareActiveTour(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    aircraftId: string;
+    hubIcao: string;
+    tourId?: string;
+    routeLabel?: string;
+    legs: BaseDispatchTourLeg[];
+  },
+): ActiveTour {
+  if (!opts.legs || opts.legs.length < 2) {
+    throw new Error('Active Tour needs at least 2 legs');
+  }
+  const acf = state.fleet.find((a) => a.id === opts.aircraftId);
+  if (!acf) throw new Error('Unknown aircraft for Active Tour');
+  const fbos = ensurePlayerFbos(state);
+  const legs: ActiveTourLeg[] = opts.legs.map((leg, i) => ({
+    index: i + 1,
+    lotId: leg.lotId,
+    originIcao: leg.originIcao.trim().toUpperCase(),
+    destIcao: leg.destIcao.trim().toUpperCase(),
+    commodityId: leg.commodityId as CommodityId,
+    liftKg: leg.liftKg,
+    distanceNm: leg.distanceNm,
+    ferryNm: leg.ferryNm,
+    payUsd: leg.payUsd,
+    fuelCostUsd: leg.fuelCostUsd,
+    netUsd: leg.netUsd,
+    lastMile: leg.lastMile,
+    status: 'planned' as ActiveTourLegStatus,
+  }));
+  const tour: ActiveTour = {
+    id: moneyTourId(),
+    tourTemplateId: opts.tourId,
+    aircraftId: opts.aircraftId,
+    aircraftClassId: acf.aircraftClassId as FreighterClassId,
+    airframeTypeId: acf.airframeTypeId,
+    hubIcao: opts.hubIcao.trim().toUpperCase(),
+    originIcao: legs[0]?.originIcao ?? '',
+    routeLabel:
+      opts.routeLabel?.trim() || formatTourRouteLabel(legs),
+    legs,
+    startedAtTick: world.tick,
+    status: 'active',
+  };
+  fbos.activeTour = tour;
+  return syncActiveTour(state, world) ?? tour;
+}
+
+/**
  * After Manifest Accept & Dispatch: attach the Search itinerary as Active Tour
  * using the mission just created (lot already accepted — do not re-accept).
  */
@@ -951,6 +1011,25 @@ export function attachActiveTourFromMission(
   // Prefer the hangar plane actually on the mission.
   const aircraftId =
     mission.aircraftId?.trim() || opts.aircraftId.trim();
+
+  // Upgrade a prepare()-d itinerary in place when lot chain matches.
+  const existing = getActiveTour(state);
+  const sameChain =
+    existing &&
+    existing.status === 'active' &&
+    existing.legs.length === opts.tourLegs.length &&
+    existing.legs.every(
+      (leg, i) => leg.lotId === opts.tourLegs[i]!.lotId,
+    );
+  if (sameChain && existing) {
+    existing.aircraftId = aircraftId;
+    const leg1 = existing.legs[0]!;
+    leg1.status = 'active';
+    leg1.missionId = mission.id;
+    ensurePlayerFbos(state).activeTour = existing;
+    return syncActiveTour(state, world) ?? existing;
+  }
+
   return startActiveTour(state, world, {
     aircraftId,
     hubIcao: opts.hubIcao,
@@ -959,6 +1038,23 @@ export function attachActiveTourFromMission(
     legs: opts.tourLegs,
     firstMission: mission,
   });
+}
+
+/**
+ * Drop Active Tour only when nothing was ever bound to a mission
+ * (Manifest cancel after prepare).
+ */
+export function dropPreparedActiveTourIfUnbound(
+  state: CareerMissionsState,
+): boolean {
+  const tour = getActiveTour(state);
+  if (!tour || tour.status !== 'active') return false;
+  const unbound = tour.legs.every(
+    (leg) => leg.status === 'planned' && !leg.missionId,
+  );
+  if (!unbound) return false;
+  dropActiveTour(state);
+  return true;
 }
 
 /**

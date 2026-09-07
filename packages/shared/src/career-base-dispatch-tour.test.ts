@@ -15,7 +15,9 @@ import {
   bindActiveTourLegToMission,
   confirmBaseDispatchTour,
   dropActiveTour,
+  dropPreparedActiveTourIfUnbound,
   listBaseDispatchTours,
+  prepareActiveTour,
 } from './career-base-dispatch-tour.js';
 import { buyFboTier1 } from './career-fbo.js';
 import { createSeedEconomyWorld } from './career-economy.js';
@@ -421,6 +423,110 @@ describe('base dispatch tours', () => {
     assert.equal(l2.rebound, false);
 
     dropActiveTour(state);
+    assert.equal(activeTourView(state, world), null);
+  });
+
+  it('prepareActiveTour persists itinerary; sync binds in-flight L1 without attach', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-prepare' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'TourPrepare',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    primeLot(world, {
+      id: 'prep_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'prepare L1',
+    });
+    primeLot(world, {
+      id: 'prep_l2',
+      originIcao: 'SBGL',
+      destIcao: 'SBSP',
+      quantityKg: 350,
+      payUsd: 4_200,
+      reason: 'prepare L2',
+    });
+
+    const prepared = prepareActiveTour(state, world, {
+      aircraftId: aircraft.id,
+      hubIcao: 'SBGR',
+      legs: [
+        {
+          lotId: 'prep_l1',
+          originIcao: 'SBGR',
+          destIcao: 'SBGL',
+          commodityId: 'general',
+          liftKg: 200,
+          distanceNm: 50,
+          ferryNm: 0,
+          payUsd: 5_000,
+          fuelCostUsd: 100,
+          netUsd: 4_900,
+          lastMile: false,
+        },
+        {
+          lotId: 'prep_l2',
+          originIcao: 'SBGL',
+          destIcao: 'SBSP',
+          commodityId: 'general',
+          liftKg: 180,
+          distanceNm: 40,
+          ferryNm: 0,
+          payUsd: 4_200,
+          fuelCostUsd: 80,
+          netUsd: 4_120,
+          lastMile: false,
+        },
+      ],
+      routeLabel: 'SBGR→SBGL→SBSP',
+    });
+    assert.equal(prepared.status, 'active');
+    assert.equal(prepared.legs[0]!.status, 'planned');
+    assert.ok(activeTourView(state, world));
+
+    // Manifest-style accept without attach — lot reserved, mission in flight.
+    const confirmed = confirmBaseDispatchTour(state, world, {
+      aircraftId: aircraft.id,
+      firstLotId: 'prep_l1',
+      hubIcao: 'SBGR',
+    });
+    confirmed.mission.status = 'in_flight';
+    const lot = world.lots.find((l) => l.id === 'prep_l1')!;
+    lot.status = 'reserved';
+    lot.reservedKg = lot.quantityKg;
+
+    const view = activeTourView(state, world);
+    assert.ok(view);
+    assert.equal(view!.legs[0]!.status, 'active');
+    assert.equal(view!.legs[0]!.missionId, confirmed.mission.id);
+
+    // Discard Manifest before bind: unbound prepare clears.
+    dropActiveTour(state);
+    state.missions = [];
+    prepareActiveTour(state, world, {
+      aircraftId: aircraft.id,
+      hubIcao: 'SBGR',
+      legs: prepared.legs.map((l) => ({
+        lotId: l.lotId,
+        originIcao: l.originIcao,
+        destIcao: l.destIcao,
+        commodityId: l.commodityId,
+        liftKg: l.liftKg,
+        distanceNm: l.distanceNm,
+        ferryNm: l.ferryNm,
+        payUsd: l.payUsd,
+        fuelCostUsd: l.fuelCostUsd,
+        netUsd: l.netUsd,
+        lastMile: l.lastMile,
+      })),
+    });
+    assert.equal(dropPreparedActiveTourIfUnbound(state), true);
     assert.equal(activeTourView(state, world), null);
   });
 

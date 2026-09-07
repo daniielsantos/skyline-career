@@ -2646,6 +2646,8 @@ export function postBaseDispatchTours(opts: {
     | 'status'
     | 'accept-leg'
     | 'drop'
+    | 'drop-unbound'
+    | 'prepare'
     | 'attach'
     | 'bind-leg';
   hubIcao?: string;

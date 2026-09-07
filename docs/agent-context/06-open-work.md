@@ -1,5 +1,27 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-07: **Manifest off-origin ferry** — Tour Accept stays on Manifest; fleet combo lists all parked (`ferry from ICAO`); Ferry opens `FerryJourneyDialog`; Accept blocked until at lot origin. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-07: **Tour Accept → Manifest** — Accept L1/L2 opens staging (pick aircraft @ origin); Active Tour attaches on Accept & Dispatch (`attach` / `bind-leg`). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-07: **Tour/Scout skip locked Cargo Ops** — Accept Trip was offering Perishables before Time unlock → banner “Perishables is locked”. Filter in scout + tour Search + rebind. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Active Tour shipped** — Accept L1 persists itinerary on `playerFbos.activeTour`; Accept L2/L3 from Base desk (rebind if lot gone); no multi-reserve. API `status`/`accept-leg`/`drop`. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Profile-gate warm before enter** — Continue/Create keep the save screen up while company + Freights board (`refresh` with explicit `market: true`) finish; `bootProfileKeyRef` skips the post-gate full refresh so Freights doesn’t flash Loading. Catch-up banner after long offline still OK. Code: `warmCareerBeforeEnter` in `App.tsx` + `ProfileGate` `busyLabel`.
+
+Atualizado 2026-09-06: **Base Dispatcher tour Search shipped** — `career-base-dispatch-tour` chains 2–3 Market lots (≤8 options in table); Accept L1 starts Active Tour. API `POST /api/base/dispatch-tours`. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Base Dispatcher hire lost on reload** — `normalizeMissionsState` + `readCompanyStateScalars` dropped `dispatchers` from `player_fbos_json` (wallet debit kept). Fix: preserve dispatcher fields on load. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **Runway Null Island repair** — 179 hubs com lat/lon 0,0 no catalog (SBCH debrief OFF + milhões m); `repair:runways:null-island` + guard runtime. Spec: [`25-runway-touchdown.md`](./25-runway-touchdown.md).
+
+Atualizado 2026-09-06: **Base Dispatcher seat + fleet scout shipped** — hire 1/Base (`career-base-dispatcher`); scout por frota + ferry score; manual desk sem hire. Multi-leg backlog. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **1ª Base free + Base Dispatcher scout shipped** — home Base CAPEX $0; Market single-leg desk (`career-base-dispatch-scout` / `POST /api/base/dispatch-scout`). Multi-leg backlog. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-06: **IH-1 Internal Haul shipped** — WH→WH pilot pay (suggest + 80–150%); settle `internal_haul_pay` ± (solo net 0); unpaid bridge + Port shuttle unchanged. Next: IH-2 members. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
 Atualizado 2026-09-06: **Port Scout Haul Phase 10 shipped** — WH → short-fill terminal (`listPortScoutHaulSuggestions` / confirm → `holdWarehouseHaul`); Ports desk **Hold Haul**. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 Atualizado 2026-09-06: **Port Scout Demand Phase 9 shipped** — WH stock → Demand board matches (`listPortScoutDemandSuggestions` / confirm → `holdDemandOrder`); Ports desk **Hold Demand**. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
@@ -361,7 +383,7 @@ Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). 
 - [ ] Watch solo: um pedido `readSimVars` (não 16 stations em série)
 - [ ] Watch no ar: tick de cruise ~5s no TIMEOUT (não ~45s); next tick `force: true`
 - [ ] Cruise burn: sample **antes** do weather ambient (wx TIMEOUT não pula o chip); TAS no flight batch; fallback se combustion flags zeram flow
-- [ ] Cruise sample 180s: VS 400 fpm / TAS 10% / flow 20% / alt 1200 ft — não zerar em bump mínimo; spike BURN **upward** (ghost Eng2+) não reseta; **corte de velocidade/flow reinicia** a janela (não congela)
+- [x] Cruise sample 180s: VS **400** fpm / TAS 10% / flow **28%** (AT hunt) / alt 1200 ft — não zerar em bump ALT HOLD; spike BURN **upward** (ghost Eng2+) não reseta; **corte de velocidade/flow reinicia** a janela (não congela)
 - [ ] Watch: TIMEOUT não fica em loop com pipe “up”; após backoff, sample volta
 - [ ] Reinject no solo após editar EFB: matching profile → fuel/cargo sem freeze em “Reading live aircraft…”
 - [ ] Caravan: leftover do Due divide L/R da fileira (não 192 num assento e 100 no outro)
@@ -611,11 +633,11 @@ Mensagem sugerida:
 - Map station roles + `maxPaxSeats` / SimBrief live max pax per type (B707 pattern), not pure freighter.
 - EFB path likely for many; inject only where proven.
 
-### Pilot travel (2026-08-21)
+### Pilot travel (2026-09-07)
 
-- Topbar **Pilot** metric opens `PilotTravelDialog` (hub combobox + fleet ICAO chips).
+- Single modal: `PilotTravelDialog` quotes in-place (nm/$), primary **Travel · $** executes — no second confirm.
+- Topbar **Pilot** → picker; Hangar **Travel here** opens same dialog with dest prefilled.
 - Hangar card: ferry/empty only; keep **Travel here** when pilot away.
-- Confirm of cost must render above travel overlay (close picker on Go; confirm z-index 120).
 
 ### Confirm / busy UX (2026-08-21)
 

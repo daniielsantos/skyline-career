@@ -82,6 +82,109 @@ describe('career fleet hangar', () => {
     assert.equal(migrated.homeHubIcao, 'SBGR');
   });
 
+  it('normalize preserves Base Dispatcher seat on playerFbos', () => {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBKP', {
+      pilotName: 'DispPersist',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.playerFbos = {
+      fbos: [
+        {
+          id: 'fbo_sbkp',
+          icao: 'SBKP',
+          tier: 1,
+          capacityKg: 3000,
+        },
+      ],
+      holds: [],
+      stock: [],
+      dispatchers: [
+        {
+          id: 'bd_1',
+          displayName: 'Quinn Hassan',
+          fboId: 'fbo_sbkp',
+          hubIcao: 'SBKP',
+          grade: 'solid',
+          skillPct: 82,
+          salaryUsdPerDay: 88,
+          hiredAtTick: 10,
+        },
+      ],
+      dispatcherHirePoolByHub: { SBKP: [] },
+      dispatcherHirePoolDayByHub: { SBKP: 1 },
+    };
+    const migrated = normalizeMissionsState(state);
+    assert.equal(migrated.playerFbos?.dispatchers?.length, 1);
+    assert.equal(
+      migrated.playerFbos?.dispatchers?.[0]?.displayName,
+      'Quinn Hassan',
+    );
+    assert.ok(migrated.playerFbos?.dispatcherHirePoolByHub);
+    assert.equal(migrated.playerFbos?.dispatcherHirePoolDayByHub?.SBKP, 1);
+  });
+
+  it('preserves Active Tour on normalizeMissionsState', () => {
+    const state = emptyMissionsStateV2();
+    state.playerFbos = {
+      fbos: [
+        {
+          id: 'fbo_sbkp',
+          icao: 'SBKP',
+          tier: 1,
+          capacityKg: 3000,
+        },
+      ],
+      holds: [],
+      stock: [],
+      activeTour: {
+        id: 'tour_1',
+        aircraftId: 'acf_1',
+        aircraftClassId: 'light_ga',
+        hubIcao: 'SBKP',
+        originIcao: 'SBKP',
+        routeLabel: 'SBKP→SBGR→SBSP',
+        startedAtTick: 10,
+        status: 'active',
+        legs: [
+          {
+            index: 1,
+            lotId: 'lot_a',
+            originIcao: 'SBKP',
+            destIcao: 'SBGR',
+            commodityId: 'general',
+            liftKg: 200,
+            distanceNm: 50,
+            ferryNm: 0,
+            payUsd: 1000,
+            fuelCostUsd: 100,
+            netUsd: 900,
+            lastMile: false,
+            status: 'done',
+          },
+          {
+            index: 2,
+            lotId: 'lot_b',
+            originIcao: 'SBGR',
+            destIcao: 'SBSP',
+            commodityId: 'general',
+            liftKg: 180,
+            distanceNm: 40,
+            ferryNm: 0,
+            payUsd: 900,
+            fuelCostUsd: 80,
+            netUsd: 820,
+            lastMile: false,
+            status: 'planned',
+          },
+        ],
+      },
+    };
+    const migrated = normalizeMissionsState(state);
+    assert.equal(migrated.playerFbos?.activeTour?.id, 'tour_1');
+    assert.equal(migrated.playerFbos?.activeTour?.legs.length, 2);
+    assert.equal(migrated.playerFbos?.activeTour?.legs[1]?.status, 'planned');
+  });
+
   it('selectStarterHub lets the pilot pick a light GA starter', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBPA', {
       ...pilot,

@@ -148,6 +148,7 @@ import {
   cancelWarehouseBridgeHold,
   acceptWarehouseBridge,
   dispatchWarehouseBridgeHold,
+  quoteInternalHaulForRoute,
   holdWarehouseHaul,
   cancelWarehouseHaulHold,
   acceptWarehouseHaul,
@@ -174,6 +175,21 @@ import {
   confirmPortScoutDemand,
   listPortScoutHaulSuggestions,
   confirmPortScoutHaul,
+  listBaseDispatchScoutSuggestions,
+  confirmBaseDispatchScout,
+  listBaseDispatchTours,
+  confirmBaseDispatchTour,
+  activeTourView,
+  acceptActiveTourLeg,
+  dropActiveTour,
+  syncActiveTour,
+  attachActiveTourFromMission,
+  bindActiveTourLegToMission,
+  resolveBaseDispatchScoutPolicy,
+  baseDispatcherSnapshot,
+  hireBaseDispatcherCandidate,
+  fireBaseDispatcherMember,
+  refreshBaseDispatcherHirePool,
   quotePortShuttleBridgeHold,
   dispatchPortShuttleBridgeHold,
   FERRY_SOFT_NM_BUDGET,
@@ -4138,6 +4154,424 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/base/dispatch-scout') {
+        const body = (await readBody(req)) as {
+          action?: 'list' | 'confirm';
+          lotId?: string;
+          aircraftId?: string;
+          kg?: number;
+          minNm?: number;
+          minKg?: number;
+          excludeLastMile?: boolean;
+          hubIcao?: string;
+        };
+        const action = body.action ?? 'list';
+        const hubIcao = body.hubIcao?.trim().toUpperCase() || undefined;
+        try {
+          if (action === 'list') {
+            const missions = await loadMissions();
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            const policy = resolveBaseDispatchScoutPolicy(missions);
+            send(res, 200, {
+              suggestions: listBaseDispatchScoutSuggestions(missions, world, {
+                aircraftId: body.aircraftId,
+                minNm: body.minNm != null ? Number(body.minNm) : undefined,
+                minKg: body.minKg != null ? Number(body.minKg) : undefined,
+                excludeLastMile: body.excludeLastMile,
+                hubIcao,
+              }),
+              policy,
+              dispatcher: baseDispatcherSnapshot(missions, world),
+            });
+            return;
+          }
+          if (!body.lotId?.trim() || !body.aircraftId?.trim()) {
+            send(res, 400, { error: 'lotId and aircraftId required' });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const confirmed = confirmBaseDispatchScout(missions, world, {
+              lotId: body.lotId!,
+              aircraftId: body.aircraftId!,
+              kg: body.kg != null ? Number(body.kg) : undefined,
+              hubIcao,
+            });
+            const policy = resolveBaseDispatchScoutPolicy(missions);
+            return {
+              mission: withMissionClientView(world, missions, confirmed.mission),
+              kg: confirmed.kg,
+              suggestions: listBaseDispatchScoutSuggestions(missions, world, {
+                hubIcao,
+              }),
+              policy,
+              dispatcher: baseDispatcherSnapshot(missions, world),
+              walletUsd: missions.walletUsd,
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+            };
+          }, { commandSliceLotIds: [body.lotId], housekeeping: false });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/base/dispatch-tours') {
+        const body = (await readBody(req)) as {
+          action?: 'list' | 'confirm' | 'status' | 'accept-leg' | 'drop' | 'attach' | 'bind-leg';
+          hubIcao?: string;
+          aircraftId?: string;
+          originIcao?: string;
+          legs?: number;
+          minNm?: number;
+          maxNm?: number | null;
+          minKg?: number;
+          returnMode?: 'none' | 'origin' | 'base';
+          excludeLastMile?: boolean;
+          firstLotId?: string;
+          kg?: number;
+          tourId?: string;
+          routeLabel?: string;
+          tourLegs?: Array<{
+            lotId: string;
+            originIcao: string;
+            destIcao: string;
+            commodityId: string;
+            liftKg: number;
+            distanceNm: number;
+            ferryNm: number;
+            payUsd: number;
+            fuelCostUsd: number;
+            netUsd: number;
+            lastMile: boolean;
+          }>;
+          legIndex?: number;
+          missionId?: string;
+        };
+        const action = body.action ?? 'list';
+        const hubIcao = body.hubIcao?.trim().toUpperCase() || undefined;
+        try {
+          if (action === 'list') {
+            if (!hubIcao) {
+              send(res, 400, { error: 'hubIcao required' });
+              return;
+            }
+            const missions = await loadMissions();
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            const maxNmRaw =
+              body.maxNm == null ? null : Number(body.maxNm);
+            const policy = resolveBaseDispatchScoutPolicy(missions);
+            syncActiveTour(missions, world);
+            send(res, 200, {
+              tours: listBaseDispatchTours(missions, world, {
+                hubIcao,
+                aircraftId: body.aircraftId,
+                originIcao: body.originIcao,
+                legs: body.legs != null ? Number(body.legs) : undefined,
+                minNm: body.minNm != null ? Number(body.minNm) : undefined,
+                maxNm:
+                  maxNmRaw != null && Number.isFinite(maxNmRaw) && maxNmRaw > 0
+                    ? maxNmRaw
+                    : null,
+                minKg: body.minKg != null ? Number(body.minKg) : undefined,
+                returnMode: body.returnMode,
+                excludeLastMile: body.excludeLastMile,
+              }),
+              activeTour: activeTourView(missions, world),
+              policy,
+              dispatcher: baseDispatcherSnapshot(missions, world),
+            });
+            return;
+          }
+          if (action === 'status') {
+            const result = await withCareerWrite((world, missions) => {
+              syncActiveTour(missions, world);
+              return {
+                activeTour: activeTourView(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, { persist: 'company', housekeeping: false });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'drop') {
+            const result = await withCareerWrite((world, missions) => {
+              dropActiveTour(missions);
+              return {
+                activeTour: null as null,
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+              };
+            }, { persist: 'company', housekeeping: false });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'attach') {
+            if (
+              !body.missionId?.trim() ||
+              !body.aircraftId?.trim() ||
+              !Array.isArray(body.tourLegs) ||
+              body.tourLegs.length < 2
+            ) {
+              send(res, 400, {
+                error: 'missionId, aircraftId, and tourLegs (2+) required',
+              });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              const attached = attachActiveTourFromMission(missions, world, {
+                missionId: body.missionId!,
+                aircraftId: body.aircraftId!,
+                hubIcao:
+                  hubIcao ||
+                  missions.homeHubIcao?.trim().toUpperCase() ||
+                  body.tourLegs![0]!.originIcao,
+                tourLegs: body.tourLegs!,
+                tourId: body.tourId,
+                routeLabel: body.routeLabel,
+              });
+              return {
+                activeTour: activeTourView(missions, world),
+                tour: attached,
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+              };
+            }, { persist: 'company', housekeeping: false });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'bind-leg') {
+            if (!body.missionId?.trim() || body.legIndex == null) {
+              send(res, 400, { error: 'missionId and legIndex required' });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              const activeTour = bindActiveTourLegToMission(missions, world, {
+                legIndex: Number(body.legIndex),
+                missionId: body.missionId!,
+              });
+              return {
+                activeTour,
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+              };
+            }, { persist: 'company', housekeeping: false });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'accept-leg') {
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              const accepted = acceptActiveTourLeg(missions, world, {
+                legIndex:
+                  body.legIndex != null ? Number(body.legIndex) : undefined,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              });
+              return {
+                mission: withMissionClientView(
+                  world,
+                  missions,
+                  accepted.mission,
+                ),
+                kg: accepted.kg,
+                tourLegIndex: accepted.tourLegIndex,
+                rebound: accepted.rebound,
+                activeTour: accepted.activeTour,
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                walletUsd: missions.walletUsd,
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, {
+              housekeeping: false,
+            });
+            send(res, 200, result);
+            return;
+          }
+          if (!body.firstLotId?.trim() || !body.aircraftId?.trim()) {
+            send(res, 400, { error: 'firstLotId and aircraftId required' });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const confirmed = confirmBaseDispatchTour(missions, world, {
+              firstLotId: body.firstLotId!,
+              aircraftId: body.aircraftId!,
+              kg: body.kg != null ? Number(body.kg) : undefined,
+              hubIcao,
+              tourId: body.tourId,
+              routeLabel: body.routeLabel,
+              tourLegs: body.tourLegs,
+            });
+            const policy = resolveBaseDispatchScoutPolicy(missions);
+            return {
+              mission: withMissionClientView(
+                world,
+                missions,
+                confirmed.mission,
+              ),
+              kg: confirmed.kg,
+              tourLegIndex: confirmed.tourLegIndex,
+              activeTour: confirmed.activeTour
+                ? activeTourView(missions, world)
+                : null,
+              tours: hubIcao
+                ? listBaseDispatchTours(missions, world, {
+                    hubIcao,
+                    aircraftId: body.aircraftId,
+                    originIcao: body.originIcao,
+                    legs: body.legs != null ? Number(body.legs) : undefined,
+                    minNm: body.minNm != null ? Number(body.minNm) : undefined,
+                    returnMode: body.returnMode,
+                  })
+                : [],
+              suggestions: listBaseDispatchScoutSuggestions(missions, world, {
+                hubIcao,
+              }),
+              policy,
+              dispatcher: baseDispatcherSnapshot(missions, world),
+              walletUsd: missions.walletUsd,
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+              playerFbos: playerFboSnapshot(missions, world),
+            };
+          }, {
+            commandSliceLotIds: [body.firstLotId],
+            housekeeping: false,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/base/dispatcher') {
+        const body = (await readBody(req)) as {
+          action?: 'list' | 'hire' | 'fire' | 'refresh';
+          fboId?: string;
+          hubIcao?: string;
+          candidateId?: string;
+          memberId?: string;
+        };
+        const action = body.action ?? 'list';
+        try {
+          if (action === 'list') {
+            const missions = await loadMissions();
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            send(res, 200, {
+              dispatcher: baseDispatcherSnapshot(missions, world, {
+                hubIcao: body.hubIcao,
+              }),
+              policy: resolveBaseDispatchScoutPolicy(missions),
+            });
+            return;
+          }
+          if (action === 'refresh') {
+            const result = await withCareerWrite((world, missions) => {
+              refreshBaseDispatcherHirePool(missions, world, {
+                hubIcao: body.hubIcao,
+                force: true,
+              });
+              return {
+                dispatcher: baseDispatcherSnapshot(missions, world, {
+                  hubIcao: body.hubIcao,
+                }),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+              };
+            }, { persist: 'company' });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'hire') {
+            if (!body.fboId?.trim() || !body.candidateId?.trim()) {
+              send(res, 400, { error: 'fboId and candidateId required' });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              const hired = hireBaseDispatcherCandidate(missions, world, {
+                fboId: body.fboId!.trim(),
+                candidateId: body.candidateId!.trim(),
+              });
+              return {
+                member: hired.member,
+                debitUsd: hired.debitUsd,
+                walletUsd: missions.walletUsd,
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                suggestions: listBaseDispatchScoutSuggestions(missions, world),
+              };
+            }, { persist: 'company' });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'fire') {
+            if (!body.memberId?.trim()) {
+              send(res, 400, { error: 'memberId required' });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              const fired = fireBaseDispatcherMember(
+                missions,
+                world,
+                body.memberId!.trim(),
+              );
+              return {
+                member: fired.member,
+                debitUsd: fired.debitUsd,
+                walletUsd: missions.walletUsd,
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                suggestions: listBaseDispatchScoutSuggestions(missions, world),
+              };
+            }, { persist: 'company' });
+            send(res, 200, result);
+            return;
+          }
+          send(res, 400, { error: 'Unknown action' });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/ports/scout') {
         const body = (await readBody(req)) as {
           action?: 'list' | 'confirm';
@@ -4591,12 +5025,44 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/warehouses/bridge/quote') {
+        const body = (await readBody(req)) as {
+          originIcao?: string;
+          destIcao?: string;
+          kg?: number;
+        };
+        if (!body.originIcao || !body.destIcao) {
+          send(res, 400, { error: 'originIcao and destIcao required' });
+          return;
+        }
+        try {
+          const world = requireStore().peekEconomyWorld();
+          if (!world) {
+            send(res, 503, { error: 'Economy not loaded' });
+            return;
+          }
+          send(res, 200, {
+            quote: quoteInternalHaulForRoute(world, {
+              originIcao: body.originIcao,
+              destIcao: body.destIcao,
+              kg: body.kg != null ? Number(body.kg) : 0,
+            }),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/warehouses/bridge/hold') {
         const body = (await readBody(req)) as {
           originIcao?: string;
           destIcao?: string;
           commodityId?: string;
           kg?: number;
+          pilotPayUsd?: number | null;
         };
         if (!body.originIcao || !body.destIcao || !body.commodityId) {
           send(res, 400, {
@@ -4613,10 +5079,17 @@ export function createCareerApiServer(port = 8787) {
                 destIcao: body.destIcao!,
                 commodityId: body.commodityId as CommodityId,
                 kg: body.kg != null ? Number(body.kg) : undefined,
+                pilotPayUsd:
+                  body.pilotPayUsd === null
+                    ? 0
+                    : body.pilotPayUsd != null
+                      ? Number(body.pilotPayUsd)
+                      : undefined,
               });
               return {
                 hold: held.hold,
                 kg: held.kg,
+                pilotPayUsd: held.pilotPayUsd,
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             });
@@ -4662,6 +5135,7 @@ export function createCareerApiServer(port = 8787) {
           commodityId?: string;
           aircraftId?: string;
           kg?: number;
+          pilotPayUsd?: number | null;
         };
         if (
           !body.originIcao ||
@@ -4684,12 +5158,19 @@ export function createCareerApiServer(port = 8787) {
                 commodityId: body.commodityId as CommodityId,
                 aircraftId: body.aircraftId!,
                 kg: body.kg != null ? Number(body.kg) : undefined,
+                pilotPayUsd:
+                  body.pilotPayUsd === null
+                    ? 0
+                    : body.pilotPayUsd != null
+                      ? Number(body.pilotPayUsd)
+                      : undefined,
               });
               const warehouses = playerWarehouseSnapshot(missions, world);
               return {
                 walletUsd: missions.walletUsd,
                 mission: withMissionClientView(world, missions, accepted.mission),
                 kg: accepted.kg,
+                pilotPayUsd: accepted.pilotPayUsd,
                 warehouses,
                 fleet: missions.fleet,
                 missions: missions.missions.map((m) =>
@@ -4711,6 +5192,7 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           holdId?: string;
           aircraftId?: string;
+          pilotPayUsd?: number | null;
         };
         if (!body.holdId || !body.aircraftId) {
           send(res, 400, {
@@ -4725,6 +5207,12 @@ export function createCareerApiServer(port = 8787) {
               const dispatched = dispatchWarehouseBridgeHold(missions, world, {
                 holdId: body.holdId!,
                 aircraftId: body.aircraftId!,
+                pilotPayUsd:
+                  body.pilotPayUsd === null
+                    ? 0
+                    : body.pilotPayUsd != null
+                      ? Number(body.pilotPayUsd)
+                      : undefined,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -4734,6 +5222,7 @@ export function createCareerApiServer(port = 8787) {
                   dispatched.mission,
                 ),
                 kg: dispatched.kg,
+                pilotPayUsd: dispatched.pilotPayUsd,
                 warehouses: playerWarehouseSnapshot(missions, world),
                 fleet: missions.fleet,
                 missions: missions.missions.map((m) =>

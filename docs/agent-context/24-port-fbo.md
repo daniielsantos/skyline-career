@@ -1,6 +1,6 @@
 # Port FBO — chão, não ar
 
-Atualizado 2026-09-06. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle).
+Atualizado 2026-09-06. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + **fleet Market scout** (single-leg) + **tour Search** (2–3 Market legs) + **Active Tour** (Accept L2/L3, no multi-reserve).
 Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md), [`10-aircraft-pool.md`](./10-aircraft-pool.md) (lease-out).
 
 ## Fantasia (uma frase)
@@ -132,13 +132,21 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - Caps: max **1** active; classes **light_ga / light_turboprop** only; active Port FBO on origin pickup.
 - Costs: ledger `port_shuttle` fee (floor $100 + $/kg + $/nm) + Jet-A; **payUsd = 0** (no Demand/Market). No `crewRoundTrip` deadhead.
 - API `POST /api/ports/shuttle` (`quote` | `dispatch`); Ports Dispatch dialog **You fly** / **Port shuttle**.
+- **Recusa** Internal Haul holds com `pilotPayUsd` &gt; 0 (quote + dispatch).
 - **Não** reabre company crew Hangar/Market.
 
-### Phase 7 — shipped (Port Scout bridge)
+### Phase 7 — shipped (Port Scout bridge) · + IH-1 pay
 
-- `career-port-scout.ts`: lista sugestões WH→WH (≥200 kg, Port FBO no origin pickup, dest room); confirm → `holdWarehouseBridge` (sem payout).
+- `career-port-scout.ts`: lista sugestões WH→WH (≥200 kg, Port FBO no origin pickup, dest room); confirm → `holdWarehouseBridge` (**default suggest Internal Haul pay**; `$0` = unpaid for shuttle).
 - API `POST /api/ports/scout` (`list` | `confirm`); Ports UI desk **Hold bridge**.
-- Player Dispatch **ou** Phase 8 Port shuttle.
+- Player Dispatch (paid Internal Haul) **ou** Phase 8 Port shuttle (unpaid only).
+
+### IH-1 — shipped (Internal Haul pay)
+
+- `quoteInternalHaulPayUsd` / band 80–150%; APIs bridge hold/accept/dispatch + `/api/warehouses/bridge/quote`.
+- Mission flags: `warehouseBridge` + `internalHaul`; settle dest WH + ledger `internal_haul_pay` (± solo net 0).
+- Ports UI: bridge dialog slider; Dispatch shows frozen pay; shuttle disabled when paid.
+- Paths: `career-warehouse-bridge.ts`, settle em `career-mission.ts` / `applySettleWalletDeltas`.
 
 ### Phase 6 — shipped (company crew off)
 
@@ -160,6 +168,44 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - Player copy **Airport FBO → Base** (nav, buy/hold/upgrade, cashflow, help). **Port FBO** intacto.
 - Mantém parking / Jet-A / MRO perks (`career-fbo-perks.ts`). Spot continua 410. Phase 5 corta **novos** bonded holds.
 - Saves com 3 bases: grandfather (não vende); só bloqueia compra nova.
+- **2026-09-06:** **1ª Base CAPEX $0** (`quoteFboBuyUsd` owned===0); 2ª paga `tier × FBO_SECOND_BUY_MULT`. Sem ledger se debit 0.
+- **UI Base:** sem barra/capacidade bonded (legado); header = T# + perks parking/Jet-A. Holds grandfather só se ainda existirem na save.
+
+### Base Dispatcher seat + scout — shipped (Market single-leg)
+
+- `career-base-dispatcher.ts`: **1 seat / Base** (ground desk, not flying crew). Hire pool / fire severance / daily salary (`base_dispatcher_*` ledger). Persist inside `player_fbos_json` (`dispatchers`, hire pools).
+- Perks via skill: fleet scout mode, max suggestions 6–12, milder ferry $/nm penalty. Sem hire = **manual** desk (aircraft already @ lot origin, max 3).
+- `career-base-dispatch-scout.ts`: rank Market lots by `estimateBoardLotEconomics` (pay − Jet-A) − ferry penalty; reason shows ferry nm.
+- Confirm → `executeAcceptLot` (você voa; parked required). **Não** multi-perna; **não** NPC fly; **não** Port Scout (WH).
+- API `POST /api/base/dispatch-scout` (`list` | `confirm`) + `POST /api/base/dispatcher` (`list` | `refresh` | `hire` | `fire`); UI desk na aba Base.
+- **2026-09-06 persist bug:** hire gravava `dispatchers` em `player_fbos_json`, mas `normalizeMissionsState` / `readCompanyStateScalars` só reidratavam `fbos`+`holds` → reload apagava o seat (ledger `base_dispatcher_hire` ficava). Fix: preservar `dispatchers` + hire pools no load.
+- **Desk lens:** Scan passa `hubIcao` da Base → só lots com **origin na mesma region** do hub (ex. BR-S @ SBKP), não worldwide.
+- **Map:** selecionar linha do Market freights traça OD no `FboRouteMapCard` abaixo.
+
+### Base Dispatcher tour Search — shipped (multi-option table)
+
+- `career-base-dispatch-tour.ts`: chains **2–3 real Market lots** (region lens, ferry between legs ≤180 nm, soft return Base/origin). Cap **8** options. Requires hired Dispatcher (`policy.mode === 'fleet'`).
+- Filters (desk): aircraft, legs, origin ICAO, min/max nm, return prefer. UI button **Search** (busca no board — não soft-spawn).
+- **Empty Min nm** → tour floors (`BASE_DISPATCH_TOUR_MIN_NM`, light_jet **120**), **not** Scout’s 400 — otherwise BR-SE Citation chains almost never match.
+- **Region lens:** 1ª perna usa region do **Origin** (fallback Base); pernas seguintes sem lock de region (só ferry ≤180 nm) — evita matar cadeias SBSP(`BR-SE`)→SBCT(`BR-S`).
+- Confirm → **leg 1 only** via `confirmBaseDispatchScout` / `executeAcceptLot` + **persist Active Tour** (`playerFbos.activeTour`) when `tourLegs` ≥ 2.
+- API `POST /api/base/dispatch-tours` (`list` | `confirm` | `status` | `accept-leg` | `drop`); UI Search + tour table + **Active Tour** panel.
+- **Active Tour (2026-09-06):** no hard-reserve of L2+. After L1 settle + aircraft at next origin → **Accept L2** (rebind same OD if lot gone). Sidebar “Active tour · Continue → Base”. Persist via `player_fbos_json` (same pitfall as dispatchers — keep on normalize/load).
+- **Cargo Ops gate (2026-09-07):** Scout/Tour Search + rebind skip locked commodities (e.g. Perishables before Time unlock) — Accept no longer surfaces “Perishables is locked” from a suggested row.
+- **Manifest redirect (2026-09-07):** Accept L1/L2 opens **Manifest** (staging) to pick aircraft parked at origin (same gate as Freights). `Accept & Dispatch` then `attach` / `bind-leg` Active Tour — no immediate `confirm` accept.
+- **Off-origin Manifest (2026-09-07):** combo lists all parked fleet (`@ hub` / `ferry from`); Ferry → `FerryJourneyDialog` to lot origin; Accept blocked until airframe arrives.
+- **Route label:** inclui hop de ferry (`SBKP→SBCT→SBFL→SBCT`), não só dests de carga (`SBKP→SBCT→SBCT`) — alinha tabela/header com o mapa.
+- **Return filter:** “End at origin/Base” — last hop busca destinando ao target; se existir cadeia que volta, a tabela só mostra essas. Se não houver lot de volta no board (sem soft-spawn), cai no open-end.
+- **Perf (2026-09-06):** Search was O(lots × branching × econ) — now economics **once**/lot, index by origin, ferry only for nearby origins; Scan skips O(lots×flights) NPC claim lookups.
+- Map: selected tour draws **cargo legs solid** + **ferry dashed**; headline = cargo routeLabel + ferry nm (2 legs ≠ 2 map segments when reposition needed).
+- UI: Search/Scan loading states separated (Search no longer flips Scan to “Scanning…”).
+
+### Base Dispatcher — backlog
+
+- Soft-hold curto em L2+ (opcional; v1 é plan-only + Accept Ln).
+- Preferência “sai da Base ICAO” (mais apertado que region) vs corridor vizinho.
+- Ferry-first CTA quando suggestion/tour tem ferryNm &gt; 0 (link Ferry → origin).
+- Não reabrir company Hangar crew fly (`COMPANY_CREW_ENABLED = false`).
 
 ### Phase 3 — shipped
 

@@ -71,7 +71,7 @@ describe('pushCruiseTick', () => {
   });
   it('does not collect during a shallow capture climb', () => {
     let state = createCruiseSampleState();
-    state = pushCruiseTick(state, tick(0, { vsFpm: 300 })).state;
+    state = pushCruiseTick(state, tick(0, { vsFpm: 500 })).state;
     assert.equal(state.window.length, 0);
     assert.equal(cruiseSampleStatus(state).phase, 'idle');
   });
@@ -90,6 +90,28 @@ describe('pushCruiseTick', () => {
     ).state;
     assert.equal(state.window.length, 0);
     assert.equal(cruiseSampleStatus(state, opts).phase, 'idle');
+  });
+
+  it('tolerates mild ALT HOLD VS and autothrottle flow hunt', () => {
+    let state = createCruiseSampleState();
+    const opts = { minStableMs: 60_000 };
+    // 300 fpm used to hard-clear at the old 200 fpm gate.
+    state = pushCruiseTick(state, tick(0, { vsFpm: 280 }), opts).state;
+    assert.equal(state.window.length, 1);
+    // ~24% flow swing (AT hunt) stays inside the 28% spread.
+    state = pushCruiseTick(
+      state,
+      tick(5_000, { vsFpm: 40, fuelFlowKgPerHour: 160 }),
+      opts,
+    ).state;
+    state = pushCruiseTick(
+      state,
+      tick(10_000, { vsFpm: -120, fuelFlowKgPerHour: 198 }),
+      opts,
+    ).state;
+    assert.ok(state.window.length >= 3);
+    assert.equal(cruiseSampleStatus(state, opts).phase, 'collecting');
+    assert.ok(cruiseSampleStatus(state, opts).elapsedMs >= 10_000);
   });
 
   it('rejects a window with large TAS spread', () => {

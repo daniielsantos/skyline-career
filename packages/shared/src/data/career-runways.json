@@ -7,11 +7,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 1402,
       "widthM": 50.3,
-      "lat": 0,
-      "lon": 0,
+      "lat": 38.383301,
+      "lon": -118.100998,
       "surface": "dirt",
       "lighted": false
     }
@@ -20,11 +20,11 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 690,
       "widthM": 15.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 35.426498,
+      "lon": -83.458199,
       "surface": "asphalt",
       "lighted": false
     }
@@ -87,11 +87,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 853,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 41.273201,
+      "lon": -122.122002,
       "surface": "dirt",
       "lighted": false
     }
@@ -100,11 +100,11 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 823,
       "widthM": 9.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 38.016899,
+      "lon": -122.521004,
       "surface": "asphalt",
       "lighted": true
     }
@@ -113,11 +113,11 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 120,
       "lengthM": 792,
       "widthM": 12.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 38.704601,
+      "lon": -123.432999,
       "surface": "asphalt",
       "lighted": false
     }
@@ -248,11 +248,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1207,
       "widthM": 76.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 49.368865,
+      "lon": -121.49495,
       "surface": "grass",
       "lighted": false
     }
@@ -261,11 +261,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 1524,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 51.691101,
+      "lon": -76.135597,
       "surface": "gravel",
       "lighted": false
     }
@@ -357,11 +357,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 1216,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 52.996418,
+      "lon": -118.060233,
       "surface": "grass",
       "lighted": false
     }
@@ -4398,7 +4398,7 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 51.7,
+      "headingTrueDeg": 52.2,
       "lengthM": 3658,
       "widthM": 45.7,
       "lat": 34.6271,
@@ -4420,11 +4420,11 @@
     {
       "ident": "072",
       "identReciprocal": "252",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1829,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 34.629398,
+      "lon": -118.084999,
       "surface": "concrete",
       "lighted": false
     }
@@ -6126,11 +6126,11 @@
     {
       "ident": "2",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 1290,
       "widthM": 6.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 41.1116,
+      "lon": -117.5222,
       "surface": "dirt",
       "lighted": true
     }
@@ -6139,7 +6139,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 190,
+      "headingTrueDeg": 189.6,
       "lengthM": 1424,
       "widthM": 22.9,
       "lat": 38.030441,
@@ -6150,7 +6150,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 134,
+      "headingTrueDeg": 136,
       "lengthM": 795,
       "widthM": 15.2,
       "lat": 38.030525,
@@ -6161,22 +6161,22 @@
     {
       "ident": "H1",
       "identReciprocal": "H1",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 30,
       "widthM": 30.5,
-      "lat": 0,
-      "lon": 0,
+      "lat": 38.030399,
+      "lon": -120.415001,
       "surface": "asphalt",
       "lighted": false
     },
     {
       "ident": "H2",
       "identReciprocal": "H2",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 24,
       "widthM": 23.8,
-      "lat": 0,
-      "lon": 0,
+      "lat": 38.030399,
+      "lon": -120.415001,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6226,11 +6226,11 @@
   "O64": [
     {
       "ident": "H1",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 15,
       "widthM": 15.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 36.230841,
+      "lon": -95.73968,
       "surface": "concrete",
       "lighted": false
     }
@@ -6256,11 +6256,11 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 2500,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -9.866389,
+      "lon": -56.106298,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6269,11 +6269,11 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 28,
+      "headingTrueDeg": 50,
       "lengthM": 2120,
       "widthM": 35.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -21.141479,
+      "lon": -50.424575,
       "surface": "asphalt",
       "lighted": true
     }
@@ -6330,11 +6330,11 @@
     {
       "ident": "8",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 2700,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 2.84615,
+      "lon": -60.690648,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6343,11 +6343,11 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1598,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -15.861417,
+      "lon": -52.389008,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6382,7 +6382,7 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 42.1,
       "lengthM": 2600,
       "widthM": 45.1,
       "lat": -20.469973,
@@ -6392,11 +6392,11 @@
     },
     {
       "ident": "H06",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 23,
       "widthM": 22.6,
-      "lat": 0,
-      "lon": 0,
+      "lat": -20.469998,
+      "lon": -54.673988,
       "surface": "concrete",
       "lighted": true
     }
@@ -6405,11 +6405,11 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 2060,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -27.134199,
+      "lon": -52.656601,
       "surface": "asphalt",
       "lighted": true
     }
@@ -6481,11 +6481,11 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 2400,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -7.59991,
+      "lon": -72.769501,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6644,11 +6644,11 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 2003,
       "widthM": 38.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -3.253144,
+      "lon": -52.253938,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6657,11 +6657,11 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 1577,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -14.815929,
+      "lon": -39.033458,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6670,11 +6670,11 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1798,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -5.53129,
+      "lon": -47.459999,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6683,11 +6683,11 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 2515,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -7.148691,
+      "lon": -34.950554,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6696,11 +6696,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 1940,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -7.21932,
+      "lon": -39.269096,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6709,11 +6709,11 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 1640,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -26.224501,
+      "lon": -48.797401,
       "surface": "asphalt",
       "lighted": true
     }
@@ -6761,11 +6761,11 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 1500,
       "widthM": 35.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -22.196899,
+      "lon": -49.926485,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6774,11 +6774,11 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 120,
       "lengthM": 2602,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -9.512559,
+      "lon": -35.791839,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6787,11 +6787,11 @@
     {
       "ident": "8",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 2100,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 0.050664,
+      "lon": -51.072201,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6852,11 +6852,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 2760,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -9.362422,
+      "lon": -40.569098,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6878,11 +6878,11 @@
     {
       "ident": "1",
       "identReciprocal": "19",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 2400,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -8.708491,
+      "lon": -63.902338,
       "surface": "asphalt",
       "lighted": true
     }
@@ -6904,11 +6904,11 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 1850,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -16.584292,
+      "lon": -54.724803,
       "surface": "asphalt",
       "lighted": true
     }
@@ -6917,11 +6917,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 162,
+      "headingTrueDeg": 180,
       "lengthM": 3007,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -8.12747,
+      "lon": -34.922961,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6956,11 +6956,11 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 1630,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -11.885001,
+      "lon": -55.586109,
       "surface": "asphalt",
       "lighted": false
     }
@@ -6982,22 +6982,22 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 39,
+      "headingTrueDeg": 60,
       "lengthM": 2386,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -2.586386,
+      "lon": -44.235008,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 90,
       "lengthM": 1464,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -2.586386,
+      "lon": -44.235008,
       "surface": "asphalt",
       "lighted": true
     }
@@ -7006,11 +7006,11 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 2400,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -2.422423,
+      "lon": -54.79306,
       "surface": "asphalt",
       "lighted": true
     }
@@ -7032,22 +7032,22 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 78,
+      "headingTrueDeg": 100,
       "lengthM": 3005,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.908611,
+      "lon": -38.322498,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 143,
+      "headingTrueDeg": 170,
       "lengthM": 1520,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.908611,
+      "lon": -38.322498,
       "surface": "asphalt",
       "lighted": true
     }
@@ -7056,11 +7056,11 @@
     {
       "ident": "2",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 2200,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -5.06025,
+      "lon": -42.823712,
       "surface": "asphalt",
       "lighted": false
     }
@@ -7069,11 +7069,11 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 120,
       "lengthM": 2150,
       "widthM": 32.6,
-      "lat": 0,
-      "lon": 0,
+      "lat": -4.25567,
+      "lon": -69.935799,
       "surface": "asphalt",
       "lighted": true
     }
@@ -7082,11 +7082,11 @@
     {
       "ident": "4",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 1950,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -18.883579,
+      "lon": -48.225936,
       "surface": "asphalt",
       "lighted": false
     }
@@ -7095,11 +7095,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1759,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -19.765036,
+      "lon": -47.964805,
       "surface": "asphalt",
       "lighted": false
     }
@@ -7132,11 +7132,11 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1200,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -1.479524,
+      "lon": -52.578214,
       "surface": "gravel",
       "lighted": false
     }
@@ -7145,11 +7145,11 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 1200,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -0.378604,
+      "lon": -64.992558,
       "surface": "dirt",
       "lighted": false
     }
@@ -7158,11 +7158,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 579,
       "widthM": 15.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 37.55889,
+      "lon": -81.350616,
       "surface": "asphalt",
       "lighted": false
     }
@@ -7171,11 +7171,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1006,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 37.9487,
+      "lon": -80.716499,
       "surface": "grass",
       "lighted": false
     }
@@ -8283,19 +8283,19 @@
       "headingTrueDeg": 163,
       "lengthM": 2660,
       "widthM": 47.9,
-      "lat": 63.062099,
-      "lon": 21.754499,
+      "lat": 63.05065,
+      "lon": 21.762199,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 1500,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 63.05023,
+      "lon": 21.762543,
       "surface": "asphalt",
       "lighted": false
     }
@@ -9102,19 +9102,19 @@
       "headingTrueDeg": 107.5,
       "lengthM": 2504,
       "widthM": 50,
-      "lat": 52.4249,
-      "lon": 16.806101,
+      "lat": 52.421551,
+      "lon": 16.823551,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 700,
       "widthM": 299.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 52.421598,
+      "lon": 16.823359,
       "surface": "grass",
       "lighted": false
     }
@@ -9126,8 +9126,8 @@
       "headingTrueDeg": 91.2,
       "lengthM": 3200,
       "widthM": 44.8,
-      "lat": 50.110199,
-      "lon": 22.001499,
+      "lat": 50.1099,
+      "lon": 22.0239,
       "surface": "concrete",
       "lighted": true
     },
@@ -9137,30 +9137,30 @@
       "headingTrueDeg": 80.7,
       "lengthM": 2085,
       "widthM": 100,
-      "lat": 50.104401,
-      "lon": 22.042601,
+      "lat": 50.105,
+      "lon": 22.048301,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "08R",
       "identReciprocal": "26L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 900,
       "widthM": 30.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 50.109791,
+      "lon": 22.024155,
       "surface": "asphalt",
       "lighted": false
     },
     {
       "ident": "08L",
       "identReciprocal": "26R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 746,
       "widthM": 50,
-      "lat": 0,
-      "lon": 0,
+      "lat": 50.109791,
+      "lon": 22.024155,
       "surface": "grass",
       "lighted": false
     }
@@ -9981,30 +9981,30 @@
       "headingTrueDeg": 81.9,
       "lengthM": 3013,
       "widthM": 45.1,
-      "lat": 45.784801,
-      "lon": 3.15082,
+      "lat": 45.786701,
+      "lon": 3.16999,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "08L",
       "identReciprocal": "26R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 900,
       "widthM": 49.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 45.786701,
+      "lon": 3.16917,
       "surface": "grass",
       "lighted": false
     },
     {
       "ident": "01",
       "identReciprocal": "19",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 705,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": 45.786701,
+      "lon": 3.16917,
       "surface": "grass",
       "lighted": false
     }
@@ -10742,8 +10742,8 @@
       "headingTrueDeg": 162.8,
       "lengthM": 3902,
       "widthM": 59.7,
-      "lat": 41.846001,
-      "lon": 12.2615,
+      "lat": 41.829201,
+      "lon": 12.2685,
       "surface": "asphalt",
       "lighted": true
     },
@@ -10753,19 +10753,19 @@
       "headingTrueDeg": 162.7,
       "lengthM": 3902,
       "widthM": 59.7,
-      "lat": 41.815498,
-      "lon": 12.2264,
+      "lat": 41.79875,
+      "lon": 12.2334,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "16C",
       "identReciprocal": "34C",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 3602,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 41.804532,
+      "lon": 12.251998,
       "surface": "asphalt",
       "lighted": true
     },
@@ -10775,8 +10775,8 @@
       "headingTrueDeg": 69.7,
       "lengthM": 3300,
       "widthM": 44.8,
-      "lat": 41.799332,
-      "lon": 12.232144,
+      "lat": 41.804482,
+      "lon": 12.250814,
       "surface": "asphalt",
       "lighted": true
     }
@@ -11960,30 +11960,30 @@
       "headingTrueDeg": 94,
       "lengthM": 2600,
       "widthM": 45.1,
-      "lat": 49.074402,
-      "lon": 20.223499,
+      "lat": 49.073601,
+      "lon": 20.24115,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "07L",
       "identReciprocal": "25R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 760,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 49.070994,
+      "lon": 20.241394,
       "surface": "grass",
       "lighted": false
     },
     {
       "ident": "07R",
       "identReciprocal": "25L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 760,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 49.070994,
+      "lon": 20.241394,
       "surface": "grass",
       "lighted": false
     }
@@ -11992,11 +11992,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 3000,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 19.269259,
+      "lon": -69.737405,
       "surface": "asphalt",
       "lighted": true
     }
@@ -12131,11 +12131,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 2103,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 14.8656,
+      "lon": -91.501999,
       "surface": "asphalt",
       "lighted": false
     }
@@ -12825,11 +12825,11 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 650,
       "widthM": 19.8,
-      "lat": 0,
-      "lon": 0,
+      "lat": 16.536957,
+      "lon": -88.361511,
       "surface": "asphalt",
       "lighted": false
     }
@@ -13195,11 +13195,11 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 4015,
       "widthM": 59.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 24.38604,
+      "lon": 56.62541,
       "surface": "asphalt",
       "lighted": true
     }
@@ -13358,11 +13358,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1500,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -35.058899,
+      "lon": -67.692802,
       "surface": "other",
       "lighted": false
     }
@@ -14038,11 +14038,11 @@
     {
       "ident": "01",
       "identReciprocal": "19",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 800,
       "widthM": 18,
-      "lat": 0,
-      "lon": 0,
+      "lat": -34.966667,
+      "lon": -71.216393,
       "surface": "asphalt",
       "lighted": false
     }
@@ -14054,19 +14054,19 @@
       "headingTrueDeg": 25,
       "lengthM": 2600,
       "widthM": 45.1,
-      "lat": -36.782036,
-      "lon": -73.068596,
+      "lat": -36.771421,
+      "lon": -73.062405,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "02R",
       "identReciprocal": "20L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 1972,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -36.77235,
+      "lon": -73.062828,
       "surface": "asphalt",
       "lighted": true
     }
@@ -14346,11 +14346,11 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 2200,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -27.227537,
+      "lon": -55.837584,
       "surface": "asphalt",
       "lighted": true
     }
@@ -14652,11 +14652,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -10.820306,
+      "lon": -65.346494,
       "surface": "other",
       "lighted": false
     }
@@ -14778,11 +14778,11 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 750,
       "widthM": 17.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 5.811211,
+      "lon": -55.192299,
       "surface": "asphalt",
       "lighted": false
     }
@@ -15036,11 +15036,11 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 1275,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -30.4007,
+      "lon": -56.5079,
       "surface": "other",
       "lighted": false
     }
@@ -15049,11 +15049,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 1370,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -34.456402,
+      "lon": -57.770599,
       "surface": "concrete",
       "lighted": false
     }
@@ -15124,19 +15124,19 @@
       "headingTrueDeg": 8.8,
       "lengthM": 1320,
       "widthM": 29.9,
-      "lat": -32.37009,
-      "lon": -58.063362,
+      "lat": -32.364212,
+      "lon": -58.062285,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 900,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -32.3633,
+      "lon": -58.061901,
       "surface": "other",
       "lighted": false
     }
@@ -15145,11 +15145,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1830,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -30.9746,
+      "lon": -55.4762,
       "surface": "other",
       "lighted": false
     }
@@ -15395,11 +15395,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1280,
       "widthM": 30.5,
-      "lat": 0,
-      "lon": 0,
+      "lat": 6.805881,
+      "lon": -58.107657,
       "surface": "concrete",
       "lighted": true
     }
@@ -15434,11 +15434,11 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 500,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 17.636067,
+      "lon": -61.827175,
       "surface": "other",
       "lighted": false
     }
@@ -17118,11 +17118,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 3500,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": 6.283878,
+      "lon": 81.124163,
       "surface": "asphalt",
       "lighted": true
     }
@@ -17557,11 +17557,11 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 120,
       "lengthM": 2500,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 28.1838,
+      "lon": 84.0147,
       "surface": "concrete",
       "lighted": true
     }
@@ -18619,8 +18619,8 @@
       "headingTrueDeg": 162,
       "lengthM": 4000,
       "widthM": 60,
-      "lat": 31.161301,
-      "lon": 121.786003,
+      "lat": 31.144151,
+      "lon": 121.792503,
       "surface": "concrete",
       "lighted": true
     },
@@ -18630,8 +18630,8 @@
       "headingTrueDeg": 162.1,
       "lengthM": 3800,
       "widthM": 60,
-      "lat": 31.160175,
-      "lon": 121.816162,
+      "lat": 31.143875,
+      "lon": 121.822311,
       "surface": "concrete",
       "lighted": true
     },
@@ -18641,19 +18641,19 @@
       "headingTrueDeg": 162.5,
       "lengthM": 3800,
       "widthM": 60,
-      "lat": 31.159,
-      "lon": 121.811996,
+      "lat": 31.1427,
+      "lon": 121.817997,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 3400,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": 31.1434,
+      "lon": 121.805,
       "surface": "concrete",
       "lighted": true
     },
@@ -18663,8 +18663,8 @@
       "headingTrueDeg": 162.1,
       "lengthM": 3400,
       "widthM": 60,
-      "lat": 31.154833,
-      "lon": 121.783165,
+      "lat": 31.140249,
+      "lon": 121.788666,
       "surface": "concrete",
       "lighted": true
     }
@@ -19187,19 +19187,19 @@
       "headingTrueDeg": 48.7,
       "lengthM": 3800,
       "widthM": 45.1,
-      "lat": 34.442154,
-      "lon": 108.735619,
+      "lat": 34.453429,
+      "lon": 108.751187,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "05R",
       "identReciprocal": "23L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 3800,
       "widthM": 60.4,
-      "lat": 0,
-      "lon": 0,
+      "lat": 34.442207,
+      "lon": 108.762385,
       "surface": "other",
       "lighted": true
     },
@@ -19209,8 +19209,8 @@
       "headingTrueDeg": 48.7,
       "lengthM": 3800,
       "widthM": 60,
-      "lat": 34.420982,
-      "lon": 108.751053,
+      "lat": 34.432257,
+      "lon": 108.766613,
       "surface": "concrete",
       "lighted": true
     },
@@ -19220,8 +19220,8 @@
       "headingTrueDeg": 48.9,
       "lengthM": 3000,
       "widthM": 45.1,
-      "lat": 34.423126,
-      "lon": 108.76033,
+      "lat": 34.431996,
+      "lon": 108.772648,
       "surface": "concrete",
       "lighted": true
     }
@@ -20311,8 +20311,8 @@
       "headingTrueDeg": 357,
       "lengthM": 4000,
       "widthM": 45.1,
-      "lat": 36.503658,
-      "lon": 103.646469,
+      "lat": 36.521656,
+      "lon": 103.645313,
       "surface": "asphalt",
       "lighted": true
     },
@@ -20322,19 +20322,19 @@
       "headingTrueDeg": 177.1,
       "lengthM": 4000,
       "widthM": 45.1,
-      "lat": 36.531612,
-      "lon": 103.623787,
+      "lat": 36.513615,
+      "lon": 103.624935,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "18R",
       "identReciprocal": "36L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 3600,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 36.515202,
+      "lon": 103.620003,
       "surface": "asphalt",
       "lighted": true
     }
@@ -20343,22 +20343,22 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 3609,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 25.929254,
+      "lon": 119.672524,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "03R",
       "identReciprocal": "21L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 3600,
       "widthM": 60.4,
-      "lat": 0,
-      "lon": 0,
+      "lat": 25.929254,
+      "lon": 119.672524,
       "surface": "concrete",
       "lighted": true
     }
@@ -21075,11 +21075,11 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 3700,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -29.614444,
+      "lon": 31.119722,
       "surface": "asphalt",
       "lighted": false
     }
@@ -21910,11 +21910,11 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 3600,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -26.358611,
+      "lon": 31.716944,
       "surface": "asphalt",
       "lighted": true
     }
@@ -22766,19 +22766,19 @@
       "headingTrueDeg": 119.1,
       "lengthM": 1829,
       "widthM": 45.7,
-      "lat": 45.442501,
-      "lon": -71.701599,
+      "lat": 45.438501,
+      "lon": -71.691349,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1829,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 45.438599,
+      "lon": -71.691399,
       "surface": "asphalt",
       "lighted": false
     }
@@ -23267,11 +23267,11 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1605,
       "widthM": 30.5,
-      "lat": 0,
-      "lon": 0,
+      "lat": 6.579691,
+      "lon": 0.532547,
       "surface": "asphalt",
       "lighted": false
     }
@@ -23371,11 +23371,11 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 3400,
       "widthM": 57.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 6.204167,
+      "lon": 6.665278,
       "surface": "asphalt",
       "lighted": true
     }
@@ -23497,11 +23497,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 799,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 50.482006,
+      "lon": 5.913434,
       "surface": "asphalt",
       "lighted": false
     }
@@ -24089,33 +24089,33 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 846,
       "widthM": 46,
-      "lat": 0,
-      "lon": 0,
+      "lat": 57.0228,
+      "lon": -7.44306,
       "surface": "dirt",
       "lighted": false
     },
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 799,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": 57.0228,
+      "lon": -7.44306,
       "surface": "dirt",
       "lighted": false
     },
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 680,
       "widthM": 46,
-      "lat": 0,
-      "lon": 0,
+      "lat": 57.0228,
+      "lon": -7.44306,
       "surface": "dirt",
       "lighted": false
     }
@@ -24175,19 +24175,19 @@
       "headingTrueDeg": 29.8,
       "lengthM": 1199,
       "widthM": 22.9,
-      "lat": 51.251499,
-      "lon": 5.59765,
+      "lat": 51.256199,
+      "lon": 5.60195,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "03G",
       "identReciprocal": "21G",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 600,
       "widthM": 30.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 51.255299,
+      "lon": 5.60139,
       "surface": "grass",
       "lighted": false
     }
@@ -24238,19 +24238,19 @@
       "headingTrueDeg": 47.5,
       "lengthM": 2700,
       "widthM": 45.1,
-      "lat": 52.44482,
-      "lon": 5.499542,
+      "lat": 52.453014,
+      "lon": 5.514206,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "05L",
       "identReciprocal": "23R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1370,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 52.453188,
+      "lon": 5.514622,
       "surface": "grass",
       "lighted": false
     }
@@ -24320,11 +24320,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 600,
       "widthM": 18,
-      "lat": 0,
-      "lon": 0,
+      "lat": 53.230301,
+      "lon": -9.46778,
       "surface": "other",
       "lighted": false
     }
@@ -24346,11 +24346,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 520,
       "widthM": 18,
-      "lat": 0,
-      "lon": 0,
+      "lat": 53.064701,
+      "lon": -9.5109,
       "surface": "other",
       "lighted": false
     }
@@ -24681,11 +24681,11 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1000,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 56.9911,
+      "lon": 24.075001,
       "surface": "asphalt",
       "lighted": false
     }
@@ -24694,33 +24694,33 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 1100,
       "widthM": 39.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 54.652212,
+      "lon": 24.058748,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 900,
       "widthM": 39.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 54.652212,
+      "lon": 24.058748,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 667,
       "widthM": 18,
-      "lat": 0,
-      "lon": 0,
+      "lat": 54.652212,
+      "lon": 24.058748,
       "surface": "concrete",
       "lighted": false
     }
@@ -24988,11 +24988,11 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 2700,
       "widthM": 36.6,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.1737,
+      "lon": 26.365101,
       "surface": "asphalt",
       "lighted": false
     }
@@ -25066,22 +25066,22 @@
     {
       "ident": "06R",
       "identReciprocal": "24L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 4000,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -9.050734,
+      "lon": 13.499078,
       "surface": "other",
       "lighted": true
     },
     {
       "ident": "06L",
       "identReciprocal": "24R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 3800,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -9.050734,
+      "lon": 13.499078,
       "surface": "asphalt",
       "lighted": true
     }
@@ -25103,11 +25103,11 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 3700,
       "widthM": 44.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.4792,
+      "lon": 13.4869,
       "surface": "asphalt",
       "lighted": false
     }
@@ -25119,19 +25119,19 @@
       "headingTrueDeg": 100.6,
       "lengthM": 2660,
       "widthM": 45.1,
-      "lat": -12.8067,
-      "lon": 15.7485,
+      "lat": -12.8089,
+      "lon": 15.76055,
       "surface": "asphalt",
       "lighted": false
     },
     {
       "ident": "01",
       "identReciprocal": "19",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 1000,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.8089,
+      "lon": 15.7605,
       "surface": "other",
       "lighted": false
     }
@@ -25266,11 +25266,11 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1213,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.517527,
+      "lon": 34.131877,
       "surface": "other",
       "lighted": false
     }
@@ -25531,11 +25531,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 2500,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 22.757345,
+      "lon": -12.482228,
       "surface": "asphalt",
       "lighted": false
     }
@@ -25570,11 +25570,11 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 2500,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 9.331907,
+      "lon": 42.911811,
       "surface": "asphalt",
       "lighted": false
     }
@@ -25596,11 +25596,11 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 1001,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -2.644786,
+      "lon": 37.252922,
       "surface": "asphalt",
       "lighted": false
     }
@@ -25659,22 +25659,22 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1402,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -3.22931,
+      "lon": 40.1017,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 1128,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -3.22931,
+      "lon": 40.1017,
       "surface": "other",
       "lighted": false
     }
@@ -25774,11 +25774,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 1707,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 3.049152,
+      "lon": 30.911714,
       "surface": "other",
       "lighted": false
     }
@@ -26543,8 +26543,8 @@
       "headingTrueDeg": 135.8,
       "lengthM": 2469,
       "widthM": 45.7,
-      "lat": 40.047401,
-      "lon": -88.285698,
+      "lat": 40.039452,
+      "lon": -88.2756,
       "surface": "concrete",
       "lighted": true
     },
@@ -26554,8 +26554,8 @@
       "headingTrueDeg": 40.9,
       "lengthM": 1982,
       "widthM": 45.7,
-      "lat": 40.031799,
-      "lon": -88.2854,
+      "lat": 40.03855,
+      "lon": -88.277751,
       "surface": "concrete",
       "lighted": true
     },
@@ -26565,19 +26565,19 @@
       "headingTrueDeg": 179.4,
       "lengthM": 1615,
       "widthM": 45.7,
-      "lat": 40.0471,
-      "lon": -88.282303,
+      "lat": 40.039801,
+      "lon": -88.2822,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "14R",
       "identReciprocal": "32L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1163,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 40.039819,
+      "lon": -88.276249,
       "surface": "asphalt",
       "lighted": true
     }
@@ -26861,11 +26861,11 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 3048,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 30.357106,
+      "lon": -85.795414,
       "surface": "concrete",
       "lighted": true
     }
@@ -27294,19 +27294,19 @@
       "headingTrueDeg": 135.1,
       "lengthM": 2744,
       "widthM": 45.7,
-      "lat": 30.415001,
-      "lon": -89.082298,
+      "lat": 30.40625,
+      "lon": -89.072201,
       "surface": "other",
       "lighted": true
     },
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 2134,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 30.405582,
+      "lon": -89.069836,
       "surface": "asphalt",
       "lighted": false
     },
@@ -27316,8 +27316,8 @@
       "headingTrueDeg": 179.6,
       "lengthM": 1504,
       "widthM": 45.7,
-      "lat": 30.416,
-      "lon": -89.066299,
+      "lat": 30.4092,
+      "lon": -89.06625,
       "surface": "asphalt",
       "lighted": true
     }
@@ -27705,19 +27705,19 @@
       "headingTrueDeg": 134,
       "lengthM": 2127,
       "widthM": 45.7,
-      "lat": 42.497299,
-      "lon": -76.4673,
+      "lat": 42.490999,
+      "lon": -76.45845,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 615,
       "widthM": 15.2,
-      "lat": 0,
-      "lon": 0,
+      "lat": 42.491001,
+      "lon": -76.458397,
       "surface": "other",
       "lighted": false
     }
@@ -28696,11 +28696,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 2966,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 27.9102,
+      "lon": -82.687401,
       "surface": "concrete",
       "lighted": true
     },
@@ -28710,8 +28710,8 @@
       "headingTrueDeg": 171.4,
       "lengthM": 2682,
       "widthM": 45.7,
-      "lat": 27.923401,
-      "lon": -82.690697,
+      "lat": 27.91145,
+      "lon": -82.688648,
       "surface": "asphalt",
       "lighted": true
     },
@@ -28721,8 +28721,8 @@
       "headingTrueDeg": 39.2,
       "lengthM": 1829,
       "widthM": 45.7,
-      "lat": 27.900801,
-      "lon": -82.688301,
+      "lat": 27.906651,
+      "lon": -82.682899,
       "surface": "asphalt",
       "lighted": true
     },
@@ -28732,8 +28732,8 @@
       "headingTrueDeg": 88.4,
       "lengthM": 1574,
       "widthM": 45.7,
-      "lat": 27.9093,
-      "lon": -82.695396,
+      "lat": 27.9095,
+      "lon": -82.687447,
       "surface": "asphalt",
       "lighted": true
     },
@@ -28743,8 +28743,8 @@
       "headingTrueDeg": 171.2,
       "lengthM": 1219,
       "widthM": 22.9,
-      "lat": 27.9212,
-      "lon": -82.691902,
+      "lat": 27.91575,
+      "lon": -82.690952,
       "surface": "asphalt",
       "lighted": true
     }
@@ -30025,19 +30025,19 @@
       "headingTrueDeg": 159.7,
       "lengthM": 2683,
       "widthM": 45.7,
-      "lat": 36.293201,
-      "lon": -94.311996,
+      "lat": 36.281851,
+      "lon": -94.306797,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "16R",
       "identReciprocal": "34L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 2682,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 36.281898,
+      "lon": -94.306801,
       "surface": "concrete",
       "lighted": true
     }
@@ -31011,11 +31011,11 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 1460,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 39.844528,
+      "lon": -7.439875,
       "surface": "asphalt",
       "lighted": false
     }
@@ -31087,11 +31087,11 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 1800,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 39.211545,
+      "lon": -8.057787,
       "surface": "asphalt",
       "lighted": true
     }
@@ -31363,11 +31363,11 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 1900,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 18.907499,
+      "lon": -70.721901,
       "surface": "other",
       "lighted": false
     }
@@ -31389,11 +31389,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 2438,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 16.3258,
+      "lon": -89.4161,
       "surface": "gravel",
       "lighted": false
     }
@@ -31402,11 +31402,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1247,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 15.0122,
+      "lon": -91.150597,
       "surface": "asphalt",
       "lighted": false
     }
@@ -31415,11 +31415,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1547,
       "widthM": 30.5,
-      "lat": 0,
-      "lon": 0,
+      "lat": 14.917,
+      "lon": -85.900002,
       "surface": "asphalt",
       "lighted": false
     }
@@ -31454,11 +31454,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 701,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 18.341712,
+      "lon": -78.334164,
       "surface": "asphalt",
       "lighted": false
     }
@@ -31504,11 +31504,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 1682,
       "widthM": 29,
-      "lat": 0,
-      "lon": 0,
+      "lat": 31.06615,
+      "lon": -110.097878,
       "surface": "asphalt",
       "lighted": false
     }
@@ -31569,11 +31569,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 1760,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 16.176701,
+      "lon": -92.050598,
       "surface": "other",
       "lighted": false
     }
@@ -31619,11 +31619,11 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 120,
       "lengthM": 1600,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 25.053801,
+      "lon": -111.614998,
       "surface": "other",
       "lighted": false
     }
@@ -31812,11 +31812,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 2500,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 31.351987,
+      "lon": -113.305177,
       "surface": "concrete",
       "lighted": false
     }
@@ -31906,8 +31906,8 @@
       "headingTrueDeg": 49,
       "lengthM": 4500,
       "widthM": 45.1,
-      "lat": 19.728561,
-      "lon": -99.023102,
+      "lat": 19.741844,
+      "lon": -99.006866,
       "surface": "other",
       "lighted": true
     },
@@ -31917,8 +31917,8 @@
       "headingTrueDeg": 49,
       "lengthM": 4500,
       "widthM": 45.1,
-      "lat": 19.734081,
-      "lon": -99.039696,
+      "lat": 19.747366,
+      "lon": -99.02346,
       "surface": "other",
       "lighted": true
     },
@@ -31928,19 +31928,19 @@
       "headingTrueDeg": 49,
       "lengthM": 3500,
       "widthM": 45.1,
-      "lat": 19.725822,
-      "lon": -99.02063,
+      "lat": 19.736161,
+      "lon": -99.007992,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 3470,
       "widthM": 75,
-      "lat": 0,
-      "lon": 0,
+      "lat": 19.743824,
+      "lon": -99.01507,
       "surface": "concrete",
       "lighted": true
     }
@@ -31988,11 +31988,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 1397,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 14.031524,
+      "lon": -84.624311,
       "surface": "dirt",
       "lighted": false
     }
@@ -32027,11 +32027,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1000,
       "widthM": 14.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 7.534801,
+      "lon": -80.043347,
       "surface": "asphalt",
       "lighted": false
     }
@@ -32040,11 +32040,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 700,
       "widthM": 14.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 8.62876,
+      "lon": -79.034698,
       "surface": "other",
       "lighted": false
     }
@@ -32053,11 +32053,11 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 10.469311,
+      "lon": -84.579073,
       "surface": "asphalt",
       "lighted": false
     }
@@ -32066,11 +32066,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 750,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 8.71889,
+      "lon": -83.641701,
       "surface": "asphalt",
       "lighted": false
     }
@@ -32079,11 +32079,11 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 825,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 8.53333,
+      "lon": -83.300003,
       "surface": "other",
       "lighted": false
     }
@@ -32092,11 +32092,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 10.3135,
+      "lon": -85.815498,
       "surface": "other",
       "lighted": false
     }
@@ -32118,11 +32118,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 640,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 19.934045,
+      "lon": -72.84801,
       "surface": "gravel",
       "lighted": false
     }
@@ -32350,11 +32350,11 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 2140,
       "widthM": 30.5,
-      "lat": 0,
-      "lon": 0,
+      "lat": 20.975,
+      "lon": -73.666901,
       "surface": "asphalt",
       "lighted": false
     },
@@ -32364,8 +32364,8 @@
       "headingTrueDeg": 94.8,
       "lengthM": 2138,
       "widthM": 27.1,
-      "lat": 20.9758,
-      "lon": -73.677101,
+      "lat": 20.974999,
+      "lon": -73.666851,
       "surface": "asphalt",
       "lighted": false
     }
@@ -32626,8 +32626,8 @@
       "headingTrueDeg": 184.8,
       "lengthM": 1750,
       "widthM": 45.1,
-      "lat": -39.46199,
-      "lon": 176.868042,
+      "lat": -39.469842,
+      "lon": 176.86718,
       "surface": "asphalt",
       "lighted": true
     },
@@ -32637,8 +32637,8 @@
       "headingTrueDeg": 187.7,
       "lengthM": 1750,
       "widthM": 45.1,
-      "lat": -39.462898,
-      "lon": 176.867996,
+      "lat": -39.468599,
+      "lon": 176.866997,
       "surface": "asphalt",
       "lighted": true
     },
@@ -32648,30 +32648,30 @@
       "headingTrueDeg": 88.5,
       "lengthM": 1219,
       "widthM": 29.9,
-      "lat": -39.4646,
-      "lon": 176.856995,
+      "lat": -39.464449,
+      "lon": 176.864494,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "16L",
       "identReciprocal": "34R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 766,
       "widthM": 61,
-      "lat": 0,
-      "lon": 0,
+      "lat": -39.465801,
+      "lon": 176.869995,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 560,
       "widthM": 35.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -39.465801,
+      "lon": 176.869995,
       "surface": "other",
       "lighted": false
     }
@@ -32683,30 +32683,30 @@
       "headingTrueDeg": 39.5,
       "lengthM": 1347,
       "widthM": 45.1,
-      "lat": -41.3027,
-      "lon": 173.220001,
+      "lat": -41.298149,
+      "lon": 173.224999,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "02L",
       "identReciprocal": "20R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 731,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -41.296709,
+      "lon": 173.224323,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 600,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -41.296709,
+      "lon": 173.224323,
       "surface": "other",
       "lighted": false
     },
@@ -32716,8 +32716,8 @@
       "headingTrueDeg": 82.8,
       "lengthM": 526,
       "widthM": 24.1,
-      "lat": -41.296131,
-      "lon": 173.216995,
+      "lat": -41.295791,
+      "lon": 173.220581,
       "surface": "other",
       "lighted": false
     }
@@ -32772,11 +32772,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1902,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -40.320599,
+      "lon": 175.617004,
       "surface": "other",
       "lighted": false
     },
@@ -32787,18 +32787,18 @@
       "lengthM": 1902,
       "widthM": 45.1,
       "lat": -40.3214,
-      "lon": 175.602997,
+      "lon": 175.614502,
       "surface": "asphalt",
       "lighted": true
     },
     {
       "ident": "07R",
       "identReciprocal": "25L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 608,
       "widthM": 60,
-      "lat": 0,
-      "lon": 0,
+      "lat": -40.320599,
+      "lon": 175.617004,
       "surface": "other",
       "lighted": false
     }
@@ -32944,11 +32944,11 @@
     {
       "ident": "03L",
       "identReciprocal": "21R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 2700,
       "widthM": 45.7,
-      "lat": 0,
-      "lon": 0,
+      "lat": 36.181456,
+      "lon": 140.414434,
       "surface": "asphalt",
       "lighted": true
     },
@@ -32958,8 +32958,8 @@
       "headingTrueDeg": 21.2,
       "lengthM": 2700,
       "widthM": 45.7,
-      "lat": 36.169601,
-      "lon": 140.410004,
+      "lat": 36.181051,
+      "lon": 140.415505,
       "surface": "concrete",
       "lighted": true
     }
@@ -33309,11 +33309,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 2500,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 13.111915,
+      "lon": 123.676829,
       "surface": "other",
       "lighted": true
     }
@@ -33335,11 +33335,11 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 2000,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 10.776237,
+      "lon": 123.018879,
       "surface": "concrete",
       "lighted": true
     }
@@ -33559,11 +33559,11 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 1800,
       "widthM": 32.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -26.753611,
+      "lon": -60.492222,
       "surface": "concrete",
       "lighted": true
     }
@@ -33903,22 +33903,22 @@
     {
       "ident": "06L",
       "identReciprocal": "24R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 3300,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -16.2292,
+      "lon": -48.964298,
       "surface": "asphalt",
       "lighted": false
     },
     {
       "ident": "06R",
       "identReciprocal": "24L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 2233,
       "widthM": 21.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -16.2292,
+      "lon": -48.964298,
       "surface": "asphalt",
       "lighted": false
     }
@@ -33930,19 +33930,19 @@
       "headingTrueDeg": 46.3,
       "lengthM": 1500,
       "widthM": 29.9,
-      "lat": -31.3951,
-      "lon": -54.117802,
+      "lat": -31.39045,
+      "lon": -54.112101,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1149,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -31.390499,
+      "lon": -54.112202,
       "surface": "other",
       "lighted": false
     }
@@ -33990,11 +33990,11 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 2100,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -17.725096,
+      "lon": -48.606324,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34003,11 +34003,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1544,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -21.698299,
+      "lon": -41.301701,
       "surface": "asphalt",
       "lighted": true
     }
@@ -34016,11 +34016,11 @@
     {
       "ident": "6",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 1530,
       "widthM": 50,
-      "lat": 0,
-      "lon": 0,
+      "lat": -17.6523,
+      "lon": -39.253101,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34029,11 +34029,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 2000,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -21.2473,
+      "lon": -56.452399,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34042,11 +34042,11 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 120,
       "lengthM": 1845,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -3.854534,
+      "lon": -32.423017,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34081,11 +34081,11 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 1535,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -21.791482,
+      "lon": -43.386072,
       "surface": "asphalt",
       "lighted": true
     }
@@ -34094,11 +34094,11 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 1800,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -10.870743,
+      "lon": -61.846675,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34107,11 +34107,11 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 1565,
       "widthM": 42.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -7.269662,
+      "lon": -35.896057,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34120,11 +34120,11 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 2082,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.4823,
+      "lon": -41.277,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34133,11 +34133,11 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 1530,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -27.782101,
+      "lon": -50.281502,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34146,11 +34146,11 @@
     {
       "ident": "6",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 60,
       "lengthM": 1200,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -22.343,
+      "lon": -41.765999,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34159,11 +34159,11 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 2000,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -5.20192,
+      "lon": -37.3643,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34172,11 +34172,11 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1280,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -5.81138,
+      "lon": -61.278301,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34198,11 +34198,11 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 1515,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -21.842529,
+      "lon": -46.569768,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34224,11 +34224,11 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1700,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -10.719402,
+      "lon": -48.3997,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34261,22 +34261,22 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 2694,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -29.711399,
+      "lon": -53.688202,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 1414,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -29.711399,
+      "lon": -53.688202,
       "surface": "asphalt",
       "lighted": true
     }
@@ -34309,11 +34309,11 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 1600,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -1.4896,
+      "lon": -56.396801,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34322,11 +34322,11 @@
     {
       "ident": "2",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 2000,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -3.78601,
+      "lon": -49.720299,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34335,11 +34335,11 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1800,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -9.40088,
+      "lon": -38.250599,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34348,22 +34348,22 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 1500,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -29.7822,
+      "lon": -57.0382,
       "surface": "asphalt",
       "lighted": false
     },
     {
       "ident": "4",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 800,
       "widthM": 50,
-      "lat": 0,
-      "lon": 0,
+      "lat": -29.7822,
+      "lon": -57.0382,
       "surface": "other",
       "lighted": false
     }
@@ -34372,11 +34372,11 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 2600,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.6944,
+      "lon": -60.098301,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34385,11 +34385,11 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 1270,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -45.3992,
+      "lon": -72.670303,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34550,11 +34550,11 @@
     {
       "ident": "1",
       "identReciprocal": "19",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 1000,
       "widthM": 18,
-      "lat": 0,
-      "lon": 0,
+      "lat": -35.861698,
+      "lon": -71.548599,
       "surface": "other",
       "lighted": false
     }
@@ -34615,11 +34615,11 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 160,
       "lengthM": 1050,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -32.7458,
+      "lon": -70.705002,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34680,11 +34680,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 1500,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -12.200694,
+      "lon": -38.906164,
       "surface": "asphalt",
       "lighted": false
     }
@@ -34784,11 +34784,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 2300,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 0.093056,
+      "lon": -76.8675,
       "surface": "other",
       "lighted": false
     }
@@ -35185,11 +35185,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 3600,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": -19.246835,
+      "lon": -65.149611,
       "surface": "asphalt",
       "lighted": true
     }
@@ -35237,22 +35237,22 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 1500,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -14.4279,
+      "lon": -67.496803,
       "surface": "asphalt",
       "lighted": false
     },
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 1450,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -14.4279,
+      "lon": -67.496803,
       "surface": "asphalt",
       "lighted": false
     }
@@ -35274,11 +35274,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 1800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": -14.8592,
+      "lon": -66.737503,
       "surface": "other",
       "lighted": false
     }
@@ -35339,11 +35339,11 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 40,
       "lengthM": 1000,
       "widthM": 22.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 5.481891,
+      "lon": -54.034964,
       "surface": "asphalt",
       "lighted": false
     }
@@ -35751,11 +35751,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 840,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 11.946935,
+      "lon": -66.668333,
       "surface": "asphalt",
       "lighted": false
     }
@@ -35853,11 +35853,11 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 1850,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -16.0436,
+      "lon": -57.629902,
       "surface": "asphalt",
       "lighted": false
     }
@@ -35905,11 +35905,11 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 12.4761,
+      "lon": -61.472801,
       "surface": "concrete",
       "lighted": false
     }
@@ -36122,11 +36122,11 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 70,
       "lengthM": 3050,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 11.916343,
+      "lon": 75.544979,
       "surface": "asphalt",
       "lighted": true
     }
@@ -36428,11 +36428,11 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 180,
       "lengthM": 2591,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 20.74714,
+      "lon": 96.792029,
       "surface": "asphalt",
       "lighted": true
     }
@@ -36584,11 +36584,11 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 670,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 3.734648,
+      "lon": 115.478548,
       "surface": "other",
       "lighted": false
     }
@@ -37184,11 +37184,11 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 130,
       "lengthM": 2800,
       "widthM": 61,
-      "lat": 0,
-      "lon": 0,
+      "lat": 40.560001,
+      "lon": 109.997002,
       "surface": "asphalt",
       "lighted": true
     }
@@ -37223,22 +37223,22 @@
     {
       "ident": "01L",
       "identReciprocal": "19R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 3600,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 30.341178,
+      "lon": 115.03926,
       "surface": "concrete",
       "lighted": false
     },
     {
       "ident": "01R",
       "identReciprocal": "19L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 10,
       "lengthM": 3600,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 30.341178,
+      "lon": 115.03926,
       "surface": "concrete",
       "lighted": false
     }
@@ -37247,11 +37247,11 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 2500,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 34.7411,
+      "lon": 112.388,
       "surface": "concrete",
       "lighted": true
     }
@@ -37260,11 +37260,11 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 80,
       "lengthM": 2800,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 40.161953,
+      "lon": 94.812827,
       "surface": "concrete",
       "lighted": true
     }
@@ -37273,11 +37273,11 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 140,
       "lengthM": 3000,
       "widthM": 39.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": 39.859052,
+      "lon": 98.339344,
       "surface": "other",
       "lighted": false
     }
@@ -37325,11 +37325,11 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 30,
       "lengthM": 2800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 34.41406,
+      "lon": 119.17899,
       "surface": "other",
       "lighted": false
     }
@@ -37390,11 +37390,11 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 3400,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 37.659724,
+      "lon": 120.978124,
       "surface": "concrete",
       "lighted": true
     }
@@ -37403,22 +37403,22 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 90,
       "lengthM": 4000,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 29.298001,
+      "lon": 90.911951,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "10L",
       "identReciprocal": "28R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 100,
       "lengthM": 4000,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 29.298001,
+      "lon": 90.911951,
       "surface": "concrete",
       "lighted": true
     },
@@ -37428,8 +37428,8 @@
       "headingTrueDeg": 89,
       "lengthM": 4000,
       "widthM": 45.1,
-      "lat": 29.297764,
-      "lon": 90.891685,
+      "lat": 29.298067,
+      "lon": 90.912258,
       "surface": "asphalt",
       "lighted": true
     }
@@ -37454,19 +37454,19 @@
       "headingTrueDeg": 157.8,
       "lengthM": 3600,
       "widthM": 50,
-      "lat": 47.250401,
-      "lon": 123.912003,
+      "lat": 47.239602,
+      "lon": 123.918503,
       "surface": "concrete",
       "lighted": true
     },
     {
       "ident": "17R",
       "identReciprocal": "35L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 170,
       "lengthM": 3000,
       "widthM": 50,
-      "lat": 0,
-      "lon": 0,
+      "lat": 47.229969,
+      "lon": 123.914179,
       "surface": "concrete",
       "lighted": true
     }
@@ -37488,11 +37488,11 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 20,
       "lengthM": 2500,
       "widthM": 45.1,
-      "lat": 0,
-      "lon": 0,
+      "lat": 55.944721,
+      "lon": 26.665001,
       "surface": "concrete",
       "lighted": true
     }
@@ -37501,22 +37501,22 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 110,
       "lengthM": 1800,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 49.3144,
+      "lon": 17.568899,
       "surface": "other",
       "lighted": false
     },
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 50,
       "lengthM": 1200,
       "widthM": 45,
-      "lat": 0,
-      "lon": 0,
+      "lat": 49.3144,
+      "lon": 17.568899,
       "surface": "other",
       "lighted": false
     }
@@ -37564,11 +37564,11 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 150,
       "lengthM": 1775,
       "widthM": 29.9,
-      "lat": 0,
-      "lon": 0,
+      "lat": -14.862567,
+      "lon": -40.863186,
       "surface": "asphalt",
       "lighted": false
     }

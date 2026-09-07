@@ -531,17 +531,15 @@ function pickCondition(
 ): AirframeCondition {
   if (kind === 'new') return 'excellent';
   const roll = rng();
-  // Excellent is scarce; low wallet leans tired/fair.
+  // Dealer board: fair or better — never tired (near-AOG bargains are in-fleet wear only).
   if (walletUsd < 40_000) {
     if (roll < 0.06) return 'excellent';
     if (roll < 0.28) return 'good';
-    if (roll < 0.65) return 'fair';
-    return 'tired';
+    return 'fair';
   }
-  if (roll < 0.1) return 'excellent';
-  if (roll < 0.45) return 'good';
-  if (roll < 0.8) return 'fair';
-  return 'tired';
+  if (roll < 0.12) return 'excellent';
+  if (roll < 0.5) return 'good';
+  return 'fair';
 }
 
 function hoursFor(

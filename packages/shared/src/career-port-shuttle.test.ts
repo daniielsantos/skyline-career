@@ -79,11 +79,48 @@ describe('port shuttle', () => {
       destIcao: 'SBKP',
       commodityId: 'general',
       kg: 200,
+      pilotPayUsd: 0,
     });
     assert.throws(
       () =>
         quotePortShuttleBridgeHold(state, world, { holdId: held.hold.id }),
       /Port FBO/,
+    );
+  });
+
+  it('rejects Internal Haul paid holds', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    grantWh(state, 'SBKP');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 1.2,
+      tick: world.tick,
+    });
+    const held = holdWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      commodityId: 'general',
+      kg: 200,
+    });
+    assert.ok((held.pilotPayUsd ?? 0) > 0);
+    assert.throws(
+      () =>
+        quotePortShuttleBridgeHold(state, world, { holdId: held.hold.id }),
+      /unpaid WH bridges/,
+    );
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    assert.throws(
+      () =>
+        dispatchPortShuttleBridgeHold(state, world, {
+          holdId: held.hold.id,
+          aircraftId: aircraft.id,
+        }),
+      /unpaid WH bridges/,
     );
   });
 
@@ -104,6 +141,7 @@ describe('port shuttle', () => {
       destIcao: 'SBKP',
       commodityId: 'general',
       kg: 200,
+      pilotPayUsd: 0,
     });
     const aircraft = state.fleet.find((a) => a.status === 'parked')!;
     aircraft.locationIcao = 'SBGR';
@@ -135,6 +173,7 @@ describe('port shuttle', () => {
       destIcao: 'SBKP',
       commodityId: 'general',
       kg: 150,
+      pilotPayUsd: 0,
     });
     const quote = quotePortShuttleBridgeHold(state, world, {
       holdId: held.hold.id,

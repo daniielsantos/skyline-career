@@ -91,6 +91,17 @@ export function quotePortShuttleBridgeHold(
   if (!hold || (hold.kind ?? 'demand') !== 'bridge') {
     throw new Error('Bridge hold not found');
   }
+  const holdPilotPay =
+    hold.pilotPayUsd != null
+      ? hold.pilotPayUsd
+      : hold.unitPriceUsd > 0
+        ? Math.round(hold.unitPriceUsd * hold.kg * 100) / 100
+        : 0;
+  if (holdPilotPay > 0) {
+    throw new Error(
+      'Port shuttle only flies unpaid WH bridges — set Internal Haul pay to $0 or fly it yourself',
+    );
+  }
   const origin = hold.originIcao.trim().toUpperCase();
   const portId = careerPortIdForPickupHub(origin);
   if (!portId || !isPortOperator(world, portId, companyId)) {
@@ -170,6 +181,17 @@ export function dispatchPortShuttleBridgeHold(
   if (!hold || (hold.kind ?? 'demand') !== 'bridge') {
     throw new Error('Bridge hold not found');
   }
+  const holdPilotPay =
+    hold.pilotPayUsd != null
+      ? hold.pilotPayUsd
+      : hold.unitPriceUsd > 0
+        ? Math.round(hold.unitPriceUsd * hold.kg * 100) / 100
+        : 0;
+  if (holdPilotPay > 0) {
+    throw new Error(
+      'Port shuttle only flies unpaid WH bridges — set Internal Haul pay to $0 or fly it yourself',
+    );
+  }
   const origin = hold.originIcao.trim().toUpperCase();
   const portId = careerPortIdForPickupHub(origin);
   if (!portId || !isPortOperator(world, portId, companyId)) {
@@ -200,6 +222,7 @@ export function dispatchPortShuttleBridgeHold(
   const { mission: accepted, kg } = dispatchWarehouseBridgeHold(state, world, {
     holdId: opts.holdId,
     aircraftId: opts.aircraftId,
+    pilotPayUsd: 0,
   });
 
   const idx = state.missions.findIndex((m) => m.id === accepted.id);

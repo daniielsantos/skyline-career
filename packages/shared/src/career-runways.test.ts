@@ -10,6 +10,7 @@ import {
   evaluateRunwayTouchdown,
   pickFirstContactCoords,
   formatRunwayTouchdownLine,
+  isUsableRunwayCenter,
   type CareerRunway,
 } from './career-runways.js';
 
@@ -220,5 +221,32 @@ describe('pickBestRunway parallel strips', () => {
     // From the other strip this would look ~390 m off — confirm we did not pick it.
     const projWrong = projectOntoRunway(rwy30R!, rwy30L!.lat, rwy30L!.lon);
     assert.ok(Math.abs(projWrong.lateralM) > 300);
+  });
+});
+
+describe('null-island runway centers', () => {
+  it('SBCH has a real runway center (not 0,0) and labels 29 approach', () => {
+    const rwys = getAirportRunways('SBCH');
+    assert.ok(rwys.length >= 1);
+    const rwy = rwys[0]!;
+    assert.ok(Math.abs(rwy.lat) > 1);
+    assert.ok(Math.abs(rwy.lon) > 1);
+    assert.ok(Math.abs(rwy.lat + 27.13) < 0.05);
+    assert.ok(Math.abs(rwy.lon + 52.66) < 0.05);
+
+    // Touch near center approaching ~281° (RWY 29).
+    const snap = evaluateRunwayTouchdown('SBCH', rwy.lat, rwy.lon, 281);
+    assert.ok(snap);
+    assert.equal(snap!.onPavement, true);
+    assert.ok(Math.abs(snap!.lateralM) < 30);
+    const line = formatRunwayTouchdownLine(snap);
+    assert.match(line, /RWY 29/);
+    assert.match(line, /on pavement/);
+    assert.ok(!/million|5860|OFF runway/i.test(line));
+  });
+
+  it('filters Null Island rows out of getAirportRunways', () => {
+    assert.equal(isUsableRunwayCenter({ lat: 0, lon: 0 }), false);
+    assert.equal(isUsableRunwayCenter({ lat: -27.13, lon: -52.66 }), true);
   });
 });

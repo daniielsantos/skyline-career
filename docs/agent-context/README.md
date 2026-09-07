@@ -33,7 +33,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [11-persist-commands.md](./11-persist-commands.md) | Settle/comandos SQL incrementais; pré-req MP |
 | [14-mp-world-clock.md](./14-mp-world-clock.md) | MP: relógio autoritativo, tick server-side, fim do catch-up client |
 | [15-business-model.md](./15-business-model.md) | Produto: B2P único, SP+MP, sem paywall de mapa; extras opcionais |
-| [16-va-logistics.md](./16-va-logistics.md) | VA: ponte aérea WH→WH, desk auto-buy/scout (3 fases), tiers |
+| [16-va-logistics.md](./16-va-logistics.md) | VA: Internal Haul IH-1 pay; desk auto-buy/scout; tiers; IH-2/3 backlog |
 | [17-inject-regression.md](./17-inject-regression.md) | Pack GA/TP/light jet + checklist inject/read; Payload Lab (dev); freighter vs pax_and_cargo; mission `airframeLabel` enrichment |
 | [18-aircraft-pricing-balance.md](./18-aircraft-pricing-balance.md) | Buy/lease: balancear por pay da classe (perna ref., voos/sem, voos p/ comprar) |
 | [19-hub-stats.md](./19-hub-stats.md) | Aba Stats (hub) + Economy pulse tab (dev); samples SQLite v7/v8 |
@@ -41,7 +41,8 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [21-value-heavy-shelf.md](./21-value-heavy-shelf.md) | Value/Heavy shelf — **CLOSED** PASS (G2b+H1) |
 | [22-supplies-shelf.md](./22-supplies-shelf.md) | Supplies shelf — **CLOSED** PASS (Phase A flow) |
 | [23-port-xl-warehouse.md](./23-port-xl-warehouse.md) | Port XL + WH T4 Port Bonded (porto→WH→Wide) |
-| [24-port-fbo.md](./24-port-fbo.md) | Port FBO Phase 0–10; Scout bridge+Demand+Haul; Port shuttle |
+| [24-port-fbo.md](./24-port-fbo.md) | Port FBO Phase 0–10; Scout; Port shuttle; IH-1; 1ª Base free; Base Dispatcher seat + fleet scout + tour Search |
+| [25-runway-touchdown.md](./25-runway-touchdown.md) | Debrief runway: Null Island catalog → OFF runway / m left absurdo (SBCH) |
 
 ## Manutenção
 

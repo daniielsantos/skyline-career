@@ -72,6 +72,13 @@ export const REPAIR_PCT_COST_RATE: Record<FreighterClassId, number> = {
 export const CRITICAL_CONDITION_PCT = 40;
 
 /**
+ * Dealer / pool spawn floor for the `tired` bucket.
+ * In-fleet wear can still drop toward {@link CRITICAL_CONDITION_PCT};
+ * Market must not hand out near-AOG airframes on buy/lease.
+ */
+export const MARKET_TIRED_MIN_CONDITION_PCT = 50;
+
+/**
  * Max fuel-burn multiplier at/below critical condition (planning + live drain).
  * Healthy (≥90%) stays 1.0; ramps linearly toward this by CRITICAL_CONDITION_PCT.
  */
@@ -266,11 +273,11 @@ export function midPctForCondition(condition: AirframeCondition): number {
     case 'fair':
       return 64;
     case 'tired':
-      return 45;
+      return 52;
   }
 }
 
-/** Inclusive pct band for a market condition bucket (tired stays ≥ critical). */
+/** Inclusive pct band for a market condition bucket (tired ≥ market floor). */
 export function conditionPctRange(condition: AirframeCondition): {
   min: number;
   max: number;
@@ -283,7 +290,7 @@ export function conditionPctRange(condition: AirframeCondition): {
     case 'fair':
       return { min: 55, max: 74 };
     case 'tired':
-      return { min: CRITICAL_CONDITION_PCT, max: 54 };
+      return { min: MARKET_TIRED_MIN_CONDITION_PCT, max: 54 };
   }
 }
 

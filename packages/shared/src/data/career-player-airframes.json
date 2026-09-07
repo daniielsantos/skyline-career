@@ -358,7 +358,7 @@
     "label": "Cessna Citation Sovereign C680",
     "rolesPackRelPath": "profiles/ofp/skyward-cessna-c680.json",
     "simbriefIcao": "C680",
-    "simbriefAirframeMatch": "Default",
+    "simbriefAirframeMatch": "Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+",
     "oewKg": 8088,
     "mtowKg": 13959,
     "maxCargoKg": 1211,

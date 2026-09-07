@@ -1579,6 +1579,23 @@ export function readCompanyStateScalars(
           fbos: Array.isArray(parsed.fbos) ? parsed.fbos : [],
           holds: Array.isArray(parsed.holds) ? parsed.holds : [],
           stock: [],
+          ...(Array.isArray(parsed.dispatchers)
+            ? { dispatchers: parsed.dispatchers }
+            : {}),
+          ...(parsed.dispatcherHirePoolByHub &&
+          typeof parsed.dispatcherHirePoolByHub === 'object'
+            ? { dispatcherHirePoolByHub: parsed.dispatcherHirePoolByHub }
+            : {}),
+          ...(parsed.dispatcherHirePoolDayByHub &&
+          typeof parsed.dispatcherHirePoolDayByHub === 'object'
+            ? {
+                dispatcherHirePoolDayByHub:
+                  parsed.dispatcherHirePoolDayByHub,
+              }
+            : {}),
+          ...(parsed.activeTour !== undefined
+            ? { activeTour: parsed.activeTour }
+            : {}),
         };
       }
     } catch {

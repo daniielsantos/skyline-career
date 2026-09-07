@@ -1,6 +1,7 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-09-06. **Port FBO desk auto-buy (VA Fase 1) shipped solo** — ver [`24-port-fbo.md`](./24-port-fbo.md) Phase 2. Loops A/B + tiers 1–3 **decididos**; schema members/billing ainda não.
+Atualizado 2026-09-06. **IH-1 Internal Haul shipped** — pay sugerido + banda 80–150%; settle company− / pilot+ (`internal_haul_pay`); unpaid bridge + Port shuttle intactos. Spec abaixo + [`24-port-fbo.md`](./24-port-fbo.md).
+**Port FBO desk auto-buy (VA Fase 1) shipped solo** — ver [`24-port-fbo.md`](./24-port-fbo.md) Phase 2. Loops A/B + tiers 1–3 **decididos**; schema members/billing ainda não (IH-2).
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -9,24 +10,33 @@ VA (ou company solo) compra barato no porto → guarda no WH → **ponte aérea 
 
 **Port XL / T4 (solo+VA):** WH **T4 Port Bonded** (45 t) só em pickup hubs fecha a fantasia oceânica → tronco; saída gorda = **Wide haul** a partir do WH (não Demand 90 t). Market XL enviesado em origins de porto. Ver [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
-**Port FBO (solo first):** Phase 0–10 shipped — chão desk + Scout (bridge+Demand+Haul) + Port shuttle; Base = perks; crew off. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+**Port FBO (solo first):** Phase 0–10 shipped — chão desk + Scout (bridge+Demand+Haul) + Port shuttle; Base = perks; **1ª Base free**; **Base Dispatcher seat** + fleet Market scout (single-leg). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 ## Loops de economia
 
-### A) Ponte aérea WH → WH — **DECIDIDO · Tier 1**
+### A) Ponte aérea WH → WH — **DECIDIDO · Tier 1 · IH-1 shipped**
 
 1. Buy no porto origem → WH A  
-2. Owner/Dispatcher cria **Internal Haul**: WH A → WH B, commodity, kg, pay interno (wallet da company)  
-3. Pilot aceita → voa → settle credita WH B + paga o pilot  
+2. Owner/Dispatcher cria **Internal Haul**: WH A → WH B, commodity, kg, pay interno (wallet da company) — omit pay → suggest; `$0` = unpaid bridge  
+3. Pilot aceita → voa → settle credita WH B + paga o pilot (`internal_haul_pay`; solo = ±ledger net 0)  
 4. Em B: Demand local (ou guarda stock)
 
 Reusa missões / Watch / settle / WH. **Não** exige vender no porto. Solo pode ser Owner+Pilot no mesmo haul.
 
-**Pay do haul — DECIDIDO (híbrido):**
-- Sistema **sugere** pay (distância × kg × taxa + floor &gt; 0)
-- Dispatcher ajusta **dentro de banda** (ex. 80–150% do sugerido)
-- Debita **wallet da company/VA**; credita o **pilot** no settle
-- Solo Owner+Pilot: accounting interno (custo real = ops/fuel/tempo)
+**Pay do haul — DECIDIDO (híbrido) · shipped IH-1:**
+- Sistema **sugere** pay (`quoteInternalHaulPayUsd`: floor + $/kg + $/nm)
+- Dispatcher ajusta **dentro de banda** 80–150% (`clampInternalHaulPayUsd`)
+- Debita **company** / credita **pilot** no settle (kind `internal_haul_pay`)
+- Solo Owner+Pilot: mesmo `walletUsd`, duas linhas ledger (net 0 além de fuel/ops)
+- Port shuttle **recusa** hold/missão com pay &gt; 0
+
+**Roadmap pay / social:**
+| Fatia | Escopo | Status |
+|-------|--------|--------|
+| **IH-1** | Quote + stamp + settle ±pay; UI Ports/Scout | **shipped** |
+| **IH-2** | Schema members fino + board interno + accept outro piloto | Depois |
+| **IH-3** | Desk AI cria hauls (Fase 3) sob caps Owner | Depois de IH-2 |
+| **NPC** | Só shuttle/bridge unpaid | Phase 8 |
 
 ### B) Especialização regional legível — **DECIDIDO · motor da arbitragem / Tier 1**
 
@@ -123,9 +133,10 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 ## Checklist quando for implementar
 
-- [ ] `InternalHaul` como missão company-scoped (settle: WH A −kg → WH B +kg + payout pilot)  
+- [x] `InternalHaul` pay (IH-1): `career-warehouse-bridge` quote/stamp; settle WH dest + `internal_haul_pay` ±; unpaid bridge payout 0; shuttle gate  
 - [ ] UI surplus/tight por commodity no Ports / região  
 - [x] Fase 1: tabela/ordens auto-buy + tick executor (`career-port-auto-buy.ts`, Port FBO Phase 2)
-- [x] Fase 2: scout report → confirm → bridge / Demand / Haul (`career-port-scout`)  
-- [ ] Fase 3: só com VA; caps AI vs humano Dispatcher  
-- [x] Testes: auto não compra acima do max; day cap / wallet floor / sem FBO
+- [x] Fase 2: scout report → confirm → bridge / Demand / Haul (`career-port-scout`) — Scout bridge default = suggest pay  
+- [ ] IH-2 members + board interno  
+- [ ] Fase 3 / IH-3: só com VA; caps AI vs humano Dispatcher  
+- [x] Testes: auto não compra acima do max; day cap / wallet floor / sem FBO; IH quote/clamp/settle/shuttle

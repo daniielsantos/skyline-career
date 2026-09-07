@@ -162,8 +162,20 @@ async function loadHubIcaos() {
 }
 
 function num(v) {
-  const n = Number(v);
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  if (s === '') return undefined;
+  const n = Number(s);
   return Number.isFinite(n) ? n : undefined;
+}
+
+function isNullIsland(lat, lon) {
+  return (
+    typeof lat === 'number' &&
+    typeof lon === 'number' &&
+    Math.abs(lat) < 1e-9 &&
+    Math.abs(lon) < 1e-9
+  );
 }
 
 function buildRunway(row) {
@@ -178,13 +190,20 @@ function buildRunway(row) {
   const heLon = num(row.he_longitude_deg);
   let lat;
   let lon;
-  if (leLat != null && leLon != null && heLat != null && heLon != null) {
+  if (
+    leLat != null &&
+    leLon != null &&
+    heLat != null &&
+    heLon != null &&
+    !isNullIsland(leLat, leLon) &&
+    !isNullIsland(heLat, heLon)
+  ) {
     lat = (leLat + heLat) / 2;
     lon = (leLon + heLon) / 2;
-  } else if (leLat != null && leLon != null) {
+  } else if (leLat != null && leLon != null && !isNullIsland(leLat, leLon)) {
     lat = leLat;
     lon = leLon;
-  } else if (heLat != null && heLon != null) {
+  } else if (heLat != null && heLon != null && !isNullIsland(heLat, heLon)) {
     lat = heLat;
     lon = heLon;
   } else {
@@ -196,7 +215,15 @@ function buildRunway(row) {
   if (heading != null && num(row.he_heading_degT) != null && heading === num(row.he_heading_degT)) {
     /* keep */
   }
-  if (heading == null && leLat != null && heLat != null && leLon != null && heLon != null) {
+  if (
+    heading == null &&
+    leLat != null &&
+    heLat != null &&
+    leLon != null &&
+    heLon != null &&
+    !isNullIsland(leLat, leLon) &&
+    !isNullIsland(heLat, heLon)
+  ) {
     const dLat = heLat - leLat;
     const dLon = heLon - leLon;
     const latMid = ((leLat + heLat) / 2) * (Math.PI / 180);

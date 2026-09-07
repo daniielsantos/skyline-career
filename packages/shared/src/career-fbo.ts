@@ -292,7 +292,34 @@ export function normalizePlayerFboState(raw: unknown): PlayerFboState {
     }
   }
   const stock: PlayerFboStockPile[] = [];
-  return { fbos, holds, stock };
+  const dispatchers = Array.isArray(r.dispatchers)
+    ? (r.dispatchers as PlayerFboState['dispatchers'])
+    : undefined;
+  const dispatcherHirePoolByHub =
+    r.dispatcherHirePoolByHub &&
+    typeof r.dispatcherHirePoolByHub === 'object'
+      ? (r.dispatcherHirePoolByHub as PlayerFboState['dispatcherHirePoolByHub'])
+      : undefined;
+  const dispatcherHirePoolDayByHub =
+    r.dispatcherHirePoolDayByHub &&
+    typeof r.dispatcherHirePoolDayByHub === 'object'
+      ? (r.dispatcherHirePoolDayByHub as PlayerFboState['dispatcherHirePoolDayByHub'])
+      : undefined;
+  const activeTour =
+    r.activeTour && typeof r.activeTour === 'object'
+      ? (r.activeTour as PlayerFboState['activeTour'])
+      : r.activeTour === null
+        ? null
+        : undefined;
+  return {
+    fbos,
+    holds,
+    stock,
+    ...(dispatchers ? { dispatchers } : {}),
+    ...(dispatcherHirePoolByHub ? { dispatcherHirePoolByHub } : {}),
+    ...(dispatcherHirePoolDayByHub ? { dispatcherHirePoolDayByHub } : {}),
+    ...(activeTour !== undefined ? { activeTour } : {}),
+  };
 }
 
 export function ensurePlayerFbos(state: CareerMissionsState): PlayerFboState {
@@ -310,15 +337,16 @@ export function quoteFboTier1BuyUsd(
   return FBO_T1_BUY_USD[hubTierOf(ap ?? { icao })];
 }
 
-/** CAPEX for buying a T1 base here (1st = home; 2nd = premium). */
+/** CAPEX for buying a T1 base here (1st home = free; 2nd = tier list × premium). */
 export function quoteFboBuyUsd(
   state: CareerMissionsState,
   world: Pick<CareerEconomyWorld, 'airports'>,
   icao: string,
 ): number {
-  const base = quoteFboTier1BuyUsd(world, icao);
   const owned = ensurePlayerFbos(state).fbos.length;
-  if (owned === 0) return base;
+  // First company Base is free — unlocks perks + dispatcher desk without CAPEX wall.
+  if (owned === 0) return 0;
+  const base = quoteFboTier1BuyUsd(world, icao);
   return Math.round(base * FBO_SECOND_BUY_MULT);
 }
 
@@ -476,7 +504,7 @@ export function buyFboTier1(
     throw new Error(gate.reason ?? 'Cannot buy FBO here');
   }
   const debitUsd = gate.buyUsd ?? quoteFboBuyUsd(state, world, hub);
-  if (state.walletUsd < debitUsd) {
+  if (debitUsd > 0 && state.walletUsd < debitUsd) {
     throw new Error(
       `Base purchase $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
@@ -489,13 +517,15 @@ export function buyFboTier1(
     tier: 1,
     capacityKg: FBO_CAPACITY_KG[1],
   };
-  applyWalletDelta(state, {
-    amountUsd: -debitUsd,
-    kind: 'fbo_buy',
-    atTick: world.tick,
-    icao: hub,
-    note: `Base T1 · ${hub}`,
-  });
+  if (debitUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -debitUsd,
+      kind: 'fbo_buy',
+      atTick: world.tick,
+      icao: hub,
+      note: `Base T1 · ${hub}`,
+    });
+  }
   fbos.fbos.push(fbo);
   ensureCompanyCrew(state, { tick: world.tick });
   refreshCrewHirePool(state, world, { force: true });
@@ -1423,6 +1453,8 @@ export function playerFboSnapshot(
   buyAtIcaoReason?: string | null;
   phase1MaxOwned: number;
   maxOwned: number;
+  /** Raw Active Tour itinerary (desk computes Accept gates via dispatch-tours). */
+  activeTour?: PlayerFboState['activeTour'];
 } {
   const fbos = ensurePlayerFbos(state);
   const home = state.homeHubIcao?.trim().toUpperCase() || '';
@@ -1466,6 +1498,9 @@ export function playerFboSnapshot(
     homeBuyUsd,
     phase1MaxOwned: FBO_MAX_OWNED,
     maxOwned: FBO_MAX_OWNED,
+    ...(fbos.activeTour?.status === 'active'
+      ? { activeTour: fbos.activeTour }
+      : {}),
   };
 }
 

@@ -26,6 +26,7 @@ import {
   postWarehouseBridgeHoldCancel,
   postWarehouseBridgeAccept,
   postWarehouseBridgeDispatchHold,
+  postWarehouseBridgeQuote,
   postWarehouseHaulHold,
   postWarehouseHaulHoldCancel,
   postWarehouseHaulAccept,
@@ -42,6 +43,7 @@ import {
   type PortScoutDemandSuggestion,
   type PortScoutHaulSuggestion,
   type PortShuttleQuote,
+  type InternalHaulPayQuote,
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
@@ -443,6 +445,11 @@ export function PortsPanel(props: {
   const [bridgeDest, setBridgeDest] = useState('');
   const [bridgeMode, setBridgeMode] = useState<'hold' | 'fly'>('hold');
   const [bridgeAircraftId, setBridgeAircraftId] = useState('');
+  const [bridgePilotPayUsd, setBridgePilotPayUsd] = useState<number | null>(
+    null,
+  );
+  const [bridgePayQuote, setBridgePayQuote] =
+    useState<InternalHaulPayQuote | null>(null);
   const [scoutSuggestions, setScoutSuggestions] = useState<
     PortScoutBridgeSuggestion[]
   >([]);
@@ -544,9 +551,12 @@ export function PortsPanel(props: {
       setScoutSuggestions(result.suggestions ?? []);
       setScoutDemandSuggestions(result.demandSuggestions ?? []);
       setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      const pilotPay = result.hold?.pilotPayUsd ?? 0;
       props.onToast?.(
         'ok',
-        `Scout bridge hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} — Dispatch when ready`,
+        `Scout Internal haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao}${
+          pilotPay > 0 ? ` · pilot ${props.formatMoney(pilotPay)}` : ' · unpaid'
+        } — Dispatch when ready`,
       );
     } catch (err) {
       props.onToast?.(
@@ -619,6 +629,45 @@ export function PortsPanel(props: {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!bridgeDraft || !bridgeDest) {
+      setBridgePayQuote(null);
+      return;
+    }
+    const originWh = (warehouses?.warehouses ?? []).find(
+      (w) =>
+        w.icao.trim().toUpperCase() ===
+        bridgeDraft.originIcao.trim().toUpperCase(),
+    );
+    const freeKg =
+      warehouses?.stock
+        ?.filter(
+          (s) =>
+            s.warehouseId === originWh?.id &&
+            s.commodityId === bridgeDraft.commodityId,
+        )
+        .reduce((sum, s) => sum + (s.kg ?? 0), 0) ?? 0;
+    let cancelled = false;
+    void postWarehouseBridgeQuote({
+      originIcao: bridgeDraft.originIcao,
+      destIcao: bridgeDest,
+      kg: Math.max(200, freeKg),
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setBridgePayQuote(res.quote);
+        setBridgePilotPayUsd((prev) =>
+          prev == null ? res.quote.suggestedPayUsd : prev,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setBridgePayQuote(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bridgeDraft, bridgeDest, warehouses?.warehouses, warehouses?.stock]);
 
   useEffect(() => {
     void refresh().catch(() => undefined);
@@ -1680,7 +1729,15 @@ export function PortsPanel(props: {
         setShuttleQuote(null);
         props.onToast?.(
           'ok',
-          `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
+          `${
+            (result.pilotPayUsd ?? result.mission.payUsd ?? 0) > 0
+              ? 'Internal haul'
+              : 'Bridge'
+          } ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)}${
+            (result.pilotPayUsd ?? 0) > 0
+              ? ` · pilot ${props.formatMoney(result.pilotPayUsd ?? 0)}`
+              : ''
+          } · open Dispatch`,
         );
         props.onStaged?.(result.mission);
       } else if (dispatchHold.kind === 'haul') {
@@ -1768,17 +1825,26 @@ export function PortsPanel(props: {
     if (bridgeMode === 'fly' && !bridgeAircraftId) return;
     setLoading(true);
     try {
+      const pilotPayUsd =
+        bridgePilotPayUsd == null
+          ? bridgePayQuote?.suggestedPayUsd
+          : bridgePilotPayUsd;
       if (bridgeMode === 'hold') {
         const result = await postWarehouseBridgeHold({
           originIcao: bridgeDraft.originIcao,
           destIcao: bridgeDest,
           commodityId: bridgeDraft.commodityId,
+          pilotPayUsd: pilotPayUsd ?? undefined,
         });
         setWarehouses(result.warehouses);
         setBridgeDraft(null);
         props.onToast?.(
           'ok',
-          `Held ${props.formatTonnes(result.kg)} bridge ${result.hold.originIcao}→${result.hold.destIcao}`,
+          `Held ${props.formatTonnes(result.kg)} Internal haul ${result.hold.originIcao}→${result.hold.destIcao}${
+            (result.pilotPayUsd ?? 0) > 0
+              ? ` · pilot ${props.formatMoney(result.pilotPayUsd ?? 0)}`
+              : ' · unpaid'
+          }`,
         );
       } else {
         const result = await postWarehouseBridgeAccept({
@@ -1786,6 +1852,7 @@ export function PortsPanel(props: {
           destIcao: bridgeDest,
           commodityId: bridgeDraft.commodityId,
           aircraftId: bridgeAircraftId,
+          pilotPayUsd: pilotPayUsd ?? undefined,
         });
         props.onWallet?.(result.walletUsd);
         props.onFleet?.(result.fleet);
@@ -1794,7 +1861,11 @@ export function PortsPanel(props: {
         setBridgeDraft(null);
         props.onToast?.(
           'ok',
-          `Bridge ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · open Dispatch`,
+          `Internal haul ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)}${
+            (result.pilotPayUsd ?? 0) > 0
+              ? ` · pilot ${props.formatMoney(result.pilotPayUsd ?? 0)}`
+              : ''
+          } · open Dispatch`,
         );
         props.onStaged?.(result.mission);
       }
@@ -2360,6 +2431,8 @@ export function PortsPanel(props: {
     );
     setBridgeDest(dests[0]?.icao.trim().toUpperCase() ?? '');
     setBridgeMode('hold');
+    setBridgePilotPayUsd(null);
+    setBridgePayQuote(null);
     const parked = props.fleet.filter(
       (a) =>
         a.status === 'parked' &&
@@ -3727,6 +3800,14 @@ export function PortsPanel(props: {
                                                     commodityId: h.commodityId,
                                                   })}{' '}
                                                   · {props.formatTonnes(h.kg)}
+                                                  {(h.kind ?? 'demand') ===
+                                                    'bridge' &&
+                                                  (h.pilotPayUsd ?? 0) > 0
+                                                    ? ` · pilot ${props.formatMoney(h.pilotPayUsd ?? 0)}`
+                                                    : (h.kind ?? 'demand') ===
+                                                        'bridge'
+                                                      ? ' · unpaid'
+                                                      : ''}
                                                 </p>
                                               </div>
                                             </div>
@@ -5193,12 +5274,23 @@ export function PortsPanel(props: {
           mode={bridgeMode}
           aircraftId={bridgeAircraftId}
           aircraftOptions={bridgeAircraftOptions}
+          pilotPayUsd={bridgePilotPayUsd}
+          payQuote={bridgePayQuote}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
-          onDestChange={setBridgeDest}
+          formatMoney={props.formatMoney}
+          onDestChange={(icao) => {
+            setBridgeDest(icao);
+            setBridgePilotPayUsd(null);
+          }}
           onModeChange={setBridgeMode}
           onAircraftChange={setBridgeAircraftId}
-          onCancel={() => setBridgeDraft(null)}
+          onPilotPayChange={setBridgePilotPayUsd}
+          onCancel={() => {
+            setBridgeDraft(null);
+            setBridgePilotPayUsd(null);
+            setBridgePayQuote(null);
+          }}
           onConfirm={() => void onConfirmBridge()}
         />
       ) : null}
@@ -5846,6 +5938,13 @@ function DemandDispatchHoldDialog(props: {
 }) {
   const titleId = useId();
   const isBridge = (props.hold.kind ?? 'demand') === 'bridge';
+  const bridgePilotPay =
+    props.hold.pilotPayUsd != null
+      ? props.hold.pilotPayUsd
+      : props.hold.unitPriceUsd > 0
+        ? Math.round(props.hold.unitPriceUsd * props.hold.kg * 100) / 100
+        : 0;
+  const paidInternalHaul = isBridge && bridgePilotPay > 0;
   const canConfirm =
     Boolean(props.aircraftId) &&
     props.aircraftOptions.length > 0 &&
@@ -5868,7 +5967,9 @@ function DemandDispatchHoldDialog(props: {
           {isBridge
             ? props.mode === 'shuttle'
               ? 'Port shuttle'
-              : 'Warehouse bridge'
+              : paidInternalHaul
+                ? 'Internal haul'
+                : 'Warehouse bridge'
             : props.hold.kind === 'haul'
               ? 'Warehouse haul'
               : 'Warehouse hold'}
@@ -5899,11 +6000,15 @@ function DemandDispatchHoldDialog(props: {
                   role="option"
                   aria-selected={props.mode === 'shuttle'}
                   className={`demand-accept-pick${props.mode === 'shuttle' ? ' is-active' : ''}`}
-                  disabled={props.busy}
+                  disabled={props.busy || paidInternalHaul}
                   onClick={() => props.onModeChange('shuttle')}
                 >
                   <strong>Port shuttle</strong>
-                  <span>Fee + fuel · wall-clock</span>
+                  <span>
+                    {paidInternalHaul
+                      ? 'Unpaid bridge only'
+                      : 'Fee + fuel · wall-clock'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -5914,11 +6019,19 @@ function DemandDispatchHoldDialog(props: {
             {isBridge
               ? props.mode === 'shuttle'
                 ? '. NPC flies Light GA / Light TP only — cargo lands in dest WH; no freight pay.'
-                : '. No payout — cargo lands in the dest warehouse.'
+                : paidInternalHaul
+                  ? `. Internal haul · pilot pay ${props.formatMoney(bridgePilotPay)} (company) — cargo lands in dest WH.`
+                  : '. Unpaid bridge — cargo lands in the dest warehouse.'
               : props.hold.kind === 'haul'
                 ? '. Paid trunk freight — cargo fills the dest terminal.'
                 : '.'}
           </p>
+          {paidInternalHaul && props.mode === 'fly' ? (
+            <p className="demand-accept-hint">
+              Pilot pay {props.formatMoney(bridgePilotPay)} · company→pilot on
+              settle
+            </p>
+          ) : null}
           {props.mode === 'shuttle' && isBridge && props.shuttleQuote ? (
             <p className="demand-accept-hint">
               Shuttle fee {props.formatMoney(props.shuttleQuote.feeUsd)} ·{' '}
@@ -5989,16 +6102,22 @@ function WarehouseBridgeDialog(props: {
   mode: 'hold' | 'fly';
   aircraftId: string;
   aircraftOptions: PlayerAircraft[];
+  pilotPayUsd: number | null;
+  payQuote: InternalHaulPayQuote | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
   onDestChange: (icao: string) => void;
   onModeChange: (mode: 'hold' | 'fly') => void;
   onAircraftChange: (id: string) => void;
+  onPilotPayChange: (n: number | null) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const titleId = useId();
   const dest = props.destOptions.find((d) => d.icao === props.destIcao);
+  const quote = props.payQuote;
+  const payUsd = props.pilotPayUsd ?? quote?.suggestedPayUsd ?? 0;
   const canConfirm =
     Boolean(props.destIcao) &&
     props.destOptions.length > 0 &&
@@ -6019,15 +6138,14 @@ function WarehouseBridgeDialog(props: {
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <p className="confirm-kicker">Move stock</p>
+        <p className="confirm-kicker">Internal haul</p>
         <h2 id={titleId} className="confirm-title">
           {props.originIcao}→{props.destIcao || '…'}?
         </h2>
         <div className="confirm-body">
           <p>
-            Company cargo only — no Demand Board row and no payout. Hold
-            reserves kg at {props.originIcao}; Fly now withdraws and stages
-            Dispatch.
+            WH→WH company cargo. Pilot pay is company→pilot (solo = ledger
+            only). Set pay to $0 for an unpaid bridge (Port shuttle OK).
           </p>
           <div className="demand-accept-section">
             <span className="demand-accept-label">Destination warehouse</span>
@@ -6065,7 +6183,56 @@ function WarehouseBridgeDialog(props: {
             <p className="demand-accept-hint">
               Dest inbound free {props.formatTonnes(dest.inboundFreeKg)} ·{' '}
               {props.commodityId}
+              {quote ? ` · ${quote.distanceNm} nm` : ''}
             </p>
+          ) : null}
+          {quote ? (
+            <div className="demand-accept-section">
+              <span className="demand-accept-label">
+                Pilot pay ({props.formatMoney(quote.minPayUsd)}–
+                {props.formatMoney(quote.maxPayUsd)})
+              </span>
+              <input
+                type="range"
+                min={quote.minPayUsd}
+                max={quote.maxPayUsd}
+                step={1}
+                value={Math.min(
+                  quote.maxPayUsd,
+                  Math.max(quote.minPayUsd, payUsd || quote.minPayUsd),
+                )}
+                disabled={props.busy || payUsd <= 0}
+                onChange={(event) =>
+                  props.onPilotPayChange(Number(event.target.value))
+                }
+                aria-label="Internal haul pilot pay"
+              />
+              <p className="demand-accept-hint">
+                {props.formatMoney(payUsd)}
+                {payUsd <= 0
+                  ? ' · unpaid bridge'
+                  : ` · suggest ${props.formatMoney(quote.suggestedPayUsd)}`}
+                {' · '}
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={props.busy}
+                  onClick={() => props.onPilotPayChange(0)}
+                >
+                  Unpaid ($0)
+                </button>{' '}
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={props.busy}
+                  onClick={() =>
+                    props.onPilotPayChange(quote.suggestedPayUsd)
+                  }
+                >
+                  Suggest
+                </button>
+              </p>
+            </div>
           ) : null}
           <div className="demand-accept-section">
             <span className="demand-accept-label">When</span>

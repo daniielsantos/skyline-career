@@ -1,4 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  postPilotTravel,
+  type PilotTravelQuote,
+} from './api';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 
 export type PilotTravelFleetShortcut = {
@@ -7,17 +11,19 @@ export type PilotTravelFleetShortcut = {
 };
 
 /**
- * Picker for instant pilot reposition (aircraft stays put).
- * Confirm + wallet debit stay in the parent `onTravel` flow.
+ * Single-step pilot reposition: pick dest, see quote, Travel once.
  */
 export function PilotTravelDialog(props: {
   pilotIcao: string;
   hubs: FerryHubOption[];
+  /** Prefill destination (e.g. Hangar “Travel here”). */
+  initialDestIcao?: string | null;
   /** Parked fleet ICAOs where the pilot is away — one-click dest. */
   fleetShortcuts?: PilotTravelFleetShortcut[];
+  formatMoney: (n: number) => string;
   busy?: boolean;
   onCancel: () => void;
-  /** Quote → confirm → travel. Resolve true when the pilot moved. */
+  /** Execute travel after quote is shown in this dialog. Resolve true when moved. */
   onTravel: (destIcao: string) => Promise<boolean>;
 }) {
   const titleId = useId();
@@ -25,7 +31,12 @@ export function PilotTravelDialog(props: {
   const fieldRef = useRef<HTMLLabelElement>(null);
   const onCancelRef = useRef(props.onCancel);
   onCancelRef.current = props.onCancel;
-  const [destIcao, setDestIcao] = useState('');
+  const [destIcao, setDestIcao] = useState(
+    () => props.initialDestIcao?.trim().toUpperCase() ?? '',
+  );
+  const [quote, setQuote] = useState<PilotTravelQuote | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const origin = props.pilotIcao.trim().toUpperCase();
@@ -52,28 +63,64 @@ export function PilotTravelDialog(props: {
     const input = fieldRef.current?.querySelector('input');
     input?.focus();
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !submitting) {
         event.preventDefault();
         onCancelRef.current();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [submitting]);
 
   const dest = destIcao.trim().toUpperCase();
-  const canGo =
-    Boolean(dest) && dest !== origin && !props.busy && !submitting;
 
-  async function submit(nextDest: string) {
-    const icao = nextDest.trim().toUpperCase();
-    if (!icao || icao === origin || props.busy || submitting) return;
+  useEffect(() => {
+    if (!dest || dest === origin) {
+      setQuote(null);
+      setQuoteError(null);
+      setQuoting(false);
+      return;
+    }
+    let cancelled = false;
+    setQuoting(true);
+    setQuoteError(null);
+    const timer = window.setTimeout(() => {
+      void postPilotTravel({ destIcao: dest, quoteOnly: true })
+        .then((res) => {
+          if (cancelled) return;
+          setQuote(res.quote);
+          setQuoteError(null);
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setQuote(null);
+          setQuoteError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => {
+          if (!cancelled) setQuoting(false);
+        });
+    }, 180);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [dest, origin]);
+
+  const canGo =
+    Boolean(dest) &&
+    dest !== origin &&
+    Boolean(quote) &&
+    !quoteError &&
+    !quoting &&
+    !props.busy &&
+    !submitting;
+
+  async function submit() {
+    if (!canGo || !quote) return;
     setSubmitting(true);
-    // Close this overlay first — the quote confirm shares the same z-index and
-    // would otherwise sit underneath an unresponsive Cancel/Go.
-    onCancelRef.current();
     try {
-      await props.onTravel(icao);
+      const moved = await props.onTravel(dest);
+      if (moved) onCancelRef.current();
     } finally {
       setSubmitting(false);
     }
@@ -84,7 +131,9 @@ export function PilotTravelDialog(props: {
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onCancelRef.current();
+        if (event.target === event.currentTarget && !submitting) {
+          onCancelRef.current();
+        }
       }}
     >
       <div
@@ -100,8 +149,7 @@ export function PilotTravelDialog(props: {
         </h2>
         <div id={bodyId} className="confirm-body">
           <p>
-            Instant pilot reposition — aircraft stays put. Cost is quoted
-            before you confirm.
+            Instant pilot reposition — aircraft stays put.
           </p>
           {shortcuts.length > 0 ? (
             <div
@@ -135,6 +183,22 @@ export function PilotTravelDialog(props: {
               disabled={props.busy || submitting}
             />
           </label>
+          {quoting ? (
+            <p className="muted pilot-travel-quote" role="status">
+              Quoting…
+            </p>
+          ) : quoteError ? (
+            <p className="cargo-dialog-error pilot-travel-quote" role="alert">
+              {quoteError}
+            </p>
+          ) : quote ? (
+            <p className="pilot-travel-quote" role="status">
+              {Math.round(quote.distanceNm)} nm ·{' '}
+              <strong>{props.formatMoney(quote.costUsd)}</strong>
+            </p>
+          ) : dest && dest !== origin ? (
+            <p className="muted pilot-travel-quote">Pick a career hub</p>
+          ) : null}
         </div>
         <div className="confirm-actions">
           <button
@@ -147,12 +211,16 @@ export function PilotTravelDialog(props: {
           </button>
           <button
             type="button"
-            className="action"
+            className="accept"
             disabled={!canGo}
-            aria-busy={submitting || undefined}
-            onClick={() => void submit(dest)}
+            aria-busy={submitting || quoting || undefined}
+            onClick={() => void submit()}
           >
-            Go
+            {submitting
+              ? 'Traveling…'
+              : quote
+                ? `Travel · ${props.formatMoney(quote.costUsd)}`
+                : 'Travel'}
           </button>
         </div>
       </div>

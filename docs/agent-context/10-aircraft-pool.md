@@ -89,6 +89,8 @@ UI: fair / dealer 50% / ask. Ask clamp ~0.5–2.0× fair.
 
 **Spawn** — espalhar slots do país pelos hubs (SE mais, Norte não zero). Restock perto de onde vendeu.
 
+**Market condition floor (2026-09-07)** — dealer/pool spawn is **fair or better** only (`pickCondition` never returns `tired`). `tired` / near-AOG still happens via in-fleet wear (critical **40%**). `MARKET_TIRED_MIN_CONDITION_PCT` (50) remains a safety band if anything still rolls `tired` into listing pcts.
+
 **Board SP** — default país do save. Filtro região / near me depois. Importar outro país + ferry = fase posterior.
 
 ---

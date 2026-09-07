@@ -232,6 +232,7 @@ export function normalizeMissionsState(
     (raw as CareerMissionsState).companyCredit,
   );
   // Full sanitize happens in ensurePlayerFbos / career-fbo ops (avoids fleet↔mission cycle).
+  // Preserve Base Dispatcher seat fields — do NOT drop on reload (hire was lost otherwise).
   const playerFbosRaw = (raw as CareerMissionsState).playerFbos;
   const playerFbos =
     playerFbosRaw &&
@@ -242,7 +243,27 @@ export function normalizeMissionsState(
           fbos: playerFbosRaw.fbos,
           holds: playerFbosRaw.holds,
           // Spot inventory removed — always wipe on load (plan 1B).
-          stock: [],
+          stock: [] as [],
+          ...(Array.isArray(playerFbosRaw.dispatchers)
+            ? { dispatchers: playerFbosRaw.dispatchers }
+            : {}),
+          ...(playerFbosRaw.dispatcherHirePoolByHub &&
+          typeof playerFbosRaw.dispatcherHirePoolByHub === 'object'
+            ? {
+                dispatcherHirePoolByHub:
+                  playerFbosRaw.dispatcherHirePoolByHub,
+              }
+            : {}),
+          ...(playerFbosRaw.dispatcherHirePoolDayByHub &&
+          typeof playerFbosRaw.dispatcherHirePoolDayByHub === 'object'
+            ? {
+                dispatcherHirePoolDayByHub:
+                  playerFbosRaw.dispatcherHirePoolDayByHub,
+              }
+            : {}),
+          ...(playerFbosRaw.activeTour !== undefined
+            ? { activeTour: playerFbosRaw.activeTour }
+            : {}),
         }
       : { fbos: [], holds: [], stock: [] };
   const playerWarehousesRaw = (raw as CareerMissionsState).playerWarehouses;

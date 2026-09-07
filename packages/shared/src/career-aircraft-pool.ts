@@ -217,10 +217,10 @@ function pickCondition(
 ): AirframeCondition {
   if (kind === 'new') return 'excellent';
   const r = rng();
+  // Pool/dealer spawn: fair or better — never tired.
   if (r < 0.22) return 'excellent';
-  if (r < 0.52) return 'good';
-  if (r < 0.78) return 'fair';
-  return 'tired';
+  if (r < 0.55) return 'good';
+  return 'fair';
 }
 
 function hoursFor(

@@ -11,6 +11,7 @@
   "notes": [
     "Cessna C680 — auto roles pack from homologated profile",
     "Profile: skyward/cessna-c680@1.0.0",
+    "SimBrief: C680 · Skyward Simulations (MSFS) - C680 Sovereign+ (not Default)",
     "loadMethod: direct-injection; injectCapable: true",
     "Cabin seats mapped as baggage (career cargo / pax=0)",
     "Fuel strategy: simconnect-direct"
@@ -59,7 +60,7 @@
     ]
   },
   "simbriefIcao": "C680",
-  "simbriefAirframeMatch": "Default",
+  "simbriefAirframeMatch": "Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+",
   "stationMap": [
     {
       "simVarIndex": 1,

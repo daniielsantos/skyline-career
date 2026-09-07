@@ -158,6 +158,16 @@ describe('career player airframes', () => {
     );
   });
 
+  it('stages Skyward C680 on the Skyward SimBrief airframe row', () => {
+    const c680 = findCareerPlayerAirframe('skyward-cessna-c680');
+    assert.equal(c680?.simbriefIcao, 'C680');
+    assert.equal(
+      c680?.simbriefAirframeMatch,
+      'Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+',
+    );
+    assert.equal(c680?.rolesPackRelPath, 'profiles/ofp/skyward-cessna-c680.json');
+  });
+
   it('stages FSReborn Phenom 300E as pax_and_cargo (belly freight capped)', () => {
     const phenom = findCareerPlayerAirframe('fsreborn-phenom-300e');
     assert.equal(phenom?.loadLayout, 'pax_and_cargo');

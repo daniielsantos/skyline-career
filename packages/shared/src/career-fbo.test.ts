@@ -115,19 +115,22 @@ describe('player FBO', () => {
     });
     state.walletUsd = 500_000;
     const price = playerFboSnapshot(state, world).homeBuyUsd;
-    assert.ok(price != null && price > 0);
+    assert.equal(price, 0);
 
     assert.throws(
       () => buyFboTier1(state, world, 'SBPA'),
       /home hub/i,
     );
 
+    const beforeWallet = state.walletUsd;
     const bought = buyFboTier1(state, world, 'SBGR');
     assert.equal(bought.fbo.icao, 'SBGR');
     assert.equal(bought.fbo.capacityKg, FBO_T1_CAPACITY_KG);
+    assert.equal(bought.debitUsd, 0);
+    assert.equal(state.walletUsd, beforeWallet);
     assert.equal(state.playerFbos!.fbos.length, 1);
     assert.ok(
-      (state.ledger ?? []).some((e) => e.kind === 'fbo_buy'),
+      !(state.ledger ?? []).some((e) => e.kind === 'fbo_buy'),
     );
 
     state.walletUsd = 500_000;

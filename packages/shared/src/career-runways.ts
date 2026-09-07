@@ -105,9 +105,26 @@ export const CAREER_RUNWAYS: Readonly<CatalogFile> = catalog;
 export function getAirportRunways(icao: string): CareerRunway[] {
   const key = icao.trim().toUpperCase();
   const msfs = lookupMsfsBushHubOverride(key)?.runways;
-  if (msfs && msfs.length > 0) return msfs;
+  if (msfs && msfs.length > 0) {
+    return msfs.filter(isUsableRunwayCenter);
+  }
   const rows = CAREER_RUNWAYS[key];
-  return Array.isArray(rows) ? rows : [];
+  if (!Array.isArray(rows)) return [];
+  return rows.filter(isUsableRunwayCenter);
+}
+
+/**
+ * Reject Null Island / missing centers — empty OA fields used to become lat=0
+ * lon=0 via Number(""), which made touchdown project millions of meters off.
+ */
+export function isUsableRunwayCenter(
+  runway: Pick<CareerRunway, 'lat' | 'lon'>,
+): boolean {
+  return (
+    Number.isFinite(runway.lat) &&
+    Number.isFinite(runway.lon) &&
+    !(Math.abs(runway.lat) < 1e-9 && Math.abs(runway.lon) < 1e-9)
+  );
 }
 
 /** Nearest runway center at an airport (great-circle). */

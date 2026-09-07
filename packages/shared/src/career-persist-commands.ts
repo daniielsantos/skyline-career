@@ -127,18 +127,37 @@ export function applySettleWalletDeltas(
 ): void {
   const mission = result.mission;
   if (result.walletCreditUsd > 0) {
+    const internalHaul =
+      mission.warehouseBridge === true && mission.internalHaul === true;
     applyWalletDelta(missions, {
       amountUsd: result.walletCreditUsd,
-      kind: mission.demandOrderId ? 'demand_payout' : 'freight_payout',
+      kind: internalHaul
+        ? 'internal_haul_pay'
+        : mission.demandOrderId
+          ? 'demand_payout'
+          : 'freight_payout',
       atTick,
       missionId: mission.id,
       icao: mission.destIcao,
       note: mission.contractPilot
         ? `Contract pilot · ${mission.originIcao}→${mission.destIcao}`
-        : mission.demandOrderId
-          ? `Demand · ${mission.originIcao}→${mission.destIcao}`
-          : `${mission.originIcao}→${mission.destIcao}`,
+        : internalHaul
+          ? `Internal haul pilot · ${mission.originIcao}→${mission.destIcao}`
+          : mission.demandOrderId
+            ? `Demand · ${mission.originIcao}→${mission.destIcao}`
+            : `${mission.originIcao}→${mission.destIcao}`,
     });
+    // Solo Owner+Pilot: same wallet — company fee offset (ledger ±pay, net 0).
+    if (internalHaul) {
+      applyWalletDelta(missions, {
+        amountUsd: -result.walletCreditUsd,
+        kind: 'internal_haul_pay',
+        atTick,
+        missionId: mission.id,
+        icao: mission.originIcao,
+        note: `Internal haul company · ${mission.originIcao}→${mission.destIcao}`,
+      });
+    }
   }
   if (result.fuelDebitUsd > 0) {
     applyWalletDelta(missions, {

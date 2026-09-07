@@ -881,10 +881,16 @@ export interface MissionIntent {
    */
   demandOrderId?: string;
   /**
-   * Company WH→WH air bridge (no payout). Settle deposits dest warehouse;
+   * Company WH→WH air bridge. Settle deposits dest warehouse;
    * overflow goes to that hub's port yard. Cancel restores origin WH.
+   * With `internalHaul`, payUsd is company→pilot fee (not freight).
    */
   warehouseBridge?: boolean;
+  /**
+   * Internal Haul (VA spine): WH→WH with pilot fee on settle.
+   * Requires warehouseBridge. Solo Owner+Pilot = same wallet (ledger ±pay).
+   */
+  internalHaul?: boolean;
   /**
    * Port FBO shuttle: NPC wall-clock bridge (crewOperated). Fee + fuel only;
    * payUsd stays 0 — not company Market/Demand crew.
@@ -1251,11 +1257,91 @@ export interface PlayerFboStockPile {
   acquiredAtTick: number;
 }
 
+/**
+ * Base desk dispatcher (ground staff at a company Base — not flying crew).
+ * One seat per Base; unlocks fleet Market scout + ferry-aware ranking.
+ */
+export type BaseDispatcherGrade = 'ace' | 'solid' | 'capable' | 'green';
+
+export interface BaseDispatcherCandidate {
+  id: string;
+  displayName: string;
+  grade: BaseDispatcherGrade;
+  /** 40–99 skill inside the grade band (frozen). */
+  skillPct: number;
+  salaryUsdPerDay: number;
+  hireUsd: number;
+  portraitId?: string;
+}
+
+export interface BaseDispatcherMember {
+  id: string;
+  displayName: string;
+  fboId: string;
+  hubIcao: string;
+  grade: BaseDispatcherGrade;
+  skillPct: number;
+  salaryUsdPerDay: number;
+  hiredAtTick: number;
+  portraitId?: string;
+}
+
+/**
+ * Base Dispatcher multi-leg itinerary (plan only — no hard-reserve of L2+).
+ * Accept L1 persists this; Accept L2/L3 books each lot when the aircraft is ready.
+ */
+export type ActiveTourLegStatus = 'planned' | 'active' | 'done' | 'lost';
+
+export type ActiveTourStatus = 'active' | 'completed' | 'abandoned';
+
+export interface ActiveTourLeg {
+  /** 1-based leg index. */
+  index: number;
+  lotId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: CommodityId;
+  liftKg: number;
+  distanceNm: number;
+  ferryNm: number;
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  lastMile: boolean;
+  status: ActiveTourLegStatus;
+  /** Bound when this leg was accepted. */
+  missionId?: string;
+}
+
+export interface ActiveTour {
+  id: string;
+  /** Original Search row id (lotIds|aircraftId), if known. */
+  tourTemplateId?: string;
+  aircraftId: string;
+  aircraftClassId: FreighterClassId;
+  airframeTypeId?: string;
+  /** Base hub where the desk started the tour (Continue → Base). */
+  hubIcao: string;
+  originIcao: string;
+  routeLabel: string;
+  legs: ActiveTourLeg[];
+  startedAtTick: number;
+  status: ActiveTourStatus;
+}
+
 export interface PlayerFboState {
   fbos: PlayerFbo[];
   holds: PlayerFboHold[];
   /** Always wiped empty — legacy field. */
   stock: PlayerFboStockPile[];
+  /** Hired Base dispatchers (≤1 per FBO). */
+  dispatchers?: BaseDispatcherMember[];
+  /** Hire desk candidates keyed by Base hub ICAO. */
+  dispatcherHirePoolByHub?: Record<string, BaseDispatcherCandidate[]>;
+  /** Economy day when each Base hub pool was last rolled. */
+  dispatcherHirePoolDayByHub?: Record<string, number>;
+  /** In-progress Dispatcher tour itinerary (Accept L2/L3). */
+  activeTour?: ActiveTour | null;
 }
 
 /** Player warehouse at a port pickup hub. */
@@ -1313,8 +1399,13 @@ export interface PlayerDemandHold {
   destWarehouseId?: string;
   commodityId: CommodityId;
   kg: number;
-  /** Frozen USD/kg at hold (intl + demand desk). 0 on bridge. */
+  /** Frozen USD/kg at hold (intl + demand desk). Bridge: pilot fee / kg when Internal Haul. */
   unitPriceUsd: number;
+  /**
+   * Internal Haul pilot fee (USD total) on bridge holds.
+   * Omit / 0 = unpaid WH→WH bridge (Port shuttle OK).
+   */
+  pilotPayUsd?: number;
   heldAtTick: number;
   expiresAtTick: number;
 }
@@ -1653,6 +1744,7 @@ export type CareerLedgerKind =
   | 'port_yard_hold'
   | 'port_drayage'
   | 'port_shuttle'
+  | 'internal_haul_pay'
   | 'port_concession_claim'
   | 'port_concession_lease'
   | 'port_concession_upgrade'
@@ -1667,6 +1759,9 @@ export type CareerLedgerKind =
   | 'ground_staff_salary'
   | 'ground_staff_hire'
   | 'ground_staff_fire'
+  | 'base_dispatcher_salary'
+  | 'base_dispatcher_hire'
+  | 'base_dispatcher_fire'
   | 'ferry'
   | 'pilot_travel'
   | 'fuel'

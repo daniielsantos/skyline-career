@@ -59,6 +59,9 @@ import {
   postFboRelease,
   postFboSplit,
   postFboReturnMission,
+  postBaseDispatchScout,
+  postBaseDispatchTours,
+  postBaseDispatcher,
   postCrewAssign,
   postCrewDispatch,
   postCrewHire,
@@ -100,6 +103,13 @@ import {
   type NpcFleetMember,
   type PlayerAircraft,
   type PlayerFboSnapshot,
+  type BaseDispatchScoutSuggestion,
+  type BaseDispatchScoutPolicy,
+  type BaseDispatchTour,
+  type BaseDispatchTourLeg,
+  type BaseDispatchTourReturnMode,
+  type ActiveTourView,
+  type BaseDispatcherSnapshot,
   type CompanyCrewSnapshot,
   type OfflineFeeSummary,
   type EconomyCatchUpStatus,
@@ -138,6 +148,7 @@ import { PortsPanel } from './PortsPanel';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { FerryHubCombobox } from './FerryHubCombobox';
+import { FerryJourneyDialog } from './FerryJourneyDialog';
 import { BUSH_TRIPS_BOARD_ENABLED, FBO_BONDED_HOLD_ENABLED, COMPANY_CREW_ENABLED } from './feature-flags';
 import {
   AircraftMarketCountryCombobox,
@@ -179,7 +190,8 @@ import { CargoOpsPanel } from './CargoOpsPanel';
 import { CARGO_OPS_FILTER_OPTIONS } from './cargo-ops-unlock';
 import { ClassOpsPanel } from './ClassOpsPanel';
 import { classOpsUnlockProgress } from './class-ops-unlock';
-import { CrewPanel } from './CrewPanel';
+import { CrewPanel, CrewPortrait } from './CrewPanel';
+import { crewPortraitUrl } from './crewPortraits';
 import { CommodityIcon } from './CommodityIcon';
 import type { CareerCargoOps, CareerClassOps } from './api';
 import { HubNetworkMap } from './HubNetworkMap';
@@ -3493,6 +3505,9 @@ export function App() {
     useState<CareerProfileMeta | null>(null);
   /** True until the player picks a save this session. */
   const [showProfileGate, setShowProfileGate] = useState(true);
+  const [profileGateBusyLabel, setProfileGateBusyLabel] = useState(
+    'Opening career…',
+  );
   const [profilesLoading, setProfilesLoading] = useState(true);
   const [boardAircraftId, setBoardAircraftId] = useState('');
   const [profitableOnly, setProfitableOnly] = useState(false);
@@ -3514,6 +3529,46 @@ export function App() {
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
   const [playerFbos, setPlayerFbos] = useState<PlayerFboSnapshot | null>(null);
+  const [dispatchScoutSuggestions, setDispatchScoutSuggestions] = useState<
+    BaseDispatchScoutSuggestion[]
+  >([]);
+  const [dispatchScoutPolicy, setDispatchScoutPolicy] =
+    useState<BaseDispatchScoutPolicy | null>(null);
+  const [baseDispatcher, setBaseDispatcher] =
+    useState<BaseDispatcherSnapshot | null>(null);
+  const [dispatchScoutLoading, setDispatchScoutLoading] = useState(false);
+  const [dispatchTourLoading, setDispatchTourLoading] = useState(false);
+  const dispatchDeskBusy = dispatchScoutLoading || dispatchTourLoading;
+  const [selectedDispatchScoutId, setSelectedDispatchScoutId] = useState<
+    string | null
+  >(null);
+  const [dispatchDeskMode, setDispatchDeskMode] = useState<'board' | 'tours'>(
+    'board',
+  );
+  const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
+  const [activeTour, setActiveTour] = useState<ActiveTourView | null>(null);
+  /** Tour itinerary to attach after Manifest Accept & Dispatch. */
+  const [pendingActiveTour, setPendingActiveTour] = useState<{
+    kind: 'start' | 'bind';
+    hubIcao: string;
+    aircraftId: string;
+    tourId?: string;
+    routeLabel: string;
+    tourLegs: BaseDispatchTourLeg[];
+    legIndex: number;
+  } | null>(null);
+  /** FerryJourneyDialog from Manifest when selected airframe is off-origin. */
+  const [stagingFerryOpen, setStagingFerryOpen] = useState(false);
+  const [selectedDispatchTourId, setSelectedDispatchTourId] = useState<
+    string | null
+  >(null);
+  const [dispatchTourAircraftId, setDispatchTourAircraftId] = useState('');
+  const [dispatchTourOrigin, setDispatchTourOrigin] = useState('');
+  const [dispatchTourLegs, setDispatchTourLegs] = useState<2 | 3>(2);
+  const [dispatchTourMinNm, setDispatchTourMinNm] = useState('');
+  const [dispatchTourMaxNm, setDispatchTourMaxNm] = useState('');
+  const [dispatchTourReturnMode, setDispatchTourReturnMode] =
+    useState<BaseDispatchTourReturnMode>('none');
   const [splitHoldId, setSplitHoldId] = useState<string | null>(null);
   const [selectedFboHoldId, setSelectedFboHoldId] = useState<string | null>(
     null,
@@ -3533,6 +3588,9 @@ export function App() {
     token: number;
   } | null>(null);
   const [pilotTravelOpen, setPilotTravelOpen] = useState(false);
+  const [pilotTravelInitialDest, setPilotTravelInitialDest] = useState<
+    string | null
+  >(null);
   const [pilotName, setPilotName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [pilotIcao, setPilotIcao] = useState('');
@@ -3591,6 +3649,7 @@ export function App() {
   useEffect(() => {
     setSelectedFboHoldId(null);
     setSelectedFboMissionId(null);
+    setSelectedDispatchScoutId(null);
     setSplitHoldId(null);
   }, [airportIcao, terminalSection]);
 
@@ -3623,6 +3682,37 @@ export function App() {
       })
       .finally(() => {
         if (!cancelled) setHubStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [terminalSection, airportIcao]);
+
+  useEffect(() => {
+    if (terminalSection !== 'fbo' || !airportIcao) return;
+    let cancelled = false;
+    const hub = airportIcao.trim().toUpperCase();
+    setDispatchScoutLoading(true);
+    void Promise.all([
+      postBaseDispatcher({ action: 'list', hubIcao: hub }),
+      postBaseDispatchScout({ action: 'list', hubIcao: hub }),
+      postBaseDispatchTours({ action: 'status' }),
+    ])
+      .then(([desk, scout, tours]) => {
+        if (cancelled) return;
+        if (desk.dispatcher) setBaseDispatcher(desk.dispatcher);
+        if (desk.policy) setDispatchScoutPolicy(desk.policy);
+        if (scout.policy) setDispatchScoutPolicy(scout.policy);
+        if (scout.dispatcher) setBaseDispatcher(scout.dispatcher);
+        setDispatchScoutSuggestions(scout.suggestions ?? []);
+        setSelectedDispatchScoutId(null);
+        setActiveTour(tours.activeTour ?? null);
+      })
+      .catch(() => {
+        /* Scan retries */
+      })
+      .finally(() => {
+        if (!cancelled) setDispatchScoutLoading(false);
       });
     return () => {
       cancelled = true;
@@ -3774,9 +3864,11 @@ export function App() {
     const scopedFull = effectiveScope == null;
     const boardOwnsMarket =
       tabRef.current === 'market' || Boolean(airportIcao);
+    // Skip market on *unscoped* bootstrap when the Freights board effect will
+    // load it — but honor explicit `{ market: true }` (profile-gate warm).
     const wantMarket =
       (scopedFull || effectiveScope?.market === true) &&
-      !(bootstrapping && boardOwnsMarket);
+      !(bootstrapping && boardOwnsMarket && scopedFull);
     const marketSeqAtFetch = marketFetchSeqRef.current;
     const wantMissions =
       bootstrapping || scopedFull || effectiveScope?.missions === true;
@@ -3817,7 +3909,14 @@ export function App() {
     setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
     if (state.cashflow) setCashflow(state.cashflow);
     if (state.companyCredit) setCompanyCredit(state.companyCredit);
-    if (state.playerFbos) setPlayerFbos(state.playerFbos);
+    if (state.playerFbos) {
+      setPlayerFbos(state.playerFbos);
+      if (state.playerFbos.activeTour) {
+        setActiveTour(state.playerFbos.activeTour);
+      } else if (state.playerFbos.activeTour === null) {
+        setActiveTour(null);
+      }
+    }
     if (state.companyCrew) setCompanyCrew(state.companyCrew);
     careerStateReadyRef.current = true;
     setCareerStateReady(true);
@@ -4226,6 +4325,46 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reclamp when capacity payload changes
   }, [maxCargoKg]);
 
+  // Manifest ferry: when the selected airframe arrives at origin, unlock Accept.
+  useEffect(() => {
+    if (!staging || staging.replaceManifest) return;
+    if (!staging.aircraftId) return;
+    const acf = fleet.find((a) => a.id === staging.aircraftId);
+    if (!acf || acf.status !== 'parked') return;
+    const atOrigin =
+      acf.locationIcao.trim().toUpperCase() ===
+      staging.originIcao.trim().toUpperCase();
+    if (!atOrigin) return;
+    setStagingFerryOpen(false);
+    const openFlight = openFlightForRoute(
+      staging.originIcao,
+      staging.destIcao,
+      acf.aircraftClassId,
+      acf.id,
+    );
+    setStaging((current) => {
+      if (!current || current.aircraftId !== acf.id) return current;
+      if (
+        current.aircraft === acf.aircraftClassId &&
+        current.intoMissionId === openFlight?.id
+      ) {
+        return current;
+      }
+      return clampDraftToCapacity({
+        ...current,
+        aircraft: acf.aircraftClassId,
+        intoMissionId: openFlight?.id,
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    fleet,
+    staging?.aircraftId,
+    staging?.originIcao,
+    staging?.destIcao,
+    staging?.replaceManifest,
+  ]);
+
   // Self-heal manifests created by the old replacement bug while they are open.
   useEffect(() => {
     if (!staging?.replaceManifest) return;
@@ -4434,9 +4573,20 @@ export function App() {
                 );
               }
               goToTab('staging');
-              void refresh().catch(() => {
-                /* ignore */
-              });
+              void refresh()
+                .catch(() => {
+                  /* ignore */
+                })
+                .then(() =>
+                  postBaseDispatchTours({ action: 'status' })
+                    .then((r) => {
+                      setActiveTour(r.activeTour ?? null);
+                      if (r.playerFbos) setPlayerFbos(r.playerFbos);
+                    })
+                    .catch(() => {
+                      /* ignore */
+                    }),
+                );
             });
           }
           // Skip no-op updates so the sticky footer doesn't re-render every poll
@@ -6195,33 +6345,51 @@ export function App() {
     setWatch(null);
   }
 
+  /**
+   * Keep the profile gate up until company + tab board are warm — avoids the
+   * Freights “Loading…” flash after Continue.
+   */
+  async function warmCareerBeforeEnter(profileId: string): Promise<void> {
+    setProfileGateBusyLabel('Loading company & board…');
+    const scope = liveRefreshScope(tabRef.current, Boolean(airportIcao));
+    await refreshRef.current({
+      ...scope,
+      market: true,
+      missions: true,
+    });
+    setMarketBoardLoading(false);
+    // Mark boot done before closing the gate so the enter-effect does not
+    // fire a second full refresh.
+    bootProfileKeyRef.current = profileId;
+    setShowProfileGate(false);
+  }
+
   async function onSelectCareerProfile(id: string) {
-    await run(
-      async () => {
-        const result = await postCareerProfileSelect(id);
-        clearCareerSessionPaint();
-        setCareerProfiles(result.profiles);
-        setActiveCareerProfile(
-          result.profile ??
-            result.profiles.find((p) => p.id === result.activeId) ??
-            null,
-        );
-        setShowProfileGate(false);
-      },
-    );
+    await run(async () => {
+      setProfileGateBusyLabel('Opening save…');
+      const result = await postCareerProfileSelect(id);
+      clearCareerSessionPaint();
+      setCareerProfiles(result.profiles);
+      setActiveCareerProfile(
+        result.profile ??
+          result.profiles.find((p) => p.id === result.activeId) ??
+          null,
+      );
+      await warmCareerBeforeEnter(id);
+    });
   }
 
   async function onCreateCareerProfile(name: string) {
-    await run(
-      async () => {
-        const created = await postCareerProfileCreate(name);
-        const result = await postCareerProfileSelect(created.profile.id);
-        clearCareerSessionPaint();
-        setCareerProfiles(result.profiles);
-        setActiveCareerProfile(result.profile ?? created.profile);
-        setShowProfileGate(false);
-      },
-    );
+    await run(async () => {
+      setProfileGateBusyLabel('Creating save…');
+      const created = await postCareerProfileCreate(name);
+      setProfileGateBusyLabel('Opening save…');
+      const result = await postCareerProfileSelect(created.profile.id);
+      clearCareerSessionPaint();
+      setCareerProfiles(result.profiles);
+      setActiveCareerProfile(result.profile ?? created.profile);
+      await warmCareerBeforeEnter(created.profile.id);
+    });
   }
 
   async function onDeleteCareerProfile(id: string) {
@@ -6714,14 +6882,17 @@ export function App() {
     const ownedCount = playerFbos?.fbos.length ?? 0;
     const isSecond = ownedCount === 1;
     const isThird = ownedCount === 2;
+    const freeFirst = ownedCount === 0 && (price === 0 || price == null);
     const ok = await confirm({
       title: `Buy Base at ${target}?`,
       body: isThird
         ? `Third base · Tier-1 (${formatTonnes(3000)}). Late-game CAPEX ${price != null ? formatMoney(price) : ''} — needs T2 + 3 owned aircraft + Cargo Ops Time.`
         : isSecond
-          ? `Second base · Tier-1 (${formatTonnes(3000)}). Premium CAPEX ${price != null ? formatMoney(price) : ''}. Same storage + parking/Jet-A perks at this hub.`
-          : `Tier-1 bonded warehouse (${formatTonnes(3000)} capacity). Pays ${price != null ? formatMoney(price) : 'the listed CAPEX'} — 15% parking discount and 5% Jet-A/MRO discount at this hub.`,
-      confirmLabel: 'Buy Base',
+          ? `Second base · Tier-1 (${formatTonnes(3000)}). Premium CAPEX ${price != null ? formatMoney(price) : ''}. Same parking/Jet-A/MRO perks + Dispatcher desk at this hub.`
+          : freeFirst
+            ? `First company Base is free — parking/Jet-A/MRO perks and Dispatcher contract scout at ${target}.`
+            : `Tier-1 Base (${formatTonnes(3000)} capacity). Pays ${price != null ? formatMoney(price) : 'the listed CAPEX'} — parking and Jet-A/MRO discounts at this hub.`,
+      confirmLabel: freeFirst ? 'Claim Base' : 'Buy Base',
     });
     if (!ok) return;
     await run(async () => {
@@ -6731,11 +6902,9 @@ export function App() {
       if (result.companyCrew) setCompanyCrew(result.companyCrew);
       setToastKind('ok');
       setToast(
-        `Base T1 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}${
-          COMPANY_CREW_ENABLED && result.companyCrew
-            ? ` · ${result.companyCrew.slotsUnlocked} crew slot(s)`
-            : ''
-        }`,
+        result.debitUsd > 0
+          ? `Base T1 at ${result.fbo.icao} · ${formatMoney(result.debitUsd)}`
+          : `Base T1 at ${result.fbo.icao} · free`,
       );
       if (airportIcao) {
         const view = await fetchAirportView(airportIcao);
@@ -6743,6 +6912,416 @@ export function App() {
         if (view.playerFbos) setPlayerFbos(view.playerFbos);
       }
     });
+  }
+
+  async function refreshDispatchScout() {
+    if (busy || dispatchDeskBusy) return;
+    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
+    setDispatchDeskMode('board');
+    setDispatchScoutLoading(true);
+    try {
+      const result = await postBaseDispatchScout({
+        action: 'list',
+        hubIcao: hub,
+      });
+      setDispatchScoutSuggestions(result.suggestions ?? []);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      setSelectedDispatchScoutId((cur) =>
+        (result.suggestions ?? []).some((s) => s.id === cur) ? cur : null,
+      );
+      setSelectedDispatchTourId(null);
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchScoutLoading(false);
+    }
+  }
+
+  async function onGenerateDispatchTours() {
+    if (busy || dispatchDeskBusy) return;
+    const hub = (airportIcao ?? '').trim().toUpperCase();
+    if (!hub) return;
+    setDispatchDeskMode('tours');
+    setDispatchTourLoading(true);
+    try {
+      const minNmRaw = dispatchTourMinNm.trim();
+      const maxNmRaw = dispatchTourMaxNm.trim();
+      const minNm =
+        minNmRaw && Number.isFinite(Number(minNmRaw))
+          ? Number(minNmRaw)
+          : undefined;
+      const maxNm =
+        maxNmRaw && Number.isFinite(Number(maxNmRaw)) && Number(maxNmRaw) > 0
+          ? Number(maxNmRaw)
+          : null;
+      const result = await postBaseDispatchTours({
+        action: 'list',
+        hubIcao: hub,
+        aircraftId: dispatchTourAircraftId.trim() || undefined,
+        originIcao: dispatchTourOrigin.trim() || undefined,
+        legs: dispatchTourLegs,
+        minNm,
+        maxNm,
+        returnMode: dispatchTourReturnMode,
+      });
+      setDispatchTours(result.tours ?? []);
+      if (result.activeTour !== undefined) {
+        setActiveTour(result.activeTour ?? null);
+      }
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      setSelectedDispatchTourId(null);
+      setSelectedDispatchScoutId(null);
+      if ((result.tours ?? []).length === 0) {
+        setToastKind('fail');
+        setToast(
+          'No 2–3 leg chains near that origin — try Min nm 40, Any parked, or Scan single freights first.',
+        );
+      }
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  async function onConfirmDispatchScout(s: BaseDispatchScoutSuggestion) {
+    if (busy || dispatchDeskBusy) return;
+    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
+    setDispatchScoutLoading(true);
+    try {
+      const result = await postBaseDispatchScout({
+        action: 'confirm',
+        lotId: s.lotId,
+        aircraftId: s.aircraftId,
+        kg: s.liftKg,
+        hubIcao: hub,
+      });
+      if (result.walletUsd != null) setWallet(result.walletUsd);
+      if (result.missions) setMissions(result.missions.slice().reverse());
+      setDispatchScoutSuggestions(result.suggestions ?? []);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      setSelectedDispatchScoutId(null);
+      setToastKind('ok');
+      setToast(
+        `Dispatcher · ${result.mission?.originIcao}→${result.mission?.destIcao} · ${formatTonnes(result.kg ?? s.liftKg)} · open Dispatch`,
+      );
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchScoutLoading(false);
+    }
+  }
+
+  async function onConfirmDispatchTour(tour: BaseDispatchTour) {
+    if (busy || dispatchDeskBusy) return;
+    const first = tour.legs[0];
+    if (!first) return;
+    const hub =
+      (airportIcao ?? '').trim().toUpperCase() ||
+      homeHubIcao.trim().toUpperCase() ||
+      first.originIcao;
+    const lot = marketLotFromTourLeg(first);
+    if (isCargoOpsCommodityLocked(lot.commodityId)) {
+      setToastKind('fail');
+      setToast(
+        `Cargo Ops: ${lot.commodityName} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+      return;
+    }
+    setPendingActiveTour({
+      kind: 'start',
+      hubIcao: hub,
+      aircraftId: tour.aircraftId,
+      tourId: tour.id,
+      routeLabel: tour.routeLabel,
+      tourLegs: tour.legs,
+      legIndex: 1,
+    });
+    setSelectedDispatchTourId(null);
+    enterStagingForTourLeg(lot, tour.aircraftId);
+  }
+
+  async function onAcceptActiveTourLeg(legIndex: number) {
+    if (busy || dispatchDeskBusy || !activeTour) return;
+    const leg = activeTour.legs.find((l) => l.index === legIndex);
+    if (!leg) return;
+    // Refresh gates / rebind hint before staging.
+    setDispatchTourLoading(true);
+    try {
+      const status = await postBaseDispatchTours({ action: 'status' });
+      setActiveTour(status.activeTour ?? null);
+      const view = status.activeTour;
+      if (!view || view.nextLegIndex !== legIndex) {
+        setToastKind('fail');
+        setToast(
+          view?.acceptBlockedReason ??
+            'Cannot prepare this tour leg yet — Refresh Active Tour',
+        );
+        return;
+      }
+      const liveLeg =
+        view.legs.find((l) => l.index === legIndex) ?? leg;
+      const lot = marketLotFromTourLeg(liveLeg);
+      setPendingActiveTour({
+        kind: 'bind',
+        hubIcao: view.hubIcao,
+        aircraftId: view.aircraftId,
+        tourId: view.tourTemplateId,
+        routeLabel: view.routeLabel,
+        tourLegs: view.legs.map((l) => ({
+          lotId: l.lotId,
+          originIcao: l.originIcao,
+          destIcao: l.destIcao,
+          commodityId: l.commodityId,
+          liftKg: l.liftKg,
+          distanceNm: l.distanceNm,
+          ferryNm: l.ferryNm,
+          payUsd: l.payUsd,
+          fuelCostUsd: l.fuelCostUsd,
+          netUsd: l.netUsd,
+          lastMile: l.lastMile,
+        })),
+        legIndex,
+      });
+      enterStagingForTourLeg(lot, view.aircraftId);
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  function marketLotFromTourLeg(leg: {
+    lotId: string;
+    originIcao: string;
+    destIcao: string;
+    commodityId: string;
+    liftKg: number;
+    distanceNm: number;
+    payUsd: number;
+    lastMile: boolean;
+  }): MarketLot {
+    const fromBoard = lots.find((l) => l.id === leg.lotId);
+    if (fromBoard) {
+      return {
+        ...fromBoard,
+        availableKg: Math.max(fromBoard.availableKg, leg.liftKg),
+      };
+    }
+    return {
+      id: leg.lotId,
+      originIcao: leg.originIcao,
+      destIcao: leg.destIcao,
+      originName: leg.originIcao,
+      destName: leg.destIcao,
+      distanceNm: leg.distanceNm,
+      commodityId: leg.commodityId,
+      commodityName: leg.commodityId,
+      quantityKg: leg.liftKg,
+      availableKg: leg.liftKg,
+      payUsd: leg.payUsd,
+      urgency: 'normal',
+      reason: 'tour leg',
+      expiresAtTick: (tick ?? 0) + 200,
+      lastMile: leg.lastMile,
+    };
+  }
+
+  /**
+   * Open Manifest for a tour leg. Prefers the tour aircraft (even if off-origin);
+   * Manifest lists the fleet and offers Ferry when not at the lot hub.
+   */
+  function enterStagingForTourLeg(lot: MarketLot, preferredAircraftId: string) {
+    if (!hubSelected) {
+      setPendingActiveTour(null);
+      setError('Create your pilot profile first (name + home hub)');
+      goToTab('pilot');
+      return;
+    }
+    if (isCargoOpsCommodityLocked(lot.commodityId)) {
+      setPendingActiveTour(null);
+      setError(
+        `Cargo Ops: ${lot.commodityName} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+      setHangarPane('cargo');
+      goToTab('hangar');
+      return;
+    }
+    if (playerDispatchMission) {
+      setPendingActiveTour(null);
+      setError(
+        `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch before preparing another flight`,
+      );
+      goToTab('staging');
+      return;
+    }
+    const preferred =
+      fleet.find((a) => a.id === preferredAircraftId) ??
+      fleet.find((a) => a.status === 'parked') ??
+      null;
+    if (!preferred) {
+      setPendingActiveTour(null);
+      setError('No aircraft in the hangar — buy or lease one first');
+      goToTab('hangar');
+      return;
+    }
+    const atOrigin =
+      preferred.status === 'parked' &&
+      preferred.locationIcao.trim().toUpperCase() ===
+        lot.originIcao.trim().toUpperCase();
+    const aircraft = preferred.aircraftClassId;
+    const openFlight = atOrigin
+      ? openFlightForRoute(
+          lot.originIcao,
+          lot.destIcao,
+          aircraft,
+          preferred.id,
+        )
+      : undefined;
+    const draft: StagingDraft = {
+      originIcao: lot.originIcao,
+      destIcao: lot.destIcao,
+      originName: lot.originName,
+      destName: lot.destName,
+      aircraft,
+      aircraftId: preferred.id,
+      intoMissionId: openFlight?.id,
+      lines: [],
+    };
+    const maxKg = lineMaxKg(draft, lot);
+    draft.lines = [
+      {
+        lot,
+        cargoKg: maxKg > 0 ? Math.min(maxKg, Math.max(1, lot.availableKg)) : 0,
+      },
+    ];
+    setFlightDebrief(null);
+    setStagingFerryOpen(false);
+    setStaging(draft);
+    setPreferredAircraft(aircraft);
+    setError(null);
+    const restoreAirport = airportIcao
+      ? { icao: airportIcao, section: terminalSection }
+      : null;
+    closeAirport();
+    setAirportReturn(restoreAirport);
+    goToTab('staging');
+    setToastKind(atOrigin ? 'ok' : 'warn');
+    setToast(
+      atOrigin
+        ? `Manifest · ${lot.originIcao}→${lot.destIcao} · pick aircraft, then Accept & Dispatch`
+        : `Manifest · ${preferred.label} is at ${preferred.locationIcao} — ferry to ${lot.originIcao} before Accept & Dispatch`,
+    );
+  }
+
+  async function onDropActiveTour() {
+    if (busy || dispatchDeskBusy) return;
+    setDispatchTourLoading(true);
+    try {
+      const result = await postBaseDispatchTours({ action: 'drop' });
+      setActiveTour(null);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      setToastKind('ok');
+      setToast('Active Tour dropped');
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  async function onRefreshActiveTour() {
+    if (busy || dispatchDeskBusy) return;
+    setDispatchTourLoading(true);
+    try {
+      const result = await postBaseDispatchTours({ action: 'status' });
+      setActiveTour(result.activeTour ?? null);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  async function onHireBaseDispatcher(fboId: string, candidateId: string) {
+    if (busy || dispatchDeskBusy) return;
+    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
+    setDispatchScoutLoading(true);
+    try {
+      const result = await postBaseDispatcher({
+        action: 'hire',
+        fboId,
+        candidateId,
+      });
+      if (result.walletUsd != null) setWallet(result.walletUsd);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      const scout = await postBaseDispatchScout({
+        action: 'list',
+        hubIcao: hub,
+      });
+      setDispatchScoutSuggestions(scout.suggestions ?? []);
+      if (scout.policy) setDispatchScoutPolicy(scout.policy);
+      if (scout.dispatcher) setBaseDispatcher(scout.dispatcher);
+      setSelectedDispatchScoutId(null);
+      setDispatchDeskMode('board');
+      setDispatchTours([]);
+      setSelectedDispatchTourId(null);
+      setToastKind('ok');
+      setToast(
+        `Hired ${result.member?.displayName ?? 'Dispatcher'} · fleet scout unlocked`,
+      );
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchScoutLoading(false);
+    }
+  }
+
+  async function onFireBaseDispatcher(memberId: string) {
+    if (busy || dispatchDeskBusy) return;
+    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
+    setDispatchScoutLoading(true);
+    try {
+      const result = await postBaseDispatcher({
+        action: 'fire',
+        memberId,
+      });
+      if (result.walletUsd != null) setWallet(result.walletUsd);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      const scout = await postBaseDispatchScout({
+        action: 'list',
+        hubIcao: hub,
+      });
+      setDispatchScoutSuggestions(scout.suggestions ?? []);
+      if (scout.policy) setDispatchScoutPolicy(scout.policy);
+      if (scout.dispatcher) setBaseDispatcher(scout.dispatcher);
+      setSelectedDispatchScoutId(null);
+      setDispatchDeskMode('board');
+      setDispatchTours([]);
+      setSelectedDispatchTourId(null);
+      setToastKind('ok');
+      setToast('Dispatcher released · desk back to manual');
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchScoutLoading(false);
+    }
   }
 
   async function onUpgradeFbo(fboId: string) {
@@ -7096,27 +7675,24 @@ export function App() {
     }, { sync: { missions: true } });
   }
 
+  function openPilotTravel(destIcao?: string) {
+    const dest = destIcao?.trim().toUpperCase() || null;
+    setPilotTravelInitialDest(dest);
+    setPilotTravelOpen(true);
+  }
+
+  function closePilotTravel() {
+    setPilotTravelOpen(false);
+    setPilotTravelInitialDest(null);
+  }
+
+  /** Execute pilot travel (quote already shown in PilotTravelDialog). */
   async function onPilotTravel(destIcao: string): Promise<boolean> {
     if (!destIcao.trim()) return false;
     const dest = destIcao.trim().toUpperCase();
-    let quoteRes: Awaited<ReturnType<typeof postPilotTravel>>;
-    try {
-      setError(null);
-      quoteRes = await postPilotTravel({ destIcao: dest, quoteOnly: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-    const quote = quoteRes.quote;
-    const ok = await confirm({
-      title: `Travel ${quote.originIcao} → ${quote.destIcao}?`,
-      body: `${Math.round(quote.distanceNm)} nm · ${formatMoney(quote.costUsd)} (instant pilot reposition — aircraft stays put).`,
-      confirmLabel: 'Travel now',
-      cancelLabel: 'Not now',
-    });
-    if (!ok) return false;
     let moved = false;
     await run(async () => {
+      setError(null);
       const result = await postPilotTravel({ destIcao: dest });
       if (result.fleet) setFleet(result.fleet);
       setWallet(result.walletUsd);
@@ -7124,7 +7700,7 @@ export function App() {
       else setPilotIcao(dest);
       setToastKind('ok');
       setToast(
-        `Pilot at ${result.pilotIcao ?? dest} · −${formatMoney(result.walletDebitUsd ?? quote.costUsd)}`,
+        `Pilot at ${result.pilotIcao ?? dest} · −${formatMoney(result.walletDebitUsd ?? 0)}`,
       );
       moved = true;
     });
@@ -7390,6 +7966,8 @@ export function App() {
 
   function exitStaging() {
     if (busy) return;
+    setPendingActiveTour(null);
+    setStagingFerryOpen(false);
     if (staging?.replaceManifest) {
       if (activeCareerProfile?.id) {
         clearPersistedStagingDraft(activeCareerProfile.id);
@@ -7585,20 +8163,28 @@ export function App() {
   function changeStagingAircraft(nextAircraftId: string) {
     if (!staging || busy || nextAircraftId === staging.aircraftId) return;
     if (staging.replaceManifest || staging.intoMissionId) return;
-    const selected = fleet.find(
-      (aircraft) =>
-        aircraft.id === nextAircraftId &&
-        aircraft.status === 'parked' &&
-        aircraft.locationIcao === staging.originIcao,
-    );
+    const selected = fleet.find((aircraft) => aircraft.id === nextAircraftId);
     if (!selected) return;
+    // Allow off-origin parked airframes — Ferry CTA on Manifest brings them in.
+    if (
+      selected.status !== 'parked' &&
+      selected.id !== staging.aircraftId
+    ) {
+      return;
+    }
+    const atOrigin =
+      selected.status === 'parked' &&
+      selected.locationIcao.trim().toUpperCase() ===
+        staging.originIcao.trim().toUpperCase();
     const next = selected.aircraftClassId;
-    const openFlight = openFlightForRoute(
-      staging.originIcao,
-      staging.destIcao,
-      next,
-      selected.id,
-    );
+    const openFlight = atOrigin
+      ? openFlightForRoute(
+          staging.originIcao,
+          staging.destIcao,
+          next,
+          selected.id,
+        )
+      : undefined;
     const nextDraft = clampDraftToCapacity({
       ...staging,
       aircraft: next,
@@ -7607,6 +8193,7 @@ export function App() {
     });
     setStaging(nextDraft);
     setPreferredAircraft(next);
+    setStagingFerryOpen(false);
   }
 
   function updateStagingLineKg(lotId: string, rawKg: number) {
@@ -7757,6 +8344,49 @@ export function App() {
           }
           // Mission appears on Dispatch — no success toast / mission-id noise.
           goToTab('staging');
+          const pending = pendingActiveTour;
+          if (pending && result.mission?.id) {
+            setPendingActiveTour(null);
+            try {
+              if (pending.kind === 'start') {
+                const attached = await postBaseDispatchTours({
+                  action: 'attach',
+                  missionId: result.mission.id,
+                  aircraftId:
+                    result.mission.aircraftId ??
+                    pending.aircraftId ??
+                    clamped.aircraftId,
+                  hubIcao: pending.hubIcao,
+                  tourId: pending.tourId,
+                  routeLabel: pending.routeLabel,
+                  tourLegs: pending.tourLegs,
+                });
+                setActiveTour(attached.activeTour ?? null);
+                if (attached.playerFbos) setPlayerFbos(attached.playerFbos);
+                if (attached.missions) {
+                  setMissions(attached.missions.slice().reverse());
+                }
+              } else {
+                const bound = await postBaseDispatchTours({
+                  action: 'bind-leg',
+                  missionId: result.mission.id,
+                  legIndex: pending.legIndex,
+                });
+                setActiveTour(bound.activeTour ?? null);
+                if (bound.playerFbos) setPlayerFbos(bound.playerFbos);
+                if (bound.missions) {
+                  setMissions(bound.missions.slice().reverse());
+                }
+              }
+            } catch (attachErr) {
+              setToastKind('fail');
+              setToast(
+                attachErr instanceof Error
+                  ? attachErr.message
+                  : String(attachErr),
+              );
+            }
+          }
         } catch (err) {
           setToastKind('fail');
           setToast(err instanceof Error ? err.message : String(err));
@@ -8814,9 +9444,20 @@ export function App() {
   const stagingFreeKg = staging
     ? Math.max(0, aircraftCapKg(staging.aircraft) - stagingTotalKg)
     : 0;
+  const stagingAssignedAircraft = staging?.aircraftId
+    ? fleet.find((a) => a.id === staging.aircraftId)
+    : undefined;
+  const stagingAircraftAtOrigin = Boolean(
+    staging &&
+      stagingAssignedAircraft &&
+      stagingAssignedAircraft.status === 'parked' &&
+      stagingAssignedAircraft.locationIcao.trim().toUpperCase() ===
+        staging.originIcao.trim().toUpperCase(),
+  );
   const stagingValid =
     Boolean(staging) &&
     staging!.lines.length > 0 &&
+    stagingAircraftAtOrigin &&
     stagingRangeOk(staging!) &&
     routeFuelFeasible !== false &&
     staging!.lines.every((line) => {
@@ -9309,7 +9950,7 @@ export function App() {
           profiles={careerProfiles}
           lastActiveId={activeCareerProfile?.id ?? null}
           busy={busy}
-          busyLabel="Opening career…"
+          busyLabel={profileGateBusyLabel}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
         />
@@ -9502,6 +10143,31 @@ export function App() {
             busy={busy}
             onOpen={() => selectTab('staging')}
           />
+        ) : activeTour &&
+          activeTour.status === 'active' &&
+          activeTour.nextLegIndex != null ? (
+          <SidebarFlightStrip
+            kind="draft"
+            label="Active tour"
+            originIcao={
+              activeTour.legs.find(
+                (l) => l.index === activeTour.nextLegIndex,
+              )?.originIcao ?? activeTour.originIcao
+            }
+            destIcao={
+              activeTour.legs.find(
+                (l) => l.index === activeTour.nextLegIndex,
+              )?.destIcao ?? activeTour.routeLabel
+            }
+            detail={`L${activeTour.nextLegIndex}/${activeTour.legs.length} · Continue → Base`}
+            busy={busy}
+            onOpen={() => {
+              const hub =
+                activeTour.hubIcao.trim().toUpperCase() ||
+                homeHubIcao.trim().toUpperCase();
+              if (hub) void openAirport(hub, { section: 'fbo' });
+            }}
+          />
         ) : activeBushTrip ? (
           <SidebarFlightStrip
             kind="bush"
@@ -9693,7 +10359,7 @@ export function App() {
                 className="metric pilot-chip"
                 disabled={busy}
                 title="Travel / reposition pilot"
-                onClick={() => setPilotTravelOpen(true)}
+                onClick={() => openPilotTravel()}
               >
                 <span className="label">Pilot</span>
                 <strong>{pilotIcao}</strong>
@@ -10067,10 +10733,13 @@ export function App() {
                           onClick={() => void onBuyFbo(airportIcao ?? homeHubIcao)}
                         >
                           Buy Base T1
-                          {(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd) !=
-                          null
-                            ? ` · ${formatMoney(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd!)}`
-                            : ''}
+                          {(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd) ===
+                          0
+                            ? ' · Free'
+                            : (playerFbos.buyAtIcaoUsd ??
+                                  playerFbos.homeBuyUsd) != null
+                              ? ` · ${formatMoney(playerFbos.buyAtIcaoUsd ?? playerFbos.homeBuyUsd!)}`
+                              : ''}
                         </button>
                       ) : null}
                     </div>
@@ -10093,7 +10762,7 @@ export function App() {
                               ? ` — ${playerFbos.buyAtIcaoReason}.`
                               : airportIcao?.toUpperCase() ===
                                   homeHubIcao.toUpperCase()
-                                ? ' — purchase Tier 1 for parking and Jet-A/MRO perks here.'
+                                ? ' — claim your free home Base for parking, Jet-A/MRO perks, and Dispatcher scout.'
                                 : ' — expand here after your home-hub Base (needs 2 owned aircraft + Cargo Ops Value).'}
                           </p>
                         );
@@ -10104,32 +10773,15 @@ export function App() {
                       const svcPct = Math.round(
                         (1 - (localFbo.serviceCostMult ?? 1)) * 100,
                       );
-                      const bondedKg =
-                        localFbo.bondedKg ??
-                        localHolds.reduce((s, h) => s + h.cargoKg, 0);
-                      const bondedPct =
-                        localFbo.capacityKg > 0
-                          ? (bondedKg / localFbo.capacityKg) * 100
-                          : 0;
                       return (
                         <>
                           <div className="panel-head">
                             <div>
                               <p className="muted">
-                                T{localFbo.tier} · {formatTonnes(bondedKg)} /{' '}
-                                {formatTonnes(localFbo.capacityKg)} bonded
+                                T{localFbo.tier}
                                 {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
                                 {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
                               </p>
-                              <div
-                                className="fbo-capacity-bar"
-                                title={`Bonded ${formatTonnes(bondedKg)} / ${formatTonnes(localFbo.capacityKg)}`}
-                              >
-                                <div
-                                  className="fbo-capacity-bonded"
-                                  style={{ width: `${bondedPct}%` }}
-                                />
-                              </div>
                               {companyCrew && companyCrew.slotsUnlocked > 0 ? (
                                 <p className="hint">
                                   Crew {companyCrew.slotsInUse}/
@@ -10157,6 +10809,824 @@ export function App() {
                               </button>
                             ) : null}
                           </div>
+                          <div className="base-dispatcher-desk ports-desk-block">
+                            <p className="muted">Dispatcher desk</p>
+                            {(() => {
+                              const seat =
+                                (baseDispatcher?.members ?? []).find(
+                                  (m) => m.fboId === localFbo.id,
+                                ) ?? null;
+                              const pool =
+                                baseDispatcher?.hirePoolByHub?.[
+                                  localFbo.icao
+                                ] ?? [];
+                              const mode =
+                                dispatchScoutPolicy?.mode ?? 'manual';
+                              return (
+                                <>
+                                  <div className="crew-section">
+                                    <h4 className="crew-section-title">
+                                      {seat ? 'On duty' : 'Hire desk'}
+                                    </h4>
+                                    <p className="muted crew-section-lede">
+                                      {seat
+                                        ? seat.perkHint
+                                        : '1 seat · unlocks fleet scout + ferry ranking'}
+                                    </p>
+                                    {seat ? (
+                                      <ul className="crew-person-grid">
+                                        <li className="crew-person-card">
+                                          <CrewPortrait
+                                            name={seat.displayName}
+                                            imageUrl={crewPortraitUrl(
+                                              seat.portraitId,
+                                            )}
+                                          />
+                                          <div className="crew-person-body">
+                                            <div className="crew-person-head">
+                                              <strong className="crew-person-name">
+                                                {seat.displayName}
+                                              </strong>
+                                              <span className="crew-status idle">
+                                                On duty
+                                              </span>
+                                            </div>
+                                            <p className="crew-person-perk">
+                                              <span className="crew-perk-tag">
+                                                {seat.gradeLabel}
+                                              </span>
+                                              <span className="crew-perk-tag">
+                                                Dispatcher
+                                              </span>
+                                            </p>
+                                            <p className="crew-card-meta">
+                                              {formatMoney(seat.salaryUsdPerDay)}
+                                              /day
+                                            </p>
+                                            <div className="crew-card-actions">
+                                              <button
+                                                type="button"
+                                                className="action ghost"
+                                                disabled={
+                                                  busy || dispatchDeskBusy
+                                                }
+                                                onClick={() =>
+                                                  void onFireBaseDispatcher(
+                                                    seat.id,
+                                                  )
+                                                }
+                                              >
+                                                Fire ·{' '}
+                                                {formatMoney(
+                                                  seat.fireSeveranceUsd,
+                                                )}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </li>
+                                      </ul>
+                                    ) : pool.length === 0 ? (
+                                      <p className="empty">
+                                        No candidates today — try Scan.
+                                      </p>
+                                    ) : (
+                                      <ul className="crew-person-grid">
+                                        {pool.map((c) => (
+                                          <li
+                                            key={c.id}
+                                            className="crew-person-card is-hire"
+                                          >
+                                            <CrewPortrait
+                                              name={c.displayName}
+                                              imageUrl={crewPortraitUrl(
+                                                c.portraitId,
+                                              )}
+                                            />
+                                            <div className="crew-person-body">
+                                              <div className="crew-person-head">
+                                                <strong className="crew-person-name">
+                                                  {c.displayName}
+                                                </strong>
+                                                <span className="crew-perk-tag">
+                                                  {c.gradeLabel}
+                                                </span>
+                                              </div>
+                                              <p className="crew-card-meta">
+                                                {c.perkHint}
+                                              </p>
+                                              <p className="crew-card-meta">
+                                                Salary{' '}
+                                                {formatMoney(c.salaryUsdPerDay)}
+                                                /day
+                                              </p>
+                                              <div className="crew-card-actions">
+                                                <button
+                                                  type="button"
+                                                  className="accept"
+                                                  disabled={
+                                                    busy || dispatchDeskBusy
+                                                  }
+                                                  onClick={() =>
+                                                    void onHireBaseDispatcher(
+                                                      localFbo.id,
+                                                      c.id,
+                                                    )
+                                                  }
+                                                >
+                                                  Hire ·{' '}
+                                                  {formatMoney(c.hireUsd)}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+
+                                  {activeTour && activeTour.status === 'active' ? (
+                                    <div className="crew-section base-active-tour">
+                                      <div className="base-dispatcher-scout-head">
+                                        <div>
+                                          <h4 className="crew-section-title">
+                                            Active Tour
+                                          </h4>
+                                          <p className="muted crew-section-lede">
+                                            {activeTour.routeLabel}
+                                            {activeTour.aircraftLocationIcao
+                                              ? ` · aircraft @ ${activeTour.aircraftLocationIcao}`
+                                              : ''}
+                                          </p>
+                                        </div>
+                                        <div className="base-dispatcher-scout-actions">
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={busy || dispatchDeskBusy}
+                                            onClick={() =>
+                                              void onRefreshActiveTour()
+                                            }
+                                          >
+                                            Refresh
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={busy || dispatchDeskBusy}
+                                            onClick={() =>
+                                              void onDropActiveTour()
+                                            }
+                                          >
+                                            Drop tour
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className="table-wrap">
+                                        <table className="data base-active-tour-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Leg</th>
+                                              <th>Route</th>
+                                              <th>Status</th>
+                                              <th>Pay</th>
+                                              <th />
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {activeTour.legs.map((leg) => {
+                                              const isNext =
+                                                activeTour.nextLegIndex ===
+                                                leg.index;
+                                              const canAccept =
+                                                Boolean(
+                                                  activeTour.canAcceptNextLeg,
+                                                ) && isNext;
+                                              return (
+                                                <tr
+                                                  key={`${activeTour.id}-${leg.index}`}
+                                                  className={
+                                                    isNext
+                                                      ? 'is-tour-next'
+                                                      : undefined
+                                                  }
+                                                >
+                                                  <td>L{leg.index}</td>
+                                                  <td>
+                                                    {leg.originIcao}→
+                                                    {leg.destIcao}
+                                                    {leg.ferryNm > 0.5 ? (
+                                                      <small className="muted">
+                                                        {' '}
+                                                        · ferry{' '}
+                                                        {Math.round(
+                                                          leg.ferryNm,
+                                                        )}{' '}
+                                                        nm
+                                                      </small>
+                                                    ) : null}
+                                                  </td>
+                                                  <td>
+                                                    {leg.status}
+                                                    {isNext &&
+                                                    activeTour.nextLegNeedsRebind ? (
+                                                      <small className="muted">
+                                                        {' '}
+                                                        · rebind
+                                                      </small>
+                                                    ) : null}
+                                                  </td>
+                                                  <td className="pay">
+                                                    {formatMoney(leg.payUsd)}
+                                                  </td>
+                                                  <td className="actions">
+                                                    {canAccept ? (
+                                                      <button
+                                                        type="button"
+                                                        className="accept"
+                                                        disabled={
+                                                          busy ||
+                                                          dispatchDeskBusy
+                                                        }
+                                                        onClick={() =>
+                                                          void onAcceptActiveTourLeg(
+                                                            leg.index,
+                                                          )
+                                                        }
+                                                      >
+                                                        Accept L{leg.index}
+                                                        {activeTour.nextLegNeedsRebind
+                                                          ? ' · rebind'
+                                                          : ''}
+                                                      </button>
+                                                    ) : isNext &&
+                                                      activeTour.acceptBlockedReason ? (
+                                                      <small className="muted">
+                                                        {
+                                                          activeTour.acceptBlockedReason
+                                                        }
+                                                      </small>
+                                                    ) : null}
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      <p className="muted base-dispatch-tour-lede">
+                                        Finish the current leg, ferry to the
+                                        next origin if needed, then Accept L
+                                        {activeTour.nextLegIndex ?? 'n'} to open
+                                        Manifest — lots are not reserved ahead
+                                        of time.
+                                      </p>
+                                    </div>
+                                  ) : null}
+
+                                  <div className="crew-section base-dispatcher-scout">
+                                    <div className="base-dispatcher-scout-head">
+                                      <div>
+                                        <h4 className="crew-section-title">
+                                          Market freights
+                                        </h4>
+                                        <p className="muted crew-section-lede">
+                                          {dispatchTourLoading
+                                            ? 'Searching tours…'
+                                            : dispatchScoutLoading
+                                              ? 'Scanning board…'
+                                              : mode === 'fleet'
+                                                ? `Fleet scout · ${localFbo.icao} region · Scan or Search tour`
+                                                : `Manual · ${localFbo.icao} region · at-origin · max 3`}
+                                        </p>
+                                      </div>
+                                      <div className="base-dispatcher-scout-actions">
+                                        <button
+                                          type="button"
+                                          className="action ghost"
+                                          disabled={busy || dispatchDeskBusy}
+                                          onClick={() =>
+                                            void refreshDispatchScout()
+                                          }
+                                        >
+                                          {dispatchScoutLoading
+                                            ? 'Scanning…'
+                                            : 'Scan'}
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {mode === 'fleet' ? (
+                                      <div className="base-dispatch-tour-filters">
+                                        <p className="muted base-dispatch-tour-lede">
+                                          Search multi-leg tours from open
+                                          Market lots (up to 8 options). Empty
+                                          Min/Max use tour defaults (softer than
+                                          Scan). Accept L1 opens Manifest so
+                                          you can pick the aircraft at origin;
+                                          Accept &amp; Dispatch starts Active
+                                          Tour.
+                                        </p>
+                                        <div className="base-dispatch-tour-grid">
+                                          <label>
+                                            <span>Aircraft</span>
+                                            <select
+                                              value={dispatchTourAircraftId}
+                                              onChange={(e) =>
+                                                setDispatchTourAircraftId(
+                                                  e.target.value,
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            >
+                                              <option value="">
+                                                Any parked
+                                              </option>
+                                              {fleet
+                                                .filter(
+                                                  (a) => a.status === 'parked',
+                                                )
+                                                .map((a) => (
+                                                  <option
+                                                    key={a.id}
+                                                    value={a.id}
+                                                  >
+                                                    {a.label ??
+                                                      a.registration ??
+                                                      a.airframeTypeId ??
+                                                      a.id}
+                                                    {a.locationIcao
+                                                      ? ` @ ${a.locationIcao}`
+                                                      : ''}
+                                                  </option>
+                                                ))}
+                                            </select>
+                                          </label>
+                                          <label>
+                                            <span>Legs</span>
+                                            <select
+                                              value={dispatchTourLegs}
+                                              onChange={(e) =>
+                                                setDispatchTourLegs(
+                                                  Number(e.target.value) === 3
+                                                    ? 3
+                                                    : 2,
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            >
+                                              <option value={2}>2</option>
+                                              <option value={3}>3</option>
+                                            </select>
+                                          </label>
+                                          <label>
+                                            <span>Origin</span>
+                                            <input
+                                              type="text"
+                                              maxLength={4}
+                                              placeholder={localFbo.icao}
+                                              value={dispatchTourOrigin}
+                                              onChange={(e) =>
+                                                setDispatchTourOrigin(
+                                                  e.target.value
+                                                    .toUpperCase()
+                                                    .replace(/[^A-Z]/g, '')
+                                                    .slice(0, 4),
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            <span>Min nm</span>
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              step={10}
+                                              placeholder="auto ~120 jet"
+                                              value={dispatchTourMinNm}
+                                              onChange={(e) =>
+                                                setDispatchTourMinNm(
+                                                  e.target.value,
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            <span>Max nm</span>
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              step={50}
+                                              placeholder="none"
+                                              value={dispatchTourMaxNm}
+                                              onChange={(e) =>
+                                                setDispatchTourMaxNm(
+                                                  e.target.value,
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            />
+                                          </label>
+                                          <label>
+                                            <span>Return</span>
+                                            <select
+                                              value={dispatchTourReturnMode}
+                                              onChange={(e) =>
+                                                setDispatchTourReturnMode(
+                                                  e.target
+                                                    .value as BaseDispatchTourReturnMode,
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                            >
+                                              <option value="none">
+                                                Any end
+                                              </option>
+                                              <option value="origin">
+                                                End at origin
+                                              </option>
+                                              <option value="base">
+                                                End at Base
+                                              </option>
+                                            </select>
+                                          </label>
+                                          <div className="base-dispatch-tour-generate">
+                                            <button
+                                              type="button"
+                                              className="accept"
+                                              disabled={
+                                                busy || dispatchDeskBusy
+                                              }
+                                              onClick={() =>
+                                                void onGenerateDispatchTours()
+                                              }
+                                            >
+                                              {dispatchTourLoading
+                                                ? 'Searching…'
+                                                : 'Search'}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <p className="muted base-dispatch-tour-lede">
+                                        Hire a Dispatcher to unlock Search
+                                        tour (2–3 Market legs).
+                                      </p>
+                                    )}
+
+                                    {dispatchDeskMode === 'tours' ? (
+                                      dispatchTours.length === 0 ? (
+                                        <p className="empty">
+                                          {dispatchTourLoading
+                                            ? 'Chaining Market lots…'
+                                            : 'No chained tours — set Min nm to 40, widen Origin, or use Scan for single freights.'}
+                                        </p>
+                                      ) : (
+                                        <table className="data-table base-dispatch-freight-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Route</th>
+                                              <th>Legs</th>
+                                              <th>Dist</th>
+                                              <th>Ferry</th>
+                                              <th>Pay</th>
+                                              <th>Net</th>
+                                              <th>Aircraft</th>
+                                              <th />
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {(() => {
+                                              const originWantBase =
+                                                dispatchTourOrigin
+                                                  .trim()
+                                                  .toUpperCase();
+                                              const matchCount =
+                                                dispatchTourReturnMode !==
+                                                'none'
+                                                  ? dispatchTours.filter(
+                                                      (t) => {
+                                                        const last =
+                                                          t.legs[
+                                                            t.legs.length - 1
+                                                          ]?.destIcao
+                                                            ?.trim()
+                                                            .toUpperCase() ??
+                                                          '';
+                                                        const want =
+                                                          dispatchTourReturnMode ===
+                                                          'base'
+                                                            ? localFbo.icao
+                                                                .trim()
+                                                                .toUpperCase()
+                                                            : originWantBase ||
+                                                              t.legs[0]?.originIcao
+                                                                ?.trim()
+                                                                .toUpperCase() ||
+                                                              '';
+                                                        return (
+                                                          want.length > 0 &&
+                                                          last === want
+                                                        );
+                                                      },
+                                                    ).length
+                                                  : 0;
+                                              // Only mark rows when the list is mixed — all-match is already the filter.
+                                              const highlightMatches =
+                                                matchCount > 0 &&
+                                                matchCount <
+                                                  dispatchTours.length;
+
+                                              return dispatchTours.map(
+                                                (tour) => {
+                                              const acf = fleet.find(
+                                                (a) => a.id === tour.aircraftId,
+                                              );
+                                              const planeLabel =
+                                                acf?.label ??
+                                                acf?.registration ??
+                                                tour.airframeTypeId ??
+                                                tour.aircraftClassId;
+                                              const selected =
+                                                selectedDispatchTourId ===
+                                                tour.id;
+                                              const lastDest =
+                                                tour.legs[
+                                                  tour.legs.length - 1
+                                                ]?.destIcao
+                                                  ?.trim()
+                                                  .toUpperCase() ?? '';
+                                              const originWant =
+                                                originWantBase ||
+                                                tour.legs[0]?.originIcao
+                                                  ?.trim()
+                                                  .toUpperCase() ||
+                                                '';
+                                              const returnWant =
+                                                dispatchTourReturnMode ===
+                                                'base'
+                                                  ? localFbo.icao
+                                                      .trim()
+                                                      .toUpperCase()
+                                                  : dispatchTourReturnMode ===
+                                                      'origin'
+                                                    ? originWant
+                                                    : '';
+                                              const matchesReturn =
+                                                Boolean(returnWant) &&
+                                                lastDest === returnWant;
+                                              const filterMatch =
+                                                highlightMatches &&
+                                                matchesReturn;
+                                              const rowClass = [
+                                                selected ? 'is-selected' : '',
+                                                filterMatch
+                                                  ? 'is-filter-match'
+                                                  : '',
+                                              ]
+                                                .filter(Boolean)
+                                                .join(' ');
+                                              return (
+                                                <tr
+                                                  key={tour.id}
+                                                  className={
+                                                    rowClass || undefined
+                                                  }
+                                                  onClick={() => {
+                                                    setSelectedFboHoldId(null);
+                                                    setSelectedFboMissionId(
+                                                      null,
+                                                    );
+                                                    setSelectedDispatchScoutId(
+                                                      null,
+                                                    );
+                                                    setSelectedDispatchTourId(
+                                                      (cur) =>
+                                                        cur === tour.id
+                                                          ? null
+                                                          : tour.id,
+                                                    );
+                                                  }}
+                                                >
+                                                  <td>
+                                                    <span className="route">
+                                                      {tour.routeLabel}
+                                                    </span>
+                                                    {filterMatch ? (
+                                                      <span className="base-dispatch-match-tag">
+                                                        {dispatchTourReturnMode ===
+                                                        'base'
+                                                          ? 'Ends Base'
+                                                          : 'Ends origin'}
+                                                      </span>
+                                                    ) : null}
+                                                    <small className="muted">
+                                                      {' '}
+                                                      {tour.reason}
+                                                    </small>
+                                                  </td>
+                                                  <td>{tour.legCount}</td>
+                                                  <td>
+                                                    {Math.round(
+                                                      tour.totalDistanceNm,
+                                                    )}{' '}
+                                                    nm
+                                                  </td>
+                                                  <td>
+                                                    {tour.totalFerryNm > 0.5
+                                                      ? `${Math.round(tour.totalFerryNm)} nm`
+                                                      : '—'}
+                                                  </td>
+                                                  <td className="pay">
+                                                    {formatMoney(
+                                                      tour.totalPayUsd,
+                                                    )}
+                                                  </td>
+                                                  <td className="pay">
+                                                    {formatMoney(
+                                                      tour.totalNetUsd,
+                                                    )}
+                                                  </td>
+                                                  <td>
+                                                    <span>{planeLabel}</span>
+                                                    {tour.aircraftLocationIcao ? (
+                                                      <small className="muted">
+                                                        {' '}
+                                                        @{' '}
+                                                        {
+                                                          tour.aircraftLocationIcao
+                                                        }
+                                                      </small>
+                                                    ) : null}
+                                                  </td>
+                                                  <td className="actions">
+                                                    <button
+                                                      type="button"
+                                                      className="accept"
+                                                      disabled={
+                                                        busy ||
+                                                        dispatchDeskBusy
+                                                      }
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        void onConfirmDispatchTour(
+                                                          tour,
+                                                        );
+                                                      }}
+                                                    >
+                                                      Accept L1
+                                                    </button>
+                                                  </td>
+                                                </tr>
+                                              );
+                                                },
+                                              );
+                                            })()}
+                                          </tbody>
+                                        </table>
+                                      )
+                                    ) : dispatchScoutSuggestions.length ===
+                                      0 ? (
+                                      <p className="empty">
+                                        {dispatchScoutLoading
+                                          ? 'Scanning open freights…'
+                                          : mode === 'fleet'
+                                            ? 'No positive-net matches for parked fleet — ferry in range, Scan, or Search.'
+                                            : 'No matches at origin — park there and Scan, or hire a Dispatcher.'}
+                                      </p>
+                                    ) : (
+                                      <table className="data-table base-dispatch-freight-table">
+                                        <thead>
+                                          <tr>
+                                            <th>Route</th>
+                                            <th>Dist</th>
+                                            <th>Ferry</th>
+                                            <th>Lift</th>
+                                            <th>Pay</th>
+                                            <th>Net</th>
+                                            <th>Aircraft</th>
+                                            <th />
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {dispatchScoutSuggestions.map(
+                                            (s) => {
+                                              const acf = fleet.find(
+                                                (a) => a.id === s.aircraftId,
+                                              );
+                                              const planeLabel =
+                                                acf?.label ??
+                                                acf?.registration ??
+                                                s.airframeTypeId ??
+                                                s.aircraftClassId;
+                                              const selected =
+                                                selectedDispatchScoutId ===
+                                                s.id;
+                                              return (
+                                                <tr
+                                                  key={s.id}
+                                                  className={
+                                                    selected
+                                                      ? 'is-selected'
+                                                      : undefined
+                                                  }
+                                                  onClick={() => {
+                                                    setSelectedFboHoldId(null);
+                                                    setSelectedFboMissionId(
+                                                      null,
+                                                    );
+                                                    setSelectedDispatchTourId(
+                                                      null,
+                                                    );
+                                                    setSelectedDispatchScoutId(
+                                                      (cur) =>
+                                                        cur === s.id
+                                                          ? null
+                                                          : s.id,
+                                                    );
+                                                  }}
+                                                >
+                                                  <td>
+                                                    <span className="route">
+                                                      {s.originIcao}
+                                                      <span className="arrow">
+                                                        →
+                                                      </span>
+                                                      {s.destIcao}
+                                                    </span>
+                                                  </td>
+                                                  <td>
+                                                    {Math.round(s.distanceNm)} nm
+                                                  </td>
+                                                  <td>
+                                                    {(s.ferryNm ?? 0) > 0.5
+                                                      ? `${Math.round(s.ferryNm ?? 0)} nm`
+                                                      : '—'}
+                                                  </td>
+                                                  <td>
+                                                    {formatTonnes(s.liftKg)}
+                                                  </td>
+                                                  <td className="pay">
+                                                    {formatMoney(s.payUsd)}
+                                                  </td>
+                                                  <td className="pay">
+                                                    {formatMoney(s.netUsd)}
+                                                  </td>
+                                                  <td>
+                                                    <span>
+                                                      {planeLabel}
+                                                    </span>
+                                                    {s.aircraftLocationIcao ? (
+                                                      <small className="muted">
+                                                        {' '}
+                                                        @ {s.aircraftLocationIcao}
+                                                      </small>
+                                                    ) : null}
+                                                  </td>
+                                                  <td className="actions">
+                                                    <button
+                                                      type="button"
+                                                      className="accept"
+                                                      disabled={
+                                                        busy ||
+                                                        dispatchDeskBusy
+                                                      }
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        void onConfirmDispatchScout(
+                                                          s,
+                                                        );
+                                                      }}
+                                                    >
+                                                      Accept
+                                                    </button>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            },
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    )}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
                           <>
                           <FboRouteMapCard
                             baseIcao={localFbo.icao}
@@ -10171,6 +11641,21 @@ export function App() {
                                 return (
                                   localHolds.find((h) => h.id === selectedFboHoldId)
                                     ?.originIcao ?? localFbo.icao
+                                );
+                              }
+                              if (selectedDispatchTourId) {
+                                const tour = dispatchTours.find(
+                                  (t) => t.id === selectedDispatchTourId,
+                                );
+                                return (
+                                  tour?.legs[0]?.originIcao ?? localFbo.icao
+                                );
+                              }
+                              if (selectedDispatchScoutId) {
+                                return (
+                                  dispatchScoutSuggestions.find(
+                                    (s) => s.id === selectedDispatchScoutId,
+                                  )?.originIcao ?? localFbo.icao
                                 );
                               }
                               return localFbo.icao;
@@ -10189,7 +11674,47 @@ export function App() {
                                     ?.destIcao ?? null
                                 );
                               }
+                              if (selectedDispatchTourId) {
+                                const tour = dispatchTours.find(
+                                  (t) => t.id === selectedDispatchTourId,
+                                );
+                                if (!tour?.legs.length) return null;
+                                return (
+                                  tour.legs[tour.legs.length - 1]?.destIcao ??
+                                  null
+                                );
+                              }
+                              if (selectedDispatchScoutId) {
+                                return (
+                                  dispatchScoutSuggestions.find(
+                                    (s) => s.id === selectedDispatchScoutId,
+                                  )?.destIcao ?? null
+                                );
+                              }
                               return null;
+                            })()}
+                            tourLegs={(() => {
+                              if (!selectedDispatchTourId) return null;
+                              const tour = dispatchTours.find(
+                                (t) => t.id === selectedDispatchTourId,
+                              );
+                              return tour?.legs ?? null;
+                            })()}
+                            routeHeadline={(() => {
+                              if (!selectedDispatchTourId) return null;
+                              return (
+                                dispatchTours.find(
+                                  (t) => t.id === selectedDispatchTourId,
+                                )?.routeLabel ?? null
+                              );
+                            })()}
+                            ferryNm={(() => {
+                              if (!selectedDispatchTourId) return null;
+                              return (
+                                dispatchTours.find(
+                                  (t) => t.id === selectedDispatchTourId,
+                                )?.totalFerryNm ?? null
+                              );
                             })()}
                             distanceNm={(() => {
                               if (selectedFboHoldId) {
@@ -10197,8 +11722,23 @@ export function App() {
                                   (h) => h.id === selectedFboHoldId,
                                 )?.distanceNm;
                               }
+                              if (selectedDispatchTourId) {
+                                return dispatchTours.find(
+                                  (t) => t.id === selectedDispatchTourId,
+                                )?.totalDistanceNm;
+                              }
+                              if (selectedDispatchScoutId) {
+                                return dispatchScoutSuggestions.find(
+                                  (s) => s.id === selectedDispatchScoutId,
+                                )?.distanceNm;
+                              }
                               return undefined;
                             })()}
+                            idleHint={
+                              dispatchDeskMode === 'tours'
+                                ? 'Select a tour row — solid cargo legs, dashed ferry between lots.'
+                                : 'Select a Market freight row above to preview the route.'
+                            }
                             routeProgress={(() => {
                               if (!selectedFboMissionId) return null;
                               const m = missions.find(
@@ -10246,12 +11786,12 @@ export function App() {
                             onOpenAirport={openAirport}
                           />
                           {localHolds.length === 0 ? (
-                            <p className="empty">
-                              No bonded holds
-                              {FBO_BONDED_HOLD_ENABLED
-                                ? ' — use Hold at Base on an outbound contract.'
-                                : ' — Accept Market lots here, or buy WH at a port pickup hub and Demand Hold on Ports.'}
-                            </p>
+                            FBO_BONDED_HOLD_ENABLED ? (
+                              <p className="empty">
+                                No bonded holds — use Hold at Base on an outbound
+                                contract.
+                              </p>
+                            ) : null
                           ) : (
                             <table className="data-table fbo-holds-table">
                               <thead>
@@ -10275,6 +11815,7 @@ export function App() {
                                     }
                                     onClick={() => {
                                       setSelectedFboMissionId(null);
+                                      setSelectedDispatchScoutId(null);
                                       setSelectedFboHoldId((cur) =>
                                         cur === hold.id ? null : hold.id,
                                       );
@@ -10470,6 +12011,7 @@ export function App() {
                                           }
                                           onClick={() => {
                                             setSelectedFboHoldId(null);
+                                            setSelectedDispatchScoutId(null);
                                             setSelectedFboMissionId((cur) =>
                                               cur === m.id ? null : m.id,
                                             );
@@ -12851,19 +14393,66 @@ export function App() {
                         .filter(
                           (aircraft) =>
                             aircraft.id === staging.aircraftId ||
-                            (aircraft.status === 'parked' &&
-                              aircraft.locationIcao === staging.originIcao),
+                            aircraft.status === 'parked',
                         )
-                        .map((aircraft) => (
-                          <option key={aircraft.id} value={aircraft.id}>
-                            {aircraft.label} ·{' '}
-                            {aircraftClassLabel(aircraft.aircraftClassId)}
-                          </option>
-                        ))}
+                        .map((aircraft) => {
+                          const atOrigin =
+                            aircraft.status === 'parked' &&
+                            aircraft.locationIcao.trim().toUpperCase() ===
+                              staging.originIcao.trim().toUpperCase();
+                          return (
+                            <option key={aircraft.id} value={aircraft.id}>
+                              {aircraft.label} ·{' '}
+                              {aircraftClassLabel(aircraft.aircraftClassId)}
+                              {atOrigin
+                                ? ` · @ ${aircraft.locationIcao}`
+                                : ` · ferry from ${aircraft.locationIcao}`}
+                            </option>
+                          );
+                        })}
                     </select>
                   </label>
+                  {stagingAssignedAircraft &&
+                  !stagingAircraftAtOrigin &&
+                  !staging.replaceManifest &&
+                  !staging.intoMissionId ? (
+                    <div className="staging-manifest-ferry">
+                      <p className="muted staging-manifest-ferry-hint">
+                        {stagingAssignedAircraft.label} is at{' '}
+                        {stagingAssignedAircraft.locationIcao} — ferry to{' '}
+                        {staging.originIcao} before Accept &amp; Dispatch.
+                      </p>
+                      <button
+                        type="button"
+                        className="accept"
+                        disabled={
+                          busy || stagingAssignedAircraft.status !== 'parked'
+                        }
+                        onClick={() => setStagingFerryOpen(true)}
+                      >
+                        Ferry to {staging.originIcao}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
+
+              {stagingFerryOpen &&
+              stagingAssignedAircraft &&
+              stagingAssignedAircraft.status === 'parked' ? (
+                <FerryJourneyDialog
+                  aircraft={stagingAssignedAircraft}
+                  finalDestIcao={staging.originIcao}
+                  formatMoney={formatMoney}
+                  busy={busy}
+                  onClose={() => setStagingFerryOpen(false)}
+                  onFlyLeg={async (legDest) => {
+                    await onFerry(stagingAssignedAircraft.id, legDest, {
+                      finalDest: staging.originIcao,
+                    });
+                  }}
+                />
+              ) : null}
 
               <DispatchFlightSummary
                 ariaLabel="Manifest summary"
@@ -13235,7 +14824,9 @@ export function App() {
                   </p>
                   {!stagingValid ? (
                     <p className="cargo-dialog-error">
-                      {!stagingInRange
+                      {!stagingAircraftAtOrigin
+                        ? `Aircraft must be at ${staging.originIcao} — ferry first, then Accept & Dispatch.`
+                        : !stagingInRange
                         ? 'Route exceeds aircraft range — pick another airframe or shorter hop.'
                         : !stagingFuelOk
                           ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
@@ -14124,7 +15715,7 @@ export function App() {
                       onSell={(id) => void onSellAircraft(id)}
                       onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
                       onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}
-                      onTravel={(dest) => void onPilotTravel(dest)}
+                      onTravel={(dest) => openPilotTravel(dest)}
                       missionRoute={(() => {
                         if (acf.status !== 'assigned') return null;
                         const m = missions.find(
@@ -14304,7 +15895,9 @@ export function App() {
       ) : null}
       {pilotTravelOpen && pilotIcao ? (
         <PilotTravelDialog
+          key={pilotTravelInitialDest ?? 'picker'}
           pilotIcao={pilotIcao}
+          initialDestIcao={pilotTravelInitialDest}
           hubs={ferryDestinationHubs(hubOptions).map((hub) => ({
             icao: hub.icao,
             name: hub.name,
@@ -14318,8 +15911,9 @@ export function App() {
               icao: acf.locationIcao,
               label: acf.label,
             }))}
+          formatMoney={formatMoney}
           busy={busy}
-          onCancel={() => setPilotTravelOpen(false)}
+          onCancel={closePilotTravel}
           onTravel={onPilotTravel}
         />
       ) : null}

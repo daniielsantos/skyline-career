@@ -6,6 +6,7 @@ import {
   conditionBucketFromPct,
   conditionPctsForListing,
   CRITICAL_CONDITION_PCT,
+  MARKET_TIRED_MIN_CONDITION_PCT,
   ensureAircraftConditionPcts,
   fuelBurnMultFromCondition,
   inspectionCostUsd,
@@ -227,7 +228,8 @@ describe('aircraft wear + maintenance', () => {
   it('rolls listing condition pcts inside each bucket band', () => {
     const low = conditionPctsForListing('tired', 'used', () => 0);
     const high = conditionPctsForListing('tired', 'used', () => 0.999);
-    assert.equal(low.airframeConditionPct, CRITICAL_CONDITION_PCT);
+    assert.equal(low.airframeConditionPct, MARKET_TIRED_MIN_CONDITION_PCT);
+    assert.ok(low.airframeConditionPct >= MARKET_TIRED_MIN_CONDITION_PCT);
     assert.ok(high.airframeConditionPct >= 53);
     assert.ok(high.airframeConditionPct <= 54);
     assert.notEqual(low.airframeConditionPct, high.airframeConditionPct);

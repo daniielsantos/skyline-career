@@ -41,8 +41,14 @@ import {
 } from './career-demand.js';
 import {
   acceptWarehouseBridge,
+  clampInternalHaulPayUsd,
   holdWarehouseBridge,
+  INTERNAL_HAUL_PAY_BAND_MAX,
+  INTERNAL_HAUL_PAY_BAND_MIN,
+  INTERNAL_HAUL_PAY_MIN_USD,
+  quoteInternalHaulPayUsd,
 } from './career-warehouse-bridge.js';
+import { applySettleWalletDeltas } from './career-persist-commands.js';
 import {
   acceptWarehouseHaul,
   cancelWarehouseHaulHold,
@@ -1044,10 +1050,12 @@ describe('career warehouse + demand', () => {
       destIcao: 'SBCT',
       commodityId: 'general',
       kg: 200,
+      pilotPayUsd: 0,
     });
     assert.equal(held.kg, 200);
     assert.equal(held.hold.kind, 'bridge');
     assert.equal(held.hold.unitPriceUsd, 0);
+    assert.equal(held.pilotPayUsd, 0);
     assert.equal(
       (state.playerWarehouses?.stock ?? []).reduce((s, p) => s + p.kg, 0),
       500,
@@ -1092,9 +1100,11 @@ describe('career warehouse + demand', () => {
       commodityId: 'general',
       aircraftId: aircraft.id,
       kg: 150,
+      pilotPayUsd: 0,
     });
     assert.equal(accepted.mission.payUsd, 0);
     assert.equal(accepted.mission.warehouseBridge, true);
+    assert.equal(accepted.mission.internalHaul, undefined);
     assert.equal(accepted.mission.demandOrderId, undefined);
     assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
 
@@ -1113,6 +1123,7 @@ describe('career warehouse + demand', () => {
       commodityId: 'general',
       aircraftId: aircraft.id,
       kg: 150,
+      pilotPayUsd: 0,
     });
     const departed = departMission(world, accepted2.mission, { fleet: state });
     const settled = settleMission(world, departed.mission, {
@@ -1130,6 +1141,79 @@ describe('career warehouse + demand', () => {
       0,
     );
     assert.equal(shipped, 0);
+  });
+
+  it('quotes Internal Haul pay with floor and clamps band', () => {
+    assert.equal(
+      quoteInternalHaulPayUsd({ kg: 0, distanceNm: 0 }),
+      INTERNAL_HAUL_PAY_MIN_USD,
+    );
+    const suggested = quoteInternalHaulPayUsd({ kg: 1_000, distanceNm: 400 });
+    assert.equal(suggested, 80 + 180);
+    assert.equal(
+      clampInternalHaulPayUsd(suggested, suggested * 0.5),
+      Math.round(suggested * INTERNAL_HAUL_PAY_BAND_MIN * 100) / 100,
+    );
+    assert.equal(
+      clampInternalHaulPayUsd(suggested, suggested * 2),
+      Math.round(suggested * INTERNAL_HAUL_PAY_BAND_MAX * 100) / 100,
+    );
+    assert.equal(clampInternalHaulPayUsd(suggested, null), suggested);
+  });
+
+  it('Internal Haul settle deposits dest WH and ledger ±pilot pay (solo net 0)', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-internal-haul' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'InternalHaul',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const beforeWallet = state.walletUsd;
+    const accepted = acceptWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 150,
+    });
+    assert.equal(accepted.mission.warehouseBridge, true);
+    assert.equal(accepted.mission.internalHaul, true);
+    assert.ok(accepted.mission.payUsd > 0);
+    assert.equal(accepted.pilotPayUsd, accepted.mission.payUsd);
+
+    const departed = departMission(world, accepted.mission, { fleet: state });
+    const settled = settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(settled.mission.status, 'settled');
+    assert.equal(settled.walletCreditUsd, accepted.mission.payUsd);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBCT', 'general'), 150);
+
+    applySettleWalletDeltas(state, world.tick, settled);
+    const haulEntries = (state.ledger ?? []).filter(
+      (e) => e.kind === 'internal_haul_pay',
+    );
+    assert.equal(haulEntries.length, 2);
+    const credit = haulEntries.find((e) => e.amountUsd > 0)!;
+    const debit = haulEntries.find((e) => e.amountUsd < 0)!;
+    assert.equal(credit.amountUsd, accepted.mission.payUsd);
+    assert.equal(debit.amountUsd, -accepted.mission.payUsd);
+    assert.equal(
+      state.walletUsd,
+      beforeWallet - settled.fuelDebitUsd,
+    );
   });
 
   it('bridge overflow goes to dest hub yard', () => {
@@ -1156,6 +1240,7 @@ describe('career warehouse + demand', () => {
       commodityId: 'general',
       aircraftId: aircraft.id,
       kg: 150,
+      pilotPayUsd: 0,
     });
     depositCargoToWarehouse(state, {
       icao: 'SBCT',
@@ -1207,6 +1292,7 @@ describe('career warehouse + demand', () => {
       commodityId: 'general',
       aircraftId: aircraft.id,
       kg: 100,
+      pilotPayUsd: 0,
     });
     assert.throws(
       () =>
@@ -1216,6 +1302,7 @@ describe('career warehouse + demand', () => {
           commodityId: 'general',
           aircraftId: aircraft.id,
           kg: 50,
+          pilotPayUsd: 0,
         }),
       /before starting a warehouse bridge/i,
     );

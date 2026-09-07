@@ -2511,6 +2511,7 @@ export function settleMission(
         continue;
       }
       // Company WH→WH bridge: deposit dest warehouse (overflow to yard).
+      // Internal Haul: same deposit + company→pilot fee (payUsd on mission).
       if (working.warehouseBridge) {
         if (opts.fleet) {
           const destPortId =
@@ -2525,14 +2526,40 @@ export function settleMission(
             portId: destPortId,
           });
         }
-        settlementLines.push({
-          shipmentLotId: line.shipmentLotId,
-          commodityId: line.commodityId,
-          deliveredKg: line.cargoKg,
-          payUsd: 0,
-          penaltyUsd: 0,
-          payoutUsd: 0,
-        });
+        if (
+          working.internalHaul === true &&
+          working.payUsd > 0 &&
+          line.payUsd > 0
+        ) {
+          const isLast = i === working.lots.length - 1;
+          const linePenalty = isLast
+            ? penaltyLeft
+            : Math.min(
+                line.payUsd,
+                Math.round(
+                  pay.penaltyUsd * (line.payUsd / Math.max(1, working.payUsd)),
+                ),
+              );
+          penaltyLeft = Math.max(0, penaltyLeft - linePenalty);
+          const linePayout = Math.max(0, line.payUsd - linePenalty);
+          settlementLines.push({
+            shipmentLotId: line.shipmentLotId,
+            commodityId: line.commodityId,
+            deliveredKg: line.cargoKg,
+            payUsd: line.payUsd,
+            penaltyUsd: linePenalty,
+            payoutUsd: linePayout,
+          });
+        } else {
+          settlementLines.push({
+            shipmentLotId: line.shipmentLotId,
+            commodityId: line.commodityId,
+            deliveredKg: line.cargoKg,
+            payUsd: 0,
+            penaltyUsd: 0,
+            payoutUsd: 0,
+          });
+        }
         continue;
       }
       // Demand Board / WH haul: company warehouse cargo — fill dest only (no origin debit).
@@ -2774,7 +2801,10 @@ export function settleMission(
 
   return {
     mission: settled,
-    walletCreditUsd: pay.payoutUsd,
+    walletCreditUsd:
+      working.warehouseBridge && working.internalHaul !== true
+        ? 0
+        : pay.payoutUsd,
     fuelDebitUsd,
     cargoOpsDeltas,
     classOpsDeltas,

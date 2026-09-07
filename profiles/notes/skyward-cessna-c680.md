@@ -17,6 +17,7 @@
 ## Notes
 
 - Skyward Simulations Citation Sovereign+ (C680).
+- SimBrief airframe: `Skyward Simulations (MSFS) - C680 Sovereign+` (not Default) — OEW ~18691 lb on that row.
 - Direct-injection via classic LEFT_MAIN/RIGHT_MAIN + 16 payload stations.
 - CG envelope 18-40% source=manual (SimVar aft ~31% too tight vs live/sweep ~34%).
 - Smoke passed after manual aft override.
@@ -25,3 +26,4 @@
 ## Homologated
 
 - `profiles/examples/skyward-cessna-c680.json`
+- Pack + catalog: `profiles/ofp/skyward-cessna-c680.json`, `skyward-cessna-c680` in `career-player-airframes.json`

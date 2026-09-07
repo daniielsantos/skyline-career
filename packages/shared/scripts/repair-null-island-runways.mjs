@@ -1,15 +1,13 @@
 /**
- * Merge OurAirports runway strips for hubs missing from career-runways.json.
- * Does NOT wipe curated existing rows (unlike full generate-career-runways.mjs).
+ * Repair career-runways.json rows stuck at Null Island (lat=0, lon=0).
  *
- *   node packages/shared/scripts/merge-missing-career-runways.mjs
- *   npm run generate:runways:missing -w @msfs-compat/shared
+ * Root cause: Number("") === 0 treated empty OurAirports end coords as valid,
+ * so merge-missing wrote centers at 0,0 + heading 0 → touchdown debrief shows
+ * multi-million-meter "OFF runway" offsets (e.g. SBCH RWY 11/29).
  *
- * Fallbacks when OA has no usable geometry:
- *  1. Career ICAO → OA local-ident aliases (closed / renamed fields)
- *  2. Runway rows with length but no ends → airport lat/lon + heading from RWY number
- *  3. Synthetic strip at CAREER_HUB_COORDS (tier-based length)
+ *   node packages/shared/scripts/repair-null-island-runways.mjs
  */
+
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -27,24 +25,16 @@ const RUNWAYS_URL =
   'https://davidmegginson.github.io/ourairports-data/runways.csv';
 const FT_TO_M = 0.3048;
 
-/** Career ICAO → OurAirports airport_ident when gps_code/ident diverge (closed / rename). */
 const OA_AIRPORT_ALIASES = {
-  EGCN: 'GB-1212', // Doncaster Sheffield (closed)
-  EVDA: 'LV-8040', // Daugavpils (closed)
-  LKHO: 'CZ-0268', // Holešov (closed)
-  RPVT: 'PH-0683', // Tagbilaran (closed)
-  SAAJ: 'AR-0743', // Junín (closed)
-  SACT: 'AR-0744', // Chamical
-  SBQV: 'BR-1961', // Vitória da Conquista Pedro Otacílio (closed)
-  SEQU: 'SEQM', // Quito Mariscal Sucre (new field; career keeps SEQU)
-  MZSP: 'BZ-SPR', // San Pedro John Greif II
-};
-
-/** Synthetic length when OA has zero runway rows (meters). */
-const SYNTH_LENGTH_M = {
-  spoke: 1_200,
-  regional: 1_800,
-  major: 2_800,
+  EGCN: 'GB-1212',
+  EVDA: 'LV-8040',
+  LKHO: 'CZ-0268',
+  RPVT: 'PH-0683',
+  SAAJ: 'AR-0743',
+  SACT: 'AR-0744',
+  SBQV: 'BR-1961',
+  SEQU: 'SEQM',
+  MZSP: 'BZ-SPR',
 };
 
 function mapSurface(surface) {
@@ -88,6 +78,24 @@ function mapSurface(surface) {
   )
     return 'dirt';
   return 'other';
+}
+
+/** Parse number; blank / missing → undefined (do NOT treat "" as 0). */
+function num(v) {
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  if (s === '') return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function isNullIsland(lat, lon) {
+  return (
+    typeof lat === 'number' &&
+    typeof lon === 'number' &&
+    Math.abs(lat) < 1e-9 &&
+    Math.abs(lon) < 1e-9
+  );
 }
 
 function parseCsv(text) {
@@ -156,25 +164,6 @@ async function ensureCsv(name, url) {
   }
 }
 
-/** Parse number; blank / missing → undefined (do NOT treat "" as 0). */
-function num(v) {
-  if (v == null) return undefined;
-  const s = String(v).trim();
-  if (s === '') return undefined;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : undefined;
-}
-
-function isNullIsland(lat, lon) {
-  return (
-    typeof lat === 'number' &&
-    typeof lon === 'number' &&
-    Math.abs(lat) < 1e-9 &&
-    Math.abs(lon) < 1e-9
-  );
-}
-
-/** RWY 06 → 60°, RWY 36 → 360°→0° for heading math (normalize to 0–360). */
 function headingFromIdent(ident) {
   const m = String(ident ?? '')
     .trim()
@@ -186,10 +175,6 @@ function headingFromIdent(ident) {
   return (n * 10) % 360;
 }
 
-/**
- * @param {Record<string, string>} row
- * @param {{ lat: number; lon: number } | null} airportFallback
- */
 function buildRunway(row, airportFallback) {
   const lengthFt = num(row.length_ft);
   const widthFt = num(row.width_ft);
@@ -227,6 +212,7 @@ function buildRunway(row, airportFallback) {
   } else {
     return null;
   }
+
   let heading = null;
   if (
     leLat != null &&
@@ -273,19 +259,29 @@ function buildRunway(row, airportFallback) {
   };
 }
 
-function synthesizeRunway(icao, coords, tier) {
-  const lengthM = SYNTH_LENGTH_M[tier] ?? SYNTH_LENGTH_M.regional;
-  const heading = 90;
+function patchFromHub(
+  broken,
+  hubCoords,
+) {
+  if (
+    !hubCoords ||
+    !Number.isFinite(hubCoords.lat) ||
+    !Number.isFinite(hubCoords.lon) ||
+    isNullIsland(hubCoords.lat, hubCoords.lon)
+  ) {
+    return null;
+  }
+  const heading =
+    headingFromIdent(broken.ident) ??
+    headingFromIdent(broken.identReciprocal) ??
+    (typeof broken.headingTrueDeg === 'number' && broken.headingTrueDeg !== 0
+      ? broken.headingTrueDeg
+      : 90);
   return {
-    ident: '09',
-    identReciprocal: '27',
-    headingTrueDeg: heading,
-    lengthM,
-    widthM: 30,
-    lat: Math.round(coords.lat * 1e6) / 1e6,
-    lon: Math.round(coords.lon * 1e6) / 1e6,
-    surface: 'asphalt',
-    lighted: false,
+    ...broken,
+    lat: Math.round(hubCoords.lat * 1e6) / 1e6,
+    lon: Math.round(hubCoords.lon * 1e6) / 1e6,
+    headingTrueDeg: Math.round(heading * 10) / 10,
   };
 }
 
@@ -301,22 +297,31 @@ function dedupeSort(list) {
     .sort((a, b) => b.lengthM - a.lengthM || a.ident.localeCompare(b.ident));
 }
 
+function runwayIsBroken(r) {
+  return (
+    !r ||
+    !Number.isFinite(r.lat) ||
+    !Number.isFinite(r.lon) ||
+    isNullIsland(r.lat, r.lon)
+  );
+}
+
 async function main() {
   const existing = JSON.parse(await readFile(outPath, 'utf8'));
-  const { listCareerHubIcaos } = await import(
-    pathToFileURL(join(sharedRoot, 'dist', 'career-fleet.js')).href
-  );
-  const { CAREER_HUB_COORDS, hubTierOf } = await import(
+  const { CAREER_HUB_COORDS } = await import(
     pathToFileURL(join(sharedRoot, 'dist', 'career-economy.js')).href
   );
 
-  const hubs = listCareerHubIcaos().filter((icao) => {
-    const row = existing[icao];
-    return !Array.isArray(row) || row.length === 0;
-  });
-  console.log(`Missing runway hubs: ${hubs.length}`);
-  if (hubs.length === 0) {
-    console.log('Nothing to merge');
+  const brokenHubs = new Set();
+  for (const [icao, rwys] of Object.entries(existing)) {
+    if (!Array.isArray(rwys)) continue;
+    for (const r of rwys) {
+      if (runwayIsBroken(r)) brokenHubs.add(icao);
+    }
+  }
+  console.log(`Hubs with Null Island / invalid runway centers: ${brokenHubs.size}`);
+  if (brokenHubs.size === 0) {
+    console.log('Nothing to repair');
     return;
   }
 
@@ -329,7 +334,6 @@ async function main() {
     parseCsv(await readFile(runwaysPath, 'utf8')),
   );
 
-  /** @type {Map<string, { lat: number; lon: number }>} */
   const airportCoordsByIdent = new Map();
   for (const a of airportRows) {
     const lat = num(a.latitude_deg);
@@ -347,7 +351,7 @@ async function main() {
   }
 
   const hubIdents = new Map();
-  for (const icao of hubs) {
+  for (const icao of brokenHubs) {
     const set = new Set([icao]);
     const alias = OA_AIRPORT_ALIASES[icao];
     if (alias) set.add(alias);
@@ -374,61 +378,71 @@ async function main() {
     for (const id of idents) identToHub.set(id, icao);
   }
 
-  const added = {};
-  for (const icao of hubs) added[icao] = [];
-  let fromGeom = 0;
-  let fromAirportCenter = 0;
+  /** @type {Map<string, object[]>} */
+  const rebuilt = new Map();
+  for (const icao of brokenHubs) rebuilt.set(icao, []);
+
   for (const row of runwayRows) {
     const airportIdent = String(row.airport_ident ?? '')
       .trim()
       .toUpperCase();
     const hub = identToHub.get(airportIdent);
     if (!hub) continue;
-    const leLat = num(row.le_latitude_deg);
-    const heLat = num(row.he_latitude_deg);
-    const hasEnds = leLat != null || heLat != null;
-    const fallback = airportCoordsByIdent.get(airportIdent) ?? null;
+    const fallback =
+      airportCoordsByIdent.get(airportIdent) ??
+      CAREER_HUB_COORDS[hub] ??
+      null;
     const rwy = buildRunway(row, fallback);
-    if (!rwy) continue;
-    if (hasEnds) fromGeom += 1;
-    else fromAirportCenter += 1;
-    added[hub].push(rwy);
+    if (!rwy || runwayIsBroken(rwy)) continue;
+    rebuilt.get(hub).push(rwy);
   }
 
-  let fromAliasGeom = 0;
-  for (const icao of Object.keys(added)) {
-    added[icao] = dedupeSort(added[icao]);
-    if (added[icao].length > 0) {
-      existing[icao] = added[icao];
-      if (OA_AIRPORT_ALIASES[icao]) fromAliasGeom += 1;
-    }
-  }
+  let fromOa = 0;
+  let fromHubPatch = 0;
+  let stillBroken = 0;
 
-  let synth = 0;
-  const stillAfterOa = hubs.filter(
-    (i) => !Array.isArray(existing[i]) || existing[i].length === 0,
-  );
-  for (const icao of stillAfterOa) {
-    const coords = CAREER_HUB_COORDS[icao];
-    if (
-      !coords ||
-      !Number.isFinite(coords.lat) ||
-      !Number.isFinite(coords.lon)
-    ) {
+  for (const icao of brokenHubs) {
+    const oaList = dedupeSort(rebuilt.get(icao) ?? []);
+    if (oaList.length > 0) {
+      existing[icao] = oaList;
+      fromOa += 1;
       continue;
     }
-    const tier = hubTierOf({ icao });
-    existing[icao] = [synthesizeRunway(icao, coords, tier)];
-    synth += 1;
+    // Keep length/idents from broken rows; only move center + fix heading 0.
+    const prev = Array.isArray(existing[icao]) ? existing[icao] : [];
+    const hubCoords =
+      CAREER_HUB_COORDS[icao] ?? airportCoordsByIdent.get(icao) ?? null;
+    const patched = [];
+    for (const r of prev) {
+      if (!runwayIsBroken(r)) {
+        patched.push(r);
+        continue;
+      }
+      const fixed = patchFromHub(r, hubCoords);
+      if (fixed) patched.push(fixed);
+    }
+    if (patched.length > 0 && patched.every((r) => !runwayIsBroken(r))) {
+      existing[icao] = dedupeSort(patched);
+      fromHubPatch += 1;
+    } else {
+      stillBroken += 1;
+      console.warn(`Still broken: ${icao}`);
+    }
   }
 
-  const stillMissing = hubs.filter(
-    (i) => !Array.isArray(existing[i]) || existing[i].length === 0,
-  );
-  console.log(
-    `Merged OA ${hubs.length - stillAfterOa.length} (ends ${fromGeom}, airport-center ${fromAirportCenter}, alias hubs ${fromAliasGeom}); synth ${synth}; still missing: ${stillMissing.join(', ') || 'none'}`,
-  );
+  // Sanity: no Null Island left.
+  let remain = 0;
+  for (const rwys of Object.values(existing)) {
+    if (!Array.isArray(rwys)) continue;
+    for (const r of rwys) {
+      if (runwayIsBroken(r)) remain += 1;
+    }
+  }
+
   await writeFile(outPath, `${JSON.stringify(existing, null, 2)}\n`, 'utf8');
+  console.log(
+    `Repaired OA rebuild ${fromOa}; hub-center patch ${fromHubPatch}; still broken hubs ${stillBroken}; remaining null-island rows ${remain}`,
+  );
   console.log(`Wrote ${outPath}`);
 }
 

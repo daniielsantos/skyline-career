@@ -707,6 +707,46 @@ export type PlayerFboStockPile = {
   acquiredAtTick: number;
 };
 
+/** Raw Active Tour on playerFbos (Accept gates via dispatch-tours status). */
+export type ActiveTourLegStatus = 'planned' | 'active' | 'done' | 'lost';
+
+export type ActiveTourLeg = {
+  index: number;
+  lotId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  liftKg: number;
+  distanceNm: number;
+  ferryNm: number;
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  lastMile: boolean;
+  status: ActiveTourLegStatus;
+  missionId?: string;
+};
+
+export type ActiveTourView = {
+  id: string;
+  tourTemplateId?: string;
+  aircraftId: string;
+  aircraftClassId: string;
+  airframeTypeId?: string;
+  hubIcao: string;
+  originIcao: string;
+  routeLabel: string;
+  legs: ActiveTourLeg[];
+  startedAtTick: number;
+  status: 'active' | 'completed' | 'abandoned';
+  aircraftLocationIcao?: string;
+  nextLegIndex?: number | null;
+  canAcceptNextLeg?: boolean;
+  acceptBlockedReason?: string | null;
+  nextLegLotAvailable?: boolean;
+  nextLegNeedsRebind?: boolean;
+};
+
 export type PlayerFboSnapshot = {
   fbos: Array<{
     id: string;
@@ -730,6 +770,7 @@ export type PlayerFboSnapshot = {
   buyAtIcaoReason?: string | null;
   phase1MaxOwned: number;
   maxOwned?: number;
+  activeTour?: ActiveTourView | null;
 };
 
 export type CompanyCrewSnapshot = {
@@ -2268,6 +2309,8 @@ export type PlayerDemandHoldView = {
   commodityId: string;
   kg: number;
   unitPriceUsd: number;
+  /** Internal Haul pilot fee on bridge holds (0 = unpaid). */
+  pilotPayUsd?: number;
   heldAtTick: number;
   expiresAtTick: number;
 };
@@ -2459,6 +2502,8 @@ export function postPortScout(opts: {
       commodityId: string;
       kg: number;
       orderId?: string;
+      pilotPayUsd?: number;
+      unitPriceUsd?: number;
     };
     kg?: number;
     payUsd?: number;
@@ -2466,6 +2511,194 @@ export function postPortScout(opts: {
     warehouses?: PlayerWarehouseSnapshot;
     demand?: { orders: DemandOrderView[] };
   }>('/api/ports/scout', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type BaseDispatchScoutSuggestion = {
+  id: string;
+  lotId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  quantityKg: number;
+  availableKg: number;
+  liftKg: number;
+  distanceNm: number;
+  ferryNm?: number;
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  aircraftId: string;
+  aircraftClassId: string;
+  airframeTypeId?: string;
+  aircraftLocationIcao?: string;
+  lastMile: boolean;
+  reason: string;
+  score: number;
+};
+
+export type BaseDispatchScoutPolicy = {
+  mode: 'manual' | 'fleet';
+  max: number;
+  ferryPenaltyUsdPerNm: number;
+  requireAtOrigin: boolean;
+  skillPct: number | null;
+  dispatcherId: string | null;
+  dispatcherName: string | null;
+};
+
+export type BaseDispatcherMemberView = {
+  id: string;
+  displayName: string;
+  fboId: string;
+  hubIcao: string;
+  grade: string;
+  skillPct: number;
+  salaryUsdPerDay: number;
+  hiredAtTick: number;
+  gradeLabel: string;
+  fireSeveranceUsd: number;
+  perkHint: string;
+  portraitId?: string;
+};
+
+export type BaseDispatcherCandidateView = {
+  id: string;
+  displayName: string;
+  grade: string;
+  skillPct: number;
+  salaryUsdPerDay: number;
+  hireUsd: number;
+  gradeLabel: string;
+  perkHint: string;
+  portraitId?: string;
+};
+
+export type BaseDispatcherSnapshot = {
+  members: BaseDispatcherMemberView[];
+  hirePoolByHub: Record<string, BaseDispatcherCandidateView[]>;
+};
+
+export function postBaseDispatchScout(opts: {
+  action?: 'list' | 'confirm';
+  lotId?: string;
+  aircraftId?: string;
+  kg?: number;
+  minNm?: number;
+  minKg?: number;
+  excludeLastMile?: boolean;
+  hubIcao?: string;
+}) {
+  return api<{
+    suggestions?: BaseDispatchScoutSuggestion[];
+    policy?: BaseDispatchScoutPolicy;
+    dispatcher?: BaseDispatcherSnapshot;
+    mission?: Mission;
+    kg?: number;
+    walletUsd?: number;
+    missions?: Mission[];
+  }>('/api/base/dispatch-scout', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type BaseDispatchTourReturnMode = 'none' | 'origin' | 'base';
+
+export type BaseDispatchTourLeg = {
+  lotId: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  liftKg: number;
+  distanceNm: number;
+  ferryNm: number;
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  lastMile: boolean;
+};
+
+export type BaseDispatchTour = {
+  id: string;
+  aircraftId: string;
+  aircraftClassId: string;
+  airframeTypeId?: string;
+  aircraftLocationIcao?: string;
+  legs: BaseDispatchTourLeg[];
+  routeLabel: string;
+  legCount: number;
+  totalDistanceNm: number;
+  totalFerryNm: number;
+  totalPayUsd: number;
+  totalFuelCostUsd: number;
+  totalNetUsd: number;
+  score: number;
+  reason: string;
+};
+
+export function postBaseDispatchTours(opts: {
+  action?:
+    | 'list'
+    | 'confirm'
+    | 'status'
+    | 'accept-leg'
+    | 'drop'
+    | 'attach'
+    | 'bind-leg';
+  hubIcao?: string;
+  aircraftId?: string;
+  originIcao?: string;
+  legs?: number;
+  minNm?: number;
+  maxNm?: number | null;
+  minKg?: number;
+  returnMode?: BaseDispatchTourReturnMode;
+  excludeLastMile?: boolean;
+  firstLotId?: string;
+  kg?: number;
+  tourId?: string;
+  routeLabel?: string;
+  tourLegs?: BaseDispatchTourLeg[];
+  legIndex?: number;
+  missionId?: string;
+}) {
+  return api<{
+    tours?: BaseDispatchTour[];
+    suggestions?: BaseDispatchScoutSuggestion[];
+    policy?: BaseDispatchScoutPolicy;
+    dispatcher?: BaseDispatcherSnapshot;
+    activeTour?: ActiveTourView | null;
+    mission?: Mission;
+    kg?: number;
+    tourLegIndex?: number;
+    rebound?: boolean;
+    walletUsd?: number;
+    missions?: Mission[];
+    playerFbos?: PlayerFboSnapshot;
+  }>('/api/base/dispatch-tours', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postBaseDispatcher(opts: {
+  action?: 'list' | 'hire' | 'fire' | 'refresh';
+  fboId?: string;
+  hubIcao?: string;
+  candidateId?: string;
+  memberId?: string;
+}) {
+  return api<{
+    dispatcher?: BaseDispatcherSnapshot;
+    policy?: BaseDispatchScoutPolicy;
+    suggestions?: BaseDispatchScoutSuggestion[];
+    member?: BaseDispatcherMemberView;
+    debitUsd?: number;
+    walletUsd?: number;
+  }>('/api/base/dispatcher', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
@@ -2635,15 +2868,35 @@ export function postWarehouseStockAbandon(opts: { stockId: string }) {
   });
 }
 
+export type InternalHaulPayQuote = {
+  distanceNm: number;
+  suggestedPayUsd: number;
+  minPayUsd: number;
+  maxPayUsd: number;
+};
+
+export function postWarehouseBridgeQuote(opts: {
+  originIcao: string;
+  destIcao: string;
+  kg?: number;
+}) {
+  return api<{ quote: InternalHaulPayQuote }>('/api/warehouses/bridge/quote', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export function postWarehouseBridgeHold(opts: {
   originIcao: string;
   destIcao: string;
   commodityId: string;
   kg?: number;
+  pilotPayUsd?: number | null;
 }) {
   return api<{
     hold: PlayerDemandHoldView;
     kg: number;
+    pilotPayUsd?: number;
     warehouses: PlayerWarehouseSnapshot;
   }>('/api/warehouses/bridge/hold', {
     method: 'POST',
@@ -2667,11 +2920,13 @@ export function postWarehouseBridgeAccept(opts: {
   commodityId: string;
   aircraftId: string;
   kg?: number;
+  pilotPayUsd?: number | null;
 }) {
   return api<{
     walletUsd: number;
     mission: Mission;
     kg: number;
+    pilotPayUsd?: number;
     warehouses: PlayerWarehouseSnapshot;
     fleet: PlayerAircraft[];
     missions: Mission[];
@@ -2684,11 +2939,13 @@ export function postWarehouseBridgeAccept(opts: {
 export function postWarehouseBridgeDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
+  pilotPayUsd?: number | null;
 }) {
   return api<{
     walletUsd: number;
     mission: Mission;
     kg: number;
+    pilotPayUsd?: number;
     warehouses: PlayerWarehouseSnapshot;
     fleet: PlayerAircraft[];
     missions: Mission[];

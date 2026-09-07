@@ -2928,7 +2928,23 @@ tr.lot-locked {
 
 .staging-manifest-aircraft {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.staging-manifest-ferry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 28rem;
+  text-align: center;
+}
+
+.staging-manifest-ferry-hint {
+  margin: 0;
+  font-size: 0.82rem;
 }
 
 .staging-aircraft-centered {
@@ -2937,7 +2953,7 @@ tr.lot-locked {
 }
 
 .staging-aircraft-centered select {
-  min-width: min(100%, 16rem);
+  min-width: min(100%, 22rem);
   text-align: left;
 }
 
@@ -5394,6 +5410,11 @@ tr.lot-locked {
 
 .pilot-travel-dialog .fbo-icao-switcher {
   margin: 0 0 0.75rem;
+}
+
+.pilot-travel-dialog .pilot-travel-quote {
+  margin: 0.65rem 0 0;
+  font-size: 0.95rem;
 }
 
 .pilot-chip:disabled {
@@ -11299,6 +11320,226 @@ span.dispatch-route-hub-dest {
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+/* Base tab — Dispatcher hire + Market scout desk */
+.base-dispatcher-desk {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.base-dispatcher-desk .crew-section {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.base-dispatcher-desk .crew-section-title {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.base-dispatcher-desk .crew-section-lede {
+  margin: 0 0 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.base-dispatcher-desk .crew-person-grid {
+  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  gap: 0.55rem;
+}
+
+.base-dispatcher-desk .crew-person-card {
+  grid-template-columns: 3.75rem minmax(0, 1fr);
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem 0.65rem;
+  align-items: start;
+}
+
+.base-dispatcher-desk .crew-person-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.base-dispatcher-desk .crew-person-name {
+  font-size: 0.92rem;
+}
+
+.base-dispatcher-desk .crew-portrait {
+  width: 3.75rem;
+  height: 3.75rem;
+}
+
+.base-dispatcher-desk .crew-portrait-initials {
+  font-size: 0.95rem;
+}
+
+.base-dispatcher-desk .crew-card-meta,
+.base-dispatcher-desk .crew-person-perk {
+  font-size: 0.78rem;
+}
+
+.base-dispatcher-desk .crew-card-actions {
+  margin-top: 0.15rem;
+}
+
+.base-dispatcher-desk .crew-card-actions .accept {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.base-dispatcher-desk .base-dispatcher-scout .ports-scout-list {
+  margin-top: 0.15rem;
+}
+
+.base-dispatcher-scout-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.base-dispatcher-scout-head .crew-section-title {
+  margin: 0;
+}
+
+.base-dispatcher-scout-head .crew-section-lede {
+  margin: 0.15rem 0 0;
+}
+
+.base-dispatcher-scout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.base-dispatch-tour-filters {
+  margin: 0.45rem 0 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+}
+
+.base-dispatch-tour-lede {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+}
+
+.base-active-tour {
+  margin-bottom: 0.75rem;
+}
+
+.base-active-tour-table tr.is-tour-next td:first-child {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent, #3d8bfd) 80%, transparent);
+}
+
+.base-dispatch-tour-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.45rem 0.55rem;
+  align-items: end;
+}
+
+.base-dispatch-tour-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.base-dispatch-tour-grid label span {
+  letter-spacing: 0.02em;
+}
+
+.base-dispatch-tour-grid select,
+.base-dispatch-tour-grid input {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.28rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+  min-width: 0;
+}
+
+.base-dispatch-tour-generate {
+  display: flex;
+  align-items: flex-end;
+}
+
+.base-dispatch-tour-generate .accept {
+  width: 100%;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.base-dispatch-freight-table {
+  margin-top: 0.35rem;
+  width: 100%;
+}
+
+.base-dispatch-freight-table th,
+.base-dispatch-freight-table td {
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+
+.base-dispatch-freight-table .route {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.base-dispatch-freight-table .arrow {
+  margin: 0 0.2rem;
+  opacity: 0.7;
+}
+
+.base-dispatch-freight-table td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.base-dispatch-freight-table tbody tr {
+  cursor: pointer;
+}
+
+.base-dispatch-freight-table tbody tr.is-selected td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Match mark: only Route column edge — no full-row wash (looks like neon grid). */
+.base-dispatch-freight-table tbody tr.is-filter-match > td:first-child {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 75%, #6bcf9a);
+}
+
+.base-dispatch-match-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, #6bcf9a);
+  background: transparent;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.base-dispatcher-desk .empty {
+  margin: 0.15rem 0 0;
   font-size: 0.78rem;
 }
 

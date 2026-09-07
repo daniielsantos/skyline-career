@@ -4,6 +4,10 @@
  */
 
 import { resolveCrewPortraitId } from './career-crew.js';
+import {
+  refreshBaseDispatcherHirePool,
+  settleBaseDispatcherSalaries,
+} from './career-base-dispatcher.js';
 import { applyWalletDelta } from './career-ledger.js';
 import { ensurePlayerWarehouses } from './career-warehouse-stock.js';
 import { economyDayIndex } from './career-weather.js';
@@ -928,10 +932,15 @@ export function settleGroundStaffDailyOps(
   state: CareerMissionsState,
   world: Pick<CareerEconomyWorld, 'tick'> & { seed?: string },
   opts: { fromTick: number; toTick: number },
-): { salary: GroundStaffSalarySettleResult } {
+): {
+  salary: GroundStaffSalarySettleResult;
+  baseDispatcherSalary: ReturnType<typeof settleBaseDispatcherSalaries>;
+} {
   refreshGroundStaffHirePool(state, world);
   const salary = settleGroundStaffSalaries(state, opts);
-  return { salary };
+  refreshBaseDispatcherHirePool(state, world);
+  const baseDispatcherSalary = settleBaseDispatcherSalaries(state, opts);
+  return { salary, baseDispatcherSalary };
 }
 
 export function groundStaffSnapshot(

@@ -18,6 +18,8 @@ setWorkerUrl(maplibreWorkerUrl);
 const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const ROUTE_SOURCE_ID = 'dispatch-route';
 const ROUTE_LAYER_ID = 'dispatch-route-line';
+const FERRY_SOURCE_ID = 'dispatch-route-ferry';
+const FERRY_LAYER_ID = 'dispatch-route-ferry-line';
 
 export type DispatchRouteEndpoint = {
   icao: string;
@@ -31,6 +33,13 @@ export type DispatchRouteWaypoint = {
   lat: number;
   lon: number;
   type?: string;
+};
+
+/** Cargo or ferry hop drawn as its own great-circle segment. */
+export type DispatchRouteSegment = {
+  from: DispatchRouteEndpoint;
+  to: DispatchRouteEndpoint;
+  kind?: 'cargo' | 'ferry';
 };
 
 export type DispatchAircraftPosition = {
@@ -251,6 +260,40 @@ function ensureRouteLayer(map: Map): void {
   });
 }
 
+function ensureFerryLayer(map: Map): void {
+  if (map.getSource(FERRY_SOURCE_ID)) return;
+  map.addSource(FERRY_SOURCE_ID, {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: [],
+    },
+  });
+  map.addLayer({
+    id: FERRY_LAYER_ID,
+    type: 'line',
+    source: FERRY_SOURCE_ID,
+    layout: {
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#9aa4b2',
+      'line-width': 2,
+      'line-opacity': 0.75,
+      'line-dasharray': [1.2, 1.8],
+    },
+  });
+}
+
+function emptyLineFeature() {
+  return {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: { type: 'LineString' as const, coordinates: [] as [number, number][] },
+  };
+}
+
 function setRouteLine(
   map: Map,
   origin: DispatchRouteEndpoint,
@@ -258,14 +301,13 @@ function setRouteLine(
   waypoints?: DispatchRouteWaypoint[],
 ): void {
   ensureRouteLayer(map);
+  ensureFerryLayer(map);
   const source = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
+  const ferry = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
+  ferry?.setData({ type: 'FeatureCollection', features: [] });
   if (!source) return;
   if (!dest) {
-    source.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'LineString', coordinates: [] },
-    });
+    source.setData(emptyLineFeature());
     return;
   }
   source.setData({
@@ -275,6 +317,43 @@ function setRouteLine(
       type: 'LineString',
       coordinates: routeLineCoordinates(origin, dest, waypoints),
     },
+  });
+}
+
+function setRouteSegments(map: Map, segments: DispatchRouteSegment[]): void {
+  ensureRouteLayer(map);
+  ensureFerryLayer(map);
+  const cargoSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
+  const ferrySource = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
+  const cargoFeatures: Array<{
+    type: 'Feature';
+    properties: { kind: string };
+    geometry: { type: 'LineString'; coordinates: [number, number][] };
+  }> = [];
+  const ferryFeatures: typeof cargoFeatures = [];
+  for (const seg of segments) {
+    const coords = greatCircleLine(seg.from, seg.to, 48);
+    const feature = {
+      type: 'Feature' as const,
+      properties: { kind: seg.kind ?? 'cargo' },
+      geometry: { type: 'LineString' as const, coordinates: coords },
+    };
+    if (seg.kind === 'ferry') ferryFeatures.push(feature);
+    else cargoFeatures.push(feature);
+  }
+  if (cargoSource) {
+    cargoSource.setData(
+      cargoFeatures.length === 1
+        ? cargoFeatures[0]!
+        : {
+            type: 'FeatureCollection',
+            features: cargoFeatures,
+          },
+    );
+  }
+  ferrySource?.setData({
+    type: 'FeatureCollection',
+    features: ferryFeatures,
   });
 }
 
@@ -299,7 +378,16 @@ function routeCameraKey(
   dest: DispatchRouteEndpoint | null | undefined,
   waypoints: DispatchRouteWaypoint[] | undefined,
   originRole: string | undefined,
+  segments?: DispatchRouteSegment[],
 ): string {
+  if (segments?.length) {
+    return `${originRole ?? 'dep'}|seg:${segments
+      .map(
+        (s) =>
+          `${s.kind ?? 'cargo'}:${s.from.icao}:${s.from.lat.toFixed(3)},${s.from.lon.toFixed(3)}>${s.to.icao}:${s.to.lat.toFixed(3)},${s.to.lon.toFixed(3)}`,
+      )
+      .join('|')}`;
+  }
   const w = (waypoints ?? [])
     .map((p) => `${p.ident}:${p.lat.toFixed(4)},${p.lon.toFixed(4)}`)
     .join('|');
@@ -314,6 +402,11 @@ export function DispatchRouteMap(props: {
   /** When omitted, only the origin/base pin is shown (no route line). */
   dest?: DispatchRouteEndpoint | null;
   waypoints?: DispatchRouteWaypoint[];
+  /**
+   * Multi-leg tour paths. When set, draws cargo (solid) + ferry (dashed)
+   * instead of a single OD/waypoints line.
+   */
+  segments?: DispatchRouteSegment[];
   /** Live aircraft position from Watch — updated without re-fitting the route. */
   aircraft?: DispatchAircraftPosition | null;
   /** Popup title for the aircraft marker. */
@@ -388,10 +481,15 @@ export function DispatchRouteMap(props: {
         markersRef.current = [];
 
         const dest = props.dest ?? null;
-        setRouteLine(map, props.origin, dest, props.waypoints);
+        const segments = props.segments?.length ? props.segments : null;
+        if (segments) {
+          setRouteSegments(map, segments);
+        } else {
+          setRouteLine(map, props.origin, dest, props.waypoints);
+        }
 
         // Route gone → drop aircraft; live effect will recreate if needed.
-        if (!dest) {
+        if (!dest && !segments) {
           aircraftMarkerRef.current?.remove();
           aircraftMarkerRef.current = null;
         }
@@ -400,9 +498,33 @@ export function DispatchRouteMap(props: {
         const ends: Array<{
           endpoint: DispatchRouteEndpoint;
           kind: 'dep' | 'arr' | 'fbo';
-        }> = [{ endpoint: props.origin, kind: originKind }];
-        if (dest) {
-          ends.push({ endpoint: dest, kind: 'arr' });
+        }> = [];
+        const hubPts: DispatchRouteEndpoint[] = [];
+        const seen = new Set<string>();
+
+        if (segments) {
+          const cargo = segments.filter((s) => s.kind !== 'ferry');
+          const first = cargo[0]?.from ?? segments[0]!.from;
+          const last = cargo[cargo.length - 1]?.to ?? segments[segments.length - 1]!.to;
+          ends.push({ endpoint: first, kind: originKind });
+          seen.add(first.icao.toUpperCase());
+          for (const seg of segments) {
+            for (const ep of [seg.from, seg.to]) {
+              const id = ep.icao.toUpperCase();
+              if (seen.has(id)) continue;
+              seen.add(id);
+              if (id === last.icao.toUpperCase()) continue;
+              hubPts.push(ep);
+            }
+          }
+          if (!seen.has(last.icao.toUpperCase()) || last.icao.toUpperCase() !== first.icao.toUpperCase()) {
+            ends.push({ endpoint: last, kind: 'arr' });
+          }
+        } else {
+          ends.push({ endpoint: props.origin, kind: originKind });
+          if (dest) {
+            ends.push({ endpoint: dest, kind: 'arr' });
+          }
         }
 
         for (const { endpoint, kind } of ends) {
@@ -434,7 +556,32 @@ export function DispatchRouteMap(props: {
           markersRef.current.push(marker);
         }
 
-        if (dest) {
+        if (segments) {
+          for (const hub of hubPts) {
+            const wpt: DispatchRouteWaypoint = {
+              ident: hub.icao,
+              lat: hub.lat,
+              lon: hub.lon,
+              type: 'airport',
+            };
+            const el = hubRouteMarker(wpt);
+            el.addEventListener('click', (event) => {
+              event.stopPropagation();
+              onSelectRef.current?.(hub.icao);
+            });
+            const marker = new Marker({ element: el, anchor: 'bottom' })
+              .setLngLat([hub.lon, hub.lat])
+              .setPopup(
+                new Popup({
+                  offset: 14,
+                  closeButton: false,
+                  className: 'dispatch-route-popup',
+                }).setHTML(`<strong>Hub</strong><br/>${hub.icao}`),
+              )
+              .addTo(map);
+            markersRef.current.push(marker);
+          }
+        } else if (dest) {
           for (const wpt of intermediateWaypoints(
             props.origin,
             dest,
@@ -476,10 +623,18 @@ export function DispatchRouteMap(props: {
           dest,
           props.waypoints,
           props.originRole,
+          segments ?? undefined,
         );
         if (fittedRouteKeyRef.current !== cameraKey) {
           fittedRouteKeyRef.current = cameraKey;
-          if (dest) {
+          if (segments?.length) {
+            const bounds = new LngLatBounds();
+            for (const seg of segments) {
+              bounds.extend([seg.from.lon, seg.from.lat]);
+              bounds.extend([seg.to.lon, seg.to.lat]);
+            }
+            map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
+          } else if (dest) {
             const bounds = new LngLatBounds();
             for (const p of buildRouteTrack(
               props.origin,
@@ -513,7 +668,13 @@ export function DispatchRouteMap(props: {
       map.off('load', paint);
       map.off('idle', paint);
     };
-  }, [props.origin, props.dest, props.waypoints, props.originRole]);
+  }, [
+    props.origin,
+    props.dest,
+    props.waypoints,
+    props.segments,
+    props.originRole,
+  ]);
 
   // Live aircraft — move marker only; do not refit route bounds each tick.
   useEffect(() => {

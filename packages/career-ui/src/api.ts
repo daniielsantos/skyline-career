@@ -4083,6 +4083,7 @@ export function postSettle(opts: { missionId: string }) {
     settlement: MissionSettlement;
     fleet?: PlayerAircraft[];
     pilotIcao?: string;
+    activeTour?: ActiveTourView | null;
   }>('/api/settle', {
     method: 'POST',
     body: JSON.stringify(opts),

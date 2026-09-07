@@ -59,7 +59,6 @@ import {
   postFboRelease,
   postFboSplit,
   postFboReturnMission,
-  postBaseDispatchScout,
   postBaseDispatchTours,
   postBaseDispatcher,
   postCrewAssign,
@@ -103,7 +102,6 @@ import {
   type NpcFleetMember,
   type PlayerAircraft,
   type PlayerFboSnapshot,
-  type BaseDispatchScoutSuggestion,
   type BaseDispatchScoutPolicy,
   type BaseDispatchTour,
   type BaseDispatchTourLeg,
@@ -3530,9 +3528,6 @@ export function App() {
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
   const [playerFbos, setPlayerFbos] = useState<PlayerFboSnapshot | null>(null);
-  const [dispatchScoutSuggestions, setDispatchScoutSuggestions] = useState<
-    BaseDispatchScoutSuggestion[]
-  >([]);
   const [dispatchScoutPolicy, setDispatchScoutPolicy] =
     useState<BaseDispatchScoutPolicy | null>(null);
   const [baseDispatcher, setBaseDispatcher] =
@@ -3540,12 +3535,6 @@ export function App() {
   const [dispatchScoutLoading, setDispatchScoutLoading] = useState(false);
   const [dispatchTourLoading, setDispatchTourLoading] = useState(false);
   const dispatchDeskBusy = dispatchScoutLoading || dispatchTourLoading;
-  const [selectedDispatchScoutId, setSelectedDispatchScoutId] = useState<
-    string | null
-  >(null);
-  const [dispatchDeskMode, setDispatchDeskMode] = useState<'board' | 'tours'>(
-    'board',
-  );
   const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
   const [activeTour, setActiveTour] = useState<ActiveTourView | null>(null);
   /** Tour itinerary to attach after Manifest Accept & Dispatch. */
@@ -3560,10 +3549,20 @@ export function App() {
   } | null>(null);
   const pendingActiveTourRef = useRef(pendingActiveTour);
   function setPendingActiveTour(
-    next: typeof pendingActiveTour,
+    next:
+      | typeof pendingActiveTour
+      | ((prev: typeof pendingActiveTour) => typeof pendingActiveTour),
   ) {
-    pendingActiveTourRef.current = next;
-    setPendingActiveTourState(next);
+    const resolved =
+      typeof next === 'function'
+        ? (
+            next as (
+              prev: typeof pendingActiveTour,
+            ) => typeof pendingActiveTour
+          )(pendingActiveTourRef.current)
+        : next;
+    pendingActiveTourRef.current = resolved;
+    setPendingActiveTourState(resolved);
   }
   /** FerryJourneyDialog from Manifest when selected airframe is off-origin. */
   const [stagingFerryOpen, setStagingFerryOpen] = useState(false);
@@ -3572,7 +3571,7 @@ export function App() {
   >(null);
   const [dispatchTourAircraftId, setDispatchTourAircraftId] = useState('');
   const [dispatchTourOrigin, setDispatchTourOrigin] = useState('');
-  const [dispatchTourLegs, setDispatchTourLegs] = useState<2 | 3 | 4>(2);
+  const [dispatchTourLegs, setDispatchTourLegs] = useState<1 | 2 | 3 | 4>(2);
   const [dispatchTourMinNm, setDispatchTourMinNm] = useState('');
   const [dispatchTourMaxNm, setDispatchTourMaxNm] = useState('');
   const [dispatchTourMaxFerryNm, setDispatchTourMaxFerryNm] = useState('200');
@@ -3658,7 +3657,6 @@ export function App() {
   useEffect(() => {
     setSelectedFboHoldId(null);
     setSelectedFboMissionId(null);
-    setSelectedDispatchScoutId(null);
     setSplitHoldId(null);
   }, [airportIcao, terminalSection]);
 
@@ -3704,21 +3702,16 @@ export function App() {
     setDispatchScoutLoading(true);
     void Promise.all([
       postBaseDispatcher({ action: 'list', hubIcao: hub }),
-      postBaseDispatchScout({ action: 'list', hubIcao: hub }),
       postBaseDispatchTours({ action: 'status' }),
     ])
-      .then(([desk, scout, tours]) => {
+      .then(([desk, tours]) => {
         if (cancelled) return;
         if (desk.dispatcher) setBaseDispatcher(desk.dispatcher);
         if (desk.policy) setDispatchScoutPolicy(desk.policy);
-        if (scout.policy) setDispatchScoutPolicy(scout.policy);
-        if (scout.dispatcher) setBaseDispatcher(scout.dispatcher);
-        setDispatchScoutSuggestions(scout.suggestions ?? []);
-        setSelectedDispatchScoutId(null);
         setActiveTour(tours.activeTour ?? null);
       })
       .catch(() => {
-        /* Scan retries */
+        /* Base desk retries on next open */
       })
       .finally(() => {
         if (!cancelled) setDispatchScoutLoading(false);
@@ -5397,6 +5390,72 @@ export function App() {
     };
   }, [staging?.originIcao, staging?.destIcao, tick]);
 
+  /** Tour Manifest: when route lots hydrate, rebind a dead planned lot. */
+  useEffect(() => {
+    if (!staging || staging.replaceManifest) return;
+    if (!pendingActiveTourRef.current) return;
+    if (stagingRouteLotsLoading || stagingRouteLots.length === 0) return;
+    const line = staging.lines[0];
+    if (!line) return;
+    const resolved = stagingResolvedLot(
+      staging,
+      line.lot,
+      missions,
+      stagingRouteLots,
+      lots,
+    );
+    const avail = Math.max(0, Math.floor(resolved.availableKg ?? 0));
+    if (avail >= 1 && line.cargoKg > 0 && line.cargoKg <= avail) return;
+
+    const wantKg = Math.max(line.cargoKg, line.lot.quantityKg || 1, 1);
+    const pending = pendingActiveTourRef.current;
+    const alt = findSameRouteAlternateLot(
+      staging.originIcao,
+      staging.destIcao,
+      wantKg,
+      [
+        line.lot.id,
+        ...(pending ? tourLegExcludeLotIds(pending.legIndex) : []),
+      ],
+      [...stagingRouteLots, ...lots],
+    );
+    if (!alt) return;
+
+    if (pending) {
+      patchPendingTourLegLot(
+        pending.legIndex,
+        alt.id,
+        Math.min(alt.availableKg, wantKg),
+      );
+    }
+    const nextDraft: StagingDraft = {
+      ...staging,
+      lines: [
+        {
+          lot: { ...alt, reason: alt.reason || 'tour leg (rebound)' },
+          cargoKg: 0,
+        },
+      ],
+    };
+    const maxKg = lineMaxKg(nextDraft, alt);
+    nextDraft.lines[0]!.cargoKg =
+      maxKg > 0 ? Math.min(maxKg, alt.availableKg) : 0;
+    setStaging(nextDraft);
+    setToastKind('warn');
+    setToast(
+      `Planned lot gone — rebound ${alt.originIcao}→${alt.destIcao} · ${formatTonnes(alt.availableKg)} free`,
+    );
+  }, [
+    staging?.originIcao,
+    staging?.destIcao,
+    staging?.lines[0]?.lot.id,
+    staging?.lines[0]?.cargoKg,
+    stagingRouteLots,
+    stagingRouteLotsLoading,
+    lots,
+    missions,
+  ]);
+
   useEffect(() => {
     const username = simbriefUser.trim();
     const eligible =
@@ -6990,36 +7049,10 @@ export function App() {
     });
   }
 
-  async function refreshDispatchScout() {
-    if (busy || dispatchDeskBusy) return;
-    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
-    setDispatchDeskMode('board');
-    setDispatchScoutLoading(true);
-    try {
-      const result = await postBaseDispatchScout({
-        action: 'list',
-        hubIcao: hub,
-      });
-      setDispatchScoutSuggestions(result.suggestions ?? []);
-      if (result.policy) setDispatchScoutPolicy(result.policy);
-      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
-      setSelectedDispatchScoutId((cur) =>
-        (result.suggestions ?? []).some((s) => s.id === cur) ? cur : null,
-      );
-      setSelectedDispatchTourId(null);
-    } catch (err) {
-      setToastKind('fail');
-      setToast(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDispatchScoutLoading(false);
-    }
-  }
-
   async function onGenerateDispatchTours() {
     if (busy || dispatchDeskBusy) return;
     const hub = (airportIcao ?? '').trim().toUpperCase();
     if (!hub) return;
-    setDispatchDeskMode('tours');
     setDispatchTourLoading(true);
     try {
       const minNmRaw = dispatchTourMinNm.trim();
@@ -7043,7 +7076,10 @@ export function App() {
         action: 'list',
         hubIcao: hub,
         aircraftId: dispatchTourAircraftId.trim() || undefined,
-        originIcao: dispatchTourOrigin.trim() || undefined,
+        // Empty Origin means this Base (the placeholder already shows it).
+        // The server otherwise falls back to aircraft location, which made an
+        // empty SBKP field silently search from an aircraft parked at SBCT.
+        originIcao: dispatchTourOrigin.trim() || hub,
         legs: dispatchTourLegs,
         minNm,
         maxNm,
@@ -7057,15 +7093,17 @@ export function App() {
       if (result.policy) setDispatchScoutPolicy(result.policy);
       if (result.dispatcher) setBaseDispatcher(result.dispatcher);
       setSelectedDispatchTourId(null);
-      setSelectedDispatchScoutId(null);
       if ((result.tours ?? []).length === 0) {
         setToastKind('fail');
         const base = hub;
-        if (dispatchTourReturnMode === 'base') {
+        if (dispatchTourLegs > 1 && dispatchTourReturnMode === 'base') {
           setToast(
             `No tours ending at Base ${base} — need a last cargo leg into ${base} (not a ferry home). Try Any end, more Legs, or Max ferry.`,
           );
-        } else if (dispatchTourReturnMode === 'origin') {
+        } else if (
+          dispatchTourLegs > 1 &&
+          dispatchTourReturnMode === 'origin'
+        ) {
           const origin =
             dispatchTourOrigin.trim().toUpperCase() || 'origin';
           setToast(
@@ -7073,7 +7111,9 @@ export function App() {
           );
         } else {
           setToast(
-            'No 2–4 leg chains near that origin — try Min nm 40, Any parked, or Scan single freights first.',
+            dispatchTourLegs === 1
+              ? 'No single freights near that origin — try Min nm 40, Any parked, or raise Max ferry.'
+              : 'No 2–4 leg chains near that origin — try Min nm 40, Any parked, or raise Max ferry.',
           );
         }
       }
@@ -7082,36 +7122,6 @@ export function App() {
       setToast(err instanceof Error ? err.message : String(err));
     } finally {
       setDispatchTourLoading(false);
-    }
-  }
-
-  async function onConfirmDispatchScout(s: BaseDispatchScoutSuggestion) {
-    if (busy || dispatchDeskBusy) return;
-    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
-    setDispatchScoutLoading(true);
-    try {
-      const result = await postBaseDispatchScout({
-        action: 'confirm',
-        lotId: s.lotId,
-        aircraftId: s.aircraftId,
-        kg: s.liftKg,
-        hubIcao: hub,
-      });
-      if (result.walletUsd != null) setWallet(result.walletUsd);
-      if (result.missions) setMissions(result.missions.slice().reverse());
-      setDispatchScoutSuggestions(result.suggestions ?? []);
-      if (result.policy) setDispatchScoutPolicy(result.policy);
-      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
-      setSelectedDispatchScoutId(null);
-      setToastKind('ok');
-      setToast(
-        `Dispatcher · ${result.mission?.originIcao}→${result.mission?.destIcao} · ${formatTonnes(result.kg ?? s.liftKg)} · open Dispatch`,
-      );
-    } catch (err) {
-      setToastKind('fail');
-      setToast(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDispatchScoutLoading(false);
     }
   }
 
@@ -7133,6 +7143,11 @@ export function App() {
     }
     setDispatchTourLoading(true);
     try {
+      if (tour.legCount === 1) {
+        setSelectedDispatchTourId(null);
+        enterStagingForTourLeg(lot, tour.aircraftId);
+        return;
+      }
       // Persist itinerary before Manifest so refresh/rebuild cannot wipe Active Tour.
       const prepared = await postBaseDispatchTours({
         action: 'prepare',
@@ -7181,6 +7196,17 @@ export function App() {
         );
         return;
       }
+      // Stranded (no lot / Drop) — do not open Manifest.
+      if (view.resumeState === 'stranded') {
+        setToastKind('warn');
+        setToast(
+          view.acceptBlockedReason ??
+            view.resumeHint ??
+            'Tour cannot continue — Drop or Search again',
+        );
+        return;
+      }
+      // ready + blocked (ferry/parked): Manifest owns Ferry CTA + Accept gate.
       const liveLeg =
         view.legs.find((l) => l.index === legIndex) ?? leg;
       const lot = marketLotFromTourLeg(liveLeg);
@@ -7226,11 +7252,11 @@ export function App() {
   }): MarketLot {
     const fromBoard = lots.find((l) => l.id === leg.lotId);
     if (fromBoard) {
-      return {
-        ...fromBoard,
-        availableKg: Math.max(fromBoard.availableKg, leg.liftKg),
-      };
+      // Never inflate past board free kg — Accept uses server lotAvailableKg.
+      return { ...fromBoard };
     }
+    // Lot not on the loaded board page — show 0 free until route lots hydrate
+    // or we rebind to a live same-OD freight.
     return {
       id: leg.lotId,
       originIcao: leg.originIcao,
@@ -7241,13 +7267,87 @@ export function App() {
       commodityId: leg.commodityId,
       commodityName: leg.commodityId,
       quantityKg: leg.liftKg,
-      availableKg: leg.liftKg,
+      availableKg: 0,
       payUsd: leg.payUsd,
       urgency: 'normal',
       reason: 'tour leg',
       expiresAtTick: (tick ?? 0) + 200,
       lastMile: leg.lastMile,
     };
+  }
+
+  /** Same OD, free kg — when the planned tour lot was taken after Search. */
+  function findSameRouteAlternateLot(
+    originIcao: string,
+    destIcao: string,
+    wantKg: number,
+    excludeLotIds: Iterable<string> | string | undefined,
+    pools: MarketLot[],
+  ): MarketLot | null {
+    const origin = originIcao.trim().toUpperCase();
+    const dest = destIcao.trim().toUpperCase();
+    const want = Math.max(1, Math.floor(wantKg));
+    const exclude = new Set<string>();
+    if (typeof excludeLotIds === 'string') {
+      if (excludeLotIds) exclude.add(excludeLotIds);
+    } else if (excludeLotIds) {
+      for (const id of excludeLotIds) {
+        if (id) exclude.add(id);
+      }
+    }
+    let best: { lot: MarketLot; score: number } | null = null;
+    const seen = new Set<string>();
+    for (const lot of pools) {
+      if (!lot?.id || seen.has(lot.id)) continue;
+      seen.add(lot.id);
+      if (exclude.has(lot.id)) continue;
+      if (lot.originIcao.trim().toUpperCase() !== origin) continue;
+      if (lot.destIcao.trim().toUpperCase() !== dest) continue;
+      if (isCargoOpsCommodityLocked(lot.commodityId)) continue;
+      const avail = Math.max(0, Math.floor(lot.availableKg ?? 0));
+      if (avail < 1) continue;
+      const lift = Math.min(avail, want);
+      const score = -Math.abs(lift - want);
+      if (!best || score > best.score) {
+        best = { lot: { ...lot, availableKg: avail }, score };
+      }
+    }
+    return best?.lot ?? null;
+  }
+
+  function tourLegExcludeLotIds(forLegIndex: number): string[] {
+    const pending = pendingActiveTourRef.current;
+    const fromPending =
+      pending?.tourLegs
+        .map((leg, i) => (i === forLegIndex - 1 ? null : leg.lotId))
+        .filter((id): id is string => Boolean(id)) ?? [];
+    const fromActive =
+      activeTour?.legs
+        .filter((leg) => leg.index !== forLegIndex)
+        .map((leg) => leg.lotId) ?? [];
+    return [...new Set([...fromPending, ...fromActive])];
+  }
+
+  function patchPendingTourLegLot(
+    legIndex: number,
+    lotId: string,
+    liftKg: number,
+  ) {
+    setPendingActiveTour((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tourLegs: prev.tourLegs.map((leg, i) =>
+          i === legIndex - 1
+            ? {
+                ...leg,
+                lotId,
+                liftKg: Math.max(1, Math.floor(liftKg)),
+              }
+            : leg,
+        ),
+      };
+    });
   }
 
   /**
@@ -7288,38 +7388,80 @@ export function App() {
       goToTab('hangar');
       return;
     }
+
+    let resolvedLot = lot;
+    const liveAvail = Math.max(0, Math.floor(resolvedLot.availableKg ?? 0));
+    if (liveAvail < 1) {
+      const quantityKg = lot.quantityKg ?? 0;
+      const wantKg =
+        quantityKg > 0 ? quantityKg : Math.max(1, lot.availableKg || 500);
+      const alt = findSameRouteAlternateLot(
+        lot.originIcao,
+        lot.destIcao,
+        wantKg,
+        [
+          lot.id,
+          ...(pendingActiveTourRef.current
+            ? tourLegExcludeLotIds(pendingActiveTourRef.current.legIndex)
+            : []),
+        ],
+        [...lots, ...stagingRouteLots],
+      );
+      if (alt) {
+        const altAvailableKg = Math.max(0, alt.availableKg ?? 0);
+        const pending = pendingActiveTourRef.current;
+        if (pending) {
+          patchPendingTourLegLot(
+            pending.legIndex,
+            alt.id,
+            Math.min(altAvailableKg, wantKg),
+          );
+        }
+        resolvedLot = {
+          ...alt,
+          reason: alt.reason || 'tour leg (rebound)',
+        };
+        setToastKind('warn');
+        setToast(
+          `Planned lot gone — rebound ${alt.originIcao}→${alt.destIcao} · ${formatTonnes(altAvailableKg)} free`,
+        );
+      }
+    }
+
     const atOrigin =
       preferred.status === 'parked' &&
       preferred.locationIcao.trim().toUpperCase() ===
-        lot.originIcao.trim().toUpperCase();
+        resolvedLot.originIcao.trim().toUpperCase();
     const aircraft = preferred.aircraftClassId;
     const openFlight = atOrigin
       ? openFlightForRoute(
-          lot.originIcao,
-          lot.destIcao,
+          resolvedLot.originIcao,
+          resolvedLot.destIcao,
           aircraft,
           preferred.id,
         )
       : undefined;
     const draft: StagingDraft = {
-      originIcao: lot.originIcao,
-      destIcao: lot.destIcao,
-      originName: lot.originName,
-      destName: lot.destName,
+      originIcao: resolvedLot.originIcao,
+      destIcao: resolvedLot.destIcao,
+      originName: resolvedLot.originName,
+      destName: resolvedLot.destName,
       aircraft,
       aircraftId: preferred.id,
       intoMissionId: openFlight?.id,
       lines: [],
     };
-    const maxKg = lineMaxKg(draft, lot);
+    const maxKg = lineMaxKg(draft, resolvedLot);
+    const freeKg = Math.max(0, Math.floor(resolvedLot.availableKg ?? 0));
     draft.lines = [
       {
-        lot,
-        cargoKg: maxKg > 0 ? Math.min(maxKg, Math.max(1, lot.availableKg)) : 0,
+        lot: resolvedLot,
+        cargoKg: maxKg > 0 && freeKg > 0 ? Math.min(maxKg, freeKg) : 0,
       },
     ];
     setFlightDebrief(null);
-    setStagingFerryOpen(false);
+    // Tour off-origin: open Ferry dialog immediately (same CTA as Manifest).
+    setStagingFerryOpen(!atOrigin && preferred.status === 'parked');
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
@@ -7329,12 +7471,19 @@ export function App() {
     closeAirport();
     setAirportReturn(restoreAirport);
     goToTab('staging');
-    setToastKind(atOrigin ? 'ok' : 'warn');
-    setToast(
-      atOrigin
-        ? `Manifest · ${lot.originIcao}→${lot.destIcao} · pick aircraft, then Accept & Dispatch`
-        : `Manifest · ${preferred.label} is at ${preferred.locationIcao} — ferry to ${lot.originIcao} before Accept & Dispatch`,
-    );
+    if (liveAvail >= 1 || resolvedLot.id !== lot.id) {
+      setToastKind(atOrigin ? (resolvedLot.id !== lot.id ? 'warn' : 'ok') : 'warn');
+      setToast(
+        atOrigin
+          ? `Manifest · ${resolvedLot.originIcao}→${resolvedLot.destIcao} · pick aircraft, then Accept & Dispatch`
+          : `Manifest · ${preferred.label} is at ${preferred.locationIcao} — ferry to ${resolvedLot.originIcao} before Accept & Dispatch`,
+      );
+    } else {
+      setToastKind('warn');
+      setToast(
+        `Manifest · ${resolvedLot.originIcao}→${resolvedLot.destIcao} · planned lot empty — waiting for live freights to rebind`,
+      );
+    }
   }
 
   async function onDropActiveTour() {
@@ -7418,7 +7567,6 @@ export function App() {
 
   async function onHireBaseDispatcher(fboId: string, candidateId: string) {
     if (busy || dispatchDeskBusy) return;
-    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
     setDispatchScoutLoading(true);
     try {
       const result = await postBaseDispatcher({
@@ -7429,15 +7577,6 @@ export function App() {
       if (result.walletUsd != null) setWallet(result.walletUsd);
       if (result.dispatcher) setBaseDispatcher(result.dispatcher);
       if (result.policy) setDispatchScoutPolicy(result.policy);
-      const scout = await postBaseDispatchScout({
-        action: 'list',
-        hubIcao: hub,
-      });
-      setDispatchScoutSuggestions(scout.suggestions ?? []);
-      if (scout.policy) setDispatchScoutPolicy(scout.policy);
-      if (scout.dispatcher) setBaseDispatcher(scout.dispatcher);
-      setSelectedDispatchScoutId(null);
-      setDispatchDeskMode('board');
       setDispatchTours([]);
       setSelectedDispatchTourId(null);
       setToastKind('ok');
@@ -7454,7 +7593,6 @@ export function App() {
 
   async function onFireBaseDispatcher(memberId: string) {
     if (busy || dispatchDeskBusy) return;
-    const hub = (airportIcao ?? '').trim().toUpperCase() || undefined;
     setDispatchScoutLoading(true);
     try {
       const result = await postBaseDispatcher({
@@ -7464,15 +7602,6 @@ export function App() {
       if (result.walletUsd != null) setWallet(result.walletUsd);
       if (result.dispatcher) setBaseDispatcher(result.dispatcher);
       if (result.policy) setDispatchScoutPolicy(result.policy);
-      const scout = await postBaseDispatchScout({
-        action: 'list',
-        hubIcao: hub,
-      });
-      setDispatchScoutSuggestions(scout.suggestions ?? []);
-      if (scout.policy) setDispatchScoutPolicy(scout.policy);
-      if (scout.dispatcher) setBaseDispatcher(scout.dispatcher);
-      setSelectedDispatchScoutId(null);
-      setDispatchDeskMode('board');
       setDispatchTours([]);
       setSelectedDispatchTourId(null);
       setToastKind('ok');
@@ -8439,7 +8568,7 @@ export function App() {
   async function onCommitStaging() {
     if (!staging || staging.lines.length === 0) return;
     // Refresh free kg from the board, then clamp sliders (never send quantityKg as avail).
-    const refreshed: StagingDraft = {
+    let refreshed: StagingDraft = {
       ...staging,
       lines: staging.lines.map((line) => ({
         ...line,
@@ -8452,11 +8581,52 @@ export function App() {
         ),
       })),
     };
+
+    // Tour Manifest: planned lot often empties after Search — rebind same OD.
+    const pendingTour = pendingActiveTourRef.current;
+    if (pendingTour) {
+      const healedLines = refreshed.lines.map((line) => {
+        const avail = Math.max(0, Math.floor(line.lot.availableKg ?? 0));
+        if (avail >= 1 && line.cargoKg <= avail) return line;
+        const wantKg = Math.max(line.cargoKg, 1);
+        const alt = findSameRouteAlternateLot(
+          refreshed.originIcao,
+          refreshed.destIcao,
+          wantKg,
+          [
+            line.lot.id,
+            ...tourLegExcludeLotIds(pendingTour.legIndex),
+          ],
+          [...stagingRouteLots, ...lots],
+        );
+        if (!alt) return line;
+        patchPendingTourLegLot(
+          pendingTour.legIndex,
+          alt.id,
+          Math.min(alt.availableKg, wantKg),
+        );
+        return {
+          lot: { ...alt, reason: alt.reason || 'tour leg (rebound)' },
+          cargoKg: Math.min(wantKg, alt.availableKg),
+        };
+      });
+      if (
+        healedLines.some((line, i) => line.lot.id !== refreshed.lines[i]?.lot.id)
+      ) {
+        refreshed = { ...refreshed, lines: healedLines };
+        setStaging(refreshed);
+        setToastKind('warn');
+        setToast('Planned tour lot was taken — rebound to live freight on this route');
+      }
+    }
+
     const clamped = clampDraftToCapacity(refreshed);
     if (clamped.lines.some((line) => line.cargoKg <= 0)) {
       setToastKind('fail');
       setToast(
-        'One or more lots no longer have free cargo — refresh Freights or lower the slider',
+        pendingTour
+          ? 'No free freight left on this tour leg — Search again or Drop tour'
+          : 'One or more lots no longer have free cargo — refresh Freights or lower the slider',
       );
       setStaging(clamped);
       return;
@@ -8507,7 +8677,11 @@ export function App() {
           // Mission appears on Dispatch — no success toast / mission-id noise.
           goToTab('staging');
           const pending = pendingActiveTourRef.current;
-          if (pending && result.mission?.id) {
+          if (
+            pending &&
+            typeof pending === 'object' &&
+            result.mission?.id
+          ) {
             setPendingActiveTour(null);
             try {
               if (pending.kind === 'start') {
@@ -8528,7 +8702,10 @@ export function App() {
                 if (attached.missions) {
                   setMissions(attached.missions.slice().reverse());
                 }
-              } else {
+              } else if (
+                pending.kind === 'bind' &&
+                pending.legIndex != null
+              ) {
                 const bound = await postBaseDispatchTours({
                   action: 'bind-leg',
                   missionId: result.mission.id,
@@ -8539,6 +8716,9 @@ export function App() {
                 if (bound.missions) {
                   setMissions(bound.missions.slice().reverse());
                 }
+              } else {
+                setToastKind('fail');
+                setToast('Tour bind failed — missing leg index; open Base and Refresh');
               }
             } catch (attachErr) {
               setToastKind('fail');
@@ -9195,6 +9375,9 @@ export function App() {
       if (Array.isArray(result.fleet)) setFleet(result.fleet);
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      if (result.activeTour !== undefined) {
+        setActiveTour(result.activeTour ?? null);
+      }
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
@@ -11199,6 +11382,22 @@ export function App() {
                                                 Boolean(
                                                   activeTour.canAcceptNextLeg,
                                                 ) && isNext;
+                                              // Ferry / parked gates hide Accept today — keep one
+                                              // CTA into Manifest (Ferry lives there).
+                                              const canContinue =
+                                                isNext &&
+                                                (canAccept ||
+                                                  activeTour.resumeState ===
+                                                    'blocked');
+                                              const ferryMatch =
+                                                activeTour.acceptBlockedReason?.match(
+                                                  /Ferry to ([A-Z0-9]{3,4})/i,
+                                                );
+                                              const continueLabel = canAccept
+                                                ? `Accept L${leg.index}`
+                                                : ferryMatch
+                                                  ? `Continue · Ferry to ${ferryMatch[1]!.toUpperCase()}`
+                                                  : `Continue L${leg.index}`;
                                               const prevDest =
                                                 i > 0
                                                   ? activeTour.legs[
@@ -11249,7 +11448,7 @@ export function App() {
                                                     {formatMoney(leg.payUsd)}
                                                   </td>
                                                   <td className="actions">
-                                                    {canAccept ? (
+                                                    {canContinue ? (
                                                       <button
                                                         type="button"
                                                         className="accept"
@@ -11263,7 +11462,7 @@ export function App() {
                                                           )
                                                         }
                                                       >
-                                                        Accept L{leg.index}
+                                                        {continueLabel}
                                                       </button>
                                                     ) : isNext &&
                                                       activeTour.acceptBlockedReason ? (
@@ -11288,20 +11487,6 @@ export function App() {
                                       <h4 className="crew-section-title">
                                         Freights
                                       </h4>
-                                      <div className="base-dispatcher-scout-actions">
-                                        <button
-                                          type="button"
-                                          className="action ghost"
-                                          disabled={busy || dispatchDeskBusy}
-                                          onClick={() =>
-                                            void refreshDispatchScout()
-                                          }
-                                        >
-                                          {dispatchScoutLoading
-                                            ? 'Scanning…'
-                                            : 'Scan'}
-                                        </button>
-                                      </div>
                                     </div>
 
                                     {mode === 'fleet' ? (
@@ -11350,13 +11535,25 @@ export function App() {
                                               onChange={(e) => {
                                                 const n = Number(e.target.value);
                                                 setDispatchTourLegs(
-                                                  n === 4 ? 4 : n === 3 ? 3 : 2,
+                                                  n === 4
+                                                    ? 4
+                                                    : n === 3
+                                                      ? 3
+                                                      : n === 2
+                                                        ? 2
+                                                        : 1,
                                                 );
+                                                if (n === 1) {
+                                                  setDispatchTourReturnMode(
+                                                    'none',
+                                                  );
+                                                }
                                               }}
                                               disabled={
                                                 busy || dispatchDeskBusy
                                               }
                                             >
+                                              <option value={1}>1</option>
                                               <option value={2}>2</option>
                                               <option value={3}>3</option>
                                               <option value={4}>4</option>
@@ -11436,31 +11633,33 @@ export function App() {
                                               }
                                             />
                                           </label>
-                                          <label>
-                                            <span>Return</span>
-                                            <select
-                                              value={dispatchTourReturnMode}
-                                              onChange={(e) =>
-                                                setDispatchTourReturnMode(
-                                                  e.target
-                                                    .value as BaseDispatchTourReturnMode,
-                                                )
-                                              }
-                                              disabled={
-                                                busy || dispatchDeskBusy
-                                              }
-                                            >
-                                              <option value="none">
-                                                Any end
-                                              </option>
-                                              <option value="origin">
-                                                End at origin
-                                              </option>
-                                              <option value="base">
-                                                End at Base
-                                              </option>
-                                            </select>
-                                          </label>
+                                          {dispatchTourLegs > 1 ? (
+                                            <label>
+                                              <span>Return</span>
+                                              <select
+                                                value={dispatchTourReturnMode}
+                                                onChange={(e) =>
+                                                  setDispatchTourReturnMode(
+                                                    e.target
+                                                      .value as BaseDispatchTourReturnMode,
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchDeskBusy
+                                                }
+                                              >
+                                                <option value="none">
+                                                  Any end
+                                                </option>
+                                                <option value="origin">
+                                                  End at origin
+                                                </option>
+                                                <option value="base">
+                                                  End at Base
+                                                </option>
+                                              </select>
+                                            </label>
+                                          ) : null}
                                           <div className="base-dispatch-tour-generate">
                                             <button
                                               type="button"
@@ -11481,12 +11680,11 @@ export function App() {
                                       </div>
                                     ) : null}
 
-                                    {dispatchDeskMode === 'tours' ? (
-                                      dispatchTours.length === 0 ? (
+                                    {dispatchTours.length === 0 ? (
                                         <p className="empty">
                                           {dispatchTourLoading
                                             ? 'Searching…'
-                                            : 'No tours'}
+                                            : 'Search for freights'}
                                         </p>
                                       ) : (
                                         <table className="data-table base-dispatch-freight-table">
@@ -11603,9 +11801,6 @@ export function App() {
                                                     setSelectedFboMissionId(
                                                       null,
                                                     );
-                                                    setSelectedDispatchScoutId(
-                                                      null,
-                                                    );
                                                     setSelectedDispatchTourId(
                                                       (cur) =>
                                                         cur === tour.id
@@ -11700,7 +11895,9 @@ export function App() {
                                                         );
                                                       }}
                                                     >
-                                                      Accept L1
+                                                      {tour.legCount === 1
+                                                        ? 'Accept'
+                                                        : 'Accept L1'}
                                                     </button>
                                                   </td>
                                                 </tr>
@@ -11710,128 +11907,7 @@ export function App() {
                                             })()}
                                           </tbody>
                                         </table>
-                                      )
-                                    ) : dispatchScoutSuggestions.length ===
-                                      0 ? (
-                                      <p className="empty">
-                                        {dispatchScoutLoading
-                                          ? 'Scanning…'
-                                          : 'No freights'}
-                                      </p>
-                                    ) : (
-                                      <table className="data-table base-dispatch-freight-table">
-                                        <thead>
-                                          <tr>
-                                            <th>Route</th>
-                                            <th>Dist</th>
-                                            <th>Ferry</th>
-                                            <th>Lift</th>
-                                            <th>Pay</th>
-                                            <th>Net</th>
-                                            <th>Aircraft</th>
-                                            <th />
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {dispatchScoutSuggestions.map(
-                                            (s) => {
-                                              const acf = fleet.find(
-                                                (a) => a.id === s.aircraftId,
-                                              );
-                                              const planeLabel =
-                                                acf?.label ??
-                                                acf?.registration ??
-                                                s.airframeTypeId ??
-                                                s.aircraftClassId;
-                                              const selected =
-                                                selectedDispatchScoutId ===
-                                                s.id;
-                                              return (
-                                                <tr
-                                                  key={s.id}
-                                                  className={
-                                                    selected
-                                                      ? 'is-selected'
-                                                      : undefined
-                                                  }
-                                                  onClick={() => {
-                                                    setSelectedFboHoldId(null);
-                                                    setSelectedFboMissionId(
-                                                      null,
-                                                    );
-                                                    setSelectedDispatchTourId(
-                                                      null,
-                                                    );
-                                                    setSelectedDispatchScoutId(
-                                                      (cur) =>
-                                                        cur === s.id
-                                                          ? null
-                                                          : s.id,
-                                                    );
-                                                  }}
-                                                >
-                                                  <td>
-                                                    <span className="route">
-                                                      {s.originIcao}
-                                                      <span className="arrow">
-                                                        →
-                                                      </span>
-                                                      {s.destIcao}
-                                                    </span>
-                                                  </td>
-                                                  <td>
-                                                    {Math.round(s.distanceNm)} nm
-                                                  </td>
-                                                  <td>
-                                                    {(s.ferryNm ?? 0) > 0.5
-                                                      ? `${Math.round(s.ferryNm ?? 0)} nm`
-                                                      : '—'}
-                                                  </td>
-                                                  <td>
-                                                    {formatTonnes(s.liftKg)}
-                                                  </td>
-                                                  <td className="pay">
-                                                    {formatMoney(s.payUsd)}
-                                                  </td>
-                                                  <td className="pay">
-                                                    {formatMoney(s.netUsd)}
-                                                  </td>
-                                                  <td>
-                                                    <span>
-                                                      {planeLabel}
-                                                    </span>
-                                                    {s.aircraftLocationIcao ? (
-                                                      <small className="muted">
-                                                        {' '}
-                                                        @ {s.aircraftLocationIcao}
-                                                      </small>
-                                                    ) : null}
-                                                  </td>
-                                                  <td className="actions">
-                                                    <button
-                                                      type="button"
-                                                      className="accept"
-                                                      disabled={
-                                                        busy ||
-                                                        dispatchDeskBusy
-                                                      }
-                                                      onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        void onConfirmDispatchScout(
-                                                          s,
-                                                        );
-                                                      }}
-                                                    >
-                                                      Accept
-                                                    </button>
-                                                  </td>
-                                                </tr>
-                                              );
-                                            },
-                                          )}
-                                        </tbody>
-                                      </table>
-                                    )}
+                                      )}
                                   </div>
                                 </>
                               );
@@ -11861,13 +11937,6 @@ export function App() {
                                   tour?.legs[0]?.originIcao ?? localFbo.icao
                                 );
                               }
-                              if (selectedDispatchScoutId) {
-                                return (
-                                  dispatchScoutSuggestions.find(
-                                    (s) => s.id === selectedDispatchScoutId,
-                                  )?.originIcao ?? localFbo.icao
-                                );
-                              }
                               return localFbo.icao;
                             })()}
                             destIcao={(() => {
@@ -11892,13 +11961,6 @@ export function App() {
                                 return (
                                   tour.legs[tour.legs.length - 1]?.destIcao ??
                                   null
-                                );
-                              }
-                              if (selectedDispatchScoutId) {
-                                return (
-                                  dispatchScoutSuggestions.find(
-                                    (s) => s.id === selectedDispatchScoutId,
-                                  )?.destIcao ?? null
                                 );
                               }
                               return null;
@@ -11937,18 +11999,9 @@ export function App() {
                                   (t) => t.id === selectedDispatchTourId,
                                 )?.totalDistanceNm;
                               }
-                              if (selectedDispatchScoutId) {
-                                return dispatchScoutSuggestions.find(
-                                  (s) => s.id === selectedDispatchScoutId,
-                                )?.distanceNm;
-                              }
                               return undefined;
                             })()}
-                            idleHint={
-                              dispatchDeskMode === 'tours'
-                                ? 'Select a tour'
-                                : 'Select a freight'
-                            }
+                            idleHint="Select a freight"
                             routeProgress={(() => {
                               if (!selectedFboMissionId) return null;
                               const m = missions.find(
@@ -12022,7 +12075,6 @@ export function App() {
                                     }
                                     onClick={() => {
                                       setSelectedFboMissionId(null);
-                                      setSelectedDispatchScoutId(null);
                                       setSelectedFboHoldId((cur) =>
                                         cur === hold.id ? null : hold.id,
                                       );
@@ -12218,7 +12270,6 @@ export function App() {
                                           }
                                           onClick={() => {
                                             setSelectedFboHoldId(null);
-                                            setSelectedDispatchScoutId(null);
                                             setSelectedFboMissionId((cur) =>
                                               cur === m.id ? null : m.id,
                                             );
@@ -15083,21 +15134,47 @@ export function App() {
           ) : activeMission ? (
             <>
               {activeTourOnDispatch ? (
-                <p className="banner ok base-tour-dispatch-banner" role="status">
-                  <span>
-                    Tour L{activeTourOnDispatch.legIndex}/
-                    {activeTourOnDispatch.legCount}
-                    {activeTourOnDispatch.nextOrigin &&
-                    activeTourOnDispatch.nextDest
-                      ? ` · next ${activeTourOnDispatch.nextOrigin}→${activeTourOnDispatch.nextDest}`
-                      : ' · last leg'}
-                    {activeTourOnDispatch.nextFerryNm > 0.5
-                      ? ` · ferry ${Math.round(activeTourOnDispatch.nextFerryNm)} nm`
-                      : ''}
-                  </span>
+                <div className="base-tour-flight-context" role="status">
+                  <div className="base-tour-flight-context-body">
+                    <span className="base-tour-flight-context-kicker">Tour</span>
+                    <span
+                      className="base-tour-flight-context-legs"
+                      aria-label={`Leg ${activeTourOnDispatch.legIndex} of ${activeTourOnDispatch.legCount}`}
+                    >
+                      {Array.from(
+                        { length: activeTourOnDispatch.legCount },
+                        (_, i) => {
+                          const n = i + 1;
+                          const state =
+                            n < activeTourOnDispatch.legIndex
+                              ? 'done'
+                              : n === activeTourOnDispatch.legIndex
+                                ? 'current'
+                                : 'todo';
+                          return (
+                            <span
+                              key={n}
+                              className={`base-tour-flight-context-leg is-${state}`}
+                            >
+                              L{n}
+                            </span>
+                          );
+                        },
+                      )}
+                    </span>
+                    <span className="base-tour-flight-context-detail">
+                      {activeTourOnDispatch.nextOrigin &&
+                      activeTourOnDispatch.nextDest
+                        ? `Next ${activeTourOnDispatch.nextOrigin}→${activeTourOnDispatch.nextDest}`
+                        : 'Last leg'}
+                      {activeTourOnDispatch.nextFerryNm > 0.5
+                        ? ` · ferry ${Math.round(activeTourOnDispatch.nextFerryNm)} nm`
+                        : ''}
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    className="linkish"
+                    className="action ghost compact"
                     disabled={busy}
                     onClick={() => {
                       const hub =
@@ -15108,7 +15185,7 @@ export function App() {
                   >
                     Base
                   </button>
-                </p>
+                </div>
               ) : null}
             <DispatchActivePanel
               mission={activeMission}

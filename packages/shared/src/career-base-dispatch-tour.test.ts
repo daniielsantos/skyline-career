@@ -18,6 +18,7 @@ import {
   dropPreparedActiveTourIfUnbound,
   listBaseDispatchTours,
   prepareActiveTour,
+  rebindActiveTourLeg,
   tourPassesQualityGate,
   describeTourFerry,
 } from './career-base-dispatch-tour.js';
@@ -151,6 +152,40 @@ describe('base dispatch tours', () => {
           t.legs[1]!.lotId === 'tour_leg_a2',
       ),
     );
+  });
+
+  it('lists single freights through the same Search path', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-search-single' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'SearchSingle',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    primeLot(world, {
+      id: 'search_single_1',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'single freight',
+    });
+
+    const freights = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      originIcao: 'SBGR',
+      legs: 1,
+      minNm: 40,
+      // Ignored for one leg instead of filtering out every non-return freight.
+      returnMode: 'base',
+    });
+
+    assert.ok(freights.some((row) => row.legs[0]?.lotId === 'search_single_1'));
+    assert.ok(freights.every((row) => row.legCount === 1));
+    assert.ok(freights.every((row) => row.legs.length === 1));
   });
 
   it('confirm tour accepts only the first leg', () => {
@@ -637,6 +672,117 @@ describe('base dispatch tours', () => {
     assert.ok(view);
     assert.equal(view!.legs[1]!.status, 'planned');
     assert.notEqual(view!.legs[1]!.status, 'done');
+  });
+
+  it('rebind of L1 must not steal L2 lot — false complete heals on sync', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-steal-lot' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'TourSteal',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    // Same OD twice (return-style): distinct lots.
+    primeLot(world, {
+      id: 'steal_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 400,
+      payUsd: 5_000,
+      reason: 'steal L1',
+    });
+    primeLot(world, {
+      id: 'steal_l2',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 350,
+      payUsd: 4_200,
+      reason: 'steal L2',
+    });
+    primeLot(world, {
+      id: 'steal_alt',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 380,
+      payUsd: 4_500,
+      reason: 'steal alt',
+    });
+
+    prepareActiveTour(state, world, {
+      aircraftId: aircraft.id,
+      hubIcao: 'SBGR',
+      legs: [
+        {
+          lotId: 'steal_l1',
+          originIcao: 'SBGR',
+          destIcao: 'SBGL',
+          commodityId: 'general',
+          liftKg: 200,
+          distanceNm: 50,
+          ferryNm: 0,
+          payUsd: 5_000,
+          fuelCostUsd: 100,
+          netUsd: 4_900,
+          lastMile: false,
+        },
+        {
+          lotId: 'steal_l2',
+          originIcao: 'SBGR',
+          destIcao: 'SBGL',
+          commodityId: 'general',
+          liftKg: 180,
+          distanceNm: 50,
+          ferryNm: 50,
+          payUsd: 4_200,
+          fuelCostUsd: 80,
+          netUsd: 4_120,
+          lastMile: false,
+        },
+      ],
+      routeLabel: 'SBGR→SBGL→SBGR→SBGL',
+    });
+
+    const tour = state.playerFbos!.activeTour!;
+    // Corrupt like production: L1 rebind stole L2's lot + shared missionId.
+    tour.legs[0]!.lotId = 'steal_l2';
+    tour.legs[0]!.status = 'done';
+    tour.legs[0]!.missionId = 'msn_shared';
+    tour.legs[1]!.lotId = 'steal_l2';
+    tour.legs[1]!.status = 'done';
+    tour.legs[1]!.missionId = 'msn_shared';
+    tour.status = 'completed';
+
+    state.missions.push({
+      id: 'msn_shared',
+      status: 'settled',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      shipmentLotId: 'steal_l2',
+      lots: [{ shipmentLotId: 'steal_l2', cargoKg: 200 }],
+      cargoKg: 200,
+      payUsd: 5_000,
+      aircraftClassId: 'light_ga',
+      aircraftId: aircraft.id,
+      acceptedAtTick: world.tick,
+      deadlineTick: world.tick + 100,
+    } as (typeof state.missions)[number]);
+
+    const alt = rebindActiveTourLeg(state, world, tour.legs[0]!, aircraft, {
+      excludeLotIds: tour.legs.map((l) => l.lotId),
+    });
+    // With both legs on steal_l2, exclude that id — alt must be steal_alt or steal_l1.
+    assert.ok(alt);
+    assert.notEqual(alt!.lotId, 'steal_l2');
+
+    const view = activeTourView(state, world);
+    assert.ok(view, 'tour must reopen after false complete');
+    assert.equal(view!.status, 'active');
+    assert.equal(view!.legs[0]!.status, 'done');
+    assert.equal(view!.legs[0]!.missionId, 'msn_shared');
+    assert.notEqual(view!.legs[1]!.status, 'done');
+    assert.equal(view!.legs[1]!.missionId, undefined);
   });
 
   it('prepareActiveTour persists itinerary; sync binds in-flight L1 without attach', () => {

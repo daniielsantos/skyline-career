@@ -66,6 +66,7 @@ import {
   routeDistanceNm,
   executeSettleFlight,
   executeDepartFlight,
+  syncActiveTour,
   watchIntervalMsForPhase,
   weatherOpsStatus,
   fuelBurnMultFromAircraft,
@@ -3934,6 +3935,7 @@ export class CareerWatchSession {
               return false;
             }
             const result = executed.result;
+            syncActiveTour(freshMissions, worldFresh);
             const cruiseCommit = this.cruiseState.committed;
             const airframeTypeId = openMission.airframeTypeId?.trim();
             if (cruiseCommit && airframeTypeId) {

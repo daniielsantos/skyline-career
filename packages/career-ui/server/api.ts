@@ -7841,6 +7841,7 @@ export function createCareerApiServer(port = 8787) {
             if (executed.kind === 'missing') return { kind: 'missing' as const };
             if (executed.kind === 'closed') return { kind: 'closed' as const };
             const result = executed.result;
+            syncActiveTour(missions, world);
             return {
               kind: 'ok' as const,
               mission: result.mission,
@@ -7851,6 +7852,7 @@ export function createCareerApiServer(port = 8787) {
               settlement: result.settlement,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
               classOpsDeltas: result.classOpsDeltas ?? [],
+              activeTour: activeTourView(missions, world),
             };
           }, {
             housekeeping: false,
@@ -7871,6 +7873,7 @@ export function createCareerApiServer(port = 8787) {
             fuelDebitUsd: settled.fuelDebitUsd,
             fleet: settled.fleet,
             pilotIcao: settled.pilotIcao,
+            activeTour: settled.activeTour ?? null,
             settlement: {
               payoutUsd: settled.settlement.payoutUsd,
               penaltyUsd: settled.settlement.penaltyUsd,

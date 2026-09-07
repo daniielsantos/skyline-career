@@ -47,7 +47,8 @@ import { assignAircraftToMission } from './career-fleet.js';
 /** Max tours returned to the desk table. */
 export const BASE_DISPATCH_TOUR_MAX = 8;
 
-/** Soft cap on legs (UI 2–4). */
+/** Search supports a single freight or a 2–4 leg tour. */
+export const BASE_DISPATCH_TOUR_LEGS_MIN = 1;
 export const BASE_DISPATCH_TOUR_LEGS_MAX = 4;
 
 /** Allow a short reposition between chained lots (Search default / UI floor). */
@@ -550,7 +551,7 @@ export function listBaseDispatchTours(
   const hubRegion = regionByIcao.get(hub) ?? null;
   const blockedLotIds = buildCrewNeededLotIds(world);
   const legCount = Math.max(
-    2,
+    BASE_DISPATCH_TOUR_LEGS_MIN,
     Math.min(BASE_DISPATCH_TOUR_LEGS_MAX, Math.floor(opts.legs ?? 2)),
   );
   const maxTours = Math.max(
@@ -558,7 +559,8 @@ export function listBaseDispatchTours(
     Math.min(BASE_DISPATCH_TOUR_MAX, opts.max ?? BASE_DISPATCH_TOUR_MAX),
   );
   const minKg = Math.max(0, opts.minKg ?? BASE_DISPATCH_SCOUT_MIN_KG);
-  const returnMode = opts.returnMode ?? 'none';
+  // "Return" only has meaning for a chain; a single freight has one destination.
+  const returnMode = legCount === 1 ? 'none' : (opts.returnMode ?? 'none');
   const chainFerryMaxNm = resolveTourMaxFerryNm(opts.maxFerryNm);
 
   const fleet = (state.fleet ?? []).filter((a) => {
@@ -866,21 +868,59 @@ function lotStillOpen(
 function findMissionForLeg(
   state: CareerMissionsState,
   leg: ActiveTourLeg,
+  opts?: {
+    /** Missions already bound to an earlier tour leg — never soft-match these. */
+    claimedMissionIds?: Set<string>;
+  },
 ): MissionIntent | undefined {
+  const claimed = opts?.claimedMissionIds;
   if (leg.missionId) {
     const byId = state.missions.find((m) => m.id === leg.missionId);
-    if (byId) return byId;
+    if (byId) {
+      // Later leg that still points at an earlier leg's mission — unbound.
+      if (claimed?.has(byId.id)) return undefined;
+      return byId;
+    }
   }
   // Soft-match only live missions. Settled/cancelled lots must not mark a
   // later tour leg "done" (causes L2 done while L1 still planned after cancel).
   return state.missions.find(
     (m) =>
+      !(claimed && claimed.has(m.id)) &&
       (m.status === 'accepted' ||
         m.status === 'dispatched' ||
         m.status === 'in_flight') &&
       (m.shipmentLotId === leg.lotId ||
         m.lots.some((line) => line.shipmentLotId === leg.lotId)),
   );
+}
+
+/**
+ * One mission / one plan lot per leg. Rebind of L1 onto L2's lot used to mark
+ * both legs done on settle and complete the tour early.
+ */
+function repairTourLegExclusivity(tour: ActiveTour): void {
+  const seenMissions = new Set<string>();
+  const seenLots = new Set<string>();
+  for (const leg of tour.legs) {
+    if (leg.missionId && seenMissions.has(leg.missionId)) {
+      leg.missionId = undefined;
+      if (leg.status === 'done' || leg.status === 'active') {
+        leg.status = 'lost';
+      }
+    } else if (leg.missionId) {
+      seenMissions.add(leg.missionId);
+    }
+
+    if (seenLots.has(leg.lotId)) {
+      leg.missionId = undefined;
+      if (leg.status === 'done' || leg.status === 'active' || leg.status === 'planned') {
+        leg.status = 'lost';
+      }
+    } else {
+      seenLots.add(leg.lotId);
+    }
+  }
 }
 
 function missionTerminalStatus(
@@ -907,18 +947,35 @@ export function syncActiveTour(
 ): ActiveTour | null {
   const fbos = ensurePlayerFbos(state);
   const tour = fbos.activeTour;
-  if (!tour || tour.status !== 'active') return tour ?? null;
+  if (!tour) return null;
+  if (tour.status !== 'active' && tour.status !== 'completed') {
+    return tour;
+  }
 
+  repairTourLegExclusivity(tour);
+
+  // Re-open a tour that was falsely completed when L1 rebind stole L2's lot.
+  if (tour.status === 'completed') {
+    if (tour.legs.every((l) => l.status === 'done')) {
+      fbos.activeTour = tour;
+      return tour;
+    }
+    tour.status = 'active';
+  }
+
+  const claimedMissionIds = new Set<string>();
   for (const leg of tour.legs) {
-    const mission = findMissionForLeg(state, leg);
+    const mission = findMissionForLeg(state, leg, { claimedMissionIds });
     if (mission) {
       leg.missionId = mission.id;
+      claimedMissionIds.add(mission.id);
       const term = missionTerminalStatus(mission.status);
       if (term === 'done') leg.status = 'done';
       else if (term === 'active') leg.status = 'active';
       else if (term === 'lost' && leg.status !== 'done') {
         leg.status = lotStillOpen(state, world, leg.lotId) ? 'planned' : 'lost';
         leg.missionId = undefined;
+        claimedMissionIds.delete(mission.id);
       }
       continue;
     }
@@ -1083,27 +1140,53 @@ export function attachActiveTourFromMission(
   const onMission =
     mission.shipmentLotId === firstLot ||
     mission.lots.some((line) => line.shipmentLotId === firstLot);
-  if (!onMission) {
+  const odMatch =
+    mission.originIcao.trim().toUpperCase() ===
+      opts.tourLegs[0]!.originIcao.trim().toUpperCase() &&
+    mission.destIcao.trim().toUpperCase() ===
+      opts.tourLegs[0]!.destIcao.trim().toUpperCase();
+  if (!onMission && !odMatch) {
     throw new Error('Mission cargo does not match tour leg 1');
   }
   // Prefer the hangar plane actually on the mission.
   const aircraftId =
     mission.aircraftId?.trim() || opts.aircraftId.trim();
 
-  // Upgrade a prepare()-d itinerary in place when lot chain matches.
+  // After Manifest rebind, tourLegs may still hold the old lotId — sync L1.
+  const legsForStart = opts.tourLegs.map((leg, i) =>
+    i === 0 && !onMission && odMatch
+      ? {
+          ...leg,
+          lotId: mission.shipmentLotId || mission.lots[0]?.shipmentLotId || leg.lotId,
+          liftKg: mission.cargoKg || leg.liftKg,
+        }
+      : leg,
+  );
+
+  // Upgrade a prepare()-d itinerary in place when lot chain matches (or L1 OD after rebind).
   const existing = getActiveTour(state);
   const sameChain =
     existing &&
     existing.status === 'active' &&
-    existing.legs.length === opts.tourLegs.length &&
-    existing.legs.every(
-      (leg, i) => leg.lotId === opts.tourLegs[i]!.lotId,
-    );
+    existing.legs.length === legsForStart.length &&
+    existing.legs.every((leg, i) => {
+      const plan = legsForStart[i]!;
+      if (leg.lotId === plan.lotId) return true;
+      // L1 may have rebound to a new lot on the same OD.
+      return (
+        i === 0 &&
+        leg.originIcao === plan.originIcao &&
+        leg.destIcao === plan.destIcao
+      );
+    });
   if (sameChain && existing) {
     existing.aircraftId = aircraftId;
     const leg1 = existing.legs[0]!;
     leg1.status = 'active';
     leg1.missionId = mission.id;
+    leg1.lotId =
+      mission.shipmentLotId || mission.lots[0]?.shipmentLotId || leg1.lotId;
+    leg1.liftKg = mission.cargoKg || leg1.liftKg;
     ensurePlayerFbos(state).activeTour = existing;
     return syncActiveTour(state, world) ?? existing;
   }
@@ -1113,7 +1196,7 @@ export function attachActiveTourFromMission(
     hubIcao: opts.hubIcao,
     tourId: opts.tourId,
     routeLabel: opts.routeLabel,
-    legs: opts.tourLegs,
+    legs: legsForStart,
     firstMission: mission,
   });
 }
@@ -1185,6 +1268,7 @@ export function rebindActiveTourLeg(
   world: CareerEconomyWorld,
   leg: ActiveTourLeg,
   aircraft: PlayerAircraft,
+  opts?: { excludeLotIds?: Iterable<string> },
 ): { lotId: string; liftKg: number } | null {
   const origin = leg.originIcao.trim().toUpperCase();
   const dest = leg.destIcao.trim().toUpperCase();
@@ -1198,9 +1282,16 @@ export function rebindActiveTourLeg(
     aircraft.airframeTypeId,
     aircraft.aircraftClassId,
   );
+  const exclude = new Set(
+    [...(opts?.excludeLotIds ?? [])].map((id) => id.trim()).filter(Boolean),
+  );
+  // Never rebind onto this leg's own id when another leg already owns it —
+  // callers pass sibling lotIds; also skip self so we look for a *new* lot.
+  exclude.add(leg.lotId);
 
   let best: { lotId: string; liftKg: number; score: number } | null = null;
   for (const lot of world.lots) {
+    if (exclude.has(lot.id)) continue;
     if (lot.status !== 'available') continue;
     if (!cargoOpsIsUnlocked(state.cargoOps, lot.commodityId)) continue;
     if (lot.originIcao.toUpperCase() !== origin) continue;
@@ -1284,7 +1375,12 @@ export function activeTourView(
       if (lotAvailable) {
         canAccept = true;
       } else {
-        const rebound = rebindActiveTourLeg(state, world, next, acf);
+        const siblingLotIds = tour.legs
+          .filter((l) => l.index !== next.index)
+          .map((l) => l.lotId);
+        const rebound = rebindActiveTourLeg(state, world, next, acf, {
+          excludeLotIds: siblingLotIds,
+        });
         if (rebound) {
           canAccept = true;
           needsRebind = true;
@@ -1381,7 +1477,12 @@ export function acceptActiveTourLeg(
   let liftKg = opts.kg ?? leg.liftKg;
   let rebound = false;
   if (!lotStillOpen(state, world, lotId)) {
-    const alt = rebindActiveTourLeg(state, world, leg, acf);
+    const siblingLotIds = tour.legs
+      .filter((l) => l.index !== leg.index)
+      .map((l) => l.lotId);
+    const alt = rebindActiveTourLeg(state, world, leg, acf, {
+      excludeLotIds: siblingLotIds,
+    });
     if (!alt) {
       leg.status = 'lost';
       throw new Error(

@@ -45,6 +45,7 @@ import {
   syncClassOpsFromFleet,
 } from './career-class-ops.js';
 import {
+  findCareerAirframeConfiguration,
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
 } from './career-player-airframes.js';
@@ -1430,12 +1431,20 @@ function buildAircraftFromListing(
     interval * 0.9,
     Math.max(0, hoursAirframe % interval),
   );
+  const catalogAirframe = findCareerPlayerAirframe(listing.airframeTypeId);
+  const configuration = findCareerAirframeConfiguration(catalogAirframe);
   const aircraft: PlayerAircraft = {
     id: nextAircraftId(state, listing.aircraftClassId, listing.airframeTypeId),
     aircraftClassId: listing.aircraftClassId,
     airframeTypeId: listing.airframeTypeId,
+    ...(configuration
+      ? {
+          airframeConfigurationId: configuration.id,
+          rolesPackRelPath: configuration.rolesPackRelPath,
+        }
+      : {}),
     label:
-      findCareerPlayerAirframe(listing.airframeTypeId)?.label ??
+      catalogAirframe?.label ??
       listing.label ??
       classLabelShort(listing.aircraftClassId),
     registration:
@@ -2252,6 +2261,99 @@ export function leaseRemainingWeeks(
   return Math.max(1, Math.ceil(ticksLeft / TICKS_PER_WEEK));
 }
 
+/**
+ * How many weekly installments are past due (Hangar badge / catch-up).
+ * 0 when not flagged overdue or no lease.
+ */
+export function leaseOverdueWeeks(
+  aircraft: PlayerAircraft,
+  economyTick: number,
+): number {
+  const lease = aircraft.lease;
+  if (!aircraft.leaseOverdue || !lease) return 0;
+  if (lease.termEndedSoft === true) return 0;
+  if (economyTick < lease.nextDueTick) return 1;
+  const end = Math.min(economyTick, Math.max(lease.nextDueTick, lease.termEndsTick - 1));
+  return Math.max(
+    1,
+    Math.floor((end - lease.nextDueTick) / TICKS_PER_WEEK) + 1,
+  );
+}
+
+export function leaseOverdueAmountUsd(
+  aircraft: PlayerAircraft,
+  economyTick: number,
+): number {
+  const lease = aircraft.lease;
+  if (!lease) return 0;
+  return leaseOverdueWeeks(aircraft, economyTick) * lease.monthlyUsd;
+}
+
+/**
+ * Pay all past-due weekly lease installments now (Hangar catch-up).
+ * Requires full amount in wallet — clears `leaseOverdue` when caught up.
+ */
+export function payAircraftLeaseOverdue(
+  state: CareerMissionsState,
+  aircraftId: string,
+  economyTick: number,
+): { paidUsd: number; weeksPaid: number } {
+  const aircraft = state.fleet.find((a) => a.id === aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  if (aircraft.ownership !== 'leased' || !aircraft.lease) {
+    throw new Error('Aircraft is not under lease');
+  }
+  const lease = aircraft.lease;
+  if (lease.termEndedSoft === true || economyTick >= lease.termEndsTick) {
+    throw new Error(
+      'Lease term ended — return the airframe or buy out; weekly rent no longer applies',
+    );
+  }
+  if (!aircraft.leaseOverdue && economyTick < lease.nextDueTick) {
+    throw new Error('Lease is already current');
+  }
+  const weeksDue = leaseOverdueWeeks(
+    { ...aircraft, leaseOverdue: true },
+    economyTick,
+  );
+  if (weeksDue <= 0) {
+    aircraft.leaseOverdue = false;
+    return { paidUsd: 0, weeksPaid: 0 };
+  }
+  const dueUsd = weeksDue * lease.monthlyUsd;
+  if (state.walletUsd < dueUsd) {
+    throw new Error(
+      `Need $${dueUsd.toLocaleString()} to clear ${weeksDue} overdue week${
+        weeksDue === 1 ? '' : 's'
+      } (wallet $${Math.floor(state.walletUsd).toLocaleString()})`,
+    );
+  }
+  let paidUsd = 0;
+  let weeksPaid = 0;
+  while (
+    economyTick >= lease.nextDueTick &&
+    economyTick < lease.termEndsTick
+  ) {
+    applyWalletDelta(state, {
+      amountUsd: -lease.monthlyUsd,
+      kind: 'lease_payment',
+      atTick: economyTick,
+      aircraftId: aircraft.id,
+      icao: aircraft.locationIcao,
+      note: `${aircraft.label} · catch-up`,
+    });
+    paidUsd += lease.monthlyUsd;
+    weeksPaid += 1;
+    lease.nextDueTick += TICKS_PER_WEEK;
+  }
+  aircraft.leaseOverdue = false;
+  if (weeksPaid !== weeksDue) {
+    // Defensive: weeksDue should match the while loop; keep flag honest.
+    aircraft.leaseOverdue = economyTick >= lease.nextDueTick;
+  }
+  return { paidUsd, weeksPaid };
+}
+
 /** @deprecated Prefer leaseRemainingWeeks. */
 export function leaseRemainingMonths(
   aircraft: PlayerAircraft,
@@ -2396,7 +2498,9 @@ export function assertAircraftDispatchable(aircraft: PlayerAircraft): void {
     throw new Error(`Aircraft ${aircraft.id} is leased out to the market`);
   }
   if (aircraft.leaseOverdue) {
-    throw new Error(`Aircraft ${aircraft.id} has an overdue lease payment`);
+    throw new Error(
+      `${aircraft.label} has an overdue lease payment — catch up in Hangar before dispatch`,
+    );
   }
   if (aircraft.status === 'assigned') {
     throw new Error(`Aircraft ${aircraft.id} is already assigned`);

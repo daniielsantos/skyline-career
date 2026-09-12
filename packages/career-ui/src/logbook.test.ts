@@ -42,6 +42,22 @@ describe('logbookFlightKind', () => {
       'Ferry',
     );
     assert.equal(logbookFlightKind(mission()), 'Normal');
+    assert.equal(
+      logbookFlightKind(mission({ missionType: 'charter', pax: 5, cargoKg: 0 })),
+      'Charter',
+    );
+  });
+});
+
+describe('Charter logbook payload', () => {
+  it('shows passengers and baggage instead of Empty', () => {
+    assert.equal(
+      logbookCargoLabel(
+        mission({ missionType: 'charter', pax: 5, baggageKg: 90, cargoKg: 0 }),
+        (kg) => `${kg} kg`,
+      ),
+      '5 pax · 90 kg baggage',
+    );
   });
 });
 

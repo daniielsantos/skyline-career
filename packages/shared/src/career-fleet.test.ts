@@ -82,6 +82,50 @@ describe('career fleet hangar', () => {
     assert.equal(migrated.homeHubIcao, 'SBGR');
   });
 
+  it('normalizes and persists a concrete family configuration/roles pack', () => {
+    const state = emptyMissionsStateV2();
+    state.hubSelected = true;
+    state.pilotName = 'Config Pilot';
+    state.homeHubIcao = 'SBGR';
+    state.fleet = [
+      {
+        id: 'acf_pc24_1',
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'microsoft-pc-24-cargo',
+        airframeConfigurationId: 'vip',
+        rolesPackRelPath: 'profiles/ofp/microsoft-pc-24-cargo.json',
+        label: 'PC-24 VIP',
+        locationIcao: 'SBGR',
+        fuelKg: 1000,
+        fuelCapacityKg: 2705,
+        status: 'parked',
+      },
+    ];
+
+    const migrated = normalizeMissionsState(state);
+    assert.equal(migrated.fleet[0]?.airframeConfigurationId, 'vip');
+    assert.equal(
+      migrated.fleet[0]?.rolesPackRelPath,
+      'profiles/ofp/microsoft-pc-24-vip.json',
+    );
+
+    const legacy = normalizeMissionsState({
+      ...state,
+      fleet: [
+        {
+          ...state.fleet[0]!,
+          airframeConfigurationId: undefined,
+          rolesPackRelPath: undefined,
+        },
+      ],
+    });
+    assert.equal(legacy.fleet[0]?.airframeConfigurationId, 'cargo');
+    assert.equal(
+      legacy.fleet[0]?.rolesPackRelPath,
+      'profiles/ofp/microsoft-pc-24-cargo.json',
+    );
+  });
+
   it('normalize preserves Base Dispatcher seat on playerFbos', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBKP', {
       pilotName: 'DispPersist',

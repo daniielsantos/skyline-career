@@ -43,8 +43,8 @@ Draft/calibração: agent CLI (`draft-profile`, `calibrate`, `writetest`, `smoke
 1. **Market** — lots / freights  
 2. **Prepare / Staging** — escolher airframe, payload, Accept & Dispatch  
 3. **SimBrief OFP** — dispatch + inject fuel/payload (perfil)  
-4. **Preflight** — Due vs Sim (fuel, payload, CG, gates)  
-5. **Watch** — amostras live no pipe; fases ground → airborne → settle  
+4. **Preflight** — Due vs Sim (fuel, payload, CG, gates); ceremony cue when READY (Settings → Sound: voice / chime)  
+5. **Watch** — amostras live no pipe; fases ground → airborne → settle (settle cue + debrief)  
 6. **Logbook** — histórico; staging limpa após settle  
 
 Dev UI: `npm run career:ui` → UI `:5173`, API `:8787`.  

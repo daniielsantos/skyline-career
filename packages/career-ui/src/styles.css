@@ -1184,33 +1184,38 @@ body {
   line-height: 1.4;
 }
 
-.panel-head .board-aircraft {
+.board-aircraft {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: end;
   gap: 0.55rem 0.85rem;
   margin: 0.35rem 0 0;
   font-size: 0.85rem;
   color: var(--muted, #6b7280);
 }
 
-.panel-head .board-aircraft-estimate {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.65rem;
+.board-aircraft-picker {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.panel-head .board-aircraft label {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.65rem;
-}
-
-.panel-head .board-aircraft select {
-  min-width: 14rem;
+.board-aircraft-picker select {
+  min-width: 17rem;
   max-width: min(28rem, 100%);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .panel-head .board-aircraft-scope {
@@ -1218,8 +1223,9 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem 0.75rem;
-  padding: 0.15rem 0 0.15rem 0.85rem;
+  padding: 0 0 0 0.85rem;
   border-left: 1px solid var(--line);
+  align-self: end;
 }
 
 .panel-head .board-aircraft-scope .profitable-filter {
@@ -1250,10 +1256,12 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8rem;
+  box-sizing: border-box;
+  min-height: 2.35rem;
+  font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.03em;
-  padding: 0.38rem 0.75rem;
+  padding: 0.45rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 2px;
   background: var(--surface-2);
@@ -1289,6 +1297,219 @@ body {
 .panel-head .near-aircraft-btn.is-active .near-aircraft-mark {
   opacity: 1;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.charter-board {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.charter-board-aircraft {
+  margin: 0;
+}
+
+.charter-count {
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.charter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.charter-toolbar label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.charter-toolbar select,
+.charter-toolbar input {
+  min-width: 8rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.charter-toolbar select {
+  min-width: 17rem;
+}
+
+table.charter-table {
+  width: 100%;
+}
+
+table.charter-table td {
+  vertical-align: middle;
+}
+
+table.charter-table td:first-child strong,
+table.charter-table td:first-child small {
+  display: block;
+}
+
+table.charter-table td small {
+  margin-top: 0.2rem;
+  color: var(--muted);
+}
+
+.charter-board-table .col-access > span {
+  display: block;
+  min-height: 1.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.charter-fit-ok {
+  color: var(--ok);
+}
+
+.charter-fit-no {
+  color: var(--danger);
+}
+
+.terminal-inventory-table-wrap {
+  margin-bottom: 1rem;
+}
+
+table.terminal-inventory-table td strong,
+table.terminal-inventory-table td small {
+  display: block;
+}
+
+table.terminal-inventory-table td small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+}
+
+table.terminal-inventory-table tr.inventory-section-row th {
+  padding: 0.85rem 0.75rem 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+table.terminal-inventory-table tr.inventory-section-row th small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.terminal-charter-pools {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.terminal-charter-pools .panel-head.compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0;
+}
+
+.terminal-charter-pools .panel-head.compact h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.terminal-charter-pools .panel-head.compact p {
+  margin: 0;
+}
+
+.terminal-charter-offers {
+  margin: 0;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+table.terminal-charter-table td strong,
+table.terminal-charter-table td small {
+  display: block;
+}
+
+table.terminal-charter-table td small {
+  margin-top: 0.15rem;
+  color: var(--muted);
+}
+
+.contracts-products {
+  margin-bottom: 0.75rem;
+}
+
+.charter-kicker {
+  color: var(--accent) !important;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.charter-manifest-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.charter-manifest-summary > div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.charter-manifest-summary span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.charter-manifest-summary strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+
+.charter-fixed-manifest p {
+  margin-bottom: 0.35rem;
+}
+
+.charter-fixed-manifest small {
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .charter-manifest-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .charter-count {
+    margin-left: 0;
+  }
 }
 
 .filter-row .near-me-chip {
@@ -6790,6 +7011,15 @@ tr.lot-locked {
   color: var(--danger);
 }
 
+.hangar-lease-overdue-note {
+  color: var(--danger);
+}
+
+.hangar-pay-lease {
+  margin-top: 0.35rem;
+  width: 100%;
+}
+
 .badge-ownership {
   color: var(--ink);
 }
@@ -6854,11 +7084,17 @@ table.contracts-table tbody tr {
   cursor: pointer;
 }
 
-table.contracts-table tbody tr.is-selected td {
+table.charter-table tbody tr.is-selectable {
+  cursor: pointer;
+}
+
+table.contracts-table tbody tr.is-selected td,
+table.charter-table tbody tr.is-selected td {
   background: color-mix(in srgb, var(--accent, #6ea8fe) 12%, transparent);
 }
 
-table.contracts-table tbody tr.is-selected:hover td {
+table.contracts-table tbody tr.is-selected:hover td,
+table.charter-table tbody tr.is-selected:hover td {
   background: color-mix(in srgb, var(--accent, #6ea8fe) 16%, transparent);
 }
 
@@ -9189,6 +9425,7 @@ button.linkish {
 
 .freights-panel > .settings-choice {
   flex: 0 0 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
   margin: 0;
 }
@@ -9278,7 +9515,8 @@ td.actions .action.ghost {
   letter-spacing: 0.06em;
 }
 
-.freights-panel > .pagination {
+.freights-panel > .pagination,
+.freights-panel .charter-board > .pagination {
   flex: 0 0 auto;
   padding: 0.45rem 0.35rem 0;
 }
@@ -11432,6 +11670,33 @@ span.dispatch-route-hub-dest {
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
+}
+
+.base-dispatch-products {
+  margin: 0.1rem 0 0.25rem;
+}
+
+.base-dispatch-charters {
+  gap: 0.7rem !important;
+}
+
+.base-dispatch-charter-origin {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.base-dispatch-charter-origin input {
+  width: 5.5rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  text-transform: uppercase;
 }
 
 .base-dispatch-tour-filters {

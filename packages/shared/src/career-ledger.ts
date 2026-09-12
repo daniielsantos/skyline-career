@@ -21,6 +21,7 @@ export type CareerLedgerSummary = {
 
 export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   freight_payout: 'Freight payout',
+  charter_payout: 'Charter payout',
   hangar_parking: 'Hangar parking',
   lease_payment: 'Lease payment',
   lease_out_income: 'Lease-out income',

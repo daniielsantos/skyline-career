@@ -5,6 +5,7 @@ import {
   hubDistanceNm,
   nextFerryLeg,
   planFerryRoute,
+  createFerryRoutePlanner,
   remainingNmToFinal,
 } from './career-ferry-route.js';
 
@@ -66,6 +67,36 @@ describe('planFerryRoute', () => {
         maxRangeNm: 1400,
       }),
     );
+  });
+});
+
+describe('createFerryRoutePlanner', () => {
+  it('matches planFerryRoute for many destinations from one origin', () => {
+    const planner = createFerryRoutePlanner({
+      originIcao: 'SBSN',
+      maxRangeNm: 1400,
+    });
+    for (const dest of ['CYAM', 'SBGR', 'KMIA', 'TNCM'] as const) {
+      const batched = planner.planTo(dest);
+      const solo = planFerryRoute({
+        originIcao: 'SBSN',
+        finalDestIcao: dest,
+        maxRangeNm: 1400,
+      });
+      assert.equal(batched.totalDistanceNm, solo.totalDistanceNm);
+      assert.equal(batched.legCount, solo.legCount);
+      assert.deepEqual(batched.hops, solo.hops);
+    }
+  });
+
+  it('reuses planTo results for the same destination', () => {
+    const planner = createFerryRoutePlanner({
+      originIcao: 'SBGR',
+      maxRangeNm: 1400,
+    });
+    const a = planner.planTo('SBRJ');
+    const b = planner.planTo('SBRJ');
+    assert.equal(a, b);
   });
 });
 

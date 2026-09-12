@@ -169,6 +169,49 @@ export function estimateSellBackUsd(
 /** Career clock: 96 ticks/day × 7 days. */
 const TICKS_PER_WEEK = 96 * 7;
 
+/** Weekly installments past due while `leaseOverdue` is set. */
+export function estimateLeaseOverdueWeeks(
+  aircraft: {
+    leaseOverdue?: boolean;
+    lease?: {
+      nextDueTick: number;
+      termEndsTick: number;
+      termEndedSoft?: boolean;
+    } | null;
+  },
+  economyTick: number,
+): number {
+  const lease = aircraft.lease;
+  if (!aircraft.leaseOverdue || !lease) return 0;
+  if (lease.termEndedSoft === true) return 0;
+  if (economyTick < lease.nextDueTick) return 1;
+  const end = Math.min(
+    economyTick,
+    Math.max(lease.nextDueTick, lease.termEndsTick - 1),
+  );
+  return Math.max(
+    1,
+    Math.floor((end - lease.nextDueTick) / TICKS_PER_WEEK) + 1,
+  );
+}
+
+export function estimateLeaseOverdueAmountUsd(
+  aircraft: {
+    leaseOverdue?: boolean;
+    lease?: {
+      monthlyUsd: number;
+      nextDueTick: number;
+      termEndsTick: number;
+      termEndedSoft?: boolean;
+    } | null;
+  },
+  economyTick: number,
+): number {
+  const lease = aircraft.lease;
+  if (!lease) return 0;
+  return estimateLeaseOverdueWeeks(aircraft, economyTick) * lease.monthlyUsd;
+}
+
 /**
  * Early-return penalty mirror of quoteLeaseEarlyReturnUsd in shared.
  * Half the remaining weeks of rent, clamped to 1–4 weeks.

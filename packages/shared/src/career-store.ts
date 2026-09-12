@@ -107,6 +107,13 @@ import {
   readHubEconomySamplesSince as readHubEconomySamplesSinceFromDb,
   HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
 } from './career-store-v7.js';
+import {
+  ensureV9Ddl,
+  hydrateCharterFromTables,
+  migrateV8toV9IfNeeded,
+  persistCharterTables,
+  stripEconomyCharter,
+} from './career-store-v9.js';
 import type { HubEconomySample } from './types/career-economy.js';
 import type {
   CareerEconomyWorld,
@@ -122,7 +129,7 @@ import type {
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '8';
+export const CAREER_STORE_SCHEMA_VERSION = '9';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
 export type { HubEconomySample };
@@ -611,6 +618,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV6Ddl(db);
   ensureV7Ddl(db);
   ensureV8HubSampleColumns(db);
+  ensureV9Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -662,7 +670,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV7 = Number.parseInt(afterV7?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV7) || verAfterV7 < 8) {
-    migrateV7toV8IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV7toV8IfNeeded(db, metaSet, '8');
+  }
+  const afterV8 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV8 = Number.parseInt(afterV8?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV8) || verAfterV8 < 9) {
+    migrateV8toV9IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -670,9 +685,11 @@ function ensureSqliteSchema(db: SqliteDb): void {
 }
 
 function stripEconomyPersistBlob(world: CareerEconomyWorld): Record<string, unknown> {
-  const stripped = stripEconomyAircraftPool(
-    stripEconomyWorldOps(
-      stripEconomyAirports(stripEconomyHotArrays(world)),
+  const stripped = stripEconomyCharter(
+    stripEconomyAircraftPool(
+      stripEconomyWorldOps(
+        stripEconomyAirports(stripEconomyHotArrays(world)),
+      ),
     ),
   );
   // Ephemeral day samples — SQL only.
@@ -1074,11 +1091,15 @@ class SqliteCareerStore implements CareerStore {
       inboundPending: existing.inboundPending,
       npcFlights: existing.npcFlights,
       events: existing.events,
+      charterDemand: existing.charterDemand,
+      charterHubs: existing.charterHubs,
+      charterOffers: existing.charterOffers,
     };
     hydrateWorldFromTables(this.db, existing as unknown as CareerEconomyWorld);
     hydrateAirportsFromTables(this.db, existing as unknown as CareerEconomyWorld);
     hydrateWorldOpsFromTables(this.db, existing as unknown as CareerEconomyWorld);
     hydrateAircraftPoolFromTables(this.db, existing as unknown as CareerEconomyWorld);
+    hydrateCharterFromTables(this.db, existing as unknown as CareerEconomyWorld);
     overlayEconomyMeta(this.db, existing as unknown as CareerEconomyWorld);
     const tableAirports = countAirportRows(this.db);
     const blobAirports = Array.isArray(existing.airports) ? existing.airports.length : 0;
@@ -1148,6 +1169,7 @@ class SqliteCareerStore implements CareerStore {
             .run(json, now);
         }
         flushPendingHubEconomySamples(this.db, toSave);
+        persistCharterTables(this.db, toSave);
       });
       world.pendingHubEconomySamples = undefined;
       this.ram = toSave;
@@ -1204,6 +1226,7 @@ class SqliteCareerStore implements CareerStore {
           this.lastAircraftSignatures,
         );
       }
+      persistCharterTables(this.db, toSave);
       flushPendingHubEconomySamples(this.db, toSave);
       stampCompanyWorldId(this.db);
       metaSet(this.db, 'country_id', toSave.homeCountryId ?? 'BR');

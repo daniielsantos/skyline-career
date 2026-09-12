@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { listAirframeAddons } from './airframe-addons';
-import { estimateFairUsd, estimateHoursMxCostMult, estimateSellBackUsd } from './aircraft-pricing';
+import { estimateFairUsd, estimateHoursMxCostMult, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import { IcaoLink } from './IcaoLink';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
@@ -764,12 +764,17 @@ export function HangarAircraftCard(props: {
   hasListed: boolean;
   formatMoney: (n: number) => string;
   formatMass: (kg: number) => string;
+  /** Economy tick for lease due / overdue copy. */
+  economyTick?: number;
+  /** Optional clock formatter for next-due ticks. */
+  formatClock?: (tick: number) => string;
   weightSystem?: WeightSystem;
   onOpenAirport: (icao: string) => void;
   onClearMaintenance: (id: string) => void;
   onRepair: (id: string) => void;
   onUnlist: (id: string) => void;
   onBuyout: (id: string) => void;
+  onPayLeaseOverdue: (id: string) => void;
   onReturnLease: (id: string) => void;
   onListForLease: (id: string) => void;
   onListForSale: (id: string) => void;
@@ -820,6 +825,18 @@ export function HangarAircraftCard(props: {
     (afPct < 100 || engPct < 100);
   const canBuyout = acf.ownership === 'leased' && Boolean(acf.lease);
   const softTermEnded = acf.lease?.termEndedSoft === true;
+  const economyTick = props.economyTick ?? 0;
+  const overdueWeeks = estimateLeaseOverdueWeeks(acf, economyTick);
+  const overdueAmountUsd = estimateLeaseOverdueAmountUsd(acf, economyTick);
+  const leaseOverdueTitle =
+    overdueWeeks > 0
+      ? `${overdueWeeks} week${overdueWeeks === 1 ? '' : 's'} overdue · ${props.formatMoney(overdueAmountUsd)} due — pay now in Hangar or advance time with enough wallet`
+      : 'Lease payment overdue — pay now in Hangar or advance time with enough wallet';
+  const canPayLeaseOverdue =
+    canBuyout &&
+    acf.leaseOverdue === true &&
+    !softTermEnded &&
+    overdueWeeks > 0;
   const canReturnLease =
     canBuyout &&
     (!acf.leaseOverdue || softTermEnded) &&
@@ -840,7 +857,12 @@ export function HangarAircraftCard(props: {
   const journeyOriginRef = useRef<string | null>(null);
   const showMove = acf.status === 'parked' || acf.status === 'maintenance';
   const showManage =
-    canRepair || canList || canSell || canBuyout || canReturnLease;
+    canRepair ||
+    canList ||
+    canSell ||
+    canBuyout ||
+    canPayLeaseOverdue ||
+    canReturnLease;
 
   // Prefill from App navigation (market/board → Hangar) without syncing
   // every card while the player types a dest on one of them.
@@ -999,7 +1021,10 @@ export function HangarAircraftCard(props: {
               {acf.lease?.termEndedSoft ? (
                 <span className="badge badge-warn">lease term ended</span>
               ) : acf.leaseOverdue ? (
-                <span className="badge badge-warn">lease overdue</span>
+                <span className="badge badge-warn" title={leaseOverdueTitle}>
+                  lease overdue
+                  {overdueWeeks > 0 ? ` · ${overdueWeeks}w` : ''}
+                </span>
               ) : null}
             </div>
           </div>
@@ -1096,9 +1121,33 @@ export function HangarAircraftCard(props: {
             {acf.lease ? (
               <>
                 <span>
-                  Lease {props.formatMoney(acf.lease.monthlyUsd)}/wk · next due
-                  tick {acf.lease.nextDueTick}
+                  Lease {props.formatMoney(acf.lease.monthlyUsd)}/wk
+                  {acf.leaseOverdue && overdueWeeks > 0 ? (
+                    <>
+                      {' '}
+                      ·{' '}
+                      <span className="hangar-lease-overdue-note">
+                        {overdueWeeks} wk overdue (
+                        {props.formatMoney(overdueAmountUsd)})
+                      </span>
+                    </>
+                  ) : props.formatClock ? (
+                    <> · next due {props.formatClock(acf.lease.nextDueTick)}</>
+                  ) : (
+                    <> · next due tick {acf.lease.nextDueTick}</>
+                  )}
                 </span>
+                {canPayLeaseOverdue ? (
+                  <button
+                    type="button"
+                    className="action hangar-pay-lease"
+                    disabled={props.busy}
+                    title={leaseOverdueTitle}
+                    onClick={() => props.onPayLeaseOverdue(acf.id)}
+                  >
+                    Pay {props.formatMoney(overdueAmountUsd)} now
+                  </button>
+                ) : null}
                 {acf.lease.buyoutUsd != null ? (
                   <span>Buyout {props.formatMoney(acf.lease.buyoutUsd)}</span>
                 ) : null}
@@ -1272,6 +1321,16 @@ export function HangarAircraftCard(props: {
                     onClick={() => props.onBuyout(acf.id)}
                   >
                     Buy out
+                  </button>
+                ) : null}
+                {canPayLeaseOverdue ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy}
+                    onClick={() => props.onPayLeaseOverdue(acf.id)}
+                  >
+                    Pay lease overdue
                   </button>
                 ) : null}
                 {canReturnLease ? (

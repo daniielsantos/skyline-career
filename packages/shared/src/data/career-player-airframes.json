@@ -327,6 +327,20 @@
     "aircraftClassId": "light_jet",
     "label": "Cessna Citation CJ4",
     "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-cj4.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 10,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 550,
+        "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-cj4.json"
+      }
+    ],
     "simbriefIcao": "C25C",
     "simbriefAirframeMatch": "Default",
     "oewKg": 4472,
@@ -343,22 +357,55 @@
     "aircraftClassId": "light_jet",
     "label": "Cessna Citation Longitude",
     "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-longitude-passengers.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-longitude-passengers.json"
+      }
+    ],
     "simbriefIcao": "C700",
     "simbriefAirframeMatch": "Default",
     "oewKg": 10609,
     "mtowKg": 18008,
     "maxCargoKg": 1184,
     "fuelCapacityKg": 6619,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 1.4
+    "maxRangeNm": 3500,
+    "cruiseFuelFlowKgPerHour": 826,
+    "cruiseSpeedKt": 451,
+    "fuelBurnKgPerNm": 1.831
   },
   {
     "typeId": "skyward-cessna-c680",
     "aircraftClassId": "light_jet",
     "label": "Cessna Citation Sovereign C680",
     "rolesPackRelPath": "profiles/ofp/skyward-cessna-c680.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "inject_verified",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/skyward-cessna-c680.json"
+      }
+    ],
     "simbriefIcao": "C680",
     "simbriefAirframeMatch": "Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+",
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 12,
+    "efbPaxWeightLb": 210,
     "oewKg": 8088,
     "mtowKg": 13959,
     "maxCargoKg": 1211,
@@ -373,13 +420,28 @@
     "aircraftClassId": "light_jet",
     "label": "Citation X",
     "rolesPackRelPath": "profiles/ofp/flightfx-citation-x.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger / Winglets",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/flightfx-citation-x.json"
+      }
+    ],
     "simbriefIcao": "C750",
     "simbriefAirframeMatch": "Default",
     "oewKg": 10038,
     "mtowKg": 16375,
     "maxCargoKg": 1030,
     "fuelCapacityKg": 5865,
-    "maxRangeNm": 800,
+    "maxRangeNm": 3100,
+    "cruiseFuelFlowKgPerHour": 616,
     "cruiseSpeedKt": 440,
     "fuelBurnKgPerNm": 1.4
   },
@@ -388,6 +450,20 @@
     "aircraftClassId": "light_jet",
     "label": "HondaJet HA420",
     "rolesPackRelPath": "profiles/ofp/flightfx-mg-hjet-ha420.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/flightfx-mg-hjet-ha420.json"
+      }
+    ],
     "simbriefIcao": "HDJT",
     "simbriefAirframeMatch": "Default",
     "oewKg": 3267,
@@ -409,6 +485,42 @@
       "profiles/ofp/flysimware-learjet-35a-passenger-long-range.json",
       "profiles/ofp/flysimware-learjet-35a-passenger.json"
     ],
+    "defaultConfigurationId": "cargo",
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo / Cargo Long Range",
+        "role": "cargo",
+        "certificationState": "catalog_only",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 0,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-cargo.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 8,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 440,
+        "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-passenger.json"
+      },
+      {
+        "id": "passenger-long-range",
+        "label": "Passenger Long Range",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 8,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 440,
+        "rolesPackRelPath": "profiles/ofp/flysimware-learjet-35a-passenger-long-range.json"
+      }
+    ],
     "simbriefIcao": "LJ35",
     "simbriefAirframeMatch": "Default",
     "oewKg": 4700,
@@ -429,20 +541,61 @@
       "profiles/ofp/microsoft-pc-24-cargo.json",
       "profiles/ofp/microsoft-pc-24-vip.json"
     ],
+    "defaultConfigurationId": "cargo",
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "catalog_only",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 0,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/microsoft-pc-24-cargo.json"
+      },
+      {
+        "id": "vip",
+        "label": "VIP",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 7,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 385,
+        "rolesPackRelPath": "profiles/ofp/microsoft-pc-24-vip.json"
+      }
+    ],
     "simbriefIcao": "PC24",
     "simbriefAirframeMatch": "Default",
     "oewKg": 5361,
     "mtowKg": 8301,
     "maxCargoKg": 1114,
     "fuelCapacityKg": 2705,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 1.4
+    "maxRangeNm": 2000,
+    "cruiseFuelFlowKgPerHour": 528,
+    "cruiseSpeedKt": 440,
+    "fuelBurnKgPerNm": 1.2
   },
   {
     "typeId": "fsreborn-phenom-300e",
     "aircraftClassId": "light_jet",
     "label": "Phenom 300E",
     "rolesPackRelPath": "profiles/ofp/fsreborn-phenom-300e.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "inject_verified",
+        "passengerCapacity": 7,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 463,
+        "rolesPackRelPath": "profiles/ofp/fsreborn-phenom-300e.json"
+      }
+    ],
     "simbriefIcao": "E55P",
     "simbriefAirframeMatch": "FSReborn \\(MSFS\\) - Phenom 300E",
     "loadLayout": "pax_and_cargo",
@@ -453,21 +606,39 @@
     "maxCargoKg": 1200,
     "fuelCapacityKg": 2473,
     "maxRangeNm": 2000,
-    "fuelBurnKgPerNm": 1.4
+    "cruiseFuelFlowKgPerHour": 494,
+    "cruiseSpeedKt": 445,
+    "fuelBurnKgPerNm": 1.11
   },
   {
     "typeId": "workingtitle-microsoft-vision-jet-complete-seating",
     "aircraftClassId": "light_jet",
     "label": "Vision Jet Complete Seating",
     "rolesPackRelPath": "profiles/ofp/workingtitle-microsoft-vision-jet-complete-seating.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Complete Seating",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 4,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 220,
+        "rolesPackRelPath": "profiles/ofp/workingtitle-microsoft-vision-jet-complete-seating.json"
+      }
+    ],
     "simbriefIcao": "SF50",
     "simbriefAirframeMatch": "Default",
     "oewKg": 1656,
     "mtowKg": 2740,
     "maxCargoKg": 540,
     "fuelCapacityKg": 907,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 1.4
+    "maxRangeNm": 1200,
+    "cruiseFuelFlowKgPerHour": 229,
+    "cruiseSpeedKt": 305,
+    "fuelBurnKgPerNm": 0.751
   },
   {
     "typeId": "microsoft-atr-42-600",
@@ -481,7 +652,9 @@
     "maxCargoKg": 5000,
     "fuelCapacityKg": 4601,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "cruiseSpeedKt": 300,
+    "cruiseFuelFlowKgPerHour": 480,
+    "fuelBurnKgPerNm": 1.6
   },
   {
     "typeId": "microsoft-atr-72-600",
@@ -495,7 +668,9 @@
     "maxCargoKg": 7500,
     "fuelCapacityKg": 4601,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "cruiseSpeedKt": 280,
+    "cruiseFuelFlowKgPerHour": 504,
+    "fuelBurnKgPerNm": 1.8
   },
   {
     "typeId": "asobo-beechcraft-king-air-350i",
@@ -560,8 +735,10 @@
     "mtowKg": 8618,
     "maxCargoKg": 1055,
     "fuelCapacityKg": 2188,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "maxRangeNm": 900,
+    "cruiseSpeedKt": 210,
+    "cruiseFuelFlowKgPerHour": 189,
+    "fuelBurnKgPerNm": 0.9
   },
   {
     "typeId": "c208-caravan-cargo",
@@ -598,7 +775,9 @@
     "maxCargoKg": 1649,
     "fuelCapacityKg": 1374,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "cruiseSpeedKt": 170,
+    "cruiseFuelFlowKgPerHour": 179,
+    "fuelBurnKgPerNm": 1.05
   },
   {
     "typeId": "nextgensim-emb-110p1f-bandeirante",
@@ -649,8 +828,10 @@
     "mtowKg": 4756,
     "maxCargoKg": 1374,
     "fuelCapacityKg": 1173,
-    "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "maxRangeNm": 1100,
+    "cruiseSpeedKt": 250,
+    "cruiseFuelFlowKgPerHour": 175,
+    "fuelBurnKgPerNm": 0.7
   },
   {
     "typeId": "sws-kodiak-100-commuter-cargopod-tundra-wheels",
@@ -718,7 +899,9 @@
     "maxCargoKg": 3514,
     "fuelCapacityKg": 2188,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "cruiseSpeedKt": 270,
+    "cruiseFuelFlowKgPerHour": 324,
+    "fuelBurnKgPerNm": 1.2
   },
   {
     "typeId": "blacksquare-starship",
@@ -780,7 +963,9 @@
     "maxCargoKg": 7615,
     "fuelCapacityKg": 6045,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.8
+    "cruiseSpeedKt": 250,
+    "cruiseFuelFlowKgPerHour": 500,
+    "fuelBurnKgPerNm": 2.0
   },
   {
     "typeId": "microsoft-douglas-dc-3-metal-left",

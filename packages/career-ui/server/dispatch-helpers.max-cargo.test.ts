@@ -319,6 +319,73 @@ describe('buildMissionDispatch ATR payload prefill', () => {
 });
 
 describe('buildMissionDispatch pax_and_cargo', () => {
+  it('dispatches a charter as exact pax plus baggage-only cargo', async () => {
+    const built = await buildMissionDispatch(
+      {
+        id: 'msn_charter',
+        missionType: 'charter',
+        lots: [],
+        shipmentLotId: 'charter_offer',
+        status: 'accepted',
+        originIcao: 'SBSP',
+        destIcao: 'SBRJ',
+        commodityId: 'general',
+        cargoKg: 0,
+        baggageKg: 90,
+        charterOfferId: 'offer',
+        charterDemandId: 'demand',
+        charterTier: 'executive',
+        payUsd: 5000,
+        urgency: 'normal',
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'fsreborn-phenom-300e',
+        rolesPackRelPath: 'profiles/ofp/fsreborn-phenom-300e.json',
+        deadlineTick: 100,
+        reason: 'Charter',
+        acceptedAtTick: 1,
+        pax: 5,
+      },
+      {
+        units: 'KGS',
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              E55P: {
+                airframes: [
+                  {
+                    airframe_internal_id: 'phenom300e',
+                    airframe_list_type: 'E55P',
+                    airframe_icao: 'E55P',
+                    airframe_comments: 'FSReborn (MSFS) - Phenom 300E',
+                    airframe_name: 'Phenom 300E',
+                    airframe_passengers: 7,
+                    airframe_options: {
+                      wgtunits: 'KGS',
+                      oew: 5150,
+                      mzfw: 7000,
+                      mtow: 8415,
+                      maxfuel: 2473,
+                      maxcargo: 1200,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    const qs = new URL(built.url).searchParams;
+    assert.equal(qs.get('pax'), '5');
+    // Bags via bagwgt only — cargo= would double-count on SimBrief.
+    assert.equal(qs.get('cargo'), null);
+    assert.equal(qs.get('manualpayload'), null);
+    assert.deepEqual(JSON.parse(qs.get('acdata')!), {
+      paxwgt: 175,
+      bagwgt: 40,
+    });
+  });
+
   it('prefills pax from SimBrief airframe_passengers', async () => {
     const built = await buildMissionDispatch(
       {

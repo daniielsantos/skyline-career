@@ -5,13 +5,17 @@ import {
   careerPlayerAirframePackPaths,
   clampCareerMaxCargoKg,
   defaultCareerPlayerAirframe,
+  findCareerAirframeConfiguration,
   findCareerPlayerAirframe,
   isCareerPlayerAirframeEnabled,
+  isPassengerConfigurationEligible,
   listCareerPlayerAirframes,
   listStarterCareerPlayerAirframes,
+  resolvePassengerCapacity,
   resolveAirframeCruiseFuelFlowKgPerHour,
   resolveAirframeCruiseSpeedKt,
   resolveAirframeMaxRangeNm,
+  resolveAirframeFuelBurnKgPerNm,
   simconnectCabinOvershootLb,
 } from './career-player-airframes.js';
 
@@ -161,11 +165,14 @@ describe('career player airframes', () => {
   it('stages Skyward C680 on the Skyward SimBrief airframe row', () => {
     const c680 = findCareerPlayerAirframe('skyward-cessna-c680');
     assert.equal(c680?.simbriefIcao, 'C680');
+    assert.equal(c680?.efbPaxWeightLb, 210);
     assert.equal(
       c680?.simbriefAirframeMatch,
       'Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+',
     );
     assert.equal(c680?.rolesPackRelPath, 'profiles/ofp/skyward-cessna-c680.json');
+    assert.equal(c680?.loadLayout, 'pax_and_cargo');
+    assert.equal(c680?.maxPaxSeats, 12);
   });
 
   it('stages FSReborn Phenom 300E as pax_and_cargo (belly freight capped)', () => {
@@ -173,10 +180,105 @@ describe('career player airframes', () => {
     assert.equal(phenom?.loadLayout, 'pax_and_cargo');
     assert.equal(phenom?.maxPaxSeats, 7);
     assert.equal(phenom?.simconnectCargoHoldMaxLb, 463);
+    // SimBrief SBEG→SBCA enroute ≈1.11 kg/nm; class 1.4 blocked mid-range charters.
+    assert.equal(phenom?.fuelBurnKgPerNm, 1.11);
+    assert.equal(phenom?.cruiseSpeedKt, 445);
+    const vision = findCareerPlayerAirframe(
+      'workingtitle-microsoft-vision-jet-complete-seating',
+    );
+    assert.equal(vision?.fuelBurnKgPerNm, 0.751);
+    assert.equal(vision?.maxRangeNm, 1200);
+    const longitude = findCareerPlayerAirframe(
+      'workingtitle-cessna-citation-longitude-passengers',
+    );
+    assert.equal(longitude?.fuelBurnKgPerNm, 1.831);
+    assert.equal(longitude?.maxRangeNm, 3500);
+    // Cruise-sample save override beats catalog (and class template).
+    assert.equal(
+      resolveAirframeFuelBurnKgPerNm('fsreborn-phenom-300e', 'light_jet', {
+        fuelBurnKgPerNm: 1.05,
+        cruiseFuelFlowKgPerHour: 460,
+        cruiseSpeedKt: 438,
+        updatedAtIso: '2026-09-12T00:00:00.000Z',
+        sampleCount: 1,
+      }),
+      1.05,
+    );
     assert.equal(
       phenom?.simbriefAirframeMatch,
       'FSReborn \\(MSFS\\) - Phenom 300E',
     );
+  });
+
+  it('certifies passenger configurations for all nine light-jet Market SKUs', () => {
+    const expected = new Map<string, [number, string]>([
+      ['workingtitle-cessna-citation-cj4', [10, 'dispatch_ready']],
+      ['workingtitle-cessna-citation-longitude-passengers', [12, 'dispatch_ready']],
+      ['skyward-cessna-c680', [12, 'inject_verified']],
+      ['flightfx-citation-x', [12, 'dispatch_ready']],
+      ['flightfx-mg-hjet-ha420', [5, 'dispatch_ready']],
+      ['flysimware-learjet-35a-cargo', [8, 'dispatch_ready']],
+      ['microsoft-pc-24-cargo', [7, 'dispatch_ready']],
+      ['fsreborn-phenom-300e', [7, 'inject_verified']],
+      ['workingtitle-microsoft-vision-jet-complete-seating', [4, 'dispatch_ready']],
+    ]);
+    const lightJets = listCareerPlayerAirframes('light_jet');
+    assert.equal(lightJets.length, expected.size);
+    assert.equal(new Set(lightJets.map((row) => row.typeId)).size, expected.size);
+
+    for (const [typeId, [capacity, certificationState]] of expected) {
+      const airframe = findCareerPlayerAirframe(typeId);
+      assert.ok(airframe, `${typeId} missing`);
+      const passengerConfigurations = airframe!.configurations!.filter(
+        isPassengerConfigurationEligible,
+      );
+      assert.ok(passengerConfigurations.length > 0, `${typeId} has no eligible pax pack`);
+      assert.equal(
+        Math.max(...passengerConfigurations.map((row) => row.passengerCapacity)),
+        capacity,
+      );
+      assert.ok(
+        passengerConfigurations.every(
+          (row) => row.certificationState === certificationState,
+        ),
+      );
+      assert.ok(passengerConfigurations.every((row) => row.requiredCrew === 2));
+      assert.ok(
+        passengerConfigurations.every(
+          (row) =>
+            row.baggageAllowanceLbPerPassenger === 55 &&
+            row.baggageCapacityLb >= row.passengerCapacity * 55,
+        ),
+      );
+    }
+  });
+
+  it('blocks cargo-family packs from passenger capacity', () => {
+    const learjet = findCareerPlayerAirframe('flysimware-learjet-35a-cargo')!;
+    const pc24 = findCareerPlayerAirframe('microsoft-pc-24-cargo')!;
+    for (const [airframe, cargoPack, passengerId, expectedCapacity] of [
+      [
+        learjet,
+        'profiles/ofp/flysimware-learjet-35a-cargo.json',
+        'passenger',
+        8,
+      ],
+      [pc24, 'profiles/ofp/microsoft-pc-24-cargo.json', 'vip', 7],
+    ] as const) {
+      const cargo = findCareerAirframeConfiguration(airframe, undefined, cargoPack);
+      assert.equal(cargo?.role, 'cargo');
+      assert.equal(cargo?.passengerCapacity, 0);
+      assert.equal(isPassengerConfigurationEligible(cargo), false);
+      assert.equal(resolvePassengerCapacity(airframe.typeId, undefined, cargoPack), 0);
+      assert.equal(
+        resolvePassengerCapacity(airframe.typeId, passengerId),
+        expectedCapacity,
+      );
+      assert.equal(
+        resolvePassengerCapacity(airframe.typeId, 'unknown-configuration'),
+        0,
+      );
+    }
   });
 
   it('stages Just Flight F28 family as pax_and_cargo', () => {

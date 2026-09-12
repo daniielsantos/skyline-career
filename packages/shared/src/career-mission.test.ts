@@ -135,6 +135,25 @@ describe('mission load method policy', () => {
     );
   });
 
+  it('allows charter inject only for inject_verified passenger configs', () => {
+    assert.deepEqual(
+      missionLoadPolicy({
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'skyward-cessna-c680',
+        missionType: 'charter',
+      }),
+      { loadMethod: 'direct-injection', injectCapable: true },
+    );
+    assert.deepEqual(
+      missionLoadPolicy({
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'workingtitle-cessna-citation-cj4',
+        missionType: 'charter',
+      }),
+      { loadMethod: 'native-simbrief', injectCapable: false },
+    );
+  });
+
   it('opts PMDG 738 BCF and PAX families into inject via airframe.injectCapable', () => {
     assert.deepEqual(
       missionLoadPolicy({

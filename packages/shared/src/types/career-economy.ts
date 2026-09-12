@@ -147,6 +147,70 @@ export type HubTier = 'major' | 'regional' | 'spoke';
 
 export type ShipmentLotStatus = 'available' | 'reserved' | 'in_transit' | 'delivered' | 'expired';
 
+/**
+ * Legacy OD bookkeeping for charter.
+ * Passenger inventory now lives on `CharterHubState`; pressure remains a soft
+ * OD heat signal (migrated into hub pools on load).
+ */
+export interface CharterDemand {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  /** 0–100 soft OD heat; not warehouse stock. */
+  pressure: number;
+  international: boolean;
+  createdAtTick: number;
+  updatedAtTick: number;
+  lastOfferedDay: number;
+  fulfilledGroups: number;
+  expiredGroups: number;
+}
+
+/**
+ * Terminal passenger pools — charter analog of commodity stock.
+ * Never written into `airport.inventory` / WH / freight lots.
+ */
+export interface CharterHubState {
+  icao: string;
+  /** Passengers waiting to depart this hub. */
+  waitingPax: number;
+  /** Arrival pull / seats wanted at this hub. */
+  attractPax: number;
+  /** Soft capacity for waiting + attract independently. */
+  capacityPax: number;
+  updatedAtTick: number;
+}
+
+export type CharterTier = 'standard' | 'premium' | 'executive';
+export type CharterUrgency = 'normal' | 'priority' | 'urgent';
+export type CharterOfferStatus =
+  | 'available'
+  | 'reserved'
+  | 'completed'
+  | 'expired'
+  | 'cancelled';
+
+/** One indivisible 1–12 passenger charter group. */
+export interface CharterOffer {
+  id: string;
+  demandId: string;
+  originIcao: string;
+  destIcao: string;
+  groupSize: number;
+  /** Group baggage allowance carried outside commodity cargo. */
+  baggageKg: number;
+  distanceNm: number;
+  tier: CharterTier;
+  urgency: CharterUrgency;
+  international: boolean;
+  payUsd: number;
+  createdAtTick: number;
+  expiresAtTick: number;
+  status: CharterOfferStatus;
+  /** Bound while reserved; omitted for an open offer. */
+  missionId?: string;
+}
+
 export type EconomyEventKind =
   | 'harvest_boost'
   | 'port_congestion'
@@ -451,6 +515,12 @@ export interface CareerEconomyWorld {
   homeCountryId?: string;
   airports: AirportTerminal[];
   lots: ShipmentLot[];
+  /** Sparse passenger OD heat / bookkeeping. Separate from freight inventory. */
+  charterDemand?: CharterDemand[];
+  /** Per-hub Terminal passenger pools (waiting / attract). */
+  charterHubs?: CharterHubState[];
+  /** Light-jet passenger offers formed from hub imbalances. */
+  charterOffers?: CharterOffer[];
   /** Active / recent regional shocks. */
   events: EconomyEvent[];
   /** Limited competing freighter pool (seeded / migrated). */
@@ -737,6 +807,8 @@ export type MissionStatus =
   | 'cancelled'
   | 'failed';
 
+export type MissionType = 'freight' | 'charter';
+
 /**
  * What the player committed to haul — source of truth for dispatch prefill
  * and later Intent→OFP validation.
@@ -772,6 +844,11 @@ export interface MissionFuelUplift {
 
 export interface MissionIntent {
   id: string;
+  /**
+   * Canonical mission discriminator. Missing legacy values normalize to
+   * `freight`, preserving old saves.
+   */
+  missionType?: MissionType;
   /** Canonical manifest (1..MAX_MANIFEST_LOTS). Always present after normalize. */
   lots: MissionLotLine[];
   /**
@@ -785,11 +862,15 @@ export interface MissionIntent {
   destIcao: string;
   /** Sum of lots[].cargoKg. */
   cargoKg: number;
-  /** Freighter MVP always 0. */
-  pax: 0;
+  /** Freight is 0; charter is one indivisible 1–12 passenger group. */
+  pax: number;
+  /** Passenger baggage only; never terminal commodity cargo. */
+  baggageKg?: number;
   aircraftClassId: FreighterClassId;
   /** Concrete homologated player model assigned to this flight. */
   airframeTypeId?: string;
+  /** Concrete passenger/cargo cabin configuration assigned to this flight. */
+  airframeConfigurationId?: string;
   rolesPackRelPath: string;
   /** Earliest lot deadline. */
   deadlineTick: number;
@@ -798,6 +879,10 @@ export interface MissionIntent {
   /** Urgent if any lot is urgent. */
   urgency: 'normal' | 'urgent';
   reason: string;
+  /** Charter source rows (present only when missionType=charter). */
+  charterOfferId?: string;
+  charterDemandId?: string;
+  charterTier?: CharterTier;
   status: MissionStatus;
   acceptedAtTick: number;
   /** Set when career dispatch opens SimBrief. */
@@ -1027,6 +1112,23 @@ export interface MissionIntent {
   };
 }
 
+export type FreightMissionIntent = MissionIntent & {
+  missionType: 'freight';
+  pax: 0;
+};
+
+export type CharterMissionIntent = MissionIntent & {
+  missionType: 'charter';
+  pax: number;
+  baggageKg: number;
+  charterOfferId: string;
+  charterDemandId: string;
+  charterTier: CharterTier;
+};
+
+/** Canonical discriminated union; MissionIntent remains the legacy-compatible base. */
+export type CareerMissionIntent = FreightMissionIntent | CharterMissionIntent;
+
 export interface MissionSettlementLine {
   shipmentLotId: string;
   commodityId: CommodityId;
@@ -1037,6 +1139,7 @@ export interface MissionSettlementLine {
 }
 
 export interface MissionSettlement {
+  settlementType?: 'freight';
   missionId: string;
   deliveredKg: number;
   payoutUsd: number;
@@ -1051,6 +1154,37 @@ export interface MissionSettlement {
   /** Dest runway touchdown projection (catalog). */
   runwayTouch?: RunwayTouchdownSnapshot;
 }
+
+export interface CharterSettlement {
+  settlementType: 'charter';
+  missionId: string;
+  offerId: string;
+  demandId: string;
+  passengerCount: number;
+  baggageKg: number;
+  payoutUsd: number;
+  settledAtTick: number;
+  pressureBefore: number;
+  pressureAfter: number;
+  /** Shared debrief fields; charter remains an indivisible passenger contract. */
+  penaltyUsd: number;
+  lateTicks: number;
+  onTime: boolean;
+  deliveredKg: number;
+  originStockAfterKg: number;
+  destStockAfterKg: number;
+  lines?: MissionSettlementLine[];
+  weatherBonusUsd?: number;
+  runwayTouch?: RunwayTouchdownSnapshot;
+}
+
+export type FreightMissionSettlement = MissionSettlement & {
+  settlementType: 'freight';
+};
+
+export type CareerMissionSettlement =
+  | FreightMissionSettlement
+  | CharterSettlement;
 
 export type AircraftListingKind = 'new' | 'used' | 'lease';
 export type AirframeCondition = 'excellent' | 'good' | 'fair' | 'tired';
@@ -1724,6 +1858,7 @@ export type AircraftOwnership = 'owned' | 'leased';
 /** Signed company cashflow row (see career-ledger). */
 export type CareerLedgerKind =
   | 'freight_payout'
+  | 'charter_payout'
   | 'hangar_parking'
   | 'lease_payment'
   | 'lease_out_income'
@@ -1791,6 +1926,10 @@ export interface PlayerAircraft {
   aircraftClassId: FreighterClassId;
   /** Concrete homologated model bought/leased from the aircraft market. */
   airframeTypeId?: string;
+  /** Concrete cabin/configuration within the family Market SKU. */
+  airframeConfigurationId?: string;
+  /** OFP roles pack bound to airframeConfigurationId. */
+  rolesPackRelPath?: string;
   label: string;
   /** Unique tail number shown on cards, dispatch, and market listings. */
   registration?: string;

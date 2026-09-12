@@ -7,7 +7,9 @@
  *   profiles/career/bush_PLN/              — shared (read-only assets)
  *   profiles/career/msfs-bush-hub-overrides.json — shared
  *
- * Existing root skyline.sqlite is migrated once into saves/<id>/.
+ * Legacy single-save: root skyline.sqlite is claimed into the **first**
+ * profile created in the UI (keeps that world, uses the player-typed name).
+ * We never invent a ghost "Pilot 1" entry.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -116,56 +118,47 @@ async function moveIfExists(from: string, to: string): Promise<boolean> {
 }
 
 /**
- * One-shot: root skyline.sqlite (+ wal/shm) → saves/<id>/ and profiles.json entry.
+ * Move legacy root skyline.sqlite (+ sidecars) into `saveDir`.
+ * Returns true if a root DB was claimed.
+ */
+async function claimLegacyRootSaveInto(
+  careerRoot: string,
+  saveDir: string,
+): Promise<boolean> {
+  const rootSqlite = join(careerRoot, 'skyline.sqlite');
+  if (!(await pathExists(rootSqlite))) return false;
+  await mkdir(saveDir, { recursive: true });
+  await moveIfExists(rootSqlite, join(saveDir, 'skyline.sqlite'));
+  await moveIfExists(
+    join(careerRoot, 'skyline.sqlite-wal'),
+    join(saveDir, 'skyline.sqlite-wal'),
+  );
+  await moveIfExists(
+    join(careerRoot, 'skyline.sqlite-shm'),
+    join(saveDir, 'skyline.sqlite-shm'),
+  );
+  await moveIfExists(
+    join(careerRoot, 'local-economy.json'),
+    join(saveDir, 'local-economy.json'),
+  );
+  await moveIfExists(
+    join(careerRoot, 'local-missions.json'),
+    join(saveDir, 'local-missions.json'),
+  );
+  return true;
+}
+
+/**
+ * Ensure career dirs + profiles index exist.
+ * Does **not** invent a fake "Pilot 1" profile — a legacy root
+ * `skyline.sqlite` is claimed into the first profile the player creates.
  */
 export async function ensureCareerProfilesLayout(
   careerRoot: string,
 ): Promise<CareerProfilesFile> {
   await mkdir(careerRoot, { recursive: true });
   await mkdir(join(careerRoot, 'saves'), { recursive: true });
-
-  let file = await readProfilesFile(careerRoot);
-  const rootSqlite = join(careerRoot, 'skyline.sqlite');
-  const hasRootSqlite = await pathExists(rootSqlite);
-
-  if (hasRootSqlite && file.profiles.length === 0) {
-    const id = newId();
-    const saveDir = careerSaveDir(careerRoot, id);
-    await mkdir(saveDir, { recursive: true });
-    await moveIfExists(rootSqlite, join(saveDir, 'skyline.sqlite'));
-    await moveIfExists(
-      join(careerRoot, 'skyline.sqlite-wal'),
-      join(saveDir, 'skyline.sqlite-wal'),
-    );
-    await moveIfExists(
-      join(careerRoot, 'skyline.sqlite-shm'),
-      join(saveDir, 'skyline.sqlite-shm'),
-    );
-    await moveIfExists(
-      join(careerRoot, 'local-economy.json'),
-      join(saveDir, 'local-economy.json'),
-    );
-    await moveIfExists(
-      join(careerRoot, 'local-missions.json'),
-      join(saveDir, 'local-missions.json'),
-    );
-    const now = todayIso();
-    file = {
-      version: 1,
-      activeId: null,
-      profiles: [
-        {
-          id,
-          name: 'Pilot 1',
-          createdAt: now,
-          updatedAt: now,
-        },
-      ],
-    };
-    await writeProfilesFile(careerRoot, file);
-  }
-
-  return file;
+  return readProfilesFile(careerRoot);
 }
 
 export async function createCareerProfile(
@@ -183,8 +176,16 @@ export async function createCareerProfile(
   const id = newId();
   const saveDir = careerSaveDir(careerRoot, id);
   await mkdir(saveDir, { recursive: true });
-  const store = await openCareerStore({ careerDir: saveDir });
-  store.close();
+  // First profile + leftover single-save DB → keep that world under the name
+  // the player typed (never auto-register a ghost "Pilot 1").
+  const claimedLegacy =
+    file.profiles.length === 0
+      ? await claimLegacyRootSaveInto(careerRoot, saveDir)
+      : false;
+  if (!claimedLegacy) {
+    const store = await openCareerStore({ careerDir: saveDir });
+    store.close();
+  }
   const now = todayIso();
   const meta: CareerProfileMeta = {
     id,

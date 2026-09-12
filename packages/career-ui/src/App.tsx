@@ -17,6 +17,7 @@ import {
   fetchWatchStatus,
   fetchSimBridgeStatus,
   postCancel,
+  postCharterAccept,
   postConfirmOfp,
   postAcceptOfpCargo,
   postBushTripAccept,
@@ -51,6 +52,7 @@ import {
   postAircraftMaintenance,
   postAircraftRepair,
   postAircraftBuyout,
+  postAircraftPayLease,
   postAircraftReturnLease,
   postFboBuy,
   postFboUpgrade,
@@ -87,6 +89,7 @@ import {
   type ActiveBushTripView,
   type BushWatchStatus,
   type CareerProfileMeta,
+  type CharterOfferView,
   type CareerCashflowSnapshot,
   type CompanyCreditSnapshot,
   type EconomyEvent,
@@ -133,7 +136,7 @@ import {
   pickLivePayloadLb,
   holdWrittenFuelLb,
 } from './load-verification';
-import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimateLeaseEarlyReturnUsd } from './aircraft-pricing';
+import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimateLeaseEarlyReturnUsd, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks } from './aircraft-pricing';
 import {
   boardNetSortUsd,
   contractPilotFeePctLabel,
@@ -148,6 +151,11 @@ import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { FerryHubCombobox } from './FerryHubCombobox';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
+import { CharterBoard, resolveBaseCharterOrigin } from './CharterBoard';
+import {
+  CharterManifest,
+  type CharterManifestDraft,
+} from './CharterManifest';
 import { BUSH_TRIPS_BOARD_ENABLED, FBO_BONDED_HOLD_ENABLED, COMPANY_CREW_ENABLED } from './feature-flags';
 import {
   AircraftMarketCountryCombobox,
@@ -285,6 +293,12 @@ import {
   type WeightSystem,
 } from './weight-units';
 import {
+  loadUiSoundMode,
+  playUiSound,
+  saveUiSoundMode,
+  type UiSoundMode,
+} from './ui-sounds';
+import {
   buildFlightDebrief,
   deriveDispatchStep,
   dispatchStepStatusLine,
@@ -317,6 +331,7 @@ type TerminalSection =
   | 'fbo'
   | 'stats';
 type ContractsLane = 'outbound' | 'inbound';
+type ContractsProduct = 'freight' | 'charter';
 type MarketSortKey =
   | 'distance'
   | 'cargo'
@@ -2489,6 +2504,7 @@ function mergeAirportStock(
     events: stock.events?.length ? stock.events : prev.events,
     runways: stock.runways?.length ? stock.runways : prev.runways,
     homeHubIcao: stock.homeHubIcao ?? prev.homeHubIcao,
+    charter: stock.charter ?? prev.charter ?? null,
   };
 }
 
@@ -3261,6 +3277,8 @@ export function App() {
   const [hubStatsError, setHubStatsError] = useState<string | null>(null);
   const [contractsLane, setContractsLane] =
     useState<ContractsLane>('outbound');
+  const [contractsProduct, setContractsProduct] =
+    useState<ContractsProduct>('freight');
   const [contractsOffer, setContractsOffer] = useState<'aircraft' | 'crew'>(
     'aircraft',
   );
@@ -3275,6 +3293,8 @@ export function App() {
   const [selectedContractLotId, setSelectedContractLotId] = useState<
     string | null
   >(null);
+  const [selectedCharterOffer, setSelectedCharterOffer] =
+    useState<CharterOfferView | null>(null);
   /** Return target after Manifest (or legacy Hangar ferry) opened from a terminal. */
   const [airportReturn, setAirportReturn] = useState<{
     icao: string;
@@ -3386,6 +3406,7 @@ export function App() {
     null,
   );
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
+  const [uiSoundMode, setUiSoundMode] = useState<UiSoundMode>(loadUiSoundMode);
   const [devMode, setDevMode] = useState(loadDevMode);
   const [ofpAutoStatus, setOfpAutoStatus] =
     useState<'idle' | 'waiting' | 'checking'>('idle');
@@ -3493,7 +3514,7 @@ export function App() {
   const [accessFilter, setAccessFilter] = useState<AccessFilter>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
   const [freightsBoard, setFreightsBoard] = useState<
-    'aircraft' | 'crew' | 'bush'
+    'aircraft' | 'crew' | 'charter' | 'bush'
   >('aircraft');
   const [bushTrips, setBushTrips] = useState<BushTripBoardRow[]>([]);
   const [activeBushTrip, setActiveBushTrip] =
@@ -3517,6 +3538,8 @@ export function App() {
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
   const [staging, setStaging] = useState<StagingDraft | null>(null);
+  const [charterManifest, setCharterManifest] =
+    useState<CharterManifestDraft | null>(null);
   const [stagingRouteLots, setStagingRouteLots] = useState<MarketLot[]>([]);
   const [stagingRouteLotsLoading, setStagingRouteLotsLoading] = useState(false);
   const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
@@ -3536,6 +3559,8 @@ export function App() {
   const [dispatchTourLoading, setDispatchTourLoading] = useState(false);
   const dispatchDeskBusy = dispatchScoutLoading || dispatchTourLoading;
   const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
+  const [baseDispatchProduct, setBaseDispatchProduct] =
+    useState<'freight' | 'charter'>('freight');
   const [activeTour, setActiveTour] = useState<ActiveTourView | null>(null);
   /** Tour itinerary to attach after Manifest Accept & Dispatch. */
   const [pendingActiveTour, setPendingActiveTourState] = useState<{
@@ -3790,6 +3815,10 @@ export function App() {
       airportView.inboundLots.some((lot) => lot.id === selectedContractLotId);
     if (!stillThere) setSelectedContractLotId(null);
   }, [airportView, selectedContractLotId]);
+
+  useEffect(() => {
+    setSelectedCharterOffer(null);
+  }, [airportIcao]);
 
   useEffect(() => {
     const loc = { tab, airportIcao };
@@ -4180,6 +4209,10 @@ export function App() {
   useEffect(() => {
     if (showProfileGate || !activeCareerProfile) return;
     if (tab !== 'market' && !airportIcao) return;
+    if (tab === 'market' && freightsBoard === 'charter') {
+      setMarketBoardLoading(false);
+      return;
+    }
     if (!careerStateReadyRef.current) {
       setMarketBoardLoading(false);
       return;
@@ -4576,6 +4609,7 @@ export function App() {
           if (justSettled && status.settlement && status.missionId) {
             const settledMission = activeMissionRef.current;
             const settledId = status.missionId;
+            queueMicrotask(() => playUiSound('flight_settled'));
             const debrief =
               settledMission && settledMission.id === settledId
                 ? buildFlightDebrief({
@@ -5205,7 +5239,13 @@ export function App() {
   activeMissionRef.current = activeMission;
 
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile?.id || !careerReady || staging) {
+    if (
+      showProfileGate ||
+      !activeCareerProfile?.id ||
+      !careerReady ||
+      staging ||
+      charterManifest
+    ) {
       return;
     }
     if (stagingRestoreAttemptedRef.current === activeCareerProfile.id) return;
@@ -5231,6 +5271,7 @@ export function App() {
     careerReady,
     missions,
     staging,
+    charterManifest,
     activeMission?.id,
   ]);
 
@@ -6136,6 +6177,7 @@ export function App() {
       if (switchingIcao) {
         setTerminalSection(section);
         setContractsLane('outbound');
+        setContractsProduct('freight');
         setContractsOffer('aircraft');
         setContractsSorts([...DEFAULT_BOARD_SORTS]);
         setContractsAccessFilter('');
@@ -6232,6 +6274,7 @@ export function App() {
     setAirportHydrating(false);
     setTerminalSection('inventory');
     setContractsLane('outbound');
+    setContractsProduct('freight');
     setContractsOffer('aircraft');
     setContractsSorts([...DEFAULT_BOARD_SORTS]);
     setContractsAccessFilter('');
@@ -6250,6 +6293,7 @@ export function App() {
     setAirportHydrating(false);
     setTerminalSection('inventory');
     setContractsLane('outbound');
+    setContractsProduct('freight');
     setContractsOffer('aircraft');
     setContractsSorts([...DEFAULT_BOARD_SORTS]);
     setContractsAccessFilter('');
@@ -6957,6 +7001,28 @@ export function App() {
       setWallet(result.walletUsd);
       setToastKind('ok');
       setToast(`Lease bought out · ${formatMoney(result.debitUsd)}`);
+    });
+  }
+
+  async function onPayLeaseOverdue(aircraftId: string) {
+    const acf = fleet.find((a) => a.id === aircraftId);
+    if (!acf?.lease || !acf.leaseOverdue) return;
+    const weeks = estimateLeaseOverdueWeeks(acf, tick);
+    const due = estimateLeaseOverdueAmountUsd(acf, tick);
+    const ok = await confirm({
+      title: `Pay overdue lease on ${acf.label}?`,
+      body: `Clears ${weeks} week${weeks === 1 ? '' : 's'} now for ${formatMoney(due)}. You can dispatch as soon as it posts.`,
+      confirmLabel: 'Pay lease',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const result = await postAircraftPayLease({ aircraftId });
+      setFleet(result.fleet);
+      setWallet(result.walletUsd);
+      setToastKind('ok');
+      setToast(
+        `Lease catch-up · ${result.weeksPaid} wk · ${formatMoney(result.paidUsd)}`,
+      );
     });
   }
 
@@ -8229,6 +8295,69 @@ export function App() {
     }
   }
 
+  function enterCharterManifest(
+    offer: CharterOfferView,
+    aircraftId: string,
+  ) {
+    if (!hubSelected) {
+      setError('Create your pilot profile first (name + home hub)');
+      goToTab('pilot');
+      return;
+    }
+    if (playerDispatchMission) {
+      setError(
+        `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch before preparing another flight`,
+      );
+      goToTab('staging');
+      return;
+    }
+    const aircraft = fleet.find(
+      (item) => item.id === aircraftId && item.status === 'parked',
+    );
+    if (!aircraft) {
+      setError('Select a parked aircraft for this charter');
+      return;
+    }
+    const restoreAirport = airportIcao
+      ? { icao: airportIcao, section: terminalSection }
+      : null;
+    setFlightDebrief(null);
+    setStaging(null);
+    setCharterManifest({ offer, aircraftId });
+    setError(null);
+    closeAirport();
+    setAirportReturn(restoreAirport);
+    goToTab('staging');
+    if (aircraft.locationIcao.trim().toUpperCase() !== offer.originIcao) {
+      setToastKind('warn');
+      setToast(
+        `Charter manifest · ${aircraft.label} is at ${aircraft.locationIcao} — ferry to ${offer.originIcao} before accepting`,
+      );
+    }
+  }
+
+  async function onAcceptCharter(draft: CharterManifestDraft) {
+    await run(
+      async () => {
+        const result = await postCharterAccept({
+          offerId: draft.offer.id,
+          aircraftId: draft.aircraftId,
+        });
+        setFleet(result.fleet);
+        setWallet(result.walletUsd);
+        setMissions((current) => [
+          result.mission,
+          ...current.filter((mission) => mission.id !== result.mission.id),
+        ]);
+        setCharterManifest(null);
+        setWatchAutoPaused(false);
+        setSimbriefLaunchUrl(null);
+        goToTab('staging');
+      },
+      { sync: { market: true } },
+    );
+  }
+
   function isCargoOpsCommodityLocked(commodityId: string): boolean {
     if (devMode) return false;
     const row =
@@ -9397,6 +9526,7 @@ export function App() {
         mission: result.mission.fuelUplift ? result.mission : mission,
         settlement: result.settlement,
       });
+      playUiSound('flight_settled');
       setFlightDebrief(debrief);
       setSettleOverlaySticky(false);
       setStaging(null);
@@ -9971,7 +10101,7 @@ export function App() {
         (watch?.enginesRunning === false || watch?.parkingBrake === true) &&
         watch?.lastEvent?.type !== 'settle_blocked'));
   const dispatchStep = deriveDispatchStep({
-    hasDraft: Boolean(staging),
+    hasDraft: Boolean(staging || charterManifest),
     hasDebrief: stagingMode === 'debrief',
     mission:
       activeMission &&
@@ -10574,6 +10704,16 @@ export function App() {
                   ? ' · en route'
                   : ' · ready'
             }`}
+            busy={busy}
+            onOpen={() => selectTab('staging')}
+          />
+        ) : charterManifest ? (
+          <SidebarFlightStrip
+            kind="draft"
+            label="Charter manifest"
+            originIcao={charterManifest.offer.originIcao}
+            destIcao={charterManifest.offer.destIcao}
+            detail={`${charterManifest.offer.paxCount} passengers`}
             busy={busy}
             onOpen={() => selectTab('staging')}
           />
@@ -11296,7 +11436,42 @@ export function App() {
                                     )}
                                   </div>
 
-                                  {activeTour && activeTour.status === 'active' ? (
+                                  <nav
+                                    className="contracts-lanes base-dispatch-products"
+                                    aria-label="Base Dispatcher product"
+                                  >
+                                    <button
+                                      type="button"
+                                      className={
+                                        baseDispatchProduct === 'freight'
+                                          ? 'contracts-lane active'
+                                          : 'contracts-lane'
+                                      }
+                                      onClick={() =>
+                                        setBaseDispatchProduct('freight')
+                                      }
+                                    >
+                                      Freight
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={
+                                        baseDispatchProduct === 'charter'
+                                          ? 'contracts-lane active'
+                                          : 'contracts-lane'
+                                      }
+                                      onClick={() => {
+                                        setBaseDispatchProduct('charter');
+                                        setSelectedDispatchTourId(null);
+                                      }}
+                                    >
+                                      Charter
+                                    </button>
+                                  </nav>
+
+                                  {baseDispatchProduct === 'freight' &&
+                                  activeTour &&
+                                  activeTour.status === 'active' ? (
                                     <div className="crew-section base-active-tour">
                                       <div className="base-dispatcher-scout-head">
                                         <div>
@@ -11491,6 +11666,7 @@ export function App() {
                                     </div>
                                   ) : null}
 
+                                  {baseDispatchProduct === 'freight' ? (
                                   <div className="crew-section base-dispatcher-scout">
                                     <div className="base-dispatcher-scout-head">
                                       <h4 className="crew-section-title">
@@ -11918,6 +12094,52 @@ export function App() {
                                         </table>
                                       )}
                                   </div>
+                                  ) : (
+                                    <div className="crew-section base-dispatcher-scout base-dispatch-charters">
+                                      <div className="base-dispatcher-scout-head">
+                                        <h4 className="crew-section-title">
+                                          Charters
+                                        </h4>
+                                        <label className="base-dispatch-charter-origin">
+                                          <span>Origin</span>
+                                          <input
+                                            type="text"
+                                            maxLength={4}
+                                            placeholder={localFbo.icao}
+                                            value={dispatchTourOrigin}
+                                            onChange={(event) =>
+                                              setDispatchTourOrigin(
+                                                event.target.value
+                                                  .toUpperCase()
+                                                  .replace(/[^A-Z0-9]/g, '')
+                                                  .slice(0, 4),
+                                              )
+                                            }
+                                            disabled={busy || dispatchDeskBusy}
+                                          />
+                                        </label>
+                                      </div>
+                                      <CharterBoard
+                                        fleet={fleet}
+                                        initialAircraftId={dispatchTourAircraftId}
+                                        origin={resolveBaseCharterOrigin(
+                                          dispatchTourOrigin,
+                                          localFbo.icao,
+                                        )}
+                                        busy={
+                                          busy ||
+                                          dispatchDeskBusy ||
+                                          Boolean(playerDispatchMission)
+                                        }
+                                        formatMoney={formatMoney}
+                                        formatMass={(kg) =>
+                                          formatMass(kg, weightSystem)
+                                        }
+                                        onPrepare={enterCharterManifest}
+                                        onOpenAirport={openAirport}
+                                      />
+                                    </div>
+                                  )}
                                 </>
                               );
                             })()}
@@ -12483,94 +12705,161 @@ export function App() {
                       </div>
                     </div>
                     <div
-                      className={`table-wrap${
+                      className={`table-wrap terminal-inventory-table-wrap${
                         airportHydrating && airportView.commodities.length === 0
                           ? ' is-loading'
                           : ''
                       }`}
                     >
-                      <table>
+                      <table className="terminal-inventory-table">
                         <thead>
                           <tr>
-                            <th>Commodity</th>
+                            <th>Item</th>
                             <th>Stock</th>
                             <th>Fill</th>
                             <th>Balance</th>
                             <th>Trend</th>
-                            <th>Flow / hour</th>
+                            <th>Flow</th>
                             <th>Local price</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {airportHydrating &&
-                          airportView.commodities.length === 0 ? (
-                            <TableSkeleton rows={6} cols={7} />
-                          ) : (
-                          airportView.commodities.map((c) => (
-                            <tr key={c.commodityId}>
+                          {airportView.charter ? (
+                            <tr>
                               <td>
-                                <div className="commodity-cell">
-                                  <CommodityIcon
-                                    commodityId={c.commodityId}
-                                    size={48}
-                                    title={c.name}
-                                  />
-                                  <div>
-                                    <strong>{c.name}</strong>
-                                    <small>
-                                      {c.kind === 'fuel'
-                                        ? 'Jet-A (shop)'
-                                        : c.kind === 'mro'
-                                          ? 'MRO shop stock'
-                                          : c.perishable
-                                            ? 'Perishable'
-                                            : c.highValue
-                                              ? 'High value'
-                                              : 'Standard'}
-                                    </small>
-                                  </div>
-                                </div>
+                                <strong>Passengers</strong>
+                                <small>Charter pool · waiting at terminal</small>
                               </td>
                               <td>
-                                {formatTonnes(c.stockTonnes * 1000)}
-                                <small>of {formatTonnes(c.capacityTonnes * 1000)}</small>
+                                {airportView.charter.waitingPax}
+                                <small>
+                                  of {airportView.charter.capacityPax} pax
+                                </small>
                               </td>
                               <td>
                                 <div className="fill-bar" aria-hidden="true">
                                   <span
                                     style={{
-                                      width: `${Math.min(100, c.fillPct * 100)}%`,
+                                      width: `${Math.min(
+                                        100,
+                                        airportView.charter.waitingFillPct * 100,
+                                      )}%`,
                                     }}
                                   />
                                 </div>
-                                <small>{(c.fillPct * 100).toFixed(0)}%</small>
-                              </td>
-                              <td>
-                                <span className={`balance balance-${c.balance}`}>
-                                  {c.balance}
-                                </span>
-                              </td>
-                              <td>
-                                <span className={`trend trend-${c.trend ?? 'stable'}`}>
-                                  {c.trend ?? 'stable'}
-                                </span>
-                              </td>
-                              <td>
-                                +{formatTonnes(c.productionPerTickKg)}
                                 <small>
-                                  −{formatTonnes(c.consumptionPerTickKg)}
+                                  {(
+                                    airportView.charter.waitingFillPct * 100
+                                  ).toFixed(0)}
+                                  %
                                 </small>
                               </td>
-                              <td className="pay">
-                                $
-                                {(weightSystem === 'imperial'
-                                  ? c.unitPriceUsd / KG_TO_LB
-                                  : c.unitPriceUsd
-                                ).toFixed(2)}
-                                /{massUnitLabel(weightSystem)}
+                              <td>
+                                <span
+                                  className={`balance balance-${airportView.charter.waitingBalance}`}
+                                >
+                                  {airportView.charter.waitingBalance}
+                                </span>
                               </td>
+                              <td></td>
+                              <td>
+                                +{airportView.charter.attractPax}
+                                <small>
+                                  attract ·{' '}
+                                  {airportView.charter.openOffersFrom} out /{' '}
+                                  {airportView.charter.openOffersTo} in
+                                </small>
+                              </td>
+                              <td></td>
                             </tr>
-                          ))
+                          ) : null}
+                          {airportView.charter ? (
+                            <tr className="inventory-section-row">
+                              <th scope="colgroup" colSpan={7}>
+                                Commodities
+                              </th>
+                            </tr>
+                          ) : null}
+                          {airportHydrating &&
+                          airportView.commodities.length === 0 ? (
+                            <TableSkeleton rows={6} cols={7} />
+                          ) : (
+                            airportView.commodities.map((c) => (
+                              <tr key={c.commodityId}>
+                                <td>
+                                  <div className="commodity-cell">
+                                    <CommodityIcon
+                                      commodityId={c.commodityId}
+                                      size={48}
+                                      title={c.name}
+                                    />
+                                    <div>
+                                      <strong>{c.name}</strong>
+                                      <small>
+                                        {c.kind === 'fuel'
+                                          ? 'Jet-A (shop)'
+                                          : c.kind === 'mro'
+                                            ? 'MRO shop stock'
+                                            : c.perishable
+                                              ? 'Perishable'
+                                              : c.highValue
+                                                ? 'High value'
+                                                : 'Standard'}
+                                      </small>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  {formatTonnes(c.stockTonnes * 1000)}
+                                  <small>
+                                    of {formatTonnes(c.capacityTonnes * 1000)}
+                                  </small>
+                                </td>
+                                <td>
+                                  <div className="fill-bar" aria-hidden="true">
+                                    <span
+                                      style={{
+                                        width: `${Math.min(
+                                          100,
+                                          c.fillPct * 100,
+                                        )}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <small>
+                                    {(c.fillPct * 100).toFixed(0)}%
+                                  </small>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`balance balance-${c.balance}`}
+                                  >
+                                    {c.balance}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span
+                                    className={`trend trend-${c.trend ?? 'stable'}`}
+                                  >
+                                    {c.trend ?? 'stable'}
+                                  </span>
+                                </td>
+                                <td>
+                                  +{formatTonnes(c.productionPerTickKg)}
+                                  <small>
+                                    −{formatTonnes(c.consumptionPerTickKg)}
+                                  </small>
+                                </td>
+                                <td className="pay">
+                                  $
+                                  {(weightSystem === 'imperial'
+                                    ? c.unitPriceUsd / KG_TO_LB
+                                    : c.unitPriceUsd
+                                  ).toFixed(2)}
+                                  /{massUnitLabel(weightSystem)}
+                                </td>
+                              </tr>
+                            ))
                           )}
                         </tbody>
                       </table>
@@ -12595,16 +12884,17 @@ export function App() {
                     <div className="panel-head">
                       <div>
                         <h2>Contracts</h2>
-                        {boardEstimateFleet.length === 0 ? (
+                        {contractsProduct === 'freight' &&
+                        boardEstimateFleet.length === 0 ? (
                           <p className="muted board-contract-pilot-hint">
                             Contract pilot — you earn a{' '}
                             {contractPilotFeePctLabel()} crew cut on freight;
                             the operator keeps the rest and pays fuel &amp; MX.
                           </p>
-                        ) : (
+                        ) : contractsProduct === 'freight' ? (
                         <div className="board-aircraft">
-                          <label>
-                            <span>Estimate net for</span>
+                          <label className="board-aircraft-picker">
+                            Aircraft
                             <select
                               aria-label="Aircraft for Contracts net estimate"
                               value={boardAircraftId}
@@ -12614,7 +12904,11 @@ export function App() {
                                 setContractsPage(1);
                               }}
                             >
-                              <option value="">Gross pay only</option>
+                              <option value="">
+                                {boardEstimateFleet.length === 0
+                                  ? 'Gross pay (no aircraft)'
+                                  : 'Gross pay only'}
+                              </option>
                               {boardEstimateFleet.map((acf) => (
                                 <option key={acf.id} value={acf.id}>
                                   {acf.label}
@@ -12656,9 +12950,110 @@ export function App() {
                             );
                           })()}
                         </div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
+                    <nav
+                      className="contracts-lanes contracts-products"
+                      aria-label="Contract product"
+                    >
+                      <button
+                        type="button"
+                        className={
+                          contractsProduct === 'freight'
+                            ? 'contracts-lane active'
+                            : 'contracts-lane'
+                        }
+                        onClick={() => setContractsProduct('freight')}
+                      >
+                        Freight
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          contractsProduct === 'charter'
+                            ? 'contracts-lane active'
+                            : 'contracts-lane'
+                        }
+                        onClick={() => setContractsProduct('charter')}
+                      >
+                        Charter
+                      </button>
+                    </nav>
+                    {contractsProduct === 'charter' ? (
+                      <div className="contracts-board">
+                        <FboRouteMapCard
+                          baseIcao={airportView.airport.icao}
+                          originIcao={
+                            selectedCharterOffer?.originIcao ??
+                            airportView.airport.icao
+                          }
+                          destIcao={selectedCharterOffer?.destIcao ?? null}
+                          distanceNm={selectedCharterOffer?.distanceNm}
+                          originRole="dep"
+                          idleHeadline={`${airportView.airport.icao} · hub`}
+                          idleHint="Select a charter to draw the route."
+                          showTitle={false}
+                          onOpenAirport={openAirport}
+                        />
+                        <div className="contracts-board-list">
+                        <nav
+                          className="contracts-lanes"
+                          aria-label="Charter direction"
+                        >
+                          <button
+                            type="button"
+                            className={
+                              contractsLane === 'outbound'
+                                ? 'contracts-lane active'
+                                : 'contracts-lane'
+                            }
+                            onClick={() => {
+                              setContractsLane('outbound');
+                              setSelectedCharterOffer(null);
+                            }}
+                          >
+                            Outbound
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              contractsLane === 'inbound'
+                                ? 'contracts-lane active'
+                                : 'contracts-lane'
+                            }
+                            onClick={() => {
+                              setContractsLane('inbound');
+                              setSelectedCharterOffer(null);
+                            }}
+                          >
+                            Inbound
+                          </button>
+                        </nav>
+                        <CharterBoard
+                          fleet={fleet}
+                          initialAircraftId={boardAircraftId}
+                          origin={
+                            contractsLane === 'outbound'
+                              ? airportView.airport.icao
+                              : undefined
+                          }
+                          dest={
+                            contractsLane === 'inbound'
+                              ? airportView.airport.icao
+                              : undefined
+                          }
+                          busy={busy || Boolean(playerDispatchMission)}
+                          formatMoney={formatMoney}
+                          formatMass={(kg) => formatMass(kg, weightSystem)}
+                          onPrepare={enterCharterManifest}
+                          selectedOfferId={selectedCharterOffer?.id}
+                          onSelectOffer={setSelectedCharterOffer}
+                          onOpenAirport={openAirport}
+                        />
+                        </div>
+                      </div>
+                    ) : (
                     <div className="contracts-board">
                     <FboRouteMapCard
                       baseIcao={airportView.airport.icao}
@@ -13303,6 +13698,7 @@ export function App() {
                     </nav>
                     </div>
                     </div>
+                    )}
                   </>
                 ) : null}
         </section>
@@ -13325,7 +13721,6 @@ export function App() {
               disabled={busy}
             >
               Aircraft needed
-              <small>Your plane · lot pay</small>
             </button>
             <button
               type="button"
@@ -13343,7 +13738,20 @@ export function App() {
               disabled={busy}
             >
               Crew needed
-              <small>Their plane · pilot fee</small>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={freightsBoard === 'charter'}
+              className={
+                freightsBoard === 'charter'
+                  ? 'settings-choice-btn active'
+                  : 'settings-choice-btn'
+              }
+              onClick={() => setFreightsBoard('charter')}
+              disabled={busy}
+            >
+              Charter
             </button>
             {BUSH_TRIPS_BOARD_ENABLED ? (
               <button
@@ -13362,11 +13770,20 @@ export function App() {
                 disabled={busy}
               >
                 Bush trips
-                <small>Fixed arcs · light GA</small>
               </button>
             ) : null}
           </div>
-          {BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush' ? (
+          {freightsBoard === 'charter' ? (
+            <CharterBoard
+              fleet={fleet}
+              initialAircraftId={boardAircraftId}
+              busy={busy || Boolean(playerDispatchMission)}
+              formatMoney={formatMoney}
+              formatMass={(kg) => formatMass(kg, weightSystem)}
+              onPrepare={enterCharterManifest}
+              onOpenAirport={openAirport}
+            />
+          ) : BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush' ? (
             <>
               <div className="panel-head">
                 <p className="panel-stats">
@@ -13541,8 +13958,8 @@ export function App() {
             <>
           <div className="panel-head">
             <div className="board-aircraft">
-              <label className="board-aircraft-estimate">
-                <span>Estimate net for</span>
+              <label className="board-aircraft-picker">
+                Aircraft
                 <select
                   aria-label="Aircraft for Freights net estimate"
                   value={boardAircraftId}
@@ -14546,6 +14963,26 @@ export function App() {
                 </div>
               </section>
             </>
+          ) : charterManifest ? (
+            <>
+              <DispatchStepper current="manifest" />
+              <p className="dispatch-step-status" role="status">
+                Charter · fixed passenger manifest
+              </p>
+              <CharterManifest
+                draft={charterManifest}
+                fleet={fleet}
+                busy={busy}
+                formatMoney={formatMoney}
+                formatMass={(kg) => formatMass(kg, weightSystem)}
+                onChange={setCharterManifest}
+                onCancel={() => setCharterManifest(null)}
+                onFerry={(aircraftId, legDest, finalDest) =>
+                  onFerry(aircraftId, legDest, { finalDest })
+                }
+                onAccept={onAcceptCharter}
+              />
+            </>
           ) : stagingMode === 'empty' ? (
             <>
               <div className="panel-head missions-head">
@@ -15451,6 +15888,72 @@ export function App() {
                 <strong>{formatMassExact(1_704, weightSystem)}</strong>
               </p>
             </div>
+            <div className="settings-card">
+              <h3>Sound</h3>
+              <p className="settings-help">
+                Short cues when Preflight is ready and when a flight settles.
+                Voice uses the browser speech engine (usually Portuguese on this
+                PC). No looping alerts.
+              </p>
+              <div className="settings-choice" role="radiogroup" aria-label="UI sounds">
+                {(
+                  [
+                    ['voice', 'Voice', 'Spoken cue'],
+                    ['both', 'Both', 'Voice + chime'],
+                    ['chime', 'Chime', 'Tone only'],
+                    ['off', 'Off', 'Mute'],
+                  ] as const
+                ).map(([mode, label, hint]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={
+                      uiSoundMode === mode
+                        ? 'settings-choice-btn active'
+                        : 'settings-choice-btn'
+                    }
+                    onClick={() => {
+                      saveUiSoundMode(mode);
+                      setUiSoundMode(mode);
+                    }}
+                    disabled={busy}
+                  >
+                    {label}
+                    <small>{hint}</small>
+                  </button>
+                ))}
+              </div>
+              {uiSoundMode !== 'off' ? (
+                <p className="settings-sample">
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      playUiSound('preflight_ready', {
+                        force: true,
+                        mode: uiSoundMode,
+                      })
+                    }
+                  >
+                    Test preflight
+                  </button>{' '}
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      playUiSound('flight_settled', {
+                        force: true,
+                        mode: uiSoundMode,
+                      })
+                    }
+                  >
+                    Test settle
+                  </button>
+                </p>
+              ) : null}
+            </div>
             <DesktopUpdatesCard />
             <div className="settings-card">
               <h3>Developer</h3>
@@ -16090,12 +16593,15 @@ export function App() {
                       hasListed={hasListedAircraft}
                       formatMoney={formatMoney}
                       formatMass={formatTonnes}
+                      economyTick={tick}
+                      formatClock={formatClock}
                       weightSystem={weightSystem}
                       onOpenAirport={openAirport}
                       onClearMaintenance={(id) => void onClearMaintenance(id)}
                       onRepair={(id) => void onRepairAircraft(id)}
                       onUnlist={(id) => void onUnlistAircraft(id)}
                       onBuyout={(id) => void onBuyoutLease(id)}
+                      onPayLeaseOverdue={(id) => void onPayLeaseOverdue(id)}
                       onReturnLease={(id) => void onReturnLease(id)}
                       onListForLease={(id) => void onListForLease(id)}
                       onListForSale={(id) => void onListForSale(id)}

@@ -12,6 +12,7 @@ import {
   assignAircraftToMission,
   buyOutAircraftLease,
   returnAircraftLeaseEarly,
+  payAircraftLeaseOverdue,
   CAREER_COMMODITIES,
   cancelOrphanPlayerMissions,
   cargoOpsIsUnlocked,
@@ -36,12 +37,21 @@ import {
   executeFerry,
   quoteFerry,
   planFerryRoute,
+  createFerryRoutePlanner,
+  computeFerryFeeUsd,
+  estimateUpliftKg,
   ferryProgressPct,
   remainingNmToFinal,
   nextFerryLeg,
   quotePilotTravel,
   executePilotTravel,
   findCareerPlayerAirframe,
+  findCareerAirframeConfiguration,
+  resolvePassengerCapacity,
+  reserveCharterOffer,
+  tickCharterEconomy,
+  readCharterHubPoolView,
+  isCharterEligibleAircraftClass,
   findOpenManifestForRoute,
   findPlayerAircraft,
   findNpcAirframe,
@@ -54,6 +64,7 @@ import {
   listParkedAt,
   listStarterCareerPlayerAirframes,
   resolveAirframePerfForUi,
+  resolveAirframeFuelBurnKgPerNm,
   getCommodity,
   getAirportRunways,
   evaluateRunwayTouchdown,
@@ -81,6 +92,14 @@ import {
   parseMarketBoardLaneFilter,
   parseMarketBoardCrewFilter,
   parseMarketBoardSorts,
+  parseCharterBoardSorts,
+  parseCharterBoardLaneFilter,
+  parseCharterBoardFitFilter,
+  sortCharterBoardRows,
+  charterBoardNeedsFitCompute,
+  formatCharterBoardSorts,
+  marketQueryTokens,
+  marketEndpointMatchesQuery,
   parsePositiveNumberParam,
   boardFreightKgForEstimates,
   boardDisplayPayUsd,
@@ -113,6 +132,7 @@ import {
   resolveAircraftDeliveryIcao,
   routeDistanceNm,
   estimateMissionBlockHours,
+  KG_TO_LB,
   selectStarterHub,
   listAircraftForLease,
   listAircraftForSale,
@@ -257,6 +277,7 @@ import {
   resolveAirportCoords,
   type CareerEconomyWorld,
   type CareerMissionsState,
+  type CharterOffer,
   type CareerStore,
   type CommodityId,
   type FreighterClassId,
@@ -529,6 +550,138 @@ function blockReasonAnotherActiveFlight(
   const route = `${mission.originIcao}→${mission.destIcao}`;
   const tail = acf?.label ?? 'another aircraft';
   return `Finish or cancel the ${route} flight on ${tail} before staging another`;
+}
+
+function charterAircraftFit(
+  world: CareerEconomyWorld,
+  missions: CareerMissionsState,
+  offer: CharterOffer,
+  aircraft: PlayerAircraft,
+  structuralMaxPayloadKg: number,
+  ferryPlanner?: ReturnType<typeof createFerryRoutePlanner> | null,
+) {
+  const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
+  const configuration = findCareerAirframeConfiguration(
+    airframe,
+    aircraft.airframeConfigurationId,
+    aircraft.rolesPackRelPath,
+  );
+  const seatCapacity = resolvePassengerCapacity(
+    aircraft.airframeTypeId,
+    aircraft.airframeConfigurationId,
+    aircraft.rolesPackRelPath,
+  );
+  const inRange =
+    offer.distanceNm <=
+    resolveAirframeMaxRangeNm(aircraft.airframeTypeId, aircraft.aircraftClassId);
+  const baggageCapacityKg = (configuration?.baggageCapacityLb ?? 0) / KG_TO_LB;
+  const baggageOk = offer.baggageKg <= baggageCapacityKg + 0.5;
+  const passengerPayloadKg =
+    (offer.groupSize * 175) / KG_TO_LB + offer.baggageKg;
+  const planningBurnKgPerNm = resolveAirframeFuelBurnKgPerNm(
+    aircraft.airframeTypeId,
+    aircraft.aircraftClassId,
+    missions.airframePerfOverrides?.[aircraft.airframeTypeId] ?? null,
+  );
+  const routeLimit = estimateFlyableRouteCargoLimit(
+    aircraft.aircraftClassId,
+    offer.distanceNm,
+    structuralMaxPayloadKg,
+    {
+      oewKg: airframe?.oewKg,
+      mtowKg: airframe?.mtowKg,
+      fuelCapacityKg: airframe?.fuelCapacityKg,
+      fuelBurnKgPerNm: planningBurnKgPerNm,
+      airframeTypeId: aircraft.airframeTypeId,
+    },
+    // Passenger body + bags are the useful load; cockpit crew remains reserved
+    // by the route estimator.
+  );
+  const payloadOk =
+    routeLimit.fuelFeasible &&
+    passengerPayloadKg <= routeLimit.operationalMaxCargoKg + 0.5;
+  const ferryRequired =
+    aircraft.locationIcao.toUpperCase() !== offer.originIcao.toUpperCase();
+  let ferryNm = 0;
+  let ferryCostUsd = 0;
+  const reasons: string[] = [];
+  if (!isCharterEligibleAircraftClass(aircraft.aircraftClassId)) {
+    reasons.push('GA, turboprop, or light jet required');
+  }
+  if (!configuration || configuration.role !== 'passenger') {
+    reasons.push('Passenger/VIP configuration required');
+  } else if (configuration.certificationState === 'catalog_only') {
+    reasons.push('Passenger configuration is not dispatch ready');
+  }
+  if (seatCapacity < offer.groupSize) {
+    reasons.push(`${offer.groupSize} pax require more than ${seatCapacity} seats`);
+  }
+  if (!baggageOk) {
+    reasons.push(`Baggage exceeds ${Math.floor(baggageCapacityKg)} kg capacity`);
+  }
+  if (!inRange) reasons.push('Route exceeds aircraft range');
+  if (!routeLimit.fuelFeasible) reasons.push('Route fuel exceeds tank capacity');
+  else if (!payloadOk) reasons.push('Passenger and baggage payload exceeds route weight limit');
+  if (aircraft.status !== 'parked') reasons.push('Aircraft is not parked');
+  if (aircraft.leaseOverdue) {
+    reasons.push('Lease payment overdue — catch up in Hangar before dispatch');
+  }
+  // Ferry is done from Manifest (multi-leg), same as Aircraft needed — never
+  // block Prepare on a single-hop range check.
+  if (ferryRequired && aircraft.status === 'parked') {
+    try {
+      const maxRangeNm = resolveAirframeMaxRangeNm(
+        aircraft.airframeTypeId,
+        aircraft.aircraftClassId,
+      );
+      const plan = ferryPlanner
+        ? ferryPlanner.planTo(offer.originIcao)
+        : planFerryRoute({
+            originIcao: aircraft.locationIcao,
+            finalDestIcao: offer.originIcao,
+            maxRangeNm,
+          });
+      ferryNm = plan.totalDistanceNm;
+      if (plan.legCount === 1) {
+        const quote = quoteFerry(world, missions, {
+          aircraftId: aircraft.id,
+          destIcao: offer.originIcao,
+        });
+        ferryNm = quote.distanceNm;
+        ferryCostUsd = quote.totalCostUsd;
+      } else {
+        let softUsed = missions.ferrySoftNmUsed;
+        for (const leg of plan.legs) {
+          const fee = computeFerryFeeUsd({
+            distanceNm: leg.distanceNm,
+            aircraftClassId: aircraft.aircraftClassId,
+            ferrySoftNmUsed: softUsed,
+          });
+          softUsed += fee.softNmApplied;
+          ferryCostUsd += fee.ferryFeeUsd;
+          // Board estimate only — Manifest quotes each real leg on fly.
+          ferryCostUsd += Math.round(
+            estimateUpliftKg(aircraft.aircraftClassId, leg.distanceNm) * 1.35,
+          );
+        }
+      }
+    } catch (error) {
+      reasons.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return {
+    aircraftId: aircraft.id,
+    aircraftLabel: aircraft.label,
+    compatible: reasons.length === 0,
+    seatCapacity,
+    inRange,
+    baggageOk,
+    fuelFeasible: routeLimit.fuelFeasible && payloadOk,
+    ferryRequired,
+    ferryNm,
+    netUsd: offer.payUsd - ferryCostUsd,
+    reasons,
+  };
 }
 
 function withParkingRates(
@@ -1333,6 +1486,7 @@ function mapAirportTerminalChrome(
 function mapAirportStockPayload(
   snap: NonNullable<ReturnType<CareerStore['readAirportInventory']>>,
   nowMs: number,
+  world?: CareerEconomyWorld | null,
 ) {
   const commodities = mapAirportCommodities(snap.airport);
   const totalStockKg = commodities.reduce((sum, c) => sum + c.stockKg, 0);
@@ -1343,6 +1497,7 @@ function mapAirportStockPayload(
     totalStockKg,
     totalStockTonnes: totalStockKg / 1000,
     commodities,
+    charter: world ? readCharterHubPoolView(world, snap.airport) : null,
     outboundLots: [],
     inboundLots: [],
     arrivals: [],
@@ -2683,6 +2838,35 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/aircraft-market/pay-lease') {
+        const body = (await readBody(req)) as { aircraftId?: string };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const paid = payAircraftLeaseOverdue(
+              missions,
+              body.aircraftId!,
+              world.tick,
+            );
+            return {
+              walletUsd: missions.walletUsd,
+              paidUsd: paid.paidUsd,
+              weeksPaid: paid.weeksPaid,
+              fleet: withParkingRates(missions.fleet, world, missions),
+            };
+          }, { persist: 'company' });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/aircraft-market/return-lease') {
         const body = (await readBody(req)) as { aircraftId?: string };
         if (!body.aircraftId) {
@@ -3217,6 +3401,330 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/charters') {
+        const originExact = url.searchParams.get('origin')?.trim().toUpperCase();
+        const destExact = url.searchParams.get('dest')?.trim().toUpperCase();
+        const originQueryTokens = marketQueryTokens(
+          url.searchParams.get('originQ') ?? '',
+        );
+        const destQueryTokens = marketQueryTokens(
+          url.searchParams.get('destQ') ?? '',
+        );
+        const laneFilter = parseCharterBoardLaneFilter(
+          url.searchParams.get('lane'),
+        );
+        const fitFilter = parseCharterBoardFitFilter(
+          url.searchParams.get('fit'),
+        );
+        const aircraftId = url.searchParams.get('aircraftId')?.trim();
+        const requestedSorts = parseCharterBoardSorts(
+          url.searchParams.get('sort'),
+        );
+        const pageSize = Math.max(
+          1,
+          Math.min(100, Math.floor(Number(url.searchParams.get('pageSize')) || 10)),
+        );
+        const requestedPage = Math.max(
+          1,
+          Math.floor(Number(url.searchParams.get('page')) || 1),
+        );
+        try {
+          const snapshot = await withCareerWrite((world, missions) => {
+            // Listing also heals early-v9 18h offers and guarantees that an
+            // existing save cannot remain on an empty board until tomorrow.
+            tickCharterEconomy(world);
+            return {
+              world,
+              missions,
+              aircraft: aircraftId
+                ? findPlayerAircraft(missions, aircraftId)
+                : undefined,
+            };
+          });
+          if (aircraftId && !snapshot.aircraft) {
+            send(res, 404, { error: `Unknown aircraft ${aircraftId}` });
+            return;
+          }
+          const cargoLimit = snapshot.aircraft
+            ? await resolveClassMaxCargoKg(
+                snapshot.aircraft.aircraftClassId,
+                snapshot.aircraft.airframeTypeId,
+              )
+            : undefined;
+          const airports = new Map(
+            snapshot.world.airports.map((airport) => [
+              airport.icao.toUpperCase(),
+              airport,
+            ]),
+          );
+          const focusIcao = (
+            snapshot.aircraft?.locationIcao ||
+            snapshot.missions.pilotIcao ||
+            snapshot.missions.homeHubIcao ||
+            ''
+          )
+            .trim()
+            .toUpperCase();
+          const pilotCountryId = focusIcao
+            ? countryIdFromRegion(airports.get(focusIcao)?.region ?? '')
+            : undefined;
+          const filtered = (snapshot.world.charterOffers ?? []).filter(
+            (offer) => {
+              if (
+                offer.status !== 'available' ||
+                snapshot.world.tick >= offer.expiresAtTick
+              ) {
+                return false;
+              }
+              if (originExact && offer.originIcao !== originExact) return false;
+              if (destExact && offer.destIcao !== destExact) return false;
+              const originName =
+                airports.get(offer.originIcao)?.name ?? offer.originIcao;
+              const destName =
+                airports.get(offer.destIcao)?.name ?? offer.destIcao;
+              if (
+                !marketEndpointMatchesQuery(
+                  originQueryTokens,
+                  offer.originIcao,
+                  originName,
+                )
+              ) {
+                return false;
+              }
+              if (
+                !marketEndpointMatchesQuery(
+                  destQueryTokens,
+                  offer.destIcao,
+                  destName,
+                )
+              ) {
+                return false;
+              }
+              if (laneFilter === 'intl' && !offer.international) return false;
+              if (laneFilter === 'domestic' && offer.international) return false;
+              if (laneFilter === 'pilot-domestic') {
+                if (offer.international) return false;
+                if (!pilotCountryId) return false;
+                const originCountry = countryIdFromRegion(
+                  airports.get(offer.originIcao)?.region ?? '',
+                );
+                if (originCountry !== pilotCountryId) return false;
+              }
+              return true;
+            },
+          );
+          const needFitForAll =
+            Boolean(snapshot.aircraft && cargoLimit) &&
+            charterBoardNeedsFitCompute(requestedSorts, fitFilter);
+          const fitById = new Map<
+            string,
+            ReturnType<typeof charterAircraftFit>
+          >();
+          let ferryPlanner: ReturnType<typeof createFerryRoutePlanner> | null =
+            null;
+          if (needFitForAll && snapshot.aircraft && cargoLimit) {
+            // Net/Fit sort runs fit for every filtered offer. planFerryRoute used
+            // to rebuild an O(hubs²) graph per offer (~40s). One Dijkstra from
+            // the aircraft location covers the whole board.
+            if (snapshot.aircraft.status === 'parked') {
+              try {
+                ferryPlanner = createFerryRoutePlanner({
+                  originIcao: snapshot.aircraft.locationIcao,
+                  maxRangeNm: resolveAirframeMaxRangeNm(
+                    snapshot.aircraft.airframeTypeId,
+                    snapshot.aircraft.aircraftClassId,
+                  ),
+                });
+              } catch {
+                ferryPlanner = null;
+              }
+            }
+            for (const offer of filtered) {
+              fitById.set(
+                offer.id,
+                charterAircraftFit(
+                  snapshot.world,
+                  snapshot.missions,
+                  offer,
+                  snapshot.aircraft,
+                  cargoLimit.maxCargoKg,
+                  ferryPlanner,
+                ),
+              );
+            }
+          }
+          const afterFit = filtered.filter((offer) => {
+            if (!fitFilter) return true;
+            const fit = fitById.get(offer.id);
+            if (!fit) return false;
+            return fitFilter === 'open' ? fit.compatible : !fit.compatible;
+          });
+          const sortable = afterFit.map((offer) => {
+            const fit = fitById.get(offer.id);
+            return {
+              offer,
+              id: offer.id,
+              distanceNm: offer.distanceNm,
+              paxCount: offer.groupSize,
+              baggageKg: offer.baggageKg,
+              expiresAtTick: offer.expiresAtTick,
+              payUsd: offer.payUsd,
+              netUsd: fit?.netUsd ?? null,
+              fitCompatible: fit?.compatible ?? null,
+            };
+          });
+          const rows = sortCharterBoardRows(sortable, requestedSorts);
+          const total = rows.length;
+          const pageCount = Math.max(1, Math.ceil(total / pageSize));
+          const page = Math.min(requestedPage, pageCount);
+          const offers = rows
+            .slice((page - 1) * pageSize, page * pageSize)
+            .map(({ offer }) => {
+              let fit = fitById.get(offer.id);
+              if (
+                !fit &&
+                snapshot.aircraft &&
+                cargoLimit &&
+                !needFitForAll
+              ) {
+                fit = charterAircraftFit(
+                  snapshot.world,
+                  snapshot.missions,
+                  offer,
+                  snapshot.aircraft,
+                  cargoLimit.maxCargoKg,
+                );
+              }
+              return {
+                id: offer.id,
+                originIcao: offer.originIcao,
+                destIcao: offer.destIcao,
+                originName:
+                  airports.get(offer.originIcao)?.name ?? offer.originIcao,
+                destName: airports.get(offer.destIcao)?.name ?? offer.destIcao,
+                paxCount: offer.groupSize,
+                baggageKg: offer.baggageKg,
+                payUsd: offer.payUsd,
+                basePayUsd: offer.payUsd,
+                urgency: offer.urgency === 'normal' ? 'normal' : 'urgent',
+                reason: `Charter · ${offer.tier} · ${offer.groupSize} pax`,
+                createdAtTick: offer.createdAtTick,
+                expiresAtTick: offer.expiresAtTick,
+                ticksRemaining: Math.max(
+                  0,
+                  offer.expiresAtTick - snapshot.world.tick,
+                ),
+                distanceNm: offer.distanceNm,
+                international: offer.international,
+                status: offer.status,
+                ...(fit ? { fit } : {}),
+              };
+            });
+          send(res, 200, {
+            offers,
+            total,
+            page,
+            pageCount,
+            tick: snapshot.world.tick,
+            sort: formatCharterBoardSorts(requestedSorts),
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/charters/accept') {
+        const body = (await readBody(req)) as {
+          offerId?: string;
+          aircraftId?: string;
+        };
+        if (!body.offerId?.trim() || !body.aircraftId?.trim()) {
+          send(res, 400, { error: 'offerId and aircraftId required' });
+          return;
+        }
+        try {
+          const peek = await withCareerRead((_world, missions) => {
+            const aircraft = findPlayerAircraft(missions, body.aircraftId!);
+            if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
+            return aircraft;
+          });
+          const cargoLimit = await resolveClassMaxCargoKg(
+            peek.aircraftClassId,
+            peek.airframeTypeId,
+          );
+          const accepted = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const offer = (world.charterOffers ?? []).find(
+              (row) => row.id === body.offerId,
+            );
+            if (!offer) throw new Error(`Unknown charter offer ${body.offerId}`);
+            const aircraft = findPlayerAircraft(missions, body.aircraftId!);
+            if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
+            if (
+              aircraft.status !== 'parked' ||
+              aircraft.locationIcao.toUpperCase() !== offer.originIcao
+            ) {
+              throw new Error(
+                `Aircraft ${aircraft.label} must be parked at ${offer.originIcao}`,
+              );
+            }
+            const active = listActivePlayerMissions(missions.missions);
+            if (active.length > 0) {
+              throw new Error(blockReasonAnotherActiveFlight(missions, active[0]!));
+            }
+            const fit = charterAircraftFit(
+              world,
+              missions,
+              offer,
+              aircraft,
+              cargoLimit.maxCargoKg,
+            );
+            if (!fit.compatible) {
+              throw new Error(fit.reasons.join(' · ') || 'Aircraft is not compatible');
+            }
+            const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
+            const configuration = findCareerAirframeConfiguration(
+              airframe,
+              aircraft.airframeConfigurationId,
+              aircraft.rolesPackRelPath,
+            );
+            if (!configuration) throw new Error('Passenger configuration not found');
+            const missionId = `msn_charter_${world.tick}_${Math.floor(
+              Math.random() * 1e9,
+            )}`;
+            const mission = reserveCharterOffer(world, {
+              offerId: offer.id,
+              missionId,
+              aircraftClassId: aircraft.aircraftClassId,
+              aircraftId: aircraft.id,
+              airframeTypeId: aircraft.airframeTypeId,
+              airframeConfigurationId: configuration.id,
+              rolesPackRelPath: configuration.rolesPackRelPath,
+            });
+            missions.missions.push(mission);
+            assignAircraftToMission(
+              missions,
+              aircraft.id,
+              mission.id,
+              mission.originIcao,
+            );
+            return {
+              mission: withMissionClientView(world, missions, mission),
+              walletUsd: missions.walletUsd,
+              fleet: withParkingRates(missions.fleet, world, missions),
+            };
+          }, { housekeeping: false });
+          send(res, 200, accepted);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, /^Unknown /.test(message) ? 404 : 400, { error: message });
+        }
+        return;
+      }
+
       if (req.method === 'GET' && path === '/api/market') {
         const { world, cargoOps, classOps, missionsState } = await withCareerWrite(
           (w, missions) => {
@@ -3697,7 +4205,15 @@ export function createCareerApiServer(port = 8787) {
             send(res, 404, { error: `Unknown airport ${icao}` });
             return;
           }
-          send(res, 200, mapAirportStockPayload(snap, nowMs));
+          send(
+            res,
+            200,
+            mapAirportStockPayload(
+              snap,
+              nowMs,
+              requireStore().peekEconomyWorld(),
+            ),
+          );
           return;
         }
         if (url.searchParams.get('part') === 'stats') {
@@ -3861,6 +4377,7 @@ export function createCareerApiServer(port = 8787) {
           totalStockKg,
           totalStockTonnes: totalStockKg / 1000,
           commodities,
+          charter: readCharterHubPoolView(world, airport),
           aircraftClassId: aircraft ?? null,
           airframeTypeId: airframeTypeId ?? null,
           airframeLabel: cargoLimit?.airframeLabel ?? null,
@@ -6978,7 +7495,10 @@ export function createCareerApiServer(port = 8787) {
           const result = await withCareerWrite((world, missions) => {
             const existing = missions.missions.find((m) => m.id === body.missionId);
             if (!existing) return { kind: 'missing' as const };
-            const lines = existing.lots?.length
+            const charter = existing.missionType === 'charter';
+            const lines = charter
+              ? []
+              : existing.lots?.length
               ? existing.lots
               : existing.shipmentLotId
                 ? [
@@ -7001,7 +7521,7 @@ export function createCareerApiServer(port = 8787) {
               missionId: body.missionId!,
             });
             // Free orphan reserved kg left behind by older cancel paths / partial accepts.
-            reconcileLotReservations(world, missions);
+            if (!charter) reconcileLotReservations(world, missions);
             if (executed.kind === 'missing') return { kind: 'missing' as const };
             if (executed.kind === 'closed') return { kind: 'closed' as const };
             let reservedAfter = 0;
@@ -7018,7 +7538,14 @@ export function createCareerApiServer(port = 8787) {
               executed.kind === 'applied'
                 ? Math.max(0, reservedBefore - reservedAfter)
                 : 0;
-            const returnedToMarket = releasedKg > 0 && anyReturned;
+            const charterOffer = charter
+              ? (world.charterOffers ?? []).find(
+                  (offer) => offer.id === existing.charterOfferId,
+                )
+              : undefined;
+            const returnedToMarket = charter
+              ? charterOffer?.status === 'available'
+              : releasedKg > 0 && anyReturned;
             syncActiveTour(missions, world);
             return {
               kind: 'ok' as const,
@@ -7026,7 +7553,8 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               releasedKg,
               returnedToMarket,
-              foundBefore,
+              foundBefore: charter ? 1 : foundBefore,
+              charter,
               activeTour: activeTourView(missions, world),
             };
           }, { commandSliceMissionId: body.missionId, housekeeping: false });
@@ -7045,7 +7573,9 @@ export function createCareerApiServer(port = 8787) {
             returnedToMarket: result.returnedToMarket,
             activeTour: result.activeTour ?? null,
             warning:
-              result.foundBefore > 0
+              result.charter
+                ? null
+                : result.foundBefore > 0
                 ? result.returnedToMarket
                   ? null
                   : 'Mission cancelled, but its shipment lot was already expired'
@@ -7289,6 +7819,13 @@ export function createCareerApiServer(port = 8787) {
         const probeMission = probe.missions.find((m) => m.id === body.missionId);
         if (!probeMission) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
+          return;
+        }
+        if (probeMission.missionType === 'charter') {
+          send(res, 400, {
+            error:
+              'Charter passenger and baggage manifests are fixed; OFP cargo cannot be accepted',
+          });
           return;
         }
         if (
@@ -7894,7 +8431,18 @@ export function createCareerApiServer(port = 8787) {
             fleet: settled.fleet,
             pilotIcao: settled.pilotIcao,
             activeTour: settled.activeTour ?? null,
-            settlement: {
+            settlement: settled.settlement.settlementType === 'charter'
+              ? {
+                  ...settled.settlement,
+                  residualFuelKg: settled.mission.settledFuelKg ?? null,
+                  landingFpm: settled.mission.settledLandingFpm ?? null,
+                  flightDurationMs:
+                    settled.mission.settledFlightDurationMs ?? null,
+                  flightScore: settled.mission.settledFlightScore ?? null,
+                  weatherOps: settled.mission.settledWeatherOps ?? null,
+                  runwayTouch: settled.mission.settledRunwayTouch ?? null,
+                }
+              : {
               payoutUsd: settled.settlement.payoutUsd,
               penaltyUsd: settled.settlement.penaltyUsd,
               lateTicks: settled.settlement.lateTicks,

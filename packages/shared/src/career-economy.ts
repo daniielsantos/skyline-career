@@ -1025,6 +1025,7 @@ import {
   ensureDynamicInternationalLanes,
   selectDynamicInternationalLanes,
 } from './career-international-lanes.js';
+import { ensureCharterEconomy, tickCharterEconomy } from './career-charter.js';
 export {
   DYNAMIC_INTL_GATEWAYS_PER_COUNTRY,
   DYNAMIC_INTL_LANES_MAX,
@@ -8152,6 +8153,9 @@ export function createSeedEconomyWorld(opts: { seed?: string } = {}): CareerEcon
     homeCountryId: 'BR',
     airports,
     lots: [],
+    charterDemand: [],
+    charterHubs: [],
+    charterOffers: [],
     events: [],
     npcs: seedNpcFleet({ seed, regions }),
     npcFlights: [],
@@ -8455,6 +8459,9 @@ export function migrateEconomyWorld(
     lastBatchAtMs?: number;
     airports?: AirportTerminal[];
     lots?: ShipmentLot[];
+    charterDemand?: CareerEconomyWorld['charterDemand'];
+    charterHubs?: CareerEconomyWorld['charterHubs'];
+    charterOffers?: CareerEconomyWorld['charterOffers'];
     events?: EconomyEvent[];
     npcs?: NpcFreighter[];
     npcFlights?: NpcFlight[];
@@ -8506,6 +8513,9 @@ export function migrateEconomyWorld(
         : undefined,
     airports: base.airports,
     lots: Array.isArray(base.lots) ? base.lots : [],
+    charterDemand: Array.isArray(base.charterDemand) ? base.charterDemand : [],
+    charterHubs: Array.isArray(base.charterHubs) ? base.charterHubs : [],
+    charterOffers: Array.isArray(base.charterOffers) ? base.charterOffers : [],
     events: Array.isArray(base.events) ? base.events : [],
     npcs: Array.isArray(base.npcs) ? base.npcs : [],
     npcFlights: Array.isArray(base.npcFlights) ? base.npcFlights : [],
@@ -8579,6 +8589,7 @@ export function migrateEconomyWorld(
   ensureFuelTruckFleet(migrated);
   ensureWorldHubLevels(migrated);
   ensureHomeCountryId(migrated);
+  ensureCharterEconomy(migrated);
   pruneDeadLots(migrated);
 
   return migrated;
@@ -8614,6 +8625,9 @@ function prepareEconomyForCatchUp(
   w.lastSyncedAtMs = migrated.lastBatchAtMs;
   w.airports = migrated.airports;
   w.lots = migrated.lots;
+  w.charterDemand = migrated.charterDemand;
+  w.charterHubs = migrated.charterHubs;
+  w.charterOffers = migrated.charterOffers;
   w.events = migrated.events ?? [];
   w.npcs = migrated.npcs;
   w.npcFlights = migrated.npcFlights;
@@ -11338,6 +11352,9 @@ function tickEconomyPrepare(
     world.events = migrated.events;
     world.airports = migrated.airports;
     world.lots = migrated.lots;
+    world.charterDemand = migrated.charterDemand;
+    world.charterHubs = migrated.charterHubs;
+    world.charterOffers = migrated.charterOffers;
     world.npcs = migrated.npcs;
     world.npcFlights = migrated.npcFlights;
     world.fuelTrucks = migrated.fuelTrucks;
@@ -11437,6 +11454,7 @@ function tickEconomyFinish(
   tickPortInboundShips(world);
   addTickPhaseMs(profile, 'portRestock', phaseAt);
 
+  tickCharterEconomy(world);
   maybeQueueHubEconomyDaySample(world);
 
   if (profile) {

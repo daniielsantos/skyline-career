@@ -45,9 +45,15 @@ import {
   type ClassOpsDelta,
 } from './career-class-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
+import {
+  cancelCharterMission,
+  charterBaggageKg,
+  settleCharterMission,
+} from './career-charter.js';
 import { assertBushLightGa, isOfflineNetworkHub } from './career-bush.js';
 import {
   findCareerPlayerAirframe,
+  findCareerAirframeConfiguration,
   isCareerPlayerAirframeEnabled,
   listCareerPlayerAirframes,
   resolveAirframeFuelBurnKgPerNm,
@@ -68,6 +74,7 @@ import type {
   AircraftClass,
   FreighterClassId,
   InboundPending,
+  CharterSettlement,
   MissionIntent,
   MissionLotLine,
   MissionSettlement,
@@ -247,12 +254,25 @@ export function getAircraftClass(id: FreighterClassId): AircraftClass {
 export function missionLoadPolicy(mission: {
   aircraftClassId: FreighterClassId | string;
   airframeTypeId?: string | null;
+  airframeConfigurationId?: string | null;
+  rolesPackRelPath?: string | null;
+  missionType?: string | null;
 }): {
   loadMethod: AircraftClass['loadMethod'];
   injectCapable: boolean;
 } {
   const aircraft = getAircraftClass(mission.aircraftClassId as FreighterClassId);
   const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
+  if (mission.missionType === 'charter') {
+    const configuration = findCareerAirframeConfiguration(
+      airframe,
+      mission.airframeConfigurationId,
+      mission.rolesPackRelPath,
+    );
+    return configuration?.certificationState === 'inject_verified'
+      ? { loadMethod: 'direct-injection', injectCapable: true }
+      : { loadMethod: 'native-simbrief', injectCapable: false };
+  }
   if (airframe?.injectCapable === false) {
     return { loadMethod: 'native-simbrief', injectCapable: false };
   }
@@ -824,10 +844,31 @@ export function isEmptyLegMission(mission: MissionIntent): boolean {
 
 /** Recompute top-level mirrors from `lots` (or legacy single-lot fields). */
 export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
+  if (mission.missionType === 'charter') {
+    const pax = Math.max(1, Math.min(12, Math.floor(Number(mission.pax) || 1)));
+    return {
+      ...mission,
+      missionType: 'charter',
+      lots: [],
+      shipmentLotId:
+        mission.shipmentLotId ||
+        `charter_${mission.charterOfferId || mission.id}`,
+      commodityId: mission.commodityId || 'general',
+      cargoKg: 0,
+      pax,
+      baggageKg:
+        typeof mission.baggageKg === 'number' && mission.baggageKg > 0
+          ? Math.round(mission.baggageKg)
+          : charterBaggageKg(pax),
+      urgency: mission.urgency === 'urgent' ? 'urgent' : 'normal',
+    };
+  }
   // Empty legs first — ignore any phantom 0 kg lot left by older missionLines.
   if (mission.crewDeadhead) {
     return {
       ...mission,
+      missionType: 'freight',
+      pax: 0,
       lots: [],
       shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
       commodityId: mission.commodityId || 'general',
@@ -841,6 +882,8 @@ export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
   if (mission.contractPilotReposition) {
     return {
       ...mission,
+      missionType: 'freight',
+      pax: 0,
       lots: [],
       shipmentLotId: mission.shipmentLotId || `deadhead_${mission.id}`,
       commodityId: mission.commodityId || 'general',
@@ -854,6 +897,8 @@ export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
   if (mission.emptyFlight) {
     return {
       ...mission,
+      missionType: 'freight',
+      pax: 0,
       lots: [],
       shipmentLotId: mission.shipmentLotId || `empty_${mission.id}`,
       commodityId: mission.commodityId || 'general',
@@ -883,6 +928,8 @@ export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
       : `${lots.length} lots · ${(cargoKg / 1000).toFixed(1)} t · primary ${getCommodity(primary.commodityId).name}`;
   return {
     ...mission,
+    missionType: 'freight',
+    pax: 0,
     lots,
     shipmentLotId: lots[0]!.shipmentLotId,
     commodityId: primary.commodityId,
@@ -1916,6 +1963,16 @@ export function cancelMission(
   ) {
     throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
+  if (normalized.missionType === 'charter') {
+    const cancelled = cancelCharterMission(
+      world,
+      normalized as import('./types/career-economy.js').CharterMissionIntent,
+      { cancelledAtTick: world.tick },
+    ).mission;
+    if (opts.fleet) releaseAircraftOnCancel(opts.fleet, cancelled);
+    clearPlayerInbound(world, cancelled.id);
+    return cancelled;
+  }
   // A mission can outlive its shipment lots: expired lots are pruned after a
   // short retention window, and a world reset can leave orphan missions behind.
   const nowMs = opts.nowMs ?? Date.now();
@@ -2302,7 +2359,7 @@ export interface SettleMissionOpts {
 
 export interface SettleMissionResult {
   mission: MissionIntent;
-  settlement: MissionSettlement;
+  settlement: MissionSettlement | CharterSettlement;
   /** Wallet delta to apply (payoutUsd). */
   walletCreditUsd: number;
   /** Fuel debit if this settle auto-departed (else 0). */
@@ -2381,6 +2438,20 @@ export function settleMission(
     working.status !== 'accepted'
   ) {
     throw new Error(`Cannot settle mission in status=${working.status}`);
+  }
+  if (working.missionType === 'charter') {
+    const offer = (world.charterOffers ?? []).find(
+      (row) => row.id === working.charterOfferId,
+    );
+    if (!offer) throw new Error(`Unknown charter offer ${working.charterOfferId}`);
+    if (offer.status !== 'reserved' || offer.missionId !== working.id) {
+      throw new Error(
+        `Charter offer ${offer.id} is not reserved by mission ${working.id}`,
+      );
+    }
+    if (!(world.charterDemand ?? []).some((row) => row.id === offer.demandId)) {
+      throw new Error(`Unknown charter demand ${offer.demandId}`);
+    }
   }
 
   const priorAirborneAtMs = working.airborneAtMs;
@@ -2762,6 +2833,37 @@ export function settleMission(
   };
   clearPlayerInbound(world, settled.id);
 
+  if (working.missionType === 'charter') {
+    const charter = settleCharterMission(
+      world,
+      settled as import('./types/career-economy.js').CharterMissionIntent,
+      {
+        settledAtTick: settleTick,
+        payoutUsd: pay.payoutUsd,
+        penaltyUsd: pay.penaltyUsd,
+        lateTicks: pay.lateTicks,
+        weatherBonusUsd: pay.weatherBonusUsd,
+      },
+    );
+    return {
+      mission: {
+        ...charter.mission,
+        settledFuelKg: settled.settledFuelKg,
+        settledMxFuelDrainKg: settled.settledMxFuelDrainKg,
+        settledLandingFpm: settled.settledLandingFpm,
+        settledFlightDurationMs: settled.settledFlightDurationMs,
+        settledFlightScore: settled.settledFlightScore,
+        settledWeatherOps: settled.settledWeatherOps,
+        settledTouchdownLat: settled.settledTouchdownLat,
+        settledTouchdownLon: settled.settledTouchdownLon,
+        settledRunwayTouch: settled.settledRunwayTouch,
+      },
+      settlement: charter.settlement,
+      walletCreditUsd: charter.walletCreditUsd,
+      fuelDebitUsd,
+    };
+  }
+
   let cargoOpsDeltas: CargoOpsDelta[] | undefined;
   let classOpsDeltas: ClassOpsDelta[] | undefined;
   if (
@@ -2829,9 +2931,16 @@ export function settleMission(
 }
 
 export function formatSettlementSummary(
-  settlement: MissionSettlement,
+  settlement: MissionSettlement | CharterSettlement,
   walletUsd: number,
 ): string {
+  if (settlement.settlementType === 'charter') {
+    return (
+      `Settled ${settlement.missionId}: Charter ` +
+      `${settlement.passengerCount} pax + ${settlement.baggageKg} kg baggage ` +
+      `payout=$${settlement.payoutUsd.toLocaleString()} wallet=$${walletUsd.toLocaleString()}`
+    );
+  }
   const late =
     settlement.lateTicks > 0
       ? ` LATE +${settlement.lateTicks} tick(s) penalty=$${settlement.penaltyUsd.toLocaleString()}`
@@ -3381,7 +3490,10 @@ export function compareMissionIntentToOfp(
 
   const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
   const ofpPax = ofp.loadSheet?.passengerCount;
-  const maxAllowedOfpPax = isPaxAndCargoLoadLayout(airframe)
+  const charter = mission.missionType === 'charter';
+  const maxAllowedOfpPax = charter
+    ? mission.pax
+    : isPaxAndCargoLoadLayout(airframe)
     ? typeof airframe?.maxPaxSeats === 'number' && airframe.maxPaxSeats > 0
       ? Math.max(airframe.maxPaxSeats, mission.pax + tolerances.maxExtraPax)
       : // Live max comes from SimBrief at Dispatch; without a catalog cache,
@@ -3395,39 +3507,53 @@ export function compareMissionIntentToOfp(
       message:
         'OFP has no passenger count — freighter missions allow 0–1 (pilot for EFB)',
     });
-  } else if (ofpPax > maxAllowedOfpPax) {
+  } else if (
+    charter ? ofpPax !== mission.pax : ofpPax > maxAllowedOfpPax
+  ) {
     findings.push({
       code: 'INTENT_PAX_MISMATCH',
       severity: 'fail',
-      message: `OFP pax=${ofpPax} but mission expects pax≤${maxAllowedOfpPax}`,
+      message: charter
+        ? `OFP pax=${ofpPax} but charter requires exactly ${mission.pax}`
+        : `OFP pax=${ofpPax} but mission expects pax≤${maxAllowedOfpPax}`,
       expected: maxAllowedOfpPax,
       actual: ofpPax,
       delta: ofpPax - maxAllowedOfpPax,
     });
   }
 
-  const ofpCargo = ofpFreightTowardMissionKg(ofp, airframe, {
-    missionCargoKg: mission.cargoKg,
-  });
+  const baggageRaw = ofp.loadSheet?.baggage;
+  const baggageUnit = ofp.loadSheet?.unit ?? ofp.fuel.unit ?? 'kg';
+  const ofpCargo =
+    charter && typeof baggageRaw === 'number' && Number.isFinite(baggageRaw)
+      ? baggageUnit === 'kg'
+        ? baggageRaw
+        : baggageRaw / KG_TO_LB
+      : ofpFreightTowardMissionKg(ofp, airframe, {
+          missionCargoKg: mission.cargoKg,
+        });
+  const expectedCargoKg = charter ? mission.baggageKg ?? 0 : mission.cargoKg;
   if (ofpCargo === undefined) {
     findings.push({
       code: 'INTENT_CARGO_MISSING',
-      severity: 'warn',
-      message: 'OFP has no cargo/baggage weight — cannot verify freight load',
+      severity: charter ? 'fail' : 'warn',
+      message: charter
+        ? 'OFP has no baggage weight — charter baggage must match exactly'
+        : 'OFP has no cargo/baggage weight — cannot verify freight load',
     });
   } else {
-    const delta = ofpCargo - mission.cargoKg;
+    const delta = ofpCargo - expectedCargoKg;
     const direction = delta < 0 ? 'under' : 'over';
-    const tol = cargoToleranceKg(mission.cargoKg, tolerances, direction);
+    const tol = charter ? 1 : cargoToleranceKg(expectedCargoKg, tolerances, direction);
     if (Math.abs(delta) > tol) {
       findings.push({
         code: 'INTENT_CARGO_MISMATCH',
         severity: 'fail',
         message:
           direction === 'under'
-            ? `OFP cargo ${ofpCargo.toFixed(0)} kg below mission ${mission.cargoKg} kg (tol −${tol.toFixed(0)} kg) — often MTOW/fuel limited on this leg`
-            : `OFP cargo ${ofpCargo.toFixed(0)} kg vs mission ${mission.cargoKg} kg (tol ±${tol.toFixed(0)} kg)`,
-        expected: mission.cargoKg,
+            ? `OFP ${charter ? 'baggage' : 'cargo'} ${ofpCargo.toFixed(0)} kg below mission ${expectedCargoKg} kg (tol −${tol.toFixed(0)} kg)`
+            : `OFP ${charter ? 'baggage' : 'cargo'} ${ofpCargo.toFixed(0)} kg vs mission ${expectedCargoKg} kg (tol ±${tol.toFixed(0)} kg)`,
+        expected: expectedCargoKg,
         actual: ofpCargo,
         delta,
       });

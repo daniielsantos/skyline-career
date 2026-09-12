@@ -102,7 +102,7 @@ export const PAGE_HELP = {
     title: 'How Settings works',
     kicker: 'Page guide',
     bullets: [
-      'SimBrief username, pounds vs kilos, and local career prefs. This is not the aircraft EFB.',
+      'SimBrief username, pounds vs kilos, Sound (voice / chime for preflight + settle), and local career prefs. This is not the aircraft EFB.',
       'Weight units change how Skyline displays Due — the sim and OFP still use the aircraft’s native units.',
     ],
   },

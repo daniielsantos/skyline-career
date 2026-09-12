@@ -46,6 +46,7 @@ import {
 } from './career-pilot-travel.js';
 import {
   defaultCareerPlayerAirframe,
+  findCareerAirframeConfiguration,
   findCareerPlayerAirframe,
   isStarterAirframeCondition,
   listStarterCareerPlayerAirframes,
@@ -443,6 +444,11 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
   const airframe =
     findCareerPlayerAirframe(raw.airframeTypeId) ??
     defaultCareerPlayerAirframe(aircraftClassId);
+  const configuration = findCareerAirframeConfiguration(
+    airframe,
+    raw.airframeConfigurationId,
+    raw.rolesPackRelPath,
+  );
   const catalogCap = resolvePlayerFuelCapacityKg(
     airframe?.typeId ?? raw.airframeTypeId,
     aircraftClassId,
@@ -481,6 +487,12 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
     id: raw.id,
     aircraftClassId,
     airframeTypeId: airframe?.typeId,
+    ...(configuration
+      ? {
+          airframeConfigurationId: configuration.id,
+          rolesPackRelPath: configuration.rolesPackRelPath,
+        }
+      : {}),
     label:
       airframe?.label ??
       (typeof raw.label === 'string' && raw.label.trim()
@@ -816,7 +828,9 @@ export function assignAircraftToMission(
     );
   }
   if (aircraft.leaseOverdue) {
-    throw new Error(`Aircraft ${aircraft.id} has an overdue lease payment`);
+    throw new Error(
+      `${aircraft.label} has an overdue lease payment — catch up in Hangar before dispatch`,
+    );
   }
   const requirePilot = opts.requirePilotAtOrigin !== false;
   if (requirePilot) {

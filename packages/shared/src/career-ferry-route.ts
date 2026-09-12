@@ -42,11 +42,85 @@ export type FerryRoutePlan = {
   hopRangeNm: number;
 };
 
-function ferryGraphCoords(): Record<
-  string,
-  { lat: number; lon: number; name?: string }
-> {
+type FerryCoords = Record<string, { lat: number; lon: number; name?: string }>;
+
+type FerryAdjacency = {
+  hopRangeNm: number;
+  hubs: string[];
+  adj: Map<string, Array<{ to: string; nm: number }>>;
+  coords: FerryCoords;
+};
+
+/** Adjacency by hop range — building it is O(hubs²); reuse across plans. */
+const ferryAdjByHopRange = new Map<number, FerryAdjacency>();
+
+function ferryGraphCoords(): FerryCoords {
   return { ...CAREER_HUB_COORDS, ...FERRY_ROUTE_WAYPOINTS };
+}
+
+function resolveHopRangeNm(
+  maxRangeNm: number,
+  rangeMargin: number | undefined,
+): number {
+  const margin =
+    typeof rangeMargin === 'number' &&
+    Number.isFinite(rangeMargin) &&
+    rangeMargin > 0 &&
+    rangeMargin <= 1
+      ? rangeMargin
+      : FERRY_ROUTE_RANGE_MARGIN;
+  return Math.floor(Math.max(0, maxRangeNm) * margin);
+}
+
+function getFerryAdjacency(hopRangeNm: number): FerryAdjacency {
+  const cached = ferryAdjByHopRange.get(hopRangeNm);
+  if (cached) return cached;
+  const coords = ferryGraphCoords();
+  const hubs = Object.keys(coords).filter(
+    (icao) => !isBushHub(icao) && !isBushTripOnlyHub(icao),
+  );
+  // Soft-field / trip-only hubs may still be origin or final — add on demand
+  // in the planner. Graph intermediates stay network hubs + waypoints only.
+  const adj = new Map<string, Array<{ to: string; nm: number }>>();
+  for (const icao of hubs) adj.set(icao, []);
+  for (let i = 0; i < hubs.length; i++) {
+    const a = hubs[i]!;
+    const aCoords = coords[a]!;
+    for (let j = i + 1; j < hubs.length; j++) {
+      const b = hubs[j]!;
+      const nm = distanceNm(aCoords, coords[b]!);
+      if (nm > hopRangeNm) continue;
+      adj.get(a)!.push({ to: b, nm });
+      adj.get(b)!.push({ to: a, nm });
+    }
+  }
+  const built: FerryAdjacency = { hopRangeNm, hubs, adj, coords };
+  ferryAdjByHopRange.set(hopRangeNm, built);
+  return built;
+}
+
+/**
+ * Ensure origin/final exist in the adjacency even when they are trip-only /
+ * bush-adjacent hubs that were filtered from the intermediate set.
+ */
+function ensureEndpointInGraph(
+  graph: FerryAdjacency,
+  icao: string,
+): void {
+  if (graph.adj.has(icao)) return;
+  const coords = graph.coords[icao];
+  if (!coords) return;
+  const edges: Array<{ to: string; nm: number }> = [];
+  for (const other of graph.hubs) {
+    const oc = graph.coords[other];
+    if (!oc) continue;
+    const nm = distanceNm(coords, oc);
+    if (nm > graph.hopRangeNm) continue;
+    edges.push({ to: other, nm });
+    graph.adj.get(other)!.push({ to: icao, nm });
+  }
+  graph.adj.set(icao, edges);
+  graph.hubs.push(icao);
 }
 
 export function hubDistanceNm(
@@ -100,124 +174,21 @@ export function isFerryRouteWaypoint(icao: string): boolean {
   return Boolean(FERRY_ROUTE_WAYPOINTS[icao.trim().toUpperCase()]);
 }
 
-/**
- * Multi-hop ferry plan over career hubs + ferry stepping stones.
- * Each hop is ≤ maxRangeNm × margin.
- */
-export function planFerryRoute(opts: {
-  originIcao: string;
-  finalDestIcao: string;
+function buildPlanFromPrev(opts: {
+  origin: string;
+  finalDest: string;
   maxRangeNm: number;
-  rangeMargin?: number;
+  hopRangeNm: number;
+  cost: Map<string, number>;
+  prev: Map<string, string | null>;
 }): FerryRoutePlan {
-  const origin = opts.originIcao.trim().toUpperCase();
-  const finalDest = opts.finalDestIcao.trim().toUpperCase();
-  assertFerryNotBush(origin, finalDest);
-  const maxRangeNm = Math.max(0, opts.maxRangeNm);
-  const margin =
-    typeof opts.rangeMargin === 'number' &&
-    Number.isFinite(opts.rangeMargin) &&
-    opts.rangeMargin > 0 &&
-    opts.rangeMargin <= 1
-      ? opts.rangeMargin
-      : FERRY_ROUTE_RANGE_MARGIN;
-  const hopRangeNm = Math.floor(maxRangeNm * margin);
-  const coords = ferryGraphCoords();
-
-  if (!coords[origin]) {
-    throw new Error(`Unknown career hub: ${origin}`);
-  }
-  if (!coords[finalDest]) {
-    throw new Error(`Unknown career hub: ${finalDest}`);
-  }
-  if (origin === finalDest) {
-    throw new Error(`Aircraft is already at ${finalDest}`);
-  }
-  if (hopRangeNm < 50) {
-    throw new Error(`Aircraft range too short to ferry (${maxRangeNm} nm)`);
-  }
-
-  const directNm = hubDistanceNm(origin, finalDest);
-  if (directNm === undefined) {
-    throw new Error(`No route distance for ${origin}→${finalDest}`);
-  }
-
-  if (directNm <= hopRangeNm) {
-    return {
-      originIcao: origin,
-      finalDestIcao: finalDest,
-      hops: [origin, finalDest],
-      legs: [{ from: origin, to: finalDest, distanceNm: Math.round(directNm) }],
-      totalDistanceNm: Math.round(directNm),
-      legCount: 1,
-      maxRangeNm,
-      hopRangeNm,
-    };
-  }
-
-  const hubs = Object.keys(coords).filter((icao) => {
-    // Soft-field bush never as intermediate. Trip-only / origin / final OK
-    // (final gated by assertFerryNotBush — soft-field blocked, trip-only allowed).
-    if (icao === origin || icao === finalDest) return true;
-    return !isBushHub(icao) && !isBushTripOnlyHub(icao);
-  });
-
-  // Adjacency: undirected hop ≤ hopRange.
-  const adj = new Map<string, Array<{ to: string; nm: number }>>();
-  for (const icao of hubs) adj.set(icao, []);
-  for (let i = 0; i < hubs.length; i++) {
-    const a = hubs[i]!;
-    const aCoords = coords[a]!;
-    for (let j = i + 1; j < hubs.length; j++) {
-      const b = hubs[j]!;
-      const nm = distanceNm(aCoords, coords[b]!);
-      if (nm > hopRangeNm) continue;
-      adj.get(a)!.push({ to: b, nm });
-      adj.get(b)!.push({ to: a, nm });
-    }
-  }
-
-  // Dijkstra: cost = path nm.
+  const { origin, finalDest, maxRangeNm, hopRangeNm, cost, prev } = opts;
   const INF = Number.POSITIVE_INFINITY;
-  const cost = new Map<string, number>();
-  const prev = new Map<string, string | null>();
-  for (const icao of hubs) {
-    cost.set(icao, INF);
-    prev.set(icao, null);
-  }
-  cost.set(origin, 0);
-
-  const unsettled = new Set(hubs);
-  while (unsettled.size > 0) {
-    let u: string | null = null;
-    let best = INF;
-    for (const icao of unsettled) {
-      const c = cost.get(icao) ?? INF;
-      if (c < best) {
-        best = c;
-        u = icao;
-      }
-    }
-    if (u === null || best === INF) break;
-    unsettled.delete(u);
-    if (u === finalDest) break;
-
-    for (const edge of adj.get(u) ?? []) {
-      if (!unsettled.has(edge.to)) continue;
-      const nextCost = best + edge.nm;
-      if (nextCost < (cost.get(edge.to) ?? INF)) {
-        cost.set(edge.to, nextCost);
-        prev.set(edge.to, u);
-      }
-    }
-  }
-
   if ((cost.get(finalDest) ?? INF) === INF) {
     throw new Error(
       `No hub chain within ${hopRangeNm} nm hops from ${origin} to ${finalDest} (aircraft range ${maxRangeNm} nm)`,
     );
   }
-
   const hopsRev: string[] = [];
   let cur: string | null = finalDest;
   while (cur) {
@@ -245,7 +216,6 @@ export function planFerryRoute(opts: {
       );
     }
   }
-
   return {
     originIcao: origin,
     finalDestIcao: finalDest,
@@ -256,4 +226,155 @@ export function planFerryRoute(opts: {
     maxRangeNm,
     hopRangeNm,
   };
+}
+
+export type FerryRoutePlanner = {
+  originIcao: string;
+  maxRangeNm: number;
+  hopRangeNm: number;
+  /** Plan (or throw) from the planner origin to a destination. */
+  planTo(finalDestIcao: string): FerryRoutePlan;
+};
+
+/**
+ * Single-source ferry planner: build adjacency (cached) + Dijkstra once, then
+ * O(path) lookups. Use this when estimating ferry to many charter origins.
+ */
+export function createFerryRoutePlanner(opts: {
+  originIcao: string;
+  maxRangeNm: number;
+  rangeMargin?: number;
+}): FerryRoutePlanner {
+  const origin = opts.originIcao.trim().toUpperCase();
+  const maxRangeNm = Math.max(0, opts.maxRangeNm);
+  const hopRangeNm = resolveHopRangeNm(maxRangeNm, opts.rangeMargin);
+  const coords = ferryGraphCoords();
+  if (!coords[origin]) {
+    throw new Error(`Unknown career hub: ${origin}`);
+  }
+  if (hopRangeNm < 50) {
+    throw new Error(`Aircraft range too short to ferry (${maxRangeNm} nm)`);
+  }
+
+  const graph = getFerryAdjacency(hopRangeNm);
+  ensureEndpointInGraph(graph, origin);
+
+  const INF = Number.POSITIVE_INFINITY;
+  const cost = new Map<string, number>();
+  const prev = new Map<string, string | null>();
+  for (const icao of graph.hubs) {
+    cost.set(icao, INF);
+    prev.set(icao, null);
+  }
+  // Endpoints may have been appended after the hub seed loop.
+  if (!cost.has(origin)) {
+    cost.set(origin, INF);
+    prev.set(origin, null);
+  }
+  cost.set(origin, 0);
+
+  const unsettled = new Set(graph.hubs);
+  while (unsettled.size > 0) {
+    let u: string | null = null;
+    let best = INF;
+    for (const icao of unsettled) {
+      const c = cost.get(icao) ?? INF;
+      if (c < best) {
+        best = c;
+        u = icao;
+      }
+    }
+    if (u === null || best === INF) break;
+    unsettled.delete(u);
+    for (const edge of graph.adj.get(u) ?? []) {
+      if (!unsettled.has(edge.to)) continue;
+      const nextCost = best + edge.nm;
+      if (nextCost < (cost.get(edge.to) ?? INF)) {
+        cost.set(edge.to, nextCost);
+        prev.set(edge.to, u);
+      }
+    }
+  }
+
+  const planCache = new Map<string, FerryRoutePlan>();
+
+  return {
+    originIcao: origin,
+    maxRangeNm,
+    hopRangeNm,
+    planTo(finalDestIcao: string): FerryRoutePlan {
+      const finalDest = finalDestIcao.trim().toUpperCase();
+      assertFerryNotBush(origin, finalDest);
+      if (!coords[finalDest] && !graph.coords[finalDest]) {
+        throw new Error(`Unknown career hub: ${finalDest}`);
+      }
+      if (origin === finalDest) {
+        throw new Error(`Aircraft is already at ${finalDest}`);
+      }
+      const cached = planCache.get(finalDest);
+      if (cached) return cached;
+
+      const directNm = hubDistanceNm(origin, finalDest);
+      if (directNm === undefined) {
+        throw new Error(`No route distance for ${origin}→${finalDest}`);
+      }
+      if (directNm <= hopRangeNm) {
+        const plan: FerryRoutePlan = {
+          originIcao: origin,
+          finalDestIcao: finalDest,
+          hops: [origin, finalDest],
+          legs: [
+            { from: origin, to: finalDest, distanceNm: Math.round(directNm) },
+          ],
+          totalDistanceNm: Math.round(directNm),
+          legCount: 1,
+          maxRangeNm,
+          hopRangeNm,
+        };
+        planCache.set(finalDest, plan);
+        return plan;
+      }
+
+      // Dest may be trip-only / late-added — link into the static graph and
+      // re-relax only from neighbors (cost from origin already known).
+      ensureEndpointInGraph(graph, finalDest);
+      if (!cost.has(finalDest)) {
+        cost.set(finalDest, INF);
+        prev.set(finalDest, null);
+      }
+      for (const edge of graph.adj.get(finalDest) ?? []) {
+        const via = cost.get(edge.to) ?? INF;
+        if (via === INF) continue;
+        const nextCost = via + edge.nm;
+        if (nextCost < (cost.get(finalDest) ?? INF)) {
+          cost.set(finalDest, nextCost);
+          prev.set(finalDest, edge.to);
+        }
+      }
+
+      const plan = buildPlanFromPrev({
+        origin,
+        finalDest,
+        maxRangeNm,
+        hopRangeNm,
+        cost,
+        prev,
+      });
+      planCache.set(finalDest, plan);
+      return plan;
+    },
+  };
+}
+
+/**
+ * Multi-hop ferry plan over career hubs + ferry stepping stones.
+ * Each hop is ≤ maxRangeNm × margin.
+ */
+export function planFerryRoute(opts: {
+  originIcao: string;
+  finalDestIcao: string;
+  maxRangeNm: number;
+  rangeMargin?: number;
+}): FerryRoutePlan {
+  return createFerryRoutePlanner(opts).planTo(opts.finalDestIcao);
 }

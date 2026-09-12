@@ -12,14 +12,24 @@ import {
 } from './career-profiles.ts';
 
 describe('career profiles', () => {
-  it('migrates root sqlite into saves/<id> once', async () => {
+  it('does not invent Pilot 1 from a legacy root sqlite alone', async () => {
     const root = await mkdtemp(join(tmpdir(), 'career-prof-'));
     await writeFile(join(root, 'skyline.sqlite'), 'fake-db');
     const file = await ensureCareerProfilesLayout(root);
-    assert.equal(file.profiles.length, 1);
-    assert.equal(file.profiles[0]!.name, 'Pilot 1');
+    assert.equal(file.profiles.length, 0);
     assert.equal(file.activeId, null);
-    await access(join(root, 'saves', file.profiles[0]!.id, 'skyline.sqlite'));
+    await access(join(root, 'skyline.sqlite'));
+  });
+
+  it('claims legacy root sqlite into the first named profile', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'career-prof-claim-'));
+    await writeFile(join(root, 'skyline.sqlite'), 'fake-db');
+    const meta = await createCareerProfile(root, 'Nothin');
+    assert.equal(meta.name, 'Nothin');
+    const file = await readProfilesFile(root);
+    assert.equal(file.profiles.length, 1);
+    assert.equal(file.profiles[0]!.name, 'Nothin');
+    await access(join(root, 'saves', meta.id, 'skyline.sqlite'));
     await assert.rejects(() => access(join(root, 'skyline.sqlite')));
   });
 

@@ -9,11 +9,14 @@
   ],
   "matchTitlePattern": "Cessna C680",
   "notes": [
-    "Cessna C680 — auto roles pack from homologated profile",
+    "Cessna C680 — Skyward Sovereign+",
     "Profile: skyward/cessna-c680@1.0.0",
     "SimBrief: C680 · Skyward Simulations (MSFS) - C680 Sovereign+ (not Default)",
-    "loadMethod: direct-injection; injectCapable: true",
-    "Cabin seats mapped as baggage (career cargo / pax=0)",
+    "Live map: S1–S2 crew, S3–S12 cabin, S13 cargo bay; S14–S16 Import ghosts omitted from Live (2026-09-12)",
+    "Passenger config inject_verified — charter Skyline Inject seeds N×efbPaxWeightLb (210) + bags on S13",
+    "Skyward EFB SimBrief Import writes leftover mass into S14–S16 while EFB Payload = N×210 + bags on S13 — Career ignores those ghosts (same pattern as JF 146)",
+    "Catalog efbPaxWeightLb: 210",
+    "loadMethod: direct-injection; injectCapable: true (passenger cert inject_verified)",
     "Fuel strategy: simconnect-direct"
   ],
   "fuel": {
@@ -25,139 +28,35 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [
-        1,
-        2
-      ],
-      "baggageStations": [
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16
-      ],
-      "passengerStations": []
+      "crewStations": [1, 2],
+      "passengerStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      "baggageStations": [13]
     }
   },
   "liveSources": {
-    "fuel": [
-      "classic"
-    ],
-    "weights": [
-      "classic-weights"
-    ],
-    "payload": [
-      "classic-stations"
-    ]
+    "fuel": ["classic"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
   },
   "simbriefIcao": "C680",
   "simbriefAirframeMatch": "Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+",
   "stationMap": [
-    {
-      "simVarIndex": 1,
-      "cfgIndex": 0,
-      "name": "Station 1",
-      "role": "crew"
-    },
-    {
-      "simVarIndex": 2,
-      "cfgIndex": 1,
-      "name": "Station 2",
-      "role": "crew"
-    },
-    {
-      "simVarIndex": 3,
-      "cfgIndex": 2,
-      "name": "Station 3",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 4,
-      "cfgIndex": 3,
-      "name": "Station 4",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 5,
-      "cfgIndex": 4,
-      "name": "Station 5",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 6,
-      "cfgIndex": 5,
-      "name": "Station 6",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 7,
-      "cfgIndex": 6,
-      "name": "Station 7",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 8,
-      "cfgIndex": 7,
-      "name": "Station 8",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 9,
-      "cfgIndex": 8,
-      "name": "Station 9",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 10,
-      "cfgIndex": 9,
-      "name": "Station 10",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 11,
-      "cfgIndex": 10,
-      "name": "Station 11",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 12,
-      "cfgIndex": 11,
-      "name": "Station 12",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 13,
-      "cfgIndex": 12,
-      "name": "Station 13",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 14,
-      "cfgIndex": 13,
-      "name": "Station 14",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 15,
-      "cfgIndex": 14,
-      "name": "Station 15",
-      "role": "baggage"
-    },
-    {
-      "simVarIndex": 16,
-      "cfgIndex": 15,
-      "name": "Station 16",
-      "role": "baggage"
-    }
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Cabin seat 1", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Cabin seat 2", "role": "passenger" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Cabin seat 3", "role": "passenger" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Cabin seat 4", "role": "passenger" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Cabin seat 5", "role": "passenger" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Cabin seat 6", "role": "passenger" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Cabin seat 7", "role": "passenger" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Cabin seat 8", "role": "passenger" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Cabin seat 9", "role": "passenger" },
+    { "simVarIndex": 12, "cfgIndex": 11, "name": "Cabin seat 10", "role": "passenger" },
+    { "simVarIndex": 13, "cfgIndex": 12, "name": "Cargo bay", "role": "baggage" },
+    { "simVarIndex": 14, "cfgIndex": 13, "name": "Import ghost 14", "role": "service" },
+    { "simVarIndex": 15, "cfgIndex": 14, "name": "Import ghost 15", "role": "service" },
+    { "simVarIndex": 16, "cfgIndex": 15, "name": "Import ghost 16", "role": "service" }
   ],
   "tolerances": {
     "fuelAbsLb": 50,

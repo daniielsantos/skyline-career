@@ -1,10 +1,11 @@
 import type { Mission } from './api';
 import { aircraftClassLabel } from './AircraftCards';
 
-export type LogbookFlightKind = 'Contract' | 'Ferry' | 'Normal';
+export type LogbookFlightKind = 'Contract' | 'Ferry' | 'Charter' | 'Normal';
 
 /** Contract crew / empty reposition / player freight. */
 export function logbookFlightKind(mission: Mission): LogbookFlightKind {
+  if (mission.missionType === 'charter') return 'Charter';
   if (
     mission.emptyFlight ||
     mission.crewDeadhead ||
@@ -109,6 +110,9 @@ export function logbookCargoLabel(
   mission: Mission,
   formatMass: (kg: number) => string,
 ): string {
+  if (mission.missionType === 'charter') {
+    return `${mission.pax ?? 0} pax · ${formatMass(mission.baggageKg ?? 0)} baggage`;
+  }
   if (mission.cargoKg <= 0 || logbookFlightKind(mission) === 'Ferry') {
     return 'Empty';
   }

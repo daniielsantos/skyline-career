@@ -20,6 +20,9 @@ import {
   quoteAircraftDelivery,
   quoteLeaseEarlyReturnUsd,
   leaseRemainingWeeks,
+  leaseOverdueWeeks,
+  leaseOverdueAmountUsd,
+  payAircraftLeaseOverdue,
   resolveAircraftMsrpUsd,
   returnAircraftLeaseEarly,
   sellPlayerAircraft,
@@ -288,6 +291,61 @@ describe('aircraft market', () => {
         (e) => e.kind === 'lease_early_return' && e.aircraftId === aircraft.id,
       ),
     );
+  });
+
+  it('counts overdue lease weeks from nextDueTick', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-overdue-weeks' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBSP', {
+      pilotName: 'Overdue',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const aircraft = state.fleet[0]!;
+    aircraft.ownership = 'leased';
+    aircraft.leaseOverdue = true;
+    aircraft.lease = {
+      monthlyUsd: 1_000,
+      nextDueTick: world.tick - 96 * 7 * 2,
+      termEndsTick: world.tick + 96 * 60,
+      buyoutUsd: 50_000,
+      listingId: 'acfl_test',
+    };
+    assert.equal(leaseOverdueWeeks(aircraft, world.tick), 3);
+    assert.equal(leaseOverdueAmountUsd(aircraft, world.tick), 3_000);
+    aircraft.leaseOverdue = false;
+    assert.equal(leaseOverdueWeeks(aircraft, world.tick), 0);
+  });
+
+  it('pays overdue lease catch-up immediately and clears the flag', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-pay-overdue' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBRJ', {
+      pilotName: 'CatchUp',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const aircraft = state.fleet[0]!;
+    aircraft.ownership = 'leased';
+    aircraft.leaseOverdue = true;
+    aircraft.lease = {
+      monthlyUsd: 2_000,
+      nextDueTick: world.tick - 96 * 7,
+      termEndsTick: world.tick + 96 * 60,
+      buyoutUsd: 80_000,
+      listingId: 'acfl_catch',
+    };
+    state.walletUsd = 1_000;
+    assert.throws(
+      () => payAircraftLeaseOverdue(state, aircraft.id, world.tick),
+      /Need \$/,
+    );
+    state.walletUsd = 5_000;
+    const lease = aircraft.lease!;
+    const beforeDue = lease.nextDueTick;
+    const result = payAircraftLeaseOverdue(state, aircraft.id, world.tick);
+    assert.equal(result.weeksPaid, 2);
+    assert.equal(result.paidUsd, 4_000);
+    assert.equal(state.walletUsd, 1_000);
+    assert.equal(aircraft.leaseOverdue, false);
+    assert.equal(lease.nextDueTick, beforeDue + 96 * 7 * 2);
+    assert.ok(world.tick < lease.nextDueTick);
   });
 
   it('rejects early return when lease is overdue or aircraft is assigned', () => {

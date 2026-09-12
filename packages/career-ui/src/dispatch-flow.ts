@@ -1,6 +1,7 @@
 import type {
   Mission,
   MissionSettlement,
+  CharterMissionSettlement,
   FlightScoreSnapshot,
   WeatherOpsSnapshot,
   RunwayTouchdownSnapshot,
@@ -214,7 +215,7 @@ export function buildFlightDebrief(opts: {
     | 'settledWeatherBonusUsd'
     | 'settledRunwayTouch'
   >;
-  settlement: MissionSettlement;
+  settlement: MissionSettlement | CharterMissionSettlement;
 }): FlightDebrief {
   const fuelCostUsd = opts.mission.fuelUplift?.costUsd ?? 0;
   const landingFpm =

@@ -18,6 +18,32 @@ import type {
   AirframePerfOverride,
 } from './types/career-economy.js';
 
+export type PassengerCertificationState =
+  | 'catalog_only'
+  | 'dispatch_ready'
+  | 'inject_verified';
+
+export type AirframeConfigurationRole = 'cargo' | 'passenger';
+
+/**
+ * A concrete cabin/configuration inside one Market family SKU.
+ *
+ * baggageAllowanceLbPerPassenger is the SimBrief dispatch allowance. The
+ * configuration capacity is an operational cap, not a substitute for the
+ * aircraft's structural maxCargoKg.
+ */
+export interface CareerAirframeConfiguration {
+  id: string;
+  label: string;
+  role: AirframeConfigurationRole;
+  certificationState: PassengerCertificationState;
+  passengerCapacity: number;
+  requiredCrew: number;
+  baggageAllowanceLbPerPassenger: number;
+  baggageCapacityLb: number;
+  rolesPackRelPath: string;
+}
+
 export interface CareerPlayerAirframe {
   typeId: string;
   aircraftClassId: FreighterClassId;
@@ -28,6 +54,10 @@ export interface CareerPlayerAirframe {
    * (vendor forks). Always includes rolesPackRelPath when resolving.
    */
   familyRolesPackRelPaths?: string[];
+  /** Concrete default persisted on newly bought and normalized fleet tails. */
+  defaultConfigurationId?: string;
+  /** Passenger/cargo eligibility is pack-specific; one SKU still represents the family. */
+  configurations?: CareerAirframeConfiguration[];
   simbriefIcao: string;
   simbriefAirframeMatch: string;
   /** When false, omitted from Aircraft Market. Owned fleet still resolves. Default true. */
@@ -201,11 +231,22 @@ export function resolveAirframeMaxRangeNm(
   );
 }
 
-/** Prefer per-airframe planning burn; else class default. */
+/** Prefer per-airframe planning burn; else class default.
+ * Live cruise-sample overrides (save-scoped) win when present — never mutate
+ * the shared class template from a single hull's sample.
+ */
 export function resolveAirframeFuelBurnKgPerNm(
   airframeTypeId: string | null | undefined,
   aircraftClassId: FreighterClassId | string,
+  liveOverride?: AirframePerfOverride | null,
 ): number {
+  if (
+    typeof liveOverride?.fuelBurnKgPerNm === 'number' &&
+    Number.isFinite(liveOverride.fuelBurnKgPerNm) &&
+    liveOverride.fuelBurnKgPerNm > 0
+  ) {
+    return Math.round(liveOverride.fuelBurnKgPerNm * 1000) / 1000;
+  }
   const airframe = findCareerPlayerAirframe(airframeTypeId);
   if (
     typeof airframe?.fuelBurnKgPerNm === 'number' &&
@@ -276,10 +317,6 @@ export function resolveAirframePerfForUi(
   const airframe = findCareerPlayerAirframe(airframeTypeId);
   const catalogFlow = resolveAirframeCruiseFuelFlowKgPerHour(airframeTypeId);
   const catalogSpeed = resolveAirframeCruiseSpeedKt(airframeTypeId);
-  const catalogBurn = resolveAirframeFuelBurnKgPerNm(
-    airframeTypeId,
-    aircraftClassId,
-  );
   const overrideFlow =
     typeof liveOverride?.cruiseFuelFlowKgPerHour === 'number' &&
     liveOverride.cruiseFuelFlowKgPerHour > 0
@@ -290,11 +327,6 @@ export function resolveAirframePerfForUi(
     liveOverride.cruiseSpeedKt > 0
       ? Math.round(liveOverride.cruiseSpeedKt)
       : undefined;
-  const overrideBurn =
-    typeof liveOverride?.fuelBurnKgPerNm === 'number' &&
-    liveOverride.fuelBurnKgPerNm > 0
-      ? liveOverride.fuelBurnKgPerNm
-      : undefined;
   return {
     maxCargoKg:
       typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
@@ -303,7 +335,11 @@ export function resolveAirframePerfForUi(
     maxRangeNm: resolveAirframeMaxRangeNm(airframeTypeId, aircraftClassId),
     cruiseFuelFlowKgPerHour: overrideFlow ?? catalogFlow,
     cruiseSpeedKt: overrideSpeed ?? catalogSpeed,
-    fuelBurnKgPerNm: overrideBurn ?? catalogBurn,
+    fuelBurnKgPerNm: resolveAirframeFuelBurnKgPerNm(
+      airframeTypeId,
+      aircraftClassId,
+      liveOverride,
+    ),
   };
 }
 
@@ -387,8 +423,63 @@ export function careerPlayerAirframePackPaths(
     ...new Set([
       airframe.rolesPackRelPath,
       ...(airframe.familyRolesPackRelPaths ?? []),
+      ...(airframe.configurations ?? []).map(
+        (configuration) => configuration.rolesPackRelPath,
+      ),
     ]),
   ];
+}
+
+export function findCareerAirframeConfiguration(
+  airframe: CareerPlayerAirframe | undefined,
+  configurationId?: string | null,
+  rolesPackRelPath?: string | null,
+): CareerAirframeConfiguration | undefined {
+  const configurations = airframe?.configurations ?? [];
+  const byId = configurationId?.trim();
+  if (byId) {
+    const match = configurations.find((configuration) => configuration.id === byId);
+    if (match) return match;
+  }
+  const byPack = rolesPackRelPath?.trim();
+  if (byPack) {
+    const match = configurations.find(
+      (configuration) => configuration.rolesPackRelPath === byPack,
+    );
+    if (match) return match;
+  }
+  if (byId || byPack) return undefined;
+  return configurations.find(
+    (configuration) => configuration.id === airframe?.defaultConfigurationId,
+  ) ?? configurations[0];
+}
+
+export function isPassengerConfigurationEligible(
+  configuration: CareerAirframeConfiguration | null | undefined,
+): boolean {
+  return Boolean(
+    configuration &&
+      configuration.role === 'passenger' &&
+      configuration.certificationState !== 'catalog_only' &&
+      configuration.passengerCapacity > 0,
+  );
+}
+
+/** Certified dispatch capacity; cargo and catalog-only packs always resolve to zero. */
+export function resolvePassengerCapacity(
+  airframeTypeId: string | null | undefined,
+  configurationId?: string | null,
+  rolesPackRelPath?: string | null,
+): number {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  const configuration = findCareerAirframeConfiguration(
+    airframe,
+    configurationId,
+    rolesPackRelPath,
+  );
+  return isPassengerConfigurationEligible(configuration)
+    ? Math.max(0, Math.floor(configuration!.passengerCapacity))
+    : 0;
 }
 
 export function listCareerPlayerAirframes(

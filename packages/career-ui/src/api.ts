@@ -406,6 +406,41 @@ export type MarketLot = {
   npcClaim?: NpcClaim | null;
 };
 
+export type CharterFitView = {
+  aircraftId: string;
+  aircraftLabel: string;
+  compatible: boolean;
+  seatCapacity: number;
+  inRange: boolean;
+  baggageOk: boolean;
+  fuelFeasible: boolean;
+  ferryRequired: boolean;
+  ferryNm: number;
+  netUsd: number;
+  reasons: string[];
+};
+
+export type CharterOfferView = {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  originName: string;
+  destName: string;
+  paxCount: number;
+  baggageKg: number;
+  payUsd: number;
+  basePayUsd: number;
+  urgency: 'normal' | 'urgent';
+  reason: string;
+  createdAtTick: number;
+  expiresAtTick: number;
+  ticksRemaining: number;
+  distanceNm: number;
+  international: boolean;
+  status: string;
+  fit?: CharterFitView;
+};
+
 export type OfpCheckFinding = {
   code: string;
   severity: string;
@@ -446,11 +481,16 @@ export type MissionLotLine = {
 
 export type Mission = {
   id: string;
+  missionType?: 'freight' | 'charter';
   status: string;
   originIcao: string;
   destIcao: string;
   commodityId: string;
   cargoKg: number;
+  pax?: number;
+  baggageKg?: number;
+  charterOfferId?: string;
+  charterTier?: string;
   payUsd: number;
   payoutUsd?: number;
   urgency: string;
@@ -633,6 +673,19 @@ export type AirportCommodity = {
   productionPerTickKg: number;
   consumptionPerTickKg: number;
   unitPriceUsd: number;
+};
+
+/** Terminal charter passenger pools (not freight WH stock). */
+export type AirportCharterPools = {
+  waitingPax: number;
+  attractPax: number;
+  capacityPax: number;
+  waitingFillPct: number;
+  attractFillPct: number;
+  waitingBalance: 'surplus' | 'shortage' | 'balanced';
+  attractBalance: 'surplus' | 'shortage' | 'balanced';
+  openOffersFrom: number;
+  openOffersTo: number;
 };
 
 export type AirportLot = {
@@ -973,6 +1026,8 @@ export type AirportView = ClockSync & {
   totalStockKg: number;
   totalStockTonnes: number;
   commodities: AirportCommodity[];
+  /** Charter passenger pools for this Terminal (Inventory tab). */
+  charter?: AirportCharterPools | null;
   outboundLots: AirportLot[];
   inboundLots: AirportLot[];
   arrivals?: AirportMovement[];
@@ -1338,6 +1393,58 @@ export function fetchMarket(
       airframeTypeId?: string | null;
     }
   >(`/api/market${qs ? `?${qs}` : ''}`);
+}
+
+export function fetchCharters(opts: {
+  origin?: string;
+  dest?: string;
+  originQuery?: string;
+  destQuery?: string;
+  lane?: '' | 'intl' | 'domestic' | 'pilot-domestic';
+  fit?: '' | 'open' | 'locked';
+  aircraftId?: string;
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+} = {}) {
+  const qs = new URLSearchParams();
+  const origin = opts.origin?.trim().toUpperCase();
+  const dest = opts.dest?.trim().toUpperCase();
+  const aircraftId = opts.aircraftId?.trim();
+  if (origin) qs.set('origin', origin);
+  if (dest) qs.set('dest', dest);
+  const originQuery = opts.originQuery?.trim();
+  if (originQuery) qs.set('originQ', originQuery);
+  const destQuery = opts.destQuery?.trim();
+  if (destQuery) qs.set('destQ', destQuery);
+  if (opts.lane) qs.set('lane', opts.lane);
+  if (opts.fit) qs.set('fit', opts.fit);
+  if (aircraftId) qs.set('aircraftId', aircraftId);
+  if (opts.page !== undefined) qs.set('page', String(opts.page));
+  if (opts.pageSize !== undefined) qs.set('pageSize', String(opts.pageSize));
+  if (opts.sort?.trim()) qs.set('sort', opts.sort.trim());
+  return api<{
+    offers: CharterOfferView[];
+    total: number;
+    page: number;
+    pageCount: number;
+    tick: number;
+    sort?: string;
+  }>(`/api/charters${qs.size ? `?${qs.toString()}` : ''}`);
+}
+
+export function postCharterAccept(opts: {
+  offerId: string;
+  aircraftId: string;
+}) {
+  return api<{
+    mission: Mission;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+  }>('/api/charters/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
 }
 
 /** Fetch every available lot for one exact route (not the global 200-row slice). */
@@ -2089,6 +2196,18 @@ export function postAircraftBuyout(opts: { aircraftId: string }) {
     debitUsd: number;
     fleet: PlayerAircraft[];
   }>('/api/aircraft-market/buyout', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAircraftPayLease(opts: { aircraftId: string }) {
+  return api<{
+    walletUsd: number;
+    paidUsd: number;
+    weeksPaid: number;
+    fleet: PlayerAircraft[];
+  }>('/api/aircraft-market/pay-lease', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
@@ -3889,6 +4008,7 @@ export function postFuelPurchase(missionId: string) {
 }
 
 export type MissionSettlement = {
+  settlementType?: 'freight';
   payoutUsd: number;
   penaltyUsd: number;
   lateTicks: number;
@@ -3910,6 +4030,32 @@ export type MissionSettlement = {
   /** Cargo Ops ladder deltas from this settle. */
   cargoOpsDeltas?: CargoOpsDelta[];
   /** Class Ops ladder deltas from this settle. */
+  classOpsDeltas?: ClassOpsDelta[];
+};
+
+export type CharterMissionSettlement = {
+  settlementType: 'charter';
+  missionId: string;
+  offerId: string;
+  demandId: string;
+  passengerCount: number;
+  baggageKg: number;
+  payoutUsd: number;
+  penaltyUsd: number;
+  lateTicks: number;
+  onTime: boolean;
+  deliveredKg: number;
+  settledAtTick: number;
+  pressureBefore: number;
+  pressureAfter: number;
+  residualFuelKg: number | null;
+  landingFpm?: number | null;
+  flightDurationMs?: number | null;
+  flightScore?: FlightScoreSnapshot | null;
+  weatherBonusUsd?: number;
+  weatherOps?: WeatherOpsSnapshot | null;
+  runwayTouch?: RunwayTouchdownSnapshot | null;
+  cargoOpsDeltas?: CargoOpsDelta[];
   classOpsDeltas?: ClassOpsDelta[];
 };
 
@@ -3984,7 +4130,7 @@ export type WatchStatus = {
   settling?: boolean;
   /** Live parking-brake latch from MSFS (settle trigger). */
   parkingBrake?: boolean | null;
-  settlement: MissionSettlement | null;
+  settlement: MissionSettlement | CharterMissionSettlement | null;
   walletUsd: number | null;
   autoDepart: boolean;
   autoSettle: boolean;
@@ -4094,7 +4240,7 @@ export function postSettle(opts: { missionId: string }) {
   return api<{
     mission: Mission;
     walletUsd: number;
-    settlement: MissionSettlement;
+    settlement: MissionSettlement | CharterMissionSettlement;
     fleet?: PlayerAircraft[];
     pilotIcao?: string;
     activeTour?: ActiveTourView | null;

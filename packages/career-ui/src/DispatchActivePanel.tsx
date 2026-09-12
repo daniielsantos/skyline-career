@@ -1,5 +1,5 @@
 import type { Mission, MissionFuelQuote, SimBridgeStatus, WatchStatus } from './api';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import {
   DISPATCH_STEP_LABEL,
   DISPATCH_STEP_ORDER,
@@ -34,6 +34,7 @@ import {
 import { mxFuelBurnAlertText } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
 import { CargoLotCards } from './CargoLotCards';
+import { playUiSound } from './ui-sounds';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -187,6 +188,10 @@ export function DispatchActivePanel(props: {
     stickyFuelRef.current = {};
   }
   stickyInjectStatusRef.current = props.loadOfpAutoStatus;
+  const preflightWasReadyRef = useRef(false);
+  useEffect(() => {
+    preflightWasReadyRef.current = false;
+  }, [mission.id]);
   const watchPos = props.watch?.position;
   if (
     watchRunning &&
@@ -517,8 +522,14 @@ export function DispatchActivePanel(props: {
             <DispatchFlightSummary
               ariaLabel="Dispatch summary"
               formatTonnes={props.formatTonnes}
-              capacityLabel="Payload loaded"
-              totalKg={mission.cargoKg}
+              capacityLabel={
+                mission.missionType === 'charter' ? 'Charter payload' : 'Payload loaded'
+              }
+              totalKg={
+                mission.missionType === 'charter'
+                  ? ((mission.pax ?? 0) * 175) / KG_TO_LB + (mission.baggageKg ?? 0)
+                  : mission.cargoKg
+              }
               capKg={structuralMaxKg}
               capacityNote={routeOpsNote}
               highlights={[
@@ -528,28 +539,57 @@ export function DispatchActivePanel(props: {
                 },
                 { label: 'Deadline', value: deadlineLabel },
                 { label: 'Route', value: routeLabel },
+                ...(mission.missionType === 'charter'
+                  ? [
+                      {
+                        label: 'Passengers',
+                        value: String(mission.pax ?? 0),
+                      },
+                    ]
+                  : []),
               ]}
               planningDetails={
                 <>
-                  <span>
-                    Capacity left
-                    <strong>{props.formatTonnes(capacityLeftKg)}</strong>
-                    <em>structural</em>
-                  </span>
-                  {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg ? (
-                    <span>
-                      Route ops cap
-                      <strong>{props.formatTonnes(opsCapKg)}</strong>
-                      <em>MTOW − fuel estimate for this leg</em>
-                    </span>
-                  ) : null}
-                  <span>
-                    Cargo lots
-                    <strong>{mission.lots?.length ?? 1}</strong>
-                    <em>
-                      {(mission.lots?.length ?? 1) > 1 ? 'multi-lot manifest' : 'single lot'}
-                    </em>
-                  </span>
+                  {mission.missionType === 'charter' ? (
+                    <>
+                      <span>
+                        Passengers
+                        <strong>{mission.pax ?? 0}</strong>
+                        <em>charter group</em>
+                      </span>
+                      <span>
+                        Baggage
+                        <strong>
+                          {formatMassExact(mission.baggageKg ?? 0, weightSystem)}
+                        </strong>
+                        <em>contracted</em>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        Capacity left
+                        <strong>{props.formatTonnes(capacityLeftKg)}</strong>
+                        <em>structural</em>
+                      </span>
+                      {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg ? (
+                        <span>
+                          Route ops cap
+                          <strong>{props.formatTonnes(opsCapKg)}</strong>
+                          <em>MTOW − fuel estimate for this leg</em>
+                        </span>
+                      ) : null}
+                      <span>
+                        Cargo lots
+                        <strong>{mission.lots?.length ?? 1}</strong>
+                        <em>
+                          {(mission.lots?.length ?? 1) > 1
+                            ? 'multi-lot manifest'
+                            : 'single lot'}
+                        </em>
+                      </span>
+                    </>
+                  )}
                   {mission.fuelUplift &&
                   (mission.fuelUplift.costUsd > 0 ||
                     mission.fuelUplift.requestedKg > 0.5) ? (
@@ -577,9 +617,10 @@ export function DispatchActivePanel(props: {
         ['accepted', 'dispatched'].includes(mission.status)) ? (
         <div className="staging-section">
           <div className="staging-section-head">
-            <h3>Cargo</h3>
+            <h3>{mission.missionType === 'charter' ? 'Passengers' : 'Cargo'}</h3>
             {['accepted', 'dispatched'].includes(mission.status) &&
-            !mission.contractPilot ? (
+            !mission.contractPilot &&
+            mission.missionType !== 'charter' ? (
               <button
                 type="button"
                 className="action ghost info dispatch-edit-btn"
@@ -591,7 +632,14 @@ export function DispatchActivePanel(props: {
               </button>
             ) : null}
           </div>
-          {(mission.lots?.length ?? 0) > 0 ? (
+          {mission.missionType === 'charter' ? (
+            <p className="empty">
+              {mission.pax ?? 0} passenger{(mission.pax ?? 0) === 1 ? '' : 's'}
+              {' · '}
+              {formatMassExact(mission.baggageKg ?? 0, weightSystem)} baggage
+              {mission.reason?.trim() ? ` · ${mission.reason.trim()}` : ''}
+            </p>
+          ) : (mission.lots?.length ?? 0) > 0 ? (
             <CargoLotCards
               lots={mission.lots!}
               formatTonnes={props.formatTonnes}
@@ -1245,6 +1293,12 @@ export function DispatchActivePanel(props: {
             const ready = injectBusy
               ? false
               : loadReady && locationOk;
+            if (ready && !preflightWasReadyRef.current) {
+              preflightWasReadyRef.current = true;
+              queueMicrotask(() => playUiSound('preflight_ready'));
+            } else if (!ready) {
+              preflightWasReadyRef.current = false;
+            }
             const injectFailed =
               props.loadOfpAutoStatus === 'failed' && !ready;
             const injectSwitchOn =

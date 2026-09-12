@@ -520,10 +520,13 @@ export async function buildMissionDispatch(
   // Reusing it after payload edits lets SimBrief return the previous OFP and
   // can produce a false PASS when the revised values happen to match.
   const staticId = makeStaticId('career');
+  const charter = mission.missionType === 'charter';
   const cargoKg = Math.max(
     0,
     Math.floor(
-      typeof opts.cargoKg === 'number' && Number.isFinite(opts.cargoKg)
+      charter
+        ? mission.baggageKg ?? 0
+        : typeof opts.cargoKg === 'number' && Number.isFinite(opts.cargoKg)
         ? opts.cargoKg
         : mission.cargoKg,
     ),
@@ -533,7 +536,7 @@ export async function buildMissionDispatch(
   // light_ga SimBrief airframes (BN2, Comanche, …) drive load via Payload, not
   // Freight — cargo= hits a small maxcargo soft-cap while manualpayload fills
   // the field that matches EFB useful load.
-  const usePayloadPrefill = simBriefPrefillsPayloadNotFreight(
+  const usePayloadPrefill = !charter && simBriefPrefillsPayloadNotFreight(
     mission.aircraftClassId,
     mission.airframeTypeId,
   );
@@ -565,11 +568,15 @@ export async function buildMissionDispatch(
     maxPaxSeatsResolved = maxPax;
     paxAndCargo = planPaxAndCargoSimBriefLoad({ cargoKg, maxPax });
   }
-  const dispatchPax = paxAndCargo?.pax ?? (pureFreighterSimBrief ? 0 : 1);
-  const dispatchCargoKg = paxAndCargo?.cargoKg ?? cargoKg;
+  const dispatchPax = charter
+    ? mission.pax
+    : paxAndCargo?.pax ?? (pureFreighterSimBrief ? 0 : 1);
+  const dispatchCargoKg = charter ? mission.baggageKg ?? 0 : paxAndCargo?.cargoKg ?? cargoKg;
   const freightThousands = cargoWeightToThousands(
     units === 'LBS' ? dispatchCargoKg * KG_TO_LB : dispatchCargoKg,
   );
+  // Charter: bags go only through bagwgt×pax. Passing cargo= as well double-counts
+  // on SimBrief (bagwgt×N + freight ≈ 2× contracted baggage) and fails OFP check.
   const url = buildDispatchRedirectUrl({
     type,
     orig: canonicalCareerAirportIcao(mission.originIcao),
@@ -577,12 +584,27 @@ export async function buildMissionDispatch(
     pax: dispatchPax,
     ...(usePayloadPrefill
       ? { manualPayload: cargoThousands }
-      : { cargo: freightThousands }),
+      : charter
+        ? {}
+        : { cargo: freightThousands }),
     units,
     staticId,
     // Dual Class airframes default ~190 lb paxwgt; force Skyline 175+55 so
     // Payload ≈ mission freight (same math as planPaxAndCargoSimBriefLoad).
-    ...(paxAndCargo
+    ...(charter
+      ? {
+          acdata: {
+            paxwgt: SIMBRIEF_STANDARD_PAX_LB,
+            bagwgt: Math.max(
+              1,
+              Math.round(
+                ((mission.baggageKg ?? 0) * KG_TO_LB) /
+                  Math.max(1, mission.pax),
+              ),
+            ),
+          },
+        }
+      : paxAndCargo
       ? {
           acdata: {
             paxwgt: SIMBRIEF_STANDARD_PAX_LB,
@@ -596,7 +618,15 @@ export async function buildMissionDispatch(
     staticId,
     type,
     airframeLabel,
-    cargoThousands: usePayloadPrefill ? cargoThousands : freightThousands,
+    cargoThousands: usePayloadPrefill
+      ? cargoThousands
+      : charter
+        ? cargoWeightToThousands(
+            units === 'LBS'
+              ? (mission.baggageKg ?? 0) * KG_TO_LB
+              : (mission.baggageKg ?? 0),
+          )
+        : freightThousands,
     cargoKg,
     units,
     ...(maxPaxSeatsResolved !== undefined

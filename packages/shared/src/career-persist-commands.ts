@@ -25,6 +25,7 @@ import {
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
+  CharterSettlement,
   FreighterClassId,
   MissionIntent,
   MissionSettlement,
@@ -96,11 +97,34 @@ function fleetAircraftForListing(
   return undefined;
 }
 
-function settlementFromSettledMission(mission: MissionIntent): MissionSettlement {
+function settlementFromSettledMission(
+  mission: MissionIntent,
+): MissionSettlement | CharterSettlement {
   const lateTicks = mission.lateTicks ?? 0;
   const payoutUsd = mission.payoutUsd ?? 0;
   const penaltyUsd = mission.penaltyUsd ?? 0;
+  if (mission.missionType === 'charter') {
+    return {
+      settlementType: 'charter',
+      missionId: mission.id,
+      offerId: mission.charterOfferId ?? '',
+      demandId: mission.charterDemandId ?? '',
+      passengerCount: mission.pax,
+      baggageKg: mission.baggageKg ?? 0,
+      payoutUsd,
+      settledAtTick: mission.settledAtTick ?? 0,
+      pressureBefore: 0,
+      pressureAfter: 0,
+      penaltyUsd,
+      lateTicks,
+      onTime: lateTicks === 0,
+      deliveredKg: 0,
+      originStockAfterKg: 0,
+      destStockAfterKg: 0,
+    };
+  }
   return {
+    settlementType: 'freight',
     missionId: mission.id,
     deliveredKg: mission.cargoKg,
     payoutUsd,
@@ -133,6 +157,8 @@ export function applySettleWalletDeltas(
       amountUsd: result.walletCreditUsd,
       kind: internalHaul
         ? 'internal_haul_pay'
+        : mission.missionType === 'charter'
+          ? 'charter_payout'
         : mission.demandOrderId
           ? 'demand_payout'
           : 'freight_payout',

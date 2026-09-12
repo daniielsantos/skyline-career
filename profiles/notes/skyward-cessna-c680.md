@@ -19,6 +19,9 @@
 - Skyward Simulations Citation Sovereign+ (C680).
 - SimBrief airframe: `Skyward Simulations (MSFS) - C680 Sovereign+` (not Default) — OEW ~18691 lb on that row.
 - Direct-injection via classic LEFT_MAIN/RIGHT_MAIN + 16 payload stations.
+- **Station roles (2026-09-12):** S1–S2 crew, S3–S12 cabin, **S13 cargo bay**; **S14–S16 Import ghosts** omitted from Live (EFB Payload matches cabin+S13; Import still writes junk into 14–16).
+- **Charter:** passenger config **`inject_verified`** — Skyline Inject OK (seeds N×`efbPaxWeightLb` 210 + bags on S13). EFB Import still usable; ghosts ignored on Live.
+- **Catalog:** `efbPaxWeightLb: 210`. Units **LB**.
 - CG envelope 18-40% source=manual (SimVar aft ~31% too tight vs live/sweep ~34%).
 - Smoke passed after manual aft override.
 - Homologated outside wizard (promote after smoke).

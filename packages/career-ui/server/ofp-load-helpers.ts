@@ -1314,12 +1314,22 @@ async function applyMissionOfpLoadExclusive(
       stations: { ...beforeLive.stations },
     };
 
-    const seatStations = built.seatStations ?? [
+    const allCabinPassengerStations = [...(built.passengerStations ?? [])];
+    const cabinPassengerStations =
+      mission.missionType === 'charter'
+        ? allCabinPassengerStations.slice(0, Math.max(0, Math.floor(mission.pax)))
+        : allCabinPassengerStations;
+    const unusedCharterPassengerStations =
+      mission.missionType === 'charter'
+        ? allCabinPassengerStations.slice(cabinPassengerStations.length)
+        : [];
+    const seatStations = mission.missionType === 'charter'
+      ? [...built.crewStations, ...cabinPassengerStations]
+      : built.seatStations ?? [
       ...built.crewStations,
-      ...(built.passengerStations ?? []),
+      ...allCabinPassengerStations,
     ];
     let baggageStations = [...built.baggageStations];
-    const cabinPassengerStations = [...(built.passengerStations ?? [])];
     const minRetainByIndex: Record<number, number> = {};
     for (const idx of built.crewStations) {
       minRetainByIndex[idx] = FREIGHTER_PILOT_LB;
@@ -1329,8 +1339,14 @@ async function applyMissionOfpLoadExclusive(
     const preferSeatFill =
       !paxAndCargoClassic && cabinPassengerStations.length > 0;
     if (paxAndCargoClassic) {
+      const seatBodyLb =
+        typeof careerAirframe?.efbPaxWeightLb === 'number' &&
+        Number.isFinite(careerAirframe.efbPaxWeightLb) &&
+        careerAirframe.efbPaxWeightLb > 0
+          ? careerAirframe.efbPaxWeightLb
+          : SIMBRIEF_STANDARD_PAX_LB;
       for (const idx of cabinPassengerStations) {
-        minRetainByIndex[idx] = SIMBRIEF_STANDARD_PAX_LB;
+        minRetainByIndex[idx] = seatBodyLb;
       }
     }
     const seatSoftMaxByIndex: Record<number, number> = {};
@@ -1363,7 +1379,9 @@ async function applyMissionOfpLoadExclusive(
     // Start from crew floors (+ pax body for pax_and_cargo); baggage empty.
     let workingStations: Record<number, number> = {};
     for (const station of resolved.profile.payload.stations) {
-      if (seatStations.includes(station.index) || baggageStations.includes(station.index)) {
+      if (unusedCharterPassengerStations.includes(station.index)) {
+        workingStations[station.index] = 0;
+      } else if (seatStations.includes(station.index) || baggageStations.includes(station.index)) {
         workingStations[station.index] = minRetainByIndex[station.index] ?? 0;
       } else {
         workingStations[station.index] =

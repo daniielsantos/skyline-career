@@ -4,6 +4,17 @@ Jets de passageiro no Career: freight vai na **cabine + leftover cargo**, não `
 
 SimBrief Dispatch usa **175+55 lb/assento** (`paxwgt`/`bagwgt`). O Due do Preflight **não** é o klb do contrato no topo (isso é freight da missão). Due = payload OFP (pax+bags+cargo), depois os ajustes abaixo.
 
+**Charter (2026-09-07; bag prefill 2026-09-12):** manifesto é indivisível:
+Dispatch manda `pax=N` exato e bagagem **só** via `acdata.bagwgt`
+(lb/pax = bagagem÷N). **Não** mandar `cargo=` junto — SimBrief soma
+bagwgt×N + freight e o OFP falha (ex. ~160+159≈320 lb vs missão 159 lb).
+OFP exige N e bagagem exatos (±1 kg). `accept-ofp-cargo` e trim parcial
+são bloqueados. Config `inject_verified` pode usar inject direto (Phenom / C680:
+só N estações a pax body + holds; C680 body = `efbPaxWeightLb` 210); `dispatch_ready` permanece EFB/manual.
+Loaded vs Due usa Payload do OFP (pax + bags), nunca `mission.cargoKg=0`.
+Product umbrella = **Charter** (tier `executive` is pay only). Dispatch UI
+mostra pax + bagagem no summary (não a seção vazia de cargo lots).
+
 **Não** re-clampa Due/inject com EMPTY×MTOW live — mesmo contrato do freighter. Hard caps = hold/EFB (`simconnectCargoHoldMaxLb`, `efbPaxWeightLb`). MTOW fica no SimBrief + Accept.
 
 **Não** usar Import Weights do MSFS SimBrief EFB em JF / iniBuilds — estraga CG. Load no **tablet do addon**.
@@ -70,7 +81,15 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 
 | SKU | pax_and_cargo | Extra |
 |-----|---------------|--------|
-| `fsreborn-phenom-300e` | 7 | `simconnectCargoHoldMaxLb: 463`; inject seeds 175/seat + holds only (no GA seat dump) |
+| `workingtitle-cessna-citation-cj4` | 10 | Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax baggage dispatch allowance. Inject not live-certified |
+| `workingtitle-cessna-citation-longitude-passengers` | 12 | Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax. Inject not live-certified |
+| `skyward-cessna-c680` | 12 | `inject_verified` + `efbPaxWeightLb: 210` (2026-09-12). Live = S3–S12 cabin + **S13** bags; **S14–S16** Import ghosts omitted. Charter Inject seeds N×210 + bags. |
+| `flightfx-citation-x` | 12 | Passenger/Winglets shared pack `dispatch_ready`; 2 crew. Inject not live-certified |
+| `flightfx-mg-hjet-ha420` | 5 | Passenger pack `dispatch_ready`; 2 crew / 5 cabin stations. Inject not live-certified |
+| `flysimware-learjet-35a-cargo` | 8 | One family SKU: cargo packs = 0 pax; Passenger + Passenger LR `dispatch_ready`; inject not live-certified |
+| `microsoft-pc-24-cargo` | 7 | One family SKU: Cargo = 0 pax; VIP `dispatch_ready`; inject not live-certified |
+| `fsreborn-phenom-300e` | 7 | Passenger pack `inject_verified`; `simconnectCargoHoldMaxLb: 463`; inject seeds 175/seat + holds only |
+| `workingtitle-microsoft-vision-jet-complete-seating` | 4 | Complete Seating pack `dispatch_ready`; 2 crew / 4 cabin stations. Inject not live-certified |
 | `justflight-f70` | 70 | `simconnectCabinSeats: 80`, `simconnectCargoHoldMaxLb: 5000` (freight coube) |
 | `justflight-f100` | 100 | `simconnectCargoHoldMaxLb: 7784` — **sem** cabin overshoot (100 slots) |
 | `justflight-146-300` (QT pack) | freighter glass | Live = **S3–S12** only (EFB Side+FWD+AFT). S13+ ghost — omit from roles |

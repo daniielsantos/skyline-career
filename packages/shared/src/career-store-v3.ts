@@ -987,6 +987,10 @@ function missionCoreAndPayload(m: MissionIntent): {
     originIcao,
     destIcao,
     aircraftId,
+    missionType,
+    charterOfferId,
+    pax,
+    baggageKg,
     commodityId,
     cargoKg,
     payUsd,
@@ -1005,6 +1009,11 @@ function missionCoreAndPayload(m: MissionIntent): {
       originIcao,
       destIcao,
       aircraftId,
+      missionType: missionType ?? 'freight',
+      charterOfferId,
+      pax: missionType === 'charter' ? Math.max(1, Math.min(12, Math.floor(pax))) : 0,
+      baggageKg:
+        missionType === 'charter' ? Math.max(0, Math.round(baggageKg ?? 0)) : 0,
       commodityId,
       cargoKg,
       payUsd,
@@ -1275,11 +1284,13 @@ function upsertMissionRows(
 ): void {
   const upsert = db.prepare(
     `INSERT INTO missions (
-       id, company_id, status, origin_icao, dest_icao, aircraft_id, commodity_id,
+       id, company_id, status, origin_icao, dest_icao, aircraft_id,
+       mission_type, charter_offer_id, pax, baggage_kg, commodity_id,
        cargo_kg, pay_usd, accepted_at_tick, deadline_tick, departed_at_tick,
        settled_at_tick, urgency, reason, payload_json
      ) VALUES (
-       @id, @company_id, @status, @origin_icao, @dest_icao, @aircraft_id, @commodity_id,
+       @id, @company_id, @status, @origin_icao, @dest_icao, @aircraft_id,
+       @mission_type, @charter_offer_id, @pax, @baggage_kg, @commodity_id,
        @cargo_kg, @pay_usd, @accepted_at_tick, @deadline_tick, @departed_at_tick,
        @settled_at_tick, @urgency, @reason, @payload_json
      )
@@ -1289,6 +1300,10 @@ function upsertMissionRows(
        origin_icao = excluded.origin_icao,
        dest_icao = excluded.dest_icao,
        aircraft_id = excluded.aircraft_id,
+       mission_type = excluded.mission_type,
+       charter_offer_id = excluded.charter_offer_id,
+       pax = excluded.pax,
+       baggage_kg = excluded.baggage_kg,
        commodity_id = excluded.commodity_id,
        cargo_kg = excluded.cargo_kg,
        pay_usd = excluded.pay_usd,
@@ -1309,6 +1324,10 @@ function upsertMissionRows(
       origin_icao: sqlVal(core.originIcao),
       dest_icao: sqlVal(core.destIcao),
       aircraft_id: sqlVal(core.aircraftId),
+      mission_type: sqlVal(core.missionType) ?? 'freight',
+      charter_offer_id: sqlVal(core.charterOfferId),
+      pax: sqlVal(core.pax) ?? 0,
+      baggage_kg: sqlVal(core.baggageKg) ?? 0,
       commodity_id: sqlVal(core.commodityId),
       cargo_kg: sqlVal(core.cargoKg) ?? 0,
       pay_usd: sqlVal(core.payUsd) ?? 0,
@@ -1326,7 +1345,8 @@ function upsertMissionRows(
 export function readMissionsTable(db: SqliteDb, companyId: string): MissionIntent[] {
   const rows = db
     .prepare(
-      `SELECT id, status, origin_icao, dest_icao, aircraft_id, commodity_id, cargo_kg,
+      `SELECT id, status, origin_icao, dest_icao, aircraft_id,
+              mission_type, charter_offer_id, pax, baggage_kg, commodity_id, cargo_kg,
               pay_usd, accepted_at_tick, deadline_tick, departed_at_tick, settled_at_tick,
               urgency, reason, payload_json
        FROM missions WHERE company_id = ? ORDER BY accepted_at_tick ASC, id ASC`,
@@ -1337,6 +1357,10 @@ export function readMissionsTable(db: SqliteDb, companyId: string): MissionInten
     origin_icao: string;
     dest_icao: string;
     aircraft_id: string | null;
+    mission_type: string;
+    charter_offer_id: string | null;
+    pax: number;
+    baggage_kg: number;
     commodity_id: string;
     cargo_kg: number;
     pay_usd: number;
@@ -1360,11 +1384,14 @@ export function readMissionsTable(db: SqliteDb, companyId: string): MissionInten
     const mission = {
       ...extra,
       id: r.id,
+      missionType: r.mission_type === 'charter' ? 'charter' : 'freight',
       status: r.status as MissionStatus,
       originIcao: r.origin_icao,
       destIcao: r.dest_icao,
       commodityId: r.commodity_id as CommodityId,
       cargoKg: r.cargo_kg,
+      pax: r.mission_type === 'charter' ? Math.max(1, Math.min(12, r.pax)) : 0,
+      baggageKg: r.mission_type === 'charter' ? Math.max(0, r.baggage_kg) : 0,
       payUsd: r.pay_usd,
       acceptedAtTick: r.accepted_at_tick,
       deadlineTick: r.deadline_tick,
@@ -1372,6 +1399,7 @@ export function readMissionsTable(db: SqliteDb, companyId: string): MissionInten
       reason: r.reason,
     } as MissionIntent;
     if (r.aircraft_id) mission.aircraftId = r.aircraft_id;
+    if (r.charter_offer_id) mission.charterOfferId = r.charter_offer_id;
     if (typeof r.departed_at_tick === 'number') mission.departedAtTick = r.departed_at_tick;
     if (typeof r.settled_at_tick === 'number') mission.settledAtTick = r.settled_at_tick;
     return mission;

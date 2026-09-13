@@ -275,6 +275,7 @@ type LotSqlRow = {
   urgency: string;
   reason: string;
   status: string;
+  claimed_by_company_id?: string | null;
 };
 
 function lotFromRow(r: LotSqlRow): ShipmentLot {
@@ -295,6 +296,8 @@ function lotFromRow(r: LotSqlRow): ShipmentLot {
   if (typeof r.base_pay_usd === 'number' && Number.isFinite(r.base_pay_usd)) {
     lot.basePayUsd = r.base_pay_usd;
   }
+  const claim = r.claimed_by_company_id?.trim();
+  if (claim) lot.claimedByCompanyId = claim;
   return lot;
 }
 
@@ -302,7 +305,8 @@ export function readLotsRows(db: SqliteDb): ShipmentLot[] {
   const rows = db
     .prepare(
       `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
+              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+              claimed_by_company_id
        FROM lots ORDER BY created_at_tick ASC, id ASC`,
     )
     .all() as LotSqlRow[];
@@ -320,7 +324,8 @@ export function readLotsByIds(db: SqliteDb, ids: string[]): ShipmentLot[] {
     const rows = db
       .prepare(
         `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-                created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
+                created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+                claimed_by_company_id
          FROM lots WHERE id IN (${placeholders}) ORDER BY created_at_tick ASC, id ASC`,
       )
       .all(...chunk) as LotSqlRow[];
@@ -406,11 +411,11 @@ export function upsertLotRows(
     `INSERT INTO lots (
        id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
        created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
-       origin_country_id, dest_country_id, world_id
+       origin_country_id, dest_country_id, world_id, claimed_by_company_id
      ) VALUES (
        @id, @commodity_id, @origin_icao, @dest_icao, @quantity_kg, @reserved_kg,
        @created_at_tick, @expires_at_tick, @pay_usd, @base_pay_usd, @urgency, @reason, @status,
-       @origin_country_id, @dest_country_id, @world_id
+       @origin_country_id, @dest_country_id, @world_id, @claimed_by_company_id
      )
      ON CONFLICT(id) DO UPDATE SET
        commodity_id = excluded.commodity_id,
@@ -427,7 +432,8 @@ export function upsertLotRows(
        status = excluded.status,
        origin_country_id = excluded.origin_country_id,
        dest_country_id = excluded.dest_country_id,
-       world_id = excluded.world_id`,
+       world_id = excluded.world_id,
+       claimed_by_company_id = excluded.claimed_by_company_id`,
   );
   for (const lot of lots) {
     upsert.run({
@@ -450,6 +456,7 @@ export function upsertLotRows(
       origin_country_id: countryForIcao(countries, lot.originIcao) || null,
       dest_country_id: countryForIcao(countries, lot.destIcao) || null,
       world_id: LOCAL_WORLD_ID_V3,
+      claimed_by_company_id: lot.claimedByCompanyId?.trim() || null,
     });
   }
 }

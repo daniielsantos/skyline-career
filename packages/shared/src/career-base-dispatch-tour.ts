@@ -351,7 +351,7 @@ export function softHoldTourNextLeg(
   if (avail <= 0) return null;
   const kg = Math.min(want, avail);
   try {
-    reserveShipmentLot(world, target.lotId, kg);
+    reserveShipmentLot(world, target.lotId, kg, { companyId });
   } catch {
     return null;
   }

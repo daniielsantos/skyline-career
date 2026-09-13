@@ -15,6 +15,7 @@ import {
   cancelMission,
   commitStagedManifest,
   departMission,
+  LotClaimConflictError,
   normalizeMissionIntent,
   settleMission,
   type DepartMissionResult,
@@ -22,6 +23,7 @@ import {
   type SettleMissionOpts,
   type SettleMissionResult,
 } from './career-mission.js';
+import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
@@ -252,16 +254,20 @@ export type ExecuteAcceptLotOpts = {
   maxCargoKg?: number;
   cargoOps?: CareerMissionsState['cargoOps'];
   classOps?: CareerMissionsState['classOps'];
+  /** Claiming company — SP defaults to LOCAL_COMPANY_ID. */
+  companyId?: string;
 };
 
 export type ExecuteAcceptLotResult =
   | { kind: 'missing_lot' }
   | { kind: 'missing_mission' }
+  | { kind: 'conflict'; claimedByCompanyId: string }
   | { kind: 'replay'; mission: MissionIntent; appended: boolean }
   | { kind: 'applied'; mission: MissionIntent; appended: boolean };
 
 /**
  * AcceptLot: reserve once. Replay if this company already holds the lot on an open flight.
+ * Conflict if another company already claimed the lot (MP-shaped; SP always `local`).
  */
 export function executeAcceptLot(
   world: CareerEconomyWorld,
@@ -271,6 +277,12 @@ export function executeAcceptLot(
   const lotId = opts.lotId.trim();
   const lot = world.lots.find((row) => row.id === lotId);
   if (!lot) return { kind: 'missing_lot' };
+
+  const companyId = opts.companyId?.trim() || LOCAL_COMPANY_ID;
+  const holder = lot.claimedByCompanyId?.trim();
+  if (holder && holder !== companyId) {
+    return { kind: 'conflict', claimedByCompanyId: holder };
+  }
 
   let intoMission: MissionIntent | undefined;
   if (opts.intoMissionId) {
@@ -284,19 +296,27 @@ export function executeAcceptLot(
   }
 
   const beforeLots = intoMission?.lots.length ?? 0;
-  const mission = acceptMission(world, {
-    lotId,
-    cargoKg: opts.cargoKg,
-    aircraftClassId: opts.aircraftClassId,
-    missionId: opts.missionId,
-    maxCargoKg: opts.maxCargoKg,
-    intoMission,
-    cargoOps: opts.cargoOps,
-    classOps: opts.classOps,
-  });
-  const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
-  upsertCompanyMission(missions, mission);
-  return { kind: 'applied', mission, appended };
+  try {
+    const mission = acceptMission(world, {
+      lotId,
+      cargoKg: opts.cargoKg,
+      aircraftClassId: opts.aircraftClassId,
+      missionId: opts.missionId,
+      maxCargoKg: opts.maxCargoKg,
+      intoMission,
+      cargoOps: opts.cargoOps,
+      classOps: opts.classOps,
+      companyId,
+    });
+    const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
+    upsertCompanyMission(missions, mission);
+    return { kind: 'applied', mission, appended };
+  } catch (err) {
+    if (err instanceof LotClaimConflictError) {
+      return { kind: 'conflict', claimedByCompanyId: err.claimedByCompanyId };
+    }
+    throw err;
+  }
 }
 
 export type ExecuteAcceptManifestOpts = {

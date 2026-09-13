@@ -131,6 +131,7 @@ export type CareerStoreKind = 'json' | 'sqlite';
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
 export const CAREER_STORE_SCHEMA_VERSION = '9';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
+export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
 export type { HubEconomySample };
 

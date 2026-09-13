@@ -1414,15 +1414,33 @@ export function findActivePlayerMission(
 
 /**
  * Reserve cargoKg from a market lot. Mutates the lot; returns pay pro-rata.
+ * Optional `companyId` stamps `claimedByCompanyId` (MP first-claim / SP `local`).
  */
+export class LotClaimConflictError extends Error {
+  readonly code = 'lot_claimed' as const;
+  constructor(
+    readonly lotId: string,
+    readonly claimedByCompanyId: string,
+  ) {
+    super(`Lot ${lotId} is claimed by another company`);
+    this.name = 'LotClaimConflictError';
+  }
+}
+
 export function reserveShipmentLot(
   world: CareerEconomyWorld,
   lotId: string,
   cargoKg: number,
+  opts?: { companyId?: string },
 ): { lot: ShipmentLot; reservedKg: number; payUsd: number } {
   const lot = findLot(world, lotId);
   if (lot.status === 'in_transit' || lot.status === 'delivered' || lot.status === 'expired') {
     throw new Error(`Lot ${lotId} is not bookable (status=${lot.status})`);
+  }
+  const companyId = opts?.companyId?.trim() || undefined;
+  const holder = lot.claimedByCompanyId?.trim() || undefined;
+  if (holder && companyId && holder !== companyId) {
+    throw new LotClaimConflictError(lotId, holder);
   }
   const avail = lotAvailableKg(lot);
   if (avail <= 0) {
@@ -1439,6 +1457,9 @@ export function reserveShipmentLot(
   lot.reservedKg += qty;
   if (lot.reservedKg >= lot.quantityKg) {
     lot.status = 'reserved';
+  }
+  if (companyId) {
+    lot.claimedByCompanyId = companyId;
   }
 
   const payUsd = Math.max(1, Math.round((qty / lot.quantityKg) * lot.payUsd));
@@ -1483,6 +1504,10 @@ export function releaseShipmentReservation(
   ) {
     lot.status = lot.reservedKg > 0 ? 'reserved' : 'available';
   }
+  if (lot.reservedKg <= 0) {
+    delete lot.claimedByCompanyId;
+    if (lot.status === 'reserved') lot.status = 'available';
+  }
 }
 
 export function acceptMission(
@@ -1501,6 +1526,8 @@ export function acceptMission(
     cargoOps?: CareerMissionsState['cargoOps'];
     /** Aircraft class ladder — gates which freighter classes may accept. */
     classOps?: CareerMissionsState['classOps'];
+    /** Claiming company (SP `local`; MP real id). */
+    companyId?: string;
   },
 ): MissionIntent {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
@@ -1567,7 +1594,9 @@ export function acceptMission(
     );
   }
 
-  const { payUsd: reservedPay } = reserveShipmentLot(world, opts.lotId, cargoKg);
+  const { payUsd: reservedPay } = reserveShipmentLot(world, opts.lotId, cargoKg, {
+    companyId: opts.companyId,
+  });
   const payMult = cargoOpsPayMult(opts.cargoOps, lot.commodityId);
   const payUsd = Math.max(1, Math.round(reservedPay * payMult));
   const line: MissionLotLine = {

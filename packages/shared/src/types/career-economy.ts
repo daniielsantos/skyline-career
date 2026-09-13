@@ -250,6 +250,11 @@ export interface ShipmentLot {
   /** Short economic reason (surplus → shortage). */
   reason: string;
   status: ShipmentLotStatus;
+  /**
+   * Company (or `npc:…`) currently soft/hard holding reserved kg.
+   * MP Accept: first claim wins; other company → conflict. SP uses `local`.
+   */
+  claimedByCompanyId?: string;
 }
 
 /** Competing AI freighter (Phase 2) — 1 mission at a time, no player wallet credit. */

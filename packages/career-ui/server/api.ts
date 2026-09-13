@@ -114,6 +114,7 @@ import {
   MS_PER_TICK,
   msToHours,
   CATCH_UP_TICKS_PER_PULSE,
+  LOCAL_COMPANY_ID,
   LOCAL_WORLD_ID,
   worldClockFromEconomy,
   TICKS_PER_DAY,
@@ -2245,6 +2246,56 @@ export function createCareerApiServer(port = 8787) {
         } catch (error) {
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/world/clock') {
+        // SP: same mold as MP GET /worlds/:id/clock — local world only.
+        try {
+          const clock = await worldTick.getClock(LOCAL_WORLD_ID, Date.now());
+          send(res, 200, clock);
+        } catch (err) {
+          send(res, 503, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/companies/session/open') {
+        // SP: settle passive fees from world.tick delta (MP session/open path).
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        try {
+          const body = (await readBody(req)) as {
+            companyId?: string;
+            worldId?: string;
+            lastSeenTick?: number;
+          };
+          const missions = await loadMissions();
+          const result = await worldTick.openCompanySession({
+            companyId: body.companyId?.trim() || LOCAL_COMPANY_ID,
+            worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
+            lastSeenTick:
+              typeof body.lastSeenTick === 'number' &&
+              Number.isFinite(body.lastSeenTick)
+                ? body.lastSeenTick
+                : (missions.lastSeenTick ?? 0),
+          });
+          if (result.offlineFeeSummary) {
+            pendingOfflineFeeSummary = result.offlineFeeSummary;
+          }
+          send(res, 200, result);
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
           });
         }
         return;
@@ -6833,6 +6884,12 @@ export function createCareerApiServer(port = 8787) {
             if (executed.kind === 'missing_mission') {
               return { kind: 'missing_mission' as const };
             }
+            if (executed.kind === 'conflict') {
+              return {
+                kind: 'conflict' as const,
+                claimedByCompanyId: executed.claimedByCompanyId,
+              };
+            }
             return {
               kind: 'ok' as const,
               mission: executed.mission,
@@ -6846,6 +6903,14 @@ export function createCareerApiServer(port = 8787) {
           }
           if (result.kind === 'missing_mission') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
+            return;
+          }
+          if (result.kind === 'conflict') {
+            send(res, 409, {
+              error: 'Lot claimed by another company',
+              code: 'lot_claimed',
+              claimedByCompanyId: result.claimedByCompanyId,
+            });
             return;
           }
           // New / different mission must not inherit prior Watch leftovers.

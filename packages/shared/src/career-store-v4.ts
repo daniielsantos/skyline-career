@@ -730,6 +730,7 @@ function lotFromRow(r: {
   urgency: string;
   reason: string;
   status: string;
+  claimed_by_company_id?: string | null;
 }): ShipmentLot {
   const lot: ShipmentLot = {
     id: r.id,
@@ -748,6 +749,8 @@ function lotFromRow(r: {
   if (typeof r.base_pay_usd === 'number' && Number.isFinite(r.base_pay_usd)) {
     lot.basePayUsd = r.base_pay_usd;
   }
+  const claim = r.claimed_by_company_id?.trim();
+  if (claim) lot.claimedByCompanyId = claim;
   return lot;
 }
 
@@ -853,7 +856,8 @@ export function readAirportBoard(
   const lotRows = db
     .prepare(
       `SELECT id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status
+              created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+              claimed_by_company_id
        FROM lots
        WHERE world_id = ?
          AND (origin_icao = ? OR dest_icao = ?)
@@ -874,6 +878,7 @@ export function readAirportBoard(
     urgency: string;
     reason: string;
     status: string;
+    claimed_by_company_id: string | null;
   }>;
   const lots = lotRows.map(lotFromRow);
   const partnerIcaos = lots.flatMap((l) => [l.originIcao, l.destIcao]).filter((c) => c !== icao);

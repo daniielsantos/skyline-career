@@ -183,7 +183,9 @@ interface WorldTickService {
 
 ### Wiring SP (próximo)
 
-1. MP: `RemoteWorldTickService` + `POST /companies/:id/session/open`.
+1. ~~MP stub `RemoteWorldTickService` + SP HTTP clock/session~~ — Phase 1 shipped.
+2. Phase 2: pulse headless (API up sem profile / hosted job).
+3. Phase 3+: real remote host + N companies.
 
 ### MP client stub
 
@@ -201,12 +203,29 @@ class RemoteWorldTickService implements WorldTickService {
 
 ## Migração SP → MP (incremental)
 
-1. **Extrair** `WorldTickService` interface: `advance(worldId, n)`, `getClock(worldId)`.
-2. SP: implementação local = job 60s **sem** cap 1/tick quando flag `authoritativeWorld=true`
-   (opcional dev); ou manter cap 1 no load mas timer server-side equivalente.
-3. Client reads passam `skipCatchUp: true` sempre; único catch-up no `WorldTickService`.
-4. Persist: `economy_meta` já tem `lastBatchAtMs` — usar como anchor cross-instance.
-5. Postgres: mesmo schema `world_id`; um leader election / cron por world.
+**Contrato:** SP e MP usam o **mesmo** molde. SP = `N=1` company (`local`) no `world_id=local`. MP = N companies no mesmo world. Não manter dois simuladores.
+
+| Phase | Status | O quê |
+|-------|--------|-------|
+| **0** | shipped | `WorldTickService` + `LocalWorldTickService`; pulse/login; `lastSeenTick` + offline fees; command slices; soft-hold L2+ |
+| **1** | shipped 2026-09-13 | `claimedByCompanyId` on lots; Accept → `409 lot_claimed`; `GET /api/world/clock`; `POST /api/companies/session/open`; `RemoteWorldTickService` stub (client never `advance`) |
+| **2** | backlog | World pulse headless (tick com zero UI clients / hosted SP) |
+| **3** | backlog | Auth multi-company + shared `world_id` |
+| **4** | backlog | MP client `RemoteWorldTickService` live; desligar catch-up no client |
+
+1. ~~**Extrair** `WorldTickService`~~ — feito.
+2. ~~SP local pulse via service~~ — feito.
+3. Client reads `skipCatchUp: true` on GETs — feito; único catch-up no `WorldTickService`.
+4. Persist: `economy_meta.lastBatchAtMs` — feito.
+5. Postgres / leader cron por world — Phase 2+.
+
+## Phase 1 notes (2026-09-13)
+
+- `ShipmentLot.claimedByCompanyId` + SQL `lots.claimed_by_company_id` roundtrip.
+- `reserveShipmentLot(..., { companyId })` / soft-hold stamps claim; full release clears.
+- `executeAcceptLot` → `{ kind: 'conflict' }` → HTTP **409** `{ code: 'lot_claimed' }`.
+- SP clock/session HTTP mirrors the MP sketch (`/api/world/clock`, `/api/companies/session/open`).
+- `packages/career-ui/server/remote-world-tick-service.ts` — stub only.
 
 ## Deprecar em MP
 
@@ -237,9 +256,12 @@ class RemoteWorldTickService implements WorldTickService {
 
 ## Checklist antes de shippar MP slice
 
-- [ ] World tick roda com zero clients conectados
-- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept
-- [ ] Reconnect não chama `tickEconomyN` no processo UI
-- [ ] Accept concorrente → exatamente um 200, resto 409
-- [ ] `offlineFeeSummary` usa delta de **world.tick**, não ticks simulados localmente
+- [x] `WorldTickService` / Local pulse (Phase 0)
+- [x] Lot claim + Accept 409 (Phase 1)
+- [x] Clock + company session HTTP mold (Phase 1)
+- [ ] World tick roda com zero clients conectados (Phase 2)
+- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 3+)
+- [ ] Reconnect não chama `tickEconomyN` no processo UI (Phase 4)
+- [ ] Accept concorrente → exatamente um 200, resto 409 (Phase 3+; unit claim covered in SP)
+- [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)
 - [ ] Admin/debug tick isolado de build release MP

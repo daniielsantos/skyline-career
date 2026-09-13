@@ -184,8 +184,15 @@ interface WorldTickService {
 ### Wiring SP (próximo)
 
 1. ~~MP stub `RemoteWorldTickService` + SP HTTP clock/session~~ — Phase 1 shipped.
-2. Phase 2: pulse headless (API up sem profile / hosted job).
+2. ~~Phase 2 headless pulse~~ — shipped (boot resume + `/api/world/pulse`).
 3. Phase 3+: real remote host + N companies.
+
+## Phase 2 notes (2026-09-13)
+
+- On `createCareerApiServer().listen()`, `bootstrapHeadlessWorldPulse` opens `profiles.json` **activeId** (last-played) and starts `LocalWorldTickService` pulse — world advances with **no browser/UI**.
+- Opt out: `CAREER_HEADLESS_PULSE=0` (or `false` / `off`).
+- `POST /api/world/pulse` `{ n?: 1..96 }` — explicit advance for ops/debug (needs profile loaded).
+- Still one company per SP save DB; true shared world DB without a company session remains Phase 3.
 
 ### MP client stub
 
@@ -209,7 +216,7 @@ class RemoteWorldTickService implements WorldTickService {
 |-------|--------|-------|
 | **0** | shipped | `WorldTickService` + `LocalWorldTickService`; pulse/login; `lastSeenTick` + offline fees; command slices; soft-hold L2+ |
 | **1** | shipped 2026-09-13 | `claimedByCompanyId` on lots; Accept → `409 lot_claimed`; `GET /api/world/clock`; `POST /api/companies/session/open`; `RemoteWorldTickService` stub (client never `advance`) |
-| **2** | backlog | World pulse headless (tick com zero UI clients / hosted SP) |
+| **2** | shipped 2026-09-13 | Headless pulse: API `listen` resumes last-played profile + starts tick with **zero UI clients**; `POST /api/world/pulse`; opt-out `CAREER_HEADLESS_PULSE=0` |
 | **3** | backlog | Auth multi-company + shared `world_id` |
 | **4** | backlog | MP client `RemoteWorldTickService` live; desligar catch-up no client |
 
@@ -259,9 +266,9 @@ class RemoteWorldTickService implements WorldTickService {
 - [x] `WorldTickService` / Local pulse (Phase 0)
 - [x] Lot claim + Accept 409 (Phase 1)
 - [x] Clock + company session HTTP mold (Phase 1)
-- [ ] World tick roda com zero clients conectados (Phase 2)
+- [x] World tick roda com zero clients conectados (Phase 2 — last-played profile resumed on API listen)
 - [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 3+)
 - [ ] Reconnect não chama `tickEconomyN` no processo UI (Phase 4)
 - [ ] Accept concorrente → exatamente um 200, resto 409 (Phase 3+; unit claim covered in SP)
 - [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)
-- [ ] Admin/debug tick isolado de build release MP
+- [ ] Admin/debug tick isolado de build release MP (`POST /api/world/pulse` exists; MP gate later)

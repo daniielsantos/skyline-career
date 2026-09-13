@@ -1,6 +1,9 @@
 /**
  * SP implementation of WorldTickService — wrapper over career lock + store.
  * Wired from `createCareerApiServer` in api.ts.
+ *
+ * Phase 2: pulse can run with zero UI clients while a profile/store is loaded
+ * (API boot resumes last-played save and keeps ticking).
  */
 
 import type {
@@ -28,6 +31,14 @@ import {
   type WorldTickAdvanceResult,
   type WorldTickService,
 } from '@msfs-compat/shared';
+
+/** `CAREER_HEADLESS_PULSE=0|false|off` skips auto-resume on API listen. */
+export function isHeadlessPulseEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = (env.CAREER_HEADLESS_PULSE ?? '1').trim().toLowerCase();
+  return raw !== '0' && raw !== 'false' && raw !== 'off' && raw !== 'no';
+}
 
 /** Minimal hooks the Career API already exposes under `withCareerLock` / writes. */
 export type LocalWorldTickDeps = {

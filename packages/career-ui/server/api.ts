@@ -333,7 +333,7 @@ import {
   setActiveCareerProfile,
 } from './career-profiles.ts';
 import { createPromiseLock } from './career-write-lock.ts';
-import { LocalWorldTickService } from './local-world-tick-service.ts';
+import { LocalWorldTickService, isHeadlessPulseEnabled } from './local-world-tick-service.ts';
 import {
   loadMaptilerEnvFiles,
   maptilerKeyFromEnv,
@@ -470,6 +470,49 @@ function schedulePostLoginEconomyWork(tickService: LocalWorldTickService): void 
     }
     tickService.startBackgroundPulse(LOCAL_WORLD_ID);
   })();
+}
+
+/**
+ * Phase 2 — resume last-played profile on API boot so the world tick runs
+ * with zero UI clients (hosted SP mold). Opt out: CAREER_HEADLESS_PULSE=0.
+ */
+async function bootstrapHeadlessWorldPulse(
+  tickService: LocalWorldTickService,
+): Promise<void> {
+  if (!isHeadlessPulseEnabled()) {
+    console.log('[career] headless-pulse disabled (CAREER_HEADLESS_PULSE)');
+    return;
+  }
+  if (store) {
+    schedulePostLoginEconomyWork(tickService);
+    return;
+  }
+  const file = await readProfilesFile(careerRoot);
+  const id = file.activeId?.trim() ?? '';
+  if (!id || !file.profiles.some((p) => p.id === id)) {
+    console.log('[career] headless-pulse skip — no last-played profile');
+    return;
+  }
+  const t0 = performance.now();
+  try {
+    await withCareerLock(async () => {
+      if (store) return;
+      resetMsfsStampState();
+      const next = await openCareerProfileStore(careerRoot, id);
+      store = next;
+      activeProfileId = id;
+      msfsStampNeeded = true;
+    });
+    console.log(
+      `[career] headless-pulse resume id=${id} ${Math.round(performance.now() - t0)}ms`,
+    );
+    schedulePostLoginEconomyWork(tickService);
+  } catch (error) {
+    console.error(
+      `[career] headless-pulse fail id=${id} ${Math.round(performance.now() - t0)}ms:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
 }
 
 function resetMsfsStampState(): void {
@@ -2258,6 +2301,35 @@ export function createCareerApiServer(port = 8787) {
           send(res, 200, clock);
         } catch (err) {
           send(res, 503, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/world/pulse') {
+        // Explicit world advance (admin / hosted ops). Requires a loaded profile.
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        try {
+          const body = (await readBody(req)) as { n?: number };
+          const n =
+            typeof body.n === 'number' && Number.isFinite(body.n) && body.n > 0
+              ? Math.min(96, Math.floor(body.n))
+              : undefined;
+          const result = await worldTick.advance(LOCAL_WORLD_ID, {
+            n,
+            cooperative: true,
+          });
+          const clock = await worldTick.getClock(LOCAL_WORLD_ID, Date.now());
+          send(res, 200, { ...result, clock });
+        } catch (err) {
+          send(res, 400, {
             error: err instanceof Error ? err.message : String(err),
           });
         }
@@ -9089,6 +9161,8 @@ export function createCareerApiServer(port = 8787) {
     listen(): Promise<void> {
       return new Promise((resolveListen) => {
         server.listen(port, '127.0.0.1', () => {
+          // Phase 2: world tick without waiting for a UI client.
+          void bootstrapHeadlessWorldPulse(worldTick);
           resolveListen();
         });
       });

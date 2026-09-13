@@ -10251,8 +10251,10 @@ span.dispatch-route-hub-dest {
 .fbo-mode-switcher {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.4rem;
-  margin: 0.35rem 0 0.85rem;
+  margin: 0.35rem 0 0.55rem;
+  min-height: 2rem;
 }
 
 .fbo-capacity-bar {
@@ -10448,17 +10450,26 @@ span.dispatch-route-hub-dest {
   z-index: 2;
 }
 
+.ports-loop-slot,
 .ports-loop-banner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 0.75rem;
+  min-height: 2.85rem;
+  box-sizing: border-box;
   padding: 0.55rem 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.04);
   flex: 0 0 auto;
+  margin: 0 0 0.55rem;
+}
+
+.ports-loop-banner.is-on-target {
+  background: transparent;
+  border-color: transparent;
 }
 
 .ports-loop-banner-text {
@@ -10466,6 +10477,11 @@ span.dispatch-route-hub-dest {
   flex: 1 1 14rem;
   font-size: 0.9rem;
   line-height: 1.35;
+}
+
+.ports-loop-banner.is-on-target .ports-loop-banner-text {
+  font-size: 0.85rem;
+  color: var(--muted, rgba(255, 255, 255, 0.55));
 }
 
 .ports-loop-banner-cta {
@@ -10505,14 +10521,12 @@ span.dispatch-route-hub-dest {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.65rem 1rem;
-  padding: 0 0 0.3rem;
+  padding: 0.35rem 0 0.3rem;
   flex: 0 0 auto;
 }
 
-.ports-demand-board .ports-loop-section-hint {
-  padding-bottom: 0.2rem;
-  font-size: 0.82rem;
-  line-height: 1.3;
+.ports-demand-board .ports-stage-title {
+  margin-top: 0;
 }
 
 .ports-demand-origin-filter {

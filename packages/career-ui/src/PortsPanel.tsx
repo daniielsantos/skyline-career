@@ -327,11 +327,11 @@ function portsLoopMessage(
     }
     case 'fulfill_demand':
       return step.matchCount === 1
-        ? '1 Demand order matches your warehouse stock — accept to stage a flight.'
-        : `${step.matchCount} Demand orders match your warehouse stock — accept to stage a flight.`;
+        ? '1 order on this port Demand desk matches your WH stock — accept to stage a flight.'
+        : `${step.matchCount} orders on this port Demand desk match your WH stock — accept to stage a flight.`;
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? `${formatTonnes(step.stockKg)} in WH — open orders exist, but none match this commodity in corridor reach. Buy matching cargo or upgrade WH / Port FBO to extend range.`
+        ? `${formatTonnes(step.stockKg)} in WH — this port has open Demand, but none match your stock yet. Buy matching cargo or check Scout on Port FBO.`
         : `${formatTonnes(step.stockKg)} in WH — Demand posts when hub terminals run low (economy tick). Check back after a tick.`;
     case 'buy_port':
       return 'Buy factory cargo at a seaport to start the loop.';
@@ -388,10 +388,10 @@ function portsLoopSectionHint(
       return `Next: wait for ${mass} to arrive at ${step.hubIcao} (${eta}). In transit is listed below — not Demand-ready yet.`;
     }
     case 'fulfill_demand':
-      return 'Next: accept a matching order to pull stock from your warehouse and stage a flight.';
+      return 'Next: accept a matching order on this port desk to pull WH stock and stage a flight.';
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? 'Stock is ready — nothing in corridor reach for this commodity. Buy matching cargo or upgrade WH / Port FBO to extend range.'
+        ? 'Stock is ready — nothing on this port desk matches yet. Buy matching cargo or check Scout on Port FBO.'
         : 'Stock is ready — Demand appears after economy ticks when terminals run low. Check back soon.';
     case 'buy_port':
       return 'Next: pick a listing and buy into a warehouse (overflow goes to yard).';
@@ -2625,6 +2625,7 @@ export function PortsPanel(props: {
         stock: warehouses?.stock ?? [],
         pickups: snap?.pickups ?? [],
         demand,
+        focusPortId: portId ?? undefined,
         inboundTransfers: warehouses?.inboundTransfers,
         economyTick: props.economyTick,
       }),
@@ -2634,6 +2635,7 @@ export function PortsPanel(props: {
       warehouses?.inboundTransfers,
       snap?.pickups,
       demand,
+      portId,
       props.economyTick,
     ],
   );
@@ -2996,43 +2998,51 @@ export function PortsPanel(props: {
             </button>
           </div>
 
-          {showPortsLoopBanner ? (
-            <div className="ports-loop-banner" role="status">
-              <p className="ports-loop-banner-text">
-                {portsLoopMessage(
-                  loopStep,
-                  props.formatTonnes,
-                  props.formatMoney,
-                  snap.yardHoldUsdPerDay,
-                  ticksToHoursLabel,
-                )}
-              </p>
-              {loopCtaLabel ? (
-                <button
-                  type="button"
-                  className="action ghost ports-loop-banner-cta"
-                  disabled={props.busy || loading}
-                  onClick={() => goToLoopStep()}
-                >
-                  {loopCtaLabel}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-
-          {section === 'catalog' ? (
-            <>
-              {loopTargetSection === 'catalog' ? (
-                <p className="muted ports-loop-section-hint">
-                  {portsLoopSectionHint(
+          <div
+            className={
+              showPortsLoopBanner
+                ? 'ports-loop-slot ports-loop-banner'
+                : 'ports-loop-slot ports-loop-banner is-on-target'
+            }
+            role="status"
+          >
+            {showPortsLoopBanner ? (
+              <>
+                <p className="ports-loop-banner-text">
+                  {portsLoopMessage(
                     loopStep,
+                    props.formatTonnes,
                     props.formatMoney,
                     snap.yardHoldUsdPerDay,
-                    props.formatTonnes,
                     ticksToHoursLabel,
                   )}
                 </p>
-              ) : null}
+                {loopCtaLabel ? (
+                  <button
+                    type="button"
+                    className="action ghost ports-loop-banner-cta"
+                    disabled={props.busy || loading}
+                    onClick={() => goToLoopStep()}
+                  >
+                    {loopCtaLabel}
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <p className="ports-loop-banner-text">
+                {portsLoopSectionHint(
+                  loopStep,
+                  props.formatMoney,
+                  snap.yardHoldUsdPerDay,
+                  props.formatTonnes,
+                  ticksToHoursLabel,
+                )}
+              </p>
+            )}
+          </div>
+
+          {section === 'catalog' ? (
+            <>
               {port ? (
                 <h3 className="ports-selected-name ports-stage-title">
                   <span className="ports-selected-name-text">{port.name}</span>
@@ -3811,17 +3821,6 @@ export function PortsPanel(props: {
 
           {section === 'warehouse' ? (
             <>
-              {loopTargetSection === 'warehouse' ? (
-                <p className="muted ports-loop-section-hint">
-                  {portsLoopSectionHint(
-                    loopStep,
-                    props.formatMoney,
-                    snap.yardHoldUsdPerDay,
-                    props.formatTonnes,
-                    ticksToHoursLabel,
-                  )}
-                </p>
-              ) : null}
               <h3 className="ports-stage-title">
                 {whShelf === 'staff'
                   ? 'Ground staff'
@@ -5144,17 +5143,9 @@ export function PortsPanel(props: {
 
           {section === 'demand' ? (
             <div className="ports-demand-board">
-              {loopTargetSection === 'demand' ? (
-                <p className="muted ports-loop-section-hint">
-                  {portsLoopSectionHint(
-                    loopStep,
-                    props.formatMoney,
-                    snap.yardHoldUsdPerDay,
-                    props.formatTonnes,
-                    ticksToHoursLabel,
-                  )}
-                </p>
-              ) : null}
+              <h3 className="ports-stage-title">
+                {port ? `Demand · ${port.name}` : 'Demand Board'}
+              </h3>
               <div className="ports-demand-filters">
                 <label className="ports-demand-origin-filter">
                   <span>Port</span>

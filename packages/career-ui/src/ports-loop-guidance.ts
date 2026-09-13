@@ -54,7 +54,17 @@ export function derivePortsLoopStep(input: {
     kg: number;
     holdUsdPerDay?: number;
   }>;
-  demand: Array<{ commodityId: string; remainingKg: number }>;
+  demand: Array<{
+    commodityId: string;
+    remainingKg: number;
+    /** Port desk that owns the row — used when focusPortId is set. */
+    portId?: string;
+  }>;
+  /**
+   * When set, only count Demand on this port's desk (not the world board).
+   * Avoids "400+ matches" banners from commodity-only global scans.
+   */
+  focusPortId?: string;
   /** Port→WH transfers not yet in stock. */
   inboundTransfers?: Array<{
     hubIcao: string;
@@ -120,10 +130,15 @@ export function derivePortsLoopStep(input: {
   const stockCommodities = new Set(
     stockLots.map((s) => s.commodityId.trim().toLowerCase()),
   );
+  const focusPort = input.focusPortId?.trim().toUpperCase() ?? '';
   let matchCount = 0;
   let openDemandCount = 0;
   for (const order of input.demand) {
     if (order.remainingKg <= 0) continue;
+    if (focusPort) {
+      const orderPort = (order.portId ?? '').trim().toUpperCase();
+      if (orderPort !== focusPort) continue;
+    }
     openDemandCount += 1;
     if (stockCommodities.has(order.commodityId.trim().toLowerCase())) {
       matchCount += 1;

@@ -25,6 +25,10 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
+**Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.
+
+**Demand loop banner (2026-09-13):** `derivePortsLoopStep` + `focusPortId` counts only the **focused port desk** (not world commodity matches). Copy: “N orders on this port Demand desk…”.
+
 Conclusão: o desconforto não é “ter FBO”; é **dinheiro de avião sem sentar no cockpit**. Matar concession/WH seria jogar fora o endgame portuário. O corte certo é **passivo aéreo** + **não criar segundo império de FBO em hub**.
 
 ---

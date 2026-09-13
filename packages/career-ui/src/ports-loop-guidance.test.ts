@@ -52,6 +52,64 @@ describe('derivePortsLoopStep', () => {
     assert.equal(portsLoopTargetSection(step), 'demand');
   });
 
+  it('fulfill_demand counts only the focused port desk', () => {
+    const step = derivePortsLoopStep({
+      warehouseCount: 1,
+      stock: [{ commodityId: 'electronics', kg: 2_000 }],
+      pickups: [],
+      focusPortId: 'BR-SANTOS',
+      demand: [
+        {
+          commodityId: 'electronics',
+          remainingKg: 1_000,
+          portId: 'BR-SANTOS',
+        },
+        {
+          commodityId: 'electronics',
+          remainingKg: 1_000,
+          portId: 'BR-SANTOS',
+        },
+        {
+          commodityId: 'electronics',
+          remainingKg: 5_000,
+          portId: 'US-LA',
+        },
+        {
+          commodityId: 'electronics',
+          remainingKg: 5_000,
+          // missing portId — ignored when focusing a desk
+        },
+      ],
+    });
+    assert.deepEqual(step, { kind: 'fulfill_demand', matchCount: 2 });
+  });
+
+  it('wait_demand when focus port desk has no commodity match', () => {
+    const step = derivePortsLoopStep({
+      warehouseCount: 1,
+      stock: [{ commodityId: 'electronics', kg: 800 }],
+      pickups: [],
+      focusPortId: 'BR-SANTOS',
+      demand: [
+        {
+          commodityId: 'electronics',
+          remainingKg: 1_000,
+          portId: 'US-LA',
+        },
+        {
+          commodityId: 'supplies',
+          remainingKg: 500,
+          portId: 'BR-SANTOS',
+        },
+      ],
+    });
+    assert.deepEqual(step, {
+      kind: 'wait_demand',
+      stockKg: 800,
+      openDemandCount: 1,
+    });
+  });
+
   it('wait_demand reports openDemandCount when stock has no match', () => {
     const step = derivePortsLoopStep({
       warehouseCount: 1,

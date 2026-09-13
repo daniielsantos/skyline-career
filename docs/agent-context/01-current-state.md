@@ -1,3 +1,7 @@
+# Current state (2026-09-13)
+
+`main` **b7a2dad** / desktop **0.3.56** shipped: Port FBO map+Scout route tables; Demand loop banner scoped to focused port desk; Ports tab chrome height stable; WH inbound/dust + concession persist (prior commit). Release: [v0.3.56](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.56).
+
 # Current state (2026-09-07)
 
 Local `main` (ainda sem commit/release): Market internacional agora usa grafo diário dinâmico e bounded por pressão/gateways; tabela estática de ~399 lanes removida. Cobertura seed: **187 países / 421 lanes**, piso **2** e cap **6** por país, cap **2** por par; active-lot OD faz carry-over. Demand intl aceita qualquer par mapeado, mantendo Port/WH + corridor/range e premium ×1.28. Pulse dev expõe métricas do grafo. Detail: [`08-economy.md`](./08-economy.md).

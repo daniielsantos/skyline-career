@@ -782,6 +782,8 @@ export type ActiveTourLeg = {
   lastMile: boolean;
   status: ActiveTourLegStatus;
   missionId?: string;
+  softHoldKg?: number;
+  softHoldExpiresAtTick?: number;
 };
 
 export type ActiveTourResumeState =
@@ -810,6 +812,9 @@ export type ActiveTourView = {
   nextLegNeedsRebind?: boolean;
   resumeState?: ActiveTourResumeState;
   resumeHint?: string | null;
+  nextLegSoftHoldExpiresAtTick?: number | null;
+  nextLegSoftHoldRemainingTicks?: number | null;
+  nextLegSoftHoldKg?: number | null;
 };
 
 export type PlayerFboSnapshot = {
@@ -2236,6 +2241,8 @@ export function postFboBuy(opts?: { icao?: string }) {
     fbo: { id: string; icao: string; tier: number; capacityKg: number };
     playerFbos: PlayerFboSnapshot;
     companyCrew?: CompanyCrewSnapshot;
+    dispatcher?: BaseDispatcherSnapshot;
+    policy?: BaseDispatchScoutPolicy;
   }>('/api/fbo/buy', {
     method: 'POST',
     body: JSON.stringify(opts ?? {}),
@@ -2846,6 +2853,7 @@ export function postBaseDispatchTours(opts: {
   maxFerryNm?: number | null;
   minKg?: number;
   returnMode?: BaseDispatchTourReturnMode;
+  preferLeaveBase?: boolean;
   excludeLastMile?: boolean;
   firstLotId?: string;
   kg?: number;

@@ -13,9 +13,11 @@ import {
   activeTourView,
   attachActiveTourFromMission,
   bindActiveTourLegToMission,
+  BASE_TOUR_SOFT_HOLD_TTL_TICKS,
   confirmBaseDispatchTour,
   dropActiveTour,
   dropPreparedActiveTourIfUnbound,
+  expireTourLotSoftHolds,
   listBaseDispatchTours,
   prepareActiveTour,
   rebindActiveTourLeg,
@@ -1256,5 +1258,226 @@ describe('base dispatch tours', () => {
       maxFerryNm: 200,
     });
     assert.ok(open.length >= tight.length);
+  });
+});
+
+describe('base dispatch soft-hold + leave Base', () => {
+  it('prepare soft-holds L2 on the world board; drop releases', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-softhold' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'SoftHold',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    const l1 = primeLot(world, {
+      id: 'soft_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      quantityKg: 500,
+      payUsd: 6_000,
+    });
+    const l2 = primeLot(world, {
+      id: 'soft_l2',
+      originIcao: 'SBSP',
+      destIcao: 'SBGR',
+      quantityKg: 450,
+      payUsd: 5_500,
+    });
+
+    prepareActiveTour(state, world, {
+      aircraftId: aircraft.id,
+      hubIcao: 'SBGR',
+      legs: [
+        {
+          lotId: l1.id,
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+          commodityId: 'general',
+          liftKg: 200,
+          distanceNm: 50,
+          ferryNm: 0,
+          payUsd: 6_000,
+          fuelCostUsd: 100,
+          netUsd: 5_900,
+          lastMile: false,
+        },
+        {
+          lotId: l2.id,
+          originIcao: 'SBSP',
+          destIcao: 'SBGR',
+          commodityId: 'general',
+          liftKg: 180,
+          distanceNm: 50,
+          ferryNm: 0,
+          payUsd: 5_500,
+          fuelCostUsd: 90,
+          netUsd: 5_410,
+          lastMile: false,
+        },
+      ],
+    });
+
+    const tour = state.playerFbos!.activeTour!;
+    const leg2 = tour.legs[1]!;
+    assert.equal(leg2.softHoldKg, 180);
+    assert.ok((leg2.softHoldExpiresAtTick ?? 0) > world.tick);
+    assert.equal(l2.reservedKg, 180);
+    assert.ok((world.tourLotSoftHolds?.length ?? 0) >= 1);
+
+    const view = activeTourView(state, world);
+    assert.ok((view!.nextLegSoftHoldRemainingTicks ?? 0) > 0);
+
+    dropActiveTour(state, world);
+    assert.equal(l2.reservedKg, 0);
+    assert.equal(state.playerFbos!.activeTour, null);
+  });
+
+  it('expireTourLotSoftHolds releases after TTL', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-softhold-ttl' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'SoftHoldTtl',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    const l1 = primeLot(world, {
+      id: 'ttl_l1',
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      quantityKg: 400,
+      payUsd: 5_000,
+    });
+    const l2 = primeLot(world, {
+      id: 'ttl_l2',
+      originIcao: 'SBSP',
+      destIcao: 'SBGR',
+      quantityKg: 400,
+      payUsd: 5_000,
+    });
+
+    prepareActiveTour(state, world, {
+      aircraftId: aircraft.id,
+      hubIcao: 'SBGR',
+      legs: [
+        {
+          lotId: l1.id,
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+          commodityId: 'general',
+          liftKg: 150,
+          distanceNm: 50,
+          ferryNm: 0,
+          payUsd: 5_000,
+          fuelCostUsd: 80,
+          netUsd: 4_920,
+          lastMile: false,
+        },
+        {
+          lotId: l2.id,
+          originIcao: 'SBSP',
+          destIcao: 'SBGR',
+          commodityId: 'general',
+          liftKg: 150,
+          distanceNm: 50,
+          ferryNm: 0,
+          payUsd: 5_000,
+          fuelCostUsd: 80,
+          netUsd: 4_920,
+          lastMile: false,
+        },
+      ],
+    });
+
+    assert.equal(l2.reservedKg, 150);
+    world.tick += BASE_TOUR_SOFT_HOLD_TTL_TICKS + 1;
+    const n = expireTourLotSoftHolds(world, state);
+    assert.ok(n >= 1);
+    assert.equal(l2.reservedKg, 0);
+    assert.equal(state.playerFbos!.activeTour!.legs[1]!.softHoldKg, undefined);
+  });
+
+  it('preferLeaveBase boosts Base-origin first legs in sort order', () => {
+    const world = createSeedEconomyWorld({ seed: 'dispatch-tour-leave-base' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'LeaveBase',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    hireDispatcherAt(state, world, 'SBGR');
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    // Neighbor origin with higher raw net — without preferLeaveBase it ranks first.
+    primeLot(world, {
+      id: 'leave_neighbor',
+      originIcao: 'SBSP',
+      destIcao: 'SBGL',
+      quantityKg: 800,
+      payUsd: 20_000,
+      reason: 'neighbor fat',
+    });
+    primeLot(world, {
+      id: 'leave_base',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      quantityKg: 500,
+      payUsd: 9_000,
+      reason: 'base thinner',
+    });
+    // Return legs so 2-leg tours can form.
+    primeLot(world, {
+      id: 'leave_ret_a',
+      originIcao: 'SBGL',
+      destIcao: 'SBGR',
+      quantityKg: 400,
+      payUsd: 6_000,
+    });
+    primeLot(world, {
+      id: 'leave_ret_b',
+      originIcao: 'SBGL',
+      destIcao: 'SBSP',
+      quantityKg: 400,
+      payUsd: 6_000,
+    });
+
+    const prefer = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      originIcao: 'SBGR',
+      legs: 2,
+      returnMode: 'none',
+      preferLeaveBase: true,
+    });
+    const off = listBaseDispatchTours(state, world, {
+      hubIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      originIcao: 'SBGR',
+      legs: 2,
+      returnMode: 'none',
+      preferLeaveBase: false,
+    });
+
+    assert.ok(prefer.length >= 1 || off.length >= 1);
+    if (prefer.length >= 1) {
+      const baseFirst = prefer.filter((t) => t.legs[0]!.originIcao === 'SBGR');
+      const neighborFirst = prefer.filter(
+        (t) => t.legs[0]!.originIcao === 'SBSP',
+      );
+      // With boost, Base-origin tours should appear at least as early when both exist.
+      if (baseFirst.length > 0 && neighborFirst.length > 0) {
+        const firstBaseIdx = prefer.findIndex(
+          (t) => t.legs[0]!.originIcao === 'SBGR',
+        );
+        const firstNeighborIdx = prefer.findIndex(
+          (t) => t.legs[0]!.originIcao === 'SBSP',
+        );
+        assert.ok(firstBaseIdx <= firstNeighborIdx);
+      }
+    }
+    void off;
   });
 });

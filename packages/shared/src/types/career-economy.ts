@@ -556,6 +556,11 @@ export interface CareerEconomyWorld {
   portConcessions?: PortConcessionIndexRow[];
   /** Terminal buy-orders for player warehouse cargo (Demand Board). */
   demandOrders?: DemandOrder[];
+  /**
+   * Short soft-holds for Base Dispatcher next-tour legs (world tick TTL).
+   * SP uses `LOCAL_COMPANY_ID`; MP keeps one row per company claim.
+   */
+  tourLotSoftHolds?: TourLotSoftHold[];
   /** Dealer aircraft pool (finite instances; Market board source). */
   aircraftInstances?: AircraftInstance[];
   /** Hash of enabled player-airframe catalog; triggers incremental backfill. */
@@ -1423,8 +1428,9 @@ export interface BaseDispatcherMember {
 }
 
 /**
- * Base Dispatcher multi-leg itinerary (plan only — no hard-reserve of L2+).
- * Accept L1 persists this; Accept L2/L3 books each lot when the aircraft is ready.
+ * Base Dispatcher multi-leg itinerary.
+ * L1 books on Accept; L2+ stay planned with optional short world soft-hold
+ * (next leg only — see `tourLotSoftHolds` / `BASE_TOUR_SOFT_HOLD_TTL_TICKS`).
  */
 export type ActiveTourLegStatus = 'planned' | 'active' | 'done' | 'lost';
 
@@ -1447,6 +1453,10 @@ export interface ActiveTourLeg {
   status: ActiveTourLegStatus;
   /** Bound when this leg was accepted. */
   missionId?: string;
+  /** Soft-hold kg currently reserved on the world lot (next-leg only). */
+  softHoldKg?: number;
+  /** World tick when soft-hold expires (exclusive). */
+  softHoldExpiresAtTick?: number;
 }
 
 export interface ActiveTour {
@@ -1463,6 +1473,19 @@ export interface ActiveTour {
   legs: ActiveTourLeg[];
   startedAtTick: number;
   status: ActiveTourStatus;
+}
+
+/**
+ * World-board soft-hold for the next Active Tour leg (MP-shaped).
+ * `reservedKg` is bumped on the lot; TTL uses the authoritative world tick.
+ */
+export interface TourLotSoftHold {
+  companyId: string;
+  tourId: string;
+  legIndex: number;
+  lotId: string;
+  kg: number;
+  expiresAtTick: number;
 }
 
 export interface PlayerFboState {

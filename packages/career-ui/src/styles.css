@@ -12112,6 +12112,13 @@ span.dispatch-route-hub-dest {
   font-size: 0.78rem;
 }
 
+.base-dispatcher-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
 .ports-stock-details > summary {
   cursor: pointer;
   color: var(--muted, #9aa0a6);

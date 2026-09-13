@@ -191,6 +191,9 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - `POST /api/base/dispatcher` (`list` | `refresh` | `hire` | `fire`); UI desk na aba Base.
 - **2026-09-06 persist bug:** hire gravava `dispatchers` em `player_fbos_json`, mas `normalizeMissionsState` / `readCompanyStateScalars` só reidratavam `fbos`+`holds` → reload apagava o seat (ledger `base_dispatcher_hire` ficava). Fix: preservar `dispatchers` + hire pools no load.
 - **Map:** selecionar linha do Search traça OD/tour no `FboRouteMapCard` abaixo.
+- **Buy Base UI stuck (2026-09-13):** Claim T1 while already on Base tab left desk as “No candidates” / “Search for freights” (hire pool never loaded — `useEffect` deps were only section/ICAO). Fix: seed Dispatcher pool on `/api/fbo/buy`, return `dispatcher`+`policy`, client sets state; re-list when ownership boolean flips; empty copy + Refresh candidates.
+- **Freight filters locked after hire (2026-09-13):** sintoma → Origin/Min/Max/Search greyed forever after Base+Dispatcher. Causa → desk `useEffect` depended on `playerFbos.fbos` array identity; state poll replaced it every tick → `dispatchScoutLoading` stuck true → `disabled={busy || dispatchDeskBusy}`. Fix → deps on stable `ownsBaseAtAirport` boolean; Search filters/Accept use `dispatchTourBusy` only (hire/fire keep `dispatchHireBusy`).
+- **Dispatcher perk on cards (2026-09-13):** hire/seat cards show `perkHint` (`Fleet scout · up to N · ferry-tolerant|balanced|strict ferry Search`). Grade → more suggestions + milder internal ferry score (not a wallet fee; old `−$/nm` copy confused players).
 
 ### Base Dispatcher Search — shipped (single + tour)
 
@@ -227,10 +230,16 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 
 ### Base Dispatcher — backlog
 
-- Soft-hold curto em L2+ (opcional; v1 é plan-only + Accept Ln).
-- Preferência “sai da Base ICAO” (mais apertado que region) vs corridor vizinho.
+- ~~Soft-hold curto em L2+~~ **shipped 2026-09-13:** next planned leg only; `reservedKg` + TTL **4 ticks**; prepare / sync renew; Drop/expire/Accept release; world `tourLotSoftHolds` + leg meta (MP-shaped).
+- ~~Preferência “sai da Base ICAO”~~ **shipped 2026-09-13:** desk **Leave Base** Prefer/Off (default Prefer); score-boost first-leg `origin === hub` (neighbors still eligible).
 - Clareza multi-Base (hire/scout por hub) quando 2ª Base existir.
 - Não reabrir company Hangar crew fly (`COMPANY_CREW_ENABLED = false`).
+
+### Soft-hold L2+ + Leave Base (2026-09-13)
+
+- **Soft-hold:** `BASE_TOUR_SOFT_HOLD_TTL_TICKS = 4` (~1h). Only the **next** unaccepted planned leg (prepare → L2; after L1 settle → L3). Uses `reserveShipmentLot` / `releaseShipmentReservation`; Accept releases soft then hard-reserves (no double-count). UI: Tour lede `L# soft-hold Nt`.
+- **Leave Base:** `preferLeaveBase` (default true) on `listBaseDispatchTours` + Freights filter. Boost Base-origin first legs; mild neighbor penalty — not a hard ICAO filter.
+- Paths: `career-base-dispatch-tour.ts`, `types/career-economy.ts` (`TourLotSoftHold`), API `preferLeaveBase` + command-slice persist on prepare/drop/status.
 
 ### Tour ferry CTA (2026-09-07)
 

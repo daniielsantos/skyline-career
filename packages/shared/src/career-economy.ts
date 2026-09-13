@@ -8554,6 +8554,15 @@ export function migrateEconomyWorld(
         ? { demandOrders: demandRaw as CareerEconomyWorld['demandOrders'] }
         : {};
     })(),
+    ...(() => {
+      const softRaw = (base as { tourLotSoftHolds?: unknown }).tourLotSoftHolds;
+      return Array.isArray(softRaw)
+        ? {
+            tourLotSoftHolds:
+              softRaw as CareerEconomyWorld['tourLotSoftHolds'],
+          }
+        : {};
+    })(),
     ...(Array.isArray(aircraftInstancesRaw)
       ? {
           aircraftInstances:

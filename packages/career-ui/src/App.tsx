@@ -3558,7 +3558,17 @@ export function App() {
     useState<BaseDispatcherSnapshot | null>(null);
   const [dispatchScoutLoading, setDispatchScoutLoading] = useState(false);
   const [dispatchTourLoading, setDispatchTourLoading] = useState(false);
-  const dispatchDeskBusy = dispatchScoutLoading || dispatchTourLoading;
+  /** Hire/fire/refresh desk — may briefly lock hire cards. */
+  const dispatchHireBusy = dispatchScoutLoading || dispatchTourLoading;
+  /** Search / tour Accept — do not tie to desk list refresh (state poll). */
+  const dispatchTourBusy = dispatchTourLoading;
+  const ownsBaseAtAirport = useMemo(() => {
+    const hub = (airportIcao ?? '').trim().toUpperCase();
+    if (!hub) return false;
+    return (playerFbos?.fbos ?? []).some(
+      (f) => f.icao.trim().toUpperCase() === hub,
+    );
+  }, [airportIcao, playerFbos]);
   const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
   const [baseDispatchProduct, setBaseDispatchProduct] =
     useState<'freight' | 'charter'>('freight');
@@ -3603,6 +3613,9 @@ export function App() {
   const [dispatchTourMaxFerryNm, setDispatchTourMaxFerryNm] = useState('200');
   const [dispatchTourReturnMode, setDispatchTourReturnMode] =
     useState<BaseDispatchTourReturnMode>('none');
+  /** Score-boost first-leg origins at Base (default on). */
+  const [dispatchTourPreferLeaveBase, setDispatchTourPreferLeaveBase] =
+    useState(true);
   const [splitHoldId, setSplitHoldId] = useState<string | null>(null);
   const [selectedFboHoldId, setSelectedFboHoldId] = useState<string | null>(
     null,
@@ -3722,9 +3735,9 @@ export function App() {
   }, [terminalSection, airportIcao]);
 
   useEffect(() => {
-    if (terminalSection !== 'fbo' || !airportIcao) return;
-    let cancelled = false;
+    if (terminalSection !== 'fbo' || !airportIcao || !ownsBaseAtAirport) return;
     const hub = airportIcao.trim().toUpperCase();
+    let cancelled = false;
     setDispatchScoutLoading(true);
     void Promise.all([
       postBaseDispatcher({ action: 'list', hubIcao: hub }),
@@ -3745,7 +3758,9 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [terminalSection, airportIcao]);
+    // ownsBaseAtAirport is a stable boolean — not playerFbos.fbos array identity
+    // (state poll replaces that every tick and was locking Search filters forever).
+  }, [terminalSection, airportIcao, ownsBaseAtAirport]);
 
   /** Keep Accept/resume gates alive — raw /api/state tour has no view fields. */
   useEffect(() => {
@@ -7102,6 +7117,10 @@ export function App() {
       setWallet(result.walletUsd);
       setPlayerFbos(result.playerFbos);
       if (result.companyCrew) setCompanyCrew(result.companyCrew);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      setDispatchTours([]);
+      setSelectedDispatchTourId(null);
       setToastKind('ok');
       setToast(
         result.debitUsd > 0
@@ -7117,7 +7136,7 @@ export function App() {
   }
 
   async function onGenerateDispatchTours() {
-    if (busy || dispatchDeskBusy) return;
+    if (busy || dispatchTourBusy) return;
     const hub = (airportIcao ?? '').trim().toUpperCase();
     if (!hub) return;
     setDispatchTourLoading(true);
@@ -7152,6 +7171,7 @@ export function App() {
         maxNm,
         maxFerryNm,
         returnMode: dispatchTourReturnMode,
+        preferLeaveBase: dispatchTourPreferLeaveBase,
       });
       setDispatchTours(result.tours ?? []);
       if (result.activeTour !== undefined) {
@@ -7193,7 +7213,7 @@ export function App() {
   }
 
   async function onConfirmDispatchTour(tour: BaseDispatchTour) {
-    if (busy || dispatchDeskBusy) return;
+    if (busy || dispatchTourBusy) return;
     const first = tour.legs[0];
     if (!first) return;
     const hub =
@@ -7246,7 +7266,7 @@ export function App() {
   }
 
   async function onAcceptActiveTourLeg(legIndex: number) {
-    if (busy || dispatchDeskBusy || !activeTour) return;
+    if (busy || dispatchTourBusy || !activeTour) return;
     const leg = activeTour.legs.find((l) => l.index === legIndex);
     if (!leg) return;
     // Refresh gates / rebind hint before staging.
@@ -7554,7 +7574,7 @@ export function App() {
   }
 
   async function onDropActiveTour() {
-    if (busy || dispatchDeskBusy) return;
+    if (busy || dispatchTourBusy) return;
     setDispatchTourLoading(true);
     try {
       const result = await postBaseDispatchTours({ action: 'drop' });
@@ -7572,7 +7592,7 @@ export function App() {
   }
 
   async function onRefreshActiveTour() {
-    if (busy || dispatchDeskBusy) return;
+    if (busy || dispatchTourBusy) return;
     setDispatchTourLoading(true);
     try {
       const result = await postBaseDispatchTours({ action: 'status' });
@@ -7633,7 +7653,7 @@ export function App() {
   }
 
   async function onHireBaseDispatcher(fboId: string, candidateId: string) {
-    if (busy || dispatchDeskBusy) return;
+    if (busy || dispatchHireBusy) return;
     setDispatchScoutLoading(true);
     try {
       const result = await postBaseDispatcher({
@@ -7659,7 +7679,7 @@ export function App() {
   }
 
   async function onFireBaseDispatcher(memberId: string) {
-    if (busy || dispatchDeskBusy) return;
+    if (busy || dispatchHireBusy) return;
     setDispatchScoutLoading(true);
     try {
       const result = await postBaseDispatcher({
@@ -11362,12 +11382,17 @@ export function App() {
                                               {formatMoney(seat.salaryUsdPerDay)}
                                               /day
                                             </p>
+                                            {seat.perkHint ? (
+                                              <p className="crew-person-perk muted">
+                                                {seat.perkHint}
+                                              </p>
+                                            ) : null}
                                             <div className="crew-card-actions">
                                               <button
                                                 type="button"
                                                 className="action ghost"
                                                 disabled={
-                                                  busy || dispatchDeskBusy
+                                                  busy || dispatchHireBusy
                                                 }
                                                 onClick={() =>
                                                   void onFireBaseDispatcher(
@@ -11385,7 +11410,54 @@ export function App() {
                                         </li>
                                       </ul>
                                     ) : pool.length === 0 ? (
-                                      <p className="empty">No candidates</p>
+                                      <div className="base-dispatcher-empty">
+                                        <p className="empty">
+                                          {dispatchScoutLoading
+                                            ? 'Loading candidates…'
+                                            : 'No Dispatcher candidates yet.'}
+                                        </p>
+                                        {!dispatchScoutLoading ? (
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={busy || dispatchHireBusy}
+                                            onClick={() => {
+                                              const hub =
+                                                localFbo.icao.trim().toUpperCase();
+                                              setDispatchScoutLoading(true);
+                                              void postBaseDispatcher({
+                                                action: 'refresh',
+                                                hubIcao: hub,
+                                              })
+                                                .then((desk) => {
+                                                  if (desk.dispatcher) {
+                                                    setBaseDispatcher(
+                                                      desk.dispatcher,
+                                                    );
+                                                  }
+                                                  if (desk.policy) {
+                                                    setDispatchScoutPolicy(
+                                                      desk.policy,
+                                                    );
+                                                  }
+                                                })
+                                                .catch((err: unknown) => {
+                                                  setToastKind('fail');
+                                                  setToast(
+                                                    err instanceof Error
+                                                      ? err.message
+                                                      : String(err),
+                                                  );
+                                                })
+                                                .finally(() => {
+                                                  setDispatchScoutLoading(false);
+                                                });
+                                            }}
+                                          >
+                                            Refresh candidates
+                                          </button>
+                                        ) : null}
+                                      </div>
                                     ) : (
                                       <ul className="crew-person-grid">
                                         {pool.map((c) => (
@@ -11412,12 +11484,17 @@ export function App() {
                                                 {formatMoney(c.salaryUsdPerDay)}
                                                 /day
                                               </p>
+                                              {c.perkHint ? (
+                                                <p className="crew-person-perk muted">
+                                                  {c.perkHint}
+                                                </p>
+                                              ) : null}
                                               <div className="crew-card-actions">
                                                 <button
                                                   type="button"
                                                   className="accept"
                                                   disabled={
-                                                    busy || dispatchDeskBusy
+                                                    busy || dispatchHireBusy
                                                   }
                                                   onClick={() =>
                                                     void onHireBaseDispatcher(
@@ -11489,13 +11566,32 @@ export function App() {
                                             {activeTour.aircraftLocationIcao
                                               ? ` · acf ${activeTour.aircraftLocationIcao}`
                                               : ''}
+                                            {activeTour.nextLegSoftHoldRemainingTicks !=
+                                              null &&
+                                            activeTour.nextLegSoftHoldRemainingTicks >
+                                              0 ? (
+                                              <span>
+                                                {' '}
+                                                · L
+                                                {activeTour.legs.find(
+                                                  (l) =>
+                                                    (l.softHoldKg ?? 0) > 0,
+                                                )?.index ??
+                                                  activeTour.nextLegIndex}{' '}
+                                                soft-hold{' '}
+                                                {
+                                                  activeTour.nextLegSoftHoldRemainingTicks
+                                                }
+                                                t
+                                              </span>
+                                            ) : null}
                                           </p>
                                         </div>
                                         <div className="base-dispatcher-scout-actions">
                                           <button
                                             type="button"
                                             className="action ghost"
-                                            disabled={busy || dispatchDeskBusy}
+                                            disabled={busy || dispatchTourBusy}
                                             onClick={() =>
                                               void onRefreshActiveTour()
                                             }
@@ -11505,7 +11601,7 @@ export function App() {
                                           <button
                                             type="button"
                                             className="action ghost"
-                                            disabled={busy || dispatchDeskBusy}
+                                            disabled={busy || dispatchTourBusy}
                                             onClick={() =>
                                               void onDropActiveTour()
                                             }
@@ -11536,7 +11632,7 @@ export function App() {
                                               type="button"
                                               className="linkish"
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                               onClick={() =>
                                                 void onDropActiveTour()
@@ -11639,7 +11735,7 @@ export function App() {
                                                         className="accept"
                                                         disabled={
                                                           busy ||
-                                                          dispatchDeskBusy
+                                                          dispatchTourBusy
                                                         }
                                                         onClick={() =>
                                                           void onAcceptActiveTourLeg(
@@ -11688,7 +11784,7 @@ export function App() {
                                                 )
                                               }
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                             >
                                               <option value="">
@@ -11736,7 +11832,7 @@ export function App() {
                                                 }
                                               }}
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                             >
                                               <option value={1}>1</option>
@@ -11761,7 +11857,7 @@ export function App() {
                                                 )
                                               }
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                             />
                                           </label>
@@ -11779,7 +11875,7 @@ export function App() {
                                                 )
                                               }
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                             />
                                           </label>
@@ -11797,7 +11893,7 @@ export function App() {
                                                 )
                                               }
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                             />
                                           </label>
@@ -11815,7 +11911,7 @@ export function App() {
                                                 )
                                               }
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                             />
                                           </label>
@@ -11831,7 +11927,7 @@ export function App() {
                                                   )
                                                 }
                                                 disabled={
-                                                  busy || dispatchDeskBusy
+                                                  busy || dispatchTourBusy
                                                 }
                                               >
                                                 <option value="none">
@@ -11846,12 +11942,34 @@ export function App() {
                                               </select>
                                             </label>
                                           ) : null}
+                                          <label className="base-dispatch-leave-base">
+                                            <span>Leave Base</span>
+                                            <select
+                                              value={
+                                                dispatchTourPreferLeaveBase
+                                                  ? 'on'
+                                                  : 'off'
+                                              }
+                                              onChange={(e) =>
+                                                setDispatchTourPreferLeaveBase(
+                                                  e.target.value === 'on',
+                                                )
+                                              }
+                                              disabled={
+                                                busy || dispatchTourBusy
+                                              }
+                                              title="Prefer first-leg origins at this Base ICAO (neighbors still eligible)"
+                                            >
+                                              <option value="on">Prefer</option>
+                                              <option value="off">Off</option>
+                                            </select>
+                                          </label>
                                           <div className="base-dispatch-tour-generate">
                                             <button
                                               type="button"
                                               className="accept"
                                               disabled={
-                                                busy || dispatchDeskBusy
+                                                busy || dispatchTourBusy
                                               }
                                               onClick={() =>
                                                 void onGenerateDispatchTours()
@@ -11870,7 +11988,9 @@ export function App() {
                                         <p className="empty">
                                           {dispatchTourLoading
                                             ? 'Searching…'
-                                            : 'Search for freights'}
+                                            : mode !== 'fleet'
+                                              ? 'Hire a Dispatcher above to unlock freight Search.'
+                                              : 'Search for freights'}
                                         </p>
                                       ) : (
                                         <table className="data-table base-dispatch-freight-table">
@@ -12072,7 +12192,7 @@ export function App() {
                                                       className="accept"
                                                       disabled={
                                                         busy ||
-                                                        dispatchDeskBusy
+                                                        dispatchTourBusy
                                                       }
                                                       onClick={(event) => {
                                                         event.stopPropagation();
@@ -12116,7 +12236,7 @@ export function App() {
                                                   .slice(0, 4),
                                               )
                                             }
-                                            disabled={busy || dispatchDeskBusy}
+                                            disabled={busy || dispatchTourBusy}
                                           />
                                         </label>
                                       </div>
@@ -12129,7 +12249,7 @@ export function App() {
                                         )}
                                         busy={
                                           busy ||
-                                          dispatchDeskBusy ||
+                                          dispatchTourBusy ||
                                           Boolean(playerDispatchMission)
                                         }
                                         formatMoney={formatMoney}
@@ -15745,7 +15865,7 @@ export function App() {
                         <button
                           type="button"
                           className="linkish"
-                          disabled={busy || dispatchDeskBusy}
+                          disabled={busy || dispatchTourBusy}
                           onClick={() => void onDropActiveTour()}
                         >
                           Drop

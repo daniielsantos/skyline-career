@@ -655,10 +655,16 @@ export function baseDispatcherSnapshot(
   return { members, hirePoolByHub };
 }
 
-/** Player-facing perk blurb from skill. */
+/** Player-facing perk blurb from skill (no $/nm — that looked like a wallet fee). */
 export function baseDispatcherPerkHint(skillPct: number): string {
   const policy = scoutPolicyFromSkill(skillPct);
-  return `Fleet scout · up to ${policy.max} · ferry −$${policy.ferryPenaltyUsdPerNm.toFixed(2)}/nm`;
+  const ferryRank =
+    policy.ferryPenaltyUsdPerNm <= 0.08
+      ? 'ferry-tolerant Search'
+      : policy.ferryPenaltyUsdPerNm <= 0.12
+        ? 'balanced ferry Search'
+        : 'strict ferry Search';
+  return `Fleet scout · up to ${policy.max} · ${ferryRank}`;
 }
 
 export type BaseDispatchScoutPolicy = {

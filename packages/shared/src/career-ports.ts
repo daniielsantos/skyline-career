@@ -51,6 +51,7 @@ import {
   tickPortConcessions,
 } from './career-port-concessions.js';
 import { demandSnapshot, ensureDemandOrders, expireDemandHolds } from './career-demand.js';
+import { expireTourLotSoftHolds } from './career-base-dispatch-tour.js';
 import { bindPortCorridorLookups } from './career-port-corridor.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { economyDayIndex } from './career-weather.js';
@@ -2738,6 +2739,7 @@ export function portSnapshot(
   if (state) {
     healMissingPortConcessionFromLedger(state, world);
     expireDemandHolds(state, world);
+    expireTourLotSoftHolds(world, state);
     tickPortConcessions(state, world);
     syncWorldPortConcessions(world, state);
   }

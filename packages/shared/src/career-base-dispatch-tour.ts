@@ -23,6 +23,8 @@ import { fboServiceCostMult } from './career-fbo-perks.js';
 import {
   estimateBoardLotEconomics,
   getAircraftClass,
+  releaseShipmentReservation,
+  reserveShipmentLot,
 } from './career-mission.js';
 import { npcClaimForLot } from './career-npc.js';
 import {
@@ -30,6 +32,7 @@ import {
   resolveAirframeMaxRangeNm,
   resolveAirframePerfForUi,
 } from './career-player-airframes.js';
+import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import type {
   ActiveTour,
   ActiveTourLeg,
@@ -41,6 +44,7 @@ import type {
   MissionIntent,
   PlayerAircraft,
   ShipmentLot,
+  TourLotSoftHold,
 } from './types/career-economy.js';
 import { assignAircraftToMission } from './career-fleet.js';
 
@@ -56,6 +60,17 @@ export const BASE_DISPATCH_TOUR_CHAIN_FERRY_MAX_NM = 200;
 
 /** Hard ceiling for the Max ferry filter (keeps Search tractable). */
 export const BASE_DISPATCH_TOUR_CHAIN_FERRY_CAP_NM = 800;
+
+/**
+ * Next-leg soft-hold TTL on the world board (~1h at 15 min/tick).
+ * No mid-flight renew — fairness for NPCs / MP.
+ */
+export const BASE_TOUR_SOFT_HOLD_TTL_TICKS = 4;
+
+/** Soft score boost when first-leg origin === Base hub. */
+export const BASE_DISPATCH_LEAVE_BASE_BOOST_USD = 250;
+/** Mild penalty for same-region neighbors when preferLeaveBase is on. */
+export const BASE_DISPATCH_LEAVE_BASE_NEIGHBOR_PENALTY_USD = 80;
 
 /**
  * Tour floors are softer than single-leg Scout — multi-leg chains need
@@ -142,12 +157,219 @@ function lotAvailableKg(lot: ShipmentLot): number {
   return Math.max(0, Math.floor(lot.quantityKg - (lot.reservedKg ?? 0)));
 }
 
+function softHoldCreditKg(leg: ActiveTourLeg, worldTick: number): number {
+  const kg = Math.max(0, Math.floor(leg.softHoldKg ?? 0));
+  const exp = leg.softHoldExpiresAtTick;
+  if (kg <= 0 || exp == null || exp <= worldTick) return 0;
+  return kg;
+}
+
 function assertOwnsBase(state: CareerMissionsState): void {
   if (ensurePlayerFbos(state).fbos.length === 0) {
     throw new Error(
       'Dispatcher desk needs a company Base — buy your home Base first (first Base is free)',
     );
   }
+}
+
+function ensureTourLotSoftHolds(world: CareerEconomyWorld): TourLotSoftHold[] {
+  if (!Array.isArray(world.tourLotSoftHolds)) {
+    world.tourLotSoftHolds = [];
+  }
+  return world.tourLotSoftHolds;
+}
+
+/** Which planned leg gets the short soft-hold (next after committed, else L2). */
+export function nextTourSoftHoldLeg(tour: ActiveTour): ActiveTourLeg | null {
+  if (tour.status !== 'active') return null;
+  const committed = [...tour.legs]
+    .reverse()
+    .find((l) => l.status === 'done' || l.status === 'active');
+  if (committed) {
+    return (
+      tour.legs.find(
+        (l) => l.index > committed.index && l.status === 'planned',
+      ) ?? null
+    );
+  }
+  return tour.legs.find((l) => l.index === 2 && l.status === 'planned') ?? null;
+}
+
+function clearLegSoftHoldMeta(leg: ActiveTourLeg): void {
+  delete leg.softHoldKg;
+  delete leg.softHoldExpiresAtTick;
+}
+
+/**
+ * Release one leg's soft-hold on the world board (if any).
+ */
+export function releaseTourLegSoftHold(
+  world: CareerEconomyWorld,
+  tour: ActiveTour,
+  leg: ActiveTourLeg,
+): void {
+  const kg = Math.max(0, Math.floor(leg.softHoldKg ?? 0));
+  if (kg > 0 && leg.lotId) {
+    try {
+      releaseShipmentReservation(world, leg.lotId, kg);
+    } catch {
+      /* lot may already be gone */
+    }
+  }
+  clearLegSoftHoldMeta(leg);
+  const holds = ensureTourLotSoftHolds(world);
+  world.tourLotSoftHolds = holds.filter(
+    (h) => !(h.tourId === tour.id && h.legIndex === leg.index),
+  );
+}
+
+export function releaseAllTourSoftHolds(
+  world: CareerEconomyWorld,
+  tour: ActiveTour,
+): void {
+  for (const leg of tour.legs) {
+    if (leg.softHoldKg || leg.softHoldExpiresAtTick != null) {
+      releaseTourLegSoftHold(world, tour, leg);
+    }
+  }
+  const holds = ensureTourLotSoftHolds(world);
+  world.tourLotSoftHolds = holds.filter((h) => h.tourId !== tour.id);
+}
+
+/**
+ * Expire soft-holds past world tick; release reservedKg. Optional company
+ * state clears matching ActiveTour leg metadata (source of truth in SP).
+ */
+export function expireTourLotSoftHolds(
+  world: CareerEconomyWorld,
+  state?: CareerMissionsState | null,
+  nowTick = world.tick,
+): number {
+  let released = 0;
+  const holds = ensureTourLotSoftHolds(world);
+  const keep: TourLotSoftHold[] = [];
+  for (const h of holds) {
+    if (h.expiresAtTick > nowTick) {
+      keep.push(h);
+      continue;
+    }
+    try {
+      releaseShipmentReservation(world, h.lotId, h.kg);
+    } catch {
+      /* ignore */
+    }
+    released += 1;
+    if (state) {
+      const tour = ensurePlayerFbos(state).activeTour;
+      if (tour && tour.id === h.tourId) {
+        const leg = tour.legs.find((l) => l.index === h.legIndex);
+        if (leg) clearLegSoftHoldMeta(leg);
+      }
+    }
+  }
+  world.tourLotSoftHolds = keep;
+
+  // Company leg metadata may outlive a missing world index (command-slice persist).
+  if (state) {
+    const tour = ensurePlayerFbos(state).activeTour;
+    if (tour?.status === 'active') {
+      for (const leg of tour.legs) {
+        const exp = leg.softHoldExpiresAtTick;
+        const kg = Math.max(0, Math.floor(leg.softHoldKg ?? 0));
+        if (exp == null || kg <= 0) continue;
+        if (exp > nowTick) continue;
+        releaseTourLegSoftHold(world, tour, leg);
+        released += 1;
+      }
+    }
+  }
+  return released;
+}
+
+/**
+ * Soft-hold the next planned tour leg on the world board (idempotent).
+ * Returns the held leg or null when nothing to hold / lot unavailable.
+ */
+export function softHoldTourNextLeg(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts?: { companyId?: string },
+): ActiveTourLeg | null {
+  expireTourLotSoftHolds(world, state);
+  const tour = ensurePlayerFbos(state).activeTour;
+  if (!tour || tour.status !== 'active') return null;
+
+  const target = nextTourSoftHoldLeg(tour);
+  // Drop soft soft-holds on other legs (next-leg only).
+  for (const leg of tour.legs) {
+    if (!target || leg.index !== target.index) {
+      if (leg.softHoldKg || leg.softHoldExpiresAtTick != null) {
+        releaseTourLegSoftHold(world, tour, leg);
+      }
+    }
+  }
+  if (!target) return null;
+
+  const companyId = opts?.companyId ?? LOCAL_COMPANY_ID;
+  const expiresAtTick = world.tick + BASE_TOUR_SOFT_HOLD_TTL_TICKS;
+
+  // Already holding this lot with remaining TTL — refresh metadata only if same.
+  if (
+    softHoldCreditKg(target, world.tick) > 0 &&
+    target.softHoldKg &&
+    target.lotId
+  ) {
+    // Keep existing TTL (no mid-flight renew). Ensure world index row exists.
+    const holds = ensureTourLotSoftHolds(world);
+    const existing = holds.find(
+      (h) => h.tourId === tour.id && h.legIndex === target.index,
+    );
+    if (!existing) {
+      holds.push({
+        companyId,
+        tourId: tour.id,
+        legIndex: target.index,
+        lotId: target.lotId,
+        kg: target.softHoldKg,
+        expiresAtTick: target.softHoldExpiresAtTick ?? expiresAtTick,
+      });
+    }
+    return target;
+  }
+
+  // Replace any stale meta without reservation.
+  if (target.softHoldKg || target.softHoldExpiresAtTick != null) {
+    releaseTourLegSoftHold(world, tour, target);
+  }
+
+  const lot = world.lots.find((l) => l.id === target.lotId);
+  if (!lot || (lot.status !== 'available' && lot.status !== 'reserved')) {
+    return null;
+  }
+  const want = Math.max(1, Math.floor(target.liftKg));
+  const avail = lotAvailableKg(lot);
+  if (avail <= 0) return null;
+  const kg = Math.min(want, avail);
+  try {
+    reserveShipmentLot(world, target.lotId, kg);
+  } catch {
+    return null;
+  }
+  target.softHoldKg = kg;
+  target.softHoldExpiresAtTick = expiresAtTick;
+  const holds = ensureTourLotSoftHolds(world).filter(
+    (h) => !(h.tourId === tour.id && h.legIndex === target.index),
+  );
+  holds.push({
+    companyId,
+    tourId: tour.id,
+    legIndex: target.index,
+    lotId: target.lotId,
+    kg,
+    expiresAtTick,
+  });
+  world.tourLotSoftHolds = holds;
+  return target;
 }
 
 function defaultTourMinNm(cls: FreighterClassId): number {
@@ -530,6 +752,11 @@ export function listBaseDispatchTours(
     maxFerryNm?: number | null;
     minKg?: number;
     returnMode?: BaseDispatchTourReturnMode;
+    /**
+     * Score-boost first-leg origins at Base hub (default true).
+     * Neighbors in the same region stay eligible — not a hard filter.
+     */
+    preferLeaveBase?: boolean;
     max?: number;
     excludeLastMile?: boolean;
   },
@@ -543,6 +770,7 @@ export function listBaseDispatchTours(
   }
 
   const hub = opts.hubIcao.trim().toUpperCase();
+  const preferLeaveBase = opts.preferLeaveBase !== false;
   const regionByIcao = buildAirportRegionMap(world);
   const hubRegion = regionByIcao.get(hub) ?? null;
   const blockedLotIds = buildCrewNeededLotIds(world);
@@ -626,8 +854,14 @@ export function listBaseDispatchTours(
       }
     }
     firstPool.sort((a, b) => {
-      const sa = a.netUsd - a.ferryNm * policy.ferryPenaltyUsdPerNm;
-      const sb = b.netUsd - b.ferryNm * policy.ferryPenaltyUsdPerNm;
+      let sa = a.netUsd - a.ferryNm * policy.ferryPenaltyUsdPerNm;
+      let sb = b.netUsd - b.ferryNm * policy.ferryPenaltyUsdPerNm;
+      if (preferLeaveBase) {
+        if (a.originIcao === hub) sa += BASE_DISPATCH_LEAVE_BASE_BOOST_USD;
+        else sa -= BASE_DISPATCH_LEAVE_BASE_NEIGHBOR_PENALTY_USD;
+        if (b.originIcao === hub) sb += BASE_DISPATCH_LEAVE_BASE_BOOST_USD;
+        else sb -= BASE_DISPATCH_LEAVE_BASE_NEIGHBOR_PENALTY_USD;
+      }
       return sb - sa || a.ferryNm - b.ferryNm;
     });
 
@@ -855,11 +1089,22 @@ function lotStillOpen(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
   lotId: string,
+  opts?: { softHoldCreditKg?: number },
 ): boolean {
   const lot = world.lots.find((l) => l.id === lotId);
-  if (!lot || lot.status !== 'available') return false;
+  if (!lot) return false;
+  if (
+    lot.status === 'expired' ||
+    lot.status === 'delivered' ||
+    lot.status === 'in_transit'
+  ) {
+    return false;
+  }
+  // Soft-hold may flip a fully reserved lot to `reserved`.
+  if (lot.status !== 'available' && lot.status !== 'reserved') return false;
   if (!cargoOpsIsUnlocked(state.cargoOps, lot.commodityId)) return false;
-  return lotAvailableKg(lot) > 0;
+  const credit = Math.max(0, Math.floor(opts?.softHoldCreditKg ?? 0));
+  return lotAvailableKg(lot) + credit > 0;
 }
 
 function findMissionForLeg(
@@ -937,11 +1182,15 @@ function missionTerminalStatus(
 
 /**
  * Refresh leg statuses from missions + board availability.
+ * Pass `renewSoftHold: false` on read-only paths (Search list) so we do not
+ * bump world `reservedKg` without a persist.
  */
 export function syncActiveTour(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
+  opts?: { renewSoftHold?: boolean },
 ): ActiveTour | null {
+  expireTourLotSoftHolds(world, state);
   const fbos = ensurePlayerFbos(state);
   const tour = fbos.activeTour;
   if (!tour) return null;
@@ -970,7 +1219,11 @@ export function syncActiveTour(
       if (term === 'done') leg.status = 'done';
       else if (term === 'active') leg.status = 'active';
       else if (term === 'lost' && leg.status !== 'done') {
-        leg.status = lotStillOpen(state, world, leg.lotId) ? 'planned' : 'lost';
+        leg.status = lotStillOpen(state, world, leg.lotId, {
+          softHoldCreditKg: softHoldCreditKg(leg, world.tick),
+        })
+          ? 'planned'
+          : 'lost';
         leg.missionId = undefined;
         claimedMissionIds.delete(mission.id);
       }
@@ -978,21 +1231,38 @@ export function syncActiveTour(
     }
     // Prepared tour (all planned) or mid-leg after cancel: no matching mission.
     if (leg.status === 'active') {
-      leg.status = lotStillOpen(state, world, leg.lotId) ? 'planned' : 'lost';
+      leg.status = lotStillOpen(state, world, leg.lotId, {
+        softHoldCreditKg: softHoldCreditKg(leg, world.tick),
+      })
+        ? 'planned'
+        : 'lost';
       leg.missionId = undefined;
-    } else if (leg.status === 'planned' && !lotStillOpen(state, world, leg.lotId)) {
+    } else if (
+      leg.status === 'planned' &&
+      !lotStillOpen(state, world, leg.lotId, {
+        softHoldCreditKg: softHoldCreditKg(leg, world.tick),
+      })
+    ) {
       // Lot may be reserved/in_transit on the player's mission — do not mark lost.
       const lot = world.lots.find((l) => l.id === leg.lotId);
       if (!lot || lot.status === 'expired' || lot.status === 'delivered') {
         leg.status = 'lost';
       }
-    } else if (leg.status === 'lost' && lotStillOpen(state, world, leg.lotId)) {
+    } else if (
+      leg.status === 'lost' &&
+      lotStillOpen(state, world, leg.lotId, {
+        softHoldCreditKg: softHoldCreditKg(leg, world.tick),
+      })
+    ) {
       leg.status = 'planned';
     }
   }
 
   if (tour.legs.every((l) => l.status === 'done')) {
     tour.status = 'completed';
+    releaseAllTourSoftHolds(world, tour);
+  } else if (tour.status === 'active' && opts?.renewSoftHold !== false) {
+    softHoldTourNextLeg(state, world);
   }
   fbos.activeTour = tour;
   return tour;
@@ -1044,12 +1314,19 @@ export function startActiveTour(
     status: 'active',
   };
   fbos.activeTour = tour;
+  softHoldTourNextLeg(state, world);
   return tour;
 }
 
-export function dropActiveTour(state: CareerMissionsState): void {
+export function dropActiveTour(
+  state: CareerMissionsState,
+  world?: CareerEconomyWorld,
+): void {
   const fbos = ensurePlayerFbos(state);
   if (!fbos.activeTour) return;
+  if (world) {
+    releaseAllTourSoftHolds(world, fbos.activeTour);
+  }
   if (fbos.activeTour.status === 'active') {
     fbos.activeTour = { ...fbos.activeTour, status: 'abandoned' };
   }
@@ -1204,6 +1481,7 @@ export function attachActiveTourFromMission(
  */
 export function dropPreparedActiveTourIfUnbound(
   state: CareerMissionsState,
+  world?: CareerEconomyWorld,
 ): boolean {
   const tour = getActiveTour(state);
   if (!tour || tour.status !== 'active') return false;
@@ -1214,7 +1492,7 @@ export function dropPreparedActiveTourIfUnbound(
       leg.status === 'done',
   );
   if (anyBound) return false;
-  dropActiveTour(state);
+  dropActiveTour(state, world);
   return true;
 }
 
@@ -1324,13 +1602,18 @@ export type ActiveTourView = ActiveTour & {
   resumeState: ActiveTourResumeState;
   /** Short player-facing line for toast / Dispatch empty banner. */
   resumeHint: string | null;
+  /** Soft-hold on next planned leg (world tick TTL remaining). */
+  nextLegSoftHoldExpiresAtTick?: number | null;
+  nextLegSoftHoldRemainingTicks?: number | null;
+  nextLegSoftHoldKg?: number | null;
 };
 
 export function activeTourView(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
+  opts?: { renewSoftHold?: boolean },
 ): ActiveTourView | null {
-  const tour = syncActiveTour(state, world);
+  const tour = syncActiveTour(state, world, opts);
   if (!tour || tour.status !== 'active') return null;
   const acf = state.fleet.find((a) => a.id === tour.aircraftId);
   const loc = (acf?.locationIcao ?? '').trim().toUpperCase() || undefined;
@@ -1365,7 +1648,9 @@ export function activeTourView(
     } else if ((acf.locationIcao ?? '').trim().toUpperCase() !== next.originIcao) {
       reason = `Ferry to ${next.originIcao} first (aircraft at ${acf.locationIcao || '—'})`;
     } else {
-      lotAvailable = lotStillOpen(state, world, next.lotId);
+      lotAvailable = lotStillOpen(state, world, next.lotId, {
+        softHoldCreditKg: softHoldCreditKg(next, world.tick),
+      });
       needsRebind = !lotAvailable;
       if (lotAvailable) {
         canAccept = true;
@@ -1388,11 +1673,29 @@ export function activeTourView(
     }
   }
 
+  const softTarget = nextTourSoftHoldLeg(tour);
+  const softHeld =
+    softTarget && softHoldCreditKg(softTarget, world.tick) > 0
+      ? softTarget
+      : null;
+  const softExp = softHeld?.softHoldExpiresAtTick ?? null;
+  const softKg = softHeld ? softHoldCreditKg(softHeld, world.tick) : null;
+  const softRem =
+    softExp != null ? Math.max(0, softExp - world.tick) : null;
+
   let resumeState: ActiveTourResumeState;
   let resumeHint: string | null = null;
   if (activeLeg) {
     resumeState = 'in_progress';
-    resumeHint = `Tour L${activeLeg.index}/${tour.legs.length} in progress`;
+    const held = nextTourSoftHoldLeg(tour);
+    const heldRem =
+      held && softHoldCreditKg(held, world.tick) > 0
+        ? Math.max(0, (held.softHoldExpiresAtTick ?? 0) - world.tick)
+        : null;
+    resumeHint =
+      heldRem != null
+        ? `Tour L${activeLeg.index}/${tour.legs.length} in progress · L${held!.index} soft-hold ${heldRem}t`
+        : `Tour L${activeLeg.index}/${tour.legs.length} in progress`;
   } else if (canAccept && nextLegIndex != null) {
     resumeState = 'ready';
     const leg = tour.legs.find((l) => l.index === nextLegIndex);
@@ -1427,6 +1730,9 @@ export function activeTourView(
     nextLegNeedsRebind: needsRebind,
     resumeState,
     resumeHint,
+    nextLegSoftHoldExpiresAtTick: softExp,
+    nextLegSoftHoldRemainingTicks: softRem,
+    nextLegSoftHoldKg: softKg,
   };
 }
 
@@ -1471,7 +1777,15 @@ export function acceptActiveTourLeg(
   let lotId = leg.lotId;
   let liftKg = opts.kg ?? leg.liftKg;
   let rebound = false;
-  if (!lotStillOpen(state, world, lotId)) {
+  // Promote soft-hold → mission reserve: release first so Accept does not double-count.
+  if (leg.softHoldKg || leg.softHoldExpiresAtTick != null) {
+    releaseTourLegSoftHold(world, tour, leg);
+  }
+  if (
+    !lotStillOpen(state, world, lotId, {
+      softHoldCreditKg: softHoldCreditKg(leg, world.tick),
+    })
+  ) {
     const siblingLotIds = tour.legs
       .filter((l) => l.index !== leg.index)
       .map((l) => l.lotId);
@@ -1524,6 +1838,9 @@ export function acceptActiveTourLeg(
   leg.missionId = confirmed.mission.id;
   leg.lotId = lotId;
   leg.liftKg = confirmed.kg;
+
+  // Soft-hold the following planned leg (L3 after Accept L2, etc.).
+  softHoldTourNextLeg(state, world);
 
   const activeTour = activeTourView(state, world)!;
   return {

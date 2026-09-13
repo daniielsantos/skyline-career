@@ -4426,12 +4426,21 @@ export function createCareerApiServer(port = 8787) {
             assertCompanyCreditAllowsOps(missions);
             const icao = (body.icao ?? missions.homeHubIcao).trim().toUpperCase();
             const bought = buyFboTier1(missions, world, icao);
+            // Open Dispatcher hire desk for this hub (same persist as the buy).
+            refreshBaseDispatcherHirePool(missions, world, {
+              hubIcao: bought.fbo.icao,
+              force: true,
+            });
             return {
               walletUsd: missions.walletUsd,
               debitUsd: bought.debitUsd,
               fbo: bought.fbo,
               playerFbos: playerFboSnapshot(missions, world),
               companyCrew: companyCrewSnapshot(missions, world),
+              dispatcher: baseDispatcherSnapshot(missions, world, {
+                hubIcao: bought.fbo.icao,
+              }),
+              policy: resolveBaseDispatchScoutPolicy(missions),
             };
           }, { persist: 'company' });
           send(res, 200, result);
@@ -4792,6 +4801,7 @@ export function createCareerApiServer(port = 8787) {
           maxFerryNm?: number | null;
           minKg?: number;
           returnMode?: 'none' | 'origin' | 'base';
+          preferLeaveBase?: boolean;
           excludeLastMile?: boolean;
           firstLotId?: string;
           kg?: number;
@@ -4832,7 +4842,7 @@ export function createCareerApiServer(port = 8787) {
             const maxFerryNmRaw =
               body.maxFerryNm == null ? null : Number(body.maxFerryNm);
             const policy = resolveBaseDispatchScoutPolicy(missions);
-            syncActiveTour(missions, world);
+            syncActiveTour(missions, world, { renewSoftHold: false });
             const tours = withDevProgressionUnlock(req, missions, () =>
               listBaseDispatchTours(missions, world, {
                 hubIcao,
@@ -4852,18 +4862,28 @@ export function createCareerApiServer(port = 8787) {
                     : undefined,
                 minKg: body.minKg != null ? Number(body.minKg) : undefined,
                 returnMode: body.returnMode,
+                preferLeaveBase: body.preferLeaveBase,
                 excludeLastMile: body.excludeLastMile,
               }),
             );
             send(res, 200, {
               tours,
-              activeTour: activeTourView(missions, world),
+              activeTour: activeTourView(missions, world, {
+                renewSoftHold: false,
+              }),
               policy,
               dispatcher: baseDispatcherSnapshot(missions, world),
             });
             return;
           }
           if (action === 'status') {
+            const peek = await loadMissions();
+            const softLots = (peek.playerFbos?.activeTour?.legs ?? [])
+              .filter((l) => (l.softHoldKg ?? 0) > 0 && l.lotId)
+              .map((l) => l.lotId);
+            const plannedLots = (peek.playerFbos?.activeTour?.legs ?? [])
+              .filter((l) => l.status === 'planned' && l.lotId)
+              .map((l) => l.lotId);
             const result = await withCareerWrite((world, missions) => {
               syncActiveTour(missions, world);
               return {
@@ -4872,19 +4892,29 @@ export function createCareerApiServer(port = 8787) {
                 dispatcher: baseDispatcherSnapshot(missions, world),
                 playerFbos: playerFboSnapshot(missions, world),
               };
-            }, { persist: 'company', housekeeping: false });
+            }, {
+              commandSliceLotIds: [...new Set([...softLots, ...plannedLots])],
+              housekeeping: false,
+            });
             send(res, 200, result);
             return;
           }
           if (action === 'drop') {
+            const peek = await loadMissions();
+            const softLots = (peek.playerFbos?.activeTour?.legs ?? [])
+              .filter((l) => (l.softHoldKg ?? 0) > 0 && l.lotId)
+              .map((l) => l.lotId);
             const result = await withCareerWrite((world, missions) => {
-              dropActiveTour(missions);
+              dropActiveTour(missions, world);
               return {
                 activeTour: null as null,
                 policy: resolveBaseDispatchScoutPolicy(missions),
                 dispatcher: baseDispatcherSnapshot(missions, world),
               };
-            }, { persist: 'company', housekeeping: false });
+            }, {
+              commandSliceLotIds: softLots,
+              housekeeping: false,
+            });
             send(res, 200, result);
             return;
           }
@@ -4916,20 +4946,30 @@ export function createCareerApiServer(port = 8787) {
                 dispatcher: baseDispatcherSnapshot(missions, world),
                 playerFbos: playerFboSnapshot(missions, world),
               };
-            }, { persist: 'company', housekeeping: false });
+            }, {
+              commandSliceLotIds: body.tourLegs.map((l) => l.lotId),
+              housekeeping: false,
+            });
             send(res, 200, result);
             return;
           }
           if (action === 'drop-unbound') {
+            const peek = await loadMissions();
+            const softLots = (peek.playerFbos?.activeTour?.legs ?? [])
+              .filter((l) => (l.softHoldKg ?? 0) > 0 && l.lotId)
+              .map((l) => l.lotId);
             const result = await withCareerWrite((world, missions) => {
-              dropPreparedActiveTourIfUnbound(missions);
+              dropPreparedActiveTourIfUnbound(missions, world);
               return {
                 activeTour: activeTourView(missions, world),
                 policy: resolveBaseDispatchScoutPolicy(missions),
                 dispatcher: baseDispatcherSnapshot(missions, world),
                 playerFbos: playerFboSnapshot(missions, world),
               };
-            }, { persist: 'company', housekeeping: false });
+            }, {
+              commandSliceLotIds: softLots,
+              housekeeping: false,
+            });
             send(res, 200, result);
             return;
           }

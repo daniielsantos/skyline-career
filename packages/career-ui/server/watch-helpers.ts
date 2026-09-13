@@ -76,6 +76,7 @@ import {
   payloadMatchToleranceLb,
   clampPaxAndCargoDueToHoldsLb,
   adjustPaxAndCargoDueForEfbPaxLb,
+  resolveOfpPassengerCountForEfbDue,
   simconnectCabinOvershootLb,
   simconnectEmptyPayloadBiasLb,
   type CareerEconomyWorld,
@@ -2357,16 +2358,17 @@ export class CareerWatchSession {
                 prevVerification.payload.plannedLb);
           // Always recompute Due from OFP cargoLb — never from last painted
           // plannedLb (efbPaxWeightLb is not idempotent if stacked).
+          // Freight/haul keeps mission.pax=0 while Dispatch fills SimBrief seats
+          // for EFB Import — use OFP passengerCount (or estimate), not mission 0.
           const plannedPayloadLb = adjustPaxAndCargoDueForEfbPaxLb(
             clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, airframe),
             airframe,
             {
-              // Career freighter legs stay pax=0; family SKUs still have efbPaxWeightLb
-              // for passenger glass — never invent cabin seats on QT/QC Due.
-              ofpPassengerCount:
-                typeof current.pax === 'number' && Number.isFinite(current.pax)
-                  ? current.pax
-                  : undefined,
+              ofpPassengerCount: resolveOfpPassengerCountForEfbDue({
+                missionPax: current.pax,
+                ofpPassengerCount: current.lastOfpCheck?.passengerCount,
+                loadLayout: airframe?.loadLayout,
+              }),
             },
           );
           const liveCrewLb =

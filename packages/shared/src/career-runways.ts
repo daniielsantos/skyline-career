@@ -73,6 +73,30 @@ export function headingDeltaDeg(a: number, b: number): number {
   return Math.abs(d);
 }
 
+/** RWY 06 → 60°, RWY 36 → 0°. Magnetic runway-number estimate (not true). */
+export function headingFromRunwayIdent(ident: string | undefined): number | null {
+  const m = String(ident ?? '')
+    .trim()
+    .toUpperCase()
+    .match(/^(\d{1,2})/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n < 1 || n > 36) return null;
+  return (n * 10) % 360;
+}
+
+/**
+ * True when catalog heading looks like merge-missing's ident×10 stub
+ * (magnetic runway number), not surveyed true heading.
+ */
+export function isLikelyMagneticHeadingStub(
+  runway: Pick<CareerRunway, 'ident' | 'headingTrueDeg'>,
+): boolean {
+  const fromIdent = headingFromRunwayIdent(runway.ident);
+  if (fromIdent == null) return false;
+  return headingDeltaDeg(runway.headingTrueDeg, fromIdent) <= 3;
+}
+
 /**
  * Pick which runway end the aircraft was landing on.
  * When `headingTrueDeg` is finite, align to primary vs reciprocal (±90°).
@@ -168,7 +192,7 @@ export function pickBestRunway(
     segmentM: number;
   };
   const cands: Cand[] = runways.map((rwy) => {
-    const proj = projectOntoRunway(rwy, lat, lon);
+    const { proj } = bestRunwayProjection(rwy, lat, lon, headingTrueDeg);
     let headingScore = 180;
     if (typeof headingTrueDeg === 'number' && Number.isFinite(headingTrueDeg)) {
       const toPrimary = headingDeltaDeg(headingTrueDeg, rwy.headingTrueDeg);
@@ -205,7 +229,9 @@ export function pickBestRunway(
 
 /**
  * Project a WGS84 point onto a runway rectangle (local ENU approx).
- * `headingTrueDeg` is the primary-end true heading (LE → HE).
+ * `headingTrueDeg` is the primary-end true heading (LE → HE), unless
+ * `axisHeadingTrueDeg` overrides the strip axis (used when catalog heading is
+ * a magnetic runway-number stub and aircraft true heading is known).
  *
  * OurAirports centers can sit a few meters off MSFS pavement — allow a small
  * lateral cushion before marking OFF runway.
@@ -216,13 +242,18 @@ export function projectOntoRunway(
   runway: CareerRunway,
   lat: number,
   lon: number,
+  axisHeadingTrueDeg?: number,
 ): RunwayProjection {
   const latRad = (runway.lat * Math.PI) / 180;
   const mPerDegLat = 111_320;
   const mPerDegLon = 111_320 * Math.cos(latRad);
   const dNorth = (lat - runway.lat) * mPerDegLat;
   const dEast = (lon - runway.lon) * mPerDegLon;
-  const hdg = (runway.headingTrueDeg * Math.PI) / 180;
+  const rawHdg =
+    typeof axisHeadingTrueDeg === 'number' && Number.isFinite(axisHeadingTrueDeg)
+      ? axisHeadingTrueDeg
+      : runway.headingTrueDeg;
+  const hdg = (((rawHdg % 360) + 360) % 360) * (Math.PI / 180);
   const cosH = Math.cos(hdg);
   const sinH = Math.sin(hdg);
   const alongM = dNorth * cosH + dEast * sinH;
@@ -233,6 +264,66 @@ export function projectOntoRunway(
   const onPavement =
     Math.abs(alongM) <= halfLen + 1e-6 && Math.abs(lateralM) <= halfWid + 1e-6;
   return { alongM, lateralM, pastThresholdM, onPavement };
+}
+
+/**
+ * Prefer catalog axis; if aircraft true heading yields a clearly better fit
+ * (on pavement / much smaller |lateral|), use that axis instead.
+ * Covers merge-missing stubs where headingTrueDeg ≈ runway number × 10
+ * (magnetic) while MSFS coords are true.
+ */
+export function bestRunwayProjection(
+  runway: CareerRunway,
+  lat: number,
+  lon: number,
+  aircraftHeadingTrueDeg?: number,
+): { proj: RunwayProjection; axisHeadingTrueDeg: number } {
+  const catalog = projectOntoRunway(runway, lat, lon);
+  const catalogAxis = runway.headingTrueDeg;
+  if (
+    typeof aircraftHeadingTrueDeg !== 'number' ||
+    !Number.isFinite(aircraftHeadingTrueDeg)
+  ) {
+    return { proj: catalog, axisHeadingTrueDeg: catalogAxis };
+  }
+  const a = projectOntoRunway(runway, lat, lon, aircraftHeadingTrueDeg);
+  const b = projectOntoRunway(
+    runway,
+    lat,
+    lon,
+    aircraftHeadingTrueDeg + 180,
+  );
+  type Cand = { proj: RunwayProjection; axis: number; prefer: number };
+  const stub = isLikelyMagneticHeadingStub(runway);
+  const cands: Cand[] = [
+    {
+      proj: catalog,
+      axis: catalogAxis,
+      // Magnetic stubs: demote catalog so aircraft true heading wins.
+      prefer: stub ? 2 : 0,
+    },
+    {
+      proj: a,
+      axis: ((aircraftHeadingTrueDeg % 360) + 360) % 360,
+      prefer: 0,
+    },
+    {
+      proj: b,
+      axis: (((aircraftHeadingTrueDeg + 180) % 360) + 360) % 360,
+      prefer: 0,
+    },
+  ];
+  cands.sort((x, y) => {
+    if (x.proj.onPavement !== y.proj.onPavement) {
+      return x.proj.onPavement ? -1 : 1;
+    }
+    if (x.prefer !== y.prefer) return x.prefer - y.prefer;
+    const latDiff = Math.abs(x.proj.lateralM) - Math.abs(y.proj.lateralM);
+    if (Math.abs(latDiff) > 0.5) return latDiff;
+    return Math.abs(x.proj.alongM) - Math.abs(y.proj.alongM);
+  });
+  const best = cands[0]!;
+  return { proj: best.proj, axisHeadingTrueDeg: best.axis };
 }
 
 /** Hub ICAOs missing runway rows in the committed catalog (for coverage tests). */
@@ -260,12 +351,31 @@ export function evaluateRunwayTouchdown(
   if (lat === 0 && lon === 0) return undefined;
   const runway = pickBestRunway(icao, lat, lon, headingTrueDeg);
   if (!runway) return undefined;
-  const proj = projectOntoRunway(runway, lat, lon);
+  const { proj, axisHeadingTrueDeg } = bestRunwayProjection(
+    runway,
+    lat,
+    lon,
+    headingTrueDeg,
+  );
   const landingEnd = pickRunwayLandingEnd(
     runway,
     proj.pastThresholdM,
     headingTrueDeg,
   );
+  // pastThresholdM / lateralM in the snapshot are always in the catalog-primary
+  // frame (format + diagram flip for reciprocal). When the winning axis is the
+  // reciprocal true heading, convert from that axis's LE frame.
+  let pastThresholdM = proj.pastThresholdM;
+  let lateralM = proj.lateralM;
+  const toPrimary = headingDeltaDeg(axisHeadingTrueDeg, runway.headingTrueDeg);
+  const toReciprocal = headingDeltaDeg(
+    axisHeadingTrueDeg,
+    runway.headingTrueDeg + 180,
+  );
+  if (toReciprocal + 1 < toPrimary) {
+    pastThresholdM = runway.lengthM - proj.pastThresholdM;
+    lateralM = -proj.lateralM;
+  }
   return {
     lat,
     lon,
@@ -276,11 +386,13 @@ export function evaluateRunwayTouchdown(
       : {}),
     lengthM: runway.lengthM,
     widthM: runway.widthM,
+    // Keep catalog heading for strip identity; projection may have used aircraft
+    // true heading when the catalog value was a magnetic stub.
     headingTrueDeg: runway.headingTrueDeg,
     ...(runway.lighted !== undefined ? { lighted: runway.lighted } : {}),
-    alongM: Math.round(proj.alongM),
-    lateralM: Math.round(proj.lateralM),
-    pastThresholdM: Math.round(proj.pastThresholdM),
+    alongM: Math.round(pastThresholdM - runway.lengthM / 2),
+    lateralM: Math.round(lateralM),
+    pastThresholdM: Math.round(pastThresholdM),
     onPavement: proj.onPavement,
     landingEnd,
   };

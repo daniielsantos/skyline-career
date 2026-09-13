@@ -21,6 +21,7 @@ import {
   warehouseUsedKg,
   warehouseInboundPendingKg,
   WAREHOUSE_CAPACITY_KG,
+  MIN_WAREHOUSE_INBOUND_KG,
 } from './career-warehouse-stock.js';
 import { whOpsCapexMultForWarehouse } from './career-ground-staff.js';
 import type {
@@ -53,6 +54,7 @@ export {
   warehouseBridgeDestRoomKg,
   withdrawCargoFromWarehouse,
   WAREHOUSE_CAPACITY_KG,
+  MIN_WAREHOUSE_INBOUND_KG,
   WAREHOUSE_LOT_MERGE_REL_BAND,
 } from './career-warehouse-stock.js';
 
@@ -427,6 +429,8 @@ export function settleWarehouseStorageFees(
 
 /**
  * Deposit ready inbound transfers into WH stock; overflow → yard pickup.
+ * Also reclaims negligible inbounds (&lt; MIN_WAREHOUSE_INBOUND_KG) to yard so
+ * they do not linger as Mass 0.0 klb rows.
  */
 export function settleWarehouseInboundTransfers(
   state: CareerMissionsState,
@@ -444,6 +448,24 @@ export function settleWarehouseInboundTransfers(
   const tick = world.tick;
 
   for (const tr of pending) {
+    // Ghost / display-zero leftovers — fold into yard immediately (no ETA wait).
+    if (tr.kg > 0 && tr.kg < MIN_WAREHOUSE_INBOUND_KG) {
+      const pickup: PlayerPortPickup = {
+        id: nextId('portpk', tick),
+        portId: tr.portId,
+        listingId: tr.listingId,
+        hubIcao: tr.hubIcao,
+        commodityId: tr.commodityId,
+        kg: tr.kg,
+        avgCostUsdPerKg: tr.unitCostUsd,
+        purchasedAtTick: tick,
+      };
+      if (!Array.isArray(state.portPickups)) state.portPickups = [];
+      state.portPickups.push(pickup);
+      yardOverflow.push(pickup);
+      deposited.push({ ...tr });
+      continue;
+    }
     if (tr.readyAtTick > tick) {
       still.push(tr);
       continue;

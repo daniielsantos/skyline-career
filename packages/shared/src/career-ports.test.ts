@@ -27,6 +27,7 @@ import {
   buyWarehouseAtPickupHub,
   depositCargoToWarehouse,
   isPortPickupHub,
+  MIN_WAREHOUSE_INBOUND_KG,
   WAREHOUSE_T1_CAPACITY_KG,
 } from './career-warehouse.js';
 import {
@@ -863,6 +864,49 @@ describe('career ports', () => {
     });
     assert.equal(abandoned.kg, 1_500);
     assert.equal((state.portPickups ?? []).length, 0);
+  });
+
+  it('buy with tiny free WH room puts entire lot in yard (no 0.0 klb inbound)', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-tiny-free' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'PortTiny',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const whId = state.playerWarehouses!.warehouses[0]!.id;
+    state.playerWarehouses!.stock = [
+      {
+        id: 'whpile_almost_full',
+        warehouseId: whId,
+        commodityId: 'supplies',
+        kg: WAREHOUSE_T1_CAPACITY_KG - 10,
+        avgCostUsdPerKg: 1,
+        acquiredAtTick: world.tick,
+      },
+    ];
+    world.portListings = [
+      {
+        id: 'portlot_tiny_free',
+        portId: 'BRSSZ',
+        commodityId: 'supplies',
+        availableKg: 5_000,
+        unitPriceUsd: 1,
+        allocatedHubIcao: 'SBGR',
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 100,
+        status: 'open',
+      },
+    ];
+    const bought = buyPortListing(state, world, {
+      listingId: 'portlot_tiny_free',
+      kg: 2_000,
+    });
+    assert.ok(10 < MIN_WAREHOUSE_INBOUND_KG);
+    assert.equal(bought.inboundKg, 0);
+    assert.equal(bought.inboundTransfer, null);
+    assert.equal(bought.yardKg, 2_000);
+    assert.equal((state.playerWarehouses?.inboundTransfers ?? []).length, 0);
   });
 
   it('rejects fly-to-FBO stage (removed)', () => {

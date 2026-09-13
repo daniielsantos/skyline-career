@@ -6,6 +6,7 @@
 import { hubDistanceNm } from './career-ferry-route.js';
 import {
   airportByIcao,
+  CAREER_HUB_COORDS,
   routeDistanceNm,
 } from './career-economy.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
@@ -65,6 +66,11 @@ export type PortScoutBridgeSuggestion = {
   commodityId: CommodityId;
   kg: number;
   distanceNm: number;
+  /** Map pins (optional — UI draws route when both ends resolve). */
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
   /** Human-readable why this bridge. */
   reason: string;
   score: number;
@@ -82,6 +88,10 @@ export type PortScoutDemandSuggestion = {
   distanceNm: number;
   unitPriceUsd: number;
   payUsd: number;
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
   reason: string;
   score: number;
 };
@@ -98,9 +108,57 @@ export type PortScoutHaulSuggestion = {
   unitPriceUsd: number;
   payUsd: number;
   destFillPct: number;
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
   reason: string;
   score: number;
 };
+
+function airportLatLon(
+  world: CareerEconomyWorld,
+  icao: string,
+): { lat: number; lon: number } | null {
+  const code = icao.trim().toUpperCase();
+  const hub = CAREER_HUB_COORDS[code];
+  if (
+    hub &&
+    typeof hub.lat === 'number' &&
+    typeof hub.lon === 'number' &&
+    Number.isFinite(hub.lat) &&
+    Number.isFinite(hub.lon)
+  ) {
+    return { lat: hub.lat, lon: hub.lon };
+  }
+  const ap = airportByIcao(world, code);
+  if (
+    ap &&
+    typeof ap.lat === 'number' &&
+    typeof ap.lon === 'number' &&
+    Number.isFinite(ap.lat) &&
+    Number.isFinite(ap.lon)
+  ) {
+    return { lat: ap.lat, lon: ap.lon };
+  }
+  return null;
+}
+
+function routeCoords(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+): Pick<
+  PortScoutHaulSuggestion,
+  'originLat' | 'originLon' | 'destLat' | 'destLon'
+> {
+  const o = airportLatLon(world, originIcao);
+  const d = airportLatLon(world, destIcao);
+  return {
+    ...(o ? { originLat: o.lat, originLon: o.lon } : {}),
+    ...(d ? { destLat: d.lat, destLon: d.lon } : {}),
+  };
+}
 
 function moneyNm(
   world: CareerEconomyWorld,
@@ -238,6 +296,7 @@ export function listPortScoutBridgeSuggestions(
           commodityId,
           kg,
           distanceNm,
+          ...routeCoords(world, origin, dest),
           reason: `${kg.toLocaleString()} kg ${commodityId} at ${origin} → ${dest} has room`,
           score,
         });
@@ -367,6 +426,7 @@ export function listPortScoutDemandSuggestions(
         distanceNm,
         unitPriceUsd,
         payUsd,
+        ...routeCoords(world, origin, dest),
         reason: `${kg.toLocaleString()} kg ${order.commodityId} at ${origin} → Demand ${dest}`,
         score,
       });
@@ -519,6 +579,7 @@ export function listPortScoutHaulSuggestions(
           unitPriceUsd,
           payUsd,
           destFillPct: Math.round(fill * 1000) / 10,
+          ...routeCoords(world, origin, dest),
           reason: `${kg.toLocaleString()} kg ${commodityId} at ${origin} → terminal ${dest} (${Math.round(fill * 100)}% fill)`,
           score,
         });

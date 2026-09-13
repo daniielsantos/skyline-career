@@ -14,9 +14,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createWriteStream } from 'node:fs';
+import { createRequire } from 'node:module';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 
+const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sharedRoot = join(__dirname, '..');
 const outPath = join(sharedRoot, 'src', 'data', 'career-runways.json');
@@ -250,8 +252,17 @@ function buildRunway(row, airportFallback) {
     .toUpperCase();
   if (!ident) return null;
   if (heading == null) {
-    heading =
+    // ident×10 is MAGNETIC. Convert to true via WMM so touchdown projection
+    // does not invent huge lateral offsets (SBKG 150→~125).
+    const mag =
       headingFromIdent(ident) ?? headingFromIdent(identReciprocal) ?? 90;
+    try {
+      const geomagnetism = require('geomagnetism');
+      const decl = geomagnetism.model(new Date()).point([lat, lon]).decl;
+      heading = (((mag + decl) % 360) + 360) % 360;
+    } catch {
+      heading = mag;
+    }
   }
   const widthM =
     widthFt != null && widthFt > 0 ? Math.round(widthFt * FT_TO_M * 10) / 10 : 45;

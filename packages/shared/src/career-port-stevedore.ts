@@ -13,6 +13,7 @@ import { getCareerPort, ensurePlayerPortPickups } from './career-ports.js';
 import {
   ensurePlayerWarehouses,
   warehouseInboundFreeKg,
+  MIN_WAREHOUSE_INBOUND_KG,
 } from './career-warehouse-stock.js';
 import {
   warehouseInboundTransferTicks,
@@ -113,7 +114,7 @@ function resolveHaul(
   }
 
   const inboundFree = warehouseInboundFreeKg(state, destWh.id);
-  if (inboundFree <= 0) {
+  if (inboundFree < MIN_WAREHOUSE_INBOUND_KG) {
     throw new Error(`No inbound capacity at warehouse ${destHub}`);
   }
   const want =
@@ -281,7 +282,7 @@ export function listPortStevedoreDestinations(
     const hub = wh.icao.trim().toUpperCase();
     if (!hubs.has(hub) || hub === fromHub) continue;
     const inboundFreeKg = warehouseInboundFreeKg(state, wh.id);
-    if (inboundFreeKg <= 0) continue;
+    if (inboundFreeKg < MIN_WAREHOUSE_INBOUND_KG) continue;
     const nm = distanceNm(world, fromHub, hub);
     out.push({
       warehouseId: wh.id,

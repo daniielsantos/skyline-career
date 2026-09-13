@@ -60,7 +60,7 @@ import {
   ensurePortListings,
   listPortListings,
 } from './career-ports.js';
-import { cancelMission, departMission, settleMission } from './career-mission.js';
+import { cancelMission, departMission, settleMission, trimMissionCargoToKg } from './career-mission.js';
 import { createSeedEconomyWorld, migrateEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { applyWalletDelta } from './career-ledger.js';
@@ -854,6 +854,39 @@ describe('career warehouse + demand', () => {
     assert.equal((state.playerWarehouses?.inboundTransfers ?? []).length, 0);
   });
 
+  it('reclaims negligible inbound (display 0.0 klb) into yard immediately', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-inbound-ghost' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhGhost',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    state.playerWarehouses!.inboundTransfers = [
+      {
+        id: 'whin_ghost',
+        warehouseId: wh.id,
+        hubIcao: 'SBGR',
+        portId: 'BRSSZ',
+        commodityId: 'supplies',
+        kg: 10,
+        unitCostUsd: 1,
+        purchasedAtTick: world.tick,
+        readyAtTick: world.tick + 4,
+      },
+    ];
+    const settled = settleWarehouseInboundTransfers(state, world);
+    assert.equal(settled.deposited.length, 1);
+    assert.equal(settled.yardOverflow.length, 1);
+    assert.equal(settled.yardOverflow[0]!.kg, 10);
+    assert.equal((state.playerWarehouses?.inboundTransfers ?? []).length, 0);
+    assert.equal(
+      (state.portPickups ?? []).reduce((s, p) => s + p.kg, 0),
+      10,
+    );
+  });
+
   it('hold pledges WH kg and claims board remaining without withdrawing stock', () => {
     const world = createSeedEconomyWorld({ seed: 'demand-hold-partial' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
@@ -1422,5 +1455,41 @@ describe('career warehouse + demand', () => {
       state.playerWarehouses!.warehouses[0]!.lifetimeShippedKg ?? 0,
       150,
     );
+  });
+
+  it('trimMissionCargoToKg returns haul leftover to origin WH', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-haul-trim' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhHaulTrim',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 50_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 1.5,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const accepted = acceptWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 200,
+    });
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 200);
+    const trimmed = trimMissionCargoToKg(
+      world,
+      accepted.mission,
+      150,
+      state,
+    );
+    assert.equal(trimmed.releasedKg, 50);
+    assert.equal(trimmed.mission.cargoKg, 150);
+    assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
   });
 });

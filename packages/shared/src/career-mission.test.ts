@@ -36,6 +36,7 @@ import {
   ofpFreightTowardMissionKg,
   clampPaxAndCargoDueToHoldsLb,
   adjustPaxAndCargoDueForEfbPaxLb,
+  resolveOfpPassengerCountForEfbDue,
   planPaxAndCargoSimBriefLoad,
   SIMBRIEF_STANDARD_BAG_PER_PAX_LB,
   SIMBRIEF_STANDARD_PAX_LB,
@@ -1350,6 +1351,80 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
     });
     assert.equal(due, ofpPayloadLb + 153 * (192 - 175));
     assert.ok(Math.abs(37_702 - due) <= 800);
+  });
+
+  it('C680 haul: mission.pax=0 still gets EFB 210 delta from OFP seats', () => {
+    const ofpPayloadLb = 2_309; // 10×175 + 559 bags
+    const airframe = {
+      typeId: 'skyward-cessna-c680',
+      aircraftClassId: 'light_jet' as const,
+      label: 'C680',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'C680',
+      simbriefAirframeMatch: 'Skyward',
+      loadLayout: 'pax_and_cargo' as const,
+      maxPaxSeats: 12,
+      efbPaxWeightLb: 210,
+    };
+    const ofpPax = resolveOfpPassengerCountForEfbDue({
+      missionPax: 0,
+      ofpPassengerCount: 10,
+      loadLayout: 'pax_and_cargo',
+    });
+    assert.equal(ofpPax, 10);
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, airframe, {
+      ofpPassengerCount: ofpPax,
+    });
+    assert.equal(due, 2_659); // 2309 + 10×35
+  });
+
+  it('C680 haul without OFP count: estimate seats — do not pass mission 0', () => {
+    const ofpPayloadLb = 2_309;
+    const airframe = {
+      typeId: 'skyward-cessna-c680',
+      aircraftClassId: 'light_jet' as const,
+      label: 'C680',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'C680',
+      simbriefAirframeMatch: 'Skyward',
+      loadLayout: 'pax_and_cargo' as const,
+      maxPaxSeats: 12,
+      efbPaxWeightLb: 210,
+    };
+    assert.equal(
+      resolveOfpPassengerCountForEfbDue({
+        missionPax: 0,
+        loadLayout: 'pax_and_cargo',
+      }),
+      undefined,
+    );
+    // Bug path: passing mission.pax=0 skips the delta.
+    assert.equal(
+      adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, airframe, {
+        ofpPassengerCount: 0,
+      }),
+      ofpPayloadLb,
+    );
+    const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, airframe, {
+      ofpPassengerCount: resolveOfpPassengerCountForEfbDue({
+        missionPax: 0,
+        loadLayout: 'pax_and_cargo',
+      }),
+    });
+    assert.equal(due, 2_659);
+  });
+});
+
+describe('resolveOfpPassengerCountForEfbDue', () => {
+  it('keeps explicit OFP 0 as freighter sheet', () => {
+    assert.equal(
+      resolveOfpPassengerCountForEfbDue({
+        missionPax: 0,
+        ofpPassengerCount: 0,
+        loadLayout: 'pax_and_cargo',
+      }),
+      0,
+    );
   });
 });
 

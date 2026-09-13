@@ -20,6 +20,7 @@ import {
   ofpTaxiFuelLb,
   payloadMatchToleranceLb,
   adjustPaxAndCargoDueForEfbPaxLb,
+  resolveOfpPassengerCountForEfbDue,
   clampPaxAndCargoDueToHoldsLb,
   missionLoadPolicy,
   resolveAirportCoords,
@@ -500,15 +501,19 @@ export async function runMissionPreflight(
             ),
             careerAirframe,
             {
-              ofpPassengerCount:
-                typeof ofp.loadSheet?.passengerCount === 'number'
-                  ? ofp.loadSheet.passengerCount
-                  : (ofp.payload?.stationRoles?.passengerStations?.length ??
-                        0) === 0 &&
-                      (ofp.payload?.stationRoles?.baggageStations?.length ??
-                        0) > 0
-                    ? 0
-                    : undefined,
+              ofpPassengerCount: resolveOfpPassengerCountForEfbDue({
+                missionPax: mission.pax,
+                ofpPassengerCount:
+                  typeof ofp.loadSheet?.passengerCount === 'number'
+                    ? ofp.loadSheet.passengerCount
+                    : (ofp.payload?.stationRoles?.passengerStations?.length ??
+                          0) === 0 &&
+                        (ofp.payload?.stationRoles?.baggageStations?.length ??
+                          0) > 0
+                      ? 0
+                      : undefined,
+                loadLayout: careerAirframe?.loadLayout,
+              }),
             },
           )
         : undefined;

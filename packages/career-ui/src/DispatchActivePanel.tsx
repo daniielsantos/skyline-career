@@ -34,7 +34,7 @@ import {
 import { mxFuelBurnAlertText } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
 import { CargoLotCards } from './CargoLotCards';
-import { playUiSound } from './ui-sounds';
+import { playPreflightReadySound, notePreflightNotReady } from './ui-sounds';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
   const currentIndex = DISPATCH_STEP_ORDER.indexOf(props.current);
@@ -191,6 +191,8 @@ export function DispatchActivePanel(props: {
   const preflightWasReadyRef = useRef(false);
   useEffect(() => {
     preflightWasReadyRef.current = false;
+    // New mission may announce READY; do not clear prior mission's latch here
+    // beyond this component — module latch is per mission id.
   }, [mission.id]);
   const watchPos = props.watch?.position;
   if (
@@ -717,7 +719,12 @@ export function DispatchActivePanel(props: {
                   <div className="ofp-accept-cargo">
                     <p>
                       SimBrief limited payload for this leg — leftover returns to
-                      the board and{' '}
+                      {mission.warehouseHaul ||
+                      mission.warehouseBridge ||
+                      mission.demandOrderId
+                        ? ' your warehouse'
+                        : ' the board'}{' '}
+                      and{' '}
                       {mission.contractPilot ? 'pilot fee' : 'pay'} is reduced.
                       Use Accept OFP cargo below.
                     </p>
@@ -1295,9 +1302,10 @@ export function DispatchActivePanel(props: {
               : loadReady && locationOk;
             if (ready && !preflightWasReadyRef.current) {
               preflightWasReadyRef.current = true;
-              queueMicrotask(() => playUiSound('preflight_ready'));
+              queueMicrotask(() => playPreflightReadySound(mission.id));
             } else if (!ready) {
               preflightWasReadyRef.current = false;
+              notePreflightNotReady(mission.id);
             }
             const injectFailed =
               props.loadOfpAutoStatus === 'failed' && !ready;

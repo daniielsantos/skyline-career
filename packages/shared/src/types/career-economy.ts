@@ -1058,6 +1058,8 @@ export interface MissionIntent {
     staticId?: string;
     /** Compact operational details from the confirmed SimBrief OFP. */
     briefing?: OfpBriefingSummary;
+    /** SimBrief cabin seats on the OFP (0 = freighter-style sheet). */
+    passengerCount?: number;
     /** SimBrief block fuel normalized to kg for career fuel accounting. */
     plannedBlockFuelKg?: number;
     findings: Array<{

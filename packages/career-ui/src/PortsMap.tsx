@@ -465,9 +465,28 @@ export function PortsMap(props: {
       /* feeders still show if transfer lines fail */
     }
 
-    if (boundCount === 0) return;
+    if (boundCount === 0 && (props.bridgeLegs ?? []).length === 0) return;
     try {
-      if (focusLon != null && focusLat != null) {
+      const routeBounds = new LngLatBounds();
+      let routePoints = 0;
+      for (const leg of props.bridgeLegs ?? []) {
+        if (
+          !hasCoords(leg.origin.lat, leg.origin.lon) ||
+          !hasCoords(leg.dest.lat, leg.dest.lon)
+        ) {
+          continue;
+        }
+        routeBounds.extend([leg.origin.lon, leg.origin.lat]);
+        routeBounds.extend([leg.dest.lon, leg.dest.lat]);
+        routePoints += 2;
+      }
+      if (routePoints >= 2) {
+        map.fitBounds(routeBounds, {
+          padding: { top: 56, bottom: 56, left: 56, right: 56 },
+          maxZoom: 6.5,
+          duration: 550,
+        });
+      } else if (focusLon != null && focusLat != null) {
         map.easeTo({
           center: [focusLon, focusLat],
           zoom: 7.4,

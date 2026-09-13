@@ -18,6 +18,10 @@
     "generate:runways": "node scripts/generate-career-runways.mjs",
     "generate:runways:missing": "node scripts/merge-missing-career-runways.mjs",
     "repair:runways:null-island": "node scripts/repair-null-island-runways.mjs",
+    "repair:runways:magnetic": "node scripts/repair-magnetic-runway-headings.mjs",
     "generate:simbrief-dispatch": "npm run build && node scripts/gen-simbrief-dispatch-airports.mjs"
+  },
+  "devDependencies": {
+    "geomagnetism": "^0.2.0"
   }
 }

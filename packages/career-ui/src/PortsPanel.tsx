@@ -31,6 +31,7 @@ import {
   postWarehouseHaulHoldCancel,
   postWarehouseHaulAccept,
   postWarehouseHaulDispatchHold,
+  postWarehouseHaulQuote,
   type CareerCargoOps,
   type DemandOrderView,
   type GroundStaffSnapshot,
@@ -44,6 +45,7 @@ import {
   type PortScoutHaulSuggestion,
   type PortShuttleQuote,
   type InternalHaulPayQuote,
+  type WarehouseHaulPayQuote,
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
@@ -67,10 +69,11 @@ import {
   resolveUiPortCorridorLevel,
 } from './demand-accept-preview';
 import {
-  displayToKg,
+  displayAmountToStoredKg,
   KG_TO_LB,
   kgToDisplay,
   massUnitLabel,
+  formatMassPreferExact,
   type WeightSystem,
 } from './weight-units';
 
@@ -84,6 +87,8 @@ const WH_T1_CAPACITY_KG = 2_268;
 const WH_T2_CAPACITY_KG = 4_536;
 const WH_T3_CAPACITY_KG = 6_804;
 const WH_T4_CAPACITY_KG = 45_000;
+/** Mirror of shared MIN_WAREHOUSE_INBOUND_KG — avoid Mass 0.0 klb ghost rows. */
+const MIN_WAREHOUSE_INBOUND_KG = 25;
 
 function warehouseCapForTier(tier: number): number {
   if (tier >= 4) return WH_T4_CAPACITY_KG;
@@ -101,7 +106,7 @@ function transferDiscountLabel(mult: number | undefined | null): string {
     typeof mult === 'number' && Number.isFinite(mult) && mult > 0 && mult < 1
       ? mult
       : LOGISTICS_MULT;
-  return `Transfer −${Math.round((1 - m) * 100)}%`;
+  return `logistics −${Math.round((1 - m) * 100)}% ETA`;
 }
 
 function yardDiscountLabel(mult: number | undefined | null): string {
@@ -151,11 +156,14 @@ function inboundTransferTicksClient(
   return Math.max(2, Math.round(ticks * mult));
 }
 
-/** 15-min economy ticks → hours. */
+/** 15-min economy ticks → hours/minutes (exact). */
 function ticksToHoursLabel(ticks: number): string {
-  const h = ticks * 0.25;
-  if (h < 1) return `${Math.round(ticks * 15)} min`;
-  return Number.isInteger(h) ? `${h} h` : `${h.toFixed(1)} h`;
+  const totalMin = Math.max(0, Math.round(Math.max(0, ticks) * 15));
+  if (totalMin < 60) return `${totalMin} min`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (m === 0) return `${h} h`;
+  return `${h} h ${m} min`;
 }
 /** Mirror of shared PORT_YARD_HOLD_* (client must not import shared). */
 const YARD_HOLD_USD_PER_KG_DAY = 0.05;
@@ -459,6 +467,8 @@ export function PortsPanel(props: {
   const [scoutHaulSuggestions, setScoutHaulSuggestions] = useState<
     PortScoutHaulSuggestion[]
   >([]);
+  const [scoutFocusId, setScoutFocusId] = useState<string | null>(null);
+  const [scoutFocusToken, setScoutFocusToken] = useState(0);
   const [haulDraft, setHaulDraft] = useState<{
     originIcao: string;
     commodityId: string;
@@ -466,12 +476,18 @@ export function PortsPanel(props: {
   const [haulDest, setHaulDest] = useState('');
   const [haulMode, setHaulMode] = useState<'hold' | 'fly'>('hold');
   const [haulAircraftId, setHaulAircraftId] = useState('');
+  const [haulAmountText, setHaulAmountText] = useState('');
+  const [haulPayQuote, setHaulPayQuote] =
+    useState<WarehouseHaulPayQuote | null>(null);
+  const [haulOpsMaxCargoKg, setHaulOpsMaxCargoKg] = useState<number | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
-  const [section, setSection] = useState<'catalog' | 'warehouse' | 'demand'>(
-    'catalog',
-  );
+  const [section, setSection] = useState<
+    'catalog' | 'portFbo' | 'warehouse' | 'demand'
+  >('catalog');
   const [whShelf, setWhShelf] = useState<'owned' | 'staff' | 'buy'>('owned');
   const [whHubScope, setWhHubScope] = useState<'port' | 'all'>('port');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
@@ -669,6 +685,126 @@ export function PortsPanel(props: {
     };
   }, [bridgeDraft, bridgeDest, warehouses?.warehouses, warehouses?.stock]);
 
+  const haulFreeKg = useMemo(() => {
+    if (!haulDraft) return 0;
+    const origin = haulDraft.originIcao.trim().toUpperCase();
+    const wh = (warehouses?.warehouses ?? []).find(
+      (w) => w.icao.trim().toUpperCase() === origin,
+    );
+    if (!wh) return 0;
+    const stockKg = (warehouses?.stock ?? [])
+      .filter(
+        (s) =>
+          s.warehouseId === wh.id &&
+          s.commodityId === haulDraft.commodityId,
+      )
+      .reduce((sum, s) => sum + (s.kg ?? 0), 0);
+    const reservedKg = (warehouses?.demandHolds ?? [])
+      .filter(
+        (h) =>
+          h.warehouseId === wh.id &&
+          h.commodityId === haulDraft.commodityId,
+      )
+      .reduce((sum, h) => sum + (h.kg ?? 0), 0);
+    return warehouseFreeCommodityKgClient(stockKg, reservedKg);
+  }, [haulDraft, warehouses?.warehouses, warehouses?.stock, warehouses?.demandHolds]);
+
+  const haulKg = useMemo(() => {
+    if (!haulDraft) return 0;
+    return displayAmountToStoredKg(
+      haulAmountText,
+      props.weightSystem,
+      haulFreeKg,
+      haulOpsMaxCargoKg != null && haulOpsMaxCargoKg > 0
+        ? [haulOpsMaxCargoKg]
+        : [],
+    );
+  }, [
+    haulDraft,
+    haulAmountText,
+    haulFreeKg,
+    haulOpsMaxCargoKg,
+    props.weightSystem,
+  ]);
+
+  const haulAircraft = useMemo(
+    () => props.fleet.find((a) => a.id === haulAircraftId) ?? null,
+    [props.fleet, haulAircraftId],
+  );
+
+  useEffect(() => {
+    if (
+      !haulDraft ||
+      !/^[A-Z0-9]{3,4}$/.test(haulDest.trim().toUpperCase()) ||
+      haulKg <= 0
+    ) {
+      setHaulPayQuote(null);
+      return;
+    }
+    let cancelled = false;
+    void postWarehouseHaulQuote({
+      originIcao: haulDraft.originIcao,
+      destIcao: haulDest.trim().toUpperCase(),
+      commodityId: haulDraft.commodityId,
+      kg: haulKg,
+    })
+      .then((res) => {
+        if (!cancelled) setHaulPayQuote(res.quote);
+      })
+      .catch(() => {
+        if (!cancelled) setHaulPayQuote(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [haulDraft, haulDest, haulKg]);
+
+  useEffect(() => {
+    if (
+      haulMode !== 'fly' ||
+      !haulDraft ||
+      !haulAircraft ||
+      !/^[A-Z0-9]{3,4}$/.test(haulDest.trim().toUpperCase())
+    ) {
+      setHaulOpsMaxCargoKg(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchCargoLimit(
+      haulAircraft.aircraftClassId,
+      undefined,
+      haulAircraft.airframeTypeId,
+      {
+        originIcao: haulDraft.originIcao.trim().toUpperCase(),
+        destIcao: haulDest.trim().toUpperCase(),
+        aircraftId: haulAircraft.id,
+      },
+    )
+      .then((limit) => {
+        if (!cancelled) {
+          setHaulOpsMaxCargoKg(
+            Math.max(0, Math.floor(limit.operationalMaxCargoKg)),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHaulOpsMaxCargoKg(
+            Math.max(0, props.resolveMaxCargoKg?.(haulAircraft) ?? 0),
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    haulMode,
+    haulDraft,
+    haulAircraft,
+    haulDest,
+    props.resolveMaxCargoKg,
+  ]);
+
   useEffect(() => {
     void refresh().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load + refresh when clock advances
@@ -678,12 +814,10 @@ export function PortsPanel(props: {
   const amountDisplay = Math.max(0, Math.floor(Number(amountText) || 0));
   const kg =
     buyListing != null
-      ? Math.max(
-          0,
-          Math.min(
-            buyListing.availableKg,
-            Math.floor(displayToKg(amountDisplay, props.weightSystem)),
-          ),
+      ? displayAmountToStoredKg(
+          amountDisplay,
+          props.weightSystem,
+          buyListing.availableKg,
         )
       : 0;
   const preview =
@@ -1130,6 +1264,7 @@ export function PortsPanel(props: {
         `Claimed Port FBO · operator rates active`,
       );
       setConcessionOpen(false);
+      setSection('portFbo');
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -1882,6 +2017,21 @@ export function PortsPanel(props: {
   async function onConfirmHaul() {
     if (!haulDraft || !haulDest.trim() || props.busy || loading) return;
     if (haulMode === 'fly' && !haulAircraftId) return;
+    if (haulKg <= 0) {
+      props.onToast?.('fail', 'Enter a haul amount greater than zero');
+      return;
+    }
+    if (
+      haulMode === 'fly' &&
+      haulOpsMaxCargoKg != null &&
+      haulKg > haulOpsMaxCargoKg
+    ) {
+      props.onToast?.(
+        'fail',
+        `Haul ${haulKg} kg exceeds this airframe's ${haulOpsMaxCargoKg} kg ops cap for ${haulDraft.originIcao}→${haulDest.trim().toUpperCase()}`,
+      );
+      return;
+    }
     setLoading(true);
     try {
       const dest = haulDest.trim().toUpperCase();
@@ -1890,9 +2040,11 @@ export function PortsPanel(props: {
           originIcao: haulDraft.originIcao,
           destIcao: dest,
           commodityId: haulDraft.commodityId,
+          kg: haulKg,
         });
         setWarehouses(result.warehouses);
         setHaulDraft(null);
+        setHaulPayQuote(null);
         props.onToast?.(
           'ok',
           `Held ${props.formatTonnes(result.kg)} haul ${result.hold.originIcao}→${result.hold.destIcao} · ${props.formatMoney(result.payUsd)}`,
@@ -1903,12 +2055,14 @@ export function PortsPanel(props: {
           destIcao: dest,
           commodityId: haulDraft.commodityId,
           aircraftId: haulAircraftId,
+          kg: haulKg,
         });
         props.onWallet?.(result.walletUsd);
         props.onFleet?.(result.fleet);
         props.onMissions?.(result.missions.slice().reverse());
         setWarehouses(result.warehouses);
         setHaulDraft(null);
+        setHaulPayQuote(null);
         props.onToast?.(
           'ok',
           `Haul ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
@@ -2173,6 +2327,137 @@ export function PortsPanel(props: {
     }
     return legs;
   }, [mapPorts, warehouses?.demandHolds, ownedWarehousesInScope]);
+
+  const scoutRouteFocus = useMemo(() => {
+    if (!scoutFocusId) return null;
+    const haul = scoutHaulSuggestions.find((s) => s.id === scoutFocusId);
+    if (haul) {
+      return {
+        kind: 'haul' as const,
+        id: haul.id,
+        originIcao: haul.originIcao,
+        destIcao: haul.destIcao,
+        originLat: haul.originLat,
+        originLon: haul.originLon,
+        destLat: haul.destLat,
+        destLon: haul.destLon,
+      };
+    }
+    const bridge = scoutSuggestions.find((s) => s.id === scoutFocusId);
+    if (bridge) {
+      return {
+        kind: 'bridge' as const,
+        id: bridge.id,
+        originIcao: bridge.originIcao,
+        destIcao: bridge.destIcao,
+        originLat: bridge.originLat,
+        originLon: bridge.originLon,
+        destLat: bridge.destLat,
+        destLon: bridge.destLon,
+      };
+    }
+    const demandRow = scoutDemandSuggestions.find(
+      (s) => s.id === scoutFocusId,
+    );
+    if (demandRow) {
+      return {
+        kind: 'demand' as const,
+        id: demandRow.id,
+        originIcao: demandRow.originIcao,
+        destIcao: demandRow.destIcao,
+        originLat: demandRow.originLat,
+        originLon: demandRow.originLon,
+        destLat: demandRow.destLat,
+        destLon: demandRow.destLon,
+      };
+    }
+    return null;
+  }, [
+    scoutFocusId,
+    scoutHaulSuggestions,
+    scoutSuggestions,
+    scoutDemandSuggestions,
+  ]);
+
+  const scoutRouteLegs = useMemo(() => {
+    if (!scoutRouteFocus) return [];
+    const coords = new Map<string, { lat: number; lon: number }>();
+    for (const p of mapPorts) {
+      for (const h of p.pickupHubDetails ?? []) {
+        const icao = h.icao.trim().toUpperCase();
+        if (icao && Number.isFinite(h.lat) && Number.isFinite(h.lon)) {
+          coords.set(icao, { lat: h.lat, lon: h.lon });
+        }
+      }
+    }
+    for (const w of mapWarehouses) {
+      const icao = w.icao.trim().toUpperCase();
+      if (
+        icao &&
+        typeof w.lat === 'number' &&
+        typeof w.lon === 'number' &&
+        Number.isFinite(w.lat) &&
+        Number.isFinite(w.lon)
+      ) {
+        coords.set(icao, { lat: w.lat, lon: w.lon });
+      }
+    }
+    const origin = scoutRouteFocus.originIcao.trim().toUpperCase();
+    const dest = scoutRouteFocus.destIcao.trim().toUpperCase();
+    const o =
+      scoutRouteFocus.originLat != null &&
+      scoutRouteFocus.originLon != null &&
+      Number.isFinite(scoutRouteFocus.originLat) &&
+      Number.isFinite(scoutRouteFocus.originLon)
+        ? {
+            lat: scoutRouteFocus.originLat,
+            lon: scoutRouteFocus.originLon,
+          }
+        : coords.get(origin);
+    const d =
+      scoutRouteFocus.destLat != null &&
+      scoutRouteFocus.destLon != null &&
+      Number.isFinite(scoutRouteFocus.destLat) &&
+      Number.isFinite(scoutRouteFocus.destLon)
+        ? { lat: scoutRouteFocus.destLat, lon: scoutRouteFocus.destLon }
+        : coords.get(dest);
+    if (!o || !d) return [];
+    return [
+      {
+        originIcao: origin,
+        destIcao: dest,
+        origin: o,
+        dest: d,
+      },
+    ];
+  }, [scoutRouteFocus, mapPorts, mapWarehouses]);
+
+  useEffect(() => {
+    const ids = new Set([
+      ...scoutHaulSuggestions.map((s) => s.id),
+      ...scoutSuggestions.map((s) => s.id),
+      ...scoutDemandSuggestions.map((s) => s.id),
+    ]);
+    if (scoutFocusId && !ids.has(scoutFocusId)) {
+      setScoutFocusId(null);
+      return;
+    }
+    if (!scoutFocusId && scoutHaulSuggestions[0]) {
+      setScoutFocusId(scoutHaulSuggestions[0].id);
+      setScoutFocusToken((n) => n + 1);
+    }
+  }, [
+    scoutFocusId,
+    scoutHaulSuggestions,
+    scoutSuggestions,
+    scoutDemandSuggestions,
+  ]);
+
+  function focusScoutRow(id: string) {
+    setScoutFocusId(id);
+    setScoutFocusToken((n) => n + 1);
+  }
+
   const dispatchAircraftOptions = useMemo(() => {
     if (!dispatchHold) return [];
     const hub = dispatchHold.originIcao.trim().toUpperCase();
@@ -2443,9 +2728,30 @@ export function PortsPanel(props: {
 
   function openHaulFromLot(originIcao: string, commodityId: string) {
     const origin = originIcao.trim().toUpperCase();
+    const wh = (warehouses?.warehouses ?? []).find(
+      (w) => w.icao.trim().toUpperCase() === origin,
+    );
+    const stockKg = (warehouses?.stock ?? [])
+      .filter(
+        (s) =>
+          s.warehouseId === wh?.id && s.commodityId === commodityId,
+      )
+      .reduce((sum, s) => sum + (s.kg ?? 0), 0);
+    const reservedKg = (warehouses?.demandHolds ?? [])
+      .filter(
+        (h) =>
+          h.warehouseId === wh?.id && h.commodityId === commodityId,
+      )
+      .reduce((sum, h) => sum + (h.kg ?? 0), 0);
+    const free = warehouseFreeCommodityKgClient(stockKg, reservedKg);
     setHaulDraft({ originIcao: origin, commodityId });
     setHaulDest('');
     setHaulMode('hold');
+    setHaulAmountText(
+      String(Math.max(1, Math.floor(kgToDisplay(free, props.weightSystem)))),
+    );
+    setHaulPayQuote(null);
+    setHaulOpsMaxCargoKg(null);
     const parked = props.fleet.filter(
       (a) =>
         a.status === 'parked' &&
@@ -2496,13 +2802,6 @@ export function PortsPanel(props: {
         (o.portId?.trim().toUpperCase() ?? '') === pid,
     );
   }, [demand, port]);
-
-  const portCorridorMatchCount = portDeskOrders.length;
-
-  function openPortCorridorDemand() {
-    setDemandCountryFilter('');
-    setSection('demand');
-  }
 
   const demandPortsForSwitcher = useMemo(() => {
     return snap?.ports ?? [];
@@ -2654,6 +2953,21 @@ export function PortsPanel(props: {
             <button
               type="button"
               role="tab"
+              aria-selected={section === 'portFbo'}
+              className={
+                section === 'portFbo' ? 'fbo-icao-chip active' : 'fbo-icao-chip'
+              }
+              disabled={props.busy || loading}
+              onClick={() => setSection('portFbo')}
+            >
+              Port FBO
+              {port?.concession?.status === 'yours'
+                ? ` · P${port.concession.level ?? 1}`
+                : ''}
+            </button>
+            <button
+              type="button"
+              role="tab"
               aria-selected={section === 'warehouse'}
               className={
                 section === 'warehouse'
@@ -2742,7 +3056,7 @@ export function PortsPanel(props: {
                     type="button"
                     className="action ghost ports-concession-open"
                     disabled={props.busy}
-                    onClick={() => setConcessionOpen(true)}
+                    onClick={() => setSection('portFbo')}
                   >
                     Port FBO
                   </button>
@@ -2766,6 +3080,18 @@ export function PortsPanel(props: {
                 <div className="ports-listings">
                   {port ? (
                     <>
+                      <p
+                        className="ports-discharge-strip muted"
+                        aria-label="Next factory discharge"
+                      >
+                        Discharge
+                        {port.inbound.ticksLeft <= 0
+                          ? ' · next tick'
+                          : ` · ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
+                        {port.inbound.totalKg > 0
+                          ? ` · ~${props.formatTonnes(port.inbound.totalKg)}`
+                          : ''}
+                      </p>
                       {(() => {
                         const signals = (port.marketSignals ?? []).filter(
                           (s) =>
@@ -2797,195 +3123,6 @@ export function PortsPanel(props: {
                           </p>
                         );
                       })()}
-                      {scoutSuggestions.length > 0 ||
-                      scoutDemandSuggestions.length > 0 ||
-                      scoutHaulSuggestions.length > 0 ? (
-                        <div
-                          className="ports-scout-desk"
-                          aria-label="Port FBO scout suggestions"
-                        >
-                          {scoutDemandSuggestions.length > 0 ? (
-                            <>
-                              <p className="ports-scout-title">
-                                Scout · Demand fills (confirm → hold; you fly)
-                              </p>
-                              <ul className="ports-scout-list">
-                                {scoutDemandSuggestions.map((s) => (
-                                  <li key={s.id} className="ports-scout-row">
-                                    <span>
-                                      {s.originIcao}→{s.destIcao} ·{' '}
-                                      {commodityLabel({
-                                        commodityId: s.commodityId,
-                                      })}{' '}
-                                      · {props.formatTonnes(s.kg)} ·{' '}
-                                      {props.formatMoney(s.payUsd)}
-                                      {s.distanceNm > 0
-                                        ? ` · ${s.distanceNm} nm`
-                                        : ''}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      className="accept"
-                                      disabled={props.busy || loading}
-                                      onClick={() =>
-                                        void onScoutDemandConfirm(s)
-                                      }
-                                    >
-                                      Hold Demand
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          ) : null}
-                          {scoutHaulSuggestions.length > 0 ? (
-                            <>
-                              <p className="ports-scout-title">
-                                Scout · Hauls (confirm → hold; trunk pay; you
-                                fly)
-                              </p>
-                              <ul className="ports-scout-list">
-                                {scoutHaulSuggestions.map((s) => (
-                                  <li key={s.id} className="ports-scout-row">
-                                    <span>
-                                      {s.originIcao}→{s.destIcao} ·{' '}
-                                      {commodityLabel({
-                                        commodityId: s.commodityId,
-                                      })}{' '}
-                                      · {props.formatTonnes(s.kg)} ·{' '}
-                                      {props.formatMoney(s.payUsd)}
-                                      {s.distanceNm > 0
-                                        ? ` · ${s.distanceNm} nm`
-                                        : ''}
-                                      {` · dest ${s.destFillPct}%`}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      className="accept"
-                                      disabled={props.busy || loading}
-                                      onClick={() => void onScoutHaulConfirm(s)}
-                                    >
-                                      Hold Haul
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          ) : null}
-                          {scoutSuggestions.length > 0 ? (
-                            <>
-                              <p className="ports-scout-title">
-                                Scout · WH bridges (confirm → hold; you fly or
-                                shuttle)
-                              </p>
-                              <ul className="ports-scout-list">
-                                {scoutSuggestions.map((s) => (
-                                  <li key={s.id} className="ports-scout-row">
-                                    <span>
-                                      {s.originIcao}→{s.destIcao} ·{' '}
-                                      {commodityLabel({
-                                        commodityId: s.commodityId,
-                                      })}{' '}
-                                      · {props.formatTonnes(s.kg)}
-                                      {s.distanceNm > 0
-                                        ? ` · ${s.distanceNm} nm`
-                                        : ''}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      className="accept"
-                                      disabled={props.busy || loading}
-                                      onClick={() => void onScoutConfirm(s)}
-                                    >
-                                      Hold bridge
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {(port.inventory?.length ?? 0) > 0 ? (
-                        <details className="ports-stock-details">
-                          <summary>Port stock</summary>
-                          <div
-                            className="ports-inventory-bars"
-                            aria-label="Port stock"
-                          >
-                            {port.inventory!.map((row) => {
-                              const frac =
-                                row.capKg > 0
-                                  ? Math.min(1, row.stockKg / row.capKg)
-                                  : 0;
-                              return (
-                                <div
-                                  key={row.commodityId}
-                                  className="ports-inventory-bar"
-                                  title={`${commodityLabel(row)} ${props.formatTonnes(row.stockKg)} / ${props.formatTonnes(row.capKg)}`}
-                                >
-                                  <span className="ports-inventory-bar-label">
-                                    {commodityLabel(row)}
-                                  </span>
-                                  <div className="ports-inventory-bar-track">
-                                    <div
-                                      className="ports-inventory-bar-fill"
-                                      style={{
-                                        width: `${Math.round(frac * 100)}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </details>
-                      ) : null}
-                      <p
-                        className="ports-discharge-strip muted"
-                        aria-label="Next factory discharge"
-                      >
-                        Next discharge
-                        {port.inbound.ticksLeft <= 0
-                          ? ' · with the next economy tick'
-                          : ` · ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
-                        {port.inbound.totalKg > 0
-                          ? ` · ~${props.formatTonnes(port.inbound.totalKg)} estimated`
-                          : ''}
-                      </p>
-                      <p className="ports-corridor-strip" aria-label="Port corridor demand">
-                        <span className="ports-hub-pressure-label">
-                          Port desk
-                        </span>
-                        <span className="muted">
-                          {' '}
-                          · {portOperatorChip}
-                          {' · '}
-                          {formatPortCorridorReachLabel(portCorridorLevel.level, {
-                            source:
-                              port?.concession?.status === 'yours'
-                                ? 'concession'
-                                : port?.concession?.status === 'vacant' ||
-                                    !port?.concession?.status
-                                  ? 'vacant'
-                                  : portCorridorLevel.source,
-                          })}
-                          {' · '}
-                          {portCorridorMatchCount === 0
-                            ? 'no open Demand on this desk'
-                            : portCorridorMatchCount === 1
-                              ? '1 open Demand on this desk'
-                              : `${portCorridorMatchCount} open Demand on this desk`}
-                        </span>
-                        <button
-                          type="button"
-                          className="action ghost ports-corridor-cta"
-                          disabled={props.busy || loading}
-                          onClick={() => openPortCorridorDemand()}
-                        >
-                          Open Demand
-                        </button>
-                      </p>
                     <div className="table-wrap">
                       <table className="data-table">
                         <thead>
@@ -3214,6 +3351,461 @@ export function PortsPanel(props: {
                   </nav>
                 ) : null}
               </section>
+            </>
+          ) : null}
+
+          {section === 'portFbo' ? (
+            <>
+              {port ? (
+                <h3 className="ports-selected-name ports-stage-title">
+                  <span className="ports-selected-name-text">{port.name}</span>
+                  <span
+                    className={
+                      port.concession?.status === 'yours'
+                        ? 'tag ports-operator-badge ports-concession-status'
+                        : port.concession?.status === 'held'
+                          ? 'tag ports-concession-status'
+                          : 'tag muted ports-concession-status'
+                    }
+                    title="Port FBO status"
+                  >
+                    {port.concession?.status === 'yours'
+                      ? `Port FBO · P${port.concession.level ?? 1}`
+                      : port.concession?.status === 'held'
+                        ? 'Held'
+                        : 'Vacant'}
+                  </span>
+                  <button
+                    type="button"
+                    className="action ghost ports-concession-open"
+                    disabled={props.busy}
+                    onClick={() => setConcessionOpen(true)}
+                  >
+                    {port.concession?.status === 'yours'
+                      ? 'Lease · Upgrade'
+                      : port.concession?.status === 'held'
+                        ? 'Details'
+                        : 'Claim'}
+                  </button>
+                </h3>
+              ) : (
+                <p className="ports-stage-title is-muted">
+                  Select a port on Port catalog first.
+                </p>
+              )}
+
+              {port ? (
+                <div className="ports-main ports-fbo-main">
+                  <PortsMap
+                    ports={mapPorts}
+                    ownedFbos={mapWarehouses}
+                    selectedPortId={port.id}
+                    highlightedHubIcao={
+                      scoutRouteFocus?.originIcao ??
+                      port.pickupHubs?.[0] ??
+                      null
+                    }
+                    bridgeLegs={scoutRouteLegs}
+                    focusToken={scoutFocusToken}
+                    onSelectPort={selectCatalogPort}
+                    onSelectHub={(icao) => props.onOpenAirport?.(icao)}
+                  />
+                  <div className="ports-listings ports-fbo-panel">
+                    {(port.inventory?.length ?? 0) > 0 ? (
+                      <details className="ports-stock-details">
+                        <summary>Port stock</summary>
+                        <div
+                          className="ports-inventory-bars"
+                          aria-label="Port stock"
+                        >
+                          {port.inventory!.map((row) => {
+                            const frac =
+                              row.capKg > 0
+                                ? Math.min(1, row.stockKg / row.capKg)
+                                : 0;
+                            return (
+                              <div
+                                key={row.commodityId}
+                                className="ports-inventory-bar"
+                                title={`${commodityLabel(row)} ${props.formatTonnes(row.stockKg)} / ${props.formatTonnes(row.capKg)}`}
+                              >
+                                <span className="ports-inventory-bar-label">
+                                  {commodityLabel(row)}
+                                </span>
+                                <div className="ports-inventory-bar-track">
+                                  <div
+                                    className="ports-inventory-bar-fill"
+                                    style={{
+                                      width: `${Math.round(frac * 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    ) : null}
+
+                    {port.concession?.status === 'yours' ? (
+                      <div className="ports-desk-panel">
+                        <h4 className="ports-desk-title">Desk auto-buy</h4>
+                        <p className="muted ports-desk-hint">
+                          Limit orders on the economy tick (same price as manual
+                          buy; max 3). Overflow → yard.
+                        </p>
+                        <ul className="ports-desk-orders">
+                          {(snap?.autoBuyOrders ?? [])
+                            .filter(
+                              (o) =>
+                                o.portId.toUpperCase() ===
+                                port.id.toUpperCase(),
+                            )
+                            .map((o) => (
+                              <li key={o.id} className="ports-desk-order">
+                                <span>
+                                  {o.commodityId}
+                                  {o.paused ? ' · paused' : ''} · max $
+                                  {o.maxPriceUsdPerKg}/kg · {o.maxKgPerDay}{' '}
+                                  kg/day · today {o.boughtKgToday} kg · floor $
+                                  {o.walletFloorUsd}
+                                </span>
+                                <span className="ports-desk-order-actions">
+                                  <button
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={props.busy || loading}
+                                    onClick={() =>
+                                      void onDeskPause(o.id, !o.paused)
+                                    }
+                                  >
+                                    {o.paused ? 'Resume' : 'Pause'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={props.busy || loading}
+                                    onClick={() => void onDeskRemove(o.id)}
+                                  >
+                                    Remove
+                                  </button>
+                                </span>
+                              </li>
+                            ))}
+                        </ul>
+                        <div className="ports-desk-form">
+                          <label>
+                            Commodity
+                            <select
+                              value={deskCommodity}
+                              onChange={(e) =>
+                                setDeskCommodity(e.target.value)
+                              }
+                              disabled={props.busy || loading}
+                            >
+                              <option value="general">General</option>
+                              <option value="supplies">Supplies</option>
+                              <option value="machinery">Machinery</option>
+                              <option value="electronics">Electronics</option>
+                            </select>
+                          </label>
+                          <label>
+                            Max $/kg
+                            <input
+                              type="number"
+                              min={0.01}
+                              step={0.01}
+                              value={deskMaxPrice}
+                              onChange={(e) =>
+                                setDeskMaxPrice(e.target.value)
+                              }
+                              disabled={props.busy || loading}
+                            />
+                          </label>
+                          <label>
+                            Max kg/day
+                            <input
+                              type="number"
+                              min={1}
+                              step={100}
+                              value={deskMaxKgDay}
+                              onChange={(e) =>
+                                setDeskMaxKgDay(e.target.value)
+                              }
+                              disabled={props.busy || loading}
+                            />
+                          </label>
+                          <label>
+                            Wallet floor $
+                            <input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={deskWalletFloor}
+                              onChange={(e) =>
+                                setDeskWalletFloor(e.target.value)
+                              }
+                              disabled={props.busy || loading}
+                            />
+                          </label>
+                          <label>
+                            Warehouse
+                            <select
+                              value={deskWarehouseId}
+                              onChange={(e) =>
+                                setDeskWarehouseId(e.target.value)
+                              }
+                              disabled={props.busy || loading}
+                            >
+                              <option value="">Pickup WH…</option>
+                              {(warehouses?.warehouses ?? [])
+                                .filter((w) =>
+                                  (port.pickupHubs ?? [])
+                                    .map((h) => h.toUpperCase())
+                                    .includes(w.icao.toUpperCase()),
+                                )
+                                .map((w) => (
+                                  <option key={w.id} value={w.id}>
+                                    {w.icao} · T{w.tier}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            className="action"
+                            disabled={props.busy || loading}
+                            onClick={() => void onDeskUpsert(port.id)}
+                          >
+                            Add desk order
+                          </button>
+                        </div>
+                      </div>
+                    ) : port.concession?.status === 'held' ? (
+                      <p className="muted ports-warehouse-hint">
+                        Another company holds this Port FBO. Buy listings on
+                        Port catalog; warehouses still work at pickup hubs.
+                      </p>
+                    ) : (
+                      <p className="muted ports-warehouse-hint">
+                        Claim for operator rates, desk auto-buy, and Scout. Need
+                        T3 WH at a pickup hub, 25 t shipped, CAPEX + first
+                        lease.
+                      </p>
+                    )}
+
+                    {scoutHaulSuggestions.length > 0 ||
+                    scoutDemandSuggestions.length > 0 ||
+                    scoutSuggestions.length > 0 ? (
+                      <div
+                        className="ports-scout-desk"
+                        aria-label="Port FBO scout suggestions"
+                      >
+                        {scoutHaulSuggestions.length > 0 ? (
+                          <>
+                            <p className="ports-scout-title">Scout · Hauls</p>
+                            <div className="table-wrap ports-scout-table-wrap">
+                              <table className="data-table ports-scout-table">
+                                <thead>
+                                  <tr>
+                                    <th>Route</th>
+                                    <th>Commodity</th>
+                                    <th>Mass</th>
+                                    <th>Pay</th>
+                                    <th>Nm</th>
+                                    <th>Dest</th>
+                                    <th />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {scoutHaulSuggestions.map((s) => (
+                                    <tr
+                                      key={s.id}
+                                      className={
+                                        scoutFocusId === s.id
+                                          ? 'ports-scout-tr is-selected'
+                                          : 'ports-scout-tr'
+                                      }
+                                      onClick={() => focusScoutRow(s.id)}
+                                    >
+                                      <td>
+                                        <strong>
+                                          {s.originIcao}→{s.destIcao}
+                                        </strong>
+                                      </td>
+                                      <td>
+                                        {commodityLabel({
+                                          commodityId: s.commodityId,
+                                        })}
+                                      </td>
+                                      <td>{props.formatTonnes(s.kg)}</td>
+                                      <td>{props.formatMoney(s.payUsd)}</td>
+                                      <td className="muted">
+                                        {s.distanceNm > 0
+                                          ? s.distanceNm
+                                          : '—'}
+                                      </td>
+                                      <td className="muted">
+                                        {s.destFillPct}%
+                                      </td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="accept"
+                                          disabled={props.busy || loading}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void onScoutHaulConfirm(s);
+                                          }}
+                                        >
+                                          Hold
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        ) : null}
+                        {scoutDemandSuggestions.length > 0 ? (
+                          <>
+                            <p className="ports-scout-title">
+                              Scout · Demand
+                            </p>
+                            <div className="table-wrap ports-scout-table-wrap">
+                              <table className="data-table ports-scout-table">
+                                <thead>
+                                  <tr>
+                                    <th>Route</th>
+                                    <th>Commodity</th>
+                                    <th>Mass</th>
+                                    <th>Pay</th>
+                                    <th>Nm</th>
+                                    <th />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {scoutDemandSuggestions.map((s) => (
+                                    <tr
+                                      key={s.id}
+                                      className={
+                                        scoutFocusId === s.id
+                                          ? 'ports-scout-tr is-selected'
+                                          : 'ports-scout-tr'
+                                      }
+                                      onClick={() => focusScoutRow(s.id)}
+                                    >
+                                      <td>
+                                        <strong>
+                                          {s.originIcao}→{s.destIcao}
+                                        </strong>
+                                      </td>
+                                      <td>
+                                        {commodityLabel({
+                                          commodityId: s.commodityId,
+                                        })}
+                                      </td>
+                                      <td>{props.formatTonnes(s.kg)}</td>
+                                      <td>{props.formatMoney(s.payUsd)}</td>
+                                      <td className="muted">
+                                        {s.distanceNm > 0
+                                          ? s.distanceNm
+                                          : '—'}
+                                      </td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="accept"
+                                          disabled={props.busy || loading}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void onScoutDemandConfirm(s);
+                                          }}
+                                        >
+                                          Hold
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        ) : null}
+                        {scoutSuggestions.length > 0 ? (
+                          <>
+                            <p className="ports-scout-title">
+                              Scout · Bridges
+                            </p>
+                            <div className="table-wrap ports-scout-table-wrap">
+                              <table className="data-table ports-scout-table">
+                                <thead>
+                                  <tr>
+                                    <th>Route</th>
+                                    <th>Commodity</th>
+                                    <th>Mass</th>
+                                    <th>Nm</th>
+                                    <th />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {scoutSuggestions.map((s) => (
+                                    <tr
+                                      key={s.id}
+                                      className={
+                                        scoutFocusId === s.id
+                                          ? 'ports-scout-tr is-selected'
+                                          : 'ports-scout-tr'
+                                      }
+                                      onClick={() => focusScoutRow(s.id)}
+                                    >
+                                      <td>
+                                        <strong>
+                                          {s.originIcao}→{s.destIcao}
+                                        </strong>
+                                      </td>
+                                      <td>
+                                        {commodityLabel({
+                                          commodityId: s.commodityId,
+                                        })}
+                                      </td>
+                                      <td>{props.formatTonnes(s.kg)}</td>
+                                      <td className="muted">
+                                        {s.distanceNm > 0
+                                          ? s.distanceNm
+                                          : '—'}
+                                      </td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="accept"
+                                          disabled={props.busy || loading}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void onScoutConfirm(s);
+                                          }}
+                                        >
+                                          Hold
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : port.concession?.status === 'yours' ? (
+                      <p className="muted ports-warehouse-hint">
+                        No Scout suggestions right now — check back after the
+                        next economy tick.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </>
           ) : null}
 
@@ -3691,7 +4283,11 @@ export function PortsPanel(props: {
                                                   })}
                                                 </strong>
                                                 <p className="muted">
-                                                  {props.formatTonnes(s.kg)} ·{' '}
+                                                  {formatMassPreferExact(
+                                                    s.kg,
+                                                    props.weightSystem,
+                                                  )}{' '}
+                                                  ·{' '}
                                                   {formatUnitPrice(
                                                     s.avgCostUsdPerKg,
                                                   )}
@@ -4255,7 +4851,7 @@ export function PortsPanel(props: {
                     </thead>
                     <tbody>
                       {(warehouses?.inboundTransfers ?? []).map((t) => {
-                        const now = snap?.tick ?? 0;
+                        const now = props.economyTick ?? snap?.tick ?? 0;
                         const left = Math.max(0, t.readyAtTick - now);
                         const label = commodityLabel({
                           commodityId: t.commodityId,
@@ -4264,6 +4860,10 @@ export function PortsPanel(props: {
                           groundStaff?.byWarehouse[t.warehouseId];
                         const logistics =
                           logisticsMeta?.logisticsActive === true;
+                        const etaLabel =
+                          left <= 0
+                            ? 'Arriving…'
+                            : `~${ticksToHoursLabel(left)}`;
                         return (
                           <tr key={t.id}>
                             <td>{t.hubIcao}</td>
@@ -4278,13 +4878,18 @@ export function PortsPanel(props: {
                               </span>
                             </td>
                             <td>{props.formatTonnes(t.kg)}</td>
-                            <td>
-                              {left <= 0
-                                ? 'Arriving…'
-                                : `~${ticksToHoursLabel(left)}`}
+                            <td
+                              title={
+                                left > 0
+                                  ? `${left} economy tick(s) · 15 min each`
+                                  : 'Ready on the next economy settle'
+                              }
+                            >
+                              {etaLabel}
                               {logistics ? (
-                                <span className="ports-ground-staff-perk">
+                                <span className="ports-ground-staff-perk muted">
                                   {' '}
+                                  ·{' '}
                                   {transferDiscountLabel(
                                     logisticsMeta?.logisticsMult,
                                   )}
@@ -4315,7 +4920,7 @@ export function PortsPanel(props: {
                     Lots larger than WH capacity can never fully store — Abandon
                     (no refund) stops the fee.
                   </p>
-                  <table className="data-table">
+                  <table className="data-table ports-yard-table">
                     <thead>
                       <tr>
                         <th>Port</th>
@@ -4365,28 +4970,34 @@ export function PortsPanel(props: {
                           (row) =>
                             row.id.toUpperCase() === p.portId.toUpperCase(),
                         );
+                        const pickupHubSet = new Set(
+                          (portDef?.pickupHubs ?? []).map((h) =>
+                            h.trim().toUpperCase(),
+                          ),
+                        );
                         const stevedoreOk =
                           portDef?.concession?.status === 'yours';
+                        const altWhAtPort = (warehouses?.warehouses ?? []).filter(
+                          (w) => {
+                            const hub = w.icao.trim().toUpperCase();
+                            if (hub === p.hubIcao.trim().toUpperCase()) {
+                              return false;
+                            }
+                            return pickupHubSet.has(hub);
+                          },
+                        );
                         const stevedoreDests = stevedoreOk
-                          ? (warehouses?.warehouses ?? []).filter((w) => {
-                              const hub = w.icao.trim().toUpperCase();
-                              if (hub === p.hubIcao.trim().toUpperCase()) {
-                                return false;
-                              }
-                              if (
-                                !(portDef?.pickupHubs ?? [])
-                                  .map((h) => h.toUpperCase())
-                                  .includes(hub)
-                              ) {
-                                return false;
-                              }
-                              return (w.inboundFreeKg ?? 0) > 0;
-                            })
+                          ? altWhAtPort.filter(
+                              (w) => (w.inboundFreeKg ?? 0) > 0,
+                            )
                           : [];
                         const aging =
                           heldDays >= YARD_HOLD_WARN_DAYS
                             ? 'ports-yard-aging'
                             : undefined;
+                        const altHubLabel = altWhAtPort
+                          .map((w) => w.icao.trim().toUpperCase())
+                          .join(' / ');
                         return (
                           <tr key={p.id} className={aging}>
                             <td>{p.portId}</td>
@@ -4443,70 +5054,83 @@ export function PortsPanel(props: {
                                 </span>
                               )}
                             </td>
-                            <td className="actions ports-pickup-actions">
-                              {storeAllOk ? (
+                            <td className="actions">
+                              <div className="ports-pickup-actions">
+                                {storeAllOk ? (
+                                  <button
+                                    type="button"
+                                    className="accept"
+                                    disabled={props.busy || loading}
+                                    onClick={() => void onDeposit(p.id)}
+                                  >
+                                    Store in WH
+                                  </button>
+                                ) : storePartialOk ? (
+                                  <button
+                                    type="button"
+                                    className="accept"
+                                    disabled={props.busy || loading}
+                                    onClick={() => void onDeposit(p.id)}
+                                    title={`Store ${props.formatTonnes(freeKg)} now; rest stays in yard`}
+                                  >
+                                    Store {props.formatTonnes(freeKg)}
+                                  </button>
+                                ) : hasWh ? (
+                                  <span className="muted">
+                                    {foreverOversized
+                                      ? `Larger than WH capacity (${props.formatTonnes(whCap)})`
+                                      : `WH needs ${props.formatTonnes(p.kg - freeKg)} more free`}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="muted"
+                                    title={
+                                      altHubLabel && !stevedoreOk
+                                        ? `You already have WH at ${altHubLabel}. Claim Port FBO on this port to Truck cargo there (fee + ETA).`
+                                        : undefined
+                                    }
+                                  >
+                                    {buyUsdByIcao[p.hubIcao.toUpperCase()] !=
+                                    null
+                                      ? `Buy warehouse · ${props.formatMoney(buyUsdByIcao[p.hubIcao.toUpperCase()]!)} at ${p.hubIcao}`
+                                      : `Buy warehouse at ${p.hubIcao}`}
+                                    {altHubLabel && !stevedoreOk
+                                      ? ` · or Port FBO → Truck ${altHubLabel}`
+                                      : null}
+                                  </span>
+                                )}
+                                {stevedoreDests.map((w) => (
+                                  <button
+                                    key={w.id}
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={props.busy || loading}
+                                    title="Port FBO stevedore truck (fee + ETA)"
+                                    onClick={() =>
+                                      void onStevedoreTruck(
+                                        p.id,
+                                        w.id,
+                                        w.icao,
+                                      )
+                                    }
+                                  >
+                                    Truck → {w.icao}
+                                  </button>
+                                ))}
                                 <button
-                                  type="button"
-                                  className="accept"
-                                  disabled={props.busy || loading}
-                                  onClick={() => void onDeposit(p.id)}
-                                >
-                                  Store in WH
-                                </button>
-                              ) : storePartialOk ? (
-                                <button
-                                  type="button"
-                                  className="accept"
-                                  disabled={props.busy || loading}
-                                  onClick={() => void onDeposit(p.id)}
-                                  title={`Store ${props.formatTonnes(freeKg)} now; rest stays in yard`}
-                                >
-                                  Store {props.formatTonnes(freeKg)}
-                                </button>
-                              ) : hasWh ? (
-                                <span className="muted">
-                                  {foreverOversized
-                                    ? `Larger than WH capacity (${props.formatTonnes(whCap)})`
-                                    : `WH needs ${props.formatTonnes(p.kg - freeKg)} more free`}
-                                </span>
-                              ) : (
-                                <span className="muted">
-                                  {buyUsdByIcao[p.hubIcao.toUpperCase()] != null
-                                    ? `Buy warehouse · ${props.formatMoney(buyUsdByIcao[p.hubIcao.toUpperCase()]!)} at ${p.hubIcao}`
-                                    : `Buy warehouse at ${p.hubIcao}`}
-                                </span>
-                              )}
-                              {stevedoreDests.map((w) => (
-                                <button
-                                  key={w.id}
                                   type="button"
                                   className="action ghost"
                                   disabled={props.busy || loading}
-                                  title="Port FBO stevedore truck (fee + ETA)"
                                   onClick={() =>
-                                    void onStevedoreTruck(
+                                    void onAbandonPickup(
                                       p.id,
-                                      w.id,
-                                      w.icao,
+                                      `${props.formatTonnes(p.kg)} ${commodityLabel(p)}`,
                                     )
                                   }
                                 >
-                                  Truck → {w.icao}
+                                  Abandon
                                 </button>
-                              ))}
-                              <button
-                                type="button"
-                                className="action ghost"
-                                disabled={props.busy || loading}
-                                onClick={() =>
-                                  void onAbandonPickup(
-                                    p.id,
-                                    `${props.formatTonnes(p.kg)} ${commodityLabel(p)}`,
-                                  )
-                                }
-                              >
-                                Abandon
-                              </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -4933,128 +5557,9 @@ export function PortsPanel(props: {
                     ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
                     : null}
                 </p>
-                <div className="ports-desk-panel">
-                  <h4 className="ports-desk-title">Desk auto-buy</h4>
-                  <p className="muted ports-desk-hint">
-                    Limit orders run on the economy tick at the same price as
-                    manual buy (max {3} active). Overflow goes to yard.
-                  </p>
-                  <ul className="ports-desk-orders">
-                    {(snap?.autoBuyOrders ?? [])
-                      .filter(
-                        (o) =>
-                          o.portId.toUpperCase() === port.id.toUpperCase(),
-                      )
-                      .map((o) => (
-                        <li key={o.id} className="ports-desk-order">
-                          <span>
-                            {o.commodityId}
-                            {o.paused ? ' · paused' : ''} · max $
-                            {o.maxPriceUsdPerKg}/kg · {o.maxKgPerDay} kg/day ·
-                            today {o.boughtKgToday} kg · floor $
-                            {o.walletFloorUsd}
-                          </span>
-                          <span className="ports-desk-order-actions">
-                            <button
-                              type="button"
-                              className="action ghost"
-                              disabled={props.busy || loading}
-                              onClick={() =>
-                                void onDeskPause(o.id, !o.paused)
-                              }
-                            >
-                              {o.paused ? 'Resume' : 'Pause'}
-                            </button>
-                            <button
-                              type="button"
-                              className="action ghost"
-                              disabled={props.busy || loading}
-                              onClick={() => void onDeskRemove(o.id)}
-                            >
-                              Remove
-                            </button>
-                          </span>
-                        </li>
-                      ))}
-                  </ul>
-                  <div className="ports-desk-form">
-                    <label>
-                      Commodity
-                      <select
-                        value={deskCommodity}
-                        onChange={(e) => setDeskCommodity(e.target.value)}
-                        disabled={props.busy || loading}
-                      >
-                        <option value="general">General</option>
-                        <option value="supplies">Supplies</option>
-                        <option value="machinery">Machinery</option>
-                        <option value="electronics">Electronics</option>
-                      </select>
-                    </label>
-                    <label>
-                      Max $/kg
-                      <input
-                        type="number"
-                        min={0.01}
-                        step={0.01}
-                        value={deskMaxPrice}
-                        onChange={(e) => setDeskMaxPrice(e.target.value)}
-                        disabled={props.busy || loading}
-                      />
-                    </label>
-                    <label>
-                      Max kg/day
-                      <input
-                        type="number"
-                        min={1}
-                        step={100}
-                        value={deskMaxKgDay}
-                        onChange={(e) => setDeskMaxKgDay(e.target.value)}
-                        disabled={props.busy || loading}
-                      />
-                    </label>
-                    <label>
-                      Wallet floor $
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        value={deskWalletFloor}
-                        onChange={(e) => setDeskWalletFloor(e.target.value)}
-                        disabled={props.busy || loading}
-                      />
-                    </label>
-                    <label>
-                      Warehouse
-                      <select
-                        value={deskWarehouseId}
-                        onChange={(e) => setDeskWarehouseId(e.target.value)}
-                        disabled={props.busy || loading}
-                      >
-                        <option value="">Pickup WH…</option>
-                        {(warehouses?.warehouses ?? [])
-                          .filter((w) =>
-                            (port.pickupHubs ?? [])
-                              .map((h) => h.toUpperCase())
-                              .includes(w.icao.toUpperCase()),
-                          )
-                          .map((w) => (
-                            <option key={w.id} value={w.id}>
-                              {w.icao} · T{w.tier}
-                            </option>
-                          ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="action"
-                      disabled={props.busy || loading}
-                      onClick={() => void onDeskUpsert(port.id)}
-                    >
-                      Add desk order
-                    </button>
-                  </div>
-                </div>
+                <p className="muted ports-warehouse-hint">
+                  Desk auto-buy and Scout live on the Port FBO tab.
+                </p>
                 <div className="confirm-actions">
                   <button
                     type="button"
@@ -5303,11 +5808,25 @@ export function PortsPanel(props: {
           mode={haulMode}
           aircraftId={haulAircraftId}
           aircraftOptions={haulAircraftOptions}
+          weightSystem={props.weightSystem}
+          amountText={haulAmountText}
+          kg={haulKg}
+          freeKg={haulFreeKg}
+          opsMaxCargoKg={haulOpsMaxCargoKg}
+          payQuote={haulPayQuote}
           busy={Boolean(props.busy || loading)}
+          formatTonnes={props.formatTonnes}
+          formatMoney={props.formatMoney}
+          formatUnitPrice={formatUnitPrice}
           onDestChange={setHaulDest}
           onModeChange={setHaulMode}
           onAircraftChange={setHaulAircraftId}
-          onCancel={() => setHaulDraft(null)}
+          onAmountChange={setHaulAmountText}
+          onCancel={() => {
+            setHaulDraft(null);
+            setHaulPayQuote(null);
+            setHaulOpsMaxCargoKg(null);
+          }}
           onConfirm={() => void onConfirmHaul()}
         />
       ) : null}
@@ -5351,7 +5870,9 @@ function PortBuyDialog(props: {
   const canConfirm =
     props.kg > 0 && props.kg <= props.listing.availableKg && !props.busy;
   const hasWh = props.hubCapacityKg != null && props.hubCapacityKg > 0;
-  const inboundKg = hasWh ? Math.min(props.kg, props.hubFreeKg) : 0;
+  const freeForInbound =
+    props.hubFreeKg >= MIN_WAREHOUSE_INBOUND_KG ? props.hubFreeKg : 0;
+  const inboundKg = hasWh ? Math.min(props.kg, freeForInbound) : 0;
   const yardHoldKg = Math.max(0, props.kg - inboundKg);
   const transferTicks =
     inboundKg > 0
@@ -6326,17 +6847,45 @@ function WarehouseHaulDialog(props: {
   mode: 'hold' | 'fly';
   aircraftId: string;
   aircraftOptions: PlayerAircraft[];
+  weightSystem: WeightSystem;
+  amountText: string;
+  kg: number;
+  freeKg: number;
+  opsMaxCargoKg: number | null;
+  payQuote: WarehouseHaulPayQuote | null;
   busy: boolean;
+  formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
+  formatUnitPrice: (usdPerKg: number) => string;
   onDestChange: (icao: string) => void;
   onModeChange: (mode: 'hold' | 'fly') => void;
   onAircraftChange: (id: string) => void;
+  onAmountChange: (text: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const titleId = useId();
+  const unit = massUnitLabel(props.weightSystem);
   const destOk = /^[A-Z0-9]{3,4}$/.test(props.destIcao.trim().toUpperCase());
+  const displayMax = Math.max(
+    1,
+    Math.floor(kgToDisplay(props.freeKg, props.weightSystem)),
+  );
+  const opsCapDisplay =
+    props.mode === 'fly' && props.opsMaxCargoKg != null && props.opsMaxCargoKg > 0
+      ? Math.max(
+          1,
+          Math.floor(kgToDisplay(props.opsMaxCargoKg, props.weightSystem)),
+        )
+      : null;
+  const overOps =
+    props.mode === 'fly' &&
+    props.opsMaxCargoKg != null &&
+    props.kg > props.opsMaxCargoKg;
   const canConfirm =
     destOk &&
+    props.kg > 0 &&
+    !overOps &&
     !props.busy &&
     (props.mode === 'hold' ||
       (Boolean(props.aircraftId) && props.aircraftOptions.length > 0));
@@ -6378,11 +6927,86 @@ function WarehouseHaulDialog(props: {
               }
               aria-label="Destination ICAO"
             />
-            <p className="demand-accept-hint">
-              Commodity {props.commodityId} · uses all free WH stock of that
-              type (capped by aircraft ops when flying).
-            </p>
           </div>
+          <div className="demand-accept-section">
+            <span className="demand-accept-label">Amount</span>
+            <label className="cargo-amount port-buy-amount">
+              Amount
+              <div>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={displayMax}
+                  step={props.weightSystem === 'imperial' ? 10 : 100}
+                  value={props.amountText}
+                  disabled={props.busy}
+                  aria-label={`Amount (${unit})`}
+                  onChange={(event) => props.onAmountChange(event.target.value)}
+                />
+                <span>{unit}</span>
+              </div>
+            </label>
+            <div className="cargo-presets port-buy-presets">
+              {opsCapDisplay != null ? (
+                <button
+                  type="button"
+                  disabled={props.busy || props.freeKg <= 0}
+                  title="Fill this airframe's route ops cap"
+                  onClick={() =>
+                    props.onAmountChange(
+                      String(
+                        Math.max(
+                          1,
+                          Math.min(displayMax, opsCapDisplay),
+                        ),
+                      ),
+                    )
+                  }
+                >
+                  Ops cap
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={props.busy || displayMax <= 0}
+                onClick={() =>
+                  props.onAmountChange(
+                    String(Math.max(1, Math.floor(displayMax * 0.5))),
+                  )
+                }
+              >
+                50%
+              </button>
+              <button
+                type="button"
+                disabled={props.busy || displayMax <= 0}
+                onClick={() => props.onAmountChange(String(displayMax))}
+              >
+                Max
+              </button>
+            </div>
+            <p className="demand-accept-hint">
+              Commodity {props.commodityId} · free{' '}
+              {props.formatTonnes(props.freeKg)}
+              {props.mode === 'fly' && props.opsMaxCargoKg != null
+                ? ` · aircraft ops ${props.formatTonnes(props.opsMaxCargoKg)}`
+                : ''}
+            </p>
+            {overOps ? (
+              <p className="demand-accept-hint confirm-quote is-error">
+                Amount exceeds this airframe&apos;s ops cap for this route —
+                lower kg or use Hold.
+              </p>
+            ) : null}
+          </div>
+          {destOk && props.kg > 0 ? (
+            <p className="demand-accept-hint">
+              {props.payQuote
+                ? `Est. pay ${props.formatMoney(props.payQuote.payUsd)} · ${props.formatUnitPrice(props.payQuote.unitPriceUsd)} · ${props.payQuote.distanceNm} nm${props.payQuote.wide ? ' · Wide' : ''}`
+                : 'Estimating pay…'}
+            </p>
+          ) : null}
           <div className="demand-accept-section">
             <span className="demand-accept-label">When</span>
             <div className="demand-accept-picks" role="listbox" aria-label="Hold or fly">

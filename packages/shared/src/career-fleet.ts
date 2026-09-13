@@ -157,6 +157,8 @@ export function emptyMissionsStateV2(): CareerMissionsState {
     groundStaff: { members: [] },
     portPickups: [],
     playerWarehouses: { warehouses: [], stock: [], inboundTransfers: [] },
+    playerPortConcessions: [],
+    portAutoBuyOrders: [],
   };
 }
 
@@ -291,6 +293,23 @@ export function normalizeMissionsState(
   const groundStaff = normalizeGroundStaffState(
     (raw as CareerMissionsState).groundStaff,
   );
+  const playerPortConcessions = Array.isArray(
+    (raw as CareerMissionsState).playerPortConcessions,
+  )
+    ? (raw as CareerMissionsState).playerPortConcessions!.filter(
+        (c) =>
+          c &&
+          typeof c === 'object' &&
+          typeof c.portId === 'string' &&
+          typeof c.companyId === 'string' &&
+          typeof c.leasePaidThroughTick === 'number',
+      )
+    : [];
+  const portAutoBuyOrders = Array.isArray(
+    (raw as CareerMissionsState).portAutoBuyOrders,
+  )
+    ? (raw as CareerMissionsState).portAutoBuyOrders!
+    : [];
   const ferrySoftRaw = (raw as CareerMissionsState).ferrySoftNmUsed;
   const ferrySoftNmUsed =
     typeof ferrySoftRaw === 'number' && Number.isFinite(ferrySoftRaw)
@@ -328,6 +347,8 @@ export function normalizeMissionsState(
       ? (raw as CareerMissionsState).portPickups
       : [],
     playerWarehouses,
+    playerPortConcessions,
+    portAutoBuyOrders,
     // Bush trips removed — clear any persisted activeBushTrip on normalize.
     ...(airframePerfOverrides
       ? { airframePerfOverrides }

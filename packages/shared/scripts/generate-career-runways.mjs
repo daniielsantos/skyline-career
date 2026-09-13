@@ -212,11 +212,9 @@ function buildRunway(row) {
 
   let heading = num(row.le_heading_degT);
   if (heading == null) heading = num(row.he_heading_degT);
-  if (heading != null && num(row.he_heading_degT) != null && heading === num(row.he_heading_degT)) {
-    /* keep */
-  }
+  // Prefer geometry from threshold ends — OA le_heading_degT is often magnetic
+  // (runway number × 10) mislabeled as true, which breaks touchdown lateral.
   if (
-    heading == null &&
     leLat != null &&
     heLat != null &&
     leLon != null &&

@@ -23,6 +23,8 @@ Porto descarrega carga oceânica → hub de pickup → **WH do player (T4 tronco
 2. **Deposit/split** — **SHIPPED** Store in WH = `min(yard, freeKg)`; resto yard; Value listings porto 8–45 t
 3. **Market Port XL** — **SHIPPED** `xlLotOdEligible` port bias + `formLots` +1 maxXl / 35 t floor + soft cap 80
 4. **Wide from WH** — **SHIPPED** `career-warehouse-haul.ts` + API + Ports **Haul** button
+5. **Haul amount + pay quote (2026-09-12)** — dialog picks partial kg (presets 50% / Max / Ops cap); live `POST /api/warehouses/haul/quote`; accept/hold pass `kg`. Fix: full WH stock was forced → ops-cap error on small airframes.
+6. **OFP trim → WH (2026-09-12)** — `trimMissionCargoToKg(..., fleet)` deposits leftover to origin WH for Haul/Bridge/Demand (Accept OFP cargo / dispatch flyable trim). Before: Market board only; Haul leftover was lost.
 
 ## Paths
 

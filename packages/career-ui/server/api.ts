@@ -131,6 +131,8 @@ import {
   replaceMissionManifest,
   resolveAircraftDeliveryIcao,
   routeDistanceNm,
+  hubDistanceNm,
+  XL_LOT_MIN_KG,
   estimateMissionBlockHours,
   KG_TO_LB,
   selectStarterHub,
@@ -174,6 +176,7 @@ import {
   cancelWarehouseHaulHold,
   acceptWarehouseHaul,
   dispatchWarehouseHaulHold,
+  quoteWarehouseHaulPayUsd,
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
   ensurePortListings,
@@ -181,6 +184,8 @@ import {
   renewPortConcession,
   upgradePortConcession,
   tickPortConcessions,
+  healMissingPortConcessionFromLedger,
+  syncWorldPortConcessions,
   ensurePortInventoryRestock,
   tickPortAutoBuyOrders,
   upsertPortAutoBuyOrder,
@@ -905,8 +910,13 @@ async function loadEconomyUnlocked(opts?: {
   if (needsSave) {
     await activeStore.saveEconomy(caught);
   }
+  // Always deposit inbound that is already due (readyAtTick <= tick), even when
+  // catch-up advanced 0 ticks — UI can show Arriving… until the next pulse
+  // otherwise. MP-safe: uses authoritative world.tick, never early before ETA.
+  const inboundSettle = settleWarehouseInboundTransfers(missions, caught);
+  const concessionHeal = healMissingPortConcessionFromLedger(missions, caught);
+  syncWorldPortConcessions(caught, missions);
   if (advancedTicks > 0) {
-    settleWarehouseInboundTransfers(missions, caught);
     tickPortConcessions(missions, caught);
     ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
@@ -916,7 +926,17 @@ async function loadEconomyUnlocked(opts?: {
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(caught),
     });
     await saveMissions(missions);
+    await activeStore.persistPortConcessionIndex(caught.portConcessions ?? []);
     await persistEconomyUnlocked(caught);
+  } else if (
+    concessionHeal !== 'none' ||
+    inboundSettle.deposited.length > 0 ||
+    inboundSettle.yardOverflow.length > 0
+  ) {
+    await saveMissions(missions);
+    if (concessionHeal === 'restored') {
+      await activeStore.persistPortConcessionIndex(caught.portConcessions ?? []);
+    }
   }
   return caught;
 }
@@ -1183,6 +1203,8 @@ async function withCareerWrite<T>(
     }
     if (persistPortMarket) {
       await activeStore.persistPortMarketTables(world);
+      // portSnapshot syncs concessions; keep index table aligned with company JSON.
+      await activeStore.persistPortConcessionIndex(world.portConcessions ?? []);
       // Hire-desk pool lives on company_state; snapshot may roll it here.
       await saveMissions(missions);
       return result;
@@ -4471,6 +4493,7 @@ export function createCareerApiServer(port = 8787) {
           // buy can find the same listing IDs after reload.
           const result = await withCareerWrite(
             (world, missions) => {
+              settleWarehouseInboundTransfers(missions, world);
               const groundStaff = groundStaffSnapshot(missions, world);
               const ports = portSnapshot(world, missions);
               return {
@@ -5511,10 +5534,15 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/warehouses') {
         try {
-          const result = await withCareerRead((world, missions) => ({
-            ...playerWarehouseSnapshot(missions, world),
-            groundStaff: groundStaffSnapshot(missions, world),
-          }));
+          // Deposit due inbound on read so Arriving… does not wait for the next
+          // pulse (SP UX). Gate remains readyAtTick <= world.tick (MP-safe).
+          const result = await withCareerWrite((world, missions) => {
+            settleWarehouseInboundTransfers(missions, world);
+            return {
+              ...playerWarehouseSnapshot(missions, world),
+              groundStaff: groundStaffSnapshot(missions, world),
+            };
+          }, { persist: 'company' });
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {
@@ -5821,6 +5849,61 @@ export function createCareerApiServer(port = 8787) {
             });
           }, { persist: 'company' });
           send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/warehouses/haul/quote') {
+        const body = (await readBody(req)) as {
+          originIcao?: string;
+          destIcao?: string;
+          commodityId?: string;
+          kg?: number;
+        };
+        if (!body.originIcao || !body.destIcao || !body.commodityId) {
+          send(res, 400, {
+            error: 'originIcao, destIcao and commodityId required',
+          });
+          return;
+        }
+        const kg = Math.max(0, Math.floor(Number(body.kg) || 0));
+        if (kg <= 0) {
+          send(res, 400, { error: 'kg must be > 0' });
+          return;
+        }
+        try {
+          const world = requireStore().peekEconomyWorld();
+          if (!world) {
+            send(res, 503, { error: 'Economy not loaded' });
+            return;
+          }
+          const origin = body.originIcao.trim().toUpperCase();
+          const dest = body.destIcao.trim().toUpperCase();
+          const commodityId = body.commodityId as CommodityId;
+          const payUsd = quoteWarehouseHaulPayUsd(world, {
+            originIcao: origin,
+            destIcao: dest,
+            commodityId,
+            kg,
+          });
+          const distanceNm =
+            hubDistanceNm(origin, dest) ??
+            routeDistanceNm(world, origin, dest) ??
+            0;
+          send(res, 200, {
+            quote: {
+              kg,
+              payUsd,
+              unitPriceUsd:
+                kg > 0 ? Math.round((payUsd / kg) * 10000) / 10000 : 0,
+              distanceNm: Math.round(distanceNm),
+              wide: kg >= XL_LOT_MIN_KG,
+            },
+          });
         } catch (error) {
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
@@ -6901,6 +6984,7 @@ export function createCareerApiServer(port = 8787) {
                     world,
                     mission,
                     flyable.cargoKg,
+                    missions,
                   ).mission;
                 }
                 const dispatched: MissionIntent = {
@@ -7399,6 +7483,7 @@ export function createCareerApiServer(port = 8787) {
                     world,
                     mission,
                     flyable.cargoKg,
+                    missions,
                   ).mission;
                 }
                 const dispatched: MissionIntent = {
@@ -7656,7 +7741,12 @@ export function createCareerApiServer(port = 8787) {
             }
             let next = open;
             if (flyable.cargoKg < open.cargoKg) {
-              next = trimMissionCargoToKg(world, open, flyable.cargoKg).mission;
+              next = trimMissionCargoToKg(
+                world,
+                open,
+                flyable.cargoKg,
+                missions,
+              ).mission;
             }
             const dispatched: MissionIntent = {
               ...next,
@@ -7737,6 +7827,9 @@ export function createCareerApiServer(port = 8787) {
             ofpId: result.ofp.ofpId,
             staticId: probeMission.staticId,
             briefing: result.ofp.briefing,
+            ...(typeof result.ofp.passengerCount === 'number'
+              ? { passengerCount: result.ofp.passengerCount }
+              : {}),
             plannedBlockFuelKg: result.ofp.blockFuelKg,
             findings: result.check.findings.map((f) => ({
               code: f.code,
@@ -7885,7 +7978,12 @@ export function createCareerApiServer(port = 8787) {
                 `Mission ${mission.id} cannot accept OFP cargo (status=${mission.status})`,
               );
             }
-            const trimmed = trimMissionCargoToKg(world, mission, ofpCargoKg);
+            const trimmed = trimMissionCargoToKg(
+              world,
+              mission,
+              ofpCargoKg,
+              missions,
+            );
             Object.assign(mission, trimmed.mission);
             bumpMissionOfpCheckSeq(mission);
             mission.lastPreflightCheck = undefined;
@@ -7911,6 +8009,9 @@ export function createCareerApiServer(port = 8787) {
             ofpId: after.ofp.ofpId,
             staticId: trimmedWrite.mission.staticId,
             briefing: after.ofp.briefing,
+            ...(typeof after.ofp.passengerCount === 'number'
+              ? { passengerCount: after.ofp.passengerCount }
+              : {}),
             plannedBlockFuelKg: after.ofp.blockFuelKg,
             findings: after.check.findings.map((f) => ({
               code: f.code,

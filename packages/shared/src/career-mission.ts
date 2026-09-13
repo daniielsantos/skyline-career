@@ -3275,9 +3275,47 @@ export function clampPaxAndCargoDueToHoldsLb(
 }
 
 /**
+ * Resolve cabin count for {@link adjustPaxAndCargoDueForEfbPaxLb}.
+ *
+ * Freight/haul on `pax_and_cargo` glass keeps `mission.pax = 0` while Dispatch
+ * still fills SimBrief seats for EFB Import — do **not** treat that 0 as a
+ * freighter OFP (or Due stays at 175 lb/seat while EFB loads efbPaxWeightLb).
+ * Prefer confirmed OFP `passengerCount`; fall back to mission pax when > 0;
+ * for pax_and_cargo with mission pax 0 leave undefined so Due estimates seats
+ * from OFP payload. Explicit OFP 0 still means freighter sheet.
+ */
+export function resolveOfpPassengerCountForEfbDue(opts: {
+  missionPax?: number | null;
+  ofpPassengerCount?: number | null;
+  loadLayout?: CareerPlayerAirframe['loadLayout'];
+}): number | undefined {
+  const ofp = opts.ofpPassengerCount;
+  if (typeof ofp === 'number' && Number.isFinite(ofp)) {
+    return Math.max(0, Math.floor(ofp));
+  }
+  const missionPax = opts.missionPax;
+  if (
+    typeof missionPax === 'number' &&
+    Number.isFinite(missionPax) &&
+    missionPax > 0
+  ) {
+    return Math.floor(missionPax);
+  }
+  if (opts.loadLayout === 'pax_and_cargo') {
+    return undefined;
+  }
+  if (typeof missionPax === 'number' && Number.isFinite(missionPax)) {
+    return Math.max(0, Math.floor(missionPax));
+  }
+  return undefined;
+}
+
+/**
  * iniBuilds / similar EFBs apply a heavier (or lighter) standard pax than
  * SimBrief 175 lb. Pass {@link opts.ofpPassengerCount} when known — freighter
  * OFPs (pax=0) must skip this or Due shrinks by a fake cabin estimate.
+ * Career freight on passenger glass: use {@link resolveOfpPassengerCountForEfbDue}
+ * so mission.pax=0 does not skip the EFB delta.
  */
 export function adjustPaxAndCargoDueForEfbPaxLb(
   plannedPayloadLb: number,
@@ -3649,11 +3687,13 @@ export type TrimMissionCargoResult = {
  * Shrink an open mission's cargo down to `targetCargoKg` (floor).
  * Releases excess reservations back to the board and scales line pay pro-rata.
  * Used when SimBrief MTOW/fuel-limits the OFP below the staged manifest.
+ * WH Demand / Haul / Bridge: pass `fleet` so leftover kg is deposited at origin.
  */
 export function trimMissionCargoToKg(
   world: CareerEconomyWorld,
   mission: MissionIntent,
   targetCargoKg: number,
+  fleet?: CareerMissionsState,
 ): TrimMissionCargoResult {
   const normalized = normalizeMissionIntent(mission);
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
@@ -3727,9 +3767,50 @@ export function trimMissionCargoToKg(
     }
   }
   syncPlayerInbound(world, next);
+
+  const releasedKg = normalized.cargoKg - next.cargoKg;
+  if (
+    fleet &&
+    releasedKg > 0 &&
+    (normalized.warehouseHaul ||
+      normalized.warehouseBridge ||
+      normalized.demandOrderId)
+  ) {
+    const line = nextLots[0] ?? normalized.lots[0];
+    const commodityId = line?.commodityId ?? normalized.commodityId;
+    try {
+      depositCargoToWarehouse(fleet, {
+        icao: normalized.originIcao,
+        commodityId,
+        kg: releasedKg,
+        avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
+        tick: normalized.acceptedAtTick ?? world.tick,
+      });
+    } catch {
+      // Warehouse may be gone — trim still succeeds (same as cancel).
+    }
+    if (normalized.demandOrderId) {
+      if (!Array.isArray(world.demandOrders)) {
+        world.demandOrders = [];
+      }
+      const order = world.demandOrders.find(
+        (o) => o.id === normalized.demandOrderId,
+      );
+      if (order) {
+        order.remainingKg = Math.min(
+          order.wantedKg,
+          order.remainingKg + releasedKg,
+        );
+        if (order.status === 'filled' && order.remainingKg > 0) {
+          order.status = 'open';
+        }
+      }
+    }
+  }
+
   return {
     mission: next,
-    releasedKg: normalized.cargoKg - next.cargoKg,
+    releasedKg,
     payBeforeUsd,
     payAfterUsd: next.payUsd,
   };

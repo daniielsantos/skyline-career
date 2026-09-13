@@ -533,6 +533,10 @@ export type Mission = {
   payloadLab?: boolean;
   /** Demand Board mission (warehouse → terminal). */
   demandOrderId?: string;
+  /** Wide / trunk haul from WH → terminal. */
+  warehouseHaul?: boolean;
+  /** WH→WH company bridge / Internal Haul. */
+  warehouseBridge?: boolean;
   warehouseId?: string;
   warehouseAvgCostUsdPerKg?: number;
   /**
@@ -2588,6 +2592,10 @@ export type PortScoutBridgeSuggestion = {
   commodityId: string;
   kg: number;
   distanceNm: number;
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
   reason: string;
   score: number;
 };
@@ -2603,6 +2611,10 @@ export type PortScoutDemandSuggestion = {
   distanceNm: number;
   unitPriceUsd: number;
   payUsd: number;
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
   reason: string;
   score: number;
 };
@@ -2618,6 +2630,10 @@ export type PortScoutHaulSuggestion = {
   unitPriceUsd: number;
   payUsd: number;
   destFillPct: number;
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
   reason: string;
   score: number;
 };
@@ -3124,6 +3140,26 @@ export function postWarehouseBridgeDispatchHold(opts: {
     fleet: PlayerAircraft[];
     missions: Mission[];
   }>('/api/warehouses/bridge/dispatch-hold', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type WarehouseHaulPayQuote = {
+  kg: number;
+  payUsd: number;
+  unitPriceUsd: number;
+  distanceNm: number;
+  wide: boolean;
+};
+
+export function postWarehouseHaulQuote(opts: {
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  kg: number;
+}) {
+  return api<{ quote: WarehouseHaulPayQuote }>('/api/warehouses/haul/quote', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

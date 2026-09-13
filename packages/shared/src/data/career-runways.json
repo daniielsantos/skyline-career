@@ -7,7 +7,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 142.1,
       "lengthM": 1402,
       "widthM": 50.3,
       "lat": 38.383301,
@@ -20,7 +20,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 93.6,
       "lengthM": 690,
       "widthM": 15.2,
       "lat": 35.426498,
@@ -33,7 +33,7 @@
     {
       "ident": "5L",
       "identReciprocal": "23R",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 57.2,
       "lengthM": 1836,
       "widthM": 22.9,
       "lat": 40.756511,
@@ -87,7 +87,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 183.5,
       "lengthM": 853,
       "widthM": 22.9,
       "lat": 41.273201,
@@ -100,7 +100,7 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 52.9,
       "lengthM": 823,
       "widthM": 9.1,
       "lat": 38.016899,
@@ -113,7 +113,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 133.2,
       "lengthM": 792,
       "widthM": 12.2,
       "lat": 38.704601,
@@ -248,7 +248,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 85.1,
       "lengthM": 1207,
       "widthM": 76.2,
       "lat": 49.368865,
@@ -261,7 +261,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 75.9,
       "lengthM": 1524,
       "widthM": 45.7,
       "lat": 51.691101,
@@ -357,7 +357,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 145.1,
       "lengthM": 1216,
       "widthM": 45.7,
       "lat": 52.996418,
@@ -394,7 +394,7 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 75,
+      "headingTrueDeg": 66.2,
       "lengthM": 2135,
       "widthM": 45.1,
       "lat": 43.461636,
@@ -405,7 +405,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 138,
+      "headingTrueDeg": 128.5,
       "lengthM": 1251,
       "widthM": 45.1,
       "lat": 43.459002,
@@ -514,7 +514,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 35,
+      "headingTrueDeg": 29.3,
       "lengthM": 809,
       "widthM": 30.5,
       "lat": 43.922901,
@@ -1007,7 +1007,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 165,
+      "headingTrueDeg": 162.7,
       "lengthM": 1890,
       "widthM": 45.7,
       "lat": 52.17107,
@@ -1767,7 +1767,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 178,
       "lengthM": 2042,
       "widthM": 45.7,
       "lat": 48.7927,
@@ -2093,7 +2093,7 @@
     {
       "ident": "01R",
       "identReciprocal": "19L",
-      "headingTrueDeg": 23.5,
+      "headingTrueDeg": 18.7,
       "lengthM": 844,
       "widthM": 22.9,
       "lat": 37.987398,
@@ -2734,7 +2734,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 119.1,
       "lengthM": 805,
       "widthM": 30.5,
       "lat": 47.2542,
@@ -2985,7 +2985,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 116,
+      "headingTrueDeg": 125.5,
       "lengthM": 2847,
       "widthM": 45.7,
       "lat": 39.1267,
@@ -3289,7 +3289,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 182,
+      "headingTrueDeg": 180,
       "lengthM": 1208,
       "widthM": 22.9,
       "lat": 43.51705,
@@ -4420,7 +4420,7 @@
     {
       "ident": "072",
       "identReciprocal": "252",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 81.4,
       "lengthM": 1829,
       "widthM": 22.9,
       "lat": 34.629398,
@@ -5117,7 +5117,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 166.7,
+      "headingTrueDeg": 162.2,
       "lengthM": 915,
       "widthM": 42.7,
       "lat": 33.2348,
@@ -5310,7 +5310,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 165.8,
       "lengthM": 725,
       "widthM": 9.1,
       "lat": 35.968601,
@@ -5582,7 +5582,7 @@
     {
       "ident": "11L",
       "identReciprocal": "29R",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 114.1,
       "lengthM": 3538,
       "widthM": 45.1,
       "lat": 20.524511,
@@ -6126,7 +6126,7 @@
     {
       "ident": "2",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 32.5,
       "lengthM": 1290,
       "widthM": 6.1,
       "lat": 41.1116,
@@ -6185,7 +6185,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 161.5,
+      "headingTrueDeg": 173.8,
       "lengthM": 1247,
       "widthM": 15.2,
       "lat": 37.958349,
@@ -6199,7 +6199,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 185.4,
       "lengthM": 795,
       "widthM": 9.1,
       "lat": 40.803301,
@@ -6243,7 +6243,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 92,
       "lengthM": 2200,
       "widthM": 45.1,
       "lat": -10.984026,
@@ -6256,7 +6256,7 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 11,
       "lengthM": 2500,
       "widthM": 29.9,
       "lat": -9.866389,
@@ -6269,7 +6269,7 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 29.2,
       "lengthM": 2120,
       "widthM": 35.1,
       "lat": -21.141479,
@@ -6330,7 +6330,7 @@
     {
       "ident": "8",
       "identReciprocal": "26",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 63.6,
       "lengthM": 2700,
       "widthM": 45.1,
       "lat": 2.84615,
@@ -6343,7 +6343,7 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 49.4,
       "lengthM": 1598,
       "widthM": 29.9,
       "lat": -15.861417,
@@ -6356,7 +6356,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 135.1,
       "lengthM": 1771,
       "widthM": 45.1,
       "lat": -25.000183,
@@ -6405,7 +6405,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 91.9,
       "lengthM": 2060,
       "widthM": 45.1,
       "lat": -27.134199,
@@ -6418,7 +6418,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 74.2,
       "lengthM": 1500,
       "widthM": 45.1,
       "lat": -19.011379,
@@ -6442,7 +6442,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 91.7,
       "lengthM": 1798,
       "widthM": 45.1,
       "lat": -25.528538,
@@ -6481,7 +6481,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 91.9,
       "lengthM": 2400,
       "widthM": 45.1,
       "lat": -7.59991,
@@ -6494,7 +6494,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 137,
+      "headingTrueDeg": 98.6,
       "lengthM": 2110,
       "widthM": 35.1,
       "lat": -22.175034,
@@ -6507,7 +6507,7 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 39,
       "lengthM": 1950,
       "widthM": 29.9,
       "lat": -22.201864,
@@ -6520,7 +6520,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 106,
+      "headingTrueDeg": 90.1,
       "lengthM": 2700,
       "widthM": 45.1,
       "lat": -3.03859,
@@ -6546,7 +6546,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 159,
+      "headingTrueDeg": 121.3,
       "lengthM": 2400,
       "widthM": 45.1,
       "lat": -27.671329,
@@ -6644,7 +6644,7 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 50.1,
       "lengthM": 2003,
       "widthM": 38.1,
       "lat": -3.253144,
@@ -6657,7 +6657,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 86.7,
       "lengthM": 1577,
       "widthM": 45.1,
       "lat": -14.815929,
@@ -6670,7 +6670,7 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 48.9,
       "lengthM": 1798,
       "widthM": 45.1,
       "lat": -5.53129,
@@ -6683,7 +6683,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 139.3,
       "lengthM": 2515,
       "widthM": 45.1,
       "lat": -7.148691,
@@ -6696,7 +6696,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 108.5,
       "lengthM": 1940,
       "widthM": 45.1,
       "lat": -7.21932,
@@ -6709,7 +6709,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 150,
+      "headingTrueDeg": 129.6,
       "lengthM": 1640,
       "widthM": 45.1,
       "lat": -26.224501,
@@ -6761,7 +6761,7 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 9.1,
       "lengthM": 1500,
       "widthM": 35.1,
       "lat": -22.196899,
@@ -6774,7 +6774,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 98.3,
       "lengthM": 2602,
       "widthM": 45.1,
       "lat": -9.512559,
@@ -6787,7 +6787,7 @@
     {
       "ident": "8",
       "identReciprocal": "26",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 60.4,
       "lengthM": 2100,
       "widthM": 45.1,
       "lat": 0.050664,
@@ -6800,7 +6800,7 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 55.7,
       "lengthM": 1800,
       "widthM": 45.1,
       "lat": -26.879422,
@@ -6826,7 +6826,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 123.7,
       "lengthM": 2500,
       "widthM": 45.1,
       "lat": -10.291545,
@@ -6852,7 +6852,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 107.8,
       "lengthM": 2760,
       "widthM": 45.1,
       "lat": -9.362422,
@@ -6878,7 +6878,7 @@
     {
       "ident": "1",
       "identReciprocal": "19",
-      "headingTrueDeg": 10,
+      "headingTrueDeg": 355.4,
       "lengthM": 2400,
       "widthM": 45.1,
       "lat": -8.708491,
@@ -6891,7 +6891,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 57,
       "lengthM": 2158,
       "widthM": 45.1,
       "lat": -9.869033,
@@ -6904,7 +6904,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 0.6,
       "lengthM": 1850,
       "widthM": 29.9,
       "lat": -16.584292,
@@ -6917,7 +6917,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 158.9,
       "lengthM": 3007,
       "widthM": 45.1,
       "lat": -8.12747,
@@ -6930,7 +6930,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 163.5,
       "lengthM": 2100,
       "widthM": 45.1,
       "lat": -21.1346,
@@ -6956,7 +6956,7 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 10.7,
       "lengthM": 1630,
       "widthM": 29.9,
       "lat": -11.885001,
@@ -6982,7 +6982,7 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 39.4,
       "lengthM": 2386,
       "widthM": 45.1,
       "lat": -2.586386,
@@ -6993,7 +6993,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 69.4,
       "lengthM": 1464,
       "widthM": 45.1,
       "lat": -2.586386,
@@ -7006,7 +7006,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 80.9,
       "lengthM": 2400,
       "widthM": 45.1,
       "lat": -2.422423,
@@ -7032,7 +7032,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 77.1,
       "lengthM": 3005,
       "widthM": 45.1,
       "lat": -12.908611,
@@ -7043,7 +7043,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 147.1,
       "lengthM": 1520,
       "widthM": 45.1,
       "lat": -12.908611,
@@ -7056,7 +7056,7 @@
     {
       "ident": "2",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 358.8,
       "lengthM": 2200,
       "widthM": 45.1,
       "lat": -5.06025,
@@ -7069,7 +7069,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 109.2,
       "lengthM": 2150,
       "widthM": 32.6,
       "lat": -4.25567,
@@ -7082,7 +7082,7 @@
     {
       "ident": "4",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 18.1,
       "lengthM": 1950,
       "widthM": 45.1,
       "lat": -18.883579,
@@ -7095,7 +7095,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 148,
       "lengthM": 1759,
       "widthM": 45.1,
       "lat": -19.765036,
@@ -7108,7 +7108,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 351.9,
       "lengthM": 2058,
       "widthM": 45.1,
       "lat": -20.256664,
@@ -7119,7 +7119,7 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 31.5,
       "lengthM": 1750,
       "widthM": 45.1,
       "lat": -20.257599,
@@ -7132,7 +7132,7 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 30.4,
       "lengthM": 1200,
       "widthM": 29.9,
       "lat": -1.479524,
@@ -7145,7 +7145,7 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 75.7,
       "lengthM": 1200,
       "widthM": 29.9,
       "lat": -0.378604,
@@ -7158,7 +7158,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 82,
       "lengthM": 579,
       "widthM": 15.2,
       "lat": 37.55889,
@@ -7171,7 +7171,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 161.6,
       "lengthM": 1006,
       "widthM": 22.9,
       "lat": 37.9487,
@@ -7345,7 +7345,7 @@
     {
       "ident": "07R",
       "identReciprocal": "25L",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 67.3,
       "lengthM": 3000,
       "widthM": 45.1,
       "lat": 35.6194,
@@ -7395,7 +7395,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 86.8,
       "lengthM": 2895,
       "widthM": 45.1,
       "lat": 36.178486,
@@ -7471,7 +7471,7 @@
     {
       "ident": "05C",
       "identReciprocal": "23C",
-      "headingTrueDeg": 45,
+      "headingTrueDeg": 49,
       "lengthM": 4000,
       "widthM": 60,
       "lat": 30.111501,
@@ -7652,7 +7652,7 @@
     {
       "ident": "01",
       "identReciprocal": "19",
-      "headingTrueDeg": 0,
+      "headingTrueDeg": 13.6,
       "lengthM": 3600,
       "widthM": 45,
       "lat": 29.727158,
@@ -8291,7 +8291,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 120.3,
       "lengthM": 1500,
       "widthM": 45,
       "lat": 63.05023,
@@ -9110,7 +9110,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 26,
       "lengthM": 700,
       "widthM": 299.9,
       "lat": 52.421598,
@@ -9145,7 +9145,7 @@
     {
       "ident": "08R",
       "identReciprocal": "26L",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 86.8,
       "lengthM": 900,
       "widthM": 30.2,
       "lat": 50.109791,
@@ -9156,7 +9156,7 @@
     {
       "ident": "08L",
       "identReciprocal": "26R",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 86.8,
       "lengthM": 746,
       "widthM": 50,
       "lat": 50.109791,
@@ -9989,7 +9989,7 @@
     {
       "ident": "08L",
       "identReciprocal": "26R",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 82.3,
       "lengthM": 900,
       "widthM": 49.1,
       "lat": 45.786701,
@@ -10000,7 +10000,7 @@
     {
       "ident": "01",
       "identReciprocal": "19",
-      "headingTrueDeg": 10,
+      "headingTrueDeg": 12.3,
       "lengthM": 705,
       "widthM": 60,
       "lat": 45.786701,
@@ -10761,7 +10761,7 @@
     {
       "ident": "16C",
       "identReciprocal": "34C",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 164,
       "lengthM": 3602,
       "widthM": 45.1,
       "lat": 41.804532,
@@ -11968,7 +11968,7 @@
     {
       "ident": "07L",
       "identReciprocal": "25R",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 76.3,
       "lengthM": 760,
       "widthM": 29.9,
       "lat": 49.070994,
@@ -11979,7 +11979,7 @@
     {
       "ident": "07R",
       "identReciprocal": "25L",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 76.3,
       "lengthM": 760,
       "widthM": 29.9,
       "lat": 49.070994,
@@ -11992,7 +11992,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 57.7,
       "lengthM": 3000,
       "widthM": 45.1,
       "lat": 19.269259,
@@ -12417,7 +12417,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 174.3,
       "lengthM": 2591,
       "widthM": 45.1,
       "lat": 8.92651,
@@ -14062,7 +14062,7 @@
     {
       "ident": "02R",
       "identReciprocal": "20L",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 24.4,
       "lengthM": 1972,
       "widthM": 29.9,
       "lat": -36.77235,
@@ -14346,7 +14346,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 3.9,
       "lengthM": 2200,
       "widthM": 45.1,
       "lat": -27.227537,
@@ -14652,7 +14652,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 156.7,
       "lengthM": 1800,
       "widthM": 45,
       "lat": -10.820306,
@@ -14778,7 +14778,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 92.1,
       "lengthM": 750,
       "widthM": 17.1,
       "lat": 5.811211,
@@ -15036,7 +15036,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 95.9,
       "lengthM": 1275,
       "widthM": 45,
       "lat": -30.4007,
@@ -15049,7 +15049,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 119.2,
       "lengthM": 1370,
       "widthM": 45,
       "lat": -34.456402,
@@ -15132,7 +15132,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 88.1,
       "lengthM": 900,
       "widthM": 45,
       "lat": -32.3633,
@@ -15145,7 +15145,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 35.4,
       "lengthM": 1830,
       "widthM": 45,
       "lat": -30.9746,
@@ -15395,7 +15395,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 52.9,
       "lengthM": 1280,
       "widthM": 30.5,
       "lat": 6.805881,
@@ -15434,7 +15434,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 84.9,
       "lengthM": 500,
       "widthM": 45,
       "lat": 17.636067,
@@ -18649,7 +18649,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 150,
+      "headingTrueDeg": 143.4,
       "lengthM": 3400,
       "widthM": 60,
       "lat": 31.1434,
@@ -19195,7 +19195,7 @@
     {
       "ident": "05R",
       "identReciprocal": "23L",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 45.8,
       "lengthM": 3800,
       "widthM": 60.4,
       "lat": 34.442207,
@@ -19626,7 +19626,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 96,
+      "headingTrueDeg": 109.1,
       "lengthM": 3354,
       "widthM": 60,
       "lat": -12.4094,
@@ -19652,7 +19652,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 135.1,
       "lengthM": 2259,
       "widthM": 45,
       "lat": -42.837,
@@ -19665,7 +19665,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 182.5,
       "lengthM": 2140,
       "widthM": 45,
       "lat": -41.326839,
@@ -19678,7 +19678,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 176.8,
       "lengthM": 3658,
       "widthM": 46,
       "lat": 24.2647,
@@ -19691,7 +19691,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 175.6,
       "lengthM": 3050,
       "widthM": 46,
       "lat": 22.9504,
@@ -19704,7 +19704,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 162.4,
       "lengthM": 3600,
       "widthM": 60,
       "lat": 36.362,
@@ -19717,7 +19717,7 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 82.6,
       "lengthM": 3600,
       "widthM": 60,
       "lat": 43.9136,
@@ -20012,7 +20012,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 128.8,
       "lengthM": 3600,
       "widthM": 60,
       "lat": 47.501,
@@ -20330,7 +20330,7 @@
     {
       "ident": "18R",
       "identReciprocal": "36L",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 177.1,
       "lengthM": 3600,
       "widthM": 45.1,
       "lat": 36.515202,
@@ -20343,7 +20343,7 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 25,
       "lengthM": 3609,
       "widthM": 45.7,
       "lat": 25.929254,
@@ -20354,7 +20354,7 @@
     {
       "ident": "03R",
       "identReciprocal": "21L",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 25,
       "lengthM": 3600,
       "widthM": 60.4,
       "lat": 25.929254,
@@ -21075,7 +21075,7 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 32.6,
       "lengthM": 3700,
       "widthM": 60,
       "lat": -29.614444,
@@ -21910,7 +21910,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 357.5,
       "lengthM": 3600,
       "widthM": 60,
       "lat": -26.358611,
@@ -22774,7 +22774,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 125.7,
       "lengthM": 1829,
       "widthM": 45.7,
       "lat": 45.438599,
@@ -23497,7 +23497,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 53,
       "lengthM": 799,
       "widthM": 29.9,
       "lat": 50.482006,
@@ -24089,7 +24089,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 150,
+      "headingTrueDeg": 147.8,
       "lengthM": 846,
       "widthM": 46,
       "lat": 57.0228,
@@ -24100,7 +24100,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 67.8,
       "lengthM": 799,
       "widthM": 60,
       "lat": 57.0228,
@@ -24111,7 +24111,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 107.8,
       "lengthM": 680,
       "widthM": 46,
       "lat": 57.0228,
@@ -24183,7 +24183,7 @@
     {
       "ident": "03G",
       "identReciprocal": "21G",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 33,
       "lengthM": 600,
       "widthM": 30.2,
       "lat": 51.255299,
@@ -24246,7 +24246,7 @@
     {
       "ident": "05L",
       "identReciprocal": "23R",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 52.9,
       "lengthM": 1370,
       "widthM": 29.9,
       "lat": 52.453188,
@@ -24320,7 +24320,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 47.6,
       "lengthM": 600,
       "widthM": 18,
       "lat": 53.230301,
@@ -24346,7 +24346,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 127.6,
       "lengthM": 520,
       "widthM": 18,
       "lat": 53.064701,
@@ -24681,7 +24681,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 149.1,
       "lengthM": 1000,
       "widthM": 22.9,
       "lat": 56.9911,
@@ -24694,7 +24694,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 188.4,
       "lengthM": 1100,
       "widthM": 39.9,
       "lat": 54.652212,
@@ -24705,7 +24705,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 98.4,
       "lengthM": 900,
       "widthM": 39.9,
       "lat": 54.652212,
@@ -24716,7 +24716,7 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 48.4,
       "lengthM": 667,
       "widthM": 18,
       "lat": 54.652212,
@@ -24988,7 +24988,7 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 76.8,
       "lengthM": 2700,
       "widthM": 36.6,
       "lat": -12.1737,
@@ -25066,7 +25066,7 @@
     {
       "ident": "06R",
       "identReciprocal": "24L",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 57.4,
       "lengthM": 4000,
       "widthM": 60,
       "lat": -9.050734,
@@ -25077,7 +25077,7 @@
     {
       "ident": "06L",
       "identReciprocal": "24R",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 57.4,
       "lengthM": 3800,
       "widthM": 60,
       "lat": -9.050734,
@@ -25103,7 +25103,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 15.7,
       "lengthM": 3700,
       "widthM": 44.2,
       "lat": -12.4792,
@@ -25127,7 +25127,7 @@
     {
       "ident": "01",
       "identReciprocal": "19",
-      "headingTrueDeg": 10,
+      "headingTrueDeg": 6,
       "lengthM": 1000,
       "widthM": 45,
       "lat": -12.8089,
@@ -25266,7 +25266,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 134.8,
       "lengthM": 1213,
       "widthM": 45,
       "lat": -12.517527,
@@ -25531,7 +25531,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 87.3,
       "lengthM": 2500,
       "widthM": 45.1,
       "lat": 22.757345,
@@ -25774,7 +25774,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 182.2,
       "lengthM": 1707,
       "widthM": 45,
       "lat": 3.049152,
@@ -26573,7 +26573,7 @@
     {
       "ident": "14R",
       "identReciprocal": "32L",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 136.5,
       "lengthM": 1163,
       "widthM": 22.9,
       "lat": 40.039819,
@@ -26861,7 +26861,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 155.6,
       "lengthM": 3048,
       "widthM": 45.7,
       "lat": 30.357106,
@@ -27302,7 +27302,7 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 37.7,
       "lengthM": 2134,
       "widthM": 45.7,
       "lat": 30.405582,
@@ -27713,7 +27713,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 150,
+      "headingTrueDeg": 138.4,
       "lengthM": 615,
       "widthM": 15.2,
       "lat": 42.491001,
@@ -28696,7 +28696,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 173.9,
       "lengthM": 2966,
       "widthM": 45.7,
       "lat": 27.9102,
@@ -31363,7 +31363,7 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 68.2,
       "lengthM": 1900,
       "widthM": 22.9,
       "lat": 18.907499,
@@ -31415,7 +31415,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 67.4,
       "lengthM": 1547,
       "widthM": 30.5,
       "lat": 14.917,
@@ -31454,7 +31454,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 42.4,
       "lengthM": 701,
       "widthM": 22.9,
       "lat": 18.341712,
@@ -31504,7 +31504,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 188.7,
       "lengthM": 1682,
       "widthM": 29,
       "lat": 31.06615,
@@ -31619,7 +31619,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 128.3,
       "lengthM": 1600,
       "widthM": 45,
       "lat": 25.053801,
@@ -31812,7 +31812,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 189.7,
       "lengthM": 2500,
       "widthM": 45.1,
       "lat": 31.351987,
@@ -31936,7 +31936,7 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 43.8,
       "lengthM": 3470,
       "widthM": 75,
       "lat": 19.743824,
@@ -31988,7 +31988,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 176.8,
       "lengthM": 1397,
       "widthM": 45,
       "lat": 14.031524,
@@ -32027,7 +32027,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 164.8,
       "lengthM": 1000,
       "widthM": 14.9,
       "lat": 7.534801,
@@ -32040,7 +32040,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 174,
       "lengthM": 700,
       "widthM": 14.9,
       "lat": 8.62876,
@@ -32053,7 +32053,7 @@
     {
       "ident": "06",
       "identReciprocal": "24",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 57.3,
       "lengthM": 800,
       "widthM": 45,
       "lat": 10.469311,
@@ -32066,7 +32066,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 86.9,
       "lengthM": 750,
       "widthM": 45,
       "lat": 8.71889,
@@ -32079,7 +32079,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 156.8,
       "lengthM": 825,
       "widthM": 45,
       "lat": 8.53333,
@@ -32118,7 +32118,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 39.2,
       "lengthM": 640,
       "widthM": 45,
       "lat": 19.934045,
@@ -32350,7 +32350,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 89.5,
       "lengthM": 2140,
       "widthM": 30.5,
       "lat": 20.975,
@@ -32656,7 +32656,7 @@
     {
       "ident": "16L",
       "identReciprocal": "34R",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 182.3,
       "lengthM": 766,
       "widthM": 61,
       "lat": -39.465801,
@@ -32667,7 +32667,7 @@
     {
       "ident": "10",
       "identReciprocal": "28",
-      "headingTrueDeg": 100,
+      "headingTrueDeg": 122.3,
       "lengthM": 560,
       "widthM": 35.1,
       "lat": -39.465801,
@@ -32691,7 +32691,7 @@
     {
       "ident": "02L",
       "identReciprocal": "20R",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 43.1,
       "lengthM": 731,
       "widthM": 60,
       "lat": -41.296709,
@@ -32702,7 +32702,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 193.1,
       "lengthM": 600,
       "widthM": 60,
       "lat": -41.296709,
@@ -32772,7 +32772,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 92.7,
       "lengthM": 1902,
       "widthM": 45.1,
       "lat": -40.320599,
@@ -32794,7 +32794,7 @@
     {
       "ident": "07R",
       "identReciprocal": "25L",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 92.7,
       "lengthM": 608,
       "widthM": 60,
       "lat": -40.320599,
@@ -32944,7 +32944,7 @@
     {
       "ident": "03L",
       "identReciprocal": "21R",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 22,
       "lengthM": 2700,
       "widthM": 45.7,
       "lat": 36.181456,
@@ -33309,7 +33309,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 47.4,
       "lengthM": 2500,
       "widthM": 45.1,
       "lat": 13.111915,
@@ -33335,7 +33335,7 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 27.9,
       "lengthM": 2000,
       "widthM": 45.1,
       "lat": 10.776237,
@@ -33559,7 +33559,7 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 17.2,
       "lengthM": 1800,
       "widthM": 32.9,
       "lat": -26.753611,
@@ -33903,7 +33903,7 @@
     {
       "ident": "06L",
       "identReciprocal": "24R",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 38.2,
       "lengthM": 3300,
       "widthM": 45.1,
       "lat": -16.2292,
@@ -33914,7 +33914,7 @@
     {
       "ident": "06R",
       "identReciprocal": "24L",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 38.2,
       "lengthM": 2233,
       "widthM": 21.9,
       "lat": -16.2292,
@@ -33938,7 +33938,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 124.7,
       "lengthM": 1149,
       "widthM": 45.1,
       "lat": -31.390499,
@@ -33990,7 +33990,7 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 68.1,
       "lengthM": 2100,
       "widthM": 29.9,
       "lat": -17.725096,
@@ -34003,7 +34003,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 46.5,
       "lengthM": 1544,
       "widthM": 45.1,
       "lat": -21.698299,
@@ -34016,7 +34016,7 @@
     {
       "ident": "6",
       "identReciprocal": "24",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 36.3,
       "lengthM": 1530,
       "widthM": 50,
       "lat": -17.6523,
@@ -34029,7 +34029,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 162.4,
       "lengthM": 2000,
       "widthM": 29.9,
       "lat": -21.2473,
@@ -34042,7 +34042,7 @@
     {
       "ident": "12",
       "identReciprocal": "30",
-      "headingTrueDeg": 120,
+      "headingTrueDeg": 101.3,
       "lengthM": 1845,
       "widthM": 45.1,
       "lat": -3.854534,
@@ -34081,7 +34081,7 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 6.9,
       "lengthM": 1535,
       "widthM": 29.9,
       "lat": -21.791482,
@@ -34094,7 +34094,7 @@
     {
       "ident": "3",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 14.2,
       "lengthM": 1800,
       "widthM": 45.1,
       "lat": -10.870743,
@@ -34107,7 +34107,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 150,
+      "headingTrueDeg": 125,
       "lengthM": 1565,
       "widthM": 42.1,
       "lat": -7.269662,
@@ -34120,7 +34120,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 117.1,
       "lengthM": 2082,
       "widthM": 29.9,
       "lat": -12.4823,
@@ -34133,7 +34133,7 @@
     {
       "ident": "16",
       "identReciprocal": "34",
-      "headingTrueDeg": 160,
+      "headingTrueDeg": 140.8,
       "lengthM": 1530,
       "widthM": 29.9,
       "lat": -27.782101,
@@ -34146,7 +34146,7 @@
     {
       "ident": "6",
       "identReciprocal": "24",
-      "headingTrueDeg": 60,
+      "headingTrueDeg": 36.6,
       "lengthM": 1200,
       "widthM": 29.9,
       "lat": -22.343,
@@ -34159,7 +34159,7 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 29.5,
       "lengthM": 2000,
       "widthM": 29.9,
       "lat": -5.20192,
@@ -34172,7 +34172,7 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 33.6,
       "lengthM": 1280,
       "widthM": 29.9,
       "lat": -5.81138,
@@ -34198,7 +34198,7 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 67.8,
       "lengthM": 1515,
       "widthM": 29.9,
       "lat": -21.842529,
@@ -34224,7 +34224,7 @@
     {
       "ident": "5",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 28.3,
       "lengthM": 1700,
       "widthM": 29.9,
       "lat": -10.719402,
@@ -34261,7 +34261,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 93.6,
       "lengthM": 2694,
       "widthM": 45.1,
       "lat": -29.711399,
@@ -34272,7 +34272,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 3.6,
       "lengthM": 1414,
       "widthM": 29.9,
       "lat": -29.711399,
@@ -34309,7 +34309,7 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 71.5,
       "lengthM": 1600,
       "widthM": 29.9,
       "lat": -1.4896,
@@ -34322,7 +34322,7 @@
     {
       "ident": "2",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 359.5,
       "lengthM": 2000,
       "widthM": 45.1,
       "lat": -3.78601,
@@ -34335,7 +34335,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 118,
       "lengthM": 1800,
       "widthM": 45.1,
       "lat": -9.40088,
@@ -34348,7 +34348,7 @@
     {
       "ident": "9",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 76,
       "lengthM": 1500,
       "widthM": 29.9,
       "lat": -29.7822,
@@ -34359,7 +34359,7 @@
     {
       "ident": "4",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 26,
       "lengthM": 800,
       "widthM": 50,
       "lat": -29.7822,
@@ -34372,7 +34372,7 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 13.3,
       "lengthM": 2600,
       "widthM": 29.9,
       "lat": -12.6944,
@@ -34385,7 +34385,7 @@
     {
       "ident": "7",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 79.3,
       "lengthM": 1270,
       "widthM": 22.9,
       "lat": -45.3992,
@@ -34550,7 +34550,7 @@
     {
       "ident": "1",
       "identReciprocal": "19",
-      "headingTrueDeg": 10,
+      "headingTrueDeg": 12.4,
       "lengthM": 1000,
       "widthM": 18,
       "lat": -35.861698,
@@ -34680,7 +34680,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 107.2,
       "lengthM": 1500,
       "widthM": 29.9,
       "lat": -12.200694,
@@ -34784,7 +34784,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 43.7,
       "lengthM": 2300,
       "widthM": 45,
       "lat": 0.093056,
@@ -35185,7 +35185,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 168.3,
       "lengthM": 3600,
       "widthM": 45.1,
       "lat": -19.246835,
@@ -35237,7 +35237,7 @@
     {
       "ident": "14",
       "identReciprocal": "32",
-      "headingTrueDeg": 140,
+      "headingTrueDeg": 129,
       "lengthM": 1500,
       "widthM": 45,
       "lat": -14.4279,
@@ -35248,7 +35248,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 169,
       "lengthM": 1450,
       "widthM": 45,
       "lat": -14.4279,
@@ -35274,7 +35274,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 180,
+      "headingTrueDeg": 168.5,
       "lengthM": 1800,
       "widthM": 45,
       "lat": -14.8592,
@@ -35339,7 +35339,7 @@
     {
       "ident": "04",
       "identReciprocal": "22",
-      "headingTrueDeg": 40,
+      "headingTrueDeg": 21.8,
       "lengthM": 1000,
       "widthM": 22.9,
       "lat": 5.481891,
@@ -35751,7 +35751,7 @@
     {
       "ident": "07",
       "identReciprocal": "25",
-      "headingTrueDeg": 70,
+      "headingTrueDeg": 56.5,
       "lengthM": 840,
       "widthM": 45,
       "lat": 11.946935,
@@ -35853,7 +35853,7 @@
     {
       "ident": "17",
       "identReciprocal": "35",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 152.2,
       "lengthM": 1850,
       "widthM": 29.9,
       "lat": -16.0436,
@@ -35905,7 +35905,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 74.5,
       "lengthM": 800,
       "widthM": 45,
       "lat": 12.4761,
@@ -37184,7 +37184,7 @@
     {
       "ident": "13",
       "identReciprocal": "31",
-      "headingTrueDeg": 130,
+      "headingTrueDeg": 124.4,
       "lengthM": 2800,
       "widthM": 61,
       "lat": 40.560001,
@@ -37223,7 +37223,7 @@
     {
       "ident": "01L",
       "identReciprocal": "19R",
-      "headingTrueDeg": 10,
+      "headingTrueDeg": 5,
       "lengthM": 3600,
       "widthM": 45.1,
       "lat": 30.341178,
@@ -37234,7 +37234,7 @@
     {
       "ident": "01R",
       "identReciprocal": "19L",
-      "headingTrueDeg": 10,
+      "headingTrueDeg": 5,
       "lengthM": 3600,
       "widthM": 45.1,
       "lat": 30.341178,
@@ -37247,7 +37247,7 @@
     {
       "ident": "08",
       "identReciprocal": "26",
-      "headingTrueDeg": 80,
+      "headingTrueDeg": 74.8,
       "lengthM": 2500,
       "widthM": 45.1,
       "lat": 34.7411,
@@ -37325,7 +37325,7 @@
     {
       "ident": "03",
       "identReciprocal": "21",
-      "headingTrueDeg": 30,
+      "headingTrueDeg": 23.1,
       "lengthM": 2800,
       "widthM": 45,
       "lat": 34.41406,
@@ -37390,7 +37390,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 41.9,
       "lengthM": 3400,
       "widthM": 45,
       "lat": 37.659724,
@@ -37462,7 +37462,7 @@
     {
       "ident": "17R",
       "identReciprocal": "35L",
-      "headingTrueDeg": 170,
+      "headingTrueDeg": 158.6,
       "lengthM": 3000,
       "widthM": 50,
       "lat": 47.229969,
@@ -37488,7 +37488,7 @@
     {
       "ident": "02",
       "identReciprocal": "20",
-      "headingTrueDeg": 20,
+      "headingTrueDeg": 29.5,
       "lengthM": 2500,
       "widthM": 45.1,
       "lat": 55.944721,
@@ -37501,7 +37501,7 @@
     {
       "ident": "11",
       "identReciprocal": "29",
-      "headingTrueDeg": 110,
+      "headingTrueDeg": 115.8,
       "lengthM": 1800,
       "widthM": 45,
       "lat": 49.3144,
@@ -37512,7 +37512,7 @@
     {
       "ident": "05",
       "identReciprocal": "23",
-      "headingTrueDeg": 50,
+      "headingTrueDeg": 55.8,
       "lengthM": 1200,
       "widthM": 45,
       "lat": 49.3144,
@@ -37551,7 +37551,7 @@
     {
       "ident": "1",
       "identReciprocal": "19",
-      "headingTrueDeg": 7.5,
+      "headingTrueDeg": 1.7,
       "lengthM": 2050,
       "widthM": 29.9,
       "lat": -30.34525,
@@ -37564,7 +37564,7 @@
     {
       "ident": "15",
       "identReciprocal": "33",
-      "headingTrueDeg": 150,
+      "headingTrueDeg": 126.7,
       "lengthM": 1775,
       "widthM": 29.9,
       "lat": -14.862567,
@@ -37577,7 +37577,7 @@
     {
       "ident": "18",
       "identReciprocal": "36",
-      "headingTrueDeg": 177.5,
+      "headingTrueDeg": 172.3,
       "lengthM": 4098,
       "widthM": 45.1,
       "lat": -0.124133,
@@ -37590,7 +37590,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 97.5,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 52.0753,
@@ -37603,7 +37603,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 98.8,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 55.7333,
@@ -37616,7 +37616,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 77.6,
       "lengthM": 1200,
       "widthM": 30,
       "lat": -21.2667,
@@ -37642,7 +37642,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 86.1,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 15.2622,
@@ -37655,7 +37655,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 87.8,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 16.1131,
@@ -37668,7 +37668,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 98.7,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 26.9053,
@@ -37681,7 +37681,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 95.5,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 19.5996,
@@ -37694,7 +37694,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 87.3,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 11.1356,
@@ -37707,7 +37707,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 86.9,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 13.7272,
@@ -37720,7 +37720,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 86.3,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 14.7394,
@@ -37733,7 +37733,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 83.6,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 7.5178,
@@ -37746,7 +37746,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 86.6,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 10.5694,
@@ -37759,7 +37759,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 87.9,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 9.8667,
@@ -37772,7 +37772,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 86.9,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 9.3487,
@@ -37785,7 +37785,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 80,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 18.6631,
@@ -37824,7 +37824,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 102,
       "lengthM": 2800,
       "widthM": 30,
       "lat": -13.5053,
@@ -37837,7 +37837,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 82.5,
       "lengthM": 1200,
       "widthM": 30,
       "lat": -32.3201,
@@ -37850,7 +37850,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 75.2,
       "lengthM": 1200,
       "widthM": 30,
       "lat": -22.36,
@@ -37863,7 +37863,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 74.5,
       "lengthM": 1200,
       "widthM": 30,
       "lat": -17.8308,
@@ -37876,7 +37876,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 72.3,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 5.8658,
@@ -37889,7 +37889,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 71.9,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 5.6131,
@@ -37902,7 +37902,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 72.5,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 5.9556,
@@ -37915,7 +37915,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 72.4,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 5.8417,
@@ -37928,7 +37928,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 71.7,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 4.2858,
@@ -37941,7 +37941,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 71.3,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 3.6136,
@@ -37954,7 +37954,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 73,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 2.4833,
@@ -37967,7 +37967,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 73.1,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 6.3589,
@@ -37980,7 +37980,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 73.6,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 5.7083,
@@ -37993,7 +37993,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 73.3,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 4.65,
@@ -38006,7 +38006,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 73.1,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 5.2728,
@@ -38019,7 +38019,7 @@
     {
       "ident": "09",
       "identReciprocal": "27",
-      "headingTrueDeg": 90,
+      "headingTrueDeg": 74.7,
       "lengthM": 1200,
       "widthM": 30,
       "lat": 16.2578,

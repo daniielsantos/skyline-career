@@ -21,6 +21,7 @@ import {
   warehouseFreeKg,
   warehouseInboundTransferTicks,
   playerWarehouseSnapshot,
+  MIN_WAREHOUSE_INBOUND_KG,
 } from './career-warehouse.js';
 import {
   logisticsMultForWarehouse,
@@ -45,6 +46,7 @@ import {
   portStockPriceFactor,
   recentPortThroughputKg,
   PORT_OPERATOR_PRICE_MULT,
+  healMissingPortConcessionFromLedger,
   syncWorldPortConcessions,
   tickPortConcessions,
 } from './career-port-concessions.js';
@@ -2355,7 +2357,10 @@ export function buyPortListing(
   creditPortOperatorThroughput(state, world, listing.portId, qty);
 
   const wh = findPlayerWarehouseAtIcao(state, hub);
-  const free = wh ? warehouseInboundFreeKg(state, wh.id) : 0;
+  const freeRaw = wh ? warehouseInboundFreeKg(state, wh.id) : 0;
+  // Tiny free slots would show as Mass 0.0 klb in transit — treat as full → yard.
+  const free =
+    freeRaw >= MIN_WAREHOUSE_INBOUND_KG ? freeRaw : 0;
   const inboundKg = wh ? Math.min(qty, Math.max(0, free)) : 0;
   const yardKg = qty - inboundKg;
   const logisticsMult = wh ? logisticsMultForWarehouse(state, wh.id) : 1;
@@ -2731,6 +2736,7 @@ export function portSnapshot(
   autoBuyOrders: NonNullable<CareerMissionsState['portAutoBuyOrders']>;
 } {
   if (state) {
+    healMissingPortConcessionFromLedger(state, world);
     expireDemandHolds(state, world);
     tickPortConcessions(state, world);
     syncWorldPortConcessions(world, state);

@@ -1,6 +1,7 @@
-import type { AircraftClass, CareerClassOps } from './api';
+import type { CareerClassOps } from './api';
 import {
   CLASS_OPS_PROGRESS_IDS,
+  classOpsNextUnlock,
   classOpsUnlockProgress,
 } from './class-ops-unlock';
 
@@ -21,35 +22,79 @@ export function ClassOpsPanel(props: {
     );
   }
 
+  const next = classOpsNextUnlock(ops);
+  const unlockedCount = CLASS_OPS_PROGRESS_IDS.filter(
+    (id) => classOpsUnlockProgress(ops, id).unlocked,
+  ).length;
+
   return (
     <section className="cargo-ops-panel class-ops-panel" aria-label="Class Ops">
       <h3>Class Ops</h3>
-      <p className="muted">
-        Starters are open. Jet or Medium unlock Narrow; Narrow unlocks Wide.
-        Contract crew flights count — empty ferry / reposition legs do not.
+      <p className="muted cargo-ops-lede">
+        Starters (Light GA / turboprop) are always open. Jet or Medium unlocks
+        Narrow; Narrow unlocks Wide. Contract crew flights count — empty ferry /
+        reposition legs do not.
       </p>
+
+      <p className="class-ops-status-line" role="status">
+        <strong>
+          {unlockedCount}/{CLASS_OPS_PROGRESS_IDS.length}
+        </strong>{' '}
+        ladder classes unlocked
+        <span className="muted">
+          {' '}
+          · starters always open
+        </span>
+      </p>
+
+      {next ? (
+        <div className="cargo-ops-next" aria-label="Next class unlock">
+          <p className="cargo-ops-next-label">Next unlock</p>
+          <p className="cargo-ops-next-title">{next.label}</p>
+          <p className="muted cargo-ops-next-lede">{next.summary}</p>
+        </div>
+      ) : (
+        <p className="cargo-ops-all-open muted">All freighter classes unlocked.</p>
+      )}
+
       <ul className="cargo-ops-tiers">
         {CLASS_OPS_PROGRESS_IDS.map((id) => {
-          const progress = classOpsUnlockProgress(ops, id as AircraftClass);
+          const progress = classOpsUnlockProgress(ops, id);
+          const isNext = next?.classId === id;
           return (
             <li
               key={id}
-              className={
-                progress.unlocked
-                  ? 'cargo-ops-tier open'
-                  : 'cargo-ops-tier locked'
-              }
+              className={[
+                'cargo-ops-tier',
+                'class-ops-tier',
+                progress.unlocked ? 'open' : 'locked',
+                isNext ? 'is-next' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
               <div className="cargo-ops-tier-head">
-                <strong>
-                  {progress.unlocked ? '●' : '○'} {progress.label}
-                </strong>
-                {!progress.unlocked ? (
-                  <span className="cargo-ops-lock">Locked</span>
-                ) : null}
+                <div className="cargo-ops-tier-title">
+                  <strong>{progress.label}</strong>
+                  {progress.unlocked ? (
+                    <span className="class-ops-badge open">Unlocked</span>
+                  ) : isNext ? (
+                    <span className="cargo-ops-next-tag">Working toward</span>
+                  ) : (
+                    <span className="class-ops-badge locked">Locked</span>
+                  )}
+                </div>
               </div>
               {progress.summary ? (
-                <p className="cargo-ops-progress muted">{progress.summary}</p>
+                <p
+                  className={
+                    progress.unlocked
+                      ? 'cargo-ops-progress class-ops-stats'
+                      : 'cargo-ops-progress muted'
+                  }
+                >
+                  {progress.summary}
+                </p>
               ) : null}
             </li>
           );

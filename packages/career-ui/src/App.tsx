@@ -294,6 +294,7 @@ import {
 } from './weight-units';
 import {
   loadUiSoundMode,
+  playFlightSettledSound,
   playUiSound,
   saveUiSoundMode,
   type UiSoundMode,
@@ -4609,7 +4610,7 @@ export function App() {
           if (justSettled && status.settlement && status.missionId) {
             const settledMission = activeMissionRef.current;
             const settledId = status.missionId;
-            queueMicrotask(() => playUiSound('flight_settled'));
+            queueMicrotask(() => playFlightSettledSound(settledId));
             const debrief =
               settledMission && settledMission.id === settledId
                 ? buildFlightDebrief({
@@ -9526,7 +9527,7 @@ export function App() {
         mission: result.mission.fuelUplift ? result.mission : mission,
         settlement: result.settlement,
       });
-      playUiSound('flight_settled');
+      playFlightSettledSound(mission.id);
       setFlightDebrief(debrief);
       setSettleOverlaySticky(false);
       setStaging(null);
@@ -15891,9 +15892,9 @@ export function App() {
             <div className="settings-card">
               <h3>Sound</h3>
               <p className="settings-help">
-                Short cues when Preflight is ready and when a flight settles.
-                Voice uses the browser speech engine (usually Portuguese on this
-                PC). No looping alerts.
+                Cues when Preflight is ready and when a flight settles. Voice
+                uses short English cockpit-style callouts (not a live GPWS
+                rip). No looping alerts.
               </p>
               <div className="settings-choice" role="radiogroup" aria-label="UI sounds">
                 {(

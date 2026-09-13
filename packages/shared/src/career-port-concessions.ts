@@ -133,9 +133,35 @@ export function syncWorldPortConcessions(
   world: CareerEconomyWorld,
   state: CareerMissionsState,
 ): void {
-  const live = ensurePlayerPortConcessions(state).filter(
+  let live = ensurePlayerPortConcessions(state).filter(
     (c) => c.leasePaidThroughTick > world.tick,
   );
+  // Heal: company normalize used to drop playerPortConcessions on save while the
+  // world index still had the row — restore before wiping the index.
+  if (live.length === 0) {
+    const orphans = (world.portConcessions ?? []).filter(
+      (c) =>
+        c.companyId === LOCAL_COMPANY_ID &&
+        c.leasePaidThroughTick > world.tick,
+    );
+    if (orphans.length > 0) {
+      const bag = ensurePlayerPortConcessions(state);
+      for (const row of orphans) {
+        bag.push({
+          portId: row.portId,
+          companyId: row.companyId,
+          level: row.level === 2 || row.level === 3 ? row.level : 1,
+          claimedAtTick: Math.max(
+            0,
+            row.leasePaidThroughTick - PORT_CONCESSION_LEASE_TICKS,
+          ),
+          leasePaidThroughTick: row.leasePaidThroughTick,
+          lifetimeThroughputKg: 0,
+        });
+      }
+      live = bag.filter((c) => c.leasePaidThroughTick > world.tick);
+    }
+  }
   world.portConcessions = live.map(
     (c): PortConcessionIndexRow => ({
       portId: c.portId,
@@ -144,6 +170,96 @@ export function syncWorldPortConcessions(
       level: c.level === 2 || c.level === 3 ? c.level : 1,
     }),
   );
+}
+
+/**
+ * Rebuild Port FBO from ledger when claim was debited but company JSON dropped
+ * the concession (normalize bug). Restores if lease window still open; otherwise
+ * refunds CAPEX+lease once.
+ */
+export function healMissingPortConcessionFromLedger(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+): 'restored' | 'refunded' | 'none' {
+  if (
+    ensurePlayerPortConcessions(state).some(
+      (c) => c.leasePaidThroughTick > world.tick,
+    )
+  ) {
+    return 'none';
+  }
+  if (
+    (world.portConcessions ?? []).some(
+      (c) =>
+        c.companyId === LOCAL_COMPANY_ID &&
+        c.leasePaidThroughTick > world.tick,
+    )
+  ) {
+    // syncWorldPortConcessions will pull these into player state.
+    return 'none';
+  }
+
+  const ledger = state.ledger ?? [];
+  let claimIdx = -1;
+  for (let i = ledger.length - 1; i >= 0; i -= 1) {
+    const e = ledger[i];
+    if (!e || e.kind !== 'port_concession_claim') continue;
+    if ((e.note ?? '').startsWith('Refund dropped Port FBO')) continue;
+    if (e.amountUsd >= 0) continue;
+    claimIdx = i;
+    break;
+  }
+  if (claimIdx < 0) return 'none';
+  const claim = ledger[claimIdx]!;
+
+  const alreadyRefunded = ledger.some(
+    (e) =>
+      e.kind === 'port_concession_claim' &&
+      e.amountUsd > 0 &&
+      (e.note ?? '').startsWith('Refund dropped Port FBO') &&
+      e.atTick >= claim.atTick,
+  );
+  if (alreadyRefunded) return 'none';
+
+  const lease = ledger.find(
+    (e) =>
+      e.kind === 'port_concession_lease' &&
+      e.amountUsd < 0 &&
+      e.atTick === claim.atTick,
+  );
+  const hub = (claim.icao ?? '').trim().toUpperCase();
+  const port =
+    listCareerPorts().find((p) =>
+      p.pickupHubs.some((h) => h.trim().toUpperCase() === hub),
+    ) ?? null;
+  if (!port) return 'none';
+
+  const through = claim.atTick + PORT_CONCESSION_LEASE_TICKS;
+  if (through > world.tick) {
+    ensurePlayerPortConcessions(state).push({
+      portId: port.id,
+      companyId: LOCAL_COMPANY_ID,
+      level: 1,
+      claimedAtTick: claim.atTick,
+      leasePaidThroughTick: through,
+      lifetimeThroughputKg: 0,
+    });
+    syncWorldPortConcessions(world, state);
+    return 'restored';
+  }
+
+  const refund = money(
+    Math.abs(claim.amountUsd) + Math.abs(lease?.amountUsd ?? 0),
+  );
+  if (refund <= 0) return 'none';
+  applyWalletDelta(state, {
+    amountUsd: refund,
+    kind: 'port_concession_claim',
+    atTick: world.tick,
+    icao: hub || port.pickupHubs[0],
+    note: `Refund dropped Port FBO · ${port.name}`,
+  });
+  return 'refunded';
 }
 
 export function findActivePortOperator(

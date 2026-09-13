@@ -19,6 +19,12 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 | **Airport FBO** (`career-fbo.ts`) | Base em hub: CAPEX, bonded holds, parking/fuel perk, reroute | Spot já morto; holds ainda pedem **você** voar. Duplica WH como “storage story” |
 | **Lease-out** (Market) | NPC aluga sua cauda → weekly + wear simulado | **Renda aérea passiva** — o “NPC voa por você” de verdade |
 
+**Persist claim (2026-09-12):** sintoma → Claim Santos OK na sessão, refresh → Vacant + Need $192.5k. Causa → `normalizeMissionsState` omitia `playerPortConcessions` no `saveMissions` (wallet debitava, JSON `[]`). Fix → preserve + heal ledger/index.
+
+**UI Port FBO tab (2026-09-12):** Ports sections = Catalog | **Port FBO** | Warehouse | Demand. Scout + desk auto-buy + port stock on Port FBO; Catalog = map + listings BUY + discharge ETA.
+
+**Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
+
 Conclusão: o desconforto não é “ter FBO”; é **dinheiro de avião sem sentar no cockpit**. Matar concession/WH seria jogar fora o endgame portuário. O corte certo é **passivo aéreo** + **não criar segundo império de FBO em hub**.
 
 ---
@@ -233,6 +239,7 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - Gates: active Port FBO; cross-hub only (same hub → Store); dest ∈ port `pickupHubs`; clamp to inbound free; wallet ≥ fee.
 - Persist: `WarehouseInboundTransfer` + optional `source: 'stevedore'`; settle via existing `settleWarehouseInboundTransfers`.
 - Ledger `port_drayage` (“Port stevedore”); API `POST /api/ports/stevedore`; yard UI **Truck → {ICAO}**.
+- **Yard row CSS (2026-09-12):** `display:flex` on `<td class="ports-pickup-actions">` clipped row background before Abandon — flex moved to inner div. Hint when WH exists at another pickup hub but no Port FBO: `· or Port FBO → Truck {ICAO}` (Santos SBGR yard + SBKP WH).
 
 ### Phase 2 — shipped
 

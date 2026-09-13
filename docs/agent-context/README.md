@@ -42,7 +42,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [22-supplies-shelf.md](./22-supplies-shelf.md) | Supplies shelf — **CLOSED** PASS (Phase A flow) |
 | [23-port-xl-warehouse.md](./23-port-xl-warehouse.md) | Port XL + WH T4 Port Bonded (porto→WH→Wide) |
 | [24-port-fbo.md](./24-port-fbo.md) | Port FBO Phase 0–10; Scout; Port shuttle; IH-1; 1ª Base free; Base Dispatcher seat + fleet scout + tour Search |
-| [25-runway-touchdown.md](./25-runway-touchdown.md) | Debrief runway: Null Island catalog → OFF runway / m left absurdo (SBCH) |
+| [25-runway-touchdown.md](./25-runway-touchdown.md) | Debrief runway: Null Island; magnetic ident×10 stubs → false OFF runway; `repair:runways:magnetic` |
 
 ## Manutenção
 

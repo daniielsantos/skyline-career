@@ -34,6 +34,7 @@ import {
   evaluatePortConcessionUpgrade,
   estimatePortInboundCargo,
   getPortInventoryStock,
+  healMissingPortConcessionFromLedger,
   isPortOperator,
   portInventoryCapKg,
   portListingSlotCap,
@@ -47,7 +48,11 @@ import {
   createSeedEconomyWorld,
   migrateEconomyWorld,
 } from './career-economy.js';
-import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import {
+  emptyMissionsStateV2,
+  normalizeMissionsState,
+  selectStarterHub,
+} from './career-fleet.js';
 import { ensurePlayerWarehouses } from './career-warehouse.js';
 
 function missionsAtSantos() {
@@ -346,5 +351,32 @@ describe('port concessions', () => {
     });
     assert.ok(bought.unitPriceUsd <= listing!.unitPriceUsd * 0.91);
     assert.ok(bought.unitPriceUsd >= listing!.unitPriceUsd * 0.85);
+  });
+
+  it('normalizeMissionsState keeps Port FBO after claim (persist regression)', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state);
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(state.playerPortConcessions?.length, 1);
+    const normalized = normalizeMissionsState(
+      state as unknown as Record<string, unknown>,
+    );
+    assert.equal(normalized.playerPortConcessions?.length, 1);
+    assert.equal(normalized.playerPortConcessions?.[0]?.portId, 'BRSSZ');
+  });
+
+  it('heals Port FBO from ledger when company JSON dropped the row', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state);
+    const beforeWallet = state.walletUsd;
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    assert.ok(state.walletUsd < beforeWallet);
+    // Simulate the normalize bug wiping company concessions after debit.
+    state.playerPortConcessions = [];
+    world.portConcessions = [];
+    const healed = healMissingPortConcessionFromLedger(state, world);
+    assert.equal(healed, 'restored');
+    assert.equal(state.playerPortConcessions?.length, 1);
+    assert.equal(isPortOperator(world, 'BRSSZ'), true);
   });
 });

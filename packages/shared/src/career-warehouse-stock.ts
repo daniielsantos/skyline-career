@@ -50,6 +50,12 @@ export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3 | 4, number> = {
   4: 45_000,
 };
 
+/**
+ * Skip port→WH inbound when free room is below this (put that kg in yard instead).
+ * UI imperial rounds &lt;~23 kg to `0.0 klb` — tiny inbounds looked like ghost rows.
+ */
+export const MIN_WAREHOUSE_INBOUND_KG = 25;
+
 /** Legacy caps before klb-literal T1/T2/T3 (5 t / 12 t). */
 const LEGACY_WAREHOUSE_T1_CAP_KG = 5_000;
 const LEGACY_WAREHOUSE_T2_CAP_KG = 12_000;

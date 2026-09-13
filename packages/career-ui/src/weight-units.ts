@@ -50,6 +50,34 @@ export function displayToKg(value: number, system: WeightSystem): number {
   return system === 'imperial' ? value / KG_TO_LB : value;
 }
 
+/**
+ * Floored display input → stored kg, capped at `maxKg`.
+ * When the input is the floored display of `maxKg` (or any `snapKg`), return that
+ * exact kg — imperial Max otherwise leaves ~1 kg (~2 lb) dust forever.
+ */
+export function displayAmountToStoredKg(
+  displayAmount: number,
+  system: WeightSystem,
+  maxKg: number,
+  snapKg: readonly number[] = [],
+): number {
+  const display = Math.max(0, Math.floor(Number(displayAmount) || 0));
+  const max = Math.max(0, Math.floor(maxKg));
+  if (display <= 0 || max <= 0) return 0;
+
+  const snaps = [...snapKg, max]
+    .map((k) => Math.max(0, Math.floor(k)))
+    .filter((k) => k > 0 && k <= max)
+    .sort((a, b) => b - a);
+
+  for (const snap of snaps) {
+    if (display >= Math.floor(kgToDisplay(snap, system))) {
+      return snap;
+    }
+  }
+  return Math.min(max, Math.max(0, Math.floor(displayToKg(display, system))));
+}
+
 /** Bulk cargo / fuel label: metric tonnes or imperial thousands of pounds. */
 export function formatMass(kg: number, system: WeightSystem = 'metric'): string {
   if (!Number.isFinite(kg)) return system === 'imperial' ? '0.0 klb' : '0.0 t';
@@ -57,6 +85,20 @@ export function formatMass(kg: number, system: WeightSystem = 'metric'): string 
     return `${(kgToDisplay(kg, system) / 1000).toFixed(1)} klb`;
   }
   return `${(kg / 1000).toFixed(1)} t`;
+}
+
+/**
+ * Prefer exact lb/kg when bulk format would show `0.0` (dust piles ~1–22 kg).
+ */
+export function formatMassPreferExact(
+  kg: number,
+  system: WeightSystem = 'metric',
+): string {
+  const bulk = formatMass(kg, system);
+  if (bulk.startsWith('0.0 ') && kg > 0) {
+    return formatMassExact(kg, system);
+  }
+  return bulk;
 }
 
 /** Freights Load filter steps — labels match the board mass unit. */

@@ -7,10 +7,12 @@ import {
   pickNearestRunway,
   pickBestRunway,
   projectOntoRunway,
+  bestRunwayProjection,
   evaluateRunwayTouchdown,
   pickFirstContactCoords,
   formatRunwayTouchdownLine,
   isUsableRunwayCenter,
+  headingDeltaDeg,
   type CareerRunway,
 } from './career-runways.js';
 
@@ -122,6 +124,45 @@ describe('evaluateRunwayTouchdown', () => {
     const landing36 = evaluateRunwayTouchdown('KCLT', lat, lon, 356);
     assert.ok(landing36);
     assert.equal(landing36!.landingEnd, 'reciprocal');
+  });
+
+  it('uses aircraft true heading when catalog heading is a magnetic stub', () => {
+    // SBKG-like: center OK, catalog heading = ident×10 (150) instead of true ~125.
+    const stub: CareerRunway = {
+      ident: '15',
+      identReciprocal: '33',
+      headingTrueDeg: 150,
+      lengthM: 1565,
+      widthM: 42.1,
+      lat: -7.269662,
+      lon: -35.896057,
+      surface: 'asphalt',
+      lighted: false,
+    };
+    const trueHdg = (125 * Math.PI) / 180;
+    const pastThr = 431;
+    const alongM = pastThr - stub.lengthM / 2;
+    const latRad = (stub.lat * Math.PI) / 180;
+    const mPerDegLat = 111_320;
+    const mPerDegLon = 111_320 * Math.cos(latRad);
+    const lat = stub.lat + (alongM * Math.cos(trueHdg)) / mPerDegLat;
+    const lon = stub.lon + (alongM * Math.sin(trueHdg)) / mPerDegLon;
+
+    const withStubOnly = projectOntoRunway(stub, lat, lon);
+    assert.equal(withStubOnly.onPavement, false);
+    assert.ok(Math.abs(withStubOnly.lateralM) > 100);
+
+    const { proj } = bestRunwayProjection(stub, lat, lon, 125);
+    assert.equal(proj.onPavement, true);
+    assert.ok(Math.abs(proj.lateralM) < 15);
+    assert.ok(Math.abs(proj.pastThresholdM - pastThr) < 25);
+  });
+
+  it('SBKG catalog heading is true (~125), not magnetic 150', () => {
+    const rwy = getAirportRunways('SBKG')[0];
+    assert.ok(rwy);
+    assert.ok(headingDeltaDeg(rwy!.headingTrueDeg, 125) < 5);
+    assert.ok(headingDeltaDeg(rwy!.headingTrueDeg, 150) > 15);
   });
 });
 

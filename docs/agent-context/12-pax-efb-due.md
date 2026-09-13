@@ -83,7 +83,7 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 |-----|---------------|--------|
 | `workingtitle-cessna-citation-cj4` | 10 | Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax baggage dispatch allowance. Inject not live-certified |
 | `workingtitle-cessna-citation-longitude-passengers` | 12 | Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax. Inject not live-certified |
-| `skyward-cessna-c680` | 12 | `inject_verified` + `efbPaxWeightLb: 210` (2026-09-12). Live = S3–S12 cabin + **S13** bags; **S14–S16** Import ghosts omitted. Charter Inject seeds N×210 + bags. |
+| `skyward-cessna-c680` | 12 | `inject_verified` + `efbPaxWeightLb: 210` (2026-09-12). Live = S3–S12 cabin + **S13** bags; **S14–S16** Import ghosts omitted. Charter Inject seeds N×210 + bags. **Freight/haul (2026-09-12):** mission.pax stays 0 while Dispatch fills SimBrief seats — Watch Due must use OFP `passengerCount` / estimate (`resolveOfpPassengerCountForEfbDue`), not mission 0, or Due=OFP@175 while EFB Import@210 (Δ=N×35; live 2309→2659). |
 | `flightfx-citation-x` | 12 | Passenger/Winglets shared pack `dispatch_ready`; 2 crew. Inject not live-certified |
 | `flightfx-mg-hjet-ha420` | 5 | Passenger pack `dispatch_ready`; 2 crew / 5 cabin stations. Inject not live-certified |
 | `flysimware-learjet-35a-cargo` | 8 | One family SKU: cargo packs = 0 pax; Passenger + Passenger LR `dispatch_ready`; inject not live-certified |

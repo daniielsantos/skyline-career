@@ -41,6 +41,10 @@ function starterCleans(ops: CareerClassOps): number {
   );
 }
 
+function statsLine(hours: number, cleans: number): string {
+  return `${formatHours(hours)} h · ${cleans} clean settle${cleans === 1 ? '' : 's'}`;
+}
+
 export function classOpsIsUnlocked(
   ops: CareerClassOps | null | undefined,
   classId: AircraftClass,
@@ -55,17 +59,29 @@ export function classOpsUnlockProgress(
 ): { unlocked: boolean; summary: string; label: string } {
   const label = CLASS_LABEL[classId];
   if (!ops?.classes) {
-    return { unlocked: true, summary: '', label };
+    return { unlocked: true, summary: 'Open', label };
   }
   const row = ops.classes[classId];
   const unlocked = Boolean(row?.unlocked);
+  const hours = row?.hours ?? 0;
+  const cleans = row?.cleans ?? 0;
 
   if (classId === 'light_ga' || classId === 'light_turboprop') {
-    return { unlocked: true, summary: '', label };
+    return {
+      unlocked: true,
+      summary: `Starter · ${statsLine(hours, cleans)}`,
+      label,
+    };
   }
 
   if (classId === 'light_jet' || classId === 'medium_piston') {
-    if (unlocked) return { unlocked: true, summary: '', label };
+    if (unlocked) {
+      return {
+        unlocked: true,
+        label,
+        summary: statsLine(hours, cleans),
+      };
+    }
     const h = starterHours(ops);
     const c = starterCleans(ops);
     return {
@@ -76,7 +92,13 @@ export function classOpsUnlockProgress(
   }
 
   if (classId === 'narrow_freighter') {
-    if (unlocked) return { unlocked: true, summary: '', label };
+    if (unlocked) {
+      return {
+        unlocked: true,
+        label,
+        summary: statsLine(hours, cleans),
+      };
+    }
     const jet = ops.classes.light_jet;
     const med = ops.classes.medium_piston;
     const jetLine = jet?.unlocked
@@ -88,7 +110,13 @@ export function classOpsUnlockProgress(
     return { unlocked: false, label, summary: `${jetLine}  OR  ${medLine}` };
   }
 
-  if (unlocked) return { unlocked: true, summary: '', label };
+  if (unlocked) {
+    return {
+      unlocked: true,
+      label,
+      summary: statsLine(hours, cleans),
+    };
+  }
   const narrow = ops.classes.narrow_freighter;
   if (!narrow?.unlocked) {
     return { unlocked: false, label, summary: 'Unlock Narrow first' };
@@ -98,4 +126,24 @@ export function classOpsUnlockProgress(
     label,
     summary: `${formatHours(narrow.hours ?? 0)}/${WIDE.hoursRequired} h · ${narrow.cleans ?? 0}/${WIDE.cleansRequired} cleans on Narrow`,
   };
+}
+
+/** First locked ladder step the player is working toward (or null if all open). */
+export function classOpsNextUnlock(ops: CareerClassOps | null | undefined): {
+  classId: AircraftClass;
+  label: string;
+  summary: string;
+} | null {
+  if (!ops?.classes) return null;
+  for (const id of CLASS_OPS_PROGRESS_IDS) {
+    const progress = classOpsUnlockProgress(ops, id);
+    if (!progress.unlocked) {
+      return {
+        classId: id,
+        label: progress.label,
+        summary: progress.summary,
+      };
+    }
+  }
+  return null;
 }

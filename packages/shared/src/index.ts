@@ -5,6 +5,7 @@ export * from './types/ofp-compliance.js';
 export * from './types/career-economy.js';
 export * from './ofp-compliance.js';
 export * from './career-company-session.js';
+export * from './career-companies.js';
 export * from './career-world-tick-service.js';
 export * from './career-clock.js';
 export * from './career-economy.js';

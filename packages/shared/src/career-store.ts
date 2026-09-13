@@ -51,6 +51,7 @@ import {
   replaceNpcFlights,
   replaceEconomyEvents,
   stripEconomyHotArrays,
+  LOCAL_COMPANY_ID,
 } from './career-store-v3.js';
 import {
   countAirportRows,
@@ -125,6 +126,16 @@ import type {
   PortConcessionIndexRow,
   PortListing,
 } from './types/career-economy.js';
+import type { OfflineFeeSummary } from './career-offline-fees.js';
+import {
+  ensureCompany,
+  listCompaniesForWorld,
+  type CareerCompanyRow,
+  type EnsureCompanyOpts,
+} from './career-companies.js';
+import {
+  settleAllCompaniesPassiveFees,
+} from './career-company-session.js';
 
 export type CareerStoreKind = 'json' | 'sqlite';
 
@@ -198,8 +209,49 @@ export interface CareerStore {
     world: CareerEconomyWorld,
     opts: PersistCommandWorldSliceOpts,
   ): Promise<void>;
-  loadMissions(): Promise<CareerMissionsState>;
-  saveMissions(state: CareerMissionsState): Promise<void>;
+  loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState>;
+  saveMissions(
+    state: CareerMissionsState,
+    opts?: { companyId?: string },
+  ): Promise<void>;
+  /** Active company tenant for load/save (SP default `local`). */
+  getActiveCompanyId(): string;
+  setActiveCompanyId(companyId: string): void;
+  /** Companies registered on a world (SQLite); JSON store returns `local` only. */
+  listWorldCompanies(worldId?: string): Array<{
+    id: string;
+    displayName: string;
+    homeHubIcao: string;
+    homeCountryId: string;
+    worldId: string;
+    createdAtMs: number;
+  }>;
+  /** Upsert a company row on the shared world (no-op / throw on JSON for non-local). */
+  ensureCompany(opts: {
+    id: string;
+    worldId?: string;
+    displayName?: string;
+    homeHubIcao?: string;
+    homeCountryId?: string;
+  }): {
+    id: string;
+    displayName: string;
+    homeHubIcao: string;
+    homeCountryId: string;
+    worldId: string;
+    createdAtMs: number;
+  };
+  /**
+   * Pulse settle-all companies on the world (SQLite). JSON: settles active only via caller.
+   * Returns preferred (active) company fee summary when present.
+   */
+  settleWorldCompaniesPassiveFees?(opts: {
+    world: CareerEconomyWorld;
+    fromTick: number;
+    toTick: number;
+    worldId?: string;
+    nowMs?: number;
+  }): OfflineFeeSummary | null;
   /** In-process world after last load/save — skip blob parse on hot reads. */
   peekEconomyWorld(): CareerEconomyWorld | null;
   /** Schema v4: hub + stock + lots by ICAO. JSON store uses RAM if present. */
@@ -327,10 +379,52 @@ async function persistClHubIdentRemaps(
 class JsonCareerStore implements CareerStore {
   readonly kind = 'json' as const;
   private ram: CareerEconomyWorld | null = null;
+  private activeCompanyId = LOCAL_COMPANY_ID;
   constructor(
     private readonly economyPath: string,
     private readonly missionsPath: string,
   ) {}
+
+  getActiveCompanyId(): string {
+    return this.activeCompanyId;
+  }
+
+  setActiveCompanyId(companyId: string): void {
+    const id = companyId.trim() || LOCAL_COMPANY_ID;
+    if (id !== LOCAL_COMPANY_ID) {
+      throw new Error('JSON career store only supports company id "local"');
+    }
+    this.activeCompanyId = LOCAL_COMPANY_ID;
+  }
+
+  listWorldCompanies(worldId?: string): CareerCompanyRow[] {
+    void worldId;
+    return [
+      {
+        id: LOCAL_COMPANY_ID,
+        displayName: '',
+        homeHubIcao: '',
+        homeCountryId: '',
+        worldId: LOCAL_WORLD_ID,
+        createdAtMs: 0,
+      },
+    ];
+  }
+
+  ensureCompany(opts: EnsureCompanyOpts): CareerCompanyRow {
+    const id = opts.id.trim() || LOCAL_COMPANY_ID;
+    if (id !== LOCAL_COMPANY_ID) {
+      throw new Error('JSON career store only supports company id "local"');
+    }
+    return {
+      id: LOCAL_COMPANY_ID,
+      displayName: opts.displayName ?? '',
+      homeHubIcao: opts.homeHubIcao ?? '',
+      homeCountryId: opts.homeCountryId ?? '',
+      worldId: opts.worldId?.trim() || LOCAL_WORLD_ID,
+      createdAtMs: Date.now(),
+    };
+  }
 
   peekEconomyWorld(): CareerEconomyWorld | null {
     return this.ram;
@@ -495,7 +589,7 @@ class JsonCareerStore implements CareerStore {
     return [];
   }
 
-  async loadMissions(): Promise<CareerMissionsState> {
+  async loadMissions(_opts?: { companyId?: string }): Promise<CareerMissionsState> {
     const existing = await readJsonFile<Record<string, unknown>>(this.missionsPath);
     if (existing && Array.isArray(existing.missions)) {
       const normalized = normalizeMissions(existing);
@@ -517,7 +611,10 @@ class JsonCareerStore implements CareerStore {
     return fresh;
   }
 
-  async saveMissions(state: CareerMissionsState): Promise<void> {
+  async saveMissions(
+    state: CareerMissionsState,
+    _opts?: { companyId?: string },
+  ): Promise<void> {
     await writeJsonFileAtomic(this.missionsPath, missionsPayloadForBlob(state));
   }
 
@@ -790,6 +887,7 @@ class SqliteCareerStore implements CareerStore {
   readonly kind = 'sqlite' as const;
   readonly sqlitePath: string;
   private readonly db: SqliteDb;
+  private activeCompanyId = LOCAL_COMPANY_ID;
   private ram: CareerEconomyWorld | null = null;
   /** Signatures from the last successful airport table write (not in-RAM mutations). */
   private lastAirportSignatures: Map<string, string> | null = null;
@@ -815,6 +913,54 @@ class SqliteCareerStore implements CareerStore {
   constructor(sqlitePath: string) {
     this.sqlitePath = sqlitePath;
     this.db = openSqliteDb(sqlitePath);
+  }
+
+  getActiveCompanyId(): string {
+    return this.activeCompanyId;
+  }
+
+  setActiveCompanyId(companyId: string): void {
+    const id = companyId.trim() || LOCAL_COMPANY_ID;
+    if (id === this.activeCompanyId) return;
+    this.activeCompanyId = id;
+    // Invalidate company persist caches when switching tenants.
+    this.lastCompanyPersistKey = null;
+    this.lastCompanyStateKey = null;
+    this.lastFleetPersistKey = null;
+    this.lastMissionsTableKey = null;
+    this.lastLedgerPersistKey = null;
+    this.lastMissionsStubJson = null;
+    this.lastFleetSignatures = null;
+    this.lastMissionSignatures = null;
+  }
+
+  listWorldCompanies(worldId = LOCAL_WORLD_ID): CareerCompanyRow[] {
+    return listCompaniesForWorld(this.db, worldId);
+  }
+
+  ensureCompany(opts: EnsureCompanyOpts): CareerCompanyRow {
+    return ensureCompany(this.db, {
+      ...opts,
+      worldId: opts.worldId ?? LOCAL_WORLD_ID,
+    });
+  }
+
+  settleWorldCompaniesPassiveFees(opts: {
+    world: CareerEconomyWorld;
+    fromTick: number;
+    toTick: number;
+    worldId?: string;
+    nowMs?: number;
+  }): OfflineFeeSummary | null {
+    return settleAllCompaniesPassiveFees({
+      db: this.db,
+      world: opts.world,
+      fromTick: opts.fromTick,
+      toTick: opts.toTick,
+      worldId: opts.worldId ?? LOCAL_WORLD_ID,
+      preferCompanyId: this.activeCompanyId,
+      nowMs: opts.nowMs,
+    });
   }
 
   peekEconomyWorld(): CareerEconomyWorld | null {
@@ -1252,42 +1398,56 @@ class SqliteCareerStore implements CareerStore {
     this.lastEconomyBlobJson = blobJson;
   }
 
-  async loadMissions(): Promise<CareerMissionsState> {
+  async loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState> {
+    const companyId = opts?.companyId?.trim() || this.activeCompanyId || LOCAL_COMPANY_ID;
     const row = this.db.prepare(`SELECT json FROM missions_json WHERE id = 1`).get() as
       | { json: string }
       | undefined;
-    if (!row) {
+
+    let blobNormalized = emptyMissionsStateV2();
+    if (row) {
+      let existing: Record<string, unknown>;
+      try {
+        existing = JSON.parse(row.json) as Record<string, unknown>;
+      } catch (error) {
+        throw new Error(
+          `SQLite missions_json is corrupt: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      // After v3 migrate, missions[] may be empty stub — tables are SoT.
+      const hasMissionArray = Array.isArray(existing.missions);
+      if (!hasMissionArray && !companyTablesPopulated(this.db)) {
+        throw new Error('SQLite missions_json has no missions[]; refusing to wipe career');
+      }
+      blobNormalized = normalizeMissions(
+        hasMissionArray ? existing : { ...existing, missions: [] },
+      );
+    } else if (companyId === LOCAL_COMPANY_ID) {
+      // First SP boot — seed local stub + tables.
       const fresh = emptyMissionsStateV2();
-      await this.saveMissions(fresh);
+      await this.saveMissions(fresh, { companyId });
       return fresh;
     }
-    let existing: Record<string, unknown>;
-    try {
-      existing = JSON.parse(row.json) as Record<string, unknown>;
-    } catch (error) {
-      throw new Error(
-        `SQLite missions_json is corrupt: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-    // After v3 migrate, missions[] may be empty stub — tables are SoT.
-    const hasMissionArray = Array.isArray(existing.missions);
-    if (!hasMissionArray && !companyTablesPopulated(this.db)) {
-      throw new Error('SQLite missions_json has no missions[]; refusing to wipe career');
-    }
-    const blobNormalized = normalizeMissions(
-      hasMissionArray ? existing : { ...existing, missions: [] },
-    );
-    const assembled = assembleMissionsFromTables(this.db, blobNormalized);
+
+    // Legacy missions_json blob is only meaningful for the SP `local` tenant.
+    // Non-local companies may exist before any local stub is written.
+    const fallback =
+      companyId === LOCAL_COMPANY_ID ? blobNormalized : emptyMissionsStateV2();
+    const assembled = assembleMissionsFromTables(this.db, fallback, companyId);
     return normalizeMissions(assembled as unknown as Record<string, unknown>);
   }
 
-  async saveMissions(state: CareerMissionsState): Promise<void> {
+  async saveMissions(
+    state: CareerMissionsState,
+    opts?: { companyId?: string },
+  ): Promise<void> {
+    const companyId = opts?.companyId?.trim() || this.activeCompanyId || LOCAL_COMPANY_ID;
     const normalized = missionsPayloadForBlob(state);
     const ledger = normalized.ledger ?? [];
     normalized.ledger = ledger;
-    const persistKey = JSON.stringify(normalized);
+    const persistKey = `${companyId}:${JSON.stringify(normalized)}`;
     if (persistKey === this.lastCompanyPersistKey) {
       return;
     }
@@ -1302,17 +1462,20 @@ class SqliteCareerStore implements CareerStore {
     });
     const stub = missionsBlobStub(normalized);
     const json = JSON.stringify(stub);
-    const stubDirty = json !== this.lastMissionsStubJson;
+    const stubDirty =
+      companyId === LOCAL_COMPANY_ID && json !== this.lastMissionsStubJson;
     const companyStateDirty = companyStateKey !== this.lastCompanyStateKey;
     const fleetDirty = fleetKey !== this.lastFleetPersistKey;
     const missionsDirty = missionsKey !== this.lastMissionsTableKey;
     const ledgerDirty = ledgerKey !== this.lastLedgerPersistKey;
     const now = Date.now();
     runInTransaction(this.db, () => {
-      ensureLocalCompany(this.db, {
-        displayName: normalized.pilotName || '',
-        homeHubIcao: normalized.homeHubIcao || '',
-      });
+      if (companyId === LOCAL_COMPANY_ID) {
+        ensureLocalCompany(this.db, {
+          displayName: normalized.pilotName || '',
+          homeHubIcao: normalized.homeHubIcao || '',
+        });
+      }
       if (stubDirty) {
         this.db
           .prepare(
@@ -1322,20 +1485,23 @@ class SqliteCareerStore implements CareerStore {
           .run(json, now);
       }
       persistCompanyTables(this.db, normalized, {
+        companyId,
         companyState: companyStateDirty,
         fleet: fleetDirty,
         missions: missionsDirty,
         previousFleet: this.lastFleetSignatures,
         previousMissions: this.lastMissionSignatures,
       });
-      if (ledgerDirty) persistLedgerIncremental(this.db, ledger);
+      if (ledgerDirty) persistLedgerIncremental(this.db, ledger, companyId);
     });
     this.lastCompanyPersistKey = persistKey;
     this.lastCompanyStateKey = companyStateKey;
     this.lastFleetPersistKey = fleetKey;
     this.lastMissionsTableKey = missionsKey;
     this.lastLedgerPersistKey = ledgerKey;
-    this.lastMissionsStubJson = json;
+    if (companyId === LOCAL_COMPANY_ID) {
+      this.lastMissionsStubJson = json;
+    }
     if (fleetDirty) {
       this.lastFleetSignatures = fleetSignatureMap(normalized.fleet ?? []);
     }
@@ -1345,7 +1511,7 @@ class SqliteCareerStore implements CareerStore {
   }
 
   async loadLedger(): Promise<CareerLedgerEntry[]> {
-    const fromTable = readLedgerRowsV3(this.db);
+    const fromTable = readLedgerRowsV3(this.db, this.activeCompanyId);
     if (fromTable.length > 0) return fromTable;
     const missions = await this.loadMissions();
     return missions.ledger ?? [];

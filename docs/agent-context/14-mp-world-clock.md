@@ -1,6 +1,6 @@
 # MP world clock — esboço server/client
 
-Atualizado 2026-08-28. **Não é spec de implementação** — contrato alvo para quando MP existir.
+Atualizado 2026-09-13. **Não é spec de implementação** — contrato alvo para quando MP existir.
 Complementa: [08-economy.md](./08-economy.md), [11-persist-commands.md](./11-persist-commands.md),
 `.cursor/rules/career-economy-roadmap.mdc` (*Company tenant contract*).
 
@@ -185,7 +185,8 @@ interface WorldTickService {
 
 1. ~~MP stub `RemoteWorldTickService` + SP HTTP clock/session~~ — Phase 1 shipped.
 2. ~~Phase 2 headless pulse~~ — shipped (boot resume + `/api/world/pulse`).
-3. Phase 3+: real remote host + N companies.
+3. ~~Phase 3 company registry + shared world_id~~ — shipped 2026-09-13 (no OAuth).
+4. Phase 4+: live `RemoteWorldTickService` client; desligar catch-up no client.
 
 ## Phase 2 notes (2026-09-13)
 
@@ -193,6 +194,15 @@ interface WorldTickService {
 - Opt out: `CAREER_HEADLESS_PULSE=0` (or `false` / `off`).
 - `POST /api/world/pulse` `{ n?: 1..96 }` — explicit advance for ops/debug (needs profile loaded).
 - Still one company per SP save DB; true shared world DB without a company session remains Phase 3.
+
+## Phase 3 notes (2026-09-13)
+
+- `packages/shared/src/career-companies.ts` — `ensureCompany` / `listCompaniesForWorld` / `resolveCompanyId` (no OAuth; caller supplies ids).
+- Store: `getActiveCompanyId` / `setActiveCompanyId`; `loadMissions`/`saveMissions`/`ledger` take optional `companyId` (legacy `missions_json` stub only for `local`).
+- Pulse catch-up: `applyCompanySessionSettlement({ allCompanies: true })` → `settleWorldCompaniesPassiveFees` bills every company on the world.
+- HTTP: `GET|POST /api/companies`; Accept + session/open honor `X-Skyline-Company-Id` or body `companyId`.
+- Dual-company Accept conflict covered in `career-companies.test.ts`.
+- Auth/OAuth still non-goal; Phase 4 is remote client clock.
 
 ### MP client stub
 
@@ -217,7 +227,7 @@ class RemoteWorldTickService implements WorldTickService {
 | **0** | shipped | `WorldTickService` + `LocalWorldTickService`; pulse/login; `lastSeenTick` + offline fees; command slices; soft-hold L2+ |
 | **1** | shipped 2026-09-13 | `claimedByCompanyId` on lots; Accept → `409 lot_claimed`; `GET /api/world/clock`; `POST /api/companies/session/open`; `RemoteWorldTickService` stub (client never `advance`) |
 | **2** | shipped 2026-09-13 | Headless pulse: API `listen` resumes last-played profile + starts tick with **zero UI clients**; `POST /api/world/pulse`; opt-out `CAREER_HEADLESS_PULSE=0` |
-| **3** | backlog | Auth multi-company + shared `world_id` |
+| **3** | shipped 2026-09-13 | Company registry (`career-companies.ts`); N companies / `world_id`; store load/save/ledger scoped by `companyId`; Accept via `X-Skyline-Company-Id` / body; `GET|POST /api/companies`; pulse settle-all |
 | **4** | backlog | MP client `RemoteWorldTickService` live; desligar catch-up no client |
 
 1. ~~**Extrair** `WorldTickService`~~ — feito.
@@ -267,8 +277,9 @@ class RemoteWorldTickService implements WorldTickService {
 - [x] Lot claim + Accept 409 (Phase 1)
 - [x] Clock + company session HTTP mold (Phase 1)
 - [x] World tick roda com zero clients conectados (Phase 2 — last-played profile resumed on API listen)
-- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 3+)
+- [x] Company registry + N tenants / shared `world_id` (Phase 3 — no OAuth)
+- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 4 UI / remote)
 - [ ] Reconnect não chama `tickEconomyN` no processo UI (Phase 4)
-- [ ] Accept concorrente → exatamente um 200, resto 409 (Phase 3+; unit claim covered in SP)
+- [x] Accept concorrente → exatamente um 200, resto 409 (Phase 3 unit + claim path; live dual-client later)
 - [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)
 - [ ] Admin/debug tick isolado de build release MP (`POST /api/world/pulse` exists; MP gate later)

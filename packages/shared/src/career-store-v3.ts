@@ -950,6 +950,7 @@ export function ensureLocalCompany(
     homeCountryId?: string;
   },
 ): void {
+  // Lazy import avoided — keep SP bootstrap inline-compatible via career-companies.
   const now = Date.now();
   const existing = db.prepare(`SELECT id FROM companies WHERE id = ?`).get(LOCAL_COMPANY_ID) as
     | { id: string }
@@ -960,12 +961,14 @@ export function ensureLocalCompany(
         `UPDATE companies SET
            display_name = COALESCE(NULLIF(?, ''), display_name),
            home_hub_icao = COALESCE(NULLIF(?, ''), home_hub_icao),
-           home_country_id = COALESCE(NULLIF(?, ''), home_country_id)
+           home_country_id = COALESCE(NULLIF(?, ''), home_country_id),
+           world_id = COALESCE(world_id, ?)
          WHERE id = ?`,
       ).run(
         opts.displayName ?? '',
         opts.homeHubIcao ?? '',
         opts.homeCountryId ?? '',
+        LOCAL_WORLD_ID_V3,
         LOCAL_COMPANY_ID,
       );
     }
@@ -1413,12 +1416,34 @@ export function readMissionsTable(db: SqliteDb, companyId: string): MissionInten
   });
 }
 
-export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): void {
+export function upsertCompanyState(
+  db: SqliteDb,
+  state: CareerMissionsState,
+  companyId: string = LOCAL_COMPANY_ID,
+): void {
   const now = Date.now();
-  ensureLocalCompany(db, {
-    displayName: state.pilotName || '',
-    homeHubIcao: state.homeHubIcao || '',
-  });
+  const cid = companyId.trim() || LOCAL_COMPANY_ID;
+  if (cid === LOCAL_COMPANY_ID) {
+    ensureLocalCompany(db, {
+      displayName: state.pilotName || '',
+      homeHubIcao: state.homeHubIcao || '',
+    });
+  } else {
+    const row = db.prepare(`SELECT id FROM companies WHERE id = ?`).get(cid) as
+      | { id: string }
+      | undefined;
+    if (!row) {
+      throw new Error(`Unknown company ${cid} — create it before saving state`);
+    }
+    if (state.pilotName || state.homeHubIcao) {
+      db.prepare(
+        `UPDATE companies SET
+           display_name = COALESCE(NULLIF(?, ''), display_name),
+           home_hub_icao = COALESCE(NULLIF(?, ''), home_hub_icao)
+         WHERE id = ?`,
+      ).run(state.pilotName ?? '', state.homeHubIcao ?? '', cid);
+    }
+  }
   db.prepare(
     `INSERT INTO company_state (
        company_id, wallet_usd, pilot_name, pilot_icao, hub_selected,
@@ -1466,7 +1491,7 @@ export function upsertCompanyState(db: SqliteDb, state: CareerMissionsState): vo
        last_seen_tick = excluded.last_seen_tick,
        updated_at_ms = excluded.updated_at_ms`,
   ).run({
-    company_id: LOCAL_COMPANY_ID,
+    company_id: cid,
     wallet_usd: sqlVal(state.walletUsd) ?? 0,
     pilot_name: sqlVal(state.pilotName) ?? '',
     pilot_icao: sqlVal(state.pilotIcao) ?? '',
@@ -1744,6 +1769,7 @@ export function persistCompanyTables(
   db: SqliteDb,
   state: CareerMissionsState,
   opts?: {
+    companyId?: string;
     companyState?: boolean;
     fleet?: boolean;
     missions?: boolean;
@@ -1751,11 +1777,12 @@ export function persistCompanyTables(
     previousMissions?: Map<string, string> | null;
   },
 ): void {
-  if (opts?.companyState !== false) upsertCompanyState(db, state);
+  const companyId = opts?.companyId?.trim() || LOCAL_COMPANY_ID;
+  if (opts?.companyState !== false) upsertCompanyState(db, state, companyId);
   if (opts?.fleet !== false) {
     persistFleetIncremental(
       db,
-      LOCAL_COMPANY_ID,
+      companyId,
       state.fleet ?? [],
       opts?.previousFleet ?? null,
     );
@@ -1763,7 +1790,7 @@ export function persistCompanyTables(
   if (opts?.missions !== false) {
     persistMissionsIncremental(
       db,
-      LOCAL_COMPANY_ID,
+      companyId,
       state.missions ?? [],
       opts?.previousMissions ?? null,
     );
@@ -1773,9 +1800,11 @@ export function persistCompanyTables(
 export function assembleMissionsFromTables(
   db: SqliteDb,
   blobFallback: CareerMissionsState,
+  companyId: string = LOCAL_COMPANY_ID,
 ): CareerMissionsState {
-  const scalars = readCompanyStateScalars(db, LOCAL_COMPANY_ID);
-  const ledgerRows = readLedgerRowsV3(db);
+  const cid = companyId.trim() || LOCAL_COMPANY_ID;
+  const scalars = readCompanyStateScalars(db, cid);
+  const ledgerRows = readLedgerRowsV3(db, cid);
   const ledger =
     ledgerRows.length > 0 ? ledgerRows : (blobFallback.ledger ?? []);
 
@@ -1784,13 +1813,13 @@ export function assembleMissionsFromTables(
     const merged: CareerMissionsState = {
       ...blobFallback,
       ...scalars,
-      fleet: readFleetAircraft(db, LOCAL_COMPANY_ID),
-      missions: readMissionsTable(db, LOCAL_COMPANY_ID),
+      fleet: readFleetAircraft(db, cid),
+      missions: readMissionsTable(db, cid),
       ledger,
     };
     const company = db
       .prepare(`SELECT home_hub_icao, display_name FROM companies WHERE id = ?`)
-      .get(LOCAL_COMPANY_ID) as
+      .get(cid) as
       | { home_hub_icao: string; display_name: string }
       | undefined;
     if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
@@ -1806,13 +1835,19 @@ export function assembleMissionsFromTables(
   };
 }
 
-export function readLedgerRowsV3(db: SqliteDb): CareerLedgerEntry[] {
+export function readLedgerRowsV3(
+  db: SqliteDb,
+  companyId: string = LOCAL_COMPANY_ID,
+): CareerLedgerEntry[] {
+  const cid = companyId.trim() || LOCAL_COMPANY_ID;
   const rows = db
     .prepare(
       `SELECT id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao
-       FROM ledger ORDER BY at_tick ASC, id ASC`,
+       FROM ledger
+       WHERE company_id = ? OR (company_id IS NULL AND ? = ?)
+       ORDER BY at_tick ASC, id ASC`,
     )
-    .all() as Array<{
+    .all(cid, cid, LOCAL_COMPANY_ID) as Array<{
     id: string;
     at_tick: number;
     day_index: number;
@@ -1838,17 +1873,33 @@ export function readLedgerRowsV3(db: SqliteDb): CareerLedgerEntry[] {
   );
 }
 
-export function persistLedgerIncremental(db: SqliteDb, entries: CareerLedgerEntry[]): void {
+export function persistLedgerIncremental(
+  db: SqliteDb,
+  entries: CareerLedgerEntry[],
+  companyId: string = LOCAL_COMPANY_ID,
+): void {
+  const cid = companyId.trim() || LOCAL_COMPANY_ID;
   const ids = entries.map((e) => e.id).filter(Boolean);
+  const companyScope = `company_id = ? OR (company_id IS NULL AND ? = ?)`;
   if (ids.length === 0) {
-    db.prepare(`DELETE FROM ledger`).run();
+    db.prepare(`DELETE FROM ledger WHERE ${companyScope}`).run(
+      cid,
+      cid,
+      LOCAL_COMPANY_ID,
+    );
     return;
   }
   if (ids.length > SQLITE_BIND_SAFE) {
-    db.prepare(`DELETE FROM ledger`).run();
+    db.prepare(`DELETE FROM ledger WHERE ${companyScope}`).run(
+      cid,
+      cid,
+      LOCAL_COMPANY_ID,
+    );
   } else {
     const placeholders = ids.map(() => '?').join(',');
-    db.prepare(`DELETE FROM ledger WHERE id NOT IN (${placeholders})`).run(...ids);
+    db.prepare(
+      `DELETE FROM ledger WHERE (${companyScope}) AND id NOT IN (${placeholders})`,
+    ).run(cid, cid, LOCAL_COMPANY_ID, ...ids);
   }
   const upsert = db.prepare(
     `INSERT INTO ledger (
@@ -1879,7 +1930,7 @@ export function persistLedgerIncremental(db: SqliteDb, entries: CareerLedgerEntr
       aircraft_id: e.aircraftId ?? null,
       mission_id: e.missionId ?? null,
       icao: e.icao ?? null,
-      company_id: LOCAL_COMPANY_ID,
+      company_id: cid,
     });
   }
 }

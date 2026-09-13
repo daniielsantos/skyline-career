@@ -386,6 +386,11 @@ export function confirmBaseDispatchScout(
   if (executed.kind === 'missing_lot' || executed.kind === 'missing_mission') {
     throw new Error(`Lot ${opts.lotId} not available`);
   }
+  if (executed.kind === 'conflict') {
+    throw new Error(
+      `Lot ${opts.lotId} claimed by ${executed.claimedByCompanyId}`,
+    );
+  }
 
   return {
     mission: executed.mission,

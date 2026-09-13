@@ -261,6 +261,7 @@ import {
   stockTrend,
   companySessionFromTick,
   settleCompanyPassiveFeesForTickRange,
+  resolveCompanyId,
   ensureEconomyCaughtUpCooperative,
   tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
@@ -531,8 +532,10 @@ const MARKET_LOT_LIMIT = 200;
 
 type MissionsFile = CareerMissionsState;
 
-async function loadMissions(): Promise<MissionsFile> {
-  return requireStore().loadMissions();
+async function loadMissions(opts?: {
+  companyId?: string;
+}): Promise<MissionsFile> {
+  return requireStore().loadMissions(opts);
 }
 
 /** Enrich mission rows for Logbook (distance + concrete airframe name). */
@@ -860,8 +863,11 @@ function resolveMissionMxBlockFuel(
   return padOfpBlockFuelKgForMx(ofpBlockFuelKg, aircraft);
 }
 
-async function saveMissions(missions: MissionsFile): Promise<void> {
-  await requireStore().saveMissions(missions);
+async function saveMissions(
+  missions: MissionsFile,
+  opts?: { companyId?: string },
+): Promise<void> {
+  await requireStore().saveMissions(missions, opts);
 }
 
 /**
@@ -989,10 +995,25 @@ async function loadEconomyUnlocked(opts?: {
 async function applyCompanySessionSettlement(opts: {
   fromTick: number;
   toTick: number;
+  /** Pulse/headless: bill every company on the world. Session open: active only. */
+  allCompanies?: boolean;
 }): Promise<OfflineFeeSummary | undefined> {
-  const missions = await loadMissions();
-  const world = requireStore().peekEconomyWorld();
+  const activeStore = requireStore();
+  const world = activeStore.peekEconomyWorld();
   if (!world) return undefined;
+  if (
+    opts.allCompanies === true &&
+    typeof activeStore.settleWorldCompaniesPassiveFees === 'function'
+  ) {
+    const summary = activeStore.settleWorldCompaniesPassiveFees({
+      world,
+      fromTick: opts.fromTick,
+      toTick: opts.toTick,
+      worldId: LOCAL_WORLD_ID,
+    });
+    return summary ?? undefined;
+  }
+  const missions = await loadMissions();
   const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
   const summary = settleCompanyPassiveFeesForTickRange(
     missions,
@@ -1003,6 +1024,49 @@ async function applyCompanySessionSettlement(opts: {
   missions.lastSeenTick = opts.toTick;
   await saveMissions(missions);
   return summary ?? undefined;
+}
+
+function companyIdFromRequest(
+  req: import('node:http').IncomingMessage,
+  bodyCompanyId?: string | null,
+): string {
+  const headerRaw = req.headers['x-skyline-company-id'];
+  const header =
+    typeof headerRaw === 'string'
+      ? headerRaw
+      : Array.isArray(headerRaw)
+        ? headerRaw[0]
+        : undefined;
+  try {
+    return resolveCompanyId({
+      requested:
+        bodyCompanyId?.trim() ||
+        header?.trim() ||
+        store?.getActiveCompanyId() ||
+        LOCAL_COMPANY_ID,
+      worldId: LOCAL_WORLD_ID,
+      db: null,
+    });
+  } catch {
+    return LOCAL_COMPANY_ID;
+  }
+}
+
+function activateCompanyContext(companyId: string): string {
+  const activeStore = requireStore();
+  const id = resolveCompanyId({
+    requested: companyId,
+    worldId: LOCAL_WORLD_ID,
+    db: null,
+  });
+  const known = activeStore.listWorldCompanies(LOCAL_WORLD_ID);
+  if (known.length > 0 && !known.some((c) => c.id === id)) {
+    if (id !== LOCAL_COMPANY_ID) {
+      throw new Error(`Unknown company ${id}`);
+    }
+  }
+  activeStore.setActiveCompanyId(id);
+  return id;
 }
 
 async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> {
@@ -2070,6 +2134,7 @@ export function createCareerApiServer(port = 8787) {
         const summary = await applyCompanySessionSettlement({
           fromTick: toTick - catchUpTicks,
           toTick,
+          allCompanies: true,
         });
         if (summary) pendingOfflineFeeSummary = summary;
       });
@@ -2351,9 +2416,14 @@ export function createCareerApiServer(port = 8787) {
             worldId?: string;
             lastSeenTick?: number;
           };
-          const missions = await loadMissions();
+          const companyId = activateCompanyContext(
+            body.companyId?.trim() ||
+              companyIdFromRequest(req) ||
+              LOCAL_COMPANY_ID,
+          );
+          const missions = await loadMissions({ companyId });
           const result = await worldTick.openCompanySession({
-            companyId: body.companyId?.trim() || LOCAL_COMPANY_ID,
+            companyId,
             worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
             lastSeenTick:
               typeof body.lastSeenTick === 'number' &&
@@ -2364,7 +2434,78 @@ export function createCareerApiServer(port = 8787) {
           if (result.offlineFeeSummary) {
             pendingOfflineFeeSummary = result.offlineFeeSummary;
           }
-          send(res, 200, result);
+          send(res, 200, { ...result, companyId });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/companies') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        try {
+          const worldId =
+            url.searchParams.get('worldId')?.trim() || LOCAL_WORLD_ID;
+          const companies = store.listWorldCompanies(worldId);
+          send(res, 200, {
+            worldId,
+            activeCompanyId: store.getActiveCompanyId(),
+            companies,
+          });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/companies') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        try {
+          const body = (await readBody(req)) as {
+            id?: string;
+            worldId?: string;
+            displayName?: string;
+            homeHubIcao?: string;
+            homeCountryId?: string;
+            activate?: boolean;
+          };
+          if (!body.id?.trim()) {
+            send(res, 400, { error: 'id required' });
+            return;
+          }
+          const company = store.ensureCompany({
+            id: body.id.trim(),
+            worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
+            displayName: body.displayName,
+            homeHubIcao: body.homeHubIcao,
+            homeCountryId: body.homeCountryId,
+          });
+          // Seed empty company_state so load/save works for the new tenant.
+          const seeded = await store.loadMissions({ companyId: company.id });
+          await store.saveMissions(seeded, { companyId: company.id });
+          if (body.activate !== false) {
+            store.setActiveCompanyId(company.id);
+          }
+          send(res, 200, {
+            company,
+            activeCompanyId: store.getActiveCompanyId(),
+          });
         } catch (err) {
           send(res, 400, {
             error: err instanceof Error ? err.message : String(err),
@@ -6913,6 +7054,7 @@ export function createCareerApiServer(port = 8787) {
           kg?: number;
           aircraft?: string;
           missionId?: string;
+          companyId?: string;
         };
         if (!body.lotId) {
           send(res, 400, { error: 'lotId required' });
@@ -6922,6 +7064,17 @@ export function createCareerApiServer(port = 8787) {
           (parseFreighterClassId(body.aircraft) as FreighterClassId | undefined) ??
           'narrow_freighter';
         const cargoLimit = await resolveClassMaxCargoKg(aircraft);
+        let acceptCompanyId = LOCAL_COMPANY_ID;
+        try {
+          acceptCompanyId = activateCompanyContext(
+            companyIdFromRequest(req, body.companyId),
+          );
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return;
+        }
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -6949,6 +7102,7 @@ export function createCareerApiServer(port = 8787) {
               intoMissionId: intoMission?.id,
               cargoOps: cargoOpsForRequest(req, missions.cargoOps),
               classOps: classOpsForRequest(req, missions.classOps),
+              companyId: acceptCompanyId,
             });
             if (executed.kind === 'missing_lot') {
               return { kind: 'missing_lot' as const };
@@ -6967,6 +7121,7 @@ export function createCareerApiServer(port = 8787) {
               mission: executed.mission,
               walletUsd: missions.walletUsd,
               appended: executed.appended,
+              companyId: acceptCompanyId,
             };
           }, { commandSliceLotIds: [body.lotId], housekeeping: false });
           if (result.kind === 'missing_lot') {

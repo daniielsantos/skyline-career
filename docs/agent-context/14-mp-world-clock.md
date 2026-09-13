@@ -186,7 +186,8 @@ interface WorldTickService {
 1. ~~MP stub `RemoteWorldTickService` + SP HTTP clock/session~~ — Phase 1 shipped.
 2. ~~Phase 2 headless pulse~~ — shipped (boot resume + `/api/world/pulse`).
 3. ~~Phase 3 company registry + shared world_id~~ — shipped 2026-09-13 (no OAuth).
-4. Phase 4+: live `RemoteWorldTickService` client; desligar catch-up no client.
+4. ~~Phase 4 remote client clock~~ — shipped 2026-09-13 (`CAREER_WORLD_TICK=remote`).
+5. Hosted Postgres / multi-process world job — later.
 
 ## Phase 2 notes (2026-09-13)
 
@@ -204,17 +205,26 @@ interface WorldTickService {
 - Dual-company Accept conflict covered in `career-companies.test.ts`.
 - Auth/OAuth still non-goal; Phase 4 is remote client clock.
 
+## Phase 4 notes (2026-09-13)
+
+- `RemoteWorldTickService` live: fetches clock/session from host; `advance` throws; `getCatchUpProgress` always `null`.
+- Env: `CAREER_WORLD_TICK=remote` + `CAREER_REMOTE_WORLD_URL=http://host:8787` (optional `CAREER_REMOTE_WORLD_PATH_STYLE=api|worlds`, `CAREER_REMOTE_COMPANY_ID`).
+- Path styles: `api` → `/api/world/clock` + `/api/companies/session/open`; `worlds` → sketch paths.
+- Host also serves aliases `GET /worlds/:worldId/clock` and `POST /companies/:companyId/session/open`.
+- Remote client: no headless advance; `withCareerWrite` forces `skipCatchUp`; `POST /api/world/pulse` and `POST /api/tick` → **403** `client_cannot_advance`; background pulse only polls clock.
+- SP default unchanged (`CAREER_WORLD_TICK` unset / `local`).
+
 ### MP client stub
 
 ```typescript
 class RemoteWorldTickService implements WorldTickService {
   mode = 'mp-remote' as const;
-  async getClock(worldId) { return fetch(`/worlds/${worldId}/clock`).then(r => r.json()); }
+  async getClock(worldId) { return fetch(`/api/world/clock?worldId=…`).then(r => r.json()); }
   async advance() { throw new Error('MP client cannot advance world'); }
   getCatchUpProgress() { return null; }
-  startBackgroundPulse() { /* poll clock only */ }
+  startBackgroundPulse() { /* poll getClock on interval */ }
   stopBackgroundPulse() {}
-  openCompanySession(opts) { return fetch(`/companies/${opts.companyId}/session/open`, …); }
+  openCompanySession(opts) { return fetch(`/api/companies/session/open`, …); }
 }
 ```
 
@@ -228,7 +238,7 @@ class RemoteWorldTickService implements WorldTickService {
 | **1** | shipped 2026-09-13 | `claimedByCompanyId` on lots; Accept → `409 lot_claimed`; `GET /api/world/clock`; `POST /api/companies/session/open`; `RemoteWorldTickService` stub (client never `advance`) |
 | **2** | shipped 2026-09-13 | Headless pulse: API `listen` resumes last-played profile + starts tick with **zero UI clients**; `POST /api/world/pulse`; opt-out `CAREER_HEADLESS_PULSE=0` |
 | **3** | shipped 2026-09-13 | Company registry (`career-companies.ts`); N companies / `world_id`; store load/save/ledger scoped by `companyId`; Accept via `X-Skyline-Company-Id` / body; `GET|POST /api/companies`; pulse settle-all |
-| **4** | backlog | MP client `RemoteWorldTickService` live; desligar catch-up no client |
+| **4** | shipped 2026-09-13 | Live `RemoteWorldTickService`; `CAREER_WORLD_TICK=remote` + `CAREER_REMOTE_WORLD_URL`; client never advances / never local catch-up; MP path aliases `/worlds/:id/clock` + `/companies/:id/session/open` |
 
 1. ~~**Extrair** `WorldTickService`~~ — feito.
 2. ~~SP local pulse via service~~ — feito.
@@ -278,8 +288,9 @@ class RemoteWorldTickService implements WorldTickService {
 - [x] Clock + company session HTTP mold (Phase 1)
 - [x] World tick roda com zero clients conectados (Phase 2 — last-played profile resumed on API listen)
 - [x] Company registry + N tenants / shared `world_id` (Phase 3 — no OAuth)
-- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 4 UI / remote)
-- [ ] Reconnect não chama `tickEconomyN` no processo UI (Phase 4)
+- [x] Remote client never advances / never local catch-up (Phase 4)
+- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (hosted dual-UI)
+- [x] Reconnect não chama `tickEconomyN` no processo UI remoto (Phase 4)
 - [x] Accept concorrente → exatamente um 200, resto 409 (Phase 3 unit + claim path; live dual-client later)
 - [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)
-- [ ] Admin/debug tick isolado de build release MP (`POST /api/world/pulse` exists; MP gate later)
+- [x] Admin/debug tick isolado de client remoto (`POST /api/world/pulse` + `/api/tick` → 403 on mp-remote)

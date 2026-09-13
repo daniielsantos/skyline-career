@@ -291,6 +291,7 @@ import {
   type HubEconomySample,
   type MissionIntent,
   type PlayerAircraft,
+  type WorldTickService,
 } from '@msfs-compat/shared';
 import {
   buildFlyableMissionDispatch,
@@ -335,6 +336,11 @@ import {
 } from './career-profiles.ts';
 import { createPromiseLock } from './career-write-lock.ts';
 import { LocalWorldTickService, isHeadlessPulseEnabled } from './local-world-tick-service.ts';
+import {
+  RemoteWorldTickService,
+  isRemoteWorldTickEnabled,
+  remoteWorldPathStyleFromEnv,
+} from './remote-world-tick-service.ts';
 import {
   loadMaptilerEnvFiles,
   maptilerKeyFromEnv,
@@ -459,7 +465,7 @@ async function warmCareerStoreCache(): Promise<void> {
   );
 }
 
-function schedulePostLoginEconomyWork(tickService: LocalWorldTickService): void {
+function schedulePostLoginEconomyWork(tickService: WorldTickService): void {
   void (async () => {
     try {
       await warmCareerStoreCache();
@@ -469,6 +475,7 @@ function schedulePostLoginEconomyWork(tickService: LocalWorldTickService): void 
         error instanceof Error ? error.message : error,
       );
     }
+    // Remote client: poll clock only. Local host: advance + settle.
     tickService.startBackgroundPulse(LOCAL_WORLD_ID);
   })();
 }
@@ -476,10 +483,16 @@ function schedulePostLoginEconomyWork(tickService: LocalWorldTickService): void 
 /**
  * Phase 2 — resume last-played profile on API boot so the world tick runs
  * with zero UI clients (hosted SP mold). Opt out: CAREER_HEADLESS_PULSE=0.
+ * Phase 4 remote client: never resume/advance locally.
  */
 async function bootstrapHeadlessWorldPulse(
-  tickService: LocalWorldTickService,
+  tickService: WorldTickService,
 ): Promise<void> {
+  if (tickService.mode === 'mp-remote') {
+    console.log('[career] headless-pulse skip — remote world tick client');
+    tickService.startBackgroundPulse(LOCAL_WORLD_ID);
+    return;
+  }
   if (!isHeadlessPulseEnabled()) {
     console.log('[career] headless-pulse disabled (CAREER_HEADLESS_PULSE)');
     return;
@@ -1133,9 +1146,11 @@ async function withCareerWrite<T>(
   return withCareerLock(async () => {
     const activeStore = requireStore();
     const missions = await loadMissions();
-    const skipCatchUp = opts?.catchUp !== true;
+    // Phase 4 remote client: never simulate ticks locally — host owns the clock.
+    const skipCatchUp =
+      isRemoteWorldTickEnabled() || opts?.catchUp !== true;
     const catchUpTicks =
-      opts?.catchUp === true
+      !skipCatchUp && opts?.catchUp === true
         ? (opts.catchUpTicks ?? CATCH_UP_TICKS_PER_PULSE)
         : undefined;
     const persistCompany = opts?.persist === 'company';
@@ -2108,43 +2123,54 @@ async function readBody(req: import('node:http').IncomingMessage): Promise<unkno
 }
 
 export function createCareerApiServer(port = 8787) {
-  const worldTick = new LocalWorldTickService({
-    requireStore,
-    loadMissions,
-    peekWorld: () => store?.peekEconomyWorld() ?? undefined,
-    isReady: () => store != null,
-    beforeAdvance: async () => {
-      if (!store || !msfsStampNeeded) return;
-      await withCareerLock(async () => {
-        if (!store || !msfsStampNeeded) return;
-        await stampMsfsOverridesOnStore(store);
-        msfsStampNeeded = false;
+  const worldTick: WorldTickService = isRemoteWorldTickEnabled()
+    ? new RemoteWorldTickService({
+        baseUrl: process.env.CAREER_REMOTE_WORLD_URL!.trim(),
+        pathStyle: remoteWorldPathStyleFromEnv(),
+        companyId: process.env.CAREER_REMOTE_COMPANY_ID?.trim() || undefined,
+      })
+    : new LocalWorldTickService({
+        requireStore,
+        loadMissions,
+        peekWorld: () => store?.peekEconomyWorld() ?? undefined,
+        isReady: () => store != null,
+        beforeAdvance: async () => {
+          if (!store || !msfsStampNeeded) return;
+          await withCareerLock(async () => {
+            if (!store || !msfsStampNeeded) return;
+            await stampMsfsOverridesOnStore(store);
+            msfsStampNeeded = false;
+          });
+        },
+        runCatchUpWrite: async ({ catchUpTicks, cooperative }) => {
+          await withCareerWrite(() => undefined, {
+            catchUp: true,
+            catchUpTicks,
+            cooperative,
+          });
+          await withCareerLock(async () => {
+            const world = store?.peekEconomyWorld();
+            if (!world) return;
+            const toTick = world.tick;
+            const summary = await applyCompanySessionSettlement({
+              fromTick: toTick - catchUpTicks,
+              toTick,
+              allCompanies: true,
+            });
+            if (summary) pendingOfflineFeeSummary = summary;
+          });
+        },
+        applyCompanySessionSettlement: async ({ fromTick, toTick }) => {
+          return withCareerLock(async () =>
+            applyCompanySessionSettlement({ fromTick, toTick }),
+          );
+        },
       });
-    },
-    runCatchUpWrite: async ({ catchUpTicks, cooperative }) => {
-      await withCareerWrite(() => undefined, {
-        catchUp: true,
-        catchUpTicks,
-        cooperative,
-      });
-      await withCareerLock(async () => {
-        const world = store?.peekEconomyWorld();
-        if (!world) return;
-        const toTick = world.tick;
-        const summary = await applyCompanySessionSettlement({
-          fromTick: toTick - catchUpTicks,
-          toTick,
-          allCompanies: true,
-        });
-        if (summary) pendingOfflineFeeSummary = summary;
-      });
-    },
-    applyCompanySessionSettlement: async ({ fromTick, toTick }) => {
-      return withCareerLock(async () =>
-        applyCompanySessionSettlement({ fromTick, toTick }),
-      );
-    },
-  });
+  if (worldTick.mode === 'mp-remote') {
+    console.log(
+      `[career] world-tick mode=mp-remote url=${process.env.CAREER_REMOTE_WORLD_URL?.trim()}`,
+    );
+  }
   const watchSession = new CareerWatchSession({
     withCareerRead,
     withCareerWrite,
@@ -2362,7 +2388,14 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/world/clock') {
         // SP: same mold as MP GET /worlds/:id/clock — local world only.
         try {
-          const clock = await worldTick.getClock(LOCAL_WORLD_ID, Date.now());
+          const worldId =
+            url.searchParams.get('worldId')?.trim() || LOCAL_WORLD_ID;
+          const nowMsRaw = url.searchParams.get('nowMs');
+          const nowMs =
+            nowMsRaw && Number.isFinite(Number(nowMsRaw))
+              ? Number(nowMsRaw)
+              : Date.now();
+          const clock = await worldTick.getClock(worldId, nowMs);
           send(res, 200, clock);
         } catch (err) {
           send(res, 503, {
@@ -2372,8 +2405,36 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      {
+        const worldsClock = path.match(/^\/worlds\/([^/]+)\/clock$/);
+        if (req.method === 'GET' && worldsClock) {
+          try {
+            const worldId = decodeURIComponent(worldsClock[1] ?? '').trim() || LOCAL_WORLD_ID;
+            const nowMsRaw = url.searchParams.get('nowMs');
+            const nowMs =
+              nowMsRaw && Number.isFinite(Number(nowMsRaw))
+                ? Number(nowMsRaw)
+                : Date.now();
+            const clock = await worldTick.getClock(worldId, nowMs);
+            send(res, 200, clock);
+          } catch (err) {
+            send(res, 503, {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          return;
+        }
+      }
+
       if (req.method === 'POST' && path === '/api/world/pulse') {
         // Explicit world advance (admin / hosted ops). Requires a loaded profile.
+        if (worldTick.mode === 'mp-remote') {
+          send(res, 403, {
+            error: 'Remote world-tick client cannot advance the world',
+            code: 'client_cannot_advance',
+          });
+          return;
+        }
         if (!store) {
           send(res, 409, {
             error: 'Select a career profile first',
@@ -2441,6 +2502,58 @@ export function createCareerApiServer(port = 8787) {
           });
         }
         return;
+      }
+
+      {
+        const companiesSession = path.match(
+          /^\/companies\/([^/]+)\/session\/open$/,
+        );
+        if (req.method === 'POST' && companiesSession) {
+          if (!store && worldTick.mode !== 'mp-remote') {
+            send(res, 409, {
+              error: 'Select a career profile first',
+              code: 'needs_profile',
+            });
+            return;
+          }
+          try {
+            const pathCompanyId =
+              decodeURIComponent(companiesSession[1] ?? '').trim() ||
+              LOCAL_COMPANY_ID;
+            const body = (await readBody(req)) as {
+              companyId?: string;
+              worldId?: string;
+              lastSeenTick?: number;
+            };
+            const companyId =
+              worldTick.mode === 'mp-remote'
+                ? body.companyId?.trim() || pathCompanyId
+                : activateCompanyContext(
+                    body.companyId?.trim() || pathCompanyId,
+                  );
+            const lastSeenTick =
+              typeof body.lastSeenTick === 'number' &&
+              Number.isFinite(body.lastSeenTick)
+                ? body.lastSeenTick
+                : store
+                  ? ((await loadMissions({ companyId })).lastSeenTick ?? 0)
+                  : 0;
+            const result = await worldTick.openCompanySession({
+              companyId,
+              worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
+              lastSeenTick,
+            });
+            if (result.offlineFeeSummary) {
+              pendingOfflineFeeSummary = result.offlineFeeSummary;
+            }
+            send(res, 200, { ...result, companyId });
+          } catch (err) {
+            send(res, 400, {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          return;
+        }
       }
 
       if (req.method === 'GET' && path === '/api/companies') {
@@ -6864,6 +6977,13 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/tick') {
+        if (worldTick.mode === 'mp-remote') {
+          send(res, 403, {
+            error: 'Remote world-tick client cannot advance the world',
+            code: 'client_cannot_advance',
+          });
+          return;
+        }
         const body = (await readBody(req)) as { n?: number; profile?: boolean };
         const n = Math.max(1, Math.min(TICKS_PER_DAY * 7, Math.floor(body.n ?? TICKS_PER_DAY)));
         const wantProfile = body.profile === true;

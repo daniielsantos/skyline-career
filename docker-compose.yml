@@ -4,26 +4,31 @@ services:
     container_name: skyline-career-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: skyline
-      POSTGRES_PASSWORD: skyline
-      POSTGRES_DB: skyline
+      POSTGRES_USER: ${POSTGRES_USER:-skyline}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skyline}
+      POSTGRES_DB: ${POSTGRES_DB:-skyline}
     ports:
+      # Lab: reachable on host LAN. Prefer 127.0.0.1:5432:5432 on any shared/VPS host.
       - '5432:5432'
     volumes:
       - skyline_career_pg_data:/var/lib/postgresql/data
     healthcheck:
       # pg_isready alone can pass during crash recovery while SELECT still fails (57P03).
+      # User/db come from compose env (defaults skyline). Password is never in the healthcheck.
       test:
         [
           'CMD-SHELL',
-          'pg_isready -U skyline -d skyline && psql -U skyline -d skyline -c "SELECT 1" >/dev/null',
+          'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" && psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -c "SELECT 1" >/dev/null',
         ]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 20s
 
-  # Lab DB UI — keep for local sim; do not expose on a real VPS.
+  # Lab DB UI — local only. Do NOT publish :8081 (or Postgres :5432) on a VPS;
+  # bind to loopback if you must keep Adminer on a shared machine:
+  #   ports: ["127.0.0.1:8081:8080"]  (same idea for postgres 5432).
+  # Login uses POSTGRES_* from .env (System: PostgreSQL, Server: postgres).
   adminer:
     image: adminer:4
     container_name: skyline-career-adminer
@@ -37,8 +42,9 @@ services:
         condition: service_healthy
 
   # Local “production” world host (no Watch). Start with:
-  #   docker compose --profile world up -d --build
+  #   npm run career:stack:world
   # Desktop: CAREER_WORLD_API_URL=http://127.0.0.1:8787 CAREER_UI_API_PORT=8788
+  # Secrets: root `.env` (gitignored) — see `.env.example`.
   world-api:
     build:
       context: .
@@ -46,7 +52,8 @@ services:
     container_name: skyline-career-world-api
     restart: unless-stopped
     environment:
-      CAREER_DATABASE_URL: postgres://skyline:skyline@postgres:5432/skyline
+      # Prefer CAREER_DATABASE_URL in .env; must match POSTGRES_* (host = postgres on Docker net).
+      CAREER_DATABASE_URL: ${CAREER_DATABASE_URL:-postgres://skyline:skyline@postgres:5432/skyline}
       CAREER_API_MODE: world
       CAREER_DISABLE_SIM: '1'
       CAREER_AUTH: '1'
@@ -83,7 +90,7 @@ services:
     container_name: skyline-career-world-worker
     restart: unless-stopped
     environment:
-      CAREER_DATABASE_URL: postgres://skyline:skyline@postgres:5432/skyline
+      CAREER_DATABASE_URL: ${CAREER_DATABASE_URL:-postgres://skyline:skyline@postgres:5432/skyline}
       CAREER_PG: '1'
     command: ['node', 'scripts/career-world-worker-pg.mjs']
     depends_on:

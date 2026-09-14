@@ -210,6 +210,7 @@ interface WorldTickService {
 - **SP:** SQLite saves unchanged.
 - **MP:** `CAREER_DATABASE_URL` or `CAREER_PG=1` → `PostgresCareerStore`.
 - Docker: containers `skyline-career-postgres` + `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
+- **DB secrets (2026-09-14):** `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` + `CAREER_DATABASE_URL` live in root **`.env`** (gitignored); compose substitutes them (lab default still `skyline` if unset). Adminer login = those Postgres creds. Rotate password → update `.env` **and** alter role / recreate volume (init only runs once).
 - Run: `docker compose up -d` then `npm run career:host:pg` + `npm run career:client`.
 - **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`). Schema **v16**: `fleet_aircraft` promotes registration / hours / condition % / config / lease flags out of `payload_json` (backfill on open). Schema **v15**: economy SoT = relational tables + `economy_meta.misc_json`; stub tables `economy_json` + `company_missions` dropped. SP SQLite mirrors fleet columns via `ensureV3Ddl` ALTERs. Load hydrates via `emptyPgEconomyShell` + tables; BIGINT wall-clock ms truncated on write.
 - **PG light persists (2026-09-14):** `persistInboundPending` / `persistDemandBoardTables` / `persistDemandOrder` / `persistPortMarketTables` / `persistPortListing` / `persistPortConcessionIndex` / `persistNpcLiveWorld` / `persistAircraftPool` write only their tables (no full `saveEconomy`). `persistNpcLive` = clock + hubs/stock + lots + inbound + NPCs + dealer pool. Pulse `settleWorldCompaniesPassiveFees` exists on Postgres (awaited in `applyCompanySessionSettlement`).
@@ -230,13 +231,14 @@ interface WorldTickService {
 
 - **Local Auth** (no OAuth yet): `accounts` / `account_sessions` / `company_members` (schema v10).
 - Session token → account → owned companies. `Authorization: Bearer` on `api()`.
-- **Session hygiene (2026-09-14):** login/register = **one live Bearer per account** (`revokeAll` then insert). Expired rows purged on create/resolve (`expires_at_ms <= now`). `GET /api/auth/sessions` (Bearer) lists live sessions + `online` if `last_seen` within `AUTH_ONLINE_WINDOW_MS` (5 min); `?scope=mine` filters to caller. Response exposes `tokenHashPrefix` only (not the Bearer).
+- **Session hygiene (2026-09-14):** login/register = **one live Bearer per account** (`revokeAll` then insert). Expired rows purged on create/resolve (`expires_at_ms <= now`). `GET /api/auth/sessions` (Bearer) defaults to **`scope=mine`**; `?scope=all` only when `CAREER_AUTH_SESSIONS_LIST_ALL=1` (lab presence). `online` if `last_seen` within `AUTH_ONLINE_WINDOW_MS` (5 min). Response exposes `tokenHashPrefix` only (not the Bearer).
+- **Auth rate limit (2026-09-14):** login/register share an in-memory per-IP sliding window (**20 / 15 min**); over → `429` `auth_rate_limited` + `Retry-After`. Not distributed across replicas.
 - Env: `CAREER_AUTH=1` enforces; **host mode defaults on** (`dev.mjs --host`). SP `career:ui` stays off.
 - HTTP: `GET /api/auth/status`, `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `GET /api/auth/sessions`.
 - Register creates company `co_<login>` + owner membership. Claim orphan via `claimCompanyId`.
 - When required: company id cannot spoof rivals; `GET /api/companies` returns owned only; AuthGate after profile select.
 - Chip `?company=` still works **within** owned set. OAuth later plugs into same membership table.
-- Files: `packages/shared/src/career-auth.ts`, `career-store-v10.ts`; UI `AuthGate.tsx` + `career-auth-client.ts`.
+- Files: `packages/shared/src/career-auth.ts`, `career-store-v10.ts`; UI `AuthGate.tsx` + `career-auth-client.ts`; rate limit `server/auth-rate-limit.ts`.
 - **UX (same day):** AuthGate form stacked (`auth-gate-form` + `pilot-field`) — bare labels were inline-wrapping.
 - **UX (same day):** Profile gate shows **Sign out / another account** when a Bearer token is still in the tab — otherwise Continue skips AuthGate (looks like “cadastro sumiu”).
 - **UX (same day):** Ctrl+R on AuthGate no longer flashes Freights / “Loading career…” — fixed-world boot keeps `profilesLoading` until Auth warm; stale Bearer cleared when `authenticated=false`; AuthGate renders before ProfileGate/main shell.
@@ -407,7 +409,7 @@ Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em
 - Rewind / replay de world
 - Per-player time dilation
 - Múltiplos worlds por company (uma company → um `world_id`)
-- Presença-only MP (“só vejo quem está online”) — north star continua company + shared world; **stub:** `GET /api/auth/sessions` + `online` window 5 min (`last_seen`)
+- Presença-only MP (“só vejo quem está online”) — north star continua company + shared world; **stub:** `GET /api/auth/sessions?scope=all` + `CAREER_AUTH_SESSIONS_LIST_ALL=1` + `online` window 5 min (`last_seen`)
 
 ## Referências no código
 

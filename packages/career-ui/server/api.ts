@@ -332,6 +332,11 @@ import {
 } from './career-api-mode.ts';
 import { proxyToWorldApi } from './gateway-proxy.ts';
 import {
+  authRateLimitKeyFromRequest,
+  consumeAuthRateLimit,
+  isAuthSessionsListAllEnabled,
+} from './auth-rate-limit.ts';
+import {
   createGatewayWatchMutations,
   gatewayEconomyShell,
   gatewayLoadMissions,
@@ -2717,6 +2722,16 @@ export function createCareerApiServer(port = 8787) {
           send(res, 501, { error: 'Auth requires SQLite career store' });
           return;
         }
+        const rate = consumeAuthRateLimit(authRateLimitKeyFromRequest(req));
+        if (!rate.ok) {
+          res.setHeader('Retry-After', String(rate.retryAfterSec));
+          send(res, 429, {
+            error: 'Too many login/register attempts — try again later',
+            code: 'auth_rate_limited',
+            retryAfterSec: rate.retryAfterSec,
+          });
+          return;
+        }
         try {
           const body = (await readBody(req)) as {
             loginName?: string;
@@ -2782,6 +2797,16 @@ export function createCareerApiServer(port = 8787) {
         }
         if (!store.supportsAuth) {
           send(res, 501, { error: 'Auth requires SQLite career store' });
+          return;
+        }
+        const rate = consumeAuthRateLimit(authRateLimitKeyFromRequest(req));
+        if (!rate.ok) {
+          res.setHeader('Retry-After', String(rate.retryAfterSec));
+          send(res, 429, {
+            error: 'Too many login/register attempts — try again later',
+            code: 'auth_rate_limited',
+            retryAfterSec: rate.retryAfterSec,
+          });
           return;
         }
         try {
@@ -2877,17 +2902,27 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
-        const scope = (url.searchParams.get('scope') ?? 'all').trim().toLowerCase();
+        const scopeRaw = (url.searchParams.get('scope') ?? 'mine').trim().toLowerCase();
+        const wantAll = scopeRaw === 'all';
+        if (wantAll && !isAuthSessionsListAllEnabled()) {
+          send(res, 403, {
+            error:
+              'Listing all sessions requires CAREER_AUTH_SESSIONS_LIST_ALL=1 (lab presence)',
+            code: 'sessions_list_all_disabled',
+          });
+          return;
+        }
         const nowMs = Date.now();
         const sessions = await Promise.resolve(
           store.authListSessions({
-            accountId: scope === 'mine' ? session.account.id : undefined,
+            accountId: wantAll ? undefined : session.account.id,
             nowMs,
           }),
         );
         send(res, 200, {
           nowMs,
           onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
+          scope: wantAll ? 'all' : 'mine',
           sessions,
           onlineCount: sessions.filter((s) => s.online).length,
         });

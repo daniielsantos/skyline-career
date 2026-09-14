@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Auth harden** — `/api/auth/sessions` default `mine` (`scope=all` só com `CAREER_AUTH_SESSIONS_LIST_ALL=1`); login/register rate limit 20/15min por IP → 429. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Postgres secrets via `.env`** — compose lê `POSTGRES_*` + `CAREER_DATABASE_URL` (não hardcode no yml; default lab `skyline` se unset). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md) / `.env.example`.
+
 Atualizado 2026-09-14: **Desktop 0.3.63 shipped** — auth: 1 Bearer/conta, purge expired, `GET /api/auth/sessions` (online 5 min). Installer: [v0.3.63](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.63).
 
 Atualizado 2026-09-14: **Auth session hygiene** — one Bearer per account on login/register; purge expired on create/resolve; `GET /api/auth/sessions` (+ `?scope=mine`, `online` = last_seen ≤5 min). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

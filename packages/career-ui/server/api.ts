@@ -910,16 +910,19 @@ async function updateOpenMission(
     mission: MissionIntent,
     idx: number,
   ) => Promise<boolean> | boolean,
+  opts?: { companyId?: string },
 ): Promise<boolean> {
   return companyLock.withLock(async () => {
-    const missions = await loadMissions();
+    const companyId = opts?.companyId?.trim();
+    const companyOpts = companyId ? { companyId } : undefined;
+    const missions = await loadMissions(companyOpts);
     const idx = missions.missions.findIndex((m) => m.id === missionId);
     if (idx < 0) return false;
     const mission = missions.missions[idx]!;
     if (isClosedMissionStatus(mission.status)) return false;
     const shouldSave = await update(missions, mission, idx);
     if (!shouldSave) return false;
-    await saveMissions(missions);
+    await saveMissions(missions, companyOpts);
     return true;
   });
 }
@@ -2647,6 +2650,7 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const nowMs = Date.now();
+        const stateCompanyId = companyIdFromRequest(req);
         const catchUp = await worldTick.getCatchUpProgress(LOCAL_WORLD_ID, nowMs);
         const payload = await withCareerRead((world, missions) => {
           const npcBusy = (world.npcs ?? []).filter((n) => n.status === 'busy').length;
@@ -2655,6 +2659,7 @@ export function createCareerApiServer(port = 8787) {
           return {
             needsProfile: false,
             activeProfileId,
+            companyId: stateCompanyId,
             ...clockPayload(world, nowMs),
             seed: world.seed,
             airportCount: world.airports.length,
@@ -2679,12 +2684,13 @@ export function createCareerApiServer(port = 8787) {
             ...(offlineFeeSummary ? { offlineFeeSummary } : {}),
             ...(catchUp ? { catchUp } : {}),
           };
-        });
+        }, { companyId: stateCompanyId });
         send(res, 200, payload);
         return;
       }
 
       if (req.method === 'GET' && path === '/api/hubs') {
+        const hubsCompanyId = companyIdFromRequest(req);
         const payload = await withCareerRead((world, missions) => ({
           homeHubIcao: missions.homeHubIcao ?? null,
           hubs: world.airports
@@ -2704,24 +2710,26 @@ export function createCareerApiServer(port = 8787) {
             bush: airport.bush === true,
             bushTripOnly: airport.bushTripOnly === true,
           })),
-        }));
+        }), { companyId: hubsCompanyId });
         send(res, 200, payload);
         return;
       }
 
       if (req.method === 'GET' && path === '/api/fleet') {
+        const fleetCompanyId = companyIdFromRequest(req);
         const payload = await withCareerRead((world, missions) => ({
           walletUsd: missions.walletUsd,
           ...fleetPayload(missions, world),
           cashflow: summarizeCareerLedger(missions, world.tick),
           homeCountryId: world.homeCountryId ?? null,
           store: requireStore().kind,
-        }));
+        }), { companyId: fleetCompanyId });
         send(res, 200, payload);
         return;
       }
 
       if (req.method === 'GET' && path === '/api/cashflow') {
+        const cashflowCompanyId = companyIdFromRequest(req);
         const payload = await withCareerRead(async (world, missions) => {
           const cashflow = await requireStore().summarizeCashflow(world.tick);
           return {
@@ -2734,7 +2742,7 @@ export function createCareerApiServer(port = 8787) {
             companyCredit: companyCreditSnapshot(missions),
             ...cashflow,
           };
-        });
+        }, { companyId: cashflowCompanyId });
         send(res, 200, payload);
         return;
       }
@@ -6974,12 +6982,13 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/missions') {
+        const missionsCompanyId = companyIdFromRequest(req);
         const payload = await withCareerRead((world, missions) => ({
           ...missions,
           missions: missions.missions.map((m) =>
             withMissionClientView(world, missions, m),
           ),
-        }));
+        }), { companyId: missionsCompanyId });
         send(res, 200, payload);
         return;
       }
@@ -7310,6 +7319,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'lotId or npcFlightId required' });
           return;
         }
+        const cpOptionsCompanyId = companyIdFromRequest(req);
         try {
           const payload = await withCareerRead((world, missions) => {
             const flight =
@@ -7363,7 +7373,7 @@ export function createCareerApiServer(port = 8787) {
               },
               airframes,
             };
-          });
+          }, { companyId: cpOptionsCompanyId });
           if (payload.kind === 'missing') {
             send(res, 404, { error: 'No open crew-needed offer' });
             return;
@@ -7389,6 +7399,7 @@ export function createCareerApiServer(port = 8787) {
           npcFlightId?: string;
           airframeTypeId?: string;
           openDispatch?: boolean;
+          companyId?: string;
         };
         if (!body.lotId && !body.npcFlightId) {
           send(res, 400, { error: 'lotId or npcFlightId required' });
@@ -7398,6 +7409,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'airframeTypeId required' });
           return;
         }
+        const cpAcceptCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const accepted = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -7411,7 +7423,7 @@ export function createCareerApiServer(port = 8787) {
               ...result,
               walletUsd: missions.walletUsd,
             };
-          }, { persist: 'npcLive' });
+          }, { persist: 'npcLive', companyId: cpAcceptCompanyId });
           let mission = accepted.mission;
           let dispatch:
             | {
@@ -7426,12 +7438,14 @@ export function createCareerApiServer(port = 8787) {
           if (body.openDispatch === true) {
             try {
               const distanceNm =
-                (await withCareerRead((world) =>
-                  routeDistanceNm(
-                    world,
-                    mission.originIcao,
-                    mission.destIcao,
-                  ),
+                (await withCareerRead(
+                  (world) =>
+                    routeDistanceNm(
+                      world,
+                      mission.originIcao,
+                      mission.destIcao,
+                    ),
+                  { companyId: cpAcceptCompanyId },
                 )) ??
                 mission.distanceNm ??
                 0;
@@ -7465,7 +7479,10 @@ export function createCareerApiServer(port = 8787) {
                 if (idx >= 0) missions.missions[idx] = dispatched;
                 else missions.missions.push(dispatched);
                 return dispatched;
-              }, { commandSliceMissionId: mission.id });
+              }, {
+                commandSliceMissionId: mission.id,
+                companyId: cpAcceptCompanyId,
+              });
               // UI opens the URL once (Electron IPC / window.open).
               dispatch = {
                 url: built.url,
@@ -8047,11 +8064,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/cancel') {
-        const body = (await readBody(req)) as { missionId?: string };
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          companyId?: string;
+        };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
+        const cancelCompanyId = companyIdFromRequest(req, body.companyId);
         // Stop live watch first so an in-flight tick cannot rewrite this mission.
         const watch = watchSession.getStatus();
         if (watch.missionId === body.missionId) {
@@ -8127,7 +8148,11 @@ export function createCareerApiServer(port = 8787) {
               charter,
               activeTour: activeTourView(missions, world),
             };
-          }, { commandSliceMissionId: body.missionId, housekeeping: false });
+          }, {
+            commandSliceMissionId: body.missionId,
+            housekeeping: false,
+            companyId: cancelCompanyId,
+          });
           if (result.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
@@ -8167,11 +8192,13 @@ export function createCareerApiServer(port = 8787) {
           units?: 'KGS' | 'LBS';
           /** UI SimBridge title — preferred over last probe for family ICAO. */
           liveTitle?: string | null;
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
+        const dispatchCompanyId = companyIdFromRequest(req, body.companyId);
         const prep = await withCareerRead((world, missions) => {
           const mission = missions.missions.find((m) => m.id === body.missionId);
           if (!mission) return { kind: 'missing' as const };
@@ -8190,7 +8217,7 @@ export function createCareerApiServer(port = 8787) {
             dispatchDistanceNm,
             aircraftClassId: mission.aircraftClassId,
           };
-        });
+        }, { companyId: dispatchCompanyId });
         if (prep.kind === 'missing') {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
           return;
@@ -8246,7 +8273,10 @@ export function createCareerApiServer(port = 8787) {
             };
             missions.missions[idx] = dispatched;
             return dispatched;
-          }, { commandSliceMissionId: body.missionId });
+          }, {
+            commandSliceMissionId: body.missionId,
+            companyId: dispatchCompanyId,
+          });
 
           send(res, 200, {
             mission,
@@ -8276,12 +8306,14 @@ export function createCareerApiServer(port = 8787) {
           missionId?: string;
           simbriefUser?: string;
           simbriefUserid?: string;
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const probe = await loadMissions();
+        const ofpCompanyId = companyIdFromRequest(req, body.companyId);
+        const probe = await loadMissions({ companyId: ofpCompanyId });
         const probeMission = probe.missions.find((m) => m.id === body.missionId);
         if (!probeMission) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -8326,7 +8358,9 @@ export function createCareerApiServer(port = 8787) {
             })),
           };
           let savedMission: MissionIntent | null = null;
-          const wrote = await updateOpenMission(body.missionId, (_missions, mission) => {
+          const wrote = await updateOpenMission(
+            body.missionId,
+            (_missions, mission) => {
             if (
               mission.status !== 'dispatched' &&
               mission.status !== 'in_flight'
@@ -8344,9 +8378,11 @@ export function createCareerApiServer(port = 8787) {
             applyConfirmedOfpCheck(mission, ofpCheck);
             savedMission = mission;
             return true;
-          });
+          },
+            { companyId: ofpCompanyId },
+          );
           if (!wrote || !savedMission) {
-            const latest = await loadMissions();
+            const latest = await loadMissions({ companyId: ofpCompanyId });
             const current =
               savedMission ??
               latest.missions.find((m) => m.id === body.missionId);
@@ -8388,12 +8424,14 @@ export function createCareerApiServer(port = 8787) {
           missionId?: string;
           simbriefUser?: string;
           simbriefUserid?: string;
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const probe = await loadMissions();
+        const ofpCargoCompanyId = companyIdFromRequest(req, body.companyId);
+        const probe = await loadMissions({ companyId: ofpCargoCompanyId });
         const probeMission = probe.missions.find((m) => m.id === body.missionId);
         if (!probeMission) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -8481,7 +8519,10 @@ export function createCareerApiServer(port = 8787) {
               payBeforeUsd: trimmed.payBeforeUsd,
               payAfterUsd: trimmed.payAfterUsd,
             };
-          }, { commandSliceMissionId: body.missionId });
+          }, {
+            commandSliceMissionId: body.missionId,
+            companyId: ofpCargoCompanyId,
+          });
 
           const after = await confirmMissionOfp(trimmedWrite.mission, {
             username: body.simbriefUser,
@@ -8508,7 +8549,9 @@ export function createCareerApiServer(port = 8787) {
             })),
           };
           let savedMission: MissionIntent | null = null;
-          const wrote = await updateOpenMission(body.missionId, (_missions, mission) => {
+          const wrote = await updateOpenMission(
+            body.missionId,
+            (_missions, mission) => {
             if (
               mission.status !== 'accepted' &&
               mission.status !== 'dispatched'
@@ -8518,7 +8561,9 @@ export function createCareerApiServer(port = 8787) {
             applyConfirmedOfpCheck(mission, ofpCheck);
             savedMission = mission;
             return true;
-          });
+          },
+            { companyId: ofpCargoCompanyId },
+          );
           if (!wrote || !savedMission) {
             send(res, 400, {
               error: 'Mission changed before OFP reconfirm could be saved',
@@ -8546,11 +8591,15 @@ export function createCareerApiServer(port = 8787) {
         req.method === 'POST' &&
         (path === '/api/fuel/quote' || path === '/api/fuel/purchase')
       ) {
-        const body = (await readBody(req)) as { missionId?: string };
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          companyId?: string;
+        };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
+        const fuelCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (path === '/api/fuel/quote') {
             const quoted = await withCareerRead((world, missions) => {
@@ -8597,7 +8646,7 @@ export function createCareerApiServer(port = 8787) {
                 },
                 walletUsd: missions.walletUsd,
               };
-            });
+            }, { companyId: fuelCompanyId });
             if (quoted.kind === 'missing') {
               send(res, 404, { error: `Unknown mission ${body.missionId}` });
               return;
@@ -8670,7 +8719,10 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          }, { commandSliceMissionId: body.missionId });
+          }, {
+            commandSliceMissionId: body.missionId,
+            companyId: fuelCompanyId,
+          });
           if (purchased.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
@@ -8696,6 +8748,7 @@ export function createCareerApiServer(port = 8787) {
           simbriefUser?: string;
           simbriefUserid?: string;
           pipeName?: string;
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -8715,7 +8768,8 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const probe = await loadMissions();
+        const preflightCompanyId = companyIdFromRequest(req, body.companyId);
+        const probe = await loadMissions({ companyId: preflightCompanyId });
         const probeMission = probe.missions.find((m) => m.id === body.missionId);
         if (!probeMission) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -8763,16 +8817,20 @@ export function createCareerApiServer(port = 8787) {
             findings,
           };
           let savedMission: MissionIntent | null = null;
-          const wrote = await updateOpenMission(body.missionId, (_missions, mission) => {
+          const wrote = await updateOpenMission(
+            body.missionId,
+            (_missions, mission) => {
             if (!['accepted', 'dispatched', 'in_flight'].includes(mission.status)) {
               return false;
             }
             mission.lastPreflightCheck = lastPreflightCheck;
             savedMission = mission;
             return true;
-          });
+          },
+            { companyId: preflightCompanyId },
+          );
           if (!wrote || !savedMission) {
-            const latest = await loadMissions();
+            const latest = await loadMissions({ companyId: preflightCompanyId });
             const current = latest.missions.find((m) => m.id === body.missionId);
             if (!current) {
               send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -8810,11 +8868,13 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           missionId?: string;
           override?: boolean;
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
+        const departCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const idx = missions.missions.findIndex((m) => m.id === body.missionId);
@@ -8842,7 +8902,11 @@ export function createCareerApiServer(port = 8787) {
               fuelDebitUsd: departedResult.result.fuelDebitUsd,
               fleet: withParkingRates(missions.fleet),
             };
-          }, { commandSliceMissionId: body.missionId, housekeeping: false });
+          }, {
+            commandSliceMissionId: body.missionId,
+            housekeeping: false,
+            companyId: departCompanyId,
+          });
           if (result.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
@@ -8876,13 +8940,19 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/settle') {
-        const body = (await readBody(req)) as { missionId?: string };
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          companyId?: string;
+        };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const exists = await withCareerRead((_world, missions) =>
-          missions.missions.some((m) => m.id === body.missionId),
+        const settleCompanyId = companyIdFromRequest(req, body.companyId);
+        const exists = await withCareerRead(
+          (_world, missions) =>
+            missions.missions.some((m) => m.id === body.missionId),
+          { companyId: settleCompanyId },
         );
         if (!exists) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -9001,6 +9071,7 @@ export function createCareerApiServer(port = 8787) {
             housekeeping: false,
             catchUp: false,
             commandSliceMissionId: body.missionId,
+            companyId: settleCompanyId,
           });
           if (settled.kind === 'missing') {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -9096,12 +9167,14 @@ export function createCareerApiServer(port = 8787) {
           simbriefUserid?: string;
           pipeName?: string;
           runPreflightAfter?: boolean;
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
-        const missions = await loadMissions();
+        const loadOfpCompanyId = companyIdFromRequest(req, body.companyId);
+        const missions = await loadMissions({ companyId: loadOfpCompanyId });
         const idx = missions.missions.findIndex((m) => m.id === body.missionId);
         if (idx < 0) {
           send(res, 404, { error: `Unknown mission ${body.missionId}` });
@@ -9234,7 +9307,9 @@ export function createCareerApiServer(port = 8787) {
             });
           }
           {
-            const wrote = await updateOpenMission(body.missionId, (_m, open) => {
+            const wrote = await updateOpenMission(
+              body.missionId,
+              (_m, open) => {
               if (lastPreflightCheck) open.lastPreflightCheck = lastPreflightCheck;
               const painted = result.displayCg;
               const prevLv = open.lastPreflightCheck?.loadVerification;
@@ -9264,9 +9339,11 @@ export function createCareerApiServer(port = 8787) {
               open.injectBallastLb = injectBallastLb;
               savedMission = open;
               return true;
-            });
+            },
+              { companyId: loadOfpCompanyId },
+            );
             if (!wrote) {
-              const latest = await loadMissions();
+              const latest = await loadMissions({ companyId: loadOfpCompanyId });
               savedMission =
                 latest.missions.find((m) => m.id === body.missionId) ?? mission;
             }

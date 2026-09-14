@@ -8,6 +8,9 @@ import {
   fetchNpcFleet,
   fetchRouteLots,
   fetchState,
+  fetchCompanies,
+  postCompany,
+  postCompanySessionOpen,
   fetchCareerProfiles,
   postCareerProfileCreate,
   postCareerProfileSelect,
@@ -91,6 +94,7 @@ import {
   type CareerProfileMeta,
   type CharterOfferView,
   type CareerCashflowSnapshot,
+  type CareerCompanyView,
   type CompanyCreditSnapshot,
   type EconomyEvent,
   type FuelHaulView,
@@ -121,6 +125,14 @@ import {
   type StarterHubOption,
   type WatchStatus,
 } from './api';
+import {
+  companyIdFromUrl,
+  getStoredCompanyId,
+  LOCAL_COMPANY_ID,
+  setActiveCompanyIdForRequests,
+  setStoredCompanyId,
+  suggestCompanyId,
+} from './career-company-client';
 import {
   pathForLocation,
   readCareerLocation,
@@ -3409,6 +3421,13 @@ export function App() {
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
   const [uiSoundMode, setUiSoundMode] = useState<UiSoundMode>(loadUiSoundMode);
   const [devMode, setDevMode] = useState(loadDevMode);
+  const [companies, setCompanies] = useState<CareerCompanyView[]>([]);
+  const [activeCompanyId, setActiveCompanyId] = useState(getStoredCompanyId);
+
+  useEffect(() => {
+    setActiveCompanyIdForRequests(activeCompanyId);
+  }, [activeCompanyId]);
+
   const [ofpAutoStatus, setOfpAutoStatus] =
     useState<'idle' | 'waiting' | 'checking'>('idle');
   const [loadOfpAutoStatus, setLoadOfpAutoStatus] = useState<
@@ -3967,6 +3986,14 @@ export function App() {
     setWallet(state.walletUsd);
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
+    if (state.companyId) {
+      setActiveCompanyId(state.companyId);
+      setActiveCompanyIdForRequests(state.companyId);
+      // Persist only when the tab is not pinned by ?company= (shared storage).
+      if (!companyIdFromUrl()) {
+        setStoredCompanyId(state.companyId);
+      }
+    }
     if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
     if (state.offlineFeeSummary) {
       setOfflineFeeBanner(state.offlineFeeSummary);
@@ -6544,8 +6571,87 @@ export function App() {
    * Keep the profile gate up until company + tab board are warm — avoids the
    * Freights “Loading…” flash after Continue.
    */
+  async function ensureCompanySessionForUi(): Promise<string> {
+    const companyId = getStoredCompanyId();
+    // Only write shared localStorage when this tab is not URL-pinned.
+    if (!companyIdFromUrl()) {
+      setStoredCompanyId(companyId);
+    }
+    try {
+      const url = new URL(window.location.href);
+      if (companyId !== LOCAL_COMPANY_ID) {
+        url.searchParams.set('company', companyId);
+      } else if (
+        url.searchParams.has('company') &&
+        url.searchParams.get('company') !== LOCAL_COMPANY_ID
+      ) {
+        url.searchParams.delete('company');
+      }
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* ignore */
+    }
+    let listed = await fetchCompanies();
+    if (
+      companyId !== LOCAL_COMPANY_ID &&
+      !listed.companies.some((c) => c.id === companyId)
+    ) {
+      await postCompany({
+        id: companyId,
+        displayName: companyId,
+        activate: false,
+      });
+      listed = await fetchCompanies();
+    }
+    await postCompanySessionOpen({ companyId });
+    setCompanies(listed.companies);
+    setActiveCompanyId(companyId);
+    setActiveCompanyIdForRequests(companyId);
+    return companyId;
+  }
+
+  async function switchCompany(nextId: string): Promise<void> {
+    const id = nextId.trim() || LOCAL_COMPANY_ID;
+    setStoredCompanyId(id);
+    try {
+      const url = new URL(window.location.href);
+      if (id !== LOCAL_COMPANY_ID) {
+        url.searchParams.set('company', id);
+      } else {
+        url.searchParams.delete('company');
+      }
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* ignore */
+    }
+    await ensureCompanySessionForUi();
+    clearCareerSessionPaint();
+    await refreshRef.current();
+  }
+
+  async function createCompanyAndSwitch(): Promise<void> {
+    const id = suggestCompanyId();
+    await postCompany({
+      id,
+      displayName: id,
+      activate: false,
+    });
+    setStoredCompanyId(id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('company', id);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      /* ignore */
+    }
+    await ensureCompanySessionForUi();
+    clearCareerSessionPaint();
+    await refreshRef.current();
+  }
+
   async function warmCareerBeforeEnter(profileId: string): Promise<void> {
     setProfileGateBusyLabel('Loading company & board…');
+    await ensureCompanySessionForUi();
     const scope = liveRefreshScope(tabRef.current, Boolean(airportIcao));
     await refreshRef.current({
       ...scope,
@@ -10906,6 +11012,47 @@ export function App() {
           <div className="topbar-metrics">
             {catchUpBanner ? (
               <EconomySyncIndicator status={catchUpBanner} />
+            ) : null}
+            {careerReady ? (
+              <label className="metric company-switcher" title="Company tenant (dual-tab MP: ?company=)">
+                <span className="label">Company</span>
+                <span className="company-switcher-controls">
+                  <select
+                    value={activeCompanyId}
+                    disabled={busy}
+                    aria-label="Active company"
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      void run(() => switchCompany(next));
+                    }}
+                  >
+                    {(companies.length > 0
+                      ? companies
+                      : [
+                          {
+                            id: activeCompanyId || LOCAL_COMPANY_ID,
+                            displayName: activeCompanyId || LOCAL_COMPANY_ID,
+                          },
+                        ]
+                    ).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.displayName || c.id}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="company-new-btn"
+                    disabled={busy}
+                    title="Create empty company on this world"
+                    onClick={() => {
+                      void run(() => createCompanyAndSwitch());
+                    }}
+                  >
+                    +
+                  </button>
+                </span>
+              </label>
             ) : null}
             {careerReady && pilotIcao ? (
               <button

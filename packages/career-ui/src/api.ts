@@ -1,3 +1,5 @@
+import { getStoredCompanyId } from './career-company-client';
+
 export type AircraftClass =
   | 'narrow_freighter'
   | 'wide_freighter'
@@ -1062,6 +1064,14 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     /* ignore */
   }
+  try {
+    const companyId = getStoredCompanyId();
+    if (companyId) {
+      headers['X-Skyline-Company-Id'] = companyId;
+    }
+  } catch {
+    /* ignore */
+  }
   const res = await fetch(path, {
     ...init,
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
@@ -1144,6 +1154,8 @@ export function fetchState() {
     ClockSync & {
       needsProfile?: boolean;
       activeProfileId?: string | null;
+      /** Tenant used for this snapshot (header / ambient). */
+      companyId?: string;
       seed: string;
       airportCount: number;
       walletUsd: number;
@@ -1176,6 +1188,57 @@ export function fetchState() {
       }>;
     }
   >('/api/state');
+}
+
+export type CareerCompanyView = {
+  id: string;
+  displayName: string;
+  homeHubIcao: string;
+  homeCountryId: string;
+  worldId: string;
+  createdAtMs: number;
+};
+
+export function fetchCompanies(worldId?: string) {
+  const q = worldId ? `?worldId=${encodeURIComponent(worldId)}` : '';
+  return api<{
+    worldId: string;
+    activeCompanyId: string;
+    companies: CareerCompanyView[];
+  }>(`/api/companies${q}`);
+}
+
+export function postCompany(body: {
+  id: string;
+  worldId?: string;
+  displayName?: string;
+  homeHubIcao?: string;
+  homeCountryId?: string;
+  activate?: boolean;
+}) {
+  return api<{
+    company: CareerCompanyView;
+    activeCompanyId: string;
+  }>('/api/companies', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function postCompanySessionOpen(body?: {
+  companyId?: string;
+  worldId?: string;
+  lastSeenTick?: number;
+}) {
+  return api<{
+    companyId: string;
+    fromTick?: number;
+    toTick?: number;
+    offlineFeeSummary?: OfflineFeeSummary | null;
+  }>('/api/companies/session/open', {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  });
 }
 
 export type OfflineFeeSummary = {

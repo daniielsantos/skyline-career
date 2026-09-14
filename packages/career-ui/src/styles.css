@@ -775,6 +775,55 @@ body {
   color: var(--ink);
 }
 
+.topbar-metrics .company-switcher {
+  --metric-accent: color-mix(in srgb, var(--accent) 70%, #888);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 7.5rem;
+}
+
+.topbar-metrics .company-switcher-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.topbar-metrics .company-switcher select {
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.85rem;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  max-width: 8.5rem;
+  cursor: pointer;
+}
+
+.topbar-metrics .company-new-btn {
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.15rem;
+  background: color-mix(in srgb, var(--surface) 80%, var(--accent));
+  color: inherit;
+  cursor: pointer;
+}
+
+.topbar-metrics .company-new-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.topbar-metrics .company-new-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .economy-sync-chip {
   align-self: center;
   display: grid;

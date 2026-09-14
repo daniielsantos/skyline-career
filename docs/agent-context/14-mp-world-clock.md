@@ -188,8 +188,31 @@ interface WorldTickService {
 3. ~~Phase 3 company registry + shared world_id~~ — shipped 2026-09-13 (no OAuth).
 4. ~~Phase 4 remote client clock~~ — shipped 2026-09-13 (`CAREER_WORLD_TICK=remote`).
 5. ~~Phase 5 dual-tenant board/claim proof~~ — shipped 2026-09-13.
-6. Hosted Postgres / multi-process world job — later.
+6. ~~Phase 6 client company context (dual-tab)~~ — shipped 2026-09-13.
+7. Hosted Postgres / multi-process world job — later.
 
+## Phase 6 notes (2026-09-13)
+
+- Client company id: `?company=` (wins) + **sessionStorage** + in-memory chip sync — not `localStorage` (shared across tabs).
+- Every `api()` call sends `X-Skyline-Company-Id` (`packages/career-ui/src/career-company-client.ts` + `api.ts`).
+- Profile enter: `GET /api/companies` → ensure URL company exists → `POST /api/companies/session/open` → refresh.
+- Topbar company select + **+** (new empty tenant); switch → updates `?company=` + session/open + full refresh.
+- Host: `/api/state`, `/api/missions`, `/api/fleet`, `/api/hubs`, `/api/cashflow` load with per-request `companyId` (same mold as market/accept).
+- **Fix (same day):** `/api/contract-pilot/options` + `/api/contract-pilot/accept` also take per-request `companyId` — without it, Labubu Accept saw Nothin’s active `msn_cp_*` (“Finish or cancel…”) via ambient `activeCompanyId`.
+- **Fix (same day):** drop shared `localStorage` tenant — Tab A/B were thrashing each other’s header so Labubu painted Nothin’s Active Flight.
+- **Validation (same day):** flight-loop host paths now take per-request `companyId`: cancel / dispatch / depart / settle / fuel / confirm-ofp / accept-ofp-cargo / preflight / load-ofp + `updateOpenMission`. Tests: `career-multitenant-isolation.test.ts`, `career-company-client.test.ts`.
+- **Still ambient (lower priority):** aircraft buy/lease, ferry, empty-flight, select-hub, Watch singleton, aircraft-market settle — wire when dual-tab hits those flows.
+- **Dual-tab playtest:** same profile/host; Tab A `?company=co_a`, Tab B `?company=co_b` (create via **+** or auto-ensure on first open). Accept on A → Freights on B omits lot; both clocks match.
+- Default no/`local` → SP unchanged. No OAuth / Postgres / SSE.
+
+### Multitenant checklist (human)
+
+1. Open A `?company=co_a`, B `?company=co_b` (same save). Chips differ; URLs differ.
+2. B must **not** show A’s Active Flight / wallet / fleet.
+3. Accept Contract on A → offer gone on B.
+4. Accept **other** Contract on B → succeeds (no “Finish or cancel msn of A”).
+5. Cancel / Dispatch / Fuel on A only mutates A’s Dispatch.
+6. Clocks match.
 ## Phase 5 notes (2026-09-13)
 
 - Staging Freights path stamps/enforces claim: `commitStagedManifest` / `executeAcceptManifest` take `companyId`; `/api/staging/commit` → **409** `lot_claimed`.
@@ -249,6 +272,7 @@ class RemoteWorldTickService implements WorldTickService {
 | **3** | shipped 2026-09-13 | Company registry (`career-companies.ts`); N companies / `world_id`; store load/save/ledger scoped by `companyId`; Accept via `X-Skyline-Company-Id` / body; `GET|POST /api/companies`; pulse settle-all |
 | **4** | shipped 2026-09-13 | Live `RemoteWorldTickService`; `CAREER_WORLD_TICK=remote` + `CAREER_REMOTE_WORLD_URL`; client never advances / never local catch-up; MP path aliases `/worlds/:id/clock` + `/companies/:id/session/open` |
 | **5** | shipped 2026-09-13 | Dual-tenant proof: staging claim + 409; market hides foreign `claimedByCompanyId`; per-request `companyId` on market/accept/staging; same tick + lot gone + conflict tests |
+| **6** | shipped 2026-09-13 | Client company context: `X-Skyline-Company-Id` on every `api()`; `?company=` + localStorage; session/open on enter/switch; topbar switcher; state/missions/fleet scoped per request |
 
 1. ~~**Extrair** `WorldTickService`~~ — feito.
 2. ~~SP local pulse via service~~ — feito.
@@ -300,6 +324,7 @@ class RemoteWorldTickService implements WorldTickService {
 - [x] Company registry + N tenants / shared `world_id` (Phase 3 — no OAuth)
 - [x] Remote client never advances / never local catch-up (Phase 4)
 - [x] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 5 dual-tenant proof)
+- [x] Dual-tab no mesmo host com companies distintas via header/`?company=` (Phase 6)
 - [x] Reconnect não chama `tickEconomyN` no processo UI remoto (Phase 4)
 - [x] Accept concorrente → exatamente um 200, resto 409 (Phase 3 unit + Phase 5 staging/board)
 - [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)

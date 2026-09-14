@@ -201,7 +201,8 @@ interface WorldTickService {
 - **Fix (same day):** `/api/contract-pilot/options` + `/api/contract-pilot/accept` also take per-request `companyId` — without it, Labubu Accept saw Nothin’s active `msn_cp_*` (“Finish or cancel…”) via ambient `activeCompanyId`.
 - **Fix (same day):** drop shared `localStorage` tenant — Tab A/B were thrashing each other’s header so Labubu painted Nothin’s Active Flight.
 - **Validation (same day):** flight-loop host paths now take per-request `companyId`: cancel / dispatch / depart / settle / fuel / confirm-ofp / accept-ofp-cargo / preflight / load-ofp + `updateOpenMission`. Tests: `career-multitenant-isolation.test.ts`, `career-company-client.test.ts`.
-- **Still ambient (lower priority):** aircraft buy/lease, ferry, empty-flight, select-hub, Watch singleton, aircraft-market settle — wire when dual-tab hits those flows.
+- **Still ambient (lower priority):** Watch singleton (process-global) — wire when dual-tab hits concurrent Watch.
+- **Hangar/fleet (same day):** aircraft-market GET/buy/lease/sell/list/unlist/mx/repair/buyout/pay-lease/return-lease + select-hub + ferry-plan/ferry + empty-flight take per-request `companyId`.
 - **Dual-tab playtest:** same profile/host; Tab A `?company=co_a`, Tab B `?company=co_b` (create via **+** or auto-ensure on first open). Accept on A → Freights on B omits lot; both clocks match.
 - Default no/`local` → SP unchanged. No OAuth / Postgres / SSE.
 

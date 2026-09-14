@@ -2802,6 +2802,7 @@ export function createCareerApiServer(port = 8787) {
           icao?: string;
           pilotName?: string;
           airframeTypeId?: string;
+          companyId?: string;
         };
         if (!body.icao) {
           send(res, 400, { error: 'icao required' });
@@ -2811,6 +2812,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'pilotName required' });
           return;
         }
+        const selectHubCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const next = selectStarterHub(missions, body.icao!, {
@@ -2827,7 +2829,7 @@ export function createCareerApiServer(port = 8787) {
               contractPilotCareer: missions.fleet.length === 0,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'blob' });
+          }, { persist: 'blob', companyId: selectHubCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2840,6 +2842,7 @@ export function createCareerApiServer(port = 8787) {
       // Generated board contains one listing per homologated player airframe.
       if (req.method === 'GET' && path === '/api/aircraft-market') {
         const browseRaw = url.searchParams.get('country')?.trim().toUpperCase();
+        const aircraftMarketCompanyId = companyIdFromRequest(req);
         const payload = await withCareerWrite((world, missions) => {
           settleAircraftMarketOps(missions, world.tick, world);
           const homeCountryId = resolveMarketCountryId(world, missions);
@@ -2938,7 +2941,7 @@ export function createCareerApiServer(port = 8787) {
             fleet: withParkingRates(missions.fleet),
             leaseUnlock: leaseUnlockForRequest(req, missions),
           };
-        }, { persist: 'blob' });
+        }, { persist: 'blob', companyId: aircraftMarketCompanyId });
         send(res, 200, payload);
         return;
       }
@@ -2948,11 +2951,13 @@ export function createCareerApiServer(port = 8787) {
           listingId?: string;
           deliver?: boolean;
           deliverToIcao?: string;
+          companyId?: string;
         };
         if (!body.listingId) {
           send(res, 400, { error: 'listingId required' });
           return;
         }
+        const buyCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -2978,7 +2983,11 @@ export function createCareerApiServer(port = 8787) {
                 companyCredit: companyCreditSnapshot(missions),
               };
             });
-          }, { persist: 'blob', housekeeping: false });
+          }, {
+            persist: 'blob',
+            housekeeping: false,
+            companyId: buyCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -2993,11 +3002,13 @@ export function createCareerApiServer(port = 8787) {
           listingId?: string;
           deliver?: boolean;
           deliverToIcao?: string;
+          companyId?: string;
         };
         if (!body.listingId) {
           send(res, 400, { error: 'listingId required' });
           return;
         }
+        const leaseCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -3020,7 +3031,7 @@ export function createCareerApiServer(port = 8787) {
                 leaseUnlock: leaseUnlockForRequest(req, missions),
               };
             });
-          }, { persist: 'blob' });
+          }, { persist: 'blob', companyId: leaseCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3031,11 +3042,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/aircraft-market/sell') {
-        const body = (await readBody(req)) as { aircraftId?: string };
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const sellCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const sold = sellPlayerAircraft(
@@ -3051,7 +3066,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          }, { persist: 'blob' });
+          }, { persist: 'blob', companyId: sellCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3065,11 +3080,13 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           aircraftId?: string;
           askingUsd?: number;
+          companyId?: string;
         };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const listSaleCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const listed = listAircraftForSale(
@@ -3084,7 +3101,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: listSaleCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3099,11 +3116,13 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           termMonths?: number;
           monthlyUsd?: number;
+          companyId?: string;
         };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const listLeaseCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const listed = listAircraftForLease(
@@ -3121,7 +3140,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: listLeaseCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3132,11 +3151,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/aircraft-market/unlist') {
-        const body = (await readBody(req)) as { aircraftId?: string };
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const unlistCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             unlistAircraftForLease(missions, body.aircraftId!);
@@ -3145,7 +3168,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: unlistCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3156,11 +3179,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/aircraft-market/maintenance') {
-        const body = (await readBody(req)) as { aircraftId?: string };
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const mxCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const mx = clearAircraftMaintenanceWithParts(
@@ -3175,7 +3202,10 @@ export function createCareerApiServer(port = 8787) {
               mro: mx.mro,
               fleet: withParkingRates(missions.fleet),
             };
-          }, { commandSliceAircraftId: body.aircraftId });
+          }, {
+            commandSliceAircraftId: body.aircraftId,
+            companyId: mxCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3190,11 +3220,13 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           airframePts?: number;
           enginePts?: number;
+          companyId?: string;
         };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const repairCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const repaired = repairAircraftConditionWithParts(
@@ -3213,7 +3245,10 @@ export function createCareerApiServer(port = 8787) {
               mro: repaired.mro,
               fleet: withParkingRates(missions.fleet),
             };
-          }, { commandSliceAircraftId: body.aircraftId });
+          }, {
+            commandSliceAircraftId: body.aircraftId,
+            companyId: repairCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3224,11 +3259,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/aircraft-market/buyout') {
-        const body = (await readBody(req)) as { aircraftId?: string };
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const buyoutCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const boughtOut = buyOutAircraftLease(
@@ -3241,7 +3280,7 @@ export function createCareerApiServer(port = 8787) {
               debitUsd: boughtOut.debitUsd,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: buyoutCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3252,11 +3291,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/aircraft-market/pay-lease') {
-        const body = (await readBody(req)) as { aircraftId?: string };
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const payLeaseCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const paid = payAircraftLeaseOverdue(
@@ -3270,7 +3313,7 @@ export function createCareerApiServer(port = 8787) {
               weeksPaid: paid.weeksPaid,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: payLeaseCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3281,11 +3324,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/aircraft-market/return-lease') {
-        const body = (await readBody(req)) as { aircraftId?: string };
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
         if (!body.aircraftId) {
           send(res, 400, { error: 'aircraftId required' });
           return;
         }
+        const returnLeaseCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const returned = returnAircraftLeaseEarly(
@@ -3301,7 +3348,7 @@ export function createCareerApiServer(port = 8787) {
               remainingMonths: returned.remainingMonths,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          }, { persist: 'blob' });
+          }, { persist: 'blob', companyId: returnLeaseCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3322,6 +3369,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'aircraftId and dest query required' });
           return;
         }
+        const ferryPlanCompanyId = companyIdFromRequest(req);
         try {
           const result = await withCareerRead((world, missions) => {
             const aircraft = findPlayerAircraft(missions, aircraftId);
@@ -3399,7 +3447,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               aircraftLocationIcao: origin,
             };
-          });
+          }, { companyId: ferryPlanCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3414,11 +3462,13 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           destIcao?: string;
           quoteOnly?: boolean;
+          companyId?: string;
         };
         if (!body.aircraftId || !body.destIcao) {
           send(res, 400, { error: 'aircraftId and destIcao required' });
           return;
         }
+        const ferryCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (body.quoteOnly) {
             const quoted = await withCareerRead((world, missions) => {
@@ -3427,7 +3477,7 @@ export function createCareerApiServer(port = 8787) {
                 destIcao: body.destIcao!,
               });
               return { quote, walletUsd: missions.walletUsd };
-            });
+            }, { companyId: ferryCompanyId });
             send(res, 200, quoted);
             return;
           }
@@ -3447,6 +3497,7 @@ export function createCareerApiServer(port = 8787) {
           }, {
             commandSliceAircraftId: body.aircraftId,
             commandSliceIcaos: [body.destIcao],
+            companyId: ferryCompanyId,
           });
           send(res, 200, result);
         } catch (error) {
@@ -3461,11 +3512,13 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           aircraftId?: string;
           destIcao?: string;
+          companyId?: string;
         };
         if (!body.aircraftId || !body.destIcao) {
           send(res, 400, { error: 'aircraftId and destIcao required' });
           return;
         }
+        const emptyFlightCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -3479,7 +3532,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: emptyFlightCompanyId });
           const watch = watchSession.getStatus();
           if (watch.missionId && watch.missionId !== result.mission.id) {
             if (watch.running) await watchSession.stop({ reset: true });

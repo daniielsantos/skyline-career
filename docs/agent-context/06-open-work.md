@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop 0.3.61 shipped** — SP|MP PlayModeGate + Settings; fleet `registration` migrate; :8788. Installer: [v0.3.61](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.61).
+
 Atualizado 2026-09-14: **Desktop SP|MP gate** — first run (e packaged sem env) pede Single Player vs Multiplayer; URL do world gravada em `%APPDATA%\Skyline Career\career\desktop-play.json`; Settings → Change play mode reinicia a API filha. `CAREER_WORLD_API_URL` no process env ainda força MP (lab). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **Desktop toast `no such column: registration`** — save SP antigo (`fleet_aircraft` sem colunas promovidas). `ensureV3Ddl` fazia `CREATE INDEX …(registration)` no mesmo `exec` do `CREATE TABLE IF NOT EXISTS`; tabela velha = no-op, índice abortava antes do `ALTER` (mesmo classe do bug `port_id`). Fix: índice só depois do ALTER. Installer sem `CAREER_WORLD_API_URL` = **SP** (ProfileGate), não AuthGate world.

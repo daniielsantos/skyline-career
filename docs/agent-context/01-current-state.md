@@ -1,5 +1,7 @@
 # Current state (2026-09-14)
 
+`main` **10d6d9c** / desktop **0.3.61** shipped: SP|MP PlayModeGate + Settings change; `desktop-play.json`; legacy `fleet_aircraft.registration` migrate; API default **:8788**. Release: [v0.3.61](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.61).
+
 `main` **9b4fa85** / desktop **0.3.60** shipped: Electron shell defaults to API **:8788** (compose `world-api` stays **:8787**) so SP/gateway never collide with Docker; Docker-safe port reclaim (no kill of docker/WSL). Release: [v0.3.60](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.60).
 
 # Current state (2026-09-13)
@@ -28,7 +30,8 @@ Local `main` (ainda sem commit/release): Market internacional agora usa grafo di
 
 | Versão | Tag | Notas |
 |--------|-----|--------|
-| **0.3.60** (latest) | [v0.3.60](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.60) | Default API :8788; Docker-safe port reclaim |
+| **0.3.61** (latest) | [v0.3.61](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.61) | SP\|MP play gate + Settings; fleet registration migrate; :8788 |
+| **0.3.60** | [v0.3.60](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.60) | Default API :8788; Docker-safe port reclaim |
 | **0.3.50** | [v0.3.50](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.50) | Pause-aware airborne clock; cruise burn lb/h; Pulse/Stats v8; economy pricing + formLotsIntl perf |
 | **0.3.49** | [v0.3.49](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.49) | Classes validadas; A340 Market; MD-11F Due clamp; Comanche 500; A330/A340 SimBrief |
 | **0.3.48** | [v0.3.48](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.48) | PMDG 777-200ER/LR/300ER Skyline CDU inject + pax packs; Fenix A321 fingerprint; manifest edit lot caps |

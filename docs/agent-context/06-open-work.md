@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop toast `no such column: registration`** — save SP antigo (`fleet_aircraft` sem colunas promovidas). `ensureV3Ddl` fazia `CREATE INDEX …(registration)` no mesmo `exec` do `CREATE TABLE IF NOT EXISTS`; tabela velha = no-op, índice abortava antes do `ALTER` (mesmo classe do bug `port_id`). Fix: índice só depois do ALTER. Installer sem `CAREER_WORLD_API_URL` = **SP** (ProfileGate), não AuthGate world.
+
 Atualizado 2026-09-14: **Desktop 0.3.60 shipped** — default API **:8788** (world-api :8787); Docker-safe port reclaim. Installer: [v0.3.60](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.60).
 
 Atualizado 2026-09-14: **Desktop default :8788** — shell Electron deixa de usar :8787 (world-api). Evita colisão com compose sem precisar matar processos.

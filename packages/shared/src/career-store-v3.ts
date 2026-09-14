@@ -132,8 +132,10 @@ export function ensureV3Ddl(db: SqliteDb): void {
       ON fleet_aircraft(company_id, status);
     CREATE INDEX IF NOT EXISTS fleet_location_idx
       ON fleet_aircraft(location_icao);
-    CREATE INDEX IF NOT EXISTS fleet_registration_idx
-      ON fleet_aircraft(registration);
+    -- fleet_registration_idx is created after ADD COLUMN registration below.
+    -- Creating it here breaks pre-promotion DBs: CREATE TABLE IF NOT EXISTS is a
+    -- no-op, then CREATE INDEX on missing registration aborts the whole exec
+    -- before the ALTER loop runs ("no such column: registration").
 
     CREATE TABLE IF NOT EXISTS missions (
       id TEXT PRIMARY KEY NOT NULL,

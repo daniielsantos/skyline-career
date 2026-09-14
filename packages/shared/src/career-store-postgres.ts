@@ -67,7 +67,7 @@ import {
   stripPgEconomyBlob,
 } from './career-store-pg-world.js';
 
-const CAREER_PG_SCHEMA_VERSION = '12';
+const CAREER_PG_SCHEMA_VERSION = '13';
 const { Pool } = pg;
 
 export const DEFAULT_CAREER_DATABASE_URL =

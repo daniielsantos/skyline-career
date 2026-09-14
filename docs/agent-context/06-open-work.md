@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **MP PG charter parity** — `charter_demand` / `charter_hubs` / `charter_offers` in `career-store-pg-world.ts` (schema v13); hydrate/persist/strip/backfill wired; no offers→demand FK. Next: misc stub leftovers + 24/7 world job. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **MP PG world-ops + dealer pool** — `career-store-pg-world.ts` has v5 ops (`npcs` / fuel / demand / ports / flights / events) + `aircraft_instances`; hydrate/persist/strip wired; load backfills empty tables from RAM; BIGINT ms truncated. Next: charter/misc out of stub + 24/7 world job. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **MP Postgres lab** — `CAREER_PG=1` / `CAREER_DATABASE_URL` → host opens PostgresCareerStore. SP stays SQLite. Docker: `skyline-career-postgres` + Adminer `:8081`. `npm run career:host:pg`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

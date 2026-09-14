@@ -71,6 +71,7 @@ describe('career store postgres', () => {
         airports?: unknown[];
         npcs?: unknown[];
         aircraftInstances?: unknown[];
+        charterOffers?: unknown[];
       };
       assert.equal(
         Array.isArray(payload?.airports) ? payload.airports.length : -1,
@@ -89,6 +90,13 @@ describe('career store postgres', () => {
         0,
         'economy_json stub should have empty aircraftInstances[]',
       );
+      if (Array.isArray(payload?.charterOffers)) {
+        assert.equal(
+          payload.charterOffers.length,
+          0,
+          'economy_json stub should have empty charterOffers[]',
+        );
+      }
       const pool = await store['pool'].query(
         `SELECT COUNT(*)::int AS n FROM aircraft_instances`,
       );
@@ -97,6 +105,24 @@ describe('career store postgres', () => {
         typeof (pool.rows[0] as { n: number }).n === 'number',
         'aircraft_instances table should exist',
       );
+      if ((economy.world.charterOffers?.length ?? 0) > 0) {
+        const offers = await store['pool'].query(
+          `SELECT COUNT(*)::int AS n FROM charter_offers`,
+        );
+        assert.ok(
+          (offers.rows[0] as { n: number }).n > 0,
+          'charter_offers table should be populated when world has offers',
+        );
+      }
+      if ((economy.world.charterHubs?.length ?? 0) > 0) {
+        const hubs = await store['pool'].query(
+          `SELECT COUNT(*)::int AS n FROM charter_hubs`,
+        );
+        assert.ok(
+          (hubs.rows[0] as { n: number }).n > 0,
+          'charter_hubs table should be populated when world has hubs',
+        );
+      }
     } finally {
       store.close();
     }

@@ -1,8 +1,8 @@
 /**
  * Postgres relational tables for career MP world (phase 2).
  * Hot economy slices (lots / airports / stock / inbound) + world-ops
- * (npc / fuel / demand / ports) + aircraft dealer pool + company tables
- * replace the giant economy_json SoT. Meta/auth/company_missions stay in
+ * (npc / fuel / demand / ports) + aircraft dealer pool + charter + company
+ * tables replace the giant economy_json SoT. Meta/auth/company_missions stay in
  * career-store-postgres.ts; economy_json becomes a thin stub via stripPgEconomyBlob.
  */
 
@@ -22,6 +22,12 @@ import type {
   CareerLedgerEntry,
   CareerLedgerKind,
   CareerMissionsState,
+  CharterDemand,
+  CharterHubState,
+  CharterOffer,
+  CharterOfferStatus,
+  CharterTier,
+  CharterUrgency,
   CommodityId,
   DemandOrder,
   DemandOrderStatus,
@@ -436,6 +442,61 @@ CREATE UNIQUE INDEX IF NOT EXISTS aircraft_instances_reg_idx
   ON aircraft_instances(world_id, registration);
 CREATE INDEX IF NOT EXISTS aircraft_instances_country_idx
   ON aircraft_instances(world_id, country_id, status);
+
+CREATE TABLE IF NOT EXISTS charter_demand (
+  world_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  origin_icao TEXT NOT NULL,
+  dest_icao TEXT NOT NULL,
+  pressure DOUBLE PRECISION NOT NULL,
+  international BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at_tick INTEGER NOT NULL,
+  updated_at_tick INTEGER NOT NULL,
+  last_offered_day INTEGER NOT NULL,
+  fulfilled_groups INTEGER NOT NULL DEFAULT 0,
+  expired_groups INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (world_id, id)
+);
+CREATE INDEX IF NOT EXISTS charter_demand_od_idx
+  ON charter_demand(world_id, origin_icao, dest_icao);
+CREATE INDEX IF NOT EXISTS charter_demand_pressure_idx
+  ON charter_demand(world_id, pressure);
+
+CREATE TABLE IF NOT EXISTS charter_hubs (
+  world_id TEXT NOT NULL,
+  icao TEXT NOT NULL,
+  waiting_pax DOUBLE PRECISION NOT NULL DEFAULT 0,
+  attract_pax DOUBLE PRECISION NOT NULL DEFAULT 0,
+  capacity_pax INTEGER NOT NULL DEFAULT 24,
+  updated_at_tick INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (world_id, icao)
+);
+CREATE INDEX IF NOT EXISTS charter_hubs_waiting_idx
+  ON charter_hubs(world_id, waiting_pax);
+
+CREATE TABLE IF NOT EXISTS charter_offers (
+  world_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  demand_id TEXT NOT NULL,
+  origin_icao TEXT NOT NULL,
+  dest_icao TEXT NOT NULL,
+  group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 12),
+  baggage_kg DOUBLE PRECISION NOT NULL DEFAULT 0,
+  distance_nm DOUBLE PRECISION NOT NULL,
+  tier TEXT NOT NULL,
+  urgency TEXT NOT NULL,
+  international BOOLEAN NOT NULL DEFAULT FALSE,
+  pay_usd DOUBLE PRECISION NOT NULL,
+  created_at_tick INTEGER NOT NULL,
+  expires_at_tick INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  mission_id TEXT,
+  PRIMARY KEY (world_id, id)
+);
+CREATE INDEX IF NOT EXISTS charter_offers_status_expiry_idx
+  ON charter_offers(world_id, status, expires_at_tick);
+CREATE INDEX IF NOT EXISTS charter_offers_od_idx
+  ON charter_offers(world_id, origin_icao, dest_icao);
 `;
 
 function asHubTier(raw: string | null | undefined): HubTier | undefined {
@@ -977,6 +1038,9 @@ export function stripPgEconomyBlob(
     portInventories: [],
     portConcessions: [],
     aircraftInstances: [],
+    charterDemand: [],
+    charterOffers: [],
+    charterHubs: [],
   };
 }
 
@@ -998,6 +1062,8 @@ export async function economyNeedsPgTableBackfill(
     { table: 'demand_orders', ram: world.demandOrders?.length ?? 0 },
     { table: 'fuel_trucks', ram: world.fuelTrucks?.length ?? 0 },
     { table: 'port_listings', ram: world.portListings?.length ?? 0 },
+    { table: 'charter_offers', ram: world.charterOffers?.length ?? 0 },
+    { table: 'charter_demand', ram: world.charterDemand?.length ?? 0 },
   ];
   for (const { table, ram } of checks) {
     if (ram <= 0) continue;
@@ -1295,6 +1361,79 @@ export async function hydrateEconomyFromPg(
         },
       ),
     );
+  }
+
+  const charterDemandRes = await pool.query(
+    `SELECT id, origin_icao, dest_icao, pressure, international,
+            created_at_tick, updated_at_tick, last_offered_day,
+            fulfilled_groups, expired_groups
+     FROM charter_demand WHERE world_id = $1 ORDER BY id`,
+    [wid],
+  );
+  if (charterDemandRes.rows.length > 0) {
+    world.charterDemand = charterDemandRes.rows.map((raw) => {
+      const row = raw as Record<string, unknown>;
+      return {
+        id: String(row.id),
+        originIcao: String(row.origin_icao),
+        destIcao: String(row.dest_icao),
+        pressure: num(row.pressure),
+        international: Boolean(row.international),
+        createdAtTick: num(row.created_at_tick),
+        updatedAtTick: num(row.updated_at_tick),
+        lastOfferedDay: num(row.last_offered_day),
+        fulfilledGroups: num(row.fulfilled_groups),
+        expiredGroups: num(row.expired_groups),
+      } satisfies CharterDemand;
+    });
+  }
+
+  const charterOfferRes = await pool.query(
+    `SELECT id, demand_id, origin_icao, dest_icao, group_size, baggage_kg, distance_nm,
+            tier, urgency, international, pay_usd, created_at_tick,
+            expires_at_tick, status, mission_id
+     FROM charter_offers WHERE world_id = $1 ORDER BY created_at_tick, id`,
+    [wid],
+  );
+  if (charterOfferRes.rows.length > 0) {
+    world.charterOffers = charterOfferRes.rows.map((raw) => {
+      const row = raw as Record<string, unknown>;
+      return {
+        id: String(row.id),
+        demandId: String(row.demand_id),
+        originIcao: String(row.origin_icao),
+        destIcao: String(row.dest_icao),
+        groupSize: num(row.group_size),
+        baggageKg: num(row.baggage_kg),
+        distanceNm: num(row.distance_nm),
+        tier: String(row.tier) as CharterTier,
+        urgency: String(row.urgency) as CharterUrgency,
+        international: Boolean(row.international),
+        payUsd: num(row.pay_usd),
+        createdAtTick: num(row.created_at_tick),
+        expiresAtTick: num(row.expires_at_tick),
+        status: String(row.status) as CharterOfferStatus,
+        ...(row.mission_id ? { missionId: String(row.mission_id) } : {}),
+      } satisfies CharterOffer;
+    });
+  }
+
+  const charterHubRes = await pool.query(
+    `SELECT icao, waiting_pax, attract_pax, capacity_pax, updated_at_tick
+     FROM charter_hubs WHERE world_id = $1 ORDER BY icao`,
+    [wid],
+  );
+  if (charterHubRes.rows.length > 0) {
+    world.charterHubs = charterHubRes.rows.map((raw) => {
+      const row = raw as Record<string, unknown>;
+      return {
+        icao: String(row.icao),
+        waitingPax: num(row.waiting_pax),
+        attractPax: num(row.attract_pax),
+        capacityPax: num(row.capacity_pax),
+        updatedAtTick: num(row.updated_at_tick),
+      } satisfies CharterHubState;
+    });
   }
 }
 
@@ -1737,6 +1876,71 @@ function economyEventTableRows(
   });
 }
 
+function charterDemandTableRows(
+  worldId: string,
+  rows: CharterDemand[],
+): unknown[][] {
+  return rows.map((row) => [
+    worldId,
+    row.id,
+    row.originIcao,
+    row.destIcao,
+    sqlNum(row.pressure),
+    Boolean(row.international),
+    sqlNum(row.createdAtTick),
+    sqlNum(row.updatedAtTick),
+    sqlNum(row.lastOfferedDay),
+    sqlNum(row.fulfilledGroups),
+    sqlNum(row.expiredGroups),
+  ]);
+}
+
+function charterHubTableRows(
+  worldId: string,
+  rows: CharterHubState[],
+): unknown[][] {
+  const out: unknown[][] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const icao = row.icao.trim().toUpperCase();
+    if (!icao || seen.has(icao)) continue;
+    seen.add(icao);
+    out.push([
+      worldId,
+      icao,
+      sqlNum(row.waitingPax),
+      sqlNum(row.attractPax),
+      sqlNum(row.capacityPax, 24),
+      sqlNum(row.updatedAtTick),
+    ]);
+  }
+  return out;
+}
+
+function charterOfferTableRows(
+  worldId: string,
+  rows: CharterOffer[],
+): unknown[][] {
+  return rows.map((row) => [
+    worldId,
+    row.id,
+    row.demandId,
+    row.originIcao,
+    row.destIcao,
+    sqlNum(row.groupSize),
+    sqlNum(row.baggageKg),
+    sqlNum(row.distanceNm),
+    row.tier,
+    row.urgency,
+    Boolean(row.international),
+    sqlNum(row.payUsd),
+    sqlNum(row.createdAtTick),
+    sqlNum(row.expiresAtTick),
+    row.status,
+    row.missionId ?? null,
+  ]);
+}
+
 export async function persistEconomyTablesToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
@@ -1764,6 +1968,15 @@ export async function persistEconomyTablesToPg(
   const instanceRows = aircraftInstanceTableRows(
     wid,
     world.aircraftInstances ?? [],
+  );
+  const charterDemandRows = charterDemandTableRows(
+    wid,
+    world.charterDemand ?? [],
+  );
+  const charterHubRows = charterHubTableRows(wid, world.charterHubs ?? []);
+  const charterOfferRows = charterOfferTableRows(
+    wid,
+    world.charterOffers ?? [],
   );
 
   await withTx(pool, async (client) => {
@@ -1972,6 +2185,45 @@ export async function persistEconomyTablesToPg(
          )`,
         16,
         instanceRows,
+      );
+    }
+
+    // No FK from offers→demand: delete offers first (matches SQLite full-replace order).
+    await client.query(`DELETE FROM charter_offers WHERE world_id = $1`, [wid]);
+    await client.query(`DELETE FROM charter_demand WHERE world_id = $1`, [wid]);
+    await client.query(`DELETE FROM charter_hubs WHERE world_id = $1`, [wid]);
+    if (charterDemandRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO charter_demand (
+           world_id, id, origin_icao, dest_icao, pressure, international,
+           created_at_tick, updated_at_tick, last_offered_day,
+           fulfilled_groups, expired_groups
+         )`,
+        11,
+        charterDemandRows,
+      );
+    }
+    if (charterHubRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO charter_hubs (
+           world_id, icao, waiting_pax, attract_pax, capacity_pax, updated_at_tick
+         )`,
+        6,
+        charterHubRows,
+      );
+    }
+    if (charterOfferRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO charter_offers (
+           world_id, id, demand_id, origin_icao, dest_icao, group_size, baggage_kg,
+           distance_nm, tier, urgency, international, pay_usd, created_at_tick,
+           expires_at_tick, status, mission_id
+         )`,
+        16,
+        charterOfferRows,
       );
     }
   });

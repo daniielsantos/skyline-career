@@ -211,7 +211,7 @@ interface WorldTickService {
 - **MP:** `CAREER_DATABASE_URL` or `CAREER_PG=1` → `PostgresCareerStore`.
 - Docker: containers `skyline-career-postgres` + `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
 - Run: `docker compose up -d` then `npm run career:host:pg` + `npm run career:client`.
-- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`). `stripPgEconomyBlob` clears those arrays. Load backfills empty tables when RAM has data (schema upgrade). BIGINT wall-clock ms truncated on write. Stub may still hold charter / misc. Follow-up: drop stub leftovers + 24/7 world job.
+- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`, schema v13; no offers→demand FK). `stripPgEconomyBlob` clears those arrays. Load backfills empty tables when RAM has data (schema upgrade). BIGINT wall-clock ms truncated on write. Follow-up: misc stub leftovers + 24/7 world job.
 
 ## Phase 7 notes (2026-09-14)
 

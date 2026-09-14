@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop 0.3.60 shipped** — default API **:8788** (world-api :8787); Docker-safe port reclaim. Installer: [v0.3.60](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.60).
+
 Atualizado 2026-09-14: **Desktop default :8788** — shell Electron deixa de usar :8787 (world-api). Evita colisão com compose sem precisar matar processos.
 
 Atualizado 2026-09-14: **Desktop matava Docker Desktop** — `killListenersOnPort(8787)` fazia `taskkill /T /F` no PID do proxy Docker → fecha o Docker inteiro. Fix: nunca matar docker/wsl; só node/electron/Skyline; se porta ocupada → erro claro (usar `:8788` + WORLD URL).

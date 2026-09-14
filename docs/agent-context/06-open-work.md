@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop 0.3.63 shipped** — auth: 1 Bearer/conta, purge expired, `GET /api/auth/sessions` (online 5 min). Installer: [v0.3.63](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.63).
+
 Atualizado 2026-09-14: **Auth session hygiene** — one Bearer per account on login/register; purge expired on create/resolve; `GET /api/auth/sessions` (+ `?scope=mine`, `online` = last_seen ≤5 min). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **Desktop 0.3.62 shipped** — health sem lock + headless pulse off antes do PlayModeGate (boot não morre em catch-up SP). Installer: [v0.3.62](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.62).

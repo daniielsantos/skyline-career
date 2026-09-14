@@ -1,5 +1,7 @@
 # Current state (2026-09-14)
 
+`main` **a1d0af3** / desktop **0.3.63** shipped: auth single-session (1 Bearer/conta), purge expired sessions, `GET /api/auth/sessions` + online window 5 min. Release: [v0.3.63](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.63).
+
 `main` **10d6d9c** / desktop **0.3.61** shipped: SP|MP PlayModeGate + Settings change; `desktop-play.json`; legacy `fleet_aircraft.registration` migrate; API default **:8788**. Release: [v0.3.61](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.61).
 
 `main` **9b4fa85** / desktop **0.3.60** shipped: Electron shell defaults to API **:8788** (compose `world-api` stays **:8787**) so SP/gateway never collide with Docker; Docker-safe port reclaim (no kill of docker/WSL). Release: [v0.3.60](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.60).

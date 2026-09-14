@@ -648,6 +648,11 @@ async function startCareerApi() {
   } else {
     delete env.CAREER_WORLD_API_URL;
     env.CAREER_API_MODE = 'full';
+    // Before PlayModeGate choice, do not resume last SP save / catch-up —
+    // that can block boot for minutes on a stale AppData profile.
+    if (!play.mode) {
+      env.CAREER_HEADLESS_PULSE = '0';
+    }
   }
 
   if (play.worldApiUrl) {

@@ -2668,20 +2668,24 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const world = await loadEconomy();
-        const regionCount = listNpcHomeRegions(world.airports ?? []).length;
+        // Liveness must not wait on the career lock — headless login catch-up
+        // can hold it for >90s and the Electron shell times out waiting here.
+        const peeked = store.peekEconomyWorld?.() ?? null;
+        const regionCount = peeked
+          ? listNpcHomeRegions(peeked.airports ?? []).length
+          : 0;
         send(res, 200, {
           ok: true,
           needsProfile: false,
           activeProfileId: worldFixed ? FIXED_WORLD_PROFILE_ID : activeProfileId,
           activeProfileName,
           worldFixed,
-          npcFleetTarget: targetNpcFleetSize(regionCount),
+          npcFleetTarget: peeked ? targetNpcFleetSize(regionCount) : 1,
           sourceStamp: bootSourceStamp,
           store: store.kind,
-          homeCountryId: world.homeCountryId ?? null,
-          countries: listWorldCountryIds(world),
-          internationalLaneCount: world.internationalLanes?.length ?? 0,
+          homeCountryId: peeked?.homeCountryId ?? null,
+          countries: peeked ? listWorldCountryIds(peeked) : [],
+          internationalLaneCount: peeked?.internationalLanes?.length ?? 0,
           authRequired: isCareerAuthRequired(),
         });
         return;

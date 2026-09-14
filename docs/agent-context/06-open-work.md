@@ -182,6 +182,8 @@ Atualizado 2026-09-03: **Value/Heavy Phase A shipped** — idle heavy **1.08→1
 
 Atualizado 2026-09-03: **Value/Heavy slice esboçado** — Phase A idle/recycle lift → Phase B soft-origin rebound → C flow só com ask. Spec: [`21-value-heavy-shelf.md`](./21-value-heavy-shelf.md). Sem knobs ainda.
 
+Atualizado 2026-09-14: **Desktop boot timeout :8788** — `/api/health` esperava `loadEconomy()` sob career lock; headless login catch-up no save SP antigo (~94s) > waitForApi 90s → “did not become ready”. Fix: health usa `peekEconomyWorld` (sem lock). Antes do PlayModeGate (`!mode`): `CAREER_HEADLESS_PULSE=0`.
+
 Atualizado 2026-09-14: **AppData bush cleanup** — não seed/pack `bush_PLN`; ao abrir career root apaga `bush_PLN` legado. Overrides MSFS renomeados `msfs-hub-overrides.json` (migra `msfs-bush-hub-overrides.json` uma vez). Ainda úteis no SP (coords/runways). Homologate `/api/bush-hubs/*` paths API keep name for now.
 
 Atualizado 2026-09-03: **Bush trips product removed** — catalog/mission/pln/GFP/watch APIs gone (`410`); `career-bush.ts` stubs; soft hubs = normal spokes; `activeBushTrip` cleared on load/normalize; `/api/bush-hubs/homologate*` kept for MSFS overrides. File: `msfs-hub-overrides.json` (ex-`msfs-bush-hub-overrides.json`).

@@ -32,6 +32,10 @@ type Mode = 'login' | 'register';
 export function AuthGate(props: {
   busy?: boolean;
   error?: string | null;
+  /** When false, hide Create account (CAREER_AUTH_REGISTER=0). Default true. */
+  registerEnabled?: boolean;
+  /** When true, show invite field on register (CAREER_AUTH_INVITE set). */
+  inviteRequired?: boolean;
   onLogin: (opts: {
     loginName: string;
     password: string;
@@ -41,6 +45,7 @@ export function AuthGate(props: {
     displayName: string;
     password: string;
     companyDisplayName?: string;
+    inviteCode?: string;
   }) => Promise<Omit<AuthGateResult, 'rememberMe'>>;
   onSuccess: (result: AuthGateResult) => void;
 }) {
@@ -51,10 +56,13 @@ export function AuthGate(props: {
   const [displayName, setDisplayName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [rememberMe, setRememberMe] = useState(() => getRememberAuth());
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const registerEnabled = props.registerEnabled !== false;
+  const inviteRequired = props.inviteRequired === true;
   const busy = props.busy || submitting;
   const error = props.error || localError;
 
@@ -71,6 +79,9 @@ export function AuthGate(props: {
               displayName: displayName || loginName,
               password,
               companyDisplayName: companyName || displayName || loginName,
+              ...(inviteRequired || inviteCode.trim()
+                ? { inviteCode: inviteCode.trim() }
+                : {}),
             });
       props.onSuccess({ ...result, rememberMe });
     } catch (err) {
@@ -129,6 +140,19 @@ export function AuthGate(props: {
                 placeholder="Defaults to display name"
               />
             </label>
+            {inviteRequired ? (
+              <label className="pilot-field profile-gate-field">
+                Invite code
+                <input
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  required
+                  placeholder="World invite"
+                />
+              </label>
+            ) : null}
           </>
         ) : null}
 
@@ -152,7 +176,7 @@ export function AuthGate(props: {
             onChange={(e) => setRememberMe(e.target.checked)}
             disabled={busy}
           />
-          <span>Remember me on this device</span>
+          <span>Remember me on this device (keeps you signed in)</span>
         </label>
 
         {error ? (
@@ -165,17 +189,19 @@ export function AuthGate(props: {
           {busy ? '…' : mode === 'login' ? 'Sign in' : 'Create account'}
         </button>
 
-        <button
-          type="button"
-          className="action ghost auth-gate-switch"
-          disabled={busy}
-          onClick={() => {
-            setLocalError(null);
-            setMode(mode === 'login' ? 'register' : 'login');
-          }}
-        >
-          {mode === 'login' ? 'Need an account? Create one' : 'Have an account? Sign in'}
-        </button>
+        {registerEnabled ? (
+          <button
+            type="button"
+            className="action ghost auth-gate-switch"
+            disabled={busy}
+            onClick={() => {
+              setLocalError(null);
+              setMode(mode === 'login' ? 'register' : 'login');
+            }}
+          >
+            {mode === 'login' ? 'Need an account? Create one' : 'Have an account? Sign in'}
+          </button>
+        ) : null}
       </form>
     </section>
   );

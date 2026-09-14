@@ -1,6 +1,6 @@
 /**
  * Client Auth session (Phase 7) — Bearer token for CAREER_AUTH=1 hosts.
- * "Remember me" (default on) keeps the token in localStorage across Electron
+ * "Remember me" (opt-in) keeps the token in localStorage across Electron
  * restarts; otherwise sessionStorage (tab-scoped). Never stores passwords.
  */
 
@@ -23,9 +23,9 @@ function readFlag(key: string, fallback: boolean): boolean {
   }
 }
 
-/** Default true — desktop playtest should not re-type every launch. */
+/** Default false — Bearer stays in sessionStorage unless user opts in (XSS surface). */
 export function getRememberAuth(): boolean {
-  return readFlag(AUTH_REMEMBER_KEY, true);
+  return readFlag(AUTH_REMEMBER_KEY, false);
 }
 
 export function setRememberAuth(remember: boolean): void {

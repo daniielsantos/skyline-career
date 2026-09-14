@@ -233,6 +233,7 @@ interface WorldTickService {
 - Session token → account → owned companies. `Authorization: Bearer` on `api()`.
 - **Session hygiene (2026-09-14):** login/register = **one live Bearer per account** (`revokeAll` then insert). Expired rows purged on create/resolve (`expires_at_ms <= now`). `GET /api/auth/sessions` (Bearer) defaults to **`scope=mine`**; `?scope=all` only when `CAREER_AUTH_SESSIONS_LIST_ALL=1` (lab presence). `online` if `last_seen` within `AUTH_ONLINE_WINDOW_MS` (5 min). Response exposes `tokenHashPrefix` only (not the Bearer).
 - **Auth rate limit (2026-09-14):** login/register share an in-memory per-IP sliding window (**20 / 15 min**); over → `429` `auth_rate_limited` + `Retry-After`. Not distributed across replicas.
+- **Auth medium harden (2026-09-14):** `CAREER_AUTH_REGISTER=0` closes register; `CAREER_AUTH_INVITE` requires matching `inviteCode`; `claimCompanyId` needs `CAREER_AUTH_ALLOW_CLAIM=1`. `/api/map/satellite-style` not public (Bearer when auth on). Gateway keeps map **local** (loads repo `.env`); world-api gets `MAPTILER_KEY` from compose. Remember me default **off** → sessionStorage.
 - Env: `CAREER_AUTH=1` enforces; **host mode defaults on** (`dev.mjs --host`). SP `career:ui` stays off.
 - HTTP: `GET /api/auth/status`, `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `GET /api/auth/sessions`.
 - Register creates company `co_<login>` + owner membership. Claim orphan via `claimCompanyId`.

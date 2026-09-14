@@ -45,6 +45,7 @@ export function parseEnvText(text: string): {
 
 function applyParsedEnv(vars: Record<string, string>): void {
   for (const [name, value] of Object.entries(vars)) {
+    if (!value) continue; // never stamp empty over a missing key
     if (process.env[name] == null || process.env[name] === '') {
       process.env[name] = value;
     }

@@ -3585,6 +3585,8 @@ export function App() {
   const [authRequired, setAuthRequired] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [authRegisterEnabled, setAuthRegisterEnabled] = useState(true);
+  const [authInviteRequired, setAuthInviteRequired] = useState(false);
   /** Bumps when token is set/cleared so ProfileGate Sign out UI refreshes. */
   const [authSessionEpoch, setAuthSessionEpoch] = useState(0);
   const [profilesLoading, setProfilesLoading] = useState(true);
@@ -6930,6 +6932,8 @@ export function App() {
     const status = await fetchAuthStatus();
     setAuthRequired(status.required);
     setAuthChecked(true);
+    setAuthRegisterEnabled(status.registerEnabled !== false);
+    setAuthInviteRequired(status.inviteRequired === true);
     let authEnforced = false;
     if (status.required) {
       const withToken = getAuthToken()
@@ -6985,8 +6989,8 @@ export function App() {
     companies: Array<{ id: string; displayName: string }>;
     rememberMe?: boolean;
   }): Promise<void> {
-    setAuthToken(result.token, { remember: result.rememberMe !== false });
-    if (result.rememberMe !== false && result.account?.loginName?.trim()) {
+    setAuthToken(result.token, { remember: result.rememberMe === true });
+    if (result.rememberMe === true && result.account?.loginName?.trim()) {
       setRememberedLoginName(result.account.loginName);
     }
     setAuthSessionEpoch((n) => n + 1);
@@ -11067,6 +11071,8 @@ export function App() {
       <div className="app-shell profile-gate-shell">
         <AuthGate
           busy={busy}
+          registerEnabled={authRegisterEnabled}
+          inviteRequired={authInviteRequired}
           onLogin={async (opts) => {
             const result = await postAuthLogin(opts);
             return {
@@ -11081,6 +11087,7 @@ export function App() {
               displayName: opts.displayName,
               password: opts.password,
               companyDisplayName: opts.companyDisplayName,
+              inviteCode: opts.inviteCode,
             });
             return {
               token: result.token,

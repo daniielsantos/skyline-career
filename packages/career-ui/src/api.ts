@@ -1264,6 +1264,8 @@ export function fetchAuthStatus() {
     authenticated: boolean;
     account: AuthAccountView | null;
     companies: CareerCompanyView[];
+    registerEnabled?: boolean;
+    inviteRequired?: boolean;
   }>('/api/auth/status');
 }
 
@@ -1290,6 +1292,7 @@ export function postAuthRegister(body: {
   companyId?: string;
   companyDisplayName?: string;
   claimCompanyId?: string;
+  inviteCode?: string;
 }) {
   return api<{
     token: string;

@@ -337,6 +337,12 @@ import {
   isAuthSessionsListAllEnabled,
 } from './auth-rate-limit.ts';
 import {
+  authInviteCodeMatches,
+  authInviteCodeRequired,
+  isAuthClaimCompanyAllowed,
+  isAuthRegisterEnabled,
+} from './auth-register-policy.ts';
+import {
   createGatewayWatchMutations,
   gatewayEconomyShell,
   gatewayLoadMissions,
@@ -1334,7 +1340,7 @@ function isAuthPublicPath(method: string, path: string): boolean {
   if (path === '/api/auth/register' || path === '/api/auth/login') return true;
   if (path === '/api/auth/logout') return true;
   if (path.startsWith('/api/profiles')) return true;
-  if (path === '/api/map/satellite-style') return true;
+  // Map style requires Bearer when CAREER_AUTH=1 (not public).
   if (path.startsWith('/worlds/') && path.endsWith('/clock')) return true;
   if (path === '/api/world/clock') return true;
   return false;
@@ -2637,6 +2643,7 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/map/satellite-style') {
+        // When CAREER_AUTH=1, requireAuthSession already ran (path not public).
         const apiKey = maptilerKeyFromEnv();
         send(res, 200, {
           apiKey,
@@ -2706,6 +2713,8 @@ export function createCareerApiServer(port = 8787) {
           authenticated: Boolean(session),
           account: session?.account ?? null,
           companies: session?.companies ?? [],
+          registerEnabled: isAuthRegisterEnabled(),
+          inviteRequired: Boolean(authInviteCodeRequired()),
         });
         return;
       }
@@ -2720,6 +2729,13 @@ export function createCareerApiServer(port = 8787) {
         }
         if (!store.supportsAuth) {
           send(res, 501, { error: 'Auth requires SQLite career store' });
+          return;
+        }
+        if (!isAuthRegisterEnabled()) {
+          send(res, 403, {
+            error: 'Registration is disabled on this world',
+            code: 'register_disabled',
+          });
           return;
         }
         const rate = consumeAuthRateLimit(authRateLimitKeyFromRequest(req));
@@ -2737,6 +2753,7 @@ export function createCareerApiServer(port = 8787) {
             loginName?: string;
             displayName?: string;
             password?: string;
+            inviteCode?: string;
             createCompany?: boolean;
             companyId?: string;
             companyDisplayName?: string;
@@ -2747,6 +2764,23 @@ export function createCareerApiServer(port = 8787) {
           if (!body.loginName?.trim() || !body.password || !body.displayName?.trim()) {
             send(res, 400, {
               error: 'loginName, displayName, and password required',
+            });
+            return;
+          }
+          if (!authInviteCodeMatches(body.inviteCode)) {
+            send(res, 403, {
+              error: authInviteCodeRequired()
+                ? 'Valid invite code required'
+                : 'Registration invite invalid',
+              code: 'invite_required',
+            });
+            return;
+          }
+          if (body.claimCompanyId?.trim() && !isAuthClaimCompanyAllowed()) {
+            send(res, 403, {
+              error:
+                'claimCompanyId requires CAREER_AUTH_ALLOW_CLAIM=1 (lab migration)',
+              code: 'claim_disabled',
             });
             return;
           }

@@ -54,6 +54,8 @@ services:
     environment:
       # Prefer CAREER_DATABASE_URL in .env; must match POSTGRES_* (host = postgres on Docker net).
       CAREER_DATABASE_URL: ${CAREER_DATABASE_URL:-postgres://skyline:skyline@postgres:5432/skyline}
+      # From root .env — airport satellite map. Empty = map disabled on world.
+      MAPTILER_KEY: ${MAPTILER_KEY:-}
       CAREER_API_MODE: world
       CAREER_DISABLE_SIM: '1'
       CAREER_AUTH: '1'

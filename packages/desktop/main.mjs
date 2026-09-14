@@ -47,10 +47,7 @@ Menu.setApplicationMenu(null);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const API_PORT = Number(
-  process.env.CAREER_UI_API_PORT ??
-    (process.env.CAREER_WORLD_API_URL?.trim() ? 8788 : 8787),
-);
+const API_PORT = Number(process.env.CAREER_UI_API_PORT ?? 8788);
 const API_URL = `http://127.0.0.1:${API_PORT}`;
 
 /** @type {import('node:child_process').ChildProcess | null} */
@@ -521,10 +518,10 @@ async function startCareerApi() {
   if (!(await portFree(API_PORT))) {
     const holder = killListenersOnPort(API_PORT).blockedBy ?? 'another process';
     throw new Error(
-      `Port ${API_PORT} is already in use (${holder}). ` +
-        `If Docker world-api is on :8787, set CAREER_UI_API_PORT=8788 ` +
-        `(and CAREER_WORLD_API_URL=http://127.0.0.1:8787 for gateway), ` +
-        `or stop the other listener. Skyline will not kill Docker/WSL processes.`,
+        `Port ${API_PORT} is already in use (${holder}). ` +
+        `Stop the other listener or set CAREER_UI_API_PORT to a free port. ` +
+        `Compose world-api uses :8787; this shell defaults to :8788. ` +
+        `Skyline will not kill Docker/WSL processes.`,
     );
   }
 
@@ -543,8 +540,8 @@ async function startCareerApi() {
     SKYLINE_CAREER_DATA: careerDataRoot(),
     SKYLINE_UI_DIST: uiDistRoot(),
     CAREER_UI_API_PORT: String(API_PORT),
-    // Remote world host → local gateway (sim on desktop, economy on compose/VPS).
-    // Local gateway defaults to :8788 so it does not clash with world-api :8787.
+    // Desktop shell defaults to :8788 (see API_PORT) so SP never collides with
+    // compose world-api on :8787.
     ...(process.env.CAREER_WORLD_API_URL?.trim()
       ? {
           CAREER_API_MODE: process.env.CAREER_API_MODE ?? 'gateway',
@@ -560,6 +557,8 @@ async function startCareerApi() {
     logLine(
       `[desktop] gateway → world ${process.env.CAREER_WORLD_API_URL.trim()} (local API :${API_PORT})`,
     );
+  } else {
+    logLine(`[desktop] local API :${API_PORT} (world compose uses :8787)`);
   }
 
   const importSpec = pathToFileURL(tsxLoader).href;

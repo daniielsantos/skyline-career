@@ -45,7 +45,7 @@ child.on('exit', (code) => {
 
 Desktop / gateway (PowerShell):
   $env:CAREER_WORLD_API_URL = "http://127.0.0.1:8787"
-  # local gateway defaults to :8788 when WORLD URL is set
+  # desktop shell defaults to :8788 (never clashes with world-api :8787)
   npm start -w skyline-career-desktop
 
 Or Node gateway only (no Electron):

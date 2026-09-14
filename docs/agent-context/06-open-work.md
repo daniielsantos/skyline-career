@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop default :8788** — shell Electron deixa de usar :8787 (world-api). Evita colisão com compose sem precisar matar processos.
+
 Atualizado 2026-09-14: **Desktop matava Docker Desktop** — `killListenersOnPort(8787)` fazia `taskkill /T /F` no PID do proxy Docker → fecha o Docker inteiro. Fix: nunca matar docker/wsl; só node/electron/Skyline; se porta ocupada → erro claro (usar `:8788` + WORLD URL).
 
 Atualizado 2026-09-14: **world-worker 57P03** — Postgres recovery: worker retry (~90s) + compose healthcheck `pg_isready && SELECT 1` (isready sozinho passa cedo demais).

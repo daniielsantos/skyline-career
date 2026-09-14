@@ -1,5 +1,7 @@
 # Current state (2026-09-14)
 
+`main` **876463c** / desktop **0.3.64** shipped: register invite/claim gates; MapTiler auth + compose `MAPTILER_KEY`; Remember me opt-in (sessionStorage default). Release: [v0.3.64](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.64).
+
 `main` **a1d0af3** / desktop **0.3.63** shipped: auth single-session (1 Bearer/conta), purge expired sessions, `GET /api/auth/sessions` + online window 5 min. Release: [v0.3.63](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.63).
 
 `main` **10d6d9c** / desktop **0.3.61** shipped: SP|MP PlayModeGate + Settings change; `desktop-play.json`; legacy `fleet_aircraft.registration` migrate; API default **:8788**. Release: [v0.3.61](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.61).

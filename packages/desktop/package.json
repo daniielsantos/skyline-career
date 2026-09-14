@@ -30,6 +30,7 @@
     },
     "files": [
       "main.mjs",
+      "desktop-play-config.mjs",
       "preload.cjs",
       "package.json",
       "build/icon.ico",

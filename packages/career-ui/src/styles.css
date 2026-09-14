@@ -5528,6 +5528,22 @@ tr.lot-locked {
   line-height: 1.4;
 }
 
+.play-mode-gate .settings-choice {
+  margin-bottom: 1rem;
+}
+
+.play-mode-gate-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.profile-gate-footer-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
 .profile-gate-brand {
   margin: 0;
 }

@@ -195,6 +195,7 @@ import {
 import { AirportNamesProvider, IcaoLink } from './IcaoLink';
 import { BusyBlock, BusyBoot, BusyChip, BusyStatus, TableSkeleton } from './Busy';
 import { CareerProfileManage, ProfileGate, ProfileGateLoading } from './ProfileGate';
+import { PlayModeGate } from './PlayModeGate';
 import {
   DesktopUpdateHeaderButton,
   DesktopUpdatesCard,
@@ -3590,6 +3591,19 @@ export function App() {
   /** Host CAREER_WORLD_FIXED — clients attach, no ProfileGate. */
   const [worldFixed, setWorldFixed] = useState(false);
   const [worldWaiting, setWorldWaiting] = useState(false);
+  /** Electron: first-run / Settings switch between SP and MP. */
+  const [playModeGate, setPlayModeGate] = useState<
+    'loading' | 'needed' | 'hidden'
+  >(() => (window.skylineDesktop?.getPlayConfig ? 'loading' : 'hidden'));
+  const [playModeBusy, setPlayModeBusy] = useState(false);
+  const [playModeError, setPlayModeError] = useState<string | null>(null);
+  const [playModeConfig, setPlayModeConfig] = useState<{
+    mode: 'sp' | 'mp' | null;
+    worldApiUrl: string;
+    defaultWorldApiUrl: string;
+    envForced: boolean;
+  } | null>(null);
+  const [forcePlayModeGate, setForcePlayModeGate] = useState(false);
   const [boardAircraftId, setBoardAircraftId] = useState('');
   const [profitableOnly, setProfitableOnly] = useState(false);
   const boardAircraftInitRef = useRef(false);
@@ -4300,6 +4314,51 @@ export function App() {
     },
     [],
   );
+
+  useEffect(() => {
+    const desktop = window.skylineDesktop;
+    if (!desktop?.getPlayConfig) {
+      setPlayModeGate('hidden');
+      return;
+    }
+    let cancelled = false;
+    void desktop.getPlayConfig().then((cfg) => {
+      if (cancelled) return;
+      setPlayModeConfig({
+        mode: cfg.mode,
+        worldApiUrl: cfg.worldApiUrl,
+        defaultWorldApiUrl: cfg.defaultWorldApiUrl,
+        envForced: cfg.envForced,
+      });
+      setPlayModeGate(cfg.needsChoice ? 'needed' : 'hidden');
+    }).catch(() => {
+      if (!cancelled) setPlayModeGate('hidden');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function applyDesktopPlayMode(opts: {
+    mode: 'sp' | 'mp';
+    worldApiUrl: string;
+  }) {
+    const desktop = window.skylineDesktop;
+    if (!desktop?.setPlayMode) {
+      throw new Error('Play mode switching requires the desktop app');
+    }
+    setPlayModeBusy(true);
+    setPlayModeError(null);
+    clearAuthToken();
+    setAuthSessionEpoch((n) => n + 1);
+    setShowAuthGate(false);
+    const result = await desktop.setPlayMode(opts);
+    if (!result.ok) {
+      setPlayModeBusy(false);
+      throw new Error(result.reason ?? 'Failed to switch play mode');
+    }
+    // Main reloads the window after API restart; keep busy if navigation stalls.
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -10933,6 +10992,56 @@ export function App() {
   const signupPilotResolved = resolvedSignupPilotName();
   const signupPilotLocked = authRequired && signupPilotResolved.length >= 2;
 
+  const showDesktopPlayModeGate =
+    Boolean(window.skylineDesktop?.setPlayMode) &&
+    (forcePlayModeGate || playModeGate === 'needed' || playModeGate === 'loading');
+
+  if (showDesktopPlayModeGate) {
+    if (playModeGate === 'loading' && !forcePlayModeGate) {
+      return (
+        <div className="app-shell profile-gate-shell">
+          <ProfileGateLoading />
+        </div>
+      );
+    }
+    return (
+      <div className="app-shell profile-gate-shell">
+        <PlayModeGate
+          defaultUrl={
+            playModeConfig?.defaultWorldApiUrl ?? 'http://127.0.0.1:8787'
+          }
+          initialUrl={playModeConfig?.worldApiUrl}
+          currentMode={playModeConfig?.mode}
+          busy={playModeBusy}
+          error={playModeError}
+          onChoose={async (opts) => {
+            try {
+              await applyDesktopPlayMode(opts);
+            } catch (err) {
+              setPlayModeError(
+                err instanceof Error ? err.message : String(err),
+              );
+            }
+          }}
+        />
+        {forcePlayModeGate && !playModeBusy ? (
+          <p className="profile-gate-footer-actions">
+            <button
+              type="button"
+              className="action ghost"
+              onClick={() => {
+                setForcePlayModeGate(false);
+                setPlayModeError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
   if (profilesLoading) {
     return (
       <div className="app-shell profile-gate-shell">
@@ -16604,6 +16713,36 @@ export function App() {
                 </button>
               ) : null}
             </div>
+            {window.skylineDesktop?.setPlayMode && !playModeConfig?.envForced ? (
+              <div className="settings-card">
+                <h3>Play mode</h3>
+                <p className="settings-help">
+                  {playModeConfig?.mode === 'mp' ? (
+                    <>
+                      Multiplayer →{' '}
+                      <strong>{playModeConfig.worldApiUrl}</strong>. Single Player
+                      uses local profiles on this PC.
+                    </>
+                  ) : (
+                    <>
+                      Single Player (local saves). Join a world host for shared
+                      economy and Auth.
+                    </>
+                  )}
+                </p>
+                <button
+                  type="button"
+                  className="action"
+                  disabled={busy || playModeBusy}
+                  onClick={() => {
+                    setPlayModeError(null);
+                    setForcePlayModeGate(true);
+                  }}
+                >
+                  Change play mode
+                </button>
+              </div>
+            ) : null}
             <div className="settings-card">
               <h3>SimBrief</h3>
               <p className="settings-help">

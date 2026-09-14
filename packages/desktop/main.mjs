@@ -1,7 +1,7 @@
 /**
  * Skyline Career desktop shell (Electron).
  * Starts Career API (+ optional SimBridgeHost), then opens a BrowserWindow.
- * If CAREER_WORLD_API_URL is set, API runs as gateway (sim local, economy remote).
+ * SP (local SQLite) or MP gateway via desktop-play.json / CAREER_WORLD_API_URL.
  * Auto-update via electron-updater → GitHub Releases (no code signing yet).
  */
 import { createRequire } from 'node:module';
@@ -19,6 +19,13 @@ import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createConnection } from 'node:net';
+import {
+  DEFAULT_WORLD_API_URL,
+  normalizeWorldApiUrl,
+  readDesktopPlayConfig,
+  resolveDesktopPlayLaunch,
+  writeDesktopPlayConfig,
+} from './desktop-play-config.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -82,6 +89,18 @@ function careerContentRoot() {
 
 function careerDataRoot() {
   return join(app.getPath('userData'), 'career');
+}
+
+function desktopPlayConfigPath() {
+  return join(careerDataRoot(), 'desktop-play.json');
+}
+
+/** Active world URL for the next / current API child (empty = SP). */
+function resolveLaunchPlay() {
+  return resolveDesktopPlayLaunch(
+    process.env,
+    readDesktopPlayConfig(desktopPlayConfigPath()),
+  );
 }
 
 function uiDistRoot() {
@@ -388,8 +407,84 @@ function isAppUrl(url) {
   }
 }
 
+async function restartCareerApiForPlayMode() {
+  logLine('[desktop] restarting Career API for play mode…');
+  killTree(apiChild);
+  apiChild = null;
+  await sleep(500);
+  await startCareerApi();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    await mainWindow.loadURL(API_URL);
+  }
+}
+
 function registerIpc() {
   ipcMain.handle('skyline:get-version', () => app.getVersion());
+
+  ipcMain.handle('skyline:get-play-config', () => {
+    const saved = readDesktopPlayConfig(desktopPlayConfigPath());
+    const launch = resolveLaunchPlay();
+    return {
+      mode: launch.mode,
+      savedMode: saved.mode ?? null,
+      worldApiUrl:
+        launch.worldApiUrl ||
+        saved.worldApiUrl ||
+        DEFAULT_WORLD_API_URL,
+      envForced: launch.envForced,
+      needsChoice: !launch.envForced && !saved.mode,
+      defaultWorldApiUrl: DEFAULT_WORLD_API_URL,
+    };
+  });
+
+  ipcMain.handle('skyline:set-play-mode', async (_event, payload) => {
+    const launch = resolveLaunchPlay();
+    if (launch.envForced) {
+      return {
+        ok: false,
+        reason:
+          'Play mode is fixed by CAREER_WORLD_API_URL in the process environment. Unset it to choose in the app.',
+      };
+    }
+    const mode = payload?.mode === 'mp' ? 'mp' : payload?.mode === 'sp' ? 'sp' : null;
+    if (!mode) {
+      return { ok: false, reason: 'mode must be sp or mp' };
+    }
+    let worldApiUrl = DEFAULT_WORLD_API_URL;
+    if (mode === 'mp') {
+      try {
+        worldApiUrl = normalizeWorldApiUrl(
+          payload?.worldApiUrl || DEFAULT_WORLD_API_URL,
+        );
+      } catch (err) {
+        return {
+          ok: false,
+          reason: err instanceof Error ? err.message : String(err),
+        };
+      }
+      if (!worldApiUrl) {
+        return { ok: false, reason: 'Multiplayer requires a world URL' };
+      }
+    }
+    writeDesktopPlayConfig(desktopPlayConfigPath(), {
+      mode,
+      worldApiUrl: mode === 'mp' ? worldApiUrl : DEFAULT_WORLD_API_URL,
+      chosenAtMs: Date.now(),
+    });
+    logLine(
+      mode === 'mp'
+        ? `[desktop] play mode=mp world=${worldApiUrl}`
+        : '[desktop] play mode=sp',
+    );
+    try {
+      await restartCareerApiForPlayMode();
+      return { ok: true, mode, worldApiUrl: mode === 'mp' ? worldApiUrl : '' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logLine(`[desktop] play mode restart failed: ${message}`);
+      return { ok: false, reason: message };
+    }
+  });
 
   ipcMain.handle('skyline:open-external', async (_event, url) =>
     openHttpInOsBrowser(url),
@@ -532,6 +627,7 @@ async function startCareerApi() {
   logStream.write(`\n==== API start ${new Date().toISOString()} ====\n`);
   logStream.write(`tsx=${tsxLoader}\napi=${apiEntry}\nroot=${root}\n`);
 
+  const play = resolveLaunchPlay();
   const env = {
     ...process.env,
     ELECTRON_RUN_AS_NODE: '1',
@@ -540,25 +636,30 @@ async function startCareerApi() {
     SKYLINE_CAREER_DATA: careerDataRoot(),
     SKYLINE_UI_DIST: uiDistRoot(),
     CAREER_UI_API_PORT: String(API_PORT),
-    // Desktop shell defaults to :8788 (see API_PORT) so SP never collides with
-    // compose world-api on :8787.
-    ...(process.env.CAREER_WORLD_API_URL?.trim()
-      ? {
-          CAREER_API_MODE: process.env.CAREER_API_MODE ?? 'gateway',
-          CAREER_WORLD_API_URL: process.env.CAREER_WORLD_API_URL.trim(),
-          CAREER_AUTH: process.env.CAREER_AUTH ?? '0',
-          CAREER_WORLD_FIXED: process.env.CAREER_WORLD_FIXED ?? '0',
-          CAREER_HEADLESS_PULSE: '0',
-        }
-      : {}),
   };
+  // Desktop shell defaults to :8788 (see API_PORT) so SP never collides with
+  // compose world-api on :8787.
+  if (play.worldApiUrl) {
+    env.CAREER_API_MODE = process.env.CAREER_API_MODE?.trim() || 'gateway';
+    env.CAREER_WORLD_API_URL = play.worldApiUrl;
+    env.CAREER_AUTH = process.env.CAREER_AUTH ?? '0';
+    env.CAREER_WORLD_FIXED = process.env.CAREER_WORLD_FIXED ?? '0';
+    env.CAREER_HEADLESS_PULSE = '0';
+  } else {
+    delete env.CAREER_WORLD_API_URL;
+    env.CAREER_API_MODE = 'full';
+  }
 
-  if (process.env.CAREER_WORLD_API_URL?.trim()) {
+  if (play.worldApiUrl) {
     logLine(
-      `[desktop] gateway → world ${process.env.CAREER_WORLD_API_URL.trim()} (local API :${API_PORT})`,
+      `[desktop] gateway → world ${play.worldApiUrl} (local API :${API_PORT}` +
+        `${play.envForced ? ', env' : ', desktop-play.json'})`,
     );
   } else {
-    logLine(`[desktop] local API :${API_PORT} (world compose uses :8787)`);
+    logLine(
+      `[desktop] local API :${API_PORT} SP` +
+        `${play.mode ? '' : ' (play mode not chosen yet)'}`,
+    );
   }
 
   const importSpec = pathToFileURL(tsxLoader).href;

@@ -25,6 +25,7 @@ import {
   type CareerLedgerSummary,
 } from './career-ledger.js';
 import { ensureHomeCountryId } from './career-partition.js';
+import { careerDatabaseUrlFromEnv } from './career-database-url.js';
 import {
   assembleMissionsFromTables,
   companyTablesPopulated,
@@ -1775,9 +1776,6 @@ export async function openCareerStore(opts: OpenCareerStoreOpts): Promise<Career
   const missionsPath = join(careerDir, opts.missionsFileName ?? 'local-missions.json');
   const sqlitePath = join(careerDir, opts.sqliteFileName ?? 'skyline.sqlite');
 
-  const { careerDatabaseUrlFromEnv, openPostgresCareerStore } = await import(
-    './career-store-postgres.js'
-  );
   const envBackend = process.env.CAREER_STORE?.trim().toLowerCase();
   const pgUrl = opts.connectionString?.trim() || careerDatabaseUrlFromEnv();
   const backend: CareerStoreKind | 'auto' =
@@ -1788,13 +1786,18 @@ export async function openCareerStore(opts: OpenCareerStoreOpts): Promise<Career
       ? (envBackend as CareerStoreKind)
       : 'auto');
 
-  if (backend === 'postgres' || (backend === 'auto' && Boolean(opts.connectionString))) {
+  // Only load `pg` when opening Postgres — desktop packs omit that dependency.
+  if (
+    backend === 'postgres' ||
+    (backend === 'auto' && Boolean(opts.connectionString?.trim()))
+  ) {
     const url = opts.connectionString?.trim() || pgUrl;
     if (!url) {
       throw new Error(
         'Postgres career store requires connectionString or CAREER_DATABASE_URL',
       );
     }
+    const { openPostgresCareerStore } = await import('./career-store-postgres.js');
     return openPostgresCareerStore(url);
   }
 

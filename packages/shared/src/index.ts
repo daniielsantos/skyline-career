@@ -253,9 +253,10 @@ export * from './career-ledger.js';
 export * from './career-json-io.js';
 export * from './career-partition.js';
 export * from './career-store.js';
-export * from './career-store-postgres.js';
-export * from './career-store-pg-world.js';
-export * from './career-world-worker-pg.js';
+export * from './career-database-url.js';
+// Postgres modules (`career-store-postgres`, `career-store-pg-world`,
+// `career-world-worker-pg`) import `pg` — do not barrel-export them. Desktop
+// packs omit `pg`; openCareerStore / worker scripts dynamic-import when needed.
 export * from './career-mission.js';
 export * from './career-persist-commands.js';
 export * from './career-cargo-ops.js';

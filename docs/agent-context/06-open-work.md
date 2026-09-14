@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop pack crash `pg` missing** — shared barrel exportava `career-world-worker-pg` / postgres → `ERR_MODULE_NOT_FOUND` no install. Fix: `career-database-url.ts` sem pg; openCareerStore só dynamic-import postgres quando backend=postgres; pack shared `optionalDependencies.pg`.
+
 Atualizado 2026-09-14: **Topbar Move chip** — Pilot Travel dialog: tabs Pilot | Ferry → Plan ferry abre `FerryJourneyDialog` (mesmo fluxo do Hangar). Chip label `Move`.
 
 Atualizado 2026-09-14: **Remember me** — AuthGate checkbox (default on); Bearer + loginName em `localStorage` (não password). Sessão server TTL 30d. Spec: AuthGate / `career-auth-client`.

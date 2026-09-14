@@ -185,6 +185,9 @@ async function assembleRuntime() {
   await writeWorkspacePackage('shared', {
     main: './dist/index.js',
     exports: { '.': { import: './dist/index.js' } },
+    // Optional: only loaded when CAREER_PG / backend=postgres. Omit from
+    // eager shared barrel so SP desktop boots without this package installed.
+    optionalDependencies: { pg: '^8.14.1' },
   });
   await cp(
     join(root, 'packages', 'shared', 'dist'),

@@ -2,14 +2,26 @@
  * Postgres relational tables for career MP world (phase 2).
  * Hot economy slices (lots / airports / stock / inbound) + world-ops
  * (npc / fuel / demand / ports) + aircraft dealer pool + charter + company
- * tables replace the giant economy_json SoT. Meta/auth/company_missions stay in
- * career-store-postgres.ts; economy_json becomes a thin stub via stripPgEconomyBlob.
+ * tables are the economy SoT. Leftover scalars/arrays live in
+ * economy_meta.misc_json. Schema v16 promotes fleet_aircraft payload fields
+ * to columns (registration / hours / MX / config). v15 drops PG stubs
+ * economy_json / company_missions (see career-store-postgres.ts). SP SQLite
+ * mirrors fleet columns via ensureV3Ddl ALTERs. Meta/auth stay in
+ * career-store-postgres.ts.
  */
 
 import type pg from 'pg';
 import { CAREER_COMMODITIES } from './career-economy.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
+import {
+  assertCompanyPersistSafe,
+  companyProgressFromState,
+} from './career-store-company-guard.js';
+import {
+  assembleFleetAircraftFromRow,
+  splitFleetAircraftForPersist,
+} from './career-store-fleet-columns.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { LOCAL_WORLD_ID } from './career-store-v4.js';
 import type {
@@ -43,7 +55,6 @@ import type {
   NpcFlight,
   NpcFreighter,
   PlayerAircraft,
-  PlayerAircraftStatus,
   PlayerFboState,
   PortConcessionIndexRow,
   PortInventoryRow,
@@ -105,7 +116,8 @@ CREATE TABLE IF NOT EXISTS economy_meta (
   seed TEXT NOT NULL,
   tick INTEGER NOT NULL,
   last_batch_at_ms BIGINT NOT NULL,
-  home_country_id TEXT NOT NULL DEFAULT ''
+  home_country_id TEXT NOT NULL DEFAULT '',
+  misc_json JSONB
 );
 
 CREATE TABLE IF NOT EXISTS airports (
@@ -220,7 +232,20 @@ CREATE TABLE IF NOT EXISTS fleet_aircraft (
   status TEXT NOT NULL,
   assigned_mission_id TEXT,
   ownership TEXT,
+  registration TEXT,
+  condition TEXT,
+  hours_airframe DOUBLE PRECISION,
+  hours_engine DOUBLE PRECISION,
+  airframe_condition_pct DOUBLE PRECISION,
+  engine_condition_pct DOUBLE PRECISION,
+  hours_since_inspection DOUBLE PRECISION,
+  maintenance_due_at_hours DOUBLE PRECISION,
+  airframe_configuration_id TEXT,
+  roles_pack_rel_path TEXT,
+  lease_overdue BOOLEAN,
+  listed_listing_id TEXT,
   lease_json JSONB,
+  lease_out_json JSONB,
   payload_json JSONB
 );
 CREATE INDEX IF NOT EXISTS fleet_company_status_idx ON fleet_aircraft(company_id, status);
@@ -640,6 +665,173 @@ async function withTx<T>(
 
 export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(PG_WORLD_DDL);
+  await pool.query(
+    `ALTER TABLE economy_meta ADD COLUMN IF NOT EXISTS misc_json JSONB`,
+  );
+  // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
+  const fleetAlters = [
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS registration TEXT`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS condition TEXT`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS hours_airframe DOUBLE PRECISION`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS hours_engine DOUBLE PRECISION`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS airframe_condition_pct DOUBLE PRECISION`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS engine_condition_pct DOUBLE PRECISION`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS hours_since_inspection DOUBLE PRECISION`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS maintenance_due_at_hours DOUBLE PRECISION`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS airframe_configuration_id TEXT`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS roles_pack_rel_path TEXT`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS lease_overdue BOOLEAN`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS listed_listing_id TEXT`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS lease_out_json JSONB`,
+  ];
+  for (const sql of fleetAlters) {
+    await pool.query(sql);
+  }
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS fleet_registration_idx ON fleet_aircraft(registration)`,
+  );
+  // One-shot backfill from legacy payload_json (only fill NULL columns).
+  await pool.query(`
+    UPDATE fleet_aircraft SET
+      registration = COALESCE(registration, NULLIF(payload_json->>'registration', '')),
+      condition = COALESCE(condition, NULLIF(payload_json->>'condition', '')),
+      hours_airframe = COALESCE(
+        hours_airframe,
+        NULLIF(payload_json->>'hoursAirframe', '')::double precision
+      ),
+      hours_engine = COALESCE(
+        hours_engine,
+        NULLIF(payload_json->>'hoursEngine', '')::double precision
+      ),
+      airframe_condition_pct = COALESCE(
+        airframe_condition_pct,
+        NULLIF(payload_json->>'airframeConditionPct', '')::double precision
+      ),
+      engine_condition_pct = COALESCE(
+        engine_condition_pct,
+        NULLIF(payload_json->>'engineConditionPct', '')::double precision
+      ),
+      hours_since_inspection = COALESCE(
+        hours_since_inspection,
+        NULLIF(payload_json->>'hoursSinceInspection', '')::double precision
+      ),
+      maintenance_due_at_hours = COALESCE(
+        maintenance_due_at_hours,
+        NULLIF(payload_json->>'maintenanceDueAtHours', '')::double precision
+      ),
+      airframe_configuration_id = COALESCE(
+        airframe_configuration_id,
+        NULLIF(payload_json->>'airframeConfigurationId', '')
+      ),
+      roles_pack_rel_path = COALESCE(
+        roles_pack_rel_path,
+        NULLIF(payload_json->>'rolesPackRelPath', '')
+      ),
+      lease_overdue = COALESCE(
+        lease_overdue,
+        CASE
+          WHEN payload_json->>'leaseOverdue' = 'true' THEN TRUE
+          WHEN payload_json->>'leaseOverdue' = 'false' THEN FALSE
+          ELSE NULL
+        END
+      ),
+      listed_listing_id = COALESCE(
+        listed_listing_id,
+        NULLIF(payload_json->>'listedListingId', '')
+      ),
+      lease_out_json = COALESCE(
+        lease_out_json,
+        CASE
+          WHEN jsonb_typeof(payload_json->'leaseOut') = 'object'
+            THEN payload_json->'leaseOut'
+          ELSE NULL
+        END
+      )
+    WHERE payload_json IS NOT NULL
+  `);
+}
+
+/** Leftover economy fields that are not yet relational tables. */
+const PG_ECONOMY_MISC_KEYS = [
+  'internationalLanes',
+  'flow',
+  'portInboundShips',
+  'tourLotSoftHolds',
+  'aircraftPoolCatalogHash',
+  'regionalRecovery',
+  'version',
+] as const;
+
+export function pickPgEconomyMisc(
+  world: CareerEconomyWorld,
+): Record<string, unknown> {
+  const src = world as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of PG_ECONOMY_MISC_KEYS) {
+    const v = src[key];
+    if (v !== undefined) out[key] = v;
+  }
+  return out;
+}
+
+export function applyPgEconomyMisc(
+  world: CareerEconomyWorld,
+  misc: unknown,
+): void {
+  if (misc == null || typeof misc !== 'object' || Array.isArray(misc)) return;
+  const src = misc as Record<string, unknown>;
+  const dst = world as unknown as Record<string, unknown>;
+  for (const key of PG_ECONOMY_MISC_KEYS) {
+    if (src[key] !== undefined) dst[key] = src[key];
+  }
+}
+
+/**
+ * Empty CareerEconomyWorld shell for PG hydrate (tables fill slices).
+ * Does not call createSeedEconomyWorld / migrateEconomyWorld (those seed hubs).
+ */
+export function emptyPgEconomyShell(meta: {
+  seed: string;
+  tick: number;
+  lastBatchAtMs: number;
+  homeCountryId: string;
+}): CareerEconomyWorld {
+  const home = meta.homeCountryId.trim();
+  return {
+    version: 3,
+    seed: meta.seed || 'skyline-career-br-v1',
+    tick: Number.isFinite(meta.tick) ? meta.tick : 0,
+    lastBatchAtMs: Number.isFinite(meta.lastBatchAtMs)
+      ? meta.lastBatchAtMs
+      : Date.now(),
+    lastSyncedAtMs: Number.isFinite(meta.lastBatchAtMs)
+      ? meta.lastBatchAtMs
+      : Date.now(),
+    ...(home ? { homeCountryId: home } : {}),
+    airports: [],
+    lots: [],
+    events: [],
+    npcs: [],
+    npcFlights: [],
+    inboundPending: [],
+    fuelTrucks: [],
+    fuelHauls: [],
+    demandOrders: [],
+    portListings: [],
+    portInventories: [],
+    portConcessions: [],
+    aircraftInstances: [],
+    charterDemand: [],
+    charterOffers: [],
+    charterHubs: [],
+    internationalLanes: [],
+  };
+}
+
+export function isPgEconomyMiscEmpty(misc: unknown): boolean {
+  if (misc == null) return true;
+  if (typeof misc !== 'object' || Array.isArray(misc)) return true;
+  return Object.keys(misc as object).length === 0;
 }
 
 async function ensureWorldRow(
@@ -1018,29 +1210,19 @@ function instanceFromRow(r: {
 }
 
 /**
- * Empty hot slices that live in relational tables so economy_json stays thin.
+ * Meta scalars + leftover misc for legacy migration / tests.
+ * Table-backed arrays are omitted (live in relational tables).
  */
 export function stripPgEconomyBlob(
   world: CareerEconomyWorld,
 ): Record<string, unknown> {
   return {
-    ...world,
-    airports: [],
-    lots: [],
-    inboundPending: [],
-    npcFlights: [],
-    events: [],
-    npcs: [],
-    fuelTrucks: [],
-    fuelHauls: [],
-    demandOrders: [],
-    portListings: [],
-    portInventories: [],
-    portConcessions: [],
-    aircraftInstances: [],
-    charterDemand: [],
-    charterOffers: [],
-    charterHubs: [],
+    seed: world.seed,
+    tick: world.tick,
+    lastBatchAtMs: world.lastBatchAtMs,
+    lastSyncedAtMs: world.lastSyncedAtMs ?? world.lastBatchAtMs,
+    ...(world.homeCountryId ? { homeCountryId: world.homeCountryId } : {}),
+    ...pickPgEconomyMisc(world),
   };
 }
 
@@ -1085,7 +1267,7 @@ export async function hydrateEconomyFromPg(
   const wid = worldId.trim() || LOCAL_WORLD_ID;
 
   const metaRes = await pool.query(
-    `SELECT seed, tick, last_batch_at_ms, home_country_id
+    `SELECT seed, tick, last_batch_at_ms, home_country_id, misc_json
      FROM economy_meta WHERE world_id = $1`,
     [wid],
   );
@@ -1095,6 +1277,7 @@ export async function hydrateEconomyFromPg(
         tick: number;
         last_batch_at_ms: string | number;
         home_country_id: string;
+        misc_json: unknown;
       }
     | undefined;
   if (meta) {
@@ -1103,6 +1286,7 @@ export async function hydrateEconomyFromPg(
     world.lastBatchAtMs = num(meta.last_batch_at_ms);
     world.lastSyncedAtMs = world.lastBatchAtMs;
     if (meta.home_country_id) world.homeCountryId = meta.home_country_id;
+    applyPgEconomyMisc(world, meta.misc_json);
   }
 
   const hubRes = await pool.query(
@@ -1983,19 +2167,21 @@ export async function persistEconomyTablesToPg(
     await ensureWorldRow(client, wid);
 
     await client.query(
-      `INSERT INTO economy_meta (world_id, seed, tick, last_batch_at_ms, home_country_id)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO economy_meta (world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
        ON CONFLICT (world_id) DO UPDATE SET
          seed = EXCLUDED.seed,
          tick = EXCLUDED.tick,
          last_batch_at_ms = EXCLUDED.last_batch_at_ms,
-         home_country_id = EXCLUDED.home_country_id`,
+         home_country_id = EXCLUDED.home_country_id,
+         misc_json = EXCLUDED.misc_json`,
       [
         wid,
         world.seed,
         sqlNum(world.tick),
         sqlBigint(world.lastBatchAtMs),
         world.homeCountryId ?? '',
+        jsonParam(pickPgEconomyMisc(world)),
       ],
     );
 
@@ -2229,6 +2415,38 @@ export async function persistEconomyTablesToPg(
   });
 }
 
+/** Dealer pool only — buy/lease/sell must not rewrite lots/airports/NPC. */
+export async function persistAircraftPoolToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const instanceRows = aircraftInstanceTableRows(
+    wid,
+    world.aircraftInstances ?? [],
+  );
+  await withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await client.query(`DELETE FROM aircraft_instances WHERE world_id = $1`, [
+      wid,
+    ]);
+    if (instanceRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO aircraft_instances (
+           world_id, id, airframe_type_id, aircraft_class_id, country_id, based_icao,
+           registration, kind, condition, hours_airframe, hours_engine,
+           airframe_condition_pct, engine_condition_pct, status, seeded_at_tick,
+           available_at_tick
+         )`,
+        16,
+        instanceRows,
+      );
+    }
+  });
+}
+
 function missionCoreAndPayload(m: MissionIntent): {
   core: {
     id: string;
@@ -2302,52 +2520,40 @@ function missionCoreAndPayload(m: MissionIntent): {
   };
 }
 
-function fleetCoreAndPayload(a: PlayerAircraft): {
-  core: {
-    id: string;
-    aircraftClassId: FreighterClassId;
-    airframeTypeId?: string;
-    label: string;
-    locationIcao: string;
-    fuelKg: number;
-    fuelCapacityKg: number;
-    status: PlayerAircraftStatus;
-    assignedMissionId?: string;
-    ownership?: string;
-  };
-  payload: string | null;
-  leaseJson: string | null;
-} {
-  const {
-    id,
-    aircraftClassId,
-    airframeTypeId,
-    label,
-    locationIcao,
-    fuelKg,
-    fuelCapacityKg,
-    status,
-    assignedMissionId,
-    ownership,
-    lease,
-    ...rest
-  } = a;
-  return {
-    core: {
-      id,
-      aircraftClassId,
-      airframeTypeId,
-      label,
-      locationIcao,
-      fuelKg,
-      fuelCapacityKg,
-      status,
-      assignedMissionId,
-      ownership,
-    },
-    leaseJson: lease ? JSON.stringify(lease) : null,
-    payload: Object.keys(rest).length > 0 ? JSON.stringify(rest) : null,
-  };
+function fleetPersistValues(
+  a: PlayerAircraft,
+  companyId: string,
+): unknown[] {
+  const { cols, leaseJson, leaseOutJson, payloadJson } =
+    splitFleetAircraftForPersist(a);
+  return [
+    cols.id,
+    companyId,
+    cols.aircraftClassId,
+    cols.airframeTypeId ?? null,
+    cols.label ?? '',
+    cols.locationIcao ?? '',
+    sqlNum(cols.fuelKg),
+    sqlNum(cols.fuelCapacityKg),
+    cols.status,
+    cols.assignedMissionId ?? null,
+    cols.ownership ?? null,
+    cols.registration ?? null,
+    cols.condition ?? null,
+    cols.hoursAirframe ?? null,
+    cols.hoursEngine ?? null,
+    cols.airframeConditionPct ?? null,
+    cols.engineConditionPct ?? null,
+    cols.hoursSinceInspection ?? null,
+    cols.maintenanceDueAtHours ?? null,
+    cols.airframeConfigurationId ?? null,
+    cols.rolesPackRelPath ?? null,
+    cols.leaseOverdue === true ? true : null,
+    cols.listedListingId ?? null,
+    leaseJson,
+    leaseOutJson,
+    payloadJson,
+  ];
 }
 
 async function readFleetAircraft(
@@ -2357,33 +2563,48 @@ async function readFleetAircraft(
   const { rows } = await pool.query(
     `SELECT id, aircraft_class_id, airframe_type_id, label, location_icao,
             fuel_kg, fuel_capacity_kg, status, assigned_mission_id, ownership,
-            lease_json, payload_json
+            registration, condition, hours_airframe, hours_engine,
+            airframe_condition_pct, engine_condition_pct, hours_since_inspection,
+            maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
+            lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
      FROM fleet_aircraft WHERE company_id = $1 ORDER BY id ASC`,
     [companyId],
   );
-  return rows.map((r) => {
-    const extra = parseJson<Partial<PlayerAircraft>>(r.payload_json) ?? {};
-    const aircraft: PlayerAircraft = {
-      ...extra,
+  return rows.map((r) =>
+    assembleFleetAircraftFromRow({
       id: r.id as string,
-      aircraftClassId: r.aircraft_class_id as FreighterClassId,
+      aircraft_class_id: r.aircraft_class_id as string,
+      airframe_type_id: r.airframe_type_id as string | null,
       label: r.label as string,
-      locationIcao: r.location_icao as string,
-      fuelKg: num(r.fuel_kg),
-      fuelCapacityKg: num(r.fuel_capacity_kg),
-      status: r.status as PlayerAircraftStatus,
-    };
-    if (r.airframe_type_id) aircraft.airframeTypeId = r.airframe_type_id as string;
-    if (r.assigned_mission_id) {
-      aircraft.assignedMissionId = r.assigned_mission_id as string;
-    }
-    if (r.ownership === 'owned' || r.ownership === 'leased') {
-      aircraft.ownership = r.ownership;
-    }
-    const lease = parseJson<PlayerAircraft['lease']>(r.lease_json);
-    if (lease) aircraft.lease = lease;
-    return aircraft;
-  });
+      location_icao: r.location_icao as string,
+      fuel_kg: num(r.fuel_kg),
+      fuel_capacity_kg: num(r.fuel_capacity_kg),
+      status: r.status as string,
+      assigned_mission_id: r.assigned_mission_id as string | null,
+      ownership: r.ownership as string | null,
+      registration: r.registration as string | null,
+      condition: r.condition as string | null,
+      hours_airframe: r.hours_airframe == null ? null : num(r.hours_airframe),
+      hours_engine: r.hours_engine == null ? null : num(r.hours_engine),
+      airframe_condition_pct:
+        r.airframe_condition_pct == null ? null : num(r.airframe_condition_pct),
+      engine_condition_pct:
+        r.engine_condition_pct == null ? null : num(r.engine_condition_pct),
+      hours_since_inspection:
+        r.hours_since_inspection == null ? null : num(r.hours_since_inspection),
+      maintenance_due_at_hours:
+        r.maintenance_due_at_hours == null
+          ? null
+          : num(r.maintenance_due_at_hours),
+      airframe_configuration_id: r.airframe_configuration_id as string | null,
+      roles_pack_rel_path: r.roles_pack_rel_path as string | null,
+      lease_overdue: r.lease_overdue as boolean | null,
+      listed_listing_id: r.listed_listing_id as string | null,
+      lease_json: r.lease_json,
+      lease_out_json: r.lease_out_json,
+      payload_json: r.payload_json,
+    }),
+  );
 }
 
 async function readMissionsTable(
@@ -2596,6 +2817,16 @@ export async function hydrateMissionsFromPg(
     if (company?.display_name && !merged.pilotName) {
       merged.pilotName = company.display_name;
     }
+    // Heal: empty seed / bad company_state can clear hubSelected while
+    // companies.home_hub_icao still holds the registered hub (contract pilots).
+    if (
+      !merged.hubSelected &&
+      merged.homeHubIcao?.trim() &&
+      (merged.pilotName?.trim() || merged.pilotIcao?.trim() || merged.fleet.length > 0)
+    ) {
+      merged.hubSelected = true;
+      if (!merged.pilotIcao?.trim()) merged.pilotIcao = merged.homeHubIcao;
+    }
     return merged;
   }
 
@@ -2614,6 +2845,41 @@ export async function persistMissionsTablesToPg(
   const now = Date.now();
 
   await withTx(pool, async (client) => {
+    const progressRes = await client.query(
+      `SELECT
+         COALESCE(
+           (SELECT wallet_usd FROM company_state WHERE company_id = $1),
+           0
+         )::float8 AS wallet_usd,
+         (SELECT COUNT(*)::int FROM fleet_aircraft WHERE company_id = $1) AS fleet_count,
+         (SELECT COUNT(*)::int FROM ledger WHERE company_id = $1) AS ledger_count,
+         (SELECT COUNT(*)::int FROM missions WHERE company_id = $1) AS mission_count`,
+      [cid],
+    );
+    const fleetIdRes = await client.query(
+      `SELECT id FROM fleet_aircraft WHERE company_id = $1 ORDER BY id ASC`,
+      [cid],
+    );
+    const row = progressRes.rows[0] as
+      | {
+          wallet_usd: number;
+          fleet_count: number;
+          ledger_count: number;
+          mission_count: number;
+        }
+      | undefined;
+    assertCompanyPersistSafe({
+      companyId: cid,
+      existing: {
+        walletUsd: Number(row?.wallet_usd ?? 0),
+        fleetCount: Number(row?.fleet_count ?? 0),
+        ledgerCount: Number(row?.ledger_count ?? 0),
+        missionCount: Number(row?.mission_count ?? 0),
+        fleetIds: fleetIdRes.rows.map((r) => String((r as { id: string }).id)),
+      },
+      incoming: companyProgressFromState(state),
+    });
+
     if (state.pilotName || state.homeHubIcao) {
       await client.query(
         `UPDATE companies SET
@@ -2715,22 +2981,7 @@ export async function persistMissionsTablesToPg(
       const fleetRows: unknown[][] = [];
       for (const a of fleet) {
         if (!a.id) continue;
-        const { core, payload, leaseJson } = fleetCoreAndPayload(a);
-        fleetRows.push([
-          core.id,
-          cid,
-          core.aircraftClassId,
-          core.airframeTypeId ?? null,
-          core.label ?? '',
-          core.locationIcao ?? '',
-          sqlNum(core.fuelKg),
-          sqlNum(core.fuelCapacityKg),
-          core.status,
-          core.assignedMissionId ?? null,
-          core.ownership ?? null,
-          leaseJson,
-          payload,
-        ]);
+        fleetRows.push(fleetPersistValues(a, cid));
       }
       if (fleetRows.length > 0) {
         await insertChunks(
@@ -2738,9 +2989,12 @@ export async function persistMissionsTablesToPg(
           `INSERT INTO fleet_aircraft (
              id, company_id, aircraft_class_id, airframe_type_id, label, location_icao,
              fuel_kg, fuel_capacity_kg, status, assigned_mission_id, ownership,
-             lease_json, payload_json
+             registration, condition, hours_airframe, hours_engine,
+             airframe_condition_pct, engine_condition_pct, hours_since_inspection,
+             maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
+             lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
            )`,
-          13,
+          26,
           fleetRows,
         );
       }

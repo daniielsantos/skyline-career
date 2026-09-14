@@ -1,5 +1,21 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Board GET freezes (PG)** — Charter was worst (full write per sort); Freights `/api/market` `persist:inbound` and Airframes GET `blob` also full-saved on PG stubs → all switched to `withCareerRead`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **fleet_aircraft columns** — registration / hours / condition % / config / lease_overdue / listed_listing_id / lease_out_json promoted out of `payload_json` (PG schema v16 + SQLite ALTER). Soft link to dealer pool stays `registration`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md) / store fleet.
+
+Atualizado 2026-09-14: **Cashflow Recent activity order** — same-tick ledger rows were sorted by string `id` (`led_676_10` before `led_676_4`), so ATR buy appeared mid-table. Fix: sort by tick + append seq; pad new ids. Spec: ledger in Hangar cashflow.
+
+Atualizado 2026-09-14: **MP PG schema v15** — drops stub tables `economy_json` + `company_missions` (one-shot retire on open); SoT = relational + `economy_meta.misc_json` / company tables. SP SQLite unchanged. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Removed Reset World** — UI button + `POST /api/init` gone (unsafe for MP; SP = new save). Heal `hubSelected` from `companies.home_hub` kept. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Heal hubSelected** — PG hydrate restores `hubSelected` from `companies.home_hub_icao` + pilot. **Nota:** wipe `$0`/Choose-hub com mundo ainda Day 8 **não** era Reset — seed vazio + hydrate stub/`company_state` (ver [`14`](./14-mp-world-clock.md)).
+
+Atualizado 2026-09-14: **World clock UX** — topbar label shows `World · next Ns` (or `pulse due`); Day·HH:MM stays primary. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **MP PG economy_json SoT retired** — schema v14; leftovers in `economy_meta.misc_json`; stub cleared on migrate/save (v15 drops the table). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **MP PG 24/7 world worker** — `npm run career:world:pg` pulses economy via Postgres advisory lock (no UI). Pair with `CAREER_HEADLESS_PULSE=0` on host. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **MP PG charter parity** — `charter_demand` / `charter_hubs` / `charter_offers` in `career-store-pg-world.ts` (schema v13); hydrate/persist/strip/backfill wired; no offers→demand FK. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

@@ -77,7 +77,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 10. ~~**Contract-pilot accept:**~~ `persist: 'npcLive'` (NPC + flights + dirty lots/inbound/airports; not port/demand rewrite).
 11. ~~**Bush homologate + staging auto-dispatch:**~~ one hub airport patch; staging dispatch = mission slice.
 12. ~~**GET health/NPC + Watch depart:**~~ GETs skip catch-up; Watch auto-depart/false-depart = mission slice.
-13. ~~**Airport GET hydrate + bush Watch:**~~ terminal inventory hydrate skips catch-up; bush depart/settle = company only. Tick / `POST /api/init` still full `saveEconomy`.
+13. ~~**Airport GET hydrate + bush Watch:**~~ terminal inventory hydrate skips catch-up; bush depart/settle = company only. Tick still full `saveEconomy` (`POST /api/init` removed 2026-09-14).
 14. ~~**Company persist skip + ledger patch:**~~ identical `saveMissions` no-ops; ledger upsert + delete-not-in (no `DELETE FROM ledger` wipe). Dealer GET blob still calls `saveMissions` but skips SQL when unchanged.
 15. ~~**Fleet/missions skip:**~~ `saveMissions` só reescreve frota, tabela de missões, `company_state`, stub ou ledger quando aquele slice mudou (ex. parking fee = wallet+ledger, sem `replaceFleet`).
 16. ~~**Fleet/mission row patch:**~~ upsert + delete só das tails/missões dirty (assinatura por id); full rewrite se ≥80 mudanças, como lots.
@@ -92,7 +92,7 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 | ~~`CancelMission`~~ | status cancel, release tail, lot devolve | — |
 | ~~`BuyAircraft`~~ | wallet + instance `sold` + fleet row | rebalance pool mundial |
 
-`executeAcceptLot` / `executeAcceptManifest` / `executeDepartFlight` / `executeBuyAircraft` / `executeCancelMission` em `career-persist-commands.ts`. Replay: mesmo lot na missão aberta; `in_flight` sem segundo Jet-A; mesmo casco (matrícula) na frota; cancel já `cancelled` não devolve o lote de novo. Buy ainda `persist: 'blob'` (pool no stub). Slice de comando também persiste demand order / NPC live se a missão for Demand ou contract-pilot.
+`executeAcceptLot` / `executeAcceptManifest` / `executeDepartFlight` / `executeBuyAircraft` / `executeCancelMission` em `career-persist-commands.ts`. Replay: mesmo lot na missão aberta; `in_flight` sem segundo Jet-A; mesmo casco (matrícula) na frota; cancel já `cancelled` não devolve o lote de novo. Buy/lease/sell: `persist: 'aircraftMarket'` (pool + company only; PG `persistAircraftPoolToPg` — not full economy). Slice de comando também persiste demand order / NPC live se a missão for Demand ou contract-pilot.
 
 ## Fora
 

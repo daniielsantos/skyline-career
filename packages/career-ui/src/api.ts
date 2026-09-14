@@ -1954,26 +1954,17 @@ export function postTick(n = 1, opts?: { profile?: boolean }) {
   });
 }
 
-/** Dev-only test aid — credits the career wallet by $5,000. */
-export function postDebugCreditWallet() {
+/** Dev-only test aid — credits the career wallet (default $5,000). */
+export function postDebugCreditWallet(opts?: { amountUsd?: number }) {
   return api<{ walletUsd: number; creditedUsd: number }>(
     '/api/debug/credit-wallet',
     {
       method: 'POST',
+      body: JSON.stringify({
+        amountUsd: opts?.amountUsd ?? 5_000,
+      }),
     },
   );
-}
-
-export function postInitBrazil() {
-  return api<{
-    tick: number;
-    seed: string;
-    airports: number;
-    availableLots?: number;
-  }>('/api/init', {
-    method: 'POST',
-    body: JSON.stringify({ resetMissions: true }),
-  });
 }
 
 export function postAccept(opts: {

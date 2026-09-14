@@ -142,3 +142,75 @@ export function logbookPayoutUsd(mission: Mission): number | null {
   }
   return null;
 }
+
+const HOURS_PER_TICK = 0.25;
+const HOURS_PER_DAY = 24;
+
+/** Economy day/time from a tick (same mold as the World topbar clock). */
+export function formatEconomyClock(continuousTicks: number): string {
+  const totalMinutes = Math.max(
+    0,
+    Math.floor(continuousTicks * HOURS_PER_TICK * 60),
+  );
+  const day = Math.floor(totalMinutes / (HOURS_PER_DAY * 60)) + 1;
+  const rem = totalMinutes % (HOURS_PER_DAY * 60);
+  const hour = Math.floor(rem / 60);
+  const minute = rem % 60;
+  return `Day ${day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function formatFlightDurationMs(ms: number): string {
+  const totalMin = Math.max(1, Math.round(ms / 60_000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h <= 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+/**
+ * Block / airborne time for the logbook.
+ * Prefer settled Watch duration; else planned route; else OFP block; else tick span.
+ */
+export function logbookFlightDurationLabel(mission: Mission): string | null {
+  const settled = mission.settledFlightDurationMs;
+  if (typeof settled === 'number' && Number.isFinite(settled) && settled > 0) {
+    return formatFlightDurationMs(settled);
+  }
+  const planned = mission.expectedRouteMs;
+  if (typeof planned === 'number' && Number.isFinite(planned) && planned > 0) {
+    const label = formatFlightDurationMs(planned);
+    return mission.status === 'settled' || mission.status === 'failed'
+      ? label
+      : `~${label}`;
+  }
+  const ofpBlock = mission.lastOfpCheck?.briefing?.blockTime?.trim();
+  if (ofpBlock) return ofpBlock;
+  if (
+    typeof mission.departedAtTick === 'number' &&
+    typeof mission.settledAtTick === 'number' &&
+    mission.settledAtTick > mission.departedAtTick
+  ) {
+    const ticks = mission.settledAtTick - mission.departedAtTick;
+    return formatFlightDurationMs(ticks * 15 * 60 * 1000);
+  }
+  return null;
+}
+
+/**
+ * When the flight happened in world time (settle → depart → accept).
+ */
+export function logbookFlightWhenLabel(mission: Mission): string | null {
+  const tick =
+    (typeof mission.settledAtTick === 'number' && Number.isFinite(mission.settledAtTick)
+      ? mission.settledAtTick
+      : undefined) ??
+    (typeof mission.departedAtTick === 'number' && Number.isFinite(mission.departedAtTick)
+      ? mission.departedAtTick
+      : undefined) ??
+    (typeof mission.acceptedAtTick === 'number' && Number.isFinite(mission.acceptedAtTick)
+      ? mission.acceptedAtTick
+      : undefined);
+  if (tick == null) return null;
+  return formatEconomyClock(tick);
+}

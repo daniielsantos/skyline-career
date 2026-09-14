@@ -90,7 +90,6 @@ export function AuthGate(props: {
             maxLength={32}
             pattern="[A-Za-z0-9_]+"
             required
-            placeholder="alice"
           />
         </label>
 

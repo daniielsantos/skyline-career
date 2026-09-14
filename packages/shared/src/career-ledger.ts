@@ -78,9 +78,31 @@ const KIND_SET = new Set<string>(Object.keys(LEDGER_KIND_LABEL));
 
 let ledgerSeq = 0;
 
+/** Parse append order from `led_<tick>_<seq>_<rand>` (legacy unpadded seq ok). */
+function ledgerAppendSeq(id: string): number {
+  const parts = id.split('_');
+  // led, tick, seq, rand… — seq is parts[2]
+  if (parts.length < 3 || parts[0] !== 'led') return 0;
+  const n = Number(parts[2]);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Chronological: tick ASC, then in-tick append seq (not lexicographic id). */
+export function compareLedgerChronological(
+  a: Pick<CareerLedgerEntry, 'atTick' | 'id'>,
+  b: Pick<CareerLedgerEntry, 'atTick' | 'id'>,
+): number {
+  if (a.atTick !== b.atTick) return a.atTick - b.atTick;
+  const sa = ledgerAppendSeq(a.id);
+  const sb = ledgerAppendSeq(b.id);
+  if (sa !== sb) return sa - sb;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 function nextLedgerId(atTick: number): string {
   ledgerSeq += 1;
-  return `led_${atTick}_${ledgerSeq}_${Math.floor(Math.random() * 1e6)}`;
+  // Zero-pad seq so DB `ORDER BY id` stays chronological if someone sorts by id.
+  return `led_${atTick}_${String(ledgerSeq).padStart(8, '0')}_${Math.floor(Math.random() * 1e6)}`;
 }
 
 export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
@@ -117,7 +139,9 @@ export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
       icao: typeof r.icao === 'string' ? r.icao.toUpperCase() : undefined,
     });
   }
-  return out.slice(-CAREER_LEDGER_MAX_ENTRIES);
+  return out
+    .sort(compareLedgerChronological)
+    .slice(-CAREER_LEDGER_MAX_ENTRIES);
 }
 
 /**
@@ -203,11 +227,12 @@ export function summarizeCareerLedger(
   allTime: CareerLedgerSummary;
   recent: CareerLedgerEntry[];
 } {
-  const all = state.ledger ?? [];
+  const all = [...(state.ledger ?? [])].sort(compareLedgerChronological);
   return {
     week: summarizeLedgerEntries(ledgerEntriesInWindow(all, atTick, 7)),
     month: summarizeLedgerEntries(ledgerEntriesInWindow(all, atTick, 30)),
     allTime: summarizeLedgerEntries(all),
-    recent: [...all].reverse().slice(0, 80),
+    // Newest first for Recent activity.
+    recent: all.slice().reverse().slice(0, 80),
   };
 }

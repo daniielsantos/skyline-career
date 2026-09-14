@@ -191,7 +191,7 @@ interface WorldTickService {
 6. ~~Phase 6 client company context (dual-tab)~~ — shipped 2026-09-13.
 7. ~~Phase 7 local Auth (account → company)~~ — shipped 2026-09-14 (`CAREER_AUTH=1`).
 8. ~~Phase 8 fixed world (one shared SQL world; clients attach)~~ — shipped 2026-09-14 (`CAREER_WORLD_FIXED=1`).
-9. Hosted Postgres lab — **shipped 2026-09-14** (`CAREER_PG=1` / tables + `career:world:pg` 24/7 worker). Misc stub leftovers optional.
+9. Hosted Postgres lab — **shipped 2026-09-14** (`CAREER_PG=1` / tables + `career:world:pg` 24/7 worker). Schema **v15**: drops stub tables `economy_json` + `company_missions`; SoT = relational + `economy_meta.misc_json` / company tables. SP SQLite unchanged.
 
 ## Phase 8 notes (2026-09-14)
 
@@ -202,7 +202,7 @@ interface WorldTickService {
 - Company page: hide SAVE Rename/Delete when `worldFixed`. Settings: no Switch profile; Sign out re-prompts Auth only.
 - SP `career:ui` unchanged (`worldFixed` off).
 - **UX (same day):** hub picker after Auth reuses account display name — no second “Pilot name”; only home hub is required.
-- **UX (same day):** Company chip read-only when Auth/fixed world (no dual-tab `+`/select). Topbar **World** = economy Day·HH:MM (wall-paced 15 min/tick), not local timezone.
+- **UX (same day):** Company chip read-only when Auth/fixed world (no dual-tab `+`/select). Topbar **World** = economy Day·HH:MM (primary) + label `next Ns` / `pulse due` from `lastBatchAtMs + MS_PER_TICK` (wall countdown). Not local timezone.
 - **UX (same day):** Auth mode drops `?company=` from the URL — tenant lives in sessionStorage + `X-Skyline-Company-Id`. URL pin remains for non-Auth dual-tab lab only.
 
 ## Postgres lab (2026-09-14)
@@ -211,8 +211,9 @@ interface WorldTickService {
 - **MP:** `CAREER_DATABASE_URL` or `CAREER_PG=1` → `PostgresCareerStore`.
 - Docker: containers `skyline-career-postgres` + `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
 - Run: `docker compose up -d` then `npm run career:host:pg` + `npm run career:client`.
-- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`, schema v13; no offers→demand FK). `stripPgEconomyBlob` clears those arrays. Load backfills empty tables when RAM has data (schema upgrade). BIGINT wall-clock ms truncated on write. Stub may still hold misc leftovers.
+- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`). Schema **v16**: `fleet_aircraft` promotes registration / hours / condition % / config / lease flags out of `payload_json` (backfill on open). Schema **v15**: economy SoT = relational tables + `economy_meta.misc_json`; stub tables `economy_json` + `company_missions` dropped. SP SQLite mirrors fleet columns via `ensureV3Ddl` ALTERs. Load hydrates via `emptyPgEconomyShell` + tables; BIGINT wall-clock ms truncated on write.
 - **24/7 world worker (lab):** `npm run career:world:pg` — `career-world-worker-pg.ts` economy catch-up with Postgres advisory lock `87201401`. Company settlement on login. Pair with `CAREER_HEADLESS_PULSE=0` on `career:host:pg`. `--once` for one-shot/tests.
+- **Diag 2026-09-14 — Charter sort → blank/freeze:** GET `/api/charters` called `withCareerWrite` + `tickCharterEconomy` with default full economy persist on every sort/filter. On PG that blocked the career lock for seconds and starved the UI. Fix: `withCareerRead` only (charter tick stays on economy pulse). UI: `AppErrorBoundary` so render crashes show Reload, not a black root.
 
 ## Phase 7 notes (2026-09-14)
 
@@ -226,7 +227,8 @@ interface WorldTickService {
 - Files: `packages/shared/src/career-auth.ts`, `career-store-v10.ts`; UI `AuthGate.tsx` + `career-auth-client.ts`.
 - **UX (same day):** AuthGate form stacked (`auth-gate-form` + `pilot-field`) — bare labels were inline-wrapping.
 - **UX (same day):** Profile gate shows **Sign out / another account** when a Bearer token is still in the tab — otherwise Continue skips AuthGate (looks like “cadastro sumiu”).
-- **UX (same day):** **Auto-resume** last `activeId` on Ctrl+R / tab load — no forced ProfileGate when host already has a save; Switch profile / clear still shows the gate. Auth token still decides AuthGate.
+- **UX (same day):** Ctrl+R on AuthGate no longer flashes Freights / “Loading career…” — fixed-world boot keeps `profilesLoading` until Auth warm; stale Bearer cleared when `authenticated=false`; AuthGate renders before ProfileGate/main shell.
+- **UX (same day):** After register, AuthGate stays until company `/api/state`; `hubSelected` starts false and main content waits on `careerStateReady` so Choose home hub is next (not Freights loading).
 - **Product note:** SP = multi-save ProfileGate. MP = one forever world (`world/skyline.sqlite`) + Auth → company.
 
 ## Phase 6 notes (2026-09-13)

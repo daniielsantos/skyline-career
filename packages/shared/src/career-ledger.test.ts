@@ -77,4 +77,41 @@ describe('career ledger', () => {
     assert.equal(cleaned.length, 1);
     assert.equal(cleaned[0]?.amountUsd, 5);
   });
+
+  it('recent order uses append seq, not lexicographic id (same tick)', () => {
+    // Legacy ids: led_676_10_* sorts before led_676_4_* as strings — broke Recent activity.
+    const cleaned = normalizeCareerLedger([
+      {
+        id: 'led_676_10_1',
+        atTick: 676,
+        dayIndex: 7,
+        amountUsd: 100_000,
+        kind: 'other',
+        note: 'credit mid',
+      },
+      {
+        id: 'led_676_14_2',
+        atTick: 676,
+        dayIndex: 7,
+        amountUsd: -831_463,
+        kind: 'aircraft_buy',
+        note: 'ATR 72-600',
+      },
+      {
+        id: 'led_676_4_3',
+        atTick: 676,
+        dayIndex: 7,
+        amountUsd: 100_000,
+        kind: 'other',
+        note: 'credit early',
+      },
+    ]);
+    assert.deepEqual(
+      cleaned.map((e) => e.note),
+      ['credit early', 'credit mid', 'ATR 72-600'],
+    );
+    const snap = summarizeCareerLedger({ ledger: cleaned }, 676);
+    assert.equal(snap.recent[0]?.kind, 'aircraft_buy');
+    assert.equal(snap.recent[0]?.note, 'ATR 72-600');
+  });
 });

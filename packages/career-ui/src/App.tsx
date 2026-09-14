@@ -35,7 +35,6 @@ import {
   postDispatch,
   postFuelPurchase,
   postFuelQuote,
-  postInitBrazil,
   postLoadOfp,
   postCancelLoadOfp,
   fetchLoadOfpProgress,
@@ -227,7 +226,9 @@ import {
   logbookAircraftLabel,
   logbookCargoLabel,
   logbookDistanceNm,
+  logbookFlightDurationLabel,
   logbookFlightKind,
+  logbookFlightWhenLabel,
   logbookPayoutUsd,
   logbookStatusLabel,
 } from './logbook';
@@ -2210,6 +2211,18 @@ function formatClock(continuousTicks: number): string {
   return `Day ${day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+/** Wall countdown to the next economy tick pulse (compact topbar). */
+function formatNextPulseCountdown(msRemaining: number): string {
+  const sec = Math.max(0, Math.ceil(msRemaining / 1000));
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m < 60) return s === 0 ? `${m}m` : `${m}m ${String(s).padStart(2, '0')}s`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm === 0 ? `${h}h` : `${h}h ${rm}m`;
+}
+
 function formatExpiry(opts: {
   expiresAtTick: number;
   ticksRemaining?: number;
@@ -3005,7 +3018,7 @@ function FleetRoster(props: {
   if (props.fleet.length === 0) {
     return (
       <p className="empty">
-        No rival freighters seeded yet — Reset world or wait for migration.
+        No rival freighters seeded yet — wait for world migration or a pulse.
       </p>
     );
   }
@@ -3588,7 +3601,7 @@ export function App() {
   const [stagingRouteLots, setStagingRouteLots] = useState<MarketLot[]>([]);
   const [stagingRouteLotsLoading, setStagingRouteLotsLoading] = useState(false);
   const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
-  const [hubSelected, setHubSelected] = useState(true);
+  const [hubSelected, setHubSelected] = useState(false);
   const [fleet, setFleet] = useState<PlayerAircraft[]>([]);
   const [hangarPane, setHangarPane] = useState<
     'aircraft' | 'cashflow' | 'cargo' | 'crew'
@@ -4298,7 +4311,8 @@ export function App() {
         } satisfies CareerProfileMeta);
       setActiveCareerProfile(last);
       setWorldWaiting(false);
-      setShowProfileGate(false);
+      // Do not clear showProfileGate / profilesLoading here — that paints the
+      // main Freights shell before Auth finishes (Ctrl+R flicker after truncate).
       setProfileGateBusyLabel('Joining world…');
       setBusy(true);
       try {
@@ -4309,7 +4323,10 @@ export function App() {
           setWorldWaiting(true);
         }
       } finally {
-        if (!cancelled) setBusy(false);
+        if (!cancelled) {
+          setBusy(false);
+          setProfilesLoading(false);
+        }
       }
     }
 
@@ -4322,8 +4339,8 @@ export function App() {
         setAuthRequired(Boolean(health.authRequired));
 
         if (fixed) {
-          setProfilesLoading(false);
           if (health.needsProfile || !health.activeProfileId) {
+            setProfilesLoading(false);
             setWorldWaiting(true);
             setShowProfileGate(false);
             pollTimer = setInterval(() => {
@@ -4334,6 +4351,7 @@ export function App() {
                   if (!again.needsProfile && again.activeProfileId) {
                     if (pollTimer) clearInterval(pollTimer);
                     pollTimer = undefined;
+                    setProfilesLoading(true);
                     await attachFixedWorld(
                       again.activeProfileId,
                       again.activeProfileName,
@@ -4346,6 +4364,7 @@ export function App() {
             }, 2000);
             return;
           }
+          // Stay on ProfileGateLoading until Auth/company warm finishes.
           await attachFixedWorld(health.activeProfileId, health.activeProfileName);
           return;
         }
@@ -4395,7 +4414,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (showProfileGate) {
+    if (showProfileGate || showAuthGate || profilesLoading) {
       bootProfileKeyRef.current = null;
       careerReadyRef.current = false;
       setCareerReady(false);
@@ -4414,11 +4433,11 @@ export function App() {
       const message = err instanceof Error ? err.message : String(err);
       if (!isNeedsProfileMessage(message)) setError(message);
     });
-  }, [showProfileGate, activeCareerProfile?.id]);
+  }, [showProfileGate, showAuthGate, profilesLoading, activeCareerProfile?.id]);
 
   // Freights board: filter/sort/page run server-side over the full lot set.
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile) return;
+    if (showProfileGate || showAuthGate || !activeCareerProfile) return;
     if (tab !== 'market' && !airportIcao) return;
     if (tab === 'market' && freightsBoard === 'charter') {
       setMarketBoardLoading(false);
@@ -4691,7 +4710,7 @@ export function App() {
   const economySyncing = catchUpBanner != null;
   useEffect(() => {
     if (!economySyncing) return;
-    if (showProfileGate || !activeCareerProfile) return;
+    if (showProfileGate || showAuthGate || !activeCareerProfile) return;
     const id = window.setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       void fetchState()
@@ -4740,7 +4759,7 @@ export function App() {
   }, [tab, airportIcao, refresh]);
 
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile) return;
+    if (showProfileGate || showAuthGate || !activeCareerProfile) return;
     if (!hubSelected) return;
     void refreshNetworkHubs().catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
@@ -4749,12 +4768,13 @@ export function App() {
       setToast(message);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubSelected, showProfileGate, activeCareerProfile?.id]);
+  }, [hubSelected, showProfileGate, showAuthGate, activeCareerProfile?.id]);
 
   // Sidebar "Active flight" is shell chrome — load missions even if the open
   // tab never asked for the board (Freights-only bootstrap used to skip it).
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile || !hubSelected) return;
+    if (showProfileGate || showAuthGate || !activeCareerProfile || !hubSelected)
+      return;
     let cancelled = false;
     void fetchMissions()
       .then((missionState) => {
@@ -5400,6 +5420,19 @@ export function App() {
         ),
       )
     : 0;
+
+  const msUntilNextPulse = lastBatchAtMs + msPerTick - displayNowMs;
+  const worldClockLabel = tickAdvance
+    ? tickAdvance.done <= 0
+      ? `World · ${tickAdvanceElapsedSec}s`
+      : `World · ${tickAdvance.done}/${tickAdvance.total}`
+    : msUntilNextPulse <= 0
+      ? 'World · pulse due'
+      : `World · next ${formatNextPulseCountdown(msUntilNextPulse)}`;
+  // Stable title — a changing `title` every second makes native tooltips flicker.
+  const worldClockTitle = tickAdvance
+    ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} economy batches`
+    : 'Economy day/time (shared world clock). Label countdown = wall time to next 15-min tick pulse. Not your local timezone.';
 
   const formatTickAdvanceButton = (total: number, idleLabel: string) => {
     if (!tickAdvance || tickAdvance.total !== total) return idleLabel;
@@ -6541,9 +6574,9 @@ export function App() {
     }, { lockUi: false });
   }
 
-  async function onDebugCreditWallet() {
+  async function onDebugCreditWallet(amountUsd = 5_000) {
     await run(async () => {
-      const result = await postDebugCreditWallet();
+      const result = await postDebugCreditWallet({ amountUsd });
       setWallet(result.walletUsd);
       setToastKind('ok');
       setToast(`Debug credit +${formatMoney(result.creditedUsd)}`);
@@ -6678,48 +6711,14 @@ export function App() {
     }, { sync: 'full' });
   }
 
-  async function onResetWorld() {
-    const confirmed = await confirm({
-      title: 'Reset career world?',
-      body: 'Clears the local career save — pilot profile, missions, wallet, and hangar — then reseeds the full economy (Brazil + US hubs and international lanes).',
-      confirmLabel: 'Reset everything',
-      cancelLabel: 'Keep save',
-      tone: 'danger',
-    });
-    if (!confirmed) return;
-    await run(async () => {
-      const result = await postInitBrazil();
-      setToastKind('ok');
-      setToast(
-        `Career world initialized · ${result.airports} airports${
-          typeof result.availableLots === 'number'
-            ? ` · ${result.availableLots} freights ready`
-            : ''
-        }`,
-      );
-      closeAirport();
-      setStaging(null);
-      setFleet([]);
-      setHubSelected(false);
-      setPilotName('');
-      setHomeHubIcao('');
-      setPilotIcao('');
-      setSignupName('');
-      setSignupHub('');
-      // Force market refetch even if filter/sort opts are unchanged.
-      marketFetchOptsRef.current = {
-        ...marketFetchOptsRef.current,
-        page: -1,
-      };
-      marketBoardIntentRef.current = marketFetchOptsRef.current;
-      goToTab('pilot');
-    }, { sync: 'full' });
-  }
-
   function clearCareerSessionPaint() {
     careerReadyRef.current = false;
     setCareerReady(false);
+    careerStateReadyRef.current = false;
+    setCareerStateReady(false);
     bootProfileKeyRef.current = null;
+    // Unknown until /api/state — default true used to flash Freights before hub picker.
+    setHubSelected(false);
     setWallet(0);
     setMissions([]);
     setFleet([]);
@@ -6870,6 +6869,12 @@ export function App() {
         ? await fetchAuthStatus().catch(() => status)
         : status;
       if (!withToken.authenticated) {
+        // Stale Bearer after DB truncate / logout elsewhere — drop local token
+        // so ProfileGate does not flash “Signed in / Sign out”.
+        if (getAuthToken()) {
+          clearAuthToken();
+          setAuthSessionEpoch((n) => n + 1);
+        }
         setShowAuthGate(true);
         setShowProfileGate(false);
         bootProfileKeyRef.current = profileId;
@@ -6916,7 +6921,9 @@ export function App() {
     setAuthSessionEpoch((n) => n + 1);
     setAuthRequired(true);
     setAuthChecked(true);
-    setShowAuthGate(false);
+    // Keep AuthGate up until company state is warm — otherwise Freights paints
+    // with hubSelected still unknown (new accounts need Choose home hub first).
+    clearCareerSessionPaint();
     const fromAuth =
       result.account?.displayName?.trim() ||
       result.account?.loginName?.trim() ||
@@ -6951,6 +6958,7 @@ export function App() {
     setMarketBoardLoading(false);
     if (profileId) bootProfileKeyRef.current = profileId;
     setShowProfileGate(false);
+    setShowAuthGate(false);
   }
 
   /** Open (or re-open) a save then Auth/company warm — used by Continue and Ctrl+R resume. */
@@ -10215,7 +10223,7 @@ export function App() {
     return fetchAirport(icao, boardEstimateOptsRef.current);
   }
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile) return;
+    if (showProfileGate || showAuthGate || !activeCareerProfile) return;
     if (!airportIcao) return;
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -10924,6 +10932,43 @@ export function App() {
     );
   }
 
+  // Auth before profile picker / main shell — avoids Freights flash on Ctrl+R
+  // when a stale sessionStorage token is about to be rejected.
+  if (showAuthGate) {
+    return (
+      <div className="app-shell profile-gate-shell">
+        <AuthGate
+          busy={busy}
+          onLogin={async (opts) => {
+            const result = await postAuthLogin(opts);
+            return {
+              token: result.token,
+              account: result.account,
+              companies: result.companies,
+            };
+          }}
+          onRegister={async (opts) => {
+            const result = await postAuthRegister({
+              loginName: opts.loginName,
+              displayName: opts.displayName,
+              password: opts.password,
+              companyDisplayName: opts.companyDisplayName,
+            });
+            return {
+              token: result.token,
+              account: result.account,
+              companies: result.companies,
+            };
+          }}
+          onSuccess={(result) => {
+            void run(() => finishAuthAndEnter(result));
+          }}
+        />
+        {confirmDialog}
+      </div>
+    );
+  }
+
   if (showProfileGate || !activeCareerProfile) {
     const gateError =
       error && !isNeedsProfileMessage(error) ? error : null;
@@ -10971,43 +11016,8 @@ export function App() {
           busyLabel={profileGateBusyLabel}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
-          authSignedIn={Boolean(getAuthToken())}
+          authSignedIn={authChecked && Boolean(getAuthToken())}
           onSignOut={() => void onSignOutAccount()}
-        />
-        {confirmDialog}
-      </div>
-    );
-  }
-
-  if (showAuthGate) {
-    return (
-      <div className="app-shell profile-gate-shell">
-        <AuthGate
-          busy={busy}
-          onLogin={async (opts) => {
-            const result = await postAuthLogin(opts);
-            return {
-              token: result.token,
-              account: result.account,
-              companies: result.companies,
-            };
-          }}
-          onRegister={async (opts) => {
-            const result = await postAuthRegister({
-              loginName: opts.loginName,
-              displayName: opts.displayName,
-              password: opts.password,
-              companyDisplayName: opts.companyDisplayName,
-            });
-            return {
-              token: result.token,
-              account: result.account,
-              companies: result.companies,
-            };
-          }}
-          onSuccess={(result) => {
-            void run(() => finishAuthAndEnter(result));
-          }}
         />
         {confirmDialog}
       </div>
@@ -11515,21 +11525,8 @@ export function App() {
               <span className="label">Wallet</span>
               <strong>{careerStateReady ? formatMoney(wallet) : '…'}</strong>
             </div>
-            <div
-              className="metric"
-              title={
-                tickAdvance
-                  ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} batches · ${tickAdvanceElapsedSec}s`
-                  : 'World economy day/time — paced by real wall clock (1 tick = 15 min). Not your local timezone.'
-              }
-            >
-              <span className="label">
-                {tickAdvance
-                  ? tickAdvance.done <= 0
-                    ? `World · ${tickAdvanceElapsedSec}s`
-                    : `World · ${tickAdvance.done}/${tickAdvance.total}`
-                  : 'World'}
-              </span>
+            <div className="metric world-clock" title={worldClockTitle}>
+              <span className="label">{worldClockLabel}</span>
               <strong>{formatClock(continuousHours)}</strong>
             </div>
           </div>
@@ -11574,7 +11571,7 @@ export function App() {
               <button
                 type="button"
                 className="action ghost"
-                onClick={() => void onDebugCreditWallet()}
+                onClick={() => void onDebugCreditWallet(5_000)}
                 disabled={busy}
                 title="Dev Mode — add $5,000 to the wallet"
               >
@@ -11583,18 +11580,23 @@ export function App() {
               <button
                 type="button"
                 className="action ghost"
-                onClick={() => void onResetWorld()}
+                onClick={() => void onDebugCreditWallet(100_000)}
                 disabled={busy}
-                title="Clear the prototype save and reseed the full career world (BR + US)"
+                title="Dev Mode — add $100,000 to the wallet"
               >
-                Reset world
+                +$100K
               </button>
             </div>
           ) : null}
         </header>
 
         <div className="main-content">
-      {!hubSelected ? (
+      {!careerStateReady ? (
+        <BusyBoot
+          title="Opening career…"
+          detail="Loading company wallet and hub — home hub comes next if you have not chosen one yet."
+        />
+      ) : !hubSelected ? (
         <section className="panel hub-picker" role="dialog" aria-labelledby="hub-picker-title">
           <div className="panel-head">
             <div>
@@ -15334,7 +15336,7 @@ export function App() {
                             ? 'No Crew needed offers nearby — advance time or try Aircraft needed.'
                             : fleet.length === 0
                               ? 'No Aircraft needed lots you can take yet — open Crew needed, or buy a starter airframe.'
-                              : 'No freights yet — try Reset world again or advance +15 min.'
+                              : 'No freights yet — advance time (+15 min) or wait for a pulse.'
                           : freightsBoard === 'crew'
                             ? 'No Crew needed offers match the selected filters.'
                             : 'No Aircraft needed lots match the selected filters.'}
@@ -17080,14 +17082,16 @@ export function App() {
           </div>
           <div
             className={`aircraft-market-board${
-              aircraftMarketLoading ? ' is-loading' : ''
+              aircraftMarketLoading || busy ? ' is-loading' : ''
             }`}
-            aria-busy={aircraftMarketLoading}
+            aria-busy={aircraftMarketLoading || busy}
           >
-            {aircraftMarketLoading ? (
+            {aircraftMarketLoading || busy ? (
               <BusyChip
                 className="aircraft-market-loading"
-                label="Updating airframes"
+                label={
+                  busy ? 'Confirming buy / lease…' : 'Updating airframes'
+                }
               />
             ) : null}
           {aircraftListings.length === 0 && !aircraftMarketLoading ? (
@@ -17452,6 +17456,8 @@ export function App() {
               .map((m) => {
                 const kind = logbookFlightKind(m);
                 const distanceNm = logbookDistanceNm(m);
+                const duration = logbookFlightDurationLabel(m);
+                const when = logbookFlightWhenLabel(m);
                 const payout = logbookPayoutUsd(m);
                 const fleetLabel = m.aircraftId
                   ? fleet.find((a) => a.id === m.aircraftId)?.label
@@ -17494,6 +17500,10 @@ export function App() {
                         {distanceNm != null
                           ? `${distanceNm.toLocaleString('en-US')} nm`
                           : 'Distance —'}
+                        {' · '}
+                        {duration ?? 'Time —'}
+                        {' · '}
+                        {when ?? 'When —'}
                         {' · '}
                         {payout != null ? formatMoney(payout) : '—'}
                       </p>

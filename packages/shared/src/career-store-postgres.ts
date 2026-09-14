@@ -1,7 +1,9 @@
 /**
  * MP Postgres career store (lab / hosted world).
- * Auth + companies relational; economy hot slices in tables (see career-store-pg-world);
- * economy_json is a thin stub after stripPgEconomyBlob.
+ * Auth + companies relational; economy SoT is relational tables +
+ * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v16 promotes fleet_aircraft payload fields to columns.
+ * Schema v15 drops legacy stubs `economy_json` + `company_missions`.
  * SP stays on SQLite files — this backend is for CAREER_DATABASE_URL only.
  */
 
@@ -58,16 +60,18 @@ import { MAX_LOAD_CATCH_UP_TICKS } from './career-clock.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { ensureHomeCountryId } from './career-partition.js';
 import {
+  emptyPgEconomyShell,
   ensurePgWorldDdl,
   economyNeedsPgTableBackfill,
   hydrateEconomyFromPg,
   hydrateMissionsFromPg,
+  isPgEconomyMiscEmpty,
   persistEconomyTablesToPg,
+  persistAircraftPoolToPg,
   persistMissionsTablesToPg,
-  stripPgEconomyBlob,
 } from './career-store-pg-world.js';
 
-const CAREER_PG_SCHEMA_VERSION = '13';
+const CAREER_PG_SCHEMA_VERSION = '16';
 const { Pool } = pg;
 
 export const DEFAULT_CAREER_DATABASE_URL =
@@ -135,20 +139,104 @@ function normalizeMissions(raw: Record<string, unknown>): CareerMissionsState {
   return normalized;
 }
 
+async function pgTableExists(pool: pg.Pool, name: string): Promise<boolean> {
+  const { rows } = await pool.query(`SELECT to_regclass($1) AS reg`, [
+    `public.${name}`,
+  ]);
+  return rows[0]?.reg != null;
+}
+
+/**
+ * One-shot retire of PG-only JSON stubs (schema v15).
+ * SP SQLite keeps economy_json / missions_json — do not mirror this there.
+ */
+async function retirePgLegacyStubTables(pool: pg.Pool): Promise<void> {
+  if (await pgTableExists(pool, 'company_missions')) {
+    const { rows } = await pool.query(
+      `SELECT company_id, payload FROM company_missions`,
+    );
+    for (const row of rows) {
+      const companyId = String(row.company_id ?? '').trim();
+      if (!companyId) continue;
+      const payload = row.payload as Record<string, unknown> | null | undefined;
+      const stateRes = await pool.query(
+        `SELECT 1 AS ok FROM company_state WHERE company_id = $1`,
+        [companyId],
+      );
+      const hasCompanyState = Boolean(stateRes.rows[0]);
+      if (
+        !hasCompanyState &&
+        payload &&
+        typeof payload === 'object' &&
+        !Array.isArray(payload)
+      ) {
+        await persistMissionsTablesToPg(
+          pool,
+          normalizeMissions(payload),
+          companyId,
+        );
+        continue;
+      }
+      const hasFatMissions =
+        Array.isArray(payload?.missions) && payload.missions.length > 0;
+      const hasFatFleet =
+        Array.isArray(payload?.fleet) && payload.fleet.length > 0;
+      if (!hasFatMissions && !hasFatFleet) continue;
+      const tableCounts = await pool.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM missions WHERE company_id = $1) AS missions,
+           (SELECT COUNT(*)::int FROM fleet_aircraft WHERE company_id = $1) AS fleet`,
+        [companyId],
+      );
+      const counts = tableCounts.rows[0] as
+        | { missions: number; fleet: number }
+        | undefined;
+      if (Number(counts?.missions) > 0 || Number(counts?.fleet) > 0) continue;
+      const blobFallback =
+        payload && Array.isArray(payload.missions)
+          ? normalizeMissions(payload)
+          : emptyMissionsStateV2();
+      const fromTables = await hydrateMissionsFromPg(
+        pool,
+        companyId,
+        blobFallback,
+      );
+      await persistMissionsTablesToPg(pool, fromTables, companyId);
+    }
+    await pool.query(`DROP TABLE IF EXISTS company_missions`);
+  }
+
+  if (await pgTableExists(pool, 'economy_json')) {
+    const airportRes = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM airports WHERE world_id = $1`,
+      [LOCAL_WORLD_ID],
+    );
+    const metaRes = await pool.query(
+      `SELECT 1 AS ok FROM economy_meta WHERE world_id = $1`,
+      [LOCAL_WORLD_ID],
+    );
+    const hasAirports = Number(airportRes.rows[0]?.n) > 0;
+    const hasMeta = Boolean(metaRes.rows[0]);
+    if (!hasAirports && !hasMeta) {
+      const stubRes = await pool.query(
+        `SELECT payload FROM economy_json WHERE id = 1`,
+      );
+      const stubPayload = stubRes.rows[0]?.payload as
+        | Record<string, unknown>
+        | undefined;
+      if (stubPayload) {
+        const world = migrateEconomyWorld(stubPayload);
+        await persistEconomyTablesToPg(pool, world, LOCAL_WORLD_ID);
+      }
+    }
+    await pool.query(`DROP TABLE IF EXISTS economy_json`);
+  }
+}
+
 const PG_DDL = `
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS economy_json (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  payload JSONB NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS company_missions (
-  company_id TEXT PRIMARY KEY NOT NULL,
-  payload JSONB NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS companies (
@@ -247,6 +335,7 @@ export class PostgresCareerStore implements CareerStore {
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [CAREER_PG_SCHEMA_VERSION],
     );
+    await retirePgLegacyStubTables(this.pool);
     await this.pool.query(
       `INSERT INTO companies (id, display_name, home_hub_icao, home_country_id, world_id, created_at_ms)
        VALUES ($1, '', '', '', $2, $3)
@@ -624,34 +713,72 @@ export class PostgresCareerStore implements CareerStore {
         dirty: false,
       };
     }
-    const { rows } = await this.pool.query(
-      `SELECT payload FROM economy_json WHERE id = 1`,
+
+    const metaRes = await this.pool.query(
+      `SELECT seed, tick, last_batch_at_ms, home_country_id, misc_json
+       FROM economy_meta WHERE world_id = $1`,
+      [LOCAL_WORLD_ID],
     );
-    const existing = rows[0]?.payload as Record<string, unknown> | undefined;
-    if (existing) {
-      const world = migrateEconomyWorld(existing);
-      // Prefer relational tables when present; fall back to fat blob (phase-1).
-      await hydrateEconomyFromPg(this.pool, world, LOCAL_WORLD_ID);
-      const { world: caught, advancedTicks, settledFlights } = ensureEconomyCaughtUp(
-        world,
-        Date.now(),
-        catchUpOpts(opts),
+    const meta = metaRes.rows[0] as
+      | {
+          seed: string;
+          tick: number;
+          last_batch_at_ms: string | number;
+          home_country_id: string;
+          misc_json: unknown;
+        }
+      | undefined;
+
+    const countRes = await this.pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM airports WHERE world_id = $1) AS airports,
+         (SELECT COUNT(*)::int FROM lots WHERE world_id = $1) AS lots,
+         (SELECT COUNT(*)::int FROM npcs WHERE world_id = $1) AS npcs`,
+      [LOCAL_WORLD_ID],
+    );
+    const counts = countRes.rows[0] as
+      | { airports: number; lots: number; npcs: number }
+      | undefined;
+    const hasRelational =
+      Boolean(meta) ||
+      Number(counts?.airports) > 0 ||
+      Number(counts?.lots) > 0 ||
+      Number(counts?.npcs) > 0;
+
+    if (hasRelational) {
+      const world = emptyPgEconomyShell(
+        meta
+          ? {
+              seed: meta.seed,
+              tick: Number(meta.tick) || 0,
+              lastBatchAtMs: Number(meta.last_batch_at_ms) || Date.now(),
+              homeCountryId: meta.home_country_id ?? '',
+            }
+          : {
+              seed: 'skyline-career-br-v1',
+              tick: 0,
+              lastBatchAtMs: Date.now(),
+              homeCountryId: '',
+            },
       );
+      await hydrateEconomyFromPg(this.pool, world, LOCAL_WORLD_ID);
+      const { world: caught, advancedTicks, settledFlights } =
+        ensureEconomyCaughtUp(world, Date.now(), catchUpOpts(opts));
       ensureHomeCountryId(caught);
       let dirty = advancedTicks > 0 || settledFlights > 0;
       if (ensureSeedMarketFormed(caught)) dirty = true;
-      // One-shot: fat blob still has airports[] → rewrite as tables + thin stub.
-      const fatBlob =
-        Array.isArray(existing.airports) && existing.airports.length > 0;
-      if (fatBlob) dirty = true;
-      // Schema upgrade / thin stub: RAM has ops/pool but tables never filled.
       if (await economyNeedsPgTableBackfill(this.pool, caught, LOCAL_WORLD_ID)) {
+        dirty = true;
+      }
+      if (isPgEconomyMiscEmpty(meta?.misc_json)) {
+        // Schema bump: persist leftover fields into misc_json once.
         dirty = true;
       }
       this.ram = caught;
       if (dirty) await this.saveEconomy(caught);
       return { world: caught, advancedTicks, settledFlights, dirty };
     }
+
     const fresh = createSeedEconomyWorld();
     ensureSeedMarketFormed(fresh);
     await this.saveEconomy(fresh);
@@ -670,12 +797,6 @@ export class PostgresCareerStore implements CareerStore {
     ensureHomeCountryId(toSave);
     this.ram = toSave;
     await persistEconomyTablesToPg(this.pool, toSave, LOCAL_WORLD_ID);
-    const thin = stripPgEconomyBlob(toSave);
-    await this.pool.query(
-      `INSERT INTO economy_json (id, payload) VALUES (1, $1::jsonb)
-       ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload`,
-      [JSON.stringify(thin)],
-    );
   }
 
   async persistDemandOrder(_order: DemandOrder): Promise<void> {
@@ -699,8 +820,18 @@ export class PostgresCareerStore implements CareerStore {
   async persistNpcLiveWorld(_world: CareerEconomyWorld): Promise<void> {
     if (this.ram) await this.saveEconomy(this.ram);
   }
-  async persistAircraftPool(_world: CareerEconomyWorld): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistAircraftPool(world: CareerEconomyWorld): Promise<void> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    if (this.ram) {
+      this.ram = {
+        ...this.ram,
+        aircraftInstances: toSave.aircraftInstances ?? [],
+      };
+    } else {
+      this.ram = toSave;
+    }
+    await persistAircraftPoolToPg(this.pool, toSave, LOCAL_WORLD_ID);
   }
 
   readHubEconomySamples(_opts: {
@@ -720,31 +851,18 @@ export class PostgresCareerStore implements CareerStore {
   async loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState> {
     await this.ready;
     const companyId = (opts?.companyId ?? this.activeCompanyId).trim() || LOCAL_COMPANY_ID;
-    const { rows } = await this.pool.query(
-      `SELECT payload FROM company_missions WHERE company_id = $1`,
-      [companyId],
-    );
-    const existing = rows[0]?.payload as Record<string, unknown> | undefined;
-    const blobFallback =
-      existing && Array.isArray(existing.missions)
-        ? normalizeMissions(existing)
-        : emptyMissionsStateV2();
     const fromTables = await hydrateMissionsFromPg(
       this.pool,
       companyId,
-      blobFallback,
+      emptyMissionsStateV2(),
     );
-    // One-shot migrate fat company_missions → tables.
-    if (
-      existing &&
-      ((Array.isArray(existing.missions) && existing.missions.length > 0) ||
-        (Array.isArray(existing.fleet) && existing.fleet.length > 0))
-    ) {
-      const stateCount = await this.pool.query(
-        `SELECT 1 AS ok FROM company_state WHERE company_id = $1`,
+    // Persist hubSelected heal (companies.home_hub set but flag cleared).
+    if (fromTables.hubSelected && fromTables.homeHubIcao?.trim()) {
+      const flag = await this.pool.query(
+        `SELECT hub_selected FROM company_state WHERE company_id = $1`,
         [companyId],
       );
-      if (!stateCount.rows[0]) {
+      if (flag.rows[0] && flag.rows[0].hub_selected === false) {
         await this.saveMissions(fromTables, { companyId });
       }
     }
@@ -759,18 +877,6 @@ export class PostgresCareerStore implements CareerStore {
     const companyId = (opts?.companyId ?? this.activeCompanyId).trim() || LOCAL_COMPANY_ID;
     const payload = normalizeMissions(state as unknown as Record<string, unknown>);
     await persistMissionsTablesToPg(this.pool, payload, companyId);
-    // Thin stub only (missions/fleet/ledger empty) for legacy readers.
-    const stub = {
-      ...payload,
-      missions: [],
-      fleet: [],
-      ledger: [],
-    };
-    await this.pool.query(
-      `INSERT INTO company_missions (company_id, payload) VALUES ($1, $2::jsonb)
-       ON CONFLICT (company_id) DO UPDATE SET payload = EXCLUDED.payload`,
-      [companyId, JSON.stringify(stub)],
-    );
   }
 
   async loadLedger(): Promise<CareerLedgerEntry[]> {

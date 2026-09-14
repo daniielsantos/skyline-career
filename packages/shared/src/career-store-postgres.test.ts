@@ -3,6 +3,7 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { emptyMissionsStateV2 } from './career-fleet.js';
 import {
   careerDatabaseUrlFromEnv,
   openPostgresCareerStore,
@@ -33,6 +34,7 @@ describe('career store postgres', () => {
       );
       return;
     }
+    let companyId: string | undefined;
     try {
       const login = `pg_${Date.now().toString(36)}`;
       const registered = await store.authRegister({
@@ -42,6 +44,7 @@ describe('career store postgres', () => {
       });
       assert.ok(registered.session.token);
       assert.ok(registered.company?.id);
+      companyId = registered.company!.id;
       const session = await store.authResolveSession(registered.session.token);
       assert.equal(session?.account.loginName, login);
       const economy = await store.loadEconomy({ maxCatchUpTicks: 0 });
@@ -64,39 +67,87 @@ describe('career store postgres', () => {
         (npcs.rows[0] as { n: number }).n > 0,
         'npcs table should be populated',
       );
-      const thin = await store['pool'].query(
-        `SELECT payload FROM economy_json WHERE id = 1`,
+      const economyJsonReg = await store['pool'].query(
+        `SELECT to_regclass('public.economy_json') AS reg`,
       );
-      const payload = thin.rows[0]?.payload as {
-        airports?: unknown[];
-        npcs?: unknown[];
-        aircraftInstances?: unknown[];
-        charterOffers?: unknown[];
+      assert.equal(
+        economyJsonReg.rows[0]?.reg,
+        null,
+        'economy_json stub table should be dropped (schema v15)',
+      );
+      const companyMissionsReg = await store['pool'].query(
+        `SELECT to_regclass('public.company_missions') AS reg`,
+      );
+      assert.equal(
+        companyMissionsReg.rows[0]?.reg,
+        null,
+        'company_missions stub table should be dropped (schema v15)',
+      );
+      const miscRes = await store['pool'].query(
+        `SELECT misc_json FROM economy_meta WHERE world_id = 'local'`,
+      );
+      const misc = miscRes.rows[0]?.misc_json;
+      assert.ok(
+        misc != null && typeof misc === 'object' && !Array.isArray(misc),
+        'economy_meta.misc_json should be an object',
+      );
+      const missions = emptyMissionsStateV2();
+      missions.pilotName = 'Pg Pilot';
+      missions.walletUsd = 12_500;
+      missions.hubSelected = true;
+      missions.homeHubIcao = 'SBGR';
+      missions.fleet = [
+        {
+          id: 'acf_test_1',
+          aircraftClassId: 'light_ga',
+          airframeTypeId: 'asobo-c172sp-cargo',
+          label: 'C172',
+          registration: 'PR-TST',
+          locationIcao: 'SBGR',
+          fuelKg: 100,
+          fuelCapacityKg: 200,
+          status: 'parked',
+          ownership: 'owned',
+          condition: 'good',
+          hoursAirframe: 12,
+          hoursEngine: 10,
+          airframeConditionPct: 94,
+          engineConditionPct: 96,
+        },
+      ];
+      await store.saveMissions(missions, { companyId });
+      const loaded = await store.loadMissions({ companyId });
+      assert.equal(loaded.pilotName, 'Pg Pilot');
+      assert.equal(loaded.walletUsd, 12_500);
+      assert.equal(loaded.fleet[0]?.registration, 'PR-TST');
+      assert.equal(loaded.fleet[0]?.hoursAirframe, 12);
+      const companyState = await store['pool'].query(
+        `SELECT wallet_usd FROM company_state WHERE company_id = $1`,
+        [companyId],
+      );
+      assert.equal(
+        Number((companyState.rows[0] as { wallet_usd: string | number }).wallet_usd),
+        12_500,
+        'company_state should persist wallet',
+      );
+      const fleetRow = await store['pool'].query(
+        `SELECT registration, hours_airframe, payload_json
+         FROM fleet_aircraft WHERE company_id = $1 AND id = $2`,
+        [companyId, 'acf_test_1'],
+      );
+      const fr = fleetRow.rows[0] as {
+        registration: string;
+        hours_airframe: number;
+        payload_json: unknown;
       };
-      assert.equal(
-        Array.isArray(payload?.airports) ? payload.airports.length : -1,
-        0,
-        'economy_json stub should have empty airports[]',
+      assert.equal(fr.registration, 'PR-TST');
+      assert.equal(Number(fr.hours_airframe), 12);
+      assert.ok(
+        fr.payload_json == null ||
+          (typeof fr.payload_json === 'object' &&
+            !('registration' in (fr.payload_json as object))),
+        'promoted fields should not remain in payload_json',
       );
-      assert.equal(
-        Array.isArray(payload?.npcs) ? payload.npcs.length : -1,
-        0,
-        'economy_json stub should have empty npcs[]',
-      );
-      assert.equal(
-        Array.isArray(payload?.aircraftInstances)
-          ? payload.aircraftInstances.length
-          : -1,
-        0,
-        'economy_json stub should have empty aircraftInstances[]',
-      );
-      if (Array.isArray(payload?.charterOffers)) {
-        assert.equal(
-          payload.charterOffers.length,
-          0,
-          'economy_json stub should have empty charterOffers[]',
-        );
-      }
       const pool = await store['pool'].query(
         `SELECT COUNT(*)::int AS n FROM aircraft_instances`,
       );
@@ -124,6 +175,40 @@ describe('career store postgres', () => {
         );
       }
     } finally {
+      // Always scrub the throwaway tenant — this smoke test hits the lab DB URL.
+      if (companyId) {
+        const pool = store['pool'] as import('pg').Pool;
+        const members = await pool.query(
+          `SELECT account_id FROM company_members WHERE company_id = $1`,
+          [companyId],
+        );
+        const accountIds = members.rows.map(
+          (r) => (r as { account_id: string }).account_id,
+        );
+        await pool.query(`DELETE FROM fleet_aircraft WHERE company_id = $1`, [
+          companyId,
+        ]);
+        await pool.query(`DELETE FROM ledger WHERE company_id = $1`, [companyId]);
+        await pool.query(`DELETE FROM missions WHERE company_id = $1`, [
+          companyId,
+        ]);
+        await pool.query(`DELETE FROM company_state WHERE company_id = $1`, [
+          companyId,
+        ]);
+        await pool.query(`DELETE FROM company_members WHERE company_id = $1`, [
+          companyId,
+        ]);
+        await pool.query(`DELETE FROM companies WHERE id = $1`, [companyId]);
+        if (accountIds.length > 0) {
+          await pool.query(
+            `DELETE FROM account_sessions WHERE account_id = ANY($1::text[])`,
+            [accountIds],
+          );
+          await pool.query(`DELETE FROM accounts WHERE id = ANY($1::text[])`, [
+            accountIds,
+          ]);
+        }
+      }
       store.close();
     }
   });

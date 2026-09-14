@@ -767,6 +767,14 @@ body {
   color: var(--muted);
 }
 
+.topbar-metrics .metric.world-clock {
+  min-width: 7.25rem;
+}
+
+.topbar-metrics .metric.world-clock .label {
+  letter-spacing: 0.06em;
+}
+
 .topbar-metrics .metric strong {
   font-family: var(--font-display);
   font-size: 1.2rem;

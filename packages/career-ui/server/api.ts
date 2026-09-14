@@ -31,8 +31,6 @@ import {
   repairAircraftConditionWithParts,
   hoursUntilInspection,
   inspectionCostUsd,
-  createSeedEconomyWorld,
-  emptyMissionsStateV2,
   ensureSeedMarketFormed,
   executeFerry,
   quoteFerry,
@@ -49,7 +47,6 @@ import {
   findCareerAirframeConfiguration,
   resolvePassengerCapacity,
   reserveCharterOffer,
-  tickCharterEconomy,
   readCharterHubPoolView,
   isCharterEligibleAircraftClass,
   findOpenManifestForRoute,
@@ -1051,17 +1048,46 @@ async function applyCompanySessionSettlement(opts: {
   const activeStore = requireStore();
   const world = activeStore.peekEconomyWorld();
   if (!world) return undefined;
-  if (
-    opts.allCompanies === true &&
-    typeof activeStore.settleWorldCompaniesPassiveFees === 'function'
-  ) {
-    const summary = activeStore.settleWorldCompaniesPassiveFees({
-      world,
-      fromTick: opts.fromTick,
-      toTick: opts.toTick,
-      worldId: LOCAL_WORLD_ID,
-    });
-    return summary ?? undefined;
+  if (opts.allCompanies === true) {
+    if (typeof activeStore.settleWorldCompaniesPassiveFees === 'function') {
+      const summary = activeStore.settleWorldCompaniesPassiveFees({
+        world,
+        fromTick: opts.fromTick,
+        toTick: opts.toTick,
+        worldId: LOCAL_WORLD_ID,
+      });
+      return summary ?? undefined;
+    }
+    // Postgres (and any store without settle-all): settle each company explicitly —
+    // never fall through to ambient activeCompanyId (that can thrash/wipe tenants).
+    const companies = await Promise.resolve(
+      activeStore.listWorldCompanies(LOCAL_WORLD_ID),
+    );
+    let preferred: OfflineFeeSummary | undefined;
+    for (const company of companies) {
+      const missions = await loadMissions({ companyId: company.id });
+      const fromTick = companySessionFromTick(
+        missions,
+        opts.fromTick,
+        opts.toTick,
+      );
+      const summary = settleCompanyPassiveFeesForTickRange(
+        missions,
+        world,
+        fromTick,
+        opts.toTick,
+      );
+      missions.lastSeenTick = opts.toTick;
+      await saveMissions(missions, { companyId: company.id });
+      if (summary && !preferred) preferred = summary;
+      if (
+        summary &&
+        company.id === activeStore.getActiveCompanyId()
+      ) {
+        preferred = summary;
+      }
+    }
+    return preferred;
   }
   const missions = await loadMissions();
   const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
@@ -1283,7 +1309,15 @@ type CareerWriteOpts = {
   /** Per-request company tenant (avoids ambient activeCompanyId thrash). */
   companyId?: string;
   /** Skip saveEconomy when the handler only mutates company/missions. */
-  persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound' | 'npcLive';
+  persist?:
+    | 'economy'
+    | 'company'
+    | 'blob'
+    | 'aircraftMarket'
+    | 'portMarket'
+    | 'demandBoard'
+    | 'inbound'
+    | 'npcLive';
   persistDemandOrderId?: string;
   persistPortListingId?: string;
   persistPortConcessions?: boolean;
@@ -1298,6 +1332,7 @@ type CareerWriteOpts = {
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
  * `persist: 'company'` writes missions only (plus optional demand/listing/concession
  * upserts). `persist: 'blob'` writes economy stub + dealer pool table (not live cargo).
+ * `persist: 'aircraftMarket'` writes dealer pool + company (buy/lease/sell) — not lots/NPC.
  * `persist: 'portMarket'` rewrites port listings+inventory (GET /api/ports seed)
  * and company_state (hire-desk pool may roll in that snapshot).
  * `persist: 'demandBoard'` rewrites demand_orders only. `persist: 'inbound'` patches inbound_pending.
@@ -1321,6 +1356,7 @@ async function withCareerWrite<T>(
         : undefined;
     const persistCompany = opts?.persist === 'company';
     const persistBlob = opts?.persist === 'blob';
+    const persistAircraftMarket = opts?.persist === 'aircraftMarket';
     const persistPortMarket = opts?.persist === 'portMarket';
     const persistDemandBoard = opts?.persist === 'demandBoard';
     const persistInbound = opts?.persist === 'inbound';
@@ -1451,6 +1487,7 @@ async function withCareerWrite<T>(
     const housekeeping =
       persistCompany ||
       persistBlob ||
+      persistAircraftMarket ||
       persistPortMarket ||
       persistDemandBoard ||
       persistInbound ||
@@ -1486,6 +1523,11 @@ async function withCareerWrite<T>(
     }
     if (persistBlob) {
       await activeStore.saveEconomy(world, { liveTables: false });
+      await activeStore.persistAircraftPool(world);
+      await saveMissions(missions, companyOpts);
+      return result;
+    }
+    if (persistAircraftMarket) {
       await activeStore.persistAircraftPool(world);
       await saveMissions(missions, companyOpts);
       return result;
@@ -3275,7 +3317,7 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/aircraft-market') {
         const browseRaw = url.searchParams.get('country')?.trim().toUpperCase();
         const aircraftMarketCompanyId = companyIdFromRequest(req);
-        const payload = await withCareerWrite((world, missions) => {
+        const payload = await withCareerRead((world, missions) => {
           settleAircraftMarketOps(missions, world.tick, world);
           const homeCountryId = resolveMarketCountryId(world, missions);
           const browseCountryId =
@@ -3373,7 +3415,7 @@ export function createCareerApiServer(port = 8787) {
             fleet: withParkingRates(missions.fleet),
             leaseUnlock: leaseUnlockForRequest(req, missions),
           };
-        }, { persist: 'blob', companyId: aircraftMarketCompanyId });
+        }, { companyId: aircraftMarketCompanyId });
         send(res, 200, payload);
         return;
       }
@@ -3416,7 +3458,7 @@ export function createCareerApiServer(port = 8787) {
               };
             });
           }, {
-            persist: 'blob',
+            persist: 'aircraftMarket',
             housekeeping: false,
             companyId: buyCompanyId,
           });
@@ -3463,7 +3505,7 @@ export function createCareerApiServer(port = 8787) {
                 leaseUnlock: leaseUnlockForRequest(req, missions),
               };
             });
-          }, { persist: 'blob', companyId: leaseCompanyId });
+          }, { persist: 'aircraftMarket', companyId: leaseCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3498,7 +3540,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: withParkingRates(missions.fleet),
               listings: listAircraftMarket(missions, world),
             };
-          }, { persist: 'blob', companyId: sellCompanyId });
+          }, { persist: 'aircraftMarket', companyId: sellCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3780,7 +3822,7 @@ export function createCareerApiServer(port = 8787) {
               remainingMonths: returned.remainingMonths,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          }, { persist: 'blob', companyId: returnLeaseCompanyId });
+          }, { persist: 'aircraftMarket', companyId: returnLeaseCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4327,10 +4369,10 @@ export function createCareerApiServer(port = 8787) {
           Math.floor(Number(url.searchParams.get('page')) || 1),
         );
         try {
-          const snapshot = await withCareerWrite((world, missions) => {
-            // Listing also heals early-v9 18h offers and guarantees that an
-            // existing save cannot remain on an empty board until tomorrow.
-            tickCharterEconomy(world);
+          // Read-only board query — never tickCharterEconomy + full economy save here.
+          // Sort/filter used withCareerWrite (default persist), which rewrote the whole
+          // Postgres world on every click and could freeze/blank the UI for many seconds.
+          const snapshot = await withCareerRead((world, missions) => {
             return {
               world,
               missions,
@@ -4625,7 +4667,9 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/market') {
         const marketCompanyId = companyIdFromRequest(req);
-        const { world, cargoOps, classOps, missionsState } = await withCareerWrite(
+        // Sort/filter must not rewrite the world. (On Postgres, persist:'inbound'
+        // still fell through to full saveEconomy — same freeze class as Charter.)
+        const { world, cargoOps, classOps, missionsState } = await withCareerRead(
           (w, missions) => {
             reconcilePlayerInbound(w, missions.missions);
             return {
@@ -4635,7 +4679,7 @@ export function createCareerApiServer(port = 8787) {
               missionsState: missions,
             };
           },
-          { persist: 'inbound', companyId: marketCompanyId },
+          { companyId: marketCompanyId },
         );
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
@@ -7667,34 +7711,6 @@ export function createCareerApiServer(port = 8787) {
           };
         });
         send(res, 200, payload);
-        return;
-      }
-
-      if (req.method === 'POST' && path === '/api/init') {
-        const body = (await readBody(req)) as {
-          seed?: string;
-          resetMissions?: boolean;
-        };
-        const fresh = await withCareerLock(async () => {
-          const world = createSeedEconomyWorld({ seed: body.seed });
-          // Warm one career day so Freights/Contracts exist without a manual +1 day.
-          ensureSeedMarketFormed(world);
-          await persistEconomyUnlocked(world);
-          if (body.resetMissions) {
-            await saveMissions(emptyMissionsStateV2());
-          }
-          return world;
-        });
-        const availableLots = fresh.lots.filter(
-          (lot) => lot.status === 'available' && lot.quantityKg > lot.reservedKg,
-        ).length;
-        send(res, 200, {
-          tick: fresh.tick,
-          seed: fresh.seed,
-          airports: fresh.airports.length,
-          npcFleet: fresh.npcs.length,
-          availableLots,
-        });
         return;
       }
 

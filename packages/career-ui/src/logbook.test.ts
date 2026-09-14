@@ -5,9 +5,12 @@ import {
   logbookAircraftLabel,
   logbookCargoLabel,
   logbookDistanceNm,
+  logbookFlightDurationLabel,
   logbookFlightKind,
+  logbookFlightWhenLabel,
   logbookPayoutUsd,
   logbookStatusLabel,
+  formatEconomyClock,
 } from './logbook.js';
 
 function mission(overrides: Partial<Mission> = {}): Mission {
@@ -165,5 +168,54 @@ describe('logbookStatusLabel', () => {
   it('humanizes status chips', () => {
     assert.equal(logbookStatusLabel('in_flight'), 'In flight');
     assert.equal(logbookStatusLabel('settled'), 'Settled');
+  });
+});
+
+describe('logbookFlightDurationLabel', () => {
+  it('prefers settled Watch duration, then planned with tilde', () => {
+    assert.equal(
+      logbookFlightDurationLabel(
+        mission({ settledFlightDurationMs: 5_040_000 }),
+      ),
+      '1h 24m',
+    );
+    assert.equal(
+      logbookFlightDurationLabel(
+        mission({ status: 'in_flight', expectedRouteMs: 3_600_000 }),
+      ),
+      '~1h',
+    );
+    assert.equal(
+      logbookFlightDurationLabel(
+        mission({
+          departedAtTick: 10,
+          settledAtTick: 14,
+          settledFlightDurationMs: undefined,
+          expectedRouteMs: undefined,
+        }),
+      ),
+      '1h',
+    );
+  });
+});
+
+describe('logbookFlightWhenLabel', () => {
+  it('uses settle tick as world Day·time', () => {
+    assert.equal(formatEconomyClock(0), 'Day 1 · 00:00');
+    assert.equal(formatEconomyClock(96), 'Day 2 · 00:00');
+    assert.equal(
+      logbookFlightWhenLabel(mission({ settledAtTick: 96 + 4 })),
+      'Day 2 · 01:00',
+    );
+    assert.equal(
+      logbookFlightWhenLabel(
+        mission({
+          settledAtTick: undefined,
+          departedAtTick: 8,
+          acceptedAtTick: 1,
+        }),
+      ),
+      'Day 1 · 02:00',
+    );
   });
 });

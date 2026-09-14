@@ -6,6 +6,14 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
+import {
+  assertCompanyPersistSafe,
+  companyProgressFromState,
+} from './career-store-company-guard.js';
+import {
+  assembleFleetAircraftFromRow,
+  splitFleetAircraftForPersist,
+} from './career-store-fleet-columns.js';
 import type {
   CareerEconomyWorld,
   CareerLedgerEntry,
@@ -19,7 +27,6 @@ import type {
   MissionStatus,
   NpcFlight,
   PlayerAircraft,
-  PlayerAircraftStatus,
   ShipmentLot,
   ShipmentLotStatus,
 } from './types/career-economy.js';
@@ -104,7 +111,20 @@ export function ensureV3Ddl(db: SqliteDb): void {
       status TEXT NOT NULL,
       assigned_mission_id TEXT,
       ownership TEXT,
+      registration TEXT,
+      condition TEXT,
+      hours_airframe REAL,
+      hours_engine REAL,
+      airframe_condition_pct REAL,
+      engine_condition_pct REAL,
+      hours_since_inspection REAL,
+      maintenance_due_at_hours REAL,
+      airframe_configuration_id TEXT,
+      roles_pack_rel_path TEXT,
+      lease_overdue INTEGER,
+      listed_listing_id TEXT,
       lease_json TEXT,
+      lease_out_json TEXT,
       payload_json TEXT,
       FOREIGN KEY (company_id) REFERENCES companies(id)
     );
@@ -112,6 +132,8 @@ export function ensureV3Ddl(db: SqliteDb): void {
       ON fleet_aircraft(company_id, status);
     CREATE INDEX IF NOT EXISTS fleet_location_idx
       ON fleet_aircraft(location_icao);
+    CREATE INDEX IF NOT EXISTS fleet_registration_idx
+      ON fleet_aircraft(registration);
 
     CREATE TABLE IF NOT EXISTS missions (
       id TEXT PRIMARY KEY NOT NULL,
@@ -231,6 +253,89 @@ export function ensureV3Ddl(db: SqliteDb): void {
     db.exec(
       `ALTER TABLE company_state ADD COLUMN last_seen_tick INTEGER NOT NULL DEFAULT 0`,
     );
+  }
+  // Fleet columns promoted out of payload_json (registration / hours / MX / config).
+  const fleetCols: Array<[string, string]> = [
+    ['registration', 'TEXT'],
+    ['condition', 'TEXT'],
+    ['hours_airframe', 'REAL'],
+    ['hours_engine', 'REAL'],
+    ['airframe_condition_pct', 'REAL'],
+    ['engine_condition_pct', 'REAL'],
+    ['hours_since_inspection', 'REAL'],
+    ['maintenance_due_at_hours', 'REAL'],
+    ['airframe_configuration_id', 'TEXT'],
+    ['roles_pack_rel_path', 'TEXT'],
+    ['lease_overdue', 'INTEGER'],
+    ['listed_listing_id', 'TEXT'],
+    ['lease_out_json', 'TEXT'],
+  ];
+  for (const [col, typ] of fleetCols) {
+    if (!columnExists(db, 'fleet_aircraft', col)) {
+      db.exec(`ALTER TABLE fleet_aircraft ADD COLUMN ${col} ${typ}`);
+    }
+  }
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS fleet_registration_idx ON fleet_aircraft(registration);
+  `);
+  // One-shot backfill from legacy payload_json.
+  try {
+    db.exec(`
+      UPDATE fleet_aircraft SET
+        registration = COALESCE(registration, json_extract(payload_json, '$.registration')),
+        condition = COALESCE(condition, json_extract(payload_json, '$.condition')),
+        hours_airframe = COALESCE(hours_airframe, json_extract(payload_json, '$.hoursAirframe')),
+        hours_engine = COALESCE(hours_engine, json_extract(payload_json, '$.hoursEngine')),
+        airframe_condition_pct = COALESCE(
+          airframe_condition_pct,
+          json_extract(payload_json, '$.airframeConditionPct')
+        ),
+        engine_condition_pct = COALESCE(
+          engine_condition_pct,
+          json_extract(payload_json, '$.engineConditionPct')
+        ),
+        hours_since_inspection = COALESCE(
+          hours_since_inspection,
+          json_extract(payload_json, '$.hoursSinceInspection')
+        ),
+        maintenance_due_at_hours = COALESCE(
+          maintenance_due_at_hours,
+          json_extract(payload_json, '$.maintenanceDueAtHours')
+        ),
+        airframe_configuration_id = COALESCE(
+          airframe_configuration_id,
+          json_extract(payload_json, '$.airframeConfigurationId')
+        ),
+        roles_pack_rel_path = COALESCE(
+          roles_pack_rel_path,
+          json_extract(payload_json, '$.rolesPackRelPath')
+        ),
+        lease_overdue = COALESCE(
+          lease_overdue,
+          CASE json_extract(payload_json, '$.leaseOverdue')
+            WHEN 1 THEN 1
+            WHEN 'true' THEN 1
+            WHEN 0 THEN 0
+            WHEN 'false' THEN 0
+            ELSE NULL
+          END
+        ),
+        listed_listing_id = COALESCE(
+          listed_listing_id,
+          json_extract(payload_json, '$.listedListingId')
+        ),
+        lease_out_json = COALESCE(
+          lease_out_json,
+          CASE
+            WHEN json_type(json_extract(payload_json, '$.leaseOut')) = 'object'
+              THEN json_extract(payload_json, '$.leaseOut')
+            ELSE NULL
+          END
+        )
+      WHERE payload_json IS NOT NULL AND payload_json != ''
+    `);
+  } catch {
+    /* older SQLite without json1 — next save writes columns */
   }
   db.exec(`
     CREATE INDEX IF NOT EXISTS ledger_company_tick_idx ON ledger(company_id, at_tick);
@@ -1038,43 +1143,6 @@ function missionCoreAndPayload(m: MissionIntent): {
   };
 }
 
-function fleetCoreAndPayload(a: PlayerAircraft): {
-  core: Record<string, unknown>;
-  payload: string | null;
-  leaseJson: string | null;
-} {
-  const {
-    id,
-    aircraftClassId,
-    airframeTypeId,
-    label,
-    locationIcao,
-    fuelKg,
-    fuelCapacityKg,
-    status,
-    assignedMissionId,
-    ownership,
-    lease,
-    ...rest
-  } = a;
-  return {
-    core: {
-      id,
-      aircraftClassId,
-      airframeTypeId,
-      label,
-      locationIcao,
-      fuelKg,
-      fuelCapacityKg,
-      status,
-      assignedMissionId,
-      ownership,
-    },
-    leaseJson: lease ? JSON.stringify(lease) : null,
-    payload: Object.keys(rest).length > 0 ? JSON.stringify(rest) : null,
-  };
-}
-
 export function replaceFleetAircraft(
   db: SqliteDb,
   companyId: string,
@@ -1137,10 +1205,18 @@ function upsertFleetAircraftRows(
   const upsert = db.prepare(
     `INSERT INTO fleet_aircraft (
        id, company_id, aircraft_class_id, airframe_type_id, label, location_icao,
-       fuel_kg, fuel_capacity_kg, status, assigned_mission_id, ownership, lease_json, payload_json
+       fuel_kg, fuel_capacity_kg, status, assigned_mission_id, ownership,
+       registration, condition, hours_airframe, hours_engine,
+       airframe_condition_pct, engine_condition_pct, hours_since_inspection,
+       maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
+       lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
      ) VALUES (
        @id, @company_id, @aircraft_class_id, @airframe_type_id, @label, @location_icao,
-       @fuel_kg, @fuel_capacity_kg, @status, @assigned_mission_id, @ownership, @lease_json, @payload_json
+       @fuel_kg, @fuel_capacity_kg, @status, @assigned_mission_id, @ownership,
+       @registration, @condition, @hours_airframe, @hours_engine,
+       @airframe_condition_pct, @engine_condition_pct, @hours_since_inspection,
+       @maintenance_due_at_hours, @airframe_configuration_id, @roles_pack_rel_path,
+       @lease_overdue, @listed_listing_id, @lease_json, @lease_out_json, @payload_json
      )
      ON CONFLICT(id) DO UPDATE SET
        company_id = excluded.company_id,
@@ -1153,25 +1229,52 @@ function upsertFleetAircraftRows(
        status = excluded.status,
        assigned_mission_id = excluded.assigned_mission_id,
        ownership = excluded.ownership,
+       registration = excluded.registration,
+       condition = excluded.condition,
+       hours_airframe = excluded.hours_airframe,
+       hours_engine = excluded.hours_engine,
+       airframe_condition_pct = excluded.airframe_condition_pct,
+       engine_condition_pct = excluded.engine_condition_pct,
+       hours_since_inspection = excluded.hours_since_inspection,
+       maintenance_due_at_hours = excluded.maintenance_due_at_hours,
+       airframe_configuration_id = excluded.airframe_configuration_id,
+       roles_pack_rel_path = excluded.roles_pack_rel_path,
+       lease_overdue = excluded.lease_overdue,
+       listed_listing_id = excluded.listed_listing_id,
        lease_json = excluded.lease_json,
+       lease_out_json = excluded.lease_out_json,
        payload_json = excluded.payload_json`,
   );
   for (const a of fleet) {
-    const { core, payload, leaseJson } = fleetCoreAndPayload(a);
+    const { cols, leaseJson, leaseOutJson, payloadJson } =
+      splitFleetAircraftForPersist(a);
     upsert.run({
-      id: sqlVal(core.id),
+      id: sqlVal(cols.id),
       company_id: sqlVal(companyId),
-      aircraft_class_id: sqlVal(core.aircraftClassId),
-      airframe_type_id: sqlVal(core.airframeTypeId),
-      label: sqlVal(core.label) ?? '',
-      location_icao: sqlVal(core.locationIcao) ?? '',
-      fuel_kg: sqlVal(core.fuelKg) ?? 0,
-      fuel_capacity_kg: sqlVal(core.fuelCapacityKg) ?? 0,
-      status: sqlVal(core.status),
-      assigned_mission_id: sqlVal(core.assignedMissionId),
-      ownership: sqlVal(core.ownership),
+      aircraft_class_id: sqlVal(cols.aircraftClassId),
+      airframe_type_id: sqlVal(cols.airframeTypeId),
+      label: sqlVal(cols.label) ?? '',
+      location_icao: sqlVal(cols.locationIcao) ?? '',
+      fuel_kg: sqlVal(cols.fuelKg) ?? 0,
+      fuel_capacity_kg: sqlVal(cols.fuelCapacityKg) ?? 0,
+      status: sqlVal(cols.status),
+      assigned_mission_id: sqlVal(cols.assignedMissionId),
+      ownership: sqlVal(cols.ownership),
+      registration: sqlVal(cols.registration),
+      condition: sqlVal(cols.condition),
+      hours_airframe: sqlVal(cols.hoursAirframe),
+      hours_engine: sqlVal(cols.hoursEngine),
+      airframe_condition_pct: sqlVal(cols.airframeConditionPct),
+      engine_condition_pct: sqlVal(cols.engineConditionPct),
+      hours_since_inspection: sqlVal(cols.hoursSinceInspection),
+      maintenance_due_at_hours: sqlVal(cols.maintenanceDueAtHours),
+      airframe_configuration_id: sqlVal(cols.airframeConfigurationId),
+      roles_pack_rel_path: sqlVal(cols.rolesPackRelPath),
+      lease_overdue: cols.leaseOverdue === true ? 1 : null,
+      listed_listing_id: sqlVal(cols.listedListingId),
       lease_json: sqlVal(leaseJson),
-      payload_json: sqlVal(payload),
+      lease_out_json: sqlVal(leaseOutJson),
+      payload_json: sqlVal(payloadJson),
     });
   }
 }
@@ -1181,7 +1284,10 @@ export function readFleetAircraft(db: SqliteDb, companyId: string): PlayerAircra
     .prepare(
       `SELECT id, aircraft_class_id, airframe_type_id, label, location_icao,
               fuel_kg, fuel_capacity_kg, status, assigned_mission_id, ownership,
-              lease_json, payload_json
+              registration, condition, hours_airframe, hours_engine,
+              airframe_condition_pct, engine_condition_pct, hours_since_inspection,
+              maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
+              lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
        FROM fleet_aircraft WHERE company_id = ? ORDER BY id ASC`,
     )
     .all(companyId) as Array<{
@@ -1195,42 +1301,23 @@ export function readFleetAircraft(db: SqliteDb, companyId: string): PlayerAircra
     status: string;
     assigned_mission_id: string | null;
     ownership: string | null;
+    registration: string | null;
+    condition: string | null;
+    hours_airframe: number | null;
+    hours_engine: number | null;
+    airframe_condition_pct: number | null;
+    engine_condition_pct: number | null;
+    hours_since_inspection: number | null;
+    maintenance_due_at_hours: number | null;
+    airframe_configuration_id: string | null;
+    roles_pack_rel_path: string | null;
+    lease_overdue: number | null;
+    listed_listing_id: string | null;
     lease_json: string | null;
+    lease_out_json: string | null;
     payload_json: string | null;
   }>;
-  return rows.map((r) => {
-    let extra: Partial<PlayerAircraft> = {};
-    if (r.payload_json) {
-      try {
-        extra = JSON.parse(r.payload_json) as Partial<PlayerAircraft>;
-      } catch {
-        /* ignore */
-      }
-    }
-    const aircraft: PlayerAircraft = {
-      ...extra,
-      id: r.id,
-      aircraftClassId: r.aircraft_class_id as FreighterClassId,
-      label: r.label,
-      locationIcao: r.location_icao,
-      fuelKg: r.fuel_kg,
-      fuelCapacityKg: r.fuel_capacity_kg,
-      status: r.status as PlayerAircraftStatus,
-    };
-    if (r.airframe_type_id) aircraft.airframeTypeId = r.airframe_type_id;
-    if (r.assigned_mission_id) aircraft.assignedMissionId = r.assigned_mission_id;
-    if (r.ownership === 'owned' || r.ownership === 'leased') {
-      aircraft.ownership = r.ownership;
-    }
-    if (r.lease_json) {
-      try {
-        aircraft.lease = JSON.parse(r.lease_json);
-      } catch {
-        /* ignore */
-      }
-    }
-    return aircraft;
-  });
+  return rows.map((r) => assembleFleetAircraftFromRow(r));
 }
 
 export function replaceMissionsTable(
@@ -1778,6 +1865,42 @@ export function persistCompanyTables(
   },
 ): void {
   const companyId = opts?.companyId?.trim() || LOCAL_COMPANY_ID;
+  const walletRow = db
+    .prepare(`SELECT wallet_usd FROM company_state WHERE company_id = ?`)
+    .get(companyId) as { wallet_usd: number } | undefined;
+  const fleetCount = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM fleet_aircraft WHERE company_id = ?`)
+      .get(companyId) as { n: number }
+  ).n;
+  const ledgerCount = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM ledger WHERE company_id = ? OR (company_id IS NULL AND ? = ?)`,
+      )
+      .get(companyId, companyId, LOCAL_COMPANY_ID) as { n: number }
+  ).n;
+  const missionCount = (
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM missions WHERE company_id = ?`)
+      .get(companyId) as { n: number }
+  ).n;
+  const fleetIds = (
+    db
+      .prepare(`SELECT id FROM fleet_aircraft WHERE company_id = ? ORDER BY id ASC`)
+      .all(companyId) as { id: string }[]
+  ).map((r) => r.id);
+  assertCompanyPersistSafe({
+    companyId,
+    existing: {
+      walletUsd: Number(walletRow?.wallet_usd ?? 0),
+      fleetCount: Number(fleetCount ?? 0),
+      ledgerCount: Number(ledgerCount ?? 0),
+      missionCount: Number(missionCount ?? 0),
+      fleetIds,
+    },
+    incoming: companyProgressFromState(state),
+  });
   if (opts?.companyState !== false) upsertCompanyState(db, state, companyId);
   if (opts?.fleet !== false) {
     persistFleetIncremental(
@@ -1882,11 +2005,16 @@ export function persistLedgerIncremental(
   const ids = entries.map((e) => e.id).filter(Boolean);
   const companyScope = `company_id = ? OR (company_id IS NULL AND ? = ?)`;
   if (ids.length === 0) {
-    db.prepare(`DELETE FROM ledger WHERE ${companyScope}`).run(
-      cid,
-      cid,
-      LOCAL_COMPANY_ID,
-    );
+    const existing = (
+      db
+        .prepare(`SELECT COUNT(*) AS n FROM ledger WHERE ${companyScope}`)
+        .get(cid, cid, LOCAL_COMPANY_ID) as { n: number }
+    ).n;
+    if (existing > 0) {
+      throw new Error(
+        `Refusing to clear ledger for company ${cid} (had ${existing} entries, incoming empty)`,
+      );
+    }
     return;
   }
   if (ids.length > SQLITE_BIND_SAFE) {

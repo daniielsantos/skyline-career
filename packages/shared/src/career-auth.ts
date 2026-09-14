@@ -49,6 +49,20 @@ const SCRYPT_P = 1;
 const SCRYPT_KEYLEN = 32;
 /** 30 days */
 export const AUTH_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/** last_seen within this window → treated as online for /api/auth/sessions */
+export const AUTH_ONLINE_WINDOW_MS = 5 * 60 * 1000;
+
+export type AuthSessionListItem = {
+  accountId: string;
+  loginName: string;
+  displayName: string;
+  createdAtMs: number;
+  expiresAtMs: number;
+  lastSeenAtMs: number;
+  online: boolean;
+  /** Short prefix of token_hash for Adminer correlation (not the Bearer). */
+  tokenHashPrefix: string;
+};
 
 function normalizeLoginName(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
@@ -304,6 +318,9 @@ export function createSession(
   ensureV10Ddl(db);
   const now = opts.nowMs ?? Date.now();
   const ttl = opts.ttlMs ?? AUTH_SESSION_TTL_MS;
+  purgeExpiredSessions(db, now);
+  // One live Bearer per account — new login kicks previous clients.
+  revokeAllSessionsForAccount(db, opts.accountId);
   const token = mintSessionToken();
   const expiresAtMs = now + ttl;
   db.prepare(
@@ -312,6 +329,81 @@ export function createSession(
      VALUES (?, ?, ?, ?, ?)`,
   ).run(hashSessionToken(token), opts.accountId, now, expiresAtMs, now);
   return { token, accountId: opts.accountId, expiresAtMs };
+}
+
+/** Delete expired rows. Returns how many were removed. */
+export function purgeExpiredSessions(db: SqliteDb, nowMs = Date.now()): number {
+  ensureV10Ddl(db);
+  const result = db
+    .prepare(`DELETE FROM account_sessions WHERE expires_at_ms <= ?`)
+    .run(nowMs);
+  return Number(result.changes ?? 0);
+}
+
+export function listAccountSessions(
+  db: SqliteDb,
+  opts?: {
+    accountId?: string;
+    nowMs?: number;
+    onlineWindowMs?: number;
+    /** When false, include expired rows (default: purge then list live only). */
+    includeExpired?: boolean;
+  },
+): AuthSessionListItem[] {
+  ensureV10Ddl(db);
+  const now = opts?.nowMs ?? Date.now();
+  const onlineWindow = opts?.onlineWindowMs ?? AUTH_ONLINE_WINDOW_MS;
+  if (!opts?.includeExpired) {
+    purgeExpiredSessions(db, now);
+  }
+  const accountId = opts?.accountId?.trim();
+  const rows = accountId
+    ? (db
+        .prepare(
+          `SELECT s.token_hash, s.account_id, s.created_at_ms, s.expires_at_ms,
+                  s.last_seen_at_ms, a.login_name, a.display_name
+           FROM account_sessions s
+           JOIN accounts a ON a.id = s.account_id
+           WHERE s.account_id = ?
+           ORDER BY s.last_seen_at_ms DESC`,
+        )
+        .all(accountId) as Array<{
+        token_hash: string;
+        account_id: string;
+        created_at_ms: number;
+        expires_at_ms: number;
+        last_seen_at_ms: number;
+        login_name: string;
+        display_name: string;
+      }>)
+    : (db
+        .prepare(
+          `SELECT s.token_hash, s.account_id, s.created_at_ms, s.expires_at_ms,
+                  s.last_seen_at_ms, a.login_name, a.display_name
+           FROM account_sessions s
+           JOIN accounts a ON a.id = s.account_id
+           ORDER BY s.last_seen_at_ms DESC`,
+        )
+        .all() as Array<{
+        token_hash: string;
+        account_id: string;
+        created_at_ms: number;
+        expires_at_ms: number;
+        last_seen_at_ms: number;
+        login_name: string;
+        display_name: string;
+      }>);
+
+  return rows.map((r) => ({
+    accountId: r.account_id,
+    loginName: r.login_name,
+    displayName: r.display_name,
+    createdAtMs: r.created_at_ms,
+    expiresAtMs: r.expires_at_ms,
+    lastSeenAtMs: r.last_seen_at_ms,
+    online: r.last_seen_at_ms >= now - onlineWindow,
+    tokenHashPrefix: String(r.token_hash).slice(0, 8),
+  }));
 }
 
 export function revokeSession(db: SqliteDb, token: string): boolean {
@@ -340,6 +432,8 @@ export function resolveSession(
   const raw = token?.trim();
   if (!raw) return null;
   const now = opts?.nowMs ?? Date.now();
+  // Opportunistic GC so Adminer does not fill with dead rows.
+  purgeExpiredSessions(db, now);
   const tokenHash = hashSessionToken(raw);
   const row = db
     .prepare(

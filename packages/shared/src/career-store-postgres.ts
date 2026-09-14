@@ -9,12 +9,14 @@
 
 import pg from 'pg';
 import {
+  AUTH_ONLINE_WINDOW_MS,
   AUTH_SESSION_TTL_MS,
   hashPassword,
   hashSessionToken,
   mintSessionToken,
   verifyPassword,
   type AuthSessionContext,
+  type AuthSessionListItem,
   type CareerAccount,
   type CareerAccountSession,
   type CareerCompanyMember,
@@ -512,6 +514,11 @@ export class PostgresCareerStore implements CareerStore {
     ttlMs?: number,
   ): Promise<CareerAccountSession> {
     const ttl = ttlMs ?? AUTH_SESSION_TTL_MS;
+    await this.authPurgeExpiredSessions(now);
+    // One live Bearer per account — new login kicks previous clients.
+    await this.pool.query(`DELETE FROM account_sessions WHERE account_id = $1`, [
+      accountId,
+    ]);
     const token = mintSessionToken();
     const expiresAtMs = now + ttl;
     await this.pool.query(
@@ -531,6 +538,7 @@ export class PostgresCareerStore implements CareerStore {
     const raw = token?.trim();
     if (!raw) return null;
     const now = opts?.nowMs ?? Date.now();
+    await this.authPurgeExpiredSessions(now);
     const tokenHash = hashSessionToken(raw);
     const { rows } = await this.pool.query(
       `SELECT token_hash, account_id, expires_at_ms FROM account_sessions
@@ -576,6 +584,67 @@ export class PostgresCareerStore implements CareerStore {
       [hashSessionToken(token)],
     );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async authPurgeExpiredSessions(nowMs = Date.now()): Promise<number> {
+    await this.ready;
+    const result = await this.pool.query(
+      `DELETE FROM account_sessions WHERE expires_at_ms <= $1`,
+      [nowMs],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async authListSessions(opts?: {
+    accountId?: string;
+    nowMs?: number;
+    onlineWindowMs?: number;
+    includeExpired?: boolean;
+  }): Promise<AuthSessionListItem[]> {
+    await this.ready;
+    const now = opts?.nowMs ?? Date.now();
+    const onlineWindow = opts?.onlineWindowMs ?? AUTH_ONLINE_WINDOW_MS;
+    if (!opts?.includeExpired) {
+      await this.authPurgeExpiredSessions(now);
+    }
+    const accountId = opts?.accountId?.trim();
+    const { rows } = accountId
+      ? await this.pool.query(
+          `SELECT s.token_hash, s.account_id, s.created_at_ms, s.expires_at_ms,
+                  s.last_seen_at_ms, a.login_name, a.display_name
+           FROM account_sessions s
+           JOIN accounts a ON a.id = s.account_id
+           WHERE s.account_id = $1
+           ORDER BY s.last_seen_at_ms DESC`,
+          [accountId],
+        )
+      : await this.pool.query(
+          `SELECT s.token_hash, s.account_id, s.created_at_ms, s.expires_at_ms,
+                  s.last_seen_at_ms, a.login_name, a.display_name
+           FROM account_sessions s
+           JOIN accounts a ON a.id = s.account_id
+           ORDER BY s.last_seen_at_ms DESC`,
+        );
+    return (
+      rows as Array<{
+        token_hash: string;
+        account_id: string;
+        created_at_ms: string | number;
+        expires_at_ms: string | number;
+        last_seen_at_ms: string | number;
+        login_name: string;
+        display_name: string;
+      }>
+    ).map((r) => ({
+      accountId: r.account_id,
+      loginName: r.login_name,
+      displayName: r.display_name,
+      createdAtMs: Number(r.created_at_ms),
+      expiresAtMs: Number(r.expires_at_ms),
+      lastSeenAtMs: Number(r.last_seen_at_ms),
+      online: Number(r.last_seen_at_ms) >= now - onlineWindow,
+      tokenHashPrefix: String(r.token_hash).slice(0, 8),
+    }));
   }
 
   async authListCompaniesForAccount(accountId: string): Promise<CareerCompanyRow[]> {

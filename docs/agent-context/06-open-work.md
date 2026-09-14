@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Auth session hygiene** — one Bearer per account on login/register; purge expired on create/resolve; `GET /api/auth/sessions` (+ `?scope=mine`, `online` = last_seen ≤5 min). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Desktop 0.3.62 shipped** — health sem lock + headless pulse off antes do PlayModeGate (boot não morre em catch-up SP). Installer: [v0.3.62](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.62).
+
 Atualizado 2026-09-14: **Desktop 0.3.61 shipped** — SP|MP PlayModeGate + Settings; fleet `registration` migrate; :8788. Installer: [v0.3.61](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.61).
 
 Atualizado 2026-09-14: **Desktop SP|MP gate** — first run (e packaged sem env) pede Single Player vs Multiplayer; URL do world gravada em `%APPDATA%\Skyline Career\career\desktop-play.json`; Settings → Change play mode reinicia a API filha. `CAREER_WORLD_API_URL` no process env ainda força MP (lab). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

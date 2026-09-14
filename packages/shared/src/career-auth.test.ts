@@ -78,6 +78,18 @@ describe('career auth', () => {
     );
     assert.equal(login.account.id, registered.account.id);
     assert.notEqual(login.session.token, registered.session.token);
+    // Single-session: previous Bearer is revoked on login.
+    assert.equal(
+      await Promise.resolve(store.authResolveSession(registered.session.token)),
+      null,
+    );
+    assert.ok(await Promise.resolve(store.authResolveSession(login.session.token)));
+
+    const listed = await Promise.resolve(store.authListSessions());
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0]!.accountId, registered.account.id);
+    assert.equal(listed[0]!.online, true);
+    assert.equal(listed[0]!.tokenHashPrefix.length, 8);
 
     assert.equal(
       await Promise.resolve(store.authRevokeSession(login.session.token)),
@@ -91,6 +103,74 @@ describe('career auth', () => {
     // Seed missions for the new company so store is usable.
     const missions = emptyMissionsStateV2();
     await store.saveMissions(missions, { companyId: registered.company!.id });
+    store.close();
+  });
+
+  it('purges expired sessions and marks offline by last_seen window', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-auth-purge-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const t0 = 1_700_000_000_000;
+    const registered = await Promise.resolve(
+      store.authRegister({
+        loginName: 'purge_me',
+        displayName: 'Purge',
+        password: 'secret12',
+        nowMs: t0,
+        sessionTtlMs: 60_000,
+      }),
+    );
+    assert.ok(
+      await Promise.resolve(
+        store.authResolveSession(registered.session.token, {
+          nowMs: t0 + 1_000,
+          touch: false,
+        }),
+      ),
+    );
+    // Past TTL → resolve + opportunistic purge leave zero rows.
+    assert.equal(
+      await Promise.resolve(
+        store.authResolveSession(registered.session.token, {
+          nowMs: t0 + 120_000,
+        }),
+      ),
+      null,
+    );
+    assert.equal(
+      (await Promise.resolve(store.authListSessions({ nowMs: t0 + 120_000 }))).length,
+      0,
+    );
+
+    const again = await Promise.resolve(
+      store.authLogin({
+        loginName: 'purge_me',
+        password: 'secret12',
+        nowMs: t0 + 200_000,
+        sessionTtlMs: 86_400_000,
+      }),
+    );
+    const online = await Promise.resolve(
+      store.authListSessions({
+        nowMs: t0 + 200_000 + 30_000,
+        onlineWindowMs: 60_000,
+      }),
+    );
+    assert.equal(online.length, 1);
+    assert.equal(online[0]!.online, true);
+
+    const stale = await Promise.resolve(
+      store.authListSessions({
+        nowMs: t0 + 200_000 + 120_000,
+        onlineWindowMs: 60_000,
+      }),
+    );
+    assert.equal(stale.length, 1);
+    assert.equal(stale[0]!.online, false);
+
+    assert.equal(
+      await Promise.resolve(store.authRevokeSession(again.session.token)),
+      true,
+    );
     store.close();
   });
 

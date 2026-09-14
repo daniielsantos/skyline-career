@@ -139,13 +139,16 @@ import {
 } from './career-company-session.js';
 import {
   addCompanyMember,
+  listAccountSessions,
   loginAccount,
+  purgeExpiredSessions,
   registerAccount,
   resolveSession,
   revokeSession,
   accountOwnsCompany,
   listCompaniesForAccount,
   type AuthSessionContext,
+  type AuthSessionListItem,
   type LoginAccountOpts,
   type RegisterAccountOpts,
   type RegisterAccountResult,
@@ -165,6 +168,7 @@ export type { AirportBoardSnapshot, AirportInventorySnapshot };
 export type { HubEconomySample };
 export type {
   AuthSessionContext,
+  AuthSessionListItem,
   CareerAccount,
   CareerAccountSession,
   CareerCompanyMember,
@@ -305,6 +309,15 @@ export interface CareerStore {
     opts?: { nowMs?: number; touch?: boolean },
   ): AuthSessionContext | null | Promise<AuthSessionContext | null>;
   authRevokeSession(token: string): boolean | Promise<boolean>;
+  /** Delete expired account_sessions rows. Returns removed count. */
+  authPurgeExpiredSessions(nowMs?: number): number | Promise<number>;
+  /** Live sessions (+ online flag from last_seen). JSON store returns []. */
+  authListSessions(opts?: {
+    accountId?: string;
+    nowMs?: number;
+    onlineWindowMs?: number;
+    includeExpired?: boolean;
+  }): AuthSessionListItem[] | Promise<AuthSessionListItem[]>;
   authListCompaniesForAccount(
     accountId: string,
   ): CareerCompanyRow[] | Promise<CareerCompanyRow[]>;
@@ -527,6 +540,19 @@ class JsonCareerStore implements CareerStore {
 
   authRevokeSession(_token: string): boolean {
     return false;
+  }
+
+  authPurgeExpiredSessions(_nowMs?: number): number {
+    return 0;
+  }
+
+  authListSessions(_opts?: {
+    accountId?: string;
+    nowMs?: number;
+    onlineWindowMs?: number;
+    includeExpired?: boolean;
+  }): AuthSessionListItem[] {
+    return [];
   }
 
   authListCompaniesForAccount(_accountId: string): CareerCompanyRow[] {
@@ -1094,6 +1120,19 @@ class SqliteCareerStore implements CareerStore {
 
   authRevokeSession(token: string): boolean {
     return revokeSession(this.db, token);
+  }
+
+  authPurgeExpiredSessions(nowMs?: number): number {
+    return purgeExpiredSessions(this.db, nowMs);
+  }
+
+  authListSessions(opts?: {
+    accountId?: string;
+    nowMs?: number;
+    onlineWindowMs?: number;
+    includeExpired?: boolean;
+  }): AuthSessionListItem[] {
+    return listAccountSessions(this.db, opts);
   }
 
   authListCompaniesForAccount(accountId: string): CareerCompanyRow[] {

@@ -261,6 +261,7 @@ import {
   settleCompanyPassiveFeesForTickRange,
   resolveCompanyId,
   isCareerAuthRequired,
+  AUTH_ONLINE_WINDOW_MS,
   bearerTokenFromHeader,
   isCareerWorldFixed,
   ensureEconomyCaughtUpCooperative,
@@ -2848,6 +2849,47 @@ export function createCareerApiServer(port = 8787) {
           account: session.account,
           companies: session.companies,
           memberships: session.memberships,
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/auth/sessions') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        if (!store.supportsAuth) {
+          send(res, 501, {
+            error: 'Auth sessions require SQLite/Postgres career store',
+            code: 'auth_unsupported',
+          });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+        const scope = (url.searchParams.get('scope') ?? 'all').trim().toLowerCase();
+        const nowMs = Date.now();
+        const sessions = await Promise.resolve(
+          store.authListSessions({
+            accountId: scope === 'mine' ? session.account.id : undefined,
+            nowMs,
+          }),
+        );
+        send(res, 200, {
+          nowMs,
+          onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
+          sessions,
+          onlineCount: sessions.filter((s) => s.online).length,
         });
         return;
       }

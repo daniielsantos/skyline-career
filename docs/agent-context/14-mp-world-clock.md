@@ -230,8 +230,9 @@ interface WorldTickService {
 
 - **Local Auth** (no OAuth yet): `accounts` / `account_sessions` / `company_members` (schema v10).
 - Session token → account → owned companies. `Authorization: Bearer` on `api()`.
+- **Session hygiene (2026-09-14):** login/register = **one live Bearer per account** (`revokeAll` then insert). Expired rows purged on create/resolve (`expires_at_ms <= now`). `GET /api/auth/sessions` (Bearer) lists live sessions + `online` if `last_seen` within `AUTH_ONLINE_WINDOW_MS` (5 min); `?scope=mine` filters to caller. Response exposes `tokenHashPrefix` only (not the Bearer).
 - Env: `CAREER_AUTH=1` enforces; **host mode defaults on** (`dev.mjs --host`). SP `career:ui` stays off.
-- HTTP: `GET /api/auth/status`, `POST /api/auth/register|login|logout`, `GET /api/auth/me`.
+- HTTP: `GET /api/auth/status`, `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `GET /api/auth/sessions`.
 - Register creates company `co_<login>` + owner membership. Claim orphan via `claimCompanyId`.
 - When required: company id cannot spoof rivals; `GET /api/companies` returns owned only; AuthGate after profile select.
 - Chip `?company=` still works **within** owned set. OAuth later plugs into same membership table.
@@ -406,7 +407,7 @@ Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em
 - Rewind / replay de world
 - Per-player time dilation
 - Múltiplos worlds por company (uma company → um `world_id`)
-- Presença-only MP (“só vejo quem está online”) — north star continua company + shared world
+- Presença-only MP (“só vejo quem está online”) — north star continua company + shared world; **stub:** `GET /api/auth/sessions` + `online` window 5 min (`last_seen`)
 
 ## Referências no código
 

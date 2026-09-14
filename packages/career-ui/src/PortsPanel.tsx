@@ -711,8 +711,9 @@ export function PortsPanel(props: {
 
   const haulKg = useMemo(() => {
     if (!haulDraft) return 0;
+    const display = Math.max(0, Math.floor(Number(haulAmountText) || 0));
     return displayAmountToStoredKg(
-      haulAmountText,
+      display,
       props.weightSystem,
       haulFreeKg,
       haulOpsMaxCargoKg != null && haulOpsMaxCargoKg > 0

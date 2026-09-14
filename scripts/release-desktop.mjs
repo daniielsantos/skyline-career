@@ -428,11 +428,11 @@ async function main() {
 
   if (bumped) {
     console.log('[release:desktop] committing version bump…');
-    await run('git', [
-      'add',
-      'packages/desktop/package.json',
-      'packages/desktop/package-lock.json',
-    ]);
+    const bumpFiles = ['packages/desktop/package.json'];
+    if (await exists(desktopLockPath)) {
+      bumpFiles.push('packages/desktop/package-lock.json');
+    }
+    await run('git', ['add', ...bumpFiles]);
     await run('git', ['commit', '-m', `Release desktop ${tag}`]);
   }
 

@@ -240,6 +240,7 @@ import {
   executeAcceptLot,
   executeAcceptManifest,
   executeDepartFlight,
+  revertFalseDepartMission,
   executeBuyAircraft,
   executeCancelMission,
   signAircraftLease,
@@ -317,6 +318,30 @@ import {
   probeLiveLandingFpm,
   probeLiveResidualFuelKg,
 } from './watch-helpers.ts';
+import {
+  careerWorldApiUrlFromEnv,
+  isGatewayEnrichApiPath,
+  isGatewayProxiedPath,
+  isSimDisabledMode,
+  isSimLocalApiPath,
+  resolveCareerApiMode,
+  SIM_ON_CLIENT_CODE,
+  SIM_ON_CLIENT_ERROR,
+  type CareerApiMode,
+} from './career-api-mode.ts';
+import { proxyToWorldApi } from './gateway-proxy.ts';
+import {
+  createGatewayWatchMutations,
+  gatewayEconomyShell,
+  gatewayLoadMissions,
+  gatewayUpdateOpenMission,
+} from './gateway-career-access.ts';
+import {
+  WorldApiClient,
+  worldAuthFromIncoming,
+  type WorldApiAuth,
+} from './world-api-client.ts';
+
 import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import {
   homologateBushHub,
@@ -431,6 +456,15 @@ const bootSourceStamp = await serverSourceStamp();
 const careerRoot = await resolveCareerRoot();
 let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
+
+/** Process role: full (SP) | world (VPS) | gateway (desktop sim). */
+const careerApiMode: CareerApiMode = resolveCareerApiMode();
+let gatewayWorldClient: WorldApiClient | null = null;
+let gatewayAuth: WorldApiAuth = {};
+
+function gatewayAuthOrThrow(): WorldApiAuth {
+  return gatewayAuth;
+}
 /** Defer MSFS hub coord stamp until after profile-select responds. */
 let msfsStampNeeded = false;
 /** One-shot banner after long wall-clock catch-up; cleared on /api/state. */
@@ -490,6 +524,7 @@ function schedulePostLoginEconomyWork(tickService: WorldTickService): void {
  * with zero UI clients (hosted SP mold). Opt out: CAREER_HEADLESS_PULSE=0.
  * Phase 4 remote client: never resume/advance locally.
  * Phase 8 fixed world: open the single `careerRoot/world` SQLite (no profiles.json).
+ * Postgres lab/VPS: open store even when pulse is off (worker owns ticks).
  */
 async function bootstrapHeadlessWorldPulse(
   tickService: WorldTickService,
@@ -499,36 +534,46 @@ async function bootstrapHeadlessWorldPulse(
     tickService.startBackgroundPulse(LOCAL_WORLD_ID);
     return;
   }
+
+  if (isCareerWorldFixed()) {
+    if (!store) {
+      const t0 = performance.now();
+      try {
+        await withCareerLock(async () => {
+          if (store) return;
+          resetMsfsStampState();
+          store = await openCareerFixedWorldStore(careerRoot);
+          activeProfileId = FIXED_WORLD_PROFILE_ID;
+          msfsStampNeeded = true;
+        });
+        console.log(
+          `[career] fixed-world open id=${FIXED_WORLD_PROFILE_ID} ` +
+            `backend=${store?.kind ?? '?'} ${Math.round(performance.now() - t0)}ms`,
+        );
+      } catch (error) {
+        console.error(
+          `[career] fixed-world open fail ${Math.round(performance.now() - t0)}ms:`,
+          error instanceof Error ? error.message : error,
+        );
+        return;
+      }
+    }
+    if (!isHeadlessPulseEnabled()) {
+      console.log(
+        '[career] headless-pulse disabled (CAREER_HEADLESS_PULSE) — store open; worker owns ticks',
+      );
+      return;
+    }
+    schedulePostLoginEconomyWork(tickService);
+    return;
+  }
+
   if (!isHeadlessPulseEnabled()) {
     console.log('[career] headless-pulse disabled (CAREER_HEADLESS_PULSE)');
     return;
   }
   if (store) {
     schedulePostLoginEconomyWork(tickService);
-    return;
-  }
-
-  if (isCareerWorldFixed()) {
-    const t0 = performance.now();
-    try {
-      await withCareerLock(async () => {
-        if (store) return;
-        resetMsfsStampState();
-        store = await openCareerFixedWorldStore(careerRoot);
-        activeProfileId = FIXED_WORLD_PROFILE_ID;
-        msfsStampNeeded = true;
-      });
-      console.log(
-        `[career] fixed-world open id=${FIXED_WORLD_PROFILE_ID} ` +
-          `backend=${store?.kind ?? '?'} ${Math.round(performance.now() - t0)}ms`,
-      );
-      schedulePostLoginEconomyWork(tickService);
-    } catch (error) {
-      console.error(
-        `[career] fixed-world open fail ${Math.round(performance.now() - t0)}ms:`,
-        error instanceof Error ? error.message : error,
-      );
-    }
     return;
   }
 
@@ -579,6 +624,13 @@ type MissionsFile = CareerMissionsState;
 async function loadMissions(opts?: {
   companyId?: string;
 }): Promise<MissionsFile> {
+  if (careerApiMode === 'gateway' && gatewayWorldClient) {
+    const auth: WorldApiAuth = {
+      ...gatewayAuth,
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    };
+    return gatewayLoadMissions(gatewayWorldClient, auth);
+  }
   return requireStore().loadMissions(opts);
 }
 
@@ -943,6 +995,18 @@ async function updateOpenMission(
   ) => Promise<boolean> | boolean,
   opts?: { companyId?: string },
 ): Promise<boolean> {
+  if (careerApiMode === 'gateway' && gatewayWorldClient) {
+    const auth: WorldApiAuth = {
+      ...gatewayAuth,
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    };
+    return gatewayUpdateOpenMission(
+      gatewayWorldClient,
+      auth,
+      missionId,
+      update,
+    );
+  }
   return companyLock.withLock(async () => {
     const companyId = opts?.companyId?.trim();
     const companyOpts = companyId ? { companyId } : undefined;
@@ -1288,6 +1352,14 @@ async function withCareerRead<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
   opts?: { companyId?: string },
 ): Promise<T> {
+  if (careerApiMode === 'gateway' && gatewayWorldClient) {
+    const auth: WorldApiAuth = {
+      ...gatewayAuth,
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    };
+    const missions = await gatewayLoadMissions(gatewayWorldClient, auth);
+    return fn(gatewayEconomyShell(), missions);
+  }
   return withCareerLock(async () => {
     const world = await loadEconomyUnlocked({ skipCatchUp: true });
     const companyId = opts?.companyId?.trim();
@@ -1344,6 +1416,11 @@ async function withCareerWrite<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
   opts?: CareerWriteOpts,
 ): Promise<T> {
+  if (careerApiMode === 'gateway') {
+    throw new Error(
+      'gateway mode: economy writes must go to the world host (use HTTP proxy)',
+    );
+  }
   return withCareerLock(async () => {
     const activeStore = requireStore();
     const companyId = opts?.companyId?.trim();
@@ -2333,6 +2410,23 @@ async function readBody(req: import('node:http').IncomingMessage): Promise<unkno
 }
 
 export function createCareerApiServer(port = 8787) {
+  if (careerApiMode === 'gateway') {
+    const worldUrl = careerWorldApiUrlFromEnv();
+    if (!worldUrl) {
+      throw new Error(
+        'CAREER_API_MODE=gateway requires CAREER_WORLD_API_URL',
+      );
+    }
+    gatewayWorldClient = new WorldApiClient({ baseUrl: worldUrl });
+    console.log(
+      `[career] API mode=gateway → world ${worldUrl} (sim local, economy proxied)`,
+    );
+  } else if (careerApiMode === 'world') {
+    console.log(
+      '[career] API mode=world (sim disabled — Watch/inject on desktop)',
+    );
+  }
+
   const worldTick: WorldTickService = isRemoteWorldTickEnabled()
     ? new RemoteWorldTickService({
         baseUrl: process.env.CAREER_REMOTE_WORLD_URL!.trim(),
@@ -2391,6 +2485,14 @@ export function createCareerApiServer(port = 8787) {
     withCareerRead,
     withCareerWrite,
     updateOpenMission,
+    ...(careerApiMode === 'gateway' && gatewayWorldClient
+      ? {
+          worldMutations: createGatewayWatchMutations(
+            gatewayWorldClient,
+            gatewayAuthOrThrow,
+          ),
+        }
+      : {}),
   });
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
@@ -2402,10 +2504,126 @@ export function createCareerApiServer(port = 8787) {
     }
 
     try {
+      if (careerApiMode === 'gateway') {
+        gatewayAuth = worldAuthFromIncoming(req);
+        if (path === '/api/health') {
+          const worldUrl = careerWorldApiUrlFromEnv()!;
+          let worldHealth: Record<string, unknown> = {};
+          try {
+            const upstream = await fetch(`${worldUrl}/api/health`);
+            if (upstream.ok) {
+              worldHealth = (await upstream.json()) as Record<string, unknown>;
+            }
+          } catch {
+            /* world down — still report gateway alive */
+          }
+          send(res, 200, {
+            ok: true,
+            mode: 'gateway',
+            worldApiUrl: worldUrl,
+            store: worldHealth.store ?? null,
+            simLocal: true,
+            authRequired: Boolean(worldHealth.authRequired),
+            worldFixed: Boolean(worldHealth.worldFixed),
+            needsProfile: Boolean(worldHealth.needsProfile),
+            activeProfileId:
+              typeof worldHealth.activeProfileId === 'string'
+                ? worldHealth.activeProfileId
+                : null,
+            activeProfileName:
+              typeof worldHealth.activeProfileName === 'string'
+                ? worldHealth.activeProfileName
+                : null,
+            countries: Array.isArray(worldHealth.countries)
+              ? worldHealth.countries
+              : undefined,
+            homeCountryId:
+              typeof worldHealth.homeCountryId === 'string'
+                ? worldHealth.homeCountryId
+                : undefined,
+          });
+          return;
+        }
+        if (isGatewayEnrichApiPath(path) && req.method === 'POST' && path === '/api/settle') {
+          // Enrich settle with local Watch telemetry, then forward.
+          const body = (await readBody(req)) as Record<string, unknown>;
+          const missionId =
+            typeof body.missionId === 'string' ? body.missionId : '';
+          const st = watchSession.getStatus();
+          if (st.running && st.missionId === missionId) {
+            const landingFpm = watchSession.getCapturedLandingFpm();
+            const airborneEndedAtMs =
+              watchSession.getCapturedAirborneEndedAtMs();
+            const flightScore =
+              watchSession.finalizeFlightScoreForSettle(landingFpm);
+            const weatherOps = watchSession.getCapturedWeatherOps();
+            const mx = watchSession.getCapturedMxFuelDrain();
+            const td = watchSession.getCapturedTouchdownPosition();
+            Object.assign(body, {
+              ...(landingFpm != null ? { landingFpm } : {}),
+              ...(airborneEndedAtMs != null ? { airborneEndedAtMs } : {}),
+              ...(flightScore ? { flightScore } : {}),
+              ...(weatherOps ? { weatherOps } : {}),
+              mxFuelDrainUnsettledKg: mx.unsettledKg,
+              mxFuelDrainTotalKg: mx.totalKg,
+              ...(td
+                ? {
+                    touchdownLat: td.lat,
+                    touchdownLon: td.lon,
+                    touchdownHeadingTrueDeg: td.headingTrueDeg,
+                  }
+                : {}),
+            });
+            await watchSession.stop();
+          }
+          const worldUrl = careerWorldApiUrlFromEnv()!;
+          const auth = worldAuthFromIncoming(req);
+          const upstream = await fetch(`${worldUrl}/api/settle`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              ...(auth.authorization
+                ? { authorization: auth.authorization }
+                : {}),
+              ...(auth.companyId
+                ? { 'x-skyline-company-id': auth.companyId }
+                : {}),
+            },
+            body: JSON.stringify(body),
+          });
+          const text = await upstream.text();
+          res.writeHead(upstream.status, {
+            'content-type': 'application/json; charset=utf-8',
+            'access-control-allow-origin': '*',
+          });
+          res.end(text);
+          return;
+        }
+        if (isGatewayProxiedPath(path)) {
+          await proxyToWorldApi(req, res, {
+            worldBaseUrl: careerWorldApiUrlFromEnv()!,
+          });
+          return;
+        }
+        // UI + sim-local APIs fall through to local handlers / static dist.
+      }
+
+      if (
+        isSimDisabledMode(careerApiMode) &&
+        isSimLocalApiPath(path)
+      ) {
+        send(res, 501, {
+          error: SIM_ON_CLIENT_ERROR,
+          code: SIM_ON_CLIENT_CODE,
+        });
+        return;
+      }
+
       await primeAuthSession(req);
 
       if (
         isCareerAuthRequired() &&
+        careerApiMode !== 'gateway' &&
         !isAuthPublicPath(req.method ?? 'GET', path)
       ) {
         const gate = requireAuthSession(req, res);
@@ -3127,7 +3345,12 @@ export function createCareerApiServer(port = 8787) {
         }
         const nowMs = Date.now();
         const stateCompanyId = companyIdFromRequest(req);
-        const catchUp = await worldTick.getCatchUpProgress(LOCAL_WORLD_ID, nowMs);
+        // SP-only ⟳ chip. World host / worker own the clock — never tell
+        // desktop clients they must stay open to drain backlog.
+        const catchUp =
+          careerApiMode === 'world'
+            ? null
+            : await worldTick.getCatchUpProgress(LOCAL_WORLD_ID, nowMs);
         const payload = await withCareerRead((world, missions) => {
           const npcBusy = (world.npcs ?? []).filter((n) => n.status === 'busy').length;
           const offlineFeeSummary = pendingOfflineFeeSummary;
@@ -7552,6 +7775,54 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/missions/open-update') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          companyId?: string;
+          patch?: Partial<MissionIntent>;
+          revertFalseDepart?: boolean;
+        };
+        if (!body.missionId?.trim()) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        const companyId = companyIdFromRequest(req, body.companyId);
+        try {
+          const wrote = await updateOpenMission(
+            body.missionId.trim(),
+            (missions, open, idx) => {
+              if (body.revertFalseDepart === true) {
+                if (open.status !== 'in_flight') return false;
+                const world = store?.peekEconomyWorld() ?? gatewayEconomyShell();
+                missions.missions[idx] = revertFalseDepartMission(world, open);
+                return true;
+              }
+              if (!body.patch || typeof body.patch !== 'object') return false;
+              const { id: _id, ...rest } = body.patch;
+              missions.missions[idx] = {
+                ...open,
+                ...rest,
+                id: open.id,
+              };
+              return true;
+            },
+            { companyId },
+          );
+          if (!wrote) {
+            send(res, 404, { error: `Unknown or closed mission ${body.missionId}` });
+            return;
+          }
+          const missions = await loadMissions({ companyId });
+          const mission = missions.missions.find((m) => m.id === body.missionId);
+          send(res, 200, { ok: true, mission: mission ?? null });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/tick') {
         if (worldTick.mode === 'mp-remote') {
           send(res, 403, {
@@ -9401,6 +9672,9 @@ export function createCareerApiServer(port = 8787) {
           missionId?: string;
           override?: boolean;
           companyId?: string;
+          nowMs?: number;
+          distanceNm?: number;
+          expectedRouteMs?: number;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -9420,6 +9694,13 @@ export function createCareerApiServer(port = 8787) {
             }
             const departedResult = executeDepartFlight(world, missions, {
               missionId: body.missionId!,
+              ...(typeof body.nowMs === 'number' ? { nowMs: body.nowMs } : {}),
+              ...(typeof body.distanceNm === 'number'
+                ? { distanceNm: body.distanceNm }
+                : {}),
+              ...(typeof body.expectedRouteMs === 'number'
+                ? { expectedRouteMs: body.expectedRouteMs }
+                : {}),
             });
             if (departedResult.kind === 'missing') {
               return { kind: 'missing' as const };
@@ -9475,6 +9756,18 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           missionId?: string;
           companyId?: string;
+          residualFuelKg?: number;
+          landingFpm?: number;
+          airborneEndedAtMs?: number;
+          airborneElapsedMs?: number;
+          flightScore?: unknown;
+          weatherOps?: unknown;
+          mxFuelDrainUnsettledKg?: number;
+          mxFuelDrainTotalKg?: number;
+          touchdownLat?: number;
+          touchdownLon?: number;
+          touchdownHeadingTrueDeg?: number;
+          nowMs?: number;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -9491,18 +9784,25 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          let residualFuelKg: number | undefined;
-          try {
-            residualFuelKg = await probeLiveResidualFuelKg();
-          } catch {
-            // Manual/offline settle keeps the estimated-burn fallback.
-            residualFuelKg = undefined;
-          }
-          // Prefer Watch-captured touchdown VS; else probe the sim latch.
-          let landingFpm =
-            watchSession.getStatus().missionId === body.missionId
-              ? watchSession.getCapturedLandingFpm()
+          let residualFuelKg =
+            typeof body.residualFuelKg === 'number' &&
+            Number.isFinite(body.residualFuelKg)
+              ? body.residualFuelKg
               : undefined;
+          if (residualFuelKg === undefined) {
+            try {
+              residualFuelKg = await probeLiveResidualFuelKg();
+            } catch {
+              residualFuelKg = undefined;
+            }
+          }
+          // Prefer body (gateway Watch) → local Watch → sim probe.
+          let landingFpm =
+            typeof body.landingFpm === 'number' && Number.isFinite(body.landingFpm)
+              ? body.landingFpm
+              : watchSession.getStatus().missionId === body.missionId
+                ? watchSession.getCapturedLandingFpm()
+                : undefined;
           if (landingFpm === undefined) {
             try {
               landingFpm = await probeLiveLandingFpm();
@@ -9511,30 +9811,51 @@ export function createCareerApiServer(port = 8787) {
             }
           }
           const airborneEndedAtMs =
-            watchSession.getStatus().missionId === body.missionId
-              ? watchSession.getCapturedAirborneEndedAtMs()
-              : undefined;
+            typeof body.airborneEndedAtMs === 'number' &&
+            Number.isFinite(body.airborneEndedAtMs)
+              ? body.airborneEndedAtMs
+              : watchSession.getStatus().missionId === body.missionId
+                ? watchSession.getCapturedAirborneEndedAtMs()
+                : undefined;
           const flightScore =
-            watchSession.getStatus().missionId === body.missionId
-              ? watchSession.finalizeFlightScoreForSettle(landingFpm)
-              : undefined;
+            body.flightScore != null
+              ? body.flightScore
+              : watchSession.getStatus().missionId === body.missionId
+                ? watchSession.finalizeFlightScoreForSettle(landingFpm)
+                : undefined;
           const weatherOps =
-            watchSession.getStatus().missionId === body.missionId
-              ? watchSession.getCapturedWeatherOps() ?? undefined
-              : undefined;
+            body.weatherOps != null
+              ? body.weatherOps
+              : watchSession.getStatus().missionId === body.missionId
+                ? watchSession.getCapturedWeatherOps() ?? undefined
+                : undefined;
           const mxFuelDrain =
+            typeof body.mxFuelDrainUnsettledKg === 'number' ||
+            typeof body.mxFuelDrainTotalKg === 'number'
+              ? {
+                  unsettledKg: Number(body.mxFuelDrainUnsettledKg) || 0,
+                  totalKg: Number(body.mxFuelDrainTotalKg) || 0,
+                }
+              : watchSession.getStatus().missionId === body.missionId
+                ? watchSession.getCapturedMxFuelDrain()
+                : { unsettledKg: 0, totalKg: 0 };
+          let touchdownLat: number | undefined =
+            typeof body.touchdownLat === 'number' ? body.touchdownLat : undefined;
+          let touchdownLon: number | undefined =
+            typeof body.touchdownLon === 'number' ? body.touchdownLon : undefined;
+          let touchdownHeadingTrueDeg: number | undefined =
+            typeof body.touchdownHeadingTrueDeg === 'number'
+              ? body.touchdownHeadingTrueDeg
+              : undefined;
+          if (
+            (touchdownLat === undefined || touchdownLon === undefined) &&
             watchSession.getStatus().missionId === body.missionId
-              ? watchSession.getCapturedMxFuelDrain()
-              : { unsettledKg: 0, totalKg: 0 };
-          let touchdownLat: number | undefined;
-          let touchdownLon: number | undefined;
-          let touchdownHeadingTrueDeg: number | undefined;
-          if (watchSession.getStatus().missionId === body.missionId) {
+          ) {
             const captured = watchSession.getCapturedTouchdownPosition();
             if (captured) {
               touchdownLat = captured.lat;
               touchdownLon = captured.lon;
-              touchdownHeadingTrueDeg = captured.headingTrueDeg;
+              touchdownHeadingTrueDeg ??= captured.headingTrueDeg;
             }
           }
           if (touchdownLat === undefined || touchdownLon === undefined) {
@@ -9575,13 +9896,20 @@ export function createCareerApiServer(port = 8787) {
               mxFuelDrainTotalKg: mxFuelDrain.totalKg,
               landingFpm,
               airborneEndedAtMs,
-              flightScore,
-              weatherOps,
+              airborneElapsedMs:
+                typeof body.airborneElapsedMs === 'number'
+                  ? body.airborneElapsedMs
+                  : undefined,
+              flightScore: flightScore as never,
+              weatherOps: weatherOps as never,
               touchdownLat,
               touchdownLon,
               touchdownHeadingTrueDeg,
               runwayTouch,
-              nowMs: Date.now(),
+              nowMs:
+                typeof body.nowMs === 'number' && Number.isFinite(body.nowMs)
+                  ? body.nowMs
+                  : Date.now(),
             });
             if (executed.kind === 'missing') return { kind: 'missing' as const };
             if (executed.kind === 'closed') return { kind: 'closed' as const };
@@ -10082,7 +10410,10 @@ export function createCareerApiServer(port = 8787) {
         server.listen(port, bind, () => {
           console.log(`[career] API listening on http://${bind}:${port}`);
           // Phase 2: world tick without waiting for a UI client.
-          void bootstrapHeadlessWorldPulse(worldTick);
+          // Gateway has no local store — pulse lives on the world host / worker.
+          if (careerApiMode !== 'gateway') {
+            void bootstrapHeadlessWorldPulse(worldTick);
+          }
           resolveListen();
         });
       });

@@ -1,30 +1,90 @@
 /**
- * Client Auth session (Phase 7) — Bearer token in sessionStorage (tab-scoped).
- * When CAREER_AUTH=1 on the host, api() sends Authorization and company chip
- * is limited to owned companies.
+ * Client Auth session (Phase 7) — Bearer token for CAREER_AUTH=1 hosts.
+ * "Remember me" (default on) keeps the token in localStorage across Electron
+ * restarts; otherwise sessionStorage (tab-scoped). Never stores passwords.
  */
 
 export const AUTH_TOKEN_STORAGE_KEY = 'skyline.authToken';
+export const AUTH_LOGIN_NAME_KEY = 'skyline.authLoginName';
+export const AUTH_REMEMBER_KEY = 'skyline.authRemember';
 
 let memoryAuthToken: string | null = null;
+
+function readFlag(key: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const v = raw.trim().toLowerCase();
+    if (v === '1' || v === 'true' || v === 'on' || v === 'yes') return true;
+    if (v === '0' || v === 'false' || v === 'off' || v === 'no') return false;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Default true — desktop playtest should not re-type every launch. */
+export function getRememberAuth(): boolean {
+  return readFlag(AUTH_REMEMBER_KEY, true);
+}
+
+export function setRememberAuth(remember: boolean): void {
+  try {
+    localStorage.setItem(AUTH_REMEMBER_KEY, remember ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getRememberedLoginName(): string | null {
+  try {
+    const raw = localStorage.getItem(AUTH_LOGIN_NAME_KEY)?.trim();
+    return raw || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setRememberedLoginName(loginName: string | null): void {
+  try {
+    const trimmed = loginName?.trim() || '';
+    if (trimmed) localStorage.setItem(AUTH_LOGIN_NAME_KEY, trimmed);
+    else localStorage.removeItem(AUTH_LOGIN_NAME_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function getAuthToken(): string | null {
   try {
     if (memoryAuthToken?.trim()) return memoryAuthToken.trim();
-    const raw = sessionStorage.getItem(AUTH_TOKEN_STORAGE_KEY)?.trim();
-    return raw || null;
+    const durable = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)?.trim();
+    if (durable) return durable;
+    const session = sessionStorage.getItem(AUTH_TOKEN_STORAGE_KEY)?.trim();
+    return session || null;
   } catch {
     return memoryAuthToken?.trim() || null;
   }
 }
 
-export function setAuthToken(token: string | null): void {
+export function setAuthToken(
+  token: string | null,
+  opts?: { remember?: boolean },
+): void {
   memoryAuthToken = token?.trim() || null;
+  const remember =
+    opts?.remember !== undefined ? opts.remember : getRememberAuth();
+  if (opts?.remember !== undefined) {
+    setRememberAuth(opts.remember);
+  }
   try {
-    if (memoryAuthToken) {
-      sessionStorage.setItem(AUTH_TOKEN_STORAGE_KEY, memoryAuthToken);
+    sessionStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    if (!memoryAuthToken) return;
+    if (remember) {
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, memoryAuthToken);
     } else {
-      sessionStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+      sessionStorage.setItem(AUTH_TOKEN_STORAGE_KEY, memoryAuthToken);
     }
   } catch {
     /* ignore */
@@ -32,5 +92,11 @@ export function setAuthToken(token: string | null): void {
 }
 
 export function clearAuthToken(): void {
-  setAuthToken(null);
+  memoryAuthToken = null;
+  try {
+    sessionStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
 }

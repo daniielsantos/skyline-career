@@ -1,5 +1,21 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Topbar Move chip** — Pilot Travel dialog: tabs Pilot | Ferry → Plan ferry abre `FerryJourneyDialog` (mesmo fluxo do Hangar). Chip label `Move`.
+
+Atualizado 2026-09-14: **Remember me** — AuthGate checkbox (default on); Bearer + loginName em `localStorage` (não password). Sessão server TTL 30d. Spec: AuthGate / `career-auth-client`.
+
+Atualizado 2026-09-14: **Chip ⟳ sync no MP** — world `/api/state` não manda `catchUp` (SP-only). Banner “Economy syncing… while Career stays open” vinha do world ~2 batches atrás do wall + gateway proxy. “Pulse due” = `nextPulseAtMs` passado (worker ainda a fechar batch). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Gateway não proxy `/`** — só `/api/*` (+ `/worlds/*`); UI static local. Health do gateway espelha `authRequired`/`worldFixed` do world. Sintoma: Electron mostrava JSON `auth_required` (Pretty-print). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Desktop electron start** — `packages/desktop` não usa `electron` do `.bin` aninhado (hoist quebra `cli.js`). Start = `node ./run-electron.mjs` (resolve root + rebaixa binário se `path.txt` sumir). Removido `packages/desktop/package-lock.json` (workspace). Comando: `CAREER_WORLD_API_URL=…` + `npm start -w skyline-career-desktop`.
+
+Atualizado 2026-09-14: **Compose world stack** — `npm run career:stack:world` sobe postgres + world-api:8787 + worker; desktop gateway `:8788` + `CAREER_WORLD_API_URL`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Sim local / world host split** — `CAREER_API_MODE=world|gateway|full`; VPS sem Watch; desktop gateway + `CAREER_WORLD_API_URL`; compose `--profile world`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Watch por company fora da fila** — 1 Watch/host é intencional (1 MSFS); dual Watch no mesmo host não é produto e piora multi-conta. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **PG light persists + settle-all** — inbound/demand/ports/npcLive no longer stub→`saveEconomy`; `PostgresCareerStore.settleWorldCompaniesPassiveFees`; smoke prefers `skyline_test` (`CAREER_PG_TEST` / `CAREER_DATABASE_URL_TEST`). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **Board GET freezes (PG)** — Charter was worst (full write per sort); Freights `/api/market` `persist:inbound` and Airframes GET `blob` also full-saved on PG stubs → all switched to `withCareerRead`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
@@ -26,13 +42,13 @@ Atualizado 2026-09-14: **MP PG world-ops + dealer pool** — `career-store-pg-wo
 
 Atualizado 2026-09-14: **MP Postgres lab** — `CAREER_PG=1` / `CAREER_DATABASE_URL` → host opens PostgresCareerStore. SP stays SQLite. Docker: `skyline-career-postgres` + Adminer `:8081`. `npm run career:host:pg`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-14: **Phase 8 fixed world = one SQL DB** — `profiles/career/world/skyline.sqlite` (no MP Create World / no `profiles.json`). Clients Auth only. Next: Postgres hosted world. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-14: **Phase 8 fixed world = one SQL DB** — `profiles/career/world/skyline.sqlite` (no MP Create World / no `profiles.json`). Clients Auth only. Hosted = Postgres + world API + desktop gateway. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **Auto-resume save on refresh** — Ctrl+R reopens `activeId` (SP). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-14: **MP Phase 7 local Auth** — account→session→company (`CAREER_AUTH=1`, host default on). Next: Watch per-company, OAuth provider, or Postgres. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-14: **MP Phase 7 local Auth** — account→session→company (`CAREER_AUTH=1`, host default on). Next was OAuth / Postgres (PG lab shipped). Watch-per-company **dropped**. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab company header; flight-loop/hangar scoped; `npm run career:host` + `career:client`. Next: Watch per-company, Auth, or Postgres. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab company header; flight-loop/hangar scoped; `npm run career:host` + `career:client`. Auth + PG lab shipped after. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 

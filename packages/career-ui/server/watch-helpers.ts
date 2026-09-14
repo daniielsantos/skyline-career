@@ -254,6 +254,35 @@ export type WatchStatusPayload = {
   } | null;
 };
 
+/**
+ * When set (desktop gateway), depart/settle/revert hit the world host over HTTP
+ * instead of local withCareerWrite + execute*Flight.
+ */
+export type WatchWorldMutations = {
+  departFlight: (opts: {
+    missionId: string;
+    nowMs: number;
+    distanceNm?: number;
+    expectedRouteMs?: number;
+  }) => Promise<boolean>;
+  revertFalseDepart: (missionId: string) => Promise<boolean>;
+  settleFlight: (opts: {
+    missionId: string;
+    residualFuelKg?: number;
+    mxFuelDrainUnsettledKg?: number;
+    mxFuelDrainTotalKg?: number;
+    landingFpm?: number;
+    airborneEndedAtMs?: number;
+    airborneElapsedMs?: number;
+    nowMs: number;
+    flightScore?: unknown;
+    weatherOps?: unknown;
+    touchdownLat?: number;
+    touchdownLon?: number;
+    touchdownHeadingTrueDeg?: number;
+  }) => Promise<boolean>;
+};
+
 type WatchCallbacks = {
   /** Consistent world+missions snapshot (may run economy catch-up). */
   withCareerRead: <T>(
@@ -295,6 +324,8 @@ type WatchCallbacks = {
       idx: number,
     ) => Promise<boolean> | boolean,
   ) => Promise<boolean>;
+  /** Gateway → world host HTTP mutations (optional). */
+  worldMutations?: WatchWorldMutations;
 };
 
 type WatchOptions = {
@@ -3603,7 +3634,30 @@ export class CareerWatchSession {
           };
           nextState = this.watchState;
           }
-          const saved = await this.cb.withCareerWrite((worldFresh, freshMissions) => {
+          const saved = this.cb.worldMutations
+            ? await this.cb.worldMutations.departFlight({
+                missionId: this.missionId!,
+                nowMs: nextState.airborneAtMs ?? nowMs,
+                distanceNm,
+                expectedRouteMs: nextState.expectedRouteMs ?? expectedRouteMs,
+              }).then(async (ok) => {
+                if (!ok) return false;
+                const snap = await this.cb.withCareerRead((_w, missions) => {
+                  const m = missions.missions.find((x) => x.id === this.missionId);
+                  return m ?? null;
+                });
+                if (!snap) return false;
+                this.missionStatus = snap.status;
+                this.watchState = {
+                  ...this.watchState,
+                  sawAirborne: true,
+                  airborneAtMs: snap.airborneAtMs,
+                  expectedRouteMs: snap.expectedRouteMs,
+                };
+                current = snap;
+                return true;
+              })
+            : await this.cb.withCareerWrite((worldFresh, freshMissions) => {
           const openIdx = freshMissions.missions.findIndex(
             (m) => m.id === this.missionId,
           );
@@ -3712,7 +3766,23 @@ export class CareerWatchSession {
         );
         const elapsedMs = airborneCheck?.elapsedMs ?? 0;
         if (elapsedMs < maxFalseMs) {
-          const reverted = await this.cb.withCareerWrite(
+          const reverted = this.cb.worldMutations
+            ? await this.cb.worldMutations
+                .revertFalseDepart(this.missionId!)
+                .then(async (ok) => {
+                  if (!ok) return false;
+                  const snap = await this.cb.withCareerRead((_w, missions) => {
+                    const m = missions.missions.find(
+                      (x) => x.id === this.missionId,
+                    );
+                    return m ?? null;
+                  });
+                  if (!snap) return false;
+                  this.missionStatus = snap.status;
+                  current = snap;
+                  return true;
+                })
+            : await this.cb.withCareerWrite(
             (_worldFresh, freshMissions) => {
               const openIdx = freshMissions.missions.findIndex(
                 (m) => m.id === this.missionId,
@@ -3891,7 +3961,59 @@ export class CareerWatchSession {
             }
           }
         }
-        const saved = await this.cb.withCareerWrite(
+        const settleNowMs = Date.now();
+        const weatherOpsForSettle = finalizeWeatherOpsScore(this.weatherAcc, {
+          expectedRouteMs:
+            current.expectedRouteMs ?? this.watchState.expectedRouteMs,
+        });
+        const saved = this.cb.worldMutations
+          ? await this.cb.worldMutations.settleFlight({
+              missionId: this.missionId!,
+              residualFuelKg,
+              mxFuelDrainUnsettledKg: mxFuelDrain.unsettledKg,
+              mxFuelDrainTotalKg: mxFuelDrain.totalKg,
+              landingFpm,
+              airborneEndedAtMs: this.watchState.airborneEndedAtMs,
+              airborneElapsedMs:
+                resolveLiveAirborneElapsedMs(
+                  this.watchState,
+                  settleNowMs,
+                  false,
+                ) ?? undefined,
+              nowMs: settleNowMs,
+              flightScore,
+              weatherOps: weatherOpsForSettle,
+              touchdownLat: touchdownLat ?? undefined,
+              touchdownLon: touchdownLon ?? undefined,
+              touchdownHeadingTrueDeg,
+            }).then(async (ok) => {
+              if (!ok) return false;
+              const snap = await this.cb.withCareerRead((_w, missions) => {
+                const m = missions.missions.find((x) => x.id === this.missionId);
+                return { mission: m ?? null, walletUsd: missions.walletUsd };
+              });
+              if (!snap.mission) return false;
+              this.missionStatus = snap.mission.status;
+              this.walletUsd = snap.walletUsd;
+              this.settlement = {
+                payoutUsd: 0,
+                penaltyUsd: 0,
+                lateTicks: 0,
+                onTime: true,
+                deliveredKg: 0,
+                residualFuelKg: snap.mission.settledFuelKg ?? null,
+                landingFpm: snap.mission.settledLandingFpm ?? null,
+                flightDurationMs: snap.mission.settledFlightDurationMs ?? null,
+                flightScore: snap.mission.settledFlightScore ?? null,
+                weatherBonusUsd: snap.mission.settledWeatherBonusUsd,
+                weatherOps: snap.mission.settledWeatherOps ?? null,
+                runwayTouch: snap.mission.settledRunwayTouch ?? null,
+                cargoOpsDeltas: [],
+                classOpsDeltas: [],
+              };
+              return true;
+            })
+          : await this.cb.withCareerWrite(
           (worldFresh, freshMissions) => {
             if (!this.missionId) return false;
             const openMission = freshMissions.missions.find(
@@ -3911,7 +4033,6 @@ export class CareerWatchSession {
                     touchdownHeadingTrueDeg,
                   )
                 : undefined;
-            const settleNowMs = Date.now();
             const executed = executeSettleFlight(worldFresh, freshMissions, {
               missionId: this.missionId,
               residualFuelKg,

@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { BrandMark } from './BrandMark';
+import {
+  getRememberAuth,
+  getRememberedLoginName,
+} from './career-auth-client';
 
 export type AuthGateAccount = {
   id: string;
@@ -16,6 +20,8 @@ export type AuthGateResult = {
   token: string;
   account: AuthGateAccount;
   companies: AuthGateCompany[];
+  /** Persist Bearer across app restarts (not the password). */
+  rememberMe: boolean;
 };
 
 type Mode = 'login' | 'register';
@@ -29,20 +35,23 @@ export function AuthGate(props: {
   onLogin: (opts: {
     loginName: string;
     password: string;
-  }) => Promise<AuthGateResult>;
+  }) => Promise<Omit<AuthGateResult, 'rememberMe'>>;
   onRegister: (opts: {
     loginName: string;
     displayName: string;
     password: string;
     companyDisplayName?: string;
-  }) => Promise<AuthGateResult>;
+  }) => Promise<Omit<AuthGateResult, 'rememberMe'>>;
   onSuccess: (result: AuthGateResult) => void;
 }) {
   const [mode, setMode] = useState<Mode>('login');
-  const [loginName, setLoginName] = useState('');
+  const [loginName, setLoginName] = useState(
+    () => getRememberedLoginName() ?? '',
+  );
   const [displayName, setDisplayName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => getRememberAuth());
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,7 +72,7 @@ export function AuthGate(props: {
               password,
               companyDisplayName: companyName || displayName || loginName,
             });
-      props.onSuccess(result);
+      props.onSuccess({ ...result, rememberMe });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -134,6 +143,16 @@ export function AuthGate(props: {
             minLength={6}
             required
           />
+        </label>
+
+        <label className="auth-gate-remember">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            disabled={busy}
+          />
+          <span>Remember me on this device</span>
         </label>
 
         {error ? (

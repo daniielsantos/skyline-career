@@ -137,7 +137,7 @@ import {
   setStoredCompanyId,
   suggestCompanyId,
 } from './career-company-client';
-import { clearAuthToken, getAuthToken, setAuthToken } from './career-auth-client';
+import { clearAuthToken, getAuthToken, setAuthToken, setRememberedLoginName } from './career-auth-client';
 import { AuthGate } from './AuthGate';
 import { WorldWaitingGate } from './WorldWaitingGate';
 import {
@@ -2214,13 +2214,16 @@ function formatClock(continuousTicks: number): string {
 /** Wall countdown to the next economy tick pulse (compact topbar). */
 function formatNextPulseCountdown(msRemaining: number): string {
   const sec = Math.max(0, Math.ceil(msRemaining / 1000));
-  if (sec < 60) return `${sec}s`;
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  if (m < 60) return s === 0 ? `${m}m` : `${m}m ${String(s).padStart(2, '0')}s`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return rm === 0 ? `${h}h` : `${h}h ${rm}m`;
+  // Fixed-width under 1h so the World chip does not resize every second
+  // (and when seconds hit :00).
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  }
+  const h = Math.floor(sec / 3600);
+  const rm = Math.floor((sec % 3600) / 60);
+  return `${h}h ${String(rm).padStart(2, '0')}m`;
 }
 
 function formatExpiry(opts: {
@@ -3695,6 +3698,11 @@ export function App() {
   const [pilotTravelInitialDest, setPilotTravelInitialDest] = useState<
     string | null
   >(null);
+  /** Ferry journey opened from the topbar Move chip (after PilotTravelDialog). */
+  const [topbarFerry, setTopbarFerry] = useState<{
+    aircraftId: string;
+    finalDest: string;
+  } | null>(null);
   const [pilotName, setPilotName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [pilotIcao, setPilotIcao] = useState('');
@@ -6916,8 +6924,12 @@ export function App() {
     token: string;
     account?: { displayName?: string; loginName?: string };
     companies: Array<{ id: string; displayName: string }>;
+    rememberMe?: boolean;
   }): Promise<void> {
-    setAuthToken(result.token);
+    setAuthToken(result.token, { remember: result.rememberMe !== false });
+    if (result.rememberMe !== false && result.account?.loginName?.trim()) {
+      setRememberedLoginName(result.account.loginName);
+    }
     setAuthSessionEpoch((n) => n + 1);
     setAuthRequired(true);
     setAuthChecked(true);
@@ -8550,6 +8562,13 @@ export function App() {
   function closePilotTravel() {
     setPilotTravelOpen(false);
     setPilotTravelInitialDest(null);
+  }
+
+  function openTopbarFerry(aircraftId: string, destIcao: string) {
+    const dest = destIcao.trim().toUpperCase();
+    if (!aircraftId.trim() || !dest) return;
+    closePilotTravel();
+    setTopbarFerry({ aircraftId: aircraftId.trim(), finalDest: dest });
   }
 
   /** Execute pilot travel (quote already shown in PilotTravelDialog). */
@@ -10933,7 +10952,7 @@ export function App() {
   }
 
   // Auth before profile picker / main shell — avoids Freights flash on Ctrl+R
-  // when a stale sessionStorage token is about to be rejected.
+  // when a stale remembered token is about to be rejected.
   if (showAuthGate) {
     return (
       <div className="app-shell profile-gate-shell">
@@ -11514,11 +11533,21 @@ export function App() {
                 type="button"
                 className="metric pilot-chip"
                 disabled={busy}
-                title="Travel / reposition pilot"
+                title="Travel pilot or ferry aircraft"
+                aria-haspopup="dialog"
+                aria-label={`Pilot at ${pilotIcao}. Open travel or ferry.`}
                 onClick={() => openPilotTravel()}
               >
-                <span className="label">Pilot</span>
-                <strong>{pilotIcao}</strong>
+                <span className="label">
+                  Pilot
+                  <span className="pilot-chip-action">Move</span>
+                </span>
+                <strong>
+                  {pilotIcao}
+                  <span className="pilot-chip-caret" aria-hidden>
+                    ›
+                  </span>
+                </strong>
               </button>
             ) : null}
             <div className="metric">
@@ -15999,33 +16028,29 @@ export function App() {
                 }
               />
 
-              {!stagingInRange ? (
-                <p className="banner error">
-                  This route exceeds {aircraftClassLabel(staging.aircraft)} range
-                  {stagingDistanceNm !== undefined
-                    ? ` (${Math.round(stagingDistanceNm)} nm > ${aircraftMaxRangeNm(staging.aircraft)} nm)`
-                    : ''}
-                  . Choose a longer-range aircraft before Accept &amp; Dispatch.
-                </p>
-              ) : null}
-
-              {!stagingFuelOk ? (
-                <p className="banner error">
-                  Estimated block fuel exceeds tank capacity
-                  {estimatedBlockFuelKg !== null &&
-                  routeFuelCapacityKg !== null
-                    ? ` (${formatMassExact(estimatedBlockFuelKg, weightSystem)} required > ${formatMassExact(routeFuelCapacityKg, weightSystem)} max`
-                    : ''}
-                  {routeFuelDeficitKg !== null && routeFuelDeficitKg >= 1
-                    ? ` · deficit ${formatMassExact(routeFuelDeficitKg, weightSystem)}`
-                    : ''}
-                  {estimatedBlockFuelKg !== null &&
-                  routeFuelCapacityKg !== null
-                    ? ')'
-                    : ''}
-                  . Choose a shorter route or an aircraft with more tank before
-                  Dispatch.
-                </p>
+              {(!stagingInRange || !stagingFuelOk) ? (
+                <ul className="staging-feasibility" role="status">
+                  {!stagingInRange ? (
+                    <li>
+                      Out of range
+                      {stagingDistanceNm !== undefined
+                        ? ` · ${Math.round(stagingDistanceNm)} nm > ${aircraftMaxRangeNm(staging.aircraft)} nm (${aircraftClassLabel(staging.aircraft)})`
+                        : ` · ${aircraftClassLabel(staging.aircraft)}`}
+                    </li>
+                  ) : null}
+                  {!stagingFuelOk ? (
+                    <li>
+                      Tank short
+                      {estimatedBlockFuelKg !== null &&
+                      routeFuelCapacityKg !== null
+                        ? ` · need ${formatMassExact(estimatedBlockFuelKg, weightSystem)} / ${formatMassExact(routeFuelCapacityKg, weightSystem)} max`
+                        : ''}
+                      {routeFuelDeficitKg !== null && routeFuelDeficitKg >= 1
+                        ? ` (−${formatMassExact(routeFuelDeficitKg, weightSystem)})`
+                        : ''}
+                    </li>
+                  ) : null}
+                </ul>
               ) : null}
 
               {stagingMxFuelWarn ? (
@@ -17568,12 +17593,40 @@ export function App() {
               icao: acf.locationIcao,
               label: acf.label,
             }))}
+          ferryAircraft={fleet.map((acf) => ({
+            id: acf.id,
+            label: acf.label,
+            locationIcao: acf.locationIcao,
+            status: acf.status,
+            leaseOverdue: acf.leaseOverdue,
+          }))}
           formatMoney={formatMoney}
           busy={busy}
           onCancel={closePilotTravel}
           onTravel={onPilotTravel}
+          onPlanFerry={openTopbarFerry}
         />
       ) : null}
+      {topbarFerry
+        ? (() => {
+            const acf = fleet.find((a) => a.id === topbarFerry.aircraftId);
+            if (!acf) return null;
+            return (
+              <FerryJourneyDialog
+                aircraft={acf}
+                finalDestIcao={topbarFerry.finalDest}
+                formatMoney={formatMoney}
+                busy={busy}
+                onClose={() => setTopbarFerry(null)}
+                onFlyLeg={async (legDest) => {
+                  await onFerry(acf.id, legDest, {
+                    finalDest: topbarFerry.finalDest,
+                  });
+                }}
+              />
+            );
+          })()
+        : null}
       {splitHoldId
         ? (() => {
             const hold = playerFbos?.holds.find((h) => h.id === splitHoldId);

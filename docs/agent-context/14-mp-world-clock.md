@@ -217,6 +217,14 @@ interface WorldTickService {
 - **24/7 world worker (lab):** `npm run career:world:pg` — `career-world-worker-pg.ts` economy catch-up with Postgres advisory lock `87201401`. Company settlement on login. Pair with `CAREER_HEADLESS_PULSE=0` on `career:host:pg`. `--once` for one-shot/tests.
 - **Diag 2026-09-14 — Charter sort → blank/freeze:** GET `/api/charters` called `withCareerWrite` + `tickCharterEconomy` with default full economy persist on every sort/filter. On PG that blocked the career lock for seconds and starved the UI. Fix: `withCareerRead` only (charter tick stays on economy pulse). UI: `AppErrorBoundary` so render crashes show Reload, not a black root.
 - **Diag 2026-09-14 — Buy/lease ~5s:** `persist: 'blob'` → double full `saveEconomy` on PG. Fix: `persist: 'aircraftMarket'` → `persistAircraftPool` + `saveMissions` only.
+- **Sim local / world host (2026-09-14):** production split wired.
+  - `CAREER_API_MODE=full` — SP/lab all-in-one (store + Watch).
+  - `CAREER_API_MODE=world` / `CAREER_DISABLE_SIM=1` — VPS economy API; `/api/watch|preflight|load-ofp|simbridge` → **501** `sim_on_client`. Fixed world store still opens when `CAREER_HEADLESS_PULSE=0` (worker owns ticks).
+  - `CAREER_API_MODE=gateway` + `CAREER_WORLD_API_URL` — desktop: sim routes + **static UI** local; only `/api/*` (exceto sim) e `/worlds/*` proxied to world (Bearer + company). `/` nunca vai ao world (evita JSON `auth_required` no Electron). Health gateway espelha `authRequired`/`worldFixed` do world. Watch settle/depart via HTTP; gateway enriches `/api/settle` com telemetry local.
+  - **Local prod sim:** `npm run career:stack:world` → postgres + `world-api:8787` + `world-worker`. Desktop: `CAREER_WORLD_API_URL=http://127.0.0.1:8787` then `npm start -w skyline-career-desktop` (gateway **:8788**). Se Electron reclamar de `cli.js` / install: o start usa `packages/desktop/run-electron.mjs` (não o `.bin` aninhado); sem `packages/desktop/package-lock.json`. World exige Auth → register/login no AuthGate.
+  - **No SP ⟳ catch-up chip on world:** `CAREER_API_MODE=world` omits `catchUp` from `/api/state` (worker owns backlog). Topbar **pulse due** still means `nextPulseAtMs` is past — worker lag, not “stay in Career”.
+  - Scripts: `career:host:world` (Node world on host), `career:stack:world` (Docker). Adminer `:8081` for lab only.
+  - Do **not** give desktop a Postgres password — HTTP only.
 ## Phase 7 notes (2026-09-14)
 
 - **Local Auth** (no OAuth yet): `accounts` / `account_sessions` / `company_members` (schema v10).
@@ -243,7 +251,7 @@ interface WorldTickService {
 - **Fix (same day):** `/api/contract-pilot/options` + `/api/contract-pilot/accept` also take per-request `companyId` — without it, Labubu Accept saw Nothin’s active `msn_cp_*` (“Finish or cancel…”) via ambient `activeCompanyId`.
 - **Fix (same day):** drop shared `localStorage` tenant — Tab A/B were thrashing each other’s header so Labubu painted Nothin’s Active Flight.
 - **Validation (same day):** flight-loop host paths now take per-request `companyId`: cancel / dispatch / depart / settle / fuel / confirm-ofp / accept-ofp-cargo / preflight / load-ofp + `updateOpenMission`. Tests: `career-multitenant-isolation.test.ts`, `career-company-client.test.ts`.
-- **Still ambient (lower priority):** Watch singleton (process-global) — wire when dual-tab hits concurrent Watch.
+- **Watch:** one `CareerWatchSession` per **desktop gateway** process (1 MSFS / 1 pipe). World host has no Watch (`CAREER_API_MODE=world`). Dual concurrent Watch on same PC is not a product goal.
 - **Hangar/fleet (same day):** aircraft-market GET/buy/lease/sell/list/unlist/mx/repair/buyout/pay-lease/return-lease + select-hub + ferry-plan/ferry + empty-flight take per-request `companyId`.
 - **Fix (same day):** `/api/airport/:icao` + `/api/fbo/*` used ambient `loadMissions()` → co_a Base tab flashed co_b’s “Need 2 owned aircraft for a second base” until ambient flipped; now header-scoped. UI clears `playerFbos`/airport on company switch.
 - **Dual-tab playtest:** same profile/host; Tab A `?company=co_a`, Tab B `?company=co_b` (create via **+** or auto-ensure on first open). Accept on A → Freights on B omits lot; both clocks match.

@@ -10,27 +10,42 @@ export type PilotTravelFleetShortcut = {
   label: string;
 };
 
+export type PilotTravelFerryAircraft = {
+  id: string;
+  label: string;
+  locationIcao: string;
+  status: string;
+  leaseOverdue?: boolean;
+};
+
+type Mode = 'pilot' | 'ferry';
+
 /**
- * Single-step pilot reposition: pick dest, see quote, Travel once.
+ * Topbar reposition: pilot travel (instant) or open a ferry journey for a parked airframe.
  */
 export function PilotTravelDialog(props: {
   pilotIcao: string;
   hubs: FerryHubOption[];
   /** Prefill destination (e.g. Hangar “Travel here”). */
   initialDestIcao?: string | null;
-  /** Parked fleet ICAOs where the pilot is away — one-click dest. */
+  /** Parked fleet ICAOs where the pilot is away — one-click dest (pilot mode). */
   fleetShortcuts?: PilotTravelFleetShortcut[];
+  /** Parked fleet for ferry mode. */
+  ferryAircraft?: PilotTravelFerryAircraft[];
   formatMoney: (n: number) => string;
   busy?: boolean;
   onCancel: () => void;
   /** Execute travel after quote is shown in this dialog. Resolve true when moved. */
   onTravel: (destIcao: string) => Promise<boolean>;
+  /** Close this dialog and open the multi-leg ferry journey sheet. */
+  onPlanFerry?: (aircraftId: string, destIcao: string) => void;
 }) {
   const titleId = useId();
   const bodyId = useId();
   const fieldRef = useRef<HTMLLabelElement>(null);
   const onCancelRef = useRef(props.onCancel);
   onCancelRef.current = props.onCancel;
+  const [mode, setMode] = useState<Mode>('pilot');
   const [destIcao, setDestIcao] = useState(
     () => props.initialDestIcao?.trim().toUpperCase() ?? '',
   );
@@ -40,13 +55,33 @@ export function PilotTravelDialog(props: {
   const [submitting, setSubmitting] = useState(false);
 
   const origin = props.pilotIcao.trim().toUpperCase();
-  const hubs = useMemo(
-    () =>
-      props.hubs.filter(
-        (hub) => hub.icao && hub.icao.toUpperCase() !== origin,
-      ),
-    [props.hubs, origin],
-  );
+  const ferryOptions = useMemo(() => {
+    return (props.ferryAircraft ?? []).filter(
+      (acf) =>
+        (acf.status === 'parked' || acf.status === 'maintenance') &&
+        !acf.leaseOverdue &&
+        acf.locationIcao.trim(),
+    );
+  }, [props.ferryAircraft]);
+
+  const [aircraftId, setAircraftId] = useState(() => {
+    const atPilot = ferryOptions.find(
+      (a) => a.locationIcao.trim().toUpperCase() === origin,
+    );
+    return atPilot?.id ?? ferryOptions[0]?.id ?? '';
+  });
+
+  const selectedAircraft = ferryOptions.find((a) => a.id === aircraftId) ?? null;
+  const ferryOrigin = selectedAircraft?.locationIcao.trim().toUpperCase() ?? '';
+
+  const hubs = useMemo(() => {
+    const exclude =
+      mode === 'ferry' ? ferryOrigin || origin : origin;
+    return props.hubs.filter(
+      (hub) => hub.icao && hub.icao.toUpperCase() !== exclude,
+    );
+  }, [props.hubs, origin, ferryOrigin, mode]);
+
   const shortcuts = useMemo(() => {
     const seen = new Set<string>();
     const out: PilotTravelFleetShortcut[] = [];
@@ -60,6 +95,18 @@ export function PilotTravelDialog(props: {
   }, [props.fleetShortcuts, origin]);
 
   useEffect(() => {
+    if (!aircraftId && ferryOptions[0]) {
+      setAircraftId(ferryOptions[0].id);
+    } else if (
+      aircraftId &&
+      ferryOptions.length > 0 &&
+      !ferryOptions.some((a) => a.id === aircraftId)
+    ) {
+      setAircraftId(ferryOptions[0]?.id ?? '');
+    }
+  }, [aircraftId, ferryOptions]);
+
+  useEffect(() => {
     const input = fieldRef.current?.querySelector('input');
     input?.focus();
     function onKeyDown(event: KeyboardEvent) {
@@ -70,11 +117,17 @@ export function PilotTravelDialog(props: {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [submitting]);
+  }, [submitting, mode]);
 
   const dest = destIcao.trim().toUpperCase();
 
   useEffect(() => {
+    if (mode !== 'pilot') {
+      setQuote(null);
+      setQuoteError(null);
+      setQuoting(false);
+      return;
+    }
     if (!dest || dest === origin) {
       setQuote(null);
       setQuoteError(null);
@@ -104,9 +157,10 @@ export function PilotTravelDialog(props: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [dest, origin]);
+  }, [dest, origin, mode]);
 
-  const canGo =
+  const canTravel =
+    mode === 'pilot' &&
     Boolean(dest) &&
     dest !== origin &&
     Boolean(quote) &&
@@ -115,8 +169,17 @@ export function PilotTravelDialog(props: {
     !props.busy &&
     !submitting;
 
-  async function submit() {
-    if (!canGo || !quote) return;
+  const canPlanFerry =
+    mode === 'ferry' &&
+    Boolean(props.onPlanFerry) &&
+    Boolean(selectedAircraft) &&
+    Boolean(dest) &&
+    dest !== ferryOrigin &&
+    !props.busy &&
+    !submitting;
+
+  async function submitTravel() {
+    if (!canTravel || !quote) return;
     setSubmitting(true);
     try {
       const moved = await props.onTravel(dest);
@@ -125,6 +188,13 @@ export function PilotTravelDialog(props: {
       setSubmitting(false);
     }
   }
+
+  function submitFerry() {
+    if (!canPlanFerry || !selectedAircraft || !props.onPlanFerry) return;
+    props.onPlanFerry(selectedAircraft.id, dest);
+  }
+
+  const ferryAvailable = ferryOptions.length > 0 && Boolean(props.onPlanFerry);
 
   return (
     <div
@@ -143,15 +213,85 @@ export function PilotTravelDialog(props: {
         aria-labelledby={titleId}
         aria-describedby={bodyId}
       >
-        <p className="confirm-kicker">Pilot</p>
+        <p className="confirm-kicker">Reposition</p>
         <h2 id={titleId} className="confirm-title">
-          Travel from {origin || '—'}
+          {mode === 'pilot'
+            ? `Travel from ${origin || '—'}`
+            : selectedAircraft
+              ? `Ferry ${selectedAircraft.label}`
+              : 'Ferry aircraft'}
         </h2>
         <div id={bodyId} className="confirm-body">
-          <p>
-            Instant pilot reposition — aircraft stays put.
-          </p>
-          {shortcuts.length > 0 ? (
+          {ferryAvailable ? (
+            <div
+              className="pilot-travel-mode"
+              role="tablist"
+              aria-label="Reposition mode"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'pilot'}
+                className={
+                  mode === 'pilot'
+                    ? 'pilot-travel-mode-btn active'
+                    : 'pilot-travel-mode-btn'
+                }
+                disabled={props.busy || submitting}
+                onClick={() => setMode('pilot')}
+              >
+                Pilot
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'ferry'}
+                className={
+                  mode === 'ferry'
+                    ? 'pilot-travel-mode-btn active'
+                    : 'pilot-travel-mode-btn'
+                }
+                disabled={props.busy || submitting}
+                onClick={() => setMode('ferry')}
+              >
+                Ferry
+              </button>
+            </div>
+          ) : null}
+
+          {mode === 'pilot' ? (
+            <p>Instant pilot reposition — aircraft stays put.</p>
+          ) : (
+            <p>
+              Plan a ferry journey for a parked airframe. Pilot stays put unless
+              you Travel separately.
+            </p>
+          )}
+
+          {mode === 'ferry' ? (
+            ferryOptions.length === 0 ? (
+              <p className="cargo-dialog-error" role="status">
+                No parked aircraft available to ferry.
+              </p>
+            ) : (
+              <label className="confirm-field">
+                <span>Aircraft</span>
+                <select
+                  value={aircraftId}
+                  disabled={props.busy || submitting}
+                  onChange={(e) => setAircraftId(e.target.value)}
+                >
+                  {ferryOptions.map((acf) => (
+                    <option key={acf.id} value={acf.id}>
+                      {acf.label} · {acf.locationIcao.trim().toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          ) : null}
+
+          {mode === 'pilot' && shortcuts.length > 0 ? (
             <div
               className="fbo-icao-switcher"
               role="group"
@@ -173,31 +313,45 @@ export function PilotTravelDialog(props: {
               ))}
             </div>
           ) : null}
+
           <label className="confirm-field" ref={fieldRef}>
-            <span>Travel to</span>
+            <span>{mode === 'pilot' ? 'Travel to' : 'Ferry to'}</span>
             <FerryHubCombobox
               hubs={hubs}
-              excludeIcao={origin}
+              excludeIcao={mode === 'ferry' ? ferryOrigin : origin}
               value={destIcao}
               onChange={setDestIcao}
-              disabled={props.busy || submitting}
+              disabled={
+                props.busy ||
+                submitting ||
+                (mode === 'ferry' && !selectedAircraft)
+              }
             />
           </label>
-          {quoting ? (
+
+          {mode === 'pilot' ? (
+            quoting ? (
+              <p className="muted pilot-travel-quote" role="status">
+                Quoting…
+              </p>
+            ) : quoteError ? (
+              <p className="cargo-dialog-error pilot-travel-quote" role="alert">
+                {quoteError}
+              </p>
+            ) : quote ? (
+              <p className="pilot-travel-quote" role="status">
+                {Math.round(quote.distanceNm)} nm ·{' '}
+                <strong>{props.formatMoney(quote.costUsd)}</strong>
+              </p>
+            ) : dest && dest !== origin ? (
+              <p className="muted pilot-travel-quote">Pick a career hub</p>
+            ) : null
+          ) : selectedAircraft && dest && dest === ferryOrigin ? (
+            <p className="muted pilot-travel-quote">Aircraft is already there</p>
+          ) : selectedAircraft && dest ? (
             <p className="muted pilot-travel-quote" role="status">
-              Quoting…
+              Opens the ferry journey sheet (multi-leg if needed).
             </p>
-          ) : quoteError ? (
-            <p className="cargo-dialog-error pilot-travel-quote" role="alert">
-              {quoteError}
-            </p>
-          ) : quote ? (
-            <p className="pilot-travel-quote" role="status">
-              {Math.round(quote.distanceNm)} nm ·{' '}
-              <strong>{props.formatMoney(quote.costUsd)}</strong>
-            </p>
-          ) : dest && dest !== origin ? (
-            <p className="muted pilot-travel-quote">Pick a career hub</p>
           ) : null}
         </div>
         <div className="confirm-actions">
@@ -209,19 +363,30 @@ export function PilotTravelDialog(props: {
           >
             Cancel
           </button>
-          <button
-            type="button"
-            className="accept"
-            disabled={!canGo}
-            aria-busy={submitting || quoting || undefined}
-            onClick={() => void submit()}
-          >
-            {submitting
-              ? 'Traveling…'
-              : quote
-                ? `Travel · ${props.formatMoney(quote.costUsd)}`
-                : 'Travel'}
-          </button>
+          {mode === 'pilot' ? (
+            <button
+              type="button"
+              className="accept"
+              disabled={!canTravel}
+              aria-busy={submitting || quoting || undefined}
+              onClick={() => void submitTravel()}
+            >
+              {submitting
+                ? 'Traveling…'
+                : quote
+                  ? `Travel · ${props.formatMoney(quote.costUsd)}`
+                  : 'Travel'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="accept"
+              disabled={!canPlanFerry}
+              onClick={submitFerry}
+            >
+              Plan ferry
+            </button>
+          )}
         </div>
       </div>
     </div>

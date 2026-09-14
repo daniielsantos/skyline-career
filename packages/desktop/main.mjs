@@ -1,6 +1,7 @@
 /**
  * Skyline Career desktop shell (Electron).
  * Starts Career API (+ optional SimBridgeHost), then opens a BrowserWindow.
+ * If CAREER_WORLD_API_URL is set, API runs as gateway (sim local, economy remote).
  * Auto-update via electron-updater → GitHub Releases (no code signing yet).
  */
 import { createRequire } from 'node:module';
@@ -46,7 +47,10 @@ Menu.setApplicationMenu(null);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const API_PORT = Number(process.env.CAREER_UI_API_PORT ?? 8787);
+const API_PORT = Number(
+  process.env.CAREER_UI_API_PORT ??
+    (process.env.CAREER_WORLD_API_URL?.trim() ? 8788 : 8787),
+);
 const API_URL = `http://127.0.0.1:${API_PORT}`;
 
 /** @type {import('node:child_process').ChildProcess | null} */
@@ -465,7 +469,24 @@ async function startCareerApi() {
     SKYLINE_CAREER_DATA: careerDataRoot(),
     SKYLINE_UI_DIST: uiDistRoot(),
     CAREER_UI_API_PORT: String(API_PORT),
+    // Remote world host → local gateway (sim on desktop, economy on compose/VPS).
+    // Local gateway defaults to :8788 so it does not clash with world-api :8787.
+    ...(process.env.CAREER_WORLD_API_URL?.trim()
+      ? {
+          CAREER_API_MODE: process.env.CAREER_API_MODE ?? 'gateway',
+          CAREER_WORLD_API_URL: process.env.CAREER_WORLD_API_URL.trim(),
+          CAREER_AUTH: process.env.CAREER_AUTH ?? '0',
+          CAREER_WORLD_FIXED: process.env.CAREER_WORLD_FIXED ?? '0',
+          CAREER_HEADLESS_PULSE: '0',
+        }
+      : {}),
   };
+
+  if (process.env.CAREER_WORLD_API_URL?.trim()) {
+    logLine(
+      `[desktop] gateway → world ${process.env.CAREER_WORLD_API_URL.trim()} (local API :${API_PORT})`,
+    );
+  }
 
   const importSpec = pathToFileURL(tsxLoader).href;
   logLine(`[desktop] starting API via ELECTRON_RUN_AS_NODE + ${importSpec}`);

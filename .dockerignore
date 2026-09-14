@@ -1,0 +1,16 @@
+.node_modules
+**/node_modules
+.git
+**/.git
+docs
+economy-*.json
+economy-*.err
+npc-test-out.txt
+profiles/career/economy-*.json
+profiles/career/saves
+profiles/career/world
+packages/desktop/dist
+packages/desktop/release
+native
+agent-transcripts
+.cursor

@@ -7,12 +7,12 @@
   "type": "module",
   "main": "main.mjs",
   "scripts": {
-    "start": "electron .",
+    "start": "node ./run-electron.mjs .",
     "pack": "node ../../scripts/pack-desktop.mjs",
     "release": "node ../../scripts/release-desktop.mjs"
   },
   "devDependencies": {
-    "electron": "35.7.5",
+    "electron": "^35.7.5",
     "electron-builder": "26.0.12",
     "electron-updater": "^6.6.2",
     "rcedit": "^5.0.2"

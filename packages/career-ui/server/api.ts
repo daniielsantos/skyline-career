@@ -1098,13 +1098,15 @@ function loadEconomy(): Promise<CareerEconomyWorld> {
  */
 async function withCareerRead<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
+  opts?: { companyId?: string },
 ): Promise<T> {
   return withCareerLock(async () => {
     const world = await loadEconomyUnlocked({ skipCatchUp: true });
-    const missions = await loadMissions();
+    const companyId = opts?.companyId?.trim();
+    const missions = await loadMissions(companyId ? { companyId } : undefined);
     const crew = settleCrewOpsDue(missions, world, Date.now());
     if (crew.settled.length > 0) {
-      await saveMissions(missions);
+      await saveMissions(missions, companyId ? { companyId } : undefined);
     }
     return fn(world, missions);
   });
@@ -1118,6 +1120,8 @@ type CareerWriteOpts = {
   catchUpTicks?: number;
   /** Background pulse: cooperative tick via LocalWorldTickService. */
   cooperative?: boolean;
+  /** Per-request company tenant (avoids ambient activeCompanyId thrash). */
+  companyId?: string;
   /** Skip saveEconomy when the handler only mutates company/missions. */
   persist?: 'economy' | 'company' | 'blob' | 'portMarket' | 'demandBoard' | 'inbound' | 'npcLive';
   persistDemandOrderId?: string;
@@ -1145,7 +1149,9 @@ async function withCareerWrite<T>(
 ): Promise<T> {
   return withCareerLock(async () => {
     const activeStore = requireStore();
-    const missions = await loadMissions();
+    const companyId = opts?.companyId?.trim();
+    const companyOpts = companyId ? { companyId } : undefined;
+    const missions = await loadMissions(companyOpts);
     // Phase 4 remote client: never simulate ticks locally — host owns the clock.
     const skipCatchUp =
       isRemoteWorldTickEnabled() || opts?.catchUp !== true;
@@ -1315,13 +1321,13 @@ async function withCareerWrite<T>(
       if (persistPortConcessions) {
         await activeStore.persistPortConcessionIndex(world.portConcessions ?? []);
       }
-      await saveMissions(missions);
+      await saveMissions(missions, companyOpts);
       return result;
     }
     if (persistBlob) {
       await activeStore.saveEconomy(world, { liveTables: false });
       await activeStore.persistAircraftPool(world);
-      await saveMissions(missions);
+      await saveMissions(missions, companyOpts);
       return result;
     }
     if (persistPortMarket) {
@@ -1329,12 +1335,12 @@ async function withCareerWrite<T>(
       // portSnapshot syncs concessions; keep index table aligned with company JSON.
       await activeStore.persistPortConcessionIndex(world.portConcessions ?? []);
       // Hire-desk pool lives on company_state; snapshot may roll it here.
-      await saveMissions(missions);
+      await saveMissions(missions, companyOpts);
       return result;
     }
     if (persistDemandBoard) {
       await activeStore.persistDemandBoardTables(world);
-      await saveMissions(missions);
+      await saveMissions(missions, companyOpts);
       return result;
     }
     if (persistInbound) {
@@ -1343,7 +1349,7 @@ async function withCareerWrite<T>(
     }
     if (persistNpcLive) {
       await activeStore.persistNpcLiveWorld(world);
-      await saveMissions(missions);
+      await saveMissions(missions, companyOpts);
       return result;
     }
     if (useCommandPersist) {
@@ -1367,7 +1373,7 @@ async function withCareerWrite<T>(
     } else {
       await persistEconomyUnlocked(world);
     }
-    await saveMissions(missions);
+    await saveMissions(missions, companyOpts);
     return result;
   });
 }
@@ -4125,6 +4131,7 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/market') {
+        const marketCompanyId = companyIdFromRequest(req);
         const { world, cargoOps, classOps, missionsState } = await withCareerWrite(
           (w, missions) => {
             reconcilePlayerInbound(w, missions.missions);
@@ -4135,7 +4142,7 @@ export function createCareerApiServer(port = 8787) {
               missionsState: missions,
             };
           },
-          { persist: 'inbound' },
+          { persist: 'inbound', companyId: marketCompanyId },
         );
         const nowMs = Date.now();
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
@@ -4174,6 +4181,7 @@ export function createCareerApiServer(port = 8787) {
           originQuery: originQuery ?? undefined,
           destQuery: destQuery ?? undefined,
           nowMs,
+          viewerCompanyId: marketCompanyId,
         };
         const cargoLimit = aircraft
           ? await resolveClassMaxCargoKg(aircraft, airframeTypeId)
@@ -7243,7 +7251,11 @@ export function createCareerApiServer(port = 8787) {
               appended: executed.appended,
               companyId: acceptCompanyId,
             };
-          }, { commandSliceLotIds: [body.lotId], housekeeping: false });
+          }, {
+            commandSliceLotIds: [body.lotId],
+            housekeeping: false,
+            companyId: acceptCompanyId,
+          });
           if (result.kind === 'missing_lot') {
             send(res, 404, { error: `Unknown lot ${body.lotId}` });
             return;
@@ -7505,8 +7517,10 @@ export function createCareerApiServer(port = 8787) {
           replace?: boolean;
           weightSystem?: 'metric' | 'imperial';
           units?: 'KGS' | 'LBS';
+          companyId?: string;
           lines?: Array<{ lotId?: string; cargoKg?: number }>;
         };
+        const stagingCompanyId = companyIdFromRequest(req, body.companyId);
         const lines = (body.lines ?? [])
           .filter((line) => line.lotId)
           .map((line) => ({
@@ -7567,7 +7581,7 @@ export function createCareerApiServer(port = 8787) {
             airframeTypeId: playerAircraft.airframeTypeId,
             demandReplace,
           };
-        });
+        }, { companyId: stagingCompanyId });
         if (peek.kind === 'no_hub') {
           send(res, 400, {
             error:
@@ -7693,6 +7707,7 @@ export function createCareerApiServer(port = 8787) {
               if (idx >= 0) missions.missions[idx] = mission;
               else missions.missions.push(mission);
               return {
+                kind: 'ok' as const,
                 mission,
                 appended: false,
                 lineCount: 1,
@@ -7768,6 +7783,7 @@ export function createCareerApiServer(port = 8787) {
                 );
                 if (retryOfSameLoad) {
                   return {
+                    kind: 'ok' as const,
                     mission: intoMission,
                     appended: false,
                     lineCount: intoMission.lots?.length ?? 0,
@@ -7846,9 +7862,16 @@ export function createCareerApiServer(port = 8787) {
                 airframeTypeId: playerAirframe?.typeId,
                 cargoOps: cargoOpsForRequest(req, missions.cargoOps),
                 classOps: classOpsForRequest(req, missions.classOps),
+                companyId: stagingCompanyId,
               });
               if (staged.kind === 'missing_mission') {
                 throw new Error('Unknown mission for staged accept');
+              }
+              if (staged.kind === 'conflict') {
+                return {
+                  kind: 'conflict' as const,
+                  claimedByCompanyId: staged.claimedByCompanyId,
+                };
               }
               mission = {
                 ...staged.mission,
@@ -7873,6 +7896,7 @@ export function createCareerApiServer(port = 8787) {
               }
             }
             return {
+              kind: 'ok' as const,
               mission,
               appended,
               lineCount,
@@ -7884,7 +7908,16 @@ export function createCareerApiServer(port = 8787) {
           }, {
             commandSliceLotIds: lines.map((line) => line.lotId),
             housekeeping: false,
+            companyId: stagingCompanyId,
           });
+          if (committed.kind === 'conflict') {
+            send(res, 409, {
+              error: `Lot claimed by ${committed.claimedByCompanyId}`,
+              code: 'lot_claimed',
+              claimedByCompanyId: committed.claimedByCompanyId,
+            });
+            return;
+          }
 
           let mission = committed.mission;
           // Same rule as accept: a different mission must not inherit prior

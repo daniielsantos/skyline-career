@@ -187,7 +187,16 @@ interface WorldTickService {
 2. ~~Phase 2 headless pulse~~ — shipped (boot resume + `/api/world/pulse`).
 3. ~~Phase 3 company registry + shared world_id~~ — shipped 2026-09-13 (no OAuth).
 4. ~~Phase 4 remote client clock~~ — shipped 2026-09-13 (`CAREER_WORLD_TICK=remote`).
-5. Hosted Postgres / multi-process world job — later.
+5. ~~Phase 5 dual-tenant board/claim proof~~ — shipped 2026-09-13.
+6. Hosted Postgres / multi-process world job — later.
+
+## Phase 5 notes (2026-09-13)
+
+- Staging Freights path stamps/enforces claim: `commitStagedManifest` / `executeAcceptManifest` take `companyId`; `/api/staging/commit` → **409** `lot_claimed`.
+- `listMarketLots({ viewerCompanyId })` hides lots claimed by another company (covers partial soft-hold remaining kg).
+- Market / Accept / staging load-save take per-request `companyId` (header/body) so dual tenants do not thrash ambient `activeCompanyId`.
+- Proof: `career-dual-tenant.test.ts` — same world tick, rival board omits lot, Accept/staging conflict.
+- Still poll-only (no SSE); no polished dual-tab UI picker.
 
 ## Phase 2 notes (2026-09-13)
 
@@ -239,6 +248,7 @@ class RemoteWorldTickService implements WorldTickService {
 | **2** | shipped 2026-09-13 | Headless pulse: API `listen` resumes last-played profile + starts tick with **zero UI clients**; `POST /api/world/pulse`; opt-out `CAREER_HEADLESS_PULSE=0` |
 | **3** | shipped 2026-09-13 | Company registry (`career-companies.ts`); N companies / `world_id`; store load/save/ledger scoped by `companyId`; Accept via `X-Skyline-Company-Id` / body; `GET|POST /api/companies`; pulse settle-all |
 | **4** | shipped 2026-09-13 | Live `RemoteWorldTickService`; `CAREER_WORLD_TICK=remote` + `CAREER_REMOTE_WORLD_URL`; client never advances / never local catch-up; MP path aliases `/worlds/:id/clock` + `/companies/:id/session/open` |
+| **5** | shipped 2026-09-13 | Dual-tenant proof: staging claim + 409; market hides foreign `claimedByCompanyId`; per-request `companyId` on market/accept/staging; same tick + lot gone + conflict tests |
 
 1. ~~**Extrair** `WorldTickService`~~ — feito.
 2. ~~SP local pulse via service~~ — feito.
@@ -289,8 +299,8 @@ class RemoteWorldTickService implements WorldTickService {
 - [x] World tick roda com zero clients conectados (Phase 2 — last-played profile resumed on API listen)
 - [x] Company registry + N tenants / shared `world_id` (Phase 3 — no OAuth)
 - [x] Remote client never advances / never local catch-up (Phase 4)
-- [ ] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (hosted dual-UI)
+- [x] Dois clients veem o mesmo `tick` + mesmo lot id desaparecer após accept (Phase 5 dual-tenant proof)
 - [x] Reconnect não chama `tickEconomyN` no processo UI remoto (Phase 4)
-- [x] Accept concorrente → exatamente um 200, resto 409 (Phase 3 unit + claim path; live dual-client later)
+- [x] Accept concorrente → exatamente um 200, resto 409 (Phase 3 unit + Phase 5 staging/board)
 - [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)
 - [x] Admin/debug tick isolado de client remoto (`POST /api/world/pulse` + `/api/tick` → 403 on mp-remote)

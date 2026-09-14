@@ -11819,6 +11819,11 @@ export function listMarketLots(
     /** Free-text ICAO/city search applied only to destination. */
     destQuery?: string;
     nowMs?: number;
+    /**
+     * Viewing company — hide lots claimed by another tenant (partial soft-hold
+     * remaining kg stays invisible to rivals; SP default omit = show all).
+     */
+    viewerCompanyId?: string;
   } = {},
 ): MarketLotView[] {
   const byIcao = airportMap(world);
@@ -11828,9 +11833,14 @@ export function listMarketLots(
   const queryTokens = marketQueryTokens(opts.query ?? '');
   const originQueryTokens = marketQueryTokens(opts.originQuery ?? '');
   const destQueryTokens = marketQueryTokens(opts.destQuery ?? '');
+  const viewer = opts.viewerCompanyId?.trim() || undefined;
 
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') {
+      continue;
+    }
+    const holder = lot.claimedByCompanyId?.trim();
+    if (viewer && holder && holder !== viewer) {
       continue;
     }
     const claim = npcClaimForLot(world, lot.id, nowMs);

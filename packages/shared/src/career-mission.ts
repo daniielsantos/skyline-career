@@ -1668,6 +1668,8 @@ export function commitStagedManifest(
     cargoOps?: CareerMissionsState['cargoOps'];
     /** Aircraft class ladder — gates which freighter classes may accept. */
     classOps?: CareerMissionsState['classOps'];
+    /** Claiming company — SP defaults handled by acceptMission / reserve. */
+    companyId?: string;
   },
 ): { mission: MissionIntent; appended: boolean; lineCount: number } {
   const aircraft = getAircraftClass(opts.aircraftClassId ?? 'narrow_freighter');
@@ -1772,6 +1774,7 @@ export function commitStagedManifest(
     id: lot.id,
     reservedKg: lot.reservedKg,
     status: lot.status,
+    claimedByCompanyId: lot.claimedByCompanyId,
   }));
 
   let mission: MissionIntent | undefined = into;
@@ -1787,6 +1790,7 @@ export function commitStagedManifest(
         missionId: i === 0 && !into ? opts.missionId : undefined,
         cargoOps: opts.cargoOps,
         classOps: opts.classOps,
+        companyId: opts.companyId,
       });
     }
     if (!mission) {
@@ -1803,6 +1807,11 @@ export function commitStagedManifest(
       if (!lot) continue;
       lot.reservedKg = snap.reservedKg;
       lot.status = snap.status;
+      if (snap.claimedByCompanyId) {
+        lot.claimedByCompanyId = snap.claimedByCompanyId;
+      } else {
+        delete lot.claimedByCompanyId;
+      }
     }
     if (into) {
       syncPlayerInbound(world, into);
@@ -2995,6 +3004,7 @@ export function listViableMarketLots(
     /** Override class max range (e.g. catalog airframe). */
     maxRangeNm?: number;
     nowMs?: number;
+    viewerCompanyId?: string;
   } = {},
 ): MarketLotView[] {
   const aircraft = getAircraftClass(aircraftClassId);

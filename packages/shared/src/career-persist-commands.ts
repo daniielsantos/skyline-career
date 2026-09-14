@@ -328,10 +328,13 @@ export type ExecuteAcceptManifestOpts = {
   airframeTypeId?: string;
   cargoOps?: CareerMissionsState['cargoOps'];
   classOps?: CareerMissionsState['classOps'];
+  /** Claiming company — SP defaults to LOCAL_COMPANY_ID. */
+  companyId?: string;
 };
 
 export type ExecuteAcceptManifestResult =
   | { kind: 'missing_mission' }
+  | { kind: 'conflict'; claimedByCompanyId: string }
   | {
       kind: 'replay';
       mission: MissionIntent;
@@ -347,13 +350,23 @@ export type ExecuteAcceptManifestResult =
 
 /**
  * AcceptLot (staging): reserve the staged lines once.
+ * Conflict if another company already claimed any line lot.
  */
 export function executeAcceptManifest(
   world: CareerEconomyWorld,
   missions: CareerMissionsState,
   opts: ExecuteAcceptManifestOpts,
 ): ExecuteAcceptManifestResult {
+  const companyId = opts.companyId?.trim() || LOCAL_COMPANY_ID;
   const lotIds = opts.lines.map((line) => line.lotId.trim()).filter(Boolean);
+  for (const lotId of lotIds) {
+    const lot = world.lots.find((row) => row.id === lotId);
+    if (!lot) continue;
+    const holder = lot.claimedByCompanyId?.trim();
+    if (holder && holder !== companyId) {
+      return { kind: 'conflict', claimedByCompanyId: holder };
+    }
+  }
   let intoMission: MissionIntent | undefined;
   if (opts.intoMissionId) {
     intoMission = missions.missions.find((row) => row.id === opts.intoMissionId);
@@ -376,23 +389,31 @@ export function executeAcceptManifest(
       lineCount: holding.lots?.length ?? 0,
     };
   }
-  const staged = commitStagedManifest(world, {
-    lines: opts.lines,
-    aircraftClassId: opts.aircraftClassId,
-    maxCargoKg: opts.maxCargoKg,
-    intoMission,
-    missionId: opts.missionId,
-    airframeTypeId: opts.airframeTypeId,
-    cargoOps: opts.cargoOps,
-    classOps: opts.classOps,
-  });
-  upsertCompanyMission(missions, staged.mission);
-  return {
-    kind: 'applied',
-    mission: staged.mission,
-    appended: staged.appended,
-    lineCount: staged.lineCount,
-  };
+  try {
+    const staged = commitStagedManifest(world, {
+      lines: opts.lines,
+      aircraftClassId: opts.aircraftClassId,
+      maxCargoKg: opts.maxCargoKg,
+      intoMission,
+      missionId: opts.missionId,
+      airframeTypeId: opts.airframeTypeId,
+      cargoOps: opts.cargoOps,
+      classOps: opts.classOps,
+      companyId,
+    });
+    upsertCompanyMission(missions, staged.mission);
+    return {
+      kind: 'applied',
+      mission: staged.mission,
+      appended: staged.appended,
+      lineCount: staged.lineCount,
+    };
+  } catch (err) {
+    if (err instanceof LotClaimConflictError) {
+      return { kind: 'conflict', claimedByCompanyId: err.claimedByCompanyId };
+    }
+    throw err;
+  }
 }
 
 export type ExecuteDepartFlightOpts = {

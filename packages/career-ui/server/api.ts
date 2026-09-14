@@ -262,6 +262,9 @@ import {
   companySessionFromTick,
   settleCompanyPassiveFeesForTickRange,
   resolveCompanyId,
+  isCareerAuthRequired,
+  bearerTokenFromHeader,
+  isCareerWorldFixed,
   ensureEconomyCaughtUpCooperative,
   tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
@@ -286,6 +289,7 @@ import {
   type CareerMissionsState,
   type CharterOffer,
   type CareerStore,
+  type AuthSessionContext,
   type CommodityId,
   type FreighterClassId,
   type HubEconomySample,
@@ -329,6 +333,10 @@ import {
   createCareerProfile,
   deleteCareerProfile,
   ensureCareerProfilesLayout,
+  FIXED_WORLD_PROFILE_ID,
+  FIXED_WORLD_PROFILE_NAME,
+  fixedWorldProfileMeta,
+  openCareerFixedWorldStore,
   openCareerProfileStore,
   readProfilesFile,
   renameCareerProfile,
@@ -484,6 +492,7 @@ function schedulePostLoginEconomyWork(tickService: WorldTickService): void {
  * Phase 2 — resume last-played profile on API boot so the world tick runs
  * with zero UI clients (hosted SP mold). Opt out: CAREER_HEADLESS_PULSE=0.
  * Phase 4 remote client: never resume/advance locally.
+ * Phase 8 fixed world: open the single `careerRoot/world` SQLite (no profiles.json).
  */
 async function bootstrapHeadlessWorldPulse(
   tickService: WorldTickService,
@@ -501,6 +510,31 @@ async function bootstrapHeadlessWorldPulse(
     schedulePostLoginEconomyWork(tickService);
     return;
   }
+
+  if (isCareerWorldFixed()) {
+    const t0 = performance.now();
+    try {
+      await withCareerLock(async () => {
+        if (store) return;
+        resetMsfsStampState();
+        store = await openCareerFixedWorldStore(careerRoot);
+        activeProfileId = FIXED_WORLD_PROFILE_ID;
+        msfsStampNeeded = true;
+      });
+      console.log(
+        `[career] fixed-world open id=${FIXED_WORLD_PROFILE_ID} dir=world ` +
+          `${Math.round(performance.now() - t0)}ms`,
+      );
+      schedulePostLoginEconomyWork(tickService);
+    } catch (error) {
+      console.error(
+        `[career] fixed-world open fail ${Math.round(performance.now() - t0)}ms:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+    return;
+  }
+
   const file = await readProfilesFile(careerRoot);
   const id = file.activeId?.trim() ?? '';
   if (!id || !file.profiles.some((p) => p.id === id)) {
@@ -1042,6 +1076,19 @@ async function applyCompanySessionSettlement(opts: {
   return summary ?? undefined;
 }
 
+function authSessionFromRequest(
+  req: import('node:http').IncomingMessage,
+): AuthSessionContext | null {
+  if (!store?.supportsAuth) return null;
+  const token = bearerTokenFromHeader(req.headers.authorization);
+  if (!token) return null;
+  try {
+    return store.authResolveSession(token);
+  } catch {
+    return null;
+  }
+}
+
 function companyIdFromRequest(
   req: import('node:http').IncomingMessage,
   bodyCompanyId?: string | null,
@@ -1053,13 +1100,44 @@ function companyIdFromRequest(
       : Array.isArray(headerRaw)
         ? headerRaw[0]
         : undefined;
+  const requestedRaw =
+    bodyCompanyId?.trim() ||
+    header?.trim() ||
+    store?.getActiveCompanyId() ||
+    LOCAL_COMPANY_ID;
+  const authRequired = isCareerAuthRequired();
+  const session = authSessionFromRequest(req);
+
+  if (authRequired) {
+    if (!session || session.companies.length === 0) {
+      try {
+        return resolveCompanyId({
+          requested: LOCAL_COMPANY_ID,
+          worldId: LOCAL_WORLD_ID,
+          db: null,
+        });
+      } catch {
+        return LOCAL_COMPANY_ID;
+      }
+    }
+    const owned = new Set(session.companies.map((c) => c.id));
+    const pick = owned.has(requestedRaw)
+      ? requestedRaw
+      : session.companies[0]!.id;
+    try {
+      return resolveCompanyId({
+        requested: pick,
+        worldId: LOCAL_WORLD_ID,
+        db: null,
+      });
+    } catch {
+      return session.companies[0]!.id;
+    }
+  }
+
   try {
     return resolveCompanyId({
-      requested:
-        bodyCompanyId?.trim() ||
-        header?.trim() ||
-        store?.getActiveCompanyId() ||
-        LOCAL_COMPANY_ID,
+      requested: requestedRaw,
       worldId: LOCAL_WORLD_ID,
       db: null,
     });
@@ -1068,13 +1146,18 @@ function companyIdFromRequest(
   }
 }
 
-function activateCompanyContext(companyId: string): string {
+function activateCompanyContext(companyId: string, accountId?: string): string {
   const activeStore = requireStore();
   const id = resolveCompanyId({
     requested: companyId,
     worldId: LOCAL_WORLD_ID,
     db: null,
   });
+  if (isCareerAuthRequired() && accountId) {
+    if (!activeStore.authAccountOwnsCompany(accountId, id)) {
+      throw new Error('company not owned by this account');
+    }
+  }
   const known = activeStore.listWorldCompanies(LOCAL_WORLD_ID);
   if (known.length > 0 && !known.some((c) => c.id === id)) {
     if (id !== LOCAL_COMPANY_ID) {
@@ -1083,6 +1166,36 @@ function activateCompanyContext(companyId: string): string {
   }
   activeStore.setActiveCompanyId(id);
   return id;
+}
+
+function requireAuthSession(
+  req: import('node:http').IncomingMessage,
+  res: import('node:http').ServerResponse,
+): AuthSessionContext | null {
+  if (!isCareerAuthRequired()) return null;
+  const session = authSessionFromRequest(req);
+  if (!session) {
+    send(res, 401, {
+      error: 'Authentication required',
+      code: 'auth_required',
+    });
+    return null;
+  }
+  return session;
+}
+
+/** Paths that stay open when CAREER_AUTH=1 (no Bearer). */
+function isAuthPublicPath(method: string, path: string): boolean {
+  if (method === 'OPTIONS') return true;
+  if (path === '/api/health') return true;
+  if (path === '/api/auth/status') return true;
+  if (path === '/api/auth/register' || path === '/api/auth/login') return true;
+  if (path === '/api/auth/logout') return true;
+  if (path.startsWith('/api/profiles')) return true;
+  if (path === '/api/map/satellite-style') return true;
+  if (path.startsWith('/worlds/') && path.endsWith('/clock')) return true;
+  if (path === '/api/world/clock') return true;
+  return false;
 }
 
 async function persistEconomyUnlocked(world: CareerEconomyWorld): Promise<void> {
@@ -2180,6 +2293,12 @@ export function createCareerApiServer(port = 8787) {
       `[career] world-tick mode=mp-remote url=${process.env.CAREER_REMOTE_WORLD_URL?.trim()}`,
     );
   }
+  if (isCareerAuthRequired()) {
+    console.log('[career] auth required (CAREER_AUTH=1) — Bearer session → company');
+  }
+  if (isCareerWorldFixed()) {
+    console.log('[career] world-fixed (CAREER_WORLD_FIXED=1) — clients attach, no profile gate');
+  }
   const watchSession = new CareerWatchSession({
     withCareerRead,
     withCareerWrite,
@@ -2195,6 +2314,14 @@ export function createCareerApiServer(port = 8787) {
     }
 
     try {
+      if (
+        isCareerAuthRequired() &&
+        !isAuthPublicPath(req.method ?? 'GET', path)
+      ) {
+        const gate = requireAuthSession(req, res);
+        if (!gate) return;
+      }
+
       if (req.method === 'GET' && path === '/api/map/satellite-style') {
         const apiKey = maptilerKeyFromEnv();
         send(res, 200, {
@@ -2205,11 +2332,23 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/health') {
+        const worldFixed = isCareerWorldFixed();
+        const activeProfileName = worldFixed
+          ? store
+            ? FIXED_WORLD_PROFILE_NAME
+            : null
+          : activeProfileId
+            ? (
+                await readProfilesFile(careerRoot).catch(() => null)
+              )?.profiles.find((p) => p.id === activeProfileId)?.name ?? null
+            : null;
         if (!store) {
           send(res, 200, {
             ok: true,
             needsProfile: true,
             activeProfileId: null,
+            activeProfileName: null,
+            worldFixed,
             // Non-zero so career:ui health check doesn't treat idle boot as stale.
             npcFleetTarget: 1,
             sourceStamp: bootSourceStamp,
@@ -2217,6 +2356,7 @@ export function createCareerApiServer(port = 8787) {
             homeCountryId: null,
             countries: [],
             internationalLaneCount: 0,
+            authRequired: isCareerAuthRequired(),
           });
           return;
         }
@@ -2225,18 +2365,183 @@ export function createCareerApiServer(port = 8787) {
         send(res, 200, {
           ok: true,
           needsProfile: false,
-          activeProfileId,
+          activeProfileId: worldFixed ? FIXED_WORLD_PROFILE_ID : activeProfileId,
+          activeProfileName,
+          worldFixed,
           npcFleetTarget: targetNpcFleetSize(regionCount),
           sourceStamp: bootSourceStamp,
           store: store.kind,
           homeCountryId: world.homeCountryId ?? null,
           countries: listWorldCountryIds(world),
           internationalLaneCount: world.internationalLanes?.length ?? 0,
+          authRequired: isCareerAuthRequired(),
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/auth/status') {
+        const required = isCareerAuthRequired();
+        const session = authSessionFromRequest(req);
+        send(res, 200, {
+          required,
+          supportsAuth: store?.supportsAuth === true,
+          authenticated: Boolean(session),
+          account: session?.account ?? null,
+          companies: session?.companies ?? [],
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/auth/register') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        if (!store.supportsAuth) {
+          send(res, 501, { error: 'Auth requires SQLite career store' });
+          return;
+        }
+        try {
+          const body = (await readBody(req)) as {
+            loginName?: string;
+            displayName?: string;
+            password?: string;
+            createCompany?: boolean;
+            companyId?: string;
+            companyDisplayName?: string;
+            claimCompanyId?: string;
+            homeHubIcao?: string;
+            homeCountryId?: string;
+          };
+          if (!body.loginName?.trim() || !body.password || !body.displayName?.trim()) {
+            send(res, 400, {
+              error: 'loginName, displayName, and password required',
+            });
+            return;
+          }
+          const result = store.authRegister({
+            loginName: body.loginName,
+            displayName: body.displayName,
+            password: body.password,
+            createCompany: body.createCompany,
+            companyId: body.companyId,
+            companyDisplayName: body.companyDisplayName,
+            claimCompanyId: body.claimCompanyId,
+            homeHubIcao: body.homeHubIcao,
+            homeCountryId: body.homeCountryId,
+          });
+          if (result.company) {
+            const seeded = await store.loadMissions({
+              companyId: result.company.id,
+            });
+            await store.saveMissions(seeded, { companyId: result.company.id });
+            store.setActiveCompanyId(result.company.id);
+          }
+          send(res, 200, {
+            token: result.session.token,
+            expiresAtMs: result.session.expiresAtMs,
+            account: result.account,
+            company: result.company,
+            companies: store.authListCompaniesForAccount(result.account.id),
+          });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/auth/login') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        if (!store.supportsAuth) {
+          send(res, 501, { error: 'Auth requires SQLite career store' });
+          return;
+        }
+        try {
+          const body = (await readBody(req)) as {
+            loginName?: string;
+            password?: string;
+          };
+          if (!body.loginName?.trim() || !body.password) {
+            send(res, 400, { error: 'loginName and password required' });
+            return;
+          }
+          const result = store.authLogin({
+            loginName: body.loginName,
+            password: body.password,
+          });
+          const companies = store.authListCompaniesForAccount(result.account.id);
+          if (companies[0]) {
+            store.setActiveCompanyId(companies[0].id);
+          }
+          send(res, 200, {
+            token: result.session.token,
+            expiresAtMs: result.session.expiresAtMs,
+            account: result.account,
+            companies,
+          });
+        } catch (err) {
+          send(res, 401, {
+            error: err instanceof Error ? err.message : String(err),
+            code: 'auth_failed',
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/auth/logout') {
+        const token = bearerTokenFromHeader(req.headers.authorization);
+        if (store?.supportsAuth && token) {
+          store.authRevokeSession(token);
+        }
+        send(res, 200, { ok: true });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/auth/me') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        send(res, 200, {
+          account: session.account,
+          companies: session.companies,
+          memberships: session.memberships,
         });
         return;
       }
 
       if (req.method === 'GET' && path === '/api/profiles') {
+        if (isCareerWorldFixed()) {
+          const meta = fixedWorldProfileMeta();
+          send(res, 200, {
+            activeId: store ? FIXED_WORLD_PROFILE_ID : null,
+            profiles: [meta],
+            worldFixed: true,
+          });
+          return;
+        }
         const file = await readProfilesFile(careerRoot);
         send(res, 200, {
           activeId: activeProfileId ?? file.activeId,
@@ -2246,6 +2551,13 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/profiles') {
+        if (isCareerWorldFixed()) {
+          send(res, 403, {
+            error: 'Fixed world has one shared DB — no multi-save create',
+            code: 'world_fixed',
+          });
+          return;
+        }
         const body = (await readBody(req)) as { name?: string };
         try {
           const meta = await createCareerProfile(
@@ -2263,6 +2575,24 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/profiles/select') {
+        if (isCareerWorldFixed()) {
+          // Idempotent attach — host already owns careerRoot/world.
+          if (!store) {
+            send(res, 409, {
+              error: 'Fixed world not open on host yet',
+              code: 'needs_profile',
+            });
+            return;
+          }
+          const meta = fixedWorldProfileMeta();
+          send(res, 200, {
+            activeId: FIXED_WORLD_PROFILE_ID,
+            profile: meta,
+            profiles: [meta],
+            worldFixed: true,
+          });
+          return;
+        }
         const body = (await readBody(req)) as { id?: string };
         const id = body.id?.trim() ?? '';
         if (!id) {
@@ -2315,6 +2645,13 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/profiles/clear') {
+        if (isCareerWorldFixed()) {
+          send(res, 403, {
+            error: 'Fixed world cannot be cleared from a client',
+            code: 'world_fixed',
+          });
+          return;
+        }
         try {
           if (watchSession.getStatus().running) await watchSession.stop();
           worldTick.stopBackgroundPulse();
@@ -2348,6 +2685,13 @@ export function createCareerApiServer(port = 8787) {
         /^\/api\/profiles\/([a-z0-9]+)\/rename$/i,
       );
       if (req.method === 'POST' && profileRenameMatch) {
+        if (isCareerWorldFixed()) {
+          send(res, 403, {
+            error: 'Fixed world has no renameable saves',
+            code: 'world_fixed',
+          });
+          return;
+        }
         const body = (await readBody(req)) as { name?: string };
         try {
           const meta = await renameCareerProfile(
@@ -2366,6 +2710,13 @@ export function createCareerApiServer(port = 8787) {
 
       const profileDeleteMatch = path.match(/^\/api\/profiles\/([a-z0-9]+)$/i);
       if (req.method === 'DELETE' && profileDeleteMatch) {
+        if (isCareerWorldFixed()) {
+          send(res, 403, {
+            error: 'Fixed world cannot be deleted from a client',
+            code: 'world_fixed',
+          });
+          return;
+        }
         const id = profileDeleteMatch[1]!;
         try {
           if (activeProfileId === id) {
@@ -2490,6 +2841,7 @@ export function createCareerApiServer(port = 8787) {
             body.companyId?.trim() ||
               companyIdFromRequest(req) ||
               LOCAL_COMPANY_ID,
+            authSessionFromRequest(req)?.account.id,
           );
           const missions = await loadMissions({ companyId });
           const result = await worldTick.openCompanySession({
@@ -2539,6 +2891,7 @@ export function createCareerApiServer(port = 8787) {
                 ? body.companyId?.trim() || pathCompanyId
                 : activateCompanyContext(
                     body.companyId?.trim() || pathCompanyId,
+                    authSessionFromRequest(req)?.account.id,
                   );
             const lastSeenTick =
               typeof body.lastSeenTick === 'number' &&
@@ -2576,11 +2929,16 @@ export function createCareerApiServer(port = 8787) {
         try {
           const worldId =
             url.searchParams.get('worldId')?.trim() || LOCAL_WORLD_ID;
-          const companies = store.listWorldCompanies(worldId);
+          const session = authSessionFromRequest(req);
+          const companies =
+            isCareerAuthRequired() && session
+              ? session.companies
+              : store.listWorldCompanies(worldId);
           send(res, 200, {
             worldId,
             activeCompanyId: store.getActiveCompanyId(),
             companies,
+            accountId: session?.account.id ?? null,
           });
         } catch (err) {
           send(res, 400, {
@@ -2611,6 +2969,14 @@ export function createCareerApiServer(port = 8787) {
             send(res, 400, { error: 'id required' });
             return;
           }
+          const session = authSessionFromRequest(req);
+          if (isCareerAuthRequired() && !session) {
+            send(res, 401, {
+              error: 'Authentication required',
+              code: 'auth_required',
+            });
+            return;
+          }
           const company = store.ensureCompany({
             id: body.id.trim(),
             worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
@@ -2618,6 +2984,13 @@ export function createCareerApiServer(port = 8787) {
             homeHubIcao: body.homeHubIcao,
             homeCountryId: body.homeCountryId,
           });
+          if (session) {
+            store.authAddCompanyMember({
+              companyId: company.id,
+              accountId: session.account.id,
+              role: 'owner',
+            });
+          }
           // Seed empty company_state so load/save works for the new tenant.
           const seeded = await store.loadMissions({ companyId: company.id });
           await store.saveMissions(seeded, { companyId: company.id });
@@ -4667,6 +5040,7 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && airportMatch) {
         const icao = airportMatch[1]!.toUpperCase();
         const nowMs = Date.now();
+        const airportCompanyId = companyIdFromRequest(req);
         if (url.searchParams.get('part') === 'stock') {
           const snap = requireStore().readAirportInventory(icao);
           if (!snap) {
@@ -4723,7 +5097,7 @@ export function createCareerApiServer(port = 8787) {
           if (!active.peekEconomyWorld()) {
             await loadEconomyUnlocked({ skipCatchUp: true });
           }
-          const missions = await loadMissions();
+          const missions = await loadMissions({ companyId: airportCompanyId });
           const cached = active.peekEconomyWorld();
           if (!cached) return null;
           const board = active.readAirportBoard(icao);
@@ -4866,7 +5240,11 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/buy') {
-        const body = (await readBody(req)) as { icao?: string };
+        const body = (await readBody(req)) as {
+          icao?: string;
+          companyId?: string;
+        };
+        const fboBuyCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -4888,7 +5266,7 @@ export function createCareerApiServer(port = 8787) {
               }),
               policy: resolveBaseDispatchScoutPolicy(missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: fboBuyCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4899,11 +5277,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/upgrade') {
-        const body = (await readBody(req)) as { fboId?: string };
+        const body = (await readBody(req)) as {
+          fboId?: string;
+          companyId?: string;
+        };
         if (!body.fboId) {
           send(res, 400, { error: 'fboId required' });
           return;
         }
+        const fboUpgradeCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -4916,7 +5298,7 @@ export function createCareerApiServer(port = 8787) {
               companyCrew: companyCrewSnapshot(missions, world),
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: fboUpgradeCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6778,11 +7160,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/cancel-hold') {
-        const body = (await readBody(req)) as { holdId?: string };
+        const body = (await readBody(req)) as {
+          holdId?: string;
+          companyId?: string;
+        };
         if (!body.holdId) {
           send(res, 400, { error: 'holdId required' });
           return;
         }
+        const fboCancelHoldCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const cancelled = cancelFboHold(missions, world, body.holdId!);
@@ -6791,7 +7177,10 @@ export function createCareerApiServer(port = 8787) {
               playerFbos: playerFboSnapshot(missions, world),
               walletUsd: missions.walletUsd,
             };
-          }, { commandSliceHoldId: body.holdId });
+          }, {
+            commandSliceHoldId: body.holdId,
+            companyId: fboCancelHoldCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6814,11 +7203,13 @@ export function createCareerApiServer(port = 8787) {
           holdId?: string;
           aircraft?: string;
           aircraftId?: string;
+          companyId?: string;
         };
         if (!body.holdId) {
           send(res, 400, { error: 'holdId required' });
           return;
         }
+        const fboReleaseCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -6862,7 +7253,10 @@ export function createCareerApiServer(port = 8787) {
                 withMissionClientView(world, missions, m),
               ),
             };
-          }, { commandSliceHoldId: body.holdId });
+          }, {
+            commandSliceHoldId: body.holdId,
+            companyId: fboReleaseCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6881,11 +7275,15 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/fbo/return-mission') {
-        const body = (await readBody(req)) as { missionId?: string };
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          companyId?: string;
+        };
         if (!body.missionId?.trim()) {
           send(res, 400, { error: 'missionId required' });
           return;
         }
+        const fboReturnCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             const returned = returnMissionToFboHold(
@@ -6904,7 +7302,10 @@ export function createCareerApiServer(port = 8787) {
                 withMissionClientView(world, missions, m),
               ),
             };
-          }, { commandSliceMissionId: body.missionId });
+          }, {
+            commandSliceMissionId: body.missionId,
+            companyId: fboReturnCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7258,6 +7659,7 @@ export function createCareerApiServer(port = 8787) {
         try {
           acceptCompanyId = activateCompanyContext(
             companyIdFromRequest(req, body.companyId),
+            authSessionFromRequest(req)?.account.id,
           );
         } catch (err) {
           send(res, 400, {

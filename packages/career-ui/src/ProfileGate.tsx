@@ -11,6 +11,9 @@ export function ProfileGate(props: {
   busyLabel?: string;
   onSelect: (id: string) => void;
   onCreate: (name: string) => void;
+  /** When a Bearer session is still in this tab — allow another account. */
+  authSignedIn?: boolean;
+  onSignOut?: () => void;
 }) {
   const [newName, setNewName] = useState('');
 
@@ -24,6 +27,22 @@ export function ProfileGate(props: {
         />
         <h1>Select a profile</h1>
       </div>
+
+      {props.authSignedIn && props.onSignOut ? (
+        <div className="profile-gate-auth-session">
+          <p className="muted">
+            Signed in on this tab — opening a save skips account create/sign-in.
+          </p>
+          <button
+            type="button"
+            className="action ghost"
+            disabled={props.busy}
+            onClick={() => props.onSignOut?.()}
+          >
+            Sign out / another account
+          </button>
+        </div>
+      ) : null}
 
       <div className="profile-gate-section">
         <p className="profile-gate-section-label">Saved profiles</p>

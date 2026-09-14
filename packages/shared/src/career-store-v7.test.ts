@@ -77,7 +77,7 @@ describe('career store v7/v8 hub economy samples', () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-v8-hub-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     assert.equal(schemaVersionInDb(store.sqlitePath!), CAREER_STORE_SCHEMA_VERSION);
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '9');
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '10');
     assert.equal(HUB_ECONOMY_SAMPLE_RETENTION_DAYS, RETENTION);
 
     const world = createSeedEconomyWorld({ seed: 'v8-hub-stats' });

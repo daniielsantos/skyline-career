@@ -89,13 +89,46 @@ export function readCareerLocation(): CareerLocation {
   return parseCareerPath(window.location.pathname);
 }
 
+/**
+ * Gate screens (profile / auth / waiting-for-host) should not keep stale
+ * `/company?company=…` crumbs from a previous session.
+ */
+export function resetCareerShellUrl(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    const alreadyClean =
+      (url.pathname === '/' || url.pathname === '') &&
+      !url.searchParams.has('company') &&
+      !url.hash;
+    if (alreadyClean) return;
+    window.history.replaceState({}, '', '/');
+  } catch {
+    /* ignore */
+  }
+}
+
+function withPreservedCompanyQuery(path: string): string {
+  try {
+    const current = new URL(window.location.href);
+    const company = current.searchParams.get('company')?.trim();
+    if (!company) return path;
+    const next = new URL(path, window.location.origin);
+    next.searchParams.set('company', company);
+    return `${next.pathname}${next.search}`;
+  } catch {
+    return path;
+  }
+}
+
 export function writeCareerLocation(
   loc: CareerLocation,
   opts: { replace?: boolean } = {},
 ): void {
   if (typeof window === 'undefined') return;
-  const next = pathForLocation(loc);
-  if (window.location.pathname === next) return;
+  const next = withPreservedCompanyQuery(pathForLocation(loc));
+  const current = `${window.location.pathname}${window.location.search}`;
+  if (current === next) return;
   if (opts.replace) {
     window.history.replaceState(loc, '', next);
   } else {

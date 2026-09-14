@@ -189,7 +189,35 @@ interface WorldTickService {
 4. ~~Phase 4 remote client clock~~ — shipped 2026-09-13 (`CAREER_WORLD_TICK=remote`).
 5. ~~Phase 5 dual-tenant board/claim proof~~ — shipped 2026-09-13.
 6. ~~Phase 6 client company context (dual-tab)~~ — shipped 2026-09-13.
-7. Hosted Postgres / multi-process world job — later.
+7. ~~Phase 7 local Auth (account → company)~~ — shipped 2026-09-14 (`CAREER_AUTH=1`).
+8. ~~Phase 8 fixed world (one shared SQL world; clients attach)~~ — shipped 2026-09-14 (`CAREER_WORLD_FIXED=1`).
+9. Hosted Postgres / multi-process world job — later (same mold: one world DB, tables only).
+
+## Phase 8 notes (2026-09-14)
+
+- **Product:** MP = **one world forever**. No “Create World” / multi-save on host or clients. SP keeps ProfileGate + `profiles.json` + `saves/<id>/`.
+- **SoT:** `profiles/career/world/skyline.sqlite` — companies, lots, fleet, auth, clock all in **SQL tables**. No MP `profiles.json`. Env `CAREER_WORLD_FIXED` / `CAREER_AUTH` = process flags only.
+- Host bootstrap (`bootstrapHeadlessWorldPulse`): `openCareerFixedWorldStore` → mkdir `world/` + open/create schema. Synthetic id `world`.
+- Clients: skip ProfileGate; poll health until store open; Auth → company. Create/rename/delete/clear profile → **403** `world_fixed`.
+- Company page: hide SAVE Rename/Delete when `worldFixed`. Settings: no Switch profile; Sign out re-prompts Auth only.
+- SP `career:ui` unchanged (`worldFixed` off).
+- **UX (same day):** hub picker after Auth reuses account display name — no second “Pilot name”; only home hub is required.
+- **UX (same day):** Company chip read-only when Auth/fixed world (no dual-tab `+`/select). Topbar **World** = economy Day·HH:MM (wall-paced 15 min/tick), not local timezone.
+
+## Phase 7 notes (2026-09-14)
+
+- **Local Auth** (no OAuth yet): `accounts` / `account_sessions` / `company_members` (schema v10).
+- Session token → account → owned companies. `Authorization: Bearer` on `api()`.
+- Env: `CAREER_AUTH=1` enforces; **host mode defaults on** (`dev.mjs --host`). SP `career:ui` stays off.
+- HTTP: `GET /api/auth/status`, `POST /api/auth/register|login|logout`, `GET /api/auth/me`.
+- Register creates company `co_<login>` + owner membership. Claim orphan via `claimCompanyId`.
+- When required: company id cannot spoof rivals; `GET /api/companies` returns owned only; AuthGate after profile select.
+- Chip `?company=` still works **within** owned set. OAuth later plugs into same membership table.
+- Files: `packages/shared/src/career-auth.ts`, `career-store-v10.ts`; UI `AuthGate.tsx` + `career-auth-client.ts`.
+- **UX (same day):** AuthGate form stacked (`auth-gate-form` + `pilot-field`) — bare labels were inline-wrapping.
+- **UX (same day):** Profile gate shows **Sign out / another account** when a Bearer token is still in the tab — otherwise Continue skips AuthGate (looks like “cadastro sumiu”).
+- **UX (same day):** **Auto-resume** last `activeId` on Ctrl+R / tab load — no forced ProfileGate when host already has a save; Switch profile / clear still shows the gate. Auth token still decides AuthGate.
+- **Product note:** SP = multi-save ProfileGate. MP = one forever world (`world/skyline.sqlite`) + Auth → company.
 
 ## Phase 6 notes (2026-09-13)
 
@@ -203,6 +231,7 @@ interface WorldTickService {
 - **Validation (same day):** flight-loop host paths now take per-request `companyId`: cancel / dispatch / depart / settle / fuel / confirm-ofp / accept-ofp-cargo / preflight / load-ofp + `updateOpenMission`. Tests: `career-multitenant-isolation.test.ts`, `career-company-client.test.ts`.
 - **Still ambient (lower priority):** Watch singleton (process-global) — wire when dual-tab hits concurrent Watch.
 - **Hangar/fleet (same day):** aircraft-market GET/buy/lease/sell/list/unlist/mx/repair/buyout/pay-lease/return-lease + select-hub + ferry-plan/ferry + empty-flight take per-request `companyId`.
+- **Fix (same day):** `/api/airport/:icao` + `/api/fbo/*` used ambient `loadMissions()` → co_a Base tab flashed co_b’s “Need 2 owned aircraft for a second base” until ambient flipped; now header-scoped. UI clears `playerFbos`/airport on company switch.
 - **Dual-tab playtest:** same profile/host; Tab A `?company=co_a`, Tab B `?company=co_b` (create via **+** or auto-ensure on first open). Accept on A → Freights on B omits lot; both clocks match.
 - Default no/`local` → SP unchanged. No OAuth / Postgres / SSE.
 
@@ -274,6 +303,8 @@ class RemoteWorldTickService implements WorldTickService {
 | **4** | shipped 2026-09-13 | Live `RemoteWorldTickService`; `CAREER_WORLD_TICK=remote` + `CAREER_REMOTE_WORLD_URL`; client never advances / never local catch-up; MP path aliases `/worlds/:id/clock` + `/companies/:id/session/open` |
 | **5** | shipped 2026-09-13 | Dual-tenant proof: staging claim + 409; market hides foreign `claimedByCompanyId`; per-request `companyId` on market/accept/staging; same tick + lot gone + conflict tests |
 | **6** | shipped 2026-09-13 | Client company context: `X-Skyline-Company-Id` on every `api()`; `?company=` + localStorage; session/open on enter/switch; topbar switcher; state/missions/fleet scoped per request |
+| **7** | shipped 2026-09-14 | Local Auth: account/session/members (schema v10); `CAREER_AUTH=1`; Bearer → owned company; AuthGate; host defaults on |
+| **8** | shipped 2026-09-14 | Fixed world: `CAREER_WORLD_FIXED=1`; one `world/skyline.sqlite`; clients attach (no ProfileGate) |
 | **B** | shipped 2026-09-13 | Dedicated host + client UIs: `career:host` / `career:client`; API bind `CAREER_UI_API_BIND`; Vite proxy `CAREER_UI_API_PROXY` |
 
 ## Phase B — dedicated host + clients (2026-09-13)
@@ -285,26 +316,24 @@ class RemoteWorldTickService implements WorldTickService {
 ### Playtest (mesmo PC)
 
 ```bash
-# Terminal 1 — world host (API only, bind 0.0.0.0)
+# Terminal 1 — world host (API only; CAREER_AUTH=1 + CAREER_WORLD_FIXED=1 by default)
 npm run career:host
+# First time: create/open a save once (headless resumes last-played / sole profile)
 
-# Terminal 2 — UI A (proxy → host)
+# Terminal 2 — UI A (proxy → host) — no ProfileGate; AuthGate → company
 npm run career:client
-# browser: http://localhost:5173/?company=co_a
 
-# Terminal 3 — UI B (outra porta)
-# PowerShell:
+# Terminal 3 — UI B
 $env:CAREER_UI_PORT=5174; npm run career:client
-# browser: http://localhost:5174/?company=co_b
 ```
 
-Mesmo profile nas duas UIs. Accept em A → lot some em B; clocks iguais.
+Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em A → lot some em B. Opt out: `$env:CAREER_AUTH='0'; $env:CAREER_WORLD_FIXED='0'; npm run career:host`.
 
 ### Dois PCs (LAN)
 
-1. Host: `npm run career:host` (firewall liberar TCP 8787).
+1. Host: `npm run career:host` (firewall liberar TCP 8787); ensure one save is open.
 2. Client: `CAREER_UI_API_PROXY=http://<host-lan-ip>:8787 npm run career:client`
-3. Companies distintas via `?company=`.
+3. Register/login por jogador (sem escolher save).
 
 ### Env
 
@@ -314,6 +343,8 @@ Mesmo profile nas duas UIs. Accept em A → lot some em B; clocks iguais.
 | `CAREER_UI_API_BIND` | `127.0.0.1` (`0.0.0.0` no `--host`) | bind do API |
 | `CAREER_UI_API_PROXY` | `http://127.0.0.1:8787` | target do proxy Vite |
 | `CAREER_UI_API_PORT` / `CAREER_UI_PORT` | 8787 / 5173 | portas |
+| `CAREER_AUTH` | off (`1` no `--host`) | Bearer session → owned company |
+| `CAREER_WORLD_FIXED` | off (`1` no `--host`) | one shared `world/skyline.sqlite`; clients skip ProfileGate (**env only**) |
 | `CAREER_WORLD_TICK=remote` | off | 2º **API** sem tick (não substitui host único p/ sniping) |
 
 ## Phase 5 notes (2026-09-13)

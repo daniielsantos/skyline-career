@@ -19,6 +19,7 @@ profiles/career/pulse-*.txt
 profiles/career/tfull.txt
 profiles/career/profiles.json
 profiles/career/saves/
+profiles/career/world/
 profiles/career/skyline.sqlite*
 artifacts/
 

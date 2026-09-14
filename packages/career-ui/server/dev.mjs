@@ -38,6 +38,14 @@ const apiProxyTarget = (
 if (isHostOnly && !process.env.CAREER_UI_API_BIND) {
   process.env.CAREER_UI_API_BIND = '0.0.0.0';
 }
+// Host playtest: account→company (opt out with CAREER_AUTH=0).
+if (isHostOnly && process.env.CAREER_AUTH == null) {
+  process.env.CAREER_AUTH = '1';
+}
+// Host playtest: one open world for all clients (opt out with CAREER_WORLD_FIXED=0).
+if (isHostOnly && process.env.CAREER_WORLD_FIXED == null) {
+  process.env.CAREER_WORLD_FIXED = '1';
+}
 
 const { NPCS_PER_REGION } = await import('@msfs-compat/shared');
 

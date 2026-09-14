@@ -124,6 +124,11 @@ import {
   type SimBridgeStatus,
   type StarterHubOption,
   type WatchStatus,
+  fetchAuthStatus,
+  postAuthLogin,
+  postAuthRegister,
+  postAuthLogout,
+  fetchCareerHealth,
 } from './api';
 import {
   companyIdFromUrl,
@@ -133,10 +138,14 @@ import {
   setStoredCompanyId,
   suggestCompanyId,
 } from './career-company-client';
+import { clearAuthToken, getAuthToken, setAuthToken } from './career-auth-client';
+import { AuthGate } from './AuthGate';
+import { WorldWaitingGate } from './WorldWaitingGate';
 import {
   pathForLocation,
   readCareerLocation,
   writeCareerLocation,
+  resetCareerShellUrl,
   type CareerTab,
 } from './routes';
 import {
@@ -3367,6 +3376,14 @@ export function App() {
   const [careerStateReady, setCareerStateReady] = useState(false);
   /** Avoid double bootstrap refresh (profile select + Strict Mode). */
   const bootProfileKeyRef = useRef<string | null>(null);
+  /** Latest enterCareerProfile — boot effect resumes via this ref. */
+  const enterCareerProfileRef = useRef<(id: string) => Promise<void>>(
+    async () => undefined,
+  );
+  /** Fixed-world attach — warm only (host already has the save open). */
+  const attachOpenWorldRef = useRef<(profile: CareerProfileMeta) => Promise<void>>(
+    async () => undefined,
+  );
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
   const [npcActivity, setNpcActivity] = useState<NpcActivity[]>([]);
@@ -3548,7 +3565,15 @@ export function App() {
   const [profileGateBusyLabel, setProfileGateBusyLabel] = useState(
     'Opening career…',
   );
+  const [authRequired, setAuthRequired] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  /** Bumps when token is set/cleared so ProfileGate Sign out UI refreshes. */
+  const [authSessionEpoch, setAuthSessionEpoch] = useState(0);
   const [profilesLoading, setProfilesLoading] = useState(true);
+  /** Host CAREER_WORLD_FIXED — clients attach, no ProfileGate. */
+  const [worldFixed, setWorldFixed] = useState(false);
+  const [worldWaiting, setWorldWaiting] = useState(false);
   const [boardAircraftId, setBoardAircraftId] = useState('');
   const [profitableOnly, setProfitableOnly] = useState(false);
   const boardAircraftInitRef = useRef(false);
@@ -3856,14 +3881,47 @@ export function App() {
   }, [airportIcao]);
 
   useEffect(() => {
+    const onGate =
+      profilesLoading ||
+      worldWaiting ||
+      showAuthGate ||
+      showProfileGate ||
+      !activeCareerProfile;
+    if (!onGate) return;
+    resetCareerShellUrl();
+  }, [
+    profilesLoading,
+    worldWaiting,
+    showAuthGate,
+    showProfileGate,
+    activeCareerProfile,
+  ]);
+
+  // Keep path in sync while the career shell is active — gates own `/`.
+  useEffect(() => {
+    if (
+      profilesLoading ||
+      worldWaiting ||
+      showAuthGate ||
+      showProfileGate ||
+      !activeCareerProfile
+    ) {
+      return;
+    }
     const loc = { tab, airportIcao };
     const canonical = pathForLocation(loc);
     if (window.location.pathname !== canonical) {
       writeCareerLocation(loc, { replace: true });
     }
-    // Mount-only canonicalize of `/` and unknown paths.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    profilesLoading,
+    worldWaiting,
+    showAuthGate,
+    showProfileGate,
+    activeCareerProfile,
+    tab,
+    airportIcao,
+  ]);
 
   useEffect(() => {
     function onPopState() {
@@ -3898,7 +3956,14 @@ export function App() {
 
   // Restore deep-linked airport only after a profile is open (requireStore).
   useEffect(() => {
-    if (showProfileGate || !activeCareerProfile) return;
+    if (
+      worldWaiting ||
+      showAuthGate ||
+      showProfileGate ||
+      !activeCareerProfile
+    ) {
+      return;
+    }
     if (!airportIcao || airportView) return;
     let cancelled = false;
     void (async () => {
@@ -3922,7 +3987,15 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [showProfileGate, activeCareerProfile?.id, airportIcao, airportView, tab]);
+  }, [
+    worldWaiting,
+    showAuthGate,
+    showProfileGate,
+    activeCareerProfile?.id,
+    airportIcao,
+    airportView,
+    tab,
+  ]);
 
   const refreshBushTrips = useCallback(async () => {
     try {
@@ -4126,6 +4199,13 @@ export function App() {
       const firstHub = networkCargoHubs(normalizeStarterHubs(state.hubs))[0]
         ?.icao;
       setSignupHub((prev) => prev || firstHub || 'SBGR');
+      // Auth already collected the person name — don't force a blank callsign field.
+      setSignupName((prev) => {
+        if (prev.trim().length >= 2) return prev;
+        const fromState = state.pilotName?.trim() ?? '';
+        if (fromState.length >= 2) return fromState;
+        return prev;
+      });
     }
     if (wantAirport && airportIcao) {
       const view = await fetchAirportView(airportIcao);
@@ -4202,20 +4282,107 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+    async function attachFixedWorld(activeProfileId: string, nameHint?: string | null) {
+      const data = await fetchCareerProfiles();
+      if (cancelled) return;
+      setCareerProfiles(data.profiles ?? []);
+      const last =
+        data.profiles?.find((p) => p.id === activeProfileId) ??
+        ({
+          id: activeProfileId,
+          name: nameHint?.trim() || 'World',
+          createdAt: new Date(0).toISOString(),
+          updatedAt: new Date(0).toISOString(),
+        } satisfies CareerProfileMeta);
+      setActiveCareerProfile(last);
+      setWorldWaiting(false);
+      setShowProfileGate(false);
+      setProfileGateBusyLabel('Joining world…');
+      setBusy(true);
       try {
-        const data = await fetchCareerProfiles();
-        if (cancelled) return;
-        setCareerProfiles(data.profiles ?? []);
-        const last = data.profiles?.find((p) => p.id === data.activeId) ?? null;
-        setActiveCareerProfile(last);
-        setShowProfileGate(true);
-        setError((prev) =>
-          prev && isNeedsProfileMessage(prev) ? null : prev,
-        );
+        await attachOpenWorldRef.current(last);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
+          setWorldWaiting(true);
+        }
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    }
+
+    void (async () => {
+      try {
+        const health = await fetchCareerHealth();
+        if (cancelled) return;
+        const fixed = Boolean(health.worldFixed);
+        setWorldFixed(fixed);
+        setAuthRequired(Boolean(health.authRequired));
+
+        if (fixed) {
+          setProfilesLoading(false);
+          if (health.needsProfile || !health.activeProfileId) {
+            setWorldWaiting(true);
+            setShowProfileGate(false);
+            pollTimer = setInterval(() => {
+              void (async () => {
+                try {
+                  const again = await fetchCareerHealth();
+                  if (cancelled) return;
+                  if (!again.needsProfile && again.activeProfileId) {
+                    if (pollTimer) clearInterval(pollTimer);
+                    pollTimer = undefined;
+                    await attachFixedWorld(
+                      again.activeProfileId,
+                      again.activeProfileName,
+                    );
+                  }
+                } catch {
+                  /* keep polling */
+                }
+              })();
+            }, 2000);
+            return;
+          }
+          await attachFixedWorld(health.activeProfileId, health.activeProfileName);
+          return;
+        }
+
+        const data = await fetchCareerProfiles();
+        if (cancelled) return;
+        setCareerProfiles(data.profiles ?? []);
+        const last =
+          data.profiles?.find((p) => p.id === data.activeId) ?? null;
+        setActiveCareerProfile(last);
+        setError((prev) =>
+          prev && isNeedsProfileMessage(prev) ? null : prev,
+        );
+        if (last) {
+          // Ctrl+R / tab restore: reopen last save instead of ProfileGate.
+          setProfileGateBusyLabel('Resuming save…');
+          setShowProfileGate(true);
+          setProfilesLoading(false);
+          setBusy(true);
+          try {
+            await enterCareerProfileRef.current(last.id);
+          } catch (err) {
+            if (!cancelled) {
+              setShowProfileGate(true);
+              setShowAuthGate(false);
+              setError(err instanceof Error ? err.message : String(err));
+            }
+          } finally {
+            if (!cancelled) setBusy(false);
+          }
+        } else {
+          setShowProfileGate(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+          setShowProfileGate(true);
         }
       } finally {
         if (!cancelled) setProfilesLoading(false);
@@ -4223,6 +4390,7 @@ export function App() {
     })();
     return () => {
       cancelled = true;
+      if (pollTimer) clearInterval(pollTimer);
     };
   }, []);
 
@@ -6565,18 +6733,52 @@ export function App() {
     setFlightDebrief(null);
     setSettleOverlaySticky(false);
     setWatch(null);
+    // Drop tenant-scoped Base/FBO paint so co_b’s “second base” gate cannot
+    // flash on co_a before airport/state refresh lands.
+    setPlayerFbos(null);
+    setAirportView(null);
   }
 
   /**
    * Keep the profile gate up until company + tab board are warm — avoids the
    * Freights “Loading…” flash after Continue.
    */
-  async function ensureCompanySessionForUi(): Promise<string> {
-    const companyId = getStoredCompanyId();
-    // Only write shared localStorage when this tab is not URL-pinned.
-    if (!companyIdFromUrl()) {
+  async function ensureCompanySessionForUi(opts?: {
+    /** When true, only pick companies owned by the Bearer session (Auth). */
+    authEnforced?: boolean;
+  }): Promise<string> {
+    let listed = await fetchCompanies();
+    let companyId = getStoredCompanyId();
+    const authEnforced = opts?.authEnforced ?? authRequired;
+
+    if (authEnforced) {
+      const preferred = companyIdFromUrl() || companyId;
+      const owned =
+        listed.companies.find((c) => c.id === preferred)?.id ??
+        listed.companies[0]?.id;
+      if (!owned) {
+        throw new Error('No company linked to this account');
+      }
+      companyId = owned;
       setStoredCompanyId(companyId);
+    } else {
+      // Only write shared storage when this tab is not URL-pinned.
+      if (!companyIdFromUrl()) {
+        setStoredCompanyId(companyId);
+      }
+      if (
+        companyId !== LOCAL_COMPANY_ID &&
+        !listed.companies.some((c) => c.id === companyId)
+      ) {
+        await postCompany({
+          id: companyId,
+          displayName: companyId,
+          activate: false,
+        });
+        listed = await fetchCompanies();
+      }
     }
+
     try {
       const url = new URL(window.location.href);
       if (companyId !== LOCAL_COMPANY_ID) {
@@ -6590,18 +6792,6 @@ export function App() {
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     } catch {
       /* ignore */
-    }
-    let listed = await fetchCompanies();
-    if (
-      companyId !== LOCAL_COMPANY_ID &&
-      !listed.companies.some((c) => c.id === companyId)
-    ) {
-      await postCompany({
-        id: companyId,
-        displayName: companyId,
-        activate: false,
-      });
-      listed = await fetchCompanies();
     }
     await postCompanySessionOpen({ companyId });
     setCompanies(listed.companies);
@@ -6650,8 +6840,40 @@ export function App() {
   }
 
   async function warmCareerBeforeEnter(profileId: string): Promise<void> {
+    setProfileGateBusyLabel('Checking sign-in…');
+    const status = await fetchAuthStatus();
+    setAuthRequired(status.required);
+    setAuthChecked(true);
+    let authEnforced = false;
+    if (status.required) {
+      const withToken = getAuthToken()
+        ? await fetchAuthStatus().catch(() => status)
+        : status;
+      if (!withToken.authenticated) {
+        setShowAuthGate(true);
+        setShowProfileGate(false);
+        bootProfileKeyRef.current = profileId;
+        return;
+      }
+      authEnforced = true;
+      const fromAuth =
+        withToken.account?.displayName?.trim() ||
+        withToken.account?.loginName?.trim() ||
+        withToken.companies[0]?.displayName?.trim() ||
+        '';
+      if (fromAuth.length >= 2) {
+        setSignupName((prev) => (prev.trim().length >= 2 ? prev : fromAuth));
+      }
+      if (withToken.companies[0]) {
+        setStoredCompanyId(withToken.companies[0].id);
+        setCompanies(withToken.companies);
+      }
+      setShowAuthGate(false);
+    } else {
+      setShowAuthGate(false);
+    }
     setProfileGateBusyLabel('Loading company & board…');
-    await ensureCompanySessionForUi();
+    await ensureCompanySessionForUi({ authEnforced });
     const scope = liveRefreshScope(tabRef.current, Boolean(airportIcao));
     await refreshRef.current({
       ...scope,
@@ -6665,18 +6887,78 @@ export function App() {
     setShowProfileGate(false);
   }
 
+  async function finishAuthAndEnter(result: {
+    token: string;
+    account?: { displayName?: string; loginName?: string };
+    companies: Array<{ id: string; displayName: string }>;
+  }): Promise<void> {
+    setAuthToken(result.token);
+    setAuthSessionEpoch((n) => n + 1);
+    setAuthRequired(true);
+    setAuthChecked(true);
+    setShowAuthGate(false);
+    const fromAuth =
+      result.account?.displayName?.trim() ||
+      result.account?.loginName?.trim() ||
+      result.companies[0]?.displayName?.trim() ||
+      '';
+    if (fromAuth.length >= 2) {
+      setSignupName((prev) => (prev.trim().length >= 2 ? prev : fromAuth));
+    }
+    if (result.companies[0]) {
+      setStoredCompanyId(result.companies[0].id);
+      setCompanies(
+        result.companies.map((c) => ({
+          id: c.id,
+          displayName: c.displayName,
+          homeHubIcao: '',
+          homeCountryId: '',
+          worldId: 'local',
+          createdAtMs: 0,
+        })),
+      );
+    }
+    const profileId =
+      activeCareerProfile?.id ?? bootProfileKeyRef.current ?? '';
+    setProfileGateBusyLabel('Loading company & board…');
+    await ensureCompanySessionForUi({ authEnforced: true });
+    const scope = liveRefreshScope(tabRef.current, Boolean(airportIcao));
+    await refreshRef.current({
+      ...scope,
+      market: true,
+      missions: true,
+    });
+    setMarketBoardLoading(false);
+    if (profileId) bootProfileKeyRef.current = profileId;
+    setShowProfileGate(false);
+  }
+
+  /** Open (or re-open) a save then Auth/company warm — used by Continue and Ctrl+R resume. */
+  async function enterCareerProfile(id: string): Promise<void> {
+    const result = await postCareerProfileSelect(id);
+    clearCareerSessionPaint();
+    setCareerProfiles(result.profiles);
+    setActiveCareerProfile(
+      result.profile ??
+        result.profiles.find((p) => p.id === result.activeId) ??
+        null,
+    );
+    await warmCareerBeforeEnter(id);
+  }
+  enterCareerProfileRef.current = enterCareerProfile;
+
+  /** Fixed world: host already opened the save — do not POST profiles/select. */
+  async function attachOpenWorld(profile: CareerProfileMeta): Promise<void> {
+    clearCareerSessionPaint();
+    setActiveCareerProfile(profile);
+    await warmCareerBeforeEnter(profile.id);
+  }
+  attachOpenWorldRef.current = attachOpenWorld;
+
   async function onSelectCareerProfile(id: string) {
     await run(async () => {
       setProfileGateBusyLabel('Opening save…');
-      const result = await postCareerProfileSelect(id);
-      clearCareerSessionPaint();
-      setCareerProfiles(result.profiles);
-      setActiveCareerProfile(
-        result.profile ??
-          result.profiles.find((p) => p.id === result.activeId) ??
-          null,
-      );
-      await warmCareerBeforeEnter(id);
+      await enterCareerProfile(id);
     });
   }
 
@@ -6685,11 +6967,7 @@ export function App() {
       setProfileGateBusyLabel('Creating save…');
       const created = await postCareerProfileCreate(name);
       setProfileGateBusyLabel('Opening save…');
-      const result = await postCareerProfileSelect(created.profile.id);
-      clearCareerSessionPaint();
-      setCareerProfiles(result.profiles);
-      setActiveCareerProfile(result.profile ?? created.profile);
-      await warmCareerBeforeEnter(created.profile.id);
+      await enterCareerProfile(created.profile.id);
     });
   }
 
@@ -6748,6 +7026,12 @@ export function App() {
   }
 
   async function onSwitchCareerProfile() {
+    if (worldFixed) {
+      setError(
+        'This client is attached to the host world. Switch or create saves on the host only.',
+      );
+      return;
+    }
     await run(async () => {
       if (watch?.running) {
         try {
@@ -6766,6 +7050,7 @@ export function App() {
       await postCareerProfileClear();
       setActiveCareerProfile(null);
       setShowProfileGate(true);
+      setShowAuthGate(false);
       setStaging(null);
       setActiveBushTrip(null);
       setBushWatch(null);
@@ -6773,8 +7058,78 @@ export function App() {
     });
   }
 
+  async function onSignOutAccount() {
+    await run(async () => {
+      try {
+        await postAuthLogout();
+      } catch {
+        /* ignore — clear local anyway */
+      }
+      clearAuthToken();
+      setAuthSessionEpoch((n) => n + 1);
+      setShowAuthGate(false);
+      setCompanies([]);
+      // Next Continue on a save will show AuthGate again when CAREER_AUTH=1.
+    });
+  }
+
+  async function onSignOutAndSwitchProfile() {
+    await run(async () => {
+      try {
+        await postAuthLogout();
+      } catch {
+        /* ignore */
+      }
+      clearAuthToken();
+      setAuthSessionEpoch((n) => n + 1);
+      setCompanies([]);
+      if (watch?.running) {
+        try {
+          await postWatchStop({ reset: true });
+        } catch {
+          /* ignore */
+        }
+      }
+      if (bushWatch?.running) {
+        try {
+          await postBushWatchStop();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (worldFixed) {
+        // Stay on the host world — only re-prompt Auth.
+        setShowAuthGate(true);
+        setShowProfileGate(false);
+        setStaging(null);
+        setActiveBushTrip(null);
+        setBushWatch(null);
+        setWatch(null);
+        return;
+      }
+      await postCareerProfileClear();
+      setActiveCareerProfile(null);
+      setShowProfileGate(true);
+      setShowAuthGate(false);
+      setStaging(null);
+      setActiveBushTrip(null);
+      setBushWatch(null);
+      setWatch(null);
+    });
+  }
+
+  function resolvedSignupPilotName(): string {
+    const fromField = signupName.trim();
+    if (fromField.length >= 2) return fromField;
+    const company =
+      companies.find((c) => c.id === activeCompanyId)?.displayName?.trim() ||
+      companies[0]?.displayName?.trim() ||
+      '';
+    return company.length >= 2 ? company : '';
+  }
+
   async function onSelectHub() {
-    const name = signupName.trim();
+    const name = resolvedSignupPilotName();
     const icao = signupHub.trim().toUpperCase();
     if (name.length < 2) {
       setError('Enter a pilot name (at least 2 characters)');
@@ -10528,10 +10883,22 @@ export function App() {
     );
   }, [signupCargoHubs, signupCountry]);
 
+  const signupPilotResolved = resolvedSignupPilotName();
+  const signupPilotLocked = authRequired && signupPilotResolved.length >= 2;
+
   if (profilesLoading) {
     return (
       <div className="app-shell profile-gate-shell">
         <ProfileGateLoading />
+        {confirmDialog}
+      </div>
+    );
+  }
+
+  if (worldWaiting) {
+    return (
+      <div className="app-shell profile-gate-shell">
+        <WorldWaitingGate />
         {confirmDialog}
       </div>
     );
@@ -10577,12 +10944,50 @@ export function App() {
           </div>
         ) : null}
         <ProfileGate
+          key={`profiles-${authSessionEpoch}`}
           profiles={careerProfiles}
           lastActiveId={activeCareerProfile?.id ?? null}
           busy={busy}
           busyLabel={profileGateBusyLabel}
           onSelect={(id) => void onSelectCareerProfile(id)}
           onCreate={(name) => void onCreateCareerProfile(name)}
+          authSignedIn={Boolean(getAuthToken())}
+          onSignOut={() => void onSignOutAccount()}
+        />
+        {confirmDialog}
+      </div>
+    );
+  }
+
+  if (showAuthGate) {
+    return (
+      <div className="app-shell profile-gate-shell">
+        <AuthGate
+          busy={busy}
+          onLogin={async (opts) => {
+            const result = await postAuthLogin(opts);
+            return {
+              token: result.token,
+              account: result.account,
+              companies: result.companies,
+            };
+          }}
+          onRegister={async (opts) => {
+            const result = await postAuthRegister({
+              loginName: opts.loginName,
+              displayName: opts.displayName,
+              password: opts.password,
+              companyDisplayName: opts.companyDisplayName,
+            });
+            return {
+              token: result.token,
+              account: result.account,
+              companies: result.companies,
+            };
+          }}
+          onSuccess={(result) => {
+            void run(() => finishAuthAndEnter(result));
+          }}
         />
         {confirmDialog}
       </div>
@@ -11014,45 +11419,65 @@ export function App() {
               <EconomySyncIndicator status={catchUpBanner} />
             ) : null}
             {careerReady ? (
-              <label className="metric company-switcher" title="Company tenant (dual-tab MP: ?company=)">
-                <span className="label">Company</span>
-                <span className="company-switcher-controls">
-                  <select
-                    value={activeCompanyId}
-                    disabled={busy}
-                    aria-label="Active company"
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      void run(() => switchCompany(next));
-                    }}
-                  >
-                    {(companies.length > 0
-                      ? companies
-                      : [
-                          {
-                            id: activeCompanyId || LOCAL_COMPANY_ID,
-                            displayName: activeCompanyId || LOCAL_COMPANY_ID,
-                          },
-                        ]
-                    ).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.displayName || c.id}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="company-new-btn"
-                    disabled={busy}
-                    title="Create empty company on this world"
-                    onClick={() => {
-                      void run(() => createCompanyAndSwitch());
-                    }}
-                  >
-                    +
-                  </button>
-                </span>
-              </label>
+              authRequired || worldFixed ? (
+                <div
+                  className="metric"
+                  title="Your company on this world"
+                >
+                  <span className="label">Company</span>
+                  <strong>
+                    {companies.find((c) => c.id === activeCompanyId)
+                      ?.displayName ||
+                      companies[0]?.displayName ||
+                      activeCompanyId ||
+                      '—'}
+                  </strong>
+                </div>
+              ) : (
+                <label
+                  className="metric company-switcher"
+                  title="Company tenant (dual-tab lab: ?company=)"
+                >
+                  <span className="label">Company</span>
+                  <span className="company-switcher-controls">
+                    <select
+                      value={activeCompanyId}
+                      disabled={busy}
+                      aria-label="Active company"
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        void run(() => switchCompany(next));
+                      }}
+                    >
+                      {(companies.length > 0
+                        ? companies
+                        : [
+                            {
+                              id: activeCompanyId || LOCAL_COMPANY_ID,
+                              displayName:
+                                activeCompanyId || LOCAL_COMPANY_ID,
+                            },
+                          ]
+                      ).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.displayName || c.id}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="company-new-btn"
+                      disabled={busy}
+                      title="Create empty company on this world"
+                      onClick={() => {
+                        void run(() => createCompanyAndSwitch());
+                      }}
+                    >
+                      +
+                    </button>
+                  </span>
+                </label>
+              )
             ) : null}
             {careerReady && pilotIcao ? (
               <button
@@ -11075,15 +11500,15 @@ export function App() {
               title={
                 tickAdvance
                   ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} batches · ${tickAdvanceElapsedSec}s`
-                  : '1 economy tick = 15 simulated minutes'
+                  : 'World economy day/time — paced by real wall clock (1 tick = 15 min). Not your local timezone.'
               }
             >
               <span className="label">
                 {tickAdvance
                   ? tickAdvance.done <= 0
-                    ? `Clock · ${tickAdvanceElapsedSec}s`
-                    : `Clock · ${tickAdvance.done}/${tickAdvance.total}`
-                  : 'Clock'}
+                    ? `World · ${tickAdvanceElapsedSec}s`
+                    : `World · ${tickAdvance.done}/${tickAdvance.total}`
+                  : 'World'}
               </span>
               <strong>{formatClock(continuousHours)}</strong>
             </div>
@@ -11153,11 +11578,23 @@ export function App() {
         <section className="panel hub-picker" role="dialog" aria-labelledby="hub-picker-title">
           <div className="panel-head">
             <div>
-              <h2 id="hub-picker-title">Create pilot profile</h2>
+              <h2 id="hub-picker-title">
+                {signupPilotLocked ? 'Choose home hub' : 'Create pilot profile'}
+              </h2>
               <p>
-                Choose a callsign and home hub. You start as a contract pilot —
-                fly Crew needed offers on operator airframes until you buy or
-                lease your first aircraft.
+                {signupPilotLocked ? (
+                  <>
+                    Playing as <strong>{signupPilotResolved}</strong>. Pick your
+                    home hub — you start as a contract pilot until you buy or
+                    lease your first aircraft.
+                  </>
+                ) : (
+                  <>
+                    Choose a callsign and home hub. You start as a contract pilot
+                    — fly Crew needed offers on operator airframes until you buy
+                    or lease your first aircraft.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -11168,20 +11605,22 @@ export function App() {
               void onSelectHub();
             }}
           >
-            <label className="pilot-field">
-              Pilot name
-              <input
-                type="text"
-                value={signupName}
-                onChange={(e) => setSignupName(e.target.value)}
-                maxLength={40}
-                minLength={2}
-                placeholder="e.g. Ada Skyline"
-                disabled={busy}
-                autoComplete="nickname"
-                required
-              />
-            </label>
+            {signupPilotLocked ? null : (
+              <label className="pilot-field">
+                Pilot name
+                <input
+                  type="text"
+                  value={signupName}
+                  onChange={(e) => setSignupName(e.target.value)}
+                  maxLength={40}
+                  minLength={2}
+                  placeholder="e.g. Ada Skyline"
+                  disabled={busy}
+                  autoComplete="nickname"
+                  required
+                />
+              </label>
+            )}
             <div className="pilot-signup-hubs">
               <label className="pilot-field">
                 Country
@@ -11245,7 +11684,7 @@ export function App() {
               className="accept"
               disabled={
                 busy ||
-                signupName.trim().length < 2 ||
+                signupPilotResolved.length < 2 ||
                 !signupHub
               }
             >
@@ -16083,17 +16522,40 @@ export function App() {
             <div className="settings-card">
               <h3>Career profile</h3>
               <p className="settings-help">
-                Playing as <strong>{activeCareerProfile.name}</strong>. Switch
-                profiles to load another wallet, fleet, and mission history.
+                {worldFixed ? (
+                  <>
+                    Attached to host world{' '}
+                    <strong>{activeCareerProfile.name}</strong>. Saves are
+                    managed on the host — this client only signs in to a company.
+                  </>
+                ) : (
+                  <>
+                    Playing as <strong>{activeCareerProfile.name}</strong>. Switch
+                    profiles to load another wallet, fleet, and mission history.
+                  </>
+                )}
               </p>
-              <button
-                type="button"
-                className="action"
-                disabled={busy}
-                onClick={() => void onSwitchCareerProfile()}
-              >
-                Switch profile
-              </button>
+              {worldFixed ? null : (
+                <button
+                  type="button"
+                  className="action"
+                  disabled={busy}
+                  onClick={() => void onSwitchCareerProfile()}
+                >
+                  Switch profile
+                </button>
+              )}
+              {authRequired || getAuthToken() ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={busy}
+                  style={{ marginTop: '0.5rem' }}
+                  onClick={() => void onSignOutAndSwitchProfile()}
+                >
+                  Sign out / another account
+                </button>
+              ) : null}
             </div>
             <div className="settings-card">
               <h3>SimBrief</h3>
@@ -16415,18 +16877,22 @@ export function App() {
                   <dd>{fleet.length}</dd>
                 </div>
               </dl>
-              <div className="profile-manage-block">
-                <p className="aircraft-card-section-label">Save</p>
-                <CareerProfileManage
-                  name={activeCareerProfile.name}
-                  canDelete
-                  busy={busy}
-                  onRename={(name) =>
-                    void onRenameCareerProfile(activeCareerProfile.id, name)
-                  }
-                  onDelete={() => void onDeleteCareerProfile(activeCareerProfile.id)}
-                />
-              </div>
+              {worldFixed ? null : (
+                <div className="profile-manage-block">
+                  <p className="aircraft-card-section-label">Save</p>
+                  <CareerProfileManage
+                    name={activeCareerProfile.name}
+                    canDelete
+                    busy={busy}
+                    onRename={(name) =>
+                      void onRenameCareerProfile(activeCareerProfile.id, name)
+                    }
+                    onDelete={() =>
+                      void onDeleteCareerProfile(activeCareerProfile.id)
+                    }
+                  />
+                </div>
+              )}
             </div>
             <div className="pilot-card pilot-card-wide">
               <h3>Progression</h3>

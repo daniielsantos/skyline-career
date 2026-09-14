@@ -1,11 +1,15 @@
 /**
- * Multi-save career profiles under profiles/career.
+ * Multi-save career profiles under profiles/career (SP).
  *
- * Layout:
+ * Layout (SP):
  *   profiles/career/profiles.json          — index + activeId
  *   profiles/career/saves/<id>/skyline.sqlite
  *   profiles/career/bush_PLN/              — shared (read-only assets)
  *   profiles/career/msfs-bush-hub-overrides.json — shared
+ *
+ * Layout (MP / CAREER_WORLD_FIXED):
+ *   profiles/career/world/skyline.sqlite   — one shared world forever
+ *   (no profiles.json; game state lives in SQL tables inside that DB)
  *
  * Legacy single-save: root skyline.sqlite is claimed into the **first**
  * profile created in the UI (keeps that world, uses the player-typed name).
@@ -16,6 +20,10 @@ import { randomBytes } from 'node:crypto';
 import { access, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { openCareerStore, type CareerStore } from '@msfs-compat/shared';
+
+/** Synthetic profile id for CAREER_WORLD_FIXED (not a multi-save row). */
+export const FIXED_WORLD_PROFILE_ID = 'world';
+export const FIXED_WORLD_PROFILE_NAME = 'World';
 
 export type CareerProfileMeta = {
   id: string;
@@ -36,6 +44,29 @@ function newId(): string {
 
 function todayIso(): string {
   return new Date().toISOString();
+}
+
+export function careerFixedWorldDir(careerRoot: string): string {
+  return join(careerRoot, 'world');
+}
+
+export function fixedWorldProfileMeta(): CareerProfileMeta {
+  const now = todayIso();
+  return {
+    id: FIXED_WORLD_PROFILE_ID,
+    name: FIXED_WORLD_PROFILE_NAME,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/** Open (or create schema in) the single MP world SQLite under careerRoot/world/. */
+export async function openCareerFixedWorldStore(
+  careerRoot: string,
+): Promise<CareerStore> {
+  const dir = careerFixedWorldDir(careerRoot);
+  await mkdir(dir, { recursive: true });
+  return openCareerStore({ careerDir: dir });
 }
 
 async function pathExists(path: string): Promise<boolean> {

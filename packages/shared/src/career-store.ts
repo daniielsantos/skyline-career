@@ -136,15 +136,39 @@ import {
 import {
   settleAllCompaniesPassiveFees,
 } from './career-company-session.js';
+import {
+  addCompanyMember,
+  loginAccount,
+  registerAccount,
+  resolveSession,
+  revokeSession,
+  accountOwnsCompany,
+  listCompaniesForAccount,
+  type AuthSessionContext,
+  type LoginAccountOpts,
+  type RegisterAccountOpts,
+  type RegisterAccountResult,
+  type CareerAccountSession,
+  type CareerAccount,
+  type CareerCompanyMember,
+} from './career-auth.js';
+import { ensureV10Ddl, migrateV9toV10IfNeeded } from './career-store-v10.js';
 
 export type CareerStoreKind = 'json' | 'sqlite';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '9';
+export const CAREER_STORE_SCHEMA_VERSION = '10';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
 export type { HubEconomySample };
+export type {
+  AuthSessionContext,
+  CareerAccount,
+  CareerAccountSession,
+  CareerCompanyMember,
+  RegisterAccountResult,
+};
 
 export type EconomyLoadResult = {
   world: CareerEconomyWorld;
@@ -241,6 +265,25 @@ export interface CareerStore {
     worldId: string;
     createdAtMs: number;
   };
+  /** Local Auth (schema v10). JSON store throws. */
+  readonly supportsAuth: boolean;
+  authRegister(opts: RegisterAccountOpts): RegisterAccountResult;
+  authLogin(opts: LoginAccountOpts): {
+    account: CareerAccount;
+    session: CareerAccountSession;
+  };
+  authResolveSession(
+    token: string | null | undefined,
+    opts?: { nowMs?: number; touch?: boolean },
+  ): AuthSessionContext | null;
+  authRevokeSession(token: string): boolean;
+  authListCompaniesForAccount(accountId: string): CareerCompanyRow[];
+  authAddCompanyMember(opts: {
+    companyId: string;
+    accountId: string;
+    role?: CareerCompanyMember['role'];
+  }): CareerCompanyMember;
+  authAccountOwnsCompany(accountId: string, companyId: string): boolean;
   /**
    * Pulse settle-all companies on the world (SQLite). JSON: settles active only via caller.
    * Returns preferred (active) company fee summary when present.
@@ -424,6 +467,46 @@ class JsonCareerStore implements CareerStore {
       worldId: opts.worldId?.trim() || LOCAL_WORLD_ID,
       createdAtMs: Date.now(),
     };
+  }
+
+  readonly supportsAuth = false;
+
+  authRegister(_opts: RegisterAccountOpts): RegisterAccountResult {
+    throw new Error('Auth requires SQLite career store');
+  }
+
+  authLogin(_opts: LoginAccountOpts): {
+    account: CareerAccount;
+    session: CareerAccountSession;
+  } {
+    throw new Error('Auth requires SQLite career store');
+  }
+
+  authResolveSession(
+    _token: string | null | undefined,
+    _opts?: { nowMs?: number; touch?: boolean },
+  ): AuthSessionContext | null {
+    return null;
+  }
+
+  authRevokeSession(_token: string): boolean {
+    return false;
+  }
+
+  authListCompaniesForAccount(_accountId: string): CareerCompanyRow[] {
+    return [];
+  }
+
+  authAddCompanyMember(_opts: {
+    companyId: string;
+    accountId: string;
+    role?: CareerCompanyMember['role'];
+  }): CareerCompanyMember {
+    throw new Error('Auth requires SQLite career store');
+  }
+
+  authAccountOwnsCompany(_accountId: string, _companyId: string): boolean {
+    return false;
   }
 
   peekEconomyWorld(): CareerEconomyWorld | null {
@@ -717,6 +800,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV7Ddl(db);
   ensureV8HubSampleColumns(db);
   ensureV9Ddl(db);
+  ensureV10Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -775,7 +859,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV8 = Number.parseInt(afterV8?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV8) || verAfterV8 < 9) {
-    migrateV8toV9IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV8toV9IfNeeded(db, metaSet, '9');
+  }
+  const afterV9 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV9 = Number.parseInt(afterV9?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV9) || verAfterV9 < 10) {
+    migrateV9toV10IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -943,6 +1034,46 @@ class SqliteCareerStore implements CareerStore {
       ...opts,
       worldId: opts.worldId ?? LOCAL_WORLD_ID,
     });
+  }
+
+  readonly supportsAuth = true;
+
+  authRegister(opts: RegisterAccountOpts): RegisterAccountResult {
+    return registerAccount(this.db, opts);
+  }
+
+  authLogin(opts: LoginAccountOpts): {
+    account: CareerAccount;
+    session: CareerAccountSession;
+  } {
+    return loginAccount(this.db, opts);
+  }
+
+  authResolveSession(
+    token: string | null | undefined,
+    opts?: { nowMs?: number; touch?: boolean },
+  ): AuthSessionContext | null {
+    return resolveSession(this.db, token, opts);
+  }
+
+  authRevokeSession(token: string): boolean {
+    return revokeSession(this.db, token);
+  }
+
+  authListCompaniesForAccount(accountId: string): CareerCompanyRow[] {
+    return listCompaniesForAccount(this.db, accountId);
+  }
+
+  authAddCompanyMember(opts: {
+    companyId: string;
+    accountId: string;
+    role?: CareerCompanyMember['role'];
+  }): CareerCompanyMember {
+    return addCompanyMember(this.db, opts);
+  }
+
+  authAccountOwnsCompany(accountId: string, companyId: string): boolean {
+    return accountOwnsCompany(this.db, accountId, companyId);
   }
 
   settleWorldCompaniesPassiveFees(opts: {

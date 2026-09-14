@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Phase 8 fixed world = one SQL DB** — `profiles/career/world/skyline.sqlite` (no MP Create World / no `profiles.json`). Clients Auth only. Next: Postgres hosted world. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **Auto-resume save on refresh** — Ctrl+R reopens `activeId` (SP). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **MP Phase 7 local Auth** — account→session→company (`CAREER_AUTH=1`, host default on). Next: Watch per-company, OAuth provider, or Postgres. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab company header; flight-loop/hangar scoped; `npm run career:host` + `career:client`. Next: Watch per-company, Auth, or Postgres. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

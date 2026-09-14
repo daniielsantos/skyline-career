@@ -1,4 +1,5 @@
 import { getStoredCompanyId } from './career-company-client';
+import { getAuthToken } from './career-auth-client';
 
 export type AircraftClass =
   | 'narrow_freighter'
@@ -1072,11 +1073,19 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     /* ignore */
   }
+  try {
+    const token = getAuthToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    /* ignore */
+  }
   const res = await fetch(path, {
     ...init,
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
-  const data = (await res.json()) as T & { error?: string };
+  const data = (await res.json()) as T & { error?: string; code?: string };
   if (!res.ok) {
     throw new Error(data.error ?? `HTTP ${res.status}`);
   }
@@ -1239,6 +1248,75 @@ export function postCompanySessionOpen(body?: {
     method: 'POST',
     body: JSON.stringify(body ?? {}),
   });
+}
+
+export type AuthAccountView = {
+  id: string;
+  loginName: string;
+  displayName: string;
+  createdAtMs?: number;
+};
+
+export function fetchAuthStatus() {
+  return api<{
+    required: boolean;
+    supportsAuth: boolean;
+    authenticated: boolean;
+    account: AuthAccountView | null;
+    companies: CareerCompanyView[];
+  }>('/api/auth/status');
+}
+
+export type CareerHealth = {
+  ok: boolean;
+  needsProfile: boolean;
+  activeProfileId: string | null;
+  activeProfileName?: string | null;
+  worldFixed?: boolean;
+  authRequired?: boolean;
+  npcFleetTarget?: number;
+  store?: string | null;
+};
+
+export function fetchCareerHealth() {
+  return api<CareerHealth>('/api/health');
+}
+
+export function postAuthRegister(body: {
+  loginName: string;
+  displayName: string;
+  password: string;
+  createCompany?: boolean;
+  companyId?: string;
+  companyDisplayName?: string;
+  claimCompanyId?: string;
+}) {
+  return api<{
+    token: string;
+    expiresAtMs: number;
+    account: AuthAccountView;
+    company: CareerCompanyView | null;
+    companies: CareerCompanyView[];
+  }>('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function postAuthLogin(body: { loginName: string; password: string }) {
+  return api<{
+    token: string;
+    expiresAtMs: number;
+    account: AuthAccountView;
+    companies: CareerCompanyView[];
+  }>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function postAuthLogout() {
+  return api<{ ok: boolean }>('/api/auth/logout', { method: 'POST', body: '{}' });
 }
 
 export type OfflineFeeSummary = {

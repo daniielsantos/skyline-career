@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   CAREER_PG_WORLD_PULSE_LOCK_KEY,
+  isTransientPostgresStartupError,
   runPostgresWorldWorker,
 } from './career-world-worker-pg.js';
 import { careerDatabaseUrlFromEnv } from './career-store-postgres.js';
@@ -12,6 +13,24 @@ import { careerDatabaseUrlFromEnv } from './career-store-postgres.js';
 describe('career world worker postgres', () => {
   it('exports a stable advisory lock key', () => {
     assert.equal(CAREER_PG_WORLD_PULSE_LOCK_KEY, 87_201_401);
+  });
+
+  it('detects transient startup / recovery errors', () => {
+    assert.equal(
+      isTransientPostgresStartupError({
+        code: '57P03',
+        message: 'the database system is not yet accepting connections',
+      }),
+      true,
+    );
+    assert.equal(
+      isTransientPostgresStartupError({ code: 'ECONNREFUSED' }),
+      true,
+    );
+    assert.equal(
+      isTransientPostgresStartupError({ code: '42P01', message: 'missing' }),
+      false,
+    );
   });
 
   it('runs a single --once pulse when Postgres is up', async (t) => {
@@ -33,7 +52,9 @@ describe('career world worker postgres', () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (
-        /ECONNREFUSED|unreachable|connect|advisory lock held/i.test(msg) ||
+        /ECONNREFUSED|unreachable|connect|advisory lock held|57P03|not yet accepting/i.test(
+          msg,
+        ) ||
         msg.includes('password authentication')
       ) {
         t.skip(`postgres unreachable or lock busy: ${msg}`);

@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **world-worker 57P03** — Postgres recovery: worker retry (~90s) + compose healthcheck `pg_isready && SELECT 1` (isready sozinho passa cedo demais).
+
 Atualizado 2026-09-14: **Desktop pack crash `pg` missing** — shared barrel exportava `career-world-worker-pg` / postgres → `ERR_MODULE_NOT_FOUND` no install. Fix: `career-database-url.ts` sem pg; openCareerStore só dynamic-import postgres quando backend=postgres; pack shared `optionalDependencies.pg`.
 
 Atualizado 2026-09-14: **Topbar Move chip** — Pilot Travel dialog: tabs Pilot | Ferry → Plan ferry abre `FerryJourneyDialog` (mesmo fluxo do Hangar). Chip label `Move`.

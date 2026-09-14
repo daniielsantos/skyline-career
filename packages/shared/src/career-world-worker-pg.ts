@@ -23,6 +23,10 @@ import {
 /** Stable int4 key for pg_try_advisory_lock (skyline world pulse). */
 export const CAREER_PG_WORLD_PULSE_LOCK_KEY = 87_201_401;
 
+/** Default: wait up to ~90s for Postgres recovery / first accept. */
+const DEFAULT_PG_READY_ATTEMPTS = 45;
+const DEFAULT_PG_READY_DELAY_MS = 2_000;
+
 type PulseLock = { client: pg.PoolClient; pool: pg.Pool };
 
 export type PostgresWorldWorkerOpts = {
@@ -35,6 +39,9 @@ export type PostgresWorldWorkerOpts = {
   /** Injected clock for tests. */
   nowMs?: () => number;
   log?: (line: string) => void;
+  /** Retries while Postgres is starting / in recovery (57P03). */
+  pgReadyAttempts?: number;
+  pgReadyDelayMs?: number;
 };
 
 function resolveUrl(explicit?: string): string {
@@ -48,23 +55,90 @@ function resolveUrl(explicit?: string): string {
   return url;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** True when the server is up but not accepting queries yet (boot / crash recovery). */
+export function isTransientPostgresStartupError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as {
+    code?: string;
+    message?: string;
+    errno?: string;
+  };
+  const code = String(e.code ?? e.errno ?? '');
+  if (
+    code === '57P03' ||
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENOTFOUND' ||
+    code === 'EAI_AGAIN' ||
+    code === '08001' ||
+    code === '08006'
+  ) {
+    return true;
+  }
+  const msg = String(e.message ?? err);
+  return /not yet accepting connections|recovery state has not been yet reached|Connection refused|connect ECONNREFUSED|the database system is starting up|too many clients/i.test(
+    msg,
+  );
+}
+
+async function withPostgresReadyRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  opts: {
+    attempts: number;
+    delayMs: number;
+    log: (line: string) => void;
+  },
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= opts.attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientPostgresStartupError(err) || attempt >= opts.attempts) {
+        throw err;
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      opts.log(
+        `[career:world:pg] ${label}: postgres not ready (${attempt}/${opts.attempts}) — ${msg}`,
+      );
+      await sleep(opts.delayMs);
+    }
+  }
+  throw lastErr;
+}
+
 async function tryAcquirePulseLock(databaseUrl: string): Promise<PulseLock | null> {
   const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
-  const client = await pool.connect();
+  let client: pg.PoolClient | null = null;
   try {
+    client = await pool.connect();
     const res = await client.query<{ ok: boolean }>(
       `SELECT pg_try_advisory_lock($1) AS ok`,
       [CAREER_PG_WORLD_PULSE_LOCK_KEY],
     );
     if (!res.rows[0]?.ok) {
       client.release();
+      client = null;
       await pool.end();
       return null;
     }
     return { client, pool };
   } catch (err) {
-    client.release();
-    await pool.end();
+    if (client) {
+      try {
+        client.release();
+      } catch {
+        /* ignore */
+      }
+    }
+    await pool.end().catch(() => undefined);
     throw err;
   }
 }
@@ -127,12 +201,29 @@ export async function runPostgresWorldWorker(
   const ticksPerPulse = opts.ticksPerPulse ?? CATCH_UP_TICKS_PER_PULSE;
   const loginBurst = opts.loginBurstTicks ?? LOGIN_CATCH_UP_TICKS;
   const nowFn = opts.nowMs ?? (() => Date.now());
+  const readyAttempts = Math.max(
+    1,
+    opts.pgReadyAttempts ?? DEFAULT_PG_READY_ATTEMPTS,
+  );
+  const readyDelayMs = Math.max(
+    200,
+    opts.pgReadyDelayMs ?? DEFAULT_PG_READY_DELAY_MS,
+  );
+  const retry = {
+    attempts: readyAttempts,
+    delayMs: readyDelayMs,
+    log,
+  };
 
   log(
     `[career:world:pg] opening ${url.replace(/:[^:@/]+@/, ':***@')}`,
   );
 
-  const lock = await tryAcquirePulseLock(url);
+  const lock = await withPostgresReadyRetry(
+    'advisory lock',
+    () => tryAcquirePulseLock(url),
+    retry,
+  );
   if (!lock) {
     throw new Error(
       'world pulse advisory lock held by another process — stop the other worker or set CAREER_HEADLESS_PULSE=0 on the host',
@@ -142,7 +233,11 @@ export async function runPostgresWorldWorker(
     `[career:world:pg] advisory lock ${CAREER_PG_WORLD_PULSE_LOCK_KEY} acquired`,
   );
 
-  const store = await openPostgresCareerStore(url);
+  const store = await withPostgresReadyRetry(
+    'open store',
+    () => openPostgresCareerStore(url),
+    retry,
+  );
 
   let stopped = false;
   const stop = () => {

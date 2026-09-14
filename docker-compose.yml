@@ -12,10 +12,16 @@ services:
     volumes:
       - skyline_career_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U skyline -d skyline']
+      # pg_isready alone can pass during crash recovery while SELECT still fails (57P03).
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U skyline -d skyline && psql -U skyline -d skyline -c "SELECT 1" >/dev/null',
+        ]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
+      start_period: 20s
 
   # Lab DB UI — keep for local sim; do not expose on a real VPS.
   adminer:

@@ -154,7 +154,7 @@ import {
 } from './career-auth.js';
 import { ensureV10Ddl, migrateV9toV10IfNeeded } from './career-store-v10.js';
 
-export type CareerStoreKind = 'json' | 'sqlite';
+export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
 export const CAREER_STORE_SCHEMA_VERSION = '10';
@@ -241,15 +241,26 @@ export interface CareerStore {
   /** Active company tenant for load/save (SP default `local`). */
   getActiveCompanyId(): string;
   setActiveCompanyId(companyId: string): void;
-  /** Companies registered on a world (SQLite); JSON store returns `local` only. */
-  listWorldCompanies(worldId?: string): Array<{
-    id: string;
-    displayName: string;
-    homeHubIcao: string;
-    homeCountryId: string;
-    worldId: string;
-    createdAtMs: number;
-  }>;
+  /** Companies registered on a world (SQLite/Postgres); JSON store returns `local` only. */
+  listWorldCompanies(worldId?: string):
+    | Array<{
+        id: string;
+        displayName: string;
+        homeHubIcao: string;
+        homeCountryId: string;
+        worldId: string;
+        createdAtMs: number;
+      }>
+    | Promise<
+        Array<{
+          id: string;
+          displayName: string;
+          homeHubIcao: string;
+          homeCountryId: string;
+          worldId: string;
+          createdAtMs: number;
+        }>
+      >;
   /** Upsert a company row on the shared world (no-op / throw on JSON for non-local). */
   ensureCompany(opts: {
     id: string;
@@ -257,33 +268,54 @@ export interface CareerStore {
     displayName?: string;
     homeHubIcao?: string;
     homeCountryId?: string;
-  }): {
-    id: string;
-    displayName: string;
-    homeHubIcao: string;
-    homeCountryId: string;
-    worldId: string;
-    createdAtMs: number;
-  };
+  }):
+    | {
+        id: string;
+        displayName: string;
+        homeHubIcao: string;
+        homeCountryId: string;
+        worldId: string;
+        createdAtMs: number;
+      }
+    | Promise<{
+        id: string;
+        displayName: string;
+        homeHubIcao: string;
+        homeCountryId: string;
+        worldId: string;
+        createdAtMs: number;
+      }>;
   /** Local Auth (schema v10). JSON store throws. */
   readonly supportsAuth: boolean;
-  authRegister(opts: RegisterAccountOpts): RegisterAccountResult;
-  authLogin(opts: LoginAccountOpts): {
-    account: CareerAccount;
-    session: CareerAccountSession;
-  };
+  authRegister(
+    opts: RegisterAccountOpts,
+  ): RegisterAccountResult | Promise<RegisterAccountResult>;
+  authLogin(opts: LoginAccountOpts):
+    | {
+        account: CareerAccount;
+        session: CareerAccountSession;
+      }
+    | Promise<{
+        account: CareerAccount;
+        session: CareerAccountSession;
+      }>;
   authResolveSession(
     token: string | null | undefined,
     opts?: { nowMs?: number; touch?: boolean },
-  ): AuthSessionContext | null;
-  authRevokeSession(token: string): boolean;
-  authListCompaniesForAccount(accountId: string): CareerCompanyRow[];
+  ): AuthSessionContext | null | Promise<AuthSessionContext | null>;
+  authRevokeSession(token: string): boolean | Promise<boolean>;
+  authListCompaniesForAccount(
+    accountId: string,
+  ): CareerCompanyRow[] | Promise<CareerCompanyRow[]>;
   authAddCompanyMember(opts: {
     companyId: string;
     accountId: string;
     role?: CareerCompanyMember['role'];
-  }): CareerCompanyMember;
-  authAccountOwnsCompany(accountId: string, companyId: string): boolean;
+  }): CareerCompanyMember | Promise<CareerCompanyMember>;
+  authAccountOwnsCompany(
+    accountId: string,
+    companyId: string,
+  ): boolean | Promise<boolean>;
   /**
    * Pulse settle-all companies on the world (SQLite). JSON: settles active only via caller.
    * Returns preferred (active) company fee summary when present.
@@ -316,6 +348,8 @@ export type OpenCareerStoreOpts = {
   careerDir: string;
   /** Force backend. Default: sqlite (migrate from JSON when present). */
   backend?: CareerStoreKind | 'auto';
+  /** Postgres connection string (MP hosted world). */
+  connectionString?: string;
   economyFileName?: string;
   missionsFileName?: string;
   sqliteFileName?: string;
@@ -1730,6 +1764,8 @@ async function migrateJsonIntoSqlite(
 /**
  * Open the career store. Default backend is SQLite under `careerDir/skyline.sqlite`,
  * with one-shot import from local-economy.json / local-missions.json when present.
+ * Pass `backend: 'postgres'` + `connectionString` (or CAREER_DATABASE_URL / CAREER_PG=1)
+ * for the hosted MP world.
  */
 export async function openCareerStore(opts: OpenCareerStoreOpts): Promise<CareerStore> {
   const careerDir = opts.careerDir;
@@ -1738,10 +1774,28 @@ export async function openCareerStore(opts: OpenCareerStoreOpts): Promise<Career
   const missionsPath = join(careerDir, opts.missionsFileName ?? 'local-missions.json');
   const sqlitePath = join(careerDir, opts.sqliteFileName ?? 'skyline.sqlite');
 
+  const { careerDatabaseUrlFromEnv, openPostgresCareerStore } = await import(
+    './career-store-postgres.js'
+  );
   const envBackend = process.env.CAREER_STORE?.trim().toLowerCase();
+  const pgUrl = opts.connectionString?.trim() || careerDatabaseUrlFromEnv();
   const backend: CareerStoreKind | 'auto' =
     opts.backend ??
-    (envBackend === 'json' || envBackend === 'sqlite' ? envBackend : 'auto');
+    (envBackend === 'json' ||
+    envBackend === 'sqlite' ||
+    envBackend === 'postgres'
+      ? (envBackend as CareerStoreKind)
+      : 'auto');
+
+  if (backend === 'postgres' || (backend === 'auto' && Boolean(opts.connectionString))) {
+    const url = opts.connectionString?.trim() || pgUrl;
+    if (!url) {
+      throw new Error(
+        'Postgres career store requires connectionString or CAREER_DATABASE_URL',
+      );
+    }
+    return openPostgresCareerStore(url);
+  }
 
   if (backend === 'json') {
     return new JsonCareerStore(economyPath, missionsPath);

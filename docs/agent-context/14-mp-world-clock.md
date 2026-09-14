@@ -191,7 +191,7 @@ interface WorldTickService {
 6. ~~Phase 6 client company context (dual-tab)~~ — shipped 2026-09-13.
 7. ~~Phase 7 local Auth (account → company)~~ — shipped 2026-09-14 (`CAREER_AUTH=1`).
 8. ~~Phase 8 fixed world (one shared SQL world; clients attach)~~ — shipped 2026-09-14 (`CAREER_WORLD_FIXED=1`).
-9. Hosted Postgres / multi-process world job — later (same mold: one world DB, tables only).
+9. Hosted Postgres lab — **started 2026-09-14** (`CAREER_PG=1` / `PostgresCareerStore` JSONB + Auth); full table parity + 24/7 world job later.
 
 ## Phase 8 notes (2026-09-14)
 
@@ -204,6 +204,14 @@ interface WorldTickService {
 - **UX (same day):** hub picker after Auth reuses account display name — no second “Pilot name”; only home hub is required.
 - **UX (same day):** Company chip read-only when Auth/fixed world (no dual-tab `+`/select). Topbar **World** = economy Day·HH:MM (wall-paced 15 min/tick), not local timezone.
 - **UX (same day):** Auth mode drops `?company=` from the URL — tenant lives in sessionStorage + `X-Skyline-Company-Id`. URL pin remains for non-Auth dual-tab lab only.
+
+## Postgres lab (2026-09-14)
+
+- **SP:** SQLite saves unchanged.
+- **MP:** `CAREER_DATABASE_URL` or `CAREER_PG=1` → `PostgresCareerStore`.
+- Docker: containers `skyline-career-postgres` + `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
+- Run: `docker compose up -d` then `npm run career:host:pg` + `npm run career:client`.
+- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`). `stripPgEconomyBlob` clears those arrays. Load backfills empty tables when RAM has data (schema upgrade). BIGINT wall-clock ms truncated on write. Stub may still hold charter / misc. Follow-up: drop stub leftovers + 24/7 world job.
 
 ## Phase 7 notes (2026-09-14)
 

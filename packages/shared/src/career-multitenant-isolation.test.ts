@@ -48,8 +48,8 @@ describe('multitenant isolation (store)', () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-mt-ambient-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     try {
-      store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID });
-      store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID });
+      await Promise.resolve(store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID }));
+      await Promise.resolve(store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID }));
 
       const missionsA = emptyMissionsStateV2();
       missionsA.walletUsd = 50_000;
@@ -85,8 +85,8 @@ describe('multitenant isolation (store)', () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-mt-cancel-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     try {
-      store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID });
-      store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID });
+      await Promise.resolve(store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID }));
+      await Promise.resolve(store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID }));
 
       const world = createSeedEconomyWorld({ seed: 'mt-cancel' });
       const lot: ShipmentLot = {

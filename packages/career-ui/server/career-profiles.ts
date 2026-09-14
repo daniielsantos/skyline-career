@@ -19,7 +19,7 @@
 import { randomBytes } from 'node:crypto';
 import { access, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { openCareerStore, type CareerStore } from '@msfs-compat/shared';
+import { openCareerStore, careerDatabaseUrlFromEnv, type CareerStore } from '@msfs-compat/shared';
 
 /** Synthetic profile id for CAREER_WORLD_FIXED (not a multi-save row). */
 export const FIXED_WORLD_PROFILE_ID = 'world';
@@ -60,10 +60,18 @@ export function fixedWorldProfileMeta(): CareerProfileMeta {
   };
 }
 
-/** Open (or create schema in) the single MP world SQLite under careerRoot/world/. */
+/** Open (or create schema in) the single MP world — Postgres when CAREER_PG / URL set. */
 export async function openCareerFixedWorldStore(
   careerRoot: string,
 ): Promise<CareerStore> {
+  const pgUrl = careerDatabaseUrlFromEnv();
+  if (pgUrl) {
+    return openCareerStore({
+      careerDir: careerFixedWorldDir(careerRoot),
+      backend: 'postgres',
+      connectionString: pgUrl,
+    });
+  }
   const dir = careerFixedWorldDir(careerRoot);
   await mkdir(dir, { recursive: true });
   return openCareerStore({ careerDir: dir });

@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **MP PG world-ops + dealer pool** — `career-store-pg-world.ts` has v5 ops (`npcs` / fuel / demand / ports / flights / events) + `aircraft_instances`; hydrate/persist/strip wired; load backfills empty tables from RAM; BIGINT ms truncated. Next: charter/misc out of stub + 24/7 world job. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-14: **MP Postgres lab** — `CAREER_PG=1` / `CAREER_DATABASE_URL` → host opens PostgresCareerStore. SP stays SQLite. Docker: `skyline-career-postgres` + Adminer `:8081`. `npm run career:host:pg`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **Phase 8 fixed world = one SQL DB** — `profiles/career/world/skyline.sqlite` (no MP Create World / no `profiles.json`). Clients Auth only. Next: Postgres hosted world. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **Auto-resume save on refresh** — Ctrl+R reopens `activeId` (SP). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

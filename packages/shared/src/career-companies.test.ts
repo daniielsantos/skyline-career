@@ -24,19 +24,25 @@ describe('career companies registry', () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-co-reg-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     try {
-      const a = store.ensureCompany({
-        id: 'co_alpha',
-        worldId: LOCAL_WORLD_ID,
-        displayName: 'Alpha Air',
-      });
-      const b = store.ensureCompany({
-        id: 'co_beta',
-        worldId: LOCAL_WORLD_ID,
-        displayName: 'Beta Cargo',
-      });
+      const a = await Promise.resolve(
+        store.ensureCompany({
+          id: 'co_alpha',
+          worldId: LOCAL_WORLD_ID,
+          displayName: 'Alpha Air',
+        }),
+      );
+      const b = await Promise.resolve(
+        store.ensureCompany({
+          id: 'co_beta',
+          worldId: LOCAL_WORLD_ID,
+          displayName: 'Beta Cargo',
+        }),
+      );
       assert.equal(a.worldId, LOCAL_WORLD_ID);
       assert.equal(b.worldId, LOCAL_WORLD_ID);
-      const listed = store.listWorldCompanies(LOCAL_WORLD_ID);
+      const listed = await Promise.resolve(
+        store.listWorldCompanies(LOCAL_WORLD_ID),
+      );
       const ids = listed.map((c) => c.id).sort();
       assert.ok(ids.includes(LOCAL_COMPANY_ID));
       assert.ok(ids.includes('co_alpha'));
@@ -52,8 +58,8 @@ describe('career companies registry', () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-co-claim-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     try {
-      store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID });
-      store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID });
+      await Promise.resolve(store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID }));
+      await Promise.resolve(store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID }));
       await store.saveMissions(emptyMissionsStateV2(), { companyId: 'co_a' });
       await store.saveMissions(emptyMissionsStateV2(), { companyId: 'co_b' });
 
@@ -103,8 +109,8 @@ describe('career companies registry', () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-co-ledger-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
     try {
-      store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID });
-      store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID });
+      await Promise.resolve(store.ensureCompany({ id: 'co_a', worldId: LOCAL_WORLD_ID }));
+      await Promise.resolve(store.ensureCompany({ id: 'co_b', worldId: LOCAL_WORLD_ID }));
       const a = emptyMissionsStateV2();
       a.ledger = [
         {

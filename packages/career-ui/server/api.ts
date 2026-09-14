@@ -522,8 +522,8 @@ async function bootstrapHeadlessWorldPulse(
         msfsStampNeeded = true;
       });
       console.log(
-        `[career] fixed-world open id=${FIXED_WORLD_PROFILE_ID} dir=world ` +
-          `${Math.round(performance.now() - t0)}ms`,
+        `[career] fixed-world open id=${FIXED_WORLD_PROFILE_ID} ` +
+          `backend=${store?.kind ?? '?'} ${Math.round(performance.now() - t0)}ms`,
       );
       schedulePostLoginEconomyWork(tickService);
     } catch (error) {
@@ -1076,14 +1076,50 @@ async function applyCompanySessionSettlement(opts: {
   return summary ?? undefined;
 }
 
+type IncomingWithAuth = import('node:http').IncomingMessage & {
+  __skylineAuthSession?: AuthSessionContext | null;
+  __skylineAuthPrimed?: boolean;
+};
+
+async function primeAuthSession(
+  req: import('node:http').IncomingMessage,
+): Promise<void> {
+  const r = req as IncomingWithAuth;
+  if (r.__skylineAuthPrimed) return;
+  r.__skylineAuthPrimed = true;
+  if (!store?.supportsAuth) {
+    r.__skylineAuthSession = null;
+    return;
+  }
+  const token = bearerTokenFromHeader(req.headers.authorization);
+  if (!token) {
+    r.__skylineAuthSession = null;
+    return;
+  }
+  try {
+    r.__skylineAuthSession = await Promise.resolve(
+      store.authResolveSession(token),
+    );
+  } catch {
+    r.__skylineAuthSession = null;
+  }
+}
+
 function authSessionFromRequest(
   req: import('node:http').IncomingMessage,
 ): AuthSessionContext | null {
+  const r = req as IncomingWithAuth;
+  if (r.__skylineAuthPrimed) return r.__skylineAuthSession ?? null;
   if (!store?.supportsAuth) return null;
   const token = bearerTokenFromHeader(req.headers.authorization);
   if (!token) return null;
   try {
-    return store.authResolveSession(token);
+    const resolved = store.authResolveSession(token);
+    // Sync SQLite path — Postgres must be primed via primeAuthSession first.
+    if (resolved && typeof (resolved as Promise<unknown>).then === 'function') {
+      return null;
+    }
+    return resolved as AuthSessionContext | null;
   } catch {
     return null;
   }
@@ -1146,7 +1182,10 @@ function companyIdFromRequest(
   }
 }
 
-function activateCompanyContext(companyId: string, accountId?: string): string {
+async function activateCompanyContext(
+  companyId: string,
+  accountId?: string,
+): Promise<string> {
   const activeStore = requireStore();
   const id = resolveCompanyId({
     requested: companyId,
@@ -1154,11 +1193,16 @@ function activateCompanyContext(companyId: string, accountId?: string): string {
     db: null,
   });
   if (isCareerAuthRequired() && accountId) {
-    if (!activeStore.authAccountOwnsCompany(accountId, id)) {
+    const owns = await Promise.resolve(
+      activeStore.authAccountOwnsCompany(accountId, id),
+    );
+    if (!owns) {
       throw new Error('company not owned by this account');
     }
   }
-  const known = activeStore.listWorldCompanies(LOCAL_WORLD_ID);
+  const known = await Promise.resolve(
+    activeStore.listWorldCompanies(LOCAL_WORLD_ID),
+  );
   if (known.length > 0 && !known.some((c) => c.id === id)) {
     if (id !== LOCAL_COMPANY_ID) {
       throw new Error(`Unknown company ${id}`);
@@ -2314,6 +2358,8 @@ export function createCareerApiServer(port = 8787) {
     }
 
     try {
+      await primeAuthSession(req);
+
       if (
         isCareerAuthRequired() &&
         !isAuthPublicPath(req.method ?? 'GET', path)
@@ -2422,17 +2468,19 @@ export function createCareerApiServer(port = 8787) {
             });
             return;
           }
-          const result = store.authRegister({
-            loginName: body.loginName,
-            displayName: body.displayName,
-            password: body.password,
-            createCompany: body.createCompany,
-            companyId: body.companyId,
-            companyDisplayName: body.companyDisplayName,
-            claimCompanyId: body.claimCompanyId,
-            homeHubIcao: body.homeHubIcao,
-            homeCountryId: body.homeCountryId,
-          });
+          const result = await Promise.resolve(
+            store.authRegister({
+              loginName: body.loginName,
+              displayName: body.displayName,
+              password: body.password,
+              createCompany: body.createCompany,
+              companyId: body.companyId,
+              companyDisplayName: body.companyDisplayName,
+              claimCompanyId: body.claimCompanyId,
+              homeHubIcao: body.homeHubIcao,
+              homeCountryId: body.homeCountryId,
+            }),
+          );
           if (result.company) {
             const seeded = await store.loadMissions({
               companyId: result.company.id,
@@ -2445,7 +2493,9 @@ export function createCareerApiServer(port = 8787) {
             expiresAtMs: result.session.expiresAtMs,
             account: result.account,
             company: result.company,
-            companies: store.authListCompaniesForAccount(result.account.id),
+            companies: await Promise.resolve(
+              store.authListCompaniesForAccount(result.account.id),
+            ),
           });
         } catch (err) {
           send(res, 400, {
@@ -2476,11 +2526,15 @@ export function createCareerApiServer(port = 8787) {
             send(res, 400, { error: 'loginName and password required' });
             return;
           }
-          const result = store.authLogin({
-            loginName: body.loginName,
-            password: body.password,
-          });
-          const companies = store.authListCompaniesForAccount(result.account.id);
+          const result = await Promise.resolve(
+            store.authLogin({
+              loginName: body.loginName,
+              password: body.password,
+            }),
+          );
+          const companies = await Promise.resolve(
+            store.authListCompaniesForAccount(result.account.id),
+          );
           if (companies[0]) {
             store.setActiveCompanyId(companies[0].id);
           }
@@ -2502,7 +2556,7 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'POST' && path === '/api/auth/logout') {
         const token = bearerTokenFromHeader(req.headers.authorization);
         if (store?.supportsAuth && token) {
-          store.authRevokeSession(token);
+          await Promise.resolve(store.authRevokeSession(token));
         }
         send(res, 200, { ok: true });
         return;
@@ -2837,7 +2891,7 @@ export function createCareerApiServer(port = 8787) {
             worldId?: string;
             lastSeenTick?: number;
           };
-          const companyId = activateCompanyContext(
+          const companyId = await activateCompanyContext(
             body.companyId?.trim() ||
               companyIdFromRequest(req) ||
               LOCAL_COMPANY_ID,
@@ -2889,7 +2943,7 @@ export function createCareerApiServer(port = 8787) {
             const companyId =
               worldTick.mode === 'mp-remote'
                 ? body.companyId?.trim() || pathCompanyId
-                : activateCompanyContext(
+                : await activateCompanyContext(
                     body.companyId?.trim() || pathCompanyId,
                     authSessionFromRequest(req)?.account.id,
                   );
@@ -2930,10 +2984,11 @@ export function createCareerApiServer(port = 8787) {
           const worldId =
             url.searchParams.get('worldId')?.trim() || LOCAL_WORLD_ID;
           const session = authSessionFromRequest(req);
-          const companies =
+          const companies = await Promise.resolve(
             isCareerAuthRequired() && session
               ? session.companies
-              : store.listWorldCompanies(worldId);
+              : store.listWorldCompanies(worldId),
+          );
           send(res, 200, {
             worldId,
             activeCompanyId: store.getActiveCompanyId(),
@@ -2977,19 +3032,23 @@ export function createCareerApiServer(port = 8787) {
             });
             return;
           }
-          const company = store.ensureCompany({
-            id: body.id.trim(),
-            worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
-            displayName: body.displayName,
-            homeHubIcao: body.homeHubIcao,
-            homeCountryId: body.homeCountryId,
-          });
+          const company = await Promise.resolve(
+            store.ensureCompany({
+              id: body.id.trim(),
+              worldId: body.worldId?.trim() || LOCAL_WORLD_ID,
+              displayName: body.displayName,
+              homeHubIcao: body.homeHubIcao,
+              homeCountryId: body.homeCountryId,
+            }),
+          );
           if (session) {
-            store.authAddCompanyMember({
-              companyId: company.id,
-              accountId: session.account.id,
-              role: 'owner',
-            });
+            await Promise.resolve(
+              store.authAddCompanyMember({
+                companyId: company.id,
+                accountId: session.account.id,
+                role: 'owner',
+              }),
+            );
           }
           // Seed empty company_state so load/save works for the new tenant.
           const seeded = await store.loadMissions({ companyId: company.id });
@@ -7657,7 +7716,7 @@ export function createCareerApiServer(port = 8787) {
         const cargoLimit = await resolveClassMaxCargoKg(aircraft);
         let acceptCompanyId = LOCAL_COMPANY_ID;
         try {
-          acceptCompanyId = activateCompanyContext(
+          acceptCompanyId = await activateCompanyContext(
             companyIdFromRequest(req, body.companyId),
             authSessionFromRequest(req)?.account.id,
           );

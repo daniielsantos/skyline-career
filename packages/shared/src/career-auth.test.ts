@@ -40,34 +40,53 @@ describe('career auth', () => {
     assert.equal(CAREER_STORE_SCHEMA_VERSION, '10');
     assert.equal(store.supportsAuth, true);
 
-    const registered = store.authRegister({
-      loginName: 'Alice_1',
-      displayName: 'Alice Co',
-      password: 'secret12',
-    });
+    const registered = await Promise.resolve(
+      store.authRegister({
+        loginName: 'Alice_1',
+        displayName: 'Alice Co',
+        password: 'secret12',
+      }),
+    );
     assert.equal(registered.account.loginName, 'alice_1');
     assert.ok(registered.company);
     assert.equal(registered.company!.id, 'co_alice_1');
     assert.ok(registered.session.token.length > 20);
 
-    const session = store.authResolveSession(registered.session.token);
+    const session = await Promise.resolve(
+      store.authResolveSession(registered.session.token),
+    );
     assert.ok(session);
     assert.equal(session!.account.id, registered.account.id);
     assert.equal(session!.companies.length, 1);
     assert.equal(session!.companies[0]!.id, registered.company!.id);
 
     assert.equal(
-      store.authAccountOwnsCompany(registered.account.id, registered.company!.id),
+      await Promise.resolve(
+        store.authAccountOwnsCompany(registered.account.id, registered.company!.id),
+      ),
       true,
     );
-    assert.equal(store.authAccountOwnsCompany(registered.account.id, 'co_other'), false);
+    assert.equal(
+      await Promise.resolve(
+        store.authAccountOwnsCompany(registered.account.id, 'co_other'),
+      ),
+      false,
+    );
 
-    const login = store.authLogin({ loginName: 'alice_1', password: 'secret12' });
+    const login = await Promise.resolve(
+      store.authLogin({ loginName: 'alice_1', password: 'secret12' }),
+    );
     assert.equal(login.account.id, registered.account.id);
     assert.notEqual(login.session.token, registered.session.token);
 
-    assert.equal(store.authRevokeSession(login.session.token), true);
-    assert.equal(store.authResolveSession(login.session.token), null);
+    assert.equal(
+      await Promise.resolve(store.authRevokeSession(login.session.token)),
+      true,
+    );
+    assert.equal(
+      await Promise.resolve(store.authResolveSession(login.session.token)),
+      null,
+    );
 
     // Seed missions for the new company so store is usable.
     const missions = emptyMissionsStateV2();
@@ -78,20 +97,31 @@ describe('career auth', () => {
   it('rejects spoof: second account cannot resolve foreign company membership', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-auth2-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    const a = store.authRegister({
-      loginName: 'pilot_a',
-      displayName: 'Pilot A',
-      password: 'secret12',
-    });
-    const b = store.authRegister({
-      loginName: 'pilot_b',
-      displayName: 'Pilot B',
-      password: 'secret12',
-    });
+    const a = await Promise.resolve(
+      store.authRegister({
+        loginName: 'pilot_a',
+        displayName: 'Pilot A',
+        password: 'secret12',
+      }),
+    );
+    const b = await Promise.resolve(
+      store.authRegister({
+        loginName: 'pilot_b',
+        displayName: 'Pilot B',
+        password: 'secret12',
+      }),
+    );
     assert.ok(a.company && b.company);
     assert.notEqual(a.company!.id, b.company!.id);
-    assert.equal(store.authAccountOwnsCompany(b.account.id, a.company!.id), false);
-    const bSession = store.authResolveSession(b.session.token)!;
+    assert.equal(
+      await Promise.resolve(
+        store.authAccountOwnsCompany(b.account.id, a.company!.id),
+      ),
+      false,
+    );
+    const bSession = (await Promise.resolve(
+      store.authResolveSession(b.session.token),
+    ))!;
     assert.equal(
       bSession.companies.some((c) => c.id === a.company!.id),
       false,
@@ -102,17 +132,23 @@ describe('career auth', () => {
   it('claims orphan company with zero members', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-auth-orphan-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    store.ensureCompany({ id: 'co_labubu', displayName: 'Labubu' });
-    const registered = store.authRegister({
-      loginName: 'labubu',
-      displayName: 'Labubu Owner',
-      password: 'secret12',
-      createCompany: false,
-      claimCompanyId: 'co_labubu',
-    });
+    await Promise.resolve(
+      store.ensureCompany({ id: 'co_labubu', displayName: 'Labubu' }),
+    );
+    const registered = await Promise.resolve(
+      store.authRegister({
+        loginName: 'labubu',
+        displayName: 'Labubu Owner',
+        password: 'secret12',
+        createCompany: false,
+        claimCompanyId: 'co_labubu',
+      }),
+    );
     assert.equal(registered.company?.id, 'co_labubu');
     assert.equal(
-      store.authAccountOwnsCompany(registered.account.id, 'co_labubu'),
+      await Promise.resolve(
+        store.authAccountOwnsCompany(registered.account.id, 'co_labubu'),
+      ),
       true,
     );
     store.close();

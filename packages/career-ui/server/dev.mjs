@@ -11,6 +11,34 @@ const viteBin = join(dirname(vitePackage), 'bin', 'vite.js');
 const apiPort = Number(process.env.CAREER_UI_API_PORT ?? 8787);
 const uiPort = Number(process.env.CAREER_UI_PORT ?? 5173);
 
+/**
+ * Phase B roles:
+ * - all (default): API + Vite (today’s `career:ui`)
+ * - host: world host only — API binds CAREER_UI_API_BIND (default 0.0.0.0)
+ * - ui: Vite only — proxies /api to CAREER_UI_API_PROXY (default http://127.0.0.1:8787)
+ */
+const roleArg = process.argv.find((a) => a === '--host' || a === '--ui' || a === '--all');
+const roleFromArg =
+  roleArg === '--host' ? 'host' : roleArg === '--ui' ? 'ui' : roleArg === '--all' ? 'all' : null;
+const role = (
+  roleFromArg ??
+  (process.env.CAREER_DEV_ROLE ?? 'all').trim().toLowerCase()
+);
+const isHostOnly = role === 'host' || role === 'api';
+const isUiOnly = role === 'ui' || role === 'client';
+
+const apiProxyTarget = (
+  process.env.CAREER_UI_API_PROXY ??
+  process.env.CAREER_REMOTE_WORLD_URL ??
+  `http://127.0.0.1:${apiPort}`
+)
+  .trim()
+  .replace(/\/+$/, '');
+
+if (isHostOnly && !process.env.CAREER_UI_API_BIND) {
+  process.env.CAREER_UI_API_BIND = '0.0.0.0';
+}
+
 const { NPCS_PER_REGION } = await import('@msfs-compat/shared');
 
 function killListenersOnPort(port) {
@@ -54,9 +82,21 @@ function killListenersOnPort(port) {
   }
 }
 
+function apiHealthUrl() {
+  if (isUiOnly) {
+    try {
+      const u = new URL('/api/health', apiProxyTarget);
+      return u.href;
+    } catch {
+      return `http://127.0.0.1:${apiPort}/api/health`;
+    }
+  }
+  return `http://127.0.0.1:${apiPort}/api/health`;
+}
+
 async function apiHealth() {
   try {
-    const res = await fetch(`http://127.0.0.1:${apiPort}/api/health`, {
+    const res = await fetch(apiHealthUrl(), {
       signal: AbortSignal.timeout(800),
     });
     if (!res.ok) return null;
@@ -146,84 +186,122 @@ async function waitForApiReady(opts = {}) {
 
 const kids = [];
 
-const health = await apiHealth();
-const sourceStamp = await serverSourceStamp();
-const apiIsCurrent =
-  health?.ok === true &&
-  (health?.needsProfile === true ||
-    (typeof health?.npcFleetTarget === 'number' && health.npcFleetTarget > 0)) &&
-  health?.sourceStamp === sourceStamp;
+console.log(
+  `[career] dev role=${isHostOnly ? 'host' : isUiOnly ? 'ui' : 'all'}` +
+    (isUiOnly ? ` proxy→${apiProxyTarget}` : '') +
+    (isHostOnly
+      ? ` bind=${process.env.CAREER_UI_API_BIND ?? '0.0.0.0'}`
+      : ''),
+);
 
-if (apiIsCurrent) {
-  console.log(
-    `Career API already running at http://127.0.0.1:${apiPort} (npcFleetTarget=${health.npcFleetTarget}, ${NPCS_PER_REGION}/region)`,
-  );
-} else {
-  if (health?.ok) {
+if (!isUiOnly) {
+  const health = await apiHealth();
+  const sourceStamp = await serverSourceStamp();
+  const apiIsCurrent =
+    health?.ok === true &&
+    (health?.needsProfile === true ||
+      (typeof health?.npcFleetTarget === 'number' && health.npcFleetTarget > 0)) &&
+    health?.sourceStamp === sourceStamp;
+
+  if (apiIsCurrent) {
     console.log(
-      `Career API on :${apiPort} is stale (server sources changed since it booted) — restarting`,
+      `Career API already running at http://127.0.0.1:${apiPort} (npcFleetTarget=${health.npcFleetTarget}, ${NPCS_PER_REGION}/region)`,
     );
   } else {
-    console.log(`Starting Career API on :${apiPort}…`);
-  }
-  killListenersOnPort(apiPort);
-  // Brief pause so Windows releases the port.
-  await new Promise((r) => setTimeout(r, 400));
-  const apiChild = spawn(
-    process.execPath,
-    ['--import', 'tsx', join(root, 'server', 'api.ts')],
-    {
-      cwd: root,
-      stdio: 'inherit',
-      env: { ...process.env },
-    },
-  );
-  kids.push(apiChild);
-  let apiExit = null;
-  apiChild.once('exit', (code, signal) => {
-    apiExit = { code, signal };
-  });
-  const ready = await waitForApiReady({
-    shouldAbort: () => apiExit != null,
-  });
-  if (!ready) {
-    if (apiExit) {
-      console.error(
-        `Career API exited before ready (code=${apiExit.code ?? 'null'} signal=${apiExit.signal ?? 'null'})`,
+    if (health?.ok) {
+      console.log(
+        `Career API on :${apiPort} is stale (server sources changed since it booted) — restarting`,
       );
     } else {
+      console.log(`Starting Career API on :${apiPort}…`);
+    }
+    killListenersOnPort(apiPort);
+    // Brief pause so Windows releases the port.
+    await new Promise((r) => setTimeout(r, 400));
+    const apiChild = spawn(
+      process.execPath,
+      ['--import', 'tsx', join(root, 'server', 'api.ts')],
+      {
+        cwd: root,
+        stdio: 'inherit',
+        env: { ...process.env },
+      },
+    );
+    kids.push(apiChild);
+    let apiExit = null;
+    apiChild.once('exit', (code, signal) => {
+      apiExit = { code, signal };
+    });
+    const ready = await waitForApiReady({
+      shouldAbort: () => apiExit != null,
+    });
+    if (!ready) {
+      if (apiExit) {
+        console.error(
+          `Career API exited before ready (code=${apiExit.code ?? 'null'} signal=${apiExit.signal ?? 'null'})`,
+        );
+      } else {
+        console.error(
+          `Career API failed to become ready on http://127.0.0.1:${apiPort} within 60s.`,
+        );
+      }
       console.error(
-        `Career API failed to become ready on http://127.0.0.1:${apiPort} within 60s.`,
+        'Check the stack above (often SQLite migrate / profiles/career). Then re-run npm run career:ui',
+      );
+      for (const kid of kids) {
+        try {
+          kid.kill('SIGTERM');
+        } catch {
+          /* ignore */
+        }
+      }
+      process.exit(1);
+    }
+    const readyHealth = await apiHealth();
+    console.log(
+      `Career API ready at http://127.0.0.1:${apiPort} (npcFleetTarget=${readyHealth?.npcFleetTarget ?? '?'}, ${NPCS_PER_REGION}/region)`,
+    );
+    if (isHostOnly) {
+      console.log(
+        `[career] host mode — open clients with: npm run career:client` +
+          ` (or CAREER_UI_API_PROXY=http://<this-lan-ip>:${apiPort})`,
       );
     }
+  }
+} else {
+  const remote = await waitForApiReady({ timeoutMs: 5_000 });
+  if (!remote) {
     console.error(
-      'Check the stack above (often SQLite migrate / profiles/career). Then re-run npm run career:ui',
+      `[career] ui mode: no Career API at ${apiProxyTarget}/api/health — start host first (npm run career:host)`,
     );
-    for (const kid of kids) {
-      try {
-        kid.kill('SIGTERM');
-      } catch {
-        /* ignore */
-      }
-    }
     process.exit(1);
   }
-  const readyHealth = await apiHealth();
   console.log(
-    `Career API ready at http://127.0.0.1:${apiPort} (npcFleetTarget=${readyHealth?.npcFleetTarget ?? '?'}, ${NPCS_PER_REGION}/region)`,
+    `Using remote Career API at ${apiProxyTarget} (npcFleetTarget=${remote.npcFleetTarget ?? '?'})`,
   );
 }
 
-if (await hasCareerUi()) {
-  console.log(`Career UI already running at http://localhost:${uiPort}`);
+if (!isHostOnly) {
+  if (await hasCareerUi()) {
+    console.log(`Career UI already running at http://localhost:${uiPort}`);
+  } else {
+    kids.push(
+      spawn(
+        process.execPath,
+        [viteBin, '--port', String(uiPort), '--strictPort'],
+        {
+          cwd: root,
+          stdio: 'inherit',
+          env: {
+            ...process.env,
+            CAREER_UI_API_PROXY: apiProxyTarget,
+          },
+        },
+      ),
+    );
+  }
 } else {
-  kids.push(
-    spawn(process.execPath, [viteBin, '--port', String(uiPort), '--strictPort'], {
-      cwd: root,
-      stdio: 'inherit',
-      env: { ...process.env },
-    }),
-  );
+  console.log('[career] host mode — Vite UI not started');
 }
 
 function shutdown() {
@@ -235,3 +313,12 @@ function shutdown() {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+// Host-only: keep the parent alive while the API child runs.
+if (isHostOnly && kids.length > 0) {
+  for (const kid of kids) {
+    kid.on('exit', (code) => {
+      process.exit(code ?? 0);
+    });
+  }
+}

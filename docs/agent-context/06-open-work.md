@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab company header; flight-loop/hangar scoped; `npm run career:host` + `career:client`. Next: Watch per-company, Auth, or Postgres. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-07: **Mercado internacional dinâmico implementado + soak PASS (local, sem commit/release)** — static Market lanes + Demand country-pair JSON removidos. Market seleciona por dia estoque/gateways com bounds 96–480, fairness 2–6 lanes/país e 2/par, long-haul floor e carry-over de lotes ativos; intl board segue 12%. Demand abre qualquer país mapeado, ainda gated por Port/WH + corridor/range. Soak 2d: 421 lanes / 230 carry / 187 países / intl 3.57%; BR/US 100%/98.6%. Próximo: commit só se pedido. Detail: [`08-economy.md`](./08-economy.md).

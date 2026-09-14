@@ -274,6 +274,55 @@ class RemoteWorldTickService implements WorldTickService {
 | **4** | shipped 2026-09-13 | Live `RemoteWorldTickService`; `CAREER_WORLD_TICK=remote` + `CAREER_REMOTE_WORLD_URL`; client never advances / never local catch-up; MP path aliases `/worlds/:id/clock` + `/companies/:id/session/open` |
 | **5** | shipped 2026-09-13 | Dual-tenant proof: staging claim + 409; market hides foreign `claimedByCompanyId`; per-request `companyId` on market/accept/staging; same tick + lot gone + conflict tests |
 | **6** | shipped 2026-09-13 | Client company context: `X-Skyline-Company-Id` on every `api()`; `?company=` + localStorage; session/open on enter/switch; topbar switcher; state/missions/fleet scoped per request |
+| **B** | shipped 2026-09-13 | Dedicated host + client UIs: `career:host` / `career:client`; API bind `CAREER_UI_API_BIND`; Vite proxy `CAREER_UI_API_PROXY` |
+
+## Phase B — dedicated host + clients (2026-09-13)
+
+**Por quê:** dual-tab no mesmo Vite já prova sniping. “2 processos / 2 PCs” precisa de **um** Career API dono do save+tick; as UIs só falam com ele.
+
+**Não** rode dois Career API com SQLite separado — lots divergem. `CAREER_WORLD_TICK=remote` só sincroniza **relógio** (Phase 4); market/state continuam locais nesse modo.
+
+### Playtest (mesmo PC)
+
+```bash
+# Terminal 1 — world host (API only, bind 0.0.0.0)
+npm run career:host
+
+# Terminal 2 — UI A (proxy → host)
+npm run career:client
+# browser: http://localhost:5173/?company=co_a
+
+# Terminal 3 — UI B (outra porta)
+# PowerShell:
+$env:CAREER_UI_PORT=5174; npm run career:client
+# browser: http://localhost:5174/?company=co_b
+```
+
+Mesmo profile nas duas UIs. Accept em A → lot some em B; clocks iguais.
+
+### Dois PCs (LAN)
+
+1. Host: `npm run career:host` (firewall liberar TCP 8787).
+2. Client: `CAREER_UI_API_PROXY=http://<host-lan-ip>:8787 npm run career:client`
+3. Companies distintas via `?company=`.
+
+### Env
+
+| Var | Default | Uso |
+|-----|---------|-----|
+| `CAREER_DEV_ROLE` / `--host` `--ui` | `all` | host=API only; ui=Vite only; all=hoje |
+| `CAREER_UI_API_BIND` | `127.0.0.1` (`0.0.0.0` no `--host`) | bind do API |
+| `CAREER_UI_API_PROXY` | `http://127.0.0.1:8787` | target do proxy Vite |
+| `CAREER_UI_API_PORT` / `CAREER_UI_PORT` | 8787 / 5173 | portas |
+| `CAREER_WORLD_TICK=remote` | off | 2º **API** sem tick (não substitui host único p/ sniping) |
+
+## Phase 5 notes (2026-09-13)
+
+- Staging Freights path stamps/enforces claim: `commitStagedManifest` / `executeAcceptManifest` take `companyId`; `/api/staging/commit` → **409** `lot_claimed`.
+- `listMarketLots({ viewerCompanyId })` hides lots claimed by another company (covers partial soft-hold remaining kg).
+- Market / Accept / staging load-save take per-request `companyId` (header/body) so dual tenants do not thrash ambient `activeCompanyId`.
+- Proof: `career-dual-tenant.test.ts` — same world tick, rival board omits lot, Accept/staging conflict.
+- Still poll-only (no SSE); no polished dual-tab UI picker.
 
 1. ~~**Extrair** `WorldTickService`~~ — feito.
 2. ~~SP local pulse via service~~ — feito.

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node server/dev.mjs",
+    "dev:host": "node server/dev.mjs --host",
+    "dev:ui": "node server/dev.mjs --ui",
     "build": "vite build",
     "start:prod": "node --import tsx server/api.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\" \"server/**/*.test.ts\"",

@@ -9598,7 +9598,10 @@ export function createCareerApiServer(port = 8787) {
   return {
     listen(): Promise<void> {
       return new Promise((resolveListen) => {
-        server.listen(port, '127.0.0.1', () => {
+        const bind =
+          (process.env.CAREER_UI_API_BIND ?? '127.0.0.1').trim() || '127.0.0.1';
+        server.listen(port, bind, () => {
+          console.log(`[career] API listening on http://${bind}:${port}`);
           // Phase 2: world tick without waiting for a UI client.
           void bootstrapHeadlessWorldPulse(worldTick);
           resolveListen();
@@ -9619,9 +9622,11 @@ export function createCareerApiServer(port = 8787) {
 const entry = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
 if (entry && import.meta.url === entry) {
   const port = Number(process.env.CAREER_UI_API_PORT ?? 8787);
+  const bind =
+    (process.env.CAREER_UI_API_BIND ?? '127.0.0.1').trim() || '127.0.0.1';
   const api = createCareerApiServer(port);
   await api.listen();
-  console.log(`Career API http://127.0.0.1:${port}`);
+  console.log(`Career API http://${bind === '0.0.0.0' ? '127.0.0.1' : bind}:${port} (bind ${bind})`);
   try {
     await access(join(uiDist, 'index.html'));
     console.log(`Career UI (static) ${uiDist}`);

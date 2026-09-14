@@ -43,6 +43,8 @@
     "career-payload": "node packages/agent/dist/cli.js career-payload",
     "career-hubs": "node packages/agent/dist/cli.js career-hubs",
     "career:ui": "npm run dev -w @msfs-compat/career-ui",
+    "career:host": "npm run dev:host -w @msfs-compat/career-ui",
+    "career:client": "npm run dev:ui -w @msfs-compat/career-ui",
     "test:shared": "npm run test -w @msfs-compat/shared",
     "test:agent": "npm run test -w @msfs-compat/agent",
     "test:career-ui": "npm run test -w @msfs-compat/career-ui",

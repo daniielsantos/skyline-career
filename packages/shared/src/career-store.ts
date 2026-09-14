@@ -317,7 +317,8 @@ export interface CareerStore {
     companyId: string,
   ): boolean | Promise<boolean>;
   /**
-   * Pulse settle-all companies on the world (SQLite). JSON: settles active only via caller.
+   * Pulse settle-all companies on the world (SQLite/Postgres).
+   * JSON: settles active only via caller.
    * Returns preferred (active) company fee summary when present.
    */
   settleWorldCompaniesPassiveFees?(opts: {
@@ -326,7 +327,7 @@ export interface CareerStore {
     toTick: number;
     worldId?: string;
     nowMs?: number;
-  }): OfflineFeeSummary | null;
+  }): OfflineFeeSummary | null | Promise<OfflineFeeSummary | null>;
   /** In-process world after last load/save — skip blob parse on hot reads. */
   peekEconomyWorld(): CareerEconomyWorld | null;
   /** Schema v4: hub + stock + lots by ICAO. JSON store uses RAM if present. */

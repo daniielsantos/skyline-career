@@ -2447,6 +2447,322 @@ export async function persistAircraftPoolToPg(
   });
 }
 
+/** Inbound board only — Accept/settle cargo arrival, not full economy. */
+export async function persistInboundPendingToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const inboundRows = inboundTableRows(wid, world.inboundPending ?? []);
+  await withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
+    if (inboundRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO inbound_pending (
+           id, mission_id, origin_icao, dest_icao, commodity_id, cargo_kg,
+           expires_at_tick, source, payload_json, world_id
+         )`,
+        10,
+        inboundRows,
+      );
+    }
+  });
+}
+
+/** Demand board only. */
+export async function persistDemandBoardToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const demandRows = demandOrderTableRows(wid, world.demandOrders ?? []);
+  await withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await client.query(`DELETE FROM demand_orders WHERE world_id = $1`, [wid]);
+    if (demandRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO demand_orders (
+           world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
+           max_unit_price_usd, arrived_at_tick, expires_at_tick, status, port_id,
+           payload_json
+         )`,
+        12,
+        demandRows,
+      );
+    }
+  });
+}
+
+/** Single demand order upsert. */
+export async function persistDemandOrderToPg(
+  pool: pg.Pool,
+  order: DemandOrder,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const rows = demandOrderTableRows(wid, [order]);
+  if (rows.length === 0) return;
+  const row = rows[0]!;
+  await pool.query(
+    `INSERT INTO demand_orders (
+       world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
+       max_unit_price_usd, arrived_at_tick, expires_at_tick, status, port_id,
+       payload_json
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
+     ON CONFLICT (world_id, id) DO UPDATE SET
+       dest_icao = EXCLUDED.dest_icao,
+       commodity_id = EXCLUDED.commodity_id,
+       wanted_kg = EXCLUDED.wanted_kg,
+       remaining_kg = EXCLUDED.remaining_kg,
+       max_unit_price_usd = EXCLUDED.max_unit_price_usd,
+       arrived_at_tick = EXCLUDED.arrived_at_tick,
+       expires_at_tick = EXCLUDED.expires_at_tick,
+       status = EXCLUDED.status,
+       port_id = EXCLUDED.port_id,
+       payload_json = EXCLUDED.payload_json`,
+    row,
+  );
+}
+
+/** Port listings + inventories (Port FBO desk). */
+export async function persistPortMarketToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const listingRows = portListingTableRows(wid, world.portListings ?? []);
+  const invRows = portInventoryTableRows(wid, world.portInventories ?? []);
+  await withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await client.query(`DELETE FROM port_listings WHERE world_id = $1`, [wid]);
+    await client.query(`DELETE FROM port_inventories WHERE world_id = $1`, [wid]);
+    if (listingRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO port_listings (
+           world_id, id, port_id, commodity_id, available_kg, unit_price_usd,
+           allocated_hub_icao, arrived_at_tick, expires_at_tick, status, payload_json
+         )`,
+        11,
+        listingRows,
+      );
+    }
+    if (invRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO port_inventories (
+           world_id, port_id, commodity_id, stock_kg, last_restock_tick
+         )`,
+        5,
+        invRows,
+      );
+    }
+  });
+}
+
+/** Single port listing upsert. */
+export async function persistPortListingToPg(
+  pool: pg.Pool,
+  listing: PortListing,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const rows = portListingTableRows(wid, [listing]);
+  if (rows.length === 0) return;
+  const row = rows[0]!;
+  await pool.query(
+    `INSERT INTO port_listings (
+       world_id, id, port_id, commodity_id, available_kg, unit_price_usd,
+       allocated_hub_icao, arrived_at_tick, expires_at_tick, status, payload_json
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+     ON CONFLICT (world_id, id) DO UPDATE SET
+       port_id = EXCLUDED.port_id,
+       commodity_id = EXCLUDED.commodity_id,
+       available_kg = EXCLUDED.available_kg,
+       unit_price_usd = EXCLUDED.unit_price_usd,
+       allocated_hub_icao = EXCLUDED.allocated_hub_icao,
+       arrived_at_tick = EXCLUDED.arrived_at_tick,
+       expires_at_tick = EXCLUDED.expires_at_tick,
+       status = EXCLUDED.status,
+       payload_json = EXCLUDED.payload_json`,
+    row,
+  );
+}
+
+/** Port concession index (company leases on ports). */
+export async function persistPortConcessionsToPg(
+  pool: pg.Pool,
+  rows: PortConcessionIndexRow[],
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const concessionRows = portConcessionTableRows(wid, rows);
+  await withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await client.query(`DELETE FROM port_concessions WHERE world_id = $1`, [wid]);
+    if (concessionRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO port_concessions (
+           world_id, port_id, company_id, lease_paid_through_tick, level
+         )`,
+        5,
+        concessionRows,
+      );
+    }
+  });
+}
+
+/**
+ * Contract-pilot / NPC live: clock + hubs/stock + lots + inbound + NPC roster/
+ * flights + dealer pool — not port/demand/fuel/charter ops tables.
+ */
+export async function persistNpcLiveToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  worldId: string = LOCAL_WORLD_ID,
+): Promise<void> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const airports = world.airports ?? [];
+  const lots = world.lots ?? [];
+  const inbound = world.inboundPending ?? [];
+  const { hubRows, stockRows } = airportTableRows(wid, airports);
+  const lotRows = lotTableRows(wid, lots, airports);
+  const inboundRows = inboundTableRows(wid, inbound);
+  const npcRows = npcTableRows(wid, world.npcs ?? []);
+  const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
+  const instanceRows = aircraftInstanceTableRows(
+    wid,
+    world.aircraftInstances ?? [],
+  );
+  await withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await client.query(
+      `INSERT INTO economy_meta (world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+       ON CONFLICT (world_id) DO UPDATE SET
+         seed = EXCLUDED.seed,
+         tick = EXCLUDED.tick,
+         last_batch_at_ms = EXCLUDED.last_batch_at_ms,
+         home_country_id = EXCLUDED.home_country_id,
+         misc_json = EXCLUDED.misc_json`,
+      [
+        wid,
+        world.seed,
+        sqlNum(world.tick),
+        sqlBigint(world.lastBatchAtMs),
+        world.homeCountryId ?? '',
+        jsonParam(pickPgEconomyMisc(world)),
+      ],
+    );
+
+    await client.query(`DELETE FROM airport_stock WHERE world_id = $1`, [wid]);
+    await client.query(`DELETE FROM airports WHERE world_id = $1`, [wid]);
+    if (hubRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO airports (
+           world_id, icao, name, region, country_id, hub_tier, bush, bush_trip_only,
+           lat, lon, level, level_xp, level_curve_version, activity_score, last_activity_tick
+         )`,
+        15,
+        hubRows,
+      );
+    }
+    if (stockRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO airport_stock (
+           world_id, icao, commodity_id, stock_kg, capacity_kg,
+           base_production_per_tick_kg, base_consumption_per_tick_kg,
+           production_per_tick_kg, consumption_per_tick_kg
+         )`,
+        9,
+        stockRows,
+      );
+    }
+
+    await client.query(`DELETE FROM lots WHERE world_id = $1`, [wid]);
+    if (lotRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO lots (
+           id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+           created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+           origin_country_id, dest_country_id, world_id, claimed_by_company_id
+         )`,
+        17,
+        lotRows,
+      );
+    }
+
+    await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
+    if (inboundRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO inbound_pending (
+           id, mission_id, origin_icao, dest_icao, commodity_id, cargo_kg,
+           expires_at_tick, source, payload_json, world_id
+         )`,
+        10,
+        inboundRows,
+      );
+    }
+
+    await client.query(`DELETE FROM npc_flights WHERE world_id = $1`, [wid]);
+    await client.query(`DELETE FROM npcs WHERE world_id = $1`, [wid]);
+    if (npcRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO npcs (
+           world_id, id, name, aircraft_class_id, airframe_type_id, max_cargo_kg,
+           home_region, home_country_id, reliability, aggressiveness, fee_bias, status,
+           busy_until_tick, busy_until_ms, duty_hours_accum, last_leg_duty_hours,
+           rest_until_tick, rest_until_ms, hours_since_mx, location_icao, mx_until_ms,
+           mx_until_tick, leased_player_aircraft_id, current_flight_id, payload_json
+         )`,
+        25,
+        npcRows,
+      );
+    }
+    if (npcFlightRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO npc_flights (
+           id, npc_id, lot_id, origin_icao, dest_icao, commodity_id, cargo_kg, pay_usd,
+           aircraft_class_id, departed_at_tick, arrives_at_tick, departed_at_ms, arrives_at_ms,
+           status, origin_country_id, dest_country_id, payload_json, world_id
+         )`,
+        18,
+        npcFlightRows,
+      );
+    }
+
+    await client.query(`DELETE FROM aircraft_instances WHERE world_id = $1`, [
+      wid,
+    ]);
+    if (instanceRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO aircraft_instances (
+           world_id, id, airframe_type_id, aircraft_class_id, country_id, based_icao,
+           registration, kind, condition, hours_airframe, hours_engine,
+           airframe_condition_pct, engine_condition_pct, status, seeded_at_tick,
+           available_at_tick
+         )`,
+        16,
+        instanceRows,
+      );
+    }
+  });
+}
+
 function missionCoreAndPayload(m: MissionIntent): {
   core: {
     id: string;

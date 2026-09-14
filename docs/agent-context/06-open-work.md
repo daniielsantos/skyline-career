@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **PG light persists + settle-all** — inbound/demand/ports/npcLive no longer stub→`saveEconomy`; `PostgresCareerStore.settleWorldCompaniesPassiveFees`; smoke prefers `skyline_test` (`CAREER_PG_TEST` / `CAREER_DATABASE_URL_TEST`). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **Board GET freezes (PG)** — Charter was worst (full write per sort); Freights `/api/market` `persist:inbound` and Airframes GET `blob` also full-saved on PG stubs → all switched to `withCareerRead`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **fleet_aircraft columns** — registration / hours / condition % / config / lease_overdue / listed_listing_id / lease_out_json promoted out of `payload_json` (PG schema v16 + SQLite ALTER). Soft link to dealer pool stays `registration`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md) / store fleet.

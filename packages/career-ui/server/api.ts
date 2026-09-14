@@ -1050,15 +1050,17 @@ async function applyCompanySessionSettlement(opts: {
   if (!world) return undefined;
   if (opts.allCompanies === true) {
     if (typeof activeStore.settleWorldCompaniesPassiveFees === 'function') {
-      const summary = activeStore.settleWorldCompaniesPassiveFees({
-        world,
-        fromTick: opts.fromTick,
-        toTick: opts.toTick,
-        worldId: LOCAL_WORLD_ID,
-      });
+      const summary = await Promise.resolve(
+        activeStore.settleWorldCompaniesPassiveFees({
+          world,
+          fromTick: opts.fromTick,
+          toTick: opts.toTick,
+          worldId: LOCAL_WORLD_ID,
+        }),
+      );
       return summary ?? undefined;
     }
-    // Postgres (and any store without settle-all): settle each company explicitly —
+    // Store without settle-all: settle each company explicitly —
     // never fall through to ambient activeCompanyId (that can thrash/wipe tenants).
     const companies = await Promise.resolve(
       activeStore.listWorldCompanies(LOCAL_WORLD_ID),

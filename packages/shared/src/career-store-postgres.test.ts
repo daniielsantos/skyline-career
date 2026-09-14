@@ -1,11 +1,15 @@
 /**
- * Postgres career store smoke (skipped when CAREER_PG / DATABASE unreachable).
+ * Postgres career store smoke.
+ * Prefer CAREER_DATABASE_URL_TEST / CAREER_PG_TEST=1 → skyline_test.
+ * Refuse mutating live lab DB `skyline` unless CAREER_PG_ALLOW_LAB_MUTATION=1.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { emptyMissionsStateV2 } from './career-fleet.js';
 import {
   careerDatabaseUrlFromEnv,
+  careerTestDatabaseUrlFromEnv,
+  isCareerLabDatabaseUrl,
   openPostgresCareerStore,
 } from './career-store-postgres.js';
 
@@ -17,12 +21,49 @@ describe('career store postgres', () => {
     );
   });
 
+  it('careerTestDatabaseUrlFromEnv prefers test DB', () => {
+    assert.equal(careerTestDatabaseUrlFromEnv({}), null);
+    assert.ok(
+      careerTestDatabaseUrlFromEnv({ CAREER_PG_TEST: '1' })?.includes(
+        'skyline_test',
+      ),
+    );
+    assert.equal(
+      careerTestDatabaseUrlFromEnv({
+        CAREER_DATABASE_URL_TEST: 'postgres://u:p@h/custom_test',
+      }),
+      'postgres://u:p@h/custom_test',
+    );
+  });
+
+  it('isCareerLabDatabaseUrl detects skyline vs skyline_test', () => {
+    assert.equal(
+      isCareerLabDatabaseUrl('postgres://skyline:skyline@127.0.0.1:5432/skyline'),
+      true,
+    );
+    assert.equal(
+      isCareerLabDatabaseUrl(
+        'postgres://skyline:skyline@127.0.0.1:5432/skyline_test',
+      ),
+      false,
+    );
+  });
+
   it('opens schema and registers an account when Postgres is up', async (t) => {
     const url =
+      careerTestDatabaseUrlFromEnv(process.env) ||
       process.env.CAREER_DATABASE_URL?.trim() ||
       careerDatabaseUrlFromEnv({ CAREER_PG: '1' });
     if (!url) {
-      t.skip('no CAREER_DATABASE_URL');
+      t.skip('no CAREER_DATABASE_URL_TEST / CAREER_DATABASE_URL');
+      return;
+    }
+    const allowLab =
+      (process.env.CAREER_PG_ALLOW_LAB_MUTATION ?? '').trim() === '1';
+    if (isCareerLabDatabaseUrl(url) && !allowLab) {
+      t.skip(
+        'refusing live lab DB skyline — set CAREER_DATABASE_URL_TEST or CAREER_PG_TEST=1 (or CAREER_PG_ALLOW_LAB_MUTATION=1)',
+      );
       return;
     }
     let store;
@@ -174,8 +215,38 @@ describe('career store postgres', () => {
           'charter_hubs table should be populated when world has hubs',
         );
       }
+
+      // Light slice persists must not rewrite the whole economy (smoke: demand board).
+      const beforeDemand = await store['pool'].query(
+        `SELECT COUNT(*)::int AS n FROM demand_orders`,
+      );
+      const beforeLots = await store['pool'].query(
+        `SELECT COUNT(*)::int AS n FROM lots`,
+      );
+      await store.persistInboundPending(economy.world);
+      const afterLots = await store['pool'].query(
+        `SELECT COUNT(*)::int AS n FROM lots`,
+      );
+      assert.equal(
+        (afterLots.rows[0] as { n: number }).n,
+        (beforeLots.rows[0] as { n: number }).n,
+        'persistInboundPending must not rewrite lots',
+      );
+      await store.persistDemandBoardTables(economy.world);
+      const afterDemand = await store['pool'].query(
+        `SELECT COUNT(*)::int AS n FROM demand_orders`,
+      );
+      assert.equal(
+        (afterDemand.rows[0] as { n: number }).n,
+        (beforeDemand.rows[0] as { n: number }).n,
+      );
+      assert.equal(
+        typeof store.settleWorldCompaniesPassiveFees,
+        'function',
+        'PostgresCareerStore should expose settleWorldCompaniesPassiveFees',
+      );
     } finally {
-      // Always scrub the throwaway tenant — this smoke test hits the lab DB URL.
+      // Always scrub the throwaway tenant.
       if (companyId) {
         const pool = store['pool'] as import('pg').Pool;
         const members = await pool.query(

@@ -68,14 +68,29 @@ import {
   isPgEconomyMiscEmpty,
   persistEconomyTablesToPg,
   persistAircraftPoolToPg,
+  persistDemandBoardToPg,
+  persistDemandOrderToPg,
+  persistInboundPendingToPg,
   persistMissionsTablesToPg,
+  persistNpcLiveToPg,
+  persistPortConcessionsToPg,
+  persistPortListingToPg,
+  persistPortMarketToPg,
 } from './career-store-pg-world.js';
+import {
+  companySessionFromTick,
+  settleCompanyPassiveFeesForTickRange,
+} from './career-company-session.js';
+import type { OfflineFeeSummary } from './career-offline-fees.js';
 
 const CAREER_PG_SCHEMA_VERSION = '16';
 const { Pool } = pg;
 
 export const DEFAULT_CAREER_DATABASE_URL =
   'postgres://skyline:skyline@127.0.0.1:5432/skyline';
+
+export const DEFAULT_CAREER_TEST_DATABASE_URL =
+  'postgres://skyline:skyline@127.0.0.1:5432/skyline_test';
 
 export function careerDatabaseUrlFromEnv(
   env: NodeJS.Dict<string> | Record<string, string | undefined> = process.env,
@@ -87,6 +102,30 @@ export function careerDatabaseUrlFromEnv(
     return DEFAULT_CAREER_DATABASE_URL;
   }
   return null;
+}
+
+/** Prefer isolated test DB — never default to live lab `skyline`. */
+export function careerTestDatabaseUrlFromEnv(
+  env: NodeJS.Dict<string> | Record<string, string | undefined> = process.env,
+): string | null {
+  const testUrl = (env.CAREER_DATABASE_URL_TEST ?? '').trim();
+  if (testUrl) return testUrl;
+  const flag = (env.CAREER_PG_TEST ?? '').trim().toLowerCase();
+  if (flag === '1' || flag === 'true' || flag === 'on' || flag === 'yes') {
+    return DEFAULT_CAREER_TEST_DATABASE_URL;
+  }
+  return null;
+}
+
+/** True when URL path/db name looks like the live lab database. */
+export function isCareerLabDatabaseUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const db = (parsed.pathname.replace(/^\//, '') || '').trim().toLowerCase();
+    return db === 'skyline';
+  } catch {
+    return /\/skyline(?:\?|$)/i.test(url) && !/skyline_test/i.test(url);
+  }
 }
 
 function catchUpOpts(opts?: { maxCatchUpTicks?: number }) {
@@ -799,26 +838,77 @@ export class PostgresCareerStore implements CareerStore {
     await persistEconomyTablesToPg(this.pool, toSave, LOCAL_WORLD_ID);
   }
 
-  async persistDemandOrder(_order: DemandOrder): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistDemandOrder(order: DemandOrder): Promise<void> {
+    await this.ready;
+    if (this.ram?.demandOrders) {
+      const i = this.ram.demandOrders.findIndex((o) => o.id === order.id);
+      if (i >= 0) this.ram.demandOrders[i] = order;
+      else this.ram.demandOrders.push(order);
+    }
+    await persistDemandOrderToPg(this.pool, order, LOCAL_WORLD_ID);
   }
-  async persistPortListing(_listing: PortListing): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistPortListing(listing: PortListing): Promise<void> {
+    await this.ready;
+    if (this.ram?.portListings) {
+      const i = this.ram.portListings.findIndex((l) => l.id === listing.id);
+      if (i >= 0) this.ram.portListings[i] = listing;
+      else this.ram.portListings.push(listing);
+    }
+    await persistPortListingToPg(this.pool, listing, LOCAL_WORLD_ID);
   }
-  async persistPortConcessionIndex(_rows: PortConcessionIndexRow[]): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void> {
+    await this.ready;
+    if (this.ram) this.ram.portConcessions = rows;
+    await persistPortConcessionsToPg(this.pool, rows, LOCAL_WORLD_ID);
   }
-  async persistPortMarketTables(_world: CareerEconomyWorld): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistPortMarketTables(world: CareerEconomyWorld): Promise<void> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    if (this.ram) {
+      this.ram = {
+        ...this.ram,
+        portListings: toSave.portListings ?? [],
+        portInventories: toSave.portInventories ?? [],
+      };
+    } else {
+      this.ram = toSave;
+    }
+    await persistPortMarketToPg(this.pool, toSave, LOCAL_WORLD_ID);
   }
-  async persistDemandBoardTables(_world: CareerEconomyWorld): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistDemandBoardTables(world: CareerEconomyWorld): Promise<void> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    if (this.ram) {
+      this.ram = {
+        ...this.ram,
+        demandOrders: toSave.demandOrders ?? [],
+      };
+    } else {
+      this.ram = toSave;
+    }
+    await persistDemandBoardToPg(this.pool, toSave, LOCAL_WORLD_ID);
   }
-  async persistInboundPending(_world: CareerEconomyWorld): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistInboundPending(world: CareerEconomyWorld): Promise<void> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    if (this.ram) {
+      this.ram = {
+        ...this.ram,
+        inboundPending: toSave.inboundPending ?? [],
+      };
+    } else {
+      this.ram = toSave;
+    }
+    await persistInboundPendingToPg(this.pool, toSave, LOCAL_WORLD_ID);
   }
-  async persistNpcLiveWorld(_world: CareerEconomyWorld): Promise<void> {
-    if (this.ram) await this.saveEconomy(this.ram);
+  async persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    toSave.lastBatchAtMs = world.lastBatchAtMs;
+    toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    ensureHomeCountryId(toSave);
+    this.ram = toSave;
+    await persistNpcLiveToPg(this.pool, toSave, LOCAL_WORLD_ID);
   }
   async persistAircraftPool(world: CareerEconomyWorld): Promise<void> {
     await this.ready;
@@ -832,6 +922,44 @@ export class PostgresCareerStore implements CareerStore {
       this.ram = toSave;
     }
     await persistAircraftPoolToPg(this.pool, toSave, LOCAL_WORLD_ID);
+  }
+
+  async settleWorldCompaniesPassiveFees(opts: {
+    world: CareerEconomyWorld;
+    fromTick: number;
+    toTick: number;
+    worldId?: string;
+    nowMs?: number;
+  }): Promise<OfflineFeeSummary | null> {
+    await this.ready;
+    const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
+    const companies = await this.listWorldCompanies(worldId);
+    if (companies.length === 0) return null;
+    const nowMs = opts.nowMs ?? Date.now();
+    let preferred: OfflineFeeSummary | null = null;
+    let first: OfflineFeeSummary | null = null;
+    for (const company of companies) {
+      const missions = await this.loadMissions({ companyId: company.id });
+      const fromTick = companySessionFromTick(
+        missions,
+        opts.fromTick,
+        opts.toTick,
+      );
+      const summary = settleCompanyPassiveFeesForTickRange(
+        missions,
+        opts.world,
+        fromTick,
+        opts.toTick,
+        nowMs,
+      );
+      missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
+      await this.saveMissions(missions, { companyId: company.id });
+      if (summary) {
+        if (!first) first = summary;
+        if (company.id === this.activeCompanyId) preferred = summary;
+      }
+    }
+    return preferred ?? first;
   }
 
   readHubEconomySamples(_opts: {

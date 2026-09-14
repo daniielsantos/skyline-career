@@ -1,6 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-08-22. SP usa o mesmo molde MP (tabelas/comando; `saveEconomy` só no tick). GET Freights = inbound patch; Demand = demand_orders; dealer GET = blob.
+Atualizado 2026-09-14. SP usa o mesmo molde MP (tabelas/comando; `saveEconomy` só no tick). GET Freights = inbound patch; Demand = demand_orders; dealer GET = blob. **PG:** light slice helpers in `career-store-pg-world.ts` (inbound/demand/ports/npcLive/aircraft pool) — no stub→full `saveEconomy`.
 
 ## Objetivo
 

@@ -255,6 +255,7 @@ export * from './career-partition.js';
 export * from './career-store.js';
 export * from './career-store-postgres.js';
 export * from './career-store-pg-world.js';
+export * from './career-world-worker-pg.js';
 export * from './career-mission.js';
 export * from './career-persist-commands.js';
 export * from './career-cargo-ops.js';

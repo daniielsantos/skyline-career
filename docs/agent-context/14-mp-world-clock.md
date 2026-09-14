@@ -191,7 +191,7 @@ interface WorldTickService {
 6. ~~Phase 6 client company context (dual-tab)~~ — shipped 2026-09-13.
 7. ~~Phase 7 local Auth (account → company)~~ — shipped 2026-09-14 (`CAREER_AUTH=1`).
 8. ~~Phase 8 fixed world (one shared SQL world; clients attach)~~ — shipped 2026-09-14 (`CAREER_WORLD_FIXED=1`).
-9. Hosted Postgres lab — **started 2026-09-14** (`CAREER_PG=1` / `PostgresCareerStore` JSONB + Auth); full table parity + 24/7 world job later.
+9. Hosted Postgres lab — **shipped 2026-09-14** (`CAREER_PG=1` / tables + `career:world:pg` 24/7 worker). Misc stub leftovers optional.
 
 ## Phase 8 notes (2026-09-14)
 
@@ -211,7 +211,8 @@ interface WorldTickService {
 - **MP:** `CAREER_DATABASE_URL` or `CAREER_PG=1` → `PostgresCareerStore`.
 - Docker: containers `skyline-career-postgres` + `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
 - Run: `docker compose up -d` then `npm run career:host:pg` + `npm run career:client`.
-- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`, schema v13; no offers→demand FK). `stripPgEconomyBlob` clears those arrays. Load backfills empty tables when RAM has data (schema upgrade). BIGINT wall-clock ms truncated on write. Follow-up: misc stub leftovers + 24/7 world job.
+- **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`, schema v13; no offers→demand FK). `stripPgEconomyBlob` clears those arrays. Load backfills empty tables when RAM has data (schema upgrade). BIGINT wall-clock ms truncated on write. Stub may still hold misc leftovers.
+- **24/7 world worker (lab):** `npm run career:world:pg` — `career-world-worker-pg.ts` economy catch-up with Postgres advisory lock `87201401`. Company settlement on login. Pair with `CAREER_HEADLESS_PULSE=0` on `career:host:pg`. `--once` for one-shot/tests.
 
 ## Phase 7 notes (2026-09-14)
 

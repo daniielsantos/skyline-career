@@ -16,6 +16,9 @@ console.log(
   `[career:host:pg] CAREER_DATABASE_URL=${databaseUrl.replace(/:[^:@/]+@/, ':***@')}`,
 );
 console.log('[career:host:pg] Adminer http://127.0.0.1:8081 (System: PostgreSQL, Server: postgres)');
+console.log(
+  '[career:host:pg] For 24/7 without this process: npm run career:world:pg (set CAREER_HEADLESS_PULSE=0 here)',
+);
 
 const child = spawn(
   process.execPath,

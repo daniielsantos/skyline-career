@@ -137,11 +137,16 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function killPidTree(pid) {
+function killPidTree(pid, { tree = false } = {}) {
   if (!pid) return;
   try {
     if (process.platform === 'win32') {
-      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      // /T only for our own child processes. Tree-killing Docker's port proxy
+      // (com.docker.*) tears down Docker Desktop entirely.
+      const args = tree
+        ? ['/PID', String(pid), '/T', '/F']
+        : ['/PID', String(pid), '/F'];
+      execFileSync('taskkill', args, {
         stdio: 'ignore',
         windowsHide: true,
       });
@@ -153,13 +158,56 @@ function killPidTree(pid) {
   }
 }
 
+/** Windows image name for a PID (e.g. node.exe, com.docker.backend.exe). */
+function windowsImageName(pid) {
+  try {
+    const out = execFileSync(
+      'tasklist',
+      ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'],
+      { encoding: 'utf8', windowsHide: true },
+    );
+    const line = out.trim().split(/\r?\n/)[0] ?? '';
+    const m = line.match(/^"([^"]+)"/);
+    return m ? m[1] : '';
+  } catch {
+    return '';
+  }
+}
+
+/** Never taskkill these — published Docker ports bind through Docker/WSL proxies. */
+function isProtectedPortHolder(imageName) {
+  return /docker|vpnkit|wslrelay|wsl\.exe|com\.docker|vmcompute|vmmem|containerd|dockerd/i.test(
+    imageName || '',
+  );
+}
+
+/** Stale Skyline / Node API leftovers only. */
+function isSafeToKillForApiPort(imageName) {
+  return /^(node|electron|Skyline Career)\.exe$/i.test(imageName || '');
+}
+
+/**
+ * Free our own leftover API process on `port`. Never kill Docker/WSL proxies
+ * (taskkill /T on those PIDs closes Docker Desktop on Windows).
+ * @returns {{ freed: number, blockedBy: string | null }}
+ */
 function killListenersOnPort(port) {
-  if (process.platform !== 'win32') return;
+  if (process.platform !== 'win32') {
+    return { freed: 0, blockedBy: null };
+  }
+  let freed = 0;
+  /** @type {string | null} */
+  let blockedBy = null;
   try {
     const out = execFileSync('netstat', ['-ano'], { encoding: 'utf8' });
     const pids = new Set();
     for (const line of out.split(/\r?\n/)) {
       if (!line.includes(`:${port}`) || !line.includes('LISTENING')) continue;
+      // Prefer exact :port bound on loopback / any — avoid matching :87870 etc.
+      if (!new RegExp(`(?:[\\[\\]:.]|\\s):${port}\\s`).test(line) &&
+          !new RegExp(`:${port}\\s+`).test(line)) {
+        continue;
+      }
       const parts = line.trim().split(/\s+/);
       const pid = parts[parts.length - 1];
       if (pid && /^\d+$/.test(pid) && pid !== '0' && Number(pid) !== process.pid) {
@@ -167,12 +215,29 @@ function killListenersOnPort(port) {
       }
     }
     for (const pid of pids) {
-      logLine(`[desktop] freeing port ${port} (PID ${pid})`);
+      const name = windowsImageName(pid) || `(pid ${pid})`;
+      if (isProtectedPortHolder(name)) {
+        logLine(
+          `[desktop] port ${port} held by ${name} (PID ${pid}) — not killing (Docker/WSL)`,
+        );
+        blockedBy = name;
+        continue;
+      }
+      if (!isSafeToKillForApiPort(name)) {
+        logLine(
+          `[desktop] port ${port} held by ${name} (PID ${pid}) — not killing unknown process`,
+        );
+        blockedBy = name;
+        continue;
+      }
+      logLine(`[desktop] freeing port ${port} (${name} PID ${pid})`);
       killPidTree(Number(pid));
+      freed += 1;
     }
   } catch {
     /* ignore */
   }
+  return { freed, blockedBy };
 }
 
 function portFree(port) {
@@ -215,7 +280,7 @@ function killTree(child) {
   if ('kill' in child && typeof child.kill === 'function') {
     try {
       if (process.platform === 'win32' && child.pid) {
-        killPidTree(child.pid);
+        killPidTree(child.pid, { tree: true });
       } else {
         child.kill();
       }
@@ -452,6 +517,15 @@ async function startCareerApi() {
   if (!(await portFree(API_PORT))) {
     killListenersOnPort(API_PORT);
     await sleep(600);
+  }
+  if (!(await portFree(API_PORT))) {
+    const holder = killListenersOnPort(API_PORT).blockedBy ?? 'another process';
+    throw new Error(
+      `Port ${API_PORT} is already in use (${holder}). ` +
+        `If Docker world-api is on :8787, set CAREER_UI_API_PORT=8788 ` +
+        `(and CAREER_WORLD_API_URL=http://127.0.0.1:8787 for gateway), ` +
+        `or stop the other listener. Skyline will not kill Docker/WSL processes.`,
+    );
   }
 
   const logDir = join(app.getPath('userData'), 'logs');

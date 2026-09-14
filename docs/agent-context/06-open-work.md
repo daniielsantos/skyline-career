@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Desktop matava Docker Desktop** — `killListenersOnPort(8787)` fazia `taskkill /T /F` no PID do proxy Docker → fecha o Docker inteiro. Fix: nunca matar docker/wsl; só node/electron/Skyline; se porta ocupada → erro claro (usar `:8788` + WORLD URL).
+
 Atualizado 2026-09-14: **world-worker 57P03** — Postgres recovery: worker retry (~90s) + compose healthcheck `pg_isready && SELECT 1` (isready sozinho passa cedo demais).
 
 Atualizado 2026-09-14: **Desktop pack crash `pg` missing** — shared barrel exportava `career-world-worker-pg` / postgres → `ERR_MODULE_NOT_FOUND` no install. Fix: `career-database-url.ts` sem pg; openCareerStore só dynamic-import postgres quando backend=postgres; pack shared `optionalDependencies.pg`.

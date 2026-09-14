@@ -108,6 +108,10 @@ export function resetCareerShellUrl(): void {
   }
 }
 
+/**
+ * Preserve ?company= only when already present (lab dual-tab without Auth).
+ * Auth mode strips the param on session open — do not re-add it here.
+ */
 function withPreservedCompanyQuery(path: string): string {
   try {
     const current = new URL(window.location.href);

@@ -203,6 +203,7 @@ interface WorldTickService {
 - SP `career:ui` unchanged (`worldFixed` off).
 - **UX (same day):** hub picker after Auth reuses account display name — no second “Pilot name”; only home hub is required.
 - **UX (same day):** Company chip read-only when Auth/fixed world (no dual-tab `+`/select). Topbar **World** = economy Day·HH:MM (wall-paced 15 min/tick), not local timezone.
+- **UX (same day):** Auth mode drops `?company=` from the URL — tenant lives in sessionStorage + `X-Skyline-Company-Id`. URL pin remains for non-Auth dual-tab lab only.
 
 ## Phase 7 notes (2026-09-14)
 

@@ -6781,15 +6781,35 @@ export function App() {
 
     try {
       const url = new URL(window.location.href);
-      if (companyId !== LOCAL_COMPANY_ID) {
+      if (authEnforced) {
+        // Auth owns the tenant via session + header — keep URLs clean.
+        if (url.searchParams.has('company')) {
+          url.searchParams.delete('company');
+          window.history.replaceState(
+            {},
+            '',
+            `${url.pathname}${url.search}${url.hash}`,
+          );
+        }
+      } else if (companyId !== LOCAL_COMPANY_ID) {
+        // Lab dual-tab only: pin tenant in the URL so two tabs can differ.
         url.searchParams.set('company', companyId);
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        );
       } else if (
         url.searchParams.has('company') &&
         url.searchParams.get('company') !== LOCAL_COMPANY_ID
       ) {
         url.searchParams.delete('company');
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        );
       }
-      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     } catch {
       /* ignore */
     }

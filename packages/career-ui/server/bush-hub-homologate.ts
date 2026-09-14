@@ -1,9 +1,9 @@
 /**
- * Persist MSFS bush hub overrides under profiles/career and apply to world.
+ * Persist MSFS hub coordinate overrides under career data and apply to world.
  * Coords come from SimConnect Facilities (preferred) or explicit lat/lon.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
   applyMsfsBushHubOverrideToTerminal,
@@ -23,15 +23,40 @@ import {
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
+import {
+  MSFS_HUB_OVERRIDES_FILENAME,
+  MSFS_HUB_OVERRIDES_LEGACY_FILENAME,
+} from './skyline-paths.ts';
 
 export function profileMsfsBushHubOverridesPath(careerDir: string): string {
-  return join(careerDir, 'msfs-bush-hub-overrides.json');
+  return join(careerDir, MSFS_HUB_OVERRIDES_FILENAME);
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Prefer new filename; rename legacy AppData copy once. */
+async function ensureHubOverridesPath(careerDir: string): Promise<string> {
+  const next = join(careerDir, MSFS_HUB_OVERRIDES_FILENAME);
+  const legacy = join(careerDir, MSFS_HUB_OVERRIDES_LEGACY_FILENAME);
+  if ((await pathExists(legacy)) && !(await pathExists(next))) {
+    await rename(legacy, next);
+  } else if ((await pathExists(legacy)) && (await pathExists(next))) {
+    await rm(legacy, { force: true });
+  }
+  return next;
 }
 
 export async function loadProfileMsfsBushHubOverrides(
   careerDir: string,
 ): Promise<MsfsBushHubOverridesFile> {
-  const path = profileMsfsBushHubOverridesPath(careerDir);
+  const path = await ensureHubOverridesPath(careerDir);
   try {
     const raw = JSON.parse(await readFile(path, 'utf8')) as unknown;
     setRuntimeMsfsBushHubOverrides(raw);
@@ -52,7 +77,7 @@ function catalogOverrideKeepIcaos(): string[] {
 export async function persistProfileMsfsBushHubOverrides(
   careerDir: string,
 ): Promise<string> {
-  const path = profileMsfsBushHubOverridesPath(careerDir);
+  const path = await ensureHubOverridesPath(careerDir);
   await mkdir(dirname(path), { recursive: true });
   const keep = catalogOverrideKeepIcaos();
   pruneRuntimeMsfsBushHubOverrides(keep);

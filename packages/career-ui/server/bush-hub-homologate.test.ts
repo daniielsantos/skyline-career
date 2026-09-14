@@ -114,7 +114,7 @@ describe('bush hub homologate (Facilities)', () => {
     assert.equal(result.override.runways?.[0]?.ident, '15');
 
     const disk = JSON.parse(
-      await readFile(join(careerDir, 'msfs-bush-hub-overrides.json'), 'utf8'),
+      await readFile(join(careerDir, 'msfs-hub-overrides.json'), 'utf8'),
     ) as Record<string, { source: string; lat: number; runways?: unknown[] }>;
     assert.equal(disk.O67?.source, 'msfs_facility');
     assert.equal(disk.O67?.lat, 36.7372);

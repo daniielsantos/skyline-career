@@ -1,9 +1,9 @@
 /**
  * MSFS-validated coords/names/runways for career hubs.
- * Shipped seed in data/msfs-bush-hub-overrides.json; runtime may layer profiles/career overlay.
+ * Shipped seed in data/msfs-hub-overrides.json; runtime may layer profiles/career overlay.
  */
 
-import shippedRaw from './data/msfs-bush-hub-overrides.json' with { type: 'json' };
+import shippedRaw from './data/msfs-hub-overrides.json' with { type: 'json' };
 import type { CareerRunway, RunwaySurface } from './career-runways.js';
 
 export type MsfsBushHubOverrideSource =

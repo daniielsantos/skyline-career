@@ -1,7 +1,7 @@
 /**
  * Wizard: stamp career hub lat/lon/name from MSFS SimConnect Facilities.
  * Requires MSFS running + SimBridgeHost rebuilt with getAirportFacility.
- * Writes profiles/career/msfs-bush-hub-overrides.json and updates local economy airports.
+ * Writes profiles/career/msfs-hub-overrides.json and updates local economy airports.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -127,7 +127,7 @@ function todayUtc(): string {
 }
 
 function overridesPath(repoRoot: string): string {
-  return join(repoRoot, 'profiles', 'career', 'msfs-bush-hub-overrides.json');
+  return join(repoRoot, 'profiles', 'career', 'msfs-hub-overrides.json');
 }
 
 function sleep(ms: number): Promise<void> {
@@ -279,7 +279,7 @@ async function pickScope(
     .length;
   printSection('MSFS hub Facilities homologation');
   console.log('  MSFS must be running. SimBridgeHost needs getAirportFacility.');
-  console.log('  Writes profiles/career/msfs-bush-hub-overrides.json + local economy.');
+  console.log('  Writes profiles/career/msfs-hub-overrides.json + local economy.');
   console.log('  Facility lookups use a 30s IPC timeout (host may warm the airport list).');
   console.log('');
   console.log(`  1. All career hubs (${allCount})`);

@@ -254,30 +254,22 @@ async function assembleRuntime() {
     { recursive: true },
   );
 
-  // Seed content (no player saves)
+  // Seed content (no player saves) — hub MSFS overrides only (bush trips removed).
   await mkdir(join(runtimeOut, 'profiles', 'career'), { recursive: true });
-  const bushSrc = join(root, 'profiles', 'career', 'bush_PLN');
-  if (await exists(bushSrc)) {
-    await cp(bushSrc, join(runtimeOut, 'profiles', 'career', 'bush_PLN'), {
-      recursive: true,
-    });
-  }
-  const ovSrc = join(root, 'profiles', 'career', 'msfs-bush-hub-overrides.json');
+  const ovSrc = join(root, 'profiles', 'career', 'msfs-hub-overrides.json');
   const ovShared = join(
     root,
     'packages',
     'shared',
     'src',
     'data',
-    'msfs-bush-hub-overrides.json',
+    'msfs-hub-overrides.json',
   );
+  const ovDest = join(runtimeOut, 'profiles', 'career', 'msfs-hub-overrides.json');
   if (await exists(ovSrc)) {
-    await cp(ovSrc, join(runtimeOut, 'profiles', 'career', 'msfs-bush-hub-overrides.json'));
+    await cp(ovSrc, ovDest);
   } else if (await exists(ovShared)) {
-    await cp(
-      ovShared,
-      join(runtimeOut, 'profiles', 'career', 'msfs-bush-hub-overrides.json'),
-    );
+    await cp(ovShared, ovDest);
   }
 
   // Aircraft profiles (examples) + OFP roles packs (preflight / inject station maps)

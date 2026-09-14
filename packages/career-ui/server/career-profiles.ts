@@ -4,8 +4,8 @@
  * Layout (SP):
  *   profiles/career/profiles.json          — index + activeId
  *   profiles/career/saves/<id>/skyline.sqlite
- *   profiles/career/bush_PLN/              — shared (read-only assets)
- *   profiles/career/msfs-bush-hub-overrides.json — shared
+ *   profiles/career/bush_PLN/              — retired (no longer seeded/packed)
+ *   profiles/career/msfs-hub-overrides.json — shared MSFS hub coords (SP + MP)
  *
  * Layout (MP / CAREER_WORLD_FIXED):
  *   profiles/career/world/skyline.sqlite   — one shared world forever

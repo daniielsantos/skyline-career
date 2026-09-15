@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-14: **Compose lab vs prod** — base sem publish do Postgres; `docker-compose.lab.yml` (loopback DB+Adminer); `docker-compose.prod.yml` (API `127.0.0.1:8787`); `career:stack:world -- --prod`. Acesso DB: SSH tunnel / Tailscale. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **Desktop 0.3.64 shipped** — auth invite/claim gates; MapTiler behind Bearer + world `MAPTILER_KEY`; Remember me opt-in. Installer: [v0.3.64](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.64).
 
 Atualizado 2026-09-14: **Auth harden** — `/api/auth/sessions` default `mine` (`scope=all` só com `CAREER_AUTH_SESSIONS_LIST_ALL=1`); login/register rate limit 20/15min por IP → 429. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

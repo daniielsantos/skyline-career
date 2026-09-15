@@ -1,3 +1,16 @@
+# Base stack — safe default: Postgres is NOT published on the host.
+# World API / Adminer port bindings come from an overlay:
+#   lab:  docker-compose.lab.yml   (local playtest)
+#   prod: docker-compose.prod.yml  (VPS — loopback API; DB private)
+#
+# Examples:
+#   npm run db:up                      → postgres + Adminer (lab overlay)
+#   npm run career:stack:world         → lab world stack
+#   npm run career:stack:world -- --prod
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile world up -d
+#
+# Remote DB without public :5432 — SSH tunnel or Tailscale (see docs/agent-context/14-mp-world-clock.md).
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -7,14 +20,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-skyline}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skyline}
       POSTGRES_DB: ${POSTGRES_DB:-skyline}
-    ports:
-      # Lab: reachable on host LAN. Prefer 127.0.0.1:5432:5432 on any shared/VPS host.
-      - '5432:5432'
+    # No host ports here — only Docker network. Lab overlay publishes 127.0.0.1:5432.
     volumes:
       - skyline_career_pg_data:/var/lib/postgresql/data
     healthcheck:
       # pg_isready alone can pass during crash recovery while SELECT still fails (57P03).
-      # User/db come from compose env (defaults skyline). Password is never in the healthcheck.
       test:
         [
           'CMD-SHELL',
@@ -25,25 +35,7 @@ services:
       retries: 20
       start_period: 20s
 
-  # Lab DB UI — local only. Do NOT publish :8081 (or Postgres :5432) on a VPS;
-  # bind to loopback if you must keep Adminer on a shared machine:
-  #   ports: ["127.0.0.1:8081:8080"]  (same idea for postgres 5432).
-  # Login uses POSTGRES_* from .env (System: PostgreSQL, Server: postgres).
-  adminer:
-    image: adminer:4
-    container_name: skyline-career-adminer
-    restart: unless-stopped
-    ports:
-      - '8081:8080'
-    environment:
-      ADMINER_DEFAULT_SERVER: postgres
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Local “production” world host (no Watch). Start with:
-  #   npm run career:stack:world
-  # Desktop: CAREER_WORLD_API_URL=http://127.0.0.1:8787 CAREER_UI_API_PORT=8788
+  # Local “production” world host (no Watch). Ports from lab/prod overlay.
   # Secrets: root `.env` (gitignored) — see `.env.example`.
   world-api:
     build:
@@ -52,9 +44,7 @@ services:
     container_name: skyline-career-world-api
     restart: unless-stopped
     environment:
-      # Prefer CAREER_DATABASE_URL in .env; must match POSTGRES_* (host = postgres on Docker net).
       CAREER_DATABASE_URL: ${CAREER_DATABASE_URL:-postgres://skyline:skyline@postgres:5432/skyline}
-      # From root .env — airport satellite map. Empty = map disabled on world.
       MAPTILER_KEY: ${MAPTILER_KEY:-}
       CAREER_API_MODE: world
       CAREER_DISABLE_SIM: '1'
@@ -66,8 +56,6 @@ services:
       CAREER_UI_API_PORT: '8787'
       SKYLINE_CAREER_DATA: /data/career
       SKYLINE_CAREER_CONTENT: /app/profiles/career
-    ports:
-      - '8787:8787'
     volumes:
       - skyline_career_world_data:/data/career
     depends_on:

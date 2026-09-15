@@ -1,0 +1,19 @@
+# Prod / VPS overlay — Postgres stays Docker-internal (no host :5432 / Adminer).
+# World API on loopback only — terminate TLS (Caddy/nginx) or Tailscale in front.
+#
+#   npm run career:stack:world -- --prod
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile world up -d --build
+#
+# Reach the DB from your Windows PC without public exposure:
+#   1) SSH tunnel to a *loopback* publish (bring Adminer/Postgres up with lab
+#      overlay temporarily, or keep a 127.0.0.1:5432 mapping only while you work):
+#        ssh -N -L 5432:127.0.0.1:5432 user@vps
+#        → DBeaver / Adminer on Windows → 127.0.0.1:5432
+#   2) Tailscale/WireGuard on VPS + PC, then connect to the VPS Tailscale IP
+#      (only if you intentionally publish Postgres on that interface).
+# See docs/agent-context/14-mp-world-clock.md (§ DB access).
+
+services:
+  world-api:
+    ports:
+      - '127.0.0.1:8787:8787'

@@ -209,9 +209,11 @@ interface WorldTickService {
 
 - **SP:** SQLite saves unchanged.
 - **MP:** `CAREER_DATABASE_URL` or `CAREER_PG=1` → `PostgresCareerStore`.
-- Docker: containers `skyline-career-postgres` + `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
+- Docker: containers `skyline-career-postgres` + (lab) `skyline-career-adminer` (http://127.0.0.1:8081). Volume `skyline_career_pg_data`.
+- **Compose overlays (2026-09-14):** base `docker-compose.yml` = Postgres **sem** publish. **Lab** `docker-compose.lab.yml` → `127.0.0.1:5432` + Adminer `:8081` + world `:8787`. **Prod** `docker-compose.prod.yml` → world `127.0.0.1:8787` only (sem Adminer/DB ports). `npm run career:stack:world` = lab; `--prod` = VPS-safe.
+- **DB access without public :5432:** (1) SSH tunnel to loopback publish: `ssh -N -L 5432:127.0.0.1:5432 user@vps` then DBeaver → `127.0.0.1:5432`; (2) Tailscale/WireGuard. Never publish `0.0.0.0:5432` / Adminer on a VPS.
 - **DB secrets (2026-09-14):** `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` + `CAREER_DATABASE_URL` live in root **`.env`** (gitignored); compose substitutes them (lab default still `skyline` if unset). Adminer login = those Postgres creds. Rotate password → update `.env` **and** alter role / recreate volume (init only runs once).
-- Run: `docker compose up -d` then `npm run career:host:pg` + `npm run career:client`.
+- Run (lab): `npm run db:up` then `npm run career:host:pg` + `npm run career:client`. VPS world: `npm run career:stack:world -- --prod`.
 - **PG world tables (wired):** `career-store-pg-world.ts` — hot slices (`lots` / `airports` / `airport_stock` / `inbound_pending` / `economy_meta`) + company (`company_state` / `fleet_aircraft` / `missions` / `ledger`) + world-ops (`npc_flights` / `economy_events` / `npcs` / `fuel_*` / `demand_orders` / `port_*`) + dealer pool (`aircraft_instances`) + charter (`charter_demand` / `charter_hubs` / `charter_offers`). Schema **v16**: `fleet_aircraft` promotes registration / hours / condition % / config / lease flags out of `payload_json` (backfill on open). Schema **v15**: economy SoT = relational tables + `economy_meta.misc_json`; stub tables `economy_json` + `company_missions` dropped. SP SQLite mirrors fleet columns via `ensureV3Ddl` ALTERs. Load hydrates via `emptyPgEconomyShell` + tables; BIGINT wall-clock ms truncated on write.
 - **PG light persists (2026-09-14):** `persistInboundPending` / `persistDemandBoardTables` / `persistDemandOrder` / `persistPortMarketTables` / `persistPortListing` / `persistPortConcessionIndex` / `persistNpcLiveWorld` / `persistAircraftPool` write only their tables (no full `saveEconomy`). `persistNpcLive` = clock + hubs/stock + lots + inbound + NPCs + dealer pool. Pulse `settleWorldCompaniesPassiveFees` exists on Postgres (awaited in `applyCompanySessionSettlement`).
 - **PG smoke isolation:** prefer `CAREER_DATABASE_URL_TEST` or `CAREER_PG_TEST=1` → `skyline_test`; refuse mutating lab `skyline` unless `CAREER_PG_ALLOW_LAB_MUTATION=1`. Create DB once: `CREATE DATABASE skyline_test;` as role `skyline`.
@@ -225,7 +227,7 @@ interface WorldTickService {
   - **Local prod sim:** `npm run career:stack:world` → postgres + `world-api:8787` + `world-worker`. Desktop shell defaults to **:8788** (`CAREER_WORLD_API_URL=http://127.0.0.1:8787` for gateway). Se Electron reclamar de `cli.js` / install: o start usa `packages/desktop/run-electron.mjs` (não o `.bin` aninhado); sem `packages/desktop/package-lock.json`. World exige Auth → register/login no AuthGate.
   - **Desktop SP|MP (2026-09-14):** packaged app first run shows PlayModeGate (Single Player vs Multiplayer + World URL). Choice → `%APPDATA%\Skyline Career\career\desktop-play.json`; API child restart. Settings → Change play mode. Process env `CAREER_WORLD_API_URL` still forces MP (lab `npm start`). Files: `packages/desktop/desktop-play-config.mjs`, `PlayModeGate.tsx`.
   - **No SP ⟳ catch-up chip on world:** `CAREER_API_MODE=world` omits `catchUp` from `/api/state` (worker owns backlog). Topbar **pulse due** still means `nextPulseAtMs` is past — worker lag, not “stay in Career”.
-  - Scripts: `career:host:world` (Node world on host), `career:stack:world` (Docker). Adminer `:8081` for lab only.
+  - Scripts: `career:host:world` (Node world on host), `career:stack:world` (Docker lab), `career:stack:world -- --prod` (VPS: no DB publish). Adminer only on lab overlay (`127.0.0.1:8081`).
   - Do **not** give desktop a Postgres password — HTTP only.
 ## Phase 7 notes (2026-09-14)
 

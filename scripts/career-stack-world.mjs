@@ -6,6 +6,7 @@
  *   npm run career:stack:world              → lab overlay (loopback DB + Adminer)
  *   npm run career:stack:world -- --build
  *   npm run career:stack:world -- --prod    → VPS-safe (no DB publish; API 127.0.0.1)
+ *   npm run career:stack:world -- --prod --tls  → + Caddy HTTPS (CAREER_WORLD_HOST)
  *   npm run career:stack:world -- --down
  *   npm run career:stack:world -- --prod --down
  */
@@ -17,25 +18,37 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const down = args.includes('--down');
 const prod = args.includes('--prod');
+const tls = args.includes('--tls');
 const build = args.includes('--build') || !down;
+
+if (tls && !prod) {
+  console.error(
+    '[career:stack:world] --tls requires --prod (Caddy lives in docker-compose.prod.yml)',
+  );
+  process.exit(1);
+}
 
 const overlay = prod ? 'docker-compose.prod.yml' : 'docker-compose.lab.yml';
 const fileArgs = ['-f', 'docker-compose.yml', '-f', overlay];
+const profiles = ['world'];
+if (tls) profiles.push('tls');
+
+const profileArgs = profiles.flatMap((p) => ['--profile', p]);
 
 const composeArgs = down
-  ? ['compose', ...fileArgs, '--profile', 'world', 'down']
+  ? ['compose', ...fileArgs, ...profileArgs, 'down']
   : [
       'compose',
       ...fileArgs,
-      '--profile',
-      'world',
+      ...profileArgs,
       'up',
       '-d',
       ...(build ? ['--build'] : []),
     ];
 
+const modeLabel = prod ? (tls ? 'prod+tls' : 'prod') : 'lab';
 console.log(
-  `[career:stack:world] ${prod ? 'prod' : 'lab'} — docker ${composeArgs.join(' ')}`,
+  `[career:stack:world] ${modeLabel} — docker ${composeArgs.join(' ')}`,
 );
 const child = spawn('docker', composeArgs, {
   cwd: root,
@@ -45,10 +58,20 @@ const child = spawn('docker', composeArgs, {
 
 child.on('exit', (code) => {
   if (!down && (code ?? 1) === 0) {
-    if (prod) {
+    if (prod && tls) {
+      console.log(`
+[career:stack:world] up (prod + Caddy TLS)
+  HTTPS       https://$CAREER_WORLD_HOST  (Let's Encrypt via Caddy)
+  World API   http://127.0.0.1:8787        (loopback; Caddy proxies on Docker net)
+  Postgres    Docker network only
+
+Desktop:
+  CAREER_WORLD_API_URL=https://<CAREER_WORLD_HOST>
+`);
+    } else if (prod) {
       console.log(`
 [career:stack:world] up (prod overlay)
-  World API   http://127.0.0.1:8787   (loopback only — put TLS proxy in front)
+  World API   http://127.0.0.1:8787   (loopback only — add --tls for Caddy)
   Worker      skyline-career-world-worker
   Postgres    Docker network only (no host :5432)
   Adminer     not started

@@ -1,19 +1,37 @@
 # Prod / VPS overlay — Postgres stays Docker-internal (no host :5432 / Adminer).
-# World API on loopback only — terminate TLS (Caddy/nginx) or Tailscale in front.
+# World API on loopback only — put Caddy (profile `tls`) or another proxy in front.
 #
 #   npm run career:stack:world -- --prod
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile world up -d --build
+#   npm run career:stack:world -- --prod --tls   # + Caddy :80/:443 (needs CAREER_WORLD_HOST)
 #
-# Reach the DB from your Windows PC without public exposure:
-#   1) SSH tunnel to a *loopback* publish (bring Adminer/Postgres up with lab
-#      overlay temporarily, or keep a 127.0.0.1:5432 mapping only while you work):
-#        ssh -N -L 5432:127.0.0.1:5432 user@vps
-#        → DBeaver / Adminer on Windows → 127.0.0.1:5432
-#   2) Tailscale/WireGuard on VPS + PC, then connect to the VPS Tailscale IP
-#      (only if you intentionally publish Postgres on that interface).
-# See docs/agent-context/14-mp-world-clock.md (§ DB access).
+# DB access: SSH tunnel / Tailscale — docs/agent-context/14-mp-world-clock.md
 
 services:
   world-api:
     ports:
       - '127.0.0.1:8787:8787'
+
+  # Optional TLS terminator (Let's Encrypt). Enable: --profile tls / stack --tls
+  caddy:
+    image: caddy:2-alpine
+    container_name: skyline-career-caddy
+    restart: unless-stopped
+    profiles: ['tls']
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      # Prefer CAREER_WORLD_HOST; SKYLINE_WORLD_HOST remains a legacy alias.
+      CAREER_WORLD_HOST: ${CAREER_WORLD_HOST:-${SKYLINE_WORLD_HOST:?Set CAREER_WORLD_HOST in .env (e.g. world.example.com)}}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - skyline_career_caddy_data:/data
+      - skyline_career_caddy_config:/config
+    depends_on:
+      world-api:
+        condition: service_healthy
+
+volumes:
+  skyline_career_caddy_data:
+  skyline_career_caddy_config:

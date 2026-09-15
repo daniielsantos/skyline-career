@@ -1,0 +1,19 @@
+# TLS front for Skyline Career world-api (Let's Encrypt via Caddy).
+# Used by docker-compose.prod.yml service `caddy` (profile `tls`).
+#
+# Set in root `.env` (brand-neutral hostname — any domain you own):
+#   CAREER_WORLD_HOST=world.example.com
+# Legacy alias: SKYLINE_WORLD_HOST (compose still accepts it).
+#
+# DNS A/AAAA for that host must point at the VPS. Ports 80 + 443 must be open.
+# Desktop: CAREER_WORLD_API_URL=https://world.example.com
+
+{
+	# Optional: ACME account email (Let's Encrypt expiry notices)
+	# email you@example.com
+}
+
+{$CAREER_WORLD_HOST} {
+	encode gzip
+	reverse_proxy world-api:8787
+}

@@ -31,6 +31,29 @@ const HOP_BY_HOP = new Set([
   'content-length',
 ]);
 
+/**
+ * `fetch` transparently decodes gzip/br bodies but keeps the upstream
+ * content-encoding header. Forwarding that header makes Chromium decode the
+ * already-decoded bytes again and reject the response with ERR_CONTENT_DECODING_FAILED.
+ */
+export function gatewayResponseHeaders(upstream: Headers): Record<string, string> {
+  const out: Record<string, string> = {
+    'access-control-allow-origin': '*',
+  };
+  upstream.forEach((value, key) => {
+    const normalized = key.toLowerCase();
+    if (HOP_BY_HOP.has(normalized)) return;
+    if (
+      normalized === 'access-control-allow-origin' ||
+      normalized === 'content-encoding'
+    ) {
+      return;
+    }
+    out[key] = value;
+  });
+  return out;
+}
+
 export async function proxyToWorldApi(
   req: IncomingMessage,
   res: ServerResponse,
@@ -52,6 +75,9 @@ export async function proxyToWorldApi(
   const auth = worldAuthFromIncoming(req);
   if (auth.authorization) headers.authorization = auth.authorization;
   if (auth.companyId) headers['x-skyline-company-id'] = auth.companyId;
+  // Avoid compression at the upstream when possible. The response filter
+  // below remains required for servers that compress regardless.
+  headers['accept-encoding'] = 'identity';
 
   const fetchImpl = opts.fetchImpl ?? fetch;
   let upstream: Response;
@@ -73,14 +99,7 @@ export async function proxyToWorldApi(
     return;
   }
 
-  const outHeaders: Record<string, string> = {
-    'access-control-allow-origin': '*',
-  };
-  upstream.headers.forEach((value, key) => {
-    if (HOP_BY_HOP.has(key.toLowerCase())) return;
-    if (key.toLowerCase() === 'access-control-allow-origin') return;
-    outHeaders[key] = value;
-  });
+  const outHeaders = gatewayResponseHeaders(upstream.headers);
   const buf = Buffer.from(await upstream.arrayBuffer());
   res.writeHead(upstream.status, outHeaders);
   res.end(buf);

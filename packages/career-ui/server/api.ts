@@ -472,6 +472,12 @@ const careerRoot = await resolveCareerRoot();
 let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
 let fixedWorldOpenError: string | null = null;
+let worldWriterLeaseState:
+  | 'not-required'
+  | 'pending'
+  | 'acquired'
+  | 'denied' = 'not-required';
+let worldWriterLeaseError: string | null = null;
 
 /** Process role: full (SP) | world (VPS) | gateway (desktop sim). */
 const careerApiMode: CareerApiMode = resolveCareerApiMode();
@@ -535,6 +541,35 @@ function schedulePostLoginEconomyWork(tickService: WorldTickService): void {
   })();
 }
 
+async function startOwnedWorldPulse(
+  tickService: WorldTickService,
+): Promise<void> {
+  const activeStore = requireStore();
+  worldWriterLeaseState = 'pending';
+  worldWriterLeaseError = null;
+  try {
+    if (activeStore.kind === 'postgres') {
+      if (!activeStore.acquireWorldWriterLease) {
+        throw new Error('Postgres store does not implement the world-writer lease');
+      }
+      const acquired = await activeStore.acquireWorldWriterLease();
+      if (!acquired) {
+        throw new Error(
+          'Another process already owns the Postgres world-writer lease',
+        );
+      }
+    }
+    worldWriterLeaseState = 'acquired';
+    console.log('[career] world-writer lease acquired by API');
+    schedulePostLoginEconomyWork(tickService);
+  } catch (error) {
+    worldWriterLeaseState = 'denied';
+    worldWriterLeaseError =
+      error instanceof Error ? error.message : String(error);
+    console.error(`[career] world-writer lease denied: ${worldWriterLeaseError}`);
+  }
+}
+
 /**
  * Phase 2 — resume last-played profile on API boot so the world tick runs
  * with zero UI clients (hosted SP mold). Opt out: CAREER_HEADLESS_PULSE=0.
@@ -589,12 +624,19 @@ async function bootstrapHeadlessWorldPulse(
       }
     }
     if (!isHeadlessPulseEnabled()) {
+      if (careerApiMode === 'world') {
+        worldWriterLeaseState = 'denied';
+        worldWriterLeaseError =
+          'CAREER_API_MODE=world requires CAREER_HEADLESS_PULSE=1';
+        console.error(`[career] ${worldWriterLeaseError}`);
+        return;
+      }
       console.log(
-        '[career] headless-pulse disabled (CAREER_HEADLESS_PULSE) — store open; worker owns ticks',
+        '[career] headless-pulse disabled (CAREER_HEADLESS_PULSE) — store open; an external writer must own ticks',
       );
       return;
     }
-    schedulePostLoginEconomyWork(tickService);
+    await startOwnedWorldPulse(tickService);
     return;
   }
 
@@ -603,7 +645,7 @@ async function bootstrapHeadlessWorldPulse(
     return;
   }
   if (store) {
-    schedulePostLoginEconomyWork(tickService);
+    await startOwnedWorldPulse(tickService);
     return;
   }
 
@@ -626,7 +668,7 @@ async function bootstrapHeadlessWorldPulse(
     console.log(
       `[career] headless-pulse resume id=${id} ${Math.round(performance.now() - t0)}ms`,
     );
-    schedulePostLoginEconomyWork(tickService);
+    await startOwnedWorldPulse(tickService);
   } catch (error) {
     console.error(
       `[career] headless-pulse fail id=${id} ${Math.round(performance.now() - t0)}ms:`,
@@ -1473,6 +1515,19 @@ async function withCareerWrite<T>(
   }
   return withCareerLock(async () => {
     const activeStore = requireStore();
+    if (careerApiMode === 'world' && activeStore.kind === 'postgres') {
+      const acquired =
+        activeStore.acquireWorldWriterLease &&
+        (await activeStore.acquireWorldWriterLease());
+      if (!acquired) {
+        worldWriterLeaseState = 'denied';
+        worldWriterLeaseError =
+          'Another process owns the Postgres world-writer lease';
+        throw new Error(worldWriterLeaseError);
+      }
+      worldWriterLeaseState = 'acquired';
+      worldWriterLeaseError = null;
+    }
     const companyId = opts?.companyId?.trim();
     const companyOpts = companyId ? { companyId } : undefined;
     const missions = await loadMissions(companyOpts);
@@ -1664,8 +1719,13 @@ async function withCareerWrite<T>(
     }
     if (persistPortMarket) {
       await activeStore.persistPortMarketTables(world);
-      // portSnapshot syncs concessions; keep index table aligned with company JSON.
-      await activeStore.persistPortConcessionIndex(world.portConcessions ?? []);
+      // Postgres commits listings, inventory and concessions under one revision.
+      // Embedded stores retain their separate concession table update.
+      if (activeStore.kind !== 'postgres') {
+        await activeStore.persistPortConcessionIndex(
+          world.portConcessions ?? [],
+        );
+      }
       // Hire-desk pool lives on company_state; snapshot may roll it here.
       await saveMissions(missions, companyOpts);
       return result;
@@ -2737,8 +2797,28 @@ export function createCareerApiServer(port = 8787) {
         const regionCount = peeked
           ? listNpcHomeRegions(peeked.airports ?? []).length
           : 0;
-        send(res, 200, {
-          ok: true,
+        const writerRequired = careerApiMode === 'world';
+        const writerLeaseHeld =
+          worldWriterLeaseState === 'acquired' &&
+          store.hasWorldWriterLease?.() !== false;
+        const writerReady =
+          !writerRequired || writerLeaseHeld;
+        send(res, writerReady ? 200 : 503, {
+          ok: writerReady,
+          ...(!writerReady
+            ? {
+                error:
+                  worldWriterLeaseError ??
+                  (worldWriterLeaseState === 'acquired'
+                    ? 'World writer lease connection was lost'
+                    : 'World writer lease is not acquired yet'),
+                code:
+                  worldWriterLeaseState === 'denied' ||
+                  worldWriterLeaseState === 'acquired'
+                    ? 'world_writer_denied'
+                    : 'world_writer_pending',
+              }
+            : {}),
           needsProfile: false,
           activeProfileId: worldFixed ? FIXED_WORLD_PROFILE_ID : activeProfileId,
           activeProfileName,
@@ -2746,6 +2826,13 @@ export function createCareerApiServer(port = 8787) {
           npcFleetTarget: peeked ? targetNpcFleetSize(regionCount) : 1,
           sourceStamp: bootSourceStamp,
           store: store.kind,
+          worldWriter: writerRequired
+            ? writerReady
+              ? 'api'
+              : worldWriterLeaseState === 'pending'
+                ? 'pending'
+                : 'denied'
+            : 'external',
           homeCountryId: peeked?.homeCountryId ?? null,
           countries: peeked ? listWorldCountryIds(peeked) : [],
           internationalLaneCount: peeked?.internationalLanes?.length ?? 0,

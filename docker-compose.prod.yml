@@ -16,6 +16,7 @@ services:
       CAREER_WORLD_ALLOW_SEED: ${CAREER_WORLD_ALLOW_SEED:-0}
 
   world-worker:
+    # Inherits profile `legacy-worker`; normal prod never starts this service.
     environment:
       CAREER_WORLD_ALLOW_SEED: ${CAREER_WORLD_ALLOW_SEED:-0}
 

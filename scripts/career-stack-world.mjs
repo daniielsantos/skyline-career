@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Local production-ish stack: Postgres + world-api + world-worker in Docker.
+ * Local production-ish stack: Postgres + single-writer world-api in Docker.
  * Desktop / gateway talks to http://127.0.0.1:8787 (economy); local gateway on 8788.
  *
  *   npm run career:stack:world              → lab overlay (loopback DB + Adminer)
@@ -43,7 +43,7 @@ const fileArgs = [
   '-f',
   overlay,
 ];
-const profiles = ['world'];
+const profiles = down ? ['world', 'legacy-worker'] : ['world'];
 if (tls) profiles.push('tls');
 
 const profileArgs = profiles.flatMap((p) => ['--profile', p]);
@@ -77,6 +77,20 @@ function runDocker(runArgs) {
 }
 
 async function main() {
+  if (!down) {
+    // A container created by the old dual-writer stack is not selected by the
+    // new normal profile. Remove it before the API claims the writer lease.
+    await runDocker([
+      'compose',
+      ...fileArgs,
+      '--profile',
+      'legacy-worker',
+      'rm',
+      '-s',
+      '-f',
+      'world-worker',
+    ]);
+  }
   if (prod && !down) {
     const pullCode = await runDocker([
       'compose',
@@ -84,7 +98,6 @@ async function main() {
       ...profileArgs,
       'pull',
       'world-api',
-      'world-worker',
     ]);
     if (pullCode !== 0) process.exit(pullCode);
   }
@@ -105,7 +118,7 @@ Desktop:
       console.log(`
 [career:stack:world] up (prod overlay)
   World API   http://127.0.0.1:8787   (loopback only — add --tls for Caddy)
-  Worker      skyline-career-world-worker
+  Writer      world-api (clock + economy)
   Postgres    Docker network only (no host :5432)
   Adminer     not started
 
@@ -115,7 +128,7 @@ Desktop:
       console.log(`
 [career:stack:world] up (lab overlay)
   World API   http://127.0.0.1:8787   (Auth + economy — no Watch)
-  Worker      skyline-career-world-worker
+  Writer      world-api (clock + economy)
   Postgres    127.0.0.1:5432
   Adminer     http://127.0.0.1:8081
 

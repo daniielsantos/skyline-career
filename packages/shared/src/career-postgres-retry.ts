@@ -1,3 +1,6 @@
+/** Stable int4 advisory-lock key for the one authoritative world writer. */
+export const CAREER_PG_WORLD_WRITER_LOCK_KEY = 87_201_401;
+
 /** PostgreSQL failures that are safe to retry during process startup. */
 export function isTransientPostgresStartupError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;

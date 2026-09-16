@@ -2,7 +2,8 @@
 /**
  * 24/7 Postgres world pulse (no UI).
  * Expects: docker compose up -d
- * While running: set CAREER_HEADLESS_PULSE=0 on career:host:pg to avoid double ticks.
+ * Legacy diagnostics only. While running, the API must be stopped or explicitly
+ * set CAREER_HEADLESS_PULSE=0 to avoid two writers.
  *
  * Usage:
  *   npm run career:world:pg

@@ -5,9 +5,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/deploy-world.sh --image IMAGE[@DIGEST] --health-url URL [--backup]
 
-Deploys world-api and world-worker sequentially without rebuilding or touching
-Docker volumes. The repository must already be checked out at the intended
-revision and contain a host-specific, gitignored .env file.
+Deploys the single-writer world-api without rebuilding or touching Docker
+volumes. Any legacy world-worker is stopped before the API is replaced and
+removed only after health checks pass. The repository must already be checked
+out at the intended revision and contain a host-specific, gitignored .env file.
 EOF
 }
 
@@ -89,8 +90,10 @@ fi
 
 check_api_contract() {
   local url="$1"
+  local require_writer="${2:-1}"
   docker exec skyline-career-world-api node -e '
     const url = process.argv[1];
+    const requireWriter = process.argv[2] === "1";
     const timeout = setTimeout(() => process.exit(2), 10000);
     fetch(url)
       .then(async (res) => {
@@ -100,7 +103,8 @@ check_api_contract() {
           body.ok === true &&
           body.worldFixed === true &&
           body.needsProfile === false &&
-          body.store === "postgres";
+          body.store === "postgres" &&
+          (!requireWriter || body.worldWriter === "api");
         if (!valid) {
           console.error(JSON.stringify({ status: res.status, body }));
           process.exit(1);
@@ -111,31 +115,17 @@ check_api_contract() {
         process.exit(1);
       })
       .finally(() => clearTimeout(timeout));
-  ' "$url"
+  ' "$url" "$require_writer"
 }
 
 wait_for_api() {
+  local require_writer="${1:-1}"
   local attempt
   for attempt in $(seq 1 36); do
     if [[ "$(docker inspect --format '{{.State.Health.Status}}' \
       skyline-career-world-api 2>/dev/null || true)" == healthy ]] &&
-      check_api_contract 'http://127.0.0.1:8787/api/health'; then
+      check_api_contract 'http://127.0.0.1:8787/api/health' "$require_writer"; then
       return 0
-    fi
-    sleep 5
-  done
-  return 1
-}
-
-wait_for_worker() {
-  local attempt
-  for attempt in $(seq 1 12); do
-    if [[ "$(docker inspect --format '{{.State.Status}}' \
-      skyline-career-world-worker 2>/dev/null || true)" == running ]]; then
-      sleep 5
-      [[ "$(docker inspect --format '{{.State.Status}}' \
-        skyline-career-world-worker 2>/dev/null || true)" == running ]]
-      return
     fi
     sleep 5
   done
@@ -144,13 +134,11 @@ wait_for_worker() {
 
 deploy_image() {
   local target_image="$1"
+  local require_writer="${2:-1}"
   CAREER_WORLD_IMAGE="$target_image" "${compose[@]}" up -d \
     --no-deps --no-build --force-recreate world-api || return 1
-  wait_for_api || return 1
-  CAREER_WORLD_IMAGE="$target_image" "${compose[@]}" up -d \
-    --no-deps --no-build --force-recreate world-worker || return 1
-  wait_for_worker || return 1
-  check_api_contract "$health_url" || return 1
+  wait_for_api "$require_writer" || return 1
+  check_api_contract "$health_url" "$require_writer" || return 1
 }
 
 write_deploy_env() {
@@ -172,13 +160,14 @@ if ((backup)); then
 fi
 
 echo "[deploy] pulling $image"
-CAREER_WORLD_IMAGE="$image" "${compose[@]}" pull world-api world-worker
+CAREER_WORLD_IMAGE="$image" "${compose[@]}" pull world-api
 
-# The old worker must not pulse while the new API performs schema checks.
-"${compose[@]}" stop world-worker >/dev/null 2>&1 || true
+# Transition invariant: never let the legacy worker overlap the API writer.
+docker stop skyline-career-world-worker >/dev/null 2>&1 || true
 
-echo "[deploy] updating API, checking health, then updating worker"
-if deploy_image "$image"; then
+echo "[deploy] updating single-writer API and checking health"
+if deploy_image "$image" 1; then
+  docker rm -f skyline-career-world-worker >/dev/null 2>&1 || true
   write_deploy_env "$image"
   echo "[deploy] healthy: $image"
   exit 0
@@ -192,11 +181,10 @@ fi
 
 echo "[deploy] rolling application back to $previous_image" >&2
 if ! docker image inspect "$previous_image" >/dev/null 2>&1; then
-  CAREER_WORLD_IMAGE="$previous_image" "${compose[@]}" pull \
-    world-api world-worker || true
+  CAREER_WORLD_IMAGE="$previous_image" "${compose[@]}" pull world-api || true
 fi
-"${compose[@]}" stop world-worker >/dev/null 2>&1 || true
-if deploy_image "$previous_image"; then
+if deploy_image "$previous_image" 0; then
+  docker rm -f skyline-career-world-worker >/dev/null 2>&1 || true
   write_deploy_env "$previous_image"
   echo "[deploy] rollback healthy; database backup was not restored automatically" >&2
 else

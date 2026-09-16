@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * MP world host (VPS / lab): Postgres + CAREER_API_MODE=world (no SimBridge).
- * Pair with: npm run career:world:pg  and desktop CAREER_WORLD_API_URL.
+ * This process is the single writer and owns the background economy pulse.
  */
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -16,9 +16,7 @@ console.log(
   `[career:host:world] CAREER_DATABASE_URL=${databaseUrl.replace(/:[^:@/]+@/, ':***@')}`,
 );
 console.log('[career:host:world] mode=world — Watch/inject on desktop gateway');
-console.log(
-  '[career:host:world] pulse: npm run career:world:pg (CAREER_HEADLESS_PULSE=0 here)',
-);
+console.log('[career:host:world] writer=api (commands + background pulse)');
 
 const child = spawn(
   process.execPath,
@@ -32,7 +30,7 @@ const child = spawn(
       CAREER_DATABASE_URL: databaseUrl,
       CAREER_API_MODE: process.env.CAREER_API_MODE ?? 'world',
       CAREER_DISABLE_SIM: process.env.CAREER_DISABLE_SIM ?? '1',
-      CAREER_HEADLESS_PULSE: process.env.CAREER_HEADLESS_PULSE ?? '0',
+      CAREER_HEADLESS_PULSE: process.env.CAREER_HEADLESS_PULSE ?? '1',
       CAREER_AUTH: process.env.CAREER_AUTH ?? '1',
       CAREER_WORLD_FIXED: process.env.CAREER_WORLD_FIXED ?? '1',
     },

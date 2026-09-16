@@ -199,6 +199,13 @@ export type PersistCommandWorldSliceOpts = {
 export interface CareerStore {
   readonly kind: CareerStoreKind;
   readonly sqlitePath?: string;
+  /**
+   * Acquire the process-lifetime world-writer lease. Postgres implements this
+   * with a session advisory lock; embedded stores do not need one.
+   */
+  acquireWorldWriterLease?(): Promise<boolean>;
+  /** False after the lease connection is lost; used by health/write guards. */
+  hasWorldWriterLease?(): boolean;
   loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult>;
   saveEconomy(
     world: CareerEconomyWorld,
@@ -207,7 +214,7 @@ export interface CareerStore {
   persistDemandOrder(order: DemandOrder): Promise<void>;
   persistPortListing(listing: PortListing): Promise<void>;
   persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void>;
-  /** Seed/expire port listings + inventory only — not airports/lots/NPC. */
+  /** Seed/expire port market projection — not airports/lots/NPC. */
   persistPortMarketTables(world: CareerEconomyWorld): Promise<void>;
   persistDemandBoardTables(world: CareerEconomyWorld): Promise<void>;
   persistInboundPending(world: CareerEconomyWorld): Promise<void>;

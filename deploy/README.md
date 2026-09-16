@@ -10,8 +10,9 @@ The World image is built once by GitHub Actions for `linux/amd64` (VPS) and
 - A published GitHub Release builds the tagged revision and waits for approval
   on the `production` GitHub Environment.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
-- API and worker update sequentially. A failed health check rolls the
-  application image back, but never restores or deletes a database volume.
+- `world-api` is the single writer: it owns HTTP commands and the background
+  economy clock. A failed health check rolls the application image back, but
+  never restores or deletes a database volume.
 
 ## Host preparation
 
@@ -117,7 +118,9 @@ CI identity as required by that policy.
 
 4. Publish the next desktop release. Approve `production` from the workflow run
    only after staging is healthy.
-5. Confirm API, worker, Postgres and the external production health endpoint.
+5. Confirm API, Postgres and the external production health endpoint.
+   `/api/health` must report `"worldWriter":"api"`; a normal deployment must
+   not have a `skyline-career-world-worker` container.
 
 Pre-deploy dumps are retained for 14 days in
 `$DEPLOY_BACKUP_DIR` or `<DEPLOY_PATH>/backups/predeploy`. Ensure this directory
@@ -152,3 +155,14 @@ bash scripts/deploy-world.sh \
 
 Database restoration is deliberately manual because application rollback does
 not imply that destructive loss of newer database writes is acceptable.
+
+## Single-writer invariant
+
+Normal lab, staging and production stacks run only `world-api` plus Postgres.
+`CAREER_HEADLESS_PULSE=1` makes the API advance the world even with zero
+clients. The old `world-worker` service remains behind the explicit
+`legacy-worker` Compose profile for diagnostics only; never run it beside the
+normal API writer.
+
+During migration, `deploy-world.sh` stops an existing legacy worker before
+replacing the API and removes that container after the new API reports healthy.

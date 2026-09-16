@@ -17,7 +17,7 @@ console.log(
 );
 console.log('[career:host:pg] Adminer http://127.0.0.1:8081 (System: PostgreSQL, Server: postgres)');
 console.log(
-  '[career:host:pg] For 24/7 without this process: npm run career:world:pg (set CAREER_HEADLESS_PULSE=0 here)',
+  '[career:host:pg] writer=api (commands + background pulse while this process runs)',
 );
 
 const child = spawn(
@@ -30,6 +30,7 @@ const child = spawn(
       ...process.env,
       CAREER_PG: process.env.CAREER_PG ?? '1',
       CAREER_DATABASE_URL: databaseUrl,
+      CAREER_HEADLESS_PULSE: process.env.CAREER_HEADLESS_PULSE ?? '1',
     },
   },
 );

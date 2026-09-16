@@ -85,6 +85,7 @@ import {
   settleCompanyPassiveFeesForTickRange,
 } from './career-company-session.js';
 import type { OfflineFeeSummary } from './career-offline-fees.js';
+import { CAREER_PG_WORLD_WRITER_LOCK_KEY } from './career-postgres-retry.js';
 
 export {
   careerDatabaseUrlFromEnv,
@@ -370,6 +371,7 @@ export class PostgresCareerStore implements CareerStore {
   private ram: CareerEconomyWorld | null = null;
   /** Revision of `ram`; null means no authoritative PG snapshot is cached. */
   private ramRevision: bigint | null = null;
+  private writerLeaseClient: pg.PoolClient | null = null;
   private ready: Promise<void>;
 
   constructor(connectionString: string) {
@@ -380,6 +382,37 @@ export class PostgresCareerStore implements CareerStore {
   /** Wait until DDL is applied (call after open). */
   async init(): Promise<void> {
     await this.ready;
+  }
+
+  async acquireWorldWriterLease(): Promise<boolean> {
+    await this.ready;
+    if (this.writerLeaseClient) return true;
+    const client = await this.pool.connect();
+    try {
+      const result = await client.query<{ acquired: boolean }>(
+        `SELECT pg_try_advisory_lock($1) AS acquired`,
+        [CAREER_PG_WORLD_WRITER_LOCK_KEY],
+      );
+      if (result.rows[0]?.acquired !== true) {
+        client.release();
+        return false;
+      }
+      this.writerLeaseClient = client;
+      client.once('error', (error) => {
+        if (this.writerLeaseClient === client) {
+          this.writerLeaseClient = null;
+          client.release(error);
+        }
+      });
+      return true;
+    } catch (error) {
+      client.release();
+      throw error;
+    }
+  }
+
+  hasWorldWriterLease(): boolean {
+    return this.writerLeaseClient !== null;
   }
 
   private async ensureSchema(): Promise<void> {
@@ -1027,6 +1060,7 @@ export class PostgresCareerStore implements CareerStore {
               ...this.ram,
               portListings: toSave.portListings ?? [],
               portInventories: toSave.portInventories ?? [],
+              portConcessions: toSave.portConcessions ?? [],
             }
           : toSave;
       },
@@ -1188,7 +1222,21 @@ export class PostgresCareerStore implements CareerStore {
   }
 
   close(): void {
-    void this.pool.end();
+    const lease = this.writerLeaseClient;
+    this.writerLeaseClient = null;
+    if (!lease) {
+      void this.pool.end();
+      return;
+    }
+    void lease
+      .query(`SELECT pg_advisory_unlock($1)`, [
+        CAREER_PG_WORLD_WRITER_LOCK_KEY,
+      ])
+      .catch(() => undefined)
+      .finally(() => {
+        lease.release();
+        void this.pool.end();
+      });
   }
 }
 

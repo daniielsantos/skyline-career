@@ -55,7 +55,8 @@ services:
       CAREER_AUTH_ALLOW_CLAIM: ${CAREER_AUTH_ALLOW_CLAIM:-0}
       CAREER_AUTH_SESSIONS_LIST_ALL: ${CAREER_AUTH_SESSIONS_LIST_ALL:-0}
       CAREER_WORLD_FIXED: '1'
-      CAREER_HEADLESS_PULSE: '0'
+      # Single-writer invariant: this API owns the clock and all economy writes.
+      CAREER_HEADLESS_PULSE: '1'
       CAREER_PG: '1'
       CAREER_UI_API_BIND: 0.0.0.0
       CAREER_UI_API_PORT: '8787'
@@ -78,6 +79,8 @@ services:
       start_period: 40s
     profiles: ['world']
 
+  # Emergency/manual compatibility only. Never enable beside the normal
+  # world-api: both processes writing the same world creates revision races.
   world-worker:
     image: ${CAREER_WORLD_IMAGE:-ghcr.io/daniielsantos/skyline-career-world:main}
     container_name: skyline-career-world-worker
@@ -91,7 +94,7 @@ services:
         condition: service_healthy
       world-api:
         condition: service_healthy
-    profiles: ['world']
+    profiles: ['legacy-worker']
 
 volumes:
   skyline_career_pg_data:

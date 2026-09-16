@@ -2623,7 +2623,7 @@ export async function persistDemandOrderToPg(
   });
 }
 
-/** Port listings + inventories (Port FBO desk). */
+/** Port listings + inventories + concession index (Port FBO desk). */
 export async function persistPortMarketToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
@@ -2633,9 +2633,14 @@ export async function persistPortMarketToPg(
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const listingRows = portListingTableRows(wid, world.portListings ?? []);
   const invRows = portInventoryTableRows(wid, world.portInventories ?? []);
+  const concessionRows = portConcessionTableRows(
+    wid,
+    world.portConcessions ?? [],
+  );
   return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
     await client.query(`DELETE FROM port_listings WHERE world_id = $1`, [wid]);
     await client.query(`DELETE FROM port_inventories WHERE world_id = $1`, [wid]);
+    await client.query(`DELETE FROM port_concessions WHERE world_id = $1`, [wid]);
     if (listingRows.length > 0) {
       await insertChunks(
         client,
@@ -2655,6 +2660,16 @@ export async function persistPortMarketToPg(
          )`,
         5,
         invRows,
+      );
+    }
+    if (concessionRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO port_concessions (
+           world_id, port_id, company_id, lease_paid_through_tick, level
+         )`,
+        5,
+        concessionRows,
       );
     }
   });

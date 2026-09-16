@@ -31,6 +31,7 @@ services:
       - '8787:8787'
 
   world-worker:
+    # Buildable only for explicit `--profile legacy-worker` diagnostics.
     build:
       context: .
       dockerfile: Dockerfile.world

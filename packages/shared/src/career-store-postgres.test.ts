@@ -281,9 +281,48 @@ describe('career store postgres', () => {
         'PostgresCareerStore should expose settleWorldCompaniesPassiveFees',
       );
 
+      // A ports snapshot is one logical CAS write, including concessions.
+      economy.world.portConcessions = [
+        {
+          portId: 'BRSSZ',
+          companyId,
+          leasePaidThroughTick: economy.world.tick + 96,
+          level: 2,
+        },
+      ];
+      const beforePortRevision = await store['pool'].query(
+        `SELECT revision FROM economy_meta WHERE world_id = 'local'`,
+      );
+      await store.persistPortMarketTables(economy.world);
+      const afterPortRevision = await store['pool'].query(
+        `SELECT revision FROM economy_meta WHERE world_id = 'local'`,
+      );
+      assert.equal(
+        BigInt(afterPortRevision.rows[0]?.revision),
+        BigInt(beforePortRevision.rows[0]?.revision) + 1n,
+        'ports snapshot must advance the economy revision exactly once',
+      );
+      const concession = await store['pool'].query(
+        `SELECT company_id, level
+         FROM port_concessions
+         WHERE world_id = 'local' AND port_id = 'BRSSZ'`,
+      );
+      assert.equal(concession.rows[0]?.company_id, companyId);
+      assert.equal(concession.rows[0]?.level, 2);
+
       // Two processes must observe revision changes and reject stale writes.
       const peer = await openPostgresCareerStore(url);
       try {
+        assert.equal(
+          await store.acquireWorldWriterLease(),
+          true,
+          'first process must acquire the world-writer lease',
+        );
+        assert.equal(
+          await peer.acquireWorldWriterLease(),
+          false,
+          'second process must not overlap the authoritative writer',
+        );
         const peerSnapshot = await peer.loadEconomy({ maxCatchUpTicks: 0 });
         const beforeRevision = await store['pool'].query(
           `SELECT revision FROM economy_meta WHERE world_id = 'local'`,
@@ -324,6 +363,9 @@ describe('career store postgres', () => {
           (r) => (r as { account_id: string }).account_id,
         );
         await pool.query(`DELETE FROM fleet_aircraft WHERE company_id = $1`, [
+          companyId,
+        ]);
+        await pool.query(`DELETE FROM port_concessions WHERE company_id = $1`, [
           companyId,
         ]);
         await pool.query(`DELETE FROM ledger WHERE company_id = $1`, [companyId]);

@@ -2,8 +2,8 @@
  * Lab 24/7 world pulse for Postgres MP — advances economy wall-clock without
  * the Career UI host. Company mission settlement still happens on login.
  *
- * Uses a Postgres session advisory lock so two workers do not double-advance.
- * Prefer CAREER_HEADLESS_PULSE=0 on the UI host while this runs.
+ * Legacy diagnostics only. Uses the same Postgres writer lease as world-api,
+ * so it cannot overlap the normal API-owned background pulse.
  */
 
 import pg from 'pg';
@@ -21,12 +21,14 @@ import {
 } from './career-store-postgres.js';
 import { PgEconomyRevisionConflictError } from './career-store-pg-world.js';
 import {
+  CAREER_PG_WORLD_WRITER_LOCK_KEY,
   withPostgresReadyRetry,
 } from './career-postgres-retry.js';
 export { isTransientPostgresStartupError } from './career-postgres-retry.js';
 
-/** Stable int4 key for pg_try_advisory_lock (skyline world pulse). */
-export const CAREER_PG_WORLD_PULSE_LOCK_KEY = 87_201_401;
+/** Backward-compatible name for the shared world-writer advisory lock. */
+export const CAREER_PG_WORLD_PULSE_LOCK_KEY =
+  CAREER_PG_WORLD_WRITER_LOCK_KEY;
 
 /** Default: wait up to ~90s for Postgres recovery / first accept. */
 const DEFAULT_PG_READY_ATTEMPTS = 45;

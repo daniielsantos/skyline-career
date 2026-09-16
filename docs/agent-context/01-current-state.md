@@ -1,5 +1,7 @@
 # Current state (2026-09-14)
 
+`main` **667388d** / desktop **0.3.65** shipped: fixed MP boot no longer calls authenticated profiles before AuthGate (stuck “Listening for host”); post-login warm errors stay visible in AuthGate. Release: [v0.3.65](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.65).
+
 `main` **876463c** / desktop **0.3.64** shipped: register invite/claim gates; MapTiler auth + compose `MAPTILER_KEY`; Remember me opt-in (sessionStorage default). Release: [v0.3.64](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.64).
 
 `main` **a1d0af3** / desktop **0.3.63** shipped: auth single-session (1 Bearer/conta), purge expired sessions, `GET /api/auth/sessions` + online window 5 min. Release: [v0.3.63](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.63).

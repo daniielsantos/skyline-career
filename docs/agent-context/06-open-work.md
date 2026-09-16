@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-16: **VPS reboot deadlock** — Docker daemon iniciou API+worker juntos; API recebeu PG `40P01`, ficou `store:null` até restart manual. Fixed-world open agora retry 12×/1s em deadlock/recovery/connect; helper compartilhado com worker. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-15: **Prod Auth invite wiring** — compose agora passa `CAREER_AUTH_REGISTER` / `CAREER_AUTH_INVITE` e mantém claim/list-all off por default. VPS ainda precisa definir invite aleatório no `.env`, recriar `world-api` e validar `inviteRequired:true`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-15: **VPS world-api unhealthy / runtime dist missing** — `Dockerfile.world` compilava só shared, mas API importa `@msfs-compat/runtime`; imagem agora builda shared + runtime. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

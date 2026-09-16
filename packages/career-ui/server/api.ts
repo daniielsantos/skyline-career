@@ -264,6 +264,7 @@ import {
   AUTH_ONLINE_WINDOW_MS,
   bearerTokenFromHeader,
   isCareerWorldFixed,
+  withPostgresReadyRetry,
   ensureEconomyCaughtUpCooperative,
   tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
@@ -551,16 +552,27 @@ async function bootstrapHeadlessWorldPulse(
     if (!store) {
       const t0 = performance.now();
       try {
-        await withCareerLock(async () => {
-          if (store) return;
-          resetMsfsStampState();
-          store = await openCareerFixedWorldStore(careerRoot);
-          activeProfileId = FIXED_WORLD_PROFILE_ID;
-          msfsStampNeeded = true;
-        });
+        const openedStore = await withPostgresReadyRetry(
+          'fixed-world open',
+          () =>
+            withCareerLock(async () => {
+              if (store) return store;
+              resetMsfsStampState();
+              const nextStore = await openCareerFixedWorldStore(careerRoot);
+              store = nextStore;
+              activeProfileId = FIXED_WORLD_PROFILE_ID;
+              msfsStampNeeded = true;
+              return nextStore;
+            }),
+          {
+            attempts: 12,
+            delayMs: 1_000,
+            log: (line) => console.warn(`[career] ${line}`),
+          },
+        );
         console.log(
           `[career] fixed-world open id=${FIXED_WORLD_PROFILE_ID} ` +
-            `backend=${store?.kind ?? '?'} ${Math.round(performance.now() - t0)}ms`,
+            `backend=${openedStore.kind} ${Math.round(performance.now() - t0)}ms`,
         );
       } catch (error) {
         console.error(

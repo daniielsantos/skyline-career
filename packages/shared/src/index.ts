@@ -254,6 +254,7 @@ export * from './career-json-io.js';
 export * from './career-partition.js';
 export * from './career-store.js';
 export * from './career-database-url.js';
+export * from './career-postgres-retry.js';
 // Postgres modules (`career-store-postgres`, `career-store-pg-world`,
 // `career-world-worker-pg`) import `pg` — do not barrel-export them. Desktop
 // packs omit `pg`; openCareerStore / worker scripts dynamic-import when needed.

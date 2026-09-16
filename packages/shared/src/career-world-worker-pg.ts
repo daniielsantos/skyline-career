@@ -19,6 +19,10 @@ import {
   openPostgresCareerStore,
   type PostgresCareerStore,
 } from './career-store-postgres.js';
+import {
+  withPostgresReadyRetry,
+} from './career-postgres-retry.js';
+export { isTransientPostgresStartupError } from './career-postgres-retry.js';
 
 /** Stable int4 key for pg_try_advisory_lock (skyline world pulse). */
 export const CAREER_PG_WORLD_PULSE_LOCK_KEY = 87_201_401;
@@ -53,65 +57,6 @@ function resolveUrl(explicit?: string): string {
     );
   }
   return url;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-/** True when the server is up but not accepting queries yet (boot / crash recovery). */
-export function isTransientPostgresStartupError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as {
-    code?: string;
-    message?: string;
-    errno?: string;
-  };
-  const code = String(e.code ?? e.errno ?? '');
-  if (
-    code === '57P03' ||
-    code === 'ECONNREFUSED' ||
-    code === 'ECONNRESET' ||
-    code === 'ETIMEDOUT' ||
-    code === 'ENOTFOUND' ||
-    code === 'EAI_AGAIN' ||
-    code === '08001' ||
-    code === '08006'
-  ) {
-    return true;
-  }
-  const msg = String(e.message ?? err);
-  return /not yet accepting connections|recovery state has not been yet reached|Connection refused|connect ECONNREFUSED|the database system is starting up|too many clients/i.test(
-    msg,
-  );
-}
-
-async function withPostgresReadyRetry<T>(
-  label: string,
-  fn: () => Promise<T>,
-  opts: {
-    attempts: number;
-    delayMs: number;
-    log: (line: string) => void;
-  },
-): Promise<T> {
-  let lastErr: unknown;
-  for (let attempt = 1; attempt <= opts.attempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      if (!isTransientPostgresStartupError(err) || attempt >= opts.attempts) {
-        throw err;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      opts.log(
-        `[career:world:pg] ${label}: postgres not ready (${attempt}/${opts.attempts}) — ${msg}`,
-      );
-      await sleep(opts.delayMs);
-    }
-  }
-  throw lastErr;
 }
 
 async function tryAcquirePulseLock(databaseUrl: string): Promise<PulseLock | null> {

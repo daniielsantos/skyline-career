@@ -49,6 +49,13 @@ services:
       CAREER_API_MODE: world
       CAREER_DISABLE_SIM: '1'
       CAREER_AUTH: '1'
+      # Registration policy comes from the host .env. Keep lab open by
+      # default; production should set CAREER_AUTH_INVITE or disable register.
+      CAREER_AUTH_REGISTER: ${CAREER_AUTH_REGISTER:-1}
+      CAREER_AUTH_INVITE: ${CAREER_AUTH_INVITE:-}
+      # Unsafe/admin-style auth capabilities stay off unless explicitly set.
+      CAREER_AUTH_ALLOW_CLAIM: ${CAREER_AUTH_ALLOW_CLAIM:-0}
+      CAREER_AUTH_SESSIONS_LIST_ALL: ${CAREER_AUTH_SESSIONS_LIST_ALL:-0}
       CAREER_WORLD_FIXED: '1'
       CAREER_HEADLESS_PULSE: '0'
       CAREER_PG: '1'

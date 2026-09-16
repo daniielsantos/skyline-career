@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-15: **Prod Auth invite wiring** — compose agora passa `CAREER_AUTH_REGISTER` / `CAREER_AUTH_INVITE` e mantém claim/list-all off por default. VPS ainda precisa definir invite aleatório no `.env`, recriar `world-api` e validar `inviteRequired:true`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-15: **VPS world-api unhealthy / runtime dist missing** — `Dockerfile.world` compilava só shared, mas API importa `@msfs-compat/runtime`; imagem agora builda shared + runtime. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-14: **Compose lab vs prod** — base sem publish do Postgres; `docker-compose.lab.yml` (loopback DB+Adminer); `docker-compose.prod.yml` (API `127.0.0.1:8787`); `career:stack:world -- --prod`. Acesso DB: SSH tunnel / Tailscale. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

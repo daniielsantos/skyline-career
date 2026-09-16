@@ -144,8 +144,16 @@ async function pulseOnce(
     try {
       return await pulseOnceAttempt(store, ticks, nowMs, log);
     } catch (error) {
-      if (!(error instanceof PgEconomyRevisionConflictError) || attempt === 3) {
+      if (!(error instanceof PgEconomyRevisionConflictError)) {
         throw error;
+      }
+      if (attempt === 3) {
+        const latest = await store.loadEconomy({ maxCatchUpTicks: 0 });
+        log(
+          `[career:world:pg] concurrent writes persisted after 3 attempts; ` +
+            `deferring pulse without stopping worker (world.tick=${latest.world.tick})`,
+        );
+        return { advancedTicks: 0, tick: latest.world.tick };
       }
       log(
         `[career:world:pg] concurrent economy write; reloading snapshot ` +

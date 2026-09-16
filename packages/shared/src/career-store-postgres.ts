@@ -847,6 +847,7 @@ export class PostgresCareerStore implements CareerStore {
 
   async loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult> {
     await this.ready;
+    const coldLoad = this.ram === null;
     if (this.ram && opts?.maxCatchUpTicks === 0) {
       const revisionRes = await this.pool.query(
         `SELECT revision FROM economy_meta WHERE world_id = $1`,
@@ -928,13 +929,18 @@ export class PostgresCareerStore implements CareerStore {
         ensureEconomyCaughtUp(hydrated, Date.now(), catchUpOpts(opts));
       ensureHomeCountryId(caught);
       let dirty = advancedTicks > 0 || settledFlights > 0;
-      if (ensureSeedMarketFormed(caught)) dirty = true;
-      if (await economyNeedsPgTableBackfill(this.pool, caught, LOCAL_WORLD_ID)) {
-        dirty = true;
-      }
-      if (isPgEconomyMiscEmpty(meta?.misc_json)) {
-        // Schema bump: persist leftover fields into misc_json once.
-        dirty = true;
+      // Migration/backfill belongs to process cold-open only. Re-running these
+      // repair probes after every cross-process revision can create a write
+      // ping-pong between API and worker.
+      if (coldLoad) {
+        if (ensureSeedMarketFormed(caught)) dirty = true;
+        if (await economyNeedsPgTableBackfill(this.pool, caught, LOCAL_WORLD_ID)) {
+          dirty = true;
+        }
+        if (isPgEconomyMiscEmpty(meta?.misc_json)) {
+          // Schema bump: persist leftover fields into misc_json once.
+          dirty = true;
+        }
       }
       this.ram = caught;
       this.ramRevision = pgRevision(meta?.revision);

@@ -4367,17 +4367,15 @@ export function App() {
     let pollTimer: ReturnType<typeof setInterval> | undefined;
 
     async function attachFixedWorld(activeProfileId: string, nameHint?: string | null) {
-      const data = await fetchCareerProfiles();
-      if (cancelled) return;
-      setCareerProfiles(data.profiles ?? []);
-      const last =
-        data.profiles?.find((p) => p.id === activeProfileId) ??
-        ({
-          id: activeProfileId,
-          name: nameHint?.trim() || 'World',
-          createdAt: new Date(0).toISOString(),
-          updatedAt: new Date(0).toISOString(),
-        } satisfies CareerProfileMeta);
+      // A fixed MP world has no client-side save picker. Do not fetch the
+      // authenticated profiles endpoint before AuthGate has a Bearer token.
+      const last = {
+        id: activeProfileId,
+        name: nameHint?.trim() || 'World',
+        createdAt: new Date(0).toISOString(),
+        updatedAt: new Date(0).toISOString(),
+      } satisfies CareerProfileMeta;
+      setCareerProfiles([last]);
       setActiveCareerProfile(last);
       setWorldWaiting(false);
       // Do not clear showProfileGate / profilesLoading here — that paints the
@@ -11071,6 +11069,7 @@ export function App() {
       <div className="app-shell profile-gate-shell">
         <AuthGate
           busy={busy}
+          error={error}
           registerEnabled={authRegisterEnabled}
           inviteRequired={authInviteRequired}
           onLogin={async (opts) => {
@@ -11095,9 +11094,7 @@ export function App() {
               companies: result.companies,
             };
           }}
-          onSuccess={(result) => {
-            void run(() => finishAuthAndEnter(result));
-          }}
+          onSuccess={finishAuthAndEnter}
         />
         {confirmDialog}
       </div>

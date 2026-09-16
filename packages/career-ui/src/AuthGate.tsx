@@ -47,7 +47,7 @@ export function AuthGate(props: {
     companyDisplayName?: string;
     inviteCode?: string;
   }) => Promise<Omit<AuthGateResult, 'rememberMe'>>;
-  onSuccess: (result: AuthGateResult) => void;
+  onSuccess: (result: AuthGateResult) => Promise<void>;
 }) {
   const [mode, setMode] = useState<Mode>('login');
   const [loginName, setLoginName] = useState(
@@ -83,7 +83,7 @@ export function AuthGate(props: {
                 ? { inviteCode: inviteCode.trim() }
                 : {}),
             });
-      props.onSuccess({ ...result, rememberMe });
+      await props.onSuccess({ ...result, rememberMe });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : String(err));
     } finally {

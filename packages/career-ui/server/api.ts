@@ -333,7 +333,7 @@ import {
   type CareerApiMode,
 } from './career-api-mode.ts';
 import { proxyToWorldApi } from './gateway-proxy.ts';
-import { hubSelectionPersistence } from './hub-selection-persistence.ts';
+import { homeCountryPersistence } from './home-country-persistence.ts';
 import {
   authRateLimitKeyFromRequest,
   consumeAuthRateLimit,
@@ -1094,8 +1094,16 @@ async function loadEconomyUnlocked(opts?: {
   }
   const missions = await loadMissions();
   let needsSave = dirty;
-  // Home partition follows the player's chosen hub (KMIA → US), including legacy saves.
-  if (syncHomeCountryFromHub(caught, missions.homeHubIcao)) {
+  // SP owns one partition, so its world follows the player's hub. Shared
+  // worlds derive country per company and reads must never mutate global state.
+  const homeCountryPolicy = homeCountryPersistence(
+    activeStore.kind,
+    isCareerWorldFixed(),
+  );
+  if (
+    homeCountryPolicy.syncWorldHomeCountry &&
+    syncHomeCountryFromHub(caught, missions.homeHubIcao)
+  ) {
     needsSave = true;
   }
   if (needsSave) {
@@ -3657,8 +3665,11 @@ export function createCareerApiServer(port = 8787) {
         }
         const selectHubCompanyId = companyIdFromRequest(req, body.companyId);
         const selectHubStore = requireStore();
-        const hubPersistence = hubSelectionPersistence(selectHubStore.kind);
-        const postgresWorld = !hubPersistence.syncWorldHomeCountry;
+        const hubPersistence = homeCountryPersistence(
+          selectHubStore.kind,
+          isCareerWorldFixed(),
+        );
+        const sharedWorld = !hubPersistence.syncWorldHomeCountry;
         try {
           const result = await withCareerWrite(async (world, missions) => {
             const next = selectStarterHub(missions, body.icao!, {
@@ -3672,7 +3683,7 @@ export function createCareerApiServer(port = 8787) {
               countryIdFromHubIcao(world, missions.homeHubIcao) ??
               world.homeCountryId ??
               null;
-            if (postgresWorld) {
+            if (sharedWorld) {
               await selectHubStore.ensureCompany({
                 id:
                   selectHubCompanyId?.trim() ||
@@ -3693,7 +3704,7 @@ export function createCareerApiServer(port = 8787) {
               ...fleetPayload(missions, world),
             };
           }, {
-            persist: hubPersistence.persist,
+            persist: hubPersistence.persistHubSelection,
             companyId: selectHubCompanyId,
           });
           send(res, 200, result);

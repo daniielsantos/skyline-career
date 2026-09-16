@@ -109,7 +109,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.target == 'staging')
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # First pull/extract is I/O-bound on the Pi microSD; later digest pulls
+    # reuse layers and are normally much faster.
+    timeout-minutes: 45
     environment:
       name: staging
       url: ${{ vars.DEPLOY_HEALTH_URL }}

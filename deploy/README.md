@@ -29,6 +29,15 @@ The SSH deploy account must own the clone and be able to run Docker. Membership
 in the `docker` group is effectively root access, so use a dedicated SSH key and
 do not reuse a personal key.
 
+The Pi deployment uses its normal OpenSSH daemon over the Tailscale network.
+Tailscale SSH must be disabled or it intercepts port 22 and rejects the
+key-based CI identity:
+
+```bash
+sudo tailscale set --ssh=false
+sudo systemctl enable --now ssh
+```
+
 Install that key in `~/.ssh/authorized_keys` on each target. Record the host key
 from a trusted connection using the exact hostname or IP that the workflow will
 use:
@@ -96,6 +105,8 @@ CI identity as required by that policy.
 1. Commit and push the CI/CD files to `main`.
 2. Wait for `CI`, `World deploy / Build multi-architecture image`, and
    `Deploy Pi staging`.
+   The first image extraction can take 15–45 minutes on a Pi using microSD;
+   subsequent deploys reuse Docker layers.
 3. Confirm the Pi is using the digest recorded in `/opt/airframe/.env.deploy`:
 
    ```bash

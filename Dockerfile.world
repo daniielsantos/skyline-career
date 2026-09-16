@@ -10,7 +10,9 @@ COPY packages ./packages
 COPY scripts ./scripts
 COPY profiles/career ./profiles/career
 
-RUN npm ci && npm run build -w @msfs-compat/shared
+RUN npm ci \
+    && npm run build -w @msfs-compat/shared \
+    && npm run build -w @msfs-compat/runtime
 
 ENV CAREER_API_MODE=world \
     CAREER_DISABLE_SIM=1 \

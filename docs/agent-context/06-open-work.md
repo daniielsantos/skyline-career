@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-15: **VPS world-api unhealthy / runtime dist missing** — `Dockerfile.world` compilava só shared, mas API importa `@msfs-compat/runtime`; imagem agora builda shared + runtime. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-14: **Compose lab vs prod** — base sem publish do Postgres; `docker-compose.lab.yml` (loopback DB+Adminer); `docker-compose.prod.yml` (API `127.0.0.1:8787`); `career:stack:world -- --prod`. Acesso DB: SSH tunnel / Tailscale. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-15: **Caddy TLS sketch** — `deploy/Caddyfile` + serviço `caddy` (profile `tls`) no prod overlay; `career:stack:world -- --prod --tls` com `CAREER_WORLD_HOST` no `.env` (alias `SKYLINE_WORLD_HOST`). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

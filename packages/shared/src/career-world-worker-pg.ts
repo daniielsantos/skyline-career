@@ -19,6 +19,7 @@ import {
   openPostgresCareerStore,
   type PostgresCareerStore,
 } from './career-store-postgres.js';
+import { PgEconomyRevisionConflictError } from './career-store-pg-world.js';
 import {
   withPostgresReadyRetry,
 } from './career-postgres-retry.js';
@@ -99,7 +100,7 @@ async function releasePulseLock(lock: PulseLock): Promise<void> {
   }
 }
 
-async function pulseOnce(
+async function pulseOnceAttempt(
   store: PostgresCareerStore,
   ticks: number,
   nowMs: number,
@@ -131,6 +132,28 @@ async function pulseOnce(
       `${Math.round(performance.now() - t0)}ms`,
   );
   return { advancedTicks: advancedTotal, tick: world.tick };
+}
+
+async function pulseOnce(
+  store: PostgresCareerStore,
+  ticks: number,
+  nowMs: number,
+  log: (line: string) => void,
+): Promise<{ advancedTicks: number; tick: number }> {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await pulseOnceAttempt(store, ticks, nowMs, log);
+    } catch (error) {
+      if (!(error instanceof PgEconomyRevisionConflictError) || attempt === 3) {
+        throw error;
+      }
+      log(
+        `[career:world:pg] concurrent economy write; reloading snapshot ` +
+          `(retry ${attempt}/3)`,
+      );
+    }
+  }
+  throw new Error('unreachable world pulse retry state');
 }
 
 /**

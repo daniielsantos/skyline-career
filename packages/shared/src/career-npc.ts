@@ -711,6 +711,28 @@ export function npcRegionBidCapacity(
   return ready / home.length;
 }
 
+export type NpcRegionCapacityIndex = ReadonlyMap<string, number>;
+
+/** One O(NPC) pass for board rendering instead of filtering the fleet per lot. */
+export function buildNpcRegionCapacityIndex(
+  world: CareerEconomyWorld,
+  nowMs = Date.now(),
+): NpcRegionCapacityIndex {
+  const totals = new Map<string, { total: number; ready: number }>();
+  for (const npc of world.npcs ?? []) {
+    const row = totals.get(npc.homeRegion) ?? { total: 0, ready: 0 };
+    row.total += 1;
+    if (isNpcReadyToBid(npc, nowMs, world.tick)) row.ready += 1;
+    totals.set(npc.homeRegion, row);
+  }
+  return new Map(
+    [...totals].map(([region, row]) => [
+      region,
+      row.total > 0 ? row.ready / row.total : 1,
+    ]),
+  );
+}
+
 /**
  * Loaded legs a freighter completes per career day, averaged over duty and rest.
  * Duty caps at MAX_DUTY_HOURS with a 10–14h rest after, so a freighter is only
@@ -922,6 +944,7 @@ export function describeLotMarketPressure(
   world: CareerEconomyWorld,
   lot: Pick<ShipmentLot, 'originIcao' | 'destIcao' | 'commodityId'>,
   nowMs = Date.now(),
+  regionCapacity?: NpcRegionCapacityIndex,
 ): LotMarketPressure {
   const originRegion =
     airportRegion(world, lot.originIcao) ??
@@ -929,7 +952,8 @@ export function describeLotMarketPressure(
     '';
   const destRegion = airportRegion(world, lot.destIcao) ?? '';
   const originRegionCapacity = originRegion
-    ? npcRegionBidCapacity(world, originRegion, nowMs)
+    ? (regionCapacity?.get(originRegion) ??
+      npcRegionBidCapacity(world, originRegion, nowMs))
     : 1;
   const laneSaturation = npcLaneSaturation(
     world,
@@ -964,9 +988,15 @@ export function listRegionMarketPressure(
 ): RegionMarketPressure[] {
   ensureNpcFleet(world);
   const busyRegions = busyOriginRegions(world);
-  const regions = [...new Set((world.npcs ?? []).map((n) => n.homeRegion))].sort();
+  const byRegion = new Map<string, NpcFreighter[]>();
+  for (const npc of world.npcs ?? []) {
+    const home = byRegion.get(npc.homeRegion);
+    if (home) home.push(npc);
+    else byRegion.set(npc.homeRegion, [npc]);
+  }
+  const regions = [...byRegion.keys()].sort();
   return regions.map((region) => {
-    const home = world.npcs.filter((n) => n.homeRegion === region);
+    const home = byRegion.get(region) ?? [];
     let ready = 0;
     let resting = 0;
     let maintenance = 0;
@@ -1759,6 +1789,36 @@ function findActiveFlightForLot(
       (l) => l.lotId === lotId && l.status === 'in_flight',
     )
   );
+}
+
+export type NpcClaimIndex = {
+  activeFlightByLotId: ReadonlyMap<string, NpcFlight>;
+  npcById: ReadonlyMap<string, NpcFreighter>;
+};
+
+/** One O(flights + NPCs) pass for market reads. Awaiting-pilot wins by contract. */
+export function buildNpcClaimIndex(world: CareerEconomyWorld): NpcClaimIndex {
+  const activeFlightByLotId = new Map<string, NpcFlight>();
+  for (const flight of world.npcFlights ?? []) {
+    if (
+      flight.status === 'in_flight' &&
+      !activeFlightByLotId.has(flight.lotId)
+    ) {
+      activeFlightByLotId.set(flight.lotId, flight);
+    }
+  }
+  for (const flight of world.npcFlights ?? []) {
+    if (
+      flight.status === 'awaiting_pilot' &&
+      activeFlightByLotId.get(flight.lotId)?.status !== 'awaiting_pilot'
+    ) {
+      activeFlightByLotId.set(flight.lotId, flight);
+    }
+  }
+  return {
+    activeFlightByLotId,
+    npcById: new Map((world.npcs ?? []).map((npc) => [npc.id, npc])),
+  };
 }
 
 function isNpcFlightHoldingLot(flight: NpcFlight): boolean {
@@ -3658,12 +3718,13 @@ export function listNpcActivity(
 ): NpcActivityView[] {
   ensureNpcFleet(world);
   const byId = new Map(world.npcs.map((n) => [n.id, n]));
+  const lotById = new Map(world.lots.map((lot) => [lot.id, lot]));
   const views: NpcActivityView[] = [];
 
   for (const flight of world.npcFlights) {
     if (flight.status !== 'in_flight') continue;
     const npc = byId.get(flight.npcId);
-    const lot = findLot(world, flight.lotId);
+    const lot = lotById.get(flight.lotId);
     const dist = routeDistanceNm(world, flight.originIcao, flight.destIcao) ?? 0;
     const departed = flightDepartedAtMs(flight);
     const arrives = flightArrivesAtMs(flight);
@@ -3834,6 +3895,7 @@ export function npcClaimForLot(
   world: CareerEconomyWorld,
   lotId: string,
   nowMs = Date.now(),
+  index?: NpcClaimIndex,
 ):
   | {
       npcId: string;
@@ -3855,9 +3917,13 @@ export function npcClaimForLot(
       aircraftClassId?: string;
     }
   | undefined {
-  const flight = findActiveFlightForLot(world, lotId);
+  const flight =
+    index?.activeFlightByLotId.get(lotId) ??
+    findActiveFlightForLot(world, lotId);
   if (!flight) return undefined;
-  const npc = world.npcs.find((n) => n.id === flight.npcId);
+  const npc =
+    index?.npcById.get(flight.npcId) ??
+    world.npcs.find((n) => n.id === flight.npcId);
   if (flight.status === 'awaiting_pilot') {
     const until = flight.awaitingPilotUntilMs ?? flight.arrivesAtMs;
     const etaMs = Math.max(0, until - nowMs);

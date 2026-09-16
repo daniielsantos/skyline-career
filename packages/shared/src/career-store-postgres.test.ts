@@ -14,6 +14,7 @@ import {
   isCareerLabDatabaseUrl,
   openPostgresCareerStore,
 } from './career-store-postgres.js';
+import { PgEconomyRevisionConflictError } from './career-store-pg-world.js';
 
 describe('career store postgres', () => {
   it('allows seed by default for dev and requires an explicit production opt-in', () => {
@@ -279,6 +280,38 @@ describe('career store postgres', () => {
         'function',
         'PostgresCareerStore should expose settleWorldCompaniesPassiveFees',
       );
+
+      // Two processes must observe revision changes and reject stale writes.
+      const peer = await openPostgresCareerStore(url);
+      try {
+        const peerSnapshot = await peer.loadEconomy({ maxCatchUpTicks: 0 });
+        const beforeRevision = await store['pool'].query(
+          `SELECT revision FROM economy_meta WHERE world_id = 'local'`,
+        );
+        await store.persistInboundPending(economy.world);
+        const afterRevision = await store['pool'].query(
+          `SELECT revision FROM economy_meta WHERE world_id = 'local'`,
+        );
+        assert.ok(
+          Number(afterRevision.rows[0]?.revision) >
+            Number(beforeRevision.rows[0]?.revision),
+          'scoped persistence must advance economy revision',
+        );
+        await assert.rejects(
+          () => peer.persistInboundPending(peerSnapshot.world),
+          (error: unknown) => error instanceof PgEconomyRevisionConflictError,
+          'stale peer must not overwrite a newer economy snapshot',
+        );
+        const refreshed = await peer.loadEconomy({ maxCatchUpTicks: 0 });
+        assert.notEqual(
+          refreshed.world,
+          peerSnapshot.world,
+          'peer should atomically replace its stale RAM snapshot',
+        );
+        assert.equal(refreshed.world.tick, economy.world.tick);
+      } finally {
+        peer.close();
+      }
     } finally {
       // Always scrub the throwaway tenant.
       if (companyId) {

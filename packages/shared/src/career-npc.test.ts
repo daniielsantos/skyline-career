@@ -74,7 +74,11 @@ import {
   isInternationalOdAllowed,
   topUpStarterContractPilotFloor,
 } from './career-economy.js';
-import { healAwaitingPilotBoardLots } from './career-npc.js';
+import {
+  buildNpcClaimIndex,
+  buildNpcRegionCapacityIndex,
+  healAwaitingPilotBoardLots,
+} from './career-npc.js';
 import { invalidateLaneInboundIndex } from './career-lane-index.js';
 
 type SeedWorld = ReturnType<typeof createSeedEconomyWorld>;
@@ -1043,6 +1047,53 @@ describe('NPC freighter fleet', () => {
     assert.equal(npcRegionBidCapacity(world, region, nowMs), 0);
 
     assert.equal(npcRegionBidCapacity(world, 'NO-SUCH-REGION', nowMs), 1);
+  });
+
+  it('builds board indexes with the same claim and capacity semantics', () => {
+    const world = createSeedEconomyWorld({ seed: 'npc-board-index' });
+    tickEconomyN(world, 1);
+    const nowMs = world.lastBatchAtMs;
+    const lot = world.lots[0]!;
+    const npc = world.npcs[0]!;
+    world.npcFlights.push({
+      id: 'npcf-index-equivalence',
+      npcId: npc.id,
+      lotId: lot.id,
+      originIcao: lot.originIcao,
+      destIcao: lot.destIcao,
+      commodityId: lot.commodityId,
+      cargoKg: Math.max(1, lot.quantityKg),
+      payUsd: lot.payUsd,
+      aircraftClassId: npc.aircraftClassId,
+      departedAtTick: world.tick,
+      arrivesAtTick: world.tick + 2,
+      departedAtMs: nowMs,
+      arrivesAtMs: nowMs + 2 * 3_600_000,
+      status: 'in_flight',
+    });
+    const claimIndex = buildNpcClaimIndex(world);
+    assert.deepEqual(
+      npcClaimForLot(world, lot.id, nowMs, claimIndex),
+      npcClaimForLot(world, lot.id, nowMs),
+    );
+
+    const capacityIndex = buildNpcRegionCapacityIndex(world, nowMs);
+    for (const region of new Set(world.npcs.map((row) => row.homeRegion))) {
+      assert.equal(
+        capacityIndex.get(region),
+        npcRegionBidCapacity(world, region, nowMs),
+      );
+    }
+    const indexedPressure = describeLotMarketPressure(
+      world,
+      lot,
+      nowMs,
+      capacityIndex,
+    );
+    assert.deepEqual(
+      indexedPressure,
+      describeLotMarketPressure(world, lot, nowMs),
+    );
   });
 
   it('describes thin-fleet and lane-busy pressure for UI chips', () => {

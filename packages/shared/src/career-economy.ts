@@ -971,6 +971,8 @@ import {
 } from './career-fuel-logistics.js';
 import { tickPortInboundShips } from './career-port-concessions.js';
 import {
+  buildNpcClaimIndex,
+  buildNpcRegionCapacityIndex,
   ensureNpcFleet,
   listNpcActivity,
   listNpcHomeRegions,
@@ -11834,6 +11836,8 @@ export function listMarketLots(
   const originQueryTokens = marketQueryTokens(opts.originQuery ?? '');
   const destQueryTokens = marketQueryTokens(opts.destQuery ?? '');
   const viewer = opts.viewerCompanyId?.trim() || undefined;
+  const npcClaimIndex = buildNpcClaimIndex(world);
+  const regionCapacityIndex = buildNpcRegionCapacityIndex(world, nowMs);
 
   for (const lot of world.lots) {
     if (lot.status !== 'available' && lot.status !== 'reserved') {
@@ -11843,7 +11847,7 @@ export function listMarketLots(
     if (viewer && holder && holder !== viewer) {
       continue;
     }
-    const claim = npcClaimForLot(world, lot.id, nowMs);
+    const claim = npcClaimForLot(world, lot.id, nowMs, npcClaimIndex);
     const avail = availableKg(lot);
     // Fully reserved crew-needed offers stay visible until accepted or timeout.
     if (avail <= 0 && !claim?.crewNeeded) {
@@ -11907,7 +11911,12 @@ export function listMarketLots(
     const oStock = origin ? ensurePile(origin, lot.commodityId) : pile(0, 1);
     const dStock = dest ? ensurePile(dest, lot.commodityId) : pile(0, 1);
     const commodity = getCommodity(lot.commodityId);
-    const pressure = describeLotMarketPressure(world, lot, nowMs);
+    const pressure = describeLotMarketPressure(
+      world,
+      lot,
+      nowMs,
+      regionCapacityIndex,
+    );
     const idlePayMult = idleLotPayMult(lot, world.tick);
     pressure.idlePayMult = idlePayMult;
     pressure.idleEscalated = idlePayMult > 1.02;

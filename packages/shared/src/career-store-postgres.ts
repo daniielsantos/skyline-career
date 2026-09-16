@@ -2,6 +2,7 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v17 adds monotonic economy revision for cross-process snapshots.
  * Schema v16 promotes fleet_aircraft payload fields to columns.
  * Schema v15 drops legacy stubs `economy_json` + `company_missions`.
  * SP stays on SQLite files — this backend is for CAREER_DATABASE_URL only.
@@ -93,7 +94,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '16';
+const CAREER_PG_SCHEMA_VERSION = '17';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -116,6 +117,20 @@ export function assertCareerWorldSeedAllowed(
 
 function catchUpOpts(opts?: { maxCatchUpTicks?: number }) {
   return { maxTicks: opts?.maxCatchUpTicks ?? MAX_LOAD_CATCH_UP_TICKS };
+}
+
+function pgRevision(value: unknown): bigint {
+  try {
+    return BigInt(
+      typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'bigint'
+        ? value
+        : 0,
+    );
+  } catch {
+    return 0n;
+  }
 }
 
 function normalizeLoginName(raw: string): string {
@@ -353,6 +368,8 @@ export class PostgresCareerStore implements CareerStore {
   private readonly pool: pg.Pool;
   private activeCompanyId = LOCAL_COMPANY_ID;
   private ram: CareerEconomyWorld | null = null;
+  /** Revision of `ram`; null means no authoritative PG snapshot is cached. */
+  private ramRevision: bigint | null = null;
   private ready: Promise<void>;
 
   constructor(connectionString: string) {
@@ -391,6 +408,23 @@ export class PostgresCareerStore implements CareerStore {
 
   setActiveCompanyId(companyId: string): void {
     this.activeCompanyId = companyId.trim() || LOCAL_COMPANY_ID;
+  }
+
+  private async persistRevisioned(
+    persist: (expectedRevision: bigint | undefined) => Promise<bigint>,
+    applyToRam: () => void,
+  ): Promise<void> {
+    try {
+      const revision = await persist(this.ramRevision ?? undefined);
+      applyToRam();
+      this.ramRevision = revision;
+    } catch (error) {
+      // The caller may already have mutated the shared object. Never serve it
+      // after a failed/conflicting commit; the next read rehydrates from PG.
+      this.ram = null;
+      this.ramRevision = null;
+      throw error;
+    }
   }
 
   async listWorldCompanies(worldId = LOCAL_WORLD_ID): Promise<CareerCompanyRow[]> {
@@ -814,64 +848,84 @@ export class PostgresCareerStore implements CareerStore {
   async loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult> {
     await this.ready;
     if (this.ram && opts?.maxCatchUpTicks === 0) {
-      return {
-        world: this.ram,
-        advancedTicks: 0,
-        settledFlights: 0,
-        dirty: false,
-      };
+      const revisionRes = await this.pool.query(
+        `SELECT revision FROM economy_meta WHERE world_id = $1`,
+        [LOCAL_WORLD_ID],
+      );
+      const databaseRevision = pgRevision(revisionRes.rows[0]?.revision);
+      if (this.ramRevision === databaseRevision) {
+        return {
+          world: this.ram,
+          advancedTicks: 0,
+          settledFlights: 0,
+          dirty: false,
+        };
+      }
     }
 
-    const metaRes = await this.pool.query(
-      `SELECT seed, tick, last_batch_at_ms, home_country_id, misc_json
-       FROM economy_meta WHERE world_id = $1`,
-      [LOCAL_WORLD_ID],
-    );
-    const meta = metaRes.rows[0] as
+    const client = await this.pool.connect();
+    let meta:
       | {
           seed: string;
           tick: number;
           last_batch_at_ms: string | number;
           home_country_id: string;
           misc_json: unknown;
+          revision: string | number;
         }
       | undefined;
-
-    const countRes = await this.pool.query(
-      `SELECT
-         (SELECT COUNT(*)::int FROM airports WHERE world_id = $1) AS airports,
-         (SELECT COUNT(*)::int FROM lots WHERE world_id = $1) AS lots,
-         (SELECT COUNT(*)::int FROM npcs WHERE world_id = $1) AS npcs`,
-      [LOCAL_WORLD_ID],
-    );
-    const counts = countRes.rows[0] as
-      | { airports: number; lots: number; npcs: number }
-      | undefined;
-    const hasRelational =
-      Boolean(meta) ||
-      Number(counts?.airports) > 0 ||
-      Number(counts?.lots) > 0 ||
-      Number(counts?.npcs) > 0;
-
-    if (hasRelational) {
-      const world = emptyPgEconomyShell(
-        meta
-          ? {
-              seed: meta.seed,
-              tick: Number(meta.tick) || 0,
-              lastBatchAtMs: Number(meta.last_batch_at_ms) || Date.now(),
-              homeCountryId: meta.home_country_id ?? '',
-            }
-          : {
-              seed: 'skyline-career-br-v1',
-              tick: 0,
-              lastBatchAtMs: Date.now(),
-              homeCountryId: '',
-            },
+    let counts: { airports: number; lots: number; npcs: number } | undefined;
+    let hydrated: CareerEconomyWorld | null = null;
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const metaRes = await client.query(
+        `SELECT seed, tick, last_batch_at_ms, home_country_id, misc_json, revision
+         FROM economy_meta WHERE world_id = $1`,
+        [LOCAL_WORLD_ID],
       );
-      await hydrateEconomyFromPg(this.pool, world, LOCAL_WORLD_ID);
+      meta = metaRes.rows[0] as typeof meta;
+      const countRes = await client.query(
+        `SELECT
+           (SELECT COUNT(*)::int FROM airports WHERE world_id = $1) AS airports,
+           (SELECT COUNT(*)::int FROM lots WHERE world_id = $1) AS lots,
+           (SELECT COUNT(*)::int FROM npcs WHERE world_id = $1) AS npcs`,
+        [LOCAL_WORLD_ID],
+      );
+      counts = countRes.rows[0] as typeof counts;
+      const hasRelational =
+        Boolean(meta) ||
+        Number(counts?.airports) > 0 ||
+        Number(counts?.lots) > 0 ||
+        Number(counts?.npcs) > 0;
+      if (hasRelational) {
+        hydrated = emptyPgEconomyShell(
+          meta
+            ? {
+                seed: meta.seed,
+                tick: Number(meta.tick) || 0,
+                lastBatchAtMs: Number(meta.last_batch_at_ms) || Date.now(),
+                homeCountryId: meta.home_country_id ?? '',
+              }
+            : {
+                seed: 'skyline-career-br-v1',
+                tick: 0,
+                lastBatchAtMs: Date.now(),
+                homeCountryId: '',
+              },
+        );
+        await hydrateEconomyFromPg(client, hydrated, LOCAL_WORLD_ID);
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    if (hydrated) {
       const { world: caught, advancedTicks, settledFlights } =
-        ensureEconomyCaughtUp(world, Date.now(), catchUpOpts(opts));
+        ensureEconomyCaughtUp(hydrated, Date.now(), catchUpOpts(opts));
       ensureHomeCountryId(caught);
       let dirty = advancedTicks > 0 || settledFlights > 0;
       if (ensureSeedMarketFormed(caught)) dirty = true;
@@ -883,6 +937,7 @@ export class PostgresCareerStore implements CareerStore {
         dirty = true;
       }
       this.ram = caught;
+      this.ramRevision = pgRevision(meta?.revision);
       if (dirty) await this.saveEconomy(caught);
       return { world: caught, advancedTicks, settledFlights, dirty };
     }
@@ -904,72 +959,98 @@ export class PostgresCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    this.ram = toSave;
-    await persistEconomyTablesToPg(this.pool, toSave, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistEconomyTablesToPg(
+          this.pool,
+          toSave,
+          LOCAL_WORLD_ID,
+          expected,
+        ),
+      () => {
+        this.ram = toSave;
+      },
+    );
   }
 
   async persistDemandOrder(order: DemandOrder): Promise<void> {
     await this.ready;
-    if (this.ram?.demandOrders) {
-      const i = this.ram.demandOrders.findIndex((o) => o.id === order.id);
-      if (i >= 0) this.ram.demandOrders[i] = order;
-      else this.ram.demandOrders.push(order);
-    }
-    await persistDemandOrderToPg(this.pool, order, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistDemandOrderToPg(this.pool, order, LOCAL_WORLD_ID, expected),
+      () => {
+        if (!this.ram?.demandOrders) return;
+        const i = this.ram.demandOrders.findIndex((o) => o.id === order.id);
+        if (i >= 0) this.ram.demandOrders[i] = order;
+        else this.ram.demandOrders.push(order);
+      },
+    );
   }
   async persistPortListing(listing: PortListing): Promise<void> {
     await this.ready;
-    if (this.ram?.portListings) {
-      const i = this.ram.portListings.findIndex((l) => l.id === listing.id);
-      if (i >= 0) this.ram.portListings[i] = listing;
-      else this.ram.portListings.push(listing);
-    }
-    await persistPortListingToPg(this.pool, listing, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistPortListingToPg(this.pool, listing, LOCAL_WORLD_ID, expected),
+      () => {
+        if (!this.ram?.portListings) return;
+        const i = this.ram.portListings.findIndex((l) => l.id === listing.id);
+        if (i >= 0) this.ram.portListings[i] = listing;
+        else this.ram.portListings.push(listing);
+      },
+    );
   }
   async persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void> {
     await this.ready;
-    if (this.ram) this.ram.portConcessions = rows;
-    await persistPortConcessionsToPg(this.pool, rows, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistPortConcessionsToPg(this.pool, rows, LOCAL_WORLD_ID, expected),
+      () => {
+        if (this.ram) this.ram.portConcessions = rows;
+      },
+    );
   }
   async persistPortMarketTables(world: CareerEconomyWorld): Promise<void> {
     await this.ready;
     const toSave = migrateEconomyWorld(world);
-    if (this.ram) {
-      this.ram = {
-        ...this.ram,
-        portListings: toSave.portListings ?? [],
-        portInventories: toSave.portInventories ?? [],
-      };
-    } else {
-      this.ram = toSave;
-    }
-    await persistPortMarketToPg(this.pool, toSave, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistPortMarketToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
+      () => {
+        this.ram = this.ram
+          ? {
+              ...this.ram,
+              portListings: toSave.portListings ?? [],
+              portInventories: toSave.portInventories ?? [],
+            }
+          : toSave;
+      },
+    );
   }
   async persistDemandBoardTables(world: CareerEconomyWorld): Promise<void> {
     await this.ready;
     const toSave = migrateEconomyWorld(world);
-    if (this.ram) {
-      this.ram = {
-        ...this.ram,
-        demandOrders: toSave.demandOrders ?? [],
-      };
-    } else {
-      this.ram = toSave;
-    }
-    await persistDemandBoardToPg(this.pool, toSave, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistDemandBoardToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
+      () => {
+        this.ram = this.ram
+          ? { ...this.ram, demandOrders: toSave.demandOrders ?? [] }
+          : toSave;
+      },
+    );
   }
   async persistInboundPending(world: CareerEconomyWorld): Promise<void> {
     await this.ready;
     const toSave = migrateEconomyWorld(world);
-    if (this.ram) {
-      this.ram = {
-        ...this.ram,
-        inboundPending: toSave.inboundPending ?? [],
-      };
-    } else {
-      this.ram = toSave;
-    }
-    await persistInboundPendingToPg(this.pool, toSave, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistInboundPendingToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
+      () => {
+        this.ram = this.ram
+          ? { ...this.ram, inboundPending: toSave.inboundPending ?? [] }
+          : toSave;
+      },
+    );
   }
   async persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void> {
     await this.ready;
@@ -977,21 +1058,29 @@ export class PostgresCareerStore implements CareerStore {
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    this.ram = toSave;
-    await persistNpcLiveToPg(this.pool, toSave, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistNpcLiveToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
+      () => {
+        this.ram = toSave;
+      },
+    );
   }
   async persistAircraftPool(world: CareerEconomyWorld): Promise<void> {
     await this.ready;
     const toSave = migrateEconomyWorld(world);
-    if (this.ram) {
-      this.ram = {
-        ...this.ram,
-        aircraftInstances: toSave.aircraftInstances ?? [],
-      };
-    } else {
-      this.ram = toSave;
-    }
-    await persistAircraftPoolToPg(this.pool, toSave, LOCAL_WORLD_ID);
+    await this.persistRevisioned(
+      (expected) =>
+        persistAircraftPoolToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
+      () => {
+        this.ram = this.ram
+          ? {
+              ...this.ram,
+              aircraftInstances: toSave.aircraftInstances ?? [],
+            }
+          : toSave;
+      },
+    );
   }
 
   async settleWorldCompaniesPassiveFees(opts: {

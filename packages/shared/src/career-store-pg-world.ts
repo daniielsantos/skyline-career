@@ -117,7 +117,8 @@ CREATE TABLE IF NOT EXISTS economy_meta (
   tick INTEGER NOT NULL,
   last_batch_at_ms BIGINT NOT NULL,
   home_country_id TEXT NOT NULL DEFAULT '',
-  misc_json JSONB
+  misc_json JSONB,
+  revision BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS airports (
@@ -549,6 +550,20 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function revisionBigInt(value: unknown): bigint {
+  try {
+    return BigInt(
+      typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'bigint'
+        ? value
+        : 0,
+    );
+  } catch {
+    return 0n;
+  }
+}
+
 function optNum(v: unknown): number | undefined {
   if (v == null) return undefined;
   const n = typeof v === 'string' ? Number(v) : Number(v);
@@ -663,10 +678,76 @@ async function withTx<T>(
   }
 }
 
+export class PgEconomyRevisionConflictError extends Error {
+  constructor(
+    readonly expectedRevision: bigint,
+    readonly actualRevision: bigint,
+  ) {
+    super(
+      `Postgres economy revision conflict: expected ${expectedRevision}, actual ${actualRevision}`,
+    );
+    this.name = 'PgEconomyRevisionConflictError';
+  }
+}
+
+async function lockEconomyRevision(
+  client: pg.PoolClient,
+  worldId: string,
+  expectedRevision?: bigint,
+): Promise<bigint> {
+  const result = await client.query(
+    `SELECT revision FROM economy_meta WHERE world_id = $1 FOR UPDATE`,
+    [worldId],
+  );
+  const actual = revisionBigInt(result.rows[0]?.revision);
+  if (
+    expectedRevision !== undefined &&
+    actual !== expectedRevision
+  ) {
+    throw new PgEconomyRevisionConflictError(expectedRevision, actual);
+  }
+  return actual;
+}
+
+async function bumpEconomyRevision(
+  client: pg.PoolClient,
+  worldId: string,
+): Promise<bigint> {
+  const result = await client.query(
+    `UPDATE economy_meta
+     SET revision = revision + 1
+     WHERE world_id = $1
+     RETURNING revision`,
+    [worldId],
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`Missing economy_meta for world ${worldId}`);
+  }
+  return revisionBigInt(result.rows[0]?.revision);
+}
+
+async function withRevisionedTx(
+  pool: pg.Pool,
+  worldId: string,
+  expectedRevision: bigint | undefined,
+  fn: (client: pg.PoolClient) => Promise<void>,
+): Promise<bigint> {
+  return withTx(pool, async (client) => {
+    await ensureWorldRow(client, worldId);
+    await lockEconomyRevision(client, worldId, expectedRevision);
+    await fn(client);
+    return bumpEconomyRevision(client, worldId);
+  });
+}
+
 export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(PG_WORLD_DDL);
   await pool.query(
     `ALTER TABLE economy_meta ADD COLUMN IF NOT EXISTS misc_json JSONB`,
+  );
+  // Schema v17 — cross-process API/worker cache coherence + stale-write guard.
+  await pool.query(
+    `ALTER TABLE economy_meta ADD COLUMN IF NOT EXISTS revision BIGINT NOT NULL DEFAULT 0`,
   );
   // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
   const fleetAlters = [
@@ -1260,7 +1341,7 @@ export async function economyNeedsPgTableBackfill(
 }
 
 export async function hydrateEconomyFromPg(
-  pool: pg.Pool,
+  pool: pg.Pool | pg.PoolClient,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
 ): Promise<void> {
@@ -2129,7 +2210,8 @@ export async function persistEconomyTablesToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const airports = world.airports ?? [];
   const lots = world.lots ?? [];
@@ -2163,18 +2245,22 @@ export async function persistEconomyTablesToPg(
     world.charterOffers ?? [],
   );
 
-  await withTx(pool, async (client) => {
+  return withTx(pool, async (client) => {
     await ensureWorldRow(client, wid);
+    await lockEconomyRevision(client, wid, expectedRevision);
 
     await client.query(
-      `INSERT INTO economy_meta (world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+      `INSERT INTO economy_meta (
+         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json, revision
+       )
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, 1)
        ON CONFLICT (world_id) DO UPDATE SET
          seed = EXCLUDED.seed,
          tick = EXCLUDED.tick,
          last_batch_at_ms = EXCLUDED.last_batch_at_ms,
          home_country_id = EXCLUDED.home_country_id,
-         misc_json = EXCLUDED.misc_json`,
+         misc_json = EXCLUDED.misc_json,
+         revision = economy_meta.revision + 1`,
       [
         wid,
         world.seed,
@@ -2412,6 +2498,11 @@ export async function persistEconomyTablesToPg(
         charterOfferRows,
       );
     }
+    const revision = await client.query(
+      `SELECT revision FROM economy_meta WHERE world_id = $1`,
+      [wid],
+    );
+    return revisionBigInt(revision.rows[0]?.revision);
   });
 }
 
@@ -2420,14 +2511,14 @@ export async function persistAircraftPoolToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const instanceRows = aircraftInstanceTableRows(
     wid,
     world.aircraftInstances ?? [],
   );
-  await withTx(pool, async (client) => {
-    await ensureWorldRow(client, wid);
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
     await client.query(`DELETE FROM aircraft_instances WHERE world_id = $1`, [
       wid,
     ]);
@@ -2452,11 +2543,11 @@ export async function persistInboundPendingToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const inboundRows = inboundTableRows(wid, world.inboundPending ?? []);
-  await withTx(pool, async (client) => {
-    await ensureWorldRow(client, wid);
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
     await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
     if (inboundRows.length > 0) {
       await insertChunks(
@@ -2477,11 +2568,11 @@ export async function persistDemandBoardToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const demandRows = demandOrderTableRows(wid, world.demandOrders ?? []);
-  await withTx(pool, async (client) => {
-    await ensureWorldRow(client, wid);
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
     await client.query(`DELETE FROM demand_orders WHERE world_id = $1`, [wid]);
     if (demandRows.length > 0) {
       await insertChunks(
@@ -2503,13 +2594,15 @@ export async function persistDemandOrderToPg(
   pool: pg.Pool,
   order: DemandOrder,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const rows = demandOrderTableRows(wid, [order]);
-  if (rows.length === 0) return;
+  if (rows.length === 0) return expectedRevision ?? 0n;
   const row = rows[0]!;
-  await pool.query(
-    `INSERT INTO demand_orders (
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
+    await client.query(
+      `INSERT INTO demand_orders (
        world_id, id, dest_icao, commodity_id, wanted_kg, remaining_kg,
        max_unit_price_usd, arrived_at_tick, expires_at_tick, status, port_id,
        payload_json
@@ -2525,8 +2618,9 @@ export async function persistDemandOrderToPg(
        status = EXCLUDED.status,
        port_id = EXCLUDED.port_id,
        payload_json = EXCLUDED.payload_json`,
-    row,
-  );
+      row,
+    );
+  });
 }
 
 /** Port listings + inventories (Port FBO desk). */
@@ -2534,12 +2628,12 @@ export async function persistPortMarketToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const listingRows = portListingTableRows(wid, world.portListings ?? []);
   const invRows = portInventoryTableRows(wid, world.portInventories ?? []);
-  await withTx(pool, async (client) => {
-    await ensureWorldRow(client, wid);
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
     await client.query(`DELETE FROM port_listings WHERE world_id = $1`, [wid]);
     await client.query(`DELETE FROM port_inventories WHERE world_id = $1`, [wid]);
     if (listingRows.length > 0) {
@@ -2571,13 +2665,15 @@ export async function persistPortListingToPg(
   pool: pg.Pool,
   listing: PortListing,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const rows = portListingTableRows(wid, [listing]);
-  if (rows.length === 0) return;
+  if (rows.length === 0) return expectedRevision ?? 0n;
   const row = rows[0]!;
-  await pool.query(
-    `INSERT INTO port_listings (
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
+    await client.query(
+      `INSERT INTO port_listings (
        world_id, id, port_id, commodity_id, available_kg, unit_price_usd,
        allocated_hub_icao, arrived_at_tick, expires_at_tick, status, payload_json
      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
@@ -2591,8 +2687,9 @@ export async function persistPortListingToPg(
        expires_at_tick = EXCLUDED.expires_at_tick,
        status = EXCLUDED.status,
        payload_json = EXCLUDED.payload_json`,
-    row,
-  );
+      row,
+    );
+  });
 }
 
 /** Port concession index (company leases on ports). */
@@ -2600,11 +2697,11 @@ export async function persistPortConcessionsToPg(
   pool: pg.Pool,
   rows: PortConcessionIndexRow[],
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const concessionRows = portConcessionTableRows(wid, rows);
-  await withTx(pool, async (client) => {
-    await ensureWorldRow(client, wid);
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
     await client.query(`DELETE FROM port_concessions WHERE world_id = $1`, [wid]);
     if (concessionRows.length > 0) {
       await insertChunks(
@@ -2627,7 +2724,8 @@ export async function persistNpcLiveToPg(
   pool: pg.Pool,
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
-): Promise<void> {
+  expectedRevision?: bigint,
+): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const airports = world.airports ?? [];
   const lots = world.lots ?? [];
@@ -2641,17 +2739,21 @@ export async function persistNpcLiveToPg(
     wid,
     world.aircraftInstances ?? [],
   );
-  await withTx(pool, async (client) => {
+  return withTx(pool, async (client) => {
     await ensureWorldRow(client, wid);
+    await lockEconomyRevision(client, wid, expectedRevision);
     await client.query(
-      `INSERT INTO economy_meta (world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+      `INSERT INTO economy_meta (
+         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json, revision
+       )
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, 1)
        ON CONFLICT (world_id) DO UPDATE SET
          seed = EXCLUDED.seed,
          tick = EXCLUDED.tick,
          last_batch_at_ms = EXCLUDED.last_batch_at_ms,
          home_country_id = EXCLUDED.home_country_id,
-         misc_json = EXCLUDED.misc_json`,
+         misc_json = EXCLUDED.misc_json,
+         revision = economy_meta.revision + 1`,
       [
         wid,
         world.seed,
@@ -2760,6 +2862,11 @@ export async function persistNpcLiveToPg(
         instanceRows,
       );
     }
+    const revision = await client.query(
+      `SELECT revision FROM economy_meta WHERE world_id = $1`,
+      [wid],
+    );
+    return revisionBigInt(revision.rows[0]?.revision);
   });
 }
 

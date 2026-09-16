@@ -1382,6 +1382,14 @@ function loadEconomy(): Promise<CareerEconomyWorld> {
   return withCareerLock(() => loadEconomyUnlocked({ skipCatchUp: true }));
 }
 
+/** API requests never mutate/retain the Postgres store's shared RAM snapshot. */
+function isolatePostgresWorldSnapshot(
+  activeStore: CareerStore,
+  world: CareerEconomyWorld,
+): CareerEconomyWorld {
+  return activeStore.kind === 'postgres' ? structuredClone(world) : world;
+}
+
 /**
  * Load world + missions under one lock. Button/GET paths skip hourly catch-up;
  * the 60s timer and POST /api/tick advance the world.
@@ -1399,7 +1407,11 @@ async function withCareerRead<T>(
     return fn(gatewayEconomyShell(), missions);
   }
   return withCareerLock(async () => {
-    const world = await loadEconomyUnlocked({ skipCatchUp: true });
+    const activeStore = requireStore();
+    const world = isolatePostgresWorldSnapshot(
+      activeStore,
+      await loadEconomyUnlocked({ skipCatchUp: true }),
+    );
     const companyId = opts?.companyId?.trim();
     const missions = await loadMissions(companyId ? { companyId } : undefined);
     const crew = settleCrewOpsDue(missions, world, Date.now());
@@ -1586,6 +1598,7 @@ async function withCareerWrite<T>(
         cooperative: opts?.cooperative,
       });
     }
+    world = isolatePostgresWorldSnapshot(activeStore, world);
     if (sliceLotIdsOpt.length > 0 && !useCommandPersist) {
       for (const id of sliceLotIdsOpt) {
         const lot = world.lots.find((row) => row.id === id);
@@ -5548,6 +5561,7 @@ export function createCareerApiServer(port = 8787) {
         const nowMs = Date.now();
         const airportCompanyId = companyIdFromRequest(req);
         if (url.searchParams.get('part') === 'stock') {
+          const world = await loadEconomy();
           const snap = requireStore().readAirportInventory(icao);
           if (!snap) {
             send(res, 404, { error: `Unknown airport ${icao}` });
@@ -5559,7 +5573,7 @@ export function createCareerApiServer(port = 8787) {
             mapAirportStockPayload(
               snap,
               nowMs,
-              requireStore().peekEconomyWorld(),
+              world,
             ),
           );
           return;
@@ -5567,11 +5581,7 @@ export function createCareerApiServer(port = 8787) {
         if (url.searchParams.get('part') === 'stats') {
           const loaded = await withCareerLock(async () => {
             const active = requireStore();
-            if (!active.peekEconomyWorld()) {
-              await loadEconomyUnlocked({ skipCatchUp: true });
-            }
-            const cached = active.peekEconomyWorld();
-            if (!cached) return null;
+            const cached = await loadEconomyUnlocked({ skipCatchUp: true });
             const airport = cached.airports.find((a) => a.icao === icao);
             if (!airport) return { missing: true as const };
             const day = economyDayIndex(cached.tick);
@@ -5600,12 +5610,8 @@ export function createCareerApiServer(port = 8787) {
         }
         const loaded = await withCareerLock(async () => {
           const active = requireStore();
-          if (!active.peekEconomyWorld()) {
-            await loadEconomyUnlocked({ skipCatchUp: true });
-          }
+          const cached = await loadEconomyUnlocked({ skipCatchUp: true });
           const missions = await loadMissions({ companyId: airportCompanyId });
-          const cached = active.peekEconomyWorld();
-          if (!cached) return null;
           const board = active.readAirportBoard(icao);
           const airport =
             board?.airport ?? cached.airports.find((a) => a.icao === icao);

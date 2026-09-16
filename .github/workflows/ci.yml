@@ -83,6 +83,13 @@ jobs:
         env:
           DATABASE_URL: postgres://skyline:skyline@localhost:5432/skyline
 
+      - name: World snapshot concurrency (Postgres)
+        run: node --test packages/shared/dist/career-store-postgres.test.js
+        env:
+          CAREER_DATABASE_URL: postgres://skyline:skyline@localhost:5432/skyline
+          CAREER_PG_ALLOW_LAB_MUTATION: '1'
+          CAREER_WORLD_ALLOW_SEED: '1'
+
   smoke-windows:
     name: Agent smoke (Node mock / Named Pipe)
     runs-on: windows-latest

@@ -38,9 +38,7 @@ services:
   # Local “production” world host (no Watch). Ports from lab/prod overlay.
   # Secrets: root `.env` (gitignored) — see `.env.example`.
   world-api:
-    build:
-      context: .
-      dockerfile: Dockerfile.world
+    image: ${CAREER_WORLD_IMAGE:-ghcr.io/daniielsantos/skyline-career-world:main}
     container_name: skyline-career-world-api
     restart: unless-stopped
     environment:
@@ -81,9 +79,7 @@ services:
     profiles: ['world']
 
   world-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.world
+    image: ${CAREER_WORLD_IMAGE:-ghcr.io/daniielsantos/skyline-career-world:main}
     container_name: skyline-career-world-worker
     restart: unless-stopped
     environment:

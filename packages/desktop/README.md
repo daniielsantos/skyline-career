@@ -78,7 +78,7 @@ One command (pack + validate + GitHub release):
 # Use the version already in packages/desktop/package.json:
 npm run release:desktop -- --yes
 
-# Or bump first (patch/minor/major), pack, publish, commit+push the bump:
+# Or bump first (patch/minor/major), pack, commit+push, then publish:
 npm run release:desktop -- --bump patch --yes
 
 # Pack + validate only (no GitHub upload):
@@ -87,10 +87,11 @@ npm run release:desktop -- --dry-run
 
 Guardrails:
 
-- Clean git worktree (or `--allow-dirty`)
+- Committed source; `--allow-dirty` permits only known untracked diagnostics/build output
 - `gh` installed and authenticated
 - Setup exe present and sized; `latest.yml` version must match `package.json`
 - Refuses if tag/release `vX.Y.Z` already exists
+- Refreshes remote tags and pins the release tag to the published HEAD commit
 
 Assets uploaded: `SkylineCareer-Setup-<ver>.exe`, `latest.yml`, and `.blockmap` when present. Release notes are generated from commits since the previous `v*` tag and include a smoke checklist.
 

@@ -17,8 +17,8 @@
  *   --skip-pack               Reuse artifacts/skyline-desktop (must already match)
  *   --dry-run                 Pack + validate only; do not create GitHub release
  *   --draft                   Create the GitHub release as a draft
- *   --allow-dirty             Allow a dirty worktree (still refuses unknown files
- *                             outside the desktop package.json / lockfile bump)
+ *   --allow-dirty             Allow known untracked build/diagnostic artifacts.
+ *                             Tracked or unknown source changes are still refused.
  *   --yes                     Skip interactive confirmation
  */
 import { spawn } from 'node:child_process';
@@ -149,7 +149,7 @@ Flags:
   --skip-pack               Validate/publish existing artifacts only
   --dry-run                 Pack + validate; do not publish
   --draft                   Create a draft GitHub release
-  --allow-dirty             Allow dirty worktree
+  --allow-dirty             Allow known untracked build/diagnostic artifacts
   --yes                     Skip confirmation prompt
 `);
 }
@@ -174,12 +174,63 @@ async function assertGitClean(allowDirty) {
   const status = await runCapture('git', ['status', '--porcelain']);
   if (!status) return;
   if (allowDirty) {
-    console.warn('[release:desktop] WARNING: dirty worktree (--allow-dirty)\n' + status);
-    return;
+    const allowedUntracked = [
+      /^artifacts\//,
+      /^packages\/career-ui\/dist\//,
+      /^economy-[^/]+\.(?:json|err)$/,
+      /^profiles\/career\/economy-[^/]+\.json$/,
+      /^scripts\/_wave-[^/]+\.json$/,
+      /^npc-test-out\.txt$/,
+    ];
+    const unsafe = status.split(/\r?\n/).filter(Boolean).filter((line) => {
+      if (!line.startsWith('?? ')) return true;
+      const path = line.slice(3).replace(/^"(.*)"$/, '$1');
+      return !allowedUntracked.some((pattern) => pattern.test(path));
+    });
+    if (!unsafe.length) {
+      console.warn(
+        '[release:desktop] WARNING: allowing known untracked artifacts\n' + status,
+      );
+      return;
+    }
+    throw new Error(
+      `Release source must be committed; --allow-dirty only permits known untracked artifacts.\n${unsafe.join('\n')}`,
+    );
   }
   throw new Error(
     `Worktree is dirty — commit/stash first, or pass --allow-dirty.\n${status}`,
   );
+}
+
+async function refreshRemoteTags(required) {
+  try {
+    await run('git', ['fetch', '--tags', '--prune', 'origin']);
+  } catch (err) {
+    if (required) throw err;
+    console.warn(
+      '[release:desktop] WARNING: could not refresh remote tags for dry-run',
+    );
+  }
+}
+
+async function assertHeadPublished() {
+  const branch = await runCapture('git', ['branch', '--show-current']);
+  if (!branch) {
+    throw new Error('Release must be created from a named branch, not detached HEAD');
+  }
+  const head = await runCapture('git', ['rev-parse', 'HEAD']);
+  const remote = await runCapture('git', [
+    'ls-remote',
+    'origin',
+    `refs/heads/${branch}`,
+  ]);
+  const remoteHead = remote.split(/\s+/)[0] ?? '';
+  if (remoteHead !== head) {
+    throw new Error(
+      `HEAD ${head.slice(0, 12)} is not published at origin/${branch}; push it before releasing`,
+    );
+  }
+  return head;
 }
 
 async function readDesktopPkg() {
@@ -345,6 +396,7 @@ async function main() {
   console.log('[release:desktop] checking preconditions…');
   await assertGitClean(flags.allowDirty);
   if (!flags.dryRun) await assertGh();
+  await refreshRemoteTags(!flags.dryRun);
 
   let pkg = await readDesktopPkg();
   let version = pkg.version;
@@ -434,8 +486,11 @@ async function main() {
     }
     await run('git', ['add', ...bumpFiles]);
     await run('git', ['commit', '-m', `Release desktop ${tag}`]);
+    console.log('[release:desktop] pushing version commit before tagging…');
+    await run('git', ['push', '-u', 'origin', 'HEAD']);
   }
 
+  const releaseTarget = await assertHeadPublished();
   console.log(`[release:desktop] creating GitHub release ${tag}…`);
   const ghArgs = [
     'release',
@@ -446,15 +501,12 @@ async function main() {
     `Skyline Career ${version}`,
     '--notes-file',
     notesPath,
+    '--target',
+    releaseTarget,
   ];
   if (flags.draft) ghArgs.push('--draft');
   // Never shell:true here — Windows re-tokenizes unquoted spaces in --title.
   await run('gh', ghArgs);
-
-  if (bumped) {
-    console.log('[release:desktop] pushing commit…');
-    await run('git', ['push', '-u', 'origin', 'HEAD']);
-  }
 
   console.log(`[release:desktop] published ${tag}`);
   console.log(

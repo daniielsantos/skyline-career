@@ -1,0 +1,241 @@
+name: World deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment environment
+        type: choice
+        required: true
+        options:
+          - staging
+          - production
+      ref:
+        description: Git ref or commit to build
+        required: true
+        default: main
+
+concurrency:
+  group: world-${{ github.event_name == 'release' && 'production' || inputs.target || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/daniielsantos/skyline-career-world
+
+jobs:
+  build:
+    name: Build multi-architecture image
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ${{ steps.meta.outputs.image }}
+      revision: ${{ steps.meta.outputs.revision }}
+    steps:
+      - name: Resolve source revision
+        id: source
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "ref=${{ github.event.workflow_run.head_sha }}" >>"$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "ref=${{ github.event.release.tag_name }}" >>"$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ inputs.ref }}" >>"$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.ref }}
+          fetch-depth: 0
+
+      - name: Generate immutable image tags
+        id: meta
+        shell: bash
+        run: |
+          revision="$(git rev-parse HEAD)"
+          {
+            echo "revision=$revision"
+            echo "image=$IMAGE_NAME"
+            echo "tags<<EOF"
+            echo "$IMAGE_NAME:sha-$revision"
+            if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+              echo "$IMAGE_NAME:main"
+            elif [[ "${{ github.event_name }}" == "release" ]]; then
+              echo "$IMAGE_NAME:${{ github.event.release.tag_name }}"
+            fi
+            echo "EOF"
+          } >>"$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and push amd64 + arm64
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.world
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=world
+          cache-to: type=gha,mode=max,scope=world
+
+  deploy-staging:
+    name: Deploy Pi staging
+    if: >-
+      github.event_name == 'workflow_run' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'staging')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+      url: ${{ vars.DEPLOY_HEALTH_URL }}
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL }}
+      IMAGE_REF: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+      REVISION: ${{ needs.build.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.revision }}
+
+      - name: Join staging tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_HEALTH_URL"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" >~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Authenticate host to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" |
+            ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+
+      - name: Deploy immutable image
+        shell: bash
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- \
+            "$DEPLOY_PATH" "$REVISION" "$IMAGE_REF" "$DEPLOY_HEALTH_URL" 0 <<'REMOTE'
+          set -Eeuo pipefail
+          deploy_path="$1"
+          revision="$2"
+          image_ref="$3"
+          health_url="$4"
+          cd "$deploy_path"
+          git fetch --no-tags origin "$revision"
+          git checkout --detach "$revision"
+          bash scripts/deploy-world.sh \
+            --image "$image_ref" \
+            --health-url "$health_url"
+          REMOTE
+
+  deploy-production:
+    name: Deploy VPS production
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'production')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_HEALTH_URL }}
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL }}
+      IMAGE_REF: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+      REVISION: ${{ needs.build.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.revision }}
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_HEALTH_URL"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" >~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Authenticate host to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" |
+            ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+
+      - name: Backup and deploy immutable image
+        shell: bash
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- \
+            "$DEPLOY_PATH" "$REVISION" "$IMAGE_REF" "$DEPLOY_HEALTH_URL" 1 <<'REMOTE'
+          set -Eeuo pipefail
+          deploy_path="$1"
+          revision="$2"
+          image_ref="$3"
+          health_url="$4"
+          backup="$5"
+          cd "$deploy_path"
+          git fetch --no-tags origin "$revision"
+          git checkout --detach "$revision"
+          args=(--image "$image_ref" --health-url "$health_url")
+          if [[ "$backup" == 1 ]]; then args+=(--backup); fi
+          bash scripts/deploy-world.sh "${args[@]}"
+          REMOTE

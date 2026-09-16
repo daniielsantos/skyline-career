@@ -11,6 +11,7 @@
  *   npm run career:stack:world -- --prod --down
  */
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,7 +20,7 @@ const args = process.argv.slice(2);
 const down = args.includes('--down');
 const prod = args.includes('--prod');
 const tls = args.includes('--tls');
-const build = args.includes('--build') || !down;
+const build = !prod && (args.includes('--build') || !down);
 
 if (tls && !prod) {
   console.error(
@@ -29,7 +30,19 @@ if (tls && !prod) {
 }
 
 const overlay = prod ? 'docker-compose.prod.yml' : 'docker-compose.lab.yml';
-const fileArgs = ['-f', 'docker-compose.yml', '-f', overlay];
+const envFileArgs = [
+  ...(existsSync(resolve(root, '.env')) ? ['--env-file', '.env'] : []),
+  ...(prod && existsSync(resolve(root, '.env.deploy'))
+    ? ['--env-file', '.env.deploy']
+    : []),
+];
+const fileArgs = [
+  ...envFileArgs,
+  '-f',
+  'docker-compose.yml',
+  '-f',
+  overlay,
+];
 const profiles = ['world'];
 if (tls) profiles.push('tls');
 
@@ -44,20 +57,40 @@ const composeArgs = down
       'up',
       '-d',
       ...(build ? ['--build'] : []),
+      ...(prod ? ['--no-build'] : []),
     ];
 
 const modeLabel = prod ? (tls ? 'prod+tls' : 'prod') : 'lab';
-console.log(
-  `[career:stack:world] ${modeLabel} — docker ${composeArgs.join(' ')}`,
-);
-const child = spawn('docker', composeArgs, {
-  cwd: root,
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-});
 
-child.on('exit', (code) => {
-  if (!down && (code ?? 1) === 0) {
+function runDocker(runArgs) {
+  console.log(
+    `[career:stack:world] ${modeLabel} — docker ${runArgs.join(' ')}`,
+  );
+  return new Promise((resolvePromise) => {
+    const child = spawn('docker', runArgs, {
+      cwd: root,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+    child.on('exit', (code) => resolvePromise(code ?? 1));
+  });
+}
+
+async function main() {
+  if (prod && !down) {
+    const pullCode = await runDocker([
+      'compose',
+      ...fileArgs,
+      ...profileArgs,
+      'pull',
+      'world-api',
+      'world-worker',
+    ]);
+    if (pullCode !== 0) process.exit(pullCode);
+  }
+
+  const code = await runDocker(composeArgs);
+  if (!down && code === 0) {
     if (prod && tls) {
       console.log(`
 [career:stack:world] up (prod + Caddy TLS)
@@ -99,5 +132,13 @@ Or Node gateway only (no Electron):
 `);
     }
   }
-  process.exit(code ?? 0);
+  process.exit(code);
+}
+
+main().catch((err) => {
+  console.error(
+    '[career:stack:world] failed',
+    err instanceof Error ? err.message : err,
+  );
+  process.exit(1);
 });

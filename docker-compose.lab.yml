@@ -24,5 +24,13 @@ services:
         condition: service_healthy
 
   world-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.world
     ports:
       - '8787:8787'
+
+  world-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.world

@@ -1,5 +1,7 @@
 # Current state (2026-09-14)
 
+`main` **1287c3b** / desktop **0.3.67** shipped: MP hub onboarding persists only the company (SP keeps full-save semantics), proxy HTML/timeouts render a useful error, and production Postgres refuses silent empty-world reseed via `CAREER_WORLD_ALLOW_SEED=0`. Release: [v0.3.67](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.67).
+
 `main` **f00b359** / desktop **0.3.66** shipped: HTTPS gateway strips stale compression headers after Node fetch decoding, fixing Electron login `Failed to fetch` behind Caddy. Release: [v0.3.66](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.66).
 
 `main` **667388d** / desktop **0.3.65** shipped: fixed MP boot no longer calls authenticated profiles before AuthGate (stuck “Listening for host”); post-login warm errors stay visible in AuthGate. Release: [v0.3.65](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.65).

@@ -123,6 +123,20 @@ Pre-deploy dumps are retained for 14 days in
 `$DEPLOY_BACKUP_DIR` or `<DEPLOY_PATH>/backups/predeploy`. Ensure this directory
 is included in the existing encrypted restic/R2 backup policy.
 
+## Pi disk maintenance
+
+Remote hosts pull the final multi-stage image and do not need Docker build
+cache. To inspect usage and safely remove only unused build cache:
+
+```bash
+docker system df
+docker builder prune -af
+docker system df
+```
+
+This does not remove running containers, active images, or named volumes. Do
+not use `docker system prune --volumes` on a world host.
+
 ## Manual redeploy or rollback
 
 The workflow supports `Run workflow` with a target and Git ref. It still builds

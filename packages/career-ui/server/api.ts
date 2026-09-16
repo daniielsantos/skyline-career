@@ -252,6 +252,7 @@ import {
   applyMsfsBushHubOverrideToTerminal,
   pruneOrphanCareerHubs,
   listWorldCountryIds,
+  countryIdFromHubIcao,
   localUnitPriceUsd,
   computeEconomyPulse,
   aggregateHubEconomyHistoryPulse,
@@ -332,6 +333,7 @@ import {
   type CareerApiMode,
 } from './career-api-mode.ts';
 import { proxyToWorldApi } from './gateway-proxy.ts';
+import { hubSelectionPersistence } from './hub-selection-persistence.ts';
 import {
   authRateLimitKeyFromRequest,
   consumeAuthRateLimit,
@@ -3639,8 +3641,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const selectHubCompanyId = companyIdFromRequest(req, body.companyId);
+        const selectHubStore = requireStore();
+        const hubPersistence = hubSelectionPersistence(selectHubStore.kind);
+        const postgresWorld = !hubPersistence.syncWorldHomeCountry;
         try {
-          const result = await withCareerWrite((world, missions) => {
+          const result = await withCareerWrite(async (world, missions) => {
             const next = selectStarterHub(missions, body.icao!, {
               pilotName: body.pilotName!,
               ...(body.airframeTypeId?.trim()
@@ -3648,14 +3653,34 @@ export function createCareerApiServer(port = 8787) {
                 : {}),
             });
             Object.assign(missions, next);
-            syncHomeCountryFromHub(world, missions.homeHubIcao);
+            const selectedHomeCountryId =
+              countryIdFromHubIcao(world, missions.homeHubIcao) ??
+              world.homeCountryId ??
+              null;
+            if (postgresWorld) {
+              await selectHubStore.ensureCompany({
+                id:
+                  selectHubCompanyId?.trim() ||
+                  selectHubStore.getActiveCompanyId(),
+                displayName: missions.pilotName,
+                homeHubIcao: missions.homeHubIcao,
+                homeCountryId: selectedHomeCountryId ?? undefined,
+              });
+            } else {
+              // SP has one player partition and one save, so its world-level
+              // home country still follows the selected starter hub.
+              syncHomeCountryFromHub(world, missions.homeHubIcao);
+            }
             return {
               walletUsd: missions.walletUsd,
-              homeCountryId: world.homeCountryId ?? null,
+              homeCountryId: selectedHomeCountryId,
               contractPilotCareer: missions.fleet.length === 0,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'blob', companyId: selectHubCompanyId });
+          }, {
+            persist: hubPersistence.persist,
+            companyId: selectHubCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {

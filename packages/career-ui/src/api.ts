@@ -1,5 +1,6 @@
 import { getStoredCompanyId } from './career-company-client';
 import { getAuthToken } from './career-auth-client';
+import { parseApiResponse } from './api-response';
 
 export type AircraftClass =
   | 'narrow_freighter'
@@ -1085,11 +1086,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
-  const data = (await res.json()) as T & { error?: string; code?: string };
-  if (!res.ok) {
-    throw new Error(data.error ?? `HTTP ${res.status}`);
-  }
-  return data;
+  return parseApiResponse<T>(res);
 }
 
 export type CargoOpsCommodityId =

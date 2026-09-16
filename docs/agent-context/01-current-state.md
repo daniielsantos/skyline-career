@@ -1,5 +1,7 @@
 # Current state (2026-09-14)
 
+`main` **f00b359** / desktop **0.3.66** shipped: HTTPS gateway strips stale compression headers after Node fetch decoding, fixing Electron login `Failed to fetch` behind Caddy. Release: [v0.3.66](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.66).
+
 `main` **667388d** / desktop **0.3.65** shipped: fixed MP boot no longer calls authenticated profiles before AuthGate (stuck “Listening for host”); post-login warm errors stay visible in AuthGate. Release: [v0.3.65](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.65).
 
 `main` **876463c** / desktop **0.3.64** shipped: register invite/claim gates; MapTiler auth + compose `MAPTILER_KEY`; Remember me opt-in (sessionStorage default). Release: [v0.3.64](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.64).

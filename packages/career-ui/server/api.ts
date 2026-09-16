@@ -471,6 +471,7 @@ const bootSourceStamp = await serverSourceStamp();
 const careerRoot = await resolveCareerRoot();
 let store: CareerStore | null = null;
 let activeProfileId: string | null = null;
+let fixedWorldOpenError: string | null = null;
 
 /** Process role: full (SP) | world (VPS) | gateway (desktop sim). */
 const careerApiMode: CareerApiMode = resolveCareerApiMode();
@@ -554,6 +555,7 @@ async function bootstrapHeadlessWorldPulse(
     if (!store) {
       const t0 = performance.now();
       try {
+        fixedWorldOpenError = null;
         const openedStore = await withPostgresReadyRetry(
           'fixed-world open',
           () =>
@@ -577,9 +579,11 @@ async function bootstrapHeadlessWorldPulse(
             `backend=${openedStore.kind} ${Math.round(performance.now() - t0)}ms`,
         );
       } catch (error) {
+        fixedWorldOpenError =
+          error instanceof Error ? error.message : String(error);
         console.error(
           `[career] fixed-world open fail ${Math.round(performance.now() - t0)}ms:`,
-          error instanceof Error ? error.message : error,
+          fixedWorldOpenError,
         );
         return;
       }
@@ -2678,8 +2682,19 @@ export function createCareerApiServer(port = 8787) {
               )?.profiles.find((p) => p.id === activeProfileId)?.name ?? null
             : null;
         if (!store) {
-          send(res, 200, {
-            ok: true,
+          const worldUnavailable = worldFixed;
+          send(res, worldUnavailable ? 503 : 200, {
+            ok: !worldUnavailable,
+            ...(worldUnavailable
+              ? {
+                  error: fixedWorldOpenError
+                    ? 'World store failed to open; check server logs'
+                    : 'World store is opening',
+                  code: fixedWorldOpenError
+                    ? 'world_store_unavailable'
+                    : 'world_store_opening',
+                }
+              : {}),
             needsProfile: true,
             activeProfileId: null,
             activeProfileName: null,

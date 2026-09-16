@@ -10,6 +10,14 @@ services:
   world-api:
     ports:
       - '127.0.0.1:8787:8787'
+    environment:
+      # Existing production worlds must never be silently replaced by a fresh
+      # seed if the DB URL/volume is wrong. Set =1 only for first bootstrap.
+      CAREER_WORLD_ALLOW_SEED: ${CAREER_WORLD_ALLOW_SEED:-0}
+
+  world-worker:
+    environment:
+      CAREER_WORLD_ALLOW_SEED: ${CAREER_WORLD_ALLOW_SEED:-0}
 
   # Optional TLS terminator (Let's Encrypt). Enable: --profile tls / stack --tls
   caddy:

@@ -7,13 +7,47 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { emptyMissionsStateV2 } from './career-fleet.js';
 import {
+  assertCareerWorldSeedAllowed,
   careerDatabaseUrlFromEnv,
   careerTestDatabaseUrlFromEnv,
+  isCareerWorldSeedAllowed,
   isCareerLabDatabaseUrl,
   openPostgresCareerStore,
 } from './career-store-postgres.js';
 
 describe('career store postgres', () => {
+  it('allows seed by default for dev and requires an explicit production opt-in', () => {
+    assert.equal(isCareerWorldSeedAllowed({}), true);
+    assert.equal(
+      isCareerWorldSeedAllowed({ CAREER_WORLD_ALLOW_SEED: '1' }),
+      true,
+    );
+    assert.equal(
+      isCareerWorldSeedAllowed({ CAREER_WORLD_ALLOW_SEED: 'true' }),
+      true,
+    );
+    assert.equal(
+      isCareerWorldSeedAllowed({ CAREER_WORLD_ALLOW_SEED: '0' }),
+      false,
+    );
+    assert.equal(
+      isCareerWorldSeedAllowed({ CAREER_WORLD_ALLOW_SEED: 'typo' }),
+      false,
+    );
+    assert.doesNotThrow(() =>
+      assertCareerWorldSeedAllowed(true, {
+        CAREER_WORLD_ALLOW_SEED: '0',
+      }),
+    );
+    assert.throws(
+      () =>
+        assertCareerWorldSeedAllowed(false, {
+          CAREER_WORLD_ALLOW_SEED: '0',
+        }),
+      /refusing automatic world creation/,
+    );
+  });
+
   it('careerDatabaseUrlFromEnv reads CAREER_PG', () => {
     assert.equal(careerDatabaseUrlFromEnv({}), null);
     assert.ok(

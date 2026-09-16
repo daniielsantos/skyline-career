@@ -96,6 +96,24 @@ export {
 const CAREER_PG_SCHEMA_VERSION = '16';
 const { Pool } = pg;
 
+export function isCareerWorldSeedAllowed(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const raw = env.CAREER_WORLD_ALLOW_SEED;
+  if (raw == null || raw.trim() === '') return true;
+  return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
+}
+
+export function assertCareerWorldSeedAllowed(
+  hasEconomy: boolean,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (hasEconomy || isCareerWorldSeedAllowed(env)) return;
+  throw new Error(
+    'Postgres world is empty and CAREER_WORLD_ALLOW_SEED=0; refusing automatic world creation. Restore the database or explicitly set CAREER_WORLD_ALLOW_SEED=1 for the first bootstrap only.',
+  );
+}
+
 function catchUpOpts(opts?: { maxCatchUpTicks?: number }) {
   return { maxTicks: opts?.maxCatchUpTicks ?? MAX_LOAD_CATCH_UP_TICKS };
 }
@@ -240,6 +258,19 @@ async function retirePgLegacyStubTables(pool: pg.Pool): Promise<void> {
   }
 }
 
+async function postgresWorldHasEconomy(pool: pg.Pool): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT (
+       EXISTS (SELECT 1 FROM economy_meta WHERE world_id = $1)
+       OR EXISTS (SELECT 1 FROM airports WHERE world_id = $1)
+       OR EXISTS (SELECT 1 FROM lots WHERE world_id = $1)
+       OR EXISTS (SELECT 1 FROM npcs WHERE world_id = $1)
+     ) AS present`,
+    [LOCAL_WORLD_ID],
+  );
+  return result.rows[0]?.present === true;
+}
+
 const PG_DDL = `
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY NOT NULL,
@@ -348,6 +379,9 @@ export class PostgresCareerStore implements CareerStore {
        VALUES ($1, '', '', '', $2, $3)
        ON CONFLICT (id) DO NOTHING`,
       [LOCAL_COMPANY_ID, LOCAL_WORLD_ID, Date.now()],
+    );
+    assertCareerWorldSeedAllowed(
+      await postgresWorldHasEconomy(this.pool),
     );
   }
 
@@ -853,6 +887,7 @@ export class PostgresCareerStore implements CareerStore {
       return { world: caught, advancedTicks, settledFlights, dirty };
     }
 
+    assertCareerWorldSeedAllowed(false);
     const fresh = createSeedEconomyWorld();
     ensureSeedMarketFormed(fresh);
     await this.saveEconomy(fresh);

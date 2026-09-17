@@ -1,5 +1,8 @@
 # Current state (2026-09-17)
 
+`main` **786f2fc** / desktop **0.3.75** shipped: Use Airframe hero lockup on login and profile gates. Release: [v0.3.75](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.75).
+
+
 `main` **678a076** / desktop **0.3.74** shipped: Default Multiplayer world URL to world.playairframe.com. Release: [v0.3.74](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.74).
 
 

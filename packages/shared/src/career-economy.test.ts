@@ -78,7 +78,6 @@ import {
   pruneOrphanCareerHubs,
   remapMislabelledClHubs,
   remapRetiredCareerAirportIdents,
-  pruneSameOdCareerLots,
   MS_PER_HOUR,
   MS_PER_TICK,
   TICKS_PER_DAY,
@@ -4845,7 +4844,9 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.ok(world.airports.some((a) => a.icao === 'SAMR'), 'San Rafael live');
 
     const samr = world.airports.find((a) => a.icao === 'SAMR')!;
-    const stockBefore = samr.inventory.general.stockKg;
+    const general = samr.inventory.general;
+    assert.ok(general, 'SAMR general inventory');
+    const stockBefore = general.stockKg;
 
     world.lots.push({
       id: 'lot-samr-collapsed',
@@ -4893,7 +4894,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     );
     assert.equal(routeDistanceNm(world, 'SAOU', 'SAMR')! > 40, true);
     assert.ok(
-      samr.inventory.general.stockKg > stockBefore,
+      general.stockKg > stockBefore,
       'same-OD available lot refunds stock',
     );
   });

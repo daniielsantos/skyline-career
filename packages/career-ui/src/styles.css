@@ -207,6 +207,18 @@ body {
   margin-bottom: 0.35rem;
 }
 
+/* Avoid nested-card: hero bleeds to panel edges; panel keeps the accent bar. */
+.panel.profile-gate .profile-gate-brand.brand-mark-hero {
+  width: calc(100% + 3rem);
+  max-width: none;
+  margin: -1.75rem -1.5rem 0.15rem;
+}
+
+.panel.profile-gate .brand-mark-hero-lockup {
+  filter: none;
+  border-radius: 0.32rem 0.32rem 0 0;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;

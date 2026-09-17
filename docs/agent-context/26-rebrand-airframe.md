@@ -27,10 +27,17 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 
 - [x] Logo AIR|FRAME hero: `packages/career-ui/src/assets/brand/airframe-hero-lockup.png` (arquivo Skyline mantido)
 - [x] `BrandMark` `variant="hero"` → Airframe (AuthGate / ProfileGate / PlayModeGate / WorldWaitingGate)
+- [x] Hero no painel: full-bleed + PNG sem faixa laranja (evita “card dentro de card”)
 - [ ] Compact sidebar ainda **SKYLINE** (texto CSS + `md11f-mark`)
 - [ ] Ícones installer + Start Menu display name
 - [ ] Copy UI: “Skyline Career” → “Airframe” (ou “Airframe Career”)
 - [ ] Setup exe name (ex. `Airframe-Setup-…`) + `latest.yml` channel
+
+### Diagnóstico UI (2026-09-17)
+
+- **Sintoma:** login parece card dentro de card (faixa laranja dupla + PNG inset com sombra).
+- **Causa:** lockup gerado com accent strip + `.brand-mark-hero` max-width/inset/drop-shadow dentro de `.panel.profile-gate`.
+- **Fix:** PNG sem strip; hero full-bleed nas bordas do painel; sem drop-shadow no gate.
 
 ## Fase 3 — paths / ids (migrar com cuidado)
 

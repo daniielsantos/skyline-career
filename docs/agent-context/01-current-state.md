@@ -1,5 +1,8 @@
 # Current state (2026-09-17)
 
+`main` **2bfe8fe** / desktop **0.3.76** shipped: Bleed Airframe hero to gate edges and drop nested accent. Release: [v0.3.76](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.76).
+
+
 `main` **786f2fc** / desktop **0.3.75** shipped: Use Airframe hero lockup on login and profile gates. Release: [v0.3.75](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.75).
 
 

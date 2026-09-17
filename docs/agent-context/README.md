@@ -3,6 +3,8 @@
 Pasta para **continuar trabalho em chats novos** sem carregar o transcript inteiro.
 Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta + o código.
 
+**Base sempre-on:** [`AGENTS.md`](../../AGENTS.md) na raiz do repo (leitura mínima + crítica ao pedido).
+
 ## Como usar (chat novo)
 
 1. `@docs/agent-context/project-overview.md` — visão geral do projeto

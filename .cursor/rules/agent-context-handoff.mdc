@@ -1,27 +1,22 @@
 ---
-description: Handoff — ler docs/agent-context em chats novos (evita transcript gigante)
+description: Base do agente — AGENTS.md, handoff curto, crítica obrigatória ao pedido
 alwaysApply: true
 ---
 
-# Agent context handoff
+# Agent base (Skyline / Airframe)
 
-Conversas longas neste repo travam o Cursor. **Não** dependa do transcript antigo.
+Conversas longas travam o Cursor. **Não** dependa do transcript.
 
-No início de trabalho Skyline Career / SimBridge / Twin Otter / hubs:
+## Antes de agir
 
-1. Leia `docs/agent-context/project-overview.md` (visão geral)
-2. Leia `docs/agent-context/README.md` e **apenas** o arquivo de tópico necessário
-3. Respeite `docs/agent-context/00-constraints.md`
-4. Economy/map detail: `.cursor/rules/career-economy-roadmap.mdc` / `career-map-expansion.mdc` (só se a tarefa for isso)
+1. Leia a raiz **`AGENTS.md`** (produto, leitura mínima, crítica, handoff)
+2. Siga os paths lá: overview → `00-constraints` → `01-current-state` → **um** tópico
+3. Economy/map só se for a tarefa: `career-economy-roadmap` / `career-map-expansion`
 
-## Gravar solução no mesmo turno
+## Crítica ao pedido
 
-Sempre que **fecharmos um diagnóstico** (Loaded≠Due, OFP fail, inject, fuel, SimBrief row, ghost stations, etc.):
+Se o pedido for frágil, ambíguo ou de alto risco (prod, saves, economia, rebrand sem arte, “aumentar payload” quebrando inject, etc.): **conteste antes de codar**. Explique o impacto e ofereça alternativa; só prossiga no caminho perigoso com confirmação explícita.
 
-1. Atualize **no mesmo turno** o `.md` de tópico em `docs/agent-context/` (bullets curtos: sintoma → causa → fix/path)
-2. Payload / EFB / estações → `12-pax-efb-due.md` (+ linha na tabela SKUs se for airframe novo)
-3. Homologação Market / pack / SimBrief match → `09-homologate.md`
-4. Inject / freighter / Host → `17-inject-regression.md` ou o tópico certo do índice
-5. **Não** deixe a lição só no chat — o próximo agente deve recuperar pelo `.md`, não pelo transcript
+## Fechar diagnóstico
 
-Atualize também ao fechar uma sessão longa (`01` / `06` se mudou estado ou backlog).
+Atualize o `.md` de tópico no **mesmo turno** (sintoma → causa → fix). Sessão longa: `01` / `06` se mudou estado/backlog.

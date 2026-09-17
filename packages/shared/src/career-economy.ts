@@ -8316,6 +8316,9 @@ export function remapRetiredCareerAirportIdents(
     const to = toRaw.trim().toUpperCase();
     if (!from || !to || from === to) continue;
     if (!(to in CAREER_HUB_COORDS)) continue;
+    // Never rewrite a live catalog hub into another (SAOU San Luis must stay
+    // SAOU while SAMR San Rafael is also live — SAOU→SAMR created 0 nm lots).
+    if (from in CAREER_HUB_COORDS) continue;
 
     const fromAp = world.airports.find(
       (ap) => ap.icao.trim().toUpperCase() === from,
@@ -8359,7 +8362,53 @@ export function remapRetiredCareerAirportIdents(
     changed = true;
   }
   if (dedupeCareerAirportsByIcao(world)) changed = true;
+  if (pruneSameOdCareerLots(world) > 0) changed = true;
   return changed;
+}
+
+/**
+ * Drop board/NPC legs that collapsed to the same ICAO after a bad remap
+ * (e.g. SAOU↔SAMR → SAMR→SAMR). Available lots refund formation reserve;
+ * reserved / in_transit / NPC are discarded (unflyable 0 nm OD).
+ */
+export function pruneSameOdCareerLots(world: CareerEconomyWorld): number {
+  let removed = 0;
+  const keepLots: ShipmentLot[] = [];
+  for (const lot of world.lots) {
+    const origin = lot.originIcao.trim().toUpperCase();
+    const dest = lot.destIcao.trim().toUpperCase();
+    if (origin && dest && origin === dest) {
+      if (lot.status === 'available' && lot.reservedKg <= 0) {
+        retireLotToOrigin(world, lot, 'recycled');
+      }
+      removed += 1;
+      continue;
+    }
+    keepLots.push(lot);
+  }
+  if (removed > 0) world.lots = keepLots;
+
+  if (Array.isArray(world.npcFlights) && world.npcFlights.length > 0) {
+    const before = world.npcFlights.length;
+    world.npcFlights = world.npcFlights.filter((flight) => {
+      const origin = flight.originIcao.trim().toUpperCase();
+      const dest = flight.destIcao.trim().toUpperCase();
+      return !origin || !dest || origin !== dest;
+    });
+    removed += before - world.npcFlights.length;
+  }
+
+  if (Array.isArray(world.inboundPending) && world.inboundPending.length > 0) {
+    const before = world.inboundPending.length;
+    world.inboundPending = world.inboundPending.filter((pending) => {
+      const origin = pending.originIcao.trim().toUpperCase();
+      const dest = pending.destIcao.trim().toUpperCase();
+      return !origin || !dest || origin !== dest;
+    });
+    removed += before - world.inboundPending.length;
+  }
+
+  return removed;
 }
 
 /** Keep first row per ICAO — repairs clone storms from bad remaps. */
@@ -8588,6 +8637,7 @@ export function migrateEconomyWorld(
 
   remapMislabelledClHubs(migrated);
   remapRetiredCareerAirportIdents(migrated);
+  pruneSameOdCareerLots(migrated);
   pruneOrphanCareerHubs(migrated);
   ensureCareerHubCoverage(migrated);
   ensureInternationalLanes(migrated);
@@ -9330,6 +9380,7 @@ function expireLots(world: CareerEconomyWorld): void {
     }
   }
   pruneUnbookableMarketScraps(world);
+  pruneSameOdCareerLots(world);
   pruneDeadLots(world);
 }
 

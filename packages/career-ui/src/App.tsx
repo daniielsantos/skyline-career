@@ -179,6 +179,13 @@ import { FerryHubCombobox } from './FerryHubCombobox';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
 import { CharterBoard, resolveBaseCharterOrigin } from './CharterBoard';
 import {
+  boardMoneyLabel,
+  boardNetClassName,
+  formatBoardDistanceNm,
+  formatBoardMoney,
+  isFiniteMoney,
+} from './board-money';
+import {
   CharterManifest,
   type CharterManifestDraft,
 } from './CharterManifest';
@@ -643,7 +650,7 @@ function formatTonnes(kg: number, system?: WeightSystem): string {
 let activeWeightSystem: WeightSystem = loadWeightSystem();
 
 function formatMoney(n: number): string {
-  return `$${n.toLocaleString()}`;
+  return formatBoardMoney(n);
 }
 
 /** Player-facing route for an active dispatch (hide raw msn_… ids). */
@@ -2670,7 +2677,7 @@ function NpcTakenBadge(props: {
       nowMs: props.nowMs,
       fallbackHours: props.claim.etaHours,
     });
-    const feeFmt = props.formatMoney ?? ((n: number) => `$${n.toLocaleString()}`);
+    const feeFmt = props.formatMoney ?? formatBoardMoney;
     const fee = formatCrewFeeText(props.claim, feeFmt);
     const classLabel = props.claim.aircraftClassId
       ? aircraftClassLabel(props.claim.aircraftClassId)
@@ -2815,8 +2822,8 @@ function MovementBoard(props: {
                 <ProgressTrack pct={pct} />
                 <small>
                   {row.aircraftLabel ?? row.aircraftClassId}
-                  {row.distanceNm !== undefined
-                    ? ` · ${Math.round(row.distanceNm).toLocaleString()} nm`
+                  {isFiniteMoney(row.distanceNm)
+                    ? ` · ${formatBoardDistanceNm(row.distanceNm)}`
                     : ''}
                   {typeof row.arrivesAtMs === 'number'
                     ? ` · ETA ${formatDuration(eta)}`
@@ -10816,8 +10823,7 @@ export function App() {
     if (contractsProfitableOnly) {
       filtered = filtered.filter(
         (lot) =>
-          typeof lot.estimatedNetUsd === 'number' &&
-          Number.isFinite(lot.estimatedNetUsd) &&
+          isFiniteMoney(lot.estimatedNetUsd) &&
           lot.estimatedNetUsd > 0 &&
           lot.estimatedInRange !== false,
       );
@@ -12930,10 +12936,9 @@ export function App() {
                                                   </td>
                                                   <td>{tour.legCount}</td>
                                                   <td>
-                                                    {Math.round(
+                                                    {formatBoardDistanceNm(
                                                       tour.totalDistanceNm,
-                                                    )}{' '}
-                                                    nm
+                                                    )}
                                                   </td>
                                                   <td>
                                                     {tour.totalFerryNm > 0.5
@@ -12941,13 +12946,19 @@ export function App() {
                                                       : '—'}
                                                   </td>
                                                   <td className="pay">
-                                                    {formatMoney(
+                                                    {boardMoneyLabel(
                                                       tour.totalPayUsd,
+                                                      formatMoney,
                                                     )}
                                                   </td>
-                                                  <td className="pay">
-                                                    {formatMoney(
+                                                  <td
+                                                    className={boardNetClassName(
                                                       tour.totalNetUsd,
+                                                    )}
+                                                  >
+                                                    {boardMoneyLabel(
+                                                      tour.totalNetUsd,
+                                                      formatMoney,
                                                     )}
                                                   </td>
                                                   <td>
@@ -13234,9 +13245,7 @@ export function App() {
                                       </div>
                                     </td>
                                     <td>
-                                      {hold.distanceNm !== undefined
-                                        ? `${Math.round(hold.distanceNm).toLocaleString()} nm`
-                                        : '—'}
+                                      {formatBoardDistanceNm(hold.distanceNm)}
                                     </td>
                                     <td>{formatTonnes(hold.cargoKg)}</td>
                                     <td className="pay">
@@ -14356,9 +14365,7 @@ export function App() {
                                 </div>
                               </td>
                               <td className="distance col-compact">
-                                {lot.distanceNm !== undefined
-                                  ? `${Math.round(lot.distanceNm).toLocaleString()} nm`
-                                  : '—'}
+                                {formatBoardDistanceNm(lot.distanceNm)}
                               </td>
                               <td className="col-cargo">
                                 <div className="commodity-cell">
@@ -14393,27 +14400,20 @@ export function App() {
                                 <LotPayCell lot={lot} idlePct={idlePct} />
                               </td>
                               <td
-                                className={
-                                  [
-                                    'col-money',
-                                    lot.npcClaim?.crewNeeded &&
-                                    typeof lot.npcClaim.pilotFeeUsd === 'number'
-                                      ? 'net'
-                                      : typeof lot.estimatedNetUsd === 'number' &&
-                                          lot.estimatedInRange !== false
-                                        ? lot.estimatedNetUsd > 0
-                                          ? 'net net-pos'
-                                          : lot.estimatedNetUsd < 0
-                                            ? 'net net-neg'
-                                            : 'net'
-                                        : 'net',
-                                  ]
-                                    .filter(Boolean)
-                                    .join(' ')
-                                }
+                                className={[
+                                  'col-money',
+                                  lot.npcClaim?.crewNeeded &&
+                                  isFiniteMoney(lot.npcClaim.pilotFeeUsd)
+                                    ? 'net'
+                                    : boardNetClassName(lot.estimatedNetUsd, {
+                                        inRange: lot.estimatedInRange,
+                                      }),
+                                ]
+                                  .filter(Boolean)
+                                  .join(' ')}
                               >
                                 {lot.npcClaim?.crewNeeded &&
-                                typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
+                                isFiniteMoney(lot.npcClaim.pilotFeeUsd) ? (
                                   <span
                                     className="muted"
                                     title="Crew Pay is your fee — operator lot value is not shown"
@@ -14426,13 +14426,11 @@ export function App() {
                                     OOR
                                   </small>
                                 ) : boardAircraft &&
-                                  typeof lot.estimatedNetUsd === 'number' ? (
+                                  isFiniteMoney(lot.estimatedNetUsd) ? (
                                   <span
                                     title={
-                                      typeof lot.estimatedFuelCostUsd ===
-                                      'number'
-                                        ? typeof lot.estimatedLiftKg ===
-                                          'number'
+                                      isFiniteMoney(lot.estimatedFuelCostUsd)
+                                        ? isFiniteMoney(lot.estimatedLiftKg)
                                           ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
                                           : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
                                         : undefined
@@ -15366,9 +15364,7 @@ export function App() {
                       </div>
                     </td>
                     <td className="distance col-compact">
-                      {lot.distanceNm !== undefined
-                        ? `${Math.round(lot.distanceNm).toLocaleString()} nm`
-                        : '—'}
+                      {formatBoardDistanceNm(lot.distanceNm)}
                     </td>
                     <td className="col-cargo">
                       <div className="commodity-cell">
@@ -15398,26 +15394,18 @@ export function App() {
                       <LotPayCell lot={lot} idlePct={idlePct} />
                     </td>
                     <td
-                      className={
-                        [
-                          'col-money',
-                          lot.npcClaim?.crewNeeded &&
-                          typeof lot.npcClaim.pilotFeeUsd === 'number'
-                            ? 'net'
-                            : typeof lot.estimatedNetUsd === 'number'
-                              ? lot.estimatedNetUsd > 0
-                                ? 'net net-pos'
-                                : lot.estimatedNetUsd < 0
-                                  ? 'net net-neg'
-                                  : 'net'
-                              : 'net',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')
-                      }
+                      className={[
+                        'col-money',
+                        lot.npcClaim?.crewNeeded &&
+                        isFiniteMoney(lot.npcClaim.pilotFeeUsd)
+                          ? 'net'
+                          : boardNetClassName(lot.estimatedNetUsd),
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                     >
                       {lot.npcClaim?.crewNeeded &&
-                      typeof lot.npcClaim.pilotFeeUsd === 'number' ? (
+                      isFiniteMoney(lot.npcClaim.pilotFeeUsd) ? (
                         <span
                           className="muted"
                           title="Crew Pay is your fee — operator lot value is not shown"
@@ -15425,11 +15413,11 @@ export function App() {
                           —
                         </span>
                       ) : boardAircraft &&
-                        typeof lot.estimatedNetUsd === 'number' ? (
+                        isFiniteMoney(lot.estimatedNetUsd) ? (
                         <span
                           title={
-                            typeof lot.estimatedFuelCostUsd === 'number'
-                              ? typeof lot.estimatedLiftKg === 'number'
+                            isFiniteMoney(lot.estimatedFuelCostUsd)
+                              ? isFiniteMoney(lot.estimatedLiftKg)
                                 ? `Lift ${formatTonnes(lot.estimatedLiftKg)} · Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
                                 : `Jet-A ${formatMoney(lot.estimatedFuelCostUsd)}`
                               : undefined
@@ -15710,7 +15698,7 @@ export function App() {
                       <div>
                         <span className="debrief-hero-money-label">Net</span>
                         <strong className="debrief-hero-money-net">
-                          {formatMoney(flightDebrief.netUsd)}
+                          {boardMoneyLabel(flightDebrief.netUsd, formatMoney)}
                         </strong>
                       </div>
                       {flightDebrief.flightScore ? (
@@ -16072,23 +16060,18 @@ export function App() {
                   },
                   {
                     label: 'Est. net',
-                    value:
-                      stagingEstNetUsd !== null
-                        ? formatMoney(stagingEstNetUsd)
-                        : '—',
+                    value: boardMoneyLabel(stagingEstNetUsd, formatMoney),
                     strongClassName:
-                      stagingEstNetUsd !== null && stagingEstNetUsd < 0
+                      isFiniteMoney(stagingEstNetUsd) && stagingEstNetUsd < 0
                         ? 'staging-est-net-loss'
-                        : stagingEstNetUsd !== null && stagingEstNetUsd >= 0
+                        : isFiniteMoney(stagingEstNetUsd) &&
+                            stagingEstNetUsd >= 0
                           ? 'staging-est-net-ok'
                           : undefined,
                   },
                   {
                     label: 'Route',
-                    value:
-                      stagingDistanceNm !== undefined
-                        ? `${Math.round(stagingDistanceNm).toLocaleString()} nm`
-                        : '—',
+                    value: formatBoardDistanceNm(stagingDistanceNm),
                   },
                 ]}
                 planningDetails={
@@ -16134,8 +16117,8 @@ export function App() {
                         {aircraftMaxRangeNm(staging.aircraft).toLocaleString()} nm
                       </strong>
                       <em>
-                        {stagingDistanceNm !== undefined
-                          ? `this route ${Math.round(stagingDistanceNm).toLocaleString()} nm`
+                        {isFiniteMoney(stagingDistanceNm)
+                          ? `this route ${formatBoardDistanceNm(stagingDistanceNm)}`
                           : 'route distance pending'}
                       </em>
                     </span>
@@ -16143,7 +16126,7 @@ export function App() {
                       <span>
                         Net estimate
                         <strong>
-                          {formatMoney(stagingEstNetUsd ?? 0)}
+                          {boardMoneyLabel(stagingEstNetUsd, formatMoney)}
                         </strong>
                         <em>
                           {`pay − Jet-A ${formatMoney(estimatedFuelCostUsd)}${

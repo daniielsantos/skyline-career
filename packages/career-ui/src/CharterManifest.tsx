@@ -5,6 +5,7 @@ import {
   type PlayerAircraft,
 } from './api';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
+import { boardMoneyLabel, formatBoardDistanceNm } from './board-money';
 
 export type CharterManifestDraft = {
   offer: CharterOfferView;
@@ -164,11 +165,11 @@ export function CharterManifest(props: CharterManifestProps) {
       <section className="charter-manifest-summary" aria-label="Charter manifest">
         <div><span>Passengers</span><strong>{props.draft.offer.paxCount}</strong></div>
         <div><span>Baggage</span><strong>{props.formatMass(props.draft.offer.baggageKg)}</strong></div>
-        <div><span>Distance</span><strong>{Math.round(props.draft.offer.distanceNm).toLocaleString()} nm</strong></div>
-        <div><span>Contract pay</span><strong>{props.formatMoney(props.draft.offer.payUsd)}</strong></div>
+        <div><span>Distance</span><strong>{formatBoardDistanceNm(props.draft.offer.distanceNm)}</strong></div>
+        <div><span>Contract pay</span><strong>{boardMoneyLabel(props.draft.offer.payUsd, props.formatMoney)}</strong></div>
         <div>
           <span>Estimated net</span>
-          <strong>{fit ? props.formatMoney(fit.netUsd) : '—'}</strong>
+          <strong>{boardMoneyLabel(fit?.netUsd, props.formatMoney)}</strong>
         </div>
         <div>
           <span>Fit</span>
@@ -196,7 +197,7 @@ export function CharterManifest(props: CharterManifestProps) {
 
       <div className="staging-footer staging-footer-sticky">
         <div>
-          <p>{props.draft.offer.paxCount} pax · {props.formatMoney(props.draft.offer.payUsd)}</p>
+          <p>{props.draft.offer.paxCount} pax · {boardMoneyLabel(props.draft.offer.payUsd, props.formatMoney)}</p>
           {!atOrigin ? <p className="cargo-dialog-error">Aircraft must be at {origin} — ferry first.</p> : null}
         </div>
         <button

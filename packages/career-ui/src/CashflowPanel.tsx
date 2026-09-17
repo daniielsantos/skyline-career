@@ -6,6 +6,7 @@ import type {
   CompanyCreditSnapshot,
 } from './api';
 import { postCreditDraw, postCreditRepay } from './api';
+import { boardMoneyLabel, isFiniteMoney } from './board-money';
 
 const CASHFLOW_PAGE_SIZE = 20;
 
@@ -82,9 +83,16 @@ function SummaryCard(props: {
         </div>
         <div>
           <dt>Net</dt>
-          <dd className={summary.netUsd >= 0 ? 'cashflow-pos' : 'cashflow-neg'}>
-            {summary.netUsd >= 0 ? '' : '−'}
-            {formatMoney(Math.abs(summary.netUsd))}
+          <dd className={
+            isFiniteMoney(summary.netUsd) && summary.netUsd >= 0
+              ? 'cashflow-pos'
+              : 'cashflow-neg'
+          }>
+            {isFiniteMoney(summary.netUsd) && summary.netUsd >= 0 ? '' : '−'}
+            {boardMoneyLabel(
+              isFiniteMoney(summary.netUsd) ? Math.abs(summary.netUsd) : null,
+              formatMoney,
+            )}
           </dd>
         </div>
       </dl>

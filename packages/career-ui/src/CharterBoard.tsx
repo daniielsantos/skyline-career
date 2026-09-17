@@ -12,6 +12,11 @@ import {
   type CharterBoardSortKey,
   type CharterBoardSortLevel,
 } from './charter-board-sort';
+import {
+  boardMoneyLabel,
+  boardNetClassName,
+  formatBoardDistanceNm,
+} from './board-money';
 import { IcaoLink } from './IcaoLink';
 
 export const CHARTER_PAGE_SIZE = 10;
@@ -41,6 +46,14 @@ export function charterFitLabel(offer: CharterOfferView): string {
   return fit.ferryRequired
     ? `Ferry ${Math.round(fit.ferryNm)} nm`
     : 'At origin';
+}
+
+/** Net cell — never call formatMoney on null (JSON NaN) or missing fit.netUsd. */
+export function charterNetLabel(
+  offer: CharterOfferView,
+  formatMoney: (value: number) => string,
+): string {
+  return boardMoneyLabel(offer.fit?.netUsd, formatMoney);
 }
 
 type CharterBoardProps = {
@@ -473,7 +486,7 @@ export function CharterBoard(props: CharterBoardProps) {
                         </div>
                       </td>
                       <td className="col-compact">
-                        {Math.round(offer.distanceNm).toLocaleString()} nm
+                        {formatBoardDistanceNm(offer.distanceNm)}
                       </td>
                       <td className="col-compact">{offer.paxCount}</td>
                       <td className="col-cargo">
@@ -483,14 +496,14 @@ export function CharterBoard(props: CharterBoardProps) {
                         {charterExpiryLabel(offer.ticksRemaining)}
                       </td>
                       <td className="col-money pay">
-                        <strong>{props.formatMoney(offer.payUsd)}</strong>
+                        <strong>
+                          {boardMoneyLabel(offer.payUsd, props.formatMoney)}
+                        </strong>
                       </td>
                       <td
-                        className={`col-money net ${
-                          fit && fit.netUsd < 0 ? 'net-neg' : 'net-pos'
-                        }`}
+                        className={`col-money ${boardNetClassName(fit?.netUsd)}`}
                       >
-                        {fit ? props.formatMoney(fit.netUsd) : '—'}
+                        {charterNetLabel(offer, props.formatMoney)}
                       </td>
                       <td className="col-access">
                         {fitLabel ? (

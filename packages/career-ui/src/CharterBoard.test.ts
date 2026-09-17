@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   charterExpiryLabel,
   charterFitLabel,
+  charterNetLabel,
   resolveBaseCharterOrigin,
 } from './CharterBoard';
 import {
@@ -109,6 +110,74 @@ test('hides incompatible fit text from the cell label', () => {
       }),
     ),
     '',
+  );
+});
+
+test('charter net cell survives null/NaN fit.netUsd from the wire', () => {
+  const money = (n: number) => `$${n}`;
+  assert.equal(charterNetLabel(offer(), money), '—');
+  assert.equal(
+    charterNetLabel(
+      offer({
+        fit: {
+          aircraftId: 'acf-1',
+          aircraftLabel: 'Citation',
+          compatible: true,
+          seatCapacity: 8,
+          inRange: true,
+          baggageOk: true,
+          fuelFeasible: true,
+          ferryRequired: false,
+          ferryNm: 0,
+          netUsd: null as unknown as number,
+          reasons: [],
+        },
+      }),
+      money,
+    ),
+    '—',
+  );
+  assert.equal(
+    charterNetLabel(
+      offer({
+        fit: {
+          aircraftId: 'acf-1',
+          aircraftLabel: 'Citation',
+          compatible: true,
+          seatCapacity: 8,
+          inRange: true,
+          baggageOk: true,
+          fuelFeasible: true,
+          ferryRequired: false,
+          ferryNm: 0,
+          netUsd: Number.NaN,
+          reasons: [],
+        },
+      }),
+      money,
+    ),
+    '—',
+  );
+  assert.equal(
+    charterNetLabel(
+      offer({
+        fit: {
+          aircraftId: 'acf-1',
+          aircraftLabel: 'Citation',
+          compatible: true,
+          seatCapacity: 8,
+          inRange: true,
+          baggageOk: true,
+          fuelFeasible: true,
+          ferryRequired: false,
+          ferryNm: 0,
+          netUsd: 2_900,
+          reasons: [],
+        },
+      }),
+      money,
+    ),
+    '$2900',
   );
 });
 

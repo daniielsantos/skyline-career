@@ -6217,7 +6217,9 @@ function DemandAcceptDialog(props: {
             <p className="demand-accept-hint">
               Distance {selectedOrigin || 'WH'}→{props.order.destIcao}:{' '}
               <strong>
-                {Math.round(props.distanceNm).toLocaleString()} nm
+                {Number.isFinite(props.distanceNm)
+                  ? `${Math.round(props.distanceNm).toLocaleString()} nm`
+                  : '—'}
               </strong>
             </p>
           ) : selectedOrigin ? (
@@ -6385,12 +6387,16 @@ function DemandAcceptDialog(props: {
                   <dt>Margin</dt>
                   <dd
                     className={
+                      typeof preview.marginUsd === 'number' &&
+                      Number.isFinite(preview.marginUsd) &&
                       preview.marginUsd >= 0
                         ? 'demand-accept-margin-pos'
                         : 'demand-accept-margin-neg'
                     }
                   >
-                    {props.formatMoney(preview.marginUsd)}
+                    {Number.isFinite(preview.marginUsd)
+                      ? props.formatMoney(preview.marginUsd)
+                      : '—'}
                   </dd>
                 </div>
               </dl>

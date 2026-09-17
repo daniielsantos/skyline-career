@@ -901,7 +901,13 @@ function charterAircraftFit(
     fuelFeasible: routeLimit.fuelFeasible && payloadOk,
     ferryRequired,
     ferryNm,
-    netUsd: offer.payUsd - ferryCostUsd,
+    // Keep finite for JSON (NaN becomes null and crashes Net `toLocaleString`).
+    netUsd: (() => {
+      const raw = Number(offer.payUsd) - ferryCostUsd;
+      return Number.isFinite(raw)
+        ? Math.round(raw)
+        : Math.max(0, Math.round(Number(offer.payUsd) || 0));
+    })(),
     reasons,
   };
 }
@@ -5532,15 +5538,18 @@ export function createCareerApiServer(port = 8787) {
             liftKg > 0
               ? Math.max(0, Math.round((liftKg / qty) * row.lot.payUsd))
               : 0;
-          const netUsd = payUsd - cached.fuelCostUsd;
+          const netUsdRaw = payUsd - cached.fuelCostUsd;
+          const netUsd = Number.isFinite(netUsdRaw) ? netUsdRaw : payUsd;
           const marginPct =
             payUsd > 0 ? netUsd / payUsd : netUsd < 0 ? -1 : 0;
           return {
             ...base,
             estimatedLiftKg: liftKg,
-            estimatedFuelCostUsd: cached.fuelCostUsd,
+            estimatedFuelCostUsd: Number.isFinite(cached.fuelCostUsd)
+              ? cached.fuelCostUsd
+              : 0,
             estimatedNetUsd: netUsd,
-            estimatedMarginPct: marginPct,
+            estimatedMarginPct: Number.isFinite(marginPct) ? marginPct : 0,
             estimatedFuelFeasible: cached.fuelFeasible,
             estimatedInRange: cached.inRange,
           };

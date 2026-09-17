@@ -341,9 +341,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   // SANR→SANE migrates mis-seeded Santiago; Termas densify later (do not seed
   // Termas as SANR while SANR→SANE remains).
   SAOS: 'SAAV', // Sauce Viejo (already seeded)
-  // Order matters for remapRetiredCareerAirportIdents (Object insert order):
-  // San Rafael SAOU→SAMR must run before San Luis SANL→SAOU.
-  SAOU: 'SAMR', // San Rafael (stock MSFS SAOU is San Luis)
+  // San Luis is live SAOU; San Rafael is live SAMR. Do NOT remap SAOU→SAMR —
+  // that collapsed SAOU↔SAMR lots into SAMR→SAMR (0 nm) on every migrate.
+  // Legacy San Luis mis-seed SANL still migrates to SAOU.
   SANL: 'SAOU', // San Luis Ojeda (stock MSFS SANL is La Rioja)
   SAMA: 'SAMM', // Malargüe (stock MSFS SAMA is General Alvear)
   SANR: 'SANE', // Santiago del Estero (stock MSFS SANR is Termas)

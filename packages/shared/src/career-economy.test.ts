@@ -78,6 +78,7 @@ import {
   pruneOrphanCareerHubs,
   remapMislabelledClHubs,
   remapRetiredCareerAirportIdents,
+  pruneSameOdCareerLots,
   MS_PER_HOUR,
   MS_PER_TICK,
   TICKS_PER_DAY,
@@ -4835,6 +4836,65 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     assert.equal(
       after.npcFlights.some((row) => row.originIcao === 'MPPA'),
       true,
+    );
+  });
+
+  it('does not remap live SAOU (San Luis) into SAMR and prunes same-OD lots', () => {
+    const world = createSeedEconomyWorld({ seed: 'saou-live' });
+    assert.ok(world.airports.some((a) => a.icao === 'SAOU'), 'San Luis live');
+    assert.ok(world.airports.some((a) => a.icao === 'SAMR'), 'San Rafael live');
+
+    const samr = world.airports.find((a) => a.icao === 'SAMR')!;
+    const stockBefore = samr.inventory.general.stockKg;
+
+    world.lots.push({
+      id: 'lot-samr-collapsed',
+      commodityId: 'general',
+      originIcao: 'SAMR',
+      destIcao: 'SAMR',
+      quantityKg: 450,
+      reservedKg: 0,
+      payUsd: 600,
+      urgency: 'urgent',
+      reason: 'last-mile dry',
+      status: 'available',
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 40,
+    });
+    world.lots.push({
+      id: 'lot-saou-samr',
+      commodityId: 'general',
+      originIcao: 'SAOU',
+      destIcao: 'SAMR',
+      quantityKg: 450,
+      reservedKg: 0,
+      payUsd: 650,
+      urgency: 'urgent',
+      reason: 'last-mile dry',
+      status: 'available',
+      createdAtTick: world.tick,
+      expiresAtTick: world.tick + 40,
+    });
+
+    assert.equal(remapRetiredCareerAirportIdents(world), true);
+    assert.ok(world.airports.some((a) => a.icao === 'SAOU'));
+    assert.equal(
+      world.lots.some((l) => l.originIcao === 'SAMR' && l.destIcao === 'SAMR'),
+      false,
+    );
+    assert.ok(
+      world.lots.some(
+        (l) =>
+          l.id === 'lot-saou-samr' &&
+          l.originIcao === 'SAOU' &&
+          l.destIcao === 'SAMR',
+      ),
+      'live SAOU→SAMR lot must not be remapped',
+    );
+    assert.equal(routeDistanceNm(world, 'SAOU', 'SAMR')! > 40, true);
+    assert.ok(
+      samr.inventory.general.stockKg > stockBefore,
+      'same-OD available lot refunds stock',
     );
   });
 

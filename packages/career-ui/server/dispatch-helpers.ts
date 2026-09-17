@@ -11,6 +11,7 @@ import {
   estimateRouteCargoLimit,
   findCareerPlayerAirframe,
   formatIntentOfpCheck,
+  FREIGHTER_DISPATCH_CREW_KG,
   getAircraftClass,
   isPaxAndCargoLoadLayout,
   KG_TO_LB,
@@ -282,19 +283,53 @@ export async function resolveClassMaxCargoKg(
       ...params,
       ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
     });
+    // Proxy SimBrief ICAOs (C152/DR400/PA28→C172, etc.) often return a
+    // different empty/MTOW pair than the Market SKU. resolveConservativeOpsWeights
+    // then takes max(OEW)+min(MTOW); thin mixed useful goes to 0 after freighter
+    // 2-crew + margin. Prefer catalog OEW/MTOW/fuel when mixed headroom cannot
+    // clear that reserve — SimBrief still drives maxCargoKg (BN2 soft).
+    const catalogOew = airframe?.oewKg;
+    const catalogMtow = airframe?.mtowKg;
+    const catalogFuel = airframe?.fuelCapacityKg;
+    const sbOew = resolved.airframe.oewKg;
+    const sbMtow = resolved.airframe.mtowKg;
+    const catalogPairOk =
+      typeof catalogOew === 'number' &&
+      catalogOew > 0 &&
+      typeof catalogMtow === 'number' &&
+      catalogMtow > catalogOew &&
+      typeof catalogFuel === 'number' &&
+      catalogFuel > 0;
+    const sbPairOk =
+      typeof sbOew === 'number' &&
+      sbOew > 0 &&
+      typeof sbMtow === 'number' &&
+      sbMtow > sbOew;
+    const mixedHeadroom =
+      sbPairOk && catalogPairOk
+        ? Math.min(sbMtow, catalogMtow) - Math.max(sbOew, catalogOew)
+        : Number.POSITIVE_INFINITY;
+    const preferCatalogWeights =
+      catalogPairOk &&
+      (!sbPairOk || mixedHeadroom <= FREIGHTER_DISPATCH_CREW_KG + 100);
     return finish({
       maxCargoKg: resolved.maxCargoKg,
       source: resolved.source,
       airframeLabel:
         airframe?.label ??
         formatSimBriefAirframeLabel(resolved.airframe, aircraft.name),
-      oewKg: resolved.airframe.oewKg ?? airframe?.oewKg ?? aircraft.oewKg,
-      mtowKg: resolved.airframe.mtowKg ?? airframe?.mtowKg ?? aircraft.mtowKg,
+      oewKg: preferCatalogWeights
+        ? catalogOew
+        : (sbOew ?? catalogOew ?? aircraft.oewKg),
+      mtowKg: preferCatalogWeights
+        ? catalogMtow
+        : (sbMtow ?? catalogMtow ?? aircraft.mtowKg),
       mzfwKg: resolved.airframe.mzfwKg,
-      fuelCapacityKg:
-        resolved.airframe.fuelCapacityKg ??
-        airframe?.fuelCapacityKg ??
-        aircraft.fuelCapacityKg,
+      fuelCapacityKg: preferCatalogWeights
+        ? catalogFuel
+        : (resolved.airframe.fuelCapacityKg ??
+          catalogFuel ??
+          aircraft.fuelCapacityKg),
       fuelBurnKgPerNm,
       airframeTypeId: airframe?.typeId ?? airframeTypeId,
     });

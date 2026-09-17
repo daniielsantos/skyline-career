@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import { findCareerPlayerAirframe } from '@msfs-compat/shared';
 import { clearSimBriefAirframesCache } from '../../agent/src/ofp-compliance/simbrief-airframes.ts';
 import {
   buildMissionDispatch,
   clearClassMaxCargoKgCache,
+  estimateFlyableRouteCargoLimit,
   flyableDispatchCargoKg,
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
@@ -50,6 +52,131 @@ describe('resolveClassMaxCargoKg', () => {
     );
     assert.equal(limit.source, 'mzfw-oew');
     assert.equal(limit.maxCargoKg, Math.round(2186 / 2.2046226218));
+  });
+
+  it('keeps C152 catalog OEW/MTOW when SimBrief C172 proxy empties useful load', async () => {
+    const limit = await resolveClassMaxCargoKg(
+      'light_ga',
+      'asobo-cessna-c152',
+      {
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              C172: {
+                airframes: [
+                  {
+                    airframe_internal_id: 'c172_default',
+                    airframe_list_type: 'C172',
+                    airframe_icao: 'C172',
+                    airframe_comments: 'Default',
+                    airframe_name: 'Cessna 172',
+                    airframe_passengers: 3,
+                    airframe_options: {
+                      wgtunits: 'KGS',
+                      // Heavier than C152 MTOW 760 — max(OEW)+min(MTOW) → 0 cargo.
+                      oew: 767,
+                      mzfw: 1000,
+                      mtow: 1111,
+                      maxfuel: 144,
+                      maxcargo: 200,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      },
+    );
+    assert.equal(limit.oewKg, 490);
+    assert.equal(limit.mtowKg, 760);
+    assert.equal(limit.fuelCapacityKg, 71);
+    const flyable = estimateFlyableRouteCargoLimit(
+      'light_ga',
+      88,
+      limit.maxCargoKg,
+      {
+        oewKg: limit.oewKg,
+        mtowKg: limit.mtowKg,
+        fuelCapacityKg: limit.fuelCapacityKg,
+        fuelBurnKgPerNm: limit.fuelBurnKgPerNm,
+        airframeTypeId: 'asobo-cessna-c152',
+      },
+    );
+    assert.ok(flyable.operationalMaxCargoKg > 0);
+    assert.equal(flyable.fuelFeasible, true);
+  });
+
+  it('keeps DR400/Arrow catalog weights under C172 proxy (thin mixed useful)', async () => {
+    for (const typeId of [
+      'asobo-robin-dr400',
+      'justflight-just-flight-pa28-arrow-iii',
+    ] as const) {
+      const limit = await resolveClassMaxCargoKg('light_ga', typeId, {
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              C172: {
+                airframes: [
+                  {
+                    airframe_internal_id: 'c172_default',
+                    airframe_list_type: 'C172',
+                    airframe_icao: 'C172',
+                    airframe_comments: 'Default',
+                    airframe_name: 'Cessna 172',
+                    airframe_passengers: 3,
+                    airframe_options: {
+                      wgtunits: 'KGS',
+                      oew: 740,
+                      mzfw: 1000,
+                      mtow: 1111,
+                      maxfuel: 144,
+                      maxcargo: 200,
+                    },
+                  },
+                ],
+              },
+            }),
+            { status: 200 },
+          ),
+      });
+      const af = findCareerPlayerAirframe(typeId);
+      assert.equal(limit.oewKg, af?.oewKg);
+      assert.equal(limit.mtowKg, af?.mtowKg);
+      const flyable = estimateFlyableRouteCargoLimit(
+        'light_ga',
+        88,
+        limit.maxCargoKg,
+        {
+          oewKg: limit.oewKg,
+          mtowKg: limit.mtowKg,
+          fuelCapacityKg: limit.fuelCapacityKg,
+          fuelBurnKgPerNm: limit.fuelBurnKgPerNm,
+          airframeTypeId: typeId,
+        },
+      );
+      assert.ok(
+        flyable.operationalMaxCargoKg > 0,
+        `${typeId} ops cargo should stay positive`,
+      );
+    }
+  });
+
+  it('Savage Norden stays zero ops under 2-crew freighter reserve even with catalog weights', async () => {
+    // Useful load 210 kg; crew~154 + margin 50 already exhausts payload before fuel.
+    const flyable = estimateFlyableRouteCargoLimit(
+      'light_ga',
+      88,
+      210,
+      {
+        oewKg: 390,
+        mtowKg: 600,
+        fuelCapacityKg: 101,
+        fuelBurnKgPerNm: 0.2,
+        airframeTypeId: 'asobo-savage-norden',
+      },
+    );
+    assert.equal(flyable.operationalMaxCargoKg, 0);
   });
 
   it('falls back to airframe catalog when SimBrief is unreachable', async () => {

@@ -3539,6 +3539,11 @@ export function App() {
   const airborneResumeNavDoneRef = useRef(false);
   const stagingRestoreAttemptedRef = useRef<string | null>(null);
   const [maxCargoKg, setMaxCargoKg] = useState<number | null>(null);
+  /** Which fleet tail the live `maxCargoKg` belongs to — ignore stale C152=0 after switching to Duke. */
+  const [maxCargoBoundAircraftId, setMaxCargoBoundAircraftId] = useState<
+    string | null
+  >(null);
+  const cargoLimitRequestGenRef = useRef(0);
   const [structuralMaxCargoKg, setStructuralMaxCargoKg] =
     useState<number | null>(null);
   const [estimatedBlockFuelKg, setEstimatedBlockFuelKg] =
@@ -4302,6 +4307,8 @@ export function App() {
         aircraftId?: string;
       },
     ) => {
+      const requestGen = ++cargoLimitRequestGenRef.current;
+      const boundAircraftId = route?.aircraftId?.trim() || null;
       try {
         const limit = await fetchCargoLimit(
           aircraftClass,
@@ -4313,6 +4320,8 @@ export function App() {
             aircraftId: route?.aircraftId,
           },
         );
+        if (requestGen !== cargoLimitRequestGenRef.current) return;
+        setMaxCargoBoundAircraftId(boundAircraftId);
         setStructuralMaxCargoKg(limit.maxCargoKg);
         setMaxCargoKg(limit.operationalMaxCargoKg);
         setEstimatedBlockFuelKg(limit.estimatedBlockFuelKg ?? null);
@@ -4331,7 +4340,9 @@ export function App() {
         setAirframeLabel(limit.airframeLabel);
         setMxFuelBurn(limit.mxFuelBurn ?? null);
       } catch {
+        if (requestGen !== cargoLimitRequestGenRef.current) return;
         const fallback = fallbackMaxCargoKg(aircraftClass);
+        setMaxCargoBoundAircraftId(boundAircraftId);
         setStructuralMaxCargoKg(fallback);
         setMaxCargoKg(fallback);
         setEstimatedBlockFuelKg(null);
@@ -4719,18 +4730,44 @@ export function App() {
   ]);
 
   // After live SimBrief cargo limit arrives, clamp staged kg to the new capacity.
+  // Also refill lines left at 0 by a stale zero-cap (e.g. C152 → Duke switch).
   useEffect(() => {
     if (!staging || maxCargoKg === null) return;
+    if (
+      maxCargoBoundAircraftId &&
+      staging.aircraftId &&
+      maxCargoBoundAircraftId !== staging.aircraftId
+    ) {
+      return;
+    }
     setStaging((current) => {
       if (!current || current.aircraft !== staging.aircraft) return current;
-      const clamped = clampDraftToCapacity(current);
-      const changed = clamped.lines.some(
+      if (
+        maxCargoBoundAircraftId &&
+        current.aircraftId &&
+        maxCargoBoundAircraftId !== current.aircraftId
+      ) {
+        return current;
+      }
+      let next = clampDraftToCapacity(current);
+      next = {
+        ...next,
+        lines: next.lines.map((line) => {
+          if (line.cargoKg > 0) return line;
+          const maxKg = lineMaxKg(next, line.lot);
+          return maxKg > 0
+            ? { ...line, cargoKg: defaultStagingKg(maxKg) }
+            : line;
+        }),
+      };
+      next = clampDraftToCapacity(next);
+      const changed = next.lines.some(
         (line, index) => line.cargoKg !== current.lines[index]?.cargoKg,
       );
-      return changed ? clamped : current;
+      return changed ? next : current;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reclamp when capacity payload changes
-  }, [maxCargoKg]);
+  }, [maxCargoKg, maxCargoBoundAircraftId]);
 
   // Manifest ferry: when the selected airframe arrives at origin, unlock Accept.
   useEffect(() => {
@@ -5666,6 +5703,7 @@ export function App() {
       return;
     }
     setMaxCargoKg(null);
+    setMaxCargoBoundAircraftId(null);
     setStructuralMaxCargoKg(null);
     setEstimatedBlockFuelKg(null);
     setEstimatedFuelCostUsd(null);
@@ -8710,7 +8748,10 @@ export function App() {
       staging &&
       staging.aircraft === aircraftClass &&
       maxCargoKg !== null &&
-      Number.isFinite(maxCargoKg)
+      Number.isFinite(maxCargoKg) &&
+      (!maxCargoBoundAircraftId ||
+        !staging.aircraftId ||
+        maxCargoBoundAircraftId === staging.aircraftId)
     ) {
       return maxCargoKg;
     }
@@ -9237,13 +9278,45 @@ export function App() {
           selected.id,
         )
       : undefined;
-    const nextDraft = clampDraftToCapacity({
+    // Drop stale live ops cap from the previous tail (C152 operationalMax=0
+    // must not clamp Duke lines to 0 while /api/cargo-limit is in flight).
+    cargoLimitRequestGenRef.current += 1;
+    setMaxCargoKg(null);
+    setMaxCargoBoundAircraftId(null);
+    setStructuralMaxCargoKg(null);
+    setEstimatedBlockFuelKg(null);
+    setEstimatedFuelCostUsd(null);
+    setEstimatedFuelUnitPriceUsd(null);
+    setEstimatedFuelScarcity(null);
+    setRouteFuelCapacityKg(null);
+    setRouteFuelDeficitKg(null);
+    setRouteFuelFeasible(null);
+    setMaxCargoSource(null);
+    setAirframeLabel(null);
+    setMxFuelBurn(null);
+
+    const fallbackCap = fallbackMaxCargoKg(next);
+    let remaining = fallbackCap;
+    if (openFlight && !staging.replaceManifest) {
+      remaining = Math.max(0, remaining - (openFlight.cargoKg ?? 0));
+    }
+    const lines = staging.lines.map((line) => {
+      const maxKg = Math.max(
+        0,
+        Math.floor(Math.min(line.lot.availableKg, remaining)),
+      );
+      let cargoKg = Math.min(line.cargoKg, maxKg);
+      if (cargoKg <= 0 && maxKg > 0) cargoKg = defaultStagingKg(maxKg);
+      remaining = Math.max(0, remaining - cargoKg);
+      return { ...line, cargoKg };
+    });
+    setStaging({
       ...staging,
       aircraft: next,
       aircraftId: selected.id,
       intoMissionId: openFlight?.id,
+      lines,
     });
-    setStaging(nextDraft);
     setPreferredAircraft(next);
     setStagingFerryOpen(false);
   }

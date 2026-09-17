@@ -20,6 +20,9 @@ on:
         required: true
         default: main
 
+# Image builds share one group; production deploys another. Never cancel an
+# in-flight image for a newer push — release used to wait on that SHA and
+# freeze when CI for the bump commit was superseded by a follow-up push.
 concurrency:
   group: world-${{ github.event_name == 'release' && 'production' || inputs.target || 'image' }}
   cancel-in-progress: false
@@ -41,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
-      digest: ${{ steps.result.outputs.digest }}
+      digest: ${{ steps.build.outputs.digest }}
       image: ${{ steps.meta.outputs.image }}
       revision: ${{ steps.meta.outputs.revision }}
     steps:
@@ -76,6 +79,7 @@ jobs:
               echo "$IMAGE_NAME:main"
             elif [[ "${{ github.event_name }}" == "release" ]]; then
               echo "$IMAGE_NAME:${{ github.event.release.tag_name }}"
+              echo "$IMAGE_NAME:main"
             fi
             echo "EOF"
           } >>"$GITHUB_OUTPUT"
@@ -88,9 +92,11 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
+      # Always build on release too (amd64 is fast). Waiting for a sibling
+      # workflow_run on the exact bump SHA races with follow-up pushes
+      # (agent-context notes) that cancel CI for that SHA — freeze forever.
       - name: Build and push amd64
         id: build
-        if: github.event_name != 'release'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -100,124 +106,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha,scope=world-amd64
           cache-to: type=gha,mode=max,scope=world-amd64
-
-      - name: Wait for successful main image build
-        if: github.event_name == 'release'
-        uses: actions/github-script@v8
-        env:
-          REVISION: ${{ steps.meta.outputs.revision }}
-        with:
-          script: |
-            const revision = process.env.REVISION;
-            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-            for (let attempt = 1; attempt <= 180; attempt += 1) {
-              const { data } = await github.rest.actions.listWorkflowRuns({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: 'world-deploy.yml',
-                event: 'workflow_run',
-                head_sha: revision,
-                per_page: 20,
-              });
-              // Prefer a successful image build; ignore cancelled/failed siblings
-              // from concurrent pushes on the same SHA.
-              const success = data.workflow_runs.find(
-                (run) =>
-                  run.id !== context.runId &&
-                  run.status === 'completed' &&
-                  run.conclusion === 'success',
-              );
-              if (success) {
-                core.info(`Main image workflow ${success.id} succeeded`);
-                return;
-              }
-              const failed = data.workflow_runs.find(
-                (run) =>
-                  run.id !== context.runId &&
-                  run.status === 'completed' &&
-                  run.conclusion &&
-                  run.conclusion !== 'success' &&
-                  run.conclusion !== 'cancelled' &&
-                  run.conclusion !== 'skipped',
-              );
-              if (failed) {
-                core.setFailed(
-                  `Main image workflow ${failed.id} completed as ${failed.conclusion}`,
-                );
-                return;
-              }
-              if (attempt % 6 === 0) {
-                core.info(
-                  `Waiting for main image workflow (${attempt * 10}s elapsed)`,
-                );
-              }
-              await sleep(10_000);
-            }
-            core.setFailed(
-              `Main image workflow did not succeed within 30 minutes for ${revision}`,
-            );
-
-      - name: Reuse immutable image for release
-        id: promote
-        if: github.event_name == 'release'
-        shell: bash
-        env:
-          SOURCE_IMAGE: ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.revision }}
-          RELEASE_IMAGE: ${{ steps.meta.outputs.image }}:${{ github.event.release.tag_name }}
-        run: |
-          set -Eeuo pipefail
-          found=0
-          for attempt in $(seq 1 12); do
-            if docker buildx imagetools inspect "$SOURCE_IMAGE" >/dev/null 2>&1; then
-              found=1
-              break
-            fi
-            sleep 5
-          done
-          if [[ "$found" != 1 ]]; then
-            echo "::error::Successful workflow did not publish visible image: $SOURCE_IMAGE"
-            exit 1
-          fi
-
-          digest="$(
-            docker buildx imagetools inspect "$SOURCE_IMAGE" |
-              awk '$1 == "Digest:" && digest == "" { digest = $2 }
-                   END { print digest }'
-          )"
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::Could not resolve manifest digest for $SOURCE_IMAGE"
-            exit 1
-          fi
-
-          echo "Promoting $SOURCE_IMAGE@$digest as $RELEASE_IMAGE"
-          docker buildx imagetools create \
-            --tag "$RELEASE_IMAGE" \
-            "$SOURCE_IMAGE@$digest"
-          release_digest="$(
-            docker buildx imagetools inspect "$RELEASE_IMAGE" |
-              awk '$1 == "Digest:" && digest == "" { digest = $2 }
-                   END { print digest }'
-          )"
-          if [[ "$release_digest" != "$digest" ]]; then
-            echo "::error::Release tag digest differs from immutable source"
-            exit 1
-          fi
-          echo "digest=$digest" >>"$GITHUB_OUTPUT"
-
-      - name: Export immutable image result
-        id: result
-        shell: bash
-        env:
-          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
-          PROMOTED_DIGEST: ${{ steps.promote.outputs.digest }}
-        run: |
-          set -Eeuo pipefail
-          digest="${BUILD_DIGEST:-$PROMOTED_DIGEST}"
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::Build did not produce a valid image digest"
-            exit 1
-          fi
-          echo "digest=$digest" >>"$GITHUB_OUTPUT"
 
   deploy-production:
     name: Deploy VPS production

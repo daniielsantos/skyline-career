@@ -2,7 +2,7 @@
 
 Atualizado 2026-09-16: **MP Postgres single-writer** — arquitetura normal deixa de rodar API+worker concorrentes. `world-api` usa `CAREER_HEADLESS_PULSE=1` e possui comandos + relógio 24/7; worker fica somente no profile `legacy-worker`. Deploy para/remove worker antigo antes da promoção e health expõe `worldWriter:"api"`. Revision/CAS permanece defesa contra stale overwrite, não coordenação cotidiana. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-17: **World CI/CD amd64-only** — build GHCR só `linux/amd64` (Pi / arm64 + QEMU retirados). CI verde em `main` publica imagem; Release `v*` ou dispatch `target=production` espera aprovação e promove à VPS. Hosts pull-only. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-17: **World CI/CD amd64-only** — build GHCR só `linux/amd64` (Pi / arm64 + QEMU retirados). CI verde em `main` publica imagem; Release `v*` **builda** e promove à VPS (sem wait em sibling — race com nota/commit cancelava CI do bump e congelava). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-16: **World CI/CD implementado** — CI verde em `main` buildava/publicava GHCR multiarch; Pi staging era opcional por dispatch (retirado 2026-09-17). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 

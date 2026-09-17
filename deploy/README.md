@@ -9,10 +9,10 @@ Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
 ## Release policy
 
 - Successful CI on `main` builds and publishes the amd64 image.
-- A published GitHub Release waits for the immutable `sha-<commit>` image from
-  the successful `main` build, adds the release tag to that same manifest
-  without rebuilding it, then waits for approval on the `production`
-  GitHub Environment.
+- A published GitHub Release **builds** the amd64 image for that tag
+  (`sha-<commit>` + `v*` + `main`) and promotes to the VPS after Environment
+  approval. It does not wait on a sibling `workflow_run` — that race froze
+  releases when a follow-up push cancelled CI for the bump SHA.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
 - `world-api` is the single writer: it owns HTTP commands and the background
   economy clock. A failed health check rolls the application image back, but

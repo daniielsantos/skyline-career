@@ -26,6 +26,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
   packages: write
 
@@ -104,6 +105,48 @@ jobs:
           cache-from: type=gha,scope=world
           cache-to: type=gha,mode=max,scope=world
 
+      - name: Wait for successful main image build
+        if: github.event_name == 'release'
+        uses: actions/github-script@v8
+        env:
+          REVISION: ${{ steps.meta.outputs.revision }}
+        with:
+          script: |
+            const revision = process.env.REVISION;
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            for (let attempt = 1; attempt <= 180; attempt += 1) {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'world-deploy.yml',
+                event: 'workflow_run',
+                head_sha: revision,
+                per_page: 20,
+              });
+              const source = data.workflow_runs.find(
+                (run) => run.id !== context.runId,
+              );
+              if (source?.status === 'completed') {
+                if (source.conclusion !== 'success') {
+                  core.setFailed(
+                    `Main image workflow ${source.id} completed as ${source.conclusion}`,
+                  );
+                  return;
+                }
+                core.info(`Main image workflow ${source.id} succeeded`);
+                return;
+              }
+              if (attempt % 6 === 0) {
+                core.info(
+                  `Waiting for main image workflow (${attempt * 10}s elapsed)`,
+                );
+              }
+              await sleep(10_000);
+            }
+            core.setFailed(
+              `Main image workflow did not succeed within 30 minutes for ${revision}`,
+            );
+
       - name: Reuse immutable image for release
         id: promote
         if: github.event_name == 'release'
@@ -113,20 +156,16 @@ jobs:
           RELEASE_IMAGE: ${{ steps.meta.outputs.image }}:${{ github.event.release.tag_name }}
         run: |
           set -Eeuo pipefail
-          echo "Waiting for the successful main build: $SOURCE_IMAGE"
           found=0
-          for attempt in $(seq 1 180); do
+          for attempt in $(seq 1 12); do
             if docker buildx imagetools inspect "$SOURCE_IMAGE" >/dev/null 2>&1; then
               found=1
               break
             fi
-            if (( attempt % 6 == 0 )); then
-              echo "Still waiting for $SOURCE_IMAGE ($((attempt * 10))s elapsed)"
-            fi
-            sleep 10
+            sleep 5
           done
           if [[ "$found" != 1 ]]; then
-            echo "::error::Immutable image did not appear within 30 minutes: $SOURCE_IMAGE"
+            echo "::error::Successful workflow did not publish visible image: $SOURCE_IMAGE"
             exit 1
           fi
 

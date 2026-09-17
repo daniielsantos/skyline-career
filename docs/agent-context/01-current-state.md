@@ -1,5 +1,8 @@
 # Current state (2026-09-17)
 
+`main` **678a076** / desktop **0.3.74** shipped: Default Multiplayer world URL to world.playairframe.com. Release: [v0.3.74](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.74).
+
+
 `main` **e3e39ef** / desktop **0.3.73** shipped: World deploy amd64-only (Pi/arm64 retired) + release wait ignores cancelled siblings; Hangar ferry buttons side-by-side. Release: [v0.3.73](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.73).
 
 `main` **a685e88** / desktop **0.3.72** shipped: Manifest load stuck at 0 after aircraft switch (stale cargo-limit); SimBrief proxy weight collapse (C152/Arrow/DR400→C172). Release: [v0.3.72](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.72).

@@ -10,6 +10,8 @@ Atualizado 2026-09-16: **VPS reboot deadlock** — Docker daemon iniciou API+wor
 
 Atualizado 2026-09-17: **Release bump inclui nota 01** — `release-desktop` grava a linha em `01-current-state.md` no mesmo commit do bump (sem push “Note desktop…” que cancelava CI). CI `paths-ignore` `docs/agent-context/**` + `.cursor/**`; World deploy skipa imagem se o commit for só isso.
 
+Atualizado 2026-09-17: **Rebrand Fase 2 (hero)** — gates usam `airframe-hero-lockup.png`; Skyline PNG arquivado. Sidebar compact ainda SKYLINE. Spec: [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).
+
 Atualizado 2026-09-17: **Rebrand Fase 1 (URL)** — PlayModeGate MP preenche `https://world.playairframe.com`; lab `:8787` intacto. Landing/DNS/email ainda manuais. Spec: [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).
 
 Atualizado 2026-09-17: **Rebrand Airframe** — domínio/`world.playairframe.com` vivos; produto ainda Skyline. Fases em [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).

@@ -23,10 +23,11 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - **Causa:** `vite-env` + `main.mjs` expõem o campo; `playModeConfig` state/`setPlayModeConfig` omitiram ao passar do IPC.
 - **Fix:** incluir `suggestedMpWorldApiUrl?` no state e copiar de `getPlayConfig()`.
 
-## Fase 2 — rebrand visual (precisa arte AIR|FRAME)
+## Fase 2 — rebrand visual
 
-- [ ] Logo AIR|FRAME (nova composição; não search-replace do SKY|LINE)
-- [ ] `BrandMark` / AuthGate / About / sidebar
+- [x] Logo AIR|FRAME hero: `packages/career-ui/src/assets/brand/airframe-hero-lockup.png` (arquivo Skyline mantido)
+- [x] `BrandMark` `variant="hero"` → Airframe (AuthGate / ProfileGate / PlayModeGate / WorldWaitingGate)
+- [ ] Compact sidebar ainda **SKYLINE** (texto CSS + `md11f-mark`)
 - [ ] Ícones installer + Start Menu display name
 - [ ] Copy UI: “Skyline Career” → “Airframe” (ou “Airframe Career”)
 - [ ] Setup exe name (ex. `Airframe-Setup-…`) + `latest.yml` channel

@@ -104,9 +104,9 @@ jobs:
 
   deploy-staging:
     name: Deploy Pi staging
-    if: >-
-      github.event_name == 'workflow_run' ||
-      (github.event_name == 'workflow_dispatch' && inputs.target == 'staging')
+    # Pi may stay powered off. Deploy it only by explicit workflow dispatch;
+    # successful main CI still builds/publishes the multi-architecture image.
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'staging'
     needs: build
     runs-on: ubuntu-latest
     # First pull/extract is I/O-bound on the Pi microSD; later digest pulls

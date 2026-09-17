@@ -6,7 +6,9 @@ The World image is built once by GitHub Actions for `linux/amd64` (VPS) and
 
 ## Release policy
 
-- Successful CI on `main` builds an image and deploys it to `staging`.
+- Successful CI on `main` builds and publishes the multi-architecture image.
+- Pi staging is optional and runs only through `Run workflow` with
+  `target=staging`; it may remain powered off between tests.
 - A published GitHub Release builds the tagged revision and waits for approval
   on the `production` GitHub Environment.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
@@ -104,8 +106,8 @@ CI identity as required by that policy.
 ## First deployment
 
 1. Commit and push the CI/CD files to `main`.
-2. Wait for `CI`, `World deploy / Build multi-architecture image`, and
-   `Deploy Pi staging`.
+2. Wait for `CI` and `World deploy / Build multi-architecture image`.
+   To test the Pi, run `World deploy` manually with `target=staging`.
    The first image extraction can take 15–45 minutes on a Pi using microSD;
    subsequent deploys reuse Docker layers.
 3. Confirm the Pi is using the digest recorded in `/opt/airframe/.env.deploy`:

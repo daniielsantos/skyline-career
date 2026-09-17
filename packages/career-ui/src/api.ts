@@ -1055,7 +1055,8 @@ export type AirportView = ClockSync & {
   runways?: CareerRunway[];
 };
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
+/** All Career API requests must pass here so MP auth/company headers are uniform. */
+async function careerFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -1090,6 +1091,11 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) {
     signalAuthRequired(authToken);
   }
+  return res;
+}
+
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await careerFetch(path, init);
   return parseApiResponse<T>(res);
 }
 
@@ -3883,7 +3889,9 @@ export function postBushWatchStop() {
 }
 
 export async function downloadBushTripPln(tripId: string): Promise<string> {
-  const res = await fetch(`/api/bush-trips/${encodeURIComponent(tripId)}/pln`);
+  const res = await careerFetch(
+    `/api/bush-trips/${encodeURIComponent(tripId)}/pln`,
+  );
   if (!res.ok) {
     let message = `PLN download failed (${res.status})`;
     try {
@@ -3919,7 +3927,9 @@ export async function downloadBushTripGfp(tripId: string): Promise<{
   waypointCount: number | null;
   thinned: boolean;
 }> {
-  const res = await fetch(`/api/bush-trips/${encodeURIComponent(tripId)}/gfp`);
+  const res = await careerFetch(
+    `/api/bush-trips/${encodeURIComponent(tripId)}/gfp`,
+  );
   if (!res.ok) {
     let message = `GFP download failed (${res.status})`;
     try {
@@ -4590,9 +4600,8 @@ export function postLoadOfp(
   init?: { signal?: AbortSignal },
 ) {
   return (async () => {
-    const res = await fetch('/api/load-ofp', {
+    const res = await careerFetch('/api/load-ofp', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(opts),
       signal: init?.signal,
     });

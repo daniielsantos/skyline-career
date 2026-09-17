@@ -17,6 +17,12 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - [x] Desktop default MP URL: PlayModeGate prefill/placeholder + resolve fallback → `https://world.playairframe.com` (`PUBLIC_WORLD_API_URL`). Lab continua `http://127.0.0.1:8787` via `DEFAULT_WORLD_API_URL` / env.
 - [ ] Email Routing `hello@playairframe.com` (quando houver site)
 
+### Diagnóstico CI (2026-09-17)
+
+- **Sintoma:** CI `Typecheck` falha em `App.tsx` — `suggestedMpWorldApiUrl` não existe no tipo do state.
+- **Causa:** `vite-env` + `main.mjs` expõem o campo; `playModeConfig` state/`setPlayModeConfig` omitiram ao passar do IPC.
+- **Fix:** incluir `suggestedMpWorldApiUrl?` no state e copiar de `getPlayConfig()`.
+
 ## Fase 2 — rebrand visual (precisa arte AIR|FRAME)
 
 - [ ] Logo AIR|FRAME (nova composição; não search-replace do SKY|LINE)

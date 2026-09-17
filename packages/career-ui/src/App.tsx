@@ -3626,6 +3626,7 @@ export function App() {
     mode: 'sp' | 'mp' | null;
     worldApiUrl: string;
     defaultWorldApiUrl: string;
+    suggestedMpWorldApiUrl?: string;
     envForced: boolean;
   } | null>(null);
   const [forcePlayModeGate, setForcePlayModeGate] = useState(false);
@@ -4374,6 +4375,7 @@ export function App() {
         mode: cfg.mode,
         worldApiUrl: cfg.worldApiUrl,
         defaultWorldApiUrl: cfg.defaultWorldApiUrl,
+        suggestedMpWorldApiUrl: cfg.suggestedMpWorldApiUrl,
         envForced: cfg.envForced,
       });
       setPlayModeGate(cfg.needsChoice ? 'needed' : 'hidden');

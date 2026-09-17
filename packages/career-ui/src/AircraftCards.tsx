@@ -1206,43 +1206,45 @@ export function HangarAircraftCard(props: {
                     disabled={props.busy || acf.status !== 'parked'}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="ghost hangar-move-go"
-                  disabled={
-                    props.busy || !ferryReady || acf.status !== 'parked'
-                  }
-                  onClick={() => {
-                    setFerryJourneyFinal(ferryFinal);
-                    setFerryJourneyOpen(true);
-                  }}
-                  title={
-                    ferryBlockedForBush
-                      ? ferryPlanError ?? 'Instant ferry unavailable'
-                      : multiLeg
-                        ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
-                        : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
-                  }
-                >
-                  {multiLeg && ferryReady
-                    ? `Ferry · ${ferryPlan?.legCount} legs`
-                    : 'Plan ferry'}
-                </button>
-                <button
-                  type="button"
-                  className="ghost hangar-move-go"
-                  disabled={
-                    props.busy ||
-                    !emptyFlightReady ||
-                    acf.status !== 'parked'
-                  }
-                  onClick={() =>
-                    void props.onEmptyFlight(acf.id, ferryFinal)
-                  }
-                  title={`Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`}
-                >
-                  Plan empty flight
-                </button>
+                <div className="hangar-move-actions">
+                  <button
+                    type="button"
+                    className="ghost hangar-move-go"
+                    disabled={
+                      props.busy || !ferryReady || acf.status !== 'parked'
+                    }
+                    onClick={() => {
+                      setFerryJourneyFinal(ferryFinal);
+                      setFerryJourneyOpen(true);
+                    }}
+                    title={
+                      ferryBlockedForBush
+                        ? ferryPlanError ?? 'Instant ferry unavailable'
+                        : multiLeg
+                          ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
+                          : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
+                    }
+                  >
+                    {multiLeg && ferryReady
+                      ? `Ferry · ${ferryPlan?.legCount} legs`
+                      : 'Plan ferry'}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost hangar-move-go"
+                    disabled={
+                      props.busy ||
+                      !emptyFlightReady ||
+                      acf.status !== 'parked'
+                    }
+                    onClick={() =>
+                      void props.onEmptyFlight(acf.id, ferryFinal)
+                    }
+                    title={`Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`}
+                  >
+                    Plan empty flight
+                  </button>
+                </div>
               </div>
               {ferryFinal ? (
                 <div className="ferry-plan">

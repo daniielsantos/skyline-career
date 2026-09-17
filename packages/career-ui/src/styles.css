@@ -6352,21 +6352,29 @@ tr.lot-locked {
 }
 
 .hangar-move-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 0.55rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
 .hangar-move-row .ferry-hub-label {
-  flex: 1 1 10rem;
   min-width: 0;
   max-width: none;
 }
 
+.hangar-move-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
 .hangar-move-go {
-  flex: 0 0 auto;
-  min-width: 3.5rem;
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ferry-plan {

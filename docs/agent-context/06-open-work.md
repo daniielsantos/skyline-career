@@ -2,7 +2,9 @@
 
 Atualizado 2026-09-16: **MP Postgres single-writer** — arquitetura normal deixa de rodar API+worker concorrentes. `world-api` usa `CAREER_HEADLESS_PULSE=1` e possui comandos + relógio 24/7; worker fica somente no profile `legacy-worker`. Deploy para/remove worker antigo antes da promoção e health expõe `worldWriter:"api"`. Revision/CAS permanece defesa contra stale overwrite, não coordenação cotidiana. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-16: **World CI/CD implementado** — CI verde em `main` builda/publica GHCR multiarch sem depender do Pi; Pi staging só atualiza por dispatch manual `target=staging`. Release `v*` ou dispatch `target=production` espera aprovação e promove à VPS com backup, health e app rollback. Hosts pull-only. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-17: **World CI/CD amd64-only** — build GHCR só `linux/amd64` (Pi / arm64 + QEMU retirados). CI verde em `main` publica imagem; Release `v*` ou dispatch `target=production` espera aprovação e promove à VPS. Hosts pull-only. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-16: **World CI/CD implementado** — CI verde em `main` buildava/publicava GHCR multiarch; Pi staging era opcional por dispatch (retirado 2026-09-17). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-16: **VPS reboot deadlock** — Docker daemon iniciou API+worker juntos; API recebeu PG `40P01`, ficou `store:null` até restart manual. Fixed-world open agora retry 12×/1s em deadlock/recovery/connect; helper compartilhado com worker. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 

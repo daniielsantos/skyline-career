@@ -1,17 +1,17 @@
 # World deployment
 
-The World image is built once by GitHub Actions for `linux/amd64` (VPS) and
-`linux/arm64` (Pi 4). Hosts pull the same immutable digest; they never run
+The World image is built once by GitHub Actions for `linux/amd64` (VPS).
+Hosts pull the same immutable digest; they never run
 `npm ci` or build TypeScript during deployment.
+
+Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
 
 ## Release policy
 
-- Successful CI on `main` builds and publishes the multi-architecture image.
-- Pi staging is optional and runs only through `Run workflow` with
-  `target=staging`; it may remain powered off between tests.
+- Successful CI on `main` builds and publishes the amd64 image.
 - A published GitHub Release waits for the immutable `sha-<commit>` image from
-  the successful `main` build, adds the release tag to that same multi-arch
-  manifest without rebuilding it, then waits for approval on the `production`
+  the successful `main` build, adds the release tag to that same manifest
+  without rebuilding it, then waits for approval on the `production`
   GitHub Environment.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
 - `world-api` is the single writer: it owns HTTP commands and the background
@@ -20,7 +20,7 @@ The World image is built once by GitHub Actions for `linux/amd64` (VPS) and
 
 ## Host preparation
 
-Both hosts need Docker Compose v2 and a clone of this repository. Keep the
+The VPS needs Docker Compose v2 and a clone of this repository. Keep the
 host-specific `.env` in the clone; it is never fetched from GitHub.
 
 ```bash
@@ -34,21 +34,11 @@ The SSH deploy account must own the clone and be able to run Docker. Membership
 in the `docker` group is effectively root access, so use a dedicated SSH key and
 do not reuse a personal key.
 
-The Pi deployment uses its normal OpenSSH daemon over the Tailscale network.
-Tailscale SSH must be disabled or it intercepts port 22 and rejects the
-key-based CI identity:
-
-```bash
-sudo tailscale set --ssh=false
-sudo systemctl enable --now ssh
-```
-
-Install that key in `~/.ssh/authorized_keys` on each target. Record the host key
+Install that key in `~/.ssh/authorized_keys` on the VPS. Record the host key
 from a trusted connection using the exact hostname or IP that the workflow will
 use:
 
 ```bash
-ssh-keyscan -H staging-pi-tailnet-name
 ssh-keyscan -H production-hostname-or-ip
 ```
 
@@ -56,73 +46,29 @@ Verify the fingerprint interactively before saving the output as a secret.
 
 ## GitHub Environments
 
-Create `staging` and `production` under repository Settings → Environments.
-Configure the following Environment variables in both:
+Create `production` under repository Settings → Environments.
+Configure the following Environment variables:
 
-- `DEPLOY_HOST`: Tailscale hostname/IP for staging; public hostname/IP for VPS.
+- `DEPLOY_HOST`: public hostname/IP for the VPS.
 - `DEPLOY_USER`: SSH deploy account.
 - `DEPLOY_PATH`: repository path, normally `/opt/airframe`.
-- `DEPLOY_HEALTH_URL`: public health endpoint. Staging currently uses
-  `https://staging-world.playairframe.com/api/health`.
+- `DEPLOY_HEALTH_URL`: public health endpoint, e.g.
+  `https://world.playairframe.com/api/health`.
 
 Configure these Environment secrets:
 
 - `DEPLOY_SSH_KEY`: private Ed25519 deploy key, including header/footer.
 - `DEPLOY_KNOWN_HOSTS`: verified `known_hosts` line for `DEPLOY_HOST`.
 
-Add the repository secrets below for the temporary Tailscale runner:
-
-- `TS_OAUTH_CLIENT_ID`
-- `TS_OAUTH_SECRET`
-
 Protect `production` with a required reviewer and restrict it to release tags
-or the `main` branch. Do not protect `staging` with manual approval.
-
-## Tailscale policy for staging
-
-Create a `tag:ci` owner and an OAuth client with writable `auth_keys` scope for
-that tag. Limit the tag to TCP 22 on the Pi. A minimal policy fragment is:
-
-```json
-{
-  "tagOwners": {
-    "tag:ci": ["autogroup:admin"]
-  },
-  "hosts": {
-    "airframe-pi": "100.x.y.z"
-  },
-  "grants": [
-    {
-      "src": ["tag:ci"],
-      "dst": ["airframe-pi"],
-      "ip": ["tcp:22"]
-    }
-  ]
-}
-```
-
-Merge this fragment into the existing tailnet policy; do not replace unrelated
-rules. If device approval or Tailnet Lock is enabled, authorize the ephemeral
-CI identity as required by that policy.
+or the `main` branch.
 
 ## First deployment
 
 1. Commit and push the CI/CD files to `main`.
-2. Wait for `CI` and `World deploy / Build multi-architecture image`.
-   To test the Pi, run `World deploy` manually with `target=staging`.
-   The first image extraction can take 15–45 minutes on a Pi using microSD;
-   subsequent deploys reuse Docker layers.
-3. Confirm the Pi is using the digest recorded in `/opt/airframe/.env.deploy`:
-
-   ```bash
-   cat /opt/airframe/.env.deploy
-   docker inspect --format '{{.Config.Image}}' skyline-career-world-api
-   curl -fsS https://staging-world.playairframe.com/api/health
-   ```
-
-4. Publish the next desktop release. Approve `production` from the workflow run
-   only after staging is healthy.
-5. Confirm API, Postgres and the external production health endpoint.
+2. Wait for `CI` and `World deploy / Build amd64 image`.
+3. Publish a desktop release. Approve `production` from the workflow run.
+4. Confirm API, Postgres and the external production health endpoint.
    `/api/health` must report `"worldWriter":"api"`; a normal deployment must
    not have a `skyline-career-world-worker` container.
 
@@ -130,7 +76,7 @@ Pre-deploy dumps are retained for 14 days in
 `$DEPLOY_BACKUP_DIR` or `<DEPLOY_PATH>/backups/predeploy`. Ensure this directory
 is included in the existing encrypted restic/R2 backup policy.
 
-## Pi disk maintenance
+## Disk maintenance
 
 Remote hosts pull the final multi-stage image and do not need Docker build
 cache. To inspect usage and safely remove only unused build cache:
@@ -146,9 +92,9 @@ not use `docker system prune --volumes` on a world host.
 
 ## Manual redeploy or rollback
 
-The workflow supports `Run workflow` with a target and Git ref. It still builds
-and deploys by immutable digest. For a host-side emergency rollback, run the
-same sequential deploy script with a previous digest:
+The workflow supports `Run workflow` with `target=production` and a Git ref.
+It still builds and deploys by immutable digest. For a host-side emergency
+rollback, run the same sequential deploy script with a previous digest:
 
 ```bash
 previous='ghcr.io/daniielsantos/skyline-career-world@sha256:...'
@@ -162,7 +108,7 @@ not imply that destructive loss of newer database writes is acceptable.
 
 ## Single-writer invariant
 
-Normal lab, staging and production stacks run only `world-api` plus Postgres.
+Normal lab and production stacks run only `world-api` plus Postgres.
 `CAREER_HEADLESS_PULSE=1` makes the API advance the world even with zero
 clients. The old `world-worker` service remains behind the explicit
 `legacy-worker` Compose profile for diagnostics only; never run it beside the

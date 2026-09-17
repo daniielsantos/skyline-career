@@ -1,5 +1,7 @@
 # Current state (2026-09-17)
 
+`main` **e3e39ef** / desktop **0.3.73** shipped: World deploy amd64-only (Pi/arm64 retired) + release wait ignores cancelled siblings; Hangar ferry buttons side-by-side. Release: [v0.3.73](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.73).
+
 `main` **a685e88** / desktop **0.3.72** shipped: Manifest load stuck at 0 after aircraft switch (stale cargo-limit); SimBrief proxy weight collapse (C152/Arrow/DR400→C172). Release: [v0.3.72](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.72).
 
 `main` **9ff7b72** / desktop **0.3.71** shipped: null-safe board money (Charter Net crash + other boards); drop live `SAOU→SAMR` remap + prune same-OD 0 nm lots. Release: [v0.3.71](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.71).

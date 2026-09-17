@@ -357,35 +357,46 @@ function isHttpUrl(url) {
   }
 }
 
-/** Open https in the OS browser. Windows uses cmd start — shell.openExternal is flaky. */
+/**
+ * Open http(s) in the OS browser. On Windows, resolve as soon as the detached
+ * launcher starts: waiting for `cmd.exe /c start` to exit can block the renderer
+ * IPC forever even though the dispatch URL was already built.
+ */
 async function openHttpInOsBrowser(url) {
   if (typeof url !== 'string' || !isHttpUrl(url)) {
     return { ok: false, reason: 'invalid_url' };
   }
   if (process.platform === 'win32') {
-    const safeUrl = url.replace(/"/g, '');
     try {
-      const { execFile } = await import('node:child_process');
+      const { spawn } = await import('node:child_process');
       await new Promise((resolve, reject) => {
-        execFile(
-          process.env.ComSpec || 'cmd.exe',
-          ['/d', '/s', '/c', `start "" "${safeUrl}"`],
-          { windowsHide: true },
-          (err) => (err ? reject(err) : resolve()),
+        const child = spawn(
+          'rundll32.exe',
+          ['url.dll,FileProtocolHandler', url],
+          {
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: true,
+          },
         );
+        child.once('error', reject);
+        child.once('spawn', () => {
+          child.unref();
+          resolve();
+        });
       });
-      return { ok: true, via: 'cmd_start' };
-    } catch (startErr) {
-      const startMsg =
-        startErr instanceof Error ? startErr.message : String(startErr);
-      logLine(`[desktop] cmd start failed: ${startMsg}`);
+      return { ok: true, via: 'windows_protocol_handler' };
+    } catch (launchErr) {
+      const launchMsg =
+        launchErr instanceof Error ? launchErr.message : String(launchErr);
+      logLine(`[desktop] Windows protocol handler failed: ${launchMsg}`);
       try {
         await shell.openExternal(url);
         return { ok: true, via: 'openExternal_fallback' };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         logLine(`[desktop] openExternal failed: ${message}`);
-        return { ok: false, reason: `${startMsg}; ${message}` };
+        return { ok: false, reason: `${launchMsg}; ${message}` };
       }
     }
   }

@@ -2330,14 +2330,19 @@ async function openSimBriefDispatchUrl(url: string): Promise<boolean> {
   if (!href || !/^https?:\/\//i.test(href)) return false;
   const desktop = window.skylineDesktop;
   if (desktop?.openExternal) {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await desktop.openExternal(href);
+      const result = await Promise.race([
+        desktop.openExternal(href),
+        new Promise<null>((resolve) => {
+          timeoutId = setTimeout(() => resolve(null), 8_000);
+        }),
+      ]);
       if (result?.ok) return true;
-      // One retry — first Open after /api/dispatch sometimes races the shell.
-      const retry = await desktop.openExternal(href);
-      if (retry?.ok) return true;
     } catch {
       // Fall through to window.open.
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
     }
   }
   // Prefer a real http window.open. Avoid "noopener" in features — it makes

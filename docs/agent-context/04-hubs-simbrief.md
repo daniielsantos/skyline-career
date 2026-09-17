@@ -316,6 +316,7 @@
 - Seed: `assertDispatchHubsAreSimBriefKnown()`
 - **Demand Board** also skips `bush` / `bushTripOnly` dests (PLN strips, not OFP). GPS ident **MM68** retired → remap `MMCU`.
 - Gen: `npm run generate:simbrief-dispatch` (from `packages/shared`) — syncs catalog→JSON; does **not** call SimBrief API. Confirm ICAOs in Dispatch before adding.
+- **Desktop `Building SimBrief link… / Re-opening…` freeze (2026-09-16; fix v0.3.68):** `/api/dispatch` concluiu e produziu URL, mas `packages/desktop/main.mjs::openHttpInOsBrowser` aguardava indefinidamente o callback do `cmd.exe /c start`; processo filho permanecia vivo e `App.tsx::onDispatch` nunca chegava ao `finally setBusy(false)`. Não era VPS/economy/SimBrief. Fix: launcher Windows `rundll32 url.dll,FileProtocolHandler` detached resolve no `spawn` (não no exit); renderer limita IPC a 8 s e sempre libera `busy`.
 
 ## Homologate / facilities MSFS
 

@@ -258,6 +258,36 @@ async function writeDesktopVersion(next) {
   }
 }
 
+/**
+ * Upsert the desktop release one-liner in docs/agent-context/01-current-state.md
+ * so the bump commit does not need a follow-up "Note desktop …" push (that used
+ * to cancel CI for the release SHA and freeze World deploy wait).
+ */
+async function noteDesktopReleaseInAgentContext(version, headShort, summary) {
+  const path = join(root, 'docs', 'agent-context', '01-current-state.md');
+  const prev = await readFile(path, 'utf8');
+  const today = new Date().toISOString().slice(0, 10);
+  const line =
+    `\`main\` **${headShort}** / desktop **${version}** shipped: ${summary} ` +
+    `Release: [v${version}](https://github.com/daniielsantos/skyline-career/releases/tag/v${version}).`;
+  const withoutVersion = prev
+    .split(/\r?\n/)
+    .filter((l) => !l.includes(`/ desktop **${version}** shipped:`))
+    .join('\n');
+  let next = withoutVersion.replace(
+    /^# Current state \([0-9-]+\)\n\n/,
+    `# Current state (${today})\n\n${line}\n\n`,
+  );
+  if (next === withoutVersion) {
+    const nl = withoutVersion.indexOf('\n');
+    next =
+      nl >= 0
+        ? `${withoutVersion.slice(0, nl + 1)}\n${line}\n${withoutVersion.slice(nl + 1)}`
+        : `${withoutVersion}\n\n${line}\n`;
+  }
+  await writeFile(path, next.endsWith('\n') ? next : `${next}\n`, 'utf8');
+}
+
 async function lastDesktopTag() {
   try {
     const tags = await runCapture('git', [
@@ -479,13 +509,31 @@ async function main() {
   }
 
   if (bumped) {
-    console.log('[release:desktop] committing version bump…');
-    const bumpFiles = ['packages/desktop/package.json'];
+    console.log('[release:desktop] committing version bump + agent-context note…');
+    const summary =
+      (await buildReleaseNotes(version, previousTag))
+        .split(/\r?\n/)
+        .find((l) => l.startsWith('- '))
+        ?.replace(/^- /, '')
+        ?.replace(/\s*\([0-9a-f]{7,}\)\s*$/, '')
+        ?.trim() || 'desktop release';
+    await noteDesktopReleaseInAgentContext(version, 'PENDING', summary);
+
+    const bumpFiles = [
+      'packages/desktop/package.json',
+      'docs/agent-context/01-current-state.md',
+    ];
     if (await exists(desktopLockPath)) {
       bumpFiles.push('packages/desktop/package-lock.json');
     }
     await run('git', ['add', ...bumpFiles]);
     await run('git', ['commit', '-m', `Release desktop ${tag}`]);
+
+    const headShort = await runCapture('git', ['rev-parse', '--short', 'HEAD']);
+    await noteDesktopReleaseInAgentContext(version, headShort, summary);
+    await run('git', ['add', 'docs/agent-context/01-current-state.md']);
+    await run('git', ['commit', '--amend', '--no-edit']);
+
     console.log('[release:desktop] pushing version commit before tagging…');
     await run('git', ['push', '-u', 'origin', 'HEAD']);
   }

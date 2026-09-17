@@ -8,7 +8,11 @@ Atualizado 2026-09-16: **World CI/CD implementado** — CI verde em `main` build
 
 Atualizado 2026-09-16: **VPS reboot deadlock** — Docker daemon iniciou API+worker juntos; API recebeu PG `40P01`, ficou `store:null` até restart manual. Fixed-world open agora retry 12×/1s em deadlock/recovery/connect; helper compartilhado com worker. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-15: **Prod Auth invite wiring** — compose agora passa `CAREER_AUTH_REGISTER` / `CAREER_AUTH_INVITE` e mantém claim/list-all off por default. VPS ainda precisa definir invite aleatório no `.env`, recriar `world-api` e validar `inviteRequired:true`. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-17: **Release bump inclui nota 01** — `release-desktop` grava a linha em `01-current-state.md` no mesmo commit do bump (sem push “Note desktop…” que cancelava CI). CI `paths-ignore` `docs/agent-context/**` + `.cursor/**`; World deploy skipa imagem se o commit for só isso.
+
+Atualizado 2026-09-17: **Rebrand Airframe** — domínio/`world.playairframe.com` vivos; produto ainda Skyline. Fases em [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).
+
+Atualizado 2026-09-15: **Prod Auth invite wiring** — compose passa `CAREER_AUTH_*`. **Prod OK:** `/api/auth/status` → `inviteRequired:true` + `registerEnabled:true` (invite já no `.env` do VPS). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-15: **VPS world-api unhealthy / runtime dist missing** — `Dockerfile.world` compilava só shared, mas API importa `@msfs-compat/runtime`; imagem agora builda shared + runtime. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 

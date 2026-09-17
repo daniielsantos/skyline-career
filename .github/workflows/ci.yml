@@ -3,8 +3,15 @@ name: CI
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      # Agent handoff notes must not cancel/retrigger World image builds.
+      - 'docs/agent-context/**'
+      - '.cursor/**'
   pull_request:
     branches: [main, master]
+    paths-ignore:
+      - 'docs/agent-context/**'
+      - '.cursor/**'
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}

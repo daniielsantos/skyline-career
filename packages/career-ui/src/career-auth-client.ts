@@ -7,6 +7,7 @@
 export const AUTH_TOKEN_STORAGE_KEY = 'skyline.authToken';
 export const AUTH_LOGIN_NAME_KEY = 'skyline.authLoginName';
 export const AUTH_REMEMBER_KEY = 'skyline.authRemember';
+export const AUTH_REQUIRED_EVENT = 'skyline:auth-required';
 
 let memoryAuthToken: string | null = null;
 
@@ -98,5 +99,18 @@ export function clearAuthToken(): void {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Handle an API 401 without letting an older request clear a newer login.
+ * App listens for this event and replaces stale operational UI with AuthGate.
+ */
+export function signalAuthRequired(tokenUsed: string | null): void {
+  const current = getAuthToken();
+  if (tokenUsed && current && current !== tokenUsed) return;
+  clearAuthToken();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
   }
 }

@@ -12,6 +12,8 @@ Perfis são isolados (`profiles/examples/*.json`); o risco real é **policy comp
 
 Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./12-pax-efb-due.md) (MD-11F: Due ≠ station maxLoad 500×N).
 
+**MP inject `Authentication required` (2026-09-16; fix v0.3.69):** inject físico é local (desktop → SimBridge), mas `/api/load-ofp` lê missão/frota no VPS antes e salva Preflight/ballast no VPS depois; `/api/preflight` e `/api/watch/start` têm o mesmo split. Gateway guardava Bearer em variável global; qualquer request concorrente sem auth (`/api/health`, static/status) podia zerá-la durante awaits e a chamada local→world falhava. Fix: `WorldApiAuthScope` com `AsyncLocalStorage` por request + fallback autenticado só para Watch background; erros `WorldApiError` preservam HTTP/code upstream; cliente transforma qualquer 401 no AuthGate e não deixa resposta velha limpar login novo. Audit: `/load-ofp`, `/preflight`, `/watch/start` usam scope; `/simbridge`, progress/cancel e watch status/stop são locais; Dispatch/OFP/boards vão por proxy request-scoped; settle/depart encaminham auth diretamente.
+
 **A2A Comanche (2026-08-29):** Character1–4 `maxLoad` **500** (era 300). Com 300, freighter fill + CG spill → Sim ~600 vs Due 800 (bags S3/S4/S7 + spill S1/S2 above 170; S7 muitas vezes 0). S7 fica 200 (tablet Max. baggage). Accu-Sim pode ainda limitar Character no EFB — validar write sticky.
 
 ---

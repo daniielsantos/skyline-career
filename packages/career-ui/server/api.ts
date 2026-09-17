@@ -352,7 +352,9 @@ import {
   gatewayUpdateOpenMission,
 } from './gateway-career-access.ts';
 import {
+  WorldApiAuthScope,
   WorldApiClient,
+  WorldApiError,
   worldAuthFromIncoming,
   type WorldApiAuth,
 } from './world-api-client.ts';
@@ -482,10 +484,10 @@ let worldWriterLeaseError: string | null = null;
 /** Process role: full (SP) | world (VPS) | gateway (desktop sim). */
 const careerApiMode: CareerApiMode = resolveCareerApiMode();
 let gatewayWorldClient: WorldApiClient | null = null;
-let gatewayAuth: WorldApiAuth = {};
+const gatewayAuthScope = new WorldApiAuthScope();
 
 function gatewayAuthOrThrow(): WorldApiAuth {
-  return gatewayAuth;
+  return gatewayAuthScope.current();
 }
 /** Defer MSFS hub coord stamp until after profile-select responds. */
 let msfsStampNeeded = false;
@@ -698,7 +700,7 @@ async function loadMissions(opts?: {
 }): Promise<MissionsFile> {
   if (careerApiMode === 'gateway' && gatewayWorldClient) {
     const auth: WorldApiAuth = {
-      ...gatewayAuth,
+      ...gatewayAuthOrThrow(),
       ...(opts?.companyId ? { companyId: opts.companyId } : {}),
     };
     return gatewayLoadMissions(gatewayWorldClient, auth);
@@ -1069,7 +1071,7 @@ async function updateOpenMission(
 ): Promise<boolean> {
   if (careerApiMode === 'gateway' && gatewayWorldClient) {
     const auth: WorldApiAuth = {
-      ...gatewayAuth,
+      ...gatewayAuthOrThrow(),
       ...(opts?.companyId ? { companyId: opts.companyId } : {}),
     };
     return gatewayUpdateOpenMission(
@@ -1442,7 +1444,7 @@ async function withCareerRead<T>(
 ): Promise<T> {
   if (careerApiMode === 'gateway' && gatewayWorldClient) {
     const auth: WorldApiAuth = {
-      ...gatewayAuth,
+      ...gatewayAuthOrThrow(),
       ...(opts?.companyId ? { companyId: opts.companyId } : {}),
     };
     const missions = await gatewayLoadMissions(gatewayWorldClient, auth);
@@ -1849,6 +1851,28 @@ function send(res: import('node:http').ServerResponse, status: number, body: unk
     'Access-Control-Allow-Headers': 'Content-Type, X-Skyline-Dev-Mode',
   });
   res.end(json);
+}
+
+/** Preserve upstream auth/status contracts for sim-local gateway handlers. */
+function sendRouteError(
+  res: import('node:http').ServerResponse,
+  error: unknown,
+  fallbackStatus: number,
+): void {
+  if (error instanceof WorldApiError) {
+    const upstream =
+      error.body && typeof error.body === 'object' && !Array.isArray(error.body)
+        ? (error.body as Record<string, unknown>)
+        : {};
+    send(res, error.status, {
+      ...upstream,
+      error: error.message,
+    });
+    return;
+  }
+  send(res, fallbackStatus, {
+    error: error instanceof Error ? error.message : String(error),
+  });
 }
 
 const STATIC_MIME: Record<string, string> = {
@@ -2605,7 +2629,10 @@ export function createCareerApiServer(port = 8787) {
         }
       : {}),
   });
-  const server = createServer(async (req, res) => {
+  const handleRequest = async (
+    req: import('node:http').IncomingMessage,
+    res: import('node:http').ServerResponse,
+  ): Promise<void> => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`);
     const path = url.pathname;
 
@@ -2616,7 +2643,6 @@ export function createCareerApiServer(port = 8787) {
 
     try {
       if (careerApiMode === 'gateway') {
-        gatewayAuth = worldAuthFromIncoming(req);
         if (path === '/api/health') {
           const worldUrl = careerWorldApiUrlFromEnv()!;
           let worldHealth: Record<string, unknown> = {};
@@ -9933,7 +9959,7 @@ export function createCareerApiServer(port = 8787) {
           const message = error instanceof Error ? error.message : String(error);
           const unavailable =
             /ENOENT|pipe|connect|SimBridge|ECONNREFUSED/i.test(message);
-          send(res, unavailable ? 503 : 400, { error: message });
+          sendRouteError(res, error, unavailable ? 503 : 400);
         }
         return;
       }
@@ -10499,7 +10525,7 @@ export function createCareerApiServer(port = 8787) {
           const message = error instanceof Error ? error.message : String(error);
           const unavailable =
             /ENOENT|pipe|connect|SimBridge|ECONNREFUSED/i.test(message);
-          send(res, unavailable ? 503 : 400, { error: message });
+          sendRouteError(res, error, unavailable ? 503 : 400);
         } finally {
           if (!handedToApply) {
             endOfpLoadActive();
@@ -10571,9 +10597,7 @@ export function createCareerApiServer(port = 8787) {
           });
           send(res, 200, status);
         } catch (error) {
-          send(res, 503, {
-            error: error instanceof Error ? error.message : String(error),
-          });
+          sendRouteError(res, error, 503);
         }
         return;
       }
@@ -10669,8 +10693,18 @@ export function createCareerApiServer(port = 8787) {
         send(res, 409, { error: message, code: 'needs_profile' });
         return;
       }
-      send(res, 500, { error: message });
+      sendRouteError(res, error, 500);
     }
+  };
+
+  const server = createServer((req, res) => {
+    if (careerApiMode !== 'gateway') {
+      return handleRequest(req, res);
+    }
+    return gatewayAuthScope.run(
+      worldAuthFromIncoming(req),
+      () => handleRequest(req, res),
+    );
   });
 
   return {

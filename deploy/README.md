@@ -9,8 +9,10 @@ The World image is built once by GitHub Actions for `linux/amd64` (VPS) and
 - Successful CI on `main` builds and publishes the multi-architecture image.
 - Pi staging is optional and runs only through `Run workflow` with
   `target=staging`; it may remain powered off between tests.
-- A published GitHub Release builds the tagged revision and waits for approval
-  on the `production` GitHub Environment.
+- A published GitHub Release waits for the immutable `sha-<commit>` image from
+  the successful `main` build, adds the release tag to that same multi-arch
+  manifest without rebuilding it, then waits for approval on the `production`
+  GitHub Environment.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
 - `world-api` is the single writer: it owns HTTP commands and the background
   economy clock. A failed health check rolls the application image back, but

@@ -137,7 +137,13 @@ import {
   setStoredCompanyId,
   suggestCompanyId,
 } from './career-company-client';
-import { clearAuthToken, getAuthToken, setAuthToken, setRememberedLoginName } from './career-auth-client';
+import {
+  AUTH_REQUIRED_EVENT,
+  clearAuthToken,
+  getAuthToken,
+  setAuthToken,
+  setRememberedLoginName,
+} from './career-auth-client';
 import { AuthGate } from './AuthGate';
 import { WorldWaitingGate } from './WorldWaitingGate';
 import {
@@ -3921,6 +3927,21 @@ export function App() {
   useEffect(() => {
     setSelectedCharterOffer(null);
   }, [airportIcao]);
+
+  useEffect(() => {
+    const handleAuthRequired = () => {
+      setAuthRequired(true);
+      setAuthChecked(true);
+      setBusy(false);
+      setShowProfileGate(false);
+      setShowAuthGate(true);
+      setAuthSessionEpoch((epoch) => epoch + 1);
+    };
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    };
+  }, []);
 
   useEffect(() => {
     const onGate =

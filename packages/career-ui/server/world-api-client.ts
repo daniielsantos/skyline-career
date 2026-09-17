@@ -4,6 +4,7 @@
  * mission load/patch for local inject/preflight.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type {
   CareerMissionsState,
   MissionIntent,
@@ -13,6 +14,30 @@ export type WorldApiAuth = {
   authorization?: string;
   companyId?: string;
 };
+
+/**
+ * Keeps gateway credentials request-scoped. A process-global mutable auth bag
+ * lets an overlapping public health/static request erase the Bearer while a
+ * local inject/preflight request is awaiting SimBridge.
+ *
+ * The last authenticated request is retained only as a fallback for Watch
+ * background work that outlives its originating HTTP request.
+ */
+export class WorldApiAuthScope {
+  private readonly requests = new AsyncLocalStorage<WorldApiAuth>();
+  private background: WorldApiAuth = {};
+
+  run<T>(auth: WorldApiAuth, callback: () => T): T {
+    if (auth.authorization) {
+      this.background = { ...auth };
+    }
+    return this.requests.run({ ...auth }, callback);
+  }
+
+  current(): WorldApiAuth {
+    return this.requests.getStore() ?? this.background;
+  }
+}
 
 export type WorldApiClientOpts = {
   baseUrl: string;

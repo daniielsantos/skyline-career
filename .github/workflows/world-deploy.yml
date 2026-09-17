@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.result.outputs.digest }}
       image: ${{ steps.meta.outputs.image }}
       revision: ${{ steps.meta.outputs.revision }}
     steps:
@@ -87,11 +87,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/setup-qemu-action@v4
+        if: github.event_name != 'release'
 
       - uses: docker/setup-buildx-action@v4
 
       - name: Build and push amd64 + arm64
         id: build
+        if: github.event_name != 'release'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -101,6 +103,70 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha,scope=world
           cache-to: type=gha,mode=max,scope=world
+
+      - name: Reuse immutable image for release
+        id: promote
+        if: github.event_name == 'release'
+        shell: bash
+        env:
+          SOURCE_IMAGE: ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.revision }}
+          RELEASE_IMAGE: ${{ steps.meta.outputs.image }}:${{ github.event.release.tag_name }}
+        run: |
+          set -Eeuo pipefail
+          echo "Waiting for the successful main build: $SOURCE_IMAGE"
+          found=0
+          for attempt in $(seq 1 180); do
+            if docker buildx imagetools inspect "$SOURCE_IMAGE" >/dev/null 2>&1; then
+              found=1
+              break
+            fi
+            if (( attempt % 6 == 0 )); then
+              echo "Still waiting for $SOURCE_IMAGE ($((attempt * 10))s elapsed)"
+            fi
+            sleep 10
+          done
+          if [[ "$found" != 1 ]]; then
+            echo "::error::Immutable image did not appear within 30 minutes: $SOURCE_IMAGE"
+            exit 1
+          fi
+
+          digest="$(
+            docker buildx imagetools inspect "$SOURCE_IMAGE" |
+              awk '$1 == "Digest:" { print $2; exit }'
+          )"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Could not resolve manifest digest for $SOURCE_IMAGE"
+            exit 1
+          fi
+
+          echo "Promoting $SOURCE_IMAGE@$digest as $RELEASE_IMAGE"
+          docker buildx imagetools create \
+            --tag "$RELEASE_IMAGE" \
+            "$SOURCE_IMAGE@$digest"
+          release_digest="$(
+            docker buildx imagetools inspect "$RELEASE_IMAGE" |
+              awk '$1 == "Digest:" { print $2; exit }'
+          )"
+          if [[ "$release_digest" != "$digest" ]]; then
+            echo "::error::Release tag digest differs from immutable source"
+            exit 1
+          fi
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
+
+      - name: Export immutable image result
+        id: result
+        shell: bash
+        env:
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          PROMOTED_DIGEST: ${{ steps.promote.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+          digest="${BUILD_DIGEST:-$PROMOTED_DIGEST}"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Build did not produce a valid image digest"
+            exit 1
+          fi
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
 
   deploy-staging:
     name: Deploy Pi staging

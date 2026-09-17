@@ -1,5 +1,5 @@
 import { getStoredCompanyId } from './career-company-client';
-import { getAuthToken } from './career-auth-client';
+import { getAuthToken, signalAuthRequired } from './career-auth-client';
 import { parseApiResponse } from './api-response';
 
 export type AircraftClass =
@@ -1059,6 +1059,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
+  let authToken: string | null = null;
   try {
     if (localStorage.getItem('skyline.devMode') === '1') {
       headers['X-Skyline-Dev-Mode'] = '1';
@@ -1075,9 +1076,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     /* ignore */
   }
   try {
-    const token = getAuthToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+    authToken = getAuthToken();
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
     }
   } catch {
     /* ignore */
@@ -1086,6 +1087,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
+  if (res.status === 401) {
+    signalAuthRequired(authToken);
+  }
   return parseApiResponse<T>(res);
 }
 

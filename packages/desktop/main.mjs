@@ -21,6 +21,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createConnection } from 'node:net';
 import {
   DEFAULT_WORLD_API_URL,
+  PUBLIC_WORLD_API_URL,
   normalizeWorldApiUrl,
   readDesktopPlayConfig,
   resolveDesktopPlayLaunch,
@@ -445,6 +446,7 @@ function registerIpc() {
       envForced: launch.envForced,
       needsChoice: !launch.envForced && !saved.mode,
       defaultWorldApiUrl: DEFAULT_WORLD_API_URL,
+      suggestedMpWorldApiUrl: PUBLIC_WORLD_API_URL,
     };
   });
 
@@ -465,7 +467,7 @@ function registerIpc() {
     if (mode === 'mp') {
       try {
         worldApiUrl = normalizeWorldApiUrl(
-          payload?.worldApiUrl || DEFAULT_WORLD_API_URL,
+          payload?.worldApiUrl || PUBLIC_WORLD_API_URL,
         );
       } catch (err) {
         return {

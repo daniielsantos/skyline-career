@@ -12,9 +12,9 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 
 ## Fase 1 — infra URL (sem rebrand visual)
 
-- [ ] Landing / Pages em `playairframe.com` (opcional; não bloqueia MP)
-- [ ] `flyairframe.com` redirect → play (se registado)
-- [ ] Desktop default MP URL / docs: `world.playairframe.com`
+- [ ] Landing / Pages em `playairframe.com` (opcional; não bloqueia MP) — precisa brief visual
+- [ ] `flyairframe.com` redirect → play (se registado) — DNS Cloudflare
+- [x] Desktop default MP URL: PlayModeGate prefill/placeholder + resolve fallback → `https://world.playairframe.com` (`PUBLIC_WORLD_API_URL`). Lab continua `http://127.0.0.1:8787` via `DEFAULT_WORLD_API_URL` / env.
 - [ ] Email Routing `hello@playairframe.com` (quando houver site)
 
 ## Fase 2 — rebrand visual (precisa arte AIR|FRAME)
@@ -37,3 +37,4 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - Renomear monorepo GitHub só por estética
 - Mudar AppData sem migrator
 - Trocar logo sem brief de arte (AIR|FRAME ≠ SKY|LINE simétrico)
+- Landing genérica sem direção visual (ver user design rules)

@@ -17,6 +17,9 @@ import { dirname } from 'node:path';
 
 export const DEFAULT_WORLD_API_URL = 'http://127.0.0.1:8787';
 
+/** Public multiplayer world (PlayModeGate placeholder / first-run MP suggest). */
+export const PUBLIC_WORLD_API_URL = 'https://world.playairframe.com';
+
 /**
  * @param {string} raw
  * @returns {string}
@@ -96,7 +99,7 @@ export function resolveDesktopPlayLaunch(env, config) {
   }
   if (config.mode === 'mp') {
     const url = normalizeWorldApiUrl(
-      config.worldApiUrl?.trim() || DEFAULT_WORLD_API_URL,
+      config.worldApiUrl?.trim() || PUBLIC_WORLD_API_URL,
     );
     return { worldApiUrl: url, envForced: false, mode: 'mp' };
   }

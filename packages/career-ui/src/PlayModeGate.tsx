@@ -10,6 +10,8 @@ export type DesktopPlayConfigView = {
   envForced: boolean;
   needsChoice: boolean;
   defaultWorldApiUrl: string;
+  /** First-run / empty MP field — public production world. */
+  suggestedMpWorldApiUrl?: string;
 };
 
 /**
@@ -17,7 +19,10 @@ export type DesktopPlayConfigView = {
  */
 export function PlayModeGate(props: {
   initialUrl?: string;
+  /** Lab / SP fallback (typically http://127.0.0.1:8787). */
   defaultUrl: string;
+  /** Prefill + placeholder when choosing Multiplayer. */
+  suggestedMpUrl?: string;
   busy?: boolean;
   error?: string | null;
   /** When re-choosing from Settings — show current mode hint. */
@@ -27,11 +32,13 @@ export function PlayModeGate(props: {
     worldApiUrl: string;
   }) => void | Promise<void>;
 }) {
+  const suggestedMp =
+    props.suggestedMpUrl?.trim() || 'https://world.playairframe.com';
   const [mode, setMode] = useState<DesktopPlayMode>(
     props.currentMode === 'mp' ? 'mp' : 'sp',
   );
   const [worldUrl, setWorldUrl] = useState(
-    () => props.initialUrl?.trim() || props.defaultUrl,
+    () => props.initialUrl?.trim() || suggestedMp,
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -84,7 +91,12 @@ export function PlayModeGate(props: {
               mode === 'mp' ? 'settings-choice-btn active' : 'settings-choice-btn'
             }
             disabled={busy}
-            onClick={() => setMode('mp')}
+            onClick={() => {
+              setMode('mp');
+              if (!worldUrl.trim() || worldUrl.trim() === props.defaultUrl) {
+                setWorldUrl(suggestedMp);
+              }
+            }}
           >
             Multiplayer
             <small>Join a world host</small>
@@ -98,7 +110,7 @@ export function PlayModeGate(props: {
               value={worldUrl}
               onChange={(e) => setWorldUrl(e.target.value)}
               disabled={busy}
-              placeholder={props.defaultUrl}
+              placeholder={suggestedMp}
               autoComplete="off"
               spellCheck={false}
               required

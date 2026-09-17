@@ -15,6 +15,7 @@ type SkylineDesktopBridge = {
     envForced: boolean;
     needsChoice: boolean;
     defaultWorldApiUrl: string;
+    suggestedMpWorldApiUrl?: string;
   }>;
   setPlayMode?: (payload: {
     mode: 'sp' | 'mp';

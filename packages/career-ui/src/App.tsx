@@ -11117,6 +11117,10 @@ export function App() {
           defaultUrl={
             playModeConfig?.defaultWorldApiUrl ?? 'http://127.0.0.1:8787'
           }
+          suggestedMpUrl={
+            playModeConfig?.suggestedMpWorldApiUrl ??
+            'https://world.playairframe.com'
+          }
           initialUrl={playModeConfig?.worldApiUrl}
           currentMode={playModeConfig?.mode}
           busy={playModeBusy}

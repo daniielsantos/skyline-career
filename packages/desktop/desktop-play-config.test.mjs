@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import {
-  DEFAULT_WORLD_API_URL,
+  PUBLIC_WORLD_API_URL,
   normalizeWorldApiUrl,
   readDesktopPlayConfig,
   resolveDesktopPlayLaunch,
@@ -47,8 +47,14 @@ describe('desktop-play-config', () => {
     assert.equal(cfg.mode, 'mp');
     const launch = resolveDesktopPlayLaunch({}, cfg);
     assert.equal(launch.mode, 'mp');
-    assert.equal(launch.worldApiUrl, DEFAULT_WORLD_API_URL);
+    assert.equal(launch.worldApiUrl, 'http://127.0.0.1:8787');
     assert.equal(launch.envForced, false);
+  });
+
+  it('mp without saved URL defaults to public world', () => {
+    const launch = resolveDesktopPlayLaunch({}, { mode: 'mp' });
+    assert.equal(launch.mode, 'mp');
+    assert.equal(launch.worldApiUrl, PUBLIC_WORLD_API_URL);
   });
 
   it('needsChoice when no mode and no env', () => {

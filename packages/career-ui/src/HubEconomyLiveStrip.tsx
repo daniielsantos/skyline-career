@@ -296,7 +296,8 @@ export function HubEconomyLiveStrip(props: {
                   ['dryGap', r.rejectDryGap],
                   ['thinQty', r.rejectThinQty],
                   ['noSize', r.rejectNoSizePath],
-                ].sort((a, b) => b[1] - a[1]);
+                ];
+                ranked.sort((a, b) => b[1] - a[1]);
                 const top = ranked.filter(([, n]) => n > 0).slice(0, 2);
                 const topTxt = top
                   .map(([k, n]) => `${k} ${n}`)

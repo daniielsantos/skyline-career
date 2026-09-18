@@ -120,7 +120,11 @@ Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab
 
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-18: **Intl soft share 0.12→0.15** — pós-widen pulse 560 lanes / board ~3.5%; cota era o bind de volume. Re-medir % intl + live + Idle após +1–2d. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+Atualizado 2026-09-18: **Regional/spoke GA–feeder board** — regionais deixam de ser só scrap last-mile; reserved bulk seats + share/open dials (sem major/XL). Re-medir SBCT outbound + BR regional feeder após ship. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **Intl world-market quotas** — retire soft-share; INTL sized by fleet lift; domestic keeps full commodity pool. Re-medir % intl + live após +2–3d. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **Intl soft share 0.12→0.15** — pós-widen pulse 560 lanes / board ~3.5%; cota era o bind de volume. Re-medir % intl + live + Idle após +1–2d. Sem Dry. **Superseded** by lift-based quotas. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Intl graph soft widen (local, sem commit/release)** — `LANES_PER_COUNTRY` 2.25→3, `LANES_MAX` 480→560, country 6→8, pair 2→3. Motivo: board intl ~3.6% com soft share 12% = formação/OD, não cota. Sem Dry. Re-medir % intl + live pós day rollover. Detail: [`08-economy.md`](./08-economy.md).
 

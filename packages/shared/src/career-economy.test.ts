@@ -26,7 +26,11 @@ import {
   LAST_MILE_MAX_NM,
   SMALL_LOT_MAX_NM,
   LAST_MILE_OPEN_LOTS_PER_ORIGIN,
+  LAST_MILE_OPEN_LOTS_PER_REGIONAL_ORIGIN,
   LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN,
+  LAST_MILE_REGIONAL_STOCK_SHARE,
+  FEEDER_LTL_MIN_KG,
+  DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL,
   LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET,
   LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
   lastMileSkipAllSpokeFormBudget,
@@ -38,6 +42,10 @@ import {
   SMALL_LOT_MAX_KG,
   BOARD_AVAILABLE_SOFT_CAP,
   BOARD_COVER_DAYS,
+  COMMODITY_AVAILABLE_SOFT_CAP,
+  INTL_QUOTA_FLOOR,
+  intlCommodityQuota,
+  PARTITION_MIN_BOARD_KG,
   LOT_FORMATION_RESERVE_FRACTION,
   partitionBoardKgTarget,
   INTL_BOARD_PARTITION,
@@ -89,6 +97,7 @@ import {
   tickEconomyNCooperative,
   createEmptyTickPhaseProfile,
   LARGE_LOT_MAX_KG,
+  LARGE_LOT_MIN_KG,
   LANE_SATURATION_KG,
   XL_CORRIDOR_MIN_WEIGHT,
   XL_LOT_MAX_KG,
@@ -3182,15 +3191,16 @@ describe('tickEconomyN market formation', () => {
   it('caps available lots per country and keeps US and international alive', () => {
     const world = createSeedEconomyWorld({ seed: 'board-cap' });
     tickEconomyN(world, 72);
-    // Soft skipAll is not a hard ceiling; densify + intl soft-share shrink
-    // country quotas while general still posts deeply on large maps.
+    // Soft skipAll is not a hard ceiling; densify still shrinks
+    // country quotas by hub share while general posts deeply on large maps.
+    // Slack covers overshoot + full domestic commodity pool (no intl soft-share subtract).
     const partitionQuotaSlack = 300;
     const available = world.lots.filter((l) => l.status === 'available');
     const countryByIcao = new Map(
       world.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
     );
     assert.ok(
-      available.length <= BOARD_AVAILABLE_SOFT_CAP + 5_500,
+      available.length <= BOARD_AVAILABLE_SOFT_CAP + 6_500,
       `available=${available.length}`,
     );
 
@@ -3247,6 +3257,29 @@ describe('tickEconomyN market formation', () => {
         );
       }
     }
+  });
+
+  it('sizes intl quota from world fleet lift, not a domestic soft-share', () => {
+    const world = createSeedEconomyWorld({ seed: 'intl-lift-quota' });
+    const intlQuota = intlCommodityQuota(world);
+    assert.ok(intlQuota >= INTL_QUOTA_FLOOR);
+    assert.ok(intlQuota <= COMMODITY_AVAILABLE_SOFT_CAP);
+    // No longer a fixed % of commodity soft cap (was 12–15% ≈ 186–233).
+    assert.ok(
+      intlQuota > Math.round(COMMODITY_AVAILABLE_SOFT_CAP * 0.2),
+      `expected lift-based intl quota ≫ old soft-share; got ${intlQuota}`,
+    );
+    // Domestic pool is the full commodity soft cap (not softCap − intlQuota).
+    const brQuota = partitionAvailableQuota(world, 'BR');
+    const usQuota = partitionAvailableQuota(world, 'US');
+    assert.ok(brQuota >= 50);
+    assert.ok(usQuota >= brQuota);
+    const intlTarget = partitionBoardKgTarget(world, INTL_BOARD_PARTITION);
+    assert.ok(intlTarget >= PARTITION_MIN_BOARD_KG);
+    assert.ok(
+      intlTarget > 15_000_000,
+      `intl kg target should be cross-border cover; got ${intlTarget}`,
+    );
   });
 
   it('recycles stale large electronics so the shelf can turn over', () => {
@@ -3599,6 +3632,81 @@ describe('tickEconomyN market formation', () => {
         `${lot.originIcao}→${lot.destIcao} ${nm} nm`,
       );
     }
+  });
+
+  it('keeps GA and feeder lots leaving BR regional hubs', () => {
+    const world = createSeedEconomyWorld({ seed: 'regional-feeder-board' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+    }
+    for (const ap of world.airports) {
+      if (countryIdFromRegion(ap.region) !== 'BR') continue;
+      if (hubTierOf(ap) !== 'regional') continue;
+      for (const id of [
+        'general',
+        'supplies',
+        'electronics',
+        'machinery',
+        'perishables',
+      ] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        // Comfortable surplus — not critical overflow — so reserved bulk seats fire.
+        pile.stockKg = Math.max(
+          pile.stockKg,
+          Math.round(pile.capacityKg * 0.78),
+        );
+      }
+    }
+    tickEconomyN(world, TICKS_PER_DAY);
+
+    const fromRegional = world.lots.filter((l) => {
+      if (l.status !== 'available' && l.status !== 'reserved') return false;
+      const origin = world.airports.find((a) => a.icao === l.originIcao);
+      if (countryIdFromRegion(origin?.region ?? '') !== 'BR') return false;
+      return (
+        hubTierOf(
+          origin ?? {
+            icao: l.originIcao,
+            hubTier: 'spoke',
+          },
+        ) === 'regional'
+      );
+    });
+    assert.ok(fromRegional.length >= 8, `regional lots=${fromRegional.length}`);
+    const ga = fromRegional.filter((l) => l.quantityKg <= GA_LTL_MAX_KG);
+    const feeder = fromRegional.filter(
+      (l) =>
+        l.quantityKg >= FEEDER_LTL_MIN_KG && l.quantityKg < LARGE_LOT_MIN_KG,
+    );
+    assert.ok(ga.length >= 3, `regional GA=${ga.length}`);
+    assert.ok(
+      feeder.length >= 2,
+      `expected TP/LJ feeder from regionals; feeder=${feeder.length} ga=${ga.length} total=${fromRegional.length}`,
+    );
+    const perishGa = fromRegional.filter(
+      (l) =>
+        l.commodityId === 'perishables' &&
+        l.quantityKg <= GA_LTL_MAX_KG &&
+        /last-mile/i.test(l.reason),
+    );
+    assert.ok(
+      perishGa.length >= 1,
+      `expected regional/spoke perishables last-mile; got ${perishGa.length}`,
+    );
+    assert.equal(LAST_MILE_OPEN_LOTS_PER_REGIONAL_ORIGIN, 4);
+    assert.ok(LAST_MILE_REGIONAL_STOCK_SHARE >= 0.35);
+    assert.equal(DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL, 0.72);
+
+    const byOrigin = new Map<string, number>();
+    for (const lot of fromRegional) {
+      byOrigin.set(lot.originIcao, (byOrigin.get(lot.originIcao) ?? 0) + 1);
+    }
+    const sbct = byOrigin.get('SBCT') ?? 0;
+    assert.ok(sbct >= 2, `SBCT outbound=${sbct}`);
   });
 
   it('forms last-mile Dry when dests are above soft 58% room (abs headroom)', () => {

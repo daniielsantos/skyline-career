@@ -230,7 +230,7 @@ export interface EconomyPulse {
   /** Cumulative flow counters — diff two samples to get throughput rates. */
   flow: EconomyFlowStats;
   /**
-   * Why intl board share sits below soft quota (matchable lanes / skipAll).
+   * Why intl board sits below transport cover (matchable lanes / skipAll).
    * Read-only; same gates as formLotsIntl surplus∩shortage.
    */
   intlFormation: IntlFormationDiag;

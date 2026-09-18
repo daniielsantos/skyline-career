@@ -77,7 +77,7 @@
 
 # Current state (2026-09-07)
 
-Local `main` (ainda sem commit/release): Market intl dinâmico. Soft widen lanes **2026-09-18** (3/país, cap 8/3, 96–560) + soft share **0.12→0.15** (pulse pós-widen: 560 lanes / board ainda ~3.5%). Demand intl qualquer par mapeado (Port/WH + corridor/range, premium ×1.28). Detail: [`08-economy.md`](./08-economy.md).
+Local `main` (ainda sem commit/release): Market intl dinâmico + soft share retired (lift-based). **Regional/spoke GA–feeder board** — regionais deixam de ser só scrap last-mile (reserved bulk seats + share/open dials; sem major/XL). Detail: [`08-economy.md`](./08-economy.md).
 
 # Current state (2026-09-01)
 

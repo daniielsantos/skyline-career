@@ -1308,6 +1308,14 @@ export const LAST_MILE_DRY_IDS: ReadonlySet<CommodityId> = new Set([
   'general',
   'supplies',
 ]);
+/**
+ * Extra last-mile SKUs for regional/spoke origins only. Curitiba-class hubs
+ * often produce perishables (not Dry) — without this they only show scraps when
+ * Dry happens to accumulate, while majors keep the heavy board.
+ */
+export const LAST_MILE_REGIONAL_EXTRA_IDS: ReadonlySet<CommodityId> = new Set([
+  'perishables',
+]);
 const LAST_MILE_ORIGIN_TIERS: ReadonlySet<HubTier> = new Set([
   'major',
   'regional',
@@ -1316,8 +1324,13 @@ const LAST_MILE_ORIGIN_TIERS: ReadonlySet<HubTier> = new Set([
 /** Comfortable light-GA hop (C172/Bonanza with payload). */
 export const LAST_MILE_MAX_NM = 600;
 const LAST_MILE_MIN_NM = 40;
-/** Open GA Dry lots kept on the board per origin×commodity (majors/regionals). */
+/** Open GA Dry lots kept on the board per origin×commodity (majors). */
 export const LAST_MILE_OPEN_LOTS_PER_ORIGIN = 3;
+/**
+ * Regional origins: one extra open GA Dry hop so Curitiba-class boards are not
+ * a 1–2 scrap shelf while majors hold the Narrow/Wide contracts.
+ */
+export const LAST_MILE_OPEN_LOTS_PER_REGIONAL_ORIGIN = 4;
 /** Spoke origins: two short hops — densify left too many quiet spokes at open=1. */
 export const LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN = 2;
 const LAST_MILE_MIN_ORIGIN_FILL = 0.05;
@@ -1411,6 +1424,11 @@ const LAST_MILE_MAX_FORM_PER_SPOKE_TICK = 2;
 /** Fraction of spoke stock offered on a last-mile hop (still capped at GA_LTL_MAX_KG). */
 const LAST_MILE_SPOKE_STOCK_SHARE = 0.55;
 /**
+ * Regional last-mile stock share (was hardcoded 0.08). 8% left Curitiba-class
+ * boards as thin scraps; keep below spoke share and still hard-capped at GA.
+ */
+export const LAST_MILE_REGIONAL_STOCK_SHARE = 0.4;
+/**
  * Adaptive regional recovery (generic): if a region stays with low live hubs
  * and many dead spokes, temporarily relax spoke gates there.
  */
@@ -1436,9 +1454,9 @@ function lastMileAbsRoomKg(dest: {
 }
 
 function lastMileOpenLotsCap(tier: HubTier): number {
-  return tier === 'spoke'
-    ? LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN
-    : LAST_MILE_OPEN_LOTS_PER_ORIGIN;
+  if (tier === 'spoke') return LAST_MILE_OPEN_LOTS_PER_SPOKE_ORIGIN;
+  if (tier === 'regional') return LAST_MILE_OPEN_LOTS_PER_REGIONAL_ORIGIN;
+  return LAST_MILE_OPEN_LOTS_PER_ORIGIN;
 }
 
 function lastMileFormCap(tier: HubTier): number {
@@ -1632,10 +1650,18 @@ export function isGaBandBoardLotViable(input: {
 export const BOARD_AVAILABLE_SOFT_CAP = 8_500;
 export const COMMODITY_AVAILABLE_SOFT_CAP = 1_550;
 /**
- * Share of each commodity cap reserved for the dynamic international graph.
- * Soft bump 2026-09-18: 0.12→0.15 — graph was at LANES_MAX with board still ~3.5%.
+ * Typical intl lot kg when converting world-fleet cover lift → per-SKU lot quota.
+ * Trunk+feeder mix converter — not a measured average.
  */
-export const INTL_AVAILABLE_SHARE = 0.15;
+export const INTL_QUOTA_REF_LOT_KG = 8_000;
+/** Floor so INTL never starves while the fleet is still seeding. */
+export const INTL_QUOTA_FLOOR = 80;
+/**
+ * Fraction of mapped fleet daily lift assumed on cross-border legs.
+ * Sizes INTL lot/kg cover only — does **not** shrink the domestic commodity pool
+ * (retired soft-share). Bound by lane graph + capacity/maxLots as well.
+ */
+export const INTL_CROSS_BORDER_LIFT_FRAC = 0.22;
 /** Floor so a small country (CL) still turns over when the board is deep. */
 export const COUNTRY_AVAILABLE_FLOOR = 50;
 /**
@@ -3396,6 +3422,18 @@ export function quoteFreightLotPay(input: FreightLotPayInput): FreightLotPayQuot
 
 /** Emergency domestic release valve for non-major warehouses pinned near capacity. */
 const DOMESTIC_OVERFLOW_ORIGIN_FILL = 0.9;
+/**
+ * Regionals enter the bulk origin set earlier than the critical 90% valve so
+ * TP/LJ feeder can form without waiting for a warehouse emergency (and without
+ * promoting them to major/XL).
+ */
+export const DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL = 0.72;
+/**
+ * Soft seats: top surplus regionals/spokes always considered for domestic bulk
+ * even when they miss the absolute-kg top-12 (majors otherwise monopolize).
+ */
+export const DOMESTIC_REGIONAL_BULK_ORIGIN_SLOTS = 8;
+export const DOMESTIC_SPOKE_BULK_ORIGIN_SLOTS = 6;
 const DOMESTIC_OVERFLOW_DEST_FILL = 0.35;
 const DOMESTIC_OVERFLOW_CORRIDOR_WEIGHT = 1.1;
 
@@ -9582,9 +9620,11 @@ export function sizeSmallLotKg(
   const gaInRange = nm == null || nm <= GA_LTL_MAX_NM;
   // Prior: spoke OD → always GA; else 40% GA. Target mix favors feeder LTL.
   // International never rolls GA — cross-border 80 kg scraps look broken.
+  // Regional origins bias feeder so TP / light-jet have mid fills at Curitiba-class hubs.
   let gaChance = 0.16;
   if (spokeSpoke) gaChance = 0.32;
   else if (spokeOd) gaChance = 0.26;
+  else if (originTier === 'regional') gaChance = 0.1;
   const wantGa =
     !opts?.international && gaInRange && rng() < gaChance;
   if (wantGa) {
@@ -9637,11 +9677,55 @@ function partitionKey(commodityId: CommodityId, partitionId: string): string {
   return `${commodityId}:${partitionId}`;
 }
 
-export function intlCommodityQuota(): number {
-  return Math.max(
-    80,
-    Math.round(COMMODITY_AVAILABLE_SOFT_CAP * INTL_AVAILABLE_SHARE),
+/**
+ * Σ max cargo kg of NPCs whose home country is on the mapped world.
+ * Shared by intl lot quota and INTL board kg target (one fleet scan / tick).
+ */
+function worldMappedFleetCargoKg(
+  world: CareerEconomyWorld,
+  opts: { heavyOnly?: boolean } = {},
+): number {
+  const countries = new Set(listWorldCountryIds(world));
+  let liftKg = 0;
+  for (const npc of world.npcs ?? []) {
+    const id = countryIdFromRegion(npc.homeRegion ?? '');
+    if (!countries.has(id)) continue;
+    if (
+      opts.heavyOnly === true &&
+      !HEAVY_FREIGHTER_CLASSES.has(npc.aircraftClassId)
+    ) {
+      continue;
+    }
+    liftKg += npcMaxCargoKg(npc);
+  }
+  return liftKg;
+}
+
+/**
+ * Per-SKU available-lot soft quota for the INTL partition.
+ * World market: sized from fleet cover lift (transport), not a % taken from
+ * the domestic commodity pool. Capped at {@link COMMODITY_AVAILABLE_SOFT_CAP}.
+ */
+export function intlCommodityQuota(world: CareerEconomyWorld): number {
+  const cache = partitionMetricsCache(world);
+  const hit = cache.quota.get(INTL_BOARD_PARTITION);
+  if (hit !== undefined) return hit;
+
+  const coverKg =
+    worldMappedFleetCargoKg(world) *
+    NPC_LEGS_PER_DAY_EST *
+    BOARD_COVER_DAYS *
+    INTL_CROSS_BORDER_LIFT_FRAC;
+  const nSku = Math.max(1, CAREER_CARGO_COMMODITIES.length);
+  const quota = Math.min(
+    COMMODITY_AVAILABLE_SOFT_CAP,
+    Math.max(
+      INTL_QUOTA_FLOOR,
+      Math.round(coverKg / INTL_QUOTA_REF_LOT_KG / nSku),
+    ),
   );
+  cache.quota.set(INTL_BOARD_PARTITION, quota);
+  return quota;
 }
 
 /**
@@ -9676,14 +9760,15 @@ export function partitionAvailableQuota(
   world: CareerEconomyWorld,
   partitionId: string,
 ): number {
-  if (partitionId === INTL_BOARD_PARTITION) return intlCommodityQuota();
+  if (partitionId === INTL_BOARD_PARTITION) return intlCommodityQuota(world);
   const cache = partitionMetricsCache(world);
   const hit = cache.quota.get(partitionId);
   if (hit !== undefined) return hit;
   const totalHubs = Math.max(1, world.airports.length);
   const countryHubs =
     airportLookup(world.airports).hubsByCountry.get(partitionId) ?? 0;
-  const pool = Math.max(0, COMMODITY_AVAILABLE_SOFT_CAP - intlCommodityQuota());
+  // Domestic keeps the full commodity soft pool — intl no longer subtracts a share.
+  const pool = COMMODITY_AVAILABLE_SOFT_CAP;
   const quota = Math.max(
     COUNTRY_AVAILABLE_FLOOR,
     Math.round((pool * countryHubs) / totalHubs),
@@ -9836,21 +9921,14 @@ export function partitionBoardKgTarget(
     : PARTITION_MIN_BOARD_KG;
   let target: number;
   if (partitionId === INTL_BOARD_PARTITION) {
-    // Same Σ as reduce(listWorldCountryIds, partitionLiftableKgPerDay), but
-    // one pass over the fleet instead of countries × NPCs each invalidate.
-    const countries = new Set(listWorldCountryIds(world));
-    let liftKg = 0;
-    for (const npc of world.npcs ?? []) {
-      const id = countryIdFromRegion(npc.homeRegion ?? '');
-      if (!countries.has(id)) continue;
-      if (heavyOnly && !HEAVY_FREIGHTER_CLASSES.has(npc.aircraftClassId)) {
-        continue;
-      }
-      liftKg += npcMaxCargoKg(npc);
-    }
+    // Cross-border cover: mapped fleet lift × legs × cover × intl lift frac.
+    // Domestic partitions keep their own country fleets; no soft-share subtract.
     target = Math.max(
       floor,
-      liftKg * NPC_LEGS_PER_DAY_EST * INTL_AVAILABLE_SHARE * BOARD_COVER_DAYS,
+      worldMappedFleetCargoKg(world, { heavyOnly }) *
+        NPC_LEGS_PER_DAY_EST *
+        BOARD_COVER_DAYS *
+        INTL_CROSS_BORDER_LIFT_FRAC,
     );
   } else {
     target = Math.max(
@@ -9863,12 +9941,12 @@ export function partitionBoardKgTarget(
   return target;
 }
 
-/** Read-only: why intl formation is below soft-share (Pulse / VPS diag). */
+/** Read-only: why intl formation sits below transport cover (Pulse / VPS diag). */
 export type IntlFormationCommodityDiag = {
   commodityId: CommodityId;
   availableLots: number;
   quota: number;
-  /** availableLots >= soft quota for INTL partition. */
+  /** availableLots >= transport-derived soft quota for INTL partition. */
   skipAllByCount: boolean;
   surplusHubs: number;
   shortageHubs: number;
@@ -10017,7 +10095,7 @@ export function computeIntlFormationDiag(
 
   const boardKgTarget = partitionBoardKgTarget(world, INTL_BOARD_PARTITION);
   const skipAllByKg = boardKgOpen >= boardKgTarget;
-  const quota = intlCommodityQuota();
+  const quota = intlCommodityQuota(world);
   const laneIndex = ensureLaneInboundIndex(world);
 
   const rejects: IntlFormationRejects = {
@@ -10533,7 +10611,12 @@ function* formLotsFromImbalances(
   const noteOpenGaDryLot = (lot: ShipmentLot): void => {
     if (lot.status !== 'available' && lot.status !== 'reserved') return;
     if (lot.quantityKg > GA_LTL_MAX_KG) return;
-    if (!LAST_MILE_DRY_IDS.has(lot.commodityId)) return;
+    if (
+      !LAST_MILE_DRY_IDS.has(lot.commodityId) &&
+      !LAST_MILE_REGIONAL_EXTRA_IDS.has(lot.commodityId)
+    ) {
+      return;
+    }
     const gaKey = `${lot.originIcao.toUpperCase()}|${lot.commodityId}`;
     openGaDryByOrigin.set(gaKey, (openGaDryByOrigin.get(gaKey) ?? 0) + 1);
   };
@@ -11072,14 +11155,40 @@ function* formLotsFromImbalances(
       };
       // Absolute-kg ranking favors majors. Keep critically full regionals and
       // spokes eligible for the overflow valve even when they miss the top 12.
+      // Regionals also get an earlier overflow gate + reserved surplus seats so
+      // GA/TP/LJ feeder boards exist outside SBGR/SBSP without XL/major promotion.
       for (const row of ranked) {
-        if (
-          row.tier !== 'major' &&
-          row.fill >= DOMESTIC_OVERFLOW_ORIGIN_FILL &&
-          row.surplusKg >= 400
-        ) {
+        if (row.tier === 'major') continue;
+        if (row.surplusKg < 400) continue;
+        const fillGate =
+          row.tier === 'regional'
+            ? DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL
+            : DOMESTIC_OVERFLOW_ORIGIN_FILL;
+        if (row.fill >= fillGate) {
           mergeUnique(origins, row);
         }
+      }
+      const byFillDesc = (a: RankedAirport, b: RankedAirport) =>
+        b.fill - a.fill;
+      for (const row of ranked
+        .filter(
+          (r) =>
+            r.tier === 'regional' &&
+            isBulkSurplusOriginRow(world, r, commodity.id),
+        )
+        .sort(byFillDesc)
+        .slice(0, DOMESTIC_REGIONAL_BULK_ORIGIN_SLOTS)) {
+        mergeUnique(origins, row);
+      }
+      for (const row of ranked
+        .filter(
+          (r) =>
+            r.tier === 'spoke' &&
+            isBulkSurplusOriginRow(world, r, commodity.id),
+        )
+        .sort(byFillDesc)
+        .slice(0, DOMESTIC_SPOKE_BULK_ORIGIN_SLOTS)) {
+        mergeUnique(origins, row);
       }
       for (const origin of [...origins]) {
         for (const partner of corridorPartners(origin.ap.icao)) {
@@ -11234,7 +11343,9 @@ function* formLotsFromImbalances(
       lastMileDeadRegionalVitalityCap(cargoRegionalCount);
 
     for (const commodity of CAREER_CARGO_COMMODITIES) {
-      if (!LAST_MILE_DRY_IDS.has(commodity.id)) continue;
+      const dryLastMile = LAST_MILE_DRY_IDS.has(commodity.id);
+      const regionalExtra = LAST_MILE_REGIONAL_EXTRA_IDS.has(commodity.id);
+      if (!dryLastMile && !regionalExtra) continue;
       // Under skipAll, still run budgeted dead-spoke + dead-regional vitality.
       const vitalityOnly = boardPressureOf(commodity.id, countryId).skipAll;
       const ranked = rankAirports(countryAirports, commodity);
@@ -11248,6 +11359,8 @@ function* formLotsFromImbalances(
       const otherRegionals: RankedAirport[] = [];
       for (const origin of ranked) {
         if (!LAST_MILE_ORIGIN_TIERS.has(origin.tier)) continue;
+        // Perishables (etc.) last-mile is for regional/spoke boards — not major break-bulk.
+        if (regionalExtra && origin.tier === 'major') continue;
         const recoveryActive = isRegionalRecoveryActive(
           recoveryByRegion,
           origin.ap.region,
@@ -11483,7 +11596,11 @@ function* formLotsFromImbalances(
           if (liveAbsRoom < minViableKg) continue;
 
           const share =
-            origin.tier === 'spoke' ? LAST_MILE_SPOKE_STOCK_SHARE : 0.08;
+            origin.tier === 'spoke'
+              ? LAST_MILE_SPOKE_STOCK_SHARE
+              : origin.tier === 'regional'
+                ? LAST_MILE_REGIONAL_STOCK_SHARE
+                : 0.08;
           const raw = Math.min(
             origin.stock.stockKg * share,
             liveAbsRoom,

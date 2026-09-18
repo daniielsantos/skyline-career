@@ -1,4 +1,7 @@
-# Current state (2026-09-17)
+# Current state (2026-09-18)
+
+`main` **5c2f7f8** / desktop **0.3.77** shipped: Rebrand desktop display and UI copy to Airframe Career. Release: [v0.3.77](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.77).
+
 
 `main` **2bfe8fe** / desktop **0.3.76** shipped: Bleed Airframe hero to gate edges and drop nested accent. Release: [v0.3.76](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.76).
 

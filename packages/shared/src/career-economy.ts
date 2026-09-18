@@ -1631,8 +1631,11 @@ export function isGaBandBoardLotViable(input: {
  */
 export const BOARD_AVAILABLE_SOFT_CAP = 8_500;
 export const COMMODITY_AVAILABLE_SOFT_CAP = 1_550;
-/** Share of each commodity cap reserved for the dynamic international graph. */
-export const INTL_AVAILABLE_SHARE = 0.12;
+/**
+ * Share of each commodity cap reserved for the dynamic international graph.
+ * Soft bump 2026-09-18: 0.12→0.15 — graph was at LANES_MAX with board still ~3.5%.
+ */
+export const INTL_AVAILABLE_SHARE = 0.15;
 /** Floor so a small country (CL) still turns over when the board is deep. */
 export const COUNTRY_AVAILABLE_FLOOR = 50;
 /**

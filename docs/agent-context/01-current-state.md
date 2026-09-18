@@ -53,7 +53,7 @@
 
 # Current state (2026-09-07)
 
-Local `main` (ainda sem commit/release): Market internacional dinâmico por pressão/gateways. Soft widen **2026-09-18**: alvo **3/país**, cap **8/país** / **3/par**, bounds **96–560** (era 2.25 / 6 / 2 / 480) — board intl ~3.6% não era cota 12%, era OD count. Active-lot OD faz carry-over; Demand intl qualquer par mapeado (Port/WH + corridor/range, premium ×1.28). Detail: [`08-economy.md`](./08-economy.md).
+Local `main` (ainda sem commit/release): Market intl dinâmico. Soft widen lanes **2026-09-18** (3/país, cap 8/3, 96–560) + soft share **0.12→0.15** (pulse pós-widen: 560 lanes / board ainda ~3.5%). Demand intl qualquer par mapeado (Port/WH + corridor/range, premium ×1.28). Detail: [`08-economy.md`](./08-economy.md).
 
 # Current state (2026-09-01)
 

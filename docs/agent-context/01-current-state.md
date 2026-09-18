@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **3a940c1** / desktop **0.3.92** shipped: Use one-click NSIS updates to skip the installer wizard. Release: [v0.3.92](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.92).
+
+
 `main` **a6620f4** / desktop **0.3.91** shipped: Size intl quotas by fleet lift and deepen regional GA/feeder boards. Release: [v0.3.91](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.91).
 
 

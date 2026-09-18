@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **9e19877** / desktop **0.3.97** shipped: Fix intl gateway pressure to read airport inventory. Release: [v0.3.97](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.97).
+
+
 `main` **f52382c** / desktop **0.3.96** shipped: Add Intl pilot-country board filter and quit before NSIS update. Release: [v0.3.96](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.96).
 
 

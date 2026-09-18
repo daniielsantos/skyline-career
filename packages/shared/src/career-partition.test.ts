@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  cargoHubCountByCountry,
   createSeedEconomyWorld,
   DYNAMIC_INTL_LANES_MAX,
-  DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
   DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
   DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
   DYNAMIC_INTL_REGIONAL_MAX_NM,
   DYNAMIC_INTL_ULTRA_MIN_NM,
   ensureCareerHubCoverage,
   ensureInternationalLanes,
+  intlLaneBudget,
   migrateEconomyWorld,
   routeDistanceNm,
   selectDynamicInternationalLanes,
@@ -318,6 +319,7 @@ describe('career partition', () => {
   it('bounds daily lanes fairly by country and country pair', () => {
     const world = createSeedEconomyWorld({ seed: 'lane-fairness' });
     const lanes = world.internationalLanes ?? [];
+    const hubCounts = cargoHubCountByCountry(world);
     const byCountry = new Map<string, number>();
     const byPair = new Map<string, number>();
     let regional = 0;
@@ -339,13 +341,17 @@ describe('career partition', () => {
     }
     for (const country of listWorldCountryIds(world)) {
       const n = byCountry.get(country) ?? 0;
+      const budget = intlLaneBudget(hubCounts.get(country) ?? 0, {
+        totalCargoHubs: [...hubCounts.values()].reduce((a, b) => a + b, 0),
+        countryCount: hubCounts.size,
+      });
       assert.ok(
         n >= DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
         `${country} should have at least ${DYNAMIC_INTL_MIN_LANES_PER_COUNTRY} lanes, got ${n}`,
       );
       assert.ok(
-        n <= DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
-        `${country} exceeds country lane cap: ${n}`,
+        n <= budget,
+        `${country} exceeds proportional lane budget ${budget}: ${n}`,
       );
     }
     for (const [pair, n] of byPair) {
@@ -355,6 +361,10 @@ describe('career partition', () => {
       );
     }
     assert.ok(lanes.length > 0, 'expected daily lanes');
+    assert.ok(
+      lanes.length <= DYNAMIC_INTL_LANES_MAX,
+      `lane graph exceeds LANES_MAX: ${lanes.length}`,
+    );
     const regionalShare = regional / lanes.length;
     const ultraShare = ultra / lanes.length;
     assert.ok(
@@ -366,6 +376,21 @@ describe('career partition', () => {
       `expected ultra share ≤0.20, got ${ultraShare.toFixed(3)} (${ultra}/${lanes.length})`,
     );
     assert.ok(ultra >= 1, 'expected a thin ultra/trunk shelf');
+    const brHubs = hubCounts.get('BR') ?? 0;
+    const brLanes = byCountry.get('BR') ?? 0;
+    const brBudget = intlLaneBudget(brHubs, {
+      totalCargoHubs: [...hubCounts.values()].reduce((a, b) => a + b, 0),
+      countryCount: hubCounts.size,
+    });
+    assert.ok(brHubs > 80, `expected dense BR hub map, got ${brHubs}`);
+    assert.ok(
+      brLanes > 8,
+      `proportional BR budget should allow >8 lane involvements, got ${brLanes} (budget ${brBudget})`,
+    );
+    assert.ok(
+      lanes.length >= 700,
+      `expected world graph near LANES_MAX, got ${lanes.length}`,
+    );
   });
 
   it('replays the exact lane set for the same seed and economy day', () => {
@@ -439,10 +464,19 @@ describe('career partition', () => {
         (countryCounts.get(lane.destCountryId) ?? 0) + 1,
       );
     }
-    assert.ok(
-      Math.max(...countryCounts.values()) <= DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
-      'carry-over must count against the per-country cap',
-    );
+    const hubCounts = cargoHubCountByCountry(world);
+    const totalCargoHubs = [...hubCounts.values()].reduce((a, b) => a + b, 0);
+    const countryCount = hubCounts.size;
+    for (const [country, n] of countryCounts) {
+      const budget = intlLaneBudget(hubCounts.get(country) ?? 0, {
+        totalCargoHubs,
+        countryCount,
+      });
+      assert.ok(
+        n <= budget,
+        `carry-over ${country} exceeds proportional budget ${budget}: ${n}`,
+      );
+    }
     assert.notDeepEqual(
       (world.internationalLanes ?? [])
         .filter((lane) => lane.id.startsWith('dyn_'))

@@ -1033,6 +1033,7 @@ export {
   DYNAMIC_INTL_GATEWAYS_PER_COUNTRY,
   DYNAMIC_INTL_LANES_MAX,
   DYNAMIC_INTL_LANES_MIN,
+  DYNAMIC_INTL_LANES_PER_COUNTRY,
   DYNAMIC_INTL_LONG_HAUL_MIN_NM,
   DYNAMIC_INTL_LONG_HAUL_SHARE,
   DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
@@ -1043,7 +1044,10 @@ export {
   DYNAMIC_INTL_ULTRA_MIN_NM,
   DYNAMIC_INTL_ULTRA_SHARE_MAX,
   DYNAMIC_INTL_ULTRA_SHARE_MIN,
+  cargoHubCountByCountry,
   dynamicInternationalLaneTarget,
+  intlGatewayBudget,
+  intlLaneBudget,
   selectDynamicInternationalLanes,
 } from './career-international-lanes.js';
 import { isPortPickupHub } from './career-port-pickup-hubs.js';

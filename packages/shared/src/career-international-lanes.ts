@@ -3,7 +3,8 @@
  *
  * Every country is eligible, but only a bounded gateway graph is active on a
  * given economy day. Selection follows live surplus/shortage pressure, keeps
- * country and country-pair caps, and retains lanes that still own active lots.
+ * hub-count–proportional country caps (+ pair caps), and retains lanes that
+ * still own active lots.
  */
 
 import { TICKS_PER_DAY } from './career-clock.js';
@@ -16,17 +17,32 @@ import type {
   InternationalLane,
 } from './types/career-economy.js';
 
-export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 3;
+/**
+ * Absolute gateway ceiling (proportional budget never exceeds this).
+ * @deprecated Prefer {@link intlGatewayBudget}; kept for Pulse/docs aliases.
+ */
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 8;
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN = 2;
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX = 8;
+/** ~1 gateway per 18 cargo hubs (ceil), clamped to min/max. */
+export const DYNAMIC_INTL_GATEWAYS_HUBS_PER_SLOT = 18;
+
 export const DYNAMIC_INTL_MIN_LANES_PER_COUNTRY = 2;
-/** Soft widen 2026-09-18: 6→8 — more OD slots without opening every pair. */
-export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY = 8;
-/** Soft widen 2026-09-18: 2→3 — denser high-pressure country pairs. */
-export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR = 3;
+/**
+ * Absolute per-country lane ceiling (proportional budget never exceeds this).
+ * Soft cap so US/BR can densify without one country eating the whole graph.
+ */
+export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY = 120;
+export const DYNAMIC_INTL_LANES_PER_COUNTRY_MIN = 2;
+export const DYNAMIC_INTL_LANES_PER_COUNTRY_BUDGET_MAX = 120;
+
+/** Neighbor densify without opening every OD (Ship B alvo). */
+export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR = 5;
 export const DYNAMIC_INTL_LANES_MIN = 96;
-/** Soft widen 2026-09-18: 480→560 so ~3 lanes/country is not clipped. */
-export const DYNAMIC_INTL_LANES_MAX = 560;
-/** Soft widen 2026-09-18: 2.25→3 — target board OD count / country. */
-export const DYNAMIC_INTL_LANES_PER_COUNTRY = 3;
+/** Ship B alvo: world graph teto. */
+export const DYNAMIC_INTL_LANES_MAX = 1_000;
+/** Ship B alvo: target ≈ countryCount × this, clipped by LANES_MAX. */
+export const DYNAMIC_INTL_LANES_PER_COUNTRY = 5.5;
 /**
  * Regional intl band ceiling (neighbor / same-continent scale).
  * Product 2026-09-18: most lanes should sit at or below this nm.
@@ -121,12 +137,104 @@ function odKey(a: string, b: string): string {
   return left < right ? `${left}|${right}` : `${right}|${left}`;
 }
 
+function clampInt(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+/**
+ * Gateway slots for a country from cargo hub count (non-bush).
+ * ceil(hubN / 18), clamped to [2, 8].
+ */
+export function intlGatewayBudget(hubN: number): number {
+  const n = Math.max(0, Math.floor(Number(hubN) || 0));
+  return clampInt(
+    Math.ceil(n / DYNAMIC_INTL_GATEWAYS_HUBS_PER_SLOT),
+    DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN,
+    DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX,
+  );
+}
+
+/**
+ * Max lane involvements (origin or dest) for a country.
+ *
+ * With world totals: each country gets a floor of 2, then a hub-share of the
+ * remaining involvement pool (`2 × LANES_MAX − countries × 2`), clamped to
+ * {@link DYNAMIC_INTL_LANES_PER_COUNTRY_BUDGET_MAX}. This keeps tiny countries
+ * thin while letting BR/US absorb enough slots to fill the world teto.
+ *
+ * Without totals (unit/docs): legacy linear `round(2 + 0.14 × hubN)` capped 24.
+ */
+export function intlLaneBudget(
+  hubN: number,
+  opts?: { totalCargoHubs?: number; countryCount?: number },
+): number {
+  const n = Math.max(0, Math.floor(Number(hubN) || 0));
+  const total = opts?.totalCargoHubs;
+  const countries = opts?.countryCount;
+  if (
+    typeof total === 'number' &&
+    total > 0 &&
+    typeof countries === 'number' &&
+    countries > 0
+  ) {
+    const base = DYNAMIC_INTL_LANES_PER_COUNTRY_MIN;
+    const extraPool = Math.max(
+      0,
+      DYNAMIC_INTL_LANES_MAX * 2 - countries * base,
+    );
+    const extra = Math.round((n / total) * extraPool);
+    return clampInt(
+      base + extra,
+      base,
+      DYNAMIC_INTL_LANES_PER_COUNTRY_BUDGET_MAX,
+    );
+  }
+  return clampInt(Math.round(2 + n * 0.14), 2, 24);
+}
+
+/** Non-bush cargo hub counts keyed by ISO country id. */
+export function cargoHubCountByCountry(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const ap of world.airports) {
+    if (ap.bush === true || ap.bushTripOnly === true) continue;
+    const country = countryIdFromRegion(ap.region ?? '');
+    if (!/^[A-Z]{2}$/.test(country) || country === 'XX') continue;
+    counts.set(country, (counts.get(country) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function laneBudgetByCountry(
+  hubCounts: Map<string, number>,
+): Map<string, number> {
+  let totalCargoHubs = 0;
+  for (const n of hubCounts.values()) totalCargoHubs += n;
+  const countryCount = hubCounts.size;
+  const budgets = new Map<string, number>();
+  for (const [country, hubN] of hubCounts) {
+    budgets.set(
+      country,
+      intlLaneBudget(hubN, { totalCargoHubs, countryCount }),
+    );
+  }
+  return budgets;
+}
+
 function gatewayPressure(a: AirportTerminal, b: AirportTerminal): number {
   let best = 0;
   for (const commodityId of LANE_COMMODITIES) {
-    const stockA = a.inventory[commodityId];
-    const stockB = b.inventory[commodityId];
-    if (!stockA?.capacityKg || !stockB?.capacityKg) continue;
+    const stockA = a.stock?.[commodityId];
+    const stockB = b.stock?.[commodityId];
+    if (
+      !stockA ||
+      !stockB ||
+      stockA.capacityKg <= 0 ||
+      stockB.capacityKg <= 0
+    ) {
+      continue;
+    }
     const fillA = stockA.stockKg / stockA.capacityKg;
     const fillB = stockB.stockKg / stockB.capacityKg;
     const aToB = Math.max(0, fillA - 0.5) * Math.max(0, 0.5 - fillB);
@@ -161,7 +269,8 @@ function gatewayRows(
         hashUnit(`${world.seed}:${day}:gateway:${country}:${b.icao}`);
       return qualityB - qualityA || a.icao.localeCompare(b.icao);
     });
-    rows.splice(DYNAMIC_INTL_GATEWAYS_PER_COUNTRY);
+    const budget = intlGatewayBudget(rows.length);
+    rows.splice(budget);
   }
   return byCountry;
 }
@@ -169,7 +278,8 @@ function gatewayRows(
 function laneCapacityKgPerDay(a: AirportTerminal, b: AirportTerminal): number {
   const lowerTier = Math.min(tierScore(tierOf(a)), tierScore(tierOf(b)));
   const base = lowerTier >= 3 ? 90_000 : lowerTier >= 2 ? 55_000 : 30_000;
-  const levelMult = 0.85 + Math.min(5, ((a.level ?? 1) + (b.level ?? 1)) / 2) * 0.05;
+  const levelMult =
+    0.85 + Math.min(5, ((a.level ?? 1) + (b.level ?? 1)) / 2) * 0.05;
   return Math.round((base * levelMult) / 1_000) * 1_000;
 }
 
@@ -265,6 +375,11 @@ export function selectDynamicInternationalLanes(
   world: Pick<CareerEconomyWorld, 'airports' | 'seed' | 'tick'>,
 ): InternationalLane[] {
   const day = Math.floor(Math.max(0, world.tick) / TICKS_PER_DAY);
+  const hubCounts = cargoHubCountByCountry(world);
+  const laneBudgets = laneBudgetByCountry(hubCounts);
+  const countryCap = (country: string): number =>
+    laneBudgets.get(country) ?? DYNAMIC_INTL_LANES_PER_COUNTRY_MIN;
+
   const { countries, candidates } = buildCandidates(world, day);
   const target = Math.min(
     dynamicInternationalLaneTarget(countries.length),
@@ -292,9 +407,9 @@ export function selectDynamicInternationalLanes(
     if (selectedOds.has(candidate.odKey)) return false;
     if (
       (countryCounts.get(candidate.countryA) ?? 0) >=
-        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY ||
+        countryCap(candidate.countryA) ||
       (countryCounts.get(candidate.countryB) ?? 0) >=
-        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY ||
+        countryCap(candidate.countryB) ||
       (pairCounts.get(candidate.countryPairKey) ?? 0) >=
         DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR
     ) {
@@ -379,7 +494,10 @@ export function selectDynamicInternationalLanes(
   }
 
   // Thin ultra shelf for Wide/ocean careers — only after regional health.
-  if (ultraCount() < ultraMin && regionalCount() >= Math.min(regionalMin, selected.length)) {
+  if (
+    ultraCount() < ultraMin &&
+    regionalCount() >= Math.min(regionalMin, selected.length)
+  ) {
     for (const candidate of candidates) {
       if (selected.length >= target || ultraCount() >= ultraMin) break;
       if (!isUltraBandNm(candidate.nm)) continue;
@@ -446,6 +564,10 @@ export function ensureDynamicInternationalLanes(
   const oldByOd = new Map(
     existing.map((lane) => [odKey(lane.originIcao, lane.destIcao), lane]),
   );
+  const hubCounts = cargoHubCountByCountry(world);
+  const laneBudgets = laneBudgetByCountry(hubCounts);
+  const countryCap = (country: string): number =>
+    laneBudgets.get(country) ?? DYNAMIC_INTL_LANES_PER_COUNTRY_MIN;
 
   for (const lot of world.lots ?? []) {
     if (!isActiveLotStatus(lot.status)) continue;
@@ -508,18 +630,14 @@ export function ensureDynamicInternationalLanes(
     return (
       !byOd.has(key) &&
       (countryCounts.get(lane.originCountryId) ?? 0) <
-        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY &&
+        countryCap(lane.originCountryId) &&
       (countryCounts.get(lane.destCountryId) ?? 0) <
-        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY &&
-      (pairCounts.get(pair) ?? 0) <
-        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR
+        countryCap(lane.destCountryId) &&
+      (pairCounts.get(pair) ?? 0) < DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR
     );
   };
   const add = (lane: InternationalLane): boolean => {
-    if (
-      carryLanes.length + selected.length >= target ||
-      !canAdd(lane)
-    ) {
+    if (carryLanes.length + selected.length >= target || !canAdd(lane)) {
       return false;
     }
     const key = odKey(lane.originIcao, lane.destIcao);

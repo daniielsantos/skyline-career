@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **9faf88f** / desktop **0.3.100** shipped: Restore direct Setup spawn for desktop updates and drop delay scripts. Release: [v0.3.100](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.100).
+
+
 `main` **742ffc1** / desktop **0.3.99** shipped: Widen intl gateway slots so regionals can join the daily graph. Release: [v0.3.99](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.99).
 
 

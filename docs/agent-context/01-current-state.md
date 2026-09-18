@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **742ffc1** / desktop **0.3.99** shipped: Widen intl gateway slots so regionals can join the daily graph. Release: [v0.3.99](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.99).
+
+
 `main` **78eb123** / desktop **0.3.98** shipped: Launch update Setup via hidden VBS so Electron quit cannot kill it. Release: [v0.3.98](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.98).
 
 

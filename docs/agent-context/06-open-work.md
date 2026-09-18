@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **World healthcheck curl** — `docker-compose` + `Dockerfile.world` usam `CMD curl -sf /api/health` (sem `node -e`); evita zombies Z no VPS. Precisa rebuild da imagem world + redeploy compose. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-18: **Desktop update install visível** — remove `/S` no quit-and-install unsigned; Setup one-click com janela de progresso + SmartScreen na frente (evita close sem feedback). `/S` só com Authenticode. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-18: **Intl regional-first lane retune** — score/fill preferem ≤2500 nm; ultra ≥4000 capped ≤18% (+ soft floor 8%). Sem baixar MAX 6500. Re-medir mix lanes/lots após +2–3d VPS. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).

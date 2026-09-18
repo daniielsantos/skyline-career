@@ -26,6 +26,12 @@ FROM node:22-bookworm-slim AS runtime
 
 WORKDIR /app
 
+# curl for compose healthcheck (CMD curl …) — avoids zombie pile-ups from
+# `node -e fetch(...)` every 10s under Docker CMD-SHELL.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY deploy/world-runtime/package.json deploy/world-runtime/package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 

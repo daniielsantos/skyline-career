@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **9e08762** / desktop **0.3.79** shipped: Download and install desktop updates from the topbar button. Release: [v0.3.79](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.79).
+
+
 `main` **f54e247** / desktop **0.3.78** shipped: Enable GA/TP charter seats and show Pax on Airframes/Hangar cards. Release: [v0.3.78](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.78).
 
 

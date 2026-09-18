@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **72199de** / desktop **0.3.85** shipped: Fix PG hub history query rejecting MAX_SAFE_INTEGER untilDay. Release: [v0.3.85](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.85).
+
+
 `main` **b601b36** / desktop **0.3.84** shipped: Port hub economy samples to Postgres and expose intl formation on Pulse. Release: [v0.3.84](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.84).
 
 

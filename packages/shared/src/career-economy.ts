@@ -3059,9 +3059,13 @@ export const CAREER_CARGO_CORRIDORS: ReadonlyArray<{
 export const INTERNATIONAL_CORRIDOR_WEIGHT = 2.0;
 /** Pay distance bias for cross-country lots when route nm is unavailable. */
 export const INTERNATIONAL_DISTANCE_BIAS = 1.55;
-/** Extra lot lifetime for long-haul international freights. */
-/** Intl lot life vs domestic — longer shelf retention without more form/tick. */
+/** Extra lot lifetime for long-haul international freights (dial A 2026-09-18). */
 export const INTERNATIONAL_LIFE_MULT = 1.55;
+/**
+ * Extra open lots per OD×SKU on intl formation only (dial B 2026-09-18).
+ * Stacks on the corridor weight ≥1.8 bonus inside tryFormPair.
+ */
+export const INTL_LANE_MAX_LOTS_BONUS = 1;
 
 /**
  * Freight board pay (2026-08-20+): living arbitrage + haul, with hard total
@@ -10117,8 +10121,9 @@ export function computeIntlFormationDiag(
         originLevel: origin.level,
         destLevel: dest.level,
       });
-      // Intl cw ≥ INTERNATIONAL_CORRIDOR_WEIGHT (2) → same +1 as formLotsIntl.
-      caps.maxLots += 1;
+      // Intl cw ≥ INTERNATIONAL_CORRIDOR_WEIGHT (2) → same +1 as formLotsIntl,
+      // plus INTL_LANE_MAX_LOTS_BONUS (dial B).
+      caps.maxLots += 1 + INTL_LANE_MAX_LOTS_BONUS;
       caps.maxLarge += 1;
       const key = laneKey(commodity.id, oIcao, dIcao);
       const satPenalty = laneSat >= 0.5 ? 1 : 0;
@@ -10864,6 +10869,9 @@ function* formLotsFromImbalances(
     if (cw >= 1.8) {
       caps.maxLots += 1;
       caps.maxLarge += 1;
+    }
+    if (opts.international) {
+      caps.maxLots += INTL_LANE_MAX_LOTS_BONUS;
     }
     const laneSat =
       opts.precomputedLaneSat ??

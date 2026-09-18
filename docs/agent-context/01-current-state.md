@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **3d8a690** / desktop **0.3.101** shipped: Pass --updated to NSIS Setup so in-app installs skip the running-app dialog. Release: [v0.3.101](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.101).
+
+
 `main` **9faf88f** / desktop **0.3.100** shipped: Restore direct Setup spawn for desktop updates and drop delay scripts. Release: [v0.3.100](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.100).
 
 

@@ -20,7 +20,7 @@ Electron shell around the local Career API + static UI.
 Settings → **Updates** (desktop only) or the topbar **Update** pill:
 
 1. App checks GitHub Releases on startup (silent).
-2. **Download** → **Install** opens the one-click Setup **with a visible progress window** (no `/S` — quiet install hid SmartScreen failures), then closes the app shortly after.
+2. **Download** → **Install** opens the one-click Setup **with a visible progress window** (no `/S`), passing `--updated --force-run` so NSIS waits/closes the running app instead of the “still running” dialog, then Airframe relaunches.
 3. If Windows warns (unsigned), choose **More info → Run anyway**; watch the installer until it finishes — Airframe should reopen.
 4. Player saves in AppData are kept across updates.
 

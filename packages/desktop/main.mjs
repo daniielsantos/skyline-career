@@ -624,14 +624,14 @@ function registerIpc() {
     // Unsigned NSIS: do NOT pass /S. Quiet spawn often dies behind SmartScreen
     // with the app already gone and no progress UI. Visible one-click Setup
     // still skips the Next/Next wizard but shows progress + SmartScreen.
-    // /S (Cursor-silent) needs Authenticode — not enabled yet.
-    // Delay scripts (cmd ping / VBS) broke updates on Win11 Job Object — spawn
-    // Setup first, then quit shortly after.
+    // --updated: NSIS skips the "app is running" MessageBox and waits/kills
+    // (same flags electron-updater.quitAndInstall uses, minus /S).
+    // --force-run: relaunch Airframe after install finishes.
     logLine(
       `[desktop] launching update installer (visible one-click): ${installerPath}`,
     );
     try {
-      spawn(installerPath, [], {
+      spawn(installerPath, ['--updated', '--force-run'], {
         detached: true,
         stdio: 'ignore',
         windowsHide: false,

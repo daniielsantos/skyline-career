@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Desktop update `--updated`** — spawn Setup com `--updated --force-run` (como electron-updater, sem `/S`). NSIS trata como update: espera/fecha o app sem MessageBox de corrida. Detail: `packages/desktop/README.md`.
+
 Atualizado 2026-09-18: **Desktop update spawn Setup first** — revert cmd-ping/VBS delay (Job Object matava o sleeper; update não abria). Volta a `spawn(Setup)` + `quit` ~800ms. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-18: **Intl gateway slots 12/teto 12** — `ceil(hubs/12)`∈[2,12] p/ regionais entrarem no grafo (BR ~8+). Detail: [`08-economy.md`](./08-economy.md).

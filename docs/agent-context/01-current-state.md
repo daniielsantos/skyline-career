@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **18c9a74** / desktop **0.3.95** shipped: Form regional intl lots first and stop wallet \ flashes on +Nd. Release: [v0.3.95](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.95).
+
+
 `main` **d7a52f2** / desktop **0.3.94** shipped: Prefer regional intl lanes and show the update installer UI. Release: [v0.3.94](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.94).
 
 

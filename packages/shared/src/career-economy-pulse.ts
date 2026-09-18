@@ -663,6 +663,24 @@ function buildNotes(
         `INTL formation: ${intlForm.skusWithNoMatchableLane} SKU(s) with 0 matchable lanes`,
       );
     }
+    const r = intlForm.rejects;
+    if (r && r.dirsTried > 0) {
+      const ranked = (
+        [
+          ['priceGap', r.rejectPriceGap],
+          ['feederFloor', r.rejectFeederFloor],
+          ['laneSat', r.rejectLaneSat],
+          ['maxLots', r.rejectMaxLots],
+          ['capacity', r.rejectCapacity],
+        ] as Array<[string, number]>
+      ).sort((a, b) => b[1] - a[1]);
+      const top = ranked[0];
+      if (top && top[1] > 0) {
+        notes.push(
+          `INTL formation rejects: ${top[0]} ${top[1]}/${r.dirsTried} · eligible ${r.eligible}`,
+        );
+      }
+    }
   }
 
   if (pulse.availableLots > 0) {

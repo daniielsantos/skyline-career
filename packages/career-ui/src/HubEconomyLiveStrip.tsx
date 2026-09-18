@@ -282,6 +282,26 @@ export function HubEconomyLiveStrip(props: {
                   .join(' · ')
               : null}
           </span>
+          {pulse.intlFormation?.rejects &&
+          pulse.intlFormation.rejects.dirsTried > 0 ? (
+            <span className="muted">
+              {(() => {
+                const r = pulse.intlFormation.rejects;
+                const ranked: Array<[string, number]> = [
+                  ['gap', r.rejectPriceGap],
+                  ['feeder', r.rejectFeederFloor],
+                  ['sat', r.rejectLaneSat],
+                  ['maxLots', r.rejectMaxLots],
+                  ['cap', r.rejectCapacity],
+                ].sort((a, b) => b[1] - a[1]);
+                const top = ranked.filter(([, n]) => n > 0).slice(0, 2);
+                const topTxt = top
+                  .map(([k, n]) => `${k} ${n}`)
+                  .join(' · ');
+                return `dirs ${r.dirsTried} · eligible ${r.eligible}${topTxt ? ` · ${topTxt}` : ''}`;
+              })()}
+            </span>
+          ) : null}
         </div>
         <div className="hub-pulse-live-card">
           <span className="muted">NPC fleet</span>

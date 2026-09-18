@@ -92,6 +92,17 @@ describe('computeEconomyPulse', () => {
       pulse.intlFormation.lanesMatchablePct >= 0 &&
         pulse.intlFormation.lanesMatchablePct <= 1,
     );
+    assert.ok(pulse.intlFormation.rejects);
+    assert.ok(pulse.intlFormation.rejects.dirsTried >= 0);
+    assert.ok(
+      pulse.intlFormation.rejects.eligible +
+        pulse.intlFormation.rejects.rejectPriceGap +
+        pulse.intlFormation.rejects.rejectFeederFloor +
+        pulse.intlFormation.rejects.rejectLaneSat +
+        pulse.intlFormation.rejects.rejectMaxLots +
+        pulse.intlFormation.rejects.rejectCapacity ===
+        pulse.intlFormation.rejects.dirsTried,
+    );
     assert.equal(
       pulse.internationalLanes.day,
       Math.floor(world.tick / TICKS_PER_DAY),

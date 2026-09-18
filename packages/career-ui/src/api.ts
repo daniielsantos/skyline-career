@@ -1992,6 +1992,15 @@ export type IntlFormationDiagView = {
   skipAllByKg: boolean;
   skipAllByCountSkus: number;
   skusWithNoMatchableLane: number;
+  rejects: {
+    dirsTried: number;
+    rejectPriceGap: number;
+    rejectFeederFloor: number;
+    rejectLaneSat: number;
+    rejectMaxLots: number;
+    rejectCapacity: number;
+    eligible: number;
+  };
   commodities: Array<{
     commodityId: string;
     availableLots: number;

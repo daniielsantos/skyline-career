@@ -9871,6 +9871,21 @@ export type IntlFormationCommodityDiag = {
   matchableLanes: number;
 };
 
+/**
+ * Directed surplus→shortage attempts vs formLotsIntl / tryFormPair cheap gates.
+ * First-fail wins (same short-circuit order as tryIntlDir + capacity/maxLots).
+ */
+export type IntlFormationRejects = {
+  dirsTried: number;
+  rejectPriceGap: number;
+  rejectFeederFloor: number;
+  rejectLaneSat: number;
+  rejectMaxLots: number;
+  rejectCapacity: number;
+  /** Passed gates above — deeper tryFormPair body could still no-op. */
+  eligible: number;
+};
+
 export type IntlFormationDiag = {
   lanesActive: number;
   /** Unique undirected ODs in the daily graph. */
@@ -9884,6 +9899,7 @@ export type IntlFormationDiag = {
   skipAllByKg: boolean;
   skipAllByCountSkus: number;
   skusWithNoMatchableLane: number;
+  rejects: IntlFormationRejects;
   commodities: IntlFormationCommodityDiag[];
 };
 
@@ -9894,7 +9910,12 @@ export function computeIntlFormationDiag(
   const lanes = world.internationalLanes ?? [];
   const lanesActive = lanes.length;
   const endpointIcaos = new Set<string>();
-  const normLanes: Array<{ a: string; b: string; odKey: string }> = [];
+  const normLanes: Array<{
+    a: string;
+    b: string;
+    odKey: string;
+    capacityKgPerDay: number;
+  }> = [];
   const seenOd = new Set<string>();
   for (const lane of lanes) {
     const a = lane.originIcao.trim().toUpperCase();
@@ -9905,7 +9926,12 @@ export function computeIntlFormationDiag(
     const odKey = a < b ? `${a}|${b}` : `${b}|${a}`;
     if (seenOd.has(odKey)) continue;
     seenOd.add(odKey);
-    normLanes.push({ a, b, odKey });
+    normLanes.push({
+      a,
+      b,
+      odKey,
+      capacityKgPerDay: Math.max(0, lane.capacityKgPerDay ?? 0),
+    });
   }
 
   const endpoints = (world.airports ?? []).filter((ap) =>
@@ -9914,8 +9940,24 @@ export function computeIntlFormationDiag(
 
   let boardKgOpen = 0;
   const lotsByCommodity = new Map<CommodityId, number>();
+  const activeCounts = new Map<string, number>();
+  const activeLaneKgByOd = new Map<string, number>();
   for (const lot of world.lots ?? []) {
-    // Match countAvailableLots / commodityBoardBloated (available only).
+    if (
+      lot.status === 'available' ||
+      lot.status === 'reserved' ||
+      lot.status === 'in_transit'
+    ) {
+      const o = lot.originIcao.trim().toUpperCase();
+      const d = lot.destIcao.trim().toUpperCase();
+      const key = laneKey(lot.commodityId, o, d);
+      activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
+      const odKey = o < d ? `${o}|${d}` : `${d}|${o}`;
+      activeLaneKgByOd.set(
+        odKey,
+        (activeLaneKgByOd.get(odKey) ?? 0) + Math.max(0, lot.quantityKg ?? 0),
+      );
+    }
     if (lot.status !== 'available') continue;
     if (lotBoardPartition(lot, countryByIcao) !== INTL_BOARD_PARTITION) {
       continue;
@@ -9931,13 +9973,34 @@ export function computeIntlFormationDiag(
   const boardKgTarget = partitionBoardKgTarget(world, INTL_BOARD_PARTITION);
   const skipAllByKg = boardKgOpen >= boardKgTarget;
   const quota = intlCommodityQuota();
+  const laneIndex = ensureLaneInboundIndex(world);
+
+  const rejects: IntlFormationRejects = {
+    dirsTried: 0,
+    rejectPriceGap: 0,
+    rejectFeederFloor: 0,
+    rejectLaneSat: 0,
+    rejectMaxLots: 0,
+    rejectCapacity: 0,
+    eligible: 0,
+  };
 
   const matchableOdAnySku = new Set<string>();
   const commodities: IntlFormationCommodityDiag[] = [];
 
+  type HubRow = {
+    fill: number;
+    price: number;
+    surplusKg: number;
+    roomKg: number;
+    tier: HubTier;
+    level: number;
+  };
+
   for (const commodity of CAREER_CARGO_COMMODITIES) {
     const surplus = new Set<string>();
     const shortage = new Set<string>();
+    const hubRow = new Map<string, HubRow>();
     for (const ap of endpoints) {
       const code = ap.icao.trim().toUpperCase();
       const stock = ap.inventory[commodity.id];
@@ -9949,6 +10012,15 @@ export function computeIntlFormationDiag(
       });
       const surplusKg = surplusKgAboveSoftOrigin(stock, soft);
       const roomKg = destRoomKg(stock, commodity.id);
+      const row: HubRow = {
+        fill,
+        price: localUnitPriceUsd(commodity.id, stock),
+        surplusKg,
+        roomKg,
+        tier: hubTierOf(ap),
+        level: ap.level ?? 1,
+      };
+      hubRow.set(code, row);
       if (
         isBulkSurplusOriginRow(
           world,
@@ -9963,14 +10035,65 @@ export function computeIntlFormationDiag(
 
     let matchableLanes = 0;
     for (const lane of normLanes) {
-      const ab =
-        surplus.has(lane.a) && shortage.has(lane.b);
-      const ba =
-        surplus.has(lane.b) && shortage.has(lane.a);
+      const ab = surplus.has(lane.a) && shortage.has(lane.b);
+      const ba = surplus.has(lane.b) && shortage.has(lane.a);
       if (ab || ba) {
         matchableLanes += 1;
         matchableOdAnySku.add(lane.odKey);
       }
+    }
+
+    // Same cheap gates as tryIntlDir + capacity/maxLots inside tryFormPair.
+    const minGap = commodity.basePricePerKg * 0.12;
+    const scoreDir = (oIcao: string, dIcao: string, capacityKgPerDay: number) => {
+      if (!surplus.has(oIcao) || !shortage.has(dIcao)) return;
+      const origin = hubRow.get(oIcao);
+      const dest = hubRow.get(dIcao);
+      if (!origin || !dest) return;
+      rejects.dirsTried += 1;
+      if (dest.price - origin.price < minGap) {
+        rejects.rejectPriceGap += 1;
+        return;
+      }
+      if (Math.min(origin.surplusKg, dest.roomKg) < FEEDER_LTL_MIN_KG) {
+        rejects.rejectFeederFloor += 1;
+        return;
+      }
+      const laneSat = Math.min(
+        1,
+        laneInboundKgFromIndex(laneIndex, oIcao, dIcao, commodity.id) /
+          LANE_SATURATION_KG,
+      );
+      if (laneSat >= 1) {
+        rejects.rejectLaneSat += 1;
+        return;
+      }
+      const caps = laneLotCaps(origin.tier, dest.tier, {
+        originLevel: origin.level,
+        destLevel: dest.level,
+      });
+      // Intl cw ≥ INTERNATIONAL_CORRIDOR_WEIGHT (2) → same +1 as formLotsIntl.
+      caps.maxLots += 1;
+      caps.maxLarge += 1;
+      const key = laneKey(commodity.id, oIcao, dIcao);
+      const satPenalty = laneSat >= 0.5 ? 1 : 0;
+      if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) {
+        rejects.rejectMaxLots += 1;
+        return;
+      }
+      if (capacityKgPerDay > 0) {
+        const odKey = oIcao < dIcao ? `${oIcao}|${dIcao}` : `${dIcao}|${oIcao}`;
+        if ((activeLaneKgByOd.get(odKey) ?? 0) >= capacityKgPerDay) {
+          rejects.rejectCapacity += 1;
+          return;
+        }
+      }
+      rejects.eligible += 1;
+    };
+
+    for (const lane of normLanes) {
+      scoreDir(lane.a, lane.b, lane.capacityKgPerDay);
+      scoreDir(lane.b, lane.a, lane.capacityKgPerDay);
     }
 
     const availableLots = lotsByCommodity.get(commodity.id) ?? 0;
@@ -10001,6 +10124,7 @@ export function computeIntlFormationDiag(
     skipAllByCountSkus: commodities.filter((c) => c.skipAllByCount).length,
     skusWithNoMatchableLane: commodities.filter((c) => c.matchableLanes === 0)
       .length,
+    rejects,
     commodities,
   };
 }

@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **4357450** / desktop **0.3.82** shipped: Polish Base tours and widen the dynamic intl lane graph. Release: [v0.3.82](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.82).
+
+
 `main` **1180398** / desktop **0.3.81** shipped: Add Base Charter Search (1-2 legs) like Freight tours. Release: [v0.3.81](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.81).
 
 

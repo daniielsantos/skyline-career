@@ -16,6 +16,8 @@ Atualizado 2026-08-31: UI — **Terminal inventory** (= stock Dry deste ICAO, n�
 
 Atualizado 2026-08-31: History table **4/page** + sort Day/Lots/Pay/Fill/Spot; chart **16.5rem** + viewBox alto (menos letterbox); labels no SVG só **High** (atual no header; range embaixo; tooltip nos dots).
 
+Atualizado 2026-09-18: **PG history `untilDay` sentinel** — `readHubEconomySamplesSinceFromPg` usava `Number.MAX_SAFE_INTEGER` quando `untilDay` omitido → Postgres `integer` rejeita (`9007199254740991 out of range`). Fix: omitir cláusula `day_index <=` sem until. Sintoma: Pulse Network history erro no VPS.
+
 Atualizado 2026-09-18: **Intl formation Live card** — `/api/debug/economy-pulse` inclui `intlFormation` (matchable OD %, kg vs target, skipAll flags). Card no Hub Pulse Live; Network history continua em `hub_economy_samples`.
 
 Atualizado 2026-09-18: **PG hub_economy_samples (v18)** — MP Pulse / Hub Stats history deixa de ser stub vazio. `pendingHubEconomySamples` flushea em `saveEconomy` e `persistNpcLiveWorld` (headless day boundary). API `readHubEconomySamples*` agora pode ser async.

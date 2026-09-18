@@ -341,15 +341,18 @@ export async function readHubEconomySamplesSinceFromPg(
     typeof opts.sinceDay === 'number' && Number.isFinite(opts.sinceDay)
       ? Math.max(0, Math.floor(opts.sinceDay))
       : 0;
-  const untilDay =
-    typeof opts.untilDay === 'number' && Number.isFinite(opts.untilDay)
-      ? Math.floor(opts.untilDay)
-      : Number.MAX_SAFE_INTEGER;
+  // Do not bind Number.MAX_SAFE_INTEGER — Postgres INTEGER max is 2^31-1.
+  const params: unknown[] = [worldId, sinceDay];
+  let untilSql = '';
+  if (typeof opts.untilDay === 'number' && Number.isFinite(opts.untilDay)) {
+    untilSql = ' AND day_index <= $3';
+    params.push(Math.floor(opts.untilDay));
+  }
   const result = await pool.query(
     `SELECT * FROM hub_economy_samples
-     WHERE world_id = $1 AND day_index >= $2 AND day_index <= $3
+     WHERE world_id = $1 AND day_index >= $2${untilSql}
      ORDER BY day_index ASC, icao ASC`,
-    [worldId, sinceDay, untilDay],
+    params,
   );
   return result.rows
     .map((row) => sampleFromPgRow(row as Record<string, unknown>))

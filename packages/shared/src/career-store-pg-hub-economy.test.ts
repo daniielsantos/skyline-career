@@ -65,4 +65,31 @@ describe('career-store-pg-hub-economy', () => {
     assert.equal(typeof readHubEconomySamplesFromPg, 'function');
     assert.equal(typeof readHubEconomySamplesSinceFromPg, 'function');
   });
+
+  it('omits untilDay bind so Postgres INTEGER never sees MAX_SAFE_INTEGER', async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const fakePool = {
+      query: async (sql: string, params?: unknown[]) => {
+        calls.push({ sql, params: params ?? [] });
+        return { rows: [] };
+      },
+    };
+    await readHubEconomySamplesSinceFromPg(fakePool as never, {
+      sinceDay: 10,
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]!.params.length, 2);
+    assert.equal(calls[0]!.params[1], 10);
+    assert.ok(!calls[0]!.sql.includes('day_index <='));
+    assert.ok(!calls[0]!.params.includes(Number.MAX_SAFE_INTEGER));
+
+    await readHubEconomySamplesSinceFromPg(fakePool as never, {
+      sinceDay: 10,
+      untilDay: 20,
+    });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1]!.params.length, 3);
+    assert.equal(calls[1]!.params[2], 20);
+    assert.ok(calls[1]!.sql.includes('day_index <='));
+  });
 });

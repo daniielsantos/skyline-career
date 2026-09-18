@@ -64,13 +64,21 @@ jobs:
         with:
           ref: ${{ steps.source.outputs.ref }}
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Skip docs-only image builds
+      - name: Skip docs-only / release-duplicate image builds
         id: gate
         if: github.event_name == 'workflow_run'
         shell: bash
         run: |
           set -Eeuo pipefail
+          # Bump push + published release both fire this workflow. Release already
+          # built+deployed; do not rebuild the same SHA from workflow_run.
+          if git tag --points-at HEAD | grep -qE '^v[0-9]'; then
+            echo "build=false" >>"$GITHUB_OUTPUT"
+            echo "HEAD has v* tag — skipping duplicate image (release owns deploy)."
+            exit 0
+          fi
           files="$(git diff --name-only HEAD^ HEAD 2>/dev/null || true)"
           if [[ -z "$files" ]]; then
             echo "build=true" >>"$GITHUB_OUTPUT"

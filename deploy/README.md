@@ -13,6 +13,9 @@ Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
   (`sha-<commit>` + `v*` + `main`) and promotes to the VPS after Environment
   approval. It does not wait on a sibling `workflow_run` — that race froze
   releases when a follow-up push cancelled CI for the bump SHA.
+- After a release bump, the follow-up `workflow_run` on that same SHA **skips**
+  the image build when `HEAD` already has a `v*` tag (avoids a duplicate
+  rebuild; production deploy still only runs on `release` / dispatch).
 - CI ignores `docs/agent-context/**` and `.cursor/**` so handoff-note commits
   do not rebuild the World image. `release:desktop --bump` writes the
   `01-current-state.md` line in the same bump commit.

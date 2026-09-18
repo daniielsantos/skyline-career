@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **World deploy skip duplicate on release SHA** — `workflow_run` após CI do bump não rebuilda se `HEAD` já tem tag `v*` (release `on: release` já buildou+deployou). Deploy production inalterado.
+
 Atualizado 2026-09-18: **Intl formation Pulse diag** — medir bind (matchable OD / skipAll kg|count) no Live pulse antes de retunar soft share. Card em Hub Pulse. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **PG hub_economy_samples (schema v18)** — Pulse Network history deixa de ser stub no MP; flush no day boundary via `persistNpcLive` + full save. Detail: [`19-hub-stats.md`](./19-hub-stats.md).

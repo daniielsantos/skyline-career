@@ -147,7 +147,7 @@ export function DispatchRouteCard(props: {
               <p>
                 No navlog coordinates on this OFP. SimBrief only sends fix
                 lat/lon when <strong>Detailed Navlog</strong> is enabled at
-                generation. Re-open SimBrief (Skyline now forces that option),
+                generation. Re-open SimBrief (Airframe now forces that option),
                 generate the OFP again, then load navlog.
               </p>
               {props.canRefreshNavlog && props.onRefreshNavlog ? (

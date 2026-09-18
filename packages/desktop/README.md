@@ -1,13 +1,13 @@
-# Skyline Career — desktop
+# Airframe Career — desktop
 
 Electron shell around the local Career API + static UI.
 
 ## Player install
 
-1. Download **`SkylineCareer-Setup-x.y.z.exe`** from [GitHub Releases](https://github.com/daniielsantos/skyline-career/releases).
+1. Download **`Airframe-Setup-x.y.z.exe`** from [GitHub Releases](https://github.com/daniielsantos/skyline-career/releases).
 2. Run the installer (Windows may warn — builds are **not code-signed** yet; choose More info → Run anyway).
-3. Launch **Skyline Career** from the Start Menu / desktop shortcut.
-4. Create a profile and play. Saves live under `%AppData%\Skyline Career\`.
+3. Launch **Airframe Career** from the Start Menu / desktop shortcut.
+4. Create a profile and play. Saves live under `%AppData%\Skyline Career\` (legacy folder until migrator).
 
 ### Prerequisites
 
@@ -44,7 +44,7 @@ npm run pack:desktop
 
 Produces under `artifacts/skyline-desktop/`:
 
-- `SkylineCareer-Setup-<version>.exe` — **real NSIS installer** (required)
+- `Airframe-Setup-<version>.exe` — **real NSIS installer** (required)
 - `latest.yml` — auto-update metadata for electron-updater
 - `win-unpacked/` — debug folder
 
@@ -64,7 +64,7 @@ electron-builder runs an unsigned temp installer to extract the uninstaller; Win
 
 ```powershell
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\electron-builder\Cache\winCodeSign" -ErrorAction SilentlyContinue
-# Close Skyline Career if it is running, then:
+# Close Airframe Career if it is running, then:
 npm run pack:desktop
 ```
 
@@ -93,7 +93,7 @@ Guardrails:
 - Refuses if tag/release `vX.Y.Z` already exists
 - Refreshes remote tags and pins the release tag to the published HEAD commit
 
-Assets uploaded: `SkylineCareer-Setup-<ver>.exe`, `latest.yml`, and `.blockmap` when present. Release notes are generated from commits since the previous `v*` tag and include a smoke checklist.
+Assets uploaded: `Airframe-Setup-<ver>.exe`, `latest.yml`, and `.blockmap` when present. Release notes are generated from commits since the previous `v*` tag and include a smoke checklist.
 
 ### Manual fallback
 
@@ -101,9 +101,9 @@ Assets uploaded: `SkylineCareer-Setup-<ver>.exe`, `latest.yml`, and `.blockmap` 
 npm run pack:desktop
 $ver = (Get-Content packages/desktop/package.json | ConvertFrom-Json).version
 gh release create "v$ver" `
-  --title "Skyline Career $ver" `
+  --title "Airframe Career $ver" `
   --notes-file "artifacts/skyline-desktop/RELEASE_NOTES_$ver.md" `
-  "artifacts/skyline-desktop/SkylineCareer-Setup-$ver.exe" `
+  "artifacts/skyline-desktop/Airframe-Setup-$ver.exe" `
   "artifacts/skyline-desktop/latest.yml"
 ```
 

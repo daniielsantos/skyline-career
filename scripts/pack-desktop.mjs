@@ -382,7 +382,7 @@ async function buildElectron() {
   // Remove previous tiny/broken Setup leftovers so we never ship a 185KB stub.
   try {
     for (const name of await readdir(outDir)) {
-      if (!/^SkylineCareer.*\.(exe|yml|blockmap)$/i.test(name)) continue;
+      if (!/^(SkylineCareer|Airframe).*\.(exe|yml|blockmap)$/i.test(name)) continue;
       const full = join(outDir, name);
       try {
         const { stat } = await import('node:fs/promises');
@@ -498,11 +498,11 @@ async function buildElectron() {
   const desktopPkgJson = JSON.parse(
     await readFile(join(desktopPkg, 'package.json'), 'utf8'),
   );
-  const expectedSetup = `SkylineCareer-Setup-${desktopPkgJson.version}.exe`;
+  const expectedSetup = `Airframe-Setup-${desktopPkgJson.version}.exe`;
   const setup =
     names.find((n) => n.toLowerCase() === expectedSetup.toLowerCase()) ||
     names
-      .filter((n) => /^SkylineCareer-Setup-.*\.exe$/i.test(n))
+      .filter((n) => /^(Airframe-Setup|SkylineCareer-Setup)-.*\.exe$/i.test(n))
       .sort()
       .at(-1);
   if (!setup) {

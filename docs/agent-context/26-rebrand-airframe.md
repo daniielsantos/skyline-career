@@ -1,6 +1,6 @@
 # Rebranding — Skyline Career → Airframe
 
-Marca pública / domínio: **Airframe** (`playairframe.com`). Produto desktop ainda diz **Skyline Career** até a fase visual.
+Marca pública / domínio: **Airframe** (`playairframe.com`). Desktop display: **Airframe Career**; AppData/`appId` ainda legado Skyline.
 
 Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo.
 
@@ -28,16 +28,59 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - [x] Logo AIR|FRAME hero: `packages/career-ui/src/assets/brand/airframe-hero-lockup.png` (arquivo Skyline mantido)
 - [x] `BrandMark` `variant="hero"` → Airframe (AuthGate / ProfileGate / PlayModeGate / WorldWaitingGate)
 - [x] Hero no painel: inset + `mix-blend-mode: lighten` (sem slab); FRAME `#f0a35a`
-- [ ] Compact sidebar ainda **SKYLINE** (texto CSS + `md11f-mark`)
-- [ ] Ícones installer + Start Menu display name
-- [ ] Copy UI: “Skyline Career” → “Airframe” (ou “Airframe Career”)
-- [ ] Setup exe name (ex. `Airframe-Setup-…`) + `latest.yml` channel
+- [x] Compact sidebar **AIR|FRAME** (texto CSS + `md11f-mark`)
+- [x] Display name desktop → **Airframe Career** (productName / Setup / Start Menu / window)
+- [x] `userData` pin em `%APPDATA%\Skyline Career` + `appId` `com.skyline.career` intactos
+- [x] Setup artifact → `Airframe-Setup-…exe`
+- [x] Copy UI visível → Airframe (inject, help, hubs, updates, `index.html` title, SimBridge session names)
+- [x] Ícone installer: mantém MD-11F (`packages/desktop/build/icon.ico`)
+- [ ] IDs internos (`skylineDesktop`, `X-Skyline-*`, localStorage `skyline.*`, CSS `.skyline-inject-*`) — legado OK
+
+### Auditoria copy UI (2026-09-17)
+
+**Mudou (jogador vê):** inject label/toasts/status; page-help; Market/Map blurbs; sidebar fallback name; placeholders; DesktopUpdates; AircraftCards homologation; PayloadLab; DispatchRouteCard; `index.html`; bridge `open('Airframe Career UI …')`.
+
+**Ficou (interno / API):** `window.skylineDesktop`, headers `X-Skyline-*`, keys `skyline.*`, classes CSS, nomes de props `skylineInjectEnabled`.
 
 ### Diagnóstico UI (2026-09-17)
 
 - **Sintoma:** login parece card dentro de card / sem degrade / FRAME “outra cor”.
 - **Causa:** full-bleed do PNG cobria o gradient do `.panel.profile-gate`; laranja gerado ≠ LINE/accent `#f0a35a`. Sidebar nunca mudou.
 - **Fix:** hero inset; PNG field `#000` + `mix-blend-mode: lighten` (degrade do panel aparece; sem retângulo); FRAME → `#f0a35a`; rebuild `career-ui` dist.
+
+## Auditoria de nomes (2026-09-17)
+
+### Desktop — display (feito 2026-09-17)
+
+| Onde | Agora |
+|------|------|
+| `productName` / `executableName` / `shortcutName` | Airframe Career |
+| `artifactName` | `Airframe-Setup-…` |
+| `afterPack.cjs` / window / dialogs | Airframe Career |
+| `userData` | pin `%APPDATA%\Skyline Career` |
+| `appId` | `com.skyline.career` (legado) |
+
+### Desktop — **não** no mesmo PR (quebra saves/updates)
+
+| Onde | Hoje | Risco |
+|------|------|-------|
+| `appId` | `com.skyline.career` | updates / AUMID |
+| `userData` via `app.setName` | `%APPDATA%\Skyline Career` | saves |
+| npm `name` | `skyline-career-desktop` | workspace only |
+| `extraResources` → `skyline/` | path interno | pack scripts |
+| GitHub `repo` | `skyline-career` | publish URL OK |
+
+### UI copy (depois do display name)
+
+Strings “Skyline inject”, “Skyline hubs”, placeholder “Ada Skyline”, etc. em `career-ui` — passe separado.
+
+### Plano display name
+
+1. [x] Display → **Airframe Career** (installer, Start Menu, Task Manager title).
+2. [x] Manter `appId` + **pin** `app.setPath('userData', …\Skyline Career)` até Fase 3 migrator.
+3. [x] Setup artifact → `Airframe-Setup-${version}.exe` (updater lê `latest.yml`; OK no próximo release).
+
+Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anterior pode ficar em `…\Skyline Career`).
 
 ## Fase 3 — paths / ids (migrar com cuidado)
 

@@ -211,7 +211,7 @@ export async function runMissionPreflight(
   );
   return withSimBridgeExclusive(async () => {
   try {
-    await bridge.open('Skyline Career UI Preflight');
+    await bridge.open('Airframe Career UI Preflight');
     const identity = await bridge.getAircraftIdentity();
     const liveTitle = normalizeAircraftTitle(identity.title ?? '');
     let ofp = ofpBase;

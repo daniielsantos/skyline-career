@@ -34,10 +34,10 @@ async function embedWindowsExeBranding(context) {
   await rcedit(exe, {
     icon,
     'version-string': {
-      CompanyName: 'Skyline Career',
-      FileDescription: 'Skyline Career',
-      ProductName: 'Skyline Career',
-      LegalCopyright: 'Copyright © Skyline Career',
+      CompanyName: 'Airframe Career',
+      FileDescription: 'Airframe Career',
+      ProductName: 'Airframe Career',
+      LegalCopyright: 'Copyright © Airframe Career',
       OriginalFilename: `${productFilename}.exe`,
     },
     'file-version': version,

@@ -1446,7 +1446,7 @@ function AirframeAddonInfo(props: {
             </h2>
             <div className="confirm-body">
               <p>
-                Skyline Load and Watch are homologated for these store
+                Airframe Load and Watch are homologated for these store
                 products — not every livery pack with a similar name.
               </p>
               <ul className="aircraft-addon-list">

@@ -379,7 +379,7 @@ export function PayloadLabPanel(props: {
         <ol className="muted payload-lab-steps">
           <li>Load the aircraft in MSFS (solo, on ground).</li>
           <li>Start lab → Dispatch opens.</li>
-          <li>Open SimBrief → Accept OFP → Skyline inject → watch Due vs Sim.</li>
+          <li>Open SimBrief → Accept OFP → Airframe inject → watch Due vs Sim.</li>
           <li>Cancel the lab flight when finished (no settle).</li>
         </ol>
 

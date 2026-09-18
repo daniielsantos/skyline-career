@@ -140,11 +140,11 @@ body {
   color: var(--accent);
 }
 
-/* Horizon cuts SKY only — stops before LINE. */
+/* Horizon cuts AIR only — stops before FRAME. */
 .brand-mark-horizon {
   position: absolute;
   left: 0.06em;
-  width: 2.55em;
+  width: 2.35em;
   top: 48%;
   height: 0.09rem;
   color: var(--accent);

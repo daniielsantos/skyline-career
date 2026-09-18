@@ -1,6 +1,7 @@
 /**
  * Persisted SP vs MP choice for the Electron shell.
  * File: %APPDATA%/Skyline Career/career/desktop-play.json
+ * (legacy folder name; display brand is Airframe Career)
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';

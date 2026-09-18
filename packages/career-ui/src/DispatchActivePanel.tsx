@@ -829,7 +829,7 @@ export function DispatchActivePanel(props: {
                 ? 'Set your username in Settings, then open SimBrief from the primary action.'
                 : busy
                   ? 'Preparing the dispatch URL — SimBrief opens when this finishes.'
-                  : 'Generate the OFP in SimBrief. Skyline confirms automatically every few seconds while Dispatch is open — switch back here after Generate.'}
+                  : 'Generate the OFP in SimBrief. Airframe confirms automatically every few seconds while Dispatch is open — switch back here after Generate.'}
             </p>
           </div>
         </div>
@@ -1747,7 +1747,7 @@ export function DispatchActivePanel(props: {
                             const injectStatus =
                               injectFailed
                                 ? (props.loadOfpAutoError ??
-                                  'Inject failed — turn Skyline inject on to retry.')
+                                  'Inject failed — turn Airframe inject on to retry.')
                                 : props.loadOfpAutoStatus === 'loading'
                                   ? (props.loadOfpProgress?.message ??
                                     'Writing fuel + payload and balancing CG. Turn off to stop.')
@@ -1802,7 +1802,7 @@ export function DispatchActivePanel(props: {
                                   ? 'Turn off to cancel fuel/payload inject'
                                   : confirming
                                     ? 'Waiting for live sample — turn off to dismiss'
-                                  : 'Skyline inject is on — turn off to leave load as-is'
+                                  : 'Airframe inject is on — turn off to leave load as-is'
                                 : 'Turn on to write OFP fuel and payload into the sim'
                             }
                             onClick={() =>
@@ -1816,7 +1816,7 @@ export function DispatchActivePanel(props: {
                               <span className="skyline-inject-switch-knob" />
                             </span>
                             <span className="skyline-inject-switch-label">
-                              <strong>Skyline inject</strong>
+                              <strong>Airframe inject</strong>
                               <small>
                                 {injecting
                                   ? 'Writing…'

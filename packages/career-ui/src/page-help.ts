@@ -12,9 +12,9 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Freights (or a contract) become a flight here. Edit cargo if you need to change lots — then generate a new OFP.',
-      'Open SimBrief, accept the OFP, and Skyline sets Fuel and Payload Due from that plan — not from the klb on the contract tile.',
+      'Open SimBrief, accept the OFP, and Airframe sets Fuel and Payload Due from that plan — not from the klb on the contract tile.',
       'Load the aircraft in the addon EFB (or Inject when the airframe allows). Preflight is green when Sim matches Due.',
-      'Keep the aircraft EFB in LB (not kg) for Import / Apply — metric mode often mismatches Skyline Loaded vs Due.',
+      'Keep the aircraft EFB in LB (not kg) for Import / Apply — metric mode often mismatches Airframe Loaded vs Due.',
       'Cabin jets (Maddog, Fenix, JF): LOAD OFP / Import can overfill holds. Trim cargo to MZFW, Instant Load, then balance CG yourself.',
     ],
   },
@@ -57,7 +57,7 @@ export const PAGE_HELP = {
     title: 'How Airframes works',
     kicker: 'Page guide',
     bullets: [
-      'New, used, and lease prices are Skyline economy numbers — not real-world MSRP.',
+      'New, used, and lease prices are Airframe economy numbers — not real-world MSRP.',
       'Buy or lease into the Hangar. One Market card is a glass family (variants share the SKU).',
       'Condition and hours on used frames change what you pay and what MX will cost later.',
     ],
@@ -76,7 +76,7 @@ export const PAGE_HELP = {
     title: 'How Network works',
     kicker: 'Page guide',
     bullets: [
-      'Map of Skyline hubs. Open an airport to see that terminal’s stock, contracts, and fuel.',
+      'Map of Airframe hubs. Open an airport to see that terminal’s stock, contracts, and fuel.',
       'Bush and trip-only fields are on the map even when they do not form Market lots.',
     ],
   },
@@ -103,7 +103,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'SimBrief username, pounds vs kilos, Sound (voice / chime for preflight + settle), and local career prefs. This is not the aircraft EFB.',
-      'Weight units change how Skyline displays Due — the sim and OFP still use the aircraft’s native units.',
+      'Weight units change how Airframe displays Due — the sim and OFP still use the aircraft’s native units.',
     ],
   },
   airport: {

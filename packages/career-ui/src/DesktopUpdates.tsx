@@ -134,7 +134,7 @@ export function DesktopUpdatesCard() {
             ? 'You are on the latest release.'
             : status === 'checking'
               ? 'Checking GitHub Releases…'
-              : 'Checks GitHub Releases for a newer Skyline Career build. Builds are not code-signed yet — Windows SmartScreen may warn when installing updates.';
+              : 'Checks GitHub Releases for a newer Airframe Career build. Builds are not code-signed yet — Windows SmartScreen may warn when installing updates.';
 
   return (
     <div className="settings-card">

@@ -1182,7 +1182,7 @@ export async function readLiveResidualFuelKg(
 export async function probeLiveResidualFuelKg(pipeName?: string): Promise<number> {
   const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
   try {
-    await bridge.open('Skyline Career UI Settle Fuel Sync');
+    await bridge.open('Airframe Career UI Settle Fuel Sync');
     return await readLiveResidualFuelKg(bridge);
   } finally {
     try {
@@ -1272,7 +1272,7 @@ export async function probeLiveLandingFpm(
 ): Promise<number | undefined> {
   const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
   try {
-    await bridge.open('Skyline Career UI Settle Landing FPM');
+    await bridge.open('Airframe Career UI Settle Landing FPM');
     return await readLiveLandingFpm(bridge);
   } finally {
     try {
@@ -1288,7 +1288,7 @@ export async function probeLiveTouchdownPosition(
 ): Promise<{ lat: number; lon: number } | undefined> {
   const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
   try {
-    await bridge.open('Skyline Career UI Settle Touchdown Pos');
+    await bridge.open('Airframe Career UI Settle Touchdown Pos');
     return await readLiveTouchdownPosition(bridge);
   } finally {
     try {
@@ -1341,7 +1341,7 @@ export async function probeFirstContactPosition(pipeName?: string): Promise<
 > {
   const bridge = new NamedPipeSimBridge(pipeName ? { pipeName } : {});
   try {
-    await bridge.open('Skyline Career UI Settle First Contact');
+    await bridge.open('Airframe Career UI Settle First Contact');
     const [simTd, planeNow, headingTrueDeg] = [
       await readLiveTouchdownPosition(bridge),
       await readLivePlanePosition(bridge),
@@ -1879,7 +1879,7 @@ export class CareerWatchSession {
     });
     try {
       await withSimBridgeExclusive(async () => {
-        await bridge.open('Skyline Career UI Watch');
+        await bridge.open('Airframe Career UI Watch');
       });
     } catch (error) {
       this.missionId = null;
@@ -2142,7 +2142,7 @@ export class CareerWatchSession {
         });
         await withSimBridgeExclusive(async () => {
           await this.bridge!.open(
-            'Skyline Career UI Watch',
+            'Airframe Career UI Watch',
             forceSimConnectReset ? { resetSession: true } : {},
           );
         });
@@ -2152,7 +2152,7 @@ export class CareerWatchSession {
           force: true,
         });
         await withSimBridgeExclusive(async () => {
-          await this.bridge!.open('Skyline Career UI Watch', {
+          await this.bridge!.open('Airframe Career UI Watch', {
             resetSession: true,
           });
         });
@@ -2168,7 +2168,7 @@ export class CareerWatchSession {
               sessionHealthy: ping.sessionHealthy ?? null,
             });
             await withSimBridgeExclusive(async () => {
-              await this.bridge!.open('Skyline Career UI Watch', {
+              await this.bridge!.open('Airframe Career UI Watch', {
                 resetSession: true,
               });
             });

@@ -2,8 +2,8 @@
   "name": "skyline-career-desktop",
   "version": "0.3.76",
   "private": true,
-  "description": "Skyline Career desktop shell (Electron)",
-  "author": "Skyline Career",
+  "description": "Airframe Career desktop shell (Electron)",
+  "author": "Airframe Career",
   "type": "module",
   "main": "main.mjs",
   "scripts": {
@@ -19,9 +19,9 @@
   },
   "build": {
     "appId": "com.skyline.career",
-    "productName": "Skyline Career",
-    "executableName": "Skyline Career",
-    "copyright": "Copyright © Skyline Career",
+    "productName": "Airframe Career",
+    "executableName": "Airframe Career",
+    "copyright": "Copyright © Airframe Career",
     "electronVersion": "35.7.5",
     "afterPack": "./afterPack.cjs",
     "directories": {
@@ -83,7 +83,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "SkylineCareer-Setup-${version}.${ext}",
+      "artifactName": "Airframe-Setup-${version}.${ext}",
       "signAndEditExecutable": false,
       "forceCodeSigning": false
     },
@@ -93,16 +93,16 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Skyline Career",
+      "shortcutName": "Airframe Career",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "differentialPackage": false,
       "deleteAppDataOnUninstall": false,
-      "artifactName": "SkylineCareer-Setup-${version}.${ext}"
+      "artifactName": "Airframe-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "SkylineCareer-${version}-portable.exe"
+      "artifactName": "Airframe-${version}-portable.exe"
     },
     "asar": true
   }

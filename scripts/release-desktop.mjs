@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Release hygiene for Skyline Career desktop.
+ * Release hygiene for Airframe Career desktop.
  *
  * Default: pack current packages/desktop version → validate artifacts →
  * gh release create with Setup + latest.yml (+ blockmap) + commit notes.
@@ -138,7 +138,7 @@ function bumpSemver(version, kind) {
 }
 
 function printHelp() {
-  console.log(`Skyline Career — desktop release
+  console.log(`Airframe Career — desktop release
 
 Usage:
   npm run release:desktop -- [flags]
@@ -322,7 +322,7 @@ async function buildReleaseNotes(version, previousTag) {
     .filter(Boolean)
     .slice(0, 40);
   const lines = [
-    `## Skyline Career ${version}`,
+    `## Airframe Career ${version}`,
     '',
     'Desktop install + in-app auto-update (`latest.yml`).',
     '',
@@ -330,16 +330,16 @@ async function buildReleaseNotes(version, previousTag) {
     ...(commits.length ? commits : ['- (no commit messages since previous tag)']),
     '',
     '### Install',
-    `1. Download **SkylineCareer-Setup-${version}.exe**`,
+    `1. Download **Airframe-Setup-${version}.exe**`,
     '2. Run the installer (unsigned builds: More info → Run anyway)',
-    '3. Launch **Skyline Career** from Start Menu',
+    '3. Launch **Airframe Career** from Start Menu',
     '',
     '### Smoke checklist',
     '- [ ] Fresh install opens; profile create/select works',
     '- [ ] SimBridge connects with MSFS loaded',
     '- [ ] Short Dispatch hop: Watch → airborne → engines off → settle → debrief',
     '- [ ] Settings → Updates sees this release (from an older install)',
-    '- [ ] `%AppData%\\Skyline Career\\` profiles survive update',
+    '- [ ] `%AppData%\\Skyline Career\\` profiles survive update (legacy path until migrator)',
     '',
   ];
   return lines.join('\n');
@@ -351,7 +351,7 @@ function parseLatestYmlVersion(text) {
 }
 
 async function validateArtifacts(version) {
-  const setupName = `SkylineCareer-Setup-${version}.exe`;
+  const setupName = `Airframe-Setup-${version}.exe`;
   const setupPath = join(outDir, setupName);
   const latestPath = join(outDir, 'latest.yml');
 
@@ -388,6 +388,7 @@ async function validateArtifacts(version) {
   const blockmap = listing.find(
     (f) =>
       f === `${setupName}.blockmap` ||
+      f === `Airframe-Setup-${version}.exe.blockmap` ||
       f === `SkylineCareer-Setup-${version}.exe.blockmap`,
   );
 
@@ -480,7 +481,7 @@ async function main() {
     '',
     '═══ Release plan ═══',
     `  tag:      ${tag}`,
-    `  title:    Skyline Career ${version}`,
+    `  title:    Airframe Career ${version}`,
     `  previous: ${previousTag ?? '(none)'}`,
     `  draft:    ${flags.draft}`,
     `  dry-run:  ${flags.dryRun}`,
@@ -546,7 +547,7 @@ async function main() {
     tag,
     ...assetArgs,
     '--title',
-    `Skyline Career ${version}`,
+    `Airframe Career ${version}`,
     '--notes-file',
     notesPath,
     '--target',
@@ -562,11 +563,11 @@ async function main() {
   );
   console.log(`
 Smoke checklist (manual):
-  [ ] Install SkylineCareer-Setup-${version}.exe on a clean profile/VM
+  [ ] Install Airframe-Setup-${version}.exe on a clean profile/VM
   [ ] App opens; create/select profile
   [ ] SimBridge + short Dispatch flight → settle
   [ ] From an older install: Settings → Updates → download/install this build
-  [ ] Confirm AppData profiles survived
+  [ ] Confirm AppData profiles survived (%AppData%\\Skyline Career\\)
 `);
 }
 

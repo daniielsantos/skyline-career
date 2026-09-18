@@ -9947,7 +9947,7 @@ export function App() {
         // Keep status=failed so the Skyline inject switch stays visible for retry
         // (loadPath can be efb while injectCapable still allows Skyline inject).
         setLoadOfpAutoError(
-          'Inject failed — turn Skyline inject on to retry.',
+          'Inject failed — turn Airframe inject on to retry.',
         );
         setLoadOfpProgress(null);
       }
@@ -9956,7 +9956,7 @@ export function App() {
     if (!activeMission) return;
     if (!simBridge?.connected) {
       setToastKind('warn');
-      setToast('Start SimBridge before enabling Skyline inject');
+      setToast('Start SimBridge before enabling Airframe inject');
       return;
     }
     if (simBridge.onGround === false) {
@@ -11009,7 +11009,7 @@ export function App() {
       : tab === 'fleet'
         ? 'Competing freighters — idle, airborne, turnaround, shop MX, or crew rest.'
         : tab === 'aircraft'
-          ? 'New, used, and lease airframes priced to Skyline freights — not real-world MSRP.'
+          ? 'New, used, and lease airframes priced to Airframe freights — not real-world MSRP.'
           : tab === 'hangar'
             ? 'Your aircraft — ownership, condition, ferry, and maintenance.'
             : tab === 'pilot'
@@ -11017,7 +11017,7 @@ export function App() {
                 ? 'Company identity, fleet snapshot, and progression.'
                 : 'Register your name and home hub to start the career.'
               : tab === 'map'
-                ? 'Registered Skyline hubs on OpenFreeMap Dark (free public tiles).'
+                ? 'Registered Airframe hubs on OpenFreeMap Dark (free public tiles).'
                 : tab === 'ports'
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
                   : tab === 'missions'
@@ -11544,7 +11544,7 @@ export function App() {
           />
         ) : null}
         <div className="sidebar-footer">
-          <span className="who">{pilotName || 'Skyline'}</span>
+          <span className="who">{pilotName || 'Airframe'}</span>
           <span className="wallet">
             {careerStateReady ? formatMoney(wallet) : '…'}
           </span>
@@ -11889,7 +11889,7 @@ export function App() {
                   onChange={(e) => setSignupName(e.target.value)}
                   maxLength={40}
                   minLength={2}
-                  placeholder="e.g. Ada Skyline"
+                  placeholder="e.g. Ada Airframe"
                   disabled={busy}
                   autoComplete="nickname"
                   required
@@ -13652,7 +13652,7 @@ export function App() {
                       <div>
                         <h2>Trip-only strip</h2>
                         <p className="muted">
-                          No warehouse stock or demand here — Skyline keeps this
+                          No warehouse stock or demand here — Airframe keeps this
                           field for bush-trip routing (board temporarily
                           disabled).
                         </p>

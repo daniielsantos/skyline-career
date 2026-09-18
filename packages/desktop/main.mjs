@@ -1,8 +1,10 @@
 /**
- * Skyline Career desktop shell (Electron).
+ * Airframe Career desktop shell (Electron).
  * Starts Career API (+ optional SimBridgeHost), then opens a BrowserWindow.
  * SP (local SQLite) or MP gateway via desktop-play.json / CAREER_WORLD_API_URL.
  * Auto-update via electron-updater → GitHub Releases (no code signing yet).
+ *
+ * Display name is Airframe; appId + userData folder stay Skyline until Fase 3 migrator.
  */
 import { createRequire } from 'node:module';
 import {
@@ -46,8 +48,9 @@ function loadElectronUpdater() {
 
 const { autoUpdater } = loadElectronUpdater();
 
-// Branding: userData / Task Manager / Start Menu identity.
-app.setName('Skyline Career');
+// Display name (Task Manager / window). Keep legacy userData until Fase 3 migrator.
+app.setName('Airframe Career');
+app.setPath('userData', join(app.getPath('appData'), 'Skyline Career'));
 if (process.platform === 'win32') {
   app.setAppUserModelId('com.skyline.career');
 }
@@ -200,7 +203,7 @@ function isProtectedPortHolder(imageName) {
 
 /** Stale Skyline / Node API leftovers only. */
 function isSafeToKillForApiPort(imageName) {
-  return /^(node|electron|Skyline Career)\.exe$/i.test(imageName || '');
+  return /^(node|electron|Skyline Career|Airframe Career)\.exe$/i.test(imageName || '');
 }
 
 /**
@@ -553,11 +556,11 @@ function registerIpc() {
       buttons: ['Open installer', 'Cancel'],
       defaultId: 0,
       cancelId: 1,
-      title: 'Install Skyline update',
+      title: 'Install Airframe update',
       message: 'Windows may warn that the publisher is unknown.',
       detail:
         'On the next Windows dialog, choose More info → Run anyway.\n\n' +
-        'Finish the installer, then open Skyline Career from the Start Menu.\n\n' +
+        'Finish the installer, then open Airframe Career from the Start Menu.\n\n' +
         `Installer:\n${installerPath}`,
     });
     if (choice !== 0) return { ok: false, reason: 'cancelled' };
@@ -613,7 +616,7 @@ async function startCareerApi() {
   if (!tsxLoader) {
     throw new Error(
       `tsx runtime missing under ${join(root, 'node_modules', 'tsx')}. ` +
-        'Reinstall Skyline Career (pack must include skyline/node_modules).',
+        'Reinstall Airframe Career (pack must include skyline/node_modules).',
     );
   }
 
@@ -752,7 +755,7 @@ async function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 700,
-    title: 'Skyline Career',
+    title: 'Airframe Career',
     backgroundColor: '#0f1419',
     autoHideMenuBar: true,
     icon: (await pathExists(iconFile)) ? iconFile : undefined,
@@ -800,8 +803,8 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.whenReady().then(() => {
     dialog.showErrorBox(
-      'Skyline Career',
-      'Skyline Career is already running (or a previous launch did not exit cleanly).\n\nClose it from Task Manager (Skyline Career / SimBridgeHost), then try again.',
+      'Airframe Career',
+      'Airframe Career is already running (or a previous launch did not exit cleanly).\n\nClose it from Task Manager (Airframe Career / SimBridgeHost), then try again.',
     );
     app.quit();
   });
@@ -846,7 +849,7 @@ if (!gotLock) {
       const message = err instanceof Error ? err.message : String(err);
       logLine(`[desktop] startup failed: ${message}`);
       dialog.showErrorBox(
-        'Skyline Career',
+        'Airframe Career',
         `Failed to start.\n\n${message}\n\nSee logs under:\n${logDir}`,
       );
       shutdown();

@@ -773,7 +773,7 @@ async function probeSimBridgeStatusUnlocked(opts: {
   );
   return withSimBridgeExclusive(async () => {
   try {
-    await bridge.open('Skyline Career UI SimBridge Probe');
+    await bridge.open('Airframe Career UI SimBridge Probe');
     const ping = await bridge.ping();
     let aircraftTitle: string | null = null;
     try {
@@ -1004,7 +1004,7 @@ async function applyMissionOfpLoadExclusive(
       phase: 'planning',
       message: 'Opening a fresh SimConnect session…',
     });
-    await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+    await bridge.open('Airframe Career UI OFP Load', { resetSession: true });
     watchDebugLog('inject', 'simconnect session reset', {
       missionId: mission.id,
     });
@@ -1034,7 +1034,7 @@ async function applyMissionOfpLoadExclusive(
       watchDebugLog('inject', 'first read failed — reset SimConnect session', {
         error: resolveErr instanceof Error ? resolveErr.message : String(resolveErr),
       });
-      await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+      await bridge.open('Airframe Career UI OFP Load', { resetSession: true });
       resolved = await resolveInjectAircraft();
     }
 
@@ -1096,7 +1096,7 @@ async function applyMissionOfpLoadExclusive(
       watchDebugLog('inject', 'planning read failed — reset SimConnect session', {
         error: planErr instanceof Error ? planErr.message : String(planErr),
       });
-      await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+      await bridge.open('Airframe Career UI OFP Load', { resetSession: true });
       planningLive = await readPlanningLive();
     }
     const enginesRunning = await inferProbeEnginesRunning(
@@ -1584,7 +1584,7 @@ async function applyMissionOfpLoadExclusive(
       });
 
     const reconnectBridge = async (): Promise<void> => {
-      await bridge.open('Skyline Career UI OFP Load', { resetSession: true });
+      await bridge.open('Airframe Career UI OFP Load', { resetSession: true });
       engine = new DefaultProfileEngine({
         profile: resolved.profile,
         bridge,

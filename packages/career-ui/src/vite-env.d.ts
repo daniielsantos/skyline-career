@@ -30,6 +30,9 @@ type SkylineDesktopBridge = {
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string | null;
+    currentVersion?: string | null;
+    updateAvailable?: boolean;
+    downloaded?: boolean;
     reason?: string;
   }>;
   downloadUpdate: () => Promise<{ ok: boolean; reason?: string }>;

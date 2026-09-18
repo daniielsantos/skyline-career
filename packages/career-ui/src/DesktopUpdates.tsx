@@ -20,6 +20,9 @@ type SkylineDesktop = {
   checkForUpdates: () => Promise<{
     ok: boolean;
     version?: string | null;
+    currentVersion?: string | null;
+    updateAvailable?: boolean;
+    downloaded?: boolean;
     reason?: string;
   }>;
   downloadUpdate: () => Promise<{ ok: boolean; reason?: string }>;
@@ -81,6 +84,33 @@ function patchStore(partial: Partial<DesktopUpdateState>) {
   emitStore();
 }
 
+/** Semver-ish compare for desktop x.y.z (+ optional prerelease ignored). */
+export function isNewerDesktopVersion(
+  remote: string | null | undefined,
+  local: string | null | undefined,
+): boolean {
+  const parse = (raw: string | null | undefined) => {
+    const core = String(raw ?? '')
+      .trim()
+      .replace(/^v/i, '')
+      .split('-')[0]!
+      .split('+')[0]!;
+    const parts = core.split('.').map((p) => Number.parseInt(p, 10));
+    return [
+      Number.isFinite(parts[0]) ? parts[0]! : 0,
+      Number.isFinite(parts[1]) ? parts[1]! : 0,
+      Number.isFinite(parts[2]) ? parts[2]! : 0,
+    ] as const;
+  };
+  const a = parse(remote);
+  const b = parse(local);
+  for (let i = 0; i < 3; i++) {
+    if (a[i]! > b[i]!) return true;
+    if (a[i]! < b[i]!) return false;
+  }
+  return false;
+}
+
 function applyUpdateEvent(ev: DesktopUpdateEvent) {
   if (ev.type === 'checking') {
     if (
@@ -104,6 +134,20 @@ function applyUpdateEvent(ev: DesktopUpdateEvent) {
       storeState.status === 'downloading' ||
       storeState.status === 'ready'
     ) {
+      return;
+    }
+    // Stale GitHub CDN can claim "not available" right after a release while
+    // remote still equals the previous tag — only mark uptodate when remote
+    // is missing or not newer than installed.
+    if (
+      ev.version &&
+      isNewerDesktopVersion(ev.version, storeState.installedVersion)
+    ) {
+      patchStore({
+        status: 'available',
+        remoteVersion: ev.version,
+        error: null,
+      });
       return;
     }
     patchStore({
@@ -130,24 +174,70 @@ function applyUpdateEvent(ev: DesktopUpdateEvent) {
   }
 }
 
-async function runUpdateCheck(): Promise<void> {
+async function runUpdateCheck(opts?: { force?: boolean }): Promise<void> {
   const desktop = getDesktop();
   if (!desktop) return;
+  const force = opts?.force === true;
   if (
-    storeState.status === 'available' ||
-    storeState.status === 'downloading' ||
-    storeState.status === 'ready' ||
-    storeState.busy
+    !force &&
+    (storeState.status === 'available' ||
+      storeState.status === 'downloading' ||
+      storeState.status === 'ready' ||
+      storeState.busy)
   ) {
     return;
   }
   if (checkInFlight) return checkInFlight;
   checkInFlight = (async () => {
-    patchStore({ busy: true, error: null, status: 'checking' });
+    patchStore({ busy: true, error: null });
+    if (
+      storeState.status !== 'available' &&
+      storeState.status !== 'downloading' &&
+      storeState.status !== 'ready'
+    ) {
+      patchStore({ status: 'checking' });
+    }
     try {
+      const installed = await desktop.getVersion().catch(() => storeState.installedVersion);
+      if (installed && installed !== '…') {
+        patchStore({ installedVersion: installed });
+      }
       const result = await desktop.checkForUpdates();
-      if (!result.ok && result.reason && result.reason !== 'dev') {
-        patchStore({ status: 'error', error: result.reason });
+      if (!result.ok) {
+        if (result.reason && result.reason !== 'dev') {
+          patchStore({ status: 'error', error: result.reason });
+        }
+        return;
+      }
+      const remote = result.version ?? null;
+      const current = result.currentVersion ?? installed;
+      const newer =
+        result.updateAvailable === true ||
+        (remote != null && isNewerDesktopVersion(remote, current));
+      if (result.downloaded && newer && remote) {
+        patchStore({
+          status: 'ready',
+          remoteVersion: remote,
+          progressPct: 100,
+          error: null,
+        });
+      } else if (newer && remote) {
+        patchStore({
+          status: 'available',
+          remoteVersion: remote,
+          error: null,
+          progressPct: 0,
+        });
+      } else if (
+        storeState.status === 'checking' ||
+        storeState.status === 'idle' ||
+        force
+      ) {
+        patchStore({
+          status: 'uptodate',
+          remoteVersion: null,
+          error: null,
+        });
       }
     } catch (err) {
       patchStore({
@@ -226,7 +316,7 @@ export function DesktopUpdatesCard() {
   if (!desktop) return null;
 
   async function onCheck() {
-    await runUpdateCheck();
+    await runUpdateCheck({ force: true });
   }
 
   async function onDownload() {

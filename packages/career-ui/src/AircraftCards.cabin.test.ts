@@ -34,22 +34,23 @@ describe('aircraft cabin card copy', () => {
       }),
       {
         value: '4',
-        title: 'Passenger seats available for Charter',
+        title:
+          'Charter seat capacity on this cabin. Cargo kg is freight payload — this SKU has a single passenger config (no cargo glass switch).',
       },
     );
-    assert.equal(
-      formatMarketCharterSpec({
-        id: 'light_ga',
-        name: 'Titan',
-        msrpUsd: 0,
-        leaseMonthlyUsd: 0,
-        maxCargoKg: 0,
-        maxRangeNm: 0,
-        passengerSeats: 8,
-        dualLayout: true,
-      })?.value,
-      '8 · dual',
-    );
+    const dual = formatMarketCharterSpec({
+      id: 'light_ga',
+      name: 'Titan',
+      msrpUsd: 0,
+      leaseMonthlyUsd: 0,
+      maxCargoKg: 0,
+      maxRangeNm: 0,
+      passengerSeats: 8,
+      dualLayout: true,
+    });
+    assert.equal(dual?.value, '8 · dual');
+    assert.match(dual?.title ?? '', /not the Cargo kg payload line/i);
+    assert.match(dual?.title ?? '', /passenger glass/i);
   });
 
   it('formats Hangar active cabin and cargo charter block', () => {
@@ -61,19 +62,18 @@ describe('aircraft cabin card copy', () => {
       dualLayout: true,
       charterNeedsPassenger: true,
     };
-    assert.equal(
-      formatHangarCabinSpec(cargoBlocked)?.value,
-      'cargo · needs pax',
-    );
-    assert.equal(
-      formatHangarCabinSpec({
-        activeRole: 'passenger',
-        activeLabel: 'Passenger',
-        passengerSeats: 9,
-        dualLayout: true,
-        charterNeedsPassenger: false,
-      })?.value,
-      '9 pax',
-    );
+    const blocked = formatHangarCabinSpec(cargoBlocked);
+    assert.equal(blocked?.value, 'cargo · needs pax');
+    assert.match(blocked?.title ?? '', /cargo glass/i);
+    assert.match(blocked?.title ?? '', /not just freight payload/i);
+    const dualPax = formatHangarCabinSpec({
+      activeRole: 'passenger',
+      activeLabel: 'Passenger',
+      passengerSeats: 9,
+      dualLayout: true,
+      charterNeedsPassenger: false,
+    });
+    assert.equal(dualPax?.value, '9 pax');
+    assert.match(dualPax?.title ?? '', /cargo glass/i);
   });
 });

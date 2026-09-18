@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   DESKTOP_UPDATE_POLL_MS,
   desktopUpdateHeaderLabel,
+  isNewerDesktopVersion,
   type DesktopUpdateState,
 } from './DesktopUpdates.tsx';
 
@@ -54,5 +55,13 @@ describe('desktopUpdateHeaderLabel', () => {
 
   it('uses a long poll interval (30 minutes)', () => {
     assert.equal(DESKTOP_UPDATE_POLL_MS, 30 * 60 * 1000);
+  });
+});
+
+describe('isNewerDesktopVersion', () => {
+  it('compares patch versions', () => {
+    assert.equal(isNewerDesktopVersion('0.3.79', '0.3.78'), true);
+    assert.equal(isNewerDesktopVersion('0.3.78', '0.3.78'), false);
+    assert.equal(isNewerDesktopVersion('0.3.78', '0.3.79'), false);
   });
 });

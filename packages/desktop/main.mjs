@@ -331,7 +331,10 @@ function wireAutoUpdater() {
     });
   });
   autoUpdater.on('update-not-available', (info) => {
-    sendUpdateEvent({ type: 'not-available', version: info.version });
+    logLine(
+      `[desktop] update not available (current=${app.getVersion()} remote=${info?.version ?? '?'})`,
+    );
+    sendUpdateEvent({ type: 'not-available', version: info?.version });
   });
   autoUpdater.on('download-progress', (progress) => {
     sendUpdateEvent({
@@ -433,6 +436,39 @@ async function restartCareerApiForPlayMode() {
   }
 }
 
+/** Semver-ish compare for desktop x.y.z (+ optional prerelease ignored). */
+function isNewerDesktopVersion(remote, local) {
+  const parse = (raw) => {
+    const core = String(raw ?? '')
+      .trim()
+      .replace(/^v/i, '')
+      .split('-')[0]
+      .split('+')[0];
+    const parts = core.split('.').map((p) => Number.parseInt(p, 10));
+    return [
+      Number.isFinite(parts[0]) ? parts[0] : 0,
+      Number.isFinite(parts[1]) ? parts[1] : 0,
+      Number.isFinite(parts[2]) ? parts[2] : 0,
+    ];
+  };
+  const a = parse(remote);
+  const b = parse(local);
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return true;
+    if (a[i] < b[i]) return false;
+  }
+  return false;
+}
+
+function resolveDownloadedInstallerPath() {
+  if (typeof autoUpdater.installerPath === 'string' && autoUpdater.installerPath) {
+    return autoUpdater.installerPath;
+  }
+  const helperFile = autoUpdater.downloadedUpdateHelper?.file;
+  if (typeof helperFile === 'string' && helperFile) return helperFile;
+  return null;
+}
+
 function registerIpc() {
   ipcMain.handle('skyline:get-version', () => app.getVersion());
 
@@ -511,10 +547,25 @@ function registerIpc() {
       return { ok: false, reason: 'dev' };
     }
     try {
+      const current = app.getVersion();
       const result = await autoUpdater.checkForUpdates();
+      const remote = result?.updateInfo?.version ?? null;
+      const updateAvailable = Boolean(
+        remote && isNewerDesktopVersion(remote, current),
+      );
+      const downloadedPath = resolveDownloadedInstallerPath();
+      const downloadedReady = Boolean(
+        updateAvailable && downloadedPath && (await pathExists(downloadedPath)),
+      );
+      logLine(
+        `[desktop] check-updates current=${current} remote=${remote ?? 'null'} available=${updateAvailable} downloaded=${downloadedReady}`,
+      );
       return {
         ok: true,
-        version: result?.updateInfo?.version ?? null,
+        version: remote,
+        currentVersion: current,
+        updateAvailable,
+        downloaded: downloadedReady,
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -538,10 +589,7 @@ function registerIpc() {
 
     // Unsigned NSIS: quitAndInstall() often dies behind SmartScreen with no UI.
     // Open the downloaded Setup so the user can click More info → Run anyway.
-    const installerPath =
-      typeof autoUpdater.installerPath === 'string'
-        ? autoUpdater.installerPath
-        : autoUpdater.downloadedUpdateHelper?.file ?? null;
+    const installerPath = resolveDownloadedInstallerPath();
 
     if (!installerPath || !(await pathExists(installerPath))) {
       return {

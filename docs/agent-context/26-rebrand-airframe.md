@@ -86,7 +86,7 @@ Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anter
 
 **Sintoma:** `UPDATE x.y.z` só aparecia se o evento `available` chegasse com o React já montado; clique mandava para Settings.  
 **Causa:** header só escutava IPC e não re-checava no login; download ficava no card de Settings.  
-**Fix:** store compartilhado em `DesktopUpdates.tsx` — check ao entrar no shell (pós-login) + poll **30 min**; clique no botão faz download (barra no próprio pill) e depois `Install` abre o Setup (unsigned SmartScreen flow). Settings card continua como manual fallback.
+**Fix:** store compartilhado em `DesktopUpdates.tsx` — check ao entrar no shell (pós-login) + poll **30 min**; clique no botão faz download (barra no próprio pill) e depois `Install` abre o Setup (unsigned SmartScreen flow). Settings card continua como manual fallback. Check IPC agora devolve `updateAvailable` via semver (não só eventos); CDN stale que dispara `update-not-available` com remote &gt; installed ainda mostra Update.
 
 ## Fase 3 — paths / ids (migrar com cuidado)
 

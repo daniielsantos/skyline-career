@@ -60,7 +60,7 @@ export const PAGE_HELP = {
     bullets: [
       'Aircraft must be at the mission origin with you. Travel moves the pilot; ferry moves the airframe (often empty).',
       'Inspect, then repair. Hours raise MX cost and cut resale. Parked frames pay daily parking (assigned and leased-out do not).',
-      'Pax shows Charter seats. Dual-layout tails on cargo glass show “needs pax” until the passenger configuration is active.',
+      'Pax shows Charter seats. “dual” / “needs pax” means cargo glass + passenger glass on the same SKU — not the Cargo kg payload line.',
       'Cargo Ops (sub-tab here) unlocks Market commodities and freighter classes. Dry/Light starters are open; Medium and Jet climb the ladder.',
       'Company home (Base) unlocks parking and Jet-A/MRO perks. Cashflow is the ledger — freights, fuel, leases, shop, parking.',
     ],
@@ -72,7 +72,7 @@ export const PAGE_HELP = {
     bullets: [
       'New, used, and lease prices are Airframe economy numbers — not real-world MSRP.',
       'Buy or lease into the Hangar. One Market card is a glass family (variants share the SKU).',
-      'Pax on the card is Charter seat capacity. “dual” means the family also has cargo glass — Fit needs passenger.',
+      'Pax = Charter seats. “dual” = cargo glass + passenger glass on this SKU (not Cargo kg). Fit needs the passenger config.',
       'Condition and hours on used frames change what you pay and what MX will cost later.',
     ],
   },

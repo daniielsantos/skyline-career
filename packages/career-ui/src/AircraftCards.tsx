@@ -60,12 +60,13 @@ export function formatMarketCharterSpec(catalog: AircraftCatalogEntry | undefine
     return {
       value: `${seats} · dual`,
       title:
-        'Passenger seats when flying the passenger glass. This Market family also has a cargo configuration — Charter Fit needs passenger.',
+        'dual = this SKU has two cabin configs (cargo glass + passenger glass), not the Cargo kg payload line. These seats are on the passenger glass — Charter Fit needs that config active.',
     };
   }
   return {
     value: String(seats),
-    title: 'Passenger seats available for Charter',
+    title:
+      'Charter seat capacity on this cabin. Cargo kg is freight payload — this SKU has a single passenger config (no cargo glass switch).',
   };
 }
 
@@ -79,18 +80,20 @@ export function formatHangarCabinSpec(status: HangarCabinStatus | undefined): {
     return {
       value: `cargo · needs pax`,
       title:
-        'This tail is on the cargo configuration. Charter Fit requires the passenger glass on this family.',
+        'Active config is cargo glass (not just freight payload). Switch to passenger glass — Charter Fit needs it on dual-layout families.',
     };
   }
   if (status.dualLayout && status.activeRole === 'passenger') {
     return {
       value: `${status.passengerSeats} pax`,
-      title: 'Passenger configuration active — ready for Charter Fit by seats and range.',
+      title:
+        'Passenger glass active — Charter Fit by seats and range. This family also has a separate cargo glass; Cargo kg is payload on either layout.',
     };
   }
   return {
     value: `${status.passengerSeats} pax`,
-    title: 'Passenger seats available for Charter',
+    title:
+      'Charter seat capacity. Cargo kg is freight payload — single cabin config (no cargo glass switch).',
   };
 }
 

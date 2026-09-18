@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **d0e7a21** / desktop **0.3.89** shipped: Lengthen international lot life to raise intl board shelf. Release: [v0.3.89](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.89).
+
+
 `main` **b63d7c3** / desktop **0.3.88** shipped: Deepen intl formation Pulse diag past cheap eligible gates. Release: [v0.3.88](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.88).
 
 

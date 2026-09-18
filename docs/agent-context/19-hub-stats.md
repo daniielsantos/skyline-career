@@ -16,6 +16,10 @@ Atualizado 2026-08-31: UI — **Terminal inventory** (= stock Dry deste ICAO, n�
 
 Atualizado 2026-08-31: History table **4/page** + sort Day/Lots/Pay/Fill/Spot; chart **16.5rem** + viewBox alto (menos letterbox); labels no SVG só **High** (atual no header; range embaixo; tooltip nos dots).
 
+Atualizado 2026-09-18: **Intl formation Live card** — `/api/debug/economy-pulse` inclui `intlFormation` (matchable OD %, kg vs target, skipAll flags). Card no Hub Pulse Live; Network history continua em `hub_economy_samples`.
+
+Atualizado 2026-09-18: **PG hub_economy_samples (v18)** — MP Pulse / Hub Stats history deixa de ser stub vazio. `pendingHubEconomySamples` flushea em `saveEconomy` e `persistNpcLiveWorld` (headless day boundary). API `readHubEconomySamples*` agora pode ser async.
+
 Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples` (mundo / BR·US / major·regional·spoke) por dia. API `GET /api/debug/hub-economy-history?days=7|30|90`. UI: tab **Pulse** (dev). Schema **v8** cols: country/tier/region, cargo stock/cap, inbound, lot counts, pay p10/p90.
 
 ## O quê
@@ -30,9 +34,10 @@ Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples
 
 Tabela `hub_economy_samples` (`world_id`, `icao`, `day_index` PK). Retenção **90** dias (`HUB_ECONOMY_SAMPLE_RETENTION_DAYS`).
 
-- DDL / I/O: [`packages/shared/src/career-store-v7.ts`](../../packages/shared/src/career-store-v7.ts) (`ensureV8HubSampleColumns`)
-- Schema bump: `CAREER_STORE_SCHEMA_VERSION = '8'` em [`career-store.ts`](../../packages/shared/src/career-store.ts)
-- Flush: `pendingHubEconomySamples` → upsert no `saveEconomy` (stripped do blob)
+- DDL / I/O SQLite: [`packages/shared/src/career-store-v7.ts`](../../packages/shared/src/career-store-v7.ts) (`ensureV8HubSampleColumns`)
+- DDL / I/O Postgres (schema **v18**): [`packages/shared/src/career-store-pg-hub-economy.ts`](../../packages/shared/src/career-store-pg-hub-economy.ts) — flush em full save + NPC live persist
+- Schema bump SP: `CAREER_STORE_SCHEMA_VERSION = '8'` em [`career-store.ts`](../../packages/shared/src/career-store.ts)
+- Flush: `pendingHubEconomySamples` → upsert no `saveEconomy` / PG `persistNpcLive` (stripped do blob)
 
 ### Campos v8 (além do v7)
 
@@ -66,4 +71,4 @@ Tabela `hub_economy_samples` (`world_id`, `icao`, `day_index` PK). Retenção **
 
 ## Diagnóstico
 
-Samples só aparecem após **day rollover + save**. Rows antigas (pré-v8) leem country/tier vazios/`spoke` até o próximo sample.
+Samples só aparecem após **day rollover + save**. Rows antigas (pré-v8) leem country/tier vazios/`spoke` até o próximo sample. Em **MP Postgres**, a tabela fica vazia até o **primeiro day boundary** pós-deploy v18 (headless pulse ou +1 day).

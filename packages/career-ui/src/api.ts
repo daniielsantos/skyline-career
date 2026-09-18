@@ -1982,6 +1982,27 @@ export type EconomyPulseBoardView = {
   bookableGeneralPayPerKgP50: Record<string, number | null>;
 };
 
+export type IntlFormationDiagView = {
+  lanesActive: number;
+  lanesUndirected: number;
+  lanesMatchable: number;
+  lanesMatchablePct: number;
+  boardKgOpen: number;
+  boardKgTarget: number;
+  skipAllByKg: boolean;
+  skipAllByCountSkus: number;
+  skusWithNoMatchableLane: number;
+  commodities: Array<{
+    commodityId: string;
+    availableLots: number;
+    quota: number;
+    skipAllByCount: boolean;
+    surplusHubs: number;
+    shortageHubs: number;
+    matchableLanes: number;
+  }>;
+};
+
 export type EconomyPulseView = {
   tick: number;
   homeCountryId: string | null;
@@ -2006,6 +2027,7 @@ export type EconomyPulseView = {
     thinRegions: number;
   };
   board: EconomyPulseBoardView;
+  intlFormation: IntlFormationDiagView;
   notes: string[];
 };
 

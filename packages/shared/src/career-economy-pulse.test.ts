@@ -81,6 +81,17 @@ describe('computeEconomyPulse', () => {
     assert.equal(pulse.availableLots, sumLots);
     assert.ok(Number.isFinite(pulse.intlSharePct));
     assert.ok(pulse.intlSharePct >= 0 && pulse.intlSharePct <= 1);
+    assert.ok(pulse.intlFormation);
+    assert.equal(
+      pulse.intlFormation.lanesActive,
+      world.internationalLanes?.length ?? 0,
+    );
+    assert.ok(Array.isArray(pulse.intlFormation.commodities));
+    assert.ok(pulse.intlFormation.commodities.length >= 1);
+    assert.ok(
+      pulse.intlFormation.lanesMatchablePct >= 0 &&
+        pulse.intlFormation.lanesMatchablePct <= 1,
+    );
     assert.equal(
       pulse.internationalLanes.day,
       Math.floor(world.tick / TICKS_PER_DAY),

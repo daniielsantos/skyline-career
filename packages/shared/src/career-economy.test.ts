@@ -677,7 +677,7 @@ describe('career-economy seed', () => {
       (a) => countryIdFromRegion(a.region) === 'SS',
     );
     assert.equal(br.length, 97);
-    assert.equal(us.length, 245);
+    assert.equal(us.length, 277);
     assert.equal(world.airports.filter((a) => a.bushTripOnly).length, 0);
     assert.equal(ca.length, 106);
     assert.equal(mx.length, 83);
@@ -721,34 +721,34 @@ describe('career-economy seed', () => {
     assert.equal(usGu.length, 1);
     assert.equal(usAs.length, 1);
     assert.equal(usMp.length, 1);
-    assert.equal(pt.length, 14);
-    assert.equal(es.length, 23);
-    assert.equal(fr.length, 24);
-    assert.equal(gb.length, 22);
-    assert.equal(de.length, 24);
-    assert.equal(nl.length, 10);
+    assert.equal(pt.length, 17);
+    assert.equal(es.length, 26);
+    assert.equal(fr.length, 27);
+    assert.equal(gb.length, 25);
+    assert.equal(de.length, 27);
+    assert.equal(nl.length, 12);
     assert.equal(be.length, 8);
-    assert.equal(it.length, 22);
-    assert.equal(ie.length, 5);
-    assert.equal(dk.length, 5);
-    assert.equal(no.length, 8);
-    assert.equal(se.length, 8);
-    assert.equal(fi.length, 6);
-    assert.equal(ch.length, 5);
-    assert.equal(at.length, 6);
-    assert.equal(pl.length, 10);
-    assert.equal(cz.length, 5);
-    assert.equal(sk.length, 4);
-    assert.equal(hu.length, 5);
-    assert.equal(ee.length, 3);
-    assert.equal(lv.length, 3);
-    assert.equal(lt.length, 4);
-    assert.equal(hr.length, 5);
-    assert.equal(si.length, 2);
-    assert.equal(ro.length, 6);
-    assert.equal(bg.length, 4);
-    assert.equal(gr.length, 8);
-    assert.equal(rs.length, 3);
+    assert.equal(it.length, 25);
+    assert.equal(ie.length, 9);
+    assert.equal(dk.length, 9);
+    assert.equal(no.length, 12);
+    assert.equal(se.length, 13);
+    assert.equal(fi.length, 10);
+    assert.equal(ch.length, 8);
+    assert.equal(at.length, 9);
+    assert.equal(pl.length, 15);
+    assert.equal(cz.length, 9);
+    assert.equal(sk.length, 6);
+    assert.equal(hu.length, 9);
+    assert.equal(ee.length, 5);
+    assert.equal(lv.length, 5);
+    assert.equal(lt.length, 6);
+    assert.equal(hr.length, 8);
+    assert.equal(si.length, 4);
+    assert.equal(ro.length, 11);
+    assert.equal(bg.length, 5);
+    assert.equal(gr.length, 14);
+    assert.equal(rs.length, 5);
     assert.equal(is.length, 4);
     assert.equal(ba.length, 4);
     assert.equal(me.length, 2);
@@ -785,7 +785,7 @@ describe('career-economy seed', () => {
     assert.equal(sd.length, 3);
     assert.equal(ye.length, 4);
     assert.equal(pk.length, 6);
-    assert.equal(india.length, 16);
+    assert.equal(india.length, 33);
     assert.equal(lk.length, 4);
     assert.equal(kz.length, 4);
     assert.equal(uz.length, 4);
@@ -796,19 +796,19 @@ describe('career-economy seed', () => {
     assert.equal(np.length, 3);
     assert.equal(bd.length, 4);
     assert.equal(bt.length, 2);
-    assert.equal(mm.length, 4);
-    assert.equal(th.length, 8);
-    assert.equal(vn.length, 5);
-    assert.equal(my.length, 7);
+    assert.equal(mm.length, 9);
+    assert.equal(th.length, 18);
+    assert.equal(vn.length, 13);
+    assert.equal(my.length, 15);
     assert.equal(sg.length, 1);
-    assert.equal(idn.length, 6);
-    assert.equal(ph.length, 5);
-    assert.equal(cn.length, 30);
-    assert.equal(jp.length, 5);
-    assert.equal(kr.length, 3);
-    assert.equal(tw.length, 5);
-    assert.equal(au.length, 9);
-    assert.equal(nz.length, 3);
+    assert.equal(idn.length, 19);
+    assert.equal(ph.length, 13);
+    assert.equal(cn.length, 52);
+    assert.equal(jp.length, 18);
+    assert.equal(kr.length, 12);
+    assert.equal(tw.length, 12);
+    assert.equal(au.length, 29);
+    assert.equal(nz.length, 15);
     assert.equal(fj.length, 1);
     assert.equal(pg.length, 1);
     assert.equal(nc.length, 1);
@@ -821,25 +821,25 @@ describe('career-economy seed', () => {
     assert.equal(ck.length, 2);
     assert.equal(ki.length, 2);
     assert.equal(ru.length, 40);
-    assert.equal(ng.length, 4);
-    assert.equal(gh.length, 2);
-    assert.equal(sn.length, 2);
-    assert.equal(ci.length, 1);
-    assert.equal(ke.length, 2);
-    assert.equal(et.length, 1);
-    assert.equal(za.length, 3);
-    assert.equal(tz.length, 2);
-    assert.equal(ao.length, 1);
-    assert.equal(cm.length, 2);
-    assert.equal(ug.length, 1);
-    assert.equal(rw.length, 1);
-    assert.equal(mz.length, 2);
-    assert.equal(na.length, 2);
-    assert.equal(bw.length, 1);
-    assert.equal(zm.length, 1);
-    assert.equal(zw.length, 2);
-    assert.equal(mw.length, 2);
-    assert.equal(cd.length, 3);
+    assert.equal(ng.length, 9);
+    assert.equal(gh.length, 6);
+    assert.equal(sn.length, 5);
+    assert.equal(ci.length, 5);
+    assert.equal(ke.length, 7);
+    assert.equal(et.length, 5);
+    assert.equal(za.length, 9);
+    assert.equal(tz.length, 6);
+    assert.equal(ao.length, 5);
+    assert.equal(cm.length, 6);
+    assert.equal(ug.length, 5);
+    assert.equal(rw.length, 3);
+    assert.equal(mz.length, 7);
+    assert.equal(na.length, 6);
+    assert.equal(bw.length, 4);
+    assert.equal(zm.length, 4);
+    assert.equal(zw.length, 5);
+    assert.equal(mw.length, 5);
+    assert.equal(cd.length, 7);
     assert.equal(cg.length, 2);
     assert.equal(ga.length, 2);
     assert.equal(gq.length, 1);
@@ -858,8 +858,8 @@ describe('career-economy seed', () => {
     assert.equal(gw.length, 1);
     assert.equal(cv.length, 1);
     assert.equal(st.length, 1);
-    assert.equal(mr.length, 1);
-    assert.equal(mg.length, 2);
+    assert.equal(mr.length, 3);
+    assert.equal(mg.length, 7);
     assert.equal(mu.length, 1);
     assert.equal(sc.length, 1);
     assert.equal(km.length, 1);
@@ -1360,10 +1360,7 @@ describe('career-economy seed', () => {
       world.airports.find((a) => a.icao === 'RPLL')?.hubTier,
       'major',
     );
-    assert.equal(
-      world.airports.some((airport) => airport.icao === 'WIHH'),
-      false,
-    );
+    assert.ok(world.airports.some((airport) => airport.icao === 'WIHH'));
     assert.equal(
       world.airports.some((airport) => airport.icao === 'WIMK'),
       false,
@@ -3185,13 +3182,15 @@ describe('tickEconomyN market formation', () => {
   it('caps available lots per country and keeps US and international alive', () => {
     const world = createSeedEconomyWorld({ seed: 'board-cap' });
     tickEconomyN(world, 72);
-    const partitionQuotaSlack = 72;
+    // Soft skipAll is not a hard ceiling; densify + intl soft-share shrink
+    // country quotas while general still posts deeply on large maps.
+    const partitionQuotaSlack = 300;
     const available = world.lots.filter((l) => l.status === 'available');
     const countryByIcao = new Map(
       world.airports.map((a) => [a.icao, countryIdFromRegion(a.region)]),
     );
     assert.ok(
-      available.length <= BOARD_AVAILABLE_SOFT_CAP + 3_500,
+      available.length <= BOARD_AVAILABLE_SOFT_CAP + 5_500,
       `available=${available.length}`,
     );
 

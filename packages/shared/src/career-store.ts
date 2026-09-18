@@ -229,12 +229,12 @@ export interface CareerStore {
   readHubEconomySamples(opts: {
     icao: string;
     sinceDay?: number;
-  }): HubEconomySample[];
+  }): HubEconomySample[] | Promise<HubEconomySample[]>;
   /** All hubs for days ≥ sinceDay (network history pulse). */
   readHubEconomySamplesSince(opts?: {
     sinceDay?: number;
     untilDay?: number;
-  }): HubEconomySample[];
+  }): HubEconomySample[] | Promise<HubEconomySample[]>;
   /**
    * Origin/dest + listed lots + inbound for one mission. Does not set RAM.
    * JSON store returns null (caller loads the full world).

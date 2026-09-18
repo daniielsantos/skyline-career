@@ -3677,7 +3677,7 @@ export function bulkOriginMinFillForFormation(
   return 0.55;
 }
 
-function isBulkSurplusOriginRow(
+export function isBulkSurplusOriginRow(
   world: CareerEconomyWorld,
   row: { fill: number; surplusKg: number; ap: Pick<AirportTerminal, 'region'> },
   commodityId: CommodityId,
@@ -9856,6 +9856,153 @@ export function partitionBoardKgTarget(
   }
   cache.boardKg.set(cacheKey, target);
   return target;
+}
+
+/** Read-only: why intl formation is below soft-share (Pulse / VPS diag). */
+export type IntlFormationCommodityDiag = {
+  commodityId: CommodityId;
+  availableLots: number;
+  quota: number;
+  /** availableLots >= soft quota for INTL partition. */
+  skipAllByCount: boolean;
+  surplusHubs: number;
+  shortageHubs: number;
+  /** Undirected daily lanes with surplus∩shortage in at least one direction. */
+  matchableLanes: number;
+};
+
+export type IntlFormationDiag = {
+  lanesActive: number;
+  /** Unique undirected ODs in the daily graph. */
+  lanesUndirected: number;
+  /** Undirected lanes matchable for ≥1 cargo SKU. */
+  lanesMatchable: number;
+  lanesMatchablePct: number;
+  boardKgOpen: number;
+  boardKgTarget: number;
+  /** Open intl kg ≥ transport cover target (formation backs off). */
+  skipAllByKg: boolean;
+  skipAllByCountSkus: number;
+  skusWithNoMatchableLane: number;
+  commodities: IntlFormationCommodityDiag[];
+};
+
+export function computeIntlFormationDiag(
+  world: CareerEconomyWorld,
+): IntlFormationDiag {
+  const countryByIcao = countryByIcaoMap(world);
+  const lanes = world.internationalLanes ?? [];
+  const lanesActive = lanes.length;
+  const endpointIcaos = new Set<string>();
+  const normLanes: Array<{ a: string; b: string; odKey: string }> = [];
+  const seenOd = new Set<string>();
+  for (const lane of lanes) {
+    const a = lane.originIcao.trim().toUpperCase();
+    const b = lane.destIcao.trim().toUpperCase();
+    if (!a || !b || a === b) continue;
+    endpointIcaos.add(a);
+    endpointIcaos.add(b);
+    const odKey = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (seenOd.has(odKey)) continue;
+    seenOd.add(odKey);
+    normLanes.push({ a, b, odKey });
+  }
+
+  const endpoints = (world.airports ?? []).filter((ap) =>
+    endpointIcaos.has(ap.icao.trim().toUpperCase()),
+  );
+
+  let boardKgOpen = 0;
+  const lotsByCommodity = new Map<CommodityId, number>();
+  for (const lot of world.lots ?? []) {
+    // Match countAvailableLots / commodityBoardBloated (available only).
+    if (lot.status !== 'available') continue;
+    if (lotBoardPartition(lot, countryByIcao) !== INTL_BOARD_PARTITION) {
+      continue;
+    }
+    const left = Math.max(0, lot.quantityKg - (lot.reservedKg ?? 0));
+    boardKgOpen += left;
+    lotsByCommodity.set(
+      lot.commodityId,
+      (lotsByCommodity.get(lot.commodityId) ?? 0) + 1,
+    );
+  }
+
+  const boardKgTarget = partitionBoardKgTarget(world, INTL_BOARD_PARTITION);
+  const skipAllByKg = boardKgOpen >= boardKgTarget;
+  const quota = intlCommodityQuota();
+
+  const matchableOdAnySku = new Set<string>();
+  const commodities: IntlFormationCommodityDiag[] = [];
+
+  for (const commodity of CAREER_CARGO_COMMODITIES) {
+    const surplus = new Set<string>();
+    const shortage = new Set<string>();
+    for (const ap of endpoints) {
+      const code = ap.icao.trim().toUpperCase();
+      const stock = ap.inventory[commodity.id];
+      if (!stock || !(stock.capacityKg > 0)) continue;
+      const fill = stock.stockKg / stock.capacityKg;
+      const soft = softOriginFillForFormation(world, {
+        region: ap.region ?? '',
+        commodityId: commodity.id,
+      });
+      const surplusKg = surplusKgAboveSoftOrigin(stock, soft);
+      const roomKg = destRoomKg(stock, commodity.id);
+      if (
+        isBulkSurplusOriginRow(
+          world,
+          { fill, surplusKg, ap },
+          commodity.id,
+        )
+      ) {
+        surplus.add(code);
+      }
+      if (fill <= 0.45 && roomKg >= 400) shortage.add(code);
+    }
+
+    let matchableLanes = 0;
+    for (const lane of normLanes) {
+      const ab =
+        surplus.has(lane.a) && shortage.has(lane.b);
+      const ba =
+        surplus.has(lane.b) && shortage.has(lane.a);
+      if (ab || ba) {
+        matchableLanes += 1;
+        matchableOdAnySku.add(lane.odKey);
+      }
+    }
+
+    const availableLots = lotsByCommodity.get(commodity.id) ?? 0;
+    commodities.push({
+      commodityId: commodity.id,
+      availableLots,
+      quota,
+      skipAllByCount: availableLots >= quota,
+      surplusHubs: surplus.size,
+      shortageHubs: shortage.size,
+      matchableLanes,
+    });
+  }
+
+  const lanesMatchable = matchableOdAnySku.size;
+  const lanesUndirected = normLanes.length;
+  const lanesMatchablePct =
+    lanesUndirected > 0 ? lanesMatchable / lanesUndirected : 0;
+
+  return {
+    lanesActive,
+    lanesUndirected,
+    lanesMatchable,
+    lanesMatchablePct,
+    boardKgOpen,
+    boardKgTarget,
+    skipAllByKg,
+    skipAllByCountSkus: commodities.filter((c) => c.skipAllByCount).length,
+    skusWithNoMatchableLane: commodities.filter((c) => c.matchableLanes === 0)
+      .length,
+    commodities,
+  };
 }
 
 function commodityBoardBloated(

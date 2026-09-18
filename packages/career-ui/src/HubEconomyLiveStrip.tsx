@@ -251,6 +251,39 @@ export function HubEconomyLiveStrip(props: {
           </span>
         </div>
         <div className="hub-pulse-live-card">
+          <span className="muted">Intl formation</span>
+          <strong>
+            {pulse.intlFormation
+              ? `${(pulse.intlFormation.lanesMatchablePct * 100).toFixed(0)}% matchable`
+              : '—'}
+          </strong>
+          <span className="muted">
+            {pulse.intlFormation
+              ? `${pulse.intlFormation.lanesMatchable.toLocaleString('en-US')} / ${pulse.intlFormation.lanesUndirected.toLocaleString('en-US')} OD · kg ${Math.round(pulse.intlFormation.boardKgOpen).toLocaleString('en-US')} / ${Math.round(pulse.intlFormation.boardKgTarget).toLocaleString('en-US')}`
+              : 'No intlFormation payload'}
+          </span>
+          <span className="muted">
+            {pulse.intlFormation
+              ? [
+                  pulse.intlFormation.skipAllByKg ? 'skipAll by kg' : null,
+                  pulse.intlFormation.skipAllByCountSkus > 0
+                    ? `${pulse.intlFormation.skipAllByCountSkus} SKU at lot quota`
+                    : null,
+                  pulse.intlFormation.skusWithNoMatchableLane > 0
+                    ? `${pulse.intlFormation.skusWithNoMatchableLane} SKU 0-match`
+                    : null,
+                  !pulse.intlFormation.skipAllByKg &&
+                  pulse.intlFormation.skipAllByCountSkus === 0 &&
+                  pulse.intlFormation.skusWithNoMatchableLane === 0
+                    ? 'room to form'
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : null}
+          </span>
+        </div>
+        <div className="hub-pulse-live-card">
           <span className="muted">NPC fleet</span>
           <strong>{pct01(pulse.npc.readyPct)} ready</strong>
           <span className="muted">

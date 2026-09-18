@@ -2,6 +2,7 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v18 adds hub_economy_samples for Pulse / Hub Stats history.
  * Schema v17 adds monotonic economy revision for cross-process snapshots.
  * Schema v16 promotes fleet_aircraft payload fields to columns.
  * Schema v15 drops legacy stubs `economy_json` + `company_missions`.
@@ -81,6 +82,10 @@ import {
   persistPortMarketToPg,
 } from './career-store-pg-world.js';
 import {
+  readHubEconomySamplesFromPg,
+  readHubEconomySamplesSinceFromPg,
+} from './career-store-pg-hub-economy.js';
+import {
   companySessionFromTick,
   settleCompanyPassiveFeesForTickRange,
 } from './career-company-session.js';
@@ -95,7 +100,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '17';
+const CAREER_PG_SCHEMA_VERSION = '18';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -997,6 +1002,13 @@ export class PostgresCareerStore implements CareerStore {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    if (
+      (!toSave.pendingHubEconomySamples ||
+        toSave.pendingHubEconomySamples.length === 0) &&
+      world.pendingHubEconomySamples?.length
+    ) {
+      toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
+    }
     ensureHomeCountryId(toSave);
     await this.persistRevisioned(
       (expected) =>
@@ -1008,6 +1020,7 @@ export class PostgresCareerStore implements CareerStore {
         ),
       () => {
         this.ram = toSave;
+        world.pendingHubEconomySamples = undefined;
       },
     );
   }
@@ -1097,12 +1110,20 @@ export class PostgresCareerStore implements CareerStore {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    if (
+      (!toSave.pendingHubEconomySamples ||
+        toSave.pendingHubEconomySamples.length === 0) &&
+      world.pendingHubEconomySamples?.length
+    ) {
+      toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
+    }
     ensureHomeCountryId(toSave);
     await this.persistRevisioned(
       (expected) =>
         persistNpcLiveToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
       () => {
         this.ram = toSave;
+        world.pendingHubEconomySamples = undefined;
       },
     );
   }
@@ -1161,18 +1182,30 @@ export class PostgresCareerStore implements CareerStore {
     return preferred ?? first;
   }
 
-  readHubEconomySamples(_opts: {
+  readHubEconomySamples(opts: {
     icao: string;
     sinceDay?: number;
-  }): HubEconomySample[] {
-    return [];
+  }): Promise<HubEconomySample[]> {
+    return this.ready.then(() =>
+      readHubEconomySamplesFromPg(this.pool, {
+        icao: opts.icao,
+        sinceDay: opts.sinceDay,
+        worldId: LOCAL_WORLD_ID,
+      }),
+    );
   }
 
-  readHubEconomySamplesSince(_opts?: {
+  readHubEconomySamplesSince(opts?: {
     sinceDay?: number;
     untilDay?: number;
-  }): HubEconomySample[] {
-    return [];
+  }): Promise<HubEconomySample[]> {
+    return this.ready.then(() =>
+      readHubEconomySamplesSinceFromPg(this.pool, {
+        sinceDay: opts?.sinceDay,
+        untilDay: opts?.untilDay,
+        worldId: LOCAL_WORLD_ID,
+      }),
+    );
   }
 
   async loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState> {

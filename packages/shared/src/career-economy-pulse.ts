@@ -4,9 +4,11 @@
  */
 import {
   CAREER_CARGO_COMMODITIES,
+  computeIntlFormationDiag,
   localUnitPriceUsd,
   routeDistanceNm,
   tickEconomyN,
+  type IntlFormationDiag,
 } from './career-economy.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import {
@@ -227,6 +229,11 @@ export interface EconomyPulse {
   };
   /** Cumulative flow counters — diff two samples to get throughput rates. */
   flow: EconomyFlowStats;
+  /**
+   * Why intl board share sits below soft quota (matchable lanes / skipAll).
+   * Read-only; same gates as formLotsIntl surplus∩shortage.
+   */
+  intlFormation: IntlFormationDiag;
   notes: string[];
 }
 
@@ -635,6 +642,29 @@ function buildNotes(
     }
   }
 
+  const intlForm = pulse.intlFormation;
+  if (intlForm.lanesActive > 0) {
+    if (intlForm.skipAllByKg) {
+      notes.push(
+        `INTL formation: skipAll by kg (${Math.round(intlForm.boardKgOpen).toLocaleString('en-US')} ≥ target ${Math.round(intlForm.boardKgTarget).toLocaleString('en-US')})`,
+      );
+    } else if (intlForm.skipAllByCountSkus > 0) {
+      notes.push(
+        `INTL formation: ${intlForm.skipAllByCountSkus} SKU(s) at soft lot quota`,
+      );
+    }
+    if (intlForm.lanesMatchablePct < 0.15) {
+      notes.push(
+        `INTL formation: only ${(intlForm.lanesMatchablePct * 100).toFixed(0)}% of daily lanes matchable (surplus∩shortage)`,
+      );
+    }
+    if (intlForm.skusWithNoMatchableLane > 0) {
+      notes.push(
+        `INTL formation: ${intlForm.skusWithNoMatchableLane} SKU(s) with 0 matchable lanes`,
+      );
+    }
+  }
+
   if (pulse.availableLots > 0) {
     const dry = pulse.commodities.filter((c) => c.availableLots === 0);
     if (dry.length > 0 && dry.length < pulse.commodities.length) {
@@ -1028,6 +1058,7 @@ export function computeEconomyPulse(
       if (a.active !== b.active) return Number(b.active) - Number(a.active);
       return a.region.localeCompare(b.region);
     });
+  const intlFormation = computeIntlFormationDiag(world);
   const base: Omit<EconomyPulse, 'notes'> = {
     tick: world.tick,
     homeCountryId: world.homeCountryId ?? null,
@@ -1058,6 +1089,7 @@ export function computeEconomyPulse(
       regions: recoveryRows,
     },
     flow: cloneFlowStats(ensureFlowStats(world)),
+    intlFormation,
   };
 
   return {

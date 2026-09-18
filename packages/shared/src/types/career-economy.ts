@@ -45,7 +45,7 @@ export type HubEconomyCommoditySample = {
   capacityKg?: number;
 };
 
-/** Daily hub snapshot for Hub Stats history (SQLite hub_economy_samples). */
+/** Daily hub snapshot for Hub Stats history (SQLite + Postgres hub_economy_samples). */
 export type HubEconomySample = {
   icao: string;
   dayIndex: number;

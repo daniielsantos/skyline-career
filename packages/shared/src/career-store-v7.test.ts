@@ -95,12 +95,16 @@ describe('career store v7/v8 hub economy samples', () => {
 
     const anyIcao =
       world.airports.find((a) => !a.bushTripOnly)?.icao ?? 'SBGR';
-    const anyRows = store.readHubEconomySamples({ icao: anyIcao, sinceDay: 0 });
+    const anyRows = await Promise.resolve(
+      store.readHubEconomySamples({ icao: anyIcao, sinceDay: 0 }),
+    );
     assert.ok(anyRows.length >= 1, `expected samples for ${anyIcao}`);
     assert.equal(anyRows[0]!.dayIndex, 1);
     assert.ok(anyRows[0]!.countryId);
 
-    const all = store.readHubEconomySamplesSince({ sinceDay: 0 });
+    const all = await Promise.resolve(
+      store.readHubEconomySamplesSince({ sinceDay: 0 }),
+    );
     assert.ok(all.length >= expected);
 
     const db = new DatabaseSync(store.sqlitePath!);

@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Intl formation Pulse diag** — medir bind (matchable OD / skipAll kg|count) no Live pulse antes de retunar soft share. Card em Hub Pulse. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **PG hub_economy_samples (schema v18)** — Pulse Network history deixa de ser stub no MP; flush no day boundary via `persistNpcLive` + full save. Detail: [`19-hub-stats.md`](./19-hub-stats.md).
+
 Atualizado 2026-09-16: **MP Postgres single-writer** — arquitetura normal deixa de rodar API+worker concorrentes. `world-api` usa `CAREER_HEADLESS_PULSE=1` e possui comandos + relógio 24/7; worker fica somente no profile `legacy-worker`. Deploy para/remove worker antigo antes da promoção e health expõe `worldWriter:"api"`. Revision/CAS permanece defesa contra stale overwrite, não coordenação cotidiana. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-17: **World CI/CD amd64-only** — build GHCR só `linux/amd64` (Pi / arm64 + QEMU retirados). CI verde em `main` publica imagem; Release `v*` **builda** e promove à VPS (sem wait em sibling — race com nota/commit cancelava CI do bump e congelava). Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

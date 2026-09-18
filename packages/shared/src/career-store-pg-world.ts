@@ -5,9 +5,9 @@
  * tables are the economy SoT. Leftover scalars/arrays live in
  * economy_meta.misc_json. Schema v16 promotes fleet_aircraft payload fields
  * to columns (registration / hours / MX / config). v15 drops PG stubs
- * economy_json / company_missions (see career-store-postgres.ts). SP SQLite
- * mirrors fleet columns via ensureV3Ddl ALTERs. Meta/auth stay in
- * career-store-postgres.ts.
+ * economy_json / company_missions (see career-store-postgres.ts). v18 adds
+ * hub_economy_samples for Pulse / Hub Stats. SP SQLite mirrors fleet columns
+ * via ensureV3Ddl ALTERs. Meta/auth stay in career-store-postgres.ts.
  */
 
 import type pg from 'pg';
@@ -24,6 +24,10 @@ import {
 } from './career-store-fleet-columns.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { LOCAL_WORLD_ID } from './career-store-v4.js';
+import {
+  ensurePgHubEconomySamplesDdl,
+  flushPendingHubEconomySamplesToPg,
+} from './career-store-pg-hub-economy.js';
 import type {
   AircraftInstance,
   AircraftInstanceStatus,
@@ -749,6 +753,8 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `ALTER TABLE economy_meta ADD COLUMN IF NOT EXISTS revision BIGINT NOT NULL DEFAULT 0`,
   );
+  // Schema v18 — Hub Stats / Pulse daily samples (SQLite parity).
+  await ensurePgHubEconomySamplesDdl(pool);
   // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
   const fleetAlters = [
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS registration TEXT`,
@@ -2271,6 +2277,8 @@ export async function persistEconomyTablesToPg(
       ],
     );
 
+    await flushPendingHubEconomySamplesToPg(client, world, wid);
+
     await client.query(`DELETE FROM airport_stock WHERE world_id = $1`, [wid]);
     await client.query(`DELETE FROM airports WHERE world_id = $1`, [wid]);
     if (hubRows.length > 0) {
@@ -2778,6 +2786,8 @@ export async function persistNpcLiveToPg(
         jsonParam(pickPgEconomyMisc(world)),
       ],
     );
+
+    await flushPendingHubEconomySamplesToPg(client, world, wid);
 
     await client.query(`DELETE FROM airport_stock WHERE world_id = $1`, [wid]);
     await client.query(`DELETE FROM airports WHERE world_id = $1`, [wid]);

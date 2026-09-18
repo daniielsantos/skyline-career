@@ -5753,7 +5753,9 @@ export function createCareerApiServer(port = 8787) {
               0,
               day - HUB_ECONOMY_SAMPLE_RETENTION_DAYS + 1,
             );
-            const history = active.readHubEconomySamples({ icao, sinceDay });
+            const history = await Promise.resolve(
+              active.readHubEconomySamples({ icao, sinceDay }),
+            );
             return { world: cached, airport, history };
           });
           if (!loaded || 'missing' in loaded) {
@@ -8593,11 +8595,13 @@ export function createCareerApiServer(port = 8787) {
         const q = url.searchParams;
         const daysRaw = Number.parseInt(q.get('days') ?? '7', 10);
         const days = daysRaw === 90 ? 90 : daysRaw === 30 ? 30 : 7;
-        const payload = await withCareerRead((world) => {
+        const payload = await withCareerRead(async (world) => {
           const active = requireStore();
           const today = economyDayIndex(world.tick);
           const sinceDay = Math.max(0, today - days + 1);
-          const samples = active.readHubEconomySamplesSince({ sinceDay });
+          const samples = await Promise.resolve(
+            active.readHubEconomySamplesSince({ sinceDay }),
+          );
           return {
             ...clockPayload(world, Date.now()),
             windowDays: days,

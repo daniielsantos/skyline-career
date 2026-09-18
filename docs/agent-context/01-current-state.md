@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **78eb123** / desktop **0.3.98** shipped: Launch update Setup via hidden VBS so Electron quit cannot kill it. Release: [v0.3.98](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.98).
+
+
 `main` **9e19877** / desktop **0.3.97** shipped: Fix intl gateway pressure to read airport inventory. Release: [v0.3.97](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.97).
 
 

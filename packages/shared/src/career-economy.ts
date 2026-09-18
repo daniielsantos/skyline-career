@@ -9872,8 +9872,9 @@ export type IntlFormationCommodityDiag = {
 };
 
 /**
- * Directed surplus→shortage attempts vs formLotsIntl / tryFormPair cheap gates.
- * First-fail wins (same short-circuit order as tryIntlDir + capacity/maxLots).
+ * Directed surplus→shortage attempts vs formLotsIntl / tryFormPair gates.
+ * First-fail wins. Cheap gates match tryIntlDir; deep gates match tryFormPair
+ * after capacity (dry gap · thin qty · no XL/large/small path).
  */
 export type IntlFormationRejects = {
   dirsTried: number;
@@ -9882,8 +9883,26 @@ export type IntlFormationRejects = {
   rejectLaneSat: number;
   rejectMaxLots: number;
   rejectCapacity: number;
-  /** Passed gates above — deeper tryFormPair body could still no-op. */
+  /**
+   * Passed tryIntlDir + capacity/maxLots — deeper tryFormPair may still fail.
+   * @deprecated Prefer canForm + rejectDryGap / rejectThinQty / rejectNoSizePath.
+   */
   eligible: number;
+  /** tryFormPair dryFormationMinGapMult (stricter than tryIntlDir 12%). */
+  rejectDryGap: number;
+  /** After floor-to-100kg, qty &lt; FEEDER_LTL_MIN_KG. */
+  rejectThinQty: number;
+  /** No XL/large/small path open for this intl OD (range / caps). */
+  rejectNoSizePath: number;
+  /** Would reach a size pushLot attempt. */
+  canForm: number;
+};
+
+/** Intl board shelf by status (available leftover vs claimed / airborne). */
+export type IntlFormationShelf = {
+  available: number;
+  reserved: number;
+  inTransit: number;
 };
 
 export type IntlFormationDiag = {
@@ -9900,6 +9919,7 @@ export type IntlFormationDiag = {
   skipAllByCountSkus: number;
   skusWithNoMatchableLane: number;
   rejects: IntlFormationRejects;
+  shelf: IntlFormationShelf;
   commodities: IntlFormationCommodityDiag[];
 };
 
@@ -9941,7 +9961,15 @@ export function computeIntlFormationDiag(
   let boardKgOpen = 0;
   const lotsByCommodity = new Map<CommodityId, number>();
   const activeCounts = new Map<string, number>();
+  const largeCounts = new Map<string, number>();
+  const smallCounts = new Map<string, number>();
+  const xlCounts = new Map<string, number>();
   const activeLaneKgByOd = new Map<string, number>();
+  const shelf: IntlFormationShelf = {
+    available: 0,
+    reserved: 0,
+    inTransit: 0,
+  };
   for (const lot of world.lots ?? []) {
     if (
       lot.status === 'available' ||
@@ -9952,11 +9980,23 @@ export function computeIntlFormationDiag(
       const d = lot.destIcao.trim().toUpperCase();
       const key = laneKey(lot.commodityId, o, d);
       activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
+      if (lot.quantityKg >= XL_LOT_MIN_KG) {
+        xlCounts.set(key, (xlCounts.get(key) ?? 0) + 1);
+      } else if (lot.quantityKg >= LARGE_LOT_MIN_KG) {
+        largeCounts.set(key, (largeCounts.get(key) ?? 0) + 1);
+      } else {
+        smallCounts.set(key, (smallCounts.get(key) ?? 0) + 1);
+      }
       const odKey = o < d ? `${o}|${d}` : `${d}|${o}`;
       activeLaneKgByOd.set(
         odKey,
         (activeLaneKgByOd.get(odKey) ?? 0) + Math.max(0, lot.quantityKg ?? 0),
       );
+    }
+    if (lotBoardPartition(lot, countryByIcao) === INTL_BOARD_PARTITION) {
+      if (lot.status === 'available') shelf.available += 1;
+      else if (lot.status === 'reserved') shelf.reserved += 1;
+      else if (lot.status === 'in_transit') shelf.inTransit += 1;
     }
     if (lot.status !== 'available') continue;
     if (lotBoardPartition(lot, countryByIcao) !== INTL_BOARD_PARTITION) {
@@ -9983,6 +10023,10 @@ export function computeIntlFormationDiag(
     rejectMaxLots: 0,
     rejectCapacity: 0,
     eligible: 0,
+    rejectDryGap: 0,
+    rejectThinQty: 0,
+    rejectNoSizePath: 0,
+    canForm: 0,
   };
 
   const matchableOdAnySku = new Set<string>();
@@ -10089,6 +10133,51 @@ export function computeIntlFormationDiag(
         }
       }
       rejects.eligible += 1;
+
+      // Deeper tryFormPair gates (after capacity).
+      const minGapMult = dryFormationMinGapMult(
+        commodity.id,
+        dest.fill,
+        0.12,
+      );
+      if (dest.price - origin.price < commodity.basePricePerKg * minGapMult) {
+        rejects.rejectDryGap += 1;
+        return;
+      }
+      const qty =
+        Math.floor(Math.min(origin.surplusKg, dest.roomKg) / 100) * 100;
+      if (qty < FEEDER_LTL_MIN_KG) {
+        rejects.rejectThinQty += 1;
+        return;
+      }
+      const largeOk =
+        qty >= LARGE_LOT_MIN_KG &&
+        caps.maxLarge > 0 &&
+        (largeCounts.get(key) ?? 0) < caps.maxLarge &&
+        (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots;
+      const nm = routeDistanceNm(world, oIcao, dIcao);
+      const smallOk =
+        nm != null &&
+        nm >= LAST_MILE_MIN_NM &&
+        nm <= INTL_LIGHT_JET_LTL_MAX_NM &&
+        qty >= FEEDER_LTL_MIN_KG &&
+        caps.maxSmall > 0 &&
+        (smallCounts.get(key) ?? 0) < caps.maxSmall &&
+        (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots;
+      const xlOk =
+        qty >= XL_LOT_MIN_KG &&
+        caps.maxXl > 0 &&
+        (xlCounts.get(key) ?? 0) < caps.maxXl &&
+        xlLotOdEligible(origin.tier, dest.tier, INTERNATIONAL_CORRIDOR_WEIGHT, {
+          international: true,
+          capacityKgPerDay,
+        }) &&
+        (activeCounts.get(key) ?? 0) + satPenalty < caps.maxLots;
+      if (!largeOk && !smallOk && !xlOk) {
+        rejects.rejectNoSizePath += 1;
+        return;
+      }
+      rejects.canForm += 1;
     };
 
     for (const lane of normLanes) {
@@ -10125,6 +10214,7 @@ export function computeIntlFormationDiag(
     skusWithNoMatchableLane: commodities.filter((c) => c.matchableLanes === 0)
       .length,
     rejects,
+    shelf,
     commodities,
   };
 }

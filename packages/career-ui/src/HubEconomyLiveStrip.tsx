@@ -293,13 +293,26 @@ export function HubEconomyLiveStrip(props: {
                   ['sat', r.rejectLaneSat],
                   ['maxLots', r.rejectMaxLots],
                   ['cap', r.rejectCapacity],
+                  ['dryGap', r.rejectDryGap],
+                  ['thinQty', r.rejectThinQty],
+                  ['noSize', r.rejectNoSizePath],
                 ].sort((a, b) => b[1] - a[1]);
                 const top = ranked.filter(([, n]) => n > 0).slice(0, 2);
                 const topTxt = top
                   .map(([k, n]) => `${k} ${n}`)
                   .join(' · ');
-                return `dirs ${r.dirsTried} · eligible ${r.eligible}${topTxt ? ` · ${topTxt}` : ''}`;
+                return `dirs ${r.dirsTried} · canForm ${r.canForm}/${r.eligible}${topTxt ? ` · ${topTxt}` : ''}`;
               })()}
+            </span>
+          ) : null}
+          {pulse.intlFormation?.shelf ? (
+            <span className="muted">
+              shelf {pulse.intlFormation.shelf.available.toLocaleString('en-US')}{' '}
+              avail ·{' '}
+              {pulse.intlFormation.shelf.reserved.toLocaleString('en-US')}{' '}
+              reserved ·{' '}
+              {pulse.intlFormation.shelf.inTransit.toLocaleString('en-US')}{' '}
+              airborne
             </span>
           ) : null}
         </div>

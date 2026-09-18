@@ -2000,6 +2000,15 @@ export type IntlFormationDiagView = {
     rejectMaxLots: number;
     rejectCapacity: number;
     eligible: number;
+    rejectDryGap: number;
+    rejectThinQty: number;
+    rejectNoSizePath: number;
+    canForm: number;
+  };
+  shelf: {
+    available: number;
+    reserved: number;
+    inTransit: number;
   };
   commodities: Array<{
     commodityId: string;

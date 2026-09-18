@@ -672,12 +672,21 @@ function buildNotes(
           ['laneSat', r.rejectLaneSat],
           ['maxLots', r.rejectMaxLots],
           ['capacity', r.rejectCapacity],
+          ['dryGap', r.rejectDryGap],
+          ['thinQty', r.rejectThinQty],
+          ['noSize', r.rejectNoSizePath],
         ] as Array<[string, number]>
       ).sort((a, b) => b[1] - a[1]);
       const top = ranked[0];
       if (top && top[1] > 0) {
         notes.push(
-          `INTL formation rejects: ${top[0]} ${top[1]}/${r.dirsTried} · eligible ${r.eligible}`,
+          `INTL formation rejects: ${top[0]} ${top[1]}/${r.dirsTried} · canForm ${r.canForm} · eligible ${r.eligible}`,
+        );
+      }
+      const shelf = intlForm.shelf;
+      if (shelf) {
+        notes.push(
+          `INTL shelf: ${shelf.available} avail · ${shelf.reserved} reserved · ${shelf.inTransit} airborne`,
         );
       }
     }

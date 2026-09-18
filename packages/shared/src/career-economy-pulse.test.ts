@@ -94,14 +94,20 @@ describe('computeEconomyPulse', () => {
     );
     assert.ok(pulse.intlFormation.rejects);
     assert.ok(pulse.intlFormation.rejects.dirsTried >= 0);
-    assert.ok(
-      pulse.intlFormation.rejects.eligible +
-        pulse.intlFormation.rejects.rejectPriceGap +
-        pulse.intlFormation.rejects.rejectFeederFloor +
-        pulse.intlFormation.rejects.rejectLaneSat +
-        pulse.intlFormation.rejects.rejectMaxLots +
-        pulse.intlFormation.rejects.rejectCapacity ===
-        pulse.intlFormation.rejects.dirsTried,
+    assert.ok(pulse.intlFormation.shelf);
+    const r = pulse.intlFormation.rejects;
+    assert.equal(
+      r.rejectPriceGap +
+        r.rejectFeederFloor +
+        r.rejectLaneSat +
+        r.rejectMaxLots +
+        r.rejectCapacity +
+        r.eligible,
+      r.dirsTried,
+    );
+    assert.equal(
+      r.rejectDryGap + r.rejectThinQty + r.rejectNoSizePath + r.canForm,
+      r.eligible,
     );
     assert.equal(
       pulse.internationalLanes.day,

@@ -3,10 +3,11 @@ import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
   DYNAMIC_INTL_LANES_MAX,
-  DYNAMIC_INTL_LONG_HAUL_MIN_NM,
   DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
   DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
   DYNAMIC_INTL_MIN_LANES_PER_COUNTRY,
+  DYNAMIC_INTL_REGIONAL_MAX_NM,
+  DYNAMIC_INTL_ULTRA_MIN_NM,
   ensureCareerHubCoverage,
   ensureInternationalLanes,
   migrateEconomyWorld,
@@ -319,7 +320,8 @@ describe('career partition', () => {
     const lanes = world.internationalLanes ?? [];
     const byCountry = new Map<string, number>();
     const byPair = new Map<string, number>();
-    let longHaul = 0;
+    let regional = 0;
+    let ultra = 0;
     for (const lane of lanes) {
       byCountry.set(
         lane.originCountryId,
@@ -332,7 +334,8 @@ describe('career partition', () => {
       const pair = [lane.originCountryId, lane.destCountryId].sort().join('|');
       byPair.set(pair, (byPair.get(pair) ?? 0) + 1);
       const nm = routeDistanceNm(world, lane.originIcao, lane.destIcao) ?? 0;
-      if (nm >= DYNAMIC_INTL_LONG_HAUL_MIN_NM) longHaul += 1;
+      if (nm <= DYNAMIC_INTL_REGIONAL_MAX_NM) regional += 1;
+      if (nm >= DYNAMIC_INTL_ULTRA_MIN_NM) ultra += 1;
     }
     for (const country of listWorldCountryIds(world)) {
       const n = byCountry.get(country) ?? 0;
@@ -351,7 +354,18 @@ describe('career partition', () => {
         `${pair} exceeds pair lane cap: ${n}`,
       );
     }
-    assert.ok(longHaul > 0, 'expected a long-haul slice');
+    assert.ok(lanes.length > 0, 'expected daily lanes');
+    const regionalShare = regional / lanes.length;
+    const ultraShare = ultra / lanes.length;
+    assert.ok(
+      regionalShare >= 0.5,
+      `expected regional share ≥0.50, got ${regionalShare.toFixed(3)} (${regional}/${lanes.length})`,
+    );
+    assert.ok(
+      ultraShare <= 0.2,
+      `expected ultra share ≤0.20, got ${ultraShare.toFixed(3)} (${ultra}/${lanes.length})`,
+    );
+    assert.ok(ultra >= 1, 'expected a thin ultra/trunk shelf');
   });
 
   it('replays the exact lane set for the same seed and economy day', () => {

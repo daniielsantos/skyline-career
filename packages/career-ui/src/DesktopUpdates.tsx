@@ -373,7 +373,7 @@ export function DesktopUpdatesCard() {
       : state.status === 'downloading'
         ? `Downloading update… ${state.progressPct.toFixed(0)}%`
         : state.status === 'ready' && state.remoteVersion
-          ? `Version ${state.remoteVersion} downloaded. Install opens a one-click updater — if Windows warns about an unknown publisher, choose More info → Run anyway; the app should reopen when finished.`
+          ? `Version ${state.remoteVersion} downloaded. Install closes the app and opens the updater window — if Windows warns about an unknown publisher, choose More info → Run anyway; watch progress until Airframe reopens.`
           : state.status === 'uptodate'
             ? 'You are on the latest release.'
             : state.status === 'checking'
@@ -438,7 +438,7 @@ export function DesktopUpdatesCard() {
             onClick={() => void onRestart()}
           >
             Restart to update
-            <small>One-click install</small>
+            <small>Opens installer</small>
           </button>
         ) : null}
       </div>
@@ -472,7 +472,7 @@ export function DesktopUpdateHeaderButton() {
   const title = downloading
     ? `Downloading ${state.remoteVersion ?? 'update'}… ${state.progressPct.toFixed(0)}%`
     : ready
-      ? `Version ${state.remoteVersion} downloaded — click to install (SmartScreen → Run anyway, then quiet update)`
+      ? `Version ${state.remoteVersion} downloaded — click to install (SmartScreen → Run anyway, then watch the installer)`
       : `Version ${state.remoteVersion} available — click to download and install`;
 
   async function onClick() {

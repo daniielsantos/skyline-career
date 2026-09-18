@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Desktop update install visível** — remove `/S` no quit-and-install unsigned; Setup one-click com janela de progresso + SmartScreen na frente (evita close sem feedback). `/S` só com Authenticode. Detail: `packages/desktop/README.md`.
+
+Atualizado 2026-09-18: **Intl regional-first lane retune** — score/fill preferem ≤2500 nm; ultra ≥4000 capped ≤18% (+ soft floor 8%). Sem baixar MAX 6500. Re-medir mix lanes/lots após +2–3d VPS. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **Regional→major feeder pass** — sob skipAll, budget forma feeder LTL (TP/LJ) em regionais via corridor; SBCT deixa de ser só last-mile 1 klb. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **VPS d22 pós-dials** — intl **7.5%** (era 4.6%), board ~14.5k, BR/US 100%, shelf intl ~1.1k avail. Watch soft-cap overshoot + supplies fill + feeder mix. Detail: [`08-economy.md`](./08-economy.md).
@@ -124,7 +128,7 @@ Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab
 
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
-Atualizado 2026-09-18: **Desktop update one-click** — NSIS `oneClick` + launch Setup `/S` após SmartScreen (unsigned). Ainda não é Cursor-silent (falta Authenticode). Detail: `packages/desktop/README.md`.
+Atualizado 2026-09-18: **Desktop update one-click** — NSIS `oneClick`; in-app install abre Setup **visível** (sem `/S` — quiet escondia SmartScreen/falhas). Cursor-silent só com Authenticode. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-18: **Regional/spoke GA–feeder board** — regionais deixam de ser só scrap last-mile; reserved bulk seats + share/open dials (sem major/XL). Re-medir SBCT outbound + BR regional feeder após ship. Detail: [`08-economy.md`](./08-economy.md).
 

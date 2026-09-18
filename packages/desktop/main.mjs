@@ -607,9 +607,10 @@ function registerIpc() {
       title: 'Install Airframe update',
       message: 'Windows may warn that the publisher is unknown.',
       detail:
-        'On the SmartScreen dialog, choose More info → Run anyway.\n\n' +
-        'The one-click installer then updates quietly and should reopen Airframe Career.\n' +
-        'If it does not, open it from the Start Menu.\n\n' +
+        'Airframe will close and open the installer window.\n\n' +
+        'If Windows shows SmartScreen, choose More info → Run anyway.\n' +
+        'Watch the installer progress — when it finishes, Airframe should reopen.\n' +
+        'If it does not, open Airframe Career from the Start Menu.\n\n' +
         `Installer:\n${installerPath}`,
     });
     if (choice !== 0) return { ok: false, reason: 'cancelled' };
@@ -620,19 +621,22 @@ function registerIpc() {
     apiChild = null;
     hostChild = null;
 
-    // One-click NSIS: /S skips the wizard after SmartScreen. Unsigned builds
-    // still need the user to clear SmartScreen once — silent quitAndInstall
-    // without that often fails with no UI.
-    logLine(`[desktop] launching update installer (one-click /S): ${installerPath}`);
+    // Unsigned NSIS: do NOT pass /S. Quiet spawn often dies behind SmartScreen
+    // with the app already gone and no progress UI. Visible one-click Setup
+    // still skips the Next/Next wizard but shows progress + SmartScreen.
+    // /S (Cursor-silent) needs Authenticode — not enabled yet.
+    logLine(
+      `[desktop] launching update installer (visible one-click): ${installerPath}`,
+    );
     try {
-      spawn(installerPath, ['/S'], {
+      spawn(installerPath, [], {
         detached: true,
         stdio: 'ignore',
         windowsHide: false,
       }).unref();
     } catch (err) {
       logLine(
-        `[desktop] spawn /S failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
+        `[desktop] spawn installer failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
       );
       const openErr = await shell.openPath(installerPath);
       if (openErr) {

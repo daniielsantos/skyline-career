@@ -20,11 +20,11 @@ Electron shell around the local Career API + static UI.
 Settings → **Updates** (desktop only) or the topbar **Update** pill:
 
 1. App checks GitHub Releases on startup (silent).
-2. **Download** → **Install** closes the app and launches the one-click Setup with `/S` (quiet after SmartScreen).
-3. If Windows warns (unsigned), choose **More info → Run anyway**; the installer should reopen Airframe when done.
+2. **Download** → **Install** closes the app and opens the one-click Setup **with a visible progress window** (no `/S` — quiet install hid SmartScreen failures).
+3. If Windows warns (unsigned), choose **More info → Run anyway**; watch the installer until it finishes — Airframe should reopen.
 4. Player saves in AppData are kept across updates.
 
-Silent Cursor-style updates without the SmartScreen prompt need an Authenticode certificate — not enabled yet.
+Fully silent Cursor-style updates (no SmartScreen, no installer UI) need an Authenticode certificate — not enabled yet.
 
 ## Dev (from repo)
 
@@ -112,12 +112,12 @@ gh release create "v$ver" `
 
 ### Smoke auto-update
 
-Unsigned builds hit Windows SmartScreen. In-app update launches the one-click Setup with `/S` after you confirm; clear SmartScreen with **More info → Run anyway** (fully silent `quitAndInstall` without a cert often fails with no recovery).
+Unsigned builds hit Windows SmartScreen. In-app update opens the one-click Setup **visibly** (no `/S`) after you confirm so progress and SmartScreen stay on screen.
 
 1. Install an older Setup (e.g. `v0.3.90`) on a clean machine / VM.
 2. Publish a newer release (e.g. `v0.3.91+`) with Setup + `latest.yml` as **Assets** (not in release notes).
 3. Open the installed app → topbar **Update** / Settings → Updates → Download → **Install**.
-4. Clear SmartScreen if prompted; one-click installer should update quietly and reopen (or use Start Menu).
+4. Clear SmartScreen if prompted; watch the installer finish and reopen (or use Start Menu).
 5. Confirm the new version and that profiles under `%AppData%\Skyline Career\` survived.
 
 ## Logs

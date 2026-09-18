@@ -27,8 +27,29 @@ export const DYNAMIC_INTL_LANES_MIN = 96;
 export const DYNAMIC_INTL_LANES_MAX = 560;
 /** Soft widen 2026-09-18: 2.25→3 — target board OD count / country. */
 export const DYNAMIC_INTL_LANES_PER_COUNTRY = 3;
-export const DYNAMIC_INTL_LONG_HAUL_SHARE = 0.2;
-export const DYNAMIC_INTL_LONG_HAUL_MIN_NM = 2_500;
+/**
+ * Regional intl band ceiling (neighbor / same-continent scale).
+ * Product 2026-09-18: most lanes should sit at or below this nm.
+ */
+export const DYNAMIC_INTL_REGIONAL_MAX_NM = 2_500;
+/** Below this, short cross-border hops get a mild score penalty. */
+export const DYNAMIC_INTL_REGIONAL_MIN_NM = 400;
+/** Ultra / intercontinental trunk floor. */
+export const DYNAMIC_INTL_ULTRA_MIN_NM = 4_000;
+/** Soft floor: keep a thin Wide/ocean shelf after regional fill. */
+export const DYNAMIC_INTL_ULTRA_SHARE_MIN = 0.08;
+/** Hard ceiling: ultra lanes must not dominate the daily graph. */
+export const DYNAMIC_INTL_ULTRA_SHARE_MAX = 0.18;
+/** Soft floor: majority of daily lanes should be regional-band. */
+export const DYNAMIC_INTL_REGIONAL_SHARE_MIN = 0.55;
+/**
+ * @deprecated Alias of {@link DYNAMIC_INTL_REGIONAL_MAX_NM} (legacy long-haul floor nm).
+ */
+export const DYNAMIC_INTL_LONG_HAUL_MIN_NM = DYNAMIC_INTL_REGIONAL_MAX_NM;
+/**
+ * @deprecated Was long-haul floor share; now mirrors ultra ceiling for pulse/docs.
+ */
+export const DYNAMIC_INTL_LONG_HAUL_SHARE = DYNAMIC_INTL_ULTRA_SHARE_MAX;
 export const DYNAMIC_INTL_MIN_ROUTE_NM = 60;
 export const DYNAMIC_INTL_MAX_ROUTE_NM = 6_500;
 
@@ -161,14 +182,25 @@ function candidateScore(
 ): number {
   const pressure = gatewayPressure(a, b);
   const gatewayQuality = (tierScore(tierOf(a)) + tierScore(tierOf(b))) / 6;
+  // Regional-first: neighbor-scale ODs beat oceans (product 2026-09-18).
   const distanceBand =
-    nm >= DYNAMIC_INTL_LONG_HAUL_MIN_NM
-      ? 0.9
-      : nm >= 700
-        ? 1
-        : 0.82;
+    nm >= DYNAMIC_INTL_ULTRA_MIN_NM
+      ? 0.55
+      : nm > DYNAMIC_INTL_REGIONAL_MAX_NM
+        ? 0.78
+        : nm >= DYNAMIC_INTL_REGIONAL_MIN_NM
+          ? 1.15
+          : 0.88;
   const jitter = hashUnit(`${world.seed}:${day}:lane:${odKey(a.icao, b.icao)}`);
   return pressure * 5 + gatewayQuality * 2 + distanceBand + jitter * 1.5;
+}
+
+function isRegionalBandNm(nm: number): boolean {
+  return nm <= DYNAMIC_INTL_REGIONAL_MAX_NM;
+}
+
+function isUltraBandNm(nm: number): boolean {
+  return nm >= DYNAMIC_INTL_ULTRA_MIN_NM;
 }
 
 function buildCandidates(
@@ -245,17 +277,44 @@ export function selectDynamicInternationalLanes(
   const countryCounts = new Map<string, number>();
   const pairCounts = new Map<string, number>();
 
-  const canSelect = (candidate: LaneCandidate): boolean =>
-    !selectedOds.has(candidate.odKey) &&
-    (countryCounts.get(candidate.countryA) ?? 0) <
-      DYNAMIC_INTL_MAX_LANES_PER_COUNTRY &&
-    (countryCounts.get(candidate.countryB) ?? 0) <
-      DYNAMIC_INTL_MAX_LANES_PER_COUNTRY &&
-    (pairCounts.get(candidate.countryPairKey) ?? 0) <
-      DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR;
+  const ultraCount = (): number =>
+    selected.filter((row) => isUltraBandNm(row.nm)).length;
+  const regionalCount = (): number =>
+    selected.filter((row) => isRegionalBandNm(row.nm)).length;
+  const ultraCap = Math.max(1, Math.round(target * DYNAMIC_INTL_ULTRA_SHARE_MAX));
+  const ultraMin = Math.max(1, Math.round(target * DYNAMIC_INTL_ULTRA_SHARE_MIN));
+  const regionalMin = Math.round(target * DYNAMIC_INTL_REGIONAL_SHARE_MIN);
 
-  const add = (candidate: LaneCandidate): boolean => {
-    if (!canSelect(candidate) || selected.length >= target) return false;
+  const canSelect = (
+    candidate: LaneCandidate,
+    opts: { enforceUltraCap?: boolean } = {},
+  ): boolean => {
+    if (selectedOds.has(candidate.odKey)) return false;
+    if (
+      (countryCounts.get(candidate.countryA) ?? 0) >=
+        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY ||
+      (countryCounts.get(candidate.countryB) ?? 0) >=
+        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY ||
+      (pairCounts.get(candidate.countryPairKey) ?? 0) >=
+        DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR
+    ) {
+      return false;
+    }
+    if (
+      opts.enforceUltraCap !== false &&
+      isUltraBandNm(candidate.nm) &&
+      ultraCount() >= ultraCap
+    ) {
+      return false;
+    }
+    return true;
+  };
+
+  const add = (
+    candidate: LaneCandidate,
+    opts: { enforceUltraCap?: boolean } = {},
+  ): boolean => {
+    if (!canSelect(candidate, opts) || selected.length >= target) return false;
     selected.push(candidate);
     selectedOds.add(candidate.odKey);
     countryCounts.set(
@@ -273,40 +332,62 @@ export function selectDynamicInternationalLanes(
     return true;
   };
 
-  // Fairness first: give every reachable country two active links before the
-  // highest-pressure countries consume the global lane budget.
+  const findForCountry = (
+    country: string,
+    preferRegional: boolean,
+  ): LaneCandidate | undefined => {
+    if (preferRegional) {
+      const regional = candidates.find(
+        (row) =>
+          (row.countryA === country || row.countryB === country) &&
+          isRegionalBandNm(row.nm) &&
+          canSelect(row),
+      );
+      if (regional) return regional;
+    }
+    return candidates.find(
+      (row) =>
+        (row.countryA === country || row.countryB === country) &&
+        canSelect(row),
+    );
+  };
+
+  // Fairness first: prefer regional-band links per country before any distance.
   for (let pass = 0; pass < DYNAMIC_INTL_MIN_LANES_PER_COUNTRY; pass += 1) {
     const rotation =
-      countries.length > 0 ? hashSeed(`${world.seed}:${day}:country-order`) % countries.length : 0;
+      countries.length > 0
+        ? hashSeed(`${world.seed}:${day}:country-order`) % countries.length
+        : 0;
     const ordered = [
       ...countries.slice(rotation),
       ...countries.slice(0, rotation),
     ];
     for (const country of ordered) {
       if ((countryCounts.get(country) ?? 0) > pass) continue;
-      const candidate = candidates.find(
-        (row) =>
-          (row.countryA === country || row.countryB === country) &&
-          canSelect(row),
-      );
+      const candidate = findForCountry(country, true);
       if (candidate) add(candidate);
     }
   }
 
-  // Keep a real long-haul shelf instead of letting nearby pairs consume every
-  // slot. The normal score fill below still decides the remainder.
-  const longHaulTarget = Math.round(target * DYNAMIC_INTL_LONG_HAUL_SHARE);
-  let longHaulSelected = selected.filter(
-    (row) => row.nm >= DYNAMIC_INTL_LONG_HAUL_MIN_NM,
-  ).length;
-  if (longHaulSelected < longHaulTarget) {
+  // Regional fill: push neighbor-scale ODs until the majority floor is met.
+  if (regionalCount() < regionalMin) {
     for (const candidate of candidates) {
-      if (selected.length >= target || longHaulSelected >= longHaulTarget) break;
-      if (candidate.nm < DYNAMIC_INTL_LONG_HAUL_MIN_NM) continue;
-      if (add(candidate)) longHaulSelected += 1;
+      if (selected.length >= target || regionalCount() >= regionalMin) break;
+      if (!isRegionalBandNm(candidate.nm)) continue;
+      add(candidate);
     }
   }
 
+  // Thin ultra shelf for Wide/ocean careers — only after regional health.
+  if (ultraCount() < ultraMin && regionalCount() >= Math.min(regionalMin, selected.length)) {
+    for (const candidate of candidates) {
+      if (selected.length >= target || ultraCount() >= ultraMin) break;
+      if (!isUltraBandNm(candidate.nm)) continue;
+      add(candidate, { enforceUltraCap: false });
+    }
+  }
+
+  // Score fill remainder under ultra ceiling.
   for (const candidate of candidates) {
     if (selected.length >= target) break;
     add(candidate);

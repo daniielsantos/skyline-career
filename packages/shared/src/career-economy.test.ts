@@ -31,6 +31,8 @@ import {
   LAST_MILE_REGIONAL_STOCK_SHARE,
   FEEDER_LTL_MIN_KG,
   DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL,
+  REGIONAL_FEEDER_FORM_BUDGET,
+  REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN,
   LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET,
   LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
   lastMileSkipAllSpokeFormBudget,
@@ -3661,10 +3663,51 @@ describe('tickEconomyN market formation', () => {
         );
       }
     }
+    // Soft-cap skipAll is the live bind at ~14k lots — feeder pass must still run.
+    const padFor = (commodityId: CommodityId) => {
+      const quota = partitionAvailableQuota(world, 'BR');
+      while (
+        world.lots.filter(
+          (l) =>
+            l.status === 'available' &&
+            l.commodityId === commodityId &&
+            countryIdFromRegion(
+              world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+            ) === 'BR',
+        ).length <
+        quota + 20
+      ) {
+        world.lots.push({
+          id: `lot_skipall_pad_${commodityId}_${world.lots.length}`,
+          commodityId,
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+          quantityKg: 400,
+          reservedKg: 0,
+          createdAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          payUsd: 4_000,
+          basePayUsd: 4_000,
+          urgency: 'normal',
+          reason: 'skipAll pad',
+          status: 'available',
+        });
+      }
+    };
+    for (const id of [
+      'general',
+      'supplies',
+      'electronics',
+      'machinery',
+      'perishables',
+    ] as const) {
+      padFor(id);
+    }
     tickEconomyN(world, TICKS_PER_DAY);
 
     const fromRegional = world.lots.filter((l) => {
       if (l.status !== 'available' && l.status !== 'reserved') return false;
+      if (l.reason.includes('skipAll pad')) return false;
       const origin = world.airports.find((a) => a.icao === l.originIcao);
       if (countryIdFromRegion(origin?.region ?? '') !== 'BR') return false;
       return (
@@ -3687,6 +3730,13 @@ describe('tickEconomyN market formation', () => {
       feeder.length >= 2,
       `expected TP/LJ feeder from regionals; feeder=${feeder.length} ga=${ga.length} total=${fromRegional.length}`,
     );
+    const taggedFeeder = feeder.filter((l) =>
+      /regional feeder/i.test(l.reason),
+    );
+    assert.ok(
+      taggedFeeder.length >= 1,
+      `expected regional-feeder tag; tagged=${taggedFeeder.length} feeder=${feeder.length}`,
+    );
     const perishGa = fromRegional.filter(
       (l) =>
         l.commodityId === 'perishables' &&
@@ -3700,13 +3750,14 @@ describe('tickEconomyN market formation', () => {
     assert.equal(LAST_MILE_OPEN_LOTS_PER_REGIONAL_ORIGIN, 4);
     assert.ok(LAST_MILE_REGIONAL_STOCK_SHARE >= 0.35);
     assert.equal(DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL, 0.72);
+    assert.equal(REGIONAL_FEEDER_FORM_BUDGET, 3);
+    assert.equal(REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN, 2);
 
-    const byOrigin = new Map<string, number>();
-    for (const lot of fromRegional) {
-      byOrigin.set(lot.originIcao, (byOrigin.get(lot.originIcao) ?? 0) + 1);
-    }
-    const sbct = byOrigin.get('SBCT') ?? 0;
-    assert.ok(sbct >= 2, `SBCT outbound=${sbct}`);
+    const sbctFeeder = feeder.filter((l) => l.originIcao === 'SBCT');
+    assert.ok(
+      sbctFeeder.length >= 1,
+      `SBCT feeder lots=${sbctFeeder.length} (need TP/LJ fills)`,
+    );
   });
 
   it('forms last-mile Dry when dests are above soft 58% room (abs headroom)', () => {

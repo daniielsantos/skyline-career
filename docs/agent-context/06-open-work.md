@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Regional→major feeder pass** — sob skipAll, budget forma feeder LTL (TP/LJ) em regionais via corridor; SBCT deixa de ser só last-mile 1 klb. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **VPS d22 pós-dials** — intl **7.5%** (era 4.6%), board ~14.5k, BR/US 100%, shelf intl ~1.1k avail. Watch soft-cap overshoot + supplies fill + feeder mix. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **World deploy skip duplicate on release SHA** — `workflow_run` após CI do bump não rebuilda se `HEAD` já tem tag `v*` (release `on: release` já buildou+deployou). Deploy production inalterado.
 
 Atualizado 2026-09-18: **Intl formation Pulse diag** — medir bind (matchable OD / skipAll kg|count) no Live pulse antes de retunar soft share. Card em Hub Pulse. Detail: [`08-economy.md`](./08-economy.md).

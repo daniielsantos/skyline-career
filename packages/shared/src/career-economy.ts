@@ -1429,6 +1429,17 @@ const LAST_MILE_SPOKE_STOCK_SHARE = 0.55;
  */
 export const LAST_MILE_REGIONAL_STOCK_SHARE = 0.4;
 /**
+ * Under soft-cap skipAll, still post this many regional→major feeder LTL lots
+ * per country×SKU / tick so TP/light-jet boards exist outside majors.
+ */
+export const REGIONAL_FEEDER_FORM_BUDGET = 3;
+/** Open feeder-band lots kept per regional origin×commodity. */
+export const REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN = 2;
+/** Soft origin fill for the regional feeder pass (softer than value-heavy 0.66). */
+export const REGIONAL_FEEDER_SOFT_ORIGIN_FILL = 0.4;
+/** Min regional warehouse fill before offering a feeder hop. */
+export const REGIONAL_FEEDER_MIN_ORIGIN_FILL = 0.42;
+/**
  * Adaptive regional recovery (generic): if a region stays with low live hubs
  * and many dead spokes, temporarily relax spoke gates there.
  */
@@ -10741,6 +10752,8 @@ function* formLotsFromImbalances(
       /** Floor on (dest − origin) price used for pay, as a fraction of base. */
       minPayGapMult?: number;
       lastMile?: boolean;
+      /** Regional→major TP/LJ feeder (bypass soft-cap skipAll via budgeted pass). */
+      regionalFeeder?: boolean;
     },
   ): boolean => {
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
@@ -10845,6 +10858,8 @@ function* formLotsFromImbalances(
     const sizeNote =
       size === 'xl' ? ' · XL' : size === 'small' ? ' · LTL' : '';
     const lastMileNote = opts.lastMile === true ? ' · last-mile' : '';
+    const regionalFeederNote =
+      opts.regionalFeeder === true ? ' · regional feeder' : '';
     const lot: ShipmentLot = {
       id: `lot_${world.tick}_${commodity.id}_${origin.ap.icao}_${dest.ap.icao}_${Math.floor(rng() * 1e6)}`,
       commodityId: commodity.id,
@@ -10857,7 +10872,7 @@ function* formLotsFromImbalances(
       payUsd,
       basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
-      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${lastMileNote}${international ? ' · intl' : ''}${shockNote}`,
+      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${lastMileNote}${regionalFeederNote}${international ? ' · intl' : ''}${shockNote}`,
       status: 'available',
     };
 
@@ -11658,6 +11673,181 @@ function* formLotsFromImbalances(
   addTickPhaseMs(profile, 'formLotsLastMile', lotsPhaseAt);
   lotsPhaseAt = performance.now();
 
+  // --- Regional→major feeder LTL (TP / light-jet) ---
+  // Soft-cap skipAll kills bulk formation, so Curitiba-class hubs only posted
+  // GA last-mile scraps. This budgeted pass ignores skipAll/skipSmall and
+  // forces feeder-band lots along curated corridors to majors.
+  const countOpenRegionalFeederFrom = (
+    originIcao: string,
+    commodityId: CommodityId,
+  ): number => {
+    const code = originIcao.trim().toUpperCase();
+    let n = 0;
+    for (const lot of world.lots) {
+      if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+      if (lot.commodityId !== commodityId) continue;
+      if (lot.originIcao.trim().toUpperCase() !== code) continue;
+      if (lot.quantityKg < FEEDER_LTL_MIN_KG) continue;
+      if (lot.quantityKg >= LARGE_LOT_MIN_KG) continue;
+      n += 1;
+    }
+    return n;
+  };
+
+  const runRegionalFeederForCountry = (countryId: string): void => {
+    const countryAirports = airportsByCountry.get(countryId) ?? [];
+    if (countryAirports.length === 0) return;
+
+    for (const commodity of CAREER_CARGO_COMMODITIES) {
+      const ranked = rankAirports(countryAirports, commodity);
+      const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
+      const origins = ranked.filter((origin) => {
+        if (origin.tier !== 'regional') return false;
+        if (origin.fill < REGIONAL_FEEDER_MIN_ORIGIN_FILL) return false;
+        const surplus = surplusKgAboveSoftOrigin(
+          origin.stock,
+          REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
+        );
+        if (surplus < FEEDER_LTL_MIN_KG) return false;
+        return (
+          countOpenRegionalFeederFrom(origin.ap.icao, commodity.id) <
+          REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN
+        );
+      });
+      if (origins.length === 0) continue;
+
+      const rot = world.tick % origins.length;
+      const rotated =
+        rot === 0
+          ? origins
+          : [...origins.slice(rot), ...origins.slice(0, rot)];
+      rotated.sort((a, b) => b.fill - a.fill);
+
+      let formedThisTick = 0;
+      for (const origin of rotated) {
+        if (formedThisTick >= REGIONAL_FEEDER_FORM_BUDGET) break;
+        if (
+          countOpenRegionalFeederFrom(origin.ap.icao, commodity.id) >=
+          REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN
+        ) {
+          continue;
+        }
+        const surplus = surplusKgAboveSoftOrigin(
+          origin.stock,
+          REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
+        );
+        if (surplus < FEEDER_LTL_MIN_KG) continue;
+
+        const partnerRows: Array<{ dest: RankedAirport; cw: number }> = [];
+        for (const partnerIcao of corridorPartners(origin.ap.icao)) {
+          const dest = byIcao.get(partnerIcao);
+          if (!dest || dest.ap.icao === origin.ap.icao) continue;
+          if (dest.tier !== 'major' && dest.tier !== 'regional') continue;
+          if (dest.roomKg < FEEDER_LTL_MIN_KG) continue;
+          if (countryIdFromRegion(dest.ap.region) !== countryId) continue;
+          const cw = corridorWeight(origin.ap.icao, dest.ap.icao);
+          if (cw <= 1) continue;
+          partnerRows.push({ dest, cw });
+        }
+        partnerRows.sort((a, b) => {
+          if (a.dest.tier !== b.dest.tier) {
+            return a.dest.tier === 'major' ? -1 : 1;
+          }
+          return b.cw - a.cw || a.dest.fill - b.dest.fill;
+        });
+
+        for (const { dest, cw } of partnerRows) {
+          if (formedThisTick >= REGIONAL_FEEDER_FORM_BUDGET) break;
+          const liveRoom = destRoomKg(dest.stock, commodity.id);
+          if (liveRoom < FEEDER_LTL_MIN_KG) continue;
+          const priceGap = dest.price - origin.price;
+          if (priceGap < commodity.basePricePerKg * (cw >= 1.5 ? 0.15 : 0.22)) {
+            continue;
+          }
+          const key = laneKey(commodity.id, origin.ap.icao, dest.ap.icao);
+          const caps = laneLotCaps(origin.tier, dest.tier, {
+            originLevel: origin.ap.level,
+            destLevel: dest.ap.level,
+          });
+          if (cw >= 1.8) {
+            caps.maxLots += 1;
+            caps.maxSmall += 1;
+          }
+          const laneSat = laneSatOf(
+            origin.ap.icao,
+            dest.ap.icao,
+            commodity.id,
+          );
+          if (laneSat >= 1) continue;
+          const satPenalty = laneSat >= 0.5 ? 1 : 0;
+          if ((activeCounts.get(key) ?? 0) + satPenalty >= caps.maxLots) {
+            continue;
+          }
+          if ((smallCounts.get(key) ?? 0) >= Math.max(1, caps.maxSmall)) {
+            continue;
+          }
+
+          const liveSurplus = surplusKgAboveSoftOrigin(
+            origin.stock,
+            REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
+          );
+          let qty = Math.min(
+            liveSurplus,
+            liveRoom,
+            SMALL_LOT_MAX_KG,
+            Math.max(FEEDER_LTL_MIN_KG, Math.floor(liveSurplus * 0.35)),
+          );
+          qty = Math.floor(qty / 50) * 50;
+          if (qty < FEEDER_LTL_MIN_KG) {
+            if (
+              liveSurplus >= FEEDER_LTL_MIN_KG &&
+              liveRoom >= FEEDER_LTL_MIN_KG
+            ) {
+              qty = FEEDER_LTL_MIN_KG;
+            } else {
+              continue;
+            }
+          }
+          qty = Math.min(qty, SMALL_LOT_MAX_KG);
+          const nm = routeDistanceNm(world, origin.ap.icao, dest.ap.icao);
+          if (nm == null || nm < LAST_MILE_MIN_NM || nm > SMALL_LOT_MAX_NM) {
+            continue;
+          }
+
+          const inboundKg = destInboundOf(dest.ap.icao, commodity.id);
+          const formed = pushLot(
+            key,
+            commodity,
+            origin,
+            dest,
+            qty,
+            'small',
+            laneSat,
+            inboundKg,
+            cw,
+            {
+              international: false,
+              partitionId: countryId,
+              minPayGapMult: cw >= 1.5 ? 0.15 : 0.22,
+              regionalFeeder: true,
+            },
+          );
+          if (formed) {
+            formedThisTick += 1;
+            break;
+          }
+        }
+      }
+    }
+  };
+
+  for (const countryId of countryIds) {
+    runRegionalFeederForCountry(countryId);
+    yield;
+  }
+  addTickPhaseMs(profile, 'formLotsRegionalFeeder', lotsPhaseAt);
+  lotsPhaseAt = performance.now();
+
   // --- International: bounded daily gateway lanes (both directions) ---
   const lookup = airportLookup(world.airports);
   const intlEndpointIcaos = new Set<string>();
@@ -11823,6 +12013,7 @@ export type TickPhaseId =
   | 'formLots'
   | 'formLotsBulk'
   | 'formLotsLastMile'
+  | 'formLotsRegionalFeeder'
   | 'formLotsIntl'
   | 'npc'
   | 'hubLevels'
@@ -11848,6 +12039,7 @@ export function createEmptyTickPhaseProfile(): TickPhaseProfile {
       formLots: 0,
       formLotsBulk: 0,
       formLotsLastMile: 0,
+      formLotsRegionalFeeder: 0,
       formLotsIntl: 0,
       npc: 0,
       hubLevels: 0,

@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **f54e247** / desktop **0.3.78** shipped: Enable GA/TP charter seats and show Pax on Airframes/Hangar cards. Release: [v0.3.78](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.78).
+
+
 `main` **5c2f7f8** / desktop **0.3.77** shipped: Rebrand desktop display and UI copy to Airframe Career. Release: [v0.3.77](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.77).
 
 

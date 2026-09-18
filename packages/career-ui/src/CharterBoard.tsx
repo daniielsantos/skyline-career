@@ -24,11 +24,16 @@ export const CHARTER_PAGE_SIZE = 10;
 export type CharterLaneFilter = '' | 'intl' | 'domestic' | 'pilot-domestic';
 export type CharterFitFilter = '' | 'open' | 'locked';
 
+/**
+ * Base Charter desk origin filter.
+ * Typed ICAO → exact lock. Empty → undefined (any origin; do not fall back to Base).
+ */
 export function resolveBaseCharterOrigin(
   dispatcherOrigin: string,
-  baseIcao: string,
-): string {
-  return dispatcherOrigin.trim().toUpperCase() || baseIcao.trim().toUpperCase();
+  _baseIcao?: string,
+): string | undefined {
+  const typed = dispatcherOrigin.trim().toUpperCase();
+  return typed || undefined;
 }
 
 export function charterExpiryLabel(ticksRemaining: number): string {

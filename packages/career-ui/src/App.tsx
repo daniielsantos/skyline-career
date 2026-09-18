@@ -64,6 +64,7 @@ import {
   postFboSplit,
   postFboReturnMission,
   postBaseDispatchTours,
+  postBaseDispatchCharters,
   postBaseDispatcher,
   postCrewAssign,
   postCrewDispatch,
@@ -112,6 +113,9 @@ import {
   type BaseDispatchTour,
   type BaseDispatchTourLeg,
   type BaseDispatchTourReturnMode,
+  type BaseCharterTour,
+  type BaseCharterTourReturnMode,
+  type CharterActiveTourView,
   type ActiveTourView,
   type BaseDispatcherSnapshot,
   describeTourFerry,
@@ -3671,9 +3675,12 @@ export function App() {
     );
   }, [airportIcao, playerFbos]);
   const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
+  const [charterTours, setCharterTours] = useState<BaseCharterTour[]>([]);
   const [baseDispatchProduct, setBaseDispatchProduct] =
     useState<'freight' | 'charter'>('freight');
   const [activeTour, setActiveTour] = useState<ActiveTourView | null>(null);
+  const [charterActiveTour, setCharterActiveTour] =
+    useState<CharterActiveTourView | null>(null);
   /** Tour itinerary to attach after Manifest Accept & Dispatch. */
   const [pendingActiveTour, setPendingActiveTourState] = useState<{
     kind: 'start' | 'bind';
@@ -3708,6 +3715,14 @@ export function App() {
   >(null);
   const [dispatchTourAircraftId, setDispatchTourAircraftId] = useState('');
   const [dispatchTourOrigin, setDispatchTourOrigin] = useState('');
+  /** Base → Charters desk only — never share Freight Search origin (different meaning). */
+  const [baseCharterOrigin, setBaseCharterOrigin] = useState('');
+  const [charterTourLegs, setCharterTourLegs] = useState<1 | 2>(1);
+  const [charterTourReturnMode, setCharterTourReturnMode] =
+    useState<BaseCharterTourReturnMode>('none');
+  const [selectedCharterTourId, setSelectedCharterTourId] = useState<
+    string | null
+  >(null);
   const [dispatchTourLegs, setDispatchTourLegs] = useState<1 | 2 | 3 | 4>(2);
   const [dispatchTourMinNm, setDispatchTourMinNm] = useState('');
   const [dispatchTourMaxNm, setDispatchTourMaxNm] = useState('');
@@ -4195,6 +4210,29 @@ export function App() {
             return prev;
           }
           return snapTour as ActiveTourView;
+        });
+      }
+      const snapCharter = state.playerFbos.charterActiveTour;
+      if (!snapCharter || snapCharter.status !== 'active') {
+        setCharterActiveTour(null);
+      } else {
+        setCharterActiveTour((prev) => {
+          if (
+            prev &&
+            prev.id === snapCharter.id &&
+            prev.status === 'active' &&
+            prev.canAcceptNextLeg != null
+          ) {
+            return prev;
+          }
+          return {
+            ...snapCharter,
+            nextLegIndex:
+              snapCharter.legs.find(
+                (l) => l.status === 'planned' || l.status === 'active',
+              )?.index ?? null,
+            canAcceptNextLeg: false,
+          } as CharterActiveTourView;
         });
       }
     }
@@ -7916,6 +7954,199 @@ export function App() {
     }
   }
 
+  async function onGenerateCharterTours() {
+    if (busy || dispatchTourBusy) return;
+    const hub = (airportIcao ?? '').trim().toUpperCase();
+    if (!hub) return;
+    setDispatchTourLoading(true);
+    try {
+      const minNmRaw = dispatchTourMinNm.trim();
+      const maxNmRaw = dispatchTourMaxNm.trim();
+      const minNm =
+        minNmRaw && Number.isFinite(Number(minNmRaw))
+          ? Number(minNmRaw)
+          : undefined;
+      const maxNm =
+        maxNmRaw && Number.isFinite(Number(maxNmRaw)) && Number(maxNmRaw) > 0
+          ? Number(maxNmRaw)
+          : null;
+      const maxFerryRaw = dispatchTourMaxFerryNm.trim();
+      const maxFerryNm =
+        maxFerryRaw &&
+        Number.isFinite(Number(maxFerryRaw)) &&
+        Number(maxFerryRaw) > 0
+          ? Number(maxFerryRaw)
+          : 200;
+      const result = await postBaseDispatchCharters({
+        action: 'list',
+        hubIcao: hub,
+        aircraftId: dispatchTourAircraftId.trim() || undefined,
+        originIcao: resolveBaseCharterOrigin(baseCharterOrigin, hub),
+        legs: charterTourLegs,
+        minNm,
+        maxNm,
+        maxFerryNm,
+        returnMode: charterTourReturnMode,
+        preferLeaveBase: dispatchTourPreferLeaveBase,
+      });
+      setCharterTours(result.tours ?? []);
+      if (result.charterActiveTour !== undefined) {
+        setCharterActiveTour(result.charterActiveTour ?? null);
+      }
+      if (result.policy) setDispatchScoutPolicy(result.policy);
+      if (result.dispatcher) setBaseDispatcher(result.dispatcher);
+      setSelectedCharterTourId(null);
+      if ((result.tours ?? []).length === 0) {
+        setToastKind('fail');
+        setToast(
+          charterTourLegs === 1
+            ? 'No executable charter found — check parked passenger aircraft, seats/baggage, range, and ferry.'
+            : 'No executable 2-leg charter chain — try Any end, raise Max ferry, or clear Origin.',
+        );
+      }
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  function charterOfferFromTourLeg(
+    leg: BaseCharterTour['legs'][number],
+  ): CharterOfferView {
+    return {
+      id: leg.offerId,
+      originIcao: leg.originIcao,
+      destIcao: leg.destIcao,
+      originName: leg.originIcao,
+      destName: leg.destIcao,
+      paxCount: leg.groupSize,
+      baggageKg: leg.baggageKg,
+      payUsd: leg.payUsd,
+      basePayUsd: leg.payUsd,
+      urgency: 'normal',
+      reason: 'Base charter tour',
+      createdAtTick: 0,
+      expiresAtTick: leg.expiresAtTick,
+      ticksRemaining: Math.max(0, leg.expiresAtTick),
+      distanceNm: leg.distanceNm,
+      international: false,
+      status: 'available',
+    };
+  }
+
+  async function onConfirmCharterTour(tour: BaseCharterTour) {
+    if (busy || dispatchTourBusy) return;
+    const first = tour.legs[0];
+    if (!first) return;
+    const hub =
+      (airportIcao ?? '').trim().toUpperCase() ||
+      homeHubIcao.trim().toUpperCase() ||
+      first.originIcao;
+    setDispatchTourLoading(true);
+    try {
+      if (tour.legCount >= 2) {
+        const prepared = await postBaseDispatchCharters({
+          action: 'prepare',
+          aircraftId: tour.aircraftId,
+          hubIcao: hub,
+          tourId: tour.id,
+          routeLabel: tour.routeLabel,
+          tourLegs: tour.legs,
+        });
+        setCharterActiveTour(prepared.charterActiveTour ?? null);
+        if (prepared.playerFbos) setPlayerFbos(prepared.playerFbos);
+      }
+      setSelectedCharterTourId(null);
+      enterCharterManifest(
+        charterOfferFromTourLeg(first),
+        tour.aircraftId,
+      );
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  async function onAcceptCharterTourLeg(legIndex: number) {
+    if (busy || dispatchTourBusy || !charterActiveTour) return;
+    const leg = charterActiveTour.legs.find((l) => l.index === legIndex);
+    if (!leg) return;
+    setDispatchTourLoading(true);
+    try {
+      const status = await postBaseDispatchCharters({ action: 'status' });
+      setCharterActiveTour(status.charterActiveTour ?? null);
+      const view = status.charterActiveTour;
+      if (!view || view.nextLegIndex !== legIndex || !view.canAcceptNextLeg) {
+        setToastKind('fail');
+        setToast(view?.resumeHint ?? 'Cannot accept this charter leg yet');
+        return;
+      }
+      const next = view.legs.find((l) => l.index === legIndex);
+      if (!next) return;
+      enterCharterManifest(
+        {
+          id: next.offerId,
+          originIcao: next.originIcao,
+          destIcao: next.destIcao,
+          originName: next.originIcao,
+          destName: next.destIcao,
+          paxCount: next.groupSize,
+          baggageKg: next.baggageKg,
+          payUsd: next.payUsd,
+          basePayUsd: next.payUsd,
+          urgency: 'normal',
+          reason: 'Base charter tour',
+          createdAtTick: 0,
+          expiresAtTick: 0,
+          ticksRemaining: 0,
+          distanceNm: next.distanceNm,
+          international: false,
+          status: 'available',
+        },
+        view.aircraftId,
+      );
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  async function onDropCharterActiveTour() {
+    if (busy || dispatchTourBusy) return;
+    setDispatchTourLoading(true);
+    try {
+      const result = await postBaseDispatchCharters({ action: 'drop' });
+      setCharterActiveTour(null);
+      if (result.playerFbos) setPlayerFbos(result.playerFbos);
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
+  async function onRefreshCharterActiveTour() {
+    if (busy || dispatchTourBusy) return;
+    setDispatchTourLoading(true);
+    try {
+      const result = await postBaseDispatchCharters({ action: 'status' });
+      setCharterActiveTour(result.charterActiveTour ?? null);
+      if (result.playerFbos) setPlayerFbos(result.playerFbos);
+    } catch (err) {
+      setToastKind('fail');
+      setToast(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDispatchTourLoading(false);
+    }
+  }
+
   async function onAcceptActiveTourLeg(legIndex: number) {
     if (busy || dispatchTourBusy || !activeTour) return;
     const leg = activeTour.legs.find((l) => l.index === legIndex);
@@ -9027,6 +9258,9 @@ export function App() {
         });
         setFleet(result.fleet);
         setWallet(result.walletUsd);
+        if (result.charterActiveTour !== undefined) {
+          setCharterActiveTour(result.charterActiveTour ?? null);
+        }
         setMissions((current) => [
           result.mission,
           ...current.filter((mission) => mission.id !== result.mission.id),
@@ -10229,6 +10463,9 @@ export function App() {
       if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
       if (result.activeTour !== undefined) {
         setActiveTour(result.activeTour ?? null);
+      }
+      if (result.charterActiveTour !== undefined) {
+        setCharterActiveTour(result.charterActiveTour ?? null);
       }
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
@@ -12462,11 +12699,120 @@ export function App() {
                                       onClick={() => {
                                         setBaseDispatchProduct('charter');
                                         setSelectedDispatchTourId(null);
+                                        setSelectedCharterTourId(null);
                                       }}
                                     >
                                       Charter
                                     </button>
                                   </nav>
+
+                                  {baseDispatchProduct === 'charter' &&
+                                  charterActiveTour &&
+                                  charterActiveTour.status === 'active' ? (
+                                    <div className="crew-section base-active-tour">
+                                      <div className="base-dispatcher-scout-head">
+                                        <div>
+                                          <h4 className="crew-section-title">
+                                            Charter tour
+                                          </h4>
+                                          <p className="muted crew-section-lede">
+                                            {charterActiveTour.legs
+                                              .map(
+                                                (l) =>
+                                                  `${l.originIcao}→${l.destIcao}`,
+                                              )
+                                              .join(' · ')}
+                                          </p>
+                                        </div>
+                                        <div className="base-dispatcher-scout-actions">
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={busy || dispatchTourBusy}
+                                            onClick={() =>
+                                              void onRefreshCharterActiveTour()
+                                            }
+                                          >
+                                            Refresh
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={busy || dispatchTourBusy}
+                                            onClick={() =>
+                                              void onDropCharterActiveTour()
+                                            }
+                                          >
+                                            Drop
+                                          </button>
+                                        </div>
+                                      </div>
+                                      {charterActiveTour.resumeHint ? (
+                                        <p className="muted">
+                                          {charterActiveTour.resumeHint}
+                                        </p>
+                                      ) : null}
+                                      <div className="base-active-tour-legs">
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Leg</th>
+                                              <th>Route</th>
+                                              <th>Pax</th>
+                                              <th>Net</th>
+                                              <th>Status</th>
+                                              <th />
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {charterActiveTour.legs.map(
+                                              (leg) => {
+                                                const isNext =
+                                                  charterActiveTour.nextLegIndex ===
+                                                  leg.index;
+                                                return (
+                                                  <tr
+                                                    key={`${charterActiveTour.id}-${leg.index}`}
+                                                  >
+                                                    <td>L{leg.index}</td>
+                                                    <td>
+                                                      {leg.originIcao}→
+                                                      {leg.destIcao}
+                                                    </td>
+                                                    <td>{leg.groupSize}</td>
+                                                    <td>
+                                                      {formatMoney(leg.netUsd)}
+                                                    </td>
+                                                    <td>{leg.status}</td>
+                                                    <td>
+                                                      {isNext &&
+                                                      charterActiveTour.canAcceptNextLeg ? (
+                                                        <button
+                                                          type="button"
+                                                          className="accept"
+                                                          disabled={
+                                                            busy ||
+                                                            dispatchTourBusy
+                                                          }
+                                                          onClick={() =>
+                                                            void onAcceptCharterTourLeg(
+                                                              leg.index,
+                                                            )
+                                                          }
+                                                        >
+                                                          Accept L{leg.index}
+                                                        </button>
+                                                      ) : null}
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              },
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  ) : null}
 
                                   {baseDispatchProduct === 'freight' &&
                                   activeTour &&
@@ -13147,44 +13493,326 @@ export function App() {
                                         <h4 className="crew-section-title">
                                           Charters
                                         </h4>
-                                        <label className="base-dispatch-charter-origin">
-                                          <span>Origin</span>
-                                          <input
-                                            type="text"
-                                            maxLength={4}
-                                            placeholder={localFbo.icao}
-                                            value={dispatchTourOrigin}
-                                            onChange={(event) =>
-                                              setDispatchTourOrigin(
-                                                event.target.value
-                                                  .toUpperCase()
-                                                  .replace(/[^A-Z0-9]/g, '')
-                                                  .slice(0, 4),
-                                              )
-                                            }
-                                            disabled={busy || dispatchTourBusy}
-                                          />
-                                        </label>
                                       </div>
-                                      <CharterBoard
-                                        fleet={fleet}
-                                        initialAircraftId={dispatchTourAircraftId}
-                                        origin={resolveBaseCharterOrigin(
-                                          dispatchTourOrigin,
-                                          localFbo.icao,
-                                        )}
-                                        busy={
-                                          busy ||
-                                          dispatchTourBusy ||
-                                          Boolean(playerDispatchMission)
-                                        }
-                                        formatMoney={formatMoney}
-                                        formatMass={(kg) =>
-                                          formatMass(kg, weightSystem)
-                                        }
-                                        onPrepare={enterCharterManifest}
-                                        onOpenAirport={openAirport}
-                                      />
+
+                                      {mode === 'fleet' ? (
+                                        <div className="base-dispatch-tour-filters">
+                                          <div className="base-dispatch-tour-grid">
+                                            <label>
+                                              <span>Aircraft</span>
+                                              <select
+                                                value={dispatchTourAircraftId}
+                                                onChange={(e) =>
+                                                  setDispatchTourAircraftId(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              >
+                                                <option value="">
+                                                  Any parked
+                                                </option>
+                                                {fleet
+                                                  .filter(
+                                                    (a) => a.status === 'parked',
+                                                  )
+                                                  .map((a) => (
+                                                    <option
+                                                      key={a.id}
+                                                      value={a.id}
+                                                    >
+                                                      {a.label ??
+                                                        a.registration ??
+                                                        a.airframeTypeId ??
+                                                        a.id}
+                                                      {a.locationIcao
+                                                        ? ` @ ${a.locationIcao}`
+                                                        : ''}
+                                                    </option>
+                                                  ))}
+                                              </select>
+                                            </label>
+                                            <label>
+                                              <span>Legs</span>
+                                              <select
+                                                value={charterTourLegs}
+                                                onChange={(e) => {
+                                                  const n = Number(
+                                                    e.target.value,
+                                                  );
+                                                  setCharterTourLegs(
+                                                    n === 2 ? 2 : 1,
+                                                  );
+                                                  if (n === 1) {
+                                                    setCharterTourReturnMode(
+                                                      'none',
+                                                    );
+                                                  }
+                                                }}
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              >
+                                                <option value={1}>1</option>
+                                                <option value={2}>2</option>
+                                              </select>
+                                            </label>
+                                            <label>
+                                              <span>Origin</span>
+                                              <input
+                                                type="text"
+                                                maxLength={4}
+                                                placeholder="Any"
+                                                title="Exact charter origin. Clear for any departure."
+                                                value={baseCharterOrigin}
+                                                onChange={(e) =>
+                                                  setBaseCharterOrigin(
+                                                    e.target.value
+                                                      .toUpperCase()
+                                                      .replace(/[^A-Z0-9]/g, '')
+                                                      .slice(0, 4),
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Min nm</span>
+                                              <input
+                                                type="number"
+                                                min={0}
+                                                step={10}
+                                                placeholder="auto"
+                                                value={dispatchTourMinNm}
+                                                onChange={(e) =>
+                                                  setDispatchTourMinNm(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Max nm</span>
+                                              <input
+                                                type="number"
+                                                min={0}
+                                                step={50}
+                                                placeholder="—"
+                                                value={dispatchTourMaxNm}
+                                                onChange={(e) =>
+                                                  setDispatchTourMaxNm(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              <span>Max ferry</span>
+                                              <input
+                                                type="number"
+                                                min={40}
+                                                max={800}
+                                                step={20}
+                                                value={dispatchTourMaxFerryNm}
+                                                onChange={(e) =>
+                                                  setDispatchTourMaxFerryNm(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              />
+                                            </label>
+                                            {charterTourLegs > 1 ? (
+                                              <label>
+                                                <span>Return</span>
+                                                <select
+                                                  value={charterTourReturnMode}
+                                                  onChange={(e) =>
+                                                    setCharterTourReturnMode(
+                                                      e.target
+                                                        .value as BaseCharterTourReturnMode,
+                                                    )
+                                                  }
+                                                  disabled={
+                                                    busy || dispatchTourBusy
+                                                  }
+                                                >
+                                                  <option value="none">
+                                                    Any end
+                                                  </option>
+                                                  <option value="origin">
+                                                    End at origin
+                                                  </option>
+                                                  <option value="base">
+                                                    End at Base
+                                                  </option>
+                                                </select>
+                                              </label>
+                                            ) : null}
+                                            <label className="base-dispatch-leave-base">
+                                              <span>Leave Base</span>
+                                              <select
+                                                value={
+                                                  dispatchTourPreferLeaveBase
+                                                    ? 'on'
+                                                    : 'off'
+                                                }
+                                                onChange={(e) =>
+                                                  setDispatchTourPreferLeaveBase(
+                                                    e.target.value === 'on',
+                                                  )
+                                                }
+                                                disabled={
+                                                  busy || dispatchTourBusy
+                                                }
+                                              >
+                                                <option value="on">Prefer</option>
+                                                <option value="off">Off</option>
+                                              </select>
+                                            </label>
+                                            <div className="base-dispatch-tour-generate">
+                                              <button
+                                                type="button"
+                                                className="accept"
+                                                disabled={
+                                                  busy ||
+                                                  dispatchTourBusy ||
+                                                  Boolean(playerDispatchMission)
+                                                }
+                                                onClick={() =>
+                                                  void onGenerateCharterTours()
+                                                }
+                                              >
+                                                {dispatchTourLoading
+                                                  ? 'Searching…'
+                                                  : 'Search'}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : null}
+
+                                      {charterTours.length === 0 ? (
+                                        <p className="empty">
+                                          {dispatchTourLoading
+                                            ? 'Searching…'
+                                            : mode !== 'fleet'
+                                              ? 'Hire a Dispatcher above to unlock charter Search.'
+                                              : 'Search for charters'}
+                                        </p>
+                                      ) : (
+                                        <table className="data-table base-dispatch-freight-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Route</th>
+                                              <th>Legs</th>
+                                              <th>Dist</th>
+                                              <th>Ferry</th>
+                                              <th>Pax</th>
+                                              <th>Pay</th>
+                                              <th>Net</th>
+                                              <th>Aircraft</th>
+                                              <th />
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {charterTours.map((tour) => {
+                                              const selected =
+                                                selectedCharterTourId ===
+                                                tour.id;
+                                              const pax = tour.legs.reduce(
+                                                (s, l) => s + l.groupSize,
+                                                0,
+                                              );
+                                              return (
+                                                <tr
+                                                  key={tour.id}
+                                                  className={
+                                                    selected
+                                                      ? 'selected'
+                                                      : undefined
+                                                  }
+                                                  onClick={() =>
+                                                    setSelectedCharterTourId(
+                                                      tour.id,
+                                                    )
+                                                  }
+                                                >
+                                                  <td>
+                                                    {tour.routeLabel}
+                                                    {tour.totalFerryNm > 0.5
+                                                      ? ` · Ferry ${Math.round(tour.totalFerryNm)} nm`
+                                                      : ''}
+                                                  </td>
+                                                  <td>{tour.legCount}</td>
+                                                  <td>
+                                                    {Math.round(
+                                                      tour.totalDistanceNm,
+                                                    )}
+                                                  </td>
+                                                  <td>
+                                                    {Math.round(
+                                                      tour.totalFerryNm,
+                                                    )}
+                                                  </td>
+                                                  <td>{pax}</td>
+                                                  <td>
+                                                    {formatMoney(
+                                                      tour.totalPayUsd,
+                                                    )}
+                                                  </td>
+                                                  <td>
+                                                    {formatMoney(
+                                                      tour.totalNetUsd,
+                                                    )}
+                                                  </td>
+                                                  <td>
+                                                    {tour.aircraftLabel}
+                                                    {tour.aircraftLocationIcao
+                                                      ? ` @ ${tour.aircraftLocationIcao}`
+                                                      : ''}
+                                                  </td>
+                                                  <td>
+                                                    <button
+                                                      type="button"
+                                                      className="accept"
+                                                      disabled={
+                                                        busy ||
+                                                        dispatchTourBusy ||
+                                                        Boolean(
+                                                          playerDispatchMission,
+                                                        )
+                                                      }
+                                                      onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        void onConfirmCharterTour(
+                                                          tour,
+                                                        );
+                                                      }}
+                                                    >
+                                                      {tour.legCount === 1
+                                                        ? 'Accept'
+                                                        : 'Accept L1'}
+                                                    </button>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      )}
                                     </div>
                                   )}
                                 </>
@@ -13205,6 +13833,17 @@ export function App() {
                                 return (
                                   localHolds.find((h) => h.id === selectedFboHoldId)
                                     ?.originIcao ?? localFbo.icao
+                                );
+                              }
+                              if (
+                                baseDispatchProduct === 'charter' &&
+                                selectedCharterTourId
+                              ) {
+                                const tour = charterTours.find(
+                                  (t) => t.id === selectedCharterTourId,
+                                );
+                                return (
+                                  tour?.legs[0]?.originIcao ?? localFbo.icao
                                 );
                               }
                               if (selectedDispatchTourId) {
@@ -13231,6 +13870,19 @@ export function App() {
                                     ?.destIcao ?? null
                                 );
                               }
+                              if (
+                                baseDispatchProduct === 'charter' &&
+                                selectedCharterTourId
+                              ) {
+                                const tour = charterTours.find(
+                                  (t) => t.id === selectedCharterTourId,
+                                );
+                                if (!tour?.legs.length) return null;
+                                return (
+                                  tour.legs[tour.legs.length - 1]?.destIcao ??
+                                  null
+                                );
+                              }
                               if (selectedDispatchTourId) {
                                 const tour = dispatchTours.find(
                                   (t) => t.id === selectedDispatchTourId,
@@ -13244,6 +13896,15 @@ export function App() {
                               return null;
                             })()}
                             tourLegs={(() => {
+                              if (
+                                baseDispatchProduct === 'charter' &&
+                                selectedCharterTourId
+                              ) {
+                                const tour = charterTours.find(
+                                  (t) => t.id === selectedCharterTourId,
+                                );
+                                return tour?.legs ?? null;
+                              }
                               if (!selectedDispatchTourId) return null;
                               const tour = dispatchTours.find(
                                 (t) => t.id === selectedDispatchTourId,
@@ -13251,6 +13912,16 @@ export function App() {
                               return tour?.legs ?? null;
                             })()}
                             routeHeadline={(() => {
+                              if (
+                                baseDispatchProduct === 'charter' &&
+                                selectedCharterTourId
+                              ) {
+                                return (
+                                  charterTours.find(
+                                    (t) => t.id === selectedCharterTourId,
+                                  )?.routeLabel ?? null
+                                );
+                              }
                               if (!selectedDispatchTourId) return null;
                               return (
                                 dispatchTours.find(
@@ -13259,6 +13930,16 @@ export function App() {
                               );
                             })()}
                             ferryNm={(() => {
+                              if (
+                                baseDispatchProduct === 'charter' &&
+                                selectedCharterTourId
+                              ) {
+                                return (
+                                  charterTours.find(
+                                    (t) => t.id === selectedCharterTourId,
+                                  )?.totalFerryNm ?? null
+                                );
+                              }
                               if (!selectedDispatchTourId) return null;
                               return (
                                 dispatchTours.find(
@@ -13272,6 +13953,14 @@ export function App() {
                                   (h) => h.id === selectedFboHoldId,
                                 )?.distanceNm;
                               }
+                              if (
+                                baseDispatchProduct === 'charter' &&
+                                selectedCharterTourId
+                              ) {
+                                return charterTours.find(
+                                  (t) => t.id === selectedCharterTourId,
+                                )?.totalDistanceNm;
+                              }
                               if (selectedDispatchTourId) {
                                 return dispatchTours.find(
                                   (t) => t.id === selectedDispatchTourId,
@@ -13279,7 +13968,11 @@ export function App() {
                               }
                               return undefined;
                             })()}
-                            idleHint="Select a freight"
+                            idleHint={
+                              baseDispatchProduct === 'charter'
+                                ? 'Select a charter'
+                                : 'Select a freight'
+                            }
                             routeProgress={(() => {
                               if (!selectedFboMissionId) return null;
                               const m = missions.find(

@@ -823,6 +823,38 @@ export type ActiveTourView = {
   nextLegSoftHoldKg?: number | null;
 };
 
+export type CharterActiveTourLegStatus = 'planned' | 'active' | 'done' | 'lost';
+
+export type CharterActiveTourView = {
+  id: string;
+  aircraftId: string;
+  aircraftClassId: string;
+  airframeTypeId?: string;
+  hubIcao: string;
+  originIcao: string;
+  routeLabel: string;
+  legs: Array<{
+    index: number;
+    offerId: string;
+    originIcao: string;
+    destIcao: string;
+    groupSize: number;
+    baggageKg: number;
+    distanceNm: number;
+    ferryNm: number;
+    payUsd: number;
+    fuelCostUsd: number;
+    netUsd: number;
+    status: CharterActiveTourLegStatus;
+    missionId?: string;
+  }>;
+  startedAtTick: number;
+  status: 'active' | 'completed' | 'abandoned';
+  nextLegIndex: number | null;
+  canAcceptNextLeg: boolean;
+  resumeHint?: string;
+};
+
 export type PlayerFboSnapshot = {
   fbos: Array<{
     id: string;
@@ -847,6 +879,7 @@ export type PlayerFboSnapshot = {
   phase1MaxOwned: number;
   maxOwned?: number;
   activeTour?: ActiveTourView | null;
+  charterActiveTour?: CharterActiveTourView | null;
 };
 
 export type CompanyCrewSnapshot = {
@@ -1603,7 +1636,71 @@ export function postCharterAccept(opts: {
     mission: Mission;
     walletUsd: number;
     fleet: PlayerAircraft[];
+    charterActiveTour?: CharterActiveTourView | null;
   }>('/api/charters/accept', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type BaseCharterTourReturnMode = 'none' | 'origin' | 'base';
+
+export type BaseCharterTourLeg = {
+  offerId: string;
+  originIcao: string;
+  destIcao: string;
+  groupSize: number;
+  baggageKg: number;
+  distanceNm: number;
+  ferryNm: number;
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  tier: string;
+  expiresAtTick: number;
+};
+
+export type BaseCharterTour = {
+  id: string;
+  aircraftId: string;
+  aircraftLabel: string;
+  aircraftLocationIcao: string;
+  hubIcao: string;
+  routeLabel: string;
+  legs: BaseCharterTourLeg[];
+  legCount: number;
+  totalDistanceNm: number;
+  totalFerryNm: number;
+  totalPayUsd: number;
+  totalNetUsd: number;
+  score: number;
+};
+
+export function postBaseDispatchCharters(opts: {
+  action?: 'list' | 'status' | 'prepare' | 'drop' | 'bind-leg';
+  hubIcao?: string;
+  aircraftId?: string;
+  originIcao?: string;
+  legs?: number;
+  minNm?: number;
+  maxNm?: number | null;
+  maxFerryNm?: number | null;
+  returnMode?: BaseCharterTourReturnMode;
+  preferLeaveBase?: boolean;
+  tourId?: string;
+  routeLabel?: string;
+  tourLegs?: BaseCharterTourLeg[];
+  legIndex?: number;
+  missionId?: string;
+  offerId?: string;
+}) {
+  return api<{
+    tours?: BaseCharterTour[];
+    charterActiveTour?: CharterActiveTourView | null;
+    policy?: BaseDispatchScoutPolicy;
+    dispatcher?: BaseDispatcherSnapshot;
+    playerFbos?: PlayerFboSnapshot;
+  }>('/api/base/dispatch-charters', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
@@ -4451,6 +4548,7 @@ export function postSettle(opts: { missionId: string }) {
     fleet?: PlayerAircraft[];
     pilotIcao?: string;
     activeTour?: ActiveTourView | null;
+    charterActiveTour?: CharterActiveTourView | null;
   }>('/api/settle', {
     method: 'POST',
     body: JSON.stringify(opts),

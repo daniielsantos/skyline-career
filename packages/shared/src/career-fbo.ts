@@ -311,6 +311,12 @@ export function normalizePlayerFboState(raw: unknown): PlayerFboState {
       : r.activeTour === null
         ? null
         : undefined;
+  const charterActiveTour =
+    r.charterActiveTour && typeof r.charterActiveTour === 'object'
+      ? (r.charterActiveTour as PlayerFboState['charterActiveTour'])
+      : r.charterActiveTour === null
+        ? null
+        : undefined;
   return {
     fbos,
     holds,
@@ -319,6 +325,7 @@ export function normalizePlayerFboState(raw: unknown): PlayerFboState {
     ...(dispatcherHirePoolByHub ? { dispatcherHirePoolByHub } : {}),
     ...(dispatcherHirePoolDayByHub ? { dispatcherHirePoolDayByHub } : {}),
     ...(activeTour !== undefined ? { activeTour } : {}),
+    ...(charterActiveTour !== undefined ? { charterActiveTour } : {}),
   };
 }
 
@@ -1455,6 +1462,8 @@ export function playerFboSnapshot(
   maxOwned: number;
   /** Raw Active Tour itinerary (desk computes Accept gates via dispatch-tours). */
   activeTour?: PlayerFboState['activeTour'];
+  /** Raw Charter Active Tour (Base Charters Search L2). */
+  charterActiveTour?: PlayerFboState['charterActiveTour'];
 } {
   const fbos = ensurePlayerFbos(state);
   const home = state.homeHubIcao?.trim().toUpperCase() || '';
@@ -1500,6 +1509,9 @@ export function playerFboSnapshot(
     maxOwned: FBO_MAX_OWNED,
     ...(fbos.activeTour?.status === 'active'
       ? { activeTour: fbos.activeTour }
+      : {}),
+    ...(fbos.charterActiveTour?.status === 'active'
+      ? { charterActiveTour: fbos.charterActiveTour }
       : {}),
   };
 }

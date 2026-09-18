@@ -211,6 +211,12 @@ import {
   attachActiveTourFromMission,
   bindActiveTourLegToMission,
   prepareActiveTour,
+  listBaseDispatchCharterTours,
+  prepareCharterActiveTour,
+  dropCharterActiveTour,
+  bindCharterTourLegMission,
+  syncCharterActiveTour,
+  charterActiveTourView,
   resolveBaseDispatchScoutPolicy,
   baseDispatcherSnapshot,
   hireBaseDispatcherCandidate,
@@ -5204,10 +5210,28 @@ export function createCareerApiServer(port = 8787) {
               mission.id,
               mission.originIcao,
             );
+            const charterTour = missions.playerFbos?.charterActiveTour;
+            if (charterTour?.status === 'active') {
+              const planned = charterTour.legs.find(
+                (leg) =>
+                  leg.status === 'planned' &&
+                  !leg.missionId &&
+                  leg.offerId === offer.id,
+              );
+              if (planned) {
+                bindCharterTourLegMission(missions, {
+                  legIndex: planned.index,
+                  missionId: mission.id,
+                  offerId: offer.id,
+                });
+              }
+            }
+            syncCharterActiveTour(missions, world);
             return {
               mission: withMissionClientView(world, missions, mission),
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet, world, missions),
+              charterActiveTour: charterActiveTourView(missions, world),
             };
           }, { housekeeping: false, companyId: acceptCompanyId });
           send(res, 200, accepted);
@@ -6637,6 +6661,190 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/base/dispatch-charters') {
+        const body = (await readBody(req)) as {
+          action?: 'list' | 'status' | 'prepare' | 'drop' | 'bind-leg';
+          hubIcao?: string;
+          aircraftId?: string;
+          originIcao?: string;
+          legs?: number;
+          minNm?: number;
+          maxNm?: number | null;
+          maxFerryNm?: number | null;
+          returnMode?: 'none' | 'origin' | 'base';
+          preferLeaveBase?: boolean;
+          tourId?: string;
+          routeLabel?: string;
+          tourLegs?: Array<{
+            offerId: string;
+            originIcao: string;
+            destIcao: string;
+            groupSize: number;
+            baggageKg: number;
+            distanceNm: number;
+            ferryNm: number;
+            payUsd: number;
+            fuelCostUsd: number;
+            netUsd: number;
+            tier: string;
+            expiresAtTick: number;
+          }>;
+          legIndex?: number;
+          missionId?: string;
+          offerId?: string;
+          companyId?: string;
+        };
+        const action = body.action ?? 'list';
+        const hubIcao = body.hubIcao?.trim().toUpperCase() || undefined;
+        const charterCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          if (action === 'list') {
+            if (!hubIcao) {
+              send(res, 400, { error: 'hubIcao required' });
+              return;
+            }
+            const missions = await loadMissions({ companyId: charterCompanyId });
+            const world = requireStore().peekEconomyWorld();
+            if (!world) {
+              send(res, 503, { error: 'Economy not loaded' });
+              return;
+            }
+            const maxNmRaw =
+              body.maxNm == null ? null : Number(body.maxNm);
+            const maxFerryNmRaw =
+              body.maxFerryNm == null ? null : Number(body.maxFerryNm);
+            syncCharterActiveTour(missions, world);
+            const tours = withDevProgressionUnlock(req, missions, () =>
+              listBaseDispatchCharterTours(missions, world, {
+                hubIcao,
+                aircraftId: body.aircraftId,
+                originIcao: body.originIcao,
+                legs: body.legs != null ? Number(body.legs) : undefined,
+                minNm: body.minNm != null ? Number(body.minNm) : undefined,
+                maxNm:
+                  maxNmRaw != null && Number.isFinite(maxNmRaw) && maxNmRaw > 0
+                    ? maxNmRaw
+                    : null,
+                maxFerryNm:
+                  maxFerryNmRaw != null &&
+                  Number.isFinite(maxFerryNmRaw) &&
+                  maxFerryNmRaw > 0
+                    ? maxFerryNmRaw
+                    : undefined,
+                returnMode: body.returnMode,
+                preferLeaveBase: body.preferLeaveBase,
+              }),
+            );
+            send(res, 200, {
+              tours,
+              charterActiveTour: charterActiveTourView(missions, world),
+              policy: resolveBaseDispatchScoutPolicy(missions),
+              dispatcher: baseDispatcherSnapshot(missions, world),
+            });
+            return;
+          }
+          if (action === 'status') {
+            const result = await withCareerWrite((world, missions) => {
+              syncCharterActiveTour(missions, world);
+              return {
+                charterActiveTour: charterActiveTourView(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, {
+              housekeeping: false,
+              companyId: charterCompanyId,
+            });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'drop') {
+            const result = await withCareerWrite((world, missions) => {
+              dropCharterActiveTour(missions);
+              return {
+                charterActiveTour: null as null,
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, {
+              housekeeping: false,
+              companyId: charterCompanyId,
+            });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'prepare') {
+            if (
+              !body.aircraftId?.trim() ||
+              !Array.isArray(body.tourLegs) ||
+              body.tourLegs.length < 2
+            ) {
+              send(res, 400, {
+                error: 'aircraftId and tourLegs (2) required',
+              });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              assertCompanyCreditAllowsOps(missions);
+              prepareCharterActiveTour(missions, world, {
+                aircraftId: body.aircraftId!,
+                hubIcao:
+                  hubIcao ||
+                  body.tourLegs![0]!.originIcao.trim().toUpperCase(),
+                tourId: body.tourId,
+                routeLabel: body.routeLabel,
+                legs: body.tourLegs!,
+              });
+              return {
+                charterActiveTour: charterActiveTourView(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, {
+              housekeeping: false,
+              companyId: charterCompanyId,
+            });
+            send(res, 200, result);
+            return;
+          }
+          if (action === 'bind-leg') {
+            if (!body.missionId?.trim() || body.legIndex == null) {
+              send(res, 400, { error: 'missionId and legIndex required' });
+              return;
+            }
+            const result = await withCareerWrite((world, missions) => {
+              bindCharterTourLegMission(missions, {
+                legIndex: Number(body.legIndex),
+                missionId: body.missionId!,
+                offerId: body.offerId,
+              });
+              syncCharterActiveTour(missions, world);
+              return {
+                charterActiveTour: charterActiveTourView(missions, world),
+                policy: resolveBaseDispatchScoutPolicy(missions),
+                dispatcher: baseDispatcherSnapshot(missions, world),
+                playerFbos: playerFboSnapshot(missions, world),
+              };
+            }, {
+              persist: 'company',
+              housekeeping: false,
+              companyId: charterCompanyId,
+            });
+            send(res, 200, result);
+            return;
+          }
+          send(res, 400, { error: `Unknown action ${action}` });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/base/dispatcher') {
         const body = (await readBody(req)) as {
           action?: 'list' | 'hire' | 'fire' | 'refresh';
@@ -6693,13 +6901,15 @@ export function createCareerApiServer(port = 8787) {
                 fboId: body.fboId!.trim(),
                 candidateId: body.candidateId!.trim(),
               });
+              // Do not list scout suggestions here — that walks world.lots × fleet
+              // under the career lock (tens of seconds on MP). Client only needs
+              // dispatcher + policy; Search fetches tours on demand.
               return {
                 member: hired.member,
                 debitUsd: hired.debitUsd,
                 walletUsd: missions.walletUsd,
                 dispatcher: baseDispatcherSnapshot(missions, world),
                 policy: resolveBaseDispatchScoutPolicy(missions),
-                suggestions: listBaseDispatchScoutSuggestions(missions, world),
               };
             }, { persist: 'company', companyId: dispatcherCompanyId });
             send(res, 200, result);
@@ -6723,7 +6933,6 @@ export function createCareerApiServer(port = 8787) {
                 walletUsd: missions.walletUsd,
                 dispatcher: baseDispatcherSnapshot(missions, world),
                 policy: resolveBaseDispatchScoutPolicy(missions),
-                suggestions: listBaseDispatchScoutSuggestions(missions, world),
               };
             }, { persist: 'company', companyId: dispatcherCompanyId });
             send(res, 200, result);
@@ -9356,6 +9565,7 @@ export function createCareerApiServer(port = 8787) {
               ? charterOffer?.status === 'available'
               : releasedKg > 0 && anyReturned;
             syncActiveTour(missions, world);
+            syncCharterActiveTour(missions, world);
             return {
               kind: 'ok' as const,
               cancelled: executed.mission,
@@ -9365,6 +9575,7 @@ export function createCareerApiServer(port = 8787) {
               foundBefore: charter ? 1 : foundBefore,
               charter,
               activeTour: activeTourView(missions, world),
+              charterActiveTour: charterActiveTourView(missions, world),
             };
           }, {
             commandSliceMissionId: body.missionId,
@@ -9385,6 +9596,7 @@ export function createCareerApiServer(port = 8787) {
             releasedKg: result.releasedKg,
             returnedToMarket: result.returnedToMarket,
             activeTour: result.activeTour ?? null,
+            charterActiveTour: result.charterActiveTour ?? null,
             warning:
               result.charter
                 ? null
@@ -10330,6 +10542,7 @@ export function createCareerApiServer(port = 8787) {
             if (executed.kind === 'closed') return { kind: 'closed' as const };
             const result = executed.result;
             syncActiveTour(missions, world);
+            syncCharterActiveTour(missions, world);
             return {
               kind: 'ok' as const,
               mission: result.mission,
@@ -10341,6 +10554,7 @@ export function createCareerApiServer(port = 8787) {
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
               classOpsDeltas: result.classOpsDeltas ?? [],
               activeTour: activeTourView(missions, world),
+              charterActiveTour: charterActiveTourView(missions, world),
             };
           }, {
             housekeeping: false,
@@ -10363,6 +10577,7 @@ export function createCareerApiServer(port = 8787) {
             fleet: settled.fleet,
             pilotIcao: settled.pilotIcao,
             activeTour: settled.activeTour ?? null,
+            charterActiveTour: settled.charterActiveTour ?? null,
             settlement: settled.settlement.settlementType === 'charter'
               ? {
                   ...settled.settlement,

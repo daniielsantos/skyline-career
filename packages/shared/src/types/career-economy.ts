@@ -1506,6 +1506,41 @@ export interface PlayerFboState {
   dispatcherHirePoolDayByHub?: Record<string, number>;
   /** In-progress Dispatcher tour itinerary (Accept L2/L3). */
   activeTour?: ActiveTour | null;
+  /** In-progress Base Charter tour (Accept L2). */
+  charterActiveTour?: CharterActiveTour | null;
+}
+
+export type CharterActiveTourLegStatus = 'planned' | 'active' | 'done' | 'lost';
+
+export type CharterActiveTourStatus = 'active' | 'completed' | 'abandoned';
+
+export interface CharterActiveTourLeg {
+  index: number;
+  offerId: string;
+  originIcao: string;
+  destIcao: string;
+  groupSize: number;
+  baggageKg: number;
+  distanceNm: number;
+  ferryNm: number;
+  payUsd: number;
+  fuelCostUsd: number;
+  netUsd: number;
+  status: CharterActiveTourLegStatus;
+  missionId?: string;
+}
+
+export interface CharterActiveTour {
+  id: string;
+  aircraftId: string;
+  aircraftClassId: FreighterClassId;
+  airframeTypeId?: string;
+  hubIcao: string;
+  originIcao: string;
+  routeLabel: string;
+  legs: CharterActiveTourLeg[];
+  startedAtTick: number;
+  status: CharterActiveTourStatus;
 }
 
 /** Player warehouse at a port pickup hub. */

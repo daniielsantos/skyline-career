@@ -42,8 +42,8 @@ test('formats charter expiry from economy ticks', () => {
   assert.equal(charterExpiryLabel(96), '1 d');
 });
 
-test('uses dispatcher origin and falls back to Base ICAO', () => {
-  assert.equal(resolveBaseCharterOrigin('', 'sbsp'), 'SBSP');
+test('uses typed dispatcher origin; empty means any (no Base lock)', () => {
+  assert.equal(resolveBaseCharterOrigin('', 'sbsp'), undefined);
   assert.equal(resolveBaseCharterOrigin(' sbrj ', 'SBSP'), 'SBRJ');
 });
 

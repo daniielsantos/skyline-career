@@ -3154,6 +3154,9 @@ async function readCompanyStateScalars(
       ...(fbosRaw.activeTour !== undefined
         ? { activeTour: fbosRaw.activeTour }
         : {}),
+      ...(fbosRaw.charterActiveTour !== undefined
+        ? { charterActiveTour: fbosRaw.charterActiveTour }
+        : {}),
     };
   }
 

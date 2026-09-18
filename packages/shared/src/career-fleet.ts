@@ -267,6 +267,9 @@ export function normalizeMissionsState(
           ...(playerFbosRaw.activeTour !== undefined
             ? { activeTour: playerFbosRaw.activeTour }
             : {}),
+          ...(playerFbosRaw.charterActiveTour !== undefined
+            ? { charterActiveTour: playerFbosRaw.charterActiveTour }
+            : {}),
         }
       : { fbos: [], holds: [], stock: [] };
   const playerWarehousesRaw = (raw as CareerMissionsState).playerWarehouses;

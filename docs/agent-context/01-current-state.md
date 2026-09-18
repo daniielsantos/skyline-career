@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **b7426ea** / desktop **0.3.90** shipped: Add +1 intl lane maxLots bonus to raise formation intensity. Release: [v0.3.90](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.90).
+
+
 `main` **d0e7a21** / desktop **0.3.89** shipped: Lengthen international lot life to raise intl board shelf. Release: [v0.3.89](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.89).
 
 

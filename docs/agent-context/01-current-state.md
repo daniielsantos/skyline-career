@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **c10fd16** / desktop **0.3.86** shipped: Round hub economy sample kg for Postgres INTEGER and add +3 day skip. Release: [v0.3.86](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.86).
+
+
 `main` **72199de** / desktop **0.3.85** shipped: Fix PG hub history query rejecting MAX_SAFE_INTEGER untilDay. Release: [v0.3.85](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.85).
 
 

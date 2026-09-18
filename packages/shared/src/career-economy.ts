@@ -3060,7 +3060,8 @@ export const INTERNATIONAL_CORRIDOR_WEIGHT = 2.0;
 /** Pay distance bias for cross-country lots when route nm is unavailable. */
 export const INTERNATIONAL_DISTANCE_BIAS = 1.55;
 /** Extra lot lifetime for long-haul international freights. */
-export const INTERNATIONAL_LIFE_MULT = 1.35;
+/** Intl lot life vs domestic — longer shelf retention without more form/tick. */
+export const INTERNATIONAL_LIFE_MULT = 1.55;
 
 /**
  * Freight board pay (2026-08-20+): living arbitrage + haul, with hard total

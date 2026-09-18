@@ -1,8 +1,8 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-18: **Intl gateway slots 12/teto 12** — `ceil(hubs/12)`∈[2,12] p/ regionais entrarem no grafo (BR ~8+). Detail: [`08-economy.md`](./08-economy.md).
+Atualizado 2026-09-18: **Desktop update spawn Setup first** — revert cmd-ping/VBS delay (Job Object matava o sleeper; update não abria). Volta a `spawn(Setup)` + `quit` ~800ms. Detail: `packages/desktop/README.md`.
 
-Atualizado 2026-09-18: **Desktop update quit-before-NSIS (VBS)** — `cmd ping` abria console e morria no Job Object do Electron antes do Setup. Fix: temp `.vbs` + `wscript //B` via `cmd start /b`. Detail: `packages/desktop/README.md`.
+Atualizado 2026-09-18: **Intl gateway slots 12/teto 12** — `ceil(hubs/12)`∈[2,12] p/ regionais entrarem no grafo (BR ~8+). Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Intl proportional caps → LANES_MAX 1000** — gateways/lanes por hub count; seed ~896 lanes; measure VPS +2–3d antes de celebrar BR pilot-intl. Detail: [`08-economy.md`](./08-economy.md).
 

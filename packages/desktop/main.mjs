@@ -16,10 +16,9 @@ import {
   shell,
 } from 'electron';
 import { spawn, execFileSync } from 'node:child_process';
-import { createWriteStream, appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { createWriteStream, appendFileSync, mkdirSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createConnection } from 'node:net';
 import {
@@ -470,40 +469,6 @@ function resolveDownloadedInstallerPath() {
   return null;
 }
 
-/**
- * Schedule NSIS Setup after this Electron process exits.
- * A bare `cmd ping & start` stays under Electron's Win32 Job Object — the
- * console flashes and dies with the app before Setup runs. Launch a temp VBS
- * via `wscript //B` + `cmd start` so the sleeper is outside the job (no window).
- */
-function scheduleInstallerAfterQuit(installerPath) {
-  const safePath = String(installerPath).replace(/"/g, '');
-  const vbsPath = join(tmpdir(), `airframe-update-${Date.now()}.vbs`);
-  // Sleep ~2.5s then Run Setup (1 = normal focus). Self-delete best-effort.
-  const vbs = [
-    'On Error Resume Next',
-    'WScript.Sleep 2500',
-    `CreateObject("WScript.Shell").Run """${safePath}""", 1, False`,
-    `CreateObject("Scripting.FileSystemObject").DeleteFile WScript.ScriptFullName, True`,
-    '',
-  ].join('\r\n');
-  writeFileSync(vbsPath, vbs, 'utf8');
-  // `start` breaks away from Electron's job; //B = no script host UI.
-  spawn(
-    process.env.ComSpec || 'cmd.exe',
-    [
-      '/d',
-      '/c',
-      `start "" /b wscript.exe //B //Nologo "${vbsPath.replace(/"/g, '')}"`,
-    ],
-    {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    },
-  ).unref();
-}
-
 function registerIpc() {
   ipcMain.handle('skyline:get-version', () => app.getVersion());
 
@@ -642,7 +607,7 @@ function registerIpc() {
       title: 'Install Airframe update',
       message: 'Windows may warn that the publisher is unknown.',
       detail:
-        'Airframe will close first, then the installer opens after a short pause.\n\n' +
+        'Airframe will close and open the installer window.\n\n' +
         'If Windows shows SmartScreen, choose More info → Run anyway.\n' +
         'Watch the installer progress — when it finishes, Airframe should reopen.\n' +
         'If it does not, open Airframe Career from the Start Menu.\n\n' +
@@ -656,17 +621,24 @@ function registerIpc() {
     apiChild = null;
     hostChild = null;
 
-    // Schedule Setup to start AFTER this process exits. Spawning immediately
-    // raced NSIS ("Airframe Career is running — Click OK to close it").
-    // Unsigned: still no /S (visible one-click + SmartScreen).
+    // Unsigned NSIS: do NOT pass /S. Quiet spawn often dies behind SmartScreen
+    // with the app already gone and no progress UI. Visible one-click Setup
+    // still skips the Next/Next wizard but shows progress + SmartScreen.
+    // /S (Cursor-silent) needs Authenticode — not enabled yet.
+    // Delay scripts (cmd ping / VBS) broke updates on Win11 Job Object — spawn
+    // Setup first, then quit shortly after.
     logLine(
-      `[desktop] scheduling update installer after quit: ${installerPath}`,
+      `[desktop] launching update installer (visible one-click): ${installerPath}`,
     );
     try {
-      scheduleInstallerAfterQuit(installerPath);
+      spawn(installerPath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      }).unref();
     } catch (err) {
       logLine(
-        `[desktop] schedule installer failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
+        `[desktop] spawn installer failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
       );
       const openErr = await shell.openPath(installerPath);
       if (openErr) {
@@ -675,14 +647,7 @@ function registerIpc() {
       }
     }
 
-    for (const win of BrowserWindow.getAllWindows()) {
-      try {
-        win.destroy();
-      } catch {
-        /* ignore */
-      }
-    }
-    app.quit();
+    setTimeout(() => app.quit(), 800);
     return { ok: true };
   });
 }

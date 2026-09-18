@@ -20,7 +20,7 @@ Electron shell around the local Career API + static UI.
 Settings → **Updates** (desktop only) or the topbar **Update** pill:
 
 1. App checks GitHub Releases on startup (silent).
-2. **Download** → **Install** closes the app, then starts the one-click Setup ~2.5s later via a hidden VBS sleeper (outside Electron’s process job — no ping console). Visible Setup progress (no `/S`).
+2. **Download** → **Install** opens the one-click Setup **with a visible progress window** (no `/S` — quiet install hid SmartScreen failures), then closes the app shortly after.
 3. If Windows warns (unsigned), choose **More info → Run anyway**; watch the installer until it finishes — Airframe should reopen.
 4. Player saves in AppData are kept across updates.
 

@@ -3731,7 +3731,11 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/credit/draw') {
-        const body = (await readBody(req)) as { amountUsd?: number };
+        const body = (await readBody(req)) as {
+          amountUsd?: number;
+          companyId?: string;
+        };
+        const credit_drawCompanyId = companyIdFromRequest(req, body.companyId);
         const amountUsd =
           typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
             ? body.amountUsd
@@ -3745,7 +3749,7 @@ export function createCareerApiServer(port = 8787) {
               companyCredit: drawn.snapshot,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: credit_drawCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -3756,7 +3760,11 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/credit/repay') {
-        const body = (await readBody(req)) as { amountUsd?: number };
+        const body = (await readBody(req)) as {
+          amountUsd?: number;
+          companyId?: string;
+        };
+        const credit_repayCompanyId = companyIdFromRequest(req, body.companyId);
         const amountUsd =
           typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
             ? body.amountUsd
@@ -3770,7 +3778,7 @@ export function createCareerApiServer(port = 8787) {
               companyCredit: repaid.snapshot,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: credit_repayCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4689,7 +4697,9 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           destIcao?: string;
           quoteOnly?: boolean;
+          companyId?: string;
         };
+        const pilot_travelCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.destIcao) {
           send(res, 400, { error: 'destIcao required' });
           return;
@@ -4703,7 +4713,7 @@ export function createCareerApiServer(port = 8787) {
                 walletUsd: missions.walletUsd,
                 pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
               };
-            });
+            }, { companyId: pilot_travelCompanyId });
             send(res, 200, quoted);
             return;
           }
@@ -4720,7 +4730,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: pilot_travelCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -4731,6 +4741,8 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/cargo-limit') {
+        const cargo_limitCompanyId = companyIdFromRequest(req);
+
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
         if (!aircraft) {
@@ -4746,7 +4758,7 @@ export function createCareerApiServer(port = 8787) {
           airframeTypeId = await withCareerRead((_world, missions) => {
             const acf = missions.fleet.find((a) => a.id === aircraftId);
             return acf?.airframeTypeId?.trim() || undefined;
-          });
+          }, { companyId: cargo_limitCompanyId });
         }
         const cargoLimit = await resolveClassMaxCargoKg(
           aircraft,
@@ -4777,7 +4789,7 @@ export function createCareerApiServer(port = 8787) {
           ? await withCareerRead((_world, missions) => {
               const acf = missions.fleet.find((a) => a.id === aircraftId);
               return acf ? fuelBurnMultFromAircraft(acf) : null;
-            })
+            }, { companyId: cargo_limitCompanyId })
           : null;
         // Hard tank/range gate uses healthy burn — MX only advises, never blocks.
         const routeLimit =
@@ -4828,6 +4840,7 @@ export function createCareerApiServer(port = 8787) {
                 requestedKg: blockFuelKg,
                 costMult: fboServiceCostMult(missions, originIcao),
               }),
+              { companyId: cargo_limitCompanyId },
             );
             estimatedFuelCostUsd = fuelQuote.costUsd;
             estimatedFuelUnitPriceUsd = fuelQuote.unitPriceUsd;
@@ -4903,10 +4916,13 @@ export function createCareerApiServer(port = 8787) {
           1,
           Math.floor(Number(url.searchParams.get('page')) || 1),
         );
+        const chartersCompanyId = companyIdFromRequest(req);
         try {
           // Read-only board query — never tickCharterEconomy + full economy save here.
           // Sort/filter used withCareerWrite (default persist), which rewrote the whole
           // Postgres world on every click and could freeze/blank the UI for many seconds.
+          // Per-request companyId (same as /api/fleet): ambient activeCompanyId on the
+          // world host is another tenant — missing it → Unknown aircraft on Fit.
           const snapshot = await withCareerRead((world, missions) => {
             return {
               world,
@@ -4915,7 +4931,7 @@ export function createCareerApiServer(port = 8787) {
                 ? findPlayerAircraft(missions, aircraftId)
                 : undefined,
             };
-          });
+          }, { companyId: chartersCompanyId });
           if (aircraftId && !snapshot.aircraft) {
             send(res, 404, { error: `Unknown aircraft ${aircraftId}` });
             return;
@@ -5115,17 +5131,19 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           offerId?: string;
           aircraftId?: string;
+          companyId?: string;
         };
         if (!body.offerId?.trim() || !body.aircraftId?.trim()) {
           send(res, 400, { error: 'offerId and aircraftId required' });
           return;
         }
+        const acceptCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const peek = await withCareerRead((_world, missions) => {
             const aircraft = findPlayerAircraft(missions, body.aircraftId!);
             if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
             return aircraft;
-          });
+          }, { companyId: acceptCompanyId });
           const cargoLimit = await resolveClassMaxCargoKg(
             peek.aircraftClassId,
             peek.airframeTypeId,
@@ -5191,7 +5209,7 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet, world, missions),
             };
-          }, { housekeeping: false });
+          }, { housekeeping: false, companyId: acceptCompanyId });
           send(res, 200, accepted);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -5959,6 +5977,8 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/ports') {
+        const portsCompanyId = companyIdFromRequest(req);
+
         try {
           // ensurePortListings may expire/refill; persist those tables only so
           // buy can find the same listing IDs after reload.
@@ -5973,7 +5993,7 @@ export function createCareerApiServer(port = 8787) {
                 warehouses: { ...ports.warehouses, groundStaff },
               };
             },
-            { persist: 'portMarket' },
+            { persist: 'portMarket', companyId: portsCompanyId },
           );
           send(res, 200, result);
         } catch (error) {
@@ -5988,7 +6008,9 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           listingId?: string;
           kg?: number;
+          companyId?: string;
         };
+        const ports_buyCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.listingId || body.kg == null) {
           send(res, 400, { error: 'listingId and kg required' });
           return;
@@ -6021,7 +6043,8 @@ export function createCareerApiServer(port = 8787) {
           }, {
             persist: 'company',
             persistPortListingId: body.listingId,
-          });
+              companyId: ports_buyCompanyId,
+            });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6042,7 +6065,9 @@ export function createCareerApiServer(port = 8787) {
           warehouseId?: string;
           walletFloorUsd?: number;
           paused?: boolean;
+          companyId?: string;
         };
+        const ports_auto_buyCompanyId = companyIdFromRequest(req, body.companyId);
         const action = body.action ?? 'upsert';
         try {
           const result = await withCareerWrite((world, missions) => {
@@ -6088,7 +6113,7 @@ export function createCareerApiServer(port = 8787) {
               maxActive: PORT_AUTO_BUY_MAX_ACTIVE,
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ports_auto_buyCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6099,7 +6124,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/ports/concession/claim') {
-        const body = (await readBody(req)) as { portId?: string };
+        const body = (await readBody(req)) as { portId?: string; companyId?: string;
+        };
+        const ports_concession_claimCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.portId) {
           send(res, 400, { error: 'portId required' });
           return;
@@ -6115,7 +6142,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company', persistPortConcessions: true });
+          }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_claimCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6126,7 +6153,12 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/ports/concession/renew') {
-        const body = (await readBody(req)) as { portId?: string; days?: number };
+        const body = (await readBody(req)) as {
+          portId?: string;
+          days?: number;
+          companyId?: string;
+        };
+        const ports_concession_renewCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.portId) {
           send(res, 400, { error: 'portId required' });
           return;
@@ -6143,7 +6175,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company', persistPortConcessions: true });
+          }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_renewCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6154,7 +6186,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/ports/concession/upgrade') {
-        const body = (await readBody(req)) as { portId?: string };
+        const body = (await readBody(req)) as { portId?: string; companyId?: string;
+        };
+        const ports_concession_upgradeCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.portId) {
           send(res, 400, { error: 'portId required' });
           return;
@@ -6170,7 +6204,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company', persistPortConcessions: true });
+          }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_upgradeCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6190,12 +6224,14 @@ export function createCareerApiServer(port = 8787) {
           minKg?: number;
           excludeLastMile?: boolean;
           hubIcao?: string;
+          companyId?: string;
         };
         const action = body.action ?? 'list';
         const hubIcao = body.hubIcao?.trim().toUpperCase() || undefined;
+        const scoutCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (action === 'list') {
-            const missions = await loadMissions();
+            const missions = await loadMissions({ companyId: scoutCompanyId });
             const world = requireStore().peekEconomyWorld();
             if (!world) {
               send(res, 503, { error: 'Economy not loaded' });
@@ -6241,7 +6277,11 @@ export function createCareerApiServer(port = 8787) {
                 withMissionClientView(world, missions, m),
               ),
             };
-          }, { commandSliceLotIds: [body.lotId], housekeeping: false });
+          }, {
+            commandSliceLotIds: [body.lotId],
+            housekeeping: false,
+            companyId: scoutCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6284,16 +6324,18 @@ export function createCareerApiServer(port = 8787) {
           }>;
           legIndex?: number;
           missionId?: string;
+          companyId?: string;
         };
         const action = body.action ?? 'list';
         const hubIcao = body.hubIcao?.trim().toUpperCase() || undefined;
+        const tourCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (action === 'list') {
             if (!hubIcao) {
               send(res, 400, { error: 'hubIcao required' });
               return;
             }
-            const missions = await loadMissions();
+            const missions = await loadMissions({ companyId: tourCompanyId });
             const world = requireStore().peekEconomyWorld();
             if (!world) {
               send(res, 503, { error: 'Economy not loaded' });
@@ -6339,7 +6381,7 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           if (action === 'status') {
-            const peek = await loadMissions();
+            const peek = await loadMissions({ companyId: tourCompanyId });
             const softLots = (peek.playerFbos?.activeTour?.legs ?? [])
               .filter((l) => (l.softHoldKg ?? 0) > 0 && l.lotId)
               .map((l) => l.lotId);
@@ -6357,12 +6399,13 @@ export function createCareerApiServer(port = 8787) {
             }, {
               commandSliceLotIds: [...new Set([...softLots, ...plannedLots])],
               housekeeping: false,
+              companyId: tourCompanyId,
             });
             send(res, 200, result);
             return;
           }
           if (action === 'drop') {
-            const peek = await loadMissions();
+            const peek = await loadMissions({ companyId: tourCompanyId });
             const softLots = (peek.playerFbos?.activeTour?.legs ?? [])
               .filter((l) => (l.softHoldKg ?? 0) > 0 && l.lotId)
               .map((l) => l.lotId);
@@ -6376,6 +6419,7 @@ export function createCareerApiServer(port = 8787) {
             }, {
               commandSliceLotIds: softLots,
               housekeeping: false,
+              companyId: tourCompanyId,
             });
             send(res, 200, result);
             return;
@@ -6411,12 +6455,13 @@ export function createCareerApiServer(port = 8787) {
             }, {
               commandSliceLotIds: body.tourLegs.map((l) => l.lotId),
               housekeeping: false,
+              companyId: tourCompanyId,
             });
             send(res, 200, result);
             return;
           }
           if (action === 'drop-unbound') {
-            const peek = await loadMissions();
+            const peek = await loadMissions({ companyId: tourCompanyId });
             const softLots = (peek.playerFbos?.activeTour?.legs ?? [])
               .filter((l) => (l.softHoldKg ?? 0) > 0 && l.lotId)
               .map((l) => l.lotId);
@@ -6431,6 +6476,7 @@ export function createCareerApiServer(port = 8787) {
             }, {
               commandSliceLotIds: softLots,
               housekeeping: false,
+              companyId: tourCompanyId,
             });
             send(res, 200, result);
             return;
@@ -6469,7 +6515,7 @@ export function createCareerApiServer(port = 8787) {
                   withMissionClientView(world, missions, m),
                 ),
               };
-            }, { persist: 'company', housekeeping: false });
+            }, { persist: 'company', housekeeping: false, companyId: tourCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6492,7 +6538,7 @@ export function createCareerApiServer(port = 8787) {
                   withMissionClientView(world, missions, m),
                 ),
               };
-            }, { persist: 'company', housekeeping: false });
+            }, { persist: 'company', housekeeping: false, companyId: tourCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6524,6 +6570,7 @@ export function createCareerApiServer(port = 8787) {
               };
             }, {
               housekeeping: false,
+              companyId: tourCompanyId,
             });
             send(res, 200, result);
             return;
@@ -6579,7 +6626,8 @@ export function createCareerApiServer(port = 8787) {
           }, {
             commandSliceLotIds: [body.firstLotId],
             housekeeping: false,
-          });
+              companyId: tourCompanyId,
+            });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6596,11 +6644,15 @@ export function createCareerApiServer(port = 8787) {
           hubIcao?: string;
           candidateId?: string;
           memberId?: string;
+          companyId?: string;
         };
         const action = body.action ?? 'list';
+        const dispatcherCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (action === 'list') {
-            const missions = await loadMissions();
+            const missions = await loadMissions({
+              companyId: dispatcherCompanyId,
+            });
             const world = requireStore().peekEconomyWorld();
             if (!world) {
               send(res, 503, { error: 'Economy not loaded' });
@@ -6626,7 +6678,7 @@ export function createCareerApiServer(port = 8787) {
                 }),
                 policy: resolveBaseDispatchScoutPolicy(missions),
               };
-            }, { persist: 'company' });
+            }, { persist: 'company', companyId: dispatcherCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6649,7 +6701,7 @@ export function createCareerApiServer(port = 8787) {
                 policy: resolveBaseDispatchScoutPolicy(missions),
                 suggestions: listBaseDispatchScoutSuggestions(missions, world),
               };
-            }, { persist: 'company' });
+            }, { persist: 'company', companyId: dispatcherCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6673,7 +6725,7 @@ export function createCareerApiServer(port = 8787) {
                 policy: resolveBaseDispatchScoutPolicy(missions),
                 suggestions: listBaseDispatchScoutSuggestions(missions, world),
               };
-            }, { persist: 'company' });
+            }, { persist: 'company', companyId: dispatcherCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6695,14 +6747,16 @@ export function createCareerApiServer(port = 8787) {
           destIcao?: string;
           commodityId?: string;
           kg?: number;
+          companyId?: string;
         };
+        const ports_scoutCompanyId = companyIdFromRequest(req, body.companyId);
         const action = body.action ?? 'list';
         const kind =
           body.kind ??
           (body.orderId ? 'demand' : 'bridge');
         try {
           if (action === 'list') {
-            const missions = await loadMissions();
+            const missions = await loadMissions({ companyId: ports_scoutCompanyId });
             const world = requireStore().peekEconomyWorld();
             if (!world) {
               send(res, 503, { error: 'Economy not loaded' });
@@ -6749,7 +6803,7 @@ export function createCareerApiServer(port = 8787) {
                   ),
                 }),
               };
-            }, { persist: 'company' });
+            }, { persist: 'company', companyId: ports_scoutCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6788,7 +6842,7 @@ export function createCareerApiServer(port = 8787) {
                 ports: portSnapshot(world, missions),
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
-            }, { persist: 'company' });
+            }, { persist: 'company', companyId: ports_scoutCompanyId });
             send(res, 200, result);
             return;
           }
@@ -6824,7 +6878,7 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ports_scoutCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6839,7 +6893,9 @@ export function createCareerApiServer(port = 8787) {
           action?: 'quote' | 'dispatch';
           holdId?: string;
           aircraftId?: string;
+          companyId?: string;
         };
+        const ports_shuttleCompanyId = companyIdFromRequest(req, body.companyId);
         const action = body.action ?? 'dispatch';
         if (!body.holdId?.trim()) {
           send(res, 400, { error: 'holdId required' });
@@ -6847,7 +6903,7 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           if (action === 'quote') {
-            const missions = await loadMissions();
+            const missions = await loadMissions({ companyId: ports_shuttleCompanyId });
             const world = requireStore().peekEconomyWorld();
             if (!world) {
               send(res, 503, { error: 'Economy not loaded' });
@@ -6882,7 +6938,7 @@ export function createCareerApiServer(port = 8787) {
               fleet: missions.fleet ?? [],
               missions: listActivePlayerMissions(missions.missions ?? []),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ports_shuttleCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6898,7 +6954,9 @@ export function createCareerApiServer(port = 8787) {
           pickupId?: string;
           destWarehouseId?: string;
           kg?: number;
+          companyId?: string;
         };
+        const ports_stevedoreCompanyId = companyIdFromRequest(req, body.companyId);
         const action = body.action ?? 'start';
         if (!body.pickupId) {
           send(res, 400, { error: 'pickupId required' });
@@ -6906,7 +6964,7 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           if (action === 'destinations' || action === 'quote') {
-            const missions = await loadMissions();
+            const missions = await loadMissions({ companyId: ports_stevedoreCompanyId });
             const world = requireStore().peekEconomyWorld();
             if (!world) {
               send(res, 503, { error: 'Economy not loaded' });
@@ -6954,7 +7012,7 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ports_stevedoreCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6965,7 +7023,12 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/ports/deposit') {
-        const body = (await readBody(req)) as { pickupId?: string; kg?: number };
+        const body = (await readBody(req)) as {
+          pickupId?: string;
+          kg?: number;
+          companyId?: string;
+        };
+        const ports_depositCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.pickupId) {
           send(res, 400, { error: 'pickupId required' });
           return;
@@ -6986,7 +7049,7 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ports_depositCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6997,7 +7060,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/ports/pickup/abandon') {
-        const body = (await readBody(req)) as { pickupId?: string };
+        const body = (await readBody(req)) as { pickupId?: string; companyId?: string;
+        };
+        const ports_pickup_abandonCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.pickupId) {
           send(res, 400, { error: 'pickupId required' });
           return;
@@ -7016,7 +7081,7 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ports_pickup_abandonCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7035,6 +7100,8 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/warehouses') {
+        const warehousesCompanyId = companyIdFromRequest(req);
+
         try {
           // Deposit due inbound on read so Arriving… does not wait for the next
           // pulse (SP UX). Gate remains readyAtTick <= world.tick (MP-safe).
@@ -7044,7 +7111,7 @@ export function createCareerApiServer(port = 8787) {
               ...playerWarehouseSnapshot(missions, world),
               groundStaff: groundStaffSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehousesCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {
@@ -7055,7 +7122,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/warehouses/buy') {
-        const body = (await readBody(req)) as { icao?: string };
+        const body = (await readBody(req)) as { icao?: string; companyId?: string;
+        };
+        const warehouses_buyCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.icao) {
           send(res, 400, { error: 'icao required' });
           return;
@@ -7072,7 +7141,7 @@ export function createCareerApiServer(port = 8787) {
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_buyCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7083,7 +7152,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/warehouses/upgrade') {
-        const body = (await readBody(req)) as { warehouseId?: string };
+        const body = (await readBody(req)) as { warehouseId?: string; companyId?: string;
+        };
+        const warehouses_upgradeCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.warehouseId) {
           send(res, 400, { error: 'warehouseId required' });
           return;
@@ -7103,7 +7174,7 @@ export function createCareerApiServer(port = 8787) {
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_upgradeCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7114,7 +7185,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/warehouses/stock/abandon') {
-        const body = (await readBody(req)) as { stockId?: string };
+        const body = (await readBody(req)) as { stockId?: string; companyId?: string;
+        };
+        const warehouses_stock_abandonCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.stockId) {
           send(res, 400, { error: 'stockId required' });
           return;
@@ -7134,7 +7207,7 @@ export function createCareerApiServer(port = 8787) {
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: portSnapshot(world, missions),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_stock_abandonCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7182,7 +7255,9 @@ export function createCareerApiServer(port = 8787) {
           commodityId?: string;
           kg?: number;
           pilotPayUsd?: number | null;
+          companyId?: string;
         };
+        const warehouses_bridge_holdCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.originIcao || !body.destIcao || !body.commodityId) {
           send(res, 400, {
             error: 'originIcao, destIcao and commodityId required',
@@ -7212,7 +7287,7 @@ export function createCareerApiServer(port = 8787) {
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             });
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_bridge_holdCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7223,7 +7298,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/warehouses/bridge/hold/cancel') {
-        const body = (await readBody(req)) as { holdId?: string };
+        const body = (await readBody(req)) as { holdId?: string; companyId?: string;
+        };
+        const warehouses_bridge_hold_cancelCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.holdId) {
           send(res, 400, { error: 'holdId required' });
           return;
@@ -7237,7 +7314,7 @@ export function createCareerApiServer(port = 8787) {
               kg: cancelled.kg,
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_bridge_hold_cancelCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7255,7 +7332,9 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           kg?: number;
           pilotPayUsd?: number | null;
+          companyId?: string;
         };
+        const warehouses_bridge_acceptCompanyId = companyIdFromRequest(req, body.companyId);
         if (
           !body.originIcao ||
           !body.destIcao ||
@@ -7297,7 +7376,7 @@ export function createCareerApiServer(port = 8787) {
                 ),
               };
             });
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_bridge_acceptCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7312,7 +7391,9 @@ export function createCareerApiServer(port = 8787) {
           holdId?: string;
           aircraftId?: string;
           pilotPayUsd?: number | null;
+          companyId?: string;
         };
+        const warehouses_bridge_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.holdId || !body.aircraftId) {
           send(res, 400, {
             error: 'holdId and aircraftId required',
@@ -7349,7 +7430,7 @@ export function createCareerApiServer(port = 8787) {
                 ),
               };
             });
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_bridge_dispatch_holdCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7420,7 +7501,9 @@ export function createCareerApiServer(port = 8787) {
           destIcao?: string;
           commodityId?: string;
           kg?: number;
+          companyId?: string;
         };
+        const warehouses_haul_holdCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.originIcao || !body.destIcao || !body.commodityId) {
           send(res, 400, {
             error: 'originIcao, destIcao and commodityId required',
@@ -7444,7 +7527,7 @@ export function createCareerApiServer(port = 8787) {
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             });
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_haul_holdCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7455,7 +7538,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/warehouses/haul/hold/cancel') {
-        const body = (await readBody(req)) as { holdId?: string };
+        const body = (await readBody(req)) as { holdId?: string; companyId?: string;
+        };
+        const warehouses_haul_hold_cancelCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.holdId) {
           send(res, 400, { error: 'holdId required' });
           return;
@@ -7469,7 +7554,7 @@ export function createCareerApiServer(port = 8787) {
               kg: cancelled.kg,
               warehouses: playerWarehouseSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_haul_hold_cancelCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7486,7 +7571,9 @@ export function createCareerApiServer(port = 8787) {
           commodityId?: string;
           aircraftId?: string;
           kg?: number;
+          companyId?: string;
         };
+        const warehouses_haul_acceptCompanyId = companyIdFromRequest(req, body.companyId);
         if (
           !body.originIcao ||
           !body.destIcao ||
@@ -7525,7 +7612,7 @@ export function createCareerApiServer(port = 8787) {
                 ),
               };
             });
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_haul_acceptCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7539,7 +7626,9 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           holdId?: string;
           aircraftId?: string;
+          companyId?: string;
         };
+        const warehouses_haul_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.holdId || !body.aircraftId) {
           send(res, 400, {
             error: 'holdId and aircraftId required',
@@ -7570,7 +7659,7 @@ export function createCareerApiServer(port = 8787) {
                 ),
               };
             });
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: warehouses_haul_dispatch_holdCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7581,6 +7670,8 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/demand') {
+        const demandCompanyId = companyIdFromRequest(req);
+
         try {
           const result = await withCareerWrite((world, missions) => {
             expireDemandHolds(missions, world);
@@ -7594,7 +7685,7 @@ export function createCareerApiServer(port = 8787) {
               }),
               warehouses,
             };
-          }, { persist: 'demandBoard' });
+          }, { persist: 'demandBoard', companyId: demandCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 500, {
@@ -7610,7 +7701,9 @@ export function createCareerApiServer(port = 8787) {
           originIcao?: string;
           aircraftId?: string;
           kg?: number;
+          companyId?: string;
         };
+        const demand_acceptCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.orderId || !body.originIcao || !body.aircraftId) {
           send(res, 400, {
             error: 'orderId, originIcao and aircraftId required',
@@ -7648,7 +7741,8 @@ export function createCareerApiServer(port = 8787) {
           }, {
             persist: 'company',
             persistDemandOrderId: body.orderId,
-          });
+              companyId: demand_acceptCompanyId,
+            });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7663,7 +7757,9 @@ export function createCareerApiServer(port = 8787) {
           orderId?: string;
           originIcao?: string;
           kg?: number;
+          companyId?: string;
         };
+        const demand_holdCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.orderId || !body.originIcao) {
           send(res, 400, {
             error: 'orderId and originIcao required',
@@ -7693,7 +7789,8 @@ export function createCareerApiServer(port = 8787) {
           }, {
             persist: 'company',
             persistDemandOrderId: body.orderId,
-          });
+              companyId: demand_holdCompanyId,
+            });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7704,7 +7801,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/demand/hold/cancel') {
-        const body = (await readBody(req)) as { holdId?: string };
+        const body = (await readBody(req)) as { holdId?: string; companyId?: string;
+        };
+        const demand_hold_cancelCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.holdId) {
           send(res, 400, { error: 'holdId required' });
           return;
@@ -7725,7 +7824,8 @@ export function createCareerApiServer(port = 8787) {
             };
           }, {
             persist: 'demandBoard',
-          });
+              companyId: demand_hold_cancelCompanyId,
+            });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7739,7 +7839,9 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           holdId?: string;
           aircraftId?: string;
+          companyId?: string;
         };
+        const demand_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.holdId || !body.aircraftId) {
           send(res, 400, {
             error: 'holdId and aircraftId required',
@@ -7775,7 +7877,8 @@ export function createCareerApiServer(port = 8787) {
             persist: 'company',
             persistDemandOrderId: undefined,
             commandSliceAircraftId: body.aircraftId,
-          });
+              companyId: demand_dispatch_holdCompanyId,
+            });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -7974,7 +8077,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/crew/fire') {
-        const body = (await readBody(req)) as { memberId?: string };
+        const body = (await readBody(req)) as { memberId?: string; companyId?: string;
+        };
+        const crew_fireCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.memberId?.trim()) {
           send(res, 400, { error: 'memberId required' });
           return;
@@ -7986,7 +8091,7 @@ export function createCareerApiServer(port = 8787) {
               member: fired,
               companyCrew: companyCrewSnapshot(missions, world),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: crew_fireCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -8000,7 +8105,9 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           warehouseId?: string;
           candidateId?: string;
+          companyId?: string;
         };
+        const ground_staff_hireCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.warehouseId?.trim() || !body.candidateId?.trim()) {
           send(res, 400, { error: 'warehouseId and candidateId required' });
           return;
@@ -8024,7 +8131,7 @@ export function createCareerApiServer(port = 8787) {
                 groundStaff,
               },
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ground_staff_hireCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -8035,7 +8142,9 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/ground-staff/fire') {
-        const body = (await readBody(req)) as { memberId?: string };
+        const body = (await readBody(req)) as { memberId?: string; companyId?: string;
+        };
+        const ground_staff_fireCompanyId = companyIdFromRequest(req, body.companyId);
         if (!body.memberId?.trim()) {
           send(res, 400, { error: 'memberId required' });
           return;
@@ -8059,7 +8168,7 @@ export function createCareerApiServer(port = 8787) {
                 groundStaff,
               },
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: ground_staff_fireCompanyId });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -10411,6 +10520,7 @@ export function createCareerApiServer(port = 8787) {
           }
           const injectFleet = await withCareerRead(
             async (_world, missions) => missions.fleet ?? [],
+            { companyId: loadOfpCompanyId },
           );
           const injectAcf = mission.aircraftId
             ? injectFleet.find((a) => a.id === mission.aircraftId)

@@ -5,7 +5,7 @@ Electron shell around the local Career API + static UI.
 ## Player install
 
 1. Download **`Airframe-Setup-x.y.z.exe`** from [GitHub Releases](https://github.com/daniielsantos/skyline-career/releases).
-2. Run the installer (Windows may warn — builds are **not code-signed** yet; choose More info → Run anyway).
+2. Run the installer (Windows may warn — builds are **not code-signed** yet; choose More info → Run anyway). One-click Setup — no Next/Next wizard.
 3. Launch **Airframe Career** from the Start Menu / desktop shortcut.
 4. Create a profile and play. Saves live under `%AppData%\Skyline Career\` (legacy folder until migrator).
 
@@ -17,11 +17,14 @@ Electron shell around the local Career API + static UI.
 
 ### In-app updates
 
-Settings → **Updates** (desktop only):
+Settings → **Updates** (desktop only) or the topbar **Update** pill:
 
 1. App checks GitHub Releases on startup (silent).
-2. Banner / card when a newer version exists → **Download** → **Restart to update**.
-3. Player saves in AppData are kept across updates.
+2. **Download** → **Install** closes the app and launches the one-click Setup with `/S` (quiet after SmartScreen).
+3. If Windows warns (unsigned), choose **More info → Run anyway**; the installer should reopen Airframe when done.
+4. Player saves in AppData are kept across updates.
+
+Silent Cursor-style updates without the SmartScreen prompt need an Authenticode certificate — not enabled yet.
 
 ## Dev (from repo)
 
@@ -109,12 +112,12 @@ gh release create "v$ver" `
 
 ### Smoke auto-update
 
-Unsigned builds hit Windows SmartScreen. In-app update opens the downloaded Setup so you can choose **More info → Run anyway** (silent `quitAndInstall` often fails with no recovery).
+Unsigned builds hit Windows SmartScreen. In-app update launches the one-click Setup with `/S` after you confirm; clear SmartScreen with **More info → Run anyway** (fully silent `quitAndInstall` without a cert often fails with no recovery).
 
-1. Install an older Setup (e.g. `v0.1.1`) on a clean machine / VM.
-2. Publish a newer release (e.g. `v0.1.2`) with Setup + `latest.yml` as **Assets** (not in release notes).
-3. Open the installed app → Settings → Updates → Download → **Restart to update** / **Install**.
-4. Complete the Windows/SmartScreen + NSIS installer, then launch from Start Menu.
+1. Install an older Setup (e.g. `v0.3.90`) on a clean machine / VM.
+2. Publish a newer release (e.g. `v0.3.91+`) with Setup + `latest.yml` as **Assets** (not in release notes).
+3. Open the installed app → topbar **Update** / Settings → Updates → Download → **Install**.
+4. Clear SmartScreen if prompted; one-click installer should update quietly and reopen (or use Start Menu).
 5. Confirm the new version and that profiles under `%AppData%\Skyline Career\` survived.
 
 ## Logs

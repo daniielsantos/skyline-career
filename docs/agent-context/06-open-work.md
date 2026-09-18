@@ -120,6 +120,8 @@ Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab
 
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
+Atualizado 2026-09-18: **Desktop update one-click** — NSIS `oneClick` + launch Setup `/S` após SmartScreen (unsigned). Ainda não é Cursor-silent (falta Authenticode). Detail: `packages/desktop/README.md`.
+
 Atualizado 2026-09-18: **Regional/spoke GA–feeder board** — regionais deixam de ser só scrap last-mile; reserved bulk seats + share/open dials (sem major/XL). Re-medir SBCT outbound + BR regional feeder após ship. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Intl world-market quotas** — retire soft-share; INTL sized by fleet lift; domestic keeps full commodity pool. Re-medir % intl + live após +2–3d. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).

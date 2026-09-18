@@ -88,15 +88,16 @@
       "forceCodeSigning": false
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Airframe Career",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
+      "runAfterFinish": true,
       "differentialPackage": false,
       "deleteAppDataOnUninstall": false,
       "artifactName": "Airframe-Setup-${version}.${ext}"

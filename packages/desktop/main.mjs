@@ -601,14 +601,15 @@ function registerIpc() {
 
     const choice = dialog.showMessageBoxSync({
       type: 'info',
-      buttons: ['Open installer', 'Cancel'],
+      buttons: ['Update now', 'Cancel'],
       defaultId: 0,
       cancelId: 1,
       title: 'Install Airframe update',
       message: 'Windows may warn that the publisher is unknown.',
       detail:
-        'On the next Windows dialog, choose More info → Run anyway.\n\n' +
-        'Finish the installer, then open Airframe Career from the Start Menu.\n\n' +
+        'On the SmartScreen dialog, choose More info → Run anyway.\n\n' +
+        'The one-click installer then updates quietly and should reopen Airframe Career.\n' +
+        'If it does not, open it from the Start Menu.\n\n' +
         `Installer:\n${installerPath}`,
     });
     if (choice !== 0) return { ok: false, reason: 'cancelled' };
@@ -619,20 +620,24 @@ function registerIpc() {
     apiChild = null;
     hostChild = null;
 
-    logLine(`[desktop] opening update installer: ${installerPath}`);
-    const openErr = await shell.openPath(installerPath);
-    if (openErr) {
-      logLine(`[desktop] shell.openPath failed: ${openErr}; spawn fallback`);
-      try {
-        spawn(installerPath, [], {
-          detached: true,
-          stdio: 'ignore',
-          windowsHide: false,
-        }).unref();
-      } catch (err) {
+    // One-click NSIS: /S skips the wizard after SmartScreen. Unsigned builds
+    // still need the user to clear SmartScreen once — silent quitAndInstall
+    // without that often fails with no UI.
+    logLine(`[desktop] launching update installer (one-click /S): ${installerPath}`);
+    try {
+      spawn(installerPath, ['/S'], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      }).unref();
+    } catch (err) {
+      logLine(
+        `[desktop] spawn /S failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
+      );
+      const openErr = await shell.openPath(installerPath);
+      if (openErr) {
         shuttingDown = false;
-        const message = err instanceof Error ? err.message : String(err);
-        return { ok: false, reason: openErr || message };
+        return { ok: false, reason: openErr };
       }
     }
 

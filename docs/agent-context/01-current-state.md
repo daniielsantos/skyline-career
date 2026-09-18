@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **f52382c** / desktop **0.3.96** shipped: Add Intl pilot-country board filter and quit before NSIS update. Release: [v0.3.96](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.96).
+
+
 `main` **18c9a74** / desktop **0.3.95** shipped: Form regional intl lots first and stop wallet \ flashes on +Nd. Release: [v0.3.95](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.95).
 
 

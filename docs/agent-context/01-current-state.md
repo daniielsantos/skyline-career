@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **c29bb7f** / desktop **0.3.87** shipped: Add intl formation reject counts to Live Pulse. Release: [v0.3.87](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.87).
+
+
 `main` **c10fd16** / desktop **0.3.86** shipped: Round hub economy sample kg for Postgres INTEGER and add +3 day skip. Release: [v0.3.86](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.86).
 
 

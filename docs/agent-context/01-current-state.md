@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **2386d7f** / desktop **0.3.80** shipped: Harden desktop update checks and clarify dual Pax tooltips. Release: [v0.3.80](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.80).
+
+
 `main` **9e08762** / desktop **0.3.79** shipped: Download and install desktop updates from the topbar button. Release: [v0.3.79](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.79).
 
 

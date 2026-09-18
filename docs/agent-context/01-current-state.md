@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **b601b36** / desktop **0.3.84** shipped: Port hub economy samples to Postgres and expose intl formation on Pulse. Release: [v0.3.84](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.84).
+
+
 `main` **6409cfb** / desktop **0.3.83** shipped: Raise international board soft share to 15%. Release: [v0.3.83](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.83).
 
 

@@ -3370,6 +3370,8 @@ export function App() {
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [displayNowMs, setDisplayNowMs] = useState(Date.now());
   const [wallet, setWallet] = useState(0);
+  const walletRef = useRef(0);
+  walletRef.current = wallet;
   const [lots, setLots] = useState<MarketLot[]>([]);
   const [marketTotalLots, setMarketTotalLots] = useState(0);
   const [marketPageCount, setMarketPageCount] = useState(1);
@@ -3446,7 +3448,18 @@ export function App() {
     label: string;
     startedAtMs: number;
   } | null>(null);
+  const tickAdvanceRef = useRef(tickAdvance);
+  tickAdvanceRef.current = tickAdvance;
   const [tickAdvanceClockMs, setTickAdvanceClockMs] = useState(0);
+
+  /** Paint wallet without flashing $0 from ambient-tenant / empty shells mid +Nd. */
+  const paintWallet = useCallback((next: number | null | undefined) => {
+    if (typeof next !== 'number' || !Number.isFinite(next)) return;
+    if (next === 0 && walletRef.current > 0 && tickAdvanceRef.current) {
+      return;
+    }
+    setWallet(next);
+  }, []);
   /** Local lock for Crew fly — avoids app-wide busy flash on every button. */
   const [crewDispatchBusy, setCrewDispatchBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4204,7 +4217,7 @@ export function App() {
     setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
     setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
     setDisplayNowMs(serverNow);
-    setWallet(state.walletUsd);
+    paintWallet(state.walletUsd);
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
     if (state.companyId) {
@@ -4299,7 +4312,7 @@ export function App() {
     ]);
     if (wantBush) void refreshBushTrips();
     if (missionState && typeof missionState.walletUsd === 'number') {
-      setWallet(missionState.walletUsd);
+      paintWallet(missionState.walletUsd);
     }
     if (market) {
       // Drop late polls that raced a filter edit (seq bumped in the board effect).
@@ -4354,7 +4367,7 @@ export function App() {
       setAircraftCatalog(acMarket.catalog);
       setAirframePerf(acMarket.airframePerf ?? {});
       setAircraftMarketDay(acMarket.dayIndex);
-      setWallet(acMarket.walletUsd);
+      paintWallet(acMarket.walletUsd);
       if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
       if (acMarket.browseCountryId) {
         aircraftBrowseCountryRef.current = syncAircraftBrowseFromApi(
@@ -5016,7 +5029,7 @@ export function App() {
         if (cancelled) return;
         setMissions(missionState.missions.slice().reverse());
         if (typeof missionState.walletUsd === 'number') {
-          setWallet(missionState.walletUsd);
+          paintWallet(missionState.walletUsd);
         }
       })
       .catch(() => undefined);
@@ -6871,7 +6884,7 @@ export function App() {
           lastLots = result.availableLots;
           if (typeof result.walletUsd === 'number') {
             lastWallet = result.walletUsd;
-            setWallet(result.walletUsd);
+            paintWallet(result.walletUsd);
           }
           if (result.companyCredit) {
             lastCredit = result.companyCredit;
@@ -6916,7 +6929,7 @@ export function App() {
         setTickAdvance(null);
       }
 
-      if (typeof lastWallet === 'number') setWallet(lastWallet);
+      if (typeof lastWallet === 'number') paintWallet(lastWallet);
       if (lastCredit) setCompanyCredit(lastCredit);
       const leaseNote =
         leasePaidUsd > 0
@@ -6955,7 +6968,8 @@ export function App() {
     bootProfileKeyRef.current = null;
     // Unknown until /api/state — default true used to flash Freights before hub picker.
     setHubSelected(false);
-    setWallet(0);
+    // Do not setWallet(0): careerStateReady is false so chrome shows "…" —
+    // painting $0 here made +Nd / session switches look like a wipe.
     setMissions([]);
     setFleet([]);
     setLots([]);
@@ -7440,7 +7454,7 @@ export function App() {
       setAircraftCatalog(acMarket.catalog);
       setAirframePerf(acMarket.airframePerf ?? {});
       setAircraftMarketDay(acMarket.dayIndex);
-      setWallet(acMarket.walletUsd);
+      paintWallet(acMarket.walletUsd);
       if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
       if (acMarket.browseCountryId) {
         aircraftBrowseCountryRef.current = syncAircraftBrowseFromApi(
@@ -16088,6 +16102,7 @@ export function App() {
                       <option value="500">≤ 500 nm</option>
                       <option value="1000">≤ 1,000 nm</option>
                       <option value="2000">≤ 2,000 nm</option>
+                      <option value="3000">≤ 3,000 nm</option>
                     </select>
                   </th>
                   <th className="col-cargo">

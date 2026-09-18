@@ -130,6 +130,20 @@ describe('computeEconomyPulse', () => {
       pulse.internationalLanes.maxPerCountryPair <=
         DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
     );
+    const dist = pulse.internationalLanes.distance;
+    assert.ok(dist);
+    assert.equal(
+      dist.regional + dist.medium + dist.ultra + dist.unknown,
+      pulse.internationalLanes.active,
+    );
+    assert.ok(dist.regionalShare >= 0 && dist.regionalShare <= 1);
+    assert.ok(dist.ultraShare >= 0 && dist.ultraShare <= 1);
+    const intlLotsMix = pulse.internationalLanes.lots;
+    assert.ok(intlLotsMix);
+    assert.ok(intlLotsMix.le2000 <= intlLotsMix.le2500);
+    assert.ok(intlLotsMix.le2000 <= intlLotsMix.available);
+    assert.ok(intlLotsMix.ultra <= intlLotsMix.available);
+    assert.ok(intlLotsMix.le2000Share >= 0 && intlLotsMix.le2000Share <= 1);
 
     assert.ok(pulse.commodities.length >= 5);
     const commodityLots = pulse.commodities.reduce(

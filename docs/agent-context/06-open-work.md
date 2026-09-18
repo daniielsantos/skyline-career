@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Intl formation regional-first** — lots ≤2000 ainda ~7.5% após +2d; `formLotsIntl` agora prioriza OD ≤2500 nm antes de oceans. Sem Dry. Re-medir após +1–2d. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **Wallet $0 flash no +Nd** — sintoma: Dev +1d pinta wallet $0; reopen restaura. Causa: `POST /api/tick` sem `companyId` (ambient tenant / shell $0) + `clearCareerSessionPaint`/`refresh` pintavam $0. Fix: tick usa `companyIdFromRequest`; UI `paintWallet` ignora $0 mid-advance; clear session não força $0. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **Pulse intl distance mix** — Live card mostra lanes ≤2500 / ≥4000 e lots ≤2000 / ≤2500 / ≥4000 (measure do retune regional-first). Detail: [`08-economy.md`](./08-economy.md) · [`19-hub-stats.md`](./19-hub-stats.md).
+
 Atualizado 2026-09-18: **World healthcheck curl** — `docker-compose` + `Dockerfile.world` usam `CMD curl -sf /api/health` (sem `node -e`); evita zombies Z no VPS. Precisa rebuild da imagem world + redeploy compose. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-18: **Desktop update install visível** — remove `/S` no quit-and-install unsigned; Setup one-click com janela de progresso + SmartScreen na frente (evita close sem feedback). `/S` só com Authenticode. Detail: `packages/desktop/README.md`.

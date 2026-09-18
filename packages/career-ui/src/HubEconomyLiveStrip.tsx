@@ -249,6 +249,17 @@ export function HubEconomyLiveStrip(props: {
               ? ` · ${pulse.internationalLanes.carryOver} carry-over`
               : null}
           </span>
+          {pulse.internationalLanes.distance ? (
+            <span className="muted">
+              Lanes ≤2500 nm{' '}
+              {(pulse.internationalLanes.distance.regionalShare * 100).toFixed(0)}
+              % · ≥4000 nm{' '}
+              {(pulse.internationalLanes.distance.ultraShare * 100).toFixed(0)}%
+              {pulse.internationalLanes.lots
+                ? ` · lots ≤2000 ${(pulse.internationalLanes.lots.le2000Share * 100).toFixed(0)}% · ≤2500 ${(pulse.internationalLanes.lots.le2500Share * 100).toFixed(0)}% · ≥4000 ${(pulse.internationalLanes.lots.ultraShare * 100).toFixed(0)}%`
+                : null}
+            </span>
+          ) : null}
         </div>
         <div className="hub-pulse-live-card">
           <span className="muted">Intl formation</span>

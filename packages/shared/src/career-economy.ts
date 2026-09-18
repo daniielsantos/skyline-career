@@ -1024,6 +1024,7 @@ import {
   listWorldCountryIds,
 } from './career-partition.js';
 import {
+  DYNAMIC_INTL_REGIONAL_MAX_NM,
   ensureDynamicInternationalLanes,
   selectDynamicInternationalLanes,
 } from './career-international-lanes.js';
@@ -11861,6 +11862,7 @@ function* formLotsFromImbalances(
     destIcao: string;
     capacityKgPerDay?: number;
     cw: number;
+    nm: number;
   }> = [];
   for (const lane of world.internationalLanes ?? []) {
     const originIcao = lane.originIcao.trim().toUpperCase();
@@ -11870,6 +11872,7 @@ function* formLotsFromImbalances(
     }
     intlEndpointIcaos.add(originIcao);
     intlEndpointIcaos.add(destIcao);
+    const nm = routeDistanceNm(world, originIcao, destIcao);
     normIntlLanes.push({
       originIcao,
       destIcao,
@@ -11878,6 +11881,7 @@ function* formLotsFromImbalances(
         corridorWeight(originIcao, destIcao),
         INTERNATIONAL_CORRIDOR_WEIGHT,
       ),
+      nm: nm != null && Number.isFinite(nm) ? nm : 9_999,
     });
   }
   // Preserve world.airports order (stable rank ties) — do not iterate the Set.
@@ -11905,7 +11909,6 @@ function* formLotsFromImbalances(
     if (surplusOrigins.size === 0 || shortageDests.size === 0) continue;
 
     // Only lanes where at least one direction can pass surplus∩shortage.
-    // Preserve normIntlLanes order (and OD then DO within each lane).
     const candidateLanes: typeof normIntlLanes = [];
     for (const lane of normIntlLanes) {
       const a = lane.originIcao;
@@ -11918,6 +11921,17 @@ function* formLotsFromImbalances(
       }
     }
     if (candidateLanes.length === 0) continue;
+
+    // Regional-first formation (2026-09-18 follow-up): lane graph alone left
+    // Market intl ~8% ≤2000 nm because skipAll filled whatever matched first —
+    // often major↔major oceans. Try shorter ODs before ultra so board mix
+    // tracks the regional-first graph. Ultra still runs if quota remains.
+    candidateLanes.sort(
+      (a, b) =>
+        a.nm - b.nm ||
+        a.originIcao.localeCompare(b.originIcao) ||
+        a.destIcao.localeCompare(b.destIcao),
+    );
 
     const minGap = commodity.basePricePerKg * 0.12;
     const intlOpts: {
@@ -11934,7 +11948,11 @@ function* formLotsFromImbalances(
       originHasOpenCorridor: false,
     };
 
-    const tryIntlDir = (oIcao: string, dIcao: string, lane: (typeof normIntlLanes)[number]) => {
+    const tryIntlDir = (
+      oIcao: string,
+      dIcao: string,
+      lane: (typeof normIntlLanes)[number],
+    ) => {
       if (!surplusOrigins.has(oIcao) || !shortageDests.has(dIcao)) return;
       const origin = rankedByIcao.get(oIcao);
       const dest = rankedByIcao.get(dIcao);
@@ -11951,10 +11969,17 @@ function* formLotsFromImbalances(
       }
     };
 
+    // Pass 1: regional-band only (≤2500 nm) until skipAll.
     for (const lane of candidateLanes) {
-      // skipAll only at lane boundary (same as prior loop) so both dirs still run.
       if (skipAll) break;
-      // Unrolled: origin→dest then dest→origin (same order as prior pairs array).
+      if (lane.nm > DYNAMIC_INTL_REGIONAL_MAX_NM) continue;
+      tryIntlDir(lane.originIcao, lane.destIcao, lane);
+      tryIntlDir(lane.destIcao, lane.originIcao, lane);
+    }
+    // Pass 2: medium then ultra (already nm-sorted) for remaining quota.
+    for (const lane of candidateLanes) {
+      if (skipAll) break;
+      if (lane.nm <= DYNAMIC_INTL_REGIONAL_MAX_NM) continue;
       tryIntlDir(lane.originIcao, lane.destIcao, lane);
       tryIntlDir(lane.destIcao, lane.originIcao, lane);
     }

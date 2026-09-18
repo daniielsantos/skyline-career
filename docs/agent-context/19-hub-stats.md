@@ -22,6 +22,8 @@ Atualizado 2026-09-18: **PG history `untilDay` sentinel** — `readHubEconomySam
 
 Atualizado 2026-09-18: **Intl formation Live card** — `/api/debug/economy-pulse` inclui `intlFormation` (matchable OD %, kg vs target, skipAll flags). Card no Hub Pulse Live; Network history continua em `hub_economy_samples`.
 
+Atualizado 2026-09-18: **Intl distance mix Live** — `internationalLanes.distance` (lanes ≤2500 / ≥4000) + `lots` (≤2000 / ≤2500 / ≥4000) no mesmo card Intl do Pulse Live. Alvos pós-retune: lanes regional ≥55% / ultra ≤18%; lots ≤2000 ballpark ≥40%.
+
 Atualizado 2026-09-18: **PG hub_economy_samples (v18)** — MP Pulse / Hub Stats history deixa de ser stub vazio. `pendingHubEconomySamples` flushea em `saveEconomy` e `persistNpcLiveWorld` (headless day boundary). API `readHubEconomySamples*` agora pode ser async.
 
 Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples` (mundo / BR·US / major·regional·spoke) por dia. API `GET /api/debug/hub-economy-history?days=7|30|90`. UI: tab **Pulse** (dev). Schema **v8** cols: country/tier/region, cargo stock/cap, inbound, lot counts, pay p10/p90.

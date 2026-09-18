@@ -5,6 +5,8 @@
 import {
   CAREER_CARGO_COMMODITIES,
   computeIntlFormationDiag,
+  DYNAMIC_INTL_REGIONAL_MAX_NM,
+  DYNAMIC_INTL_ULTRA_MIN_NM,
   localUnitPriceUsd,
   routeDistanceNm,
   tickEconomyN,
@@ -205,6 +207,34 @@ export interface EconomyPulse {
     minPerCountry: number;
     maxPerCountry: number;
     maxPerCountryPair: number;
+    /**
+     * Distance mix of the active daily+carry lane graph (measure after
+     * regional-first retune). Shares are of `active` lanes with known nm.
+     */
+    distance: {
+      /** nm ≤ DYNAMIC_INTL_REGIONAL_MAX_NM (2500). */
+      regional: number;
+      /** 2500 < nm < 4000. */
+      medium: number;
+      /** nm ≥ DYNAMIC_INTL_ULTRA_MIN_NM (4000). */
+      ultra: number;
+      unknown: number;
+      regionalShare: number;
+      ultraShare: number;
+    };
+    /**
+     * Available INTL lots by route nm — lags the lane graph by 1–3d
+     * (carry-over + life mult). Target ballpark: le2000Share ≥ 0.40.
+     */
+    lots: {
+      available: number;
+      le2000: number;
+      le2500: number;
+      ultra: number;
+      le2000Share: number;
+      le2500Share: number;
+      ultraShare: number;
+    };
   };
   /** Median contract payUsd across bookable leftovers. */
   payUsdP50: number | null;
@@ -845,6 +875,9 @@ export function computeEconomyPulse(
   const originLotCount = new Map<string, number>();
   let availableLots = 0;
   let intlLots = 0;
+  let intlLotsLe2000 = 0;
+  let intlLotsLe2500 = 0;
+  let intlLotsUltra = 0;
   const boardPayUsd: number[] = [];
   const lotStatus = emptyLotStatus();
 
@@ -918,7 +951,15 @@ export function computeEconomyPulse(
     availableLots += 1;
     boardPayUsd.push(lot.payUsd);
     const bucket = lotBucketId(lot, byIcao);
-    if (bucket === 'INTL') intlLots += 1;
+    if (bucket === 'INTL') {
+      intlLots += 1;
+      const nm = routeDistanceNm(world, lot.originIcao, lot.destIcao);
+      if (nm != null && Number.isFinite(nm)) {
+        if (nm <= 2_000) intlLotsLe2000 += 1;
+        if (nm <= DYNAMIC_INTL_REGIONAL_MAX_NM) intlLotsLe2500 += 1;
+        if (nm >= DYNAMIC_INTL_ULTRA_MIN_NM) intlLotsUltra += 1;
+      }
+    }
     const acc = ensureAcc(bucket);
     acc.lots.push(lot);
     const qty = lot.quantityKg > 0 ? lot.quantityKg : 0;
@@ -1053,6 +1094,10 @@ export function computeEconomyPulse(
   const laneCountByCountry = new Map<string, number>();
   const laneCountByPair = new Map<string, number>();
   let carryOverLanes = 0;
+  let laneRegional = 0;
+  let laneMedium = 0;
+  let laneUltra = 0;
+  let laneUnknownNm = 0;
   for (const lane of activeInternationalLanes) {
     if (lane.id.startsWith('carry_')) carryOverLanes += 1;
     laneCountByCountry.set(
@@ -1065,9 +1110,23 @@ export function computeEconomyPulse(
     );
     const pair = [lane.originCountryId, lane.destCountryId].sort().join('|');
     laneCountByPair.set(pair, (laneCountByPair.get(pair) ?? 0) + 1);
+    const nm = routeDistanceNm(world, lane.originIcao, lane.destIcao);
+    if (nm == null || !Number.isFinite(nm)) {
+      laneUnknownNm += 1;
+    } else if (nm <= DYNAMIC_INTL_REGIONAL_MAX_NM) {
+      laneRegional += 1;
+    } else if (nm >= DYNAMIC_INTL_ULTRA_MIN_NM) {
+      laneUltra += 1;
+    } else {
+      laneMedium += 1;
+    }
   }
   const countryLaneCounts = [...laneCountByCountry.values()];
   const pairLaneCounts = [...laneCountByPair.values()];
+  const laneKnown =
+    laneRegional + laneMedium + laneUltra > 0
+      ? laneRegional + laneMedium + laneUltra
+      : 0;
   const npc = computeNpcPulse(world, nowMs);
   const recoveryRows = Object.entries(
     (world.regionalRecovery ?? {}) as Record<string, RegionalRecoveryState>,
@@ -1103,6 +1162,23 @@ export function computeEconomyPulse(
         countryLaneCounts.length > 0 ? Math.max(...countryLaneCounts) : 0,
       maxPerCountryPair:
         pairLaneCounts.length > 0 ? Math.max(...pairLaneCounts) : 0,
+      distance: {
+        regional: laneRegional,
+        medium: laneMedium,
+        ultra: laneUltra,
+        unknown: laneUnknownNm,
+        regionalShare: laneKnown > 0 ? laneRegional / laneKnown : 0,
+        ultraShare: laneKnown > 0 ? laneUltra / laneKnown : 0,
+      },
+      lots: {
+        available: intlLots,
+        le2000: intlLotsLe2000,
+        le2500: intlLotsLe2500,
+        ultra: intlLotsUltra,
+        le2000Share: intlLots > 0 ? intlLotsLe2000 / intlLots : 0,
+        le2500Share: intlLots > 0 ? intlLotsLe2500 / intlLots : 0,
+        ultraShare: intlLots > 0 ? intlLotsUltra / intlLots : 0,
+      },
     },
     payUsdP50: median(boardPayUsd),
     payUsdAvg: mean(boardPayUsd),

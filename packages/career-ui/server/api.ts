@@ -8457,9 +8457,16 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const body = (await readBody(req)) as { n?: number; profile?: boolean };
+        const body = (await readBody(req)) as {
+          n?: number;
+          profile?: boolean;
+          companyId?: string;
+        };
         const n = Math.max(1, Math.min(TICKS_PER_DAY * 7, Math.floor(body.n ?? TICKS_PER_DAY)));
         const wantProfile = body.profile === true;
+        // Same mold as market/fleet: never fall through to ambient
+        // activeCompanyId (can paint/save another tenant's $0 shell).
+        const tickCompanyId = companyIdFromRequest(req, body.companyId);
         const payload = await withCareerWrite(async (world, missions) => {
           const profile = wantProfile
             ? createEmptyTickPhaseProfile()
@@ -8552,7 +8559,10 @@ export function createCareerApiServer(port = 8787) {
               ? { tickProfile: summarizeTickPhaseProfile(profile) }
               : {}),
           };
-        }, { catchUp: true });
+        }, {
+          catchUp: true,
+          ...(tickCompanyId ? { companyId: tickCompanyId } : {}),
+        });
         send(res, 200, payload);
         return;
       }

@@ -2034,6 +2034,23 @@ export type EconomyPulseView = {
     minPerCountry: number;
     maxPerCountry: number;
     maxPerCountryPair: number;
+    distance: {
+      regional: number;
+      medium: number;
+      ultra: number;
+      unknown: number;
+      regionalShare: number;
+      ultraShare: number;
+    };
+    lots: {
+      available: number;
+      le2000: number;
+      le2500: number;
+      ultra: number;
+      le2000Share: number;
+      le2500Share: number;
+      ultraShare: number;
+    };
   };
   payUsdP50: number | null;
   commodities: EconomyPulseCommodityView[];

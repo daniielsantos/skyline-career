@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **8264f75** / desktop **0.3.93** shipped: Form regional-to-major feeder LTL under soft-cap skipAll. Release: [v0.3.93](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.93).
+
+
 `main` **3a940c1** / desktop **0.3.92** shipped: Use one-click NSIS updates to skip the installer wizard. Release: [v0.3.92](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.92).
 
 

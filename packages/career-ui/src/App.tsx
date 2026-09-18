@@ -11703,9 +11703,7 @@ export function App() {
             <h1>
               {pageTitle}
               {pageHelp ? <PageHelpButton help={pageHelp} /> : null}
-              <DesktopUpdateHeaderButton
-                onOpenSettings={() => selectTab('settings')}
-              />
+              <DesktopUpdateHeaderButton />
             </h1>
             <p className="lede">
               {pageLede}

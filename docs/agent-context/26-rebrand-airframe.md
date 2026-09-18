@@ -82,6 +82,12 @@ Strings “Skyline inject”, “Skyline hubs”, placeholder “Ada Skyline”,
 
 Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anterior pode ficar em `…\Skyline Career`).
 
+### Topbar update button (2026-09-17)
+
+**Sintoma:** `UPDATE x.y.z` só aparecia se o evento `available` chegasse com o React já montado; clique mandava para Settings.  
+**Causa:** header só escutava IPC e não re-checava no login; download ficava no card de Settings.  
+**Fix:** store compartilhado em `DesktopUpdates.tsx` — check ao entrar no shell (pós-login) + poll **30 min**; clique no botão faz download (barra no próprio pill) e depois `Install` abre o Setup (unsigned SmartScreen flow). Settings card continua como manual fallback.
+
 ## Fase 3 — paths / ids (migrar com cuidado)
 
 - [ ] `%APPDATA%\Skyline Career\` → novo path **com** migração de saves

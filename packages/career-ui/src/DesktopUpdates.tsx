@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
-type UpdateEvent =
+export type DesktopUpdateEvent =
   | { type: 'checking' }
   | { type: 'available'; version: string; releaseNotes?: string | null }
   | { type: 'not-available'; version?: string }
@@ -17,11 +17,51 @@ type UpdateEvent =
 type SkylineDesktop = {
   isDesktop: true;
   getVersion: () => Promise<string>;
-  checkForUpdates: () => Promise<{ ok: boolean; version?: string | null; reason?: string }>;
+  checkForUpdates: () => Promise<{
+    ok: boolean;
+    version?: string | null;
+    reason?: string;
+  }>;
   downloadUpdate: () => Promise<{ ok: boolean; reason?: string }>;
   quitAndInstall: () => Promise<{ ok: boolean; reason?: string }>;
-  onUpdateEvent: (cb: (payload: UpdateEvent) => void) => () => void;
+  onUpdateEvent: (cb: (payload: DesktopUpdateEvent) => void) => () => void;
 };
+
+export type DesktopUpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'error'
+  | 'uptodate';
+
+export type DesktopUpdateState = {
+  status: DesktopUpdateStatus;
+  installedVersion: string;
+  remoteVersion: string | null;
+  progressPct: number;
+  error: string | null;
+  busy: boolean;
+};
+
+/** Long-interval recheck after the login/boot check (ms). */
+export const DESKTOP_UPDATE_POLL_MS = 30 * 60 * 1000;
+
+const INITIAL_STATE: DesktopUpdateState = {
+  status: 'idle',
+  installedVersion: '…',
+  remoteVersion: null,
+  progressPct: 0,
+  error: null,
+  busy: false,
+};
+
+let storeState: DesktopUpdateState = { ...INITIAL_STATE };
+const storeListeners = new Set<() => void>();
+let bridgeWired = false;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let checkInFlight: Promise<void> | null = null;
 
 function getDesktop(): SkylineDesktop | null {
   const w = window as Window & { skylineDesktop?: SkylineDesktop };
@@ -32,107 +72,221 @@ export function isSkylineDesktopShell(): boolean {
   return getDesktop() != null;
 }
 
+function emitStore() {
+  for (const listener of storeListeners) listener();
+}
+
+function patchStore(partial: Partial<DesktopUpdateState>) {
+  storeState = { ...storeState, ...partial };
+  emitStore();
+}
+
+function applyUpdateEvent(ev: DesktopUpdateEvent) {
+  if (ev.type === 'checking') {
+    if (
+      storeState.status === 'available' ||
+      storeState.status === 'downloading' ||
+      storeState.status === 'ready'
+    ) {
+      return;
+    }
+    patchStore({ status: 'checking', error: null });
+  } else if (ev.type === 'available') {
+    patchStore({
+      status: 'available',
+      remoteVersion: ev.version,
+      error: null,
+      progressPct: 0,
+    });
+  } else if (ev.type === 'not-available') {
+    if (
+      storeState.status === 'available' ||
+      storeState.status === 'downloading' ||
+      storeState.status === 'ready'
+    ) {
+      return;
+    }
+    patchStore({
+      status: 'uptodate',
+      remoteVersion: null,
+      error: null,
+    });
+  } else if (ev.type === 'progress') {
+    patchStore({
+      status: 'downloading',
+      progressPct: Math.max(0, Math.min(100, ev.percent ?? 0)),
+      error: null,
+    });
+  } else if (ev.type === 'downloaded') {
+    patchStore({
+      status: 'ready',
+      remoteVersion: ev.version,
+      progressPct: 100,
+      error: null,
+      busy: false,
+    });
+  } else if (ev.type === 'error') {
+    patchStore({ status: 'error', error: ev.message, busy: false });
+  }
+}
+
+async function runUpdateCheck(): Promise<void> {
+  const desktop = getDesktop();
+  if (!desktop) return;
+  if (
+    storeState.status === 'available' ||
+    storeState.status === 'downloading' ||
+    storeState.status === 'ready' ||
+    storeState.busy
+  ) {
+    return;
+  }
+  if (checkInFlight) return checkInFlight;
+  checkInFlight = (async () => {
+    patchStore({ busy: true, error: null, status: 'checking' });
+    try {
+      const result = await desktop.checkForUpdates();
+      if (!result.ok && result.reason && result.reason !== 'dev') {
+        patchStore({ status: 'error', error: result.reason });
+      }
+    } catch (err) {
+      patchStore({
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      patchStore({ busy: false });
+      checkInFlight = null;
+    }
+  })();
+  return checkInFlight;
+}
+
+function ensureDesktopUpdateBridge() {
+  const desktop = getDesktop();
+  if (!desktop || bridgeWired) return desktop;
+  bridgeWired = true;
+  void desktop.getVersion().then((version) => {
+    patchStore({ installedVersion: version });
+  }).catch(() => {
+    patchStore({ installedVersion: '?' });
+  });
+  desktop.onUpdateEvent(applyUpdateEvent);
+  // Login / first paint into the shell — check now (boot may have fired early).
+  void runUpdateCheck();
+  if (!pollTimer) {
+    pollTimer = setInterval(() => {
+      void runUpdateCheck();
+    }, DESKTOP_UPDATE_POLL_MS);
+  }
+  return desktop;
+}
+
+function subscribeDesktopUpdateStore(listener: () => void): () => void {
+  ensureDesktopUpdateBridge();
+  storeListeners.add(listener);
+  return () => {
+    storeListeners.delete(listener);
+  };
+}
+
+function getDesktopUpdateSnapshot(): DesktopUpdateState {
+  ensureDesktopUpdateBridge();
+  return storeState;
+}
+
+export function useDesktopUpdateState(): DesktopUpdateState {
+  return useSyncExternalStore(
+    subscribeDesktopUpdateStore,
+    getDesktopUpdateSnapshot,
+    () => INITIAL_STATE,
+  );
+}
+
+export function desktopUpdateHeaderLabel(state: DesktopUpdateState): string | null {
+  if (state.status === 'downloading') {
+    return `Downloading ${state.progressPct.toFixed(0)}%`;
+  }
+  if (state.status === 'ready' && state.remoteVersion) {
+    return `Install ${state.remoteVersion}`;
+  }
+  if (state.status === 'available' && state.remoteVersion) {
+    return `Update ${state.remoteVersion}`;
+  }
+  if (state.status === 'error' && state.remoteVersion) {
+    return `Update ${state.remoteVersion}`;
+  }
+  return null;
+}
+
 export function DesktopUpdatesCard() {
   const desktop = getDesktop();
-  const [version, setVersion] = useState<string>('…');
-  const [status, setStatus] = useState<
-    'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error' | 'uptodate'
-  >('idle');
-  const [remoteVersion, setRemoteVersion] = useState<string | null>(null);
-  const [progressPct, setProgressPct] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!desktop) return;
-    void desktop.getVersion().then(setVersion).catch(() => setVersion('?'));
-    return desktop.onUpdateEvent((ev) => {
-      if (ev.type === 'checking') {
-        setStatus('checking');
-        setError(null);
-      } else if (ev.type === 'available') {
-        setStatus('available');
-        setRemoteVersion(ev.version);
-        setError(null);
-      } else if (ev.type === 'not-available') {
-        setStatus('uptodate');
-        setRemoteVersion(null);
-      } else if (ev.type === 'progress') {
-        setStatus('downloading');
-        setProgressPct(Math.max(0, Math.min(100, ev.percent ?? 0)));
-      } else if (ev.type === 'downloaded') {
-        setStatus('ready');
-        setRemoteVersion(ev.version);
-        setProgressPct(100);
-      } else if (ev.type === 'error') {
-        setStatus('error');
-        setError(ev.message);
-      }
-    });
-  }, [desktop]);
+  const state = useDesktopUpdateState();
 
   if (!desktop) return null;
 
   async function onCheck() {
-    setBusy(true);
-    setError(null);
-    setStatus('checking');
-    try {
-      const result = await desktop!.checkForUpdates();
-      if (!result.ok && result.reason && result.reason !== 'dev') {
-        setStatus('error');
-        setError(result.reason);
-      }
-    } finally {
-      setBusy(false);
-    }
+    await runUpdateCheck();
   }
 
   async function onDownload() {
-    setBusy(true);
-    setError(null);
-    setStatus('downloading');
-    setProgressPct(0);
+    patchStore({
+      busy: true,
+      error: null,
+      status: 'downloading',
+      progressPct: 0,
+    });
     try {
       const result = await desktop!.downloadUpdate();
       if (!result.ok) {
-        setStatus('error');
-        setError(result.reason ?? 'Download failed');
+        patchStore({
+          status: 'error',
+          error: result.reason ?? 'Download failed',
+          busy: false,
+        });
       }
+    } catch (err) {
+      patchStore({
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+        busy: false,
+      });
     } finally {
-      setBusy(false);
+      if (storeState.status === 'downloading') {
+        patchStore({ busy: false });
+      }
     }
   }
 
   async function onRestart() {
-    setBusy(true);
-    setError(null);
+    patchStore({ busy: true, error: null });
     try {
       const result = await desktop!.quitAndInstall();
       if (!result.ok) {
-        setBusy(false);
+        patchStore({ busy: false });
         if (result.reason && result.reason !== 'cancelled') {
-          setStatus('error');
-          setError(result.reason);
+          patchStore({ status: 'error', error: result.reason });
         }
       }
     } catch (err) {
-      setBusy(false);
-      setStatus('error');
-      setError(err instanceof Error ? err.message : String(err));
+      patchStore({
+        busy: false,
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
   const help =
-    status === 'available' && remoteVersion
-      ? `Version ${remoteVersion} is available.`
-      : status === 'downloading'
-        ? `Downloading update… ${progressPct.toFixed(0)}%`
-        : status === 'ready' && remoteVersion
-          ? `Version ${remoteVersion} downloaded. Open the installer — if Windows warns about an unknown publisher, choose More info → Run anyway, then finish setup.`
-          : status === 'uptodate'
+    state.status === 'available' && state.remoteVersion
+      ? `Version ${state.remoteVersion} is available.`
+      : state.status === 'downloading'
+        ? `Downloading update… ${state.progressPct.toFixed(0)}%`
+        : state.status === 'ready' && state.remoteVersion
+          ? `Version ${state.remoteVersion} downloaded. Open the installer — if Windows warns about an unknown publisher, choose More info → Run anyway, then finish setup.`
+          : state.status === 'uptodate'
             ? 'You are on the latest release.'
-            : status === 'checking'
+            : state.status === 'checking'
               ? 'Checking GitHub Releases…'
               : 'Checks GitHub Releases for a newer Airframe Career build. Builds are not code-signed yet — Windows SmartScreen may warn when installing updates.';
 
@@ -141,56 +295,56 @@ export function DesktopUpdatesCard() {
       <h3>Updates</h3>
       <p className="settings-help">{help}</p>
       <p className="settings-sample">
-        Installed version: <strong>{version}</strong>
-        {remoteVersion ? (
+        Installed version: <strong>{state.installedVersion}</strong>
+        {state.remoteVersion ? (
           <>
             {' · '}
-            Available: <strong>{remoteVersion}</strong>
+            Available: <strong>{state.remoteVersion}</strong>
           </>
         ) : null}
       </p>
-      {status === 'downloading' ? (
+      {state.status === 'downloading' ? (
         <div
           className="desktop-update-progress"
           role="progressbar"
-          aria-valuenow={Math.round(progressPct)}
+          aria-valuenow={Math.round(state.progressPct)}
           aria-valuemin={0}
           aria-valuemax={100}
         >
-          <span style={{ width: `${progressPct}%` }} />
+          <span style={{ width: `${state.progressPct}%` }} />
         </div>
       ) : null}
-      {error ? (
+      {state.error ? (
         <p className="error" role="alert">
-          {error}
+          {state.error}
         </p>
       ) : null}
       <div className="settings-choice" style={{ marginTop: '0.75rem' }}>
         <button
           type="button"
           className="settings-choice-btn"
-          disabled={busy || status === 'downloading'}
+          disabled={state.busy || state.status === 'downloading'}
           onClick={() => void onCheck()}
         >
           Check for updates
           <small>GitHub Releases</small>
         </button>
-        {status === 'available' ? (
+        {state.status === 'available' || state.status === 'error' ? (
           <button
             type="button"
             className="settings-choice-btn active"
-            disabled={busy}
+            disabled={state.busy || !state.remoteVersion}
             onClick={() => void onDownload()}
           >
             Download
-            <small>{remoteVersion ?? 'update'}</small>
+            <small>{state.remoteVersion ?? 'update'}</small>
           </button>
         ) : null}
-        {status === 'ready' ? (
+        {state.status === 'ready' ? (
           <button
             type="button"
             className="settings-choice-btn active"
-            disabled={busy}
+            disabled={state.busy}
             onClick={() => void onRestart()}
           >
             Restart to update
@@ -202,49 +356,97 @@ export function DesktopUpdatesCard() {
   );
 }
 
-/** Compact topbar control when a desktop update is available or ready. */
-export function DesktopUpdateHeaderButton(props: {
-  onOpenSettings: () => void;
-}) {
+/**
+ * Topbar control: check on shell entry (login), long-poll thereafter.
+ * Click downloads with in-button progress, then installs — no Settings hop.
+ */
+export function DesktopUpdateHeaderButton() {
   const desktop = getDesktop();
-  const [version, setVersion] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const state = useDesktopUpdateState();
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!desktop) return;
-    return desktop.onUpdateEvent((ev) => {
-      if (ev.type === 'available') {
-        setReady(false);
-        setVersion(ev.version);
-      } else if (ev.type === 'downloaded') {
-        setReady(true);
-        setVersion(ev.version);
+    // ensure bridge + login check even if Settings card never mounts
+    ensureDesktopUpdateBridge();
+  }, []);
+
+  if (!desktop) return null;
+
+  const label = desktopUpdateHeaderLabel(state);
+  if (!label && state.status !== 'checking') return null;
+  // Hide quiet "checking" so the bar does not flash on every poll.
+  if (!label) return null;
+
+  const downloading = state.status === 'downloading';
+  const ready = state.status === 'ready';
+  const title = downloading
+    ? `Downloading ${state.remoteVersion ?? 'update'}… ${state.progressPct.toFixed(0)}%`
+    : ready
+      ? `Version ${state.remoteVersion} downloaded — click to open the installer`
+      : `Version ${state.remoteVersion} available — click to download and install`;
+
+  async function onClick() {
+    setActionError(null);
+    if (ready) {
+      patchStore({ busy: true });
+      try {
+        const result = await desktop!.quitAndInstall();
+        if (!result.ok) {
+          patchStore({ busy: false });
+          if (result.reason && result.reason !== 'cancelled') {
+            setActionError(result.reason);
+            patchStore({ status: 'error', error: result.reason });
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setActionError(message);
+        patchStore({ busy: false, status: 'error', error: message });
       }
+      return;
+    }
+    if (downloading || state.busy) return;
+    patchStore({
+      busy: true,
+      error: null,
+      status: 'downloading',
+      progressPct: 0,
     });
-  }, [desktop]);
-
-  if (!desktop || !version) return null;
-
-  const label = ready ? `Install ${version}` : `Update ${version}`;
-  const title = ready
-    ? `Version ${version} downloaded — open the installer`
-    : `Version ${version} available — open Settings to download`;
+    try {
+      const result = await desktop!.downloadUpdate();
+      if (!result.ok) {
+        const reason = result.reason ?? 'Download failed';
+        setActionError(reason);
+        patchStore({ status: 'error', error: reason, busy: false });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setActionError(message);
+      patchStore({ status: 'error', error: message, busy: false });
+    } finally {
+      if (storeState.status === 'downloading') {
+        patchStore({ busy: false });
+      }
+    }
+  }
 
   return (
     <button
       type="button"
-      className={`topbar-update-btn${ready ? ' is-ready' : ''}`}
-      title={title}
-      aria-label={title}
-      onClick={() => {
-        if (ready) {
-          void desktop.quitAndInstall();
-        } else {
-          props.onOpenSettings();
-        }
-      }}
+      className={`topbar-update-btn${ready ? ' is-ready' : ''}${downloading ? ' is-downloading' : ''}`}
+      title={actionError ? actionError : title}
+      aria-label={actionError ? actionError : title}
+      disabled={downloading || state.busy}
+      onClick={() => void onClick()}
     >
-      {label}
+      {downloading ? (
+        <span
+          className="topbar-update-btn-progress"
+          aria-hidden="true"
+          style={{ width: `${state.progressPct}%` }}
+        />
+      ) : null}
+      <span className="topbar-update-btn-label">{label}</span>
     </button>
   );
 }

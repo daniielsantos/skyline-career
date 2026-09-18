@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **1180398** / desktop **0.3.81** shipped: Add Base Charter Search (1-2 legs) like Freight tours. Release: [v0.3.81](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.81).
+
+
 `main` **2386d7f** / desktop **0.3.80** shipped: Harden desktop update checks and clarify dual Pax tooltips. Release: [v0.3.80](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.80).
 
 

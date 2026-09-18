@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **d7a52f2** / desktop **0.3.94** shipped: Prefer regional intl lanes and show the update installer UI. Release: [v0.3.94](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.94).
+
+
 `main` **8264f75** / desktop **0.3.93** shipped: Form regional-to-major feeder LTL under soft-cap skipAll. Release: [v0.3.93](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.93).
 
 

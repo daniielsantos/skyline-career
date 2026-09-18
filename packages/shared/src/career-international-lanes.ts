@@ -225,8 +225,8 @@ function laneBudgetByCountry(
 function gatewayPressure(a: AirportTerminal, b: AirportTerminal): number {
   let best = 0;
   for (const commodityId of LANE_COMMODITIES) {
-    const stockA = a.stock?.[commodityId];
-    const stockB = b.stock?.[commodityId];
+    const stockA = a.inventory?.[commodityId];
+    const stockB = b.inventory?.[commodityId];
     if (
       !stockA ||
       !stockB ||

@@ -1283,6 +1283,12 @@ export function startActiveTour(
   const acf = state.fleet.find((a) => a.id === opts.aircraftId);
   if (!acf) throw new Error('Unknown aircraft for Active Tour');
   const fbos = ensurePlayerFbos(state);
+  if (fbos.charterActiveTour?.status === 'active') {
+    throw new Error('Finish or drop the charter Active Tour first');
+  }
+  if (fbos.activeTour?.status === 'active') {
+    throw new Error('Finish or drop the freight Active Tour first');
+  }
   const legs: ActiveTourLeg[] = opts.legs.map((leg, i) => ({
     index: i + 1,
     lotId: leg.lotId,
@@ -1356,6 +1362,12 @@ export function prepareActiveTour(
   const acf = state.fleet.find((a) => a.id === opts.aircraftId);
   if (!acf) throw new Error('Unknown aircraft for Active Tour');
   const fbos = ensurePlayerFbos(state);
+  if (fbos.charterActiveTour?.status === 'active') {
+    throw new Error('Finish or drop the charter Active Tour first');
+  }
+  if (fbos.activeTour?.status === 'active') {
+    throw new Error('Finish or drop the freight Active Tour first');
+  }
   const legs: ActiveTourLeg[] = opts.legs.map((leg, i) => ({
     index: i + 1,
     lotId: leg.lotId,

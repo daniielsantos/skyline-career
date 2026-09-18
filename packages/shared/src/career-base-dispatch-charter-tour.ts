@@ -582,11 +582,27 @@ export function syncCharterActiveTour(
 export function charterActiveTourView(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
-): (CharterActiveTour & {
+): {
+  id: string;
+  aircraftId: string;
+  aircraftClassId: FreighterClassId;
+  airframeTypeId?: string;
+  hubIcao: string;
+  originIcao: string;
+  routeLabel: string;
+  startedAtTick: number;
+  status: CharterActiveTour['status'];
   nextLegIndex: number | null;
   canAcceptNextLeg: boolean;
   resumeHint?: string;
-}) | null {
+  legs: Array<
+    CharterActiveTour['legs'][number] & {
+      expiresAtTick: number | null;
+      ticksRemaining: number | null;
+      offerExpired: boolean;
+    }
+  >;
+} | null {
   syncCharterActiveTour(state, world);
   const tour = ensurePlayerFbos(state).charterActiveTour;
   if (!tour || tour.status !== 'active') return null;
@@ -600,20 +616,48 @@ export function charterActiveTourView(
     aircraft?.status === 'parked' &&
     (aircraft.locationIcao ?? '').trim().toUpperCase() ===
       next!.originIcao.toUpperCase();
-  const offerOk =
+
+  const legs = tour.legs.map((leg) => {
+    const offer = (world.charterOffers ?? []).find((o) => o.id === leg.offerId);
+    if (!offer) {
+      return {
+        ...leg,
+        expiresAtTick: null as number | null,
+        ticksRemaining: null as number | null,
+        offerExpired: leg.status === 'planned' || leg.status === 'lost',
+      };
+    }
+    const ticksRemaining = Math.max(0, offer.expiresAtTick - world.tick);
+    const offerExpired =
+      leg.status === 'planned' &&
+      (world.tick >= offer.expiresAtTick || offer.status !== 'available');
+    return {
+      ...leg,
+      expiresAtTick: offer.expiresAtTick,
+      ticksRemaining,
+      offerExpired,
+    };
+  });
+
+  const nextOfferOk =
     Boolean(next) &&
-    (world.charterOffers ?? []).some(
-      (o) =>
-        o.id === next!.offerId &&
-        o.status === 'available' &&
-        world.tick < o.expiresAtTick,
+    legs.some(
+      (l) =>
+        l.index === next!.index &&
+        !l.offerExpired &&
+        (world.charterOffers ?? []).some(
+          (o) =>
+            o.id === l.offerId &&
+            o.status === 'available' &&
+            world.tick < o.expiresAtTick,
+        ),
     );
   const canAcceptNextLeg =
     Boolean(next) &&
     next!.status === 'planned' &&
     !next!.missionId &&
     atOrigin &&
-    offerOk &&
+    nextOfferOk &&
     !state.missions.some(
       (m) =>
         m.status === 'accepted' ||
@@ -621,12 +665,21 @@ export function charterActiveTourView(
         m.status === 'in_flight',
     );
   return {
-    ...tour,
+    id: tour.id,
+    aircraftId: tour.aircraftId,
+    aircraftClassId: tour.aircraftClassId,
+    airframeTypeId: tour.airframeTypeId,
+    hubIcao: tour.hubIcao,
+    originIcao: tour.originIcao,
+    routeLabel: tour.routeLabel,
+    startedAtTick: tour.startedAtTick,
+    status: tour.status,
+    legs,
     nextLegIndex,
     canAcceptNextLeg,
     resumeHint: !next
       ? undefined
-      : !offerOk
+      : !nextOfferOk
         ? `L${next.index} offer expired — Drop tour`
         : !atOrigin
           ? `Ferry to ${next.originIcao} for L${next.index}`

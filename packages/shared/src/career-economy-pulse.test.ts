@@ -206,6 +206,18 @@ describe('computeEconomyPulse', () => {
 
   it('excludes bushTripOnly from country dead hub metrics', () => {
     const world = createSeedEconomyWorld({ seed: 'pulse-bush-dead' });
+    const template = world.airports.find(
+      (ap) => countryIdFromRegion(ap.region ?? '') === 'US',
+    );
+    assert.ok(template);
+    // Seed no longer ships bushTripOnly hubs; stamp one so pulse still
+    // drops them from country hub / dead counts.
+    world.airports.push({
+      ...structuredClone(template),
+      icao: 'ZZZZ',
+      bushTripOnly: true,
+      bush: true,
+    });
     const pulse = computeEconomyPulse(world);
     const us = pulse.countries.find((c) => c.countryId === 'US');
     assert.ok(us);
@@ -215,9 +227,12 @@ describe('computeEconomyPulse', () => {
         !(ap.bushTripOnly === true || isBushTripOnlyHub(ap.icao)),
     );
     assert.equal(us!.hubs, cargoUs.length);
-    assert.ok(cargoUs.length < world.airports.filter(
-      (ap) => countryIdFromRegion(ap.region ?? '') === 'US',
-    ).length);
+    assert.ok(
+      cargoUs.length <
+        world.airports.filter(
+          (ap) => countryIdFromRegion(ap.region ?? '') === 'US',
+        ).length,
+    );
   });
 
   it('includes player-bookable board metrics', () => {

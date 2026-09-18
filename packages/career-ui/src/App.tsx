@@ -181,7 +181,7 @@ import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { FerryHubCombobox } from './FerryHubCombobox';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
-import { CharterBoard, resolveBaseCharterOrigin } from './CharterBoard';
+import { CharterBoard, resolveBaseCharterOrigin, charterExpiryLabel } from './CharterBoard';
 import {
   boardMoneyLabel,
   boardNetClassName,
@@ -3676,8 +3676,10 @@ export function App() {
   }, [airportIcao, playerFbos]);
   const [dispatchTours, setDispatchTours] = useState<BaseDispatchTour[]>([]);
   const [charterTours, setCharterTours] = useState<BaseCharterTour[]>([]);
-  const [baseDispatchProduct, setBaseDispatchProduct] =
-    useState<'freight' | 'charter'>('freight');
+  const [baseDispatchProduct, setBaseDispatchProduct] = useState<
+    'freight' | 'charter'
+  >('freight');
+  const [baseDispatcherHireOpen, setBaseDispatcherHireOpen] = useState(false);
   const [activeTour, setActiveTour] = useState<ActiveTourView | null>(null);
   const [charterActiveTour, setCharterActiveTour] =
     useState<CharterActiveTourView | null>(null);
@@ -3924,6 +3926,45 @@ export function App() {
     activeTour?.status,
     activeTour?.resumeState,
     activeTour?.canAcceptNextLeg,
+  ]);
+
+  /** Charter Active Tour — raw /api/state has no resumeHint / Accept gates. */
+  useEffect(() => {
+    if (terminalSection !== 'fbo' || !airportIcao) return;
+    if (!charterActiveTour || charterActiveTour.status !== 'active') return;
+    if (charterActiveTour.resumeHint != null) return;
+    let cancelled = false;
+    void postBaseDispatchCharters({ action: 'status' })
+      .then((status) => {
+        if (cancelled) return;
+        setCharterActiveTour(status.charterActiveTour ?? null);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    terminalSection,
+    airportIcao,
+    charterActiveTour?.id,
+    charterActiveTour?.status,
+    charterActiveTour?.resumeHint,
+  ]);
+
+  /** One Active Tour desk at a time — keep the matching product tab selected. */
+  useEffect(() => {
+    if (activeTour?.status === 'active') {
+      setBaseDispatchProduct('freight');
+    } else if (charterActiveTour?.status === 'active') {
+      setBaseDispatchProduct('charter');
+    }
+  }, [
+    activeTour?.status,
+    activeTour?.id,
+    charterActiveTour?.status,
+    charterActiveTour?.id,
   ]);
 
   useEffect(() => {
@@ -4221,10 +4262,11 @@ export function App() {
             prev &&
             prev.id === snapCharter.id &&
             prev.status === 'active' &&
-            prev.canAcceptNextLeg != null
+            prev.resumeHint != null
           ) {
             return prev;
           }
+          // Raw persist has no resumeHint / Accept gates — status fetch fills them.
           return {
             ...snapCharter,
             nextLegIndex:
@@ -7903,6 +7945,11 @@ export function App() {
 
   async function onConfirmDispatchTour(tour: BaseDispatchTour) {
     if (busy || dispatchTourBusy) return;
+    if (charterActiveTour?.status === 'active') {
+      setToastKind('fail');
+      setToast('Drop the Charter tour before starting a Freight tour');
+      return;
+    }
     const first = tour.legs[0];
     if (!first) return;
     const hub =
@@ -7924,7 +7971,7 @@ export function App() {
         enterStagingForTourLeg(lot, tour.aircraftId);
         return;
       }
-      // Persist itinerary before Manifest so refresh/rebuild cannot wipe Active Tour.
+      // Persist itinerary only — Manifest opens from Active Tour L1 Continue.
       const prepared = await postBaseDispatchTours({
         action: 'prepare',
         aircraftId: tour.aircraftId,
@@ -7935,17 +7982,12 @@ export function App() {
       });
       setActiveTour(prepared.activeTour ?? null);
       if (prepared.playerFbos) setPlayerFbos(prepared.playerFbos);
-      setPendingActiveTour({
-        kind: 'start',
-        hubIcao: hub,
-        aircraftId: tour.aircraftId,
-        tourId: tour.id,
-        routeLabel: tour.routeLabel,
-        tourLegs: tour.legs,
-        legIndex: 1,
-      });
+      setPendingActiveTour(null);
       setSelectedDispatchTourId(null);
-      enterStagingForTourLeg(lot, tour.aircraftId);
+      setDispatchTours([]);
+      setBaseDispatchProduct('freight');
+      setToastKind('ok');
+      setToast('Freight tour ready — Continue L1 when you are set');
     } catch (err) {
       setToastKind('fail');
       setToast(err instanceof Error ? err.message : String(err));
@@ -8038,6 +8080,11 @@ export function App() {
 
   async function onConfirmCharterTour(tour: BaseCharterTour) {
     if (busy || dispatchTourBusy) return;
+    if (activeTour?.status === 'active') {
+      setToastKind('fail');
+      setToast('Drop the Freight tour before starting a Charter tour');
+      return;
+    }
     const first = tour.legs[0];
     if (!first) return;
     const hub =
@@ -8046,23 +8093,29 @@ export function App() {
       first.originIcao;
     setDispatchTourLoading(true);
     try {
-      if (tour.legCount >= 2) {
-        const prepared = await postBaseDispatchCharters({
-          action: 'prepare',
-          aircraftId: tour.aircraftId,
-          hubIcao: hub,
-          tourId: tour.id,
-          routeLabel: tour.routeLabel,
-          tourLegs: tour.legs,
-        });
-        setCharterActiveTour(prepared.charterActiveTour ?? null);
-        if (prepared.playerFbos) setPlayerFbos(prepared.playerFbos);
+      if (tour.legCount === 1) {
+        setSelectedCharterTourId(null);
+        enterCharterManifest(
+          charterOfferFromTourLeg(first),
+          tour.aircraftId,
+        );
+        return;
       }
+      const prepared = await postBaseDispatchCharters({
+        action: 'prepare',
+        aircraftId: tour.aircraftId,
+        hubIcao: hub,
+        tourId: tour.id,
+        routeLabel: tour.routeLabel,
+        tourLegs: tour.legs,
+      });
+      setCharterActiveTour(prepared.charterActiveTour ?? null);
+      if (prepared.playerFbos) setPlayerFbos(prepared.playerFbos);
       setSelectedCharterTourId(null);
-      enterCharterManifest(
-        charterOfferFromTourLeg(first),
-        tour.aircraftId,
-      );
+      setCharterTours([]);
+      setBaseDispatchProduct('charter');
+      setToastKind('ok');
+      setToast('Charter tour ready — Continue L1 when you are set');
     } catch (err) {
       setToastKind('fail');
       setToast(err instanceof Error ? err.message : String(err));
@@ -8080,13 +8133,31 @@ export function App() {
       const status = await postBaseDispatchCharters({ action: 'status' });
       setCharterActiveTour(status.charterActiveTour ?? null);
       const view = status.charterActiveTour;
-      if (!view || view.nextLegIndex !== legIndex || !view.canAcceptNextLeg) {
+      if (!view || view.nextLegIndex !== legIndex) {
         setToastKind('fail');
-        setToast(view?.resumeHint ?? 'Cannot accept this charter leg yet');
+        setToast(view?.resumeHint ?? 'Cannot continue this charter leg');
         return;
       }
       const next = view.legs.find((l) => l.index === legIndex);
-      if (!next) return;
+      if (!next || next.status !== 'planned' || next.missionId) {
+        setToastKind('fail');
+        setToast(view.resumeHint ?? 'Cannot continue this charter leg');
+        return;
+      }
+      if (next.offerExpired) {
+        setToastKind('fail');
+        setToast(view.resumeHint ?? 'Offer expired — Drop tour');
+        return;
+      }
+      // Mirror Freight: allow Manifest while off-origin (Ferry lives there).
+      const ferryContinue = Boolean(
+        view.resumeHint?.match(/^Ferry to [A-Z0-9]{3,4}/i),
+      );
+      if (!view.canAcceptNextLeg && !ferryContinue) {
+        setToastKind('fail');
+        setToast(view.resumeHint ?? 'Cannot accept this charter leg yet');
+        return;
+      }
       enterCharterManifest(
         {
           id: next.offerId,
@@ -8101,8 +8172,8 @@ export function App() {
           urgency: 'normal',
           reason: 'Base charter tour',
           createdAtTick: 0,
-          expiresAtTick: 0,
-          ticksRemaining: 0,
+          expiresAtTick: next.expiresAtTick ?? 0,
+          ticksRemaining: next.ticksRemaining ?? 0,
           distanceNm: next.distanceNm,
           international: false,
           status: 'available',
@@ -8179,8 +8250,10 @@ export function App() {
       const liveLeg =
         view.legs.find((l) => l.index === legIndex) ?? leg;
       const lot = marketLotFromTourLeg(liveLeg);
+      const isFirstUnbound =
+        legIndex === 1 && !liveLeg.missionId && liveLeg.status === 'planned';
       setPendingActiveTour({
-        kind: 'bind',
+        kind: isFirstUnbound ? 'start' : 'bind',
         hubIcao: view.hubIcao,
         aircraftId: view.aircraftId,
         tourId: view.tourTemplateId,
@@ -8548,6 +8621,8 @@ export function App() {
       if (result.policy) setDispatchScoutPolicy(result.policy);
       setDispatchTours([]);
       setSelectedDispatchTourId(null);
+      setBaseDispatcherHireOpen(false);
+      setBaseDispatchProduct('freight');
       setToastKind('ok');
       setToast(
         `Hired ${result.member?.displayName ?? 'Dispatcher'} · fleet scout unlocked`,
@@ -12476,14 +12551,108 @@ export function App() {
                       const svcPct = Math.round(
                         (1 - (localFbo.serviceCostMult ?? 1)) * 100,
                       );
+                      const seat =
+                        (baseDispatcher?.members ?? []).find(
+                          (m) => m.fboId === localFbo.id,
+                        ) ?? null;
+                      const hirePool =
+                        baseDispatcher?.hirePoolByHub?.[localFbo.icao] ?? [];
                       return (
                         <>
                           <div className="panel-head base-tier-head">
-                            <p className="muted base-tier-line">
-                              T{localFbo.tier}
-                              {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
-                              {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
-                            </p>
+                            <div className="base-header-main">
+                              <p className="muted base-tier-line">
+                                T{localFbo.tier}
+                                {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
+                                {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
+                              </p>
+                              <div className="base-dispatcher-compact">
+                                {seat ? (
+                                  <>
+                                    <CrewPortrait
+                                      name={seat.displayName}
+                                      imageUrl={crewPortraitUrl(
+                                        seat.portraitId,
+                                      )}
+                                    />
+                                    <div className="base-dispatcher-compact-meta">
+                                      <span className="base-dispatcher-compact-name">
+                                        {seat.displayName}
+                                        {seat.gradeLabel ? (
+                                          <span className="crew-perk-tag">
+                                            {seat.gradeLabel}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                      <span
+                                        className="muted"
+                                        title={seat.perkHint ?? undefined}
+                                      >
+                                        {formatMoney(seat.salaryUsdPerDay)}/day
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="action ghost base-dispatcher-compact-fire"
+                                      disabled={busy || dispatchHireBusy}
+                                      onClick={() =>
+                                        void onFireBaseDispatcher(seat.id)
+                                      }
+                                    >
+                                      Fire ·{' '}
+                                      {formatMoney(seat.fireSeveranceUsd)}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={busy || dispatchHireBusy}
+                                    onClick={() => {
+                                      setBaseDispatcherHireOpen((open) => !open);
+                                      if (
+                                        !baseDispatcherHireOpen &&
+                                        hirePool.length === 0 &&
+                                        !dispatchScoutLoading
+                                      ) {
+                                        const hub =
+                                          localFbo.icao.trim().toUpperCase();
+                                        setDispatchScoutLoading(true);
+                                        void postBaseDispatcher({
+                                          action: 'refresh',
+                                          hubIcao: hub,
+                                        })
+                                          .then((desk) => {
+                                            if (desk.dispatcher) {
+                                              setBaseDispatcher(desk.dispatcher);
+                                            }
+                                            if (desk.policy) {
+                                              setDispatchScoutPolicy(
+                                                desk.policy,
+                                              );
+                                            }
+                                          })
+                                          .catch((err: unknown) => {
+                                            setToastKind('fail');
+                                            setToast(
+                                              err instanceof Error
+                                                ? err.message
+                                                : String(err),
+                                            );
+                                          })
+                                          .finally(() => {
+                                            setDispatchScoutLoading(false);
+                                          });
+                                      }
+                                    }}
+                                  >
+                                    {baseDispatcherHireOpen
+                                      ? 'Close hire'
+                                      : 'Hire Dispatcher'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                             {localFbo.canUpgradeToTier2 ? (
                               <button
                                 type="button"
@@ -12498,180 +12667,111 @@ export function App() {
                               </button>
                             ) : null}
                           </div>
+
+                          {!seat && baseDispatcherHireOpen ? (
+                            <div className="base-dispatcher-hire-strip">
+                              {dispatchScoutLoading ? (
+                                <p className="empty">Loading candidates…</p>
+                              ) : hirePool.length === 0 ? (
+                                <div className="base-dispatcher-empty">
+                                  <p className="empty">
+                                    No Dispatcher candidates yet.
+                                  </p>
+                                  <button
+                                    type="button"
+                                    className="action ghost"
+                                    disabled={busy || dispatchHireBusy}
+                                    onClick={() => {
+                                      const hub =
+                                        localFbo.icao.trim().toUpperCase();
+                                      setDispatchScoutLoading(true);
+                                      void postBaseDispatcher({
+                                        action: 'refresh',
+                                        hubIcao: hub,
+                                      })
+                                        .then((desk) => {
+                                          if (desk.dispatcher) {
+                                            setBaseDispatcher(desk.dispatcher);
+                                          }
+                                          if (desk.policy) {
+                                            setDispatchScoutPolicy(desk.policy);
+                                          }
+                                        })
+                                        .catch((err: unknown) => {
+                                          setToastKind('fail');
+                                          setToast(
+                                            err instanceof Error
+                                              ? err.message
+                                              : String(err),
+                                          );
+                                        })
+                                        .finally(() => {
+                                          setDispatchScoutLoading(false);
+                                        });
+                                    }}
+                                  >
+                                    Refresh candidates
+                                  </button>
+                                </div>
+                              ) : (
+                                <ul className="crew-person-grid base-dispatcher-hire-grid">
+                                  {hirePool.map((c) => (
+                                    <li
+                                      key={c.id}
+                                      className="crew-person-card is-hire"
+                                    >
+                                      <CrewPortrait
+                                        name={c.displayName}
+                                        imageUrl={crewPortraitUrl(c.portraitId)}
+                                      />
+                                      <div className="crew-person-body">
+                                        <div className="crew-person-head">
+                                          <strong className="crew-person-name">
+                                            {c.displayName}
+                                          </strong>
+                                          <span className="crew-perk-tag">
+                                            {c.gradeLabel}
+                                          </span>
+                                        </div>
+                                        <p className="crew-card-meta">
+                                          {formatMoney(c.salaryUsdPerDay)}/day
+                                        </p>
+                                        {c.perkHint ? (
+                                          <p className="crew-person-perk muted">
+                                            {c.perkHint}
+                                          </p>
+                                        ) : null}
+                                        <div className="crew-card-actions">
+                                          <button
+                                            type="button"
+                                            className="accept"
+                                            disabled={
+                                              busy || dispatchHireBusy
+                                            }
+                                            onClick={() =>
+                                              void onHireBaseDispatcher(
+                                                localFbo.id,
+                                                c.id,
+                                              )
+                                            }
+                                          >
+                                            Hire · {formatMoney(c.hireUsd)}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ) : null}
+
                           <div className="base-dispatcher-desk ports-desk-block">
                             {(() => {
-                              const seat =
-                                (baseDispatcher?.members ?? []).find(
-                                  (m) => m.fboId === localFbo.id,
-                                ) ?? null;
-                              const pool =
-                                baseDispatcher?.hirePoolByHub?.[
-                                  localFbo.icao
-                                ] ?? [];
                               const mode =
                                 dispatchScoutPolicy?.mode ?? 'manual';
                               return (
                                 <>
-                                  <div className="crew-section">
-                                    {!seat ? (
-                                      <h4 className="crew-section-title">
-                                        Dispatcher
-                                      </h4>
-                                    ) : null}
-                                    {seat ? (
-                                      <ul className="crew-person-grid">
-                                        <li className="crew-person-card">
-                                          <CrewPortrait
-                                            name={seat.displayName}
-                                            imageUrl={crewPortraitUrl(
-                                              seat.portraitId,
-                                            )}
-                                          />
-                                          <div className="crew-person-body">
-                                            <div className="crew-person-head">
-                                              <strong className="crew-person-name">
-                                                {seat.displayName}
-                                              </strong>
-                                              <span className="crew-perk-tag">
-                                                {seat.gradeLabel}
-                                              </span>
-                                            </div>
-                                            <p className="crew-card-meta">
-                                              {formatMoney(seat.salaryUsdPerDay)}
-                                              /day
-                                            </p>
-                                            {seat.perkHint ? (
-                                              <p className="crew-person-perk muted">
-                                                {seat.perkHint}
-                                              </p>
-                                            ) : null}
-                                            <div className="crew-card-actions">
-                                              <button
-                                                type="button"
-                                                className="action ghost"
-                                                disabled={
-                                                  busy || dispatchHireBusy
-                                                }
-                                                onClick={() =>
-                                                  void onFireBaseDispatcher(
-                                                    seat.id,
-                                                  )
-                                                }
-                                              >
-                                                Fire ·{' '}
-                                                {formatMoney(
-                                                  seat.fireSeveranceUsd,
-                                                )}
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </li>
-                                      </ul>
-                                    ) : pool.length === 0 ? (
-                                      <div className="base-dispatcher-empty">
-                                        <p className="empty">
-                                          {dispatchScoutLoading
-                                            ? 'Loading candidates…'
-                                            : 'No Dispatcher candidates yet.'}
-                                        </p>
-                                        {!dispatchScoutLoading ? (
-                                          <button
-                                            type="button"
-                                            className="action ghost"
-                                            disabled={busy || dispatchHireBusy}
-                                            onClick={() => {
-                                              const hub =
-                                                localFbo.icao.trim().toUpperCase();
-                                              setDispatchScoutLoading(true);
-                                              void postBaseDispatcher({
-                                                action: 'refresh',
-                                                hubIcao: hub,
-                                              })
-                                                .then((desk) => {
-                                                  if (desk.dispatcher) {
-                                                    setBaseDispatcher(
-                                                      desk.dispatcher,
-                                                    );
-                                                  }
-                                                  if (desk.policy) {
-                                                    setDispatchScoutPolicy(
-                                                      desk.policy,
-                                                    );
-                                                  }
-                                                })
-                                                .catch((err: unknown) => {
-                                                  setToastKind('fail');
-                                                  setToast(
-                                                    err instanceof Error
-                                                      ? err.message
-                                                      : String(err),
-                                                  );
-                                                })
-                                                .finally(() => {
-                                                  setDispatchScoutLoading(false);
-                                                });
-                                            }}
-                                          >
-                                            Refresh candidates
-                                          </button>
-                                        ) : null}
-                                      </div>
-                                    ) : (
-                                      <ul className="crew-person-grid">
-                                        {pool.map((c) => (
-                                          <li
-                                            key={c.id}
-                                            className="crew-person-card is-hire"
-                                          >
-                                            <CrewPortrait
-                                              name={c.displayName}
-                                              imageUrl={crewPortraitUrl(
-                                                c.portraitId,
-                                              )}
-                                            />
-                                            <div className="crew-person-body">
-                                              <div className="crew-person-head">
-                                                <strong className="crew-person-name">
-                                                  {c.displayName}
-                                                </strong>
-                                                <span className="crew-perk-tag">
-                                                  {c.gradeLabel}
-                                                </span>
-                                              </div>
-                                              <p className="crew-card-meta">
-                                                {formatMoney(c.salaryUsdPerDay)}
-                                                /day
-                                              </p>
-                                              {c.perkHint ? (
-                                                <p className="crew-person-perk muted">
-                                                  {c.perkHint}
-                                                </p>
-                                              ) : null}
-                                              <div className="crew-card-actions">
-                                                <button
-                                                  type="button"
-                                                  className="accept"
-                                                  disabled={
-                                                    busy || dispatchHireBusy
-                                                  }
-                                                  onClick={() =>
-                                                    void onHireBaseDispatcher(
-                                                      localFbo.id,
-                                                      c.id,
-                                                    )
-                                                  }
-                                                >
-                                                  Hire ·{' '}
-                                                  {formatMoney(c.hireUsd)}
-                                                </button>
-                                              </div>
-                                            </div>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </div>
-
                                   <nav
                                     className="contracts-lanes base-dispatch-products"
                                     aria-label="Base Dispatcher product"
@@ -12682,6 +12782,14 @@ export function App() {
                                         baseDispatchProduct === 'freight'
                                           ? 'contracts-lane active'
                                           : 'contracts-lane'
+                                      }
+                                      disabled={
+                                        charterActiveTour?.status === 'active'
+                                      }
+                                      title={
+                                        charterActiveTour?.status === 'active'
+                                          ? 'Drop the Charter tour first'
+                                          : undefined
                                       }
                                       onClick={() =>
                                         setBaseDispatchProduct('freight')
@@ -12695,6 +12803,14 @@ export function App() {
                                         baseDispatchProduct === 'charter'
                                           ? 'contracts-lane active'
                                           : 'contracts-lane'
+                                      }
+                                      disabled={
+                                        activeTour?.status === 'active'
+                                      }
+                                      title={
+                                        activeTour?.status === 'active'
+                                          ? 'Drop the Freight tour first'
+                                          : undefined
                                       }
                                       onClick={() => {
                                         setBaseDispatchProduct('charter');
@@ -12711,19 +12827,15 @@ export function App() {
                                   charterActiveTour.status === 'active' ? (
                                     <div className="crew-section base-active-tour">
                                       <div className="base-dispatcher-scout-head">
-                                        <div>
-                                          <h4 className="crew-section-title">
-                                            Charter tour
-                                          </h4>
-                                          <p className="muted crew-section-lede">
-                                            {charterActiveTour.legs
+                                        <p className="muted crew-section-lede">
+                                          {charterActiveTour.routeLabel ||
+                                            charterActiveTour.legs
                                               .map(
                                                 (l) =>
                                                   `${l.originIcao}→${l.destIcao}`,
                                               )
                                               .join(' · ')}
-                                          </p>
-                                        </div>
+                                        </p>
                                         <div className="base-dispatcher-scout-actions">
                                           <button
                                             type="button"
@@ -12760,7 +12872,7 @@ export function App() {
                                               <th>Route</th>
                                               <th>Pax</th>
                                               <th>Net</th>
-                                              <th>Status</th>
+                                              <th>Exp</th>
                                               <th />
                                             </tr>
                                           </thead>
@@ -12770,9 +12882,42 @@ export function App() {
                                                 const isNext =
                                                   charterActiveTour.nextLegIndex ===
                                                   leg.index;
+                                                const expLabel =
+                                                  leg.status === 'done' ||
+                                                  leg.status === 'lost'
+                                                    ? '—'
+                                                    : leg.offerExpired
+                                                      ? 'expired'
+                                                      : leg.ticksRemaining !=
+                                                          null
+                                                        ? charterExpiryLabel(
+                                                            leg.ticksRemaining,
+                                                          )
+                                                        : '—';
+                                                const ferryMatch =
+                                                  charterActiveTour.resumeHint?.match(
+                                                    /Ferry to ([A-Z0-9]{3,4})/i,
+                                                  );
+                                                const canContinue =
+                                                  isNext &&
+                                                  leg.status === 'planned' &&
+                                                  !leg.offerExpired &&
+                                                  (charterActiveTour.canAcceptNextLeg ||
+                                                    Boolean(ferryMatch));
+                                                const continueLabel =
+                                                  charterActiveTour.canAcceptNextLeg
+                                                    ? `Accept L${leg.index}`
+                                                    : ferryMatch
+                                                      ? `Continue · Ferry to ${ferryMatch[1]!.toUpperCase()}`
+                                                      : `Continue L${leg.index}`;
                                                 return (
                                                   <tr
                                                     key={`${charterActiveTour.id}-${leg.index}`}
+                                                    className={
+                                                      leg.offerExpired
+                                                        ? 'warn'
+                                                        : undefined
+                                                    }
                                                   >
                                                     <td>L{leg.index}</td>
                                                     <td>
@@ -12783,10 +12928,18 @@ export function App() {
                                                     <td>
                                                       {formatMoney(leg.netUsd)}
                                                     </td>
-                                                    <td>{leg.status}</td>
+                                                    <td
+                                                      title={
+                                                        leg.expiresAtTick !=
+                                                        null
+                                                          ? `expires at tick ${leg.expiresAtTick}`
+                                                          : undefined
+                                                      }
+                                                    >
+                                                      {expLabel}
+                                                    </td>
                                                     <td>
-                                                      {isNext &&
-                                                      charterActiveTour.canAcceptNextLeg ? (
+                                                      {canContinue ? (
                                                         <button
                                                           type="button"
                                                           className="accept"
@@ -12800,7 +12953,7 @@ export function App() {
                                                             )
                                                           }
                                                         >
-                                                          Accept L{leg.index}
+                                                          {continueLabel}
                                                         </button>
                                                       ) : null}
                                                     </td>
@@ -12819,41 +12972,15 @@ export function App() {
                                   activeTour.status === 'active' ? (
                                     <div className="crew-section base-active-tour">
                                       <div className="base-dispatcher-scout-head">
-                                        <div>
-                                          <h4 className="crew-section-title">
-                                            Tour
-                                          </h4>
-                                          <p className="muted crew-section-lede">
-                                            {activeTour.legs
+                                        <p className="muted crew-section-lede">
+                                          {activeTour.routeLabel ||
+                                            activeTour.legs
                                               .map(
                                                 (l) =>
                                                   `${l.originIcao}→${l.destIcao}`,
                                               )
                                               .join(' · ')}
-                                            {activeTour.aircraftLocationIcao
-                                              ? ` · acf ${activeTour.aircraftLocationIcao}`
-                                              : ''}
-                                            {activeTour.nextLegSoftHoldRemainingTicks !=
-                                              null &&
-                                            activeTour.nextLegSoftHoldRemainingTicks >
-                                              0 ? (
-                                              <span>
-                                                {' '}
-                                                · L
-                                                {activeTour.legs.find(
-                                                  (l) =>
-                                                    (l.softHoldKg ?? 0) > 0,
-                                                )?.index ??
-                                                  activeTour.nextLegIndex}{' '}
-                                                soft-hold{' '}
-                                                {
-                                                  activeTour.nextLegSoftHoldRemainingTicks
-                                                }
-                                                t
-                                              </span>
-                                            ) : null}
-                                          </p>
-                                        </div>
+                                        </p>
                                         <div className="base-dispatcher-scout-actions">
                                           <button
                                             type="button"
@@ -12916,13 +13043,12 @@ export function App() {
                                             <tr>
                                               <th>Leg</th>
                                               <th>Route</th>
-                                              <th>Status</th>
                                               <th>Pay</th>
                                               <th />
                                             </tr>
                                           </thead>
                                           <tbody>
-                                            {activeTour.legs.map((leg, i) => {
+                                            {activeTour.legs.map((leg) => {
                                               const isNext =
                                                 activeTour.nextLegIndex ===
                                                 leg.index;
@@ -12930,8 +13056,6 @@ export function App() {
                                                 Boolean(
                                                   activeTour.canAcceptNextLeg,
                                                 ) && isNext;
-                                              // Ferry / parked gates hide Accept today — keep one
-                                              // CTA into Manifest (Ferry lives there).
                                               const canContinue =
                                                 isNext &&
                                                 (canAccept ||
@@ -12946,12 +13070,6 @@ export function App() {
                                                 : ferryMatch
                                                   ? `Continue · Ferry to ${ferryMatch[1]!.toUpperCase()}`
                                                   : `Continue L${leg.index}`;
-                                              const prevDest =
-                                                i > 0
-                                                  ? activeTour.legs[
-                                                      i - 1
-                                                    ]!.destIcao
-                                                  : null;
                                               return (
                                                 <tr
                                                   key={`${activeTour.id}-${leg.index}`}
@@ -12967,30 +13085,6 @@ export function App() {
                                                       {leg.originIcao}→
                                                       {leg.destIcao}
                                                     </span>
-                                                    {leg.ferryNm > 0.5 ? (
-                                                      <span className="base-dispatch-ferry-tag">
-                                                        Ferry{' '}
-                                                        {Math.round(
-                                                          leg.ferryNm,
-                                                        )}{' '}
-                                                        nm
-                                                        {prevDest &&
-                                                        prevDest !==
-                                                          leg.originIcao
-                                                          ? ` · ${prevDest}→${leg.originIcao}`
-                                                          : ''}
-                                                      </span>
-                                                    ) : null}
-                                                  </td>
-                                                  <td>
-                                                    {leg.status}
-                                                    {isNext &&
-                                                    activeTour.nextLegNeedsRebind ? (
-                                                      <small className="muted">
-                                                        {' '}
-                                                        · rebind
-                                                      </small>
-                                                    ) : null}
                                                   </td>
                                                   <td className="pay">
                                                     {formatMoney(leg.payUsd)}
@@ -13038,6 +13132,13 @@ export function App() {
                                       </h4>
                                     </div>
 
+                                    {activeTour?.status === 'active' ? (
+                                      <p className="empty muted">
+                                        Finish or Drop the Freight tour above to
+                                        Search again.
+                                      </p>
+                                    ) : (
+                                      <>
                                     {mode === 'fleet' ? (
                                       <div className="base-dispatch-tour-filters">
                                         <div className="base-dispatch-tour-grid">
@@ -13486,8 +13587,10 @@ export function App() {
                                           </tbody>
                                         </table>
                                       )}
+                                      </>
+                                    )}
                                   </div>
-                                  ) : (
+                                  ) : baseDispatchProduct === 'charter' ? (
                                     <div className="crew-section base-dispatcher-scout base-dispatch-charters">
                                       <div className="base-dispatcher-scout-head">
                                         <h4 className="crew-section-title">
@@ -13495,6 +13598,14 @@ export function App() {
                                         </h4>
                                       </div>
 
+                                      {charterActiveTour?.status ===
+                                      'active' ? (
+                                        <p className="empty muted">
+                                          Finish or Drop the Charter tour above
+                                          to Search again.
+                                        </p>
+                                      ) : (
+                                        <>
                                       {mode === 'fleet' ? (
                                         <div className="base-dispatch-tour-filters">
                                           <div className="base-dispatch-tour-grid">
@@ -13813,8 +13924,10 @@ export function App() {
                                           </tbody>
                                         </table>
                                       )}
+                                        </>
+                                      )}
                                     </div>
-                                  )}
+                                  ) : null}
                                 </>
                               );
                             })()}

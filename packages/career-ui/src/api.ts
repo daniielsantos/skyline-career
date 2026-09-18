@@ -847,6 +847,10 @@ export type CharterActiveTourView = {
     netUsd: number;
     status: CharterActiveTourLegStatus;
     missionId?: string;
+    /** Live board expiry (null if offer gone). */
+    expiresAtTick?: number | null;
+    ticksRemaining?: number | null;
+    offerExpired?: boolean;
   }>;
   startedAtTick: number;
   status: 'active' | 'completed' | 'abandoned';

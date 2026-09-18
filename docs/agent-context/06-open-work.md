@@ -114,6 +114,8 @@ Atualizado 2026-09-13: **MP Phases 0–6 + B host/client playtest** — dual-tab
 
 Atualizado 2026-09-13: **MP world clock Phases 0–5 shipped** — dual-tenant claim on staging + viewer board filter + per-request companyId; remote client cannot catch-up. Next: Postgres/world job or dual-tab UI polish. Spec: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
+Atualizado 2026-09-18: **Intl graph soft widen (local, sem commit/release)** — `LANES_PER_COUNTRY` 2.25→3, `LANES_MAX` 480→560, country 6→8, pair 2→3. Motivo: board intl ~3.6% com soft share 12% = formação/OD, não cota. Sem `INTL_AVAILABLE_SHARE` / Dry. Re-medir % intl + live pós day rollover. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-07: **Mercado internacional dinâmico implementado + soak PASS (local, sem commit/release)** — static Market lanes + Demand country-pair JSON removidos. Market seleciona por dia estoque/gateways com bounds 96–480, fairness 2–6 lanes/país e 2/par, long-haul floor e carry-over de lotes ativos; intl board segue 12%. Demand abre qualquer país mapeado, ainda gated por Port/WH + corridor/range. Soak 2d: 421 lanes / 230 carry / 187 países / intl 3.57%; BR/US 100%/98.6%. Próximo: commit só se pedido. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-07: **Manifest off-origin ferry** — Tour Accept stays on Manifest; fleet combo lists all parked (`ferry from ICAO`); Ferry opens `FerryJourneyDialog`; Accept blocked until at lot origin. Spec: [`24-port-fbo.md`](./24-port-fbo.md).

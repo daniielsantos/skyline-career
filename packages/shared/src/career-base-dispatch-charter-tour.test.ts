@@ -219,6 +219,11 @@ describe('base dispatch charter tours', () => {
     assert.equal(view!.legs[0]!.status, 'done');
     assert.equal(view!.nextLegIndex, 2);
     assert.equal(view!.canAcceptNextLeg, true);
+    assert.equal(view!.legs[1]!.offerExpired, false);
+    assert.ok(
+      (view!.legs[1]!.ticksRemaining ?? 0) > 0,
+      'L2 should expose live board expiry',
+    );
 
     dropCharterActiveTour(state);
     assert.equal(syncCharterActiveTour(state, world), null);

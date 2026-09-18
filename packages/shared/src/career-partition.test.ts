@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   createSeedEconomyWorld,
+  DYNAMIC_INTL_LANES_MAX,
   DYNAMIC_INTL_LONG_HAUL_MIN_NM,
   DYNAMIC_INTL_MAX_LANES_PER_COUNTRY,
   DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR,
@@ -410,7 +411,7 @@ describe('career partition', () => {
       'active freight OD must remain legal after the refresh',
     );
     assert.ok(
-      (world.internationalLanes?.length ?? 0) <= 480,
+      (world.internationalLanes?.length ?? 0) <= DYNAMIC_INTL_LANES_MAX,
       'carry-over must consume the bounded daily graph instead of growing it',
     );
     const countryCounts = new Map<string, number>();

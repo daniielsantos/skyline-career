@@ -50,7 +50,7 @@
 
 # Current state (2026-09-07)
 
-Local `main` (ainda sem commit/release): Market internacional agora usa grafo diário dinâmico e bounded por pressão/gateways; tabela estática de ~399 lanes removida. Cobertura seed: **187 países / 421 lanes**, piso **2** e cap **6** por país, cap **2** por par; active-lot OD faz carry-over. Demand intl aceita qualquer par mapeado, mantendo Port/WH + corridor/range e premium ×1.28. Pulse dev expõe métricas do grafo. Detail: [`08-economy.md`](./08-economy.md).
+Local `main` (ainda sem commit/release): Market internacional dinâmico por pressão/gateways. Soft widen **2026-09-18**: alvo **3/país**, cap **8/país** / **3/par**, bounds **96–560** (era 2.25 / 6 / 2 / 480) — board intl ~3.6% não era cota 12%, era OD count. Active-lot OD faz carry-over; Demand intl qualquer par mapeado (Port/WH + corridor/range, premium ×1.28). Detail: [`08-economy.md`](./08-economy.md).
 
 # Current state (2026-09-01)
 

@@ -18,11 +18,15 @@ import type {
 
 export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 3;
 export const DYNAMIC_INTL_MIN_LANES_PER_COUNTRY = 2;
-export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY = 6;
-export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR = 2;
+/** Soft widen 2026-09-18: 6→8 — more OD slots without opening every pair. */
+export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY = 8;
+/** Soft widen 2026-09-18: 2→3 — denser high-pressure country pairs. */
+export const DYNAMIC_INTL_MAX_LANES_PER_COUNTRY_PAIR = 3;
 export const DYNAMIC_INTL_LANES_MIN = 96;
-export const DYNAMIC_INTL_LANES_MAX = 480;
-export const DYNAMIC_INTL_LANES_PER_COUNTRY = 2.25;
+/** Soft widen 2026-09-18: 480→560 so ~3 lanes/country is not clipped. */
+export const DYNAMIC_INTL_LANES_MAX = 560;
+/** Soft widen 2026-09-18: 2.25→3 — target board OD count / country. */
+export const DYNAMIC_INTL_LANES_PER_COUNTRY = 3;
 export const DYNAMIC_INTL_LONG_HAUL_SHARE = 0.2;
 export const DYNAMIC_INTL_LONG_HAUL_MIN_NM = 2_500;
 export const DYNAMIC_INTL_MIN_ROUTE_NM = 60;

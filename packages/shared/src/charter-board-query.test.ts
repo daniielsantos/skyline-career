@@ -93,6 +93,7 @@ test('fit filter also requires fit computation', () => {
 test('parses charter lane and fit filters', () => {
   assert.equal(parseCharterBoardLaneFilter('intl'), 'intl');
   assert.equal(parseCharterBoardLaneFilter('pilot-domestic'), 'pilot-domestic');
+  assert.equal(parseCharterBoardLaneFilter('pilot-intl'), 'pilot-intl');
   assert.equal(parseCharterBoardLaneFilter('bush'), undefined);
   assert.equal(parseCharterBoardFitFilter('open'), 'open');
   assert.equal(parseCharterBoardFitFilter('locked'), 'locked');

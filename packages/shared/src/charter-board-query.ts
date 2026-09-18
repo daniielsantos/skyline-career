@@ -172,14 +172,25 @@ export function charterBoardNeedsFitSort(
   );
 }
 
-export type CharterBoardLaneFilter = 'intl' | 'domestic' | 'pilot-domestic';
+export type CharterBoardLaneFilter =
+  | 'intl'
+  | 'domestic'
+  | 'pilot-domestic'
+  | 'pilot-intl';
 export type CharterBoardFitFilter = 'open' | 'locked';
 
 export function parseCharterBoardLaneFilter(
   raw: string | null | undefined,
 ): CharterBoardLaneFilter | undefined {
   const v = raw?.trim().toLowerCase();
-  if (v === 'intl' || v === 'domestic' || v === 'pilot-domestic') return v;
+  if (
+    v === 'intl' ||
+    v === 'domestic' ||
+    v === 'pilot-domestic' ||
+    v === 'pilot-intl'
+  ) {
+    return v;
+  }
   return undefined;
 }
 

@@ -607,7 +607,7 @@ function registerIpc() {
       title: 'Install Airframe update',
       message: 'Windows may warn that the publisher is unknown.',
       detail:
-        'Airframe will close and open the installer window.\n\n' +
+        'Airframe will close first, then the installer opens after a short pause.\n\n' +
         'If Windows shows SmartScreen, choose More info → Run anyway.\n' +
         'Watch the installer progress — when it finishes, Airframe should reopen.\n' +
         'If it does not, open Airframe Career from the Start Menu.\n\n' +
@@ -621,22 +621,32 @@ function registerIpc() {
     apiChild = null;
     hostChild = null;
 
-    // Unsigned NSIS: do NOT pass /S. Quiet spawn often dies behind SmartScreen
-    // with the app already gone and no progress UI. Visible one-click Setup
-    // still skips the Next/Next wizard but shows progress + SmartScreen.
-    // /S (Cursor-silent) needs Authenticode — not enabled yet.
+    // Schedule Setup to start AFTER this process exits. Spawning immediately
+    // raced NSIS ("Airframe Career is running — Click OK to close it").
+    // Unsigned: still no /S (visible one-click + SmartScreen).
     logLine(
-      `[desktop] launching update installer (visible one-click): ${installerPath}`,
+      `[desktop] scheduling update installer after quit: ${installerPath}`,
     );
     try {
-      spawn(installerPath, [], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: false,
-      }).unref();
+      const safePath = installerPath.replace(/"/g, '');
+      // ping ≈ 1s/hop; -n 3 ≈ 2s so Electron can exit before NSIS process check.
+      spawn(
+        process.env.ComSpec || 'cmd.exe',
+        [
+          '/d',
+          '/s',
+          '/c',
+          `ping 127.0.0.1 -n 3 >nul & start "" "${safePath}"`,
+        ],
+        {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+        },
+      ).unref();
     } catch (err) {
       logLine(
-        `[desktop] spawn installer failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
+        `[desktop] schedule installer failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,
       );
       const openErr = await shell.openPath(installerPath);
       if (openErr) {
@@ -645,7 +655,14 @@ function registerIpc() {
       }
     }
 
-    setTimeout(() => app.quit(), 800);
+    for (const win of BrowserWindow.getAllWindows()) {
+      try {
+        win.destroy();
+      } catch {
+        /* ignore */
+      }
+    }
+    app.quit();
     return { ok: true };
   });
 }

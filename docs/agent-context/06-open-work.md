@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Desktop update quit-before-NSIS** — agenda Setup ~2s após `app.quit()` (cmd ping) para não disparar “Airframe Career is running”. Detail: `packages/desktop/README.md`.
+
 Atualizado 2026-09-18: **Intl formation regional-first** — lots ≤2000 ainda ~7.5% após +2d; `formLotsIntl` agora prioriza OD ≤2500 nm antes de oceans. Sem Dry. Re-medir após +1–2d. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Wallet $0 flash no +Nd** — sintoma: Dev +1d pinta wallet $0; reopen restaura. Causa: `POST /api/tick` sem `companyId` (ambient tenant / shell $0) + `clearCareerSessionPaint`/`refresh` pintavam $0. Fix: tick usa `companyIdFromRequest`; UI `paintWallet` ignora $0 mid-advance; clear session não força $0. Detail: [`08-economy.md`](./08-economy.md).

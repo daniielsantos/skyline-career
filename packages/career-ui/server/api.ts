@@ -5007,6 +5007,14 @@ export function createCareerApiServer(port = 8787) {
                 );
                 if (originCountry !== pilotCountryId) return false;
               }
+              if (laneFilter === 'pilot-intl') {
+                if (!offer.international) return false;
+                if (!pilotCountryId) return false;
+                const originCountry = countryIdFromRegion(
+                  airports.get(offer.originIcao)?.region ?? '',
+                );
+                if (originCountry !== pilotCountryId) return false;
+              }
               return true;
             },
           );

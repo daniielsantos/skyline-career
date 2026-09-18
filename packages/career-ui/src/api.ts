@@ -1526,8 +1526,14 @@ export function fetchMarket(
     nearMaxNm?: number | string;
     /** Cargo Ops: open = unlocked only, locked = locked only. */
     access?: 'open' | 'locked' | '';
-    /** Route scope; pilot-domestic uses the pilot's current country. */
-    lane?: 'intl' | 'domestic' | 'pilot-domestic' | 'bush' | '';
+    /** Route scope; pilot-* uses the pilot's current country. */
+    lane?:
+      | 'intl'
+      | 'domestic'
+      | 'pilot-domestic'
+      | 'pilot-intl'
+      | 'bush'
+      | '';
     /** Crew needed vs own-aircraft freights. */
     crew?: 'crew' | 'aircraft' | '';
   } = {},
@@ -1568,7 +1574,9 @@ export function fetchMarket(
   if (
     lane === 'intl' ||
     lane === 'domestic' ||
-    lane === 'pilot-domestic'
+    lane === 'pilot-domestic' ||
+    lane === 'pilot-intl' ||
+    lane === 'bush'
   ) {
     params.set('lane', lane);
   }
@@ -1599,7 +1607,7 @@ export function fetchCharters(opts: {
   dest?: string;
   originQuery?: string;
   destQuery?: string;
-  lane?: '' | 'intl' | 'domestic' | 'pilot-domestic';
+  lane?: '' | 'intl' | 'domestic' | 'pilot-domestic' | 'pilot-intl';
   fit?: '' | 'open' | 'locked';
   aircraftId?: string;
   page?: number;

@@ -21,7 +21,12 @@ import { IcaoLink } from './IcaoLink';
 
 export const CHARTER_PAGE_SIZE = 10;
 
-export type CharterLaneFilter = '' | 'intl' | 'domestic' | 'pilot-domestic';
+export type CharterLaneFilter =
+  | ''
+  | 'intl'
+  | 'domestic'
+  | 'pilot-domestic'
+  | 'pilot-intl';
 export type CharterFitFilter = '' | 'open' | 'locked';
 
 /**
@@ -358,7 +363,8 @@ export function CharterBoard(props: CharterBoardProps) {
                         setLane(
                           next === 'intl' ||
                             next === 'domestic' ||
-                            next === 'pilot-domestic'
+                            next === 'pilot-domestic' ||
+                            next === 'pilot-intl'
                             ? next
                             : '',
                         );
@@ -370,6 +376,9 @@ export function CharterBoard(props: CharterBoardProps) {
                       <option value="domestic">Domestic</option>
                       <option value="pilot-domestic">
                         Domestic · pilot country
+                      </option>
+                      <option value="pilot-intl">
+                        Intl · pilot country
                       </option>
                     </select>
                   </div>

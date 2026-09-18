@@ -72,11 +72,12 @@ export type MarketBoardSortable = {
 };
 
 export type MarketBoardAccessFilter = 'open' | 'locked';
-/** Freights route scope, including domestic origins in the pilot's current country. */
+/** Freights route scope, including origins in the pilot's current country. */
 export type MarketBoardLaneFilter =
   | 'intl'
   | 'domestic'
   | 'pilot-domestic'
+  | 'pilot-intl'
   | 'bush';
 /** Split Freights: crew = fly NPC airframe; aircraft = haul with your plane. */
 export type MarketBoardCrewFilter = 'crew' | 'aircraft';
@@ -198,7 +199,7 @@ export type MarketBoardQueryOpts = {
   accessFilter?: MarketBoardAccessFilter;
   /** International vs domestic route filter. */
   laneFilter?: MarketBoardLaneFilter;
-  /** Country containing the pilot's current airport, for `pilot-domestic`. */
+  /** Country containing the pilot's current airport, for pilot-* lane filters. */
   pilotCountryId?: string;
   /** Crew needed vs own-aircraft freights. */
   crewFilter?: MarketBoardCrewFilter;
@@ -406,6 +407,7 @@ export function parseMarketBoardLaneFilter(
     v === 'intl' ||
     v === 'domestic' ||
     v === 'pilot-domestic' ||
+    v === 'pilot-intl' ||
     v === 'bush'
   ) {
     return v;
@@ -624,6 +626,14 @@ export function marketBoardRowMatchesFilters<T extends MarketBoardSortable>(
   if (
     opts.laneFilter === 'pilot-domestic' &&
     (row.international ||
+      !opts.pilotCountryId ||
+      row.originCountryId !== opts.pilotCountryId)
+  ) {
+    return false;
+  }
+  if (
+    opts.laneFilter === 'pilot-intl' &&
+    (!row.international ||
       !opts.pilotCountryId ||
       row.originCountryId !== opts.pilotCountryId)
   ) {

@@ -385,7 +385,13 @@ type MarketSortKey =
 type SortDirection = 'asc' | 'desc';
 type MarketSortLevel = { key: MarketSortKey; direction: SortDirection };
 type AccessFilter = '' | 'open' | 'locked';
-type LaneFilter = '' | 'intl' | 'domestic' | 'pilot-domestic' | 'bush';
+type LaneFilter =
+  | ''
+  | 'intl'
+  | 'domestic'
+  | 'pilot-domestic'
+  | 'pilot-intl'
+  | 'bush';
 
 const DEFAULT_BOARD_SORTS: MarketSortLevel[] = [];
 
@@ -16028,6 +16034,7 @@ export function App() {
                               next === 'intl' ||
                                 next === 'domestic' ||
                                 next === 'pilot-domestic' ||
+                                next === 'pilot-intl' ||
                                 next === 'bush'
                                 ? next
                                 : '',
@@ -16040,6 +16047,9 @@ export function App() {
                           <option value="domestic">Domestic</option>
                           <option value="pilot-domestic">
                             Domestic · pilot country
+                          </option>
+                          <option value="pilot-intl">
+                            Intl · pilot country
                           </option>
                         </select>
                       </div>

@@ -31,6 +31,12 @@ function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
+/** Whole-kg for SQL INTEGER samples (stock/lots can be half-kg floats). */
+function intKg(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.round(n));
+}
+
 function fillOf(stock: { stockKg: number; capacityKg: number } | undefined): number {
   if (!stock || !(stock.capacityKg > 0)) return 0;
   return clamp01(stock.stockKg / stock.capacityKg);
@@ -131,7 +137,7 @@ export function buildHubEconomySampleForAirport(
   let lotsNarrow = 0;
   let lotsWide = 0;
   for (const lot of lots) {
-    const kg = Math.max(0, lot.quantityKg ?? 0);
+    const kg = intKg(lot.quantityKg ?? 0);
     outboundKg += kg;
     const band = sizeBandKg(kg);
     if (band === 'kgGa') {
@@ -162,14 +168,16 @@ export function buildHubEconomySampleForAirport(
     (c) => {
       const pile = airport.inventory?.[c.id];
       const stock = pile ?? { stockKg: 0, capacityKg: 0 };
-      cargoStockKg += Math.max(0, stock.stockKg ?? 0);
-      cargoCapacityKg += Math.max(0, stock.capacityKg ?? 0);
+      const stockKg = intKg(stock.stockKg ?? 0);
+      const capacityKg = intKg(stock.capacityKg ?? 0);
+      cargoStockKg += stockKg;
+      cargoCapacityKg += capacityKg;
       return {
         id: c.id,
         fill: fillOf(stock),
         spotUsd: localUnitPriceUsd(c.id, stock),
-        stockKg: Math.max(0, stock.stockKg ?? 0),
-        capacityKg: Math.max(0, stock.capacityKg ?? 0),
+        stockKg,
+        capacityKg,
       };
     },
   );
@@ -210,7 +218,7 @@ export function buildHubEconomySampleForAirport(
     lotsWide,
     cargoStockKg,
     cargoCapacityKg,
-    inboundKg: hubInboundCargoKg(world, icao),
+    inboundKg: intKg(hubInboundCargoKg(world, icao)),
     commodities,
   };
 }

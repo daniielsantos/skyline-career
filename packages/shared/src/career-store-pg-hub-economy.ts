@@ -151,39 +151,47 @@ function sampleFromPgRow(r: Record<string, unknown>): HubEconomySample | null {
   };
 }
 
+function sqlInt(v: unknown, fallback = 0): number {
+  const n = typeof v === 'number' ? v : sqlNum(v, fallback);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.round(n);
+}
+
 function sampleRowValues(
   worldId: string,
   s: HubEconomySample,
 ): unknown[] {
+  // INTEGER columns — sample kg fields can be half-kg floats; SQLite coerced,
+  // Postgres rejects e.g. 497492.5.
   return [
     worldId,
     s.icao.trim().toUpperCase(),
-    s.dayIndex,
-    s.tick,
+    sqlInt(s.dayIndex),
+    sqlInt(s.tick),
     s.activityScore,
-    s.hubLevel,
+    sqlInt(s.hubLevel, 1),
     s.quiet === true,
     s.jetAFill,
-    s.outboundLots,
-    s.outboundKg,
+    sqlInt(s.outboundLots),
+    sqlInt(s.outboundKg),
     s.payP50Usd,
-    s.kgGa,
-    s.kgTp,
-    s.kgMedium,
-    s.kgNarrow,
-    s.kgWide,
+    sqlInt(s.kgGa),
+    sqlInt(s.kgTp),
+    sqlInt(s.kgMedium),
+    sqlInt(s.kgNarrow),
+    sqlInt(s.kgWide),
     JSON.stringify(s.commodities ?? []),
     s.countryId ?? '',
     s.region ?? '',
     s.hubTier ?? 'spoke',
-    s.cargoStockKg,
-    s.cargoCapacityKg,
-    s.inboundKg,
-    s.lotsGa,
-    s.lotsTp,
-    s.lotsMedium,
-    s.lotsNarrow,
-    s.lotsWide,
+    sqlInt(s.cargoStockKg),
+    sqlInt(s.cargoCapacityKg),
+    sqlInt(s.inboundKg),
+    sqlInt(s.lotsGa),
+    sqlInt(s.lotsTp),
+    sqlInt(s.lotsMedium),
+    sqlInt(s.lotsNarrow),
+    sqlInt(s.lotsWide),
     s.payP10Usd ?? null,
     s.payP90Usd ?? null,
   ];

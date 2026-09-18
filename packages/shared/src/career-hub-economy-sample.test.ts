@@ -110,6 +110,32 @@ describe('buildHubEconomySamples', () => {
     });
     assert.equal(buildHubEconomySamples(world).length, 0);
   });
+
+  it('rounds half-kg floats to whole kg for SQL INTEGER columns', () => {
+    const world = makeWorld({
+      airports: [
+        makeAirport({
+          inventory: {
+            general: { stockKg: 497_492.5, capacityKg: 800_000.5 },
+            fuel: { stockKg: 1, capacityKg: 2 },
+          },
+        }),
+      ],
+      lots: [makeLot({ quantityKg: 400.5, payUsd: 1_000 })],
+    });
+    const sample = buildHubEconomySampleForAirport(
+      world,
+      world.airports[0]!,
+      world.lots,
+    );
+    assert.ok(sample);
+    assert.equal(sample.outboundKg, 401);
+    assert.equal(sample.kgGa, 401);
+    assert.equal(sample.cargoStockKg, 497_493);
+    assert.equal(sample.cargoCapacityKg, 800_001);
+    const general = sample.commodities.find((c) => c.id === 'general');
+    assert.equal(general?.stockKg, 497_493);
+  });
 });
 
 describe('maybeQueueHubEconomyDaySample', () => {

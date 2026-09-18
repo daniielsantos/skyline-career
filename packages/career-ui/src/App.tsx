@@ -3439,7 +3439,7 @@ export function App() {
   const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [busy, setBusy] = useState(false);
-  /** Chunked time-advance progress (dev +1 / +7 / +14 / +30 day skips). */
+  /** Chunked time-advance progress (dev +1 / +3 / +7 / +14 / +30 day skips). */
   const [tickAdvance, setTickAdvance] = useState<{
     done: number;
     total: number;
@@ -12165,6 +12165,15 @@ export function App() {
                 title="Advance economy + crew wall-clock by 1 day (96 ticks)"
               >
                 {formatTickAdvanceButton(96, '+1 day')}
+              </button>
+              <button
+                type="button"
+                className="action"
+                onClick={() => void onTick(96 * 3)}
+                disabled={busy}
+                title="Advance economy + crew wall-clock by 3 days (288 ticks)"
+              >
+                {formatTickAdvanceButton(96 * 3, '+3 day')}
               </button>
               <button
                 type="button"

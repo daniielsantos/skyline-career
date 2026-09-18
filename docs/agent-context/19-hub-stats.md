@@ -16,6 +16,8 @@ Atualizado 2026-08-31: UI — **Terminal inventory** (= stock Dry deste ICAO, n�
 
 Atualizado 2026-08-31: History table **4/page** + sort Day/Lots/Pay/Fill/Spot; chart **16.5rem** + viewBox alto (menos letterbox); labels no SVG só **High** (atual no header; range embaixo; tooltip nos dots).
 
+Atualizado 2026-09-18: **PG sample INTEGER half-kg** — day-boundary flush falhava com `invalid input syntax for type integer: "497492.5"` (stock/lot kg float). Fix: `intKg` no sample builder + `sqlInt` no upsert PG.
+
 Atualizado 2026-09-18: **PG history `untilDay` sentinel** — `readHubEconomySamplesSinceFromPg` usava `Number.MAX_SAFE_INTEGER` quando `untilDay` omitido → Postgres `integer` rejeita (`9007199254740991 out of range`). Fix: omitir cláusula `day_index <=` sem until. Sintoma: Pulse Network history erro no VPS.
 
 Atualizado 2026-09-18: **Intl formation Live card** — `/api/debug/economy-pulse` inclui `intlFormation` (matchable OD %, kg vs target, skipAll flags). Card no Hub Pulse Live; Network history continua em `hub_economy_samples`.

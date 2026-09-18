@@ -27,7 +27,7 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 
 - [x] Logo AIR|FRAME hero: `packages/career-ui/src/assets/brand/airframe-hero-lockup.png` (arquivo Skyline mantido)
 - [x] `BrandMark` `variant="hero"` → Airframe (AuthGate / ProfileGate / PlayModeGate / WorldWaitingGate)
-- [x] Hero no painel: full-bleed + PNG sem faixa laranja (evita “card dentro de card”)
+- [x] Hero no painel: inset + `mix-blend-mode: lighten` (sem slab); FRAME `#f0a35a`
 - [ ] Compact sidebar ainda **SKYLINE** (texto CSS + `md11f-mark`)
 - [ ] Ícones installer + Start Menu display name
 - [ ] Copy UI: “Skyline Career” → “Airframe” (ou “Airframe Career”)
@@ -35,9 +35,9 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 
 ### Diagnóstico UI (2026-09-17)
 
-- **Sintoma:** login parece card dentro de card (faixa laranja dupla + PNG inset com sombra).
-- **Causa:** lockup gerado com accent strip + `.brand-mark-hero` max-width/inset/drop-shadow dentro de `.panel.profile-gate`.
-- **Fix:** PNG sem strip; hero full-bleed nas bordas do painel; sem drop-shadow no gate.
+- **Sintoma:** login parece card dentro de card / sem degrade / FRAME “outra cor”.
+- **Causa:** full-bleed do PNG cobria o gradient do `.panel.profile-gate`; laranja gerado ≠ LINE/accent `#f0a35a`. Sidebar nunca mudou.
+- **Fix:** hero inset; PNG field `#000` + `mix-blend-mode: lighten` (degrade do panel aparece; sem retângulo); FRAME → `#f0a35a`; rebuild `career-ui` dist.
 
 ## Fase 3 — paths / ids (migrar com cuidado)
 

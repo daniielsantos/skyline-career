@@ -184,7 +184,7 @@ body {
   flex-wrap: nowrap;
 }
 
-/* Hero lockup (profile gate): baked AIR · MD-11F · FRAME / CAREER image */
+/* Hero lockup: black field + lighten blends into panel gradient (no nested slab). */
 .brand-mark-hero {
   align-items: center;
   width: 100%;
@@ -198,25 +198,14 @@ body {
   object-fit: contain;
   pointer-events: none;
   user-select: none;
-  filter: drop-shadow(0 0.3rem 0.9rem color-mix(in srgb, #000 40%, transparent));
+  filter: none;
+  mix-blend-mode: lighten;
 }
 
 .profile-gate-brand.brand-mark-hero {
   margin-left: auto;
   margin-right: auto;
   margin-bottom: 0.35rem;
-}
-
-/* Avoid nested-card: hero bleeds to panel edges; panel keeps the accent bar. */
-.panel.profile-gate .profile-gate-brand.brand-mark-hero {
-  width: calc(100% + 3rem);
-  max-width: none;
-  margin: -1.75rem -1.5rem 0.15rem;
-}
-
-.panel.profile-gate .brand-mark-hero-lockup {
-  filter: none;
-  border-radius: 0.32rem 0.32rem 0 0;
 }
 
 .sidebar-nav {

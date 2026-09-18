@@ -16,9 +16,10 @@ import {
   shell,
 } from 'electron';
 import { spawn, execFileSync } from 'node:child_process';
-import { createWriteStream, appendFileSync, mkdirSync } from 'node:fs';
+import { createWriteStream, appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createConnection } from 'node:net';
 import {
@@ -469,6 +470,40 @@ function resolveDownloadedInstallerPath() {
   return null;
 }
 
+/**
+ * Schedule NSIS Setup after this Electron process exits.
+ * A bare `cmd ping & start` stays under Electron's Win32 Job Object — the
+ * console flashes and dies with the app before Setup runs. Launch a temp VBS
+ * via `wscript //B` + `cmd start` so the sleeper is outside the job (no window).
+ */
+function scheduleInstallerAfterQuit(installerPath) {
+  const safePath = String(installerPath).replace(/"/g, '');
+  const vbsPath = join(tmpdir(), `airframe-update-${Date.now()}.vbs`);
+  // Sleep ~2.5s then Run Setup (1 = normal focus). Self-delete best-effort.
+  const vbs = [
+    'On Error Resume Next',
+    'WScript.Sleep 2500',
+    `CreateObject("WScript.Shell").Run """${safePath}""", 1, False`,
+    `CreateObject("Scripting.FileSystemObject").DeleteFile WScript.ScriptFullName, True`,
+    '',
+  ].join('\r\n');
+  writeFileSync(vbsPath, vbs, 'utf8');
+  // `start` breaks away from Electron's job; //B = no script host UI.
+  spawn(
+    process.env.ComSpec || 'cmd.exe',
+    [
+      '/d',
+      '/c',
+      `start "" /b wscript.exe //B //Nologo "${vbsPath.replace(/"/g, '')}"`,
+    ],
+    {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    },
+  ).unref();
+}
+
 function registerIpc() {
   ipcMain.handle('skyline:get-version', () => app.getVersion());
 
@@ -628,22 +663,7 @@ function registerIpc() {
       `[desktop] scheduling update installer after quit: ${installerPath}`,
     );
     try {
-      const safePath = installerPath.replace(/"/g, '');
-      // ping ≈ 1s/hop; -n 3 ≈ 2s so Electron can exit before NSIS process check.
-      spawn(
-        process.env.ComSpec || 'cmd.exe',
-        [
-          '/d',
-          '/s',
-          '/c',
-          `ping 127.0.0.1 -n 3 >nul & start "" "${safePath}"`,
-        ],
-        {
-          detached: true,
-          stdio: 'ignore',
-          windowsHide: true,
-        },
-      ).unref();
+      scheduleInstallerAfterQuit(installerPath);
     } catch (err) {
       logLine(
         `[desktop] schedule installer failed: ${err instanceof Error ? err.message : String(err)}; openPath fallback`,

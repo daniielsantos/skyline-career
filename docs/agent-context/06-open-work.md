@@ -1,8 +1,8 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-18: **Intl proportional caps → LANES_MAX 1000** — gateways/lanes por hub count; seed ~896 lanes; measure VPS +2–3d antes de celebrar BR pilot-intl. Detail: [`08-economy.md`](./08-economy.md).
+Atualizado 2026-09-18: **Desktop update quit-before-NSIS (VBS)** — `cmd ping` abria console e morria no Job Object do Electron antes do Setup. Fix: temp `.vbs` + `wscript //B` via `cmd start /b`. Detail: `packages/desktop/README.md`.
 
-Atualizado 2026-09-18: **Desktop update quit-before-NSIS** — agenda Setup ~2s após `app.quit()` (cmd ping) para não disparar “Airframe Career is running”. Detail: `packages/desktop/README.md`.
+Atualizado 2026-09-18: **Intl proportional caps → LANES_MAX 1000** — gateways/lanes por hub count; seed ~896 lanes; measure VPS +2–3d antes de celebrar BR pilot-intl. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Intl formation regional-first** — lots ≤2000 ainda ~7.5% após +2d; `formLotsIntl` agora prioriza OD ≤2500 nm antes de oceans. Sem Dry. Re-medir após +1–2d. Detail: [`08-economy.md`](./08-economy.md).
 

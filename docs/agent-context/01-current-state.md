@@ -1,5 +1,8 @@
 # Current state (2026-09-18)
 
+`main` **6409cfb** / desktop **0.3.83** shipped: Raise international board soft share to 15%. Release: [v0.3.83](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.83).
+
+
 `main` **4357450** / desktop **0.3.82** shipped: Polish Base tours and widen the dynamic intl lane graph. Release: [v0.3.82](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.82).
 
 

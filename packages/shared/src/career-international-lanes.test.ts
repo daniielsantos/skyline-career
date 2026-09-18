@@ -11,13 +11,13 @@ import {
 } from './career-international-lanes.js';
 
 describe('intl proportional budgets', () => {
-  it('scales gateways with hub count inside [2, 8]', () => {
+  it('scales gateways with hub count inside [2, 12]', () => {
     assert.equal(intlGatewayBudget(0), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN);
-    assert.equal(intlGatewayBudget(18), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN);
-    assert.equal(intlGatewayBudget(36), 2);
-    assert.equal(intlGatewayBudget(37), 3);
-    assert.equal(intlGatewayBudget(54), 3);
-    assert.equal(intlGatewayBudget(90), 5);
+    assert.equal(intlGatewayBudget(12), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN);
+    assert.equal(intlGatewayBudget(24), 2);
+    assert.equal(intlGatewayBudget(25), 3);
+    assert.equal(intlGatewayBudget(60), 5);
+    assert.equal(intlGatewayBudget(96), 8);
     assert.equal(intlGatewayBudget(144), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX);
     assert.equal(intlGatewayBudget(400), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX);
   });

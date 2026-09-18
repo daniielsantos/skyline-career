@@ -21,11 +21,11 @@ import type {
  * Absolute gateway ceiling (proportional budget never exceeds this).
  * @deprecated Prefer {@link intlGatewayBudget}; kept for Pulse/docs aliases.
  */
-export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 8;
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 12;
 export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN = 2;
-export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX = 8;
-/** ~1 gateway per 18 cargo hubs (ceil), clamped to min/max. */
-export const DYNAMIC_INTL_GATEWAYS_HUBS_PER_SLOT = 18;
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX = 12;
+/** ~1 gateway per 12 cargo hubs (ceil), clamped to min/max. */
+export const DYNAMIC_INTL_GATEWAYS_HUBS_PER_SLOT = 12;
 
 export const DYNAMIC_INTL_MIN_LANES_PER_COUNTRY = 2;
 /**
@@ -143,7 +143,7 @@ function clampInt(n: number, min: number, max: number): number {
 
 /**
  * Gateway slots for a country from cargo hub count (non-bush).
- * ceil(hubN / 18), clamped to [2, 8].
+ * ceil(hubN / 12), clamped to [2, 12].
  */
 export function intlGatewayBudget(hubN: number): number {
   const n = Math.max(0, Math.floor(Number(hubN) || 0));

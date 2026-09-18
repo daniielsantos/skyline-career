@@ -225,6 +225,7 @@ import {
   aircraftListingMatchesQuery,
   hangarAircraftMatchesQuery,
   type AircraftCatalogEntry,
+  type HangarCabinStatus,
 } from './AircraftCards';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { CargoOpsPanel } from './CargoOpsPanel';
@@ -3591,7 +3592,7 @@ export function App() {
   const [accessFilter, setAccessFilter] = useState<AccessFilter>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
   const [freightsBoard, setFreightsBoard] = useState<
-    'aircraft' | 'crew' | 'charter' | 'bush'
+    'aircraft' | 'crew' | 'bush'
   >('aircraft');
   const [bushTrips, setBushTrips] = useState<BushTripBoardRow[]>([]);
   const [activeBushTrip, setActiveBushTrip] =
@@ -3773,6 +3774,21 @@ export function App() {
         cruiseFuelFlowKgPerHour?: number;
         cruiseSpeedKt?: number;
         fuelBurnKgPerNm: number;
+        cabin?: {
+          passengerSeats: number;
+          hasCargoConfig: boolean;
+          hasPassengerConfig: boolean;
+          dualLayout: boolean;
+          defaultConfigurationId?: string;
+          defaultRole?: 'cargo' | 'passenger';
+          configurations: Array<{
+            id: string;
+            label: string;
+            role: 'cargo' | 'passenger';
+            passengerCapacity: number;
+            rolesPackRelPath: string;
+          }>;
+        };
       }
     >
   >({});
@@ -3901,7 +3917,7 @@ export function App() {
     }
   }, [freightsBoard]);
 
-  // Empty hangar: open on Crew needed once per profile session.
+  // Empty hangar: open Operator aircraft board once per profile session.
   const freightsBoardInitRef = useRef(false);
   useEffect(() => {
     if (freightsBoardInitRef.current) return;
@@ -4552,7 +4568,7 @@ export function App() {
   useEffect(() => {
     if (showProfileGate || showAuthGate || !activeCareerProfile) return;
     if (tab !== 'market' && !airportIcao) return;
-    if (tab === 'market' && freightsBoard === 'charter') {
+    if (tab === 'charter') {
       setMarketBoardLoading(false);
       return;
     }
@@ -7327,7 +7343,7 @@ export function App() {
       setWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
-        `${result.pilotName} registered at ${result.homeHubIcao} · fly Crew needed offers until you buy your first aircraft`,
+        `${result.pilotName} registered at ${result.homeHubIcao} · fly Operator aircraft offers until you buy your first aircraft`,
       );
       goToTab('pilot');
     }, { sync: 'full' });
@@ -10257,6 +10273,9 @@ export function App() {
       cruiseFuelFlowKgPerHour: perf?.cruiseFuelFlowKgPerHour,
       cruiseSpeedKt: perf?.cruiseSpeedKt,
       fuelBurnKgPerNm: perf?.fuelBurnKgPerNm,
+      passengerSeats: perf?.cabin?.passengerSeats,
+      dualLayout: perf?.cabin?.dualLayout,
+      defaultCabinRole: perf?.cabin?.defaultRole,
     };
   }
 
@@ -10278,6 +10297,34 @@ export function App() {
       cruiseFuelFlowKgPerHour: perf?.cruiseFuelFlowKgPerHour,
       cruiseSpeedKt: perf?.cruiseSpeedKt,
       fuelBurnKgPerNm: perf?.fuelBurnKgPerNm,
+      passengerSeats: perf?.cabin?.passengerSeats,
+      dualLayout: perf?.cabin?.dualLayout,
+      defaultCabinRole: perf?.cabin?.defaultRole,
+    };
+  }
+
+  function hangarCabinStatus(acf: PlayerAircraft): HangarCabinStatus | undefined {
+    const cabin = acf.airframeTypeId
+      ? airframePerf[acf.airframeTypeId]?.cabin
+      : undefined;
+    if (!cabin || cabin.passengerSeats <= 0) return undefined;
+    const resolved =
+      cabin.configurations.find(
+        (row) => row.id === acf.airframeConfigurationId,
+      ) ??
+      cabin.configurations.find(
+        (row) => row.rolesPackRelPath === acf.rolesPackRelPath,
+      ) ??
+      cabin.configurations.find(
+        (row) => row.id === cabin.defaultConfigurationId,
+      );
+    const activeRole = resolved?.role;
+    return {
+      activeRole,
+      activeLabel: resolved?.label,
+      passengerSeats: cabin.passengerSeats,
+      dualLayout: cabin.dualLayout,
+      charterNeedsPassenger: cabin.dualLayout && activeRole === 'cargo',
     };
   }
   const aircraftCountryOptions = useMemo((): AircraftMarketCountryOption[] => {
@@ -10985,7 +11032,9 @@ export function App() {
                       ? 'Economy pulse'
                   : tab === 'settings'
                     ? 'Settings'
-                    : 'Freights';
+                    : tab === 'charter'
+                      ? 'Charter'
+                      : 'Freights';
   const pageLede = showAirport
     ? `${airportView.airport.name} · ${airportView.airport.region} · ${
         airportView.airport.bushTripOnly
@@ -11028,9 +11077,13 @@ export function App() {
                       ? 'Saved network economy samples — world / BR / US pulse (dev).'
                   : tab === 'settings'
                     ? 'SimBrief, weight units, and local career preferences.'
-                    : freightsBoard === 'bush' && BUSH_TRIPS_BOARD_ENABLED
-                      ? 'Validated bush trip arcs — light GA only, separate from Market freights.'
-                      : 'Local cargo board — pick a freight, prepare in Dispatch, watch it settle.';
+                    : tab === 'charter'
+                      ? 'Passenger offers — seats and range on your aircraft, separate from cargo freights.'
+                      : freightsBoard === 'bush' && BUSH_TRIPS_BOARD_ENABLED
+                        ? 'Validated bush trip arcs — light GA only, separate from Market freights.'
+                        : freightsBoard === 'crew'
+                          ? 'Fly operator airframes for a pilot fee — starter path until you own a hull.'
+                          : 'Cargo board for your aircraft — lot pay, then Dispatch.';
   const pageHelp = resolvePageHelp({
     showAirport,
     showStaging,
@@ -11311,9 +11364,18 @@ export function App() {
             className={!showAirport && tab === 'market' ? 'tab active' : 'tab'}
             onClick={() => selectTab('market')}
             disabled={busy}
-            title="Freight board"
+            title="Cargo board — your aircraft or operator holds"
           >
             Freights
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'charter' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('charter')}
+            disabled={busy}
+            title="Passenger charter offers"
+          >
+            Charter
           </button>
           <button
             type="button"
@@ -11866,7 +11928,7 @@ export function App() {
                 ) : (
                   <>
                     Choose a callsign and home hub. You start as a contract pilot
-                    — fly Crew needed offers on operator airframes until you buy
+                    — fly Operator aircraft offers until you buy
                     or lease your first aircraft.
                   </>
                 )}
@@ -14676,6 +14738,18 @@ export function App() {
                   </>
                 ) : null}
         </section>
+      ) : hubSelected && tab === 'charter' ? (
+        <section className="panel freights-panel">
+          <CharterBoard
+            fleet={fleet}
+            initialAircraftId={boardAircraftId}
+            busy={busy || Boolean(playerDispatchMission)}
+            formatMoney={formatMoney}
+            formatMass={(kg) => formatMass(kg, weightSystem)}
+            onPrepare={enterCharterManifest}
+            onOpenAirport={openAirport}
+          />
+        </section>
       ) : hubSelected && tab === 'market' ? (
         <section className="panel freights-panel">
           <div className="settings-choice" role="tablist" aria-label="Freight boards">
@@ -14694,7 +14768,7 @@ export function App() {
               }}
               disabled={busy}
             >
-              Aircraft needed
+              Your aircraft
             </button>
             <button
               type="button"
@@ -14711,21 +14785,7 @@ export function App() {
               }}
               disabled={busy}
             >
-              Crew needed
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={freightsBoard === 'charter'}
-              className={
-                freightsBoard === 'charter'
-                  ? 'settings-choice-btn active'
-                  : 'settings-choice-btn'
-              }
-              onClick={() => setFreightsBoard('charter')}
-              disabled={busy}
-            >
-              Charter
+              Operator aircraft
             </button>
             {BUSH_TRIPS_BOARD_ENABLED ? (
               <button
@@ -14747,17 +14807,7 @@ export function App() {
               </button>
             ) : null}
           </div>
-          {freightsBoard === 'charter' ? (
-            <CharterBoard
-              fleet={fleet}
-              initialAircraftId={boardAircraftId}
-              busy={busy || Boolean(playerDispatchMission)}
-              formatMoney={formatMoney}
-              formatMass={(kg) => formatMass(kg, weightSystem)}
-              onPrepare={enterCharterManifest}
-              onOpenAirport={openAirport}
-            />
-          ) : BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush' ? (
+          {BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush' ? (
             <>
               <div className="panel-head">
                 <p className="panel-stats">
@@ -15529,7 +15579,7 @@ export function App() {
                             : playerDispatchMission
                             ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
                             : fleet.length === 0 && !lot.npcClaim?.crewNeeded
-                              ? 'Need an aircraft — fly Crew needed, or buy a starter'
+                              ? 'Need an aircraft — fly Operator aircraft, or buy a starter'
                             : lot.npcClaim?.crewNeeded
                               ? lot.npcClaim.crewReposition
                                 ? 'Ferry empty aircraft home'
@@ -15568,13 +15618,13 @@ export function App() {
                             !hasMarketFilters &&
                             marketSorts.length === 0
                           ? freightsBoard === 'crew'
-                            ? 'No Crew needed offers nearby — advance time or try Aircraft needed.'
+                            ? 'No Operator aircraft offers nearby — advance time or try Your aircraft.'
                             : fleet.length === 0
-                              ? 'No Aircraft needed lots you can take yet — open Crew needed, or buy a starter airframe.'
+                              ? 'No Your aircraft lots you can take yet — open Operator aircraft, or buy a starter airframe.'
                               : 'No freights yet — advance time (+15 min) or wait for a pulse.'
                           : freightsBoard === 'crew'
-                            ? 'No Crew needed offers match the selected filters.'
-                            : 'No Aircraft needed lots match the selected filters.'}
+                            ? 'No Operator aircraft offers match the selected filters.'
+                            : 'No Your aircraft lots match the selected filters.'}
                     </td>
                   </tr>
                 ) : null}
@@ -17204,8 +17254,8 @@ export function App() {
             {fleet.length === 0 ? (
               <p className="empty">
                 {!devMode && leaseUnlock && !leaseUnlock.unlocked
-                  ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Fly Crew needed, or buy a starter class on the Aircraft Market.`
-                  : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
+                  ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Fly Operator aircraft, or buy a starter class on the Aircraft Market.`
+                  : 'No aircraft yet — accept Operator aircraft offers on Freights, or buy your first airframe on the Aircraft Market.'}
               </p>
             ) : (
               <ul className="hangar-list">
@@ -17579,8 +17629,8 @@ export function App() {
               {fleet.length === 0 ? (
                 <p className="empty">
                   {!devMode && leaseUnlock && !leaseUnlock.unlocked
-                    ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Crew needed on time (score ≥70), or buy a starter class if you can afford it.`
-                    : 'No aircraft yet — accept Crew needed offers on Freights, or buy your first airframe on the Aircraft Market.'}
+                    ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Finish Operator aircraft on time (score ≥70), or buy a starter class if you can afford it.`
+                    : 'No aircraft yet — accept Operator aircraft offers on Freights, or buy your first airframe on the Aircraft Market.'}
                 </p>
               ) : filteredHangarFleet.length === 0 ? (
                 <p className="empty">
@@ -17593,6 +17643,7 @@ export function App() {
                       key={acf.id}
                       aircraft={acf}
                       catalog={hangarCatalogEntry(acf)}
+                      cabinStatus={hangarCabinStatus(acf)}
                       busy={busy}
                       hubOptions={ferryDestinationHubs(hubOptions).map(
                         (hub) => ({

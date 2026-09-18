@@ -9,4 +9,9 @@ describe('liveRefreshScope', () => {
     assert.equal(liveRefreshScope('ports', false).missions, true);
     assert.equal(liveRefreshScope('market', true).missions, true);
   });
+
+  it('loads aircraft market specs on Hangar so cabin/charter lines resolve', () => {
+    assert.equal(liveRefreshScope('hangar', false).aircraftMarket, true);
+    assert.equal(liveRefreshScope('aircraft', false).aircraftMarket, true);
+  });
 });

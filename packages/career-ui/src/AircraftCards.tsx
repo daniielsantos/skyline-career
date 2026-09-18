@@ -31,7 +31,68 @@ export type AircraftCatalogEntry = {
   /** Optional cruise TAS (kt). */
   cruiseSpeedKt?: number;
   fuelBurnKgPerNm?: number;
+  /** Max charter seats when the SKU has a dispatch-ready passenger config. */
+  passengerSeats?: number;
+  /** Cargo + passenger glass share this Market SKU. */
+  dualLayout?: boolean;
+  /** Catalog default cabin role for new purchases. */
+  defaultCabinRole?: 'cargo' | 'passenger';
 };
+
+export type HangarCabinStatus = {
+  /** Active cabin role on this tail, when known. */
+  activeRole?: 'cargo' | 'passenger';
+  activeLabel?: string;
+  passengerSeats: number;
+  dualLayout: boolean;
+  /** True when active cargo config blocks charter despite passenger glass on SKU. */
+  charterNeedsPassenger: boolean;
+};
+
+/** Market card line — passenger seats (peer to Cargo). */
+export function formatMarketCharterSpec(catalog: AircraftCatalogEntry | undefined): {
+  value: string;
+  title?: string;
+} | null {
+  const seats = catalog?.passengerSeats ?? 0;
+  if (seats <= 0) return null;
+  if (catalog?.dualLayout) {
+    return {
+      value: `${seats} · dual`,
+      title:
+        'Passenger seats when flying the passenger glass. This Market family also has a cargo configuration — Charter Fit needs passenger.',
+    };
+  }
+  return {
+    value: String(seats),
+    title: 'Passenger seats available for Charter',
+  };
+}
+
+/** Hangar card line — active cabin + charter readiness. */
+export function formatHangarCabinSpec(status: HangarCabinStatus | undefined): {
+  value: string;
+  title?: string;
+} | null {
+  if (!status || status.passengerSeats <= 0) return null;
+  if (status.charterNeedsPassenger) {
+    return {
+      value: `cargo · needs pax`,
+      title:
+        'This tail is on the cargo configuration. Charter Fit requires the passenger glass on this family.',
+    };
+  }
+  if (status.dualLayout && status.activeRole === 'passenger') {
+    return {
+      value: `${status.passengerSeats} pax`,
+      title: 'Passenger configuration active — ready for Charter Fit by seats and range.',
+    };
+  }
+  return {
+    value: `${status.passengerSeats} pax`,
+    title: 'Passenger seats available for Charter',
+  };
+}
 
 export const AIRCRAFT_CLASS_FILTERS: Array<{
   id: '' | AircraftClass;
@@ -493,6 +554,16 @@ export function MarketListingCard(props: {
                 : '—'}
             </strong>
           </li>
+          {(() => {
+            const charter = formatMarketCharterSpec(catalog);
+            if (!charter) return null;
+            return (
+              <li>
+                <span>Pax</span>
+                <strong title={charter.title}>{charter.value}</strong>
+              </li>
+            );
+          })()}
           <li>
             <span>Range</span>
             <strong>
@@ -754,6 +825,7 @@ export function ListLeaseAskBody(props: {
 export function HangarAircraftCard(props: {
   aircraft: PlayerAircraft;
   catalog?: AircraftCatalogEntry;
+  cabinStatus?: HangarCabinStatus;
   busy: boolean;
   hubOptions: FerryHubOption[];
   /** One-shot prefill when App navigates to Hangar with a target dest. */
@@ -1059,6 +1131,16 @@ export function HangarAircraftCard(props: {
                 {formatMassExact(acf.fuelCapacityKg, weightSystem)}
               </strong>
             </li>
+            {(() => {
+              const cabin = formatHangarCabinSpec(props.cabinStatus);
+              if (!cabin) return null;
+              return (
+                <li>
+                  <span>Pax</span>
+                  <strong title={cabin.title}>{cabin.value}</strong>
+                </li>
+              );
+            })()}
             <li>
               <span>Range</span>
               <strong>

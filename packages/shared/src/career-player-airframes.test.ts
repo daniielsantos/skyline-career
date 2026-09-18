@@ -12,10 +12,12 @@ import {
   listCareerPlayerAirframes,
   listStarterCareerPlayerAirframes,
   resolvePassengerCapacity,
+  resolveAirframeCabinSummary,
   resolveAirframeCruiseFuelFlowKgPerHour,
   resolveAirframeCruiseSpeedKt,
   resolveAirframeMaxRangeNm,
   resolveAirframeFuelBurnKgPerNm,
+  resolveAirframePerfForUi,
   simconnectCabinOvershootLb,
 } from './career-player-airframes.js';
 
@@ -251,6 +253,86 @@ describe('career player airframes', () => {
         ),
       );
     }
+  });
+
+  it('stamps dispatch_ready passenger configs on charter-eligible GA/TP SKUs', () => {
+    const samples = new Map<string, number>([
+      ['blacksquare-b60-duke', 4],
+      ['asobo-cessna-c152', 1],
+      ['asobo-beechcraft-bonanza', 5],
+      ['workingtitle-tbm-930-passengers', 5],
+      ['microsoft-pc-12-ngx-passengers', 8],
+      ['c208-caravan-cargo', 9],
+      ['inibuilds-f406-caravan-ii-passenger', 10],
+      ['microsoft-atr-42-600', 12],
+    ]);
+    for (const [typeId, capacity] of samples) {
+      assert.equal(
+        resolvePassengerCapacity(typeId, 'passenger'),
+        capacity,
+        typeId,
+      );
+    }
+
+    const gaTp = [
+      ...listCareerPlayerAirframes('light_ga'),
+      ...listCareerPlayerAirframes('light_turboprop'),
+    ];
+    for (const airframe of gaTp) {
+      const passengerConfigurations = (airframe.configurations ?? []).filter(
+        isPassengerConfigurationEligible,
+      );
+      assert.ok(
+        passengerConfigurations.length > 0,
+        `${airframe.typeId} missing eligible passenger configuration`,
+      );
+      assert.ok(
+        passengerConfigurations.every(
+          (row) =>
+            row.certificationState === 'dispatch_ready' &&
+            row.baggageAllowanceLbPerPassenger === 55 &&
+            row.baggageCapacityLb >= row.passengerCapacity * 55,
+        ),
+        airframe.typeId,
+      );
+    }
+
+    assert.equal(
+      resolvePassengerCapacity(
+        'microsoft-pc-12-ngx-passengers',
+        undefined,
+        'profiles/ofp/microsoft-pc-12ngx-cargo.json',
+      ),
+      0,
+    );
+    assert.equal(
+      resolvePassengerCapacity(
+        'microsoft-pc-12-ngx-passengers',
+        undefined,
+        'profiles/ofp/microsoft-pc-12-ngx-passengers.json',
+      ),
+      8,
+    );
+  });
+
+  it('summarizes cabin/charter layout for Market and Hangar cards', () => {
+    const duke = resolveAirframeCabinSummary('blacksquare-b60-duke', 'light_ga');
+    assert.equal(duke.passengerSeats, 4);
+    assert.equal(duke.hasPassengerConfig, true);
+    assert.equal(duke.dualLayout, false);
+    assert.equal(duke.defaultRole, 'passenger');
+
+    const titan = resolveAirframeCabinSummary('microsoft-404-titan', 'light_ga');
+    assert.equal(titan.passengerSeats, 8);
+    assert.equal(titan.dualLayout, true);
+    assert.equal(titan.defaultRole, 'cargo');
+
+    const md11 = resolveAirframeCabinSummary('tfdi-md11f-family', 'wide_freighter');
+    assert.equal(md11.passengerSeats, 0);
+    assert.equal(md11.hasPassengerConfig, false);
+
+    const perf = resolveAirframePerfForUi('blacksquare-b60-duke', 'light_ga');
+    assert.equal(perf.cabin.passengerSeats, 4);
   });
 
   it('blocks cargo-family packs from passenger capacity', () => {

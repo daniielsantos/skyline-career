@@ -12,6 +12,7 @@ describe('page help copy', () => {
 
   it('routes Dispatch, Ports, and airport terminals', () => {
     assert.equal(resolvePageHelp({ showAirport: false, showStaging: true, tab: 'market' }).id, 'dispatch');
+    assert.equal(resolvePageHelp({ showAirport: false, showStaging: false, tab: 'charter' }).id, 'charter');
     assert.equal(resolvePageHelp({ showAirport: false, showStaging: false, tab: 'ports' }).id, 'ports');
     assert.equal(resolvePageHelp({ showAirport: true, showStaging: false, tab: 'market' }).id, 'airport');
     assert.match(PAGE_HELP.ports.bullets.join(' '), /warehouse/i);

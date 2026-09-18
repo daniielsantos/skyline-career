@@ -15,7 +15,32 @@
     "maxCargoKg": 1563,
     "fuelCapacityKg": 947,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.35
+    "fuelBurnKgPerNm": 0.35,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/microsoft-404-titan-cargo.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 8,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 440,
+        "rolesPackRelPath": "profiles/ofp/microsoft-404-titan-passengers.json"
+      }
+    ],
+    "defaultConfigurationId": "cargo"
   },
   {
     "typeId": "blacksquare-baron-58-professional",
@@ -31,7 +56,21 @@
     "maxRangeNm": 1275,
     "cruiseFuelFlowKgPerHour": 90.7,
     "cruiseSpeedKt": 198,
-    "fuelBurnKgPerNm": 0.458
+    "fuelBurnKgPerNm": 0.458,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-baron-58-professional.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-baron-58p-professional",
@@ -47,7 +86,21 @@
     "maxRangeNm": 1450,
     "cruiseFuelFlowKgPerHour": 90.7,
     "cruiseSpeedKt": 261,
-    "fuelBurnKgPerNm": 0.348
+    "fuelBurnKgPerNm": 0.348,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-baron-58p-professional.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-beech-baron-g58",
@@ -61,7 +114,21 @@
     "maxCargoKg": 612,
     "fuelCapacityKg": 544,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.35
+    "fuelBurnKgPerNm": 0.35,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/asobo-beech-baron-g58.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-beechcraft-bonanza",
@@ -77,7 +144,21 @@
     "maxRangeNm": 920,
     "cruiseFuelFlowKgPerHour": 45.4,
     "cruiseSpeedKt": 176,
-    "fuelBurnKgPerNm": 0.258
+    "fuelBurnKgPerNm": 0.258,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/asobo-beechcraft-bonanza.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blackbox-bn2-islander-cargo-tip-tanks",
@@ -98,7 +179,32 @@
     "maxRangeNm": 800,
     "cruiseFuelFlowKgPerHour": 86.2,
     "cruiseSpeedKt": 124,
-    "fuelBurnKgPerNm": 0.695
+    "fuelBurnKgPerNm": 0.695,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-cargo-tip-tanks.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 9,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 495,
+        "rolesPackRelPath": "profiles/ofp/blackbox-bn2-islander-passenger-analogue-tip-tanks.json"
+      }
+    ],
+    "defaultConfigurationId": "cargo"
   },
   {
     "typeId": "blacksquare-bonanza-professional",
@@ -114,7 +220,21 @@
     "maxRangeNm": 915,
     "cruiseFuelFlowKgPerHour": 45.4,
     "cruiseSpeedKt": 174,
-    "fuelBurnKgPerNm": 0.261
+    "fuelBurnKgPerNm": 0.261,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-bonanza-professional.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-c400-corvalis",
@@ -130,7 +250,21 @@
     "maxRangeNm": 1250,
     "cruiseFuelFlowKgPerHour": 75.3,
     "cruiseSpeedKt": 235,
-    "fuelBurnKgPerNm": 0.32
+    "fuelBurnKgPerNm": 0.32,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/microsoft-c400-corvalis.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-c172sp-cargo",
@@ -146,7 +280,21 @@
     "maxRangeNm": 640,
     "cruiseFuelFlowKgPerHour": 24.5,
     "cruiseSpeedKt": 124,
-    "fuelBurnKgPerNm": 0.198
+    "fuelBurnKgPerNm": 0.198,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/asobo-c172sp-cargo.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-cessna-c152",
@@ -162,7 +310,21 @@
     "maxRangeNm": 415,
     "cruiseFuelFlowKgPerHour": 18.1,
     "cruiseSpeedKt": 107,
-    "fuelBurnKgPerNm": 0.169
+    "fuelBurnKgPerNm": 0.169,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 1,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 55,
+        "rolesPackRelPath": "profiles/ofp/asobo-cessna-c152.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "skyward-da50",
@@ -178,7 +340,21 @@
     "maxRangeNm": 700,
     "cruiseFuelFlowKgPerHour": 31.3,
     "cruiseSpeedKt": 165,
-    "fuelBurnKgPerNm": 0.19
+    "fuelBurnKgPerNm": 0.19,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 4,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 220,
+        "rolesPackRelPath": "profiles/ofp/skyward-da50.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-b60-duke",
@@ -194,7 +370,21 @@
     "maxRangeNm": 1100,
     "cruiseFuelFlowKgPerHour": 120,
     "cruiseSpeedKt": 230,
-    "fuelBurnKgPerNm": 0.522
+    "fuelBurnKgPerNm": 0.522,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 4,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 220,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-b60-duke.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "a2a-piper-aerostar-600",
@@ -210,7 +400,21 @@
     "maxRangeNm": 1400,
     "cruiseFuelFlowKgPerHour": 66.5,
     "cruiseSpeedKt": 190,
-    "fuelBurnKgPerNm": 0.35
+    "fuelBurnKgPerNm": 0.35,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/a2a-piper-aerostar-600.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "a2a-piper-pa-24-250-comanche",
@@ -226,7 +430,21 @@
     "maxRangeNm": 1200,
     "cruiseFuelFlowKgPerHour": 33.6,
     "cruiseSpeedKt": 160,
-    "fuelBurnKgPerNm": 0.21
+    "fuelBurnKgPerNm": 0.21,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/a2a-piper-pa-24-250-comanche.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-just-flight-pa28-arrow-iii",
@@ -242,7 +460,21 @@
     "maxRangeNm": 780,
     "cruiseFuelFlowKgPerHour": 38.6,
     "cruiseSpeedKt": 172,
-    "fuelBurnKgPerNm": 0.224
+    "fuelBurnKgPerNm": 0.224,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/justflight-just-flight-pa28-arrow-iii.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-just-flight-pa28-warrior-ii",
@@ -258,7 +490,21 @@
     "maxRangeNm": 637,
     "cruiseFuelFlowKgPerHour": 22.9,
     "cruiseSpeedKt": 111,
-    "fuelBurnKgPerNm": 0.206
+    "fuelBurnKgPerNm": 0.206,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/justflight-just-flight-pa28-warrior-ii.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-piper-pa28-236-dakota-standard",
@@ -274,7 +520,21 @@
     "maxRangeNm": 740,
     "cruiseFuelFlowKgPerHour": 48.5,
     "cruiseSpeedKt": 124,
-    "fuelBurnKgPerNm": 0.391
+    "fuelBurnKgPerNm": 0.391,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/asobo-piper-pa28-236-dakota-standard.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-robin-dr400",
@@ -290,7 +550,21 @@
     "maxRangeNm": 550,
     "cruiseFuelFlowKgPerHour": 18.1,
     "cruiseSpeedKt": 115,
-    "fuelBurnKgPerNm": 0.157
+    "fuelBurnKgPerNm": 0.157,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/asobo-robin-dr400.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-commander-114",
@@ -306,7 +580,21 @@
     "maxRangeNm": 725,
     "cruiseFuelFlowKgPerHour": 36.3,
     "cruiseSpeedKt": 174,
-    "fuelBurnKgPerNm": 0.209
+    "fuelBurnKgPerNm": 0.209,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-commander-114.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-savage-norden",
@@ -320,7 +608,21 @@
     "maxCargoKg": 210,
     "fuelCapacityKg": 101,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 0.35
+    "fuelBurnKgPerNm": 0.35,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 3,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 165,
+        "rolesPackRelPath": "profiles/ofp/asobo-savage-norden.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "workingtitle-cessna-citation-cj4",
@@ -654,7 +956,21 @@
     "maxRangeNm": 800,
     "cruiseSpeedKt": 300,
     "cruiseFuelFlowKgPerHour": 480,
-    "fuelBurnKgPerNm": 1.6
+    "fuelBurnKgPerNm": 1.6,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/microsoft-atr-42-600.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-atr-72-600",
@@ -670,7 +986,21 @@
     "maxRangeNm": 800,
     "cruiseSpeedKt": 280,
     "cruiseFuelFlowKgPerHour": 504,
-    "fuelBurnKgPerNm": 1.8
+    "fuelBurnKgPerNm": 1.8,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/microsoft-atr-72-600.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-beechcraft-king-air-350i",
@@ -686,7 +1016,21 @@
     "maxRangeNm": 1806,
     "cruiseFuelFlowKgPerHour": 204.1,
     "cruiseSpeedKt": 244,
-    "fuelBurnKgPerNm": 0.836
+    "fuelBurnKgPerNm": 0.836,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 9,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 495,
+        "rolesPackRelPath": "profiles/ofp/asobo-beechcraft-king-air-350i.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-turbine-duke",
@@ -702,7 +1046,21 @@
     "maxRangeNm": 1200,
     "cruiseFuelFlowKgPerHour": 181.4,
     "cruiseSpeedKt": 290,
-    "fuelBurnKgPerNm": 0.626
+    "fuelBurnKgPerNm": 0.626,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 4,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 220,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-turbine-duke.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-b36tp-bonanza-professional",
@@ -718,7 +1076,21 @@
     "maxRangeNm": 982,
     "cruiseFuelFlowKgPerHour": 79.4,
     "cruiseSpeedKt": 250,
-    "fuelBurnKgPerNm": 0.318
+    "fuelBurnKgPerNm": 0.318,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-b36tp-bonanza-professional.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-c408-skycourier-cargo",
@@ -738,7 +1110,32 @@
     "maxRangeNm": 900,
     "cruiseSpeedKt": 210,
     "cruiseFuelFlowKgPerHour": 189,
-    "fuelBurnKgPerNm": 0.9
+    "fuelBurnKgPerNm": 0.9,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/microsoft-c408-skycourier-cargo.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 11,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 605,
+        "rolesPackRelPath": "profiles/ofp/microsoft-c408-skycourier-passenger.json"
+      }
+    ],
+    "defaultConfigurationId": "cargo"
   },
   {
     "typeId": "c208-caravan-cargo",
@@ -761,7 +1158,32 @@
     "maxRangeNm": 964,
     "cruiseFuelFlowKgPerHour": 181.4,
     "cruiseSpeedKt": 195,
-    "fuelBurnKgPerNm": 0.93
+    "fuelBurnKgPerNm": 0.93,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-caravan-cargo-pod.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 9,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 495,
+        "rolesPackRelPath": "profiles/ofp/asobo-c208b-passengers.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-dhc-6-300-twin-otter-wheels",
@@ -777,7 +1199,21 @@
     "maxRangeNm": 800,
     "cruiseSpeedKt": 170,
     "cruiseFuelFlowKgPerHour": 179,
-    "fuelBurnKgPerNm": 1.05
+    "fuelBurnKgPerNm": 1.05,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/microsoft-dhc-6-300-twin-otter-wheels.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "nextgensim-emb-110p1f-bandeirante",
@@ -799,7 +1235,32 @@
     "maxRangeNm": 1060,
     "cruiseFuelFlowKgPerHour": 182.3,
     "cruiseSpeedKt": 220,
-    "fuelBurnKgPerNm": 0.829
+    "fuelBurnKgPerNm": 0.829,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/nextgensim-emb-110p1f-bandeirante.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/nextgensim-emb-110p1-bandeirante.json"
+      }
+    ],
+    "defaultConfigurationId": "cargo"
   },
   {
     "typeId": "inibuilds-f406-caravan-ii-passenger",
@@ -815,7 +1276,21 @@
     "maxRangeNm": 1153,
     "cruiseFuelFlowKgPerHour": 132.5,
     "cruiseSpeedKt": 210,
-    "fuelBurnKgPerNm": 0.631
+    "fuelBurnKgPerNm": 0.631,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 10,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 550,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-f406-caravan-ii-passenger.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-king-air-c90-gtx-passengers",
@@ -831,7 +1306,21 @@
     "maxRangeNm": 1100,
     "cruiseSpeedKt": 250,
     "cruiseFuelFlowKgPerHour": 175,
-    "fuelBurnKgPerNm": 0.7
+    "fuelBurnKgPerNm": 0.7,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 6,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 330,
+        "rolesPackRelPath": "profiles/ofp/microsoft-king-air-c90-gtx-passengers.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "sws-kodiak-100-commuter-cargopod-tundra-wheels",
@@ -860,7 +1349,32 @@
     "maxRangeNm": 1132,
     "cruiseFuelFlowKgPerHour": 100.2,
     "cruiseSpeedKt": 174,
-    "fuelBurnKgPerNm": 0.576
+    "fuelBurnKgPerNm": 0.576,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/sws-kodiak-100-commuter-cargopod-tundra-wheels.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 9,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 495,
+        "rolesPackRelPath": "profiles/ofp/sws-kodiak-100-commuter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-pc-12-ngx-passengers",
@@ -881,7 +1395,43 @@
     "maxRangeNm": 1803,
     "cruiseFuelFlowKgPerHour": 156,
     "cruiseSpeedKt": 290,
-    "fuelBurnKgPerNm": 0.538
+    "fuelBurnKgPerNm": 0.538,
+    "configurations": [
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/microsoft-pc-12ngx-cargo.json"
+      },
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 8,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 440,
+        "rolesPackRelPath": "profiles/ofp/microsoft-pc-12-ngx-passengers.json"
+      },
+      {
+        "id": "vip",
+        "label": "VIP",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 6,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 330,
+        "rolesPackRelPath": "profiles/ofp/microsoft-pc-12-ngx-vip.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "carenado-saab-340-passenger",
@@ -901,7 +1451,21 @@
     "maxRangeNm": 800,
     "cruiseSpeedKt": 270,
     "cruiseFuelFlowKgPerHour": 324,
-    "fuelBurnKgPerNm": 1.2
+    "fuelBurnKgPerNm": 1.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/carenado-saab-340-passenger.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-starship",
@@ -917,7 +1481,21 @@
     "maxRangeNm": 1575,
     "cruiseFuelFlowKgPerHour": 272.2,
     "cruiseSpeedKt": 325,
-    "fuelBurnKgPerNm": 0.838
+    "fuelBurnKgPerNm": 0.838,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 6,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 330,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-starship.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blacksquare-tbm-850-feather-red",
@@ -933,7 +1511,21 @@
     "maxRangeNm": 1450,
     "cruiseFuelFlowKgPerHour": 112.5,
     "cruiseSpeedKt": 320,
-    "fuelBurnKgPerNm": 0.352
+    "fuelBurnKgPerNm": 0.352,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/blacksquare-tbm-850-feather-red.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "workingtitle-tbm-930-passengers",
@@ -949,7 +1541,21 @@
     "maxRangeNm": 1730,
     "cruiseFuelFlowKgPerHour": 112.5,
     "cruiseSpeedKt": 330,
-    "fuelBurnKgPerNm": 0.341
+    "fuelBurnKgPerNm": 0.341,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 5,
+        "requiredCrew": 1,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 275,
+        "rolesPackRelPath": "profiles/ofp/workingtitle-tbm-930-passengers.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "inibuilds-ys-11",
@@ -965,7 +1571,21 @@
     "maxRangeNm": 800,
     "cruiseSpeedKt": 250,
     "cruiseFuelFlowKgPerHour": 500,
-    "fuelBurnKgPerNm": 2.0
+    "fuelBurnKgPerNm": 2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 12,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 660,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-ys-11.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-douglas-dc-3-metal-left",

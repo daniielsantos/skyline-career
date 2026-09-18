@@ -30,7 +30,11 @@ export function liveRefreshScope(
         missions: true,
         bushTrips: false,
       };
+    case 'charter':
+      return { missions: true };
     case 'aircraft':
+      return { aircraftMarket: true, missions: true };
+    case 'hangar':
       return { aircraftMarket: true, missions: true };
     case 'missions':
     case 'staging':
@@ -39,4 +43,4 @@ export function liveRefreshScope(
       return { missions: true };
   }
 }
-
+

@@ -14,6 +14,8 @@ export type PlayerAircraft = {
   id: string;
   aircraftClassId: AircraftClass;
   airframeTypeId?: string;
+  airframeConfigurationId?: string;
+  rolesPackRelPath?: string;
   label: string;
   registration?: string;
   locationIcao: string;
@@ -2198,6 +2200,21 @@ export function fetchAircraftMarket(opts?: { country?: string }) {
           cruiseFuelFlowKgPerHour?: number;
           cruiseSpeedKt?: number;
           fuelBurnKgPerNm: number;
+          cabin?: {
+            passengerSeats: number;
+            hasCargoConfig: boolean;
+            hasPassengerConfig: boolean;
+            dualLayout: boolean;
+            defaultConfigurationId?: string;
+            defaultRole?: 'cargo' | 'passenger';
+            configurations: Array<{
+              id: string;
+              label: string;
+              role: 'cargo' | 'passenger';
+              passengerCapacity: number;
+              rolesPackRelPath: string;
+            }>;
+          };
         }
       >;
       fleet: PlayerAircraft[];

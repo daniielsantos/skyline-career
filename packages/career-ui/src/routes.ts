@@ -2,6 +2,7 @@
 
 export type CareerTab =
   | 'market'
+  | 'charter'
   | 'aircraft'
   | 'missions'
   | 'fleet'
@@ -22,6 +23,7 @@ export type CareerLocation = {
 /** Canonical public paths (operational vocabulary). */
 const TAB_PATH: Record<CareerTab, string> = {
   market: '/freights',
+  charter: '/charter',
   aircraft: '/airframes',
   hangar: '/hangar',
   staging: '/dispatch',
@@ -40,6 +42,7 @@ const PATH_TAB: Record<string, CareerTab> = {
   '/': 'market',
   '/freights': 'market',
   '/market': 'market',
+  '/charter': 'charter',
   '/airframes': 'aircraft',
   '/aircraft': 'aircraft',
   '/hangar': 'hangar',

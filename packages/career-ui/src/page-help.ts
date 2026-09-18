@@ -23,10 +23,22 @@ export const PAGE_HELP = {
     title: 'How Freights works',
     kicker: 'Page guide',
     bullets: [
-      'This is the local cargo board. Pick a lot (or several on the same route), then Dispatch to build the flight.',
+      'Cargo board for your company. Your aircraft = lot pay on hulls you own or lease; Operator aircraft = pilot fee on NPC holds.',
+      'Pick a lot (or several on the same route), then Dispatch to build the flight.',
       'Urgent and idle chips are economy pressure — same commodity, different pay and clock.',
       'A lock means Hangar → Cargo Ops has not unlocked that commodity yet.',
-      'Bush trips, when listed, are separate arcs — not Market freights.',
+      'Passenger work is under Charter in the sidebar — separate from cargo freights.',
+    ],
+  },
+  charter: {
+    id: 'charter',
+    title: 'How Charter works',
+    kicker: 'Page guide',
+    bullets: [
+      'Passenger offers from terminal pools — not Market cargo freights.',
+      'Fit gates seats, range, and passenger config on your parked airframe.',
+      'Prepare opens a fixed passenger manifest (no split/combine like cargo).',
+      'TTL is delivery pressure: accept late relative to the clock and settle can cut pay.',
     ],
   },
   ports: {
@@ -48,6 +60,7 @@ export const PAGE_HELP = {
     bullets: [
       'Aircraft must be at the mission origin with you. Travel moves the pilot; ferry moves the airframe (often empty).',
       'Inspect, then repair. Hours raise MX cost and cut resale. Parked frames pay daily parking (assigned and leased-out do not).',
+      'Pax shows Charter seats. Dual-layout tails on cargo glass show “needs pax” until the passenger configuration is active.',
       'Cargo Ops (sub-tab here) unlocks Market commodities and freighter classes. Dry/Light starters are open; Medium and Jet climb the ladder.',
       'Company home (Base) unlocks parking and Jet-A/MRO perks. Cashflow is the ledger — freights, fuel, leases, shop, parking.',
     ],
@@ -59,6 +72,7 @@ export const PAGE_HELP = {
     bullets: [
       'New, used, and lease prices are Airframe economy numbers — not real-world MSRP.',
       'Buy or lease into the Hangar. One Market card is a glass family (variants share the SKU).',
+      'Pax on the card is Charter seat capacity. “dual” means the family also has cargo glass — Fit needs passenger.',
       'Condition and hours on used frames change what you pay and what MX will cost later.',
     ],
   },
@@ -145,6 +159,9 @@ export function resolvePageHelp(opts: {
     case 'settings':
       return PAGE_HELP.settings;
     case 'market':
+      return PAGE_HELP.freights;
+    case 'charter':
+      return PAGE_HELP.charter;
     default:
       return PAGE_HELP.freights;
   }

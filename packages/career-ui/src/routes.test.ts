@@ -5,6 +5,7 @@ import { parseCareerPath, pathForLocation } from './routes.ts';
 describe('career UI routes', () => {
   it('maps tabs to canonical operational paths', () => {
     assert.equal(pathForLocation({ tab: 'market', airportIcao: null }), '/freights');
+    assert.equal(pathForLocation({ tab: 'charter', airportIcao: null }), '/charter');
     assert.equal(pathForLocation({ tab: 'aircraft', airportIcao: null }), '/airframes');
     assert.equal(pathForLocation({ tab: 'hangar', airportIcao: null }), '/hangar');
     assert.equal(pathForLocation({ tab: 'staging', airportIcao: null }), '/dispatch');
@@ -29,6 +30,10 @@ describe('career UI routes', () => {
     });
     assert.deepEqual(parseCareerPath('/market'), {
       tab: 'market',
+      airportIcao: null,
+    });
+    assert.deepEqual(parseCareerPath('/charter'), {
+      tab: 'charter',
       airportIcao: null,
     });
     assert.deepEqual(parseCareerPath('/airframes'), {

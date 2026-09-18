@@ -12,6 +12,7 @@
  * Caravan) share one Market SKU via familyRolesPackRelPaths.
  */
 import catalogJson from './data/career-player-airframes.json' with { type: 'json' };
+import { isCharterEligibleAircraftClass } from './career-charter.js';
 import type {
   FreighterClassId,
   PlayerAircraft,
@@ -301,6 +302,62 @@ export function resolveAirframeCruiseSpeedKt(
   return undefined;
 }
 
+/** Cabin / charter hints for Market + Hangar cards. */
+export type AirframeCabinUiSummary = {
+  /** Max eligible passenger seats on this SKU (0 = no charter config). */
+  passengerSeats: number;
+  hasCargoConfig: boolean;
+  hasPassengerConfig: boolean;
+  /** Cargo + passenger glass share one Market SKU. */
+  dualLayout: boolean;
+  defaultConfigurationId?: string;
+  defaultRole?: AirframeConfigurationRole;
+  /** Compact config list so Hangar can label the active cabin without a second catalog fetch. */
+  configurations: Array<{
+    id: string;
+    label: string;
+    role: AirframeConfigurationRole;
+    passengerCapacity: number;
+    rolesPackRelPath: string;
+  }>;
+};
+
+export function resolveAirframeCabinSummary(
+  airframeTypeId: string | null | undefined,
+  aircraftClassId?: FreighterClassId | string | null,
+): AirframeCabinUiSummary {
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  const classId = aircraftClassId ?? airframe?.aircraftClassId;
+  const configs = airframe?.configurations ?? [];
+  const passengerConfigs = configs.filter(isPassengerConfigurationEligible);
+  const hasCargoConfig = configs.some((row) => row.role === 'cargo');
+  const hasPassengerConfig = passengerConfigs.length > 0;
+  const charterClass = isCharterEligibleAircraftClass(classId ?? null);
+  const passengerSeats =
+    charterClass && hasPassengerConfig
+      ? Math.max(...passengerConfigs.map((row) => row.passengerCapacity))
+      : 0;
+  const defaultConfiguration = findCareerAirframeConfiguration(
+    airframe,
+    airframe?.defaultConfigurationId,
+  );
+  return {
+    passengerSeats,
+    hasCargoConfig,
+    hasPassengerConfig: charterClass && hasPassengerConfig,
+    dualLayout: charterClass && hasCargoConfig && hasPassengerConfig,
+    defaultConfigurationId: airframe?.defaultConfigurationId,
+    defaultRole: defaultConfiguration?.role,
+    configurations: configs.map((row) => ({
+      id: row.id,
+      label: row.label,
+      role: row.role,
+      passengerCapacity: row.passengerCapacity,
+      rolesPackRelPath: row.rolesPackRelPath,
+    })),
+  };
+}
+
 /** Specs for market/hangar cards — airframe overrides with class fallback. */
 export function resolveAirframePerfForUi(
   airframeTypeId: string | null | undefined,
@@ -313,6 +370,7 @@ export function resolveAirframePerfForUi(
   cruiseFuelFlowKgPerHour?: number;
   cruiseSpeedKt?: number;
   fuelBurnKgPerNm: number;
+  cabin: AirframeCabinUiSummary;
 } {
   const airframe = findCareerPlayerAirframe(airframeTypeId);
   const catalogFlow = resolveAirframeCruiseFuelFlowKgPerHour(airframeTypeId);
@@ -340,6 +398,7 @@ export function resolveAirframePerfForUi(
       aircraftClassId,
       liveOverride,
     ),
+    cabin: resolveAirframeCabinSummary(airframeTypeId, aircraftClassId),
   };
 }
 

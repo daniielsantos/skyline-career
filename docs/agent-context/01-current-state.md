@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **66bd739** / desktop **0.3.116** shipped: Tune charter pay toward freight and align Base Charter Search UI. Release: [v0.3.116](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.116).
+
+
 `main` **8249eb1** / desktop **0.3.115** shipped: Keep desktop update progress bar monotonic during differential downloads. Release: [v0.3.115](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.115).
 
 

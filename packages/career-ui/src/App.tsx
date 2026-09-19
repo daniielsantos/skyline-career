@@ -9,6 +9,7 @@ import {
   fetchRouteLots,
   fetchState,
   fetchCompanies,
+  fetchWorldPresence,
   postCompany,
   postCompanySessionOpen,
   fetchCareerProfiles,
@@ -3526,6 +3527,10 @@ export function App() {
   const [devMode, setDevMode] = useState(loadDevMode);
   const [companies, setCompanies] = useState<CareerCompanyView[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState(getStoredCompanyId);
+  const [worldPresence, setWorldPresence] = useState<{
+    onlineCount: number;
+    recent: Array<{ companyDisplayName: string; summary: string }>;
+  } | null>(null);
 
   useEffect(() => {
     setActiveCompanyIdForRequests(activeCompanyId);
@@ -3671,6 +3676,37 @@ export function App() {
   /** Host CAREER_WORLD_FIXED — clients attach, no ProfileGate. */
   const [worldFixed, setWorldFixed] = useState(false);
   const [worldWaiting, setWorldWaiting] = useState(false);
+
+  useEffect(() => {
+    if (!careerReady || !(authRequired || worldFixed)) {
+      setWorldPresence(null);
+      return;
+    }
+    let cancelled = false;
+    const pull = () => {
+      void fetchWorldPresence()
+        .then((p) => {
+          if (cancelled) return;
+          setWorldPresence({
+            onlineCount: p.onlineCount,
+            recent: (p.recent ?? []).slice(0, 5).map((r) => ({
+              companyDisplayName: r.companyDisplayName,
+              summary: r.summary,
+            })),
+          });
+        })
+        .catch(() => {
+          /* presence is best-effort */
+        });
+    };
+    pull();
+    const id = window.setInterval(pull, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [careerReady, authRequired, worldFixed]);
+
   /** Electron: first-run / Settings switch between SP and MP. */
   const [playModeGate, setPlayModeGate] = useState<
     'loading' | 'needed' | 'hidden'
@@ -12283,6 +12319,21 @@ export function App() {
                   </span>
                 </label>
               )
+            ) : null}
+            {careerReady && (authRequired || worldFixed) && worldPresence ? (
+              <div
+                className="metric"
+                title={
+                  worldPresence.recent.length > 0
+                    ? worldPresence.recent
+                        .map((r) => `${r.companyDisplayName}: ${r.summary}`)
+                        .join('\n')
+                    : 'Companies with a live session on this world'
+                }
+              >
+                <span className="label">Online</span>
+                <strong>{worldPresence.onlineCount}</strong>
+              </div>
             ) : null}
             {careerReady && pilotIcao ? (
               <button

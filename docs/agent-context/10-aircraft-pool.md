@@ -1,6 +1,6 @@
 # Aircraft instance pool
 
-F0–F6 shipped. **F7 started:** SQLite `aircraft_instances` is SoT (`world_id` + unique `registration`). RAM still ticks the array. Not N companies / SELECT FOR UPDATE yet.
+F0–F6 shipped. **F7 in progress (2026-09-19):** RAM claim-before-debit + `ownerCompanyId` on sold instances; buy/lease → 409 `aircraft_claimed` if already taken. Still open: PG `owner_company_id` column + `SELECT FOR UPDATE`. Presence: [`27-mp-presence.md`](./27-mp-presence.md).
 
 Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `career-partition.ts`, `career-player-airframes.ts`, `career-store-v6.ts`.
 
@@ -160,7 +160,8 @@ Não misturar MP, ferry internacional e lease flexível na primeira fatia. Playt
 ### F7 — Multiplayer (depois de SP estável)
 
 - ~~Pool no blob~~ **feito (SP):** tabela `aircraft_instances`, unique `(world_id, registration)`, persist incremental; `persist: 'blob'` também grava o pool.
-- Ainda: server-authoritative `SELECT FOR UPDATE`, buyer humano no lugar (ou além) do NPC, N `company_id`.
+- **2026-09-19:** claim atômico em RAM (`markDealerInstanceSold` + buy/lease antes do débito); `ownerCompanyId`; HTTP 409 `aircraft_claimed`. Presence board: [`27-mp-presence.md`](./27-mp-presence.md).
+- Ainda: PG `owner_company_id` + `SELECT FOR UPDATE` (defesa se multi-writer voltar).
 
 ---
 

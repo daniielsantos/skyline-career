@@ -2790,10 +2790,24 @@ export function PortsPanel(props: {
 
   const portOperatorChip = useMemo(() => {
     const status = port?.concession?.status;
-    if (status === 'yours') return 'Port FBO · you';
-    if (status === 'held') return 'Port FBO · held';
+    const level = port?.concession?.level ?? 1;
+    const name = port?.concession?.companyDisplayName?.trim();
+    if (status === 'yours') {
+      return name
+        ? `Port FBO · P${level} · you`
+        : `Port FBO · P${level} · you`;
+    }
+    if (status === 'held') {
+      return name
+        ? `Port FBO · P${level} · ${name}`
+        : `Port FBO · P${level} · held`;
+    }
     return 'Vacant';
-  }, [port?.concession?.status]);
+  }, [
+    port?.concession?.status,
+    port?.concession?.level,
+    port?.concession?.companyDisplayName,
+  ]);
 
   const portDeskOrders = useMemo(() => {
     if (!port) return [] as DemandOrderView[];

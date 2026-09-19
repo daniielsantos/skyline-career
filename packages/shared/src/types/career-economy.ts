@@ -559,6 +559,11 @@ export interface CareerEconomyWorld {
   portInboundShips?: PortInboundShip[];
   /** Thin world index of who operates each port (lease window). */
   portConcessions?: PortConcessionIndexRow[];
+  /**
+   * Ring-buffer of recent player-visible MP actions (accept / Port FBO /
+   * aircraft buy). See `career-presence.ts`. Persisted in PG misc_json.
+   */
+  presenceLog?: PresenceEvent[];
   /** Terminal buy-orders for player warehouse cargo (Demand Board). */
   demandOrders?: DemandOrder[];
   /**
@@ -614,6 +619,11 @@ export interface AircraftInstance {
   seededAtTick: number;
   /** Hidden from Market until this tick (trade-in restock delay). */
   availableAtTick?: number;
+  /**
+   * F7 / MP: company that bought/leased this hull off the dealer (when sold).
+   * Absent for NPC-consumed or pre-F7 rows.
+   */
+  ownerCompanyId?: string;
 }
 
 /** Lot size buckets used by flow instrumentation. */
@@ -1688,6 +1698,23 @@ export interface PortConcessionIndexRow {
   companyId: string;
   leasePaidThroughTick: number;
   level?: PortConcessionLevel;
+}
+
+/** Compact MP presence feed row (ring-buffer on the world). */
+export type PresenceEventKind =
+  | 'lot_accept'
+  | 'port_claim'
+  | 'aircraft_buy'
+  | 'aircraft_lease';
+
+export interface PresenceEvent {
+  id: string;
+  kind: PresenceEventKind;
+  atTick: number;
+  atMs: number;
+  companyId: string;
+  companyDisplayName: string;
+  summary: string;
 }
 
 export interface PlayerPortConcession {

@@ -1304,6 +1304,38 @@ export function fetchCompanies(worldId?: string) {
   }>(`/api/companies${q}`);
 }
 
+export type WorldPresenceView = {
+  nowMs: number;
+  onlineWindowMs: number;
+  onlineCount: number;
+  online: Array<{
+    companyId: string;
+    displayName: string;
+    lastSeenAtMs: number;
+  }>;
+  tick: number;
+  recent: Array<{
+    id: string;
+    kind: string;
+    atTick: number;
+    atMs: number;
+    companyId: string;
+    companyDisplayName: string;
+    summary: string;
+  }>;
+  portsHeld: Array<{
+    portId: string;
+    name: string;
+    companyId: string;
+    displayName: string;
+    level: number;
+  }>;
+};
+
+export function fetchWorldPresence() {
+  return api<WorldPresenceView>('/api/world/presence');
+}
+
 export function postCompany(body: {
   id: string;
   worldId?: string;
@@ -2729,6 +2761,7 @@ export type PortsSnapshot = {
     concession?: {
       status: 'vacant' | 'yours' | 'held';
       companyId: string | null;
+      companyDisplayName?: string | null;
       level?: 1 | 2 | 3 | null;
       leasePaidThroughTick: number | null;
       lifetimeThroughputKg: number | null;

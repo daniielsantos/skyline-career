@@ -2665,6 +2665,10 @@ export function hubSpotUnitPriceUsd(
 export function portSnapshot(
   world: CareerEconomyWorld,
   state?: CareerMissionsState,
+  opts?: {
+    /** Map companyId → displayName for MP Port FBO presence chips. */
+    companyDisplayNames?: ReadonlyMap<string, string>;
+  },
 ): {
   ports: Array<
     CareerPortDef & {
@@ -2702,6 +2706,8 @@ export function portSnapshot(
       concession: {
         status: 'vacant' | 'yours' | 'held';
         companyId: string | null;
+        /** Resolved company display name when held/yours (MP presence). */
+        companyDisplayName: string | null;
         level: 1 | 2 | 3 | null;
         leasePaidThroughTick: number | null;
         lifetimeThroughputKg: number | null;
@@ -2743,6 +2749,7 @@ export function portSnapshot(
     tickPortConcessions(state, world);
     syncWorldPortConcessions(world, state);
   }
+  const companyDisplayNames = opts?.companyDisplayNames;
   ensurePortListings(world);
   ensureDemandOrders(world, {
     operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
@@ -2854,6 +2861,10 @@ export function portSnapshot(
         concession: {
           status: yours ? 'yours' : op ? 'held' : 'vacant',
           companyId: op?.companyId ?? null,
+          companyDisplayName: op?.companyId
+            ? (companyDisplayNames?.get(op.companyId) ??
+              op.companyId)
+            : null,
           level: yours
             ? portOperatorLevel(world, port.id)
             : op

@@ -907,10 +907,15 @@ export function instanceToListing(
 export function markDealerInstanceSold(
   world: CareerEconomyWorld,
   instanceId: string,
+  opts?: { companyId?: string },
 ): boolean {
   const inst = world.aircraftInstances?.find((row) => row.id === instanceId);
   if (!inst || inst.status !== 'available') return false;
   inst.status = 'sold';
+  const companyId = opts?.companyId?.trim();
+  if (companyId) {
+    inst.ownerCompanyId = companyId;
+  }
   return true;
 }
 

@@ -46,6 +46,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [24-port-fbo.md](./24-port-fbo.md) | Port FBO Phase 0–10; Scout; Port shuttle; IH-1; 1ª Base free; Base Dispatcher seat + fleet scout + tour Search |
 | [25-runway-touchdown.md](./25-runway-touchdown.md) | Debrief runway: Null Island; magnetic ident×10 stubs → false OFF runway; `repair:runways:magnetic` |
 | [26-rebrand-airframe.md](./26-rebrand-airframe.md) | Marca Airframe / `playairframe.com`; fases domínio → UI → AppData |
+| [27-mp-presence.md](./27-mp-presence.md) | MP presence board + Port/lot names + F7 claim-before-debit |
 
 ## Manutenção
 

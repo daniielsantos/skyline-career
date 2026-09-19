@@ -60,6 +60,8 @@ Atualizado 2026-09-19: **Pulse SLOW timing logs** — economy-pulse log com lock
 
 Atualizado 2026-09-19: **Spoke feeder open-count stall** — pós densify+feeder, pulse “infinito” / gateway fetch failed. Causa: full-scan lots por spoke×SKU. Fix: índice `openFeederBandByOrigin` 1×/tick. **world-api redeploy** required. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **MP presence + F7 claim** — Online chip, Port FBO/lot 409 com nome, presence recent, Port FBO index merge multi-company, buy/lease claim-before-debit. Detail: [`27-mp-presence.md`](./27-mp-presence.md).
+
 Atualizado 2026-09-19: **Spoke feeder LTL dial** — pass `formLotsSpokeFeeder` (budget 4 / open 1 / soft `· spoke feeder`) após regional; last-mile GA 450 kg intact. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **Asia Wave A measure ~6d (dia 50→56)** — AS hubs **254→300** (d51); live quiet **0%**, dead **0–2**; fill/soft **~53/54%** flat; lots **2440→2566**; pay p50 **$1160→$1085** (esperado: median-of-hub-medians). World 99% live / fill 56%. Gate Wave A **PASS** → migrar Wave B (seed 2231). Detail: [`08-economy.md`](./08-economy.md).

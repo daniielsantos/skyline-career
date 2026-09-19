@@ -1205,12 +1205,20 @@ function markListingSold(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
   listing: AircraftListing,
-): void {
+  opts?: { companyId?: string },
+): boolean {
+  if (!markDealerInstanceSold(world, listing.id, opts)) {
+    const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
+    if (boardListing && boardListing.status === 'available') {
+      boardListing.status = 'sold';
+    }
+    return false;
+  }
   const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
   if (boardListing && boardListing.status === 'available') {
     boardListing.status = 'sold';
   }
-  markDealerInstanceSold(world, listing.id);
+  return true;
 }
 
 export function isCrossBorderAircraftListing(
@@ -1687,6 +1695,8 @@ export type AircraftAcquireOpts = {
   deliver?: boolean;
   /** Override delivery destination (defaults to pilotIcao ?? homeHubIcao). */
   deliverToIcao?: string;
+  /** F7 / MP: stamp ownerCompanyId on the dealer instance when sold. */
+  companyId?: string;
 };
 
 export function purchaseAircraftListing(
@@ -1742,15 +1752,25 @@ export function purchaseAircraftListing(
       `Needs $${debitUsd.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
     );
   }
-  const aircraft = buildAircraftFromListing(state, listing, 'owned', world.tick);
-  if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
-    aircraft.locationIcao = deliverTo;
+
+  // Claim the dealer hull before wallet debit (F7 race: second buyer sees unavailable).
+  const companyId = opts?.companyId?.trim();
+  if (!markDealerInstanceSold(world, listing.id, { companyId })) {
+    const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
+    if (boardListing && boardListing.status === 'available') {
+      boardListing.status = 'sold';
+    }
+    throw new Error(`Listing ${listingId} is not available`);
   }
   const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
   if (boardListing && boardListing.status === 'available') {
     boardListing.status = 'sold';
   }
-  markDealerInstanceSold(world, listing.id);
+
+  const aircraft = buildAircraftFromListing(state, listing, 'owned', world.tick);
+  if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
+    aircraft.locationIcao = deliverTo;
+  }
   applyWalletDelta(state, {
     amountUsd: -listing.askingUsd,
     kind: 'aircraft_buy',
@@ -1840,6 +1860,10 @@ export function signAircraftLease(
       `Lease entry $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
+  const companyId = opts?.companyId?.trim();
+  if (!markListingSold(state, world, listing, { companyId })) {
+    throw new Error(`Listing ${listingId} is not available`);
+  }
   const aircraft = buildAircraftFromListing(state, listing, 'leased', world.tick);
   if (opts?.deliver && deliverTo !== listing.basedIcao.trim().toUpperCase()) {
     aircraft.locationIcao = deliverTo;
@@ -1847,7 +1871,6 @@ export function signAircraftLease(
   if (aircraft.lease) {
     aircraft.lease.startIcao = aircraft.locationIcao.trim().toUpperCase();
   }
-  markListingSold(state, world, listing);
   applyWalletDelta(state, {
     amountUsd: -listing.askingUsd,
     kind: 'aircraft_lease_sign',

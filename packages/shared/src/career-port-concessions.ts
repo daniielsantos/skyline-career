@@ -129,9 +129,14 @@ export function ensurePlayerPortConcessions(
   return state.playerPortConcessions;
 }
 
+/**
+ * Merge this company's live Port FBOs into the world index.
+ * Must not wipe other companies' rows (MP shared world).
+ */
 export function syncWorldPortConcessions(
   world: CareerEconomyWorld,
   state: CareerMissionsState,
+  opts?: { companyId?: string; companyIds?: readonly string[] },
 ): void {
   let live = ensurePlayerPortConcessions(state).filter(
     (c) => c.leasePaidThroughTick > world.tick,
@@ -162,14 +167,35 @@ export function syncWorldPortConcessions(
       live = bag.filter((c) => c.leasePaidThroughTick > world.tick);
     }
   }
-  world.portConcessions = live.map(
-    (c): PortConcessionIndexRow => ({
-      portId: c.portId,
-      companyId: c.companyId,
-      leasePaidThroughTick: c.leasePaidThroughTick,
-      level: c.level === 2 || c.level === 3 ? c.level : 1,
-    }),
+
+  const touch = new Set<string>();
+  const optId = opts?.companyId?.trim();
+  if (optId) touch.add(optId);
+  for (const id of opts?.companyIds ?? []) {
+    const t = id?.trim();
+    if (t) touch.add(t);
+  }
+  for (const c of live) {
+    if (c.companyId) touch.add(c.companyId);
+  }
+  if (touch.size === 0) touch.add(LOCAL_COMPANY_ID);
+
+  const preserved = (world.portConcessions ?? []).filter(
+    (c) =>
+      c.leasePaidThroughTick > world.tick &&
+      !touch.has(c.companyId),
   );
+  const mine = live
+    .filter((c) => touch.has(c.companyId))
+    .map(
+      (c): PortConcessionIndexRow => ({
+        portId: c.portId,
+        companyId: c.companyId,
+        leasePaidThroughTick: c.leasePaidThroughTick,
+        level: c.level === 2 || c.level === 3 ? c.level : 1,
+      }),
+    );
+  world.portConcessions = [...preserved, ...mine];
 }
 
 /**
@@ -244,7 +270,7 @@ export function healMissingPortConcessionFromLedger(
       leasePaidThroughTick: through,
       lifetimeThroughputKg: 0,
     });
-    syncWorldPortConcessions(world, state);
+    syncWorldPortConcessions(world, state, { companyId: LOCAL_COMPANY_ID });
     return 'restored';
   }
 
@@ -766,7 +792,7 @@ export function claimPortConcession(
       !(c.companyId === companyId && c.leasePaidThroughTick <= world.tick),
   );
   state.playerPortConcessions.push(row);
-  syncWorldPortConcessions(world, state);
+  syncWorldPortConcessions(world, state, { companyId });
   return row;
 }
 
@@ -810,7 +836,7 @@ export function renewPortConcession(
   });
   const base = Math.max(conc.leasePaidThroughTick, world.tick);
   conc.leasePaidThroughTick = base + days * 96;
-  syncWorldPortConcessions(world, state);
+  syncWorldPortConcessions(world, state, { companyId });
   return conc;
 }
 
@@ -900,7 +926,7 @@ export function upgradePortConcession(
     note: `Port FBO · P${gate.toLevel} · ${port.name}`,
   });
   conc.level = gate.toLevel;
-  syncWorldPortConcessions(world, state);
+  syncWorldPortConcessions(world, state, { companyId });
   return conc;
 }
 
@@ -909,16 +935,17 @@ export function tickPortConcessions(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
 ): boolean {
-  const before = ensurePlayerPortConcessions(state).length;
-  state.playerPortConcessions = ensurePlayerPortConcessions(state).filter(
+  const before = ensurePlayerPortConcessions(state);
+  const touchIds = [...new Set(before.map((c) => c.companyId).filter(Boolean))];
+  state.playerPortConcessions = before.filter(
     (c) => c.leasePaidThroughTick > world.tick,
   );
-  syncWorldPortConcessions(world, state);
-  // Also prune world index orphans.
+  syncWorldPortConcessions(world, state, { companyIds: touchIds });
+  // Also prune world index orphans (all companies).
   world.portConcessions = (world.portConcessions ?? []).filter(
     (c) => c.leasePaidThroughTick > world.tick,
   );
-  return state.playerPortConcessions.length !== before;
+  return state.playerPortConcessions.length !== before.length;
 }
 
 export function creditPortOperatorThroughput(

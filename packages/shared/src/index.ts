@@ -242,6 +242,7 @@ export * from './career-warehouse-haul.js';
 export * from './career-demand.js';
 export * from './career-ports.js';
 export * from './career-port-concessions.js';
+export * from './career-presence.js';
 export * from './career-port-auto-buy.js';
 export * from './career-port-stevedore.js';
 export * from './career-port-scout.js';

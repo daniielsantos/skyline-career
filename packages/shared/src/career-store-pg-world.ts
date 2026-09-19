@@ -1107,6 +1107,7 @@ const PG_ECONOMY_MISC_KEYS = [
   'regionalRecovery',
   'clientUpdatePolicy',
   'version',
+  'presenceLog',
 ] as const;
 
 export function pickPgEconomyMisc(

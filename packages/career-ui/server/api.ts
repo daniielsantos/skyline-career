@@ -301,6 +301,9 @@ import {
   trimMissionCargoToKg,
   airportByIcao,
   resolveAirportCoords,
+  pushPresenceEvent,
+  listPresenceEvents,
+  getCareerPort,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CharterOffer,
@@ -1402,6 +1405,46 @@ function companyIdFromRequest(
   } catch {
     return LOCAL_COMPANY_ID;
   }
+}
+
+async function companyDisplayNameMap(
+  store: CareerStore,
+): Promise<Map<string, string>> {
+  const rows = await Promise.resolve(store.listWorldCompanies(LOCAL_WORLD_ID));
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    map.set(row.id, row.displayName?.trim() || row.id);
+  }
+  return map;
+}
+
+async function resolveCompanyDisplayName(
+  store: CareerStore,
+  companyId: string | null | undefined,
+): Promise<string | null> {
+  const id = companyId?.trim();
+  if (!id) return null;
+  const map = await companyDisplayNameMap(store);
+  return map.get(id) ?? id;
+}
+
+function recordPresence(
+  world: CareerEconomyWorld,
+  opts: {
+    kind: 'lot_accept' | 'port_claim' | 'aircraft_buy' | 'aircraft_lease';
+    companyId: string;
+    companyDisplayName: string;
+    summary: string;
+  },
+): void {
+  pushPresenceEvent(world, {
+    kind: opts.kind,
+    atTick: world.tick,
+    atMs: Date.now(),
+    companyId: opts.companyId,
+    companyDisplayName: opts.companyDisplayName,
+    summary: opts.summary,
+  });
 }
 
 async function activateCompanyContext(
@@ -3252,6 +3295,90 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/world/presence') {
+        if (!store) {
+          send(res, 409, {
+            error: 'Select a career profile first',
+            code: 'needs_profile',
+          });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (isCareerAuthRequired() && !session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        try {
+          const nowMs = Date.now();
+          const companyNames = await companyDisplayNameMap(store);
+          const onlineByCompany = new Map<
+            string,
+            { companyId: string; displayName: string; lastSeenAtMs: number }
+          >();
+          if (store.supportsAuth) {
+            const sessions = await Promise.resolve(
+              store.authListSessions({ nowMs }),
+            );
+            for (const s of sessions) {
+              if (!s.online) continue;
+              const companies = await Promise.resolve(
+                store.authListCompaniesForAccount(s.accountId),
+              );
+              for (const co of companies) {
+                const prev = onlineByCompany.get(co.id);
+                if (!prev || s.lastSeenAtMs > prev.lastSeenAtMs) {
+                  onlineByCompany.set(co.id, {
+                    companyId: co.id,
+                    displayName:
+                      companyNames.get(co.id) ||
+                      co.displayName ||
+                      co.id,
+                    lastSeenAtMs: s.lastSeenAtMs,
+                  });
+                }
+              }
+            }
+          }
+          const presence = await withCareerRead((world) => {
+            const portsHeld = (world.portConcessions ?? [])
+              .filter((c) => c.leasePaidThroughTick > world.tick)
+              .map((c) => {
+                const port = getCareerPort(c.portId);
+                return {
+                  portId: c.portId,
+                  name: port?.name ?? c.portId,
+                  companyId: c.companyId,
+                  displayName:
+                    companyNames.get(c.companyId) ?? c.companyId,
+                  level: c.level ?? 1,
+                };
+              });
+            return {
+              tick: world.tick,
+              recent: listPresenceEvents(world, 20),
+              portsHeld,
+            };
+          });
+          send(res, 200, {
+            nowMs,
+            onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
+            onlineCount: onlineByCompany.size,
+            online: [...onlineByCompany.values()].sort(
+              (a, b) => b.lastSeenAtMs - a.lastSeenAtMs,
+            ),
+            ...presence,
+          });
+        } catch (error) {
+          send(res, 500, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'GET' && path === '/api/profiles') {
         if (isCareerWorldFixed()) {
           const meta = fixedWorldProfileMeta();
@@ -4096,6 +4223,9 @@ export function createCareerApiServer(port = 8787) {
         }
         const buyCompanyId = companyIdFromRequest(req, body.companyId);
         try {
+          const companyNames = await companyDisplayNameMap(requireStore());
+          const displayName =
+            companyNames.get(buyCompanyId) ?? buyCompanyId;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
@@ -4103,12 +4233,26 @@ export function createCareerApiServer(port = 8787) {
               const purchased = executeBuyAircraft(world, missions, {
                 listingId: body.listingId!,
                 deliver: body.deliver === true,
+                companyId: buyCompanyId,
                 ...(typeof body.deliverToIcao === 'string'
                   ? { deliverToIcao: body.deliverToIcao }
                   : {}),
               });
               if (purchased.kind === 'unavailable') {
-                throw new Error(`Listing ${body.listingId} is not available`);
+                const err = new Error(
+                  `Listing ${body.listingId} is not available`,
+                ) as Error & { code?: string };
+                err.code = 'aircraft_claimed';
+                throw err;
+              }
+              if (purchased.kind === 'applied') {
+                const ac = purchased.aircraft;
+                recordPresence(world, {
+                  kind: 'aircraft_buy',
+                  companyId: buyCompanyId,
+                  companyDisplayName: displayName,
+                  summary: `${ac.registration ?? 'aircraft'} · buy`,
+                });
               }
               return {
                 walletUsd: missions.walletUsd,
@@ -4127,8 +4271,15 @@ export function createCareerApiServer(port = 8787) {
           });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          const code =
+            error instanceof Error &&
+            'code' in error &&
+            (error as { code?: string }).code === 'aircraft_claimed'
+              ? 'aircraft_claimed'
+              : undefined;
+          send(res, code === 'aircraft_claimed' ? 409 : 400, {
             error: error instanceof Error ? error.message : String(error),
+            ...(code ? { code } : {}),
           });
         }
         return;
@@ -6157,11 +6308,14 @@ export function createCareerApiServer(port = 8787) {
         try {
           // ensurePortListings may expire/refill; persist those tables only so
           // buy can find the same listing IDs after reload.
+          const companyNames = await companyDisplayNameMap(requireStore());
           const result = await withCareerWrite(
             (world, missions) => {
               settleWarehouseInboundTransfers(missions, world);
               const groundStaff = groundStaffSnapshot(missions, world);
-              const ports = portSnapshot(world, missions);
+              const ports = portSnapshot(world, missions, {
+                companyDisplayNames: companyNames,
+              });
               return {
                 ...ports,
                 groundStaff,
@@ -6307,17 +6461,37 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const companyNames = await companyDisplayNameMap(requireStore());
+          const displayName =
+            companyNames.get(ports_concession_claimCompanyId) ??
+            ports_concession_claimCompanyId;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const concession = claimPortConcession(missions, world, {
               portId: body.portId!,
+              companyId: ports_concession_claimCompanyId,
+            });
+            const port = getCareerPort(body.portId!);
+            recordPresence(world, {
+              kind: 'port_claim',
+              companyId: ports_concession_claimCompanyId,
+              companyDisplayName: displayName,
+              summary: port
+                ? `Port FBO · ${port.name}`
+                : `Port FBO · ${body.portId}`,
             });
             return {
               walletUsd: missions.walletUsd,
               concession,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, {
+                companyDisplayNames: companyNames,
+              }),
             };
-          }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_claimCompanyId });
+          }, {
+            persist: 'company',
+            persistPortConcessions: true,
+            companyId: ports_concession_claimCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {
@@ -6344,6 +6518,7 @@ export function createCareerApiServer(port = 8787) {
             const concession = renewPortConcession(missions, world, {
               portId: body.portId!,
               days: body.days != null ? Number(body.days) : undefined,
+              companyId: ports_concession_renewCompanyId,
             });
             return {
               walletUsd: missions.walletUsd,
@@ -6373,6 +6548,7 @@ export function createCareerApiServer(port = 8787) {
             assertCompanyCreditAllowsOps(missions);
             const concession = upgradePortConcession(missions, world, {
               portId: body.portId!,
+              companyId: ports_concession_upgradeCompanyId,
             });
             return {
               walletUsd: missions.walletUsd,
@@ -8817,6 +8993,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const acceptDisplayName =
+            (await resolveCompanyDisplayName(
+              requireStore(),
+              acceptCompanyId,
+            )) ?? acceptCompanyId;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const lot = world.lots.find((l) => l.id === body.lotId);
@@ -8857,6 +9038,12 @@ export function createCareerApiServer(port = 8787) {
                 claimedByCompanyId: executed.claimedByCompanyId,
               };
             }
+            recordPresence(world, {
+              kind: 'lot_accept',
+              companyId: acceptCompanyId,
+              companyDisplayName: acceptDisplayName,
+              summary: `${executed.mission.originIcao}→${executed.mission.destIcao}`,
+            });
             return {
               kind: 'ok' as const,
               mission: executed.mission,
@@ -8878,10 +9065,18 @@ export function createCareerApiServer(port = 8787) {
             return;
           }
           if (result.kind === 'conflict') {
+            const claimedByCompanyDisplayName =
+              await resolveCompanyDisplayName(
+                requireStore(),
+                result.claimedByCompanyId,
+              );
             send(res, 409, {
-              error: 'Lot claimed by another company',
+              error: claimedByCompanyDisplayName
+                ? `Lot claimed by ${claimedByCompanyDisplayName}`
+                : 'Lot claimed by another company',
               code: 'lot_claimed',
               claimedByCompanyId: result.claimedByCompanyId,
+              claimedByCompanyDisplayName,
             });
             return;
           }
@@ -9542,10 +9737,18 @@ export function createCareerApiServer(port = 8787) {
             companyId: stagingCompanyId,
           });
           if (committed.kind === 'conflict') {
+            const claimedByCompanyDisplayName =
+              await resolveCompanyDisplayName(
+                requireStore(),
+                committed.claimedByCompanyId,
+              );
             send(res, 409, {
-              error: `Lot claimed by ${committed.claimedByCompanyId}`,
+              error: claimedByCompanyDisplayName
+                ? `Lot claimed by ${claimedByCompanyDisplayName}`
+                : `Lot claimed by ${committed.claimedByCompanyId}`,
               code: 'lot_claimed',
               claimedByCompanyId: committed.claimedByCompanyId,
+              claimedByCompanyDisplayName,
             });
             return;
           }

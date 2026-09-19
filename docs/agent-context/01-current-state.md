@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **7c35d20** / desktop **0.3.111** shipped: Densify EU-1 Wave 1 hubs with MSFS homologation and runway merge. Release: [v0.3.111](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.111).
+
+
 `main` **6234f80** / desktop **0.3.110** shipped: Widen US intl gateways and soft-cap Pacific remotes. Release: [v0.3.110](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.110).
 
 

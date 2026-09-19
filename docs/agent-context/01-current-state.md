@@ -1,4 +1,7 @@
-# Current state (2026-09-18)
+# Current state (2026-09-19)
+
+`main` **255eb3a** / desktop **0.3.102** shipped: Form intl lots with origin-country fairness and more board room. Release: [v0.3.102](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.102).
+
 
 `main` **3d8a690** / desktop **0.3.101** shipped: Pass --updated to NSIS Setup so in-app installs skip the running-app dialog. Release: [v0.3.101](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.101).
 

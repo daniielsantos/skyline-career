@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Charter board deepen** — live ~234 era form×TTL (quota 4), não max 600. Form 14 / warm 28 / target hubs/2 / max 1600 + intl origin RR. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **Intl origin-fair formation + board room** — `formLotsIntl` round-robin por país de origem (não BR-only); lift frac 0.32 + soft cap INTL 2400. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **BR `pilot-intl` ainda fino (~5)** — Near me off; grafo 1000/gw12 insuficiente. Causa: nm-sort global. Fix shipped: origin round-robin mundial + quota. Detail: [`08-economy.md`](./08-economy.md).

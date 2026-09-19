@@ -8,6 +8,7 @@
 
 import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
 import { countryIdFromRegion } from './career-partition.js';
+import { orderIntlDirsOriginRoundRobin } from './career-international-lanes.js';
 import { regionalWeatherIndex } from './career-weather.js';
 import type {
   AirportTerminal,
@@ -31,11 +32,15 @@ export const CHARTER_DEMAND_RETENTION_DAYS = 45;
 export const CHARTER_BAGGAGE_KG_PER_PAX = 18;
 export const CHARTER_BAGGAGE_MAX_KG = 180;
 export const CHARTER_BOARD_MIN = 120;
-export const CHARTER_BOARD_MAX = 600;
-/** Steady-state formation once the board is warm. */
-export const CHARTER_FORM_QUOTA_PER_TICK = 4;
+/** Hard ceiling on live available offers (formation stops at target or this). */
+export const CHARTER_BOARD_MAX = 1_600;
+/**
+ * Steady-state formation once the board is warm.
+ * Sized so form×TTL can approach boardTarget (~hubs/2) instead of stalling ~250.
+ */
+export const CHARTER_FORM_QUOTA_PER_TICK = 14;
 /** Catch-up when the live board is below MIN. */
-export const CHARTER_WARM_QUOTA_PER_TICK = 12;
+export const CHARTER_WARM_QUOTA_PER_TICK = 28;
 
 /**
  * Classes that may accept charter offers.
@@ -303,9 +308,9 @@ function boardTarget(world: CareerEconomyWorld): number {
       .map((ap) => countryIdFromRegion(ap.region))
       .filter(Boolean),
   ).size;
-  // Scale with the map: ~1 offer / 3 hubs, with a country floor so small
+  // Scale with the map: ~1 offer / 2 hubs, with a country floor so small
   // saves still breathe. Caps keep charter below freight volume.
-  const byHubs = Math.round(hubs / 3);
+  const byHubs = Math.round(hubs / 2);
   const byCountries = Math.round(countries * 2.5);
   return clamp(
     Math.max(byHubs, byCountries),
@@ -731,6 +736,67 @@ export function formCharterOffersForTick(
   };
 
   let domesticFormed = 0;
+  let intlFormed = 0;
+
+  type HubRow = { ap: AirportTerminal; hub: CharterHubState };
+  type IntlDir = {
+    originCountryId: string;
+    nm: number;
+    originIcao: string;
+    destIcao: string;
+    origin: AirportTerminal;
+    dest: AirportTerminal;
+  };
+
+  // Intl candidates: per-origin-country top waiting hubs × attract pool, then
+  // origin-country round-robin so short-border hubs cannot monopolize intl slots.
+  const originsByCountry = new Map<string, HubRow[]>();
+  for (const row of origins) {
+    const country = countryIdFromRegion(row.ap.region);
+    if (!/^[A-Z]{2}$/.test(country)) continue;
+    const list = originsByCountry.get(country);
+    if (list) list.push(row);
+    else originsByCountry.set(country, [row]);
+  }
+  const destPool = dests.slice(0, 64);
+  const intlDirs: IntlDir[] = [];
+  for (const [originCountry, localOrigins] of originsByCountry) {
+    for (const originRow of localOrigins.slice(0, 8)) {
+      let added = 0;
+      for (const destRow of destPool) {
+        if (added >= 4) break;
+        const destCountry = countryIdFromRegion(destRow.ap.region);
+        if (!destCountry || destCountry === originCountry) continue;
+        const nm = distanceNm(originRow.ap, destRow.ap);
+        if (nm < CHARTER_MIN_DISTANCE_NM || nm > CHARTER_MAX_DISTANCE_NM) {
+          continue;
+        }
+        const od = demandId(originRow.ap.icao, destRow.ap.icao);
+        if (openOd.has(od)) continue;
+        intlDirs.push({
+          originCountryId: originCountry,
+          nm,
+          originIcao: originRow.ap.icao.toUpperCase(),
+          destIcao: destRow.ap.icao.toUpperCase(),
+          origin: originRow.ap,
+          dest: destRow.ap,
+        });
+        added += 1;
+      }
+    }
+  }
+  const intlQueue = orderIntlDirsOriginRoundRobin(intlDirs);
+  let intlQueueIdx = 0;
+
+  const tryNextIntl = (): boolean => {
+    while (intlQueueIdx < intlQueue.length) {
+      const dir = intlQueue[intlQueueIdx]!;
+      intlQueueIdx += 1;
+      if (tryPair(dir.origin, dir.dest, true)) return true;
+    }
+    return false;
+  };
+
   for (let attempt = 0; attempt < room * 40 && formed < room; attempt += 1) {
     const wantDomestic = domesticFormed < wantedDomestic;
     if (wantDomestic) {
@@ -774,13 +840,17 @@ export function formCharterOffersForTick(
       }
     } else {
       if (countries.length < 2) break;
-      const originRow = origins[Math.floor(rng() * Math.min(origins.length, 32))]!;
-      const destRow = dests[Math.floor(rng() * Math.min(dests.length, 32))]!;
-      if (tryPair(originRow.ap, destRow.ap, true)) formed += 1;
+      if (tryNextIntl()) {
+        formed += 1;
+        intlFormed += 1;
+      } else {
+        // Fair intl queue exhausted — leave remaining room to domestic fallback.
+        break;
+      }
     }
   }
 
-  // Fallback: prefer unfinished domestic countries, then global surplus×shortage.
+  // Fallback: prefer unfinished domestic countries, then remaining fair intl.
   if (formed < room) {
     for (const { country } of domesticCountryWeights) {
       if (formed >= room) break;
@@ -813,15 +883,9 @@ export function formCharterOffersForTick(
     }
   }
   if (formed < room) {
-    for (const originRow of origins.slice(0, 40)) {
-      if (formed >= room) break;
-      for (const destRow of dests.slice(0, 40)) {
-        if (formed >= room) break;
-        const international =
-          countryIdFromRegion(originRow.ap.region) !==
-          countryIdFromRegion(destRow.ap.region);
-        if (tryPair(originRow.ap, destRow.ap, international)) formed += 1;
-      }
+    while (formed < room && tryNextIntl()) {
+      formed += 1;
+      intlFormed += 1;
     }
   }
 

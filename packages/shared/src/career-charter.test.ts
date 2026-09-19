@@ -169,6 +169,40 @@ describe('Charter economy', () => {
     );
   });
 
+  it('warm burst can deepen the board past the legacy 600 soft ceiling', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-board-deepen' });
+    const formed = generateDailyCharterOffers(world, 0);
+    const available = (world.charterOffers ?? []).filter(
+      (offer) => offer.status === 'available',
+    );
+    assert.ok(formed > 600, `expected deep warm board, formed=${formed}`);
+    assert.ok(
+      available.length > 600,
+      `available=${available.length} should clear legacy 600 cap`,
+    );
+    assert.ok(available.length <= CHARTER_BOARD_MAX);
+  });
+
+  it('spreads international offers across many origin countries', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-intl-fair' });
+    generateDailyCharterOffers(world, 0);
+    const intl = (world.charterOffers ?? []).filter(
+      (offer) => offer.status === 'available' && offer.international,
+    );
+    assert.ok(intl.length >= 40, `intl offers=${intl.length}`);
+    const originCountries = new Set(
+      intl.map((offer) => {
+        const ap = world.airports.find((row) => row.icao === offer.originIcao);
+        return countryIdFromRegion(ap?.region ?? '');
+      }),
+    );
+    originCountries.delete('');
+    assert.ok(
+      originCountries.size >= 8,
+      `intl origin countries=${originCountries.size} (${[...originCountries].slice(0, 12).join(',')})`,
+    );
+  });
+
   it('returns passengers to hubs on expiry and reduces OD heat only through settlement', () => {
     const world = createSeedEconomyWorld({ seed: 'charter-pressure' });
     generateDailyCharterOffers(world, 0);

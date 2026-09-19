@@ -66,6 +66,18 @@ Prompts de arte de card: `docs/market-airframe-card-prompts.md` (kit da classe, 
 
 Jets de passageiro no Market (`loadLayout: pax_and_cargo`): Loaded vs Due vs tablet — **não** é o mesmo que inject writetest. Ver [`12-pax-efb-due.md`](./12-pax-efb-due.md).
 
+### Charter / passenger (obrigatório em homologações futuras)
+
+Homologação **não** é só cargo writetest. Se o SKU tem assentos (ou `loadLayout: pax_and_cargo`):
+
+1. Stamp `configurations` com `role: passenger`, `certificationState: dispatch_ready` (mínimo), `passengerCapacity`, bag = seats×55 lb, pack OFP.
+2. Classes Charter-eligible: `light_ga` / `light_turboprop` / `light_jet` / `medium_piston` / `narrow_freighter`. Fit ainda exige config passenger — freighter puro na mesma classe **sem** stamp pax fica fora do board.
+3. Smoke: Charter Fit numa oferta 1–N pax (N ≤ seats / `CHARTER_GROUP_SIZE_MAX`); Dispatch SimBrief `pax=N` + bagwgt (sem `cargo=`).
+4. Se `pax_and_cargo`: Due/Loaded playbook em [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+5. `inject_verified` para inject nativo de charter = passo **posterior** (Phenom/C680); board unlock não exige.
+
+Pure freighter SKUs (BCF, C-130, …): cargo-only — **não** inventar passenger stamp.
+
 Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço em [`13-collaborative-homologation.md`](./13-collaborative-homologation.md).
 
 ## Hubs (aeroportos career)

@@ -1599,7 +1599,21 @@
     "maxCargoKg": 3770,
     "fuelCapacityKg": 2188,
     "maxRangeNm": 2200,
-    "fuelBurnKgPerNm": 3.2
+    "fuelBurnKgPerNm": 3.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 21,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 1155,
+        "rolesPackRelPath": "profiles/ofp/microsoft-douglas-dc-3-metal-left.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "pmdg-dc6",
@@ -1615,7 +1629,21 @@
     "maxRangeNm": 4100,
     "cruiseFuelFlowKgPerHour": 249.5,
     "cruiseSpeedKt": 250,
-    "fuelBurnKgPerNm": 1
+    "fuelBurnKgPerNm": 1,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 48,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 2640,
+        "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-a320neo-v2",
@@ -1633,7 +1661,21 @@
     "fuelCapacityKg": 19055,
     "maxRangeNm": 3500,
     "cruiseSpeedKt": 450,
-    "fuelBurnKgPerNm": 5
+    "fuelBurnKgPerNm": 5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 180,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 9900,
+        "rolesPackRelPath": "profiles/ofp/microsoft-a320neo-v2.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "microsoft-a321lr",
@@ -1651,7 +1693,21 @@
     "fuelCapacityKg": 17360,
     "maxRangeNm": 4000,
     "cruiseSpeedKt": 450,
-    "fuelBurnKgPerNm": 5.6
+    "fuelBurnKgPerNm": 5.6,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 220,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 12100,
+        "rolesPackRelPath": "profiles/ofp/microsoft-a321lr.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "synaptic-a220-300",
@@ -1670,7 +1726,21 @@
     "fuelCapacityKg": 17490,
     "maxRangeNm": 3400,
     "cruiseSpeedKt": 447,
-    "fuelBurnKgPerNm": 4.2
+    "fuelBurnKgPerNm": 4.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 140,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 7700,
+        "rolesPackRelPath": "profiles/ofp/synaptic-a220-300.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "fenix-a319",
@@ -1688,7 +1758,21 @@
     "fuelCapacityKg": 20370,
     "maxRangeNm": 3700,
     "cruiseSpeedKt": 440,
-    "fuelBurnKgPerNm": 5.2
+    "fuelBurnKgPerNm": 5.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 150,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 8250,
+        "rolesPackRelPath": "profiles/ofp/fenix-a319.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "fenix-a320",
@@ -1706,7 +1790,21 @@
     "fuelCapacityKg": 20370,
     "maxRangeNm": 3300,
     "cruiseSpeedKt": 450,
-    "fuelBurnKgPerNm": 5.4
+    "fuelBurnKgPerNm": 5.4,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 180,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 9900,
+        "rolesPackRelPath": "profiles/ofp/fenix-a320.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "fenix-a321",
@@ -1724,7 +1822,21 @@
     "fuelCapacityKg": 21260,
     "maxRangeNm": 3200,
     "cruiseSpeedKt": 450,
-    "fuelBurnKgPerNm": 5.8
+    "fuelBurnKgPerNm": 5.8,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 230,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 12650,
+        "rolesPackRelPath": "profiles/ofp/fenix-a321.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "pmdg-738-bbj2-family",
@@ -1782,7 +1894,21 @@
     "maxRangeNm": 2935,
     "cruiseFuelFlowKgPerHour": 2400,
     "cruiseSpeedKt": 430,
-    "fuelBurnKgPerNm": 5.581
+    "fuelBurnKgPerNm": 5.581,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 163,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 8965,
+        "rolesPackRelPath": "profiles/ofp/pmdg-738-pax.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "asobo-737-max-8-passengers",
@@ -1799,7 +1925,21 @@
     "fuelCapacityKg": 20725,
     "maxRangeNm": 3550,
     "cruiseSpeedKt": 453,
-    "fuelBurnKgPerNm": 5.2
+    "fuelBurnKgPerNm": 5.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 189,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 10395,
+        "rolesPackRelPath": "profiles/ofp/asobo-737-max-8-passengers.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "inibuilds-boeing-b707-gns",
@@ -1816,7 +1956,21 @@
     "maxCargoKg": 29329,
     "fuelCapacityKg": 72497,
     "maxRangeNm": 800,
-    "fuelBurnKgPerNm": 5
+    "fuelBurnKgPerNm": 5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 194,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 10670,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-boeing-b707-gns.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "blackbird-c-130j-long-configuration",
@@ -1848,7 +2002,21 @@
     "maxCargoKg": 11993,
     "fuelCapacityKg": 10764,
     "maxRangeNm": 1700,
-    "fuelBurnKgPerNm": 4.2
+    "fuelBurnKgPerNm": 4.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 100,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 5500,
+        "rolesPackRelPath": "profiles/ofp/justflight-fokker-f100.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-fokker-f28",
@@ -1862,7 +2030,21 @@
     "maxCargoKg": 8000,
     "fuelCapacityKg": 10473,
     "maxRangeNm": 1800,
-    "fuelBurnKgPerNm": 4.5
+    "fuelBurnKgPerNm": 4.5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 85,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 4675,
+        "rolesPackRelPath": "profiles/ofp/justflight-fokker-f28.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-f70",
@@ -1881,7 +2063,21 @@
     "maxCargoKg": 9190,
     "fuelCapacityKg": 7718,
     "maxRangeNm": 1700,
-    "fuelBurnKgPerNm": 4.2
+    "fuelBurnKgPerNm": 4.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 70,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 3850,
+        "rolesPackRelPath": "profiles/ofp/justflight-fokker-f70.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-146-100",
@@ -1905,7 +2101,21 @@
     "cruiseSpeedKt": 390,
     "fuelBurnKgPerNm": 3.6,
     "mzfwKg": 31071,
-    "efbPaxWeightLb": 170
+    "efbPaxWeightLb": 170,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 80,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 4400,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-100.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-146-200",
@@ -1929,7 +2139,32 @@
     "cruiseSpeedKt": 390,
     "fuelBurnKgPerNm": 3.7,
     "mzfwKg": 34745,
-    "efbPaxWeightLb": 170
+    "efbPaxWeightLb": 170,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 112,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 6160,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-200.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-200-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "justflight-146-300",
@@ -1953,7 +2188,32 @@
     "cruiseSpeedKt": 390,
     "fuelBurnKgPerNm": 3.8,
     "mzfwKg": 36514,
-    "efbPaxWeightLb": 170
+    "efbPaxWeightLb": 170,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 128,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 7040,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-300.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-300-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "leonardo-fly-the-maddog-x-md-82-20th",
@@ -1972,7 +2232,21 @@
     "maxRangeNm": 2360,
     "cruiseFuelFlowKgPerHour": 2630.8,
     "cruiseSpeedKt": 467,
-    "fuelBurnKgPerNm": 5.633
+    "fuelBurnKgPerNm": 5.633,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 162,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 8910,
+        "rolesPackRelPath": "profiles/ofp/leonardo-fly-the-maddog-x-md-82-20th.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "leonardo-fly-the-maddog-x-md-83-20th",
@@ -1990,7 +2264,21 @@
     "maxRangeNm": 3000,
     "cruiseFuelFlowKgPerHour": 2630.8,
     "cruiseSpeedKt": 467,
-    "fuelBurnKgPerNm": 5.633
+    "fuelBurnKgPerNm": 5.633,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 162,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 8910,
+        "rolesPackRelPath": "profiles/ofp/leonardo-fly-the-maddog-x-md-83-20th.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "leonardo-fly-the-maddog-x-md-88-20th",
@@ -2008,7 +2296,21 @@
     "maxRangeNm": 2360,
     "cruiseFuelFlowKgPerHour": 2630.8,
     "cruiseSpeedKt": 467,
-    "fuelBurnKgPerNm": 5.633
+    "fuelBurnKgPerNm": 5.633,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 162,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 8910,
+        "rolesPackRelPath": "profiles/ofp/leonardo-fly-the-maddog-x-md-88-20th.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "toliss-toliss-a346-pro-preset-pax",

@@ -190,7 +190,7 @@ export type CharterOfferStatus =
   | 'expired'
   | 'cancelled';
 
-/** One indivisible 1–12 passenger charter group. */
+/** One indivisible charter passenger group (1…230 / narrow Market max). */
 export interface CharterOffer {
   id: string;
   demandId: string;
@@ -872,7 +872,7 @@ export interface MissionIntent {
   destIcao: string;
   /** Sum of lots[].cargoKg. */
   cargoKg: number;
-  /** Freight is 0; charter is one indivisible 1–12 passenger group. */
+  /** Freight is 0; charter is one indivisible passenger group (≤ narrow max). */
   pax: number;
   /** Passenger baggage only; never terminal commodity cargo. */
   baggageKg?: number;

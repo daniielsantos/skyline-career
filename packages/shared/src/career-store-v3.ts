@@ -4,6 +4,7 @@
  */
 
 import type { DatabaseSync } from 'node:sqlite';
+import { CHARTER_GROUP_SIZE_MAX } from './career-charter.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
 import {
@@ -1128,7 +1129,9 @@ function missionCoreAndPayload(m: MissionIntent): {
       aircraftId,
       missionType: missionType ?? 'freight',
       charterOfferId,
-      pax: missionType === 'charter' ? Math.max(1, Math.min(12, Math.floor(pax))) : 0,
+      pax: missionType === 'charter'
+        ? Math.max(1, Math.min(CHARTER_GROUP_SIZE_MAX, Math.floor(pax)))
+        : 0,
       baggageKg:
         missionType === 'charter' ? Math.max(0, Math.round(baggageKg ?? 0)) : 0,
       commodityId,
@@ -1489,7 +1492,10 @@ export function readMissionsTable(db: SqliteDb, companyId: string): MissionInten
       destIcao: r.dest_icao,
       commodityId: r.commodity_id as CommodityId,
       cargoKg: r.cargo_kg,
-      pax: r.mission_type === 'charter' ? Math.max(1, Math.min(12, r.pax)) : 0,
+      pax:
+        r.mission_type === 'charter'
+          ? Math.max(1, Math.min(CHARTER_GROUP_SIZE_MAX, r.pax))
+          : 0,
       baggageKg: r.mission_type === 'charter' ? Math.max(0, r.baggage_kg) : 0,
       payUsd: r.pay_usd,
       acceptedAtTick: r.accepted_at_tick,

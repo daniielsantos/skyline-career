@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Charter group size 1…230 + pay taper** — bands light/med/narrow; √ pay past 12 pax so Freights stay competitive. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **Charter med piston + narrow** — classes eligible + passenger config stamps; freighter-only SKUs blocked by Fit; homologate checklist now requires pax/charter. Detail: [`09-homologate.md`](./09-homologate.md) · [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **Charter board deepen** — live ~234 era form×TTL (quota 4), não max 600. Form 14 / warm 28 / target hubs/2 / max 1600 + intl origin RR. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Intl origin-fair formation + board room** — `formLotsIntl` round-robin por país de origem (não BR-only); lift frac 0.32 + soft cap INTL 2400. Detail: [`08-economy.md`](./08-economy.md).

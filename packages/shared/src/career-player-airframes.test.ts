@@ -315,6 +315,65 @@ describe('career player airframes', () => {
     );
   });
 
+  it('stamps passenger configs on medium_piston and narrow pax SKUs for charter', () => {
+    assert.equal(
+      resolvePassengerCapacity('microsoft-douglas-dc-3-metal-left', 'passenger'),
+      21,
+    );
+    assert.equal(resolvePassengerCapacity('pmdg-dc6', 'passenger'), 48);
+
+    for (const airframe of listCareerPlayerAirframes('medium_piston')) {
+      const pax = (airframe.configurations ?? []).filter(
+        isPassengerConfigurationEligible,
+      );
+      assert.ok(pax.length > 0, `${airframe.typeId} missing passenger config`);
+    }
+
+    const freighterOnly = new Set([
+      'pmdg-738-bcf-family',
+      'blackbird-c-130j-long-configuration',
+    ]);
+    for (const airframe of listCareerPlayerAirframes('narrow_freighter')) {
+      const pax = (airframe.configurations ?? []).filter(
+        isPassengerConfigurationEligible,
+      );
+      if (freighterOnly.has(airframe.typeId)) {
+        assert.equal(
+          pax.length,
+          0,
+          `${airframe.typeId} must stay cargo-only for charter Fit`,
+        );
+        assert.equal(resolvePassengerCapacity(airframe.typeId, 'passenger'), 0);
+        continue;
+      }
+      assert.ok(
+        pax.length > 0,
+        `${airframe.typeId} missing eligible passenger configuration`,
+      );
+      assert.equal(
+        Math.max(...pax.map((row) => row.passengerCapacity)),
+        airframe.maxPaxSeats,
+        airframe.typeId,
+      );
+      assert.ok(
+        pax.every(
+          (row) =>
+            row.certificationState === 'dispatch_ready' &&
+            row.baggageCapacityLb >= row.passengerCapacity * 55,
+        ),
+        airframe.typeId,
+      );
+    }
+
+    const dual = findCareerPlayerAirframe('justflight-146-200')!;
+    assert.equal(
+      findCareerAirframeConfiguration(dual, 'cargo')?.role,
+      'cargo',
+    );
+    assert.equal(resolvePassengerCapacity(dual.typeId, 'cargo'), 0);
+    assert.equal(resolvePassengerCapacity(dual.typeId, 'passenger'), 112);
+  });
+
   it('summarizes cabin/charter layout for Market and Hangar cards', () => {
     const duke = resolveAirframeCabinSummary('blacksquare-b60-duke', 'light_ga');
     assert.equal(duke.passengerSeats, 4);

@@ -11,6 +11,7 @@
  */
 
 import type pg from 'pg';
+import { CHARTER_GROUP_SIZE_MAX } from './career-charter.js';
 import { CAREER_COMMODITIES } from './career-economy.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
@@ -2950,7 +2951,7 @@ function missionCoreAndPayload(m: MissionIntent): {
       charterOfferId,
       pax:
         missionType === 'charter'
-          ? Math.max(1, Math.min(12, Math.floor(pax)))
+          ? Math.max(1, Math.min(CHARTER_GROUP_SIZE_MAX, Math.floor(pax)))
           : 0,
       baggageKg:
         missionType === 'charter' ? Math.max(0, Math.round(baggageKg ?? 0)) : 0,
@@ -3079,7 +3080,10 @@ async function readMissionsTable(
       destIcao: r.dest_icao as string,
       commodityId: r.commodity_id as CommodityId,
       cargoKg: num(r.cargo_kg),
-      pax: missionType === 'charter' ? Math.max(1, Math.min(12, num(r.pax))) : 0,
+      pax:
+        missionType === 'charter'
+          ? Math.max(1, Math.min(CHARTER_GROUP_SIZE_MAX, num(r.pax)))
+          : 0,
       baggageKg: missionType === 'charter' ? Math.max(0, num(r.baggage_kg)) : 0,
       payUsd: num(r.pay_usd),
       acceptedAtTick: num(r.accepted_at_tick),

@@ -834,7 +834,9 @@ function charterAircraftFit(
   let ferryCostUsd = 0;
   const reasons: string[] = [];
   if (!isCharterEligibleAircraftClass(aircraft.aircraftClassId)) {
-    reasons.push('GA, turboprop, or light jet required');
+    reasons.push(
+      'Charter class required (GA, TP, light jet, medium piston, or narrowbody)',
+    );
   }
   if (!configuration || configuration.role !== 'passenger') {
     reasons.push('Passenger/VIP configuration required');

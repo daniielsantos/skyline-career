@@ -8,6 +8,7 @@ import {
   type CareerEconomyWorld,
   type MarketLotView,
 } from './career-economy.js';
+import { CHARTER_GROUP_SIZE_MAX } from './career-charter.js';
 import { invalidateLaneInboundIndex } from './career-lane-index.js';
 import { quoteContractPilotFeeUsd } from './career-contract-pilot-fee.js';
 import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './career-aircraft-market.js';
@@ -845,7 +846,10 @@ export function isEmptyLegMission(mission: MissionIntent): boolean {
 /** Recompute top-level mirrors from `lots` (or legacy single-lot fields). */
 export function recomputeMissionTotals(mission: MissionIntent): MissionIntent {
   if (mission.missionType === 'charter') {
-    const pax = Math.max(1, Math.min(12, Math.floor(Number(mission.pax) || 1)));
+    const pax = Math.max(
+      1,
+      Math.min(CHARTER_GROUP_SIZE_MAX, Math.floor(Number(mission.pax) || 1)),
+    );
     return {
       ...mission,
       missionType: 'charter',

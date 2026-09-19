@@ -30,7 +30,14 @@ export const CHARTER_OFFER_LIFE_MIN_TICKS = 8 * TICKS_PER_HOUR;
 export const CHARTER_OFFER_LIFE_MAX_TICKS = 24 * TICKS_PER_HOUR;
 export const CHARTER_DEMAND_RETENTION_DAYS = 45;
 export const CHARTER_BAGGAGE_KG_PER_PAX = 18;
-export const CHARTER_BAGGAGE_MAX_KG = 180;
+/**
+ * Soft ceiling on formed group size — matches the largest narrow Market
+ * `maxPaxSeats` (Fenix A321 = 230). Fit still gates by airframe seats.
+ */
+export const CHARTER_GROUP_SIZE_MAX = 230;
+/** Baggage kg ceiling = full narrow group × per-pax allowance. */
+export const CHARTER_BAGGAGE_MAX_KG =
+  CHARTER_GROUP_SIZE_MAX * CHARTER_BAGGAGE_KG_PER_PAX;
 export const CHARTER_BOARD_MIN = 120;
 /** Hard ceiling on live available offers (formation stops at target or this). */
 export const CHARTER_BOARD_MAX = 1_600;
@@ -45,13 +52,16 @@ export const CHARTER_WARM_QUOTA_PER_TICK = 28;
 /**
  * Classes that may accept charter offers.
  * Fit still gates by passenger config, seats, baggage, and range — so a
- * 2-seat GA only sees 1–2 pax groups on the shared 1–12 board. Narrow+ can
- * join later when group-size formation grows.
+ * 2-seat GA only sees 1–2 pax groups while narrowbodies can take up to
+ * {@link CHARTER_GROUP_SIZE_MAX}. Pure freighters in `narrow_freighter`
+ * stay blocked without a passenger config.
  */
 export const CHARTER_ELIGIBLE_AIRCRAFT_CLASSES = [
   'light_ga',
   'light_turboprop',
   'light_jet',
+  'medium_piston',
+  'narrow_freighter',
 ] as const;
 
 export type CharterEligibleAircraftClass =
@@ -63,7 +73,9 @@ export function isCharterEligibleAircraftClass(
   return (
     classId === 'light_ga' ||
     classId === 'light_turboprop' ||
-    classId === 'light_jet'
+    classId === 'light_jet' ||
+    classId === 'medium_piston' ||
+    classId === 'narrow_freighter'
   );
 }
 
@@ -124,8 +136,14 @@ function airportDemandWeight(airport: AirportTerminal): number {
 }
 
 function hubCapacityPax(airport: AirportTerminal): number {
+  // Sized so majors can host a full narrow charter group; regionals/spokes
+  // still feed the light/med bands without starving pool turnover.
   const base =
-    airport.hubTier === 'major' ? 96 : airport.hubTier === 'regional' ? 48 : 24;
+    airport.hubTier === 'major'
+      ? 280
+      : airport.hubTier === 'regional'
+        ? 160
+        : 64;
   const level = clamp(Number(airport.level) || 1, 1, 5);
   return Math.round(base * (0.85 + level * 0.05));
 }
@@ -214,10 +232,24 @@ function offerLifeTicks(rng: () => number, urgency: CharterUrgency): number {
   return clamp(life, CHARTER_OFFER_LIFE_MIN_TICKS, CHARTER_OFFER_LIFE_MAX_TICKS);
 }
 
-/** Baggage allowance, capped to a practical small-jet envelope. */
+/** Baggage allowance for the formed group (scales to {@link CHARTER_GROUP_SIZE_MAX}). */
 export function charterBaggageKg(groupSize: number): number {
-  const pax = clamp(Math.floor(Number(groupSize) || 1), 1, 12);
+  const pax = clamp(
+    Math.floor(Number(groupSize) || 1),
+    1,
+    CHARTER_GROUP_SIZE_MAX,
+  );
   return Math.min(CHARTER_BAGGAGE_MAX_KG, pax * CHARTER_BAGGAGE_KG_PER_PAX);
+}
+
+/**
+ * Effective pax weight for pay. Linear through 12 (GA/light jet parity), then
+ * √ taper so a full narrow (~160–230) pays ~freight-band money — not 5–7×.
+ */
+export function charterPayPaxWeight(groupSize: number): number {
+  const n = clamp(Math.floor(Number(groupSize) || 1), 1, CHARTER_GROUP_SIZE_MAX);
+  if (n <= 12) return n;
+  return 12 + Math.sqrt(n - 12) * 1.85;
 }
 
 /** Transparent trip quote; no freight value or commodity-price input. */
@@ -228,7 +260,7 @@ export function quoteCharterPayUsd(opts: {
   tier: CharterTier;
   international: boolean;
 }): number {
-  const pax = clamp(Math.floor(opts.groupSize), 1, 12);
+  const pax = charterPayPaxWeight(opts.groupSize);
   const distance = clamp(opts.distanceNm, CHARTER_MIN_DISTANCE_NM, CHARTER_MAX_DISTANCE_NM);
   const urgencyMult = { normal: 1, priority: 1.22, urgent: 1.48 }[opts.urgency];
   const tierMult = { standard: 1, premium: 1.35, executive: 1.8 }[opts.tier];
@@ -239,6 +271,39 @@ export function quoteCharterPayUsd(opts: {
     500,
     Math.round((trip + distancePay) * urgencyMult * tierMult * internationalMult),
   );
+}
+
+/**
+ * Banded group size so the shelf stays GA-friendly while still spawning
+ * med-piston / narrow loads when Terminal pools allow.
+ * ~55% 1–12 · ~27% 13–48 · ~18% 49–max (when avail permits).
+ */
+export function pickCharterGroupSize(
+  rng: () => number,
+  waiting: number,
+  attract: number,
+): number {
+  const avail = Math.min(
+    CHARTER_GROUP_SIZE_MAX,
+    Math.floor(waiting),
+    Math.floor(attract),
+  );
+  if (avail < 1) return 0;
+  const roll = rng();
+  let lo = 1;
+  let hi = Math.min(12, avail);
+  if (avail >= 49 && roll < 0.18) {
+    lo = 49;
+    hi = avail;
+  } else if (avail >= 13 && roll < 0.45) {
+    lo = 13;
+    hi = Math.min(48, avail);
+  }
+  if (lo > hi) {
+    lo = 1;
+    hi = avail;
+  }
+  return lo + Math.floor(rng() * (hi - lo + 1));
 }
 
 function normalizeDemand(raw: CharterDemand): CharterDemand | null {
@@ -263,7 +328,9 @@ function normalizeOffer(raw: CharterOffer): CharterOffer | null {
   const originIcao = String(raw.originIcao ?? '').trim().toUpperCase();
   const destIcao = String(raw.destIcao ?? '').trim().toUpperCase();
   const groupSize = Math.floor(Number(raw.groupSize));
-  if (!originIcao || !destIcao || groupSize < 1 || groupSize > 12) return null;
+  if (!originIcao || !destIcao || groupSize < 1 || groupSize > CHARTER_GROUP_SIZE_MAX) {
+    return null;
+  }
   return Object.assign(raw, {
     ...raw,
     id: String(raw.id),
@@ -688,11 +755,8 @@ export function formCharterOffersForTick(
     const offerRng = mulberry32(
       hashSeed(`${world.seed}:charter:${world.tick}:${demand.id}`),
     );
-    const groupSize = clamp(
-      1 + Math.floor(offerRng() * Math.min(8, waiting, attract)),
-      1,
-      Math.min(12, waiting, attract),
-    );
+    const groupSize = pickCharterGroupSize(offerRng, waiting, attract);
+    if (groupSize < 1) return false;
     const tier = chooseTier(offerRng, heat);
     const urgency = chooseUrgency(offerRng, heat);
     const life = offerLifeTicks(offerRng, urgency);

@@ -3,10 +3,12 @@ import { describe, it } from 'node:test';
 import {
   CHARTER_BOARD_MAX,
   CHARTER_BOARD_MIN,
+  CHARTER_GROUP_SIZE_MAX,
   CHARTER_MAX_DISTANCE_NM,
   CHARTER_WARM_QUOTA_PER_TICK,
   cancelCharterMission,
   charterBaggageKg,
+  charterPayPaxWeight,
   compareMissionIntentToOfp,
   countryIdFromRegion,
   createSeedEconomyWorld,
@@ -16,6 +18,7 @@ import {
   formCharterOffersForTick,
   generateDailyCharterOffers,
   normalizeOfpExpectation,
+  pickCharterGroupSize,
   quoteCharterPayUsd,
   readCharterHubPoolView,
   isCharterEligibleAircraftClass,
@@ -38,7 +41,12 @@ describe('Charter economy', () => {
     assert.ok((a.charterHubs?.length ?? 0) > 0);
     assert.ok(a.charterOffers!.some((offer) => offer.international));
     assert.ok(a.charterOffers!.some((offer) => !offer.international));
-    assert.ok(a.charterOffers!.every((offer) => offer.groupSize >= 1 && offer.groupSize <= 12));
+    assert.ok(
+      a.charterOffers!.every(
+        (offer) =>
+          offer.groupSize >= 1 && offer.groupSize <= CHARTER_GROUP_SIZE_MAX,
+      ),
+    );
     assert.ok(
       a.charterOffers!.every(
         (offer) => offer.baggageKg === charterBaggageKg(offer.groupSize),
@@ -102,6 +110,48 @@ describe('Charter economy', () => {
         international: true,
       }) > base,
     );
+    // Linear through 12; √ taper after so narrow full-load stays freight-band.
+    assert.equal(charterPayPaxWeight(12), 12);
+    assert.ok(charterPayPaxWeight(48) < 30);
+    assert.ok(charterPayPaxWeight(160) < 40);
+    const twelve = quoteCharterPayUsd({
+      distanceNm: 1_500,
+      groupSize: 12,
+      urgency: 'normal',
+      tier: 'standard',
+      international: false,
+    });
+    const narrow = quoteCharterPayUsd({
+      distanceNm: 1_500,
+      groupSize: 160,
+      urgency: 'normal',
+      tier: 'standard',
+      international: false,
+    });
+    assert.ok(narrow > twelve);
+    assert.ok(
+      narrow < twelve * 3.5,
+      `narrow pay ${narrow} should stay < 3.5× twelve-pax ${twelve}`,
+    );
+  });
+
+  it('bands group sizes so light, med, and narrow loads all appear', () => {
+    const counts = { light: 0, med: 0, narrow: 0 };
+    let seed = 1;
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < 400; i += 1) {
+      const n = pickCharterGroupSize(rng, 200, 200);
+      assert.ok(n >= 1 && n <= CHARTER_GROUP_SIZE_MAX);
+      if (n <= 12) counts.light += 1;
+      else if (n <= 48) counts.med += 1;
+      else counts.narrow += 1;
+    }
+    assert.ok(counts.light > 150, `light=${counts.light}`);
+    assert.ok(counts.med > 50, `med=${counts.med}`);
+    assert.ok(counts.narrow > 30, `narrow=${counts.narrow}`);
   });
 
   it('forms a few offers from the regular economy tick without a daily dump', () => {
@@ -150,7 +200,9 @@ describe('Charter economy', () => {
       for (const offer of available) {
         created.add(offer.createdAtTick);
         expires.add(offer.expiresAtTick);
-        assert.ok(offer.groupSize >= 1 && offer.groupSize <= 12);
+        assert.ok(
+          offer.groupSize >= 1 && offer.groupSize <= CHARTER_GROUP_SIZE_MAX,
+        );
         assert.equal(offer.baggageKg, charterBaggageKg(offer.groupSize));
       }
       assert.ok(world.charterOffers!.length <= CHARTER_BOARD_MAX * 3);
@@ -482,11 +534,12 @@ describe('Charter economy', () => {
     assert.ok(available <= CHARTER_BOARD_MAX);
   });
 
-  it('allows GA and turboprop classes on the shared charter board', () => {
+  it('allows medium piston and narrowbody classes on the shared charter board', () => {
     assert.equal(isCharterEligibleAircraftClass('light_ga'), true);
     assert.equal(isCharterEligibleAircraftClass('light_turboprop'), true);
     assert.equal(isCharterEligibleAircraftClass('light_jet'), true);
-    assert.equal(isCharterEligibleAircraftClass('narrow_freighter'), false);
-    assert.equal(isCharterEligibleAircraftClass('medium_piston'), false);
+    assert.equal(isCharterEligibleAircraftClass('medium_piston'), true);
+    assert.equal(isCharterEligibleAircraftClass('narrow_freighter'), true);
+    assert.equal(isCharterEligibleAircraftClass('wide_freighter'), false);
   });
 });

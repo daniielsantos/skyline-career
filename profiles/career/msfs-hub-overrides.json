@@ -32596,5 +32596,321 @@
         "surface": "other"
       }
     ]
+  },
+  "AYBA": {
+    "name": "Baimuru Airport",
+    "lat": -7.497115842998028,
+    "lon": 144.8215927183628,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 228.86068725585938,
+        "lengthM": 988.224609375,
+        "widthM": 32.32987976074219,
+        "lat": -7.497115842998028,
+        "lon": 144.8215927183628,
+        "identReciprocal": "4",
+        "surface": "grass"
+      }
+    ]
+  },
+  "AYBK": {
+    "name": "Buka",
+    "lat": -5.42077761143446,
+    "lon": 154.67549979686737,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 47.64260482788086,
+        "lengthM": 1561.6661376953125,
+        "widthM": 25,
+        "lat": -5.422304794192314,
+        "lon": 154.67268839478493,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "AYCH": {
+    "name": "Chimbu Airport",
+    "lat": -6.02416668087244,
+    "lon": 144.96999979019165,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "AYDU": {
+    "name": "Daru Airport",
+    "lat": -9.08661101013422,
+    "lon": 143.20819437503815,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "AYGR": {
+    "name": "Girua Airport",
+    "lat": -8.808889053761959,
+    "lon": 148.30638885498047,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "AYWD": {
+    "name": "Wapenamanda Airport",
+    "lat": -5.633333288133144,
+    "lon": 143.8911111652851,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NFTL": {
+    "name": "Lifuka Island Airport",
+    "lat": -19.77705828845501,
+    "lon": -174.34037491679192,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NTAR": {
+    "name": "Rurutu Airport",
+    "lat": -22.43166670203209,
+    "lon": -151.36722207069397,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NTAT": {
+    "name": "Tubuai Airport",
+    "lat": -23.369722366333008,
+    "lon": -149.52972203493118,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NTGA": {
+    "name": "Anaa Airport",
+    "lat": -17.35500007867813,
+    "lon": -145.50833344459534,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NTGB": {
+    "name": "Fangatau Airport",
+    "lat": -15.820000022649765,
+    "lon": -140.88583320379257,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NTGC": {
+    "name": "Tikehau Airport",
+    "lat": -15.120277740061283,
+    "lon": -148.23361113667488,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NTHE": {
+    "name": "Ahe Airport",
+    "lat": -14.427500031888485,
+    "lon": -146.25527769327164,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NWWR": {
+    "name": "Maré Airport",
+    "lat": -21.481111273169518,
+    "lon": 168.03749978542328,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NWWU": {
+    "name": "Touho Airport",
+    "lat": -20.78999988734722,
+    "lon": 165.2594442665577,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NWWV": {
+    "name": "Ouvéa Airport",
+    "lat": -20.64055558294058,
+    "lon": 166.57277762889862,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NZTU": {
+    "name": "Timaru Airport",
+    "lat": -44.302777871489525,
+    "lon": 171.22527793049812,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NZWB": {
+    "name": "Woodbourne Airport",
+    "lat": -41.518333442509174,
+    "lon": 173.8702780008316,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NZWF": {
+    "name": "Wanaka Airport",
+    "lat": -44.72222238779068,
+    "lon": 169.24555554986,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NZWK": {
+    "name": "Whakatāne Airport",
+    "lat": -37.920147366821766,
+    "lon": 176.91321685910225,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NZWS": {
+    "name": "Westport Airport",
+    "lat": -41.738055646419525,
+    "lon": 171.58083334565163,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "NZWU": {
+    "name": "Wanganui Airport",
+    "lat": -39.962222054600716,
+    "lon": 175.0252778828144,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "PCIS": {
+    "name": "Canton Island Airport",
+    "lat": -2.7700000628829002,
+    "lon": -171.7133331298828,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YBTI": {
+    "name": "Bathurst Island Airport",
+    "lat": -11.769166700541973,
+    "lon": 130.61972200870514,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YBTR": {
+    "name": "Blackwater Airport",
+    "lat": -23.60305543988943,
+    "lon": 148.80694448947906,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCCA": {
+    "name": "Chinchilla Airport",
+    "lat": -26.769444420933723,
+    "lon": 150.61666667461395,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCCY": {
+    "name": "Cloncurry Airport",
+    "lat": -20.668611153960228,
+    "lon": 140.50444453954697,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCDU": {
+    "name": "Ceduna Airport",
+    "lat": -32.130555622279644,
+    "lon": 133.70972201228142,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCEE": {
+    "name": "Cleve Airport",
+    "lat": -33.70972227305174,
+    "lon": 136.5047223865986,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCFS": {
+    "name": "Coffs Harbour Airport",
+    "lat": -30.320555716753006,
+    "lon": 153.1163889169693,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCKN": {
+    "name": "Cooktown Airport",
+    "lat": -15.444722101092339,
+    "lon": 145.1844446361065,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCMT": {
+    "name": "Clermont Airport",
+    "lat": -22.7730555832386,
+    "lon": 147.62055560946465,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCMU": {
+    "name": "Cunnamulla Airport",
+    "lat": -28.0299998447299,
+    "lon": 145.62222227454185,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCNM": {
+    "name": "Coonamble Airport",
+    "lat": -30.983333252370358,
+    "lon": 148.37555542588234,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCOE": {
+    "name": "Coen Airport",
+    "lat": -13.761944398283958,
+    "lon": 143.11666667461395,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCOM": {
+    "name": "Cooma Snowy Mountains Airport",
+    "lat": -36.30055546760559,
+    "lon": 148.97388875484467,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCOR": {
+    "name": "Corowa Airport",
+    "lat": -35.990277864038944,
+    "lon": 146.35138884186745,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCRG": {
+    "name": "Corryong Airport",
+    "lat": -36.1827776581049,
+    "lon": 147.8877778351307,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCTM": {
+    "name": "Cootamundra Airport",
+    "lat": -34.624444395303726,
+    "lon": 148.03583353757858,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "YCIN": {
+    "name": "Curtin",
+    "lat": -17.581388913094997,
+    "lon": 123.8283334672451,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "11",
+        "headingTrueDeg": 110.56327819824219,
+        "lengthM": 3043.572998046875,
+        "widthM": 44.51809310913086,
+        "lat": -17.58040487766266,
+        "lon": 123.82860884070396,
+        "identReciprocal": "29",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

@@ -28,6 +28,18 @@ export const KI_DENSIFY_HUBS: readonly KiDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave B Oceania densify (+1)
+  {
+    icao: 'PCIS',
+    name: "Canton Island Airport",
+    region: 'KI-L',
+    hubTier: 'spoke',
+    lat: -2.76812,
+    lon: -171.71001,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
 ];
 
 export const KI_DENSIFY_HUB_COUNT = KI_DENSIFY_HUBS.length;

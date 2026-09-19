@@ -5,6 +5,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { TO_DENSIFY_HUBS, TO_DENSIFY_HUB_COUNT } from './career-to-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -46,9 +47,10 @@ export const TO_CAREER_HUBS: readonly ToCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.15, supplies: 1.05 },
     consume: { electronics: 0.9, machinery: 0.85, fuel: 1.1 },
   },
+  ...TO_DENSIFY_HUBS
 ];
 
-export const TO_CAREER_HUB_COUNT = 2;
+export const TO_CAREER_HUB_COUNT = 2 + TO_DENSIFY_HUB_COUNT;
 
 export function buildToFeederCorridors(
   hubs: readonly ToCareerHubDef[] = TO_CAREER_HUBS,

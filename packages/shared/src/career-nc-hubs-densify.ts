@@ -38,6 +38,38 @@ export const NC_DENSIFY_HUBS: readonly NcDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave B Oceania densify (+3)
+  {
+    icao: 'NWWR',
+    name: "Maré Airport",
+    region: 'NC-S',
+    hubTier: 'spoke',
+    lat: -21.48244,
+    lon: 168.03847,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'NWWU',
+    name: "Touho Airport",
+    region: 'NC-S',
+    hubTier: 'spoke',
+    lat: -20.79013,
+    lon: 165.25952,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'NWWV',
+    name: "Ouvéa Airport",
+    region: 'NC-S',
+    hubTier: 'spoke',
+    lat: -20.64093,
+    lon: 166.57302,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const NC_DENSIFY_HUB_COUNT = NC_DENSIFY_HUBS.length;

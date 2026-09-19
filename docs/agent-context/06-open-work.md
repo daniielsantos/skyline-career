@@ -2,6 +2,10 @@
 
 Atualizado 2026-09-19: **Desktop slim hotfix** — 0.3.117 API exit: drop de `packages/agent` quebrou imports relativos `../../agent/src` (dispatch/preflight/watch). Agent `src` volta no pack. Detail: `packages/desktop/README.md`.
 
+Atualizado 2026-09-19: **Active Tour map plot** — Base mapa plota `charterActiveTour` / `activeTour` (não só Search). Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-19: **Search nm/ferry per-leg labels** — `Min/Max nm/leg`, `Max ferry/hop` + tooltips; Dist/Ferry = totais do tour. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
 Atualizado 2026-09-19: **Pack slim fase 2** — esbuild `api.bundle.mjs` (server + agent); pack sem `tsx`/agent src; Setup **~120 MB**. Lab ainda `tsx`+`api.ts`. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-19: **Max ferry UX** — tooltip 2× no filtro; label multi-hop `Ferry · a+b`; coluna Ferry alinhada. Regra intacta. Detail: [`24-port-fbo.md`](./24-port-fbo.md).

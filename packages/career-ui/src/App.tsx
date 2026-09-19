@@ -5951,6 +5951,68 @@ export function App() {
       hubIcao: activeTour.hubIcao,
     };
   }, [activeTour, activeMission?.id]);
+
+  /** Base map route: prefer Active Tour legs, else Search selection. */
+  const baseDispatchMapTour = useMemo(() => {
+    if (baseDispatchProduct === 'charter') {
+      if (
+        charterActiveTour?.status === 'active' &&
+        charterActiveTour.legs.length > 0
+      ) {
+        return {
+          legs: charterActiveTour.legs,
+          routeLabel: charterActiveTour.routeLabel,
+          totalFerryNm: charterActiveTour.legs.reduce(
+            (s, l) => s + (l.ferryNm ?? 0),
+            0,
+          ),
+          totalDistanceNm: charterActiveTour.legs.reduce(
+            (s, l) => s + (l.distanceNm ?? 0),
+            0,
+          ),
+        };
+      }
+      const tour = charterTours.find((t) => t.id === selectedCharterTourId);
+      if (!tour?.legs.length) return null;
+      return {
+        legs: tour.legs,
+        routeLabel: tour.routeLabel,
+        totalFerryNm: tour.totalFerryNm,
+        totalDistanceNm: tour.totalDistanceNm,
+      };
+    }
+    if (activeTour?.status === 'active' && activeTour.legs.length > 0) {
+      return {
+        legs: activeTour.legs,
+        routeLabel: activeTour.routeLabel,
+        totalFerryNm: activeTour.legs.reduce(
+          (s, l) => s + (l.ferryNm ?? 0),
+          0,
+        ),
+        totalDistanceNm: activeTour.legs.reduce(
+          (s, l) => s + (l.distanceNm ?? 0),
+          0,
+        ),
+      };
+    }
+    const tour = dispatchTours.find((t) => t.id === selectedDispatchTourId);
+    if (!tour?.legs.length) return null;
+    return {
+      legs: tour.legs,
+      routeLabel: tour.routeLabel,
+      totalFerryNm: tour.totalFerryNm,
+      totalDistanceNm: tour.totalDistanceNm,
+    };
+  }, [
+    baseDispatchProduct,
+    charterActiveTour,
+    charterTours,
+    selectedCharterTourId,
+    activeTour,
+    dispatchTours,
+    selectedDispatchTourId,
+  ]);
+
   const playerDispatchMission = useMemo(
     () => findPlayerDispatchMission(missions),
     [missions],
@@ -13374,8 +13436,10 @@ export function App() {
                                               }
                                             />
                                           </label>
-                                          <label>
-                                            <span>Min nm</span>
+                                          <label
+                                            title="Minimum revenue-leg distance (each cargo/charter leg). Dist column is the tour total."
+                                          >
+                                            <span>Min nm/leg</span>
                                             <input
                                               type="number"
                                               min={0}
@@ -13392,8 +13456,10 @@ export function App() {
                                               }
                                             />
                                           </label>
-                                          <label>
-                                            <span>Max nm</span>
+                                          <label
+                                            title="Maximum revenue-leg distance (each cargo/charter leg). Dist column is the tour total — 2 legs × 3000 can show ~6000 nm."
+                                          >
+                                            <span>Max nm/leg</span>
                                             <input
                                               type="number"
                                               min={0}
@@ -13411,9 +13477,9 @@ export function App() {
                                             />
                                           </label>
                                           <label
-                                            title="Between legs (default 200). First reposition may be up to 2× (e.g. 200 → 400 nm)."
+                                            title="Max reposition between legs (default 200). First hop may be up to 2× (e.g. 200 → 400 nm). Ferry column sums all hops."
                                           >
-                                            <span>Max ferry</span>
+                                            <span>Max ferry/hop</span>
                                             <input
                                               type="number"
                                               min={40}
@@ -13515,8 +13581,12 @@ export function App() {
                                             <tr>
                                               <th>Route</th>
                                               <th>Legs</th>
-                                              <th>Dist</th>
-                                              <th>Ferry</th>
+                                              <th title="Sum of revenue-leg distances (not the Max nm/leg filter).">
+                                                Dist
+                                              </th>
+                                              <th title="Sum of reposition hops (Max ferry/hop is per hop; first hop may be 2×).">
+                                                Ferry
+                                              </th>
                                               <th>Pay</th>
                                               <th>Net</th>
                                               <th>Aircraft</th>
@@ -13863,8 +13933,10 @@ export function App() {
                                                 }
                                               />
                                             </label>
-                                            <label>
-                                              <span>Min nm</span>
+                                            <label
+                                              title="Minimum revenue-leg distance (each cargo/charter leg). Dist column is the tour total."
+                                            >
+                                              <span>Min nm/leg</span>
                                               <input
                                                 type="number"
                                                 min={0}
@@ -13881,8 +13953,10 @@ export function App() {
                                                 }
                                               />
                                             </label>
-                                            <label>
-                                              <span>Max nm</span>
+                                            <label
+                                              title="Maximum revenue-leg distance (each cargo/charter leg). Dist column is the tour total — 2 legs × 3000 can show ~6000 nm."
+                                            >
+                                              <span>Max nm/leg</span>
                                               <input
                                                 type="number"
                                                 min={0}
@@ -13900,9 +13974,9 @@ export function App() {
                                               />
                                             </label>
                                             <label
-                                              title="Between legs (default 200). First reposition may be up to 2× (e.g. 200 → 400 nm)."
+                                              title="Max reposition between legs (default 200). First hop may be up to 2× (e.g. 200 → 400 nm). Ferry column sums all hops."
                                             >
-                                              <span>Max ferry</span>
+                                              <span>Max ferry/hop</span>
                                               <input
                                                 type="number"
                                                 min={40}
@@ -14006,8 +14080,12 @@ export function App() {
                                             <tr>
                                               <th>Route</th>
                                               <th>Legs</th>
-                                              <th>Dist</th>
-                                              <th>Ferry</th>
+                                              <th title="Sum of revenue-leg distances (not the Max nm/leg filter).">
+                                                Dist
+                                              </th>
+                                              <th title="Sum of reposition hops (Max ferry/hop is per hop; first hop may be 2×).">
+                                                Ferry
+                                              </th>
                                               <th>Pax</th>
                                               <th>Pay</th>
                                               <th>Net</th>
@@ -14209,26 +14287,10 @@ export function App() {
                                     ?.originIcao ?? localFbo.icao
                                 );
                               }
-                              if (
-                                baseDispatchProduct === 'charter' &&
-                                selectedCharterTourId
-                              ) {
-                                const tour = charterTours.find(
-                                  (t) => t.id === selectedCharterTourId,
-                                );
-                                return (
-                                  tour?.legs[0]?.originIcao ?? localFbo.icao
-                                );
-                              }
-                              if (selectedDispatchTourId) {
-                                const tour = dispatchTours.find(
-                                  (t) => t.id === selectedDispatchTourId,
-                                );
-                                return (
-                                  tour?.legs[0]?.originIcao ?? localFbo.icao
-                                );
-                              }
-                              return localFbo.icao;
+                              return (
+                                baseDispatchMapTour?.legs[0]?.originIcao ??
+                                localFbo.icao
+                              );
                             })()}
                             destIcao={(() => {
                               if (selectedFboMissionId) {
@@ -14244,103 +14306,26 @@ export function App() {
                                     ?.destIcao ?? null
                                 );
                               }
-                              if (
-                                baseDispatchProduct === 'charter' &&
-                                selectedCharterTourId
-                              ) {
-                                const tour = charterTours.find(
-                                  (t) => t.id === selectedCharterTourId,
-                                );
-                                if (!tour?.legs.length) return null;
-                                return (
-                                  tour.legs[tour.legs.length - 1]?.destIcao ??
-                                  null
-                                );
-                              }
-                              if (selectedDispatchTourId) {
-                                const tour = dispatchTours.find(
-                                  (t) => t.id === selectedDispatchTourId,
-                                );
-                                if (!tour?.legs.length) return null;
-                                return (
-                                  tour.legs[tour.legs.length - 1]?.destIcao ??
-                                  null
-                                );
-                              }
-                              return null;
+                              const legs = baseDispatchMapTour?.legs;
+                              if (!legs?.length) return null;
+                              return legs[legs.length - 1]?.destIcao ?? null;
                             })()}
-                            tourLegs={(() => {
-                              if (
-                                baseDispatchProduct === 'charter' &&
-                                selectedCharterTourId
-                              ) {
-                                const tour = charterTours.find(
-                                  (t) => t.id === selectedCharterTourId,
-                                );
-                                return tour?.legs ?? null;
-                              }
-                              if (!selectedDispatchTourId) return null;
-                              const tour = dispatchTours.find(
-                                (t) => t.id === selectedDispatchTourId,
-                              );
-                              return tour?.legs ?? null;
-                            })()}
-                            routeHeadline={(() => {
-                              if (
-                                baseDispatchProduct === 'charter' &&
-                                selectedCharterTourId
-                              ) {
-                                return (
-                                  charterTours.find(
-                                    (t) => t.id === selectedCharterTourId,
-                                  )?.routeLabel ?? null
-                                );
-                              }
-                              if (!selectedDispatchTourId) return null;
-                              return (
-                                dispatchTours.find(
-                                  (t) => t.id === selectedDispatchTourId,
-                                )?.routeLabel ?? null
-                              );
-                            })()}
-                            ferryNm={(() => {
-                              if (
-                                baseDispatchProduct === 'charter' &&
-                                selectedCharterTourId
-                              ) {
-                                return (
-                                  charterTours.find(
-                                    (t) => t.id === selectedCharterTourId,
-                                  )?.totalFerryNm ?? null
-                                );
-                              }
-                              if (!selectedDispatchTourId) return null;
-                              return (
-                                dispatchTours.find(
-                                  (t) => t.id === selectedDispatchTourId,
-                                )?.totalFerryNm ?? null
-                              );
-                            })()}
+                            tourLegs={baseDispatchMapTour?.legs ?? null}
+                            routeHeadline={
+                              baseDispatchMapTour?.routeLabel ?? null
+                            }
+                            ferryNm={
+                              baseDispatchMapTour != null
+                                ? baseDispatchMapTour.totalFerryNm
+                                : null
+                            }
                             distanceNm={(() => {
                               if (selectedFboHoldId) {
                                 return localHolds.find(
                                   (h) => h.id === selectedFboHoldId,
                                 )?.distanceNm;
                               }
-                              if (
-                                baseDispatchProduct === 'charter' &&
-                                selectedCharterTourId
-                              ) {
-                                return charterTours.find(
-                                  (t) => t.id === selectedCharterTourId,
-                                )?.totalDistanceNm;
-                              }
-                              if (selectedDispatchTourId) {
-                                return dispatchTours.find(
-                                  (t) => t.id === selectedDispatchTourId,
-                                )?.totalDistanceNm;
-                              }
-                              return undefined;
+                              return baseDispatchMapTour?.totalDistanceNm;
                             })()}
                             idleHint={
                               baseDispatchProduct === 'charter'

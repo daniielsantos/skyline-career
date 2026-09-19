@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **93f29ed** / desktop **0.3.107** shipped: Widen charter_offers group_size CHECK to 1..230. Release: [v0.3.107](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.107).
+
+
 `main` **3eb6351** / desktop **0.3.106** shipped: Fix charter med/narrow pax formation and add Pax board filter. Release: [v0.3.106](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.106).
 
 

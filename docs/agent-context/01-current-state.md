@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **430a625** / desktop **0.3.122** shipped: Densify MENA Wave A to ~115 hubs. Release: [v0.3.122](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.122).
+
+
 `main` **0029bc9** / desktop **0.3.121** shipped: Densify EU-1 Wave 2 to ~300 hubs and add MENA/SE-Asia pulse lenses. Release: [v0.3.121](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.121).
 
 

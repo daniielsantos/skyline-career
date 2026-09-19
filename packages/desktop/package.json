@@ -23,6 +23,7 @@
     "executableName": "Airframe Career",
     "copyright": "Copyright © Airframe Career",
     "electronVersion": "35.7.5",
+    "electronLanguages": ["en-US"],
     "afterPack": "./afterPack.cjs",
     "directories": {
       "output": "../../artifacts/skyline-desktop",

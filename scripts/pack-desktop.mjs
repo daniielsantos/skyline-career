@@ -16,6 +16,7 @@ import {
   rm,
   writeFile,
   readFile,
+  stat,
 } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +53,167 @@ async function exists(p) {
   } catch {
     return false;
   }
+}
+
+async function dirSizeBytes(dir) {
+  if (!(await exists(dir))) return 0;
+  let total = 0;
+  const stack = [dir];
+  while (stack.length) {
+    const cur = stack.pop();
+    let entries = [];
+    try {
+      entries = await readdir(cur, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = join(cur, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else {
+        try {
+          total += (await stat(full)).size;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  return total;
+}
+
+/** UI deps are Vite-bundled into career-ui/dist — not needed by the API process. */
+const RUNTIME_UI_ONLY_MODULES = [
+  'maplibre-gl',
+  'react',
+  'react-dom',
+  'scheduler',
+  'gl-matrix',
+  'earcut',
+  'pbf',
+  'bidi-js',
+  'potpack',
+  'protocol-buffers-schema',
+  'tinyqueue',
+];
+
+const RUNTIME_UI_ONLY_SCOPES = ['@maplibre', '@mapbox'];
+
+/**
+ * Replace workspace copies under node_modules/@msfs-compat with tiny stubs that
+ * point at packages/*. afterPack used to `dereference: true` junctions and
+ * doubled ~50MB of career-ui/shared into the installer.
+ */
+async function writeMsfsCompatStubs(runtimeRoot) {
+  const scopeDir = join(runtimeRoot, 'node_modules', '@msfs-compat');
+  await mkdir(scopeDir, { recursive: true });
+  const names = ['shared', 'runtime', 'career-ui'];
+  for (const name of names) {
+    const pkgPath = join(runtimeRoot, 'packages', name);
+    if (!(await exists(pkgPath))) continue;
+    const dest = join(scopeDir, name);
+    await rm(dest, { recursive: true, force: true });
+    await mkdir(dest, { recursive: true });
+    const main =
+      name === 'career-ui'
+        ? '../../../packages/career-ui/server/api.ts'
+        : `../../../packages/${name}/dist/index.js`;
+    const pkg = {
+      name: `@msfs-compat/${name}`,
+      version: '0.1.0',
+      private: true,
+      type: 'module',
+      main,
+    };
+    // main-only stub: Node `exports` may reject `../` paths outside the package root.
+    await writeFile(join(dest, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
+  }
+  // Drop unused workspace packages from the scope (agent is not on the API path).
+  for (const stale of ['agent', 'catalog-api']) {
+    await rm(join(scopeDir, stale), { recursive: true, force: true });
+  }
+}
+
+async function stripPackedJunkFiles(rootDir) {
+  if (!(await exists(rootDir))) return { removed: 0, bytes: 0 };
+  let removed = 0;
+  let bytes = 0;
+  const stack = [rootDir];
+  while (stack.length) {
+    const cur = stack.pop();
+    let entries = [];
+    try {
+      entries = await readdir(cur, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = join(cur, entry.name);
+      if (entry.isDirectory()) {
+        // Drop maplibre/esbuild sourcemap-heavy trees already handled by module rm;
+        // still walk remaining node_modules for *.map.
+        stack.push(full);
+        continue;
+      }
+      const name = entry.name;
+      const drop =
+        name.endsWith('.map') ||
+        name.endsWith('.d.ts') ||
+        /\.test\.[cm]?js$/i.test(name) ||
+        /-dev\.(m?js|cjs)$/i.test(name);
+      if (!drop) continue;
+      try {
+        bytes += (await stat(full)).size;
+        await rm(full, { force: true });
+        removed += 1;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return { removed, bytes };
+}
+
+async function slimRuntimePayload() {
+  const before = await dirSizeBytes(runtimeOut);
+  const nm = join(runtimeOut, 'node_modules');
+
+  for (const name of RUNTIME_UI_ONLY_MODULES) {
+    await rm(join(nm, name), { recursive: true, force: true });
+  }
+  for (const scope of RUNTIME_UI_ONLY_SCOPES) {
+    await rm(join(nm, scope), { recursive: true, force: true });
+  }
+
+  await writeMsfsCompatStubs(runtimeOut);
+
+  // Agent is CLI/probe only — career-ui never imports it on desktop.
+  await rm(join(runtimeOut, 'packages', 'agent'), {
+    recursive: true,
+    force: true,
+  });
+
+  const junkPackages = await stripPackedJunkFiles(join(runtimeOut, 'packages'));
+  const junkNm = await stripPackedJunkFiles(nm);
+  // Server unit tests are not needed at runtime.
+  const serverDir = join(runtimeOut, 'packages', 'career-ui', 'server');
+  if (await exists(serverDir)) {
+    for (const name of await readdir(serverDir)) {
+      if (/\.test\.[cm]?[jt]sx?$/i.test(name)) {
+        await rm(join(serverDir, name), { force: true });
+      }
+    }
+  }
+
+  const after = await dirSizeBytes(runtimeOut);
+  const savedMb = ((before - after) / (1024 * 1024)).toFixed(1);
+  console.log(
+    `[pack:desktop] slim runtime ${savedMb} MB saved ` +
+      `(stubs @msfs-compat, drop UI deps/agent, strip ${junkPackages.removed + junkNm.removed} junk files)`,
+  );
+  console.log(
+    `[pack:desktop] runtime size ${(after / (1024 * 1024)).toFixed(1)} MB`,
+  );
 }
 
 /**
@@ -207,46 +369,21 @@ async function assembleRuntime() {
     { recursive: true },
   );
 
-  // agent — ship src (career-ui imports .ts) + dist for any JS consumers
-  await writeWorkspacePackage('agent', {
-    main: './dist/index.js',
-    exports: { '.': { import: './dist/index.js' } },
-    dependencies: {
-      '@msfs-compat/runtime': '0.1.0',
-      '@msfs-compat/shared': '0.1.0',
-    },
-  });
-  await cp(
-    join(root, 'packages', 'agent', 'src'),
-    join(runtimeOut, 'packages', 'agent', 'src'),
-    { recursive: true },
-  );
-  if (await exists(join(root, 'packages', 'agent', 'dist'))) {
-    await cp(
-      join(root, 'packages', 'agent', 'dist'),
-      join(runtimeOut, 'packages', 'agent', 'dist'),
-      { recursive: true },
-    );
-  }
-
-  // career-ui — server sources + Vite UI dist + public already in dist
-  const careerUiPkg = JSON.parse(
-    await readFile(join(root, 'packages', 'career-ui', 'package.json'), 'utf8'),
-  );
+  // career-ui — server sources + Vite UI dist (maplibre/react already in dist bundle)
   await writeWorkspacePackage('career-ui', {
     main: './server/api.ts',
     dependencies: {
       '@msfs-compat/runtime': '0.1.0',
       '@msfs-compat/shared': '0.1.0',
-      'maplibre-gl': careerUiPkg.dependencies['maplibre-gl'],
-      react: careerUiPkg.dependencies.react,
-      'react-dom': careerUiPkg.dependencies['react-dom'],
     },
   });
   await cp(
     join(root, 'packages', 'career-ui', 'server'),
     join(runtimeOut, 'packages', 'career-ui', 'server'),
-    { recursive: true },
+    {
+      recursive: true,
+      filter: (src) => !/\.test\.[cm]?[jt]sx?$/i.test(src),
+    },
   );
   await cp(
     join(root, 'packages', 'career-ui', 'dist'),
@@ -321,6 +458,7 @@ Player saves live under %AppData%\\\\Skyline Career\\\\career\\\\.
     );
   }
   console.log('[pack:desktop] runtime includes tsx ✓');
+  await slimRuntimePayload();
 }
 
 async function assembleHost() {

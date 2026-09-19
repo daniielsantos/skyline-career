@@ -3,6 +3,10 @@
  * Re-copy skyline-runtime + updater-nm trees after pack.
  * Also embed the Windows .exe icon / version strings (signAndEditExecutable is
  * off to avoid winCodeSign spawn failures, so builder skips rcedit).
+ *
+ * skyline-runtime/node_modules is already slimmed by pack-desktop
+ * (@msfs-compat stubs, no maplibre/react). Copy with dereference so Windows
+ * installs do not depend on build-machine junctions.
  */
 const { cp, access, mkdir, readFile } = require('node:fs/promises');
 const { join } = require('node:path');

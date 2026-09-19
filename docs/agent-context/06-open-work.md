@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **Desktop pack slim** — stubs `@msfs-compat` (sem duplicar packages), drop maplibre/react/agent do runtime, strip `.map`/`.d.ts`/tests, Electron `electronLanguages: en-US`. Detail: `packages/desktop/README.md`.
+
 Atualizado 2026-09-19: **Charter pay ≤12 ~1.3× frete** — coeffs `420+pax×55` / `nm×(2.35+pax×0.31)` (era 650/85 / 3.6/0.48); taper √ intacto. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **Base Charter table = Freight mold** — Accept/`td.actions`, Pay/Net/Dist/Ferry/selection iguais; Pax fica. Detail: [`24-port-fbo.md`](./24-port-fbo.md).

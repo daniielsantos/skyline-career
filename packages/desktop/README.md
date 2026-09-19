@@ -55,6 +55,18 @@ Produces under `artifacts/skyline-desktop/`:
 
 Pack **fails** if the Setup exe is missing/undersized or the `.blockmap` is missing (`nsis.differentialPackage: true`).
 
+### Runtime slim (2026-09-19)
+
+The installer is still Electron-heavy (~Chromium), but the Career payload is trimmed:
+
+1. **`@msfs-compat` stubs** — `node_modules/@msfs-compat/*` are tiny `package.json` pointers into `packages/*` (avoids afterPack `dereference` doubling career-ui/shared).
+2. **No UI npm deps in runtime** — maplibre/react stay out; the Vite `dist/` already bundles them.
+3. **No agent package** — desktop API never imports it.
+4. **Strip** `*.map`, `*.d.ts`, `*.test.js`, `*-dev.mjs` from the packed tree.
+5. **`electronLanguages: ["en-US"]`** — drop the other Chromium locale packs.
+
+tsx/esbuild stay (API still boots `server/api.ts`). Compiling the server to JS would drop another ~12 MB later.
+
 The pack script also:
 
 1. Builds `artifacts/skyline-updater-nm` — complete flat `electron-updater` dependency tree

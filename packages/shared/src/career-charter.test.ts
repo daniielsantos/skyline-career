@@ -133,6 +133,18 @@ describe('Charter economy', () => {
       narrow < twelve * 3.5,
       `narrow pay ${narrow} should stay < 3.5× twelve-pax ${twelve}`,
     );
+    // ≤12 band ~1.2–1.5× mid-gap freight (Sovereign-ish 10 pax @ 750–840 nm).
+    const lightJet = quoteCharterPayUsd({
+      distanceNm: 750,
+      groupSize: 10,
+      urgency: 'normal',
+      tier: 'standard',
+      international: false,
+    });
+    assert.ok(
+      lightJet >= 4_500 && lightJet <= 5_800,
+      `10-pax @750 nm pay ${lightJet} should sit ~1.3× freight leg (~$4–5k)`,
+    );
   });
 
   it('bands group sizes so light, med, and narrow loads all appear', () => {

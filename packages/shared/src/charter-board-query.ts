@@ -225,6 +225,23 @@ export function charterOfferMatchesPaxFilter(
   return n >= 49;
 }
 
+/** True when haul ≤ `distanceMaxNm` (same ceiling mold as Freights `distanceMaxNm`). */
+export function charterOfferMatchesDistanceMax(
+  distanceNm: number,
+  distanceMaxNm: number | null | undefined,
+): boolean {
+  if (
+    distanceMaxNm == null ||
+    !Number.isFinite(distanceMaxNm) ||
+    distanceMaxNm <= 0
+  ) {
+    return true;
+  }
+  const nm = Number(distanceNm);
+  if (!Number.isFinite(nm)) return false;
+  return nm <= distanceMaxNm;
+}
+
 /** Fit filter or net/fit sort needs per-offer aircraft fit before paging. */
 export function charterBoardNeedsFitCompute(
   sorts: readonly CharterBoardSortLevel[] | null | undefined,

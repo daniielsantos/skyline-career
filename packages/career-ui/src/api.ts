@@ -1673,6 +1673,7 @@ export function fetchCharters(opts: {
   lane?: '' | 'intl' | 'domestic' | 'pilot-domestic' | 'pilot-intl';
   fit?: '' | 'open' | 'locked';
   pax?: '' | 'light' | 'med' | 'narrow';
+  distanceMaxNm?: number | string;
   aircraftId?: string;
   page?: number;
   pageSize?: number;
@@ -1691,6 +1692,8 @@ export function fetchCharters(opts: {
   if (opts.lane) qs.set('lane', opts.lane);
   if (opts.fit) qs.set('fit', opts.fit);
   if (opts.pax) qs.set('pax', opts.pax);
+  const distanceMaxNm = String(opts.distanceMaxNm ?? '').trim();
+  if (distanceMaxNm) qs.set('distanceMaxNm', distanceMaxNm);
   if (aircraftId) qs.set('aircraftId', aircraftId);
   if (opts.page !== undefined) qs.set('page', String(opts.page));
   if (opts.pageSize !== undefined) qs.set('pageSize', String(opts.pageSize));

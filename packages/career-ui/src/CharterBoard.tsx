@@ -19,7 +19,7 @@ import {
 } from './board-money';
 import { IcaoLink } from './IcaoLink';
 
-export const CHARTER_PAGE_SIZE = 10;
+export const CHARTER_PAGE_SIZE = 12;
 
 export type CharterLaneFilter =
   | ''
@@ -102,6 +102,7 @@ export function CharterBoard(props: CharterBoardProps) {
   const [lane, setLane] = useState<CharterLaneFilter>('');
   const [fitFilter, setFitFilter] = useState<CharterFitFilter>('');
   const [paxFilter, setPaxFilter] = useState<CharterPaxFilter>('');
+  const [distanceMaxNm, setDistanceMaxNm] = useState('');
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [total, setTotal] = useState(0);
@@ -135,6 +136,7 @@ export function CharterBoard(props: CharterBoardProps) {
     lane !== '' ||
     fitFilter !== '' ||
     paxFilter !== '' ||
+    distanceMaxNm !== '' ||
     sorts.length > 0;
 
   useEffect(() => {
@@ -150,6 +152,7 @@ export function CharterBoard(props: CharterBoardProps) {
         lane: lane || undefined,
         fit: fitFilter || undefined,
         pax: paxFilter || undefined,
+        distanceMaxNm: distanceMaxNm || undefined,
         aircraftId,
         page,
         pageSize: CHARTER_PAGE_SIZE,
@@ -188,6 +191,7 @@ export function CharterBoard(props: CharterBoardProps) {
     originQuery,
     page,
     paxFilter,
+    distanceMaxNm,
     sorts,
   ]);
 
@@ -206,6 +210,7 @@ export function CharterBoard(props: CharterBoardProps) {
     setLane('');
     setFitFilter('');
     setPaxFilter('');
+    setDistanceMaxNm('');
     setSorts([]);
     setPage(1);
   }
@@ -392,7 +397,24 @@ export function CharterBoard(props: CharterBoardProps) {
                   </div>
                 </div>
               </th>
-              <th className="col-compact" />
+              <th className="col-compact">
+                <select
+                  className="route-lane-filter"
+                  aria-label="Maximum distance"
+                  value={distanceMaxNm}
+                  onChange={(event) => {
+                    setDistanceMaxNm(event.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">Any</option>
+                  <option value="250">≤ 250 nm</option>
+                  <option value="500">≤ 500 nm</option>
+                  <option value="1000">≤ 1,000 nm</option>
+                  <option value="2000">≤ 2,000 nm</option>
+                  <option value="3000">≤ 3,000 nm</option>
+                </select>
+              </th>
               <th className="col-compact">
                 <select
                   className="route-lane-filter"

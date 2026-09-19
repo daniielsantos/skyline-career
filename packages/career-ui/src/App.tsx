@@ -12578,6 +12578,31 @@ export function App() {
                     <div className="panel-head">
                       <div>
                         <h2>Base</h2>
+                        {(() => {
+                          const headerFbo = (playerFbos?.fbos ?? []).find(
+                            (f) =>
+                              f.icao.toUpperCase() ===
+                              (airportIcao ?? '').toUpperCase(),
+                          );
+                          if (!headerFbo) return null;
+                          const parkPct = Math.round(
+                            (1 - (headerFbo.parkingFeeMult ?? 1)) * 100,
+                          );
+                          const svcPct = Math.round(
+                            (1 - (headerFbo.serviceCostMult ?? 1)) * 100,
+                          );
+                          return (
+                            <p className="muted base-tier-line">
+                              T{headerFbo.tier}
+                              {parkPct > 0
+                                ? ` · −${parkPct}% parking`
+                                : ''}
+                              {svcPct > 0
+                                ? ` · −${svcPct}% Jet-A/MRO`
+                                : ''}
+                            </p>
+                          );
+                        })()}
                         {(playerFbos?.fbos.length ?? 0) > 1 ? (
                           <div
                             className="fbo-icao-switcher"
@@ -12652,12 +12677,6 @@ export function App() {
                           </p>
                         );
                       }
-                      const parkPct = Math.round(
-                        (1 - (localFbo.parkingFeeMult ?? 1)) * 100,
-                      );
-                      const svcPct = Math.round(
-                        (1 - (localFbo.serviceCostMult ?? 1)) * 100,
-                      );
                       const seat =
                         (baseDispatcher?.members ?? []).find(
                           (m) => m.fboId === localFbo.id,
@@ -12668,11 +12687,6 @@ export function App() {
                         <>
                           <div className="panel-head base-tier-head">
                             <div className="base-header-main">
-                              <p className="muted base-tier-line">
-                                T{localFbo.tier}
-                                {parkPct > 0 ? ` · −${parkPct}% parking` : ''}
-                                {svcPct > 0 ? ` · −${svcPct}% Jet-A/MRO` : ''}
-                              </p>
                               <div className="base-dispatcher-compact">
                                 {seat ? (
                                   <>
@@ -13981,45 +13995,78 @@ export function App() {
                                               const selected =
                                                 selectedCharterTourId ===
                                                 tour.id;
-                                              const paxLabel = formatTourPaxByLeg(
-                                                tour.legs,
-                                              );
+                                              const paxLabel =
+                                                formatTourPaxByLeg(tour.legs);
                                               return (
                                                 <tr
                                                   key={tour.id}
                                                   className={
                                                     selected
-                                                      ? 'selected'
+                                                      ? 'is-selected'
                                                       : undefined
                                                   }
-                                                  onClick={() =>
+                                                  onClick={() => {
+                                                    setSelectedFboHoldId(null);
+                                                    setSelectedFboMissionId(
+                                                      null,
+                                                    );
                                                     setSelectedCharterTourId(
-                                                      tour.id,
-                                                    )
-                                                  }
+                                                      (cur) =>
+                                                        cur === tour.id
+                                                          ? null
+                                                          : tour.id,
+                                                    );
+                                                  }}
                                                 >
                                                   <td>
                                                     <TourRouteLabel
-                                                      routeLabel={tour.routeLabel}
-                                                      onOpenAirport={openAirport}
+                                                      routeLabel={
+                                                        tour.routeLabel
+                                                      }
+                                                      onOpenAirport={
+                                                        openAirport
+                                                      }
                                                       busy={busy}
                                                     />
-                                                    {tour.totalFerryNm > 0.5 ? (
-                                                      <span className="base-dispatch-ferry-tag">
-                                                        {`Ferry · ${Math.round(tour.totalFerryNm)} nm`}
-                                                      </span>
-                                                    ) : null}
+                                                    {(() => {
+                                                      const ferry =
+                                                        describeTourFerry(
+                                                          tour.legs,
+                                                          tour.aircraftLocationIcao,
+                                                        );
+                                                      if (
+                                                        !ferry &&
+                                                        !(
+                                                          tour.totalFerryNm >
+                                                          0.5
+                                                        )
+                                                      ) {
+                                                        return null;
+                                                      }
+                                                      return (
+                                                        <span
+                                                          className="base-dispatch-ferry-tag"
+                                                          title={
+                                                            ferry?.detail ??
+                                                            undefined
+                                                          }
+                                                        >
+                                                          {ferry?.label ??
+                                                            `Ferry · ${Math.round(tour.totalFerryNm)} nm`}
+                                                        </span>
+                                                      );
+                                                    })()}
                                                   </td>
                                                   <td>{tour.legCount}</td>
                                                   <td>
-                                                    {Math.round(
+                                                    {formatBoardDistanceNm(
                                                       tour.totalDistanceNm,
                                                     )}
                                                   </td>
                                                   <td>
-                                                    {Math.round(
-                                                      tour.totalFerryNm,
-                                                    )}
+                                                    {tour.totalFerryNm > 0.5
+                                                      ? `${Math.round(tour.totalFerryNm)} nm`
+                                                      : '—'}
                                                   </td>
                                                   <td
                                                     title={
@@ -14030,23 +14077,37 @@ export function App() {
                                                   >
                                                     {paxLabel}
                                                   </td>
-                                                  <td>
-                                                    {formatMoney(
+                                                  <td className="pay">
+                                                    {boardMoneyLabel(
                                                       tour.totalPayUsd,
+                                                      formatMoney,
                                                     )}
                                                   </td>
-                                                  <td>
-                                                    {formatMoney(
+                                                  <td
+                                                    className={boardNetClassName(
                                                       tour.totalNetUsd,
                                                     )}
+                                                  >
+                                                    {boardMoneyLabel(
+                                                      tour.totalNetUsd,
+                                                      formatMoney,
+                                                    )}
                                                   </td>
                                                   <td>
-                                                    {tour.aircraftLabel}
-                                                    {tour.aircraftLocationIcao
-                                                      ? ` @ ${tour.aircraftLocationIcao}`
-                                                      : ''}
+                                                    <span>
+                                                      {tour.aircraftLabel}
+                                                    </span>
+                                                    {tour.aircraftLocationIcao ? (
+                                                      <small className="muted">
+                                                        {' '}
+                                                        @{' '}
+                                                        {
+                                                          tour.aircraftLocationIcao
+                                                        }
+                                                      </small>
+                                                    ) : null}
                                                   </td>
-                                                  <td>
+                                                  <td className="actions">
                                                     <button
                                                       type="button"
                                                       className="accept"

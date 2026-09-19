@@ -181,7 +181,9 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - Mantém parking / Jet-A / MRO perks (`career-fbo-perks.ts`). Spot continua 410. Phase 5 corta **novos** bonded holds.
 - Saves com 3 bases: grandfather (não vende); só bloqueia compra nova.
 - **2026-09-06:** **1ª Base CAPEX $0** (`quoteFboBuyUsd` owned===0); 2ª paga `tier × FBO_SECOND_BUY_MULT`. Sem ledger se debit 0.
-- **UI Base:** sem barra/capacidade bonded (legado); header = T# + perks parking/Jet-A. Holds grandfather só se ainda existirem na save.
+- **UI Base:** sem barra/capacidade bonded (legado); T# + perks parking/Jet-A ficam como subtítulo sob o h2 **Base** (não soltos acima do Dispatcher). Holds grandfather só se ainda existirem na save.
+- **Base Charter Search table parity (2026-09-19):** mesma moldura do Freight Search — `is-selected`, Dist/Ferry com `nm`/`—`, Pay/Net via `boardMoneyLabel`/`boardNetClassName`, ferry tag `describeTourFerry`, Accept em `td.actions`. Coluna Pax permanece (só Charter).
+- **Base perk line float (2026-09-19):** sintoma = `T1 · −15% parking · −5% Jet-A/MRO` parecia solto no meio do panel. Causa = segundo `panel-head` acima do Dispatcher. Fix: subtítulo do h2 Base.
 
 ### Base Dispatcher seat + Search — shipped
 

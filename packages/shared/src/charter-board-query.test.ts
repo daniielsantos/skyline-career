@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   charterBoardNeedsFitCompute,
   charterBoardNeedsFitSort,
+  charterOfferMatchesDistanceMax,
   charterOfferMatchesPaxFilter,
   formatCharterBoardSorts,
   parseCharterBoardFitFilter,
@@ -109,6 +110,10 @@ test('parses charter lane, fit, and pax filters', () => {
   assert.equal(charterOfferMatchesPaxFilter(24, 'med'), true);
   assert.equal(charterOfferMatchesPaxFilter(80, 'narrow'), true);
   assert.equal(charterOfferMatchesPaxFilter(12, undefined), true);
+  assert.equal(charterOfferMatchesDistanceMax(400, undefined), true);
+  assert.equal(charterOfferMatchesDistanceMax(400, 500), true);
+  assert.equal(charterOfferMatchesDistanceMax(600, 500), false);
+  assert.equal(charterOfferMatchesDistanceMax(Number.NaN, 500), false);
 });
 
 test('sorts by net and fit when present', () => {

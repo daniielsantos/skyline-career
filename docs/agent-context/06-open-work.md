@@ -1,5 +1,13 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **Charter pay ≤12 ~1.3× frete** — coeffs `420+pax×55` / `nm×(2.35+pax×0.31)` (era 650/85 / 3.6/0.48); taper √ intacto. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **Base Charter table = Freight mold** — Accept/`td.actions`, Pay/Net/Dist/Ferry/selection iguais; Pax fica. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-19: **Base perk line** — `T# · −% parking · −% Jet-A/MRO` ancorado sob o h2 Base (não flutuando acima do Dispatcher). Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-19: **Charter distance filter + page 12** — teto nm na coluna Distance (igual Freights) + `CHARTER_PAGE_SIZE` 12. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **Updater progress monotonic** — barra in-app não recua quando o diferencial emite % jumpy entre HTTP ranges (`clampDesktopUpdateProgressPct`). Detail: `packages/desktop/README.md` · `DesktopUpdates.tsx`.
 
 Atualizado 2026-09-19: **PG lots/charter UPSERT (Wave 1)** — pulse deixa de `DELETE FROM lots/charter_offers` + INSERT full; orphan-delete vs RAM + `ON CONFLICT DO UPDATE … WHERE IS DISTINCT FROM` (skip no-op). Timing: `CAREER_PG_PERSIST_TIMING=1`. Re-medir pulse ms + row counts no VPS. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

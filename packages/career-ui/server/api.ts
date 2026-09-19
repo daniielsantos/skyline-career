@@ -94,6 +94,7 @@ import {
   parseCharterBoardFitFilter,
   parseCharterBoardPaxFilter,
   charterOfferMatchesPaxFilter,
+  charterOfferMatchesDistanceMax,
   sortCharterBoardRows,
   charterBoardNeedsFitCompute,
   formatCharterBoardSorts,
@@ -4973,6 +4974,9 @@ export function createCareerApiServer(port = 8787) {
         const paxFilter = parseCharterBoardPaxFilter(
           url.searchParams.get('pax'),
         );
+        const distanceMaxNm = parsePositiveNumberParam(
+          url.searchParams.get('distanceMaxNm'),
+        );
         const aircraftId = url.searchParams.get('aircraftId')?.trim();
         const requestedSorts = parseCharterBoardSorts(
           url.searchParams.get('sort'),
@@ -5079,6 +5083,14 @@ export function createCareerApiServer(port = 8787) {
                 if (originCountry !== pilotCountryId) return false;
               }
               if (!charterOfferMatchesPaxFilter(offer.groupSize, paxFilter)) {
+                return false;
+              }
+              if (
+                !charterOfferMatchesDistanceMax(
+                  offer.distanceNm,
+                  distanceMaxNm,
+                )
+              ) {
                 return false;
               }
               return true;

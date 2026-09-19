@@ -255,6 +255,17 @@ export function charterPayPaxWeight(groupSize: number): number {
   return 12 + Math.sqrt(n - 12) * 1.85;
 }
 
+/**
+ * Charter trip quote coeffs (2026-09-19 retune).
+ * Calibrated so ≤12 pax (GA/LJ) lands ~1.2–1.5× mid-gap freight gross on
+ * the same haul (~1.3× avg); √ taper weight unchanged so narrow stays
+ * ~2–3× a 12-pax trip, not a second jackpot curve.
+ */
+export const CHARTER_TRIP_BASE_USD = 420;
+export const CHARTER_TRIP_PER_PAX_USD = 55;
+export const CHARTER_NM_BASE_USD = 2.35;
+export const CHARTER_NM_PER_PAX_USD = 0.31;
+
 /** Transparent trip quote; no freight value or commodity-price input. */
 export function quoteCharterPayUsd(opts: {
   distanceNm: number;
@@ -268,8 +279,9 @@ export function quoteCharterPayUsd(opts: {
   const urgencyMult = { normal: 1, priority: 1.22, urgent: 1.48 }[opts.urgency];
   const tierMult = { standard: 1, premium: 1.35, executive: 1.8 }[opts.tier];
   const internationalMult = opts.international ? 1.2 : 1;
-  const trip = 650 + pax * 85;
-  const distancePay = distance * (3.6 + pax * 0.48);
+  const trip = CHARTER_TRIP_BASE_USD + pax * CHARTER_TRIP_PER_PAX_USD;
+  const distancePay =
+    distance * (CHARTER_NM_BASE_USD + pax * CHARTER_NM_PER_PAX_USD);
   return Math.max(
     500,
     Math.round((trip + distancePay) * urgencyMult * tierMult * internationalMult),

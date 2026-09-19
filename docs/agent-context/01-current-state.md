@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **480cf88** / desktop **0.3.130** shipped: Add F7 dealer claim lock with owner_company_id persist. Release: [v0.3.130](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.130).
+
+
 `main` **c8a720b** / desktop **0.3.129** shipped: Add MP presence board and aircraft pool F7 claim. Release: [v0.3.129](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.129).
 
 

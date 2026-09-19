@@ -11877,21 +11877,39 @@ function* formLotsFromImbalances(
   // Soft-cap skipAll kills bulk formation, so Curitiba/Ilhéus-class hubs only
   // posted GA last-mile scraps. These budgeted passes ignore skipAll/skipSmall
   // and force feeder-band lots along curated corridors to majors/regionals.
+  //
+  // Open-count MUST be indexed: a full lots scan per spoke×SKU (spoke densify)
+  // was O(countries × commodities × spokes × lots) and stalled the VPS pulse
+  // (~10+ min / 8 ticks → gateway fetch failed).
+  const openFeederBandByOrigin = new Map<string, number>();
+  let openFeederBandIndexed = false;
+  const feederBandKey = (originIcao: string, commodityId: CommodityId): string =>
+    `${commodityId}:${originIcao.trim().toUpperCase()}`;
+  const ensureOpenFeederBandIndex = (): void => {
+    if (openFeederBandIndexed) return;
+    openFeederBandIndexed = true;
+    for (const lot of world.lots) {
+      if (lot.status !== 'available' && lot.status !== 'reserved') continue;
+      if (lot.quantityKg < FEEDER_LTL_MIN_KG) continue;
+      if (lot.quantityKg >= LARGE_LOT_MIN_KG) continue;
+      const key = feederBandKey(lot.originIcao, lot.commodityId);
+      openFeederBandByOrigin.set(key, (openFeederBandByOrigin.get(key) ?? 0) + 1);
+    }
+  };
   const countOpenFeederBandFrom = (
     originIcao: string,
     commodityId: CommodityId,
   ): number => {
-    const code = originIcao.trim().toUpperCase();
-    let n = 0;
-    for (const lot of world.lots) {
-      if (lot.status !== 'available' && lot.status !== 'reserved') continue;
-      if (lot.commodityId !== commodityId) continue;
-      if (lot.originIcao.trim().toUpperCase() !== code) continue;
-      if (lot.quantityKg < FEEDER_LTL_MIN_KG) continue;
-      if (lot.quantityKg >= LARGE_LOT_MIN_KG) continue;
-      n += 1;
-    }
-    return n;
+    ensureOpenFeederBandIndex();
+    return openFeederBandByOrigin.get(feederBandKey(originIcao, commodityId)) ?? 0;
+  };
+  const bumpOpenFeederBandFrom = (
+    originIcao: string,
+    commodityId: CommodityId,
+  ): void => {
+    ensureOpenFeederBandIndex();
+    const key = feederBandKey(originIcao, commodityId);
+    openFeederBandByOrigin.set(key, (openFeederBandByOrigin.get(key) ?? 0) + 1);
   };
 
   const runDomesticFeederPass = (
@@ -12039,6 +12057,7 @@ function* formLotsFromImbalances(
           );
           if (formed) {
             formedThisTick += 1;
+            bumpOpenFeederBandFrom(origin.ap.icao, commodity.id);
             break;
           }
         }

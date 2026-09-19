@@ -54,6 +54,12 @@ Atualizado 2026-09-19: **Oceania densify Wave A (~+47 → 110)** — AU+18/PG+12
 
 Atualizado 2026-09-19: **Oceania densify Wave B (~+40 → 150)** — AU+17/PG+6/NZ+6/PF+6/NC+3/KI+1/TO+1; seed **2368**; SimBrief **2368**; OA runways +40 (0 synth). First TO densify (NFTL). Homolog: AYBM→YCIN. Gate pulse **OC** live ≥85% 7d antes Wave C. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **Spoke feeder measure day-0** — v0.3.127 install OK; seed SBIL last-mile + feeder to SBSV/SBRF PASS (dest room required). Live pulse +1-2d aberto vs baseline d57. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **Pulse SLOW timing logs** — economy-pulse log com lockWait/tick/save/settle/lots (SLOW se >=60s). Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-19: **Spoke feeder open-count stall** — pós densify+feeder, pulse “infinito” / gateway fetch failed. Causa: full-scan lots por spoke×SKU. Fix: índice `openFeederBandByOrigin` 1×/tick. **world-api redeploy** required. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **Spoke feeder LTL dial** — pass `formLotsSpokeFeeder` (budget 4 / open 1 / soft `· spoke feeder`) após regional; last-mile GA 450 kg intact. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **Asia Wave A measure ~6d (dia 50→56)** — AS hubs **254→300** (d51); live quiet **0%**, dead **0–2**; fill/soft **~53/54%** flat; lots **2440→2566**; pay p50 **$1160→$1085** (esperado: median-of-hub-medians). World 99% live / fill 56%. Gate Wave A **PASS** → migrar Wave B (seed 2231). Detail: [`08-economy.md`](./08-economy.md).

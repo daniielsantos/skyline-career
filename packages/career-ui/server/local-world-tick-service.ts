@@ -40,6 +40,19 @@ export function isHeadlessPulseEnabled(
   return raw !== '0' && raw !== 'false' && raw !== 'off' && raw !== 'no';
 }
 
+/** Per catch-up chunk timing (pulse spike diag). */
+export type PulseChunkTiming = {
+  lockWaitMs: number;
+  tickMs: number;
+  saveMs: number;
+  settleMs: number;
+  lots: number;
+};
+
+export function emptyPulseChunkTiming(): PulseChunkTiming {
+  return { lockWaitMs: 0, tickMs: 0, saveMs: 0, settleMs: 0, lots: 0 };
+}
+
 /** Minimal hooks the Career API already exposes under `withCareerLock` / writes. */
 export type LocalWorldTickDeps = {
   /** SP always `'local'` until profile picker maps saves → world rows. */
@@ -51,11 +64,12 @@ export type LocalWorldTickDeps = {
   /**
    * Catch-up write path — today `withCareerWrite(() => undefined, {
    * catchUp: true, catchUpTicks, cooperative: true })`.
+   * Returns phase timings for pulse spike diagnosis.
    */
   runCatchUpWrite(opts: {
     catchUpTicks: number;
     cooperative: boolean;
-  }): Promise<void>;
+  }): Promise<PulseChunkTiming>;
 
   /**
    * Company passive fee settlement + lastSeenTick persist (MP session/open path).
@@ -123,6 +137,7 @@ export class LocalWorldTickService implements WorldTickService {
     const cooperative = opts.cooperative !== false;
     const t0 = performance.now();
     this.pulseInFlight = true;
+    const totals = emptyPulseChunkTiming();
     try {
       await this.deps.beforeAdvance?.();
       let remaining = totalTicks;
@@ -131,7 +146,15 @@ export class LocalWorldTickService implements WorldTickService {
         const chunk = cooperative
           ? Math.min(CATCH_UP_LOCK_CHUNK_TICKS, remaining)
           : remaining;
-        await this.deps.runCatchUpWrite({ catchUpTicks: chunk, cooperative });
+        const chunkTiming = await this.deps.runCatchUpWrite({
+          catchUpTicks: chunk,
+          cooperative,
+        });
+        totals.lockWaitMs += chunkTiming.lockWaitMs;
+        totals.tickMs += chunkTiming.tickMs;
+        totals.saveMs += chunkTiming.saveMs;
+        totals.settleMs += chunkTiming.settleMs;
+        totals.lots = Math.max(totals.lots, chunkTiming.lots);
         advancedTicks += chunk;
         remaining -= chunk;
         if (remaining > 0) {
@@ -143,8 +166,14 @@ export class LocalWorldTickService implements WorldTickService {
         ? economyTicksBehind(world.lastBatchAtMs ?? Date.now(), Date.now())
         : 0;
       const wallMs = performance.now() - t0;
+      const slow = wallMs >= 60_000;
       console.log(
-        `[career] economy-pulse ok ticks=${advancedTicks} ${Math.round(wallMs)}ms`,
+        `[career] economy-pulse ${slow ? 'SLOW ' : ''}ok ticks=${advancedTicks} ${Math.round(wallMs)}ms` +
+          ` lockWait=${Math.round(totals.lockWaitMs)}ms` +
+          ` tick=${Math.round(totals.tickMs)}ms` +
+          ` save=${Math.round(totals.saveMs)}ms` +
+          ` settle=${Math.round(totals.settleMs)}ms` +
+          ` lots=${totals.lots}`,
       );
       return {
         advancedTicks,
@@ -155,7 +184,11 @@ export class LocalWorldTickService implements WorldTickService {
       };
     } catch (error) {
       console.error(
-        `[career] economy-pulse fail ticks=${totalTicks} ${Math.round(performance.now() - t0)}ms:`,
+        `[career] economy-pulse fail ticks=${totalTicks} ${Math.round(performance.now() - t0)}ms` +
+          ` lockWait=${Math.round(totals.lockWaitMs)}ms` +
+          ` tick=${Math.round(totals.tickMs)}ms` +
+          ` save=${Math.round(totals.saveMs)}ms` +
+          ` settle=${Math.round(totals.settleMs)}ms:`,
         error instanceof Error ? error.message : error,
       );
       return {

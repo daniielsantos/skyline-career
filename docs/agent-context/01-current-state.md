@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **cf8428e** / desktop **0.3.119** shipped: Clarify Max ferry Search UX and slim the desktop pack by bundling the Career API. Release: [v0.3.119](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.119).
+
+
 `main` **8f6a9d9** / desktop **0.3.118** shipped: Restore agent sources in the desktop runtime pack. Release: [v0.3.118](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.118).
 
 

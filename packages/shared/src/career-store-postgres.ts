@@ -40,6 +40,7 @@ import {
   type VaJoinRequestRow,
   type VaMemberRow,
   type VaPilotRankRow,
+  type VaPublishResult,
 } from './career-va.js';
 import type { CareerCompanyRow, EnsureCompanyOpts } from './career-companies.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
@@ -1260,12 +1261,7 @@ export class PostgresCareerStore implements CareerStore {
     displayName: string;
     homeHubIcao: string;
     recruiting?: boolean;
-  }): Promise<{
-    companyId: string;
-    displayName: string;
-    homeHubIcao: string;
-    recruiting: boolean;
-  }> {
+  }): Promise<VaPublishResult> {
     await this.ready;
     const companyId = opts.companyId.trim();
     if (!companyId) throw new Error('companyId required');

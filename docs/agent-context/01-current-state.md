@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **6ef0770** / desktop **0.3.114** shipped: Honor Dispatcher search cap and stop PG pulse wipe of live lots. Release: [v0.3.114](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.114).
+
+
 `main` **8ca2926** / desktop **0.3.113** shipped: Enable NSIS differential updates and require blockmap on release. Release: [v0.3.113](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.113).
 
 

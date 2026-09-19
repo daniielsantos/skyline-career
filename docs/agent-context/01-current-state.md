@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **796afb9** / desktop **0.3.112** shipped: Align catalog maxPax to matched SimBrief rows and fix charter tour route/pax UI. Release: [v0.3.112](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.112).
+
+
 `main` **7c35d20** / desktop **0.3.111** shipped: Densify EU-1 Wave 1 hubs with MSFS homologation and runway merge. Release: [v0.3.111](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.111).
 
 

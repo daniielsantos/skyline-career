@@ -161,6 +161,7 @@ import {
 import { ensureV10Ddl, migrateV9toV10IfNeeded } from './career-store-v10.js';
 import { ensureV11Ddl, migrateV10toV11IfNeeded } from './career-store-v11.js';
 import { ensureV12Ddl, migrateV11toV12IfNeeded } from './career-store-v12.js';
+import { ensureV13Ddl, migrateV12toV13IfNeeded } from './career-store-v13.js';
 import {
   acceptJoinRequest,
   createCompanyInvite,
@@ -176,6 +177,7 @@ import {
   listOpenCompanyInvites,
   listPendingJoinRequests,
   listPilotHaulRankingForCompany,
+  isCompanyVaListed,
   listVaDirectory,
   recordInternalHaulStats,
   rejectJoinRequest,
@@ -194,7 +196,7 @@ import {
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '12';
+export const CAREER_STORE_SCHEMA_VERSION = '13';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -452,6 +454,7 @@ export interface CareerStore {
     homeHubIcao: string;
     recruiting?: boolean;
   }): VaPublishResult | Promise<VaPublishResult>;
+  vaIsListed(companyId: string): boolean | Promise<boolean>;
   vaIsRecruiting(companyId: string): boolean | Promise<boolean>;
   vaCreateJoinRequest(opts: {
     companyId: string;
@@ -820,6 +823,10 @@ class JsonCareerStore implements CareerStore {
     throw new Error('VA requires SQLite career store');
   }
 
+  vaIsListed(_companyId: string): boolean {
+    return false;
+  }
+
   vaIsRecruiting(_companyId: string): boolean {
     return false;
   }
@@ -1143,6 +1150,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV10Ddl(db);
   ensureV11Ddl(db);
   ensureV12Ddl(db);
+  ensureV13Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -1222,7 +1230,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV11 = Number.parseInt(afterV11?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV11) || verAfterV11 < 12) {
-    migrateV11toV12IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV11toV12IfNeeded(db, metaSet, '12');
+  }
+  const afterV12 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV12 = Number.parseInt(afterV12?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV12) || verAfterV12 < 13) {
+    migrateV12toV13IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -1553,6 +1568,10 @@ class SqliteCareerStore implements CareerStore {
     recruiting?: boolean;
   }): VaPublishResult {
     return publishCompanyAsVa(this.db, opts);
+  }
+
+  vaIsListed(companyId: string): boolean {
+    return isCompanyVaListed(this.db, companyId);
   }
 
   vaIsRecruiting(companyId: string): boolean {

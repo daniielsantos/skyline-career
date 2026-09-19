@@ -227,7 +227,9 @@ import {
   DesktopUpdatesCard,
 } from './DesktopUpdates';
 import { VaPage } from './VaPage';
+import { VaDirectoryPage } from './VaDirectoryPage';
 import { VaRankingPage } from './VaRankingPage';
+import { CompanyVaPublishCard } from './CompanyVaPublishCard';
 import { EconomySyncIndicator } from './EconomySyncIndicator';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
@@ -11530,7 +11532,9 @@ export function App() {
                 : tab === 'ports'
                   ? 'Ports'
                   : tab === 'va'
-                    ? 'VA'
+                    ? 'My VA'
+                    : tab === 'vaDirectory'
+                      ? 'VAs'
                     : tab === 'vaRanking'
                       ? 'Ranking'
                   : tab === 'missions'
@@ -11579,7 +11583,9 @@ export function App() {
                 : tab === 'ports'
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
                   : tab === 'va'
-                    ? 'Browse VAs, join, or list your company — same wallet and fleet.'
+                    ? 'Roster, invites, and recruiting for your listed airline.'
+                    : tab === 'vaDirectory'
+                      ? 'Published virtual airlines — request to join or use an invite code.'
                     : tab === 'vaRanking'
                       ? 'Internal Haul distance and count over the last week.'
                   : tab === 'missions'
@@ -11982,12 +11988,23 @@ export function App() {
           </button>
           <button
             type="button"
+            className={
+              !showAirport && tab === 'vaDirectory' ? 'tab active' : 'tab'
+            }
+            onClick={() => selectTab('vaDirectory')}
+            disabled={busy}
+            title="Browse published virtual airlines"
+          >
+            VAs
+          </button>
+          <button
+            type="button"
             className={!showAirport && tab === 'va' ? 'tab active' : 'tab'}
             onClick={() => selectTab('va')}
             disabled={busy}
-            title="Virtual airlines — directory, join, list your company"
+            title="Manage your VA roster and recruiting"
           >
-            VA
+            My VA
           </button>
           <button
             type="button"
@@ -18327,11 +18344,10 @@ export function App() {
             setToast(message);
           }}
         />
-      ) : hubSelected && tab === 'va' ? (
-        <VaPage
+      ) : hubSelected && tab === 'vaDirectory' ? (
+        <VaDirectoryPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
-          defaultHomeHubIcao={homeHubIcao}
           onCompaniesChanged={(next) => {
             setCompanies((prev) =>
               next.map((c) => {
@@ -18349,6 +18365,13 @@ export function App() {
               }),
             );
           }}
+        />
+      ) : hubSelected && tab === 'va' ? (
+        <VaPage
+          authRequired={authRequired}
+          activeCompanyId={activeCompanyId}
+          onGoCompany={() => selectTab('pilot')}
+          onGoDirectory={() => selectTab('vaDirectory')}
         />
       ) : hubSelected && tab === 'vaRanking' ? (
         <VaRankingPage authRequired={authRequired} />
@@ -18421,6 +18444,16 @@ export function App() {
                 </div>
               )}
             </div>
+            <CompanyVaPublishCard
+              authRequired={authRequired}
+              activeCompanyId={activeCompanyId}
+              defaultHomeHubIcao={homeHubIcao}
+              defaultDisplayName={
+                companies.find((c) => c.id === activeCompanyId)?.displayName ||
+                pilotName
+              }
+              onGoVa={() => selectTab('va')}
+            />
             <div className="pilot-card pilot-card-wide">
               <h3>Progression</h3>
               <dl className="pilot-dl muted">

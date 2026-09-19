@@ -1286,10 +1286,20 @@ export class PostgresCareerStore implements CareerStore {
     }
     const recruiting = opts.recruiting !== false;
     await this.pool.query(
-      `UPDATE companies SET display_name = $1, home_hub_icao = $2, recruiting = $3 WHERE id = $4`,
+      `UPDATE companies SET display_name = $1, home_hub_icao = $2, recruiting = $3, va_listed = TRUE WHERE id = $4`,
       [displayName, homeHubIcao, recruiting, companyId],
     );
-    return { companyId, displayName, homeHubIcao, recruiting };
+    return { companyId, displayName, homeHubIcao, recruiting, listed: true };
+  }
+
+  async vaIsListed(companyId: string): Promise<boolean> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT va_listed FROM companies WHERE id = $1`,
+      [companyId],
+    );
+    if (!rows[0]) return false;
+    return Boolean(rows[0].va_listed);
   }
 
   async vaDirectory(opts?: {
@@ -1303,10 +1313,11 @@ export class PostgresCareerStore implements CareerStore {
     const includeClosed = opts?.includeClosed === true;
     const worldId = opts?.worldId?.trim() || null;
     const { rows } = await this.pool.query(
-      `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting,
+      `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
               (SELECT COUNT(*)::int FROM company_members m WHERE m.company_id = c.id) AS member_count
        FROM companies c
-       WHERE ($1::text IS NULL OR COALESCE(c.world_id, 'local') = $1)
+       WHERE c.va_listed IS TRUE
+         AND ($1::text IS NULL OR COALESCE(c.world_id, 'local') = $1)
          AND ($2::int = 1 OR c.recruiting IS TRUE)
        ORDER BY c.display_name ASC, c.id ASC
        LIMIT $3`,
@@ -1336,6 +1347,7 @@ export class PostgresCareerStore implements CareerStore {
         memberCount,
         memberCap: VA_MEMBER_CAP,
         recruiting,
+        listed: Boolean(r.va_listed),
         seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
         myRequestStatus,
       });
@@ -1355,6 +1367,9 @@ export class PostgresCareerStore implements CareerStore {
     }
     if (!(await this.vaIsRecruiting(companyId))) {
       throw new Error('This company is not recruiting');
+    }
+    if (!(await this.vaIsListed(companyId))) {
+      throw new Error('This company is not listed as a VA');
     }
     const countRes = await this.pool.query(
       `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,

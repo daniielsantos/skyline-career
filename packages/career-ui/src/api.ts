@@ -4956,6 +4956,10 @@ export function fetchVaMembers() {
     memberCap: number;
     role: string;
     members: VaMember[];
+    listed: boolean;
+    recruiting: boolean;
+    displayName: string;
+    homeHubIcao: string;
   }>('/api/va/members');
 }
 
@@ -5033,6 +5037,7 @@ export type VaDirectoryEntry = {
   memberCount: number;
   memberCap: number;
   recruiting: boolean;
+  listed?: boolean;
   seatsOpen: number;
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
 };

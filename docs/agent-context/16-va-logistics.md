@@ -132,11 +132,17 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - Fase C (porto→porto) — **CAI**; revenda = Demand
 - AI pilot voando a ponte
 
+### VA page split (2026-09-19)
+
+**Sintoma:** uma página misturava directory + publish + My VA; companies sem publish apareciam como VA (`recruiting` default).
+**Causa:** UI monólito; directory filtrava só recruiting, não “listada”.
+**Fix:** `va_listed` (SQLite **v13** / PG **v23**). Sidebar **VAs** (cards) / **My VA** (roster) / **Ranking**. Publish em **Company → Become a VA**. Directory só `va_listed`.
+
 ### VA pages + publish (2026-09-19)
 
 **Sintoma:** Settings card VA zoado (directory+roster+hauls+ranking numa coluna); jogador não achava a página.
 **Causa:** UI cravada em Settings; “criar VA” não existia como fluxo.
-**Fix:** sidebar **VA** (`/va`) + **Ranking** (`/ranking`); Settings card removido. Narrativa: company = VA (reusa tenant). **Publish** = `POST /api/va/publish` atualiza `display_name` / `home_hub` / recruiting da company ativa (owner). Hauls ficam em Ports.
+**Fix:** sidebar VA + Ranking; Settings card removido. Narrativa: company = tenant; VA = listada via publish.
 
 ### Desktop local Failed to start / Career API exit 1 (2026-09-19)
 

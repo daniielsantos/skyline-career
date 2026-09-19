@@ -1024,6 +1024,10 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE`,
   );
+  // Schema v23 — company is a VA only after explicit publish.
+  await pool.query(
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS va_listed BOOLEAN NOT NULL DEFAULT FALSE`,
+  );
   await pool.query(`
     CREATE TABLE IF NOT EXISTS company_join_requests (
       id TEXT PRIMARY KEY NOT NULL,

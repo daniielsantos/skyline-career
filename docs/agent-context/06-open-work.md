@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **VA split** — VAs directory (cards) / My VA / Ranking; Become a VA na Company; `va_listed` v13/PG v23. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
 Atualizado 2026-09-19: **VA pages** — sidebar VA + Ranking; publish = listar company ativa (sem 2º tenant); Settings card removido. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 Atualizado 2026-09-19: **VA directory + join requests** — lista de VAs, Request join, Accept/Reject, Stop recruiting (sem spam). Invite code fica como atalho privado. Spec: [`16-va-logistics.md`](./16-va-logistics.md).

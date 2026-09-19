@@ -55,13 +55,22 @@ export const PAGE_HELP = {
   },
   va: {
     id: 'va',
-    title: 'How VA works',
+    title: 'How My VA works',
     kicker: 'Page guide',
     bullets: [
-      'Your company is the VA — same wallet and fleet. Publish a name and home hub to appear in the directory.',
-      'Pilots request to join open VAs, or use a private invite code when recruiting is off.',
-      'Owners and dispatchers manage roster, invites, and join requests here.',
-      'Internal Hauls are created and flown from Ports, not from this page.',
+      'Manage roster, invites, join requests, and recruiting for your listed airline.',
+      'Your company is not a VA until you publish it from Company (name + home hub).',
+      'Internal Hauls stay on Ports — this page is people and hiring only.',
+    ],
+  },
+  vaDirectory: {
+    id: 'va-directory',
+    title: 'How VAs directory works',
+    kicker: 'Page guide',
+    bullets: [
+      'Lists only published virtual airlines — not every company in the world.',
+      'Request to join when hiring is open, or use a private invite code anytime.',
+      'Owners publish from Company; manage seats under My VA.',
     ],
   },
   vaRanking: {
@@ -167,6 +176,8 @@ export function resolvePageHelp(opts: {
       return PAGE_HELP.ports;
     case 'va':
       return PAGE_HELP.va;
+    case 'vaDirectory':
+      return PAGE_HELP.vaDirectory;
     case 'vaRanking':
       return PAGE_HELP.vaRanking;
     case 'aircraft':

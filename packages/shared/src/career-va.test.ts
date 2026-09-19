@@ -41,14 +41,14 @@ describe('VA IH-2', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('bumps schema to v12 with invite tables', () => {
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '12');
+  it('bumps schema to v13 with va_listed', () => {
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '13');
     const dbPath = store.sqlitePath!;
     const db = new DatabaseSync(dbPath);
     const row = db
       .prepare(`SELECT value FROM meta WHERE key = 'schema_version'`)
       .get() as { value: string };
-    assert.equal(row.value, '12');
+    assert.equal(row.value, '13');
     const tables = db
       .prepare(
         `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('company_invites','company_haul_stats')`,
@@ -317,6 +317,14 @@ describe('VA IH-2', () => {
       }),
     );
     const companyId = owner.company!.id;
+    await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: owner.account.id,
+        displayName: 'Dir Airways',
+        homeHubIcao: 'SBGR',
+      }),
+    );
     const pilot = await Promise.resolve(
       store.authRegister({
         loginName: 'va_dir_pilot',
@@ -383,6 +391,8 @@ describe('VA IH-2', () => {
       }),
     );
     const companyId = owner.company!.id;
+    const before = await Promise.resolve(store.vaDirectory({}));
+    assert.ok(!before.some((e) => e.companyId === companyId));
     const published = await Promise.resolve(
       store.vaPublish({
         companyId,
@@ -394,11 +404,14 @@ describe('VA IH-2', () => {
     assert.equal(published.displayName, 'Skyline Airbridge');
     assert.equal(published.homeHubIcao, 'SBGR');
     assert.equal(published.recruiting, true);
+    assert.equal(published.listed, true);
+    assert.equal(await Promise.resolve(store.vaIsListed(companyId)), true);
     const dir = await Promise.resolve(store.vaDirectory({}));
     const row = dir.find((e) => e.companyId === companyId);
     assert.ok(row);
     assert.equal(row!.displayName, 'Skyline Airbridge');
     assert.equal(row!.homeHubIcao, 'SBGR');
     assert.equal(row!.recruiting, true);
+    assert.equal(row!.listed, true);
   });
 });

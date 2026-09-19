@@ -13755,3 +13755,121 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font-size: 0.76rem;
 }
 
+
+/* VA directory (Jetcard-style operator cards) */
+.va-directory-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.va-directory-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+.va-directory-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.va-directory-search {
+  flex: 1 1 14rem;
+  min-width: 10rem;
+  background: color-mix(in srgb, var(--surface-2) 85%, var(--bg-deep));
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.45rem 0.65rem;
+}
+.va-directory-invite {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex: 1 1 14rem;
+}
+.va-directory-invite input {
+  flex: 1;
+  min-width: 8rem;
+  background: color-mix(in srgb, var(--surface-2) 85%, var(--bg-deep));
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.45rem 0.65rem;
+}
+.va-directory-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.va-directory-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--bg-deep));
+  padding: 0.85rem 1rem;
+}
+.va-directory-card-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.5rem;
+  align-items: center;
+  flex: 1 1 18rem;
+}
+.va-directory-card-id {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 10rem;
+}
+.va-directory-card-name {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.va-directory-card-code {
+  font-size: 0.75rem;
+  color: var(--accent, #c4a574);
+  letter-spacing: 0.02em;
+}
+.va-directory-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.1rem;
+}
+.va-directory-card-stats > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 3.2rem;
+}
+.va-stat-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.va-stat-value {
+  font-size: 0.95rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.va-stat-value.is-open {
+  color: #6fbf73;
+}
+.va-stat-value.is-closed {
+  color: var(--muted);
+}
+.va-directory-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.va-directory-pending {
+  font-size: 0.8rem;
+  color: var(--muted);
+}

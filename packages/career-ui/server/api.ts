@@ -3309,11 +3309,21 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const members = await Promise.resolve(store.vaListMembers(companyId));
+        const listed = await Promise.resolve(store.vaIsListed(companyId));
+        const recruiting = await Promise.resolve(store.vaIsRecruiting(companyId));
+        const companies = await Promise.resolve(
+          store.authListCompaniesForAccount(session.account.id),
+        );
+        const co = companies.find((c) => c.id === companyId);
         send(res, 200, {
           companyId,
           memberCap: VA_MEMBER_CAP,
           role: membership.role,
           members,
+          listed,
+          recruiting,
+          displayName: co?.displayName?.trim() || companyId,
+          homeHubIcao: co?.homeHubIcao?.trim() || '',
         });
         return;
       }

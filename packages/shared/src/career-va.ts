@@ -13,6 +13,7 @@ import {
   type CareerCompanyMember,
 } from './career-auth.js';
 import { ensureV12Ddl } from './career-store-v12.js';
+import { ensureV13Ddl } from './career-store-v13.js';
 import type {
   CareerMissionsState,
   MissionIntent,
@@ -511,6 +512,7 @@ export type VaDirectoryEntry = {
   memberCount: number;
   memberCap: number;
   recruiting: boolean;
+  listed: boolean;
   seatsOpen: number;
   /** Pending request from the viewing account, if any. */
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
@@ -562,11 +564,12 @@ export type VaPublishResult = {
   displayName: string;
   homeHubIcao: string;
   recruiting: boolean;
+  listed: boolean;
 };
 
 /**
- * Owner lists the existing company row as a VA (no second tenant).
- * Updates display name + home hub and opens recruiting by default.
+ * Owner turns the existing company into a listed VA (no second tenant).
+ * Sets display name + home hub, marks va_listed, opens recruiting by default.
  */
 export function publishCompanyAsVa(
   db: SqliteDb,
@@ -578,7 +581,7 @@ export function publishCompanyAsVa(
     recruiting?: boolean;
   },
 ): VaPublishResult {
-  ensureV12Ddl(db);
+  ensureV13Ddl(db);
   const companyId = opts.companyId.trim();
   if (!companyId) throw new Error('companyId required');
   const actor = getCompanyMembership(db, opts.actorAccountId, companyId);
@@ -598,9 +601,24 @@ export function publishCompanyAsVa(
   }
   const recruiting = opts.recruiting !== false;
   db.prepare(
-    `UPDATE companies SET display_name = ?, home_hub_icao = ?, recruiting = ? WHERE id = ?`,
+    `UPDATE companies SET display_name = ?, home_hub_icao = ?, recruiting = ?, va_listed = 1 WHERE id = ?`,
   ).run(displayName, homeHubIcao, recruiting ? 1 : 0, companyId);
-  return { companyId, displayName, homeHubIcao, recruiting };
+  return {
+    companyId,
+    displayName,
+    homeHubIcao,
+    recruiting,
+    listed: true,
+  };
+}
+
+export function isCompanyVaListed(db: SqliteDb, companyId: string): boolean {
+  ensureV13Ddl(db);
+  const row = db
+    .prepare(`SELECT va_listed FROM companies WHERE id = ?`)
+    .get(companyId) as { va_listed: number } | undefined;
+  if (!row) return false;
+  return Number(row.va_listed) !== 0;
 }
 
 export function listVaDirectory(
@@ -608,21 +626,22 @@ export function listVaDirectory(
   opts: {
     worldId?: string;
     accountId?: string;
-    /** When true, include closed (not recruiting) VAs as read-only. */
+    /** When true, include closed (not recruiting) listed VAs as read-only. */
     includeClosed?: boolean;
     limit?: number;
   } = {},
 ): VaDirectoryEntry[] {
-  ensureV12Ddl(db);
+  ensureV13Ddl(db);
   const limit = Math.max(1, Math.min(100, opts.limit ?? 50));
   const includeClosed = opts.includeClosed === true;
   const worldId = opts.worldId?.trim() || null;
   const rows = db
     .prepare(
-      `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting,
+      `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
               (SELECT COUNT(*) FROM company_members m WHERE m.company_id = c.id) AS member_count
        FROM companies c
-       WHERE (? IS NULL OR IFNULL(c.world_id, 'local') = ?)
+       WHERE c.va_listed != 0
+         AND (? IS NULL OR IFNULL(c.world_id, 'local') = ?)
          AND (? = 1 OR c.recruiting != 0)
        ORDER BY c.display_name ASC, c.id ASC
        LIMIT ?`,
@@ -632,6 +651,7 @@ export function listVaDirectory(
     display_name: string;
     home_hub_icao: string;
     recruiting: number;
+    va_listed: number;
     member_count: number;
   }>;
 
@@ -663,6 +683,7 @@ export function listVaDirectory(
       memberCount,
       memberCap: VA_MEMBER_CAP,
       recruiting,
+      listed: Number(row.va_listed) !== 0,
       seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
       myRequestStatus,
     });
@@ -682,6 +703,9 @@ export function createJoinRequest(
   }
   if (!isCompanyRecruiting(db, companyId)) {
     throw new Error('This company is not recruiting');
+  }
+  if (!isCompanyVaListed(db, companyId)) {
+    throw new Error('This company is not listed as a VA');
   }
   const count = countCompanyMembers(db, companyId);
   if (count >= VA_MEMBER_CAP) {

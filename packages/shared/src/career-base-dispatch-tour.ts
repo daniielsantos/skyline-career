@@ -48,8 +48,8 @@ import type {
 } from './types/career-economy.js';
 import { assignAircraftToMission } from './career-fleet.js';
 
-/** Max tours returned to the desk table. */
-export const BASE_DISPATCH_TOUR_MAX = 8;
+/** Max tours returned to the desk table (hard ceiling; ACE scout policy max is 12). */
+export const BASE_DISPATCH_TOUR_MAX = 12;
 
 /** Search supports a single freight or a 2–4 leg tour. */
 export const BASE_DISPATCH_TOUR_LEGS_MIN = 1;
@@ -780,7 +780,7 @@ export function listBaseDispatchTours(
   );
   const maxTours = Math.max(
     1,
-    Math.min(BASE_DISPATCH_TOUR_MAX, opts.max ?? BASE_DISPATCH_TOUR_MAX),
+    Math.min(BASE_DISPATCH_TOUR_MAX, opts.max ?? policy.max),
   );
   const minKg = Math.max(0, opts.minKg ?? BASE_DISPATCH_SCOUT_MIN_KG);
   // "Return" only has meaning for a chain; a single freight has one destination.

@@ -11,9 +11,17 @@
  */
 
 import type pg from 'pg';
-import { CHARTER_GROUP_SIZE_MAX, shouldRetainCharterOffer } from './career-charter.js';
+import {
+  CHARTER_DEAD_OFFER_RETENTION_TICKS,
+  CHARTER_GROUP_SIZE_MAX,
+  shouldRetainCharterOffer,
+} from './career-charter.js';
 import { parseClientUpdatePolicy } from './career-client-update-policy.js';
-import { CAREER_COMMODITIES, shouldRetainLot } from './career-economy.js';
+import {
+  CAREER_COMMODITIES,
+  DEAD_LOT_RETENTION_TICKS,
+  shouldRetainLot,
+} from './career-economy.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
 import {
@@ -660,6 +668,246 @@ async function insertChunks(
       flat,
     );
   }
+}
+
+async function upsertChunks(
+  client: pg.PoolClient,
+  sqlPrefix: string,
+  colCount: number,
+  rows: unknown[][],
+  onConflictSql: string,
+  chunkSize = BATCH_SIZE,
+): Promise<void> {
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    await client.query(
+      `${sqlPrefix} VALUES ${placeholders(chunk.length, colCount)} ${onConflictSql}`,
+      chunk.flat(),
+    );
+  }
+}
+
+function pgPersistTimingEnabled(): boolean {
+  return process.env.CAREER_PG_PERSIST_TIMING === '1';
+}
+
+function logPgPersistTiming(
+  slice: string,
+  stats: { deleted: number; upserted: number; ms: number },
+): void {
+  if (!pgPersistTimingEnabled()) return;
+  console.log(
+    `[pg-persist] ${slice} deleted=${stats.deleted} upserted=${stats.upserted} ${stats.ms.toFixed(1)}ms`,
+  );
+}
+
+/** Tick floor for expired lots still kept — mirrors `shouldRetainLot`. */
+export function lotPgRetainKeepFromTick(
+  tick: number,
+  retentionTicks: number = DEAD_LOT_RETENTION_TICKS,
+): number {
+  return tick - Math.max(0, Math.floor(retentionTicks));
+}
+
+/** Tick floor for expired charter offers — mirrors `shouldRetainCharterOffer`. */
+export function charterOfferPgRetainKeepFromTick(
+  tick: number,
+  retentionTicks: number = CHARTER_DEAD_OFFER_RETENTION_TICKS,
+): number {
+  return tick - Math.max(0, Math.floor(retentionTicks));
+}
+
+/**
+ * SQL-parity retain check for lots rows (status + expires). Used by tests and
+ * optional status-based DELETE; orphan sync against RAM ids is authoritative.
+ */
+export function lotPgRowMatchesRetain(
+  status: string,
+  expiresAtTick: number,
+  tick: number,
+  retentionTicks: number = DEAD_LOT_RETENTION_TICKS,
+): boolean {
+  if (
+    status === 'available' ||
+    status === 'reserved' ||
+    status === 'in_transit'
+  ) {
+    return true;
+  }
+  if (status !== 'expired') return false;
+  return expiresAtTick >= lotPgRetainKeepFromTick(tick, retentionTicks);
+}
+
+export function charterOfferPgRowMatchesRetain(
+  status: string,
+  expiresAtTick: number,
+  tick: number,
+  retentionTicks: number = CHARTER_DEAD_OFFER_RETENTION_TICKS,
+): boolean {
+  if (status === 'available' || status === 'reserved') return true;
+  if (status !== 'expired') return false;
+  return (
+    expiresAtTick >= charterOfferPgRetainKeepFromTick(tick, retentionTicks)
+  );
+}
+
+const LOT_UPSERT_ON_CONFLICT = `ON CONFLICT (id) DO UPDATE SET
+  commodity_id = EXCLUDED.commodity_id,
+  origin_icao = EXCLUDED.origin_icao,
+  dest_icao = EXCLUDED.dest_icao,
+  quantity_kg = EXCLUDED.quantity_kg,
+  reserved_kg = EXCLUDED.reserved_kg,
+  created_at_tick = EXCLUDED.created_at_tick,
+  expires_at_tick = EXCLUDED.expires_at_tick,
+  pay_usd = EXCLUDED.pay_usd,
+  base_pay_usd = EXCLUDED.base_pay_usd,
+  urgency = EXCLUDED.urgency,
+  reason = EXCLUDED.reason,
+  status = EXCLUDED.status,
+  origin_country_id = EXCLUDED.origin_country_id,
+  dest_country_id = EXCLUDED.dest_country_id,
+  world_id = EXCLUDED.world_id,
+  claimed_by_company_id = EXCLUDED.claimed_by_company_id
+WHERE lots.commodity_id IS DISTINCT FROM EXCLUDED.commodity_id
+   OR lots.origin_icao IS DISTINCT FROM EXCLUDED.origin_icao
+   OR lots.dest_icao IS DISTINCT FROM EXCLUDED.dest_icao
+   OR lots.quantity_kg IS DISTINCT FROM EXCLUDED.quantity_kg
+   OR lots.reserved_kg IS DISTINCT FROM EXCLUDED.reserved_kg
+   OR lots.created_at_tick IS DISTINCT FROM EXCLUDED.created_at_tick
+   OR lots.expires_at_tick IS DISTINCT FROM EXCLUDED.expires_at_tick
+   OR lots.pay_usd IS DISTINCT FROM EXCLUDED.pay_usd
+   OR lots.base_pay_usd IS DISTINCT FROM EXCLUDED.base_pay_usd
+   OR lots.urgency IS DISTINCT FROM EXCLUDED.urgency
+   OR lots.reason IS DISTINCT FROM EXCLUDED.reason
+   OR lots.status IS DISTINCT FROM EXCLUDED.status
+   OR lots.origin_country_id IS DISTINCT FROM EXCLUDED.origin_country_id
+   OR lots.dest_country_id IS DISTINCT FROM EXCLUDED.dest_country_id
+   OR lots.world_id IS DISTINCT FROM EXCLUDED.world_id
+   OR lots.claimed_by_company_id IS DISTINCT FROM EXCLUDED.claimed_by_company_id`;
+
+const CHARTER_OFFER_UPSERT_ON_CONFLICT = `ON CONFLICT (world_id, id) DO UPDATE SET
+  demand_id = EXCLUDED.demand_id,
+  origin_icao = EXCLUDED.origin_icao,
+  dest_icao = EXCLUDED.dest_icao,
+  group_size = EXCLUDED.group_size,
+  baggage_kg = EXCLUDED.baggage_kg,
+  distance_nm = EXCLUDED.distance_nm,
+  tier = EXCLUDED.tier,
+  urgency = EXCLUDED.urgency,
+  international = EXCLUDED.international,
+  pay_usd = EXCLUDED.pay_usd,
+  created_at_tick = EXCLUDED.created_at_tick,
+  expires_at_tick = EXCLUDED.expires_at_tick,
+  status = EXCLUDED.status,
+  mission_id = EXCLUDED.mission_id
+WHERE charter_offers.demand_id IS DISTINCT FROM EXCLUDED.demand_id
+   OR charter_offers.origin_icao IS DISTINCT FROM EXCLUDED.origin_icao
+   OR charter_offers.dest_icao IS DISTINCT FROM EXCLUDED.dest_icao
+   OR charter_offers.group_size IS DISTINCT FROM EXCLUDED.group_size
+   OR charter_offers.baggage_kg IS DISTINCT FROM EXCLUDED.baggage_kg
+   OR charter_offers.distance_nm IS DISTINCT FROM EXCLUDED.distance_nm
+   OR charter_offers.tier IS DISTINCT FROM EXCLUDED.tier
+   OR charter_offers.urgency IS DISTINCT FROM EXCLUDED.urgency
+   OR charter_offers.international IS DISTINCT FROM EXCLUDED.international
+   OR charter_offers.pay_usd IS DISTINCT FROM EXCLUDED.pay_usd
+   OR charter_offers.created_at_tick IS DISTINCT FROM EXCLUDED.created_at_tick
+   OR charter_offers.expires_at_tick IS DISTINCT FROM EXCLUDED.expires_at_tick
+   OR charter_offers.status IS DISTINCT FROM EXCLUDED.status
+   OR charter_offers.mission_id IS DISTINCT FROM EXCLUDED.mission_id`;
+
+/**
+ * Sync RAM retained lots → PG without full wipe. Deletes orphans / dead rows
+ * not in `lotRows`, then UPSERTs (skips no-op updates via IS DISTINCT FROM).
+ */
+export async function syncLotsTableToPg(
+  client: pg.PoolClient,
+  worldId: string,
+  lotRows: unknown[][],
+): Promise<{ deleted: number; upserted: number; ms: number }> {
+  const t0 = performance.now();
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const retainedIds = lotRows.map((row) => String(row[0]));
+  let deleted = 0;
+  if (retainedIds.length === 0) {
+    const wipe = await client.query(`DELETE FROM lots WHERE world_id = $1`, [
+      wid,
+    ]);
+    deleted = wipe.rowCount ?? 0;
+  } else {
+    const orphan = await client.query(
+      `DELETE FROM lots WHERE world_id = $1 AND NOT (id = ANY($2::text[]))`,
+      [wid, retainedIds],
+    );
+    deleted = orphan.rowCount ?? 0;
+  }
+  if (lotRows.length > 0) {
+    await upsertChunks(
+      client,
+      `INSERT INTO lots (
+         id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+         created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+         origin_country_id, dest_country_id, world_id, claimed_by_company_id
+       )`,
+      17,
+      lotRows,
+      LOT_UPSERT_ON_CONFLICT,
+    );
+  }
+  const stats = {
+    deleted,
+    upserted: lotRows.length,
+    ms: performance.now() - t0,
+  };
+  logPgPersistTiming('lots', stats);
+  return stats;
+}
+
+/**
+ * Sync RAM retained charter offers → PG without full wipe.
+ */
+export async function syncCharterOffersTableToPg(
+  client: pg.PoolClient,
+  worldId: string,
+  offerRows: unknown[][],
+): Promise<{ deleted: number; upserted: number; ms: number }> {
+  const t0 = performance.now();
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  // col0 = world_id, col1 = id
+  const retainedIds = offerRows.map((row) => String(row[1]));
+  let deleted = 0;
+  if (retainedIds.length === 0) {
+    const wipe = await client.query(
+      `DELETE FROM charter_offers WHERE world_id = $1`,
+      [wid],
+    );
+    deleted = wipe.rowCount ?? 0;
+  } else {
+    const orphan = await client.query(
+      `DELETE FROM charter_offers WHERE world_id = $1 AND NOT (id = ANY($2::text[]))`,
+      [wid, retainedIds],
+    );
+    deleted = orphan.rowCount ?? 0;
+  }
+  if (offerRows.length > 0) {
+    await upsertChunks(
+      client,
+      `INSERT INTO charter_offers (
+         world_id, id, demand_id, origin_icao, dest_icao, group_size, baggage_kg,
+         distance_nm, tier, urgency, international, pay_usd, created_at_tick,
+         expires_at_tick, status, mission_id
+       )`,
+      16,
+      offerRows,
+      CHARTER_OFFER_UPSERT_ON_CONFLICT,
+    );
+  }
+  const stats = {
+    deleted,
+    upserted: offerRows.length,
+    ms: performance.now() - t0,
+  };
+  logPgPersistTiming('charter_offers', stats);
+  return stats;
 }
 
 async function withTx<T>(
@@ -2334,19 +2582,7 @@ export async function persistEconomyTablesToPg(
       );
     }
 
-    await client.query(`DELETE FROM lots WHERE world_id = $1`, [wid]);
-    if (lotRows.length > 0) {
-      await insertChunks(
-        client,
-        `INSERT INTO lots (
-           id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-           created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
-           origin_country_id, dest_country_id, world_id, claimed_by_company_id
-         )`,
-        17,
-        lotRows,
-      );
-    }
+    await syncLotsTableToPg(client, wid, lotRows);
 
     await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
     if (inboundRows.length > 0) {
@@ -2497,8 +2733,7 @@ export async function persistEconomyTablesToPg(
       );
     }
 
-    // No FK from offers→demand: delete offers first (matches SQLite full-replace order).
-    await client.query(`DELETE FROM charter_offers WHERE world_id = $1`, [wid]);
+    // Demand/hubs still full-replace; offers use orphan-delete + UPSERT (Wave 1).
     await client.query(`DELETE FROM charter_demand WHERE world_id = $1`, [wid]);
     await client.query(`DELETE FROM charter_hubs WHERE world_id = $1`, [wid]);
     if (charterDemandRows.length > 0) {
@@ -2523,18 +2758,7 @@ export async function persistEconomyTablesToPg(
         charterHubRows,
       );
     }
-    if (charterOfferRows.length > 0) {
-      await insertChunks(
-        client,
-        `INSERT INTO charter_offers (
-           world_id, id, demand_id, origin_icao, dest_icao, group_size, baggage_kg,
-           distance_nm, tier, urgency, international, pay_usd, created_at_tick,
-           expires_at_tick, status, mission_id
-         )`,
-        16,
-        charterOfferRows,
-      );
-    }
+    await syncCharterOffersTableToPg(client, wid, charterOfferRows);
     const revision = await client.query(
       `SELECT revision FROM economy_meta WHERE world_id = $1`,
       [wid],
@@ -2844,19 +3068,7 @@ export async function persistNpcLiveToPg(
       );
     }
 
-    await client.query(`DELETE FROM lots WHERE world_id = $1`, [wid]);
-    if (lotRows.length > 0) {
-      await insertChunks(
-        client,
-        `INSERT INTO lots (
-           id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
-           created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
-           origin_country_id, dest_country_id, world_id, claimed_by_company_id
-         )`,
-        17,
-        lotRows,
-      );
-    }
+    await syncLotsTableToPg(client, wid, lotRows);
 
     await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
     if (inboundRows.length > 0) {

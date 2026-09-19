@@ -3467,11 +3467,30 @@ export function App() {
   const [tickAdvanceClockMs, setTickAdvanceClockMs] = useState(0);
 
   /** Paint wallet without flashing $0 from ambient-tenant / empty shells mid +Nd. */
+  const walletCommitHoldRef = useRef<{ usd: number; untilMs: number } | null>(
+    null,
+  );
   const paintWallet = useCallback((next: number | null | undefined) => {
     if (typeof next !== 'number' || !Number.isFinite(next)) return;
     if (next === 0 && walletRef.current > 0 && tickAdvanceRef.current) {
       return;
     }
+    const hold = walletCommitHoldRef.current;
+    if (hold && Date.now() < hold.untilMs) {
+      // Mutation response already painted the true balance; ignore in-flight
+      // /api/state or /api/missions that started before the write committed.
+      if (Math.abs(next - hold.usd) > 0.5) return;
+      walletCommitHoldRef.current = null;
+    }
+    setWallet(next);
+  }, []);
+  /** Authoritative wallet from a mutation — holds ambient refresh from regressing. */
+  const commitWallet = useCallback((next: number) => {
+    if (!Number.isFinite(next)) return;
+    walletCommitHoldRef.current = {
+      usd: next,
+      untilMs: Date.now() + 12_000,
+    };
     setWallet(next);
   }, []);
   /** Local lock for Crew fly — avoids app-wide busy flash on every button. */
@@ -6886,7 +6905,7 @@ export function App() {
   async function onDebugCreditWallet(amountUsd = 5_000) {
     await run(async () => {
       const result = await postDebugCreditWallet({ amountUsd });
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(`Debug credit +${formatMoney(result.creditedUsd)}`);
     });
@@ -13422,7 +13441,10 @@ export function App() {
                                               </select>
                                             </label>
                                           ) : null}
-                                          <label className="base-dispatch-leave-base">
+                                          <label
+                                            className="base-dispatch-leave-base"
+                                            title="Sort preference only — Prefer ranks tours that start at this Base higher. Does not hide other origins."
+                                          >
                                             <span>Leave Base</span>
                                             <select
                                               value={
@@ -13438,7 +13460,6 @@ export function App() {
                                               disabled={
                                                 busy || dispatchTourBusy
                                               }
-                                              title="Prefer first-leg origins at this Base ICAO (neighbors still eligible)"
                                             >
                                               <option value="on">Prefer</option>
                                               <option value="off">Off</option>
@@ -13886,7 +13907,10 @@ export function App() {
                                                 </select>
                                               </label>
                                             ) : null}
-                                            <label className="base-dispatch-leave-base">
+                                            <label
+                                              className="base-dispatch-leave-base"
+                                              title="Sort preference only — Prefer ranks tours that start at this Base higher. Does not hide other origins."
+                                            >
                                               <span>Leave Base</span>
                                               <select
                                                 value={
@@ -18511,7 +18535,7 @@ export function App() {
               busy={busy}
               formatMoney={formatMoney}
               onCreditUpdated={({ walletUsd, companyCredit: next }) => {
-                setWallet(walletUsd);
+                commitWallet(walletUsd);
                 setCompanyCredit(next);
                 void fetchCashflow()
                   .then((snap) => {

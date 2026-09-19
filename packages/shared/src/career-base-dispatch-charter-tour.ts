@@ -235,7 +235,7 @@ export function listBaseDispatchCharterTours(
   );
   const maxTours = Math.max(
     1,
-    Math.min(BASE_DISPATCH_TOUR_MAX, opts.max ?? BASE_DISPATCH_TOUR_MAX),
+    Math.min(BASE_DISPATCH_TOUR_MAX, opts.max ?? policy.max),
   );
   const returnMode = legCount === 1 ? 'none' : (opts.returnMode ?? 'none');
   const chainFerryMaxNm = resolveMaxFerryNm(opts.maxFerryNm);

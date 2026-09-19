@@ -8657,7 +8657,10 @@ export function createCareerApiServer(port = 8787) {
           send(res, 403, { error: 'Dev Mode is required' });
           return;
         }
-        const body = (await readBody(req)) as { amountUsd?: number };
+        const body = (await readBody(req)) as {
+          amountUsd?: number;
+          companyId?: string;
+        };
         const amountUsd =
           typeof body.amountUsd === 'number' && Number.isFinite(body.amountUsd)
             ? Math.round(body.amountUsd * 100) / 100
@@ -8666,6 +8669,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'amountUsd must be non-zero' });
           return;
         }
+        const creditCompanyId = companyIdFromRequest(req, body.companyId);
         const payload = await withCareerWrite((world, missions) => {
           applyWalletDelta(missions, {
             amountUsd,
@@ -8674,7 +8678,7 @@ export function createCareerApiServer(port = 8787) {
             note: 'Debug wallet credit',
           });
           return { walletUsd: missions.walletUsd, creditedUsd: amountUsd };
-        }, { persist: 'company' });
+        }, { persist: 'company', companyId: creditCompanyId });
         send(res, 200, payload);
         return;
       }

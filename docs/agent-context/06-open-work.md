@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **PG lots/charter UPSERT (Wave 1)** — pulse deixa de `DELETE FROM lots/charter_offers` + INSERT full; orphan-delete vs RAM + `ON CONFLICT DO UPDATE … WHERE IS DISTINCT FROM` (skip no-op). Timing: `CAREER_PG_PERSIST_TIMING=1`. Re-medir pulse ms + row counts no VPS. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-19: **Debug +$ wallet flicker** — credit pintava o saldo novo e o poll `/api/state` (ou missions) in-flight revertia ao antigo até reload. Causa: `POST /api/debug/credit-wallet` sem `companyId` + `paintWallet` aceitava regressão ambient. Fix: write com `companyIdFromRequest`; `commitWallet` segura ~12s contra paint stale. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **Base Search cap vs Dispatcher perk** — Freights/Charters truncavam em 8 e ignoravam ACE “up to 11”. Fix: `policy.max` (6–12) + ceiling 12. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
 Atualizado 2026-09-19: **Desktop differential updates** — `nsis.differentialPackage: true`; pack/release **exigem** `Airframe-Setup-*.exe.blockmap` no GitHub Release. Download pode ser delta (cache do Setup anterior); install NSIS continua full overwrite. Smoke: N→N+1 (pode ser full se cache frio) e N+1→N+2 (delta). Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-19: **Catalog maxPax ← SimBrief** — `audit-simbrief-max-pax.mjs --sync` alinhou 28 SKUs ao `airframe_passengers` da row matched. Phenom 7 OK; C680/Longitude 10; Vision/Honda 6; ATR/SAAB/YS11/DC3/DC6/Fenix/F100 etc. Pack stations **não** capam seats. Restam 2 FALLBACK (Bandeirante / F28). Detail: [`12-pax-efb-due.md`](./12-pax-efb-due.md).

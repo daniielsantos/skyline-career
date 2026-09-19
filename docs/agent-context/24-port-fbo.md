@@ -208,7 +208,8 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 
 ### Base Dispatcher Search — shipped (single + tour)
 
-- `career-base-dispatch-tour.ts`: lists **1 real Market lot** or chains **2–4 lots** (region lens, ferry between legs ≤**200 nm** default / UI **Max ferry** filter, soft return Base/origin). Cap **8** options. Requires hired Dispatcher (`policy.mode === 'fleet'`).
+- `career-base-dispatch-tour.ts`: lists **1 real Market lot** or chains **2–4 lots** (region lens, ferry between legs ≤**200 nm** default / UI **Max ferry** filter, soft return Base/origin). Cap = Dispatcher scout `policy.max` (6–12 by skill; hard ceiling **12**). Requires hired Dispatcher (`policy.mode === 'fleet'`).
+- **Tour/Charter desk cap vs perk (2026-09-19):** Search truncava em **8** (`BASE_DISPATCH_TOUR_MAX`) e ignorava `policy.max` — ACE “up to 11” mostrava 8. Fix: `maxTours = min(12, policy.max)` em freight + charter Search (igual Scout).
 - **Legs cap (2026-09-07):** Search UI + `BASE_DISPATCH_TOUR_LEGS_MAX` = **4** (was 3).
 - **Unified single-leg UI (2026-09-07):** removeu botão/tabela **Scan**; filtro Legs = **1/2/3/4**. Legs 1 abre Manifest normal e não cria Active Tour; Return fica oculto. Legs 2–4 mantêm Active Tour.
 - **Origin vazio (2026-09-07):** UI envia o ICAO da Base (igual ao placeholder). Antes o server caía silenciosamente na localização do avião — ex. campo parecia SBKP, mas buscava desde SBCT.

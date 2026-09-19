@@ -7,12 +7,14 @@ import { describe, it } from 'node:test';
 import {
   hireBaseDispatcherCandidate,
   refreshBaseDispatcherHirePool,
+  scoutPolicyFromSkill,
 } from './career-base-dispatcher.js';
 import {
   acceptActiveTourLeg,
   activeTourView,
   attachActiveTourFromMission,
   bindActiveTourLegToMission,
+  BASE_DISPATCH_TOUR_MAX,
   BASE_TOUR_SOFT_HOLD_TTL_TICKS,
   confirmBaseDispatchTour,
   dropActiveTour,
@@ -144,7 +146,7 @@ describe('base dispatch tours', () => {
       returnMode: 'none',
     });
     assert.ok(tours.length >= 1);
-    assert.ok(tours.length <= 8);
+    assert.ok(tours.length <= BASE_DISPATCH_TOUR_MAX);
     assert.ok(tours.every((t) => t.legCount === 2));
     assert.ok(tours.every((t) => t.legs.length === 2));
     assert.ok(
@@ -1479,5 +1481,13 @@ describe('base dispatch soft-hold + leave Base', () => {
       }
     }
     void off;
+  });
+
+  it('tour desk ceiling covers ACE scout policy.max (perk “up to N”)', () => {
+    assert.equal(BASE_DISPATCH_TOUR_MAX, 12);
+    const ace = scoutPolicyFromSkill(95);
+    assert.ok(ace.max >= 11);
+    assert.ok(ace.max <= BASE_DISPATCH_TOUR_MAX);
+    assert.ok(scoutPolicyFromSkill(99).max <= BASE_DISPATCH_TOUR_MAX);
   });
 });

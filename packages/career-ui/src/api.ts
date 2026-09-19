@@ -4,7 +4,7 @@ import { parseApiResponse } from './api-response';
 import {
   isClientUpdateRequired,
   parseClientUpdatePolicy,
-} from '@msfs-compat/shared';
+} from '@msfs-compat/shared/career-client-update-policy';
 
 export type AircraftClass =
   | 'narrow_freighter'

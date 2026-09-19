@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./career-client-update-policy": {
+      "types": "./dist/career-client-update-policy.d.ts",
+      "import": "./dist/career-client-update-policy.js"
     }
   },
   "scripts": {

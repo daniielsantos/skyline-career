@@ -61,7 +61,7 @@ The installer is still Electron-heavy (~Chromium), but the Career payload is tri
 
 1. **`@msfs-compat` stubs** — `node_modules/@msfs-compat/*` are tiny `package.json` pointers into `packages/*` (avoids afterPack `dereference` doubling career-ui/shared).
 2. **No UI npm deps in runtime** — maplibre/react stay out; the Vite `dist/` already bundles them.
-3. **No agent package** — desktop API never imports it.
+3. **Keep `packages/agent/src`** — career-ui server imports it via relative `../../agent/src` (SimBrief / pipe / OFP). Do not drop it.
 4. **Strip** `*.map`, `*.d.ts`, `*.test.js`, `*-dev.mjs` from the packed tree.
 5. **`electronLanguages: ["en-US"]`** — drop the other Chromium locale packs.
 

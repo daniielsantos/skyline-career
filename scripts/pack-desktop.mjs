@@ -187,12 +187,6 @@ async function slimRuntimePayload() {
 
   await writeMsfsCompatStubs(runtimeOut);
 
-  // Agent is CLI/probe only — career-ui never imports it on desktop.
-  await rm(join(runtimeOut, 'packages', 'agent'), {
-    recursive: true,
-    force: true,
-  });
-
   const junkPackages = await stripPackedJunkFiles(join(runtimeOut, 'packages'));
   const junkNm = await stripPackedJunkFiles(nm);
   // Server unit tests are not needed at runtime.
@@ -209,7 +203,7 @@ async function slimRuntimePayload() {
   const savedMb = ((before - after) / (1024 * 1024)).toFixed(1);
   console.log(
     `[pack:desktop] slim runtime ${savedMb} MB saved ` +
-      `(stubs @msfs-compat, drop UI deps/agent, strip ${junkPackages.removed + junkNm.removed} junk files)`,
+      `(stubs @msfs-compat, drop UI deps, strip ${junkPackages.removed + junkNm.removed} junk files)`,
   );
   console.log(
     `[pack:desktop] runtime size ${(after / (1024 * 1024)).toFixed(1)} MB`,
@@ -369,6 +363,24 @@ async function assembleRuntime() {
     { recursive: true },
   );
 
+  // agent — career-ui server imports ../../agent/src/*.ts (SimBrief, pipe, OFP)
+  await writeWorkspacePackage('agent', {
+    main: './dist/index.js',
+    exports: { '.': { import: './dist/index.js' } },
+    dependencies: {
+      '@msfs-compat/runtime': '0.1.0',
+      '@msfs-compat/shared': '0.1.0',
+    },
+  });
+  await cp(
+    join(root, 'packages', 'agent', 'src'),
+    join(runtimeOut, 'packages', 'agent', 'src'),
+    {
+      recursive: true,
+      filter: (src) => !/\.test\.[cm]?[jt]sx?$/i.test(src),
+    },
+  );
+
   // career-ui — server sources + Vite UI dist (maplibre/react already in dist bundle)
   await writeWorkspacePackage('career-ui', {
     main: './server/api.ts',
@@ -459,6 +471,20 @@ Player saves live under %AppData%\\\\Skyline Career\\\\career\\\\.
   }
   console.log('[pack:desktop] runtime includes tsx ✓');
   await slimRuntimePayload();
+
+  const agentDispatch = join(
+    runtimeOut,
+    'packages',
+    'agent',
+    'src',
+    'ofp-compliance',
+    'simbrief-dispatch.ts',
+  );
+  if (!(await exists(agentDispatch))) {
+    throw new Error(
+      'skyline-runtime missing packages/agent/src/ofp-compliance/simbrief-dispatch.ts — career-ui server imports it',
+    );
+  }
 }
 
 async function assembleHost() {

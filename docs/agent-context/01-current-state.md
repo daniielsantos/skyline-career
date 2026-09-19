@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **6234f80** / desktop **0.3.110** shipped: Widen US intl gateways and soft-cap Pacific remotes. Release: [v0.3.110](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.110).
+
+
 `main` **5cbddb9** / desktop **0.3.109** shipped: Stop persisting dead lots and charter offers on every pulse. Release: [v0.3.109](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.109).
 
 

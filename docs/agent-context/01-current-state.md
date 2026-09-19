@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **4d60413** / desktop **0.3.117** shipped: Slim the desktop installer by dropping duplicate runtime payload. Release: [v0.3.117](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.117).
+
+
 `main` **66bd739** / desktop **0.3.116** shipped: Tune charter pay toward freight and align Base Charter Search UI. Release: [v0.3.116](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.116).
 
 

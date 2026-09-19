@@ -1,6 +1,6 @@
 {
   "name": "skyline-career-desktop",
-  "version": "0.3.116",
+  "version": "0.3.117",
   "private": true,
   "description": "Airframe Career desktop shell (Electron)",
   "author": "Airframe Career",
@@ -23,7 +23,9 @@
     "executableName": "Airframe Career",
     "copyright": "Copyright © Airframe Career",
     "electronVersion": "35.7.5",
-    "electronLanguages": ["en-US"],
+    "electronLanguages": [
+      "en-US"
+    ],
     "afterPack": "./afterPack.cjs",
     "directories": {
       "output": "../../artifacts/skyline-desktop",

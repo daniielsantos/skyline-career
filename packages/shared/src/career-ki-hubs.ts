@@ -5,6 +5,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { KI_DENSIFY_HUBS, KI_DENSIFY_HUB_COUNT } from './career-ki-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -46,9 +47,10 @@ export const KI_CAREER_HUBS: readonly KiCareerHubDef[] = [
     produce: { perishables: 1.2, general: 1.15, supplies: 1.1 },
     consume: { electronics: 0.9, machinery: 0.85, fuel: 1.15 },
   },
+  ...KI_DENSIFY_HUBS
 ];
 
-export const KI_CAREER_HUB_COUNT = 2;
+export const KI_CAREER_HUB_COUNT = 2 + KI_DENSIFY_HUB_COUNT;
 
 export function buildKiFeederCorridors(
   hubs: readonly KiCareerHubDef[] = KI_CAREER_HUBS,

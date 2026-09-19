@@ -5,6 +5,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { VU_DENSIFY_HUBS, VU_DENSIFY_HUB_COUNT } from './career-vu-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -46,9 +47,10 @@ export const VU_CAREER_HUBS: readonly VuCareerHubDef[] = [
     produce: { perishables: 1.3, general: 1.2, supplies: 1.05 },
     consume: { electronics: 0.9, machinery: 0.85, fuel: 1.1 },
   },
+  ...VU_DENSIFY_HUBS
 ];
 
-export const VU_CAREER_HUB_COUNT = 2;
+export const VU_CAREER_HUB_COUNT = 2 + VU_DENSIFY_HUB_COUNT;
 
 export function buildVuFeederCorridors(
   hubs: readonly VuCareerHubDef[] = VU_CAREER_HUBS,

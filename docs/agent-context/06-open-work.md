@@ -50,6 +50,8 @@ Atualizado 2026-09-19: **Asia densify Wave B (~+50 → 350)** — CN+10/IN+8/JP+
 
 Atualizado 2026-09-19: **Asia densify Wave C (~+50 → 400)** — CN+10/IN+8/JP+6/ID+6/PH+5/TH+3/PK+3/MY+2/TW+2/MM+2/KR+1/UZ+1/BD+1; seed **2281**; SimBrief **2281**; OA runways +50 (0 synth). First UZ/BD densify. Homolog: VAKJ/VALT/VAND/VARP→VEAN/VASL/VAUD; WAKT→WAON; ZBCD/ZGSD/ZUTR/ZBDH→ZBCF/ZBHD/ZBES. Asia ~400 done. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **Oceania densify Wave A (~+47 → 110)** — AU+18/PG+12/NZ+6/PF+4/NC+2/FJ+2/VU+2/KI+1; seed **2328**; SimBrief **2328**; OA runways +47 (0 synth). First PG/FJ/NC/PF/VU/KI densify. Homolog MSFS **47/47 ok**. Gate pulse **OC** live ≥85% 7d antes Wave B. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **Asia Wave A measure ~6d (dia 50→56)** — AS hubs **254→300** (d51); live quiet **0%**, dead **0–2**; fill/soft **~53/54%** flat; lots **2440→2566**; pay p50 **$1160→$1085** (esperado: median-of-hub-medians). World 99% live / fill 56%. Gate Wave A **PASS** → migrar Wave B (seed 2231). Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **Pulse synthetic region lenses** — Network history: **EU** / **MENA** / **SEA** multi-country (not 349 `XX-YY`). MENA lens covers ~115 hubs post Wave A. Detail: [`08-economy.md`](./08-economy.md).

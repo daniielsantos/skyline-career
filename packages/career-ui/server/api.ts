@@ -265,6 +265,7 @@ import {
   localUnitPriceUsd,
   computeEconomyPulse,
   aggregateHubEconomyHistoryPulse,
+  DEFAULT_HUB_ECONOMY_HISTORY_FOCUS,
   syncHomeCountryFromHub,
   stockTrend,
   companySessionFromTick,
@@ -8717,7 +8718,7 @@ export function createCareerApiServer(port = 8787) {
             windowDays: days,
             ...aggregateHubEconomyHistoryPulse(samples, {
               retentionDays: HUB_ECONOMY_SAMPLE_RETENTION_DAYS,
-              focusCountries: ['BR', 'US', 'EU', 'DE', 'FR', 'GB', 'CA', 'MX', 'AR', 'CO'],
+              focusCountries: [...DEFAULT_HUB_ECONOMY_HISTORY_FOCUS],
             }),
           };
         });

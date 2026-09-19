@@ -75,6 +75,58 @@ export const BE_DENSIFY_HUBS: readonly BeDensifyHub[] = [
     produce: { perishables: 1.15, general: 1.05, supplies: 1.0 },
     consume: { electronics: 0.9, machinery: 0.85 },
   },
+
+  // Wave 2 EU-1 densify (+5)
+  {
+    icao: 'EBCV',
+    name: "Chièvres Air Base",
+    region: 'BE-C',
+    hubTier: 'spoke',
+    lat: 50.5758,
+    lon: 3.831,
+    produce: { perishables: 1.35, general: 1.1, supplies: 1 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'EBBE',
+    name: "Beauvechain Air Base",
+    region: 'BE-C',
+    hubTier: 'spoke',
+    lat: 50.7586,
+    lon: 4.76833,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'EBBL',
+    name: "Kleine Brogel Air Base",
+    region: 'BE-C',
+    hubTier: 'spoke',
+    lat: 51.1683,
+    lon: 5.47,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'EBFN',
+    name: "Koksijde Air Base",
+    region: 'BE-C',
+    hubTier: 'spoke',
+    lat: 51.0903,
+    lon: 2.65278,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'EBFS',
+    name: "Florennes Air Base",
+    region: 'BE-C',
+    hubTier: 'spoke',
+    lat: 50.2433,
+    lon: 4.64583,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
 ];
 
 export const BE_DENSIFY_HUB_COUNT = BE_DENSIFY_HUBS.length;

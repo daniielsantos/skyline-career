@@ -148,4 +148,50 @@ describe('aggregateHubEconomyHistoryPulse', () => {
     assert.equal(pulse.days[0]!.byCountry.US?.hubs, 1);
     assert.equal(pulse.days[0]!.byCountry.BR?.hubs, 0);
   });
+
+  it('merges MENA and SEA synthetic lenses', () => {
+    const samples: HubEconomySample[] = [
+      sample({
+        icao: 'OEJN',
+        dayIndex: 1,
+        countryId: 'SA',
+        hubTier: 'major',
+        outboundLots: 2,
+      }),
+      sample({
+        icao: 'OMDB',
+        dayIndex: 1,
+        countryId: 'AE',
+        hubTier: 'major',
+        outboundLots: 1,
+      }),
+      sample({
+        icao: 'VTBS',
+        dayIndex: 1,
+        countryId: 'TH',
+        hubTier: 'major',
+        outboundLots: 3,
+      }),
+      sample({
+        icao: 'WSSS',
+        dayIndex: 1,
+        countryId: 'SG',
+        hubTier: 'regional',
+        outboundLots: 1,
+      }),
+      sample({
+        icao: 'KJFK',
+        dayIndex: 1,
+        countryId: 'US',
+        hubTier: 'major',
+        outboundLots: 1,
+      }),
+    ];
+    const pulse = aggregateHubEconomyHistoryPulse(samples, {
+      focusCountries: ['MENA', 'SEA', 'US'],
+    });
+    assert.equal(pulse.days[0]!.byCountry.MENA?.hubs, 2);
+    assert.equal(pulse.days[0]!.byCountry.SEA?.hubs, 2);
+    assert.equal(pulse.days[0]!.byCountry.US?.hubs, 1);
+  });
 });

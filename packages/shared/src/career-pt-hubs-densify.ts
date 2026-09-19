@@ -144,6 +144,68 @@ export const PT_DENSIFY_HUBS: readonly PtDensifyHub[] = [
     ...drySpoke,
   },
 
+
+  // Wave 2 EU-1 densify (+6)
+  {
+    icao: 'LPSJ',
+    name: "São Jorge Airport",
+    region: 'PT-A',
+    hubTier: 'spoke',
+    lat: 38.6655,
+    lon: -28.1758,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'LPAR',
+    name: "Alverca Air Base",
+    region: 'PT-C',
+    hubTier: 'spoke',
+    lat: 38.8833,
+    lon: -9.0301,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'LPBR',
+    name: "Braga Municipal Aerodrome",
+    region: 'PT-C',
+    hubTier: 'spoke',
+    lat: 41.587,
+    lon: -8.44519,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'LPMR',
+    name: "Monte Real Air Base",
+    region: 'PT-C',
+    hubTier: 'spoke',
+    lat: 39.82834,
+    lon: -8.8875,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'LPMT',
+    name: "Montijo Air Base",
+    region: 'PT-C',
+    hubTier: 'spoke',
+    lat: 38.70929,
+    lon: -9.03368,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'LPST',
+    name: "Sintra Air Base",
+    region: 'PT-C',
+    hubTier: 'spoke',
+    lat: 38.8311,
+    lon: -9.33955,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
 ];
 
 export const PT_DENSIFY_HUB_COUNT = PT_DENSIFY_HUBS.length;

@@ -10,7 +10,30 @@ import { formatMass, KG_TO_LB, massUnitLabel, type WeightSystem } from './weight
 
 const HISTORY_PAGE_SIZE = 14;
 
-type PulseLens = 'world' | 'BR' | 'US' | 'EU' | 'DE' | 'FR' | 'GB' | 'spoke';
+type PulseLens =
+  | 'world'
+  | 'BR'
+  | 'US'
+  | 'EU'
+  | 'MENA'
+  | 'SEA'
+  | 'DE'
+  | 'FR'
+  | 'GB'
+  | 'spoke';
+
+const PULSE_LENSES: readonly PulseLens[] = [
+  'world',
+  'BR',
+  'US',
+  'EU',
+  'MENA',
+  'SEA',
+  'DE',
+  'FR',
+  'GB',
+  'spoke',
+];
 
 function pct01(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -108,6 +131,8 @@ function lensLabel(lens: PulseLens): string {
   if (lens === 'world') return 'World';
   if (lens === 'spoke') return 'Spoke';
   if (lens === 'EU') return 'EU-West';
+  if (lens === 'MENA') return 'MENA';
+  if (lens === 'SEA') return 'SE-Asia';
   return lens;
 }
 
@@ -278,7 +303,7 @@ export function HubEconomyNetworkHistory(props: {
   const lensToggle =
     layout === 'page' ? (
       <div className="hub-stats-window" role="group" aria-label="Pulse lens">
-        {(['world', 'BR', 'US', 'EU', 'DE', 'FR', 'GB', 'spoke'] as const).map(
+        {PULSE_LENSES.map(
           (id) => (
             <button
               key={id}

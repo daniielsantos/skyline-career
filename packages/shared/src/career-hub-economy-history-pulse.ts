@@ -208,7 +208,78 @@ export const EU1_WEST_COUNTRY_IDS = [
   'IT',
 ] as const;
 
-const EU1_WEST_SET = new Set<string>(EU1_WEST_COUNTRY_IDS);
+/** MENA-1…6 seed countries — synthetic `MENA` pulse lens. */
+export const MENA_COUNTRY_IDS = [
+  'MA',
+  'DZ',
+  'TN',
+  'EG',
+  'IL',
+  'SA',
+  'AE',
+  'QA',
+  'BH',
+  'KW',
+  'OM',
+  'IQ',
+  'IR',
+  'JO',
+  'LB',
+  'SY',
+  'LY',
+  'SD',
+  'YE',
+] as const;
+
+/**
+ * Southeast Asia cargo seed — synthetic `SEA` pulse lens.
+ * (TH/VN/MY/SG/ID/PH + MM/BN; no KH/LA/TL in seed yet.)
+ */
+export const SEA_COUNTRY_IDS = [
+  'TH',
+  'VN',
+  'MY',
+  'SG',
+  'ID',
+  'PH',
+  'MM',
+  'BN',
+] as const;
+
+/**
+ * Synthetic multi-country pulse lenses (not ISO codes).
+ * Keep keys short for UI + JSON; expand via country sets below.
+ */
+export const PULSE_SYNTHETIC_REGIONS: Readonly<
+  Record<string, readonly string[]>
+> = {
+  EU: EU1_WEST_COUNTRY_IDS,
+  MENA: MENA_COUNTRY_IDS,
+  SEA: SEA_COUNTRY_IDS,
+};
+
+const PULSE_SYNTHETIC_SETS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
+  Object.entries(PULSE_SYNTHETIC_REGIONS).map(([id, countries]) => [
+    id,
+    new Set(countries),
+  ]),
+);
+
+/** Default Network-history focus list (ISO + synthetic lenses). */
+export const DEFAULT_HUB_ECONOMY_HISTORY_FOCUS = [
+  'BR',
+  'US',
+  'EU',
+  'MENA',
+  'SEA',
+  'DE',
+  'FR',
+  'GB',
+  'CA',
+  'MX',
+  'AR',
+  'CO',
+] as const;
 
 /**
  * Collapse flat hub samples into one row per economy day with world /
@@ -245,15 +316,16 @@ export function aggregateHubEconomyHistoryPulse(
     }
     // UI pulse only needs focus countries — dumping every ISO bloated
     // the JSON (~80KB+/day) and made Network history flaky under lock contention.
-    // Synthetic `EU` merges EU-1 Western core samples without listing every ISO.
+    // Synthetic lenses (EU / MENA / SEA) merge multi-country samples.
     const byCountry: Record<string, HubEconomyHistoryBucket> = {};
     for (const id of focusCountries) {
-      if (id === 'EU') {
-        const euSamples: HubEconomySample[] = [];
+      const synth = PULSE_SYNTHETIC_SETS.get(id);
+      if (synth) {
+        const merged: HubEconomySample[] = [];
         for (const [cid, list] of byCountrySamples) {
-          if (EU1_WEST_SET.has(cid)) euSamples.push(...list);
+          if (synth.has(cid)) merged.push(...list);
         }
-        byCountry.EU = finalizeBucket(euSamples);
+        byCountry[id] = finalizeBucket(merged);
         continue;
       }
       byCountry[id] = finalizeBucket(byCountrySamples.get(id) ?? []);

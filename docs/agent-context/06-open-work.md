@@ -38,9 +38,13 @@ Atualizado 2026-09-19: **C680 maxPax 12→10** — SimBrief Sovereign+ Full=(10)
 
 Atualizado 2026-09-19: **Charter Search Pax sum UX** — coluna Pax somava `groupSize` das legs (12+11→23) e parecia exigir avião >12 seats; filter já exige seats≥cada oferta. Fix UI: `12 · 11` por leg + Route com ICAO chips. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **Pulse lenses MENA + SE-Asia** — synthetic multi-country (igual EU-West); não 349 regiões. MENA=MENA-1…6; SEA=TH/VN/MY/SG/ID/PH/MM/BN. Registry `PULSE_SYNTHETIC_REGIONS`. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **EU-1 Wave 1 MSFS homolog** — 45 ok; drop/replace **EDFE→EDFM** (Egelsbach≠Mannheim), **LEZG→LEBG**, **LEBZ→LELN** (absent stock). Overrides shipped + OA runway merge (45 hubs; 0 synth). Touchdown: MSFS rwy when present, else OA. Detail: [`04-hubs-simbrief.md`](./04-hubs-simbrief.md).
 
-Atualizado 2026-09-19: **EU-1 densify Wave 1 (~+45)** — PT21/ES33/FR37/GB33/DE34/NL15/BE8/IT31 → EU-1 **~212**; seed **2012**. BE +0 (redirect +2 FR). Homolog MSFS offline — coords publicados; re-probe on ship. Gate 7–14d live ≥85% antes Wave 2. Detail: [`08-economy.md`](./08-economy.md).
+Atualizado 2026-09-19: **EU-1 densify Wave 2 (~+88 → 300)** — PT27/ES45/FR54/GB47/DE48/NL23/BE13/IT43; seed **2100**; SimBrief **2100**; OA runways +88 (0 synth). Fuel ~30 producers. BE +5 (shortfall → FR). Homolog MSFS **pending** on ship. Gate 7–14d EU LIVE ≥85% antes Wave 3. Sem Dry/`CARGO_FLOW_BALANCE`. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **EU-1 densify Wave 1 (~+45)** — PT21/ES33/FR37/GB33/DE34/NL15/BE8/IT31 → EU-1 **~212**; seed **2012**. BE +0 (redirect +2 FR). Homolog MSFS done (EDFE→EDFM, LEZG→LEBG, LEBZ→LELN). Gate 7–14d live ≥85% **passed** (pulse EU LIVE 100%) → Wave 2. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **Intl gateway max 24** — US deixa de bater teto 12 (formula ~24); BR segue ~9. + soft-cap Pacific. Detail: [`08-economy.md`](./08-economy.md).
 

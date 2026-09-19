@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **3eb6351** / desktop **0.3.106** shipped: Fix charter med/narrow pax formation and add Pax board filter. Release: [v0.3.106](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.106).
+
+
 `main` **a96b104** / desktop **0.3.105** shipped: Avoid pulling Node auth into the Career UI bundle. Release: [v0.3.105](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.105).
 
 

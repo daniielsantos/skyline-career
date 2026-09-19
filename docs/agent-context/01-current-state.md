@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **a96b104** / desktop **0.3.105** shipped: Avoid pulling Node auth into the Career UI bundle. Release: [v0.3.105](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.105).
+
+
 `main` **1deab5c** / desktop **0.3.104** shipped: Open charter to medium piston and narrow with balanced group pay. Release: [v0.3.104](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.104).
 
 

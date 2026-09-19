@@ -127,7 +127,7 @@ describe('career-economy seed', () => {
     assert.equal(world.version, 3);
     assert.ok(typeof world.lastBatchAtMs === 'number');
     assert.ok(Array.isArray(world.events));
-    assert.equal(world.airports.length, 2135);
+    assert.equal(world.airports.length, 2181);
     assert.equal(world.homeCountryId, 'BR');
     assert.ok((world.internationalLanes?.length ?? 0) >= 399);
     const br = world.airports.filter(
@@ -796,8 +796,8 @@ describe('career-economy seed', () => {
     assert.equal(ly.length, 5);
     assert.equal(sd.length, 4);
     assert.equal(ye.length, 5);
-    assert.equal(pk.length, 6);
-    assert.equal(india.length, 33);
+    assert.equal(pk.length, 10);
+    assert.equal(india.length, 41);
     assert.equal(lk.length, 4);
     assert.equal(kz.length, 4);
     assert.equal(uz.length, 4);
@@ -809,15 +809,15 @@ describe('career-economy seed', () => {
     assert.equal(bd.length, 4);
     assert.equal(bt.length, 2);
     assert.equal(mm.length, 9);
-    assert.equal(th.length, 18);
-    assert.equal(vn.length, 13);
-    assert.equal(my.length, 15);
+    assert.equal(th.length, 21);
+    assert.equal(vn.length, 15);
+    assert.equal(my.length, 16);
     assert.equal(sg.length, 1);
-    assert.equal(idn.length, 19);
-    assert.equal(ph.length, 13);
-    assert.equal(cn.length, 52);
-    assert.equal(jp.length, 18);
-    assert.equal(kr.length, 12);
+    assert.equal(idn.length, 25);
+    assert.equal(ph.length, 18);
+    assert.equal(cn.length, 62);
+    assert.equal(jp.length, 24);
+    assert.equal(kr.length, 13);
     assert.equal(tw.length, 12);
     assert.equal(au.length, 29);
     assert.equal(nz.length, 15);
@@ -4719,7 +4719,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     };
     assert.equal(truncated.airports.length, 61);
     const migrated = migrateEconomyWorld(truncated);
-    assert.equal(migrated.airports.length, 2135);
+    assert.equal(migrated.airports.length, 2181);
     assert.ok(migrated.airports.some((a) => a.icao === 'SBEG'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBR'));
     assert.ok(migrated.airports.some((a) => a.icao === 'SBBV'));

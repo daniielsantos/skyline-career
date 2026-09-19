@@ -189,6 +189,93 @@ export const IN_DENSIFY_HUBS: readonly InDensifyHub[] = [
     produce: {"general":1.2,"electronics":1.1,"supplies":1},
     consume: {"perishables":1.1,"general":1,"machinery":0.9},
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+8)
+  {
+    icao: 'VISR',
+    name: "Srinagar International Airport",
+    region: 'IN-N',
+    hubTier: 'spoke',
+    lat: 33.9871,
+    lon: 74.7742,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'VICG',
+    name: "Shaheed Bhagat Singh International Airport",
+    region: 'IN-N',
+    hubTier: 'spoke',
+    lat: 30.6735,
+    lon: 76.7885,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VABO',
+    name: "Vadodara International Airport",
+    region: 'IN-W',
+    hubTier: 'spoke',
+    lat: 22.3362,
+    lon: 73.2263,
+    produce: { machinery: 1.25, electronics: 1.15, general: 1.15 },
+    consume: { perishables: 1.05, supplies: 1 },
+  },
+  {
+    icao: 'VASU',
+    name: "Surat International Airport",
+    region: 'IN-W',
+    hubTier: 'spoke',
+    lat: 21.11553,
+    lon: 72.74325,
+    produce: { machinery: 1.25, electronics: 1.15, general: 1.15 },
+    consume: { perishables: 1.05, supplies: 1 },
+  },
+  {
+    icao: 'VOTR',
+    name: "Tiruchirappalli International Airport",
+    region: 'IN-S',
+    hubTier: 'spoke',
+    lat: 10.76291,
+    lon: 78.71774,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VOTV',
+    name: "Thiruvananthapuram International Airport",
+    region: 'IN-S',
+    hubTier: 'spoke',
+    lat: 8.48189,
+    lon: 76.92003,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VASD',
+    name: "Shirdi International Airport",
+    region: 'IN-W',
+    hubTier: 'spoke',
+    lat: 19.68921,
+    lon: 74.37365,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VAAU',
+    name: "Aurangabad Airport",
+    region: 'IN-W',
+    hubTier: 'spoke',
+    lat: 19.86287,
+    lon: 75.39631,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const IN_DENSIFY_HUB_COUNT = IN_DENSIFY_HUBS.length;

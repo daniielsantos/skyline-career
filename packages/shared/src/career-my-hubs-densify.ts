@@ -98,6 +98,23 @@ export const MY_DENSIFY_HUBS: readonly MyDensifyHub[] = [
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+1)
+  {
+    icao: 'WBGR',
+    name: "Miri Airport",
+    region: 'MY-E',
+    hubTier: 'spoke',
+    lat: 4.32201,
+    lon: 113.987,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const MY_DENSIFY_HUB_COUNT = MY_DENSIFY_HUBS.length;

@@ -7,7 +7,7 @@
  * Confirm the ICAO in SimBrief Dispatch before adding a new cargo hub, then
  * re-run this script so CI stays green.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -30,8 +30,15 @@ const payload = {
   icaos,
 };
 const body = `${JSON.stringify(payload, null, 2)}\n`;
-writeFileSync(srcOut, body, 'utf8');
+
+function atomicWrite(path, text) {
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, text, 'utf8');
+  renameSync(tmp, path);
+}
+
+atomicWrite(srcOut, body);
 mkdirSync(dirname(distOut), { recursive: true });
-writeFileSync(distOut, body, 'utf8');
+atomicWrite(distOut, body);
 console.log(`Wrote ${icaos.length} ICAOs → ${srcOut}`);
 console.log(`Mirrored → ${distOut}`);

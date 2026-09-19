@@ -108,6 +108,23 @@ export const KR_DENSIFY_HUBS: readonly KrDensifyHub[] = [
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+1)
+  {
+    icao: 'RKPD',
+    name: "Jeongseok Airport",
+    region: 'KR-S',
+    hubTier: 'spoke',
+    lat: 33.3996,
+    lon: 126.712,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
 ];
 
 export const KR_DENSIFY_HUB_COUNT = KR_DENSIFY_HUBS.length;

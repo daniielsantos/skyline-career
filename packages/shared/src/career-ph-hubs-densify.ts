@@ -100,6 +100,63 @@ export const PH_DENSIFY_HUBS: readonly PhDensifyHub[] = [
     produce: {"perishables":1.15,"general":1.1,"supplies":1.05},
     consume: {"electronics":1.0,"machinery":0.85},
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+5)
+  {
+    icao: 'RPMZ',
+    name: "Zamboanga International Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 6.92242,
+    lon: 122.06,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMC',
+    name: "Cotabato (Awang) Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 7.16475,
+    lon: 124.20994,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPME',
+    name: "Bancasi Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 8.9515,
+    lon: 125.4788,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMG',
+    name: "Dipolog Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 8.60198,
+    lon: 123.34188,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMP',
+    name: "Pagadian Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 7.82563,
+    lon: 123.45964,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const PH_DENSIFY_HUB_COUNT = PH_DENSIFY_HUBS.length;

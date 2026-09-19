@@ -38,7 +38,13 @@ Atualizado 2026-09-19: **C680 maxPax 12→10** — SimBrief Sovereign+ Full=(10)
 
 Atualizado 2026-09-19: **Charter Search Pax sum UX** — coluna Pax somava `groupSize` das legs (12+11→23) e parecia exigir avião >12 seats; filter já exige seats≥cada oferta. Fix UI: `12 · 11` por leg + Route com ICAO chips. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **EU-1 Wave 2 homolog LELC/LELO** — fail stock: **LELC→LETL** Teruel; **LELO→LERJ** (OA gps; Logroño já densify Wave 1) + catalog slot **LESU**. Remaps in `CAREER_AIRPORT_ICAO_REMAP`. Re-run `career-hubs -- missing`. Detail: [`04-hubs-simbrief.md`](./04-hubs-simbrief.md).
+
+Atualizado 2026-09-19: **Pulse continent lenses** — AM / EUR / AS / AF / OC (+ existing EU-West / MENA / SEA). Coverage 2181 hubs, 0 countries orphan. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **MENA densify Wave A (~+35 → 115)** — SA16/EG10/IR12/DZ8/MA10/AE9/…; seed **2135**; SimBrief **2135**; OA runways +35 (0 synth). Fuel ~12. Homolog MSFS **pending** on ship. Gate pulse MENA live ≥85% 7d antes Wave B (~150). Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **Asia densify Wave A (~+46 → 300)** — CN62/IN41/JP24/ID25/PH18/PK10/TH21/VN15/MY16/KR13; seed **2181**; SimBrief **2181**; OA runways +46 (0 synth). First PK densify. Homolog MSFS done (swaps RPSP/VEKI/VVVD/WALK/WARQ/WIPT/WMKM/…). Gate pulse **SEA** live ≥85% 7d (+ sample CN/IN/JP) antes Wave B. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **Pulse synthetic region lenses** — Network history: **EU** / **MENA** / **SEA** multi-country (not 349 `XX-YY`). MENA lens covers ~115 hubs post Wave A. Detail: [`08-economy.md`](./08-economy.md).
 

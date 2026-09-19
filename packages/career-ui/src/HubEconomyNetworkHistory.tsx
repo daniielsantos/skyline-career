@@ -14,9 +14,14 @@ type PulseLens =
   | 'world'
   | 'BR'
   | 'US'
+  | 'AM'
   | 'EU'
+  | 'EUR'
   | 'MENA'
+  | 'AS'
   | 'SEA'
+  | 'AF'
+  | 'OC'
   | 'DE'
   | 'FR'
   | 'GB'
@@ -26,9 +31,14 @@ const PULSE_LENSES: readonly PulseLens[] = [
   'world',
   'BR',
   'US',
+  'AM',
   'EU',
+  'EUR',
   'MENA',
+  'AS',
   'SEA',
+  'AF',
+  'OC',
   'DE',
   'FR',
   'GB',
@@ -130,9 +140,14 @@ function bucketForLens(
 function lensLabel(lens: PulseLens): string {
   if (lens === 'world') return 'World';
   if (lens === 'spoke') return 'Spoke';
+  if (lens === 'AM') return 'Americas';
   if (lens === 'EU') return 'EU-West';
+  if (lens === 'EUR') return 'Europe';
   if (lens === 'MENA') return 'MENA';
+  if (lens === 'AS') return 'Asia';
   if (lens === 'SEA') return 'SE-Asia';
+  if (lens === 'AF') return 'Africa';
+  if (lens === 'OC') return 'Oceania';
   return lens;
 }
 

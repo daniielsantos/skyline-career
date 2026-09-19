@@ -98,6 +98,33 @@ export const VN_DENSIFY_HUBS: readonly VnDensifyHub[] = [
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+2)
+  {
+    icao: 'VVPB',
+    name: "Phu Bai International Airport",
+    region: 'VN-S',
+    hubTier: 'spoke',
+    lat: 16.40063,
+    lon: 107.70309,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VVPC',
+    name: "Phu Cat Airport",
+    region: 'VN-S',
+    hubTier: 'spoke',
+    lat: 13.955,
+    lon: 109.042,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const VN_DENSIFY_HUB_COUNT = VN_DENSIFY_HUBS.length;

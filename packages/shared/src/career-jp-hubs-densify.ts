@@ -148,6 +148,73 @@ export const JP_DENSIFY_HUBS: readonly JpDensifyHub[] = [
     produce: {"general":1.2,"electronics":1.1,"supplies":1},
     consume: {"perishables":1.1,"general":1,"machinery":0.9},
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+6)
+  {
+    icao: 'RJSN',
+    name: "Niigata Airport",
+    region: 'JP-E',
+    hubTier: 'spoke',
+    lat: 37.95417,
+    lon: 139.11219,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RJSS',
+    name: "Sendai Airport",
+    region: 'JP-E',
+    hubTier: 'spoke',
+    lat: 38.1397,
+    lon: 140.91701,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RJOT',
+    name: "Takamatsu Airport",
+    region: 'JP-W',
+    hubTier: 'spoke',
+    lat: 34.21496,
+    lon: 134.01545,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RJFM',
+    name: "Miyazaki Airport",
+    region: 'JP-S',
+    hubTier: 'spoke',
+    lat: 31.8772,
+    lon: 131.449,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'RJFU',
+    name: "Nagasaki Airport",
+    region: 'JP-S',
+    hubTier: 'spoke',
+    lat: 32.9169,
+    lon: 129.914,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RJNS',
+    name: "Mount Fuji Shizuoka Airport",
+    region: 'JP-E',
+    hubTier: 'spoke',
+    lat: 34.79502,
+    lon: 138.19098,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
 ];
 
 export const JP_DENSIFY_HUB_COUNT = JP_DENSIFY_HUBS.length;

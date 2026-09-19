@@ -194,4 +194,24 @@ describe('aggregateHubEconomyHistoryPulse', () => {
     assert.equal(pulse.days[0]!.byCountry.SEA?.hubs, 2);
     assert.equal(pulse.days[0]!.byCountry.US?.hubs, 1);
   });
+
+  it('merges continent macro lenses AM / EUR / AS / AF / OC', () => {
+    const samples: HubEconomySample[] = [
+      sample({ icao: 'SBGR', dayIndex: 1, countryId: 'BR', outboundLots: 1 }),
+      sample({ icao: 'EDDF', dayIndex: 1, countryId: 'DE', outboundLots: 1 }),
+      sample({ icao: 'ZBAA', dayIndex: 1, countryId: 'CN', outboundLots: 1 }),
+      sample({ icao: 'FAOR', dayIndex: 1, countryId: 'ZA', outboundLots: 1 }),
+      sample({ icao: 'YSSY', dayIndex: 1, countryId: 'AU', outboundLots: 1 }),
+      sample({ icao: 'OEJN', dayIndex: 1, countryId: 'SA', outboundLots: 1 }),
+    ];
+    const pulse = aggregateHubEconomyHistoryPulse(samples, {
+      focusCountries: ['AM', 'EUR', 'AS', 'AF', 'OC', 'MENA'],
+    });
+    assert.equal(pulse.days[0]!.byCountry.AM?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.EUR?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.AS?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.AF?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.OC?.hubs, 1);
+    assert.equal(pulse.days[0]!.byCountry.MENA?.hubs, 1);
+  });
 });

@@ -152,6 +152,73 @@ export const ID_DENSIFY_HUBS: readonly IdDensifyHub[] = [
     lon: 106.139,
     ...drySpoke,
   },
+
+
+
+
+
+
+  // Wave A Asia densify (+6)
+  {
+    icao: 'WIBB',
+    name: "Sultan Syarif Kasim II International Airport",
+    region: 'ID-S',
+    hubTier: 'spoke',
+    lat: 0.45865,
+    lon: 101.44432,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'WAKK',
+    name: "Mopah International Airport",
+    region: 'ID-U',
+    hubTier: 'spoke',
+    lat: -8.5239,
+    lon: 140.41969,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'WILL',
+    name: "Radin Inten II International Airport",
+    region: 'ID-S',
+    hubTier: 'spoke',
+    lat: -5.2468,
+    lon: 105.18253,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'WICA',
+    name: "Kertajati International Airport",
+    region: 'ID-J',
+    hubTier: 'spoke',
+    lat: -6.64738,
+    lon: 108.16556,
+    produce: { machinery: 1.25, electronics: 1.15, general: 1.15 },
+    consume: { perishables: 1.05, supplies: 1 },
+  },
+  {
+    icao: 'WALS',
+    name: "Aji Pangeran Tumenggung Pranoto International Airport",
+    region: 'ID-K',
+    hubTier: 'spoke',
+    lat: -0.37448,
+    lon: 117.25013,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'WADB',
+    name: "Sultan Muhammad Salahuddin Airport",
+    region: 'ID-U',
+    hubTier: 'spoke',
+    lat: -8.53718,
+    lon: 118.685,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const ID_DENSIFY_HUB_COUNT = ID_DENSIFY_HUBS.length;

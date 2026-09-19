@@ -360,6 +360,9 @@ export const CAREER_AIRPORT_ICAO_REMAP: Readonly<Record<string, string>> = {
   SLYG: 'SLYA', // Yacuiba
   TGCC: 'TGPZ', // Carriacou Lauriston
   MGTK: 'MGMM', // Mundo Maya already seeded
+  // EU-1 Wave 2 densify homolog (2026-09-19)
+  LELC: 'LETL', // San Javier absent stock → Teruel
+  LELO: 'LERJ', // wrong ICAO; Logroño stock/gps is LERJ (already densify)
 };
 
 const CAREER_ICAO_FIELD_KEYS = new Set([

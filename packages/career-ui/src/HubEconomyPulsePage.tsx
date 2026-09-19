@@ -14,7 +14,8 @@ export function HubEconomyPulsePage(props: {
           <h2>Economy pulse</h2>
           <p>
             Dev-only: live world scan + saved daily hub samples. Lenses: World /
-            BR / US / Spoke — dead-spoke counts, size mix, soft-fill, pay band.
+            continents (Americas / Europe / Asia / Africa / Oceania) + densify
+            gates (EU-West / MENA / SE-Asia) + BR/US/Spoke.
           </p>
         </div>
       </div>

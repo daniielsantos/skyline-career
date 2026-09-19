@@ -3,6 +3,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { PK_DENSIFY_HUBS, PK_DENSIFY_HUB_COUNT } from './career-pk-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -91,9 +92,10 @@ export const PK_CAREER_HUBS: readonly PkCareerHubDef[] = [
     lon: 71.4191,
     ...punjab,
   },
+  ...PK_DENSIFY_HUBS
 ];
 
-export const PK_CAREER_HUB_COUNT = 6;
+export const PK_CAREER_HUB_COUNT = 6 + PK_DENSIFY_HUB_COUNT;
 
 export function buildPkFeederCorridors(
   hubs: readonly PkCareerHubDef[] = PK_CAREER_HUBS,

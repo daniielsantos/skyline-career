@@ -246,6 +246,183 @@ export const SEA_COUNTRY_IDS = [
   'BN',
 ] as const;
 
+/** Americas macro lens (SA + NA + Central/Caribe; not US territories as separate ISO). */
+export const AM_COUNTRY_IDS = [
+  'BR',
+  'US',
+  'CA',
+  'MX',
+  'AR',
+  'CL',
+  'UY',
+  'PY',
+  'PE',
+  'BO',
+  'EC',
+  'CO',
+  'VE',
+  'GY',
+  'SR',
+  'GF',
+  'PA',
+  'CR',
+  'NI',
+  'HN',
+  'SV',
+  'GT',
+  'BZ',
+  'CU',
+  'DO',
+  'HT',
+  'JM',
+  'BS',
+  'TT',
+  'BB',
+  'LC',
+  'GD',
+  'AG',
+  'GP',
+  'MQ',
+  'CW',
+  'SX',
+  'AW',
+] as const;
+
+/** Full Europe (EU-1…8 + RU) — denser gate remains `EU` (West only). */
+export const EUR_COUNTRY_IDS = [
+  ...EU1_WEST_COUNTRY_IDS,
+  'IE',
+  'DK',
+  'NO',
+  'SE',
+  'FI',
+  'CH',
+  'AT',
+  'PL',
+  'CZ',
+  'SK',
+  'HU',
+  'EE',
+  'LV',
+  'LT',
+  'HR',
+  'SI',
+  'RO',
+  'BG',
+  'GR',
+  'RS',
+  'IS',
+  'BA',
+  'ME',
+  'AL',
+  'MK',
+  'TR',
+  'UA',
+  'BY',
+  'MD',
+  'GE',
+  'AM',
+  'AZ',
+  'LU',
+  'MT',
+  'CY',
+  'XK',
+  'RU',
+] as const;
+
+/**
+ * Asia ex-MENA (includes SEA + Central Asia + CN/IN/JP/KR/…).
+ * Densify gate for SE Asia remains `SEA`.
+ */
+export const AS_COUNTRY_IDS = [
+  'CN',
+  'IN',
+  'JP',
+  'KR',
+  'TW',
+  'PK',
+  'LK',
+  'KZ',
+  'UZ',
+  'TM',
+  'TJ',
+  'KG',
+  'AF',
+  'NP',
+  'BD',
+  'BT',
+  ...SEA_COUNTRY_IDS,
+] as const;
+
+/** Sub-Saharan Africa (MENA Maghreb/Nile/Yemen stay under `MENA`). */
+export const AF_COUNTRY_IDS = [
+  'NG',
+  'GH',
+  'SN',
+  'CI',
+  'KE',
+  'ET',
+  'ZA',
+  'TZ',
+  'AO',
+  'CM',
+  'UG',
+  'RW',
+  'MZ',
+  'NA',
+  'BW',
+  'ZM',
+  'ZW',
+  'MW',
+  'CD',
+  'CG',
+  'GA',
+  'GQ',
+  'CF',
+  'TD',
+  'DJ',
+  'ST',
+  'BI',
+  'BJ',
+  'TG',
+  'BF',
+  'ML',
+  'NE',
+  'GN',
+  'SL',
+  'LR',
+  'GM',
+  'GW',
+  'CV',
+  'MR',
+  'MG',
+  'MU',
+  'SC',
+  'KM',
+  'LS',
+  'SZ',
+  'SO',
+  'ER',
+  'SS',
+] as const;
+
+/** Oceania + Pacific island seeds (AU/NZ + Melanesia/Polynesia/Micronesia). */
+export const OC_COUNTRY_IDS = [
+  'AU',
+  'NZ',
+  'FJ',
+  'PG',
+  'NC',
+  'PF',
+  'PW',
+  'WS',
+  'TO',
+  'VU',
+  'SB',
+  'CK',
+  'KI',
+] as const;
+
 /**
  * Synthetic multi-country pulse lenses (not ISO codes).
  * Keep keys short for UI + JSON; expand via country sets below.
@@ -256,6 +433,11 @@ export const PULSE_SYNTHETIC_REGIONS: Readonly<
   EU: EU1_WEST_COUNTRY_IDS,
   MENA: MENA_COUNTRY_IDS,
   SEA: SEA_COUNTRY_IDS,
+  AM: AM_COUNTRY_IDS,
+  EUR: EUR_COUNTRY_IDS,
+  AS: AS_COUNTRY_IDS,
+  AF: AF_COUNTRY_IDS,
+  OC: OC_COUNTRY_IDS,
 };
 
 const PULSE_SYNTHETIC_SETS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
@@ -272,6 +454,11 @@ export const DEFAULT_HUB_ECONOMY_HISTORY_FOCUS = [
   'EU',
   'MENA',
   'SEA',
+  'AM',
+  'EUR',
+  'AS',
+  'AF',
+  'OC',
   'DE',
   'FR',
   'GB',
@@ -316,7 +503,8 @@ export function aggregateHubEconomyHistoryPulse(
     }
     // UI pulse only needs focus countries — dumping every ISO bloated
     // the JSON (~80KB+/day) and made Network history flaky under lock contention.
-    // Synthetic lenses (EU / MENA / SEA) merge multi-country samples.
+    // Synthetic lenses (EU / MENA / SEA / AM / EUR / AS / AF / OC) merge
+    // multi-country samples.
     const byCountry: Record<string, HubEconomyHistoryBucket> = {};
     for (const id of focusCountries) {
       const synth = PULSE_SYNTHETIC_SETS.get(id);

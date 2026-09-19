@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **c8a720b** / desktop **0.3.129** shipped: Add MP presence board and aircraft pool F7 claim. Release: [v0.3.129](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.129).
+
+
 `main` **9224d36** / desktop **0.3.128** shipped: Index feeder open-counts so pulse does not stall after densify. Release: [v0.3.128](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.128).
 
 

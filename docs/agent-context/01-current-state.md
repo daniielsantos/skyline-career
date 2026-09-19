@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **1deab5c** / desktop **0.3.104** shipped: Open charter to medium piston and narrow with balanced group pay. Release: [v0.3.104](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.104).
+
+
 `main` **6652365** / desktop **0.3.103** shipped: Deepen the charter board past form-rate equilibrium. Release: [v0.3.103](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.103).
 
 

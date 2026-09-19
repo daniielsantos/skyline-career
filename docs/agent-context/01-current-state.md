@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **6652365** / desktop **0.3.103** shipped: Deepen the charter board past form-rate equilibrium. Release: [v0.3.103](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.103).
+
+
 `main` **255eb3a** / desktop **0.3.102** shipped: Form intl lots with origin-country fairness and more board room. Release: [v0.3.102](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.102).
 
 

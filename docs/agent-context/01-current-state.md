@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **9224d36** / desktop **0.3.128** shipped: Index feeder open-counts so pulse does not stall after densify. Release: [v0.3.128](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.128).
+
+
 `main` **8739fbf** / desktop **0.3.127** shipped: Add spoke→major/regional feeder LTL pass. Release: [v0.3.127](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.127).
 
 

@@ -179,6 +179,9 @@ export type CharterBoardLaneFilter =
   | 'pilot-intl';
 export type CharterBoardFitFilter = 'open' | 'locked';
 
+/** Group-size bands — aligned with `pickCharterGroupSize` formation bands. */
+export type CharterBoardPaxFilter = 'light' | 'med' | 'narrow';
+
 export function parseCharterBoardLaneFilter(
   raw: string | null | undefined,
 ): CharterBoardLaneFilter | undefined {
@@ -200,6 +203,26 @@ export function parseCharterBoardFitFilter(
   const v = raw?.trim().toLowerCase();
   if (v === 'open' || v === 'locked') return v;
   return undefined;
+}
+
+export function parseCharterBoardPaxFilter(
+  raw: string | null | undefined,
+): CharterBoardPaxFilter | undefined {
+  const v = raw?.trim().toLowerCase();
+  if (v === 'light' || v === 'med' || v === 'narrow') return v;
+  return undefined;
+}
+
+/** True when `groupSize` falls in the selected Pax band. */
+export function charterOfferMatchesPaxFilter(
+  groupSize: number,
+  filter: CharterBoardPaxFilter | null | undefined,
+): boolean {
+  if (!filter) return true;
+  const n = Math.floor(Number(groupSize) || 0);
+  if (filter === 'light') return n >= 1 && n <= 12;
+  if (filter === 'med') return n >= 13 && n <= 48;
+  return n >= 49;
 }
 
 /** Fit filter or net/fit sort needs per-offer aircraft fit before paging. */

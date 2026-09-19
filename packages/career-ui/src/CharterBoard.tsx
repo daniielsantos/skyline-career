@@ -28,6 +28,7 @@ export type CharterLaneFilter =
   | 'pilot-domestic'
   | 'pilot-intl';
 export type CharterFitFilter = '' | 'open' | 'locked';
+export type CharterPaxFilter = '' | 'light' | 'med' | 'narrow';
 
 /**
  * Base Charter desk origin filter.
@@ -100,6 +101,7 @@ export function CharterBoard(props: CharterBoardProps) {
   const [destQuery, setDestQuery] = useState('');
   const [lane, setLane] = useState<CharterLaneFilter>('');
   const [fitFilter, setFitFilter] = useState<CharterFitFilter>('');
+  const [paxFilter, setPaxFilter] = useState<CharterPaxFilter>('');
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [total, setTotal] = useState(0);
@@ -132,6 +134,7 @@ export function CharterBoard(props: CharterBoardProps) {
     (!destLocked && destQuery.trim() !== '') ||
     lane !== '' ||
     fitFilter !== '' ||
+    paxFilter !== '' ||
     sorts.length > 0;
 
   useEffect(() => {
@@ -146,6 +149,7 @@ export function CharterBoard(props: CharterBoardProps) {
         destQuery: destLocked ? undefined : destQuery,
         lane: lane || undefined,
         fit: fitFilter || undefined,
+        pax: paxFilter || undefined,
         aircraftId,
         page,
         pageSize: CHARTER_PAGE_SIZE,
@@ -183,6 +187,7 @@ export function CharterBoard(props: CharterBoardProps) {
     originLocked,
     originQuery,
     page,
+    paxFilter,
     sorts,
   ]);
 
@@ -200,6 +205,7 @@ export function CharterBoard(props: CharterBoardProps) {
     if (!destLocked) setDestQuery('');
     setLane('');
     setFitFilter('');
+    setPaxFilter('');
     setSorts([]);
     setPage(1);
   }
@@ -387,7 +393,28 @@ export function CharterBoard(props: CharterBoardProps) {
                 </div>
               </th>
               <th className="col-compact" />
-              <th className="col-compact" />
+              <th className="col-compact">
+                <select
+                  className="route-lane-filter"
+                  aria-label="Filter by passenger group size"
+                  value={paxFilter}
+                  title="Light 1–12 · Med 13–48 · Narrow 49+"
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setPaxFilter(
+                      next === 'light' || next === 'med' || next === 'narrow'
+                        ? next
+                        : '',
+                    );
+                    setPage(1);
+                  }}
+                >
+                  <option value="">Any</option>
+                  <option value="light">1–12</option>
+                  <option value="med">13–48</option>
+                  <option value="narrow">49+</option>
+                </select>
+              </th>
               <th className="col-cargo" />
               <th className="col-compact" />
               <th className="col-money" />

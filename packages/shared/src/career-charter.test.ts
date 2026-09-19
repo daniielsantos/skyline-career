@@ -149,9 +149,25 @@ describe('Charter economy', () => {
       else if (n <= 48) counts.med += 1;
       else counts.narrow += 1;
     }
-    assert.ok(counts.light > 150, `light=${counts.light}`);
-    assert.ok(counts.med > 50, `med=${counts.med}`);
-    assert.ok(counts.narrow > 30, `narrow=${counts.narrow}`);
+    // Deep pools: narrow majority, then med; light is residual.
+    assert.ok(counts.narrow > 150, `narrow=${counts.narrow}`);
+    assert.ok(counts.med > 80, `med=${counts.med}`);
+    assert.ok(counts.light > 20 && counts.light < 120, `light=${counts.light}`);
+  });
+
+  it('prefers med loads when pools are mid-depth', () => {
+    const counts = { light: 0, med: 0 };
+    let seed = 99;
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < 200; i += 1) {
+      const n = pickCharterGroupSize(rng, 30, 30);
+      if (n <= 12) counts.light += 1;
+      else counts.med += 1;
+    }
+    assert.ok(counts.med > counts.light, `med=${counts.med} light=${counts.light}`);
   });
 
   it('forms a few offers from the regular economy tick without a daily dump', () => {

@@ -3,9 +3,11 @@ import test from 'node:test';
 import {
   charterBoardNeedsFitCompute,
   charterBoardNeedsFitSort,
+  charterOfferMatchesPaxFilter,
   formatCharterBoardSorts,
   parseCharterBoardFitFilter,
   parseCharterBoardLaneFilter,
+  parseCharterBoardPaxFilter,
   parseCharterBoardSorts,
   sortCharterBoardRows,
   withCharterFitSort,
@@ -90,7 +92,7 @@ test('fit filter also requires fit computation', () => {
   assert.equal(charterBoardNeedsFitCompute([], 'locked'), true);
 });
 
-test('parses charter lane and fit filters', () => {
+test('parses charter lane, fit, and pax filters', () => {
   assert.equal(parseCharterBoardLaneFilter('intl'), 'intl');
   assert.equal(parseCharterBoardLaneFilter('pilot-domestic'), 'pilot-domestic');
   assert.equal(parseCharterBoardLaneFilter('pilot-intl'), 'pilot-intl');
@@ -98,6 +100,15 @@ test('parses charter lane and fit filters', () => {
   assert.equal(parseCharterBoardFitFilter('open'), 'open');
   assert.equal(parseCharterBoardFitFilter('locked'), 'locked');
   assert.equal(parseCharterBoardFitFilter('any'), undefined);
+  assert.equal(parseCharterBoardPaxFilter('light'), 'light');
+  assert.equal(parseCharterBoardPaxFilter('med'), 'med');
+  assert.equal(parseCharterBoardPaxFilter('narrow'), 'narrow');
+  assert.equal(parseCharterBoardPaxFilter('any'), undefined);
+  assert.equal(charterOfferMatchesPaxFilter(8, 'light'), true);
+  assert.equal(charterOfferMatchesPaxFilter(8, 'med'), false);
+  assert.equal(charterOfferMatchesPaxFilter(24, 'med'), true);
+  assert.equal(charterOfferMatchesPaxFilter(80, 'narrow'), true);
+  assert.equal(charterOfferMatchesPaxFilter(12, undefined), true);
 });
 
 test('sorts by net and fit when present', () => {

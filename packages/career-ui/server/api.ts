@@ -92,6 +92,8 @@ import {
   parseCharterBoardSorts,
   parseCharterBoardLaneFilter,
   parseCharterBoardFitFilter,
+  parseCharterBoardPaxFilter,
+  charterOfferMatchesPaxFilter,
   sortCharterBoardRows,
   charterBoardNeedsFitCompute,
   formatCharterBoardSorts,
@@ -4968,6 +4970,9 @@ export function createCareerApiServer(port = 8787) {
         const fitFilter = parseCharterBoardFitFilter(
           url.searchParams.get('fit'),
         );
+        const paxFilter = parseCharterBoardPaxFilter(
+          url.searchParams.get('pax'),
+        );
         const aircraftId = url.searchParams.get('aircraftId')?.trim();
         const requestedSorts = parseCharterBoardSorts(
           url.searchParams.get('sort'),
@@ -5072,6 +5077,9 @@ export function createCareerApiServer(port = 8787) {
                   airports.get(offer.originIcao)?.region ?? '',
                 );
                 if (originCountry !== pilotCountryId) return false;
+              }
+              if (!charterOfferMatchesPaxFilter(offer.groupSize, paxFilter)) {
+                return false;
               }
               return true;
             },

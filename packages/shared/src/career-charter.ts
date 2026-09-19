@@ -276,7 +276,10 @@ export function quoteCharterPayUsd(opts: {
 /**
  * Banded group size so the shelf stays GA-friendly while still spawning
  * med-piston / narrow loads when Terminal pools allow.
- * ~55% 1–12 · ~27% 13–48 · ~18% 49–max (when avail permits).
+ *
+ * Deep pools (avail ≥ 49): mostly narrow, then med — otherwise continuous
+ * 1–12 drains keep majors forever below the med/narrow thresholds.
+ * Mid pools (13–48): prefer med. Shallow: light only.
  */
 export function pickCharterGroupSize(
   rng: () => number,
@@ -292,12 +295,25 @@ export function pickCharterGroupSize(
   const roll = rng();
   let lo = 1;
   let hi = Math.min(12, avail);
-  if (avail >= 49 && roll < 0.18) {
-    lo = 49;
-    hi = avail;
-  } else if (avail >= 13 && roll < 0.45) {
-    lo = 13;
-    hi = Math.min(48, avail);
+  if (avail >= 49) {
+    if (roll < 0.55) {
+      lo = 49;
+      hi = avail;
+    } else if (roll < 0.88) {
+      lo = 13;
+      hi = Math.min(48, avail);
+    } else {
+      lo = 1;
+      hi = Math.min(12, avail);
+    }
+  } else if (avail >= 13) {
+    if (roll < 0.62) {
+      lo = 13;
+      hi = avail;
+    } else {
+      lo = 1;
+      hi = Math.min(12, avail);
+    }
   }
   if (lo > hi) {
     lo = 1;
@@ -399,10 +415,20 @@ function hubFor(
   const capacityPax = hubCapacityPax(airport);
   const weight = airportDemandWeight(airport);
   const jitter = hashSeed(`${world.seed}:hub-seed:${icao}`) % 7;
+  // Seed deep enough that med/narrow bands can unlock without waiting days.
+  const seedFloor = Math.floor(capacityPax * 0.28);
   hub = {
     icao,
-    waitingPax: clamp(Math.floor(weight * 2.2 + jitter), 0, capacityPax),
-    attractPax: clamp(Math.floor(weight * 1.8 + (jitter % 5)), 0, capacityPax),
+    waitingPax: clamp(
+      Math.max(seedFloor, Math.floor(weight * 8 + jitter)),
+      0,
+      capacityPax,
+    ),
+    attractPax: clamp(
+      Math.max(seedFloor, Math.floor(weight * 6 + (jitter % 5))),
+      0,
+      capacityPax,
+    ),
     capacityPax,
     updatedAtTick: world.tick,
   };
@@ -522,18 +548,36 @@ export function tickCharterPools(world: CareerEconomyWorld): void {
     const weight = airportDemandWeight(airport);
     const weather = regionalWeatherIndex(world, airport.region);
     const weatherBoost = weather === 'poor' ? 1.15 : weather === 'marginal' ? 1.05 : 1;
-    const waitingGain = weight * (0.035 + rng() * 0.055) * weatherBoost;
-    const attractGain = weight * (0.03 + rng() * 0.05) * weatherBoost;
+    // ~3× prior gain so majors can reach med/narrow band floors between forms.
+    const waitingGain = weight * (0.11 + rng() * 0.16) * weatherBoost;
+    const attractGain = weight * (0.09 + rng() * 0.14) * weatherBoost;
     hub.waitingPax = clamp(
-      hub.waitingPax + waitingGain - hub.waitingPax * 0.004,
+      hub.waitingPax + waitingGain - hub.waitingPax * 0.003,
       0,
       hub.capacityPax,
     );
     hub.attractPax = clamp(
-      hub.attractPax + attractGain - hub.attractPax * 0.004,
+      hub.attractPax + attractGain - hub.attractPax * 0.003,
       0,
       hub.capacityPax,
     );
+    // Soft floor ~20% capacity — continuous small-form drain otherwise keeps
+    // min(waiting,attract) ≤12 forever and med/narrow bands never unlock.
+    const floor = Math.floor(hub.capacityPax * 0.2);
+    if (floor >= 13) {
+      if (hub.waitingPax < floor) {
+        hub.waitingPax = Math.min(
+          floor,
+          hub.waitingPax + Math.max(0.8, (floor - hub.waitingPax) * 0.06),
+        );
+      }
+      if (hub.attractPax < floor) {
+        hub.attractPax = Math.min(
+          floor,
+          hub.attractPax + Math.max(0.8, (floor - hub.attractPax) * 0.06),
+        );
+      }
+    }
     // Keep integer people for formation math.
     hub.waitingPax = Math.floor(hub.waitingPax * 1000) / 1000;
     hub.attractPax = Math.floor(hub.attractPax * 1000) / 1000;

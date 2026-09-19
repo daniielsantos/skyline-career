@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **7968e1b** / desktop **0.3.120** shipped: Clarify Base Search nm/ferry as per-leg and plot Active Tours on the map. Release: [v0.3.120](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.120).
+
+
 `main` **cf8428e** / desktop **0.3.119** shipped: Clarify Max ferry Search UX and slim the desktop pack by bundling the Career API. Release: [v0.3.119](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.119).
 
 

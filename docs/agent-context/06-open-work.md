@@ -2,6 +2,10 @@
 
 Atualizado 2026-09-19: **Desktop slim hotfix** — 0.3.117 API exit: drop de `packages/agent` quebrou imports relativos `../../agent/src` (dispatch/preflight/watch). Agent `src` volta no pack. Detail: `packages/desktop/README.md`.
 
+Atualizado 2026-09-19: **Pack slim fase 2** — esbuild `api.bundle.mjs` (server + agent); pack sem `tsx`/agent src; Setup **~120 MB**. Lab ainda `tsx`+`api.ts`. Detail: `packages/desktop/README.md`.
+
+Atualizado 2026-09-19: **Max ferry UX** — tooltip 2× no filtro; label multi-hop `Ferry · a+b`; coluna Ferry alinhada. Regra intacta. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
 Atualizado 2026-09-19: **Desktop pack slim** — stubs `@msfs-compat` (sem duplicar packages), drop maplibre/react do runtime, strip `.map`/`.d.ts`/tests, Electron `electronLanguages: en-US`. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-19: **Charter pay ≤12 ~1.3× frete** — coeffs `420+pax×55` / `nm×(2.35+pax×0.31)` (era 650/85 / 3.6/0.48); taper √ intacto. Detail: [`08-economy.md`](./08-economy.md).
@@ -14,7 +18,7 @@ Atualizado 2026-09-19: **Charter distance filter + page 12** — teto nm na colu
 
 Atualizado 2026-09-19: **Updater progress monotonic** — barra in-app não recua quando o diferencial emite % jumpy entre HTTP ranges (`clampDesktopUpdateProgressPct`). Detail: `packages/desktop/README.md` · `DesktopUpdates.tsx`.
 
-Atualizado 2026-09-19: **PG lots/charter UPSERT (Wave 1)** — pulse deixa de `DELETE FROM lots/charter_offers` + INSERT full; orphan-delete vs RAM + `ON CONFLICT DO UPDATE … WHERE IS DISTINCT FROM` (skip no-op). Timing: `CAREER_PG_PERSIST_TIMING=1`. Re-medir pulse ms + row counts no VPS. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-19: **PG lots/charter UPSERT (Wave 1)** — medido: lots ~1.2s / charter ~200ms; size lots **150→73 MB** (0 delivered), charter_offers **21→5.8 MB**. Samples **82 MB** + demand **65 MB** são o próximo bulk; Wave 2 PG não urgente. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-19: **Debug +$ wallet flicker** — credit pintava o saldo novo e o poll `/api/state` (ou missions) in-flight revertia ao antigo até reload. Causa: `POST /api/debug/credit-wallet` sem `companyId` + `paintWallet` aceitava regressão ambient. Fix: write com `companyIdFromRequest`; `commitWallet` segura ~12s contra paint stale. Detail: [`08-economy.md`](./08-economy.md).
 

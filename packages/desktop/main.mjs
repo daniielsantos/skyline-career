@@ -654,29 +654,45 @@ function registerIpc() {
 
 async function startCareerApi() {
   const root = skylineRoot();
-  const apiEntry = join(root, 'packages', 'career-ui', 'server', 'api.ts');
+  const bundleEntry = join(
+    root,
+    'packages',
+    'career-ui',
+    'server',
+    'api.bundle.mjs',
+  );
+  const tsEntry = join(root, 'packages', 'career-ui', 'server', 'api.ts');
+  const useBundle = await pathExists(bundleEntry);
+  const apiEntry = useBundle ? bundleEntry : tsEntry;
   if (!(await pathExists(apiEntry))) {
     throw new Error(`Career API entry missing: ${apiEntry}`);
   }
 
-  // Prefer absolute tsx loader — packaged installs must ship node_modules/tsx.
-  const tsxCandidates = [
-    join(root, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs'),
-    join(root, 'node_modules', 'tsx', 'esm.mjs'),
-    join(root, 'node_modules', 'tsx', 'dist', 'loader.mjs'),
-  ];
-  let tsxLoader = '';
-  for (const candidate of tsxCandidates) {
-    if (await pathExists(candidate)) {
-      tsxLoader = candidate;
-      break;
+  let spawnArgs;
+  if (useBundle) {
+    spawnArgs = [apiEntry];
+  } else {
+    // Lab / unpackaged monorepo — boot TypeScript via tsx.
+    const tsxCandidates = [
+      join(root, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs'),
+      join(root, 'node_modules', 'tsx', 'esm.mjs'),
+      join(root, 'node_modules', 'tsx', 'dist', 'loader.mjs'),
+    ];
+    let tsxLoader = '';
+    for (const candidate of tsxCandidates) {
+      if (await pathExists(candidate)) {
+        tsxLoader = candidate;
+        break;
+      }
     }
-  }
-  if (!tsxLoader) {
-    throw new Error(
-      `tsx runtime missing under ${join(root, 'node_modules', 'tsx')}. ` +
-        'Reinstall Airframe Career (pack must include skyline/node_modules).',
-    );
+    if (!tsxLoader) {
+      throw new Error(
+        `tsx runtime missing under ${join(root, 'node_modules', 'tsx')}. ` +
+          'Reinstall Airframe Career (pack must include skyline/node_modules) ' +
+          'or run from a monorepo with tsx installed.',
+      );
+    }
+    spawnArgs = ['--import', pathToFileURL(tsxLoader).href, apiEntry];
   }
 
   killListenersOnPort(API_PORT);
@@ -700,7 +716,9 @@ async function startCareerApi() {
   const logPath = join(logDir, 'career-api.log');
   const logStream = createWriteStream(logPath, { flags: 'a' });
   logStream.write(`\n==== API start ${new Date().toISOString()} ====\n`);
-  logStream.write(`tsx=${tsxLoader}\napi=${apiEntry}\nroot=${root}\n`);
+  logStream.write(
+    `boot=${useBundle ? 'api.bundle.mjs' : 'tsx+api.ts'}\napi=${apiEntry}\nroot=${root}\n`,
+  );
 
   const play = resolveLaunchPlay();
   const env = {
@@ -742,18 +760,17 @@ async function startCareerApi() {
     );
   }
 
-  const importSpec = pathToFileURL(tsxLoader).href;
-  logLine(`[desktop] starting API via ELECTRON_RUN_AS_NODE + ${importSpec}`);
-  apiChild = spawn(
-    process.execPath,
-    ['--import', importSpec, apiEntry],
-    {
-      cwd: root,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    },
+  logLine(
+    `[desktop] starting API via ELECTRON_RUN_AS_NODE + ${
+      useBundle ? 'api.bundle.mjs' : 'tsx'
+    }`,
   );
+  apiChild = spawn(process.execPath, spawnArgs, {
+    cwd: root,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
   apiChild.stdout?.pipe(logStream);
   apiChild.stderr?.pipe(logStream);
   apiChild.on('exit', (code) => {

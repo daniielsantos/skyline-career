@@ -56,7 +56,7 @@ exports.default = async function afterPack(context) {
   const root = join(__dirname, '..', '..');
   const resources = join(context.appOutDir, 'resources');
 
-  // --- Career API runtime node_modules (tsx, etc.) ---
+  // --- Career API runtime node_modules (stubs; API is api.bundle.mjs) ---
   const skylineSrc = join(root, 'artifacts', 'skyline-runtime', 'node_modules');
   const skylineDest = join(resources, 'skyline', 'node_modules');
   await mustExist(skylineSrc, 'skyline-runtime/node_modules');
@@ -68,10 +68,17 @@ exports.default = async function afterPack(context) {
     dereference: true,
   });
   await mustExist(
-    join(skylineDest, 'tsx', 'dist', 'esm', 'index.mjs'),
-    'tsx after copy',
+    join(
+      resources,
+      'skyline',
+      'packages',
+      'career-ui',
+      'server',
+      'api.bundle.mjs',
+    ),
+    'api.bundle.mjs after pack',
   );
-  console.log('[afterPack] skyline tsx present ✓');
+  console.log('[afterPack] skyline api.bundle.mjs present ✓');
 
   // --- electron-updater flat tree (stripped from extraResources otherwise) ---
   const updaterSrc = join(root, 'artifacts', 'skyline-updater-nm');

@@ -116,7 +116,7 @@ async function writeMsfsCompatStubs(runtimeRoot) {
     await mkdir(dest, { recursive: true });
     const main =
       name === 'career-ui'
-        ? '../../../packages/career-ui/server/api.ts'
+        ? '../../../packages/career-ui/server/api.bundle.mjs'
         : `../../../packages/${name}/dist/index.js`;
     const pkg = {
       name: `@msfs-compat/${name}`,
@@ -128,7 +128,7 @@ async function writeMsfsCompatStubs(runtimeRoot) {
     // main-only stub: Node `exports` may reject `../` paths outside the package root.
     await writeFile(join(dest, 'package.json'), `${JSON.stringify(pkg, null, 2)}\n`);
   }
-  // Drop unused workspace packages from the scope (agent is not on the API path).
+  // Drop unused workspace packages from the scope (agent is bundled into the API).
   for (const stale of ['agent', 'catalog-api']) {
     await rm(join(scopeDir, stale), { recursive: true, force: true });
   }
@@ -189,21 +189,30 @@ async function slimRuntimePayload() {
 
   const junkPackages = await stripPackedJunkFiles(join(runtimeOut, 'packages'));
   const junkNm = await stripPackedJunkFiles(nm);
-  // Server unit tests are not needed at runtime.
+  // Drop server TypeScript sources — packaged boot uses api.bundle.mjs only.
   const serverDir = join(runtimeOut, 'packages', 'career-ui', 'server');
   if (await exists(serverDir)) {
     for (const name of await readdir(serverDir)) {
-      if (/\.test\.[cm]?[jt]sx?$/i.test(name)) {
+      if (name === 'api.bundle.mjs') continue;
+      if (
+        /\.test\.[cm]?[jt]sx?$/i.test(name) ||
+        /\.[cm]?[jt]sx?$/i.test(name)
+      ) {
         await rm(join(serverDir, name), { force: true });
       }
     }
   }
+  // Agent TS is compiled into the API bundle — do not ship sources.
+  await rm(join(runtimeOut, 'packages', 'agent'), {
+    recursive: true,
+    force: true,
+  });
 
   const after = await dirSizeBytes(runtimeOut);
   const savedMb = ((before - after) / (1024 * 1024)).toFixed(1);
   console.log(
     `[pack:desktop] slim runtime ${savedMb} MB saved ` +
-      `(stubs @msfs-compat, drop UI deps, strip ${junkPackages.removed + junkNm.removed} junk files)`,
+      `(stubs @msfs-compat, drop UI deps/tsx/agent src, strip ${junkPackages.removed + junkNm.removed} junk files)`,
   );
   console.log(
     `[pack:desktop] runtime size ${(after / (1024 * 1024)).toFixed(1)} MB`,
@@ -300,9 +309,7 @@ async function writeRuntimePackageJson() {
         type: 'module',
         workspaces: ['packages/*'],
         engines: { node: '>=22.5' },
-        dependencies: {
-          tsx: '^4.19.3',
-        },
+        dependencies: {},
       },
       null,
       2,
@@ -363,27 +370,9 @@ async function assembleRuntime() {
     { recursive: true },
   );
 
-  // agent — career-ui server imports ../../agent/src/*.ts (SimBrief, pipe, OFP)
-  await writeWorkspacePackage('agent', {
-    main: './dist/index.js',
-    exports: { '.': { import: './dist/index.js' } },
-    dependencies: {
-      '@msfs-compat/runtime': '0.1.0',
-      '@msfs-compat/shared': '0.1.0',
-    },
-  });
-  await cp(
-    join(root, 'packages', 'agent', 'src'),
-    join(runtimeOut, 'packages', 'agent', 'src'),
-    {
-      recursive: true,
-      filter: (src) => !/\.test\.[cm]?[jt]sx?$/i.test(src),
-    },
-  );
-
-  // career-ui — server sources + Vite UI dist (maplibre/react already in dist bundle)
+  // career-ui — server sources (bundled below) + Vite UI dist
   await writeWorkspacePackage('career-ui', {
-    main: './server/api.ts',
+    main: './server/api.bundle.mjs',
     dependencies: {
       '@msfs-compat/runtime': '0.1.0',
       '@msfs-compat/shared': '0.1.0',
@@ -402,6 +391,8 @@ async function assembleRuntime() {
     join(runtimeOut, 'packages', 'career-ui', 'dist'),
     { recursive: true },
   );
+
+  await bundleCareerApi();
 
   // Seed content (no player saves) — hub MSFS overrides only (bush trips removed).
   await mkdir(join(runtimeOut, 'profiles', 'career'), { recursive: true });
@@ -461,30 +452,64 @@ Player saves live under %AppData%\\\\Skyline Career\\\\career\\\\.
     shell: true,
   });
 
-  const tsxOk = await exists(
-    join(runtimeOut, 'node_modules', 'tsx', 'dist', 'esm', 'index.mjs'),
+  const bundleOk = await exists(
+    join(
+      runtimeOut,
+      'packages',
+      'career-ui',
+      'server',
+      'api.bundle.mjs',
+    ),
   );
-  if (!tsxOk) {
+  if (!bundleOk) {
     throw new Error(
-      'skyline-runtime missing node_modules/tsx after npm install — desktop API cannot start',
+      'skyline-runtime missing packages/career-ui/server/api.bundle.mjs — desktop API cannot start',
     );
   }
-  console.log('[pack:desktop] runtime includes tsx ✓');
+  console.log('[pack:desktop] runtime includes api.bundle.mjs ✓');
   await slimRuntimePayload();
+}
 
-  const agentDispatch = join(
+/**
+ * Compile career-ui server + agent TS into one ESM file so the packaged
+ * desktop does not need tsx / agent sources at runtime.
+ */
+async function bundleCareerApi() {
+  console.log('[pack:desktop] bundling career-ui server → api.bundle.mjs…');
+  let esbuild;
+  try {
+    esbuild = await import('esbuild');
+  } catch (err) {
+    throw new Error(
+      `esbuild required for pack slim phase 2: ${
+        err instanceof Error ? err.message : String(err)
+      }. Run npm install at repo root.`,
+    );
+  }
+  const entry = join(root, 'packages', 'career-ui', 'server', 'api.ts');
+  const outfile = join(
     runtimeOut,
     'packages',
-    'agent',
-    'src',
-    'ofp-compliance',
-    'simbrief-dispatch.ts',
+    'career-ui',
+    'server',
+    'api.bundle.mjs',
   );
-  if (!(await exists(agentDispatch))) {
-    throw new Error(
-      'skyline-runtime missing packages/agent/src/ofp-compliance/simbrief-dispatch.ts — career-ui server imports it',
-    );
+  await esbuild.build({
+    entryPoints: [entry],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node22',
+    outfile,
+    // Keep workspace packages external — shipped as packages/*/dist.
+    packages: 'external',
+    logLevel: 'warning',
+  });
+  if (!(await exists(outfile))) {
+    throw new Error(`esbuild did not write ${outfile}`);
   }
+  const sizeMb = ((await stat(outfile)).size / (1024 * 1024)).toFixed(2);
+  console.log(`[pack:desktop] api.bundle.mjs ${sizeMb} MB ✓`);
 }
 
 async function assembleHost() {

@@ -61,11 +61,12 @@ The installer is still Electron-heavy (~Chromium), but the Career payload is tri
 
 1. **`@msfs-compat` stubs** — `node_modules/@msfs-compat/*` are tiny `package.json` pointers into `packages/*` (avoids afterPack `dereference` doubling career-ui/shared).
 2. **No UI npm deps in runtime** — maplibre/react stay out; the Vite `dist/` already bundles them.
-3. **Keep `packages/agent/src`** — career-ui server imports it via relative `../../agent/src` (SimBrief / pipe / OFP). Do not drop it.
-4. **Strip** `*.map`, `*.d.ts`, `*.test.js`, `*-dev.mjs` from the packed tree.
-5. **`electronLanguages: ["en-US"]`** — drop the other Chromium locale packs.
+3. **API bundle (phase 2)** — pack runs **esbuild** on `career-ui/server/api.ts` (+ relative `agent/src` imports) → `server/api.bundle.mjs`. Packaged `main.mjs` boots the bundle with Node (no `tsx`). Monorepo lab still uses `tsx` + `api.ts` when the bundle is absent.
+4. **No `agent/src` / server `.ts` in the installer** — compiled into the API bundle (avoids the 0.3.117 “drop agent” crash).
+5. **Strip** `*.map`, `*.d.ts`, `*.test.js`, `*-dev.mjs` from the packed tree.
+6. **`electronLanguages: ["en-US"]`** — drop the other Chromium locale packs.
 
-tsx/esbuild stay (API still boots `server/api.ts`). Compiling the server to JS would drop another ~12 MB later.
+Measured on pack (0.3.118 rebuild): runtime payload **~47 MB**; NSIS Setup **~120 MB** (was ~124 MB after phase 1 / ~175 MB before slim).
 
 The pack script also:
 

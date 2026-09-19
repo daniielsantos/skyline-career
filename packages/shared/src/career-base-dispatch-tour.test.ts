@@ -497,6 +497,27 @@ describe('base dispatch tours', () => {
         detail: 'L2 SBCT→SBKP 188 nm',
       },
     );
+    assert.deepEqual(
+      describeTourFerry(
+        [
+          {
+            originIcao: 'SBCT',
+            destIcao: 'SBFL',
+            ferryNm: 120,
+          },
+          {
+            originIcao: 'SBKP',
+            destIcao: 'SBSP',
+            ferryNm: 68,
+          },
+        ],
+        'SBGR',
+      ),
+      {
+        label: 'Ferry · 120+68',
+        detail: 'L1 SBGR→SBCT 120 nm · L2 SBFL→SBKP 68 nm',
+      },
+    );
   });
 
   it('persists Active Tour on L1 and accepts L2 after settle + reposition', () => {

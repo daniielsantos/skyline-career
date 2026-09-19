@@ -24,6 +24,9 @@ profiles/career/skyline.sqlite*
 artifacts/
 backups/
 
+# Pack-only Career API bundle (esbuild; not used in monorepo lab)
+packages/career-ui/server/api.bundle.mjs
+
 # Local cloc binary (https://github.com/AlDanial/cloc)
 cloc*.exe
 

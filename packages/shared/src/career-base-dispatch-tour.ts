@@ -623,14 +623,14 @@ export function tourPassesQualityGate(tour: {
 
 /**
  * Search-table ferry chip: short label + tooltip detail of each reposition hop.
- * Label e.g. "Ferry · 188 nm"; detail e.g. "L2 SBCT→SBKP · 188 nm".
+ * One hop: "Ferry · 188 nm"; multi: "Ferry · 120+68" (nm sum in tooltip hops).
  */
 export function describeTourFerry(
   legs: Array<{ originIcao: string; destIcao: string; ferryNm: number }>,
   fromIcao?: string | null,
 ): { label: string; detail: string } | null {
   const hops: string[] = [];
-  let total = 0;
+  const hopNm: number[] = [];
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i]!;
     if (!(leg.ferryNm > 0.5)) continue;
@@ -640,7 +640,7 @@ export function describeTourFerry(
         : (fromIcao ?? '').trim().toUpperCase() || null;
     const origin = leg.originIcao.trim().toUpperCase();
     const nm = Math.round(leg.ferryNm);
-    total += leg.ferryNm;
+    hopNm.push(nm);
     if (prev && prev !== origin) {
       hops.push(`L${i + 1} ${prev}→${origin} ${nm} nm`);
     } else {
@@ -648,8 +648,12 @@ export function describeTourFerry(
     }
   }
   if (!hops.length) return null;
+  const label =
+    hopNm.length === 1
+      ? `Ferry · ${hopNm[0]} nm`
+      : `Ferry · ${hopNm.join('+')}`;
   return {
-    label: `Ferry · ${Math.round(total)} nm`,
+    label,
     detail: hops.join(' · '),
   };
 }

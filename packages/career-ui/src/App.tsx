@@ -13410,7 +13410,9 @@ export function App() {
                                               }
                                             />
                                           </label>
-                                          <label>
+                                          <label
+                                            title="Between legs (default 200). First reposition may be up to 2× (e.g. 200 → 400 nm)."
+                                          >
                                             <span>Max ferry</span>
                                             <input
                                               type="number"
@@ -13676,9 +13678,30 @@ export function App() {
                                                     )}
                                                   </td>
                                                   <td>
-                                                    {tour.totalFerryNm > 0.5
-                                                      ? `${Math.round(tour.totalFerryNm)} nm`
-                                                      : '—'}
+                                                    {(() => {
+                                                      const ferry =
+                                                        describeTourFerry(
+                                                          tour.legs,
+                                                          tour.aircraftLocationIcao,
+                                                        );
+                                                      if (
+                                                        !ferry &&
+                                                        !(tour.totalFerryNm > 0.5)
+                                                      ) {
+                                                        return '—';
+                                                      }
+                                                      return (
+                                                        <span
+                                                          title={
+                                                            ferry?.detail ??
+                                                            undefined
+                                                          }
+                                                        >
+                                                          {ferry?.label ??
+                                                            `Ferry · ${Math.round(tour.totalFerryNm)} nm`}
+                                                        </span>
+                                                      );
+                                                    })()}
                                                   </td>
                                                   <td className="pay">
                                                     {boardMoneyLabel(
@@ -13876,7 +13899,9 @@ export function App() {
                                                 }
                                               />
                                             </label>
-                                            <label>
+                                            <label
+                                              title="Between legs (default 200). First reposition may be up to 2× (e.g. 200 → 400 nm)."
+                                            >
                                               <span>Max ferry</span>
                                               <input
                                                 type="number"
@@ -14064,9 +14089,33 @@ export function App() {
                                                     )}
                                                   </td>
                                                   <td>
-                                                    {tour.totalFerryNm > 0.5
-                                                      ? `${Math.round(tour.totalFerryNm)} nm`
-                                                      : '—'}
+                                                    {(() => {
+                                                      const ferry =
+                                                        describeTourFerry(
+                                                          tour.legs,
+                                                          tour.aircraftLocationIcao,
+                                                        );
+                                                      if (
+                                                        !ferry &&
+                                                        !(
+                                                          tour.totalFerryNm >
+                                                          0.5
+                                                        )
+                                                      ) {
+                                                        return '—';
+                                                      }
+                                                      return (
+                                                        <span
+                                                          title={
+                                                            ferry?.detail ??
+                                                            undefined
+                                                          }
+                                                        >
+                                                          {ferry?.label ??
+                                                            `Ferry · ${Math.round(tour.totalFerryNm)} nm`}
+                                                        </span>
+                                                      );
+                                                    })()}
                                                   </td>
                                                   <td
                                                     title={

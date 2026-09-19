@@ -173,6 +173,12 @@ import {
   acceptWarehouseBridge,
   dispatchWarehouseBridgeHold,
   quoteInternalHaulForRoute,
+  listOpenInternalHaulHolds,
+  listInternalHaulMissions,
+  vaDayKeyFromTick,
+  VA_RANKING_WINDOW_DAYS,
+  VA_MEMBER_CAP,
+  canManageVaRoster,
   holdWarehouseHaul,
   cancelWarehouseHaulHold,
   acceptWarehouseHaul,
@@ -3272,6 +3278,619 @@ export function createCareerApiServer(port = 8787) {
           account: session.account,
           companies: session.companies,
           memberships: session.memberships,
+        });
+        return;
+      }
+
+      // --- VA / Internal Haul multi-pilot (IH-2) ---
+      if (req.method === 'GET' && path === '/api/va/members') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const companyId = companyIdFromRequest(req);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        const membership = await Promise.resolve(
+          store.vaGetMembership(session.account.id, companyId),
+        );
+        if (!membership) {
+          send(res, 403, { error: 'Not a member of this company' });
+          return;
+        }
+        const members = await Promise.resolve(store.vaListMembers(companyId));
+        send(res, 200, {
+          companyId,
+          memberCap: VA_MEMBER_CAP,
+          role: membership.role,
+          members,
+        });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/invite') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          role?: string;
+          maxUses?: number;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          const invite = await Promise.resolve(
+            store.vaCreateInvite({
+              companyId,
+              createdByAccountId: session.account.id,
+              role:
+                body.role === 'dispatcher' ? 'dispatcher' : 'pilot',
+              maxUses: body.maxUses,
+            }),
+          );
+          send(res, 200, { invite });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/va/invites') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const companyId = companyIdFromRequest(req);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        const membership = await Promise.resolve(
+          store.vaGetMembership(session.account.id, companyId),
+        );
+        if (!membership || !canManageVaRoster(membership.role)) {
+          send(res, 403, { error: 'Owner or dispatcher only' });
+          return;
+        }
+        const invites = await Promise.resolve(store.vaListInvites(companyId));
+        send(res, 200, { invites });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/join') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as { code?: string };
+        if (!body.code?.trim()) {
+          send(res, 400, { error: 'code required' });
+          return;
+        }
+        try {
+          const joined = await Promise.resolve(
+            store.vaJoinInvite({
+              code: body.code,
+              accountId: session.account.id,
+            }),
+          );
+          const companies = await Promise.resolve(
+            store.authListCompaniesForAccount(session.account.id),
+          );
+          send(res, 200, {
+            companyId: joined.companyId,
+            member: joined.member,
+            companies,
+          });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/leave') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as { companyId?: string };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          await Promise.resolve(
+            store.vaLeave({ companyId, accountId: session.account.id }),
+          );
+          send(res, 200, { ok: true });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/kick') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          accountId?: string;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId || !body.accountId?.trim()) {
+          send(res, 400, { error: 'companyId and accountId required' });
+          return;
+        }
+        try {
+          await Promise.resolve(
+            store.vaKick({
+              companyId,
+              actorAccountId: session.account.id,
+              targetAccountId: body.accountId.trim(),
+            }),
+          );
+          send(res, 200, { ok: true });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/role') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          accountId?: string;
+          role?: string;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId || !body.accountId?.trim() || !body.role) {
+          send(res, 400, { error: 'companyId, accountId, role required' });
+          return;
+        }
+        try {
+          const member = await Promise.resolve(
+            store.vaSetRole({
+              companyId,
+              actorAccountId: session.account.id,
+              targetAccountId: body.accountId.trim(),
+              role: body.role === 'dispatcher' ? 'dispatcher' : 'pilot',
+            }),
+          );
+          send(res, 200, { member });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/va/hauls') {
+        if (!store) {
+          send(res, 409, { error: 'Select a career profile first' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (isCareerAuthRequired() && !session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const companyId = companyIdFromRequest(req);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        if (session && store.supportsAuth) {
+          const membership = await Promise.resolve(
+            store.vaGetMembership(session.account.id, companyId),
+          );
+          if (!membership) {
+            send(res, 403, { error: 'Not a member of this company' });
+            return;
+          }
+        }
+        const missions = await store.loadMissions({ companyId });
+        const openHolds = listOpenInternalHaulHolds(missions);
+        const active = listInternalHaulMissions(missions);
+        send(res, 200, {
+          companyId,
+          openHolds,
+          activeMissions: active.map((m) => ({
+            id: m.id,
+            originIcao: m.originIcao,
+            destIcao: m.destIcao,
+            commodityId: m.commodityId,
+            cargoKg: m.cargoKg,
+            payUsd: m.payUsd,
+            status: m.status,
+            distanceNm: m.distanceNm,
+            pilotAccountId: m.pilotAccountId,
+            aircraftId: m.aircraftId,
+          })),
+        });
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/va/directory') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const url = new URL(
+          req.url ?? '/',
+          `http://${req.headers.host ?? 'localhost'}`,
+        );
+        const includeClosed = url.searchParams.get('includeClosed') === '1';
+        const world = store.peekEconomyWorld();
+        const worldId =
+          url.searchParams.get('worldId')?.trim() ||
+          world?.worldId ||
+          undefined;
+        const directory = await Promise.resolve(
+          store.vaDirectory({
+            worldId,
+            accountId: session.account.id,
+            includeClosed,
+            limit: 80,
+          }),
+        );
+        send(res, 200, { directory });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/request') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as { companyId?: string };
+        if (!body.companyId?.trim()) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          const request = await Promise.resolve(
+            store.vaCreateJoinRequest({
+              companyId: body.companyId.trim(),
+              accountId: session.account.id,
+            }),
+          );
+          send(res, 200, { request });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/va/requests') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const companyId = companyIdFromRequest(req);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        const membership = await Promise.resolve(
+          store.vaGetMembership(session.account.id, companyId),
+        );
+        if (!membership || !canManageVaRoster(membership.role)) {
+          send(res, 403, { error: 'Owner or dispatcher only' });
+          return;
+        }
+        const requests = await Promise.resolve(
+          store.vaListJoinRequests(companyId),
+        );
+        send(res, 200, { requests });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/requests/accept') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as { requestId?: string };
+        if (!body.requestId?.trim()) {
+          send(res, 400, { error: 'requestId required' });
+          return;
+        }
+        try {
+          const result = await Promise.resolve(
+            store.vaAcceptJoinRequest({
+              requestId: body.requestId.trim(),
+              actorAccountId: session.account.id,
+            }),
+          );
+          send(res, 200, result);
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/requests/reject') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as { requestId?: string };
+        if (!body.requestId?.trim()) {
+          send(res, 400, { error: 'requestId required' });
+          return;
+        }
+        try {
+          await Promise.resolve(
+            store.vaRejectJoinRequest({
+              requestId: body.requestId.trim(),
+              actorAccountId: session.account.id,
+            }),
+          );
+          send(res, 200, { ok: true });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/recruiting') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          recruiting?: boolean;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId || typeof body.recruiting !== 'boolean') {
+          send(res, 400, { error: 'companyId and recruiting boolean required' });
+          return;
+        }
+        try {
+          const recruiting = await Promise.resolve(
+            store.vaSetRecruiting({
+              companyId,
+              actorAccountId: session.account.id,
+              recruiting: body.recruiting,
+            }),
+          );
+          send(res, 200, { recruiting });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/publish') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          displayName?: string;
+          homeHubIcao?: string;
+          recruiting?: boolean;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId || !body.displayName?.trim() || !body.homeHubIcao?.trim()) {
+          send(res, 400, {
+            error: 'companyId, displayName, and homeHubIcao required',
+          });
+          return;
+        }
+        try {
+          const published = await Promise.resolve(
+            store.vaPublish({
+              companyId,
+              actorAccountId: session.account.id,
+              displayName: body.displayName,
+              homeHubIcao: body.homeHubIcao,
+              recruiting: body.recruiting,
+            }),
+          );
+          send(res, 200, { company: published });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/va/ranking') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA ranking requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (isCareerAuthRequired() && !session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const url = new URL(
+          req.url ?? '/',
+          `http://${req.headers.host ?? 'localhost'}`,
+        );
+        const world = store.peekEconomyWorld();
+        const tick = world?.tick ?? 0;
+        const toDay = vaDayKeyFromTick(tick);
+        const fromDay = Math.max(0, toDay - (VA_RANKING_WINDOW_DAYS - 1));
+        const companyId = companyIdFromRequest(req) ?? url.searchParams.get('companyId') ?? undefined;
+        const ranking = await Promise.resolve(
+          store.vaCompanyRanking({
+            fromDayKey: fromDay,
+            toDayKey: toDay,
+            limit: 20,
+          }),
+        );
+        let pilots: Awaited<ReturnType<typeof store.vaPilotRanking>> = [];
+        if (companyId) {
+          pilots = await Promise.resolve(
+            store.vaPilotRanking({
+              companyId,
+              fromDayKey: fromDay,
+              toDayKey: toDay,
+              limit: 12,
+            }),
+          );
+        }
+        send(res, 200, {
+          windowDays: VA_RANKING_WINDOW_DAYS,
+          fromDayKey: fromDay,
+          toDayKey: toDay,
+          companies: ranking,
+          pilots,
         });
         return;
       }
@@ -7973,6 +8592,19 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const session = authSessionFromRequest(req);
+          const pilotHome =
+            session && store
+              ? ((await Promise.resolve(
+                  store.vaHomeCompanyId(session.account.id),
+                )) ?? warehouses_bridge_acceptCompanyId)
+              : warehouses_bridge_acceptCompanyId;
+          const pilotStamp = session
+            ? {
+                pilotAccountId: session.account.id,
+                pilotHomeCompanyId: pilotHome ?? undefined,
+              }
+            : {};
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
@@ -7988,6 +8620,7 @@ export function createCareerApiServer(port = 8787) {
                     : body.pilotPayUsd != null
                       ? Number(body.pilotPayUsd)
                       : undefined,
+                ...pilotStamp,
               });
               const warehouses = playerWarehouseSnapshot(missions, world);
               return {
@@ -8027,6 +8660,19 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const session = authSessionFromRequest(req);
+          const pilotHome =
+            session && store
+              ? ((await Promise.resolve(
+                  store.vaHomeCompanyId(session.account.id),
+                )) ?? warehouses_bridge_dispatch_holdCompanyId)
+              : warehouses_bridge_dispatch_holdCompanyId;
+          const pilotStamp = session
+            ? {
+                pilotAccountId: session.account.id,
+                pilotHomeCompanyId: pilotHome ?? undefined,
+              }
+            : {};
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
@@ -8039,6 +8685,7 @@ export function createCareerApiServer(port = 8787) {
                     : body.pilotPayUsd != null
                       ? Number(body.pilotPayUsd)
                       : undefined,
+                ...pilotStamp,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -10998,6 +11645,7 @@ export function createCareerApiServer(port = 8787) {
                 : undefined;
             const executed = executeSettleFlight(world, missions, {
               missionId: body.missionId,
+              companyId: settleCompanyId,
               residualFuelKg,
               mxFuelDrainUnsettledKg: mxFuelDrain.unsettledKg,
               mxFuelDrainTotalKg: mxFuelDrain.totalKg,
@@ -11035,6 +11683,11 @@ export function createCareerApiServer(port = 8787) {
               classOpsDeltas: result.classOpsDeltas ?? [],
               activeTour: activeTourView(missions, world),
               charterActiveTour: charterActiveTourView(missions, world),
+              pilotPayCredit:
+                executed.kind === 'applied'
+                  ? executed.pilotPayCredit
+                  : undefined,
+              settleTick: world.tick,
             };
           }, {
             housekeeping: false,
@@ -11049,6 +11702,44 @@ export function createCareerApiServer(port = 8787) {
           if (settled.kind === 'closed') {
             send(res, 409, { error: `Mission ${body.missionId} is already closed` });
             return;
+          }
+          if (settled.pilotPayCredit && settled.pilotPayCredit.amountUsd > 0) {
+            const credit = settled.pilotPayCredit;
+            await withCareerWrite(
+              (_world, missions) => {
+                applyWalletDelta(missions, {
+                  amountUsd: credit.amountUsd,
+                  kind: 'internal_haul_pay',
+                  atTick: settled.settleTick,
+                  missionId: credit.missionId,
+                  icao: credit.destIcao,
+                  note: `Internal haul pilot · ${credit.originIcao}→${credit.destIcao}`,
+                });
+                return { walletUsd: missions.walletUsd };
+              },
+              {
+                persist: 'company',
+                companyId: credit.companyId,
+                housekeeping: false,
+                catchUp: false,
+              },
+            );
+          }
+          if (
+            settled.mission.internalHaul === true &&
+            settleCompanyId &&
+            store
+          ) {
+            const dayKey = vaDayKeyFromTick(settled.settleTick);
+            await Promise.resolve(
+              store.vaRecordHaulStats({
+                companyId: settleCompanyId,
+                accountId: settled.mission.pilotAccountId,
+                dayKey,
+                nm: Number(settled.mission.distanceNm) || 0,
+                payUsd: settled.settlement.payoutUsd ?? 0,
+              }),
+            );
           }
           send(res, 200, {
             mission: await toClientMission(settled.mission),

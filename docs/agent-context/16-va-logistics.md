@@ -1,7 +1,7 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-09-06. **IH-1 Internal Haul shipped** — pay sugerido + banda 80–150%; settle company− / pilot+ (`internal_haul_pay`); unpaid bridge + Port shuttle intactos. Spec abaixo + [`24-port-fbo.md`](./24-port-fbo.md).
-**Port FBO desk auto-buy (VA Fase 1) shipped solo** — ver [`24-port-fbo.md`](./24-port-fbo.md) Phase 2. Loops A/B + tiers 1–3 **decididos**; schema members/billing ainda não (IH-2).
+Atualizado 2026-09-19. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator, ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
+**IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -34,7 +34,7 @@ Reusa missões / Watch / settle / WH. **Não** exige vender no porto. Solo pode 
 | Fatia | Escopo | Status |
 |-------|--------|--------|
 | **IH-1** | Quote + stamp + settle ±pay; UI Ports/Scout | **shipped** |
-| **IH-2** | Schema members fino + board interno + accept outro piloto | Depois |
+| **IH-2** | Schema members fino + board interno + accept outro piloto + ranking 7d | **shipped** |
 | **IH-3** | Desk AI cria hauls (Fase 3) sob caps Owner | Depois de IH-2 |
 | **NPC** | Só shuttle/bridge unpaid | Phase 8 |
 
@@ -125,18 +125,43 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 ## Non-goals (por agora)
 
-- Schema `members` / invites / billing  
-- Bolsa P2P de commodities  
-- Dual currency no porto  
+- Chat / company crew Hangar
+- Billing / seats IAP
+- Bolsa P2P de commodities
+- Dual currency no porto
 - Fase C (porto→porto) — **CAI**; revenda = Demand
-- AI pilot voando a ponte  
+- AI pilot voando a ponte
+
+### VA pages + publish (2026-09-19)
+
+**Sintoma:** Settings card VA zoado (directory+roster+hauls+ranking numa coluna); jogador não achava a página.
+**Causa:** UI cravada em Settings; “criar VA” não existia como fluxo.
+**Fix:** sidebar **VA** (`/va`) + **Ranking** (`/ranking`); Settings card removido. Narrativa: company = VA (reusa tenant). **Publish** = `POST /api/va/publish` atualiza `display_name` / `home_hub` / recruiting da company ativa (owner). Hauls ficam em Ports.
+
+### Desktop local Failed to start / Career API exit 1 (2026-09-19)
+
+**Sintoma:** Airframe Career “Failed to start… Career API exited early (code 1). See career-api.log”.
+**Causa:** em `api.ts`, `if` órfão duplicado em `/api/va/ranking` (bloco aberto sem corpo) — `try` do `handleRequest` fechava cedo e o `catch` virava `Unexpected "catch"` (TransformError).
+**Fix:** remover o `if` duplicado; esbuild ESM do `api.ts` volta a passar. Reabrir o desktop local.
+
+### VA directory + join requests (2026-09-19)
+
+**Sintoma:** invite-only escondia VAs do world.
+**Causa:** só código privado, sem lista/pedido.
+**Fix:** directory + join requests; owner Accept/Reject; `recruiting` off remove da lista aberta (invite code privado intacto). Schema SQLite **v12** / PG **v22**.
+
+### IH-2 — shipped (2026-09-19)
+
+**Sintoma / gap:** solo Internal Haul only; sem convidar outro piloto.
+**Causa:** members table existia (auth) mas sem invite/join, board, pay cross-company, ranking.
+**Fix:** schema v11 / PG v21 company_invites + haul stats; career-va.ts; APIs /api/va/*; UI sidebar **VA** + **Ranking** (publish reusa company); settle pilotAccountId/pilotHomeCompanyId + credit home quando ≠ VA.
 
 ## Checklist quando for implementar
 
-- [x] `InternalHaul` pay (IH-1): `career-warehouse-bridge` quote/stamp; settle WH dest + `internal_haul_pay` ±; unpaid bridge payout 0; shuttle gate  
-- [ ] UI surplus/tight por commodity no Ports / região  
-- [x] Fase 1: tabela/ordens auto-buy + tick executor (`career-port-auto-buy.ts`, Port FBO Phase 2)
-- [x] Fase 2: scout report → confirm → bridge / Demand / Haul (`career-port-scout`) — Scout bridge default = suggest pay  
-- [ ] IH-2 members + board interno  
-- [ ] Fase 3 / IH-3: só com VA; caps AI vs humano Dispatcher  
-- [x] Testes: auto não compra acima do max; day cap / wallet floor / sem FBO; IH quote/clamp/settle/shuttle
+- [x] InternalHaul pay (IH-1)
+- [ ] UI surplus/tight por commodity no Ports / região
+- [x] Fase 1 auto-buy
+- [x] Fase 2 scout
+- [x] IH-2 members + board interno + ranking 7d
+- [ ] Fase 3 / IH-3: só com VA; caps AI vs humano Dispatcher
+- [x] Testes IH-1 + VA invite/cap/cross-pay/ranking

@@ -8,6 +8,17 @@ export * from './career-company-session.js';
 export * from './career-companies.js';
 export * from './career-auth.js';
 export * from './career-store-v10.js';
+export {
+  CAREER_STORE_SCHEMA_V11,
+  ensureV11Ddl,
+  migrateV10toV11IfNeeded,
+} from './career-store-v11.js';
+export {
+  CAREER_STORE_SCHEMA_V12,
+  ensureV12Ddl,
+  migrateV11toV12IfNeeded,
+} from './career-store-v12.js';
+export * from './career-va.js';
 export * from './career-world-tick-service.js';
 export * from './career-clock.js';
 export * from './career-client-update-policy.js';

@@ -159,11 +159,42 @@ import {
   type CareerCompanyMember,
 } from './career-auth.js';
 import { ensureV10Ddl, migrateV9toV10IfNeeded } from './career-store-v10.js';
+import { ensureV11Ddl, migrateV10toV11IfNeeded } from './career-store-v11.js';
+import { ensureV12Ddl, migrateV11toV12IfNeeded } from './career-store-v12.js';
+import {
+  acceptJoinRequest,
+  createCompanyInvite,
+  createJoinRequest,
+  getCompanyMembership,
+  homeCompanyIdForAccount,
+  isCompanyRecruiting,
+  joinCompanyWithInvite,
+  kickCompanyMember,
+  leaveCompany,
+  listCompanyHaulRanking,
+  listMembersForCompany,
+  listOpenCompanyInvites,
+  listPendingJoinRequests,
+  listPilotHaulRankingForCompany,
+  listVaDirectory,
+  recordInternalHaulStats,
+  rejectJoinRequest,
+  setCompanyMemberRole,
+  setCompanyRecruiting,
+  publishCompanyAsVa,
+  type CareerCompanyInvite,
+  type VaCompanyRankRow,
+  type VaDirectoryEntry,
+  type VaJoinRequestRow,
+  type VaMemberRow,
+  type VaPilotRankRow,
+  type VaPublishResult,
+} from './career-va.js';
 
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '10';
+export const CAREER_STORE_SCHEMA_VERSION = '12';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -354,6 +385,91 @@ export interface CareerStore {
     accountId: string,
     companyId: string,
   ): boolean | Promise<boolean>;
+  /** VA roster / invites (SQLite + Postgres). JSON store throws / empty. */
+  vaListMembers(companyId: string): VaMemberRow[] | Promise<VaMemberRow[]>;
+  vaCreateInvite(opts: {
+    companyId: string;
+    createdByAccountId: string;
+    role?: CareerCompanyMember['role'];
+    maxUses?: number;
+  }): CareerCompanyInvite | Promise<CareerCompanyInvite>;
+  vaListInvites(
+    companyId: string,
+  ): CareerCompanyInvite[] | Promise<CareerCompanyInvite[]>;
+  vaJoinInvite(opts: { code: string; accountId: string }):
+    | { member: CareerCompanyMember; companyId: string }
+    | Promise<{ member: CareerCompanyMember; companyId: string }>;
+  vaLeave(opts: { companyId: string; accountId: string }): void | Promise<void>;
+  vaKick(opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+  }): void | Promise<void>;
+  vaSetRole(opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+    role: CareerCompanyMember['role'];
+  }): CareerCompanyMember | Promise<CareerCompanyMember>;
+  vaHomeCompanyId(accountId: string): string | null | Promise<string | null>;
+  vaGetMembership(
+    accountId: string,
+    companyId: string,
+  ): CareerCompanyMember | null | Promise<CareerCompanyMember | null>;
+  vaRecordHaulStats(opts: {
+    companyId: string;
+    accountId?: string | null;
+    dayKey: number;
+    nm: number;
+    payUsd: number;
+  }): void | Promise<void>;
+  vaCompanyRanking(opts: {
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): VaCompanyRankRow[] | Promise<VaCompanyRankRow[]>;
+  vaPilotRanking(opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): VaPilotRankRow[] | Promise<VaPilotRankRow[]>;
+  vaDirectory(opts?: {
+    worldId?: string;
+    accountId?: string;
+    includeClosed?: boolean;
+    limit?: number;
+  }): VaDirectoryEntry[] | Promise<VaDirectoryEntry[]>;
+  vaSetRecruiting(opts: {
+    companyId: string;
+    actorAccountId: string;
+    recruiting: boolean;
+  }): boolean | Promise<boolean>;
+  vaPublish(opts: {
+    companyId: string;
+    actorAccountId: string;
+    displayName: string;
+    homeHubIcao: string;
+    recruiting?: boolean;
+  }): VaPublishResult | Promise<VaPublishResult>;
+  vaIsRecruiting(companyId: string): boolean | Promise<boolean>;
+  vaCreateJoinRequest(opts: {
+    companyId: string;
+    accountId: string;
+  }): VaJoinRequestRow | Promise<VaJoinRequestRow>;
+  vaListJoinRequests(companyId: string):
+    | VaJoinRequestRow[]
+    | Promise<VaJoinRequestRow[]>;
+  vaAcceptJoinRequest(opts: {
+    requestId: string;
+    actorAccountId: string;
+  }):
+    | { member: CareerCompanyMember; companyId: string }
+    | Promise<{ member: CareerCompanyMember; companyId: string }>;
+  vaRejectJoinRequest(opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): void | Promise<void>;
   /**
    * Pulse settle-all companies on the world (SQLite/Postgres).
    * JSON: settles active only via caller.
@@ -599,6 +715,138 @@ class JsonCareerStore implements CareerStore {
 
   authAccountOwnsCompany(_accountId: string, _companyId: string): boolean {
     return false;
+  }
+
+  vaListMembers(_companyId: string): VaMemberRow[] {
+    return [];
+  }
+
+  vaCreateInvite(_opts: {
+    companyId: string;
+    createdByAccountId: string;
+    role?: CareerCompanyMember['role'];
+    maxUses?: number;
+  }): CareerCompanyInvite {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaListInvites(_companyId: string): CareerCompanyInvite[] {
+    return [];
+  }
+
+  vaJoinInvite(_opts: {
+    code: string;
+    accountId: string;
+  }): { member: CareerCompanyMember; companyId: string } {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaLeave(_opts: { companyId: string; accountId: string }): void {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaKick(_opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+  }): void {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaSetRole(_opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+    role: CareerCompanyMember['role'];
+  }): CareerCompanyMember {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaHomeCompanyId(_accountId: string): string | null {
+    return null;
+  }
+
+  vaGetMembership(
+    _accountId: string,
+    _companyId: string,
+  ): CareerCompanyMember | null {
+    return null;
+  }
+
+  vaRecordHaulStats(_opts: {
+    companyId: string;
+    accountId?: string | null;
+    dayKey: number;
+    nm: number;
+    payUsd: number;
+  }): void {}
+
+  vaCompanyRanking(_opts: {
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): VaCompanyRankRow[] {
+    return [];
+  }
+
+  vaPilotRanking(_opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): VaPilotRankRow[] {
+    return [];
+  }
+
+  vaDirectory(): VaDirectoryEntry[] {
+    return [];
+  }
+
+  vaSetRecruiting(_opts: {
+    companyId: string;
+    actorAccountId: string;
+    recruiting: boolean;
+  }): boolean {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaPublish(_opts: {
+    companyId: string;
+    actorAccountId: string;
+    displayName: string;
+    homeHubIcao: string;
+    recruiting?: boolean;
+  }): VaPublishResult {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaIsRecruiting(_companyId: string): boolean {
+    return false;
+  }
+
+  vaCreateJoinRequest(_opts: {
+    companyId: string;
+    accountId: string;
+  }): VaJoinRequestRow {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaListJoinRequests(_companyId: string): VaJoinRequestRow[] {
+    return [];
+  }
+
+  vaAcceptJoinRequest(_opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): { member: CareerCompanyMember; companyId: string } {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaRejectJoinRequest(_opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): void {
+    throw new Error('VA requires SQLite career store');
   }
 
   peekEconomyWorld(): CareerEconomyWorld | null {
@@ -893,6 +1141,8 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV8HubSampleColumns(db);
   ensureV9Ddl(db);
   ensureV10Ddl(db);
+  ensureV11Ddl(db);
+  ensureV12Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -958,7 +1208,21 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV9 = Number.parseInt(afterV9?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV9) || verAfterV9 < 10) {
-    migrateV9toV10IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV9toV10IfNeeded(db, metaSet, '10');
+  }
+  const afterV10 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV10 = Number.parseInt(afterV10?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV10) || verAfterV10 < 11) {
+    migrateV10toV11IfNeeded(db, metaSet, '11');
+  }
+  const afterV11 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV11 = Number.parseInt(afterV11?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV11) || verAfterV11 < 12) {
+    migrateV11toV12IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -1179,6 +1443,145 @@ class SqliteCareerStore implements CareerStore {
 
   authAccountOwnsCompany(accountId: string, companyId: string): boolean {
     return accountOwnsCompany(this.db, accountId, companyId);
+  }
+
+  vaListMembers(companyId: string): VaMemberRow[] {
+    return listMembersForCompany(this.db, companyId);
+  }
+
+  vaCreateInvite(opts: {
+    companyId: string;
+    createdByAccountId: string;
+    role?: CareerCompanyMember['role'];
+    maxUses?: number;
+  }): CareerCompanyInvite {
+    return createCompanyInvite(this.db, opts);
+  }
+
+  vaListInvites(companyId: string): CareerCompanyInvite[] {
+    return listOpenCompanyInvites(this.db, companyId);
+  }
+
+  vaJoinInvite(opts: {
+    code: string;
+    accountId: string;
+  }): { member: CareerCompanyMember; companyId: string } {
+    return joinCompanyWithInvite(this.db, opts);
+  }
+
+  vaLeave(opts: { companyId: string; accountId: string }): void {
+    leaveCompany(this.db, opts);
+  }
+
+  vaKick(opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+  }): void {
+    kickCompanyMember(this.db, opts);
+  }
+
+  vaSetRole(opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+    role: CareerCompanyMember['role'];
+  }): CareerCompanyMember {
+    return setCompanyMemberRole(this.db, opts);
+  }
+
+  vaHomeCompanyId(accountId: string): string | null {
+    return homeCompanyIdForAccount(this.db, accountId);
+  }
+
+  vaGetMembership(
+    accountId: string,
+    companyId: string,
+  ): CareerCompanyMember | null {
+    return getCompanyMembership(this.db, accountId, companyId);
+  }
+
+  vaRecordHaulStats(opts: {
+    companyId: string;
+    accountId?: string | null;
+    dayKey: number;
+    nm: number;
+    payUsd: number;
+  }): void {
+    recordInternalHaulStats(this.db, opts);
+  }
+
+  vaCompanyRanking(opts: {
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): VaCompanyRankRow[] {
+    return listCompanyHaulRanking(this.db, opts);
+  }
+
+  vaPilotRanking(opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): VaPilotRankRow[] {
+    return listPilotHaulRankingForCompany(this.db, opts);
+  }
+
+  vaDirectory(opts?: {
+    worldId?: string;
+    accountId?: string;
+    includeClosed?: boolean;
+    limit?: number;
+  }): VaDirectoryEntry[] {
+    return listVaDirectory(this.db, opts ?? {});
+  }
+
+  vaSetRecruiting(opts: {
+    companyId: string;
+    actorAccountId: string;
+    recruiting: boolean;
+  }): boolean {
+    return setCompanyRecruiting(this.db, opts);
+  }
+
+  vaPublish(opts: {
+    companyId: string;
+    actorAccountId: string;
+    displayName: string;
+    homeHubIcao: string;
+    recruiting?: boolean;
+  }): VaPublishResult {
+    return publishCompanyAsVa(this.db, opts);
+  }
+
+  vaIsRecruiting(companyId: string): boolean {
+    return isCompanyRecruiting(this.db, companyId);
+  }
+
+  vaCreateJoinRequest(opts: {
+    companyId: string;
+    accountId: string;
+  }): VaJoinRequestRow {
+    return createJoinRequest(this.db, opts);
+  }
+
+  vaListJoinRequests(companyId: string): VaJoinRequestRow[] {
+    return listPendingJoinRequests(this.db, companyId);
+  }
+
+  vaAcceptJoinRequest(opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): { member: CareerCompanyMember; companyId: string } {
+    return acceptJoinRequest(this.db, opts);
+  }
+
+  vaRejectJoinRequest(opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): void {
+    rejectJoinRequest(this.db, opts);
   }
 
   settleWorldCompaniesPassiveFees(opts: {

@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **VA pages** — sidebar VA + Ranking; publish = listar company ativa (sem 2º tenant); Settings card removido. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA directory + join requests** — lista de VAs, Request join, Accept/Reject, Stop recruiting (sem spam). Invite code fica como atalho privado. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **IH-2 VA multi-piloto + ranking leve** — invite/join/kick/role; Internal Haul board; settle fee-to-operator; 7d company ranking + pilots strip. Sem chat/crew. Spec: [16-va-logistics.md](./16-va-logistics.md).
+
 Atualizado 2026-09-19: **Desktop slim hotfix** — 0.3.117 API exit: drop de `packages/agent` quebrou imports relativos `../../agent/src` (dispatch/preflight/watch). Agent `src` volta no pack. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-19: **Active Tour map plot** — Base mapa plota `charterActiveTour` / `activeTour` (não só Search). Detail: [`24-port-fbo.md`](./24-port-fbo.md).

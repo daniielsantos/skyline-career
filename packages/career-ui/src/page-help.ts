@@ -53,6 +53,27 @@ export const PAGE_HELP = {
       'On Warehouse, pick a hub. Move sends company stock to another warehouse (no payout). Overflow lands in the dest hub yard, not the terminal.',
     ],
   },
+  va: {
+    id: 'va',
+    title: 'How VA works',
+    kicker: 'Page guide',
+    bullets: [
+      'Your company is the VA — same wallet and fleet. Publish a name and home hub to appear in the directory.',
+      'Pilots request to join open VAs, or use a private invite code when recruiting is off.',
+      'Owners and dispatchers manage roster, invites, and join requests here.',
+      'Internal Hauls are created and flown from Ports, not from this page.',
+    ],
+  },
+  vaRanking: {
+    id: 'va-ranking',
+    title: 'How Ranking works',
+    kicker: 'Page guide',
+    bullets: [
+      'Seven-day Internal Haul stats across VAs — distance and haul count.',
+      'Pilot strip shows members of your active company when you have one.',
+      'Settle hauls from Dispatch after flying WH→WH bridges from Ports.',
+    ],
+  },
   hangar: {
     id: 'hangar',
     title: 'How Hangar works',
@@ -144,6 +165,10 @@ export function resolvePageHelp(opts: {
   switch (opts.tab) {
     case 'ports':
       return PAGE_HELP.ports;
+    case 'va':
+      return PAGE_HELP.va;
+    case 'vaRanking':
+      return PAGE_HELP.vaRanking;
     case 'aircraft':
       return PAGE_HELP.airframes;
     case 'hangar':

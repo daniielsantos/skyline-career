@@ -911,15 +911,9 @@ if (!gotLock) {
       await createWindow();
 
       if (isPackaged()) {
+        // Wire listeners only — the UI runs a single check when the shell mounts
+        // (plus a 30 min poll). A second boot check here flashed "2 updates".
         wireAutoUpdater();
-        // Silent boot check — UI shows banner / Settings card.
-        setTimeout(() => {
-          void autoUpdater.checkForUpdates().catch((err) => {
-            logLine(
-              `[desktop] boot update check failed: ${err instanceof Error ? err.message : err}`,
-            );
-          });
-        }, 4_000);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

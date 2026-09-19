@@ -88,6 +88,12 @@ Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anter
 **Causa:** header só escutava IPC e não re-checava no login; download ficava no card de Settings.  
 **Fix:** store compartilhado em `DesktopUpdates.tsx` — check ao entrar no shell (pós-login) + poll **30 min**; clique no botão faz download (barra no próprio pill) e depois `Install` lança o Setup one-click com `/S` (unsigned: ainda precisa SmartScreen → Run anyway; `runAfterFinish` tenta reabrir). Settings card continua como manual fallback. Check IPC agora devolve `updateAvailable` via semver (não só eventos); CDN stale que dispara `update-not-available` com remote &gt; installed ainda mostra Update.
 
+### Dois checks / “2 atualizações” no boot (2026-09-19)
+
+**Sintoma:** na app Airframe (Settings → Updates / flash do header) parece que a atualização roda **duas vezes** ao abrir.  
+**Causa:** dois `checkForUpdates` no mesmo boot — (1) `packages/desktop/main.mjs` silent boot após 4s; (2) `ensureDesktopUpdateBridge()` em `DesktopUpdates.tsx` ao montar o shell. Cada um emitia `checking` / `available` via IPC.  
+**Fix:** removido o boot check do `main.mjs`; ficou **um** check no mount do shell + poll quieto a cada **30 min** (`DESKTOP_UPDATE_POLL_MS`) enquanto o app fica aberto (pula se já há update offered/downloading).
+
 ## Fase 3 — paths / ids (migrar com cuidado)
 
 - [ ] `%APPDATA%\Skyline Career\` → novo path **com** migração de saves

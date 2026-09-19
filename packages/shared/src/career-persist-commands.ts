@@ -146,37 +146,41 @@ function settlementFromSettledMission(
   };
 }
 
+export type ApplySettleWalletDeltasResult = {
+  /** When Internal Haul pilot pay must credit another company wallet. */
+  pilotPayCredit?: {
+    companyId: string;
+    amountUsd: number;
+    missionId: string;
+    originIcao: string;
+    destIcao: string;
+  };
+};
+
 export function applySettleWalletDeltas(
   missions: CareerMissionsState,
   atTick: number,
   result: SettleMissionResult,
-): void {
+  opts?: {
+    /** Active VA / ops company id for this settle write. */
+    companyId?: string;
+  },
+): ApplySettleWalletDeltasResult {
   const mission = result.mission;
+  const out: ApplySettleWalletDeltasResult = {};
   if (result.walletCreditUsd > 0) {
     const internalHaul =
       mission.warehouseBridge === true && mission.internalHaul === true;
-    applyWalletDelta(missions, {
-      amountUsd: result.walletCreditUsd,
-      kind: internalHaul
-        ? 'internal_haul_pay'
-        : mission.missionType === 'charter'
-          ? 'charter_payout'
-        : mission.demandOrderId
-          ? 'demand_payout'
-          : 'freight_payout',
-      atTick,
-      missionId: mission.id,
-      icao: mission.destIcao,
-      note: mission.contractPilot
-        ? `Contract pilot · ${mission.originIcao}→${mission.destIcao}`
-        : internalHaul
-          ? `Internal haul pilot · ${mission.originIcao}→${mission.destIcao}`
-          : mission.demandOrderId
-            ? `Demand · ${mission.originIcao}→${mission.destIcao}`
-            : `${mission.originIcao}→${mission.destIcao}`,
-    });
-    // Solo Owner+Pilot: same wallet — company fee offset (ledger ±pay, net 0).
-    if (internalHaul) {
+    const pilotHome = mission.pilotHomeCompanyId?.trim() || '';
+    const opsCompany = opts?.companyId?.trim() || '';
+    const crossCompany =
+      internalHaul &&
+      Boolean(pilotHome) &&
+      Boolean(opsCompany) &&
+      pilotHome !== opsCompany;
+
+    if (crossCompany) {
+      // VA pays the pilot's home company — debit only on this wallet.
       applyWalletDelta(missions, {
         amountUsd: -result.walletCreditUsd,
         kind: 'internal_haul_pay',
@@ -185,6 +189,45 @@ export function applySettleWalletDeltas(
         icao: mission.originIcao,
         note: `Internal haul company · ${mission.originIcao}→${mission.destIcao}`,
       });
+      out.pilotPayCredit = {
+        companyId: pilotHome,
+        amountUsd: result.walletCreditUsd,
+        missionId: mission.id,
+        originIcao: mission.originIcao,
+        destIcao: mission.destIcao,
+      };
+    } else {
+      applyWalletDelta(missions, {
+        amountUsd: result.walletCreditUsd,
+        kind: internalHaul
+          ? 'internal_haul_pay'
+          : mission.missionType === 'charter'
+            ? 'charter_payout'
+            : mission.demandOrderId
+              ? 'demand_payout'
+              : 'freight_payout',
+        atTick,
+        missionId: mission.id,
+        icao: mission.destIcao,
+        note: mission.contractPilot
+          ? `Contract pilot · ${mission.originIcao}→${mission.destIcao}`
+          : internalHaul
+            ? `Internal haul pilot · ${mission.originIcao}→${mission.destIcao}`
+            : mission.demandOrderId
+              ? `Demand · ${mission.originIcao}→${mission.destIcao}`
+              : `${mission.originIcao}→${mission.destIcao}`,
+      });
+      // Solo Owner+Pilot: same wallet — company fee offset (ledger ±pay, net 0).
+      if (internalHaul) {
+        applyWalletDelta(missions, {
+          amountUsd: -result.walletCreditUsd,
+          kind: 'internal_haul_pay',
+          atTick,
+          missionId: mission.id,
+          icao: mission.originIcao,
+          note: `Internal haul company · ${mission.originIcao}→${mission.destIcao}`,
+        });
+      }
     }
   }
   if (result.fuelDebitUsd > 0) {
@@ -197,17 +240,24 @@ export function applySettleWalletDeltas(
       note: 'settlement fuel',
     });
   }
+  return out;
 }
 
 export type ExecuteSettleFlightOpts = SettleMissionOpts & {
   missionId: string;
+  /** Ops company for Internal Haul cross-wallet pay. */
+  companyId?: string;
 };
 
 export type ExecuteSettleFlightResult =
   | { kind: 'missing' }
   | { kind: 'closed' }
   | { kind: 'replay'; result: SettleMissionResult }
-  | { kind: 'applied'; result: SettleMissionResult };
+  | {
+      kind: 'applied';
+      result: SettleMissionResult;
+      pilotPayCredit?: ApplySettleWalletDeltasResult['pilotPayCredit'];
+    };
 
 /**
  * SettleFlight: pay once. Replay if the mission is already `settled`.
@@ -235,14 +285,20 @@ export function executeSettleFlight(
       },
     };
   }
-  const { missionId: _id, ...settleOpts } = opts;
+  const { missionId: _id, companyId, ...settleOpts } = opts;
   const result = settleMission(world, open, {
     ...settleOpts,
     fleet: settleOpts.fleet ?? missions,
   });
   missions.missions[idx] = result.mission;
-  applySettleWalletDeltas(missions, world.tick, result);
-  return { kind: 'applied', result };
+  const wallet = applySettleWalletDeltas(missions, world.tick, result, {
+    companyId,
+  });
+  return {
+    kind: 'applied',
+    result,
+    pilotPayCredit: wallet.pilotPayCredit,
+  };
 }
 
 export type ExecuteAcceptLotOpts = {

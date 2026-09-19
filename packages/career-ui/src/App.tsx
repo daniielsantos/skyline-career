@@ -226,6 +226,8 @@ import {
   DesktopUpdateHeaderButton,
   DesktopUpdatesCard,
 } from './DesktopUpdates';
+import { VaPage } from './VaPage';
+import { VaRankingPage } from './VaRankingPage';
 import { EconomySyncIndicator } from './EconomySyncIndicator';
 import { CrewFlyControls } from './CrewFlyControls';
 import {
@@ -11527,6 +11529,10 @@ export function App() {
                 ? 'Network'
                 : tab === 'ports'
                   ? 'Ports'
+                  : tab === 'va'
+                    ? 'VA'
+                    : tab === 'vaRanking'
+                      ? 'Ranking'
                   : tab === 'missions'
                   ? 'Logbook'
                   : tab === 'lab'
@@ -11572,6 +11578,10 @@ export function App() {
                 ? 'Registered Airframe hubs on OpenFreeMap Dark (free public tiles).'
                 : tab === 'ports'
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
+                  : tab === 'va'
+                    ? 'Browse VAs, join, or list your company — same wallet and fleet.'
+                    : tab === 'vaRanking'
+                      ? 'Internal Haul distance and count over the last week.'
                   : tab === 'missions'
                   ? 'Past flights — aircraft, cargo, distance, and payout.'
                   : tab === 'lab'
@@ -11969,6 +11979,26 @@ export function App() {
             title="Seaport factory cargo"
           >
             Ports
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'va' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('va')}
+            disabled={busy}
+            title="Virtual airlines — directory, join, list your company"
+          >
+            VA
+          </button>
+          <button
+            type="button"
+            className={
+              !showAirport && tab === 'vaRanking' ? 'tab active' : 'tab'
+            }
+            onClick={() => selectTab('vaRanking')}
+            disabled={busy}
+            title="VA Internal Haul ranking · 7 days"
+          >
+            Ranking
           </button>
           <button
             type="button"
@@ -18297,6 +18327,31 @@ export function App() {
             setToast(message);
           }}
         />
+      ) : hubSelected && tab === 'va' ? (
+        <VaPage
+          authRequired={authRequired}
+          activeCompanyId={activeCompanyId}
+          defaultHomeHubIcao={homeHubIcao}
+          onCompaniesChanged={(next) => {
+            setCompanies((prev) =>
+              next.map((c) => {
+                const existing = prev.find((p) => p.id === c.id);
+                return existing
+                  ? { ...existing, displayName: c.displayName }
+                  : {
+                      id: c.id,
+                      displayName: c.displayName,
+                      homeHubIcao: '',
+                      homeCountryId: '',
+                      worldId: '',
+                      createdAtMs: Date.now(),
+                    };
+              }),
+            );
+          }}
+        />
+      ) : hubSelected && tab === 'vaRanking' ? (
+        <VaRankingPage authRequired={authRequired} />
       ) : hubSelected && tab === 'pilot' ? (
         <section className="panel pilot-panel">
           <div className="pilot-profile-grid">

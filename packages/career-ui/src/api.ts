@@ -4901,3 +4901,205 @@ export function postLoadOfp(
     return data;
   })();
 }
+
+export type VaMember = {
+  companyId: string;
+  accountId: string;
+  role: 'owner' | 'dispatcher' | 'pilot';
+  createdAtMs: number;
+  loginName: string;
+  displayName: string;
+};
+
+export type VaCompanyRank = {
+  companyId: string;
+  displayName: string;
+  hauls: number;
+  nm: number;
+  payUsd: number;
+};
+
+export type VaPilotRank = {
+  accountId: string;
+  loginName: string;
+  displayName: string;
+  hauls: number;
+  nm: number;
+  payUsd: number;
+};
+
+export type VaHaulHold = {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  kg: number;
+  commodityId: string;
+  pilotPayUsd?: number;
+};
+
+export type VaHaulMission = {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  commodityId: string;
+  cargoKg: number;
+  payUsd: number;
+  status: string;
+  distanceNm?: number;
+  pilotAccountId?: string;
+  aircraftId?: string;
+};
+
+export function fetchVaMembers() {
+  return api<{
+    companyId: string;
+    memberCap: number;
+    role: string;
+    members: VaMember[];
+  }>('/api/va/members');
+}
+
+export function postVaInvite(body: { role?: string; maxUses?: number }) {
+  return api<{
+    invite: {
+      code: string;
+      companyId: string;
+      role: string;
+      expiresAtMs: number;
+      maxUses: number;
+      uses: number;
+    };
+  }>('/api/va/invite', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function postVaJoin(code: string) {
+  return api<{
+    companyId: string;
+    member: { companyId: string; accountId: string; role: string };
+    companies: Array<{ id: string; displayName: string }>;
+  }>('/api/va/join', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function postVaLeave() {
+  return api<{ ok: boolean }>('/api/va/leave', {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export function postVaKick(accountId: string) {
+  return api<{ ok: boolean }>('/api/va/kick', {
+    method: 'POST',
+    body: JSON.stringify({ accountId }),
+  });
+}
+
+export function postVaRole(body: {
+  accountId: string;
+  role: 'dispatcher' | 'pilot';
+}) {
+  return api<{ member: { accountId: string; role: string } }>('/api/va/role', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchVaHauls() {
+  return api<{
+    companyId: string;
+    openHolds: VaHaulHold[];
+    activeMissions: VaHaulMission[];
+  }>('/api/va/hauls');
+}
+
+export function fetchVaRanking() {
+  return api<{
+    windowDays: number;
+    companies: VaCompanyRank[];
+    pilots: VaPilotRank[];
+  }>('/api/va/ranking');
+}
+
+export type VaDirectoryEntry = {
+  companyId: string;
+  displayName: string;
+  homeHubIcao: string;
+  memberCount: number;
+  memberCap: number;
+  recruiting: boolean;
+  seatsOpen: number;
+  myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
+};
+
+export type VaJoinRequest = {
+  id: string;
+  companyId: string;
+  accountId: string;
+  loginName: string;
+  displayName: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAtMs: number;
+  decidedAtMs: number | null;
+};
+
+export function fetchVaDirectory(opts?: { includeClosed?: boolean }) {
+  const q = opts?.includeClosed ? '?includeClosed=1' : '';
+  return api<{ directory: VaDirectoryEntry[] }>(`/api/va/directory${q}`);
+}
+
+export function postVaJoinRequest(companyId: string) {
+  return api<{ request: VaJoinRequest }>('/api/va/request', {
+    method: 'POST',
+    body: JSON.stringify({ companyId }),
+  });
+}
+
+export function fetchVaJoinRequests() {
+  return api<{ requests: VaJoinRequest[] }>('/api/va/requests');
+}
+
+export function postVaAcceptJoinRequest(requestId: string) {
+  return api<{ companyId: string }>('/api/va/requests/accept', {
+    method: 'POST',
+    body: JSON.stringify({ requestId }),
+  });
+}
+
+export function postVaRejectJoinRequest(requestId: string) {
+  return api<{ ok: boolean }>('/api/va/requests/reject', {
+    method: 'POST',
+    body: JSON.stringify({ requestId }),
+  });
+}
+
+export function postVaRecruiting(recruiting: boolean) {
+  return api<{ recruiting: boolean }>('/api/va/recruiting', {
+    method: 'POST',
+    body: JSON.stringify({ recruiting }),
+  });
+}
+
+export function postVaPublish(body: {
+  displayName: string;
+  homeHubIcao: string;
+  recruiting?: boolean;
+  companyId?: string;
+}) {
+  return api<{
+    company: {
+      companyId: string;
+      displayName: string;
+      homeHubIcao: string;
+      recruiting: boolean;
+    };
+  }>('/api/va/publish', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}

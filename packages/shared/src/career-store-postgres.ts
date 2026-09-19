@@ -2,6 +2,8 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v22 adds companies.recruiting + company_join_requests (VA directory).
+ * Schema v21 adds company_invites + haul ranking stats (VA IH-2).
  * Schema v20 adds aircraft_instances.owner_company_id (F7 dealer claim).
  * Schema v19 widens charter_offers.group_size to 1…230 (med/narrow).
  * Schema v18 adds hub_economy_samples for Pulse / Hub Stats history.
@@ -28,6 +30,17 @@ import {
   type RegisterAccountOpts,
   type RegisterAccountResult,
 } from './career-auth.js';
+import {
+  VA_INVITE_DEFAULT_MAX_USES,
+  VA_INVITE_TTL_MS,
+  VA_MEMBER_CAP,
+  type CareerCompanyInvite,
+  type VaCompanyRankRow,
+  type VaDirectoryEntry,
+  type VaJoinRequestRow,
+  type VaMemberRow,
+  type VaPilotRankRow,
+} from './career-va.js';
 import type { CareerCompanyRow, EnsureCompanyOpts } from './career-companies.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import {
@@ -104,7 +117,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '20';
+const CAREER_PG_SCHEMA_VERSION = '22';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -338,6 +351,57 @@ CREATE TABLE IF NOT EXISTS company_members (
   PRIMARY KEY (company_id, account_id)
 );
 CREATE INDEX IF NOT EXISTS company_members_account_idx ON company_members(account_id);
+
+CREATE TABLE IF NOT EXISTS company_invites (
+  code TEXT PRIMARY KEY NOT NULL,
+  company_id TEXT NOT NULL REFERENCES companies(id),
+  created_by_account_id TEXT NOT NULL REFERENCES accounts(id),
+  role TEXT NOT NULL DEFAULT 'pilot',
+  created_at_ms BIGINT NOT NULL,
+  expires_at_ms BIGINT NOT NULL,
+  max_uses INTEGER NOT NULL DEFAULT 8,
+  uses INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS company_invites_company_idx ON company_invites(company_id);
+CREATE INDEX IF NOT EXISTS company_invites_expires_idx ON company_invites(expires_at_ms);
+
+CREATE TABLE IF NOT EXISTS company_haul_stats (
+  company_id TEXT NOT NULL REFERENCES companies(id),
+  day_key INTEGER NOT NULL,
+  hauls INTEGER NOT NULL DEFAULT 0,
+  nm DOUBLE PRECISION NOT NULL DEFAULT 0,
+  pay_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  PRIMARY KEY (company_id, day_key)
+);
+CREATE INDEX IF NOT EXISTS company_haul_stats_day_idx ON company_haul_stats(day_key);
+
+CREATE TABLE IF NOT EXISTS company_pilot_haul_stats (
+  company_id TEXT NOT NULL REFERENCES companies(id),
+  account_id TEXT NOT NULL REFERENCES accounts(id),
+  day_key INTEGER NOT NULL,
+  hauls INTEGER NOT NULL DEFAULT 0,
+  nm DOUBLE PRECISION NOT NULL DEFAULT 0,
+  pay_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+  PRIMARY KEY (company_id, account_id, day_key)
+);
+CREATE INDEX IF NOT EXISTS company_pilot_haul_stats_day_idx
+  ON company_pilot_haul_stats(company_id, day_key);
+
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE TABLE IF NOT EXISTS company_join_requests (
+  id TEXT PRIMARY KEY NOT NULL,
+  company_id TEXT NOT NULL REFERENCES companies(id),
+  account_id TEXT NOT NULL REFERENCES accounts(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at_ms BIGINT NOT NULL,
+  decided_at_ms BIGINT,
+  decided_by_account_id TEXT
+);
+CREATE INDEX IF NOT EXISTS company_join_requests_company_idx
+  ON company_join_requests(company_id, status);
+CREATE INDEX IF NOT EXISTS company_join_requests_account_idx
+  ON company_join_requests(account_id, status);
 `;
 
 function rowToCompany(row: {
@@ -805,7 +869,638 @@ export class PostgresCareerStore implements CareerStore {
     return Boolean(rows[0]);
   }
 
+  async vaGetMembership(
+    accountId: string,
+    companyId: string,
+  ): Promise<CareerCompanyMember | null> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT company_id, account_id, role, created_at_ms
+       FROM company_members WHERE account_id = $1 AND company_id = $2`,
+      [accountId, companyId],
+    );
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      companyId: r.company_id as string,
+      accountId: r.account_id as string,
+      role: r.role as CareerCompanyMember['role'],
+      createdAtMs: Number(r.created_at_ms) || 0,
+    };
+  }
+
+  async vaListMembers(companyId: string): Promise<VaMemberRow[]> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT m.company_id, m.account_id, m.role, m.created_at_ms,
+              a.login_name, a.display_name
+       FROM company_members m
+       JOIN accounts a ON a.id = m.account_id
+       WHERE m.company_id = $1
+       ORDER BY
+         CASE m.role WHEN 'owner' THEN 0 WHEN 'dispatcher' THEN 1 ELSE 2 END,
+         m.created_at_ms ASC`,
+      [companyId],
+    );
+    return rows.map((r) => ({
+      companyId: r.company_id as string,
+      accountId: r.account_id as string,
+      role: r.role as CareerCompanyMember['role'],
+      createdAtMs: Number(r.created_at_ms) || 0,
+      loginName: r.login_name as string,
+      displayName: r.display_name as string,
+    }));
+  }
+
+  async vaCreateInvite(opts: {
+    companyId: string;
+    createdByAccountId: string;
+    role?: CareerCompanyMember['role'];
+    maxUses?: number;
+  }): Promise<CareerCompanyInvite> {
+    await this.ready;
+    const membership = await this.vaGetMembership(
+      opts.createdByAccountId,
+      opts.companyId,
+    );
+    if (
+      !membership ||
+      (membership.role !== 'owner' && membership.role !== 'dispatcher')
+    ) {
+      throw new Error('Only owner or dispatcher can create invites');
+    }
+    const role = opts.role === 'dispatcher' ? 'dispatcher' : 'pilot';
+    const now = Date.now();
+    const maxUses = Math.max(
+      1,
+      Math.min(
+        VA_MEMBER_CAP,
+        Math.floor(opts.maxUses ?? VA_INVITE_DEFAULT_MAX_USES),
+      ),
+    );
+    const expiresAtMs = now + VA_INVITE_TTL_MS;
+    let code = `VA-${randomBytes(4).toString('hex').toUpperCase()}`;
+    for (let i = 0; i < 5; i++) {
+      const exists = await this.pool.query(
+        `SELECT 1 AS ok FROM company_invites WHERE code = $1`,
+        [code],
+      );
+      if (!exists.rows[0]) break;
+      code = `VA-${randomBytes(4).toString('hex').toUpperCase()}`;
+    }
+    await this.pool.query(
+      `INSERT INTO company_invites
+         (code, company_id, created_by_account_id, role, created_at_ms, expires_at_ms, max_uses, uses)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0)`,
+      [
+        code,
+        opts.companyId,
+        opts.createdByAccountId,
+        role,
+        now,
+        expiresAtMs,
+        maxUses,
+      ],
+    );
+    return {
+      code,
+      companyId: opts.companyId,
+      createdByAccountId: opts.createdByAccountId,
+      role,
+      createdAtMs: now,
+      expiresAtMs,
+      maxUses,
+      uses: 0,
+    };
+  }
+
+  async vaListInvites(companyId: string): Promise<CareerCompanyInvite[]> {
+    await this.ready;
+    const now = Date.now();
+    const { rows } = await this.pool.query(
+      `SELECT code, company_id, created_by_account_id, role, created_at_ms,
+              expires_at_ms, max_uses, uses
+       FROM company_invites
+       WHERE company_id = $1 AND expires_at_ms > $2 AND uses < max_uses
+       ORDER BY created_at_ms DESC`,
+      [companyId, now],
+    );
+    return rows.map((r) => ({
+      code: r.code as string,
+      companyId: r.company_id as string,
+      createdByAccountId: r.created_by_account_id as string,
+      role: r.role as CareerCompanyMember['role'],
+      createdAtMs: Number(r.created_at_ms) || 0,
+      expiresAtMs: Number(r.expires_at_ms) || 0,
+      maxUses: Number(r.max_uses) || 0,
+      uses: Number(r.uses) || 0,
+    }));
+  }
+
+  async vaJoinInvite(opts: {
+    code: string;
+    accountId: string;
+  }): Promise<{ member: CareerCompanyMember; companyId: string }> {
+    await this.ready;
+    const code = opts.code.trim().toUpperCase();
+    const now = Date.now();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(
+        `SELECT code, company_id, role, expires_at_ms, max_uses, uses
+         FROM company_invites WHERE code = $1 FOR UPDATE`,
+        [code],
+      );
+      const row = rows[0] as
+        | {
+            code: string;
+            company_id: string;
+            role: string;
+            expires_at_ms: string | number;
+            max_uses: number;
+            uses: number;
+          }
+        | undefined;
+      if (!row) throw new Error('Invite code not found');
+      if (Number(row.expires_at_ms) <= now) throw new Error('Invite code expired');
+      if (row.uses >= row.max_uses) throw new Error('Invite code exhausted');
+      const existing = await client.query(
+        `SELECT 1 AS ok FROM company_members
+         WHERE account_id = $1 AND company_id = $2`,
+        [opts.accountId, row.company_id],
+      );
+      if (existing.rows[0]) throw new Error('Already a member of this company');
+      const countRes = await client.query(
+        `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
+        [row.company_id],
+      );
+      if ((countRes.rows[0]?.n as number) >= VA_MEMBER_CAP) {
+        throw new Error(`Company is full (max ${VA_MEMBER_CAP} members)`);
+      }
+      const role =
+        row.role === 'dispatcher' || row.role === 'pilot' ? row.role : 'pilot';
+      await client.query(
+        `INSERT INTO company_members (company_id, account_id, role, created_at_ms)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (company_id, account_id) DO UPDATE SET role = EXCLUDED.role`,
+        [row.company_id, opts.accountId, role, now],
+      );
+      await client.query(
+        `UPDATE company_invites SET uses = uses + 1 WHERE code = $1`,
+        [code],
+      );
+      await client.query('COMMIT');
+      return {
+        companyId: row.company_id,
+        member: {
+          companyId: row.company_id,
+          accountId: opts.accountId,
+          role: role as CareerCompanyMember['role'],
+          createdAtMs: now,
+        },
+      };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async vaLeave(opts: { companyId: string; accountId: string }): Promise<void> {
+    await this.ready;
+    const membership = await this.vaGetMembership(opts.accountId, opts.companyId);
+    if (!membership) throw new Error('Not a member of this company');
+    if (membership.role === 'owner') {
+      throw new Error('Owner cannot leave — transfer ownership first (not yet)');
+    }
+    await this.pool.query(
+      `DELETE FROM company_members WHERE company_id = $1 AND account_id = $2`,
+      [opts.companyId, opts.accountId],
+    );
+  }
+
+  async vaKick(opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+  }): Promise<void> {
+    await this.ready;
+    const actor = await this.vaGetMembership(opts.actorAccountId, opts.companyId);
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can kick members');
+    }
+    if (opts.targetAccountId === opts.actorAccountId) {
+      throw new Error('Cannot kick yourself');
+    }
+    const target = await this.vaGetMembership(
+      opts.targetAccountId,
+      opts.companyId,
+    );
+    if (!target) throw new Error('Member not found');
+    if (target.role === 'owner') throw new Error('Cannot kick another owner');
+    await this.pool.query(
+      `DELETE FROM company_members WHERE company_id = $1 AND account_id = $2`,
+      [opts.companyId, opts.targetAccountId],
+    );
+  }
+
+  async vaSetRole(opts: {
+    companyId: string;
+    actorAccountId: string;
+    targetAccountId: string;
+    role: CareerCompanyMember['role'];
+  }): Promise<CareerCompanyMember> {
+    await this.ready;
+    const actor = await this.vaGetMembership(opts.actorAccountId, opts.companyId);
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can change roles');
+    }
+    if (opts.role === 'owner') throw new Error('Cannot promote to owner this way');
+    const target = await this.vaGetMembership(
+      opts.targetAccountId,
+      opts.companyId,
+    );
+    if (!target) throw new Error('Member not found');
+    if (target.role === 'owner') throw new Error('Cannot demote owner');
+    return this.authAddCompanyMember({
+      companyId: opts.companyId,
+      accountId: opts.targetAccountId,
+      role: opts.role === 'dispatcher' ? 'dispatcher' : 'pilot',
+    });
+  }
+
+  async vaHomeCompanyId(accountId: string): Promise<string | null> {
+    const memberships = await this.listMemberships(accountId);
+    const asOwner = memberships.find((m) => m.role === 'owner');
+    if (asOwner) return asOwner.companyId;
+    return memberships[0]?.companyId ?? null;
+  }
+
+  async vaRecordHaulStats(opts: {
+    companyId: string;
+    accountId?: string | null;
+    dayKey: number;
+    nm: number;
+    payUsd: number;
+  }): Promise<void> {
+    await this.ready;
+    const nm = Math.max(0, opts.nm);
+    const pay = Math.max(0, opts.payUsd);
+    await this.pool.query(
+      `INSERT INTO company_haul_stats (company_id, day_key, hauls, nm, pay_usd)
+       VALUES ($1, $2, 1, $3, $4)
+       ON CONFLICT (company_id, day_key) DO UPDATE SET
+         hauls = company_haul_stats.hauls + 1,
+         nm = company_haul_stats.nm + EXCLUDED.nm,
+         pay_usd = company_haul_stats.pay_usd + EXCLUDED.pay_usd`,
+      [opts.companyId, opts.dayKey, nm, pay],
+    );
+    if (opts.accountId?.trim()) {
+      await this.pool.query(
+        `INSERT INTO company_pilot_haul_stats
+           (company_id, account_id, day_key, hauls, nm, pay_usd)
+         VALUES ($1, $2, $3, 1, $4, $5)
+         ON CONFLICT (company_id, account_id, day_key) DO UPDATE SET
+           hauls = company_pilot_haul_stats.hauls + 1,
+           nm = company_pilot_haul_stats.nm + EXCLUDED.nm,
+           pay_usd = company_pilot_haul_stats.pay_usd + EXCLUDED.pay_usd`,
+        [opts.companyId, opts.accountId.trim(), opts.dayKey, nm, pay],
+      );
+    }
+  }
+
+  async vaCompanyRanking(opts: {
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): Promise<VaCompanyRankRow[]> {
+    await this.ready;
+    const limit = Math.max(1, Math.min(50, opts.limit ?? 20));
+    const { rows } = await this.pool.query(
+      `SELECT s.company_id, c.display_name,
+              SUM(s.hauls)::int AS hauls, SUM(s.nm) AS nm, SUM(s.pay_usd) AS pay_usd
+       FROM company_haul_stats s
+       JOIN companies c ON c.id = s.company_id
+       WHERE s.day_key >= $1 AND s.day_key <= $2
+       GROUP BY s.company_id, c.display_name
+       ORDER BY nm DESC, hauls DESC
+       LIMIT $3`,
+      [opts.fromDayKey, opts.toDayKey, limit],
+    );
+    return rows.map((r) => ({
+      companyId: r.company_id as string,
+      displayName: (r.display_name as string) || (r.company_id as string),
+      hauls: Number(r.hauls) || 0,
+      nm: Math.round(Number(r.nm) || 0),
+      payUsd: Math.round((Number(r.pay_usd) || 0) * 100) / 100,
+    }));
+  }
+
+  async vaPilotRanking(opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  }): Promise<VaPilotRankRow[]> {
+    await this.ready;
+    const limit = Math.max(1, Math.min(50, opts.limit ?? 20));
+    const { rows } = await this.pool.query(
+      `SELECT s.account_id, a.login_name, a.display_name,
+              SUM(s.hauls)::int AS hauls, SUM(s.nm) AS nm, SUM(s.pay_usd) AS pay_usd
+       FROM company_pilot_haul_stats s
+       JOIN accounts a ON a.id = s.account_id
+       WHERE s.company_id = $1 AND s.day_key >= $2 AND s.day_key <= $3
+       GROUP BY s.account_id, a.login_name, a.display_name
+       ORDER BY nm DESC, hauls DESC
+       LIMIT $4`,
+      [opts.companyId, opts.fromDayKey, opts.toDayKey, limit],
+    );
+    return rows.map((r) => ({
+      accountId: r.account_id as string,
+      loginName: r.login_name as string,
+      displayName: r.display_name as string,
+      hauls: Number(r.hauls) || 0,
+      nm: Math.round(Number(r.nm) || 0),
+      payUsd: Math.round((Number(r.pay_usd) || 0) * 100) / 100,
+    }));
+  }
+
+  async vaIsRecruiting(companyId: string): Promise<boolean> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT recruiting FROM companies WHERE id = $1`,
+      [companyId],
+    );
+    if (!rows[0]) return false;
+    return Boolean(rows[0].recruiting);
+  }
+
+  async vaSetRecruiting(opts: {
+    companyId: string;
+    actorAccountId: string;
+    recruiting: boolean;
+  }): Promise<boolean> {
+    await this.ready;
+    const actor = await this.vaGetMembership(opts.actorAccountId, opts.companyId);
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can change recruiting');
+    }
+    await this.pool.query(`UPDATE companies SET recruiting = $1 WHERE id = $2`, [
+      opts.recruiting,
+      opts.companyId,
+    ]);
+    return opts.recruiting;
+  }
+
+  async vaPublish(opts: {
+    companyId: string;
+    actorAccountId: string;
+    displayName: string;
+    homeHubIcao: string;
+    recruiting?: boolean;
+  }): Promise<{
+    companyId: string;
+    displayName: string;
+    homeHubIcao: string;
+    recruiting: boolean;
+  }> {
+    await this.ready;
+    const companyId = opts.companyId.trim();
+    if (!companyId) throw new Error('companyId required');
+    const actor = await this.vaGetMembership(opts.actorAccountId, companyId);
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can publish this company as a VA');
+    }
+    const exists = await this.pool.query(`SELECT id FROM companies WHERE id = $1`, [
+      companyId,
+    ]);
+    if (!exists.rows[0]) throw new Error('Unknown company');
+    const displayName = opts.displayName.trim();
+    if (!displayName) throw new Error('displayName required');
+    if (displayName.length > 64) throw new Error('displayName too long');
+    const homeHubIcao = opts.homeHubIcao.trim().toUpperCase();
+    if (!/^[A-Z0-9]{3,4}$/.test(homeHubIcao)) {
+      throw new Error('homeHubIcao must be a 3–4 letter ICAO');
+    }
+    const recruiting = opts.recruiting !== false;
+    await this.pool.query(
+      `UPDATE companies SET display_name = $1, home_hub_icao = $2, recruiting = $3 WHERE id = $4`,
+      [displayName, homeHubIcao, recruiting, companyId],
+    );
+    return { companyId, displayName, homeHubIcao, recruiting };
+  }
+
+  async vaDirectory(opts?: {
+    worldId?: string;
+    accountId?: string;
+    includeClosed?: boolean;
+    limit?: number;
+  }): Promise<VaDirectoryEntry[]> {
+    await this.ready;
+    const limit = Math.max(1, Math.min(100, opts?.limit ?? 50));
+    const includeClosed = opts?.includeClosed === true;
+    const worldId = opts?.worldId?.trim() || null;
+    const { rows } = await this.pool.query(
+      `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting,
+              (SELECT COUNT(*)::int FROM company_members m WHERE m.company_id = c.id) AS member_count
+       FROM companies c
+       WHERE ($1::text IS NULL OR COALESCE(c.world_id, 'local') = $1)
+         AND ($2::int = 1 OR c.recruiting IS TRUE)
+       ORDER BY c.display_name ASC, c.id ASC
+       LIMIT $3`,
+      [worldId, includeClosed ? 1 : 0, limit],
+    );
+    const out: VaDirectoryEntry[] = [];
+    for (const r of rows) {
+      const memberCount = Number(r.member_count) || 0;
+      const recruiting = Boolean(r.recruiting);
+      let myRequestStatus: VaDirectoryEntry['myRequestStatus'] = null;
+      if (opts?.accountId) {
+        const req = await this.pool.query(
+          `SELECT status FROM company_join_requests
+           WHERE company_id = $1 AND account_id = $2
+           ORDER BY created_at_ms DESC LIMIT 1`,
+          [r.id, opts.accountId],
+        );
+        const st = req.rows[0]?.status as string | undefined;
+        if (st === 'pending' || st === 'accepted' || st === 'rejected') {
+          myRequestStatus = st;
+        }
+      }
+      out.push({
+        companyId: r.id as string,
+        displayName: (r.display_name as string) || (r.id as string),
+        homeHubIcao: (r.home_hub_icao as string) || '',
+        memberCount,
+        memberCap: VA_MEMBER_CAP,
+        recruiting,
+        seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
+        myRequestStatus,
+      });
+    }
+    return out;
+  }
+
+  async vaCreateJoinRequest(opts: {
+    companyId: string;
+    accountId: string;
+  }): Promise<VaJoinRequestRow> {
+    await this.ready;
+    const companyId = opts.companyId.trim();
+    if (!companyId) throw new Error('companyId required');
+    if (await this.vaGetMembership(opts.accountId, companyId)) {
+      throw new Error('Already a member of this company');
+    }
+    if (!(await this.vaIsRecruiting(companyId))) {
+      throw new Error('This company is not recruiting');
+    }
+    const countRes = await this.pool.query(
+      `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
+      [companyId],
+    );
+    if ((countRes.rows[0]?.n as number) >= VA_MEMBER_CAP) {
+      throw new Error(`Company is full (max ${VA_MEMBER_CAP} members)`);
+    }
+    const pending = await this.pool.query(
+      `SELECT id FROM company_join_requests
+       WHERE company_id = $1 AND account_id = $2 AND status = 'pending'`,
+      [companyId, opts.accountId],
+    );
+    if (pending.rows[0]) throw new Error('Join request already pending');
+    const now = Date.now();
+    const id = `jr_${randomBytes(8).toString('hex')}`;
+    await this.pool.query(
+      `INSERT INTO company_join_requests
+         (id, company_id, account_id, status, created_at_ms, decided_at_ms, decided_by_account_id)
+       VALUES ($1, $2, $3, 'pending', $4, NULL, NULL)`,
+      [id, companyId, opts.accountId, now],
+    );
+    const acc = await this.pool.query(
+      `SELECT login_name, display_name FROM accounts WHERE id = $1`,
+      [opts.accountId],
+    );
+    return {
+      id,
+      companyId,
+      accountId: opts.accountId,
+      loginName: (acc.rows[0]?.login_name as string) ?? '',
+      displayName: (acc.rows[0]?.display_name as string) ?? '',
+      status: 'pending',
+      createdAtMs: now,
+      decidedAtMs: null,
+    };
+  }
+
+  async vaListJoinRequests(companyId: string): Promise<VaJoinRequestRow[]> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT r.id, r.company_id, r.account_id, r.status, r.created_at_ms, r.decided_at_ms,
+              a.login_name, a.display_name
+       FROM company_join_requests r
+       JOIN accounts a ON a.id = r.account_id
+       WHERE r.company_id = $1 AND r.status = 'pending'
+       ORDER BY r.created_at_ms ASC`,
+      [companyId],
+    );
+    return rows.map((r) => ({
+      id: r.id as string,
+      companyId: r.company_id as string,
+      accountId: r.account_id as string,
+      loginName: r.login_name as string,
+      displayName: r.display_name as string,
+      status: 'pending' as const,
+      createdAtMs: Number(r.created_at_ms) || 0,
+      decidedAtMs: r.decided_at_ms != null ? Number(r.decided_at_ms) : null,
+    }));
+  }
+
+  async vaAcceptJoinRequest(opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): Promise<{ member: CareerCompanyMember; companyId: string }> {
+    await this.ready;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(
+        `SELECT id, company_id, account_id, status FROM company_join_requests
+         WHERE id = $1 FOR UPDATE`,
+        [opts.requestId],
+      );
+      const row = rows[0] as
+        | { id: string; company_id: string; account_id: string; status: string }
+        | undefined;
+      if (!row) throw new Error('Join request not found');
+      if (row.status !== 'pending') throw new Error('Join request is not pending');
+      const actor = await this.vaGetMembership(opts.actorAccountId, row.company_id);
+      if (!actor || (actor.role !== 'owner' && actor.role !== 'dispatcher')) {
+        throw new Error('Only owner or dispatcher can accept requests');
+      }
+      const now = Date.now();
+      const existing = await this.vaGetMembership(row.account_id, row.company_id);
+      let member: CareerCompanyMember;
+      if (existing) {
+        member = existing;
+      } else {
+        const countRes = await client.query(
+          `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
+          [row.company_id],
+        );
+        if ((countRes.rows[0]?.n as number) >= VA_MEMBER_CAP) {
+          throw new Error(`Company is full (max ${VA_MEMBER_CAP} members)`);
+        }
+        member = await this.authAddCompanyMember({
+          companyId: row.company_id,
+          accountId: row.account_id,
+          role: 'pilot',
+        });
+      }
+      await client.query(
+        `UPDATE company_join_requests
+         SET status = 'accepted', decided_at_ms = $1, decided_by_account_id = $2
+         WHERE id = $3`,
+        [now, opts.actorAccountId, row.id],
+      );
+      await client.query('COMMIT');
+      return { member, companyId: row.company_id };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async vaRejectJoinRequest(opts: {
+    requestId: string;
+    actorAccountId: string;
+  }): Promise<void> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT id, company_id, status FROM company_join_requests WHERE id = $1`,
+      [opts.requestId],
+    );
+    const row = rows[0] as
+      | { id: string; company_id: string; status: string }
+      | undefined;
+    if (!row) throw new Error('Join request not found');
+    if (row.status !== 'pending') throw new Error('Join request is not pending');
+    const actor = await this.vaGetMembership(opts.actorAccountId, row.company_id);
+    if (!actor || (actor.role !== 'owner' && actor.role !== 'dispatcher')) {
+      throw new Error('Only owner or dispatcher can reject requests');
+    }
+    await this.pool.query(
+      `UPDATE company_join_requests
+       SET status = 'rejected', decided_at_ms = $1, decided_by_account_id = $2
+       WHERE id = $3`,
+      [Date.now(), opts.actorAccountId, row.id],
+    );
+  }
+
   private async listMemberships(accountId: string): Promise<CareerCompanyMember[]> {
+
     const { rows } = await this.pool.query(
       `SELECT company_id, account_id, role, created_at_ms
        FROM company_members WHERE account_id = $1`,

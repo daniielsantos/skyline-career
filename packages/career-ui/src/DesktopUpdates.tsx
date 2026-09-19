@@ -285,8 +285,9 @@ function ensureDesktopUpdateBridge() {
     patchStore({ installedVersion: '?' });
   });
   desktop.onUpdateEvent(applyUpdateEvent);
-  // Login / first paint into the shell — check now (boot may have fired early).
+  // Single check when the shell first mounts (Electron no longer boots a parallel check).
   void runUpdateCheck();
+  // Quiet recheck while the app stays open — skips if an update is already offered/downloading.
   if (!pollTimer) {
     pollTimer = setInterval(() => {
       void runUpdateCheck();
@@ -401,7 +402,7 @@ export function DesktopUpdatesCard() {
             ? 'You are on the latest release.'
             : state.status === 'checking'
               ? 'Checking GitHub Releases…'
-              : 'Checks GitHub Releases for a newer Airframe Career build. Builds are not code-signed yet — Windows SmartScreen may warn when installing updates.';
+              : 'Checks GitHub Releases once when you open Career (and again every 30 minutes while the app stays open). Builds are not code-signed yet — Windows SmartScreen may warn when installing updates.';
 
   return (
     <div className="settings-card">

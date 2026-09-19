@@ -1006,6 +1006,13 @@ export interface MissionIntent {
    */
   internalHaul?: boolean;
   /**
+   * Account that accepted/flew the Internal Haul (IH-2 multi-pilot).
+   * Settle credits `pilotHomeCompanyId` when it differs from the VA company.
+   */
+  pilotAccountId?: string;
+  /** Home company wallet that receives Internal Haul pilot pay. */
+  pilotHomeCompanyId?: string;
+  /**
    * Port FBO shuttle: NPC wall-clock bridge (crewOperated). Fee + fuel only;
    * payUsd stays 0 — not company Market/Demand crew.
    */

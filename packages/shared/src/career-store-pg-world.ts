@@ -1019,6 +1019,57 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `ALTER TABLE aircraft_instances ADD COLUMN IF NOT EXISTS owner_company_id TEXT`,
   );
+  // Schema v21 — VA invites + haul ranking (CREATE IF NOT EXISTS also in PG_DDL).
+  // Schema v22 — VA directory recruiting + join requests.
+  await pool.query(
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE`,
+  );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_join_requests (
+      id TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES companies(id),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at_ms BIGINT NOT NULL,
+      decided_at_ms BIGINT,
+      decided_by_account_id TEXT
+    )`);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS company_join_requests_company_idx ON company_join_requests(company_id, status)`,
+  );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_invites (
+      code TEXT PRIMARY KEY NOT NULL,
+      company_id TEXT NOT NULL REFERENCES companies(id),
+      created_by_account_id TEXT NOT NULL REFERENCES accounts(id),
+      role TEXT NOT NULL DEFAULT 'pilot',
+      created_at_ms BIGINT NOT NULL,
+      expires_at_ms BIGINT NOT NULL,
+      max_uses INTEGER NOT NULL DEFAULT 8,
+      uses INTEGER NOT NULL DEFAULT 0
+    )`);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS company_invites_company_idx ON company_invites(company_id)`,
+  );
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_haul_stats (
+      company_id TEXT NOT NULL REFERENCES companies(id),
+      day_key INTEGER NOT NULL,
+      hauls INTEGER NOT NULL DEFAULT 0,
+      nm DOUBLE PRECISION NOT NULL DEFAULT 0,
+      pay_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+      PRIMARY KEY (company_id, day_key)
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_pilot_haul_stats (
+      company_id TEXT NOT NULL REFERENCES companies(id),
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      day_key INTEGER NOT NULL,
+      hauls INTEGER NOT NULL DEFAULT 0,
+      nm DOUBLE PRECISION NOT NULL DEFAULT 0,
+      pay_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
+      PRIMARY KEY (company_id, account_id, day_key)
+    )`);
   // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
   const fleetAlters = [
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS registration TEXT`,

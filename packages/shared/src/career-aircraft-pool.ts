@@ -910,9 +910,14 @@ export function markDealerInstanceSold(
   opts?: { companyId?: string },
 ): boolean {
   const inst = world.aircraftInstances?.find((row) => row.id === instanceId);
-  if (!inst || inst.status !== 'available') return false;
-  inst.status = 'sold';
+  if (!inst) return false;
   const companyId = opts?.companyId?.trim();
+  if (inst.status === 'sold') {
+    // F7 idempotent: DB/RAM already claimed by this company.
+    return Boolean(companyId && inst.ownerCompanyId === companyId);
+  }
+  if (inst.status !== 'available') return false;
+  inst.status = 'sold';
   if (companyId) {
     inst.ownerCompanyId = companyId;
   }

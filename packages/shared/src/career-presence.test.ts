@@ -81,5 +81,10 @@ describe('MP presence + contested scarcity helpers', () => {
       markDealerInstanceSold(world, inst!.id, { companyId: 'co_b' }),
       false,
     );
+    assert.equal(
+      markDealerInstanceSold(world, inst!.id, { companyId: 'co_a' }),
+      true,
+      'same company claim is idempotent',
+    );
   });
 });

@@ -97,6 +97,8 @@ import {
   hydrateAircraftPoolFromTables,
   migrateV5toV6IfNeeded,
   persistAircraftInstancesIncremental,
+  claimAircraftInstanceInSqlite,
+  releaseAircraftInstanceClaimInSqlite,
   stripEconomyAircraftPool,
 } from './career-store-v6.js';
 import {
@@ -225,6 +227,21 @@ export interface CareerStore {
   persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void>;
   /** Dealer pool rows only (F7); blob stub no longer holds instances. */
   persistAircraftPool(world: CareerEconomyWorld): Promise<void>;
+  /**
+   * F7 — lock dealer hull as sold for companyId (PG FOR UPDATE / SQLite
+   * BEGIN IMMEDIATE). Idempotent for same company. Optional on JSON store.
+   */
+  claimAircraftInstance?(opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  }): Promise<'claimed' | 'unavailable'>;
+  /** Undo claimAircraftInstance after a failed buy/lease. */
+  releaseAircraftInstanceClaim?(opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  }): Promise<boolean>;
   /** Daily Hub Stats samples for one ICAO (empty on JSON store). */
   readHubEconomySamples(opts: {
     icao: string;
@@ -1364,6 +1381,44 @@ class SqliteCareerStore implements CareerStore {
     this.ram = toSave;
     this.lastAircraftSignatures = aircraftInstanceSignatureMap(toSave);
     this.lastAircraftPoolKey = aircraftPoolPersistKey(toSave);
+  }
+
+  async claimAircraftInstance(opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  }): Promise<'claimed' | 'unavailable'> {
+    const result = claimAircraftInstanceInSqlite(this.db, opts);
+    if (result === 'claimed' && this.ram?.aircraftInstances) {
+      const inst = this.ram.aircraftInstances.find(
+        (row) => row.id === opts.instanceId.trim(),
+      );
+      if (inst) {
+        inst.status = 'sold';
+        inst.ownerCompanyId = opts.companyId.trim();
+      }
+      this.lastAircraftSignatures = aircraftInstanceSignatureMap(this.ram);
+    }
+    return result;
+  }
+
+  async releaseAircraftInstanceClaim(opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  }): Promise<boolean> {
+    const ok = releaseAircraftInstanceClaimInSqlite(this.db, opts);
+    if (ok && this.ram?.aircraftInstances) {
+      const inst = this.ram.aircraftInstances.find(
+        (row) => row.id === opts.instanceId.trim(),
+      );
+      if (inst) {
+        inst.status = 'available';
+        delete inst.ownerCompanyId;
+      }
+      this.lastAircraftSignatures = aircraftInstanceSignatureMap(this.ram);
+    }
+    return ok;
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {

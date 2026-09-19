@@ -1,8 +1,8 @@
 # Aircraft instance pool
 
-F0–F6 shipped. **F7 in progress (2026-09-19):** RAM claim-before-debit + `ownerCompanyId` on sold instances; buy/lease → 409 `aircraft_claimed` if already taken. Still open: PG `owner_company_id` column + `SELECT FOR UPDATE`. Presence: [`27-mp-presence.md`](./27-mp-presence.md).
+F0–F6 shipped. **F7 shipped (2026-09-19):** RAM claim-before-debit + `ownerCompanyId`; PG/SQLite `owner_company_id` + atomic claim (`SELECT FOR UPDATE` / `BEGIN IMMEDIATE`); buy/lease → 409 `aircraft_claimed`. Presence: [`27-mp-presence.md`](./27-mp-presence.md).
 
-Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `career-partition.ts`, `career-player-airframes.ts`, `career-store-v6.ts`.
+Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `career-partition.ts`, `career-player-airframes.ts`, `career-store-v6.ts`, `career-store-pg-world.ts`.
 
 **Diag MP 2026-09-16 — Worldwide ~833 vs ~500 antigo:** não é crescimento por tick. Seed atual com 1967 aeroportos/catálogo vigente = **834 available** (GA 413 / TP 203 / LJ 79 / medium 43 / narrow 60 / wide 36; BR 65). UI 833 / BR 64 = exatamente seed menos 1 casco adquirido. A alta vs saves antigos vem do mapa/catálogo ampliado e caps por país; pool só nasce vazio ou recebe floor incremental em mudança de catálogo.
 
@@ -161,7 +161,7 @@ Não misturar MP, ferry internacional e lease flexível na primeira fatia. Playt
 
 - ~~Pool no blob~~ **feito (SP):** tabela `aircraft_instances`, unique `(world_id, registration)`, persist incremental; `persist: 'blob'` também grava o pool.
 - **2026-09-19:** claim atômico em RAM (`markDealerInstanceSold` + buy/lease antes do débito); `ownerCompanyId`; HTTP 409 `aircraft_claimed`. Presence board: [`27-mp-presence.md`](./27-mp-presence.md).
-- Ainda: PG `owner_company_id` + `SELECT FOR UPDATE` (defesa se multi-writer voltar).
+- **2026-09-19 F7 resto:** PG schema **v20** `owner_company_id`; SQLite ALTER; `claimAircraftInstance` / `releaseAircraftInstanceClaim` (PG `FOR UPDATE`, SQLite `BEGIN IMMEDIATE`); buy/lease claim DB before wallet, release on fail.
 
 ---
 

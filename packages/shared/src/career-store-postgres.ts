@@ -2,6 +2,7 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v20 adds aircraft_instances.owner_company_id (F7 dealer claim).
  * Schema v19 widens charter_offers.group_size to 1…230 (med/narrow).
  * Schema v18 adds hub_economy_samples for Pulse / Hub Stats history.
  * Schema v17 adds monotonic economy revision for cross-process snapshots.
@@ -73,6 +74,8 @@ import {
   isPgEconomyMiscEmpty,
   persistEconomyTablesToPg,
   persistAircraftPoolToPg,
+  claimAircraftInstanceInPg,
+  releaseAircraftInstanceClaimInPg,
   persistDemandBoardToPg,
   persistDemandOrderToPg,
   persistInboundPendingToPg,
@@ -101,7 +104,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '19';
+const CAREER_PG_SCHEMA_VERSION = '20';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -1156,6 +1159,73 @@ export class PostgresCareerStore implements CareerStore {
           : toSave;
       },
     );
+  }
+
+  async claimAircraftInstance(opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  }): Promise<'claimed' | 'unavailable'> {
+    await this.ready;
+    const result = await claimAircraftInstanceInPg(this.pool, {
+      ...opts,
+      // Don't CAS against ramRevision — pulse may bump between peek and claim;
+      // instance FOR UPDATE is the real exclusivity guard.
+    });
+    // Claim bumps revision outside persistRevisioned — refresh local CAS.
+    try {
+      const rev = await this.pool.query(
+        `SELECT revision FROM economy_meta WHERE world_id = $1`,
+        [LOCAL_WORLD_ID],
+      );
+      if (rev.rows[0]?.revision != null) {
+        this.ramRevision = BigInt(rev.rows[0].revision);
+      }
+    } catch {
+      this.ramRevision = null;
+    }
+    if (result === 'claimed' && this.ram?.aircraftInstances) {
+      const inst = this.ram.aircraftInstances.find(
+        (row) => row.id === opts.instanceId.trim(),
+      );
+      if (inst) {
+        inst.status = 'sold';
+        inst.ownerCompanyId = opts.companyId.trim();
+      }
+    }
+    return result;
+  }
+
+  async releaseAircraftInstanceClaim(opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  }): Promise<boolean> {
+    await this.ready;
+    const ok = await releaseAircraftInstanceClaimInPg(this.pool, {
+      ...opts,
+    });
+    try {
+      const rev = await this.pool.query(
+        `SELECT revision FROM economy_meta WHERE world_id = $1`,
+        [LOCAL_WORLD_ID],
+      );
+      if (rev.rows[0]?.revision != null) {
+        this.ramRevision = BigInt(rev.rows[0].revision);
+      }
+    } catch {
+      this.ramRevision = null;
+    }
+    if (ok && this.ram?.aircraftInstances) {
+      const inst = this.ram.aircraftInstances.find(
+        (row) => row.id === opts.instanceId.trim(),
+      );
+      if (inst) {
+        inst.status = 'available';
+        delete inst.ownerCompanyId;
+      }
+    }
+    return ok;
   }
 
   async settleWorldCompaniesPassiveFees(opts: {

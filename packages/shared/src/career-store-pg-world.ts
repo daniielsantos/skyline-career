@@ -476,6 +476,7 @@ CREATE TABLE IF NOT EXISTS aircraft_instances (
   status TEXT NOT NULL,
   seeded_at_tick INTEGER NOT NULL,
   available_at_tick INTEGER,
+  owner_company_id TEXT,
   PRIMARY KEY (world_id, id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS aircraft_instances_reg_idx
@@ -1014,6 +1015,10 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
        ADD CONSTRAINT charter_offers_group_size_check
        CHECK (group_size BETWEEN 1 AND 230)`,
   );
+  // Schema v20 — F7 dealer claim owner.
+  await pool.query(
+    `ALTER TABLE aircraft_instances ADD COLUMN IF NOT EXISTS owner_company_id TEXT`,
+  );
   // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
   const fleetAlters = [
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS registration TEXT`,
@@ -1534,6 +1539,7 @@ function instanceFromRow(r: {
   status: string;
   seeded_at_tick: number;
   available_at_tick: number | null;
+  owner_company_id?: string | null;
 }): AircraftInstance {
   const status = INSTANCE_STATUSES.has(r.status as AircraftInstanceStatus)
     ? (r.status as AircraftInstanceStatus)
@@ -1564,6 +1570,8 @@ function instanceFromRow(r: {
   if (engPct !== undefined) inst.engineConditionPct = engPct;
   const avail = optNum(r.available_at_tick);
   if (avail !== undefined) inst.availableAtTick = avail;
+  const owner = String(r.owner_company_id ?? '').trim();
+  if (owner) inst.ownerCompanyId = owner;
   return inst;
 }
 
@@ -1877,7 +1885,7 @@ export async function hydrateEconomyFromPg(
     `SELECT id, airframe_type_id, aircraft_class_id, country_id, based_icao,
             registration, kind, condition, hours_airframe, hours_engine,
             airframe_condition_pct, engine_condition_pct, status,
-            seeded_at_tick, available_at_tick
+            seeded_at_tick, available_at_tick, owner_company_id
      FROM aircraft_instances WHERE world_id = $1 ORDER BY id ASC`,
     [wid],
   );
@@ -1900,6 +1908,7 @@ export async function hydrateEconomyFromPg(
           status: string;
           seeded_at_tick: number;
           available_at_tick: number | null;
+          owner_company_id: string | null;
         },
       ),
     );
@@ -2345,6 +2354,7 @@ function aircraftInstanceTableRows(
       inst.status,
       sqlNum(inst.seededAtTick),
       inst.availableAtTick ?? null,
+      inst.ownerCompanyId?.trim() || null,
     ]);
   }
   return rows;
@@ -2727,9 +2737,9 @@ export async function persistEconomyTablesToPg(
            world_id, id, airframe_type_id, aircraft_class_id, country_id, based_icao,
            registration, kind, condition, hours_airframe, hours_engine,
            airframe_condition_pct, engine_condition_pct, status, seeded_at_tick,
-           available_at_tick
+           available_at_tick, owner_company_id
          )`,
-        16,
+        17,
         instanceRows,
       );
     }
@@ -2791,12 +2801,100 @@ export async function persistAircraftPoolToPg(
            world_id, id, airframe_type_id, aircraft_class_id, country_id, based_icao,
            registration, kind, condition, hours_airframe, hours_engine,
            airframe_condition_pct, engine_condition_pct, status, seeded_at_tick,
-           available_at_tick
+           available_at_tick, owner_company_id
          )`,
-        16,
+        17,
         instanceRows,
       );
     }
+  });
+}
+
+export type AircraftInstanceClaimResult = 'claimed' | 'unavailable';
+
+/**
+ * F7 — SELECT FOR UPDATE then mark sold + owner_company_id.
+ * Idempotent when already sold to the same company.
+ */
+export async function claimAircraftInstanceInPg(
+  pool: pg.Pool,
+  opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+    expectedRevision?: bigint;
+  },
+): Promise<AircraftInstanceClaimResult> {
+  const wid = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
+  const instanceId = opts.instanceId.trim();
+  const companyId = opts.companyId.trim();
+  if (!instanceId || !companyId) return 'unavailable';
+
+  return withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await lockEconomyRevision(client, wid, opts.expectedRevision);
+    const locked = await client.query(
+      `SELECT id, status, owner_company_id
+       FROM aircraft_instances
+       WHERE world_id = $1 AND id = $2
+       FOR UPDATE`,
+      [wid, instanceId],
+    );
+    const row = locked.rows[0] as
+      | { id: string; status: string; owner_company_id: string | null }
+      | undefined;
+    if (!row) {
+      await bumpEconomyRevision(client, wid);
+      return 'unavailable';
+    }
+    if (
+      row.status === 'sold' &&
+      String(row.owner_company_id ?? '').trim() === companyId
+    ) {
+      await bumpEconomyRevision(client, wid);
+      return 'claimed';
+    }
+    if (row.status !== 'available') {
+      await bumpEconomyRevision(client, wid);
+      return 'unavailable';
+    }
+    const updated = await client.query(
+      `UPDATE aircraft_instances
+       SET status = 'sold', owner_company_id = $3
+       WHERE world_id = $1 AND id = $2 AND status = 'available'`,
+      [wid, instanceId, companyId],
+    );
+    await bumpEconomyRevision(client, wid);
+    return (updated.rowCount ?? 0) === 1 ? 'claimed' : 'unavailable';
+  });
+}
+
+export async function releaseAircraftInstanceClaimInPg(
+  pool: pg.Pool,
+  opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+    expectedRevision?: bigint;
+  },
+): Promise<boolean> {
+  const wid = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
+  const instanceId = opts.instanceId.trim();
+  const companyId = opts.companyId.trim();
+  if (!instanceId || !companyId) return false;
+
+  return withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await lockEconomyRevision(client, wid, opts.expectedRevision);
+    const updated = await client.query(
+      `UPDATE aircraft_instances
+       SET status = 'available', owner_company_id = NULL
+       WHERE world_id = $1 AND id = $2 AND status = 'sold'
+         AND owner_company_id = $3`,
+      [wid, instanceId, companyId],
+    );
+    await bumpEconomyRevision(client, wid);
+    return (updated.rowCount ?? 0) === 1;
   });
 }
 
@@ -3123,9 +3221,9 @@ export async function persistNpcLiveToPg(
            world_id, id, airframe_type_id, aircraft_class_id, country_id, based_icao,
            registration, kind, condition, hours_airframe, hours_engine,
            airframe_condition_pct, engine_condition_pct, status, seeded_at_tick,
-           available_at_tick
+           available_at_tick, owner_company_id
          )`,
-        16,
+        17,
         instanceRows,
       );
     }

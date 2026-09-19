@@ -1447,6 +1447,38 @@ function recordPresence(
   });
 }
 
+/** F7 DB claim before wallet debit; returns whether a claim was taken. */
+async function tryClaimDealerListing(opts: {
+  store: CareerStore;
+  listingId: string;
+  companyId: string;
+}): Promise<'ok' | 'unavailable' | 'skipped'> {
+  if (typeof opts.store.claimAircraftInstance !== 'function') {
+    return 'skipped';
+  }
+  const result = await opts.store.claimAircraftInstance({
+    instanceId: opts.listingId,
+    companyId: opts.companyId,
+  });
+  return result === 'claimed' ? 'ok' : 'unavailable';
+}
+
+async function releaseDealerListingClaim(opts: {
+  store: CareerStore;
+  listingId: string;
+  companyId: string;
+}): Promise<void> {
+  if (typeof opts.store.releaseAircraftInstanceClaim !== 'function') return;
+  try {
+    await opts.store.releaseAircraftInstanceClaim({
+      instanceId: opts.listingId,
+      companyId: opts.companyId,
+    });
+  } catch {
+    /* best-effort rollback */
+  }
+}
+
 async function activateCompanyContext(
   companyId: string,
   accountId?: string,
@@ -4222,8 +4254,23 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const buyCompanyId = companyIdFromRequest(req, body.companyId);
+        const buyStore = requireStore();
+        let dbClaimed = false;
         try {
-          const companyNames = await companyDisplayNameMap(requireStore());
+          const claim = await tryClaimDealerListing({
+            store: buyStore,
+            listingId: body.listingId!,
+            companyId: buyCompanyId,
+          });
+          if (claim === 'unavailable') {
+            send(res, 409, {
+              error: `Listing ${body.listingId} is not available`,
+              code: 'aircraft_claimed',
+            });
+            return;
+          }
+          dbClaimed = claim === 'ok';
+          const companyNames = await companyDisplayNameMap(buyStore);
           const displayName =
             companyNames.get(buyCompanyId) ?? buyCompanyId;
           const result = await withCareerWrite((world, missions) => {
@@ -4271,6 +4318,13 @@ export function createCareerApiServer(port = 8787) {
           });
           send(res, 200, result);
         } catch (error) {
+          if (dbClaimed) {
+            await releaseDealerListingClaim({
+              store: buyStore,
+              listingId: body.listingId!,
+              companyId: buyCompanyId,
+            });
+          }
           const code =
             error instanceof Error &&
             'code' in error &&
@@ -4297,16 +4351,41 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const leaseCompanyId = companyIdFromRequest(req, body.companyId);
+        const leaseStore = requireStore();
+        let dbClaimed = false;
         try {
+          const claim = await tryClaimDealerListing({
+            store: leaseStore,
+            listingId: body.listingId!,
+            companyId: leaseCompanyId,
+          });
+          if (claim === 'unavailable') {
+            send(res, 409, {
+              error: `Listing ${body.listingId} is not available`,
+              code: 'aircraft_claimed',
+            });
+            return;
+          }
+          dbClaimed = claim === 'ok';
+          const companyNames = await companyDisplayNameMap(leaseStore);
+          const displayName =
+            companyNames.get(leaseCompanyId) ?? leaseCompanyId;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             settleAircraftMarketOps(missions, world.tick);
             return withDevProgressionUnlock(req, missions, () => {
               const leased = signAircraftLease(missions, world, body.listingId!, {
                 deliver: body.deliver === true,
+                companyId: leaseCompanyId,
                 ...(typeof body.deliverToIcao === 'string'
                   ? { deliverToIcao: body.deliverToIcao }
                   : {}),
+              });
+              recordPresence(world, {
+                kind: 'aircraft_lease',
+                companyId: leaseCompanyId,
+                companyDisplayName: displayName,
+                summary: `${leased.aircraft.registration ?? 'aircraft'} · lease`,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -4322,8 +4401,19 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'aircraftMarket', companyId: leaseCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
+          if (dbClaimed) {
+            await releaseDealerListingClaim({
+              store: leaseStore,
+              listingId: body.listingId!,
+              companyId: leaseCompanyId,
+            });
+          }
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const claimed = /not available/i.test(message);
+          send(res, claimed ? 409 : 400, {
+            error: message,
+            ...(claimed ? { code: 'aircraft_claimed' } : {}),
           });
         }
         return;

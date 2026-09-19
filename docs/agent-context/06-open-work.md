@@ -56,11 +56,15 @@ Atualizado 2026-09-19: **Oceania densify Wave B (~+40 → 150)** — AU+17/PG+6/
 
 Atualizado 2026-09-19: **Spoke feeder measure day-0** — v0.3.127 install OK; seed SBIL last-mile + feeder to SBSV/SBRF PASS (dest room required). Live pulse +1-2d aberto vs baseline d57. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **Spoke feeder +7d (d63→69)** — World live 99% / soft-fill 56→66% (d64→65) flat / lots ~20.6k / pay p50 ~$1.17k. OC 150 hubs live 98–99% → gate Wave C **PASS** por live. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **Pulse SLOW timing logs** — economy-pulse log com lockWait/tick/save/settle/lots (SLOW se >=60s). Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-19: **Spoke feeder open-count stall** — pós densify+feeder, pulse “infinito” / gateway fetch failed. Causa: full-scan lots por spoke×SKU. Fix: índice `openFeederBandByOrigin` 1×/tick. **world-api redeploy** required. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **MP presence + F7 claim** — Online chip, Port FBO/lot 409 com nome, presence recent, Port FBO index merge multi-company, buy/lease claim-before-debit. Detail: [`27-mp-presence.md`](./27-mp-presence.md).
+
+Atualizado 2026-09-19: **F7 resto** — PG v20 `owner_company_id` + `claimAircraftInstance` FOR UPDATE; SQLite BEGIN IMMEDIATE; buy/lease claim DB before wallet. Detail: [`10-aircraft-pool.md`](./10-aircraft-pool.md).
 
 Atualizado 2026-09-19: **Spoke feeder LTL dial** — pass `formLotsSpokeFeeder` (budget 4 / open 1 / soft `· spoke feeder`) após regional; last-mile GA 450 kg intact. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 

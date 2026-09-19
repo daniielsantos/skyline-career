@@ -85,6 +85,7 @@ export function ensureV6Ddl(db: SqliteDb): void {
       status TEXT NOT NULL,
       seeded_at_tick INTEGER NOT NULL,
       available_at_tick INTEGER,
+      owner_company_id TEXT,
       PRIMARY KEY (world_id, id)
     );
     CREATE UNIQUE INDEX IF NOT EXISTS aircraft_instances_reg_idx
@@ -92,6 +93,14 @@ export function ensureV6Ddl(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS aircraft_instances_country_idx
       ON aircraft_instances(world_id, country_id, status);
   `);
+  // F7 — existing DBs created before owner_company_id.
+  try {
+    db.exec(
+      `ALTER TABLE aircraft_instances ADD COLUMN owner_company_id TEXT`,
+    );
+  } catch {
+    /* column already present */
+  }
 }
 
 export function aircraftInstancePersistSignature(inst: AircraftInstance): string {
@@ -107,6 +116,7 @@ export function aircraftInstancePersistSignature(inst: AircraftInstance): string
     inst.availableAtTick ?? '',
     inst.countryId,
     inst.airframeTypeId,
+    inst.ownerCompanyId ?? '',
   ].join('|');
 }
 
@@ -136,6 +146,7 @@ function instanceFromRow(r: {
   status: string;
   seeded_at_tick: number;
   available_at_tick: number | null;
+  owner_company_id?: string | null;
 }): AircraftInstance | null {
   const status = INSTANCE_STATUSES.has(r.status as AircraftInstanceStatus)
     ? (r.status as AircraftInstanceStatus)
@@ -166,6 +177,8 @@ function instanceFromRow(r: {
   if (engPct !== undefined) inst.engineConditionPct = engPct;
   const avail = sqlOptNum(r.available_at_tick);
   if (avail !== undefined) inst.availableAtTick = avail;
+  const owner = String(r.owner_company_id ?? '').trim();
+  if (owner) inst.ownerCompanyId = owner;
   return inst;
 }
 
@@ -178,7 +191,7 @@ export function readAircraftInstances(
       `SELECT id, airframe_type_id, aircraft_class_id, country_id, based_icao,
               registration, kind, condition, hours_airframe, hours_engine,
               airframe_condition_pct, engine_condition_pct, status,
-              seeded_at_tick, available_at_tick
+              seeded_at_tick, available_at_tick, owner_company_id
        FROM aircraft_instances WHERE world_id = ? ORDER BY id ASC`,
     )
     .all(worldId) as Array<{
@@ -197,6 +210,7 @@ export function readAircraftInstances(
     status: string;
     seeded_at_tick: number;
     available_at_tick: number | null;
+    owner_company_id: string | null;
   }>;
   const out: AircraftInstance[] = [];
   for (const row of rows) {
@@ -226,12 +240,12 @@ function upsertAircraftInstanceRows(
        world_id, id, airframe_type_id, aircraft_class_id, country_id, based_icao,
        registration, kind, condition, hours_airframe, hours_engine,
        airframe_condition_pct, engine_condition_pct, status, seeded_at_tick,
-       available_at_tick
+       available_at_tick, owner_company_id
      ) VALUES (
        @world_id, @id, @airframe_type_id, @aircraft_class_id, @country_id, @based_icao,
        @registration, @kind, @condition, @hours_airframe, @hours_engine,
        @airframe_condition_pct, @engine_condition_pct, @status, @seeded_at_tick,
-       @available_at_tick
+       @available_at_tick, @owner_company_id
      )
      ON CONFLICT(world_id, id) DO UPDATE SET
        airframe_type_id = excluded.airframe_type_id,
@@ -247,7 +261,8 @@ function upsertAircraftInstanceRows(
        engine_condition_pct = excluded.engine_condition_pct,
        status = excluded.status,
        seeded_at_tick = excluded.seeded_at_tick,
-       available_at_tick = excluded.available_at_tick`,
+       available_at_tick = excluded.available_at_tick,
+       owner_company_id = excluded.owner_company_id`,
   );
   for (const inst of instances) {
     const id = sqlText(inst.id).trim();
@@ -270,6 +285,7 @@ function upsertAircraftInstanceRows(
       status: inst.status,
       seeded_at_tick: inst.seededAtTick,
       available_at_tick: inst.availableAtTick ?? null,
+      owner_company_id: inst.ownerCompanyId?.trim() || null,
     });
   }
 }
@@ -343,6 +359,91 @@ export function persistAircraftPoolTables(
   worldId = LOCAL_WORLD_ID,
 ): void {
   replaceAircraftInstances(db, world.aircraftInstances ?? [], worldId);
+}
+
+export type AircraftInstanceClaimResult = 'claimed' | 'unavailable';
+
+/**
+ * F7 — atomic dealer claim (SQLite). BEGIN IMMEDIATE + UPDATE WHERE available.
+ * Idempotent if already sold to the same companyId.
+ */
+export function claimAircraftInstanceInSqlite(
+  db: SqliteDb,
+  opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  },
+): AircraftInstanceClaimResult {
+  ensureV6Ddl(db);
+  const worldId = opts.worldId?.trim() || LOCAL_WORLD_ID;
+  const instanceId = opts.instanceId.trim();
+  const companyId = opts.companyId.trim();
+  if (!instanceId || !companyId) return 'unavailable';
+  let result: AircraftInstanceClaimResult = 'unavailable';
+  withSqliteTransaction(db, () => {
+    const row = db
+      .prepare(
+        `SELECT status, owner_company_id FROM aircraft_instances
+         WHERE world_id = ? AND id = ?`,
+      )
+      .get(worldId, instanceId) as
+      | { status: string; owner_company_id: string | null }
+      | undefined;
+    if (!row) {
+      result = 'unavailable';
+      return;
+    }
+    if (
+      row.status === 'sold' &&
+      String(row.owner_company_id ?? '').trim() === companyId
+    ) {
+      result = 'claimed';
+      return;
+    }
+    if (row.status !== 'available') {
+      result = 'unavailable';
+      return;
+    }
+    const updated = db
+      .prepare(
+        `UPDATE aircraft_instances
+         SET status = 'sold', owner_company_id = ?
+         WHERE world_id = ? AND id = ? AND status = 'available'`,
+      )
+      .run(companyId, worldId, instanceId);
+    result = Number(updated.changes ?? 0) === 1 ? 'claimed' : 'unavailable';
+  });
+  return result;
+}
+
+/** Undo a claim that failed after DB lock (wallet / rule reject). */
+export function releaseAircraftInstanceClaimInSqlite(
+  db: SqliteDb,
+  opts: {
+    instanceId: string;
+    companyId: string;
+    worldId?: string;
+  },
+): boolean {
+  ensureV6Ddl(db);
+  const worldId = opts.worldId?.trim() || LOCAL_WORLD_ID;
+  const instanceId = opts.instanceId.trim();
+  const companyId = opts.companyId.trim();
+  if (!instanceId || !companyId) return false;
+  let ok = false;
+  withSqliteTransaction(db, () => {
+    const updated = db
+      .prepare(
+        `UPDATE aircraft_instances
+         SET status = 'available', owner_company_id = NULL
+         WHERE world_id = ? AND id = ? AND status = 'sold'
+           AND owner_company_id = ?`,
+      )
+      .run(worldId, instanceId, companyId);
+    ok = Number(updated.changes ?? 0) === 1;
+  });
+  return ok;
 }
 
 /**

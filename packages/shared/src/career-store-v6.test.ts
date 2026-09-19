@@ -101,4 +101,43 @@ describe('career store v6', () => {
     );
     again.close();
   });
+
+  it('claimAircraftInstance is exclusive across companies (F7)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'skyline-v6-claim-'));
+    const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
+    const world = createSeedEconomyWorld({ seed: 'v6-claim' });
+    world.lastBatchAtMs = Date.now();
+    ensureWorldAircraftPool(world);
+    await store.saveEconomy(world);
+    const sample = world.aircraftInstances!.find((r) => r.status === 'available')!;
+    assert.ok(sample);
+
+    const first = await store.claimAircraftInstance!({
+      instanceId: sample.id,
+      companyId: 'co_a',
+    });
+    assert.equal(first, 'claimed');
+    const second = await store.claimAircraftInstance!({
+      instanceId: sample.id,
+      companyId: 'co_b',
+    });
+    assert.equal(second, 'unavailable');
+    const replay = await store.claimAircraftInstance!({
+      instanceId: sample.id,
+      companyId: 'co_a',
+    });
+    assert.equal(replay, 'claimed');
+
+    const released = await store.releaseAircraftInstanceClaim!({
+      instanceId: sample.id,
+      companyId: 'co_a',
+    });
+    assert.equal(released, true);
+    const again = await store.claimAircraftInstance!({
+      instanceId: sample.id,
+      companyId: 'co_b',
+    });
+    assert.equal(again, 'claimed');
+    store.close();
+  });
 });

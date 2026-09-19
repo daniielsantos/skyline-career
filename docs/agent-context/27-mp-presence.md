@@ -21,11 +21,11 @@ Order: presence UI → online chip → aircraft pool F7 claim.
 
 - `syncWorldPortConcessions` **merges** by company (no longer replaces the whole world index with one tenant). Claim/renew/upgrade pass `companyId`.
 
-### Aircraft pool F7 (partial)
+### Aircraft pool F7
 
-- `markDealerInstanceSold(..., { companyId })` stamps `ownerCompanyId`; returns false if already sold.
-- Buy/lease claim the dealer hull **before** wallet debit; second buyer → unavailable / HTTP **409** `aircraft_claimed`.
-- Still open: PG `SELECT FOR UPDATE` column persist for `owner_company_id` (single-writer RAM claim is the day-1 race guard).
+- `markDealerInstanceSold(..., { companyId })` stamps `ownerCompanyId` (idempotent same company).
+- Buy/lease: DB `claimAircraftInstance` (PG `FOR UPDATE` / SQLite `BEGIN IMMEDIATE`) **before** wallet; release on fail; HTTP **409** `aircraft_claimed`.
+- PG schema **v20** `owner_company_id` on `aircraft_instances`.
 
 ## Non-goals (this wave)
 

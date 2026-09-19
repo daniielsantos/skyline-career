@@ -3,6 +3,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { SA_DENSIFY_HUBS, SA_DENSIFY_HUB_COUNT } from './career-sa-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -137,9 +138,10 @@ export const SA_CAREER_HUBS: readonly SaCareerHubDef[] = [
     lon: 38.0634,
     ...westCoast,
   },
+  ...SA_DENSIFY_HUBS
 ];
 
-export const SA_CAREER_HUB_COUNT = 10;
+export const SA_CAREER_HUB_COUNT = 10 + SA_DENSIFY_HUB_COUNT;
 
 export function buildSaFeederCorridors(
   hubs: readonly SaCareerHubDef[] = SA_CAREER_HUBS,

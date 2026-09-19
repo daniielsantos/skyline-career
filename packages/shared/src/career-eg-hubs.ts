@@ -3,6 +3,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { EG_DENSIFY_HUBS, EG_DENSIFY_HUB_COUNT } from './career-eg-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -98,9 +99,10 @@ export const EG_CAREER_HUBS: readonly EgCareerHubDef[] = [
     lon: 33.7994,
     ...redSea,
   },
+  ...EG_DENSIFY_HUBS
 ];
 
-export const EG_CAREER_HUB_COUNT = 6;
+export const EG_CAREER_HUB_COUNT = 6 + EG_DENSIFY_HUB_COUNT;
 
 export function buildEgFeederCorridors(
   hubs: readonly EgCareerHubDef[] = EG_CAREER_HUBS,

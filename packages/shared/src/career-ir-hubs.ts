@@ -3,6 +3,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { IR_DENSIFY_HUBS, IR_DENSIFY_HUB_COUNT } from './career-ir-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -111,9 +112,10 @@ export const IR_CAREER_HUBS: readonly IrCareerHubDef[] = [
     lon: 56.9511,
     ...plateau,
   },
+  ...IR_DENSIFY_HUBS
 ];
 
-export const IR_CAREER_HUB_COUNT = 8;
+export const IR_CAREER_HUB_COUNT = 8 + IR_DENSIFY_HUB_COUNT;
 
 export function buildIrFeederCorridors(
   hubs: readonly IrCareerHubDef[] = IR_CAREER_HUBS,

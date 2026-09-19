@@ -38,7 +38,9 @@ Atualizado 2026-09-19: **C680 maxPax 12→10** — SimBrief Sovereign+ Full=(10)
 
 Atualizado 2026-09-19: **Charter Search Pax sum UX** — coluna Pax somava `groupSize` das legs (12+11→23) e parecia exigir avião >12 seats; filter já exige seats≥cada oferta. Fix UI: `12 · 11` por leg + Route com ICAO chips. Detail: [`08-economy.md`](./08-economy.md).
 
-Atualizado 2026-09-19: **Pulse lenses MENA + SE-Asia** — synthetic multi-country (igual EU-West); não 349 regiões. MENA=MENA-1…6; SEA=TH/VN/MY/SG/ID/PH/MM/BN. Registry `PULSE_SYNTHETIC_REGIONS`. Detail: [`08-economy.md`](./08-economy.md).
+Atualizado 2026-09-19: **MENA densify Wave A (~+35 → 115)** — SA16/EG10/IR12/DZ8/MA10/AE9/…; seed **2135**; SimBrief **2135**; OA runways +35 (0 synth). Fuel ~12. Homolog MSFS **pending** on ship. Gate pulse MENA live ≥85% 7d antes Wave B (~150). Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **Pulse synthetic region lenses** — Network history: **EU** / **MENA** / **SEA** multi-country (not 349 `XX-YY`). MENA lens covers ~115 hubs post Wave A. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **EU-1 Wave 1 MSFS homolog** — 45 ok; drop/replace **EDFE→EDFM** (Egelsbach≠Mannheim), **LEZG→LEBG**, **LEBZ→LELN** (absent stock). Overrides shipped + OA runway merge (45 hubs; 0 synth). Touchdown: MSFS rwy when present, else OA. Detail: [`04-hubs-simbrief.md`](./04-hubs-simbrief.md).
 

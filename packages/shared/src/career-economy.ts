@@ -4242,6 +4242,19 @@ export const FUEL_HUB_ICAOS = new Set([
   // MENA-6 Yemen
   'OYSN',
   'OYAA',
+  // MENA Wave A densify producers (~1 per 2–3 new hubs)
+  'OETB',
+  'OERR',
+  'HEMA',
+  'HETB',
+  'OIBK',
+  'DAUG',
+  'GMTA',
+  'OMAM',
+  'ORAA',
+  'HLGT',
+  'DTNH',
+  'OYTZ',
   // Asia-1 Pakistan
   'OPIS',
   'OPKC',

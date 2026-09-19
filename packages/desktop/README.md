@@ -20,7 +20,7 @@ Electron shell around the local Career API + static UI.
 Settings → **Updates** (desktop only) or the topbar **Update** pill:
 
 1. App checks GitHub Releases on startup (silent).
-2. **Download** uses **differential** blocks when possible (NSIS `.blockmap` on the release + previous Setup still in the updater cache). Otherwise it falls back to the full `Airframe-Setup-*.exe` (~160 MB). Install still runs the one-click NSIS overwrite either way.
+2. **Download** uses **differential** blocks when possible (NSIS `.blockmap` on the release + previous Setup still in the updater cache). Otherwise it falls back to the full `Airframe-Setup-*.exe` (~160 MB). Install still runs the one-click NSIS overwrite either way. The UI progress bar is **monotonic** (differential range events can jump backward; we keep the highest %).
 3. **Install** opens the Setup **with a visible progress window** (no `/S`), passing `--updated --force-run` so NSIS waits/closes the running app instead of the “still running” dialog, then Airframe relaunches.
 4. If Windows warns (unsigned), choose **More info → Run anyway**; watch the installer until it finishes — Airframe should reopen.
 5. Player saves in AppData are kept across updates.

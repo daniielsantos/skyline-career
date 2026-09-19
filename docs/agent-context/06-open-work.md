@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **Updater progress monotonic** — barra in-app não recua quando o diferencial emite % jumpy entre HTTP ranges (`clampDesktopUpdateProgressPct`). Detail: `packages/desktop/README.md` · `DesktopUpdates.tsx`.
+
 Atualizado 2026-09-19: **PG lots/charter UPSERT (Wave 1)** — pulse deixa de `DELETE FROM lots/charter_offers` + INSERT full; orphan-delete vs RAM + `ON CONFLICT DO UPDATE … WHERE IS DISTINCT FROM` (skip no-op). Timing: `CAREER_PG_PERSIST_TIMING=1`. Re-medir pulse ms + row counts no VPS. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-19: **Debug +$ wallet flicker** — credit pintava o saldo novo e o poll `/api/state` (ou missions) in-flight revertia ao antigo até reload. Causa: `POST /api/debug/credit-wallet` sem `companyId` + `paintWallet` aceitava regressão ambient. Fix: write com `companyIdFromRequest`; `commitWallet` segura ~12s contra paint stale. Detail: [`08-economy.md`](./08-economy.md).

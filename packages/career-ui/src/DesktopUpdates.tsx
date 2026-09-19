@@ -111,6 +111,26 @@ export function isNewerDesktopVersion(
   return false;
 }
 
+/**
+ * Differential downloads emit jumpy percent across HTTP ranges. Keep the UI
+ * bar monotonic within a download session (reset when progressPct is set to 0
+ * at download start).
+ */
+export function clampDesktopUpdateProgressPct(
+  previousPct: number,
+  reportedPct: number | null | undefined,
+): number {
+  const next = Math.max(
+    0,
+    Math.min(100, Number.isFinite(reportedPct) ? Number(reportedPct) : 0),
+  );
+  const prev = Math.max(
+    0,
+    Math.min(100, Number.isFinite(previousPct) ? previousPct : 0),
+  );
+  return Math.max(prev, next);
+}
+
 function applyUpdateEvent(ev: DesktopUpdateEvent) {
   if (ev.type === 'checking') {
     if (
@@ -158,7 +178,10 @@ function applyUpdateEvent(ev: DesktopUpdateEvent) {
   } else if (ev.type === 'progress') {
     patchStore({
       status: 'downloading',
-      progressPct: Math.max(0, Math.min(100, ev.percent ?? 0)),
+      progressPct: clampDesktopUpdateProgressPct(
+        storeState.progressPct,
+        ev.percent,
+      ),
       error: null,
     });
   } else if (ev.type === 'downloaded') {

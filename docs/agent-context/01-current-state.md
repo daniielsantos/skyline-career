@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **1de1360** / desktop **0.3.126** shipped: Densify Oceania Wave B to ~150 hubs (seed 2368). Release: [v0.3.126](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.126).
+
+
 `main` **f0626cc** / desktop **0.3.125** shipped: Densify Asia Wave C to ~400 hubs (seed 2281). Release: [v0.3.125](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.125).
 
 

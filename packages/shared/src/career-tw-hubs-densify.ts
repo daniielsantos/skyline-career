@@ -110,6 +110,28 @@ export const TW_DENSIFY_HUBS: readonly TwDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave C Asia densify (+2)
+  {
+    icao: 'RCSQ',
+    name: "Pingtung Air Force Base North",
+    region: 'TW-N',
+    hubTier: 'spoke',
+    lat: 22.7002,
+    lon: 120.482,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RCDC',
+    name: "Pingtung Air Force Base",
+    region: 'TW-S',
+    hubTier: 'spoke',
+    lat: 22.67258,
+    lon: 120.46171,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const TW_DENSIFY_HUB_COUNT = TW_DENSIFY_HUBS.length;

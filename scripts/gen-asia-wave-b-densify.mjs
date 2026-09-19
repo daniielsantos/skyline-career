@@ -76,6 +76,15 @@ const FORBIDDEN = new Set([
   'VEVZ',
   'VABM',
   'VAHB',
+  'VAKJ',
+  'VALT',
+  'VAND',
+  'VARP',
+  'WAKT',
+  'ZBCD',
+  'ZGSD',
+  'ZUTR',
+  'ZBDH',
   'VYML',
   'VYNP',
   'VYST',
@@ -124,10 +133,9 @@ const QUOTAS_C = {
   tw: 2,
   mm: 2,
   kr: 1,
+  // Central +2 (UZ/BD); LK deferred if OA/MSFS thin
   uz: 1,
   bd: 1,
-  // VN shortfall → redirect; central +2 as UZ+BD+LK
-  lk: 1,
 };
 
 const ISO = {

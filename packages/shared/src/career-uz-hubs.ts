@@ -3,6 +3,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { UZ_DENSIFY_HUBS, UZ_DENSIFY_HUB_COUNT } from './career-uz-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -72,9 +73,10 @@ export const UZ_CAREER_HUBS: readonly UzCareerHubDef[] = [
     lon: 59.6233,
     ...oasis,
   },
+  ...UZ_DENSIFY_HUBS
 ];
 
-export const UZ_CAREER_HUB_COUNT = 4;
+export const UZ_CAREER_HUB_COUNT = 4 + UZ_DENSIFY_HUB_COUNT;
 
 export function buildUzFeederCorridors(
   hubs: readonly UzCareerHubDef[] = UZ_CAREER_HUBS,

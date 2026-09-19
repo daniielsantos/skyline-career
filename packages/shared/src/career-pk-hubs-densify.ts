@@ -90,6 +90,38 @@ export const PK_DENSIFY_HUBS: readonly PkDensifyHub[] = [
     produce: { perishables: 1.35, general: 1.1, supplies: 1 },
     consume: { electronics: 0.9, machinery: 0.85 },
   },
+
+  // Wave C Asia densify (+3)
+  {
+    icao: 'OPCH',
+    name: "Chitral Airport",
+    region: 'PK-N',
+    hubTier: 'spoke',
+    lat: 35.88621,
+    lon: 71.79992,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'OPDG',
+    name: "Dera Ghazi Khan Airport",
+    region: 'PK-S',
+    hubTier: 'spoke',
+    lat: 29.961,
+    lon: 70.4859,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'OPDI',
+    name: "Dera Ismael Khan Airport [IN-ACTIVE]",
+    region: 'PK-N',
+    hubTier: 'spoke',
+    lat: 31.9094,
+    lon: 70.8966,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const PK_DENSIFY_HUB_COUNT = PK_DENSIFY_HUBS.length;

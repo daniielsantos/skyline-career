@@ -137,6 +137,28 @@ export const MY_DENSIFY_HUBS: readonly MyDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave C Asia densify (+2)
+  {
+    icao: 'WMKC',
+    name: "Sultan Ismail Petra Airport",
+    region: 'MY-E',
+    hubTier: 'spoke',
+    lat: 6.16685,
+    lon: 102.293,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'WBGK',
+    name: "Mukah Airport",
+    region: 'MY-E',
+    hubTier: 'spoke',
+    lat: 2.88194,
+    lon: 112.04333,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const MY_DENSIFY_HUB_COUNT = MY_DENSIFY_HUBS.length;

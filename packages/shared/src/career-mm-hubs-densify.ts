@@ -90,6 +90,28 @@ export const MM_DENSIFY_HUBS: readonly MmDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave C Asia densify (+2)
+  {
+    icao: 'VYME',
+    name: "Myeik Airport",
+    region: 'MM-N',
+    hubTier: 'spoke',
+    lat: 12.4398,
+    lon: 98.6215,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VYMK',
+    name: "Myitkyina Airport",
+    region: 'MM-N',
+    hubTier: 'spoke',
+    lat: 25.3836,
+    lon: 97.3519,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const MM_DENSIFY_HUB_COUNT = MM_DENSIFY_HUBS.length;

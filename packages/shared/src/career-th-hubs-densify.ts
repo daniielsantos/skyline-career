@@ -187,6 +187,38 @@ export const TH_DENSIFY_HUBS: readonly ThDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave C Asia densify (+3)
+  {
+    icao: 'VTSC',
+    name: "Narathiwat Airport",
+    region: 'TH-S',
+    hubTier: 'spoke',
+    lat: 6.51992,
+    lon: 101.743,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VTSF',
+    name: "Nakhon Si Thammarat Airport",
+    region: 'TH-S',
+    hubTier: 'spoke',
+    lat: 8.53962,
+    lon: 99.9447,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'VTSH',
+    name: "Songkhla Airport",
+    region: 'TH-S',
+    hubTier: 'spoke',
+    lat: 7.18656,
+    lon: 100.608,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const TH_DENSIFY_HUB_COUNT = TH_DENSIFY_HUBS.length;

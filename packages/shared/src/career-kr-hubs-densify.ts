@@ -137,6 +137,18 @@ export const KR_DENSIFY_HUBS: readonly KrDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave C Asia densify (+1)
+  {
+    icao: 'RKSW',
+    name: "Suwon Airport",
+    region: 'KR-C',
+    hubTier: 'spoke',
+    lat: 37.2394,
+    lon: 127.007,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const KR_DENSIFY_HUB_COUNT = KR_DENSIFY_HUBS.length;

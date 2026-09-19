@@ -209,6 +209,58 @@ export const PH_DENSIFY_HUBS: readonly PhDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave C Asia densify (+5)
+  {
+    icao: 'RPMO',
+    name: "Labo Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 8.17851,
+    lon: 123.842,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMQ',
+    name: "Mati National Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 6.94909,
+    lon: 126.27368,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMS',
+    name: "Surigao Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 9.75584,
+    lon: 125.48095,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMW',
+    name: "Tandag Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 9.072,
+    lon: 126.17132,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPUD',
+    name: "Daet Airport",
+    region: 'PH-L',
+    hubTier: 'spoke',
+    lat: 14.1292,
+    lon: 122.98,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const PH_DENSIFY_HUB_COUNT = PH_DENSIFY_HUBS.length;

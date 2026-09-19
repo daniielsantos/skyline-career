@@ -45,6 +45,7 @@ import {
   BOARD_AVAILABLE_SOFT_CAP,
   BOARD_COVER_DAYS,
   COMMODITY_AVAILABLE_SOFT_CAP,
+  INTL_COMMODITY_AVAILABLE_SOFT_CAP,
   INTL_QUOTA_FLOOR,
   intlCommodityQuota,
   PARTITION_MIN_BOARD_KG,
@@ -3265,7 +3266,7 @@ describe('tickEconomyN market formation', () => {
     const world = createSeedEconomyWorld({ seed: 'intl-lift-quota' });
     const intlQuota = intlCommodityQuota(world);
     assert.ok(intlQuota >= INTL_QUOTA_FLOOR);
-    assert.ok(intlQuota <= COMMODITY_AVAILABLE_SOFT_CAP);
+    assert.ok(intlQuota <= INTL_COMMODITY_AVAILABLE_SOFT_CAP);
     // No longer a fixed % of commodity soft cap (was 12–15% ≈ 186–233).
     assert.ok(
       intlQuota > Math.round(COMMODITY_AVAILABLE_SOFT_CAP * 0.2),

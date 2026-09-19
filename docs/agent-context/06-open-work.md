@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Intl origin-fair formation + board room** — `formLotsIntl` round-robin por país de origem (não BR-only); lift frac 0.32 + soft cap INTL 2400. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **BR `pilot-intl` ainda fino (~5)** — Near me off; grafo 1000/gw12 insuficiente. Causa: nm-sort global. Fix shipped: origin round-robin mundial + quota. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **Desktop update `--updated`** — spawn Setup com `--updated --force-run` (como electron-updater, sem `/S`). NSIS trata como update: espera/fecha o app sem MessageBox de corrida. Detail: `packages/desktop/README.md`.
 
 Atualizado 2026-09-18: **Desktop update spawn Setup first** — revert cmd-ping/VBS delay (Job Object matava o sleeper; update não abria). Volta a `spawn(Setup)` + `quit` ~800ms. Detail: `packages/desktop/README.md`.

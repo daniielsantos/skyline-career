@@ -8,6 +8,7 @@ import {
   DYNAMIC_INTL_LANES_PER_COUNTRY_MIN,
   intlGatewayBudget,
   intlLaneBudget,
+  orderIntlDirsOriginRoundRobin,
 } from './career-international-lanes.js';
 
 describe('intl proportional budgets', () => {
@@ -51,5 +52,25 @@ describe('intl proportional budgets', () => {
       base + Math.round((100 / totalCargoHubs) * extraPool),
     );
     assert.equal(br, expected);
+  });
+});
+
+describe('orderIntlDirsOriginRoundRobin', () => {
+  it('interleaves origin countries instead of pure global nm-sort', () => {
+    const dirs = [
+      { originCountryId: 'DE', nm: 120, originIcao: 'EDDF', destIcao: 'LFPG' },
+      { originCountryId: 'DE', nm: 200, originIcao: 'EDDM', destIcao: 'LIRF' },
+      { originCountryId: 'BR', nm: 900, originIcao: 'SBGR', destIcao: 'SCEL' },
+      { originCountryId: 'BR', nm: 1_200, originIcao: 'SBSN', destIcao: 'SPQU' },
+      { originCountryId: 'US', nm: 400, originIcao: 'KJFK', destIcao: 'CYYZ' },
+    ];
+    const ordered = orderIntlDirsOriginRoundRobin(dirs);
+    assert.deepEqual(
+      ordered.map((d) => d.originCountryId),
+      ['BR', 'DE', 'US', 'BR', 'DE'],
+    );
+    assert.equal(ordered[0]?.originIcao, 'SBGR');
+    assert.equal(ordered[1]?.originIcao, 'EDDF');
+    assert.equal(ordered[2]?.originIcao, 'KJFK');
   });
 });

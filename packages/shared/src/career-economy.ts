@@ -1026,6 +1026,7 @@ import {
 import {
   DYNAMIC_INTL_REGIONAL_MAX_NM,
   ensureDynamicInternationalLanes,
+  orderIntlDirsOriginRoundRobin,
   selectDynamicInternationalLanes,
 } from './career-international-lanes.js';
 import { ensureCharterEconomy, tickCharterEconomy } from './career-charter.js';
@@ -1048,6 +1049,7 @@ export {
   dynamicInternationalLaneTarget,
   intlGatewayBudget,
   intlLaneBudget,
+  orderIntlDirsOriginRoundRobin,
   selectDynamicInternationalLanes,
 } from './career-international-lanes.js';
 import { isPortPickupHub } from './career-port-pickup-hubs.js';
@@ -1681,8 +1683,16 @@ export const INTL_QUOTA_FLOOR = 80;
  * Fraction of mapped fleet daily lift assumed on cross-border legs.
  * Sizes INTL lot/kg cover only — does **not** shrink the domestic commodity pool
  * (retired soft-share). Bound by lane graph + capacity/maxLots as well.
+ * 0.32 (was 0.22): room for origin-fair formation across many countries without
+ * short-border hops alone saturating skipAll.
  */
-export const INTL_CROSS_BORDER_LIFT_FRAC = 0.22;
+export const INTL_CROSS_BORDER_LIFT_FRAC = 0.32;
+/**
+ * Per-SKU available-lot ceiling for the INTL partition only.
+ * Above {@link COMMODITY_AVAILABLE_SOFT_CAP} so world-wide origin fairness can
+ * deepen `pilot-intl` shelves without stealing domestic soft room.
+ */
+export const INTL_COMMODITY_AVAILABLE_SOFT_CAP = 2_400;
 /** Floor so a small country (CL) still turns over when the board is deep. */
 export const COUNTRY_AVAILABLE_FLOOR = 50;
 /**
@@ -9725,7 +9735,7 @@ function worldMappedFleetCargoKg(
 /**
  * Per-SKU available-lot soft quota for the INTL partition.
  * World market: sized from fleet cover lift (transport), not a % taken from
- * the domestic commodity pool. Capped at {@link COMMODITY_AVAILABLE_SOFT_CAP}.
+ * the domestic commodity pool. Capped at {@link INTL_COMMODITY_AVAILABLE_SOFT_CAP}.
  */
 export function intlCommodityQuota(world: CareerEconomyWorld): number {
   const cache = partitionMetricsCache(world);
@@ -9739,7 +9749,7 @@ export function intlCommodityQuota(world: CareerEconomyWorld): number {
     INTL_CROSS_BORDER_LIFT_FRAC;
   const nSku = Math.max(1, CAREER_CARGO_COMMODITIES.length);
   const quota = Math.min(
-    COMMODITY_AVAILABLE_SOFT_CAP,
+    INTL_COMMODITY_AVAILABLE_SOFT_CAP,
     Math.max(
       INTL_QUOTA_FLOOR,
       Math.round(coverKg / INTL_QUOTA_REF_LOT_KG / nSku),
@@ -11926,17 +11936,10 @@ function* formLotsFromImbalances(
     }
     if (candidateLanes.length === 0) continue;
 
-    // Regional-first formation (2026-09-18 follow-up): lane graph alone left
-    // Market intl ~8% ≤2000 nm because skipAll filled whatever matched first —
-    // often major↔major oceans. Try shorter ODs before ultra so board mix
-    // tracks the regional-first graph. Ultra still runs if quota remains.
-    candidateLanes.sort(
-      (a, b) =>
-        a.nm - b.nm ||
-        a.originIcao.localeCompare(b.originIcao) ||
-        a.destIcao.localeCompare(b.destIcao),
-    );
-
+    // Regional-first + origin-country fairness (2026-09-18): nm-sort alone let
+    // short-border countries burn INTL skipAll before longer regional ODs from
+    // other origins. Round-robin by origin country (shortest-first within each)
+    // so every pilot-intl shelf can form — still regional pass before ultra.
     const minGap = commodity.basePricePerKg * 0.12;
     const intlOpts: {
       international: boolean;
@@ -11952,11 +11955,38 @@ function* formLotsFromImbalances(
       originHasOpenCorridor: false,
     };
 
-    const tryIntlDir = (
-      oIcao: string,
-      dIcao: string,
-      lane: (typeof normIntlLanes)[number],
-    ) => {
+    type IntlDir = {
+      originIcao: string;
+      destIcao: string;
+      originCountryId: string;
+      nm: number;
+      lane: (typeof normIntlLanes)[number];
+    };
+
+    const collectDirs = (regionalBand: boolean): IntlDir[] => {
+      const dirs: IntlDir[] = [];
+      for (const lane of candidateLanes) {
+        const regional = lane.nm <= DYNAMIC_INTL_REGIONAL_MAX_NM;
+        if (regionalBand !== regional) continue;
+        for (const [originIcao, destIcao] of [
+          [lane.originIcao, lane.destIcao],
+          [lane.destIcao, lane.originIcao],
+        ] as const) {
+          dirs.push({
+            originIcao,
+            destIcao,
+            originCountryId: lookup.countryByIcao.get(originIcao) ?? '',
+            nm: lane.nm,
+            lane,
+          });
+        }
+      }
+      return orderIntlDirsOriginRoundRobin(dirs);
+    };
+
+    const tryIntlDir = (dir: IntlDir) => {
+      const oIcao = dir.originIcao;
+      const dIcao = dir.destIcao;
       if (!surplusOrigins.has(oIcao) || !shortageDests.has(dIcao)) return;
       const origin = rankedByIcao.get(oIcao);
       const dest = rankedByIcao.get(dIcao);
@@ -11966,26 +11996,22 @@ function* formLotsFromImbalances(
       if (Math.min(origin.surplusKg, dest.roomKg) < FEEDER_LTL_MIN_KG) return;
       const laneSat = laneSatOf(oIcao, dIcao, commodity.id);
       if (laneSat >= 1) return;
-      intlOpts.capacityKgPerDay = lane.capacityKgPerDay;
+      intlOpts.capacityKgPerDay = dir.lane.capacityKgPerDay;
       intlOpts.precomputedLaneSat = laneSat;
-      if (tryFormPair(commodity, origin, dest, lane.cw, intlOpts)) {
+      if (tryFormPair(commodity, origin, dest, dir.lane.cw, intlOpts)) {
         skipAll = boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll;
       }
     };
 
     // Pass 1: regional-band only (≤2500 nm) until skipAll.
-    for (const lane of candidateLanes) {
+    for (const dir of collectDirs(true)) {
       if (skipAll) break;
-      if (lane.nm > DYNAMIC_INTL_REGIONAL_MAX_NM) continue;
-      tryIntlDir(lane.originIcao, lane.destIcao, lane);
-      tryIntlDir(lane.destIcao, lane.originIcao, lane);
+      tryIntlDir(dir);
     }
-    // Pass 2: medium then ultra (already nm-sorted) for remaining quota.
-    for (const lane of candidateLanes) {
+    // Pass 2: medium then ultra for remaining quota (fair within band).
+    for (const dir of collectDirs(false)) {
       if (skipAll) break;
-      if (lane.nm <= DYNAMIC_INTL_REGIONAL_MAX_NM) continue;
-      tryIntlDir(lane.originIcao, lane.destIcao, lane);
-      tryIntlDir(lane.destIcao, lane.originIcao, lane);
+      tryIntlDir(dir);
     }
   }
   addTickPhaseMs(profile, 'formLotsIntl', lotsPhaseAt);

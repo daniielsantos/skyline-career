@@ -69,6 +69,58 @@ export const DYNAMIC_INTL_LONG_HAUL_SHARE = DYNAMIC_INTL_ULTRA_SHARE_MAX;
 export const DYNAMIC_INTL_MIN_ROUTE_NM = 60;
 export const DYNAMIC_INTL_MAX_ROUTE_NM = 6_500;
 
+/**
+ * Order directed intl formation attempts so every origin country gets interleaved
+ * turns (shortest-first within country). Pure nm-sort worldwide lets short-border
+ * countries burn global INTL skipAll before longer regional ODs elsewhere —
+ * starving `pilot-intl` shelves for BR/US/AU/… alike.
+ */
+export function orderIntlDirsOriginRoundRobin<
+  T extends {
+    originCountryId: string;
+    nm: number;
+    originIcao: string;
+    destIcao: string;
+  },
+>(dirs: readonly T[]): T[] {
+  if (dirs.length <= 1) return dirs.slice();
+  const byCountry = new Map<string, T[]>();
+  for (const dir of dirs) {
+    const raw = dir.originCountryId.trim().toUpperCase();
+    const key = /^[A-Z]{2}$/.test(raw) ? raw : 'XX';
+    const list = byCountry.get(key);
+    if (list) list.push(dir);
+    else byCountry.set(key, [dir]);
+  }
+  for (const list of byCountry.values()) {
+    list.sort(
+      (a, b) =>
+        a.nm - b.nm ||
+        a.originIcao.localeCompare(b.originIcao) ||
+        a.destIcao.localeCompare(b.destIcao),
+    );
+  }
+  const countries = [...byCountry.keys()].sort((a, b) => a.localeCompare(b));
+  const heads = countries.map(() => 0);
+  const queues = countries.map((c) => byCountry.get(c)!);
+  const out: T[] = [];
+  let remaining = dirs.length;
+  while (remaining > 0) {
+    let progressed = false;
+    for (let i = 0; i < queues.length; i += 1) {
+      const q = queues[i]!;
+      const h = heads[i]!;
+      if (h >= q.length) continue;
+      out.push(q[h]!);
+      heads[i] = h + 1;
+      remaining -= 1;
+      progressed = true;
+    }
+    if (!progressed) break;
+  }
+  return out;
+}
+
 const LANE_COMMODITIES: readonly CommodityId[] = [
   'general',
   'supplies',

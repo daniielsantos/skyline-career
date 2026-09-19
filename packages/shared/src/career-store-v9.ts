@@ -68,7 +68,7 @@ export function ensureV9Ddl(db: SqliteDb): void {
       demand_id TEXT NOT NULL,
       origin_icao TEXT NOT NULL,
       dest_icao TEXT NOT NULL,
-      group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 12),
+      group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 230),
       baggage_kg REAL NOT NULL DEFAULT 0,
       distance_nm REAL NOT NULL,
       tier TEXT NOT NULL,
@@ -93,6 +93,57 @@ export function ensureV9Ddl(db: SqliteDb): void {
   ensureColumn(db, 'missions', 'baggage_kg', 'REAL NOT NULL DEFAULT 0');
   // Handles databases already stamped v9 by the initial charter foundation.
   ensureColumn(db, 'charter_offers', 'baggage_kg', 'REAL NOT NULL DEFAULT 0');
+  // Schema v19: widen group_size CHECK 1…12 → 1…230 (SQLite cannot ALTER CHECK).
+  const charterOfferSql = (
+    db
+      .prepare(
+        `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'charter_offers'`,
+      )
+      .get() as { sql?: string } | undefined
+  )?.sql;
+  if (
+    typeof charterOfferSql === 'string' &&
+    /group_size[^,]*BETWEEN 1 AND 12/i.test(charterOfferSql)
+  ) {
+    db.exec(`
+      CREATE TABLE charter_offers_v19 (
+        world_id TEXT NOT NULL,
+        id TEXT NOT NULL,
+        demand_id TEXT NOT NULL,
+        origin_icao TEXT NOT NULL,
+        dest_icao TEXT NOT NULL,
+        group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 230),
+        baggage_kg REAL NOT NULL DEFAULT 0,
+        distance_nm REAL NOT NULL,
+        tier TEXT NOT NULL,
+        urgency TEXT NOT NULL,
+        international INTEGER NOT NULL DEFAULT 0,
+        pay_usd REAL NOT NULL,
+        created_at_tick INTEGER NOT NULL,
+        expires_at_tick INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        mission_id TEXT,
+        PRIMARY KEY (world_id, id),
+        FOREIGN KEY (world_id, demand_id) REFERENCES charter_demand(world_id, id)
+      );
+      INSERT INTO charter_offers_v19 (
+        world_id, id, demand_id, origin_icao, dest_icao, group_size, baggage_kg,
+        distance_nm, tier, urgency, international, pay_usd, created_at_tick,
+        expires_at_tick, status, mission_id
+      )
+      SELECT
+        world_id, id, demand_id, origin_icao, dest_icao, group_size, baggage_kg,
+        distance_nm, tier, urgency, international, pay_usd, created_at_tick,
+        expires_at_tick, status, mission_id
+      FROM charter_offers;
+      DROP TABLE charter_offers;
+      ALTER TABLE charter_offers_v19 RENAME TO charter_offers;
+      CREATE INDEX IF NOT EXISTS charter_offers_status_expiry_idx
+        ON charter_offers(world_id, status, expires_at_tick);
+      CREATE INDEX IF NOT EXISTS charter_offers_od_idx
+        ON charter_offers(world_id, origin_icao, dest_icao);
+    `);
+  }
   db.exec(`
     UPDATE missions SET mission_type = 'freight'
       WHERE mission_type IS NULL OR TRIM(mission_type) = '';

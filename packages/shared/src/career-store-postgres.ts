@@ -2,6 +2,7 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v19 widens charter_offers.group_size to 1…230 (med/narrow).
  * Schema v18 adds hub_economy_samples for Pulse / Hub Stats history.
  * Schema v17 adds monotonic economy revision for cross-process snapshots.
  * Schema v16 promotes fleet_aircraft payload fields to columns.
@@ -100,7 +101,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '18';
+const CAREER_PG_SCHEMA_VERSION = '19';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(

@@ -512,7 +512,7 @@ CREATE TABLE IF NOT EXISTS charter_offers (
   demand_id TEXT NOT NULL,
   origin_icao TEXT NOT NULL,
   dest_icao TEXT NOT NULL,
-  group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 12),
+  group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 230),
   baggage_kg DOUBLE PRECISION NOT NULL DEFAULT 0,
   distance_nm DOUBLE PRECISION NOT NULL,
   tier TEXT NOT NULL,
@@ -757,6 +757,15 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   );
   // Schema v18 — Hub Stats / Pulse daily samples (SQLite parity).
   await ensurePgHubEconomySamplesDdl(pool);
+  // Schema v19 — charter group_size 1…230 (med/narrow loads; was 1…12).
+  await pool.query(
+    `ALTER TABLE charter_offers DROP CONSTRAINT IF EXISTS charter_offers_group_size_check`,
+  );
+  await pool.query(
+    `ALTER TABLE charter_offers
+       ADD CONSTRAINT charter_offers_group_size_check
+       CHECK (group_size BETWEEN 1 AND 230)`,
+  );
   // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
   const fleetAlters = [
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS registration TEXT`,

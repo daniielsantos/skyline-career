@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Charter `group_size_check` 1…12** — +1d / form med-narrow batia CHECK no Postgres. Schema **v19** alarga 1…230 (PG ALTER + SQLite rebuild). Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **Charter pax só ~7–9 no board** — pools rasas + bandas light drenavam antes de med/narrow. Fix: bandas deep→narrow-first, refill/floor. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Client update kill switch** — rare `misc_json.clientUpdatePolicy` (`forceUpdate` + `minClientVersion`); health + 426 on Prepare/accept; UI CTA → Settings Updates. Ops SQL: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

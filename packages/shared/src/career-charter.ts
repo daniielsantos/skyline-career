@@ -40,14 +40,15 @@ export const CHARTER_BAGGAGE_MAX_KG =
   CHARTER_GROUP_SIZE_MAX * CHARTER_BAGGAGE_KG_PER_PAX;
 export const CHARTER_BOARD_MIN = 120;
 /** Hard ceiling on live available offers (formation stops at target or this). */
-export const CHARTER_BOARD_MAX = 1_600;
+export const CHARTER_BOARD_MAX = 4_000;
 /**
  * Steady-state formation once the board is warm.
- * Sized so form×TTL can approach boardTarget (~hubs/2) instead of stalling ~250.
+ * Sized so form×TTL can approach boardTarget (~hubs*2 / commodity-like)
+ * — mean life ~16h ≈ 64 ticks → 48×64 ≈ 3k equilibrium.
  */
-export const CHARTER_FORM_QUOTA_PER_TICK = 14;
+export const CHARTER_FORM_QUOTA_PER_TICK = 48;
 /** Catch-up when the live board is below MIN. */
-export const CHARTER_WARM_QUOTA_PER_TICK = 28;
+export const CHARTER_WARM_QUOTA_PER_TICK = 96;
 
 /**
  * Classes that may accept charter offers.
@@ -391,10 +392,11 @@ function boardTarget(world: CareerEconomyWorld): number {
       .map((ap) => countryIdFromRegion(ap.region))
       .filter(Boolean),
   ).size;
-  // Scale with the map: ~1 offer / 2 hubs, with a country floor so small
-  // saves still breathe. Caps keep charter below freight volume.
-  const byHubs = Math.round(hubs / 2);
-  const byCountries = Math.round(countries * 2.5);
+  // Scale with the map: ~2 offers / hub (commodity-like depth vs freights),
+  // with a country floor so small saves still breathe. Caps keep charter
+  // below the full freight board soft cap (~8.5k).
+  const byHubs = Math.round(hubs * 2);
+  const byCountries = Math.round(countries * 5);
   return clamp(
     Math.max(byHubs, byCountries),
     CHARTER_BOARD_MIN,
@@ -645,7 +647,24 @@ export function formCharterOffersForTick(
 
   const rng = mulberry32(hashSeed(`${world.seed}:charter-form:${world.tick}`));
   let formed = 0;
-  const wantedDomestic = Math.ceil(room / 2);
+  // When the live board is intl-heavy, bias formation hard toward domestic —
+  // but keep a floor for intl so a cold board (share=0) does not lock out
+  // international until the first TTL wave.
+  const liveDomesticAvailable = (world.charterOffers ?? []).filter(
+    (offer) =>
+      !offer.international &&
+      offer.status === 'available' &&
+      world.tick < offer.expiresAtTick,
+  ).length;
+  const domesticBoardShare =
+    available > 0 ? liveDomesticAvailable / available : 0;
+  const domesticDeficit = available > 0 && domesticBoardShare < 0.4;
+  const wantedDomestic = Math.min(
+    room,
+    domesticDeficit
+      ? Math.max(0, room - Math.max(1, Math.ceil(room * 0.15)))
+      : Math.ceil(room * 0.7),
+  );
 
   /** Domestic formation picks a country first (pool-weighted) so large maps
    * like BR are not starved by sampling only the top global hubs. Cap any
@@ -700,9 +719,11 @@ export function formCharterOffersForTick(
       return null;
     }
     const projectedDomestic = liveDomesticTotal + 1;
+    // Large home maps (BR/US) need room on the Domestic filter — 10%/8
+    // capped them so the shelf looked empty while intl filled the board.
     const maxPerCountry = Math.max(
-      8,
-      Math.ceil(projectedDomestic * 0.1),
+      28,
+      Math.ceil(projectedDomestic * 0.25),
     );
     const topByPool = [...domesticCountryWeights]
       .sort(
@@ -716,7 +737,7 @@ export function formCharterOffersForTick(
       (row) => (liveDomesticByCountry.get(row.country) ?? 0) === 0,
     );
     const underFloor = topByPool.filter(
-      (row) => (liveDomesticByCountry.get(row.country) ?? 0) < 6,
+      (row) => (liveDomesticByCountry.get(row.country) ?? 0) < 18,
     );
     const prefer =
       starvedTop.length > 0
@@ -905,7 +926,7 @@ export function formCharterOffersForTick(
     return false;
   };
 
-  for (let attempt = 0; attempt < room * 40 && formed < room; attempt += 1) {
+  for (let attempt = 0; attempt < room * 60 && formed < room; attempt += 1) {
     const wantDomestic = domesticFormed < wantedDomestic;
     if (wantDomestic) {
       const country = pickDomesticCountry();

@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-18: **Charter board depth vs freights** — ~800 lia magro vs Freights multi-k. Fix: target hubs×2, max 4000, form 48 / warm 96. Re-medir available + Fit após deploy. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-18: **Charter Domestic thin** — ~9 vs ~800 world; form intl-heavy + country cap 10%/8. Fix: deficit → ~85% domestic form (intl floor 15%), steady 70%, cap 25%/28, floor 18. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-18: **Charter `group_size_check` 1…12** — +1d / form med-narrow batia CHECK no Postgres. Schema **v19** alarga 1…230 (PG ALTER + SQLite rebuild). Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Charter pax só ~7–9 no board** — pools rasas + bandas light drenavam antes de med/narrow. Fix: bandas deep→narrow-first, refill/floor. Detail: [`08-economy.md`](./08-economy.md).

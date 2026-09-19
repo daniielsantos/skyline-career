@@ -514,11 +514,15 @@ describe('Charter economy', () => {
       }
       const topShare = Math.max(0, ...byCountry.values());
       assert.ok(
-        brDomestic.length >= 6,
+        domestic.length >= Math.floor(offers.length * 0.28),
+        `seed ${seed}: domestic shelf too thin (${domestic.length}/${offers.length})`,
+      );
+      assert.ok(
+        brDomestic.length >= 10,
         `seed ${seed}: expected BR domestic share, got ${brDomestic.length} of ${offers.length}`,
       );
       assert.ok(
-        topShare <= Math.max(12, Math.ceil(domestic.length * 0.2)),
+        topShare <= Math.max(28, Math.ceil(domestic.length * 0.28)),
         `seed ${seed}: one country monopolized domestic board (${topShare}/${domestic.length})`,
       );
     }
@@ -544,8 +548,8 @@ describe('Charter economy', () => {
         offer.status === 'available' && world.tick < offer.expiresAtTick,
     ).length;
     assert.ok(
-      available >= 200,
-      `expected a denser worldwide charter board, got ${available}`,
+      available >= 1_200,
+      `expected commodity-like worldwide charter board, got ${available}`,
     );
     assert.ok(available <= CHARTER_BOARD_MAX);
   });

@@ -21,9 +21,9 @@ import type {
  * Absolute gateway ceiling (proportional budget never exceeds this).
  * @deprecated Prefer {@link intlGatewayBudget}; kept for Pulse/docs aliases.
  */
-export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 12;
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY = 24;
 export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN = 2;
-export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX = 12;
+export const DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX = 24;
 /** ~1 gateway per 12 cargo hubs (ceil), clamped to min/max. */
 export const DYNAMIC_INTL_GATEWAYS_HUBS_PER_SLOT = 12;
 
@@ -195,7 +195,7 @@ function clampInt(n: number, min: number, max: number): number {
 
 /**
  * Gateway slots for a country from cargo hub count (non-bush).
- * ceil(hubN / 12), clamped to [2, 12].
+ * ceil(hubN / 12), clamped to [2, 24].
  */
 export function intlGatewayBudget(hubN: number): number {
   const n = Math.max(0, Math.floor(Number(hubN) || 0));
@@ -296,6 +296,70 @@ function gatewayPressure(a: AirportTerminal, b: AirportTerminal): number {
   return Math.min(1, best * 8);
 }
 
+/**
+ * Pacific remote US regions soft-capped inside the shared US intl gateway
+ * budget. PR/VI stay uncapped (Caribbean feeders for SE). Without this,
+ * 6 territory majors compete 1:1 with continentals for 12 slots and
+ * `pilot-intl` at KMIA fills with PGSN/NSTU/PGUM/PHNL.
+ */
+export const US_PACIFIC_REMOTE_REGIONS = new Set([
+  'US-AS',
+  'US-MP',
+  'US-GU',
+  'US-HI',
+]);
+
+/** Max Pacific remote gateways inside the US country budget (of up to 24). */
+export const US_PACIFIC_REMOTE_GATEWAY_SOFT_CAP = 2;
+
+export function isUsPacificRemoteRegion(region: string): boolean {
+  return US_PACIFIC_REMOTE_REGIONS.has(region.trim().toUpperCase());
+}
+
+function gatewayQuality(
+  world: Pick<CareerEconomyWorld, 'seed'>,
+  day: number,
+  country: string,
+  ap: AirportTerminal,
+): number {
+  return (
+    tierScore(tierOf(ap)) * 10 +
+    Math.max(1, ap.level ?? 1) +
+    hashUnit(`${world.seed}:${day}:gateway:${country}:${ap.icao}`)
+  );
+}
+
+/**
+ * Ranked intl gateways for one country after budget (+ US Pacific soft-cap).
+ * Exported for unit tests / diagnostics.
+ */
+export function selectCountryIntlGateways(
+  world: Pick<CareerEconomyWorld, 'seed'>,
+  country: string,
+  hubs: AirportTerminal[],
+  day: number,
+): AirportTerminal[] {
+  const ranked = [...hubs].sort(
+    (a, b) =>
+      gatewayQuality(world, day, country, b) -
+        gatewayQuality(world, day, country, a) ||
+      a.icao.localeCompare(b.icao),
+  );
+  const budget = intlGatewayBudget(ranked.length);
+  if (country !== 'US') return ranked.slice(0, budget);
+
+  const picked: AirportTerminal[] = [];
+  let pacific = 0;
+  for (const ap of ranked) {
+    if (picked.length >= budget) break;
+    const remote = isUsPacificRemoteRegion(ap.region ?? '');
+    if (remote && pacific >= US_PACIFIC_REMOTE_GATEWAY_SOFT_CAP) continue;
+    if (remote) pacific += 1;
+    picked.push(ap);
+  }
+  return picked;
+}
+
 function gatewayRows(
   world: Pick<CareerEconomyWorld, 'airports' | 'seed'>,
   day: number,
@@ -310,19 +374,9 @@ function gatewayRows(
     else byCountry.set(country, [ap]);
   }
   for (const [country, rows] of byCountry) {
-    rows.sort((a, b) => {
-      const qualityA =
-        tierScore(tierOf(a)) * 10 +
-        Math.max(1, a.level ?? 1) +
-        hashUnit(`${world.seed}:${day}:gateway:${country}:${a.icao}`);
-      const qualityB =
-        tierScore(tierOf(b)) * 10 +
-        Math.max(1, b.level ?? 1) +
-        hashUnit(`${world.seed}:${day}:gateway:${country}:${b.icao}`);
-      return qualityB - qualityA || a.icao.localeCompare(b.icao);
-    });
-    const budget = intlGatewayBudget(rows.length);
-    rows.splice(budget);
+    const picked = selectCountryIntlGateways(world, country, rows, day);
+    rows.length = 0;
+    rows.push(...picked);
   }
   return byCountry;
 }

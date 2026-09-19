@@ -6,20 +6,27 @@ import {
   DYNAMIC_INTL_LANES_MAX,
   DYNAMIC_INTL_LANES_PER_COUNTRY_BUDGET_MAX,
   DYNAMIC_INTL_LANES_PER_COUNTRY_MIN,
+  US_PACIFIC_REMOTE_GATEWAY_SOFT_CAP,
   intlGatewayBudget,
   intlLaneBudget,
+  isUsPacificRemoteRegion,
   orderIntlDirsOriginRoundRobin,
+  selectCountryIntlGateways,
 } from './career-international-lanes.js';
+import { createSeedEconomyWorld } from './career-economy.js';
+import { countryIdFromRegion } from './career-partition.js';
 
 describe('intl proportional budgets', () => {
-  it('scales gateways with hub count inside [2, 12]', () => {
+  it('scales gateways with hub count inside [2, 24]', () => {
     assert.equal(intlGatewayBudget(0), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN);
     assert.equal(intlGatewayBudget(12), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MIN);
     assert.equal(intlGatewayBudget(24), 2);
     assert.equal(intlGatewayBudget(25), 3);
     assert.equal(intlGatewayBudget(60), 5);
     assert.equal(intlGatewayBudget(96), 8);
-    assert.equal(intlGatewayBudget(144), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX);
+    assert.equal(intlGatewayBudget(97), 9);
+    assert.equal(intlGatewayBudget(144), 12);
+    assert.equal(intlGatewayBudget(288), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX);
     assert.equal(intlGatewayBudget(400), DYNAMIC_INTL_GATEWAYS_PER_COUNTRY_MAX);
   });
 
@@ -72,5 +79,41 @@ describe('orderIntlDirsOriginRoundRobin', () => {
     assert.equal(ordered[0]?.originIcao, 'SBGR');
     assert.equal(ordered[1]?.originIcao, 'EDDF');
     assert.equal(ordered[2]?.originIcao, 'KJFK');
+  });
+});
+
+describe('US Pacific remote gateway soft-cap', () => {
+  it('keeps US gateways mostly continental across seed days', () => {
+    const world = createSeedEconomyWorld({ seed: 'us-gw-pacific-cap' });
+    const usHubs = world.airports.filter(
+      (ap) =>
+        !ap.bush &&
+        !ap.bushTripOnly &&
+        countryIdFromRegion(ap.region ?? '') === 'US',
+    );
+    assert.ok(usHubs.some((ap) => isUsPacificRemoteRegion(ap.region ?? '')));
+    for (const day of [0, 1, 2, 7, 30]) {
+      const gateways = selectCountryIntlGateways(world, 'US', usHubs, day);
+      const pacific = gateways.filter((ap) =>
+        isUsPacificRemoteRegion(ap.region ?? ''),
+      );
+      assert.ok(
+        gateways.length >= 12,
+        `day ${day}: expected a full US gateway set, got ${gateways.length}`,
+      );
+      assert.ok(
+        pacific.length <= US_PACIFIC_REMOTE_GATEWAY_SOFT_CAP,
+        `day ${day}: pacific gateways ${pacific.map((a) => a.icao).join(',')} exceed soft-cap`,
+      );
+      assert.equal(
+        gateways.length,
+        intlGatewayBudget(usHubs.length),
+        `day ${day}: US gateways should fill proportional budget`,
+      );
+      assert.ok(
+        gateways.some((ap) => ap.icao === 'KMIA' || ap.icao === 'KJFK' || ap.icao === 'KLAX' || ap.icao === 'KORD'),
+        `day ${day}: expected a continental major in US gateways (${gateways.map((a) => a.icao).join(',')})`,
+      );
+    }
   });
 });

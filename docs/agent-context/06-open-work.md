@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **Intl gateway max 24** — US deixa de bater teto 12 (formula ~24); BR segue ~9. + soft-cap Pacific. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **US pilot-intl Pacific skew** — KMIA via `pilot-intl` só PGSN/NSTU: gateways território comiam budget US. Fix: soft-cap 2 Pacific remotes no grafo intl. Re-medir após day rollover. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **PG skip-dead persist** — delivered/completed drop; expired ~48 ticks; PG full-replace filtra. Re-medir lots/charter counts + pulse ms. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-19: **PG measure prod** — lots 150MB/33k; charter_offers 21MB com 6772 expired vs 2492 available; pulse ~3s/tick baseline, spikes ~70s. Next: skip dead rows no full-replace / upsert. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).

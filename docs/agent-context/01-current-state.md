@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **8249eb1** / desktop **0.3.115** shipped: Keep desktop update progress bar monotonic during differential downloads. Release: [v0.3.115](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.115).
+
+
 `main` **6ef0770** / desktop **0.3.114** shipped: Honor Dispatcher search cap and stop PG pulse wipe of live lots. Release: [v0.3.114](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.114).
 
 

@@ -33,6 +33,8 @@ import {
   DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL,
   REGIONAL_FEEDER_FORM_BUDGET,
   REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN,
+  SPOKE_FEEDER_FORM_BUDGET,
+  SPOKE_FEEDER_OPEN_LOTS_PER_ORIGIN,
   LAST_MILE_SKIPALL_VITALITY_FORM_BUDGET,
   LAST_MILE_SKIPALL_REGIONAL_FORM_BUDGET,
   lastMileSkipAllSpokeFormBudget,
@@ -3637,7 +3639,7 @@ describe('tickEconomyN market formation', () => {
     }
   });
 
-  it('keeps GA and feeder lots leaving BR regional hubs', () => {
+  it('keeps GA and feeder lots leaving BR regional and spoke hubs', () => {
     const world = createSeedEconomyWorld({ seed: 'regional-feeder-board' });
     const parkUntil =
       (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
@@ -3647,7 +3649,8 @@ describe('tickEconomyN market formation', () => {
     }
     for (const ap of world.airports) {
       if (countryIdFromRegion(ap.region) !== 'BR') continue;
-      if (hubTierOf(ap) !== 'regional') continue;
+      const tier = hubTierOf(ap);
+      if (tier !== 'regional' && tier !== 'spoke') continue;
       for (const id of [
         'general',
         'supplies',
@@ -3753,11 +3756,32 @@ describe('tickEconomyN market formation', () => {
     assert.equal(DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL, 0.72);
     assert.equal(REGIONAL_FEEDER_FORM_BUDGET, 3);
     assert.equal(REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN, 2);
+    assert.equal(SPOKE_FEEDER_FORM_BUDGET, 4);
+    assert.equal(SPOKE_FEEDER_OPEN_LOTS_PER_ORIGIN, 1);
 
     const sbctFeeder = feeder.filter((l) => l.originIcao === 'SBCT');
     assert.ok(
       sbctFeeder.length >= 1,
       `SBCT feeder lots=${sbctFeeder.length} (need TP/LJ fills)`,
+    );
+
+    const fromSpoke = world.lots.filter((l) => {
+      if (l.status !== 'available' && l.status !== 'reserved') return false;
+      if (l.reason.includes('skipAll pad')) return false;
+      const origin = world.airports.find((a) => a.icao === l.originIcao);
+      if (countryIdFromRegion(origin?.region ?? '') !== 'BR') return false;
+      return hubTierOf(origin ?? { icao: l.originIcao, hubTier: 'major' }) ===
+        'spoke';
+    });
+    const spokeFeeder = fromSpoke.filter(
+      (l) =>
+        l.quantityKg >= FEEDER_LTL_MIN_KG &&
+        l.quantityKg < LARGE_LOT_MIN_KG &&
+        /spoke feeder/i.test(l.reason),
+    );
+    assert.ok(
+      spokeFeeder.length >= 1,
+      `expected spoke-feeder tag; tagged=${spokeFeeder.length} spokeLots=${fromSpoke.length}`,
     );
   });
 

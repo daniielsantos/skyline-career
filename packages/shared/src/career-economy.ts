@@ -1452,6 +1452,18 @@ export const REGIONAL_FEEDER_SOFT_ORIGIN_FILL = 0.4;
 /** Min regional warehouse fill before offering a feeder hop. */
 export const REGIONAL_FEEDER_MIN_ORIGIN_FILL = 0.42;
 /**
+ * Under soft-cap skipAll, still post this many spoke→major/regional feeder LTL
+ * lots per country×SKU / tick so TP/light-jet boards exist outside regionals.
+ * Slightly above regional budget; open-per-origin is tighter (many more spokes).
+ */
+export const SPOKE_FEEDER_FORM_BUDGET = 4;
+/** Open feeder-band lots kept per spoke origin×commodity. */
+export const SPOKE_FEEDER_OPEN_LOTS_PER_ORIGIN = 1;
+/** Soft origin fill for the spoke feeder pass. */
+export const SPOKE_FEEDER_SOFT_ORIGIN_FILL = 0.35;
+/** Min spoke warehouse fill before offering a feeder hop (above last-mile 0.14). */
+export const SPOKE_FEEDER_MIN_ORIGIN_FILL = 0.28;
+/**
  * Adaptive regional recovery (generic): if a region stays with low live hubs
  * and many dead spokes, temporarily relax spoke gates there.
  */
@@ -10938,6 +10950,8 @@ function* formLotsFromImbalances(
       lastMile?: boolean;
       /** Regional→major TP/LJ feeder (bypass soft-cap skipAll via budgeted pass). */
       regionalFeeder?: boolean;
+      /** Spoke→major/regional TP/LJ feeder (same bypass; separate budget). */
+      spokeFeeder?: boolean;
     },
   ): boolean => {
     if (opts.capacityKgPerDay != null && opts.capacityKgPerDay > 0) {
@@ -11044,6 +11058,8 @@ function* formLotsFromImbalances(
     const lastMileNote = opts.lastMile === true ? ' · last-mile' : '';
     const regionalFeederNote =
       opts.regionalFeeder === true ? ' · regional feeder' : '';
+    const spokeFeederNote =
+      opts.spokeFeeder === true ? ' · spoke feeder' : '';
     const lot: ShipmentLot = {
       id: `lot_${world.tick}_${commodity.id}_${origin.ap.icao}_${dest.ap.icao}_${Math.floor(rng() * 1e6)}`,
       commodityId: commodity.id,
@@ -11056,7 +11072,7 @@ function* formLotsFromImbalances(
       payUsd,
       basePayUsd: payUsd,
       urgency: urgent ? 'urgent' : 'normal',
-      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${lastMileNote}${regionalFeederNote}${international ? ' · intl' : ''}${shockNote}`,
+      reason: `${commodity.name}: surplus at ${origin.ap.icao} (fill ${(origin.fill * 100).toFixed(0)}%) → shortage at ${dest.ap.icao} (fill ${(dest.fill * 100).toFixed(0)}%)${sizeNote}${lastMileNote}${regionalFeederNote}${spokeFeederNote}${international ? ' · intl' : ''}${shockNote}`,
       status: 'available',
     };
 
@@ -11857,11 +11873,11 @@ function* formLotsFromImbalances(
   addTickPhaseMs(profile, 'formLotsLastMile', lotsPhaseAt);
   lotsPhaseAt = performance.now();
 
-  // --- Regional→major feeder LTL (TP / light-jet) ---
-  // Soft-cap skipAll kills bulk formation, so Curitiba-class hubs only posted
-  // GA last-mile scraps. This budgeted pass ignores skipAll/skipSmall and
-  // forces feeder-band lots along curated corridors to majors.
-  const countOpenRegionalFeederFrom = (
+  // --- Domestic feeder LTL (regional / spoke → major|regional) ---
+  // Soft-cap skipAll kills bulk formation, so Curitiba/Ilhéus-class hubs only
+  // posted GA last-mile scraps. These budgeted passes ignore skipAll/skipSmall
+  // and force feeder-band lots along curated corridors to majors/regionals.
+  const countOpenFeederBandFrom = (
     originIcao: string,
     commodityId: CommodityId,
   ): number => {
@@ -11878,7 +11894,17 @@ function* formLotsFromImbalances(
     return n;
   };
 
-  const runRegionalFeederForCountry = (countryId: string): void => {
+  const runDomesticFeederPass = (
+    countryId: string,
+    cfg: {
+      originTier: 'regional' | 'spoke';
+      formBudget: number;
+      openPerOrigin: number;
+      softFill: number;
+      minFill: number;
+      feederKind: 'regional' | 'spoke';
+    },
+  ): void => {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     if (countryAirports.length === 0) return;
 
@@ -11886,16 +11912,13 @@ function* formLotsFromImbalances(
       const ranked = rankAirports(countryAirports, commodity);
       const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
       const origins = ranked.filter((origin) => {
-        if (origin.tier !== 'regional') return false;
-        if (origin.fill < REGIONAL_FEEDER_MIN_ORIGIN_FILL) return false;
-        const surplus = surplusKgAboveSoftOrigin(
-          origin.stock,
-          REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
-        );
+        if (origin.tier !== cfg.originTier) return false;
+        if (origin.fill < cfg.minFill) return false;
+        const surplus = surplusKgAboveSoftOrigin(origin.stock, cfg.softFill);
         if (surplus < FEEDER_LTL_MIN_KG) return false;
         return (
-          countOpenRegionalFeederFrom(origin.ap.icao, commodity.id) <
-          REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN
+          countOpenFeederBandFrom(origin.ap.icao, commodity.id) <
+          cfg.openPerOrigin
         );
       });
       if (origins.length === 0) continue;
@@ -11909,17 +11932,14 @@ function* formLotsFromImbalances(
 
       let formedThisTick = 0;
       for (const origin of rotated) {
-        if (formedThisTick >= REGIONAL_FEEDER_FORM_BUDGET) break;
+        if (formedThisTick >= cfg.formBudget) break;
         if (
-          countOpenRegionalFeederFrom(origin.ap.icao, commodity.id) >=
-          REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN
+          countOpenFeederBandFrom(origin.ap.icao, commodity.id) >=
+          cfg.openPerOrigin
         ) {
           continue;
         }
-        const surplus = surplusKgAboveSoftOrigin(
-          origin.stock,
-          REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
-        );
+        const surplus = surplusKgAboveSoftOrigin(origin.stock, cfg.softFill);
         if (surplus < FEEDER_LTL_MIN_KG) continue;
 
         const partnerRows: Array<{ dest: RankedAirport; cw: number }> = [];
@@ -11941,7 +11961,7 @@ function* formLotsFromImbalances(
         });
 
         for (const { dest, cw } of partnerRows) {
-          if (formedThisTick >= REGIONAL_FEEDER_FORM_BUDGET) break;
+          if (formedThisTick >= cfg.formBudget) break;
           const liveRoom = destRoomKg(dest.stock, commodity.id);
           if (liveRoom < FEEDER_LTL_MIN_KG) continue;
           const priceGap = dest.price - origin.price;
@@ -11973,7 +11993,7 @@ function* formLotsFromImbalances(
 
           const liveSurplus = surplusKgAboveSoftOrigin(
             origin.stock,
-            REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
+            cfg.softFill,
           );
           let qty = Math.min(
             liveSurplus,
@@ -12013,7 +12033,8 @@ function* formLotsFromImbalances(
               international: false,
               partitionId: countryId,
               minPayGapMult: cw >= 1.5 ? 0.15 : 0.22,
-              regionalFeeder: true,
+              regionalFeeder: cfg.feederKind === 'regional',
+              spokeFeeder: cfg.feederKind === 'spoke',
             },
           );
           if (formed) {
@@ -12026,10 +12047,31 @@ function* formLotsFromImbalances(
   };
 
   for (const countryId of countryIds) {
-    runRegionalFeederForCountry(countryId);
+    runDomesticFeederPass(countryId, {
+      originTier: 'regional',
+      formBudget: REGIONAL_FEEDER_FORM_BUDGET,
+      openPerOrigin: REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN,
+      softFill: REGIONAL_FEEDER_SOFT_ORIGIN_FILL,
+      minFill: REGIONAL_FEEDER_MIN_ORIGIN_FILL,
+      feederKind: 'regional',
+    });
     yield;
   }
   addTickPhaseMs(profile, 'formLotsRegionalFeeder', lotsPhaseAt);
+  lotsPhaseAt = performance.now();
+
+  for (const countryId of countryIds) {
+    runDomesticFeederPass(countryId, {
+      originTier: 'spoke',
+      formBudget: SPOKE_FEEDER_FORM_BUDGET,
+      openPerOrigin: SPOKE_FEEDER_OPEN_LOTS_PER_ORIGIN,
+      softFill: SPOKE_FEEDER_SOFT_ORIGIN_FILL,
+      minFill: SPOKE_FEEDER_MIN_ORIGIN_FILL,
+      feederKind: 'spoke',
+    });
+    yield;
+  }
+  addTickPhaseMs(profile, 'formLotsSpokeFeeder', lotsPhaseAt);
   lotsPhaseAt = performance.now();
 
   // --- International: bounded daily gateway lanes (both directions) ---
@@ -12238,6 +12280,7 @@ export type TickPhaseId =
   | 'formLotsBulk'
   | 'formLotsLastMile'
   | 'formLotsRegionalFeeder'
+  | 'formLotsSpokeFeeder'
   | 'formLotsIntl'
   | 'npc'
   | 'hubLevels'
@@ -12264,6 +12307,7 @@ export function createEmptyTickPhaseProfile(): TickPhaseProfile {
       formLotsBulk: 0,
       formLotsLastMile: 0,
       formLotsRegionalFeeder: 0,
+      formLotsSpokeFeeder: 0,
       formLotsIntl: 0,
       npc: 0,
       hubLevels: 0,

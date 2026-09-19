@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **5cbddb9** / desktop **0.3.109** shipped: Stop persisting dead lots and charter offers on every pulse. Release: [v0.3.109](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.109).
+
+
 `main` **4c4eb7d** / desktop **0.3.108** shipped: Deepen charter board toward commodity scale and boost domestic share. Release: [v0.3.108](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.108).
 
 

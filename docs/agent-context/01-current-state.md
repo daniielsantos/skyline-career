@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **af4a7db** / desktop **0.3.124** shipped: Densify Asia Wave B to ~350 hubs (seed 2231). Release: [v0.3.124](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.124).
+
+
 `main` **92cd64b** / desktop **0.3.123** shipped: Densify Asia Wave A to ~300 hubs and add continent pulse lenses. Release: [v0.3.123](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.123).
 
 

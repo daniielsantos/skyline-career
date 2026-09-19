@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **8f6a9d9** / desktop **0.3.118** shipped: Restore agent sources in the desktop runtime pack. Release: [v0.3.118](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.118).
+
+
 `main` **4d60413** / desktop **0.3.117** shipped: Slim the desktop installer by dropping duplicate runtime payload. Release: [v0.3.117](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.117).
 
 

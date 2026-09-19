@@ -30153,5 +30153,603 @@
         "surface": "asphalt"
       }
     ]
+  },
+  "OPBW": {
+    "name": "Bahawalpur",
+    "lat": 29.347064048051834,
+    "lon": 71.71140566468239,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 78.84671020507812,
+        "lengthM": 2849.822021484375,
+        "widthM": 29.395864486694336,
+        "lat": 29.348216392099857,
+        "lon": 71.71809017658234,
+        "identReciprocal": "26",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPSD": {
+    "name": "Skardu",
+    "lat": 35.339491814374924,
+    "lon": 75.54139450192451,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "33L",
+        "headingTrueDeg": 332.5842590332031,
+        "lengthM": 2512.371337890625,
+        "widthM": 32.33220672607422,
+        "lat": 35.33338073641062,
+        "lon": 75.52874967455864,
+        "identReciprocal": "15R",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "32",
+        "headingTrueDeg": 327.13848876953125,
+        "lengthM": 3639.92822265625,
+        "widthM": 29.241535186767578,
+        "lat": 35.33952198922634,
+        "lon": 75.54139584302902,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "OPTU": {
+    "name": "Turbat Intl",
+    "lat": 25.986369475722313,
+    "lon": 63.03016662597656,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "26R",
+        "headingTrueDeg": 263.04962158203125,
+        "lengthM": 1835.2908935546875,
+        "widthM": 14.992514610290527,
+        "lat": 25.986360758543015,
+        "lon": 63.0301970243454,
+        "identReciprocal": "8L",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCFN": {
+    "name": "Fengnin",
+    "lat": 22.755277901887894,
+    "lon": 121.1002779006958,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 38.523658752441406,
+        "lengthM": 2434.914794921875,
+        "widthM": 43.66325759887695,
+        "lat": 22.75486718863249,
+        "lon": 121.10163152217865,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RCKW": {
+    "name": "Hengchun",
+    "lat": 22.040833309292793,
+    "lon": 120.73027789592743,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "32",
+        "headingTrueDeg": 318.8756408691406,
+        "lengthM": 1700.3480224609375,
+        "widthM": 28.781757354736328,
+        "lat": 22.04088930040598,
+        "lon": 120.73017194867134,
+        "identReciprocal": "14",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJAF": {
+    "name": "Matsumoto",
+    "lat": 36.16666663438082,
+    "lon": 137.9227776825428,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "18",
+        "headingTrueDeg": 171.022216796875,
+        "lengthM": 1990.8143310546875,
+        "widthM": 41.37527084350586,
+        "lat": 36.16676386445761,
+        "lon": 137.92265385389328,
+        "identReciprocal": "36",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJBD": {
+    "name": "Nanki-Shirahama",
+    "lat": 33.66222236305475,
+    "lon": 135.36444425582886,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "15",
+        "headingTrueDeg": 140.94215393066406,
+        "lengthM": 1988.6395263671875,
+        "widthM": 43.72056198120117,
+        "lat": 33.66234038025141,
+        "lon": 135.36455154418945,
+        "identReciprocal": "33",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJBT": {
+    "name": "Tajima",
+    "lat": 35.51277793943882,
+    "lon": 134.78694453835487,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 183.10130310058594,
+        "lengthM": 1298.0528564453125,
+        "widthM": 27.675899505615234,
+        "lat": 35.512904673814774,
+        "lon": 134.78698700666428,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJCB": {
+    "name": "Obihiro",
+    "lat": 42.733333222568035,
+    "lon": 143.21722224354744,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 159.33575439453125,
+        "lengthM": 2489.826904296875,
+        "widthM": 44.63390350341797,
+        "lat": 42.73360077291727,
+        "lon": 143.21740597486496,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJCK": {
+    "name": "Kushiro",
+    "lat": 43.04083339869976,
+    "lon": 144.1930554807186,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "17",
+        "headingTrueDeg": 158.93264770507812,
+        "lengthM": 2493.69921875,
+        "widthM": 54,
+        "lat": 43.0409886315465,
+        "lon": 144.19296875596046,
+        "identReciprocal": "35",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RJOB": {
+    "name": "Okayama",
+    "lat": 34.75694451481104,
+    "lon": 133.85527789592743,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "25",
+        "headingTrueDeg": 239.1209716796875,
+        "lengthM": 2981.742431640625,
+        "widthM": 41.03690719604492,
+        "lat": 34.756935462355614,
+        "lon": 133.855469673872,
+        "identReciprocal": "7",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RKNN": {
+    "name": "Gangneung",
+    "lat": 37.753561064600945,
+    "lon": 128.94362479448318,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "26",
+        "headingTrueDeg": 248.1950225830078,
+        "lengthM": 2727.7763671875,
+        "widthM": 41.474876403808594,
+        "lat": 37.75350574404001,
+        "lon": 128.9438161253929,
+        "identReciprocal": "8",
+        "surface": "concrete"
+      }
+    ]
+  },
+  "RPLU": {
+    "name": "Lubang Airport",
+    "lat": 13.858611211180687,
+    "lon": 120.10638892650604,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "RPMF": {
+    "name": "Bislig Airport",
+    "lat": 8.188333176076412,
+    "lon": 126.32694438099861,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "UACK": {
+    "name": "Kokshetau International Airport",
+    "lat": 53.33027768880129,
+    "lon": 69.5955553650856,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VABJ": {
+    "name": "Bhuj Airport",
+    "lat": 23.28694436699152,
+    "lon": 69.67055574059486,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VABV": {
+    "name": "Bhavnagar Airport",
+    "lat": 21.752340607345104,
+    "lon": 72.18604311347008,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VADN": {
+    "name": "Daman Airport",
+    "lat": 20.433760955929756,
+    "lon": 72.84240826964378,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VAJB": {
+    "name": "Jabalpur Airport",
+    "lat": 23.18337220698595,
+    "lon": 80.06044462323189,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VOPB": {
+    "name": "Veer Savarkar International Airport / INS Utkrosh",
+    "lat": 11.647222079336643,
+    "lon": 92.7330556511879,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VTBO": {
+    "name": "Trat Airport",
+    "lat": 12.275277748703957,
+    "lon": 102.31999978423119,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VTCN": {
+    "name": "Nan Airport",
+    "lat": 18.807913810014725,
+    "lon": 100.78341946005821,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VTCP": {
+    "name": "Phrae Airport",
+    "lat": 18.131713829934597,
+    "lon": 100.16461685299873,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VVPK": {
+    "name": "Pleiku Airport",
+    "lat": 14.00444459170103,
+    "lon": 108.01972210407257,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VYLK": {
+    "name": "Loikaw Airport",
+    "lat": 19.691755659878254,
+    "lon": 97.2148834168911,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "VYLS": {
+    "name": "Lashio Airport",
+    "lat": 22.97763604670763,
+    "lon": 97.75241106748581,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WABI": {
+    "name": "Douw Aturure Airport",
+    "lat": -3.368055559694767,
+    "lon": 135.49722209572792,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WABO": {
+    "name": "Stevanus Rumbewas Airport",
+    "lat": -1.8300001323223114,
+    "lon": 136.0694445669651,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WAEE": {
+    "name": "Sultan Babullah Airport",
+    "lat": 0.8311109617352486,
+    "lon": 127.38027781248093,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WAEW": {
+    "name": "Pitu Airport",
+    "lat": 2.0499999448657036,
+    "lon": 128.3166664838791,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WMAP": {
+    "name": "Kluang Airport",
+    "lat": 2.0438888669013977,
+    "lon": 103.3075001835823,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WMKN": {
+    "name": "Sultan Mahmud Airport",
+    "lat": 5.381111092865467,
+    "lon": 103.10305550694466,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZBAD": {
+    "name": "Beijing Daxing International Airport",
+    "lat": 39.49986286461353,
+    "lon": 116.42385587096214,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZBER": {
+    "name": "Erenhot Saiwusu International Airport",
+    "lat": 43.42500016093254,
+    "lon": 112.09333330392838,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZPMS": {
+    "name": "Dehong Mangshi International Airport",
+    "lat": 24.40000008791685,
+    "lon": 98.53333309292793,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZSCG": {
+    "name": "Changzhou Benniu International Airport",
+    "lat": 31.919376589357853,
+    "lon": 119.77352321147919,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZSNT": {
+    "name": "Nantong Xingdong International Airport",
+    "lat": 32.06833340227604,
+    "lon": 120.98166659474373,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZSXZ": {
+    "name": "Xuzhou Guanyin International Airport",
+    "lat": 34.058333337306976,
+    "lon": 117.55500018596649,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZSZS": {
+    "name": "Zhoushan Putuoshan International Airport",
+    "lat": 29.934999905526638,
+    "lon": 122.36333325505257,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZWYN": {
+    "name": "Ili Yining International Airport",
+    "lat": 43.95612481981516,
+    "lon": 81.33056446909904,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZYDD": {
+    "name": "Dandong Langtou International Airport",
+    "lat": 40.02565328031778,
+    "lon": 124.2869071662426,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "ZYJM": {
+    "name": "Jiamusi Songjiang International Airport",
+    "lat": 46.84166673570871,
+    "lon": 130.46500012278557,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "RPMH": {
+    "name": "Camiguin Airport",
+    "lat": 9.253806173801422,
+    "lon": 124.70849454402924,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 70.06268310546875,
+        "lengthM": 1168.5357666015625,
+        "widthM": 27.100914001464844,
+        "lat": 9.253806173801422,
+        "lon": 124.70849454402924,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RPMJ": {
+    "name": "Jolo",
+    "lat": 6.053055413067341,
+    "lon": 121.00972205400467,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 88.73358154296875,
+        "lengthM": 1798.5352783203125,
+        "widthM": 29.291847229003906,
+        "lat": 6.053781285881996,
+        "lon": 121.01314499974251,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "RPMN": {
+    "name": "Sanga Sanga",
+    "lat": 5.048611052334309,
+    "lon": 119.7436112165451,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "2",
+        "headingTrueDeg": 18.291852951049805,
+        "lengthM": 1917.67919921875,
+        "widthM": 28.436542510986328,
+        "lat": 5.048404857516289,
+        "lon": 119.74347352981567,
+        "identReciprocal": "20",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VAAK": {
+    "name": "Akola",
+    "lat": 20.697777830064297,
+    "lon": 77.05888867378235,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "28",
+        "headingTrueDeg": 283.2687683105469,
+        "lengthM": 1399.4818115234375,
+        "widthM": 39.77225875854492,
+        "lat": 20.698982141911983,
+        "lon": 77.05693334341049,
+        "identReciprocal": "10",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VAJM": {
+    "name": "Jamnagar AB",
+    "lat": 22.46513832360506,
+    "lon": 70.00820875167847,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 116.6087417602539,
+        "lengthM": 2515.71240234375,
+        "widthM": 43.49813461303711,
+        "lat": 22.46675468981266,
+        "lon": 70.0104783475399,
+        "identReciprocal": "30",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "24",
+        "headingTrueDeg": 241.75440979003906,
+        "lengthM": 2502.482421875,
+        "widthM": 40.112667083740234,
+        "lat": 22.46354542672634,
+        "lon": 70.00591948628426,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "VAKE": {
+    "name": "Kandla",
+    "lat": 23.112200126051903,
+    "lon": 70.10056927800179,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 49.97907638549805,
+        "lengthM": 1520.251708984375,
+        "widthM": 27.577896118164062,
+        "lat": 23.11240330338478,
+        "lon": 70.10035559535027,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "WAFP": {
+    "name": "Kasiguncu Airport",
+    "lat": -1.4169443026185036,
+    "lon": 120.65916672348976,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "WAGG": {
+    "name": "Tjilik Riwut",
+    "lat": -2.226666659116745,
+    "lon": 113.94444465637207,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "16",
+        "headingTrueDeg": 158.95460510253906,
+        "lengthM": 2508.978271484375,
+        "widthM": 40.25440216064453,
+        "lat": -2.227553129196167,
+        "lon": 113.94353717565536,
+        "identReciprocal": "34",
+        "surface": "asphalt"
+      }
+    ]
   }
 }

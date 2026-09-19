@@ -157,6 +157,58 @@ export const PH_DENSIFY_HUBS: readonly PhDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave B Asia densify (+5)
+  {
+    icao: 'RPMH',
+    name: "Camiguin Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 9.25389,
+    lon: 124.70911,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMJ',
+    name: "Jolo Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 6.05367,
+    lon: 121.011,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPLU',
+    name: "Lubang Airport",
+    region: 'PH-L',
+    hubTier: 'spoke',
+    lat: 13.8554,
+    lon: 120.105,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'RPMN',
+    name: "Sanga Sanga Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 5.0482,
+    lon: 119.74334,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'RPMF',
+    name: "Bislig Airport",
+    region: 'PH-M',
+    hubTier: 'spoke',
+    lat: 8.19505,
+    lon: 126.32102,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const PH_DENSIFY_HUB_COUNT = PH_DENSIFY_HUBS.length;

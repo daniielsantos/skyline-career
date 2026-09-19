@@ -3,6 +3,7 @@
  */
 
 import type { CommodityId, HubTier } from './types/career-economy.js';
+import { KZ_DENSIFY_HUBS, KZ_DENSIFY_HUB_COUNT } from './career-kz-hubs-densify.js';
 import {
   buildCareerFeederCorridors,
   type CareerCorridorEdge,
@@ -64,9 +65,10 @@ export const KZ_CAREER_HUBS: readonly KzCareerHubDef[] = [
     produce: { machinery: 1.25, general: 1.25, supplies: 1.1 },
     consume: { perishables: 1.1, electronics: 0.95, fuel: 1.15 },
   },
+  ...KZ_DENSIFY_HUBS
 ];
 
-export const KZ_CAREER_HUB_COUNT = 4;
+export const KZ_CAREER_HUB_COUNT = 4 + KZ_DENSIFY_HUB_COUNT;
 
 export function buildKzFeederCorridors(
   hubs: readonly KzCareerHubDef[] = KZ_CAREER_HUBS,

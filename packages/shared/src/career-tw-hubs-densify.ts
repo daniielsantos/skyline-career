@@ -88,6 +88,28 @@ export const TW_DENSIFY_HUBS: readonly TwDensifyHub[] = [
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
   },
+
+  // Wave B Asia densify (+2)
+  {
+    icao: 'RCKW',
+    name: "Hengchun Airport",
+    region: 'TW-S',
+    hubTier: 'spoke',
+    lat: 22.0411,
+    lon: 120.7303,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'RCFN',
+    name: "Taitung Airport",
+    region: 'TW-S',
+    hubTier: 'spoke',
+    lat: 22.75486,
+    lon: 121.10179,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const TW_DENSIFY_HUB_COUNT = TW_DENSIFY_HUBS.length;

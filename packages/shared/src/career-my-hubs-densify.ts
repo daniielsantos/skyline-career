@@ -115,6 +115,28 @@ export const MY_DENSIFY_HUBS: readonly MyDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave B Asia densify (+2)
+  {
+    icao: 'WMKN',
+    name: "Sultan Mahmud Airport",
+    region: 'MY-E',
+    hubTier: 'spoke',
+    lat: 5.38264,
+    lon: 103.103,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'WMAP',
+    name: "Kluang Airport",
+    region: 'MY-C',
+    hubTier: 'spoke',
+    lat: 2.04139,
+    lon: 103.307,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const MY_DENSIFY_HUB_COUNT = MY_DENSIFY_HUBS.length;

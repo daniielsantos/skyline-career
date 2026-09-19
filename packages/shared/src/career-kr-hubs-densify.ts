@@ -125,6 +125,18 @@ export const KR_DENSIFY_HUBS: readonly KrDensifyHub[] = [
     produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
     consume: { electronics: 1, machinery: 0.85 },
   },
+
+  // Wave B Asia densify (+1)
+  {
+    icao: 'RKNN',
+    name: "Gangneung Airport (K-18)",
+    region: 'KR-C',
+    hubTier: 'spoke',
+    lat: 37.7536,
+    lon: 128.94392,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const KR_DENSIFY_HUB_COUNT = KR_DENSIFY_HUBS.length;

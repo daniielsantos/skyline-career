@@ -155,6 +155,38 @@ export const TH_DENSIFY_HUBS: readonly ThDensifyHub[] = [
     produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
     consume: { electronics: 1, machinery: 0.85 },
   },
+
+  // Wave B Asia densify (+3)
+  {
+    icao: 'VTBO',
+    name: "Trat Airport",
+    region: 'TH-C',
+    hubTier: 'spoke',
+    lat: 12.2746,
+    lon: 102.319,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'VTCN',
+    name: "Nan Airport",
+    region: 'TH-N',
+    hubTier: 'spoke',
+    lat: 18.8079,
+    lon: 100.783,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VTCP',
+    name: "Phrae Airport",
+    region: 'TH-N',
+    hubTier: 'spoke',
+    lat: 18.1322,
+    lon: 100.165,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const TH_DENSIFY_HUB_COUNT = TH_DENSIFY_HUBS.length;

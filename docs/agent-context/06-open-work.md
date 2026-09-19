@@ -46,6 +46,10 @@ Atualizado 2026-09-19: **MENA densify Wave A (~+35 → 115)** — SA16/EG10/IR12
 
 Atualizado 2026-09-19: **Asia densify Wave A (~+46 → 300)** — CN62/IN41/JP24/ID25/PH18/PK10/TH21/VN15/MY16/KR13; seed **2181**; SimBrief **2181**; OA runways +46 (0 synth). First PK densify. Homolog MSFS done (swaps RPSP/VEKI/VVVD/WALK/WARQ/WIPT/WMKM/…). Gate pulse **SEA** live ≥85% 7d (+ sample CN/IN/JP) antes Wave B. Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
 
+Atualizado 2026-09-19: **Asia densify Wave B (~+50 → 350)** — CN+10/IN+8/JP+6/ID+6/PH+5/TH+3/PK+3/MY+2/TW+2/MM+2/KR+1/VN+1/KZ+1; seed **2231**; SimBrief **2231**; OA runways +50 (0 synth). First KZ densify (UACK). Homolog: VEVZ/VABM/VAHB→VAAK/VAJM/VAKE; WAHI/WALR/WAFB→WAGG/WAFP; RPLH/RPLT/RPMA→RPMH/RPMJ/RPMN; TW RCKW not RCQC. Gate SEA+AS live ≥85% 7d antes Wave C (+50→400). Sem Dry. Detail: [`08-economy.md`](./08-economy.md).
+
+Atualizado 2026-09-19: **Asia Wave A measure ~6d (dia 50→56)** — AS hubs **254→300** (d51); live quiet **0%**, dead **0–2**; fill/soft **~53/54%** flat; lots **2440→2566**; pay p50 **$1160→$1085** (esperado: median-of-hub-medians). World 99% live / fill 56%. Gate Wave A **PASS** → migrar Wave B (seed 2231). Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **Pulse synthetic region lenses** — Network history: **EU** / **MENA** / **SEA** multi-country (not 349 `XX-YY`). MENA lens covers ~115 hubs post Wave A. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **EU-1 Wave 1 MSFS homolog** — 45 ok; drop/replace **EDFE→EDFM** (Egelsbach≠Mannheim), **LEZG→LEBG**, **LEBZ→LELN** (absent stock). Overrides shipped + OA runway merge (45 hubs; 0 synth). Touchdown: MSFS rwy when present, else OA. Detail: [`04-hubs-simbrief.md`](./04-hubs-simbrief.md).

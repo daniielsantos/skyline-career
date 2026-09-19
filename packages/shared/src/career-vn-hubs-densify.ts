@@ -125,6 +125,18 @@ export const VN_DENSIFY_HUBS: readonly VnDensifyHub[] = [
     produce: { general: 1.2, electronics: 1.1, supplies: 1 },
     consume: { perishables: 1.1, machinery: 0.9 },
   },
+
+  // Wave B Asia densify (+1)
+  {
+    icao: 'VVPK',
+    name: "Pleiku Airport",
+    region: 'VN-S',
+    hubTier: 'spoke',
+    lat: 14.0045,
+    lon: 108.017,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const VN_DENSIFY_HUB_COUNT = VN_DENSIFY_HUBS.length;

@@ -58,6 +58,38 @@ export const PK_DENSIFY_HUBS: readonly PkDensifyHub[] = [
     produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
     consume: { electronics: 1, machinery: 0.85 },
   },
+
+  // Wave B Asia densify (+3)
+  {
+    icao: 'OPSD',
+    name: "Skardu International Airport",
+    region: 'PK-N',
+    hubTier: 'spoke',
+    lat: 35.33866,
+    lon: 75.53865,
+    produce: { perishables: 1.15, general: 1.1, supplies: 1.05 },
+    consume: { electronics: 1, machinery: 0.85 },
+  },
+  {
+    icao: 'OPTU',
+    name: "Turbat International Airport",
+    region: 'PK-S',
+    hubTier: 'spoke',
+    lat: 25.98477,
+    lon: 63.02886,
+    produce: { general: 1.1, supplies: 1, perishables: 1.05 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'OPBW',
+    name: "Bahawalpur Airport",
+    region: 'PK-N',
+    hubTier: 'spoke',
+    lat: 29.3481,
+    lon: 71.718,
+    produce: { perishables: 1.35, general: 1.1, supplies: 1 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
 ];
 
 export const PK_DENSIFY_HUB_COUNT = PK_DENSIFY_HUBS.length;

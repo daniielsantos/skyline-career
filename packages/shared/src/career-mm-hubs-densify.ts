@@ -68,6 +68,28 @@ export const MM_DENSIFY_HUBS: readonly MmDensifyHub[] = [
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
   },
+
+  // Wave B Asia densify (+2)
+  {
+    icao: 'VYLK',
+    name: "Loikaw Airport",
+    region: 'MM-N',
+    hubTier: 'spoke',
+    lat: 19.6915,
+    lon: 97.2148,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
+  {
+    icao: 'VYLS',
+    name: "Lashio Airport",
+    region: 'MM-N',
+    hubTier: 'spoke',
+    lat: 22.9779,
+    lon: 97.7522,
+    produce: { general: 1.2, electronics: 1.1, supplies: 1 },
+    consume: { perishables: 1.1, machinery: 0.9 },
+  },
 ];
 
 export const MM_DENSIFY_HUB_COUNT = MM_DENSIFY_HUBS.length;

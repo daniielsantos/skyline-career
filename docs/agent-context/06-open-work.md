@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **Desktop differential updates** — `nsis.differentialPackage: true`; pack/release **exigem** `Airframe-Setup-*.exe.blockmap` no GitHub Release. Download pode ser delta (cache do Setup anterior); install NSIS continua full overwrite. Smoke: N→N+1 (pode ser full se cache frio) e N+1→N+2 (delta). Detail: `packages/desktop/README.md`.
+
 Atualizado 2026-09-19: **Catalog maxPax ← SimBrief** — `audit-simbrief-max-pax.mjs --sync` alinhou 28 SKUs ao `airframe_passengers` da row matched. Phenom 7 OK; C680/Longitude 10; Vision/Honda 6; ATR/SAAB/YS11/DC3/DC6/Fenix/F100 etc. Pack stations **não** capam seats. Restam 2 FALLBACK (Bandeirante / F28). Detail: [`12-pax-efb-due.md`](./12-pax-efb-due.md).
 
 Atualizado 2026-09-19: **Phenom maxPax 7 vs Full(8)** — não é bug do catálogo: row **FSReborn E55P = 7** (Dispatch match); **Default / custom N178PP = 8**. Audit: `node scripts/audit-simbrief-max-pax.mjs`. Detail: [`12-pax-efb-due.md`](./12-pax-efb-due.md).

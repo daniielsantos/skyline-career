@@ -98,7 +98,7 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "runAfterFinish": true,
-      "differentialPackage": false,
+      "differentialPackage": true,
       "deleteAppDataOnUninstall": false,
       "artifactName": "Airframe-Setup-${version}.${ext}"
     },

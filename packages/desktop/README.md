@@ -20,9 +20,10 @@ Electron shell around the local Career API + static UI.
 Settings → **Updates** (desktop only) or the topbar **Update** pill:
 
 1. App checks GitHub Releases on startup (silent).
-2. **Download** → **Install** opens the one-click Setup **with a visible progress window** (no `/S`), passing `--updated --force-run` so NSIS waits/closes the running app instead of the “still running” dialog, then Airframe relaunches.
-3. If Windows warns (unsigned), choose **More info → Run anyway**; watch the installer until it finishes — Airframe should reopen.
-4. Player saves in AppData are kept across updates.
+2. **Download** uses **differential** blocks when possible (NSIS `.blockmap` on the release + previous Setup still in the updater cache). Otherwise it falls back to the full `Airframe-Setup-*.exe` (~160 MB). Install still runs the one-click NSIS overwrite either way.
+3. **Install** opens the Setup **with a visible progress window** (no `/S`), passing `--updated --force-run` so NSIS waits/closes the running app instead of the “still running” dialog, then Airframe relaunches.
+4. If Windows warns (unsigned), choose **More info → Run anyway**; watch the installer until it finishes — Airframe should reopen.
+5. Player saves in AppData are kept across updates.
 
 Fully silent Cursor-style updates (no SmartScreen, no installer UI) need an Authenticode certificate — not enabled yet.
 
@@ -48,10 +49,11 @@ npm run pack:desktop
 Produces under `artifacts/skyline-desktop/`:
 
 - `Airframe-Setup-<version>.exe` — **real NSIS installer** (required)
+- `Airframe-Setup-<version>.exe.blockmap` — differential map for electron-updater (required)
 - `latest.yml` — auto-update metadata for electron-updater
 - `win-unpacked/` — debug folder
 
-Pack **fails** if the Setup exe is missing or undersized (avoids shipping a broken stub).
+Pack **fails** if the Setup exe is missing/undersized or the `.blockmap` is missing (`nsis.differentialPackage: true`).
 
 The pack script also:
 
@@ -93,10 +95,11 @@ Guardrails:
 - Committed source; `--allow-dirty` permits only known untracked diagnostics/build output
 - `gh` installed and authenticated
 - Setup exe present and sized; `latest.yml` version must match `package.json`
+- `.blockmap` present (required for differential downloads)
 - Refuses if tag/release `vX.Y.Z` already exists
 - Refreshes remote tags and pins the release tag to the published HEAD commit
 
-Assets uploaded: `Airframe-Setup-<ver>.exe`, `latest.yml`, and `.blockmap` when present. Release notes are generated from commits since the previous `v*` tag and include a smoke checklist.
+Assets uploaded: `Airframe-Setup-<ver>.exe`, `latest.yml`, and `Airframe-Setup-<ver>.exe.blockmap`. Release notes are generated from commits since the previous `v*` tag and include a smoke checklist.
 
 ### Manual fallback
 
@@ -107,6 +110,7 @@ gh release create "v$ver" `
   --title "Airframe Career $ver" `
   --notes-file "artifacts/skyline-desktop/RELEASE_NOTES_$ver.md" `
   "artifacts/skyline-desktop/Airframe-Setup-$ver.exe" `
+  "artifacts/skyline-desktop/Airframe-Setup-$ver.exe.blockmap" `
   "artifacts/skyline-desktop/latest.yml"
 ```
 
@@ -114,11 +118,12 @@ gh release create "v$ver" `
 
 Unsigned builds hit Windows SmartScreen. In-app update opens the one-click Setup **visibly** (no `/S`) after you confirm so progress and SmartScreen stay on screen.
 
-1. Install an older Setup (e.g. `v0.3.90`) on a clean machine / VM.
-2. Publish a newer release (e.g. `v0.3.91+`) with Setup + `latest.yml` as **Assets** (not in release notes).
+1. Install an older Setup (e.g. `v0.3.112`) on a clean machine / VM.
+2. Publish a newer release with Setup + `.blockmap` + `latest.yml` as **Assets** (not in release notes).
 3. Open the installed app → topbar **Update** / Settings → Updates → Download → **Install**.
 4. Clear SmartScreen if prompted; watch the installer finish and reopen (or use Start Menu).
 5. Confirm the new version and that profiles under `%AppData%\Skyline Career\` survived.
+6. **Differential check:** update again to N+2. Download should be much smaller than full Setup when the previous package is still in the updater cache; if delta fails, electron-updater falls back to full download (still OK).
 
 ## Logs
 

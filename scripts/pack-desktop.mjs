@@ -532,6 +532,16 @@ async function buildElectron() {
       '[pack:desktop] latest.yml missing — electron-updater needs it on the GitHub Release',
     );
   }
+  const expectedBlockmap = `${setup}.blockmap`;
+  const blockmapName = names.find(
+    (n) => n.toLowerCase() === expectedBlockmap.toLowerCase(),
+  );
+  if (!blockmapName) {
+    throw new Error(
+      `Missing ${expectedBlockmap} after electron-builder (nsis.differentialPackage). electron-updater needs it for delta downloads.`,
+    );
+  }
+  console.log(`[pack:desktop] blockmap OK → ${blockmapName}`);
 
   // Packaged app loads updater from resources/updater-nm (not asar).
   // Verify in an isolated temp dir — createRequire inside the repo can walk up

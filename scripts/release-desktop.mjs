@@ -339,6 +339,7 @@ async function buildReleaseNotes(version, previousTag) {
     '- [ ] SimBridge connects with MSFS loaded',
     '- [ ] Short Dispatch hop: Watch → airborne → engines off → settle → debrief',
     '- [ ] Settings → Updates sees this release (from an older install)',
+    '- [ ] Update download uses .blockmap delta when updater cache has prior Setup (else full fallback)',
     '- [ ] `%AppData%\\Skyline Career\\` profiles survive update (legacy path until migrator)',
     '',
   ];
@@ -391,11 +392,16 @@ async function validateArtifacts(version) {
       f === `Airframe-Setup-${version}.exe.blockmap` ||
       f === `SkylineCareer-Setup-${version}.exe.blockmap`,
   );
+  if (!blockmap) {
+    throw new Error(
+      `Missing ${setupName}.blockmap — NSIS differentialPackage requires it for electron-updater delta downloads. Re-run pack:desktop.`,
+    );
+  }
 
   return {
     setupPath,
     latestPath,
-    blockmapPath: blockmap ? join(outDir, blockmap) : null,
+    blockmapPath: join(outDir, blockmap),
     setupBytes: st.size,
   };
 }
@@ -464,18 +470,17 @@ async function main() {
     `[release:desktop] OK ${artifacts.setupPath} (${Math.round(artifacts.setupBytes / 1024 / 1024)} MiB)`,
   );
   console.log(`[release:desktop] OK ${artifacts.latestPath} (version=${version})`);
-  if (artifacts.blockmapPath) {
-    console.log(`[release:desktop] OK ${artifacts.blockmapPath}`);
-  } else {
-    console.log('[release:desktop] (no .blockmap — optional)');
-  }
+  console.log(`[release:desktop] OK ${artifacts.blockmapPath}`);
 
   const notes = await buildReleaseNotes(version, previousTag);
   const notesPath = join(outDir, `RELEASE_NOTES_${version}.md`);
   await writeFile(notesPath, notes, 'utf8');
 
-  const assetArgs = [artifacts.setupPath, artifacts.latestPath];
-  if (artifacts.blockmapPath) assetArgs.push(artifacts.blockmapPath);
+  const assetArgs = [
+    artifacts.setupPath,
+    artifacts.latestPath,
+    artifacts.blockmapPath,
+  ];
 
   const summary = [
     '',

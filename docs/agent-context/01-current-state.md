@@ -1,5 +1,8 @@
 # Current state (2026-09-19)
 
+`main` **4c4eb7d** / desktop **0.3.108** shipped: Deepen charter board toward commodity scale and boost domestic share. Release: [v0.3.108](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.108).
+
+
 `main` **93f29ed** / desktop **0.3.107** shipped: Widen charter_offers group_size CHECK to 1..230. Release: [v0.3.107](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.107).
 
 

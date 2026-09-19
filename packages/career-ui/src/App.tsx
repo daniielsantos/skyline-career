@@ -187,6 +187,10 @@ import { FerryHubCombobox } from './FerryHubCombobox';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
 import { CharterBoard, resolveBaseCharterOrigin, charterExpiryLabel } from './CharterBoard';
 import {
+  formatTourPaxByLeg,
+  TourRouteLabel,
+} from './TourRouteLabel';
+import {
   boardMoneyLabel,
   boardNetClassName,
   formatBoardDistanceNm,
@@ -12911,15 +12915,20 @@ export function App() {
                                   charterActiveTour.status === 'active' ? (
                                     <div className="crew-section base-active-tour">
                                       <div className="base-dispatcher-scout-head">
-                                        <p className="muted crew-section-lede">
-                                          {charterActiveTour.routeLabel ||
+                                        <TourRouteLabel
+                                          className="route base-active-tour-route"
+                                          routeLabel={
+                                            charterActiveTour.routeLabel ||
                                             charterActiveTour.legs
                                               .map(
                                                 (l) =>
                                                   `${l.originIcao}→${l.destIcao}`,
                                               )
-                                              .join(' · ')}
-                                        </p>
+                                              .join('→')
+                                          }
+                                          onOpenAirport={openAirport}
+                                          busy={busy}
+                                        />
                                         <div className="base-dispatcher-scout-actions">
                                           <button
                                             type="button"
@@ -12943,17 +12952,13 @@ export function App() {
                                           </button>
                                         </div>
                                       </div>
-                                      {charterActiveTour.resumeHint ? (
-                                        <p className="muted">
-                                          {charterActiveTour.resumeHint}
-                                        </p>
-                                      ) : null}
                                       <div className="base-active-tour-legs">
-                                        <table className="data-table">
+                                        <table className="data-table base-active-tour-table">
                                           <thead>
                                             <tr>
                                               <th>Leg</th>
                                               <th>Route</th>
+                                              <th>Dist</th>
                                               <th>Pax</th>
                                               <th>Net</th>
                                               <th>Exp</th>
@@ -12998,15 +13003,32 @@ export function App() {
                                                   <tr
                                                     key={`${charterActiveTour.id}-${leg.index}`}
                                                     className={
-                                                      leg.offerExpired
-                                                        ? 'warn'
-                                                        : undefined
+                                                      [
+                                                        isNext
+                                                          ? 'is-tour-next'
+                                                          : '',
+                                                        leg.offerExpired
+                                                          ? 'warn'
+                                                          : '',
+                                                      ]
+                                                        .filter(Boolean)
+                                                        .join(' ') || undefined
                                                     }
                                                   >
                                                     <td>L{leg.index}</td>
                                                     <td>
-                                                      {leg.originIcao}→
-                                                      {leg.destIcao}
+                                                      <TourRouteLabel
+                                                        routeLabel={`${leg.originIcao}→${leg.destIcao}`}
+                                                        onOpenAirport={
+                                                          openAirport
+                                                        }
+                                                        busy={busy}
+                                                      />
+                                                    </td>
+                                                    <td>
+                                                      {formatBoardDistanceNm(
+                                                        leg.distanceNm,
+                                                      )}
                                                     </td>
                                                     <td>{leg.groupSize}</td>
                                                     <td>
@@ -13056,15 +13078,20 @@ export function App() {
                                   activeTour.status === 'active' ? (
                                     <div className="crew-section base-active-tour">
                                       <div className="base-dispatcher-scout-head">
-                                        <p className="muted crew-section-lede">
-                                          {activeTour.routeLabel ||
+                                        <TourRouteLabel
+                                          className="route base-active-tour-route"
+                                          routeLabel={
+                                            activeTour.routeLabel ||
                                             activeTour.legs
                                               .map(
                                                 (l) =>
                                                   `${l.originIcao}→${l.destIcao}`,
                                               )
-                                              .join(' · ')}
-                                        </p>
+                                              .join('→')
+                                          }
+                                          onOpenAirport={openAirport}
+                                          busy={busy}
+                                        />
                                         <div className="base-dispatcher-scout-actions">
                                           <button
                                             type="button"
@@ -13165,10 +13192,11 @@ export function App() {
                                                 >
                                                   <td>L{leg.index}</td>
                                                   <td>
-                                                    <span className="route">
-                                                      {leg.originIcao}→
-                                                      {leg.destIcao}
-                                                    </span>
+                                                    <TourRouteLabel
+                                                      routeLabel={`${leg.originIcao}→${leg.destIcao}`}
+                                                      onOpenAirport={openAirport}
+                                                      busy={busy}
+                                                    />
                                                   </td>
                                                   <td className="pay">
                                                     {formatMoney(leg.payUsd)}
@@ -13568,9 +13596,11 @@ export function App() {
                                                   }}
                                                 >
                                                   <td>
-                                                    <span className="route">
-                                                      {tour.routeLabel}
-                                                    </span>
+                                                    <TourRouteLabel
+                                                      routeLabel={tour.routeLabel}
+                                                      onOpenAirport={openAirport}
+                                                      busy={busy}
+                                                    />
                                                     {(() => {
                                                       const ferry = describeTourFerry(
                                                         tour.legs,
@@ -13927,9 +13957,8 @@ export function App() {
                                               const selected =
                                                 selectedCharterTourId ===
                                                 tour.id;
-                                              const pax = tour.legs.reduce(
-                                                (s, l) => s + l.groupSize,
-                                                0,
+                                              const paxLabel = formatTourPaxByLeg(
+                                                tour.legs,
                                               );
                                               return (
                                                 <tr
@@ -13946,10 +13975,16 @@ export function App() {
                                                   }
                                                 >
                                                   <td>
-                                                    {tour.routeLabel}
-                                                    {tour.totalFerryNm > 0.5
-                                                      ? ` · Ferry ${Math.round(tour.totalFerryNm)} nm`
-                                                      : ''}
+                                                    <TourRouteLabel
+                                                      routeLabel={tour.routeLabel}
+                                                      onOpenAirport={openAirport}
+                                                      busy={busy}
+                                                    />
+                                                    {tour.totalFerryNm > 0.5 ? (
+                                                      <span className="base-dispatch-ferry-tag">
+                                                        {`Ferry · ${Math.round(tour.totalFerryNm)} nm`}
+                                                      </span>
+                                                    ) : null}
                                                   </td>
                                                   <td>{tour.legCount}</td>
                                                   <td>
@@ -13962,7 +13997,15 @@ export function App() {
                                                       tour.totalFerryNm,
                                                     )}
                                                   </td>
-                                                  <td>{pax}</td>
+                                                  <td
+                                                    title={
+                                                      tour.legs.length > 1
+                                                        ? 'Pax per leg (each offer must fit the aircraft seats)'
+                                                        : undefined
+                                                    }
+                                                  >
+                                                    {paxLabel}
+                                                  </td>
                                                   <td>
                                                     {formatMoney(
                                                       tour.totalPayUsd,

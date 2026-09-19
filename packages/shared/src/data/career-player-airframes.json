@@ -33,14 +33,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 8,
+        "passengerCapacity": 9,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 440,
+        "baggageCapacityLb": 495,
         "rolesPackRelPath": "profiles/ofp/microsoft-404-titan-passengers.json"
       }
     ],
-    "defaultConfigurationId": "cargo"
+    "defaultConfigurationId": "cargo",
+    "maxPaxSeats": 9
   },
   {
     "typeId": "blacksquare-baron-58-professional",
@@ -317,14 +318,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 1,
+        "passengerCapacity": 3,
         "requiredCrew": 1,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 55,
+        "baggageCapacityLb": 165,
         "rolesPackRelPath": "profiles/ofp/asobo-cessna-c152.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 3
   },
   {
     "typeId": "skyward-da50",
@@ -377,14 +379,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 4,
+        "passengerCapacity": 5,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 220,
+        "baggageCapacityLb": 275,
         "rolesPackRelPath": "profiles/ofp/blacksquare-b60-duke.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 5
   },
   {
     "typeId": "a2a-piper-aerostar-600",
@@ -437,14 +440,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 3,
+        "passengerCapacity": 4,
         "requiredCrew": 1,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 165,
+        "baggageCapacityLb": 220,
         "rolesPackRelPath": "profiles/ofp/a2a-piper-pa-24-250-comanche.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 4
   },
   {
     "typeId": "justflight-just-flight-pa28-arrow-iii",
@@ -666,10 +670,10 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 12,
+        "passengerCapacity": 10,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 550,
         "rolesPackRelPath": "profiles/ofp/workingtitle-cessna-citation-longitude-passengers.json"
       }
     ],
@@ -682,7 +686,8 @@
     "maxRangeNm": 3500,
     "cruiseFuelFlowKgPerHour": 826,
     "cruiseSpeedKt": 451,
-    "fuelBurnKgPerNm": 1.831
+    "fuelBurnKgPerNm": 1.831,
+    "maxPaxSeats": 10
   },
   {
     "typeId": "skyward-cessna-c680",
@@ -696,17 +701,17 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "inject_verified",
-        "passengerCapacity": 12,
+        "passengerCapacity": 10,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 550,
         "rolesPackRelPath": "profiles/ofp/skyward-cessna-c680.json"
       }
     ],
     "simbriefIcao": "C680",
     "simbriefAirframeMatch": "Skyward Simulations \\(MSFS\\) - C680 Sovereign\\+",
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 12,
+    "maxPaxSeats": 10,
     "efbPaxWeightLb": 210,
     "oewKg": 8088,
     "mtowKg": 13959,
@@ -759,10 +764,10 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 5,
+        "passengerCapacity": 6,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 275,
+        "baggageCapacityLb": 330,
         "rolesPackRelPath": "profiles/ofp/flightfx-mg-hjet-ha420.json"
       }
     ],
@@ -775,7 +780,8 @@
     "maxRangeNm": 1437,
     "cruiseFuelFlowKgPerHour": 246.3,
     "cruiseSpeedKt": 422,
-    "fuelBurnKgPerNm": 0.584
+    "fuelBurnKgPerNm": 0.584,
+    "maxPaxSeats": 6
   },
   {
     "typeId": "flysimware-learjet-35a-cargo",
@@ -861,10 +867,10 @@
         "label": "VIP",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 7,
+        "passengerCapacity": 10,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 385,
+        "baggageCapacityLb": 550,
         "rolesPackRelPath": "profiles/ofp/microsoft-pc-24-vip.json"
       }
     ],
@@ -877,7 +883,8 @@
     "maxRangeNm": 2000,
     "cruiseFuelFlowKgPerHour": 528,
     "cruiseSpeedKt": 440,
-    "fuelBurnKgPerNm": 1.2
+    "fuelBurnKgPerNm": 1.2,
+    "maxPaxSeats": 10
   },
   {
     "typeId": "fsreborn-phenom-300e",
@@ -924,10 +931,10 @@
         "label": "Complete Seating",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 4,
+        "passengerCapacity": 6,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 220,
+        "baggageCapacityLb": 330,
         "rolesPackRelPath": "profiles/ofp/workingtitle-microsoft-vision-jet-complete-seating.json"
       }
     ],
@@ -940,7 +947,8 @@
     "maxRangeNm": 1200,
     "cruiseFuelFlowKgPerHour": 229,
     "cruiseSpeedKt": 305,
-    "fuelBurnKgPerNm": 0.751
+    "fuelBurnKgPerNm": 0.751,
+    "maxPaxSeats": 6
   },
   {
     "typeId": "microsoft-atr-42-600",
@@ -963,14 +971,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 12,
+        "passengerCapacity": 18,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 990,
         "rolesPackRelPath": "profiles/ofp/microsoft-atr-42-600.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 18
   },
   {
     "typeId": "microsoft-atr-72-600",
@@ -993,14 +1002,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 12,
+        "passengerCapacity": 28,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 1540,
         "rolesPackRelPath": "profiles/ofp/microsoft-atr-72-600.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 28
   },
   {
     "typeId": "asobo-beechcraft-king-air-350i",
@@ -1023,14 +1033,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 9,
+        "passengerCapacity": 12,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 495,
+        "baggageCapacityLb": 660,
         "rolesPackRelPath": "profiles/ofp/asobo-beechcraft-king-air-350i.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 12
   },
   {
     "typeId": "blacksquare-turbine-duke",
@@ -1053,14 +1064,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 4,
+        "passengerCapacity": 5,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 220,
+        "baggageCapacityLb": 275,
         "rolesPackRelPath": "profiles/ofp/blacksquare-turbine-duke.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 5
   },
   {
     "typeId": "blacksquare-b36tp-bonanza-professional",
@@ -1128,14 +1140,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 11,
+        "passengerCapacity": 19,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 605,
+        "baggageCapacityLb": 1045,
         "rolesPackRelPath": "profiles/ofp/microsoft-c408-skycourier-passenger.json"
       }
     ],
-    "defaultConfigurationId": "cargo"
+    "defaultConfigurationId": "cargo",
+    "maxPaxSeats": 19
   },
   {
     "typeId": "c208-caravan-cargo",
@@ -1176,14 +1189,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 9,
+        "passengerCapacity": 8,
         "requiredCrew": 1,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 495,
+        "baggageCapacityLb": 440,
         "rolesPackRelPath": "profiles/ofp/asobo-c208b-passengers.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 8
   },
   {
     "typeId": "microsoft-dhc-6-300-twin-otter-wheels",
@@ -1206,14 +1220,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 12,
+        "passengerCapacity": 16,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 880,
         "rolesPackRelPath": "profiles/ofp/microsoft-dhc-6-300-twin-otter-wheels.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 16
   },
   {
     "typeId": "nextgensim-emb-110p1f-bandeirante",
@@ -1283,14 +1298,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 10,
+        "passengerCapacity": 12,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 550,
+        "baggageCapacityLb": 660,
         "rolesPackRelPath": "profiles/ofp/inibuilds-f406-caravan-ii-passenger.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 12
   },
   {
     "typeId": "microsoft-king-air-c90-gtx-passengers",
@@ -1313,14 +1329,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 6,
+        "passengerCapacity": 7,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 330,
+        "baggageCapacityLb": 385,
         "rolesPackRelPath": "profiles/ofp/microsoft-king-air-c90-gtx-passengers.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 7
   },
   {
     "typeId": "sws-kodiak-100-commuter-cargopod-tundra-wheels",
@@ -1413,10 +1430,10 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 8,
+        "passengerCapacity": 9,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 440,
+        "baggageCapacityLb": 495,
         "rolesPackRelPath": "profiles/ofp/microsoft-pc-12-ngx-passengers.json"
       },
       {
@@ -1431,7 +1448,8 @@
         "rolesPackRelPath": "profiles/ofp/microsoft-pc-12-ngx-vip.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 9
   },
   {
     "typeId": "carenado-saab-340-passenger",
@@ -1458,14 +1476,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 12,
+        "passengerCapacity": 34,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 1870,
         "rolesPackRelPath": "profiles/ofp/carenado-saab-340-passenger.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 34
   },
   {
     "typeId": "blacksquare-starship",
@@ -1518,14 +1537,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 5,
+        "passengerCapacity": 6,
         "requiredCrew": 1,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 275,
+        "baggageCapacityLb": 330,
         "rolesPackRelPath": "profiles/ofp/blacksquare-tbm-850-feather-red.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 6
   },
   {
     "typeId": "workingtitle-tbm-930-passengers",
@@ -1548,14 +1568,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 5,
+        "passengerCapacity": 6,
         "requiredCrew": 1,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 275,
+        "baggageCapacityLb": 330,
         "rolesPackRelPath": "profiles/ofp/workingtitle-tbm-930-passengers.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 6
   },
   {
     "typeId": "inibuilds-ys-11",
@@ -1578,14 +1599,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 12,
+        "passengerCapacity": 60,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 660,
+        "baggageCapacityLb": 3300,
         "rolesPackRelPath": "profiles/ofp/inibuilds-ys-11.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 60
   },
   {
     "typeId": "microsoft-douglas-dc-3-metal-left",
@@ -1606,14 +1628,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 21,
+        "passengerCapacity": 26,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 1155,
+        "baggageCapacityLb": 1430,
         "rolesPackRelPath": "profiles/ofp/microsoft-douglas-dc-3-metal-left.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 26
   },
   {
     "typeId": "pmdg-dc6",
@@ -1636,14 +1659,15 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 48,
+        "passengerCapacity": 68,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 2640,
+        "baggageCapacityLb": 3740,
         "rolesPackRelPath": "profiles/ofp/pmdg-dc6.json"
       }
     ],
-    "defaultConfigurationId": "passenger"
+    "defaultConfigurationId": "passenger",
+    "maxPaxSeats": 68
   },
   {
     "typeId": "microsoft-a320neo-v2",
@@ -1750,7 +1774,7 @@
     "simbriefIcao": "A319",
     "simbriefAirframeMatch": "Default",
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 150,
+    "maxPaxSeats": 145,
     "simconnectEmptyPayloadBiasLb": 2642,
     "oewKg": 40800,
     "mtowKg": 75500,
@@ -1765,10 +1789,10 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 150,
+        "passengerCapacity": 145,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 8250,
+        "baggageCapacityLb": 7975,
         "rolesPackRelPath": "profiles/ofp/fenix-a319.json"
       }
     ],
@@ -1814,7 +1838,7 @@
     "simbriefIcao": "A321",
     "simbriefAirframeMatch": "Default",
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 230,
+    "maxPaxSeats": 220,
     "simconnectEmptyPayloadBiasLb": 2201,
     "oewKg": 48500,
     "mtowKg": 93500,
@@ -1829,10 +1853,10 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 230,
+        "passengerCapacity": 220,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 12650,
+        "baggageCapacityLb": 12100,
         "rolesPackRelPath": "profiles/ofp/fenix-a321.json"
       }
     ],
@@ -1994,7 +2018,7 @@
     "simbriefIcao": "F100",
     "simbriefAirframeMatch": "Default",
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 100,
+    "maxPaxSeats": 97,
     "simconnectCargoHoldMaxLb": 7784,
     "oewKg": 24747,
     "mtowKg": 45810,
@@ -2009,10 +2033,10 @@
         "label": "Passenger",
         "role": "passenger",
         "certificationState": "dispatch_ready",
-        "passengerCapacity": 100,
+        "passengerCapacity": 97,
         "requiredCrew": 2,
         "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 5500,
+        "baggageCapacityLb": 5335,
         "rolesPackRelPath": "profiles/ofp/justflight-fokker-f100.json"
       }
     ],

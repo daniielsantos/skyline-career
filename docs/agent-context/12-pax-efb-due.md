@@ -19,6 +19,14 @@ mostra pax + bagagem no summary (não a seção vazia de cargo lots).
 
 **Não** usar Import Weights do MSFS SimBrief EFB em JF / iniBuilds — estraga CG. Load no **tablet do addon**.
 
+## Catalog maxPax ← SimBrief (2026-09-19)
+
+**Sintoma:** Charter Fit / Full(N) no Dispatch divergiam do catálogo (C680 12 vs Full 10; Longitude 12 vs 10; Vision 4 vs 6; etc.). Phenom “Full(8)” era Default/custom, não a row FSReborn.
+
+**Causa:** `maxPaxSeats` / `passengerCapacity` escritos à mão; não sync com `airframes.json`. Tentativa de capar por `passengerStations` do pack era errada (zonas de inject, não assentos — PMDG 163→4).
+
+**Fix:** `node scripts/audit-simbrief-max-pax.mjs` (dry-run) / `--sync` escreve `airframe_passengers` da row matched. `--include-fallback` só se quiser Default quando o match string falha (hoje: Bandeirante, F28). Re-auditar após mudar `simbriefAirframeMatch`.
+
 ## Unidades EFB (kg vs lb) — afeta o Sim, não o Due
 
 Skyline lê `PAYLOAD STATION WEIGHT` / fuel **sempre como pounds** (SDK). O Due vem do OFP já convertido para lb. O toggle **metric/imperial do Career UI** só muda o texto na tela.
@@ -82,28 +90,29 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 | SKU | pax_and_cargo | Extra |
 |-----|---------------|--------|
 | `workingtitle-cessna-citation-cj4` | 10 | Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax baggage dispatch allowance. Inject not live-certified |
-| `workingtitle-cessna-citation-longitude-passengers` | 12 | Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax. Inject not live-certified |
-| `skyward-cessna-c680` | 12 | `inject_verified` + `efbPaxWeightLb: 210` (2026-09-12). Live = S3–S12 cabin + **S13** bags; **S14–S16** Import ghosts omitted. Charter Inject seeds N×210 + bags. **Freight/haul (2026-09-12):** mission.pax stays 0 while Dispatch fills SimBrief seats — Watch Due must use OFP `passengerCount` / estimate (`resolveOfpPassengerCountForEfbDue`), not mission 0, or Due=OFP@175 while EFB Import@210 (Δ=N×35; live 2309→2659). |
+| `workingtitle-cessna-citation-longitude-passengers` | 10 | SimBrief Default C700 Full=(10); was wrongly catalog 12 (2026-09-19 SB sync). Passenger pack `dispatch_ready`; 2 crew; 55 lb/pax. Inject not live-certified |
+| `skyward-cessna-c680` | 10 | `inject_verified` + `efbPaxWeightLb: 210` (2026-09-12). Live = S3–S12 cabin (**10** = SimBrief Full) + **S13** bags; **S14–S16** Import ghosts omitted. Catalog was wrongly 12 (2026-09-19 fix). Charter Inject seeds N×210 + bags. **Freight/haul (2026-09-12):** mission.pax stays 0 while Dispatch fills SimBrief seats — Watch Due must use OFP `passengerCount` / estimate (`resolveOfpPassengerCountForEfbDue`), not mission 0, or Due=OFP@175 while EFB Import@210 (Δ=N×35; live 2309→2659). |
+| `fsreborn-phenom-300e` | 7 | Match row **FSReborn (MSFS) - Phenom 300E** = `airframe_passengers` **7**. Default E55P / custom airframes (ex. N178PP) may show Full(8) — not the Dispatch `type=` we send. Audit: `scripts/audit-simbrief-max-pax.mjs`. |
 | `flightfx-citation-x` | 12 | Passenger/Winglets shared pack `dispatch_ready`; 2 crew. Inject not live-certified |
-| `flightfx-mg-hjet-ha420` | 5 | Passenger pack `dispatch_ready`; 2 crew / 5 cabin stations. Inject not live-certified |
+| `flightfx-mg-hjet-ha420` | 6 | SimBrief Default HDJT Full=(6); was catalog 5 (2026-09-19 SB sync). Passenger pack `dispatch_ready`; 2 crew. Inject not live-certified |
 | `flysimware-learjet-35a-cargo` | 8 | One family SKU: cargo packs = 0 pax; Passenger + Passenger LR `dispatch_ready`; inject not live-certified |
-| `microsoft-pc-24-cargo` | 7 | One family SKU: Cargo = 0 pax; VIP `dispatch_ready`; inject not live-certified |
+| `microsoft-pc-24-cargo` | 10 | SimBrief Default PC24 Full=(10); VIP config was catalog 7 (2026-09-19 SB sync). Cargo = 0 pax; VIP `dispatch_ready` |
 | `fsreborn-phenom-300e` | 7 | Passenger pack `inject_verified`; `simconnectCargoHoldMaxLb: 463`; inject seeds 175/seat + holds only |
-| `workingtitle-microsoft-vision-jet-complete-seating` | 4 | Complete Seating pack `dispatch_ready`; 2 crew / 4 cabin stations. Inject not live-certified |
+| `workingtitle-microsoft-vision-jet-complete-seating` | 6 | SimBrief Default SF50 Full=(6); was catalog 4 (2026-09-19 SB sync). Complete Seating pack `dispatch_ready`; 2 crew. Inject not live-certified |
 | `justflight-f70` | 70 | `simconnectCabinSeats: 80`, `simconnectCargoHoldMaxLb: 5000` (freight coube) |
-| `justflight-f100` | 100 | `simconnectCargoHoldMaxLb: 7784` — **sem** cabin overshoot (100 slots) |
+| `justflight-f100` | 97 | SimBrief Default F100 Full=(97); was catalog 100 (2026-09-19 SB sync). `simconnectCargoHoldMaxLb: 7784` |
 | `justflight-146-300` (QT pack) | freighter glass | Live = **S3–S12** only (EFB Side+FWD+AFT). S13+ ghost — omit from roles |
 | `justflight-146-300` (pax pack) | cabin+holds | Live = **S3–S10** cabin + **S11–S12** FWD/AFT; `efbPaxWeightLb: 170`; S13+ ghost |
 | `justflight-146-100` (Statesman pack) | VIP cabin+holds | Same Live map as pax 100 (**S3–S10** + **S11–S12**); S13+ sticky omitted (was summing ~5.6k ghost → false FAIL) |
-| `justflight-fokker-f28` | 85 fallback; live Mk 65/79/65/85 | Nenhum extra (82×170 bateu) |
+| `justflight-fokker-f28` | 85 fallback; live Mk 65/79/65/85 | Nenhum extra (82×170 bateu). `--sync` skips MISMATCH_FALLBACK (no Default row) |
 | `microsoft-a320neo-v2` | 180 | `efbPaxWeightLb: 187` (zonas S3–S7, não fileiras 170) |
 | `microsoft-a321lr` | 220 | `efbPaxWeightLb: 188` (153 pax: Sim 37127 vs OFP 35164). **Fuel:** EFB APPLY **não** grava FOB (bug iniBuilds A321LR); usar EFB/slider **padrão do MSFS**. Watch C = CENTER+CENTER2; TOTAL pode ser > L+R+C |
 | `inibuilds-a330-200` | 257 | SimBrief **iniBuilds GE/RR** (OEW 116t = EFB Dry). Default OEW ~270k → APPLY ZFW inflates stations by ~14.5k vs OFP Payload |
 | `inibuilds-a330-300` | 291 | Same: iniBuilds GE/RR (P2F → P2F rows); not A333 Default |
 | `inibuilds-a340-300` | 279 (Passenger) | **A343** Passenger / Preighter / VIP — not Default. Freighter glass → Preighter (0 pax). Family packs pax/freighter/VIP |
 | `fenix-a320` | 180 | `simconnectEmptyPayloadBiasLb: 2591` — sem `efbPaxWeightLb` |
-| `fenix-a319` | 150 | `simconnectEmptyPayloadBiasLb: 2642` — sem `efbPaxWeightLb` |
-| `fenix-a321` | 230 | `simconnectEmptyPayloadBiasLb: 2201` — sem `efbPaxWeightLb`; 8 vidros CFM/IAE × SL/WF × TC/SC |
+| `fenix-a319` | 145 | SimBrief Default A319 Full=(145); was catalog 150 (2026-09-19 SB sync). `simconnectEmptyPayloadBiasLb: 2642` |
+| `fenix-a321` | 220 | SimBrief Default A321 Full=(220); was catalog 230 (2026-09-19 SB sync). `simconnectEmptyPayloadBiasLb: 2201`; 8 vidros CFM/IAE × SL/WF × TC/SC |
 | `leonardo-fly-the-maddog-x-md-82-20th` | 162 | **Verde:** LOAD OFP + trim MZFW + INSTANT LOAD. Sem `efbPaxWeightLb`. CG manual |
 | `leonardo-fly-the-maddog-x-md-83-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
 | `leonardo-fly-the-maddog-x-md-88-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |

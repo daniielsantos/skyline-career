@@ -1312,7 +1312,7 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
       simbriefIcao: 'A319',
       simbriefAirframeMatch: 'Default',
       loadLayout: 'pax_and_cargo',
-      maxPaxSeats: 150,
+      maxPaxSeats: 145,
       efbPaxWeightLb: 200,
     });
     assert.equal(due, ofpPayloadLb + 115 * (200 - 175));
@@ -1346,7 +1346,7 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
       simbriefIcao: 'A321',
       simbriefAirframeMatch: 'Default',
       loadLayout: 'pax_and_cargo',
-      maxPaxSeats: 230,
+      maxPaxSeats: 220,
       efbPaxWeightLb: 192,
     });
     assert.equal(due, ofpPayloadLb + 153 * (192 - 175));
@@ -1363,7 +1363,7 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
       simbriefIcao: 'C680',
       simbriefAirframeMatch: 'Skyward',
       loadLayout: 'pax_and_cargo' as const,
-      maxPaxSeats: 12,
+      maxPaxSeats: 10,
       efbPaxWeightLb: 210,
     };
     const ofpPax = resolveOfpPassengerCountForEfbDue({
@@ -1388,7 +1388,7 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
       simbriefIcao: 'C680',
       simbriefAirframeMatch: 'Skyward',
       loadLayout: 'pax_and_cargo' as const,
-      maxPaxSeats: 12,
+      maxPaxSeats: 10,
       efbPaxWeightLb: 210,
     };
     assert.equal(

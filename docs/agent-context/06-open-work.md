@@ -1,5 +1,13 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **Catalog maxPax ← SimBrief** — `audit-simbrief-max-pax.mjs --sync` alinhou 28 SKUs ao `airframe_passengers` da row matched. Phenom 7 OK; C680/Longitude 10; Vision/Honda 6; ATR/SAAB/YS11/DC3/DC6/Fenix/F100 etc. Pack stations **não** capam seats. Restam 2 FALLBACK (Bandeirante / F28). Detail: [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+
+Atualizado 2026-09-19: **Phenom maxPax 7 vs Full(8)** — não é bug do catálogo: row **FSReborn E55P = 7** (Dispatch match); **Default / custom N178PP = 8**. Audit: `node scripts/audit-simbrief-max-pax.mjs`. Detail: [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+
+Atualizado 2026-09-19: **C680 maxPax 12→10** — SimBrief Sovereign+ Full=(10); catalog/stations S3–S12. Charter Fit passa a bloquear 11+. Detail: [`12-pax-efb-due.md`](./12-pax-efb-due.md).
+
+Atualizado 2026-09-19: **Charter Search Pax sum UX** — coluna Pax somava `groupSize` das legs (12+11→23) e parecia exigir avião >12 seats; filter já exige seats≥cada oferta. Fix UI: `12 · 11` por leg + Route com ICAO chips. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **EU-1 Wave 1 MSFS homolog** — 45 ok; drop/replace **EDFE→EDFM** (Egelsbach≠Mannheim), **LEZG→LEBG**, **LEBZ→LELN** (absent stock). Overrides shipped + OA runway merge (45 hubs; 0 synth). Touchdown: MSFS rwy when present, else OA. Detail: [`04-hubs-simbrief.md`](./04-hubs-simbrief.md).
 
 Atualizado 2026-09-19: **EU-1 densify Wave 1 (~+45)** — PT21/ES33/FR37/GB33/DE34/NL15/BE8/IT31 → EU-1 **~212**; seed **2012**. BE +0 (redirect +2 FR). Homolog MSFS offline — coords publicados; re-probe on ship. Gate 7–14d live ≥85% antes Wave 2. Detail: [`08-economy.md`](./08-economy.md).

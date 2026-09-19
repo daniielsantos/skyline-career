@@ -96,7 +96,7 @@ describe('career player airframes', () => {
     assert.equal(simconnectCabinOvershootLb(f100), 0);
     assert.equal(f100?.simconnectCargoHoldMaxLb, 7784);
     assert.equal(f100?.loadLayout, 'pax_and_cargo');
-    assert.equal(f100?.maxPaxSeats, 100);
+    assert.equal(f100?.maxPaxSeats, 97);
     assert.ok((f70?.maxCargoKg ?? 0) < (f100?.maxCargoKg ?? 0));
     assert.equal(f70?.simbriefAirframeMatch, 'Just Flight \\(MSFS\\) - 70 Passengers');
   });
@@ -174,7 +174,7 @@ describe('career player airframes', () => {
     );
     assert.equal(c680?.rolesPackRelPath, 'profiles/ofp/skyward-cessna-c680.json');
     assert.equal(c680?.loadLayout, 'pax_and_cargo');
-    assert.equal(c680?.maxPaxSeats, 12);
+    assert.equal(c680?.maxPaxSeats, 10);
   });
 
   it('stages FSReborn Phenom 300E as pax_and_cargo (belly freight capped)', () => {
@@ -215,14 +215,14 @@ describe('career player airframes', () => {
   it('certifies passenger configurations for all nine light-jet Market SKUs', () => {
     const expected = new Map<string, [number, string]>([
       ['workingtitle-cessna-citation-cj4', [10, 'dispatch_ready']],
-      ['workingtitle-cessna-citation-longitude-passengers', [12, 'dispatch_ready']],
-      ['skyward-cessna-c680', [12, 'inject_verified']],
+      ['workingtitle-cessna-citation-longitude-passengers', [10, 'dispatch_ready']],
+      ['skyward-cessna-c680', [10, 'inject_verified']],
       ['flightfx-citation-x', [12, 'dispatch_ready']],
-      ['flightfx-mg-hjet-ha420', [5, 'dispatch_ready']],
+      ['flightfx-mg-hjet-ha420', [6, 'dispatch_ready']],
       ['flysimware-learjet-35a-cargo', [8, 'dispatch_ready']],
-      ['microsoft-pc-24-cargo', [7, 'dispatch_ready']],
+      ['microsoft-pc-24-cargo', [10, 'dispatch_ready']],
       ['fsreborn-phenom-300e', [7, 'inject_verified']],
-      ['workingtitle-microsoft-vision-jet-complete-seating', [4, 'dispatch_ready']],
+      ['workingtitle-microsoft-vision-jet-complete-seating', [6, 'dispatch_ready']],
     ]);
     const lightJets = listCareerPlayerAirframes('light_jet');
     assert.equal(lightJets.length, expected.size);
@@ -257,14 +257,14 @@ describe('career player airframes', () => {
 
   it('stamps dispatch_ready passenger configs on charter-eligible GA/TP SKUs', () => {
     const samples = new Map<string, number>([
-      ['blacksquare-b60-duke', 4],
-      ['asobo-cessna-c152', 1],
+      ['blacksquare-b60-duke', 5],
+      ['asobo-cessna-c152', 3],
       ['asobo-beechcraft-bonanza', 5],
-      ['workingtitle-tbm-930-passengers', 5],
-      ['microsoft-pc-12-ngx-passengers', 8],
-      ['c208-caravan-cargo', 9],
-      ['inibuilds-f406-caravan-ii-passenger', 10],
-      ['microsoft-atr-42-600', 12],
+      ['workingtitle-tbm-930-passengers', 6],
+      ['microsoft-pc-12-ngx-passengers', 9],
+      ['c208-caravan-cargo', 8],
+      ['inibuilds-f406-caravan-ii-passenger', 12],
+      ['microsoft-atr-42-600', 18],
     ]);
     for (const [typeId, capacity] of samples) {
       assert.equal(
@@ -311,16 +311,16 @@ describe('career player airframes', () => {
         undefined,
         'profiles/ofp/microsoft-pc-12-ngx-passengers.json',
       ),
-      8,
+      9,
     );
   });
 
   it('stamps passenger configs on medium_piston and narrow pax SKUs for charter', () => {
     assert.equal(
       resolvePassengerCapacity('microsoft-douglas-dc-3-metal-left', 'passenger'),
-      21,
+      26,
     );
-    assert.equal(resolvePassengerCapacity('pmdg-dc6', 'passenger'), 48);
+    assert.equal(resolvePassengerCapacity('pmdg-dc6', 'passenger'), 68);
 
     for (const airframe of listCareerPlayerAirframes('medium_piston')) {
       const pax = (airframe.configurations ?? []).filter(
@@ -376,13 +376,13 @@ describe('career player airframes', () => {
 
   it('summarizes cabin/charter layout for Market and Hangar cards', () => {
     const duke = resolveAirframeCabinSummary('blacksquare-b60-duke', 'light_ga');
-    assert.equal(duke.passengerSeats, 4);
+    assert.equal(duke.passengerSeats, 5);
     assert.equal(duke.hasPassengerConfig, true);
     assert.equal(duke.dualLayout, false);
     assert.equal(duke.defaultRole, 'passenger');
 
     const titan = resolveAirframeCabinSummary('microsoft-404-titan', 'light_ga');
-    assert.equal(titan.passengerSeats, 8);
+    assert.equal(titan.passengerSeats, 9);
     assert.equal(titan.dualLayout, true);
     assert.equal(titan.defaultRole, 'cargo');
 
@@ -391,7 +391,7 @@ describe('career player airframes', () => {
     assert.equal(md11.hasPassengerConfig, false);
 
     const perf = resolveAirframePerfForUi('blacksquare-b60-duke', 'light_ga');
-    assert.equal(perf.cabin.passengerSeats, 4);
+    assert.equal(perf.cabin.passengerSeats, 5);
   });
 
   it('blocks cargo-family packs from passenger capacity', () => {
@@ -404,7 +404,7 @@ describe('career player airframes', () => {
         'passenger',
         8,
       ],
-      [pc24, 'profiles/ofp/microsoft-pc-24-cargo.json', 'vip', 7],
+      [pc24, 'profiles/ofp/microsoft-pc-24-cargo.json', 'vip', 10],
     ] as const) {
       const cargo = findCareerAirframeConfiguration(airframe, undefined, cargoPack);
       assert.equal(cargo?.role, 'cargo');
@@ -463,7 +463,7 @@ describe('career player airframes', () => {
   it('stages Fenix A319 family as pax_and_cargo', () => {
     const a319 = findCareerPlayerAirframe('fenix-a319');
     assert.equal(a319?.loadLayout, 'pax_and_cargo');
-    assert.equal(a319?.maxPaxSeats, 150);
+    assert.equal(a319?.maxPaxSeats, 145);
     assert.equal(a319?.efbPaxWeightLb, undefined);
     assert.equal(a319?.simconnectEmptyPayloadBiasLb, 2642);
   });
@@ -471,7 +471,7 @@ describe('career player airframes', () => {
   it('stages Fenix A321 family as pax_and_cargo', () => {
     const a321 = findCareerPlayerAirframe('fenix-a321');
     assert.equal(a321?.loadLayout, 'pax_and_cargo');
-    assert.equal(a321?.maxPaxSeats, 230);
+    assert.equal(a321?.maxPaxSeats, 220);
     assert.equal(a321?.efbPaxWeightLb, undefined);
     assert.equal(a321?.simconnectEmptyPayloadBiasLb, 2201);
     assert.equal(a321?.simbriefIcao, 'A321');

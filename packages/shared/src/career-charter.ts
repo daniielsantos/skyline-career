@@ -34,7 +34,7 @@ export const CHARTER_DEAD_OFFER_RETENTION_TICKS = 48;
 export const CHARTER_BAGGAGE_KG_PER_PAX = 18;
 /**
  * Soft ceiling on formed group size — matches the largest narrow Market
- * `maxPaxSeats` (Fenix A321 = 230). Fit still gates by airframe seats.
+ * `maxPaxSeats` (Fenix A321 = 220). Fit still gates by airframe seats.
  */
 export const CHARTER_GROUP_SIZE_MAX = 230;
 /** Baggage kg ceiling = full narrow group × per-pax allowance. */

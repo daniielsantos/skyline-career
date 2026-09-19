@@ -12352,6 +12352,54 @@ span.dispatch-route-hub-dest {
   margin-bottom: 0.25rem;
 }
 
+.base-active-tour-route {
+  flex: 1;
+  min-width: 0;
+  gap: 0.35rem 0.4rem;
+  font-size: 1.05rem;
+}
+
+.base-active-tour-route .icao-link,
+.base-active-tour-route .icao {
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--panel, #1a2230) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line, #3a4558) 70%, transparent);
+  text-decoration: none;
+}
+
+.base-active-tour-route .icao-link:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.base-active-tour-route .arrow {
+  opacity: 0.45;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.base-active-tour-table {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.base-active-tour-table .route {
+  gap: 0.15rem 0.25rem;
+}
+
+.base-active-tour-table .route .icao-link,
+.base-active-tour-table .route .icao {
+  font-size: 0.92rem;
+}
+
+.base-active-tour-table .arrow {
+  opacity: 0.55;
+  font-size: 0.78rem;
+}
+
 .base-active-tour-table tr.is-tour-next td:first-child {
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent, #3d8bfd) 80%, transparent);
 }
@@ -12413,11 +12461,20 @@ span.dispatch-route-hub-dest {
   font-family: var(--font-display);
   letter-spacing: 0.03em;
   white-space: nowrap;
+  gap: 0.15rem 0.25rem;
+}
+
+.base-dispatch-freight-table .route .icao-link,
+.base-dispatch-freight-table .route .icao {
+  font-size: 0.92rem;
+  letter-spacing: 0.03em;
+  text-underline-offset: 0.12em;
 }
 
 .base-dispatch-freight-table .arrow {
-  margin: 0 0.2rem;
-  opacity: 0.7;
+  margin: 0 0.05rem;
+  opacity: 0.55;
+  font-size: 0.78rem;
 }
 
 .base-dispatch-freight-table td.actions {

@@ -78,8 +78,10 @@ export interface CareerPlayerAirframe {
    */
   loadLayout?: 'freighter' | 'pax_and_cargo';
   /**
-   * Optional catalog fallback for cabin seats when SimBrief airframes.json
-   * is unreachable. Live Dispatch prefers `airframe_passengers` from SimBrief.
+   * Cabin seats for charter Fit / Dispatch fallback. Keep in sync with the
+   * matched SimBrief row (`simbriefIcao` + `simbriefAirframeMatch`) via
+   * `node scripts/audit-simbrief-max-pax.mjs --sync`. Live Dispatch still
+   * prefers `airframe_passengers` from that row.
    */
   maxPaxSeats?: number;
   /**

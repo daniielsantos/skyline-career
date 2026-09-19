@@ -562,4 +562,40 @@ describe('Charter economy', () => {
     assert.equal(isCharterEligibleAircraftClass('narrow_freighter'), true);
     assert.equal(isCharterEligibleAircraftClass('wide_freighter'), false);
   });
+
+  it('drops old expired charter offers instead of keeping a 2-day corpse pile', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-prune-dead' });
+    generateDailyCharterOffers(world, 0);
+    world.tick = 500;
+    const live = (world.charterOffers ?? []).find(
+      (offer) => offer.status === 'available',
+    );
+    assert.ok(live);
+    world.charterOffers!.push({
+      ...live!,
+      id: 'expired-old',
+      status: 'expired',
+      createdAtTick: world.tick - TICKS_PER_DAY * 3,
+      expiresAtTick: world.tick - (TICKS_PER_DAY + 1),
+    });
+    world.charterOffers!.push({
+      ...live!,
+      id: 'expired-recent',
+      status: 'expired',
+      createdAtTick: world.tick - 10,
+      expiresAtTick: world.tick - 2,
+    });
+    world.charterOffers!.push({
+      ...live!,
+      id: 'completed-drop',
+      status: 'completed',
+      createdAtTick: world.tick - 5,
+      expiresAtTick: world.tick + 40,
+    });
+    tickCharterEconomy(world);
+    const ids = new Set((world.charterOffers ?? []).map((offer) => offer.id));
+    assert.equal(ids.has('expired-old'), false);
+    assert.equal(ids.has('completed-drop'), false);
+    assert.equal(ids.has('expired-recent'), true);
+  });
 });

@@ -29,6 +29,8 @@ export const CHARTER_OFFER_LIFE_TICKS = TICKS_PER_DAY;
 export const CHARTER_OFFER_LIFE_MIN_TICKS = 8 * TICKS_PER_HOUR;
 export const CHARTER_OFFER_LIFE_MAX_TICKS = 24 * TICKS_PER_HOUR;
 export const CHARTER_DEMAND_RETENTION_DAYS = 45;
+/** Keep expired/completed/cancelled offers this many ticks, then drop (~12h). */
+export const CHARTER_DEAD_OFFER_RETENTION_TICKS = 48;
 export const CHARTER_BAGGAGE_KG_PER_PAX = 18;
 /**
  * Soft ceiling on formed group size — matches the largest narrow Market
@@ -1057,13 +1059,32 @@ export function expireCharterOffers(world: CareerEconomyWorld): number {
   return expired;
 }
 
+/**
+ * Live charter offers always stay. Expired stay briefly (~12h) for debug.
+ * Completed / cancelled drop immediately (mission state is elsewhere).
+ * Old rule kept any non-live row for 2 days by createdAtTick → ~73% expired
+ * rows on prod full-replace.
+ */
+export function shouldRetainCharterOffer(
+  offer: CharterOffer,
+  tick: number,
+  opts: { retentionTicks?: number } = {},
+): boolean {
+  if (offer.status === 'available' || offer.status === 'reserved') return true;
+  if (offer.status !== 'expired') return false;
+  const retention = Math.max(
+    0,
+    Math.floor(opts.retentionTicks ?? CHARTER_DEAD_OFFER_RETENTION_TICKS),
+  );
+  return (
+    typeof offer.expiresAtTick === 'number' &&
+    offer.expiresAtTick >= tick - retention
+  );
+}
+
 function pruneCharterEconomy(world: CareerEconomyWorld): void {
-  const offerCutoff = world.tick - 2 * TICKS_PER_DAY;
-  world.charterOffers = world.charterOffers!.filter(
-    (offer) =>
-      offer.status === 'available' ||
-      offer.status === 'reserved' ||
-      offer.createdAtTick >= offerCutoff,
+  world.charterOffers = world.charterOffers!.filter((offer) =>
+    shouldRetainCharterOffer(offer, world.tick),
   );
   const activeDemandIds = new Set(world.charterOffers.map((offer) => offer.demandId));
   const demandCutoff = world.tick - CHARTER_DEMAND_RETENTION_DAYS * TICKS_PER_DAY;

@@ -11,9 +11,9 @@
  */
 
 import type pg from 'pg';
-import { CHARTER_GROUP_SIZE_MAX } from './career-charter.js';
+import { CHARTER_GROUP_SIZE_MAX, shouldRetainCharterOffer } from './career-charter.js';
 import { parseClientUpdatePolicy } from './career-client-update-policy.js';
-import { CAREER_COMMODITIES } from './career-economy.js';
+import { CAREER_COMMODITIES, shouldRetainLot } from './career-economy.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
 import {
@@ -1780,9 +1780,12 @@ function lotTableRows(
   worldId: string,
   lots: ShipmentLot[],
   airports: CareerEconomyWorld['airports'],
+  tick: number,
 ): unknown[][] {
   const countries = icaoCountryMap(airports);
-  return lots.map((lot) => [
+  return lots
+    .filter((lot) => shouldRetainLot(lot, tick))
+    .map((lot) => [
     lot.id,
     lot.commodityId,
     lot.originIcao,
@@ -2213,8 +2216,11 @@ function charterHubTableRows(
 function charterOfferTableRows(
   worldId: string,
   rows: CharterOffer[],
+  tick: number,
 ): unknown[][] {
-  return rows.map((row) => [
+  return rows
+    .filter((row) => shouldRetainCharterOffer(row, tick))
+    .map((row) => [
     worldId,
     row.id,
     row.demandId,
@@ -2245,7 +2251,7 @@ export async function persistEconomyTablesToPg(
   const lots = world.lots ?? [];
   const inbound = world.inboundPending ?? [];
   const { hubRows, stockRows } = airportTableRows(wid, airports);
-  const lotRows = lotTableRows(wid, lots, airports);
+  const lotRows = lotTableRows(wid, lots, airports, sqlNum(world.tick));
   const inboundRows = inboundTableRows(wid, inbound);
   const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
   const eventRows = economyEventTableRows(wid, world.events ?? []);
@@ -2271,6 +2277,7 @@ export async function persistEconomyTablesToPg(
   const charterOfferRows = charterOfferTableRows(
     wid,
     world.charterOffers ?? [],
+    sqlNum(world.tick),
   );
 
   return withTx(pool, async (client) => {
@@ -2776,7 +2783,7 @@ export async function persistNpcLiveToPg(
   const lots = world.lots ?? [];
   const inbound = world.inboundPending ?? [];
   const { hubRows, stockRows } = airportTableRows(wid, airports);
-  const lotRows = lotTableRows(wid, lots, airports);
+  const lotRows = lotTableRows(wid, lots, airports, sqlNum(world.tick));
   const inboundRows = inboundTableRows(wid, inbound);
   const npcRows = npcTableRows(wid, world.npcs ?? []);
   const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);

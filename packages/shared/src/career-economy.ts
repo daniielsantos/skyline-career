@@ -9319,37 +9319,56 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
   }
 }
 
-/** Keep expired/delivered lots this many ticks after expiresAtTick, then drop (~12h). */
+/** Keep expired lots this many ticks after expiresAtTick, then drop (~12h). */
 export const DEAD_LOT_RETENTION_TICKS = 48;
 
 /**
+ * Live market lots always stay. Expired stay briefly for debug/pulse.
+ * Delivered / unknown dead statuses are dropped immediately — delivered lots
+ * often keep a future expiresAtTick, which used to pin them forever under the
+ * old "expiresAtTick >= keepFrom" rule and ballooned PG full-replace I/O.
+ */
+export function shouldRetainLot(
+  lot: ShipmentLot,
+  tick: number,
+  opts: { retentionTicks?: number } = {},
+): boolean {
+  if (
+    lot.status === 'available' ||
+    lot.status === 'reserved' ||
+    lot.status === 'in_transit'
+  ) {
+    return true;
+  }
+  if (lot.status !== 'expired') return false;
+  const retention = Math.max(
+    0,
+    Math.floor(opts.retentionTicks ?? DEAD_LOT_RETENTION_TICKS),
+  );
+  const keepFrom = tick - retention;
+  return (
+    typeof lot.expiresAtTick === 'number' && lot.expiresAtTick >= keepFrom
+  );
+}
+
+/**
  * Drop market lots that are no longer actionable.
- * Keeps available / reserved / in_transit always; expired & delivered only briefly.
- * Does not touch player missions / logbook (separate file).
+ * Keeps available / reserved / in_transit always; expired only briefly;
+ * delivered never (missions/logbook hold the settlement record).
  */
 export function pruneDeadLots(
   world: CareerEconomyWorld,
   opts: { retentionTicks?: number } = {},
 ): { removed: number; kept: number } {
+  const before = world.lots.length;
   const retention = Math.max(
     0,
     Math.floor(opts.retentionTicks ?? DEAD_LOT_RETENTION_TICKS),
   );
   const keepFrom = world.tick - retention;
-  const before = world.lots.length;
-  world.lots = world.lots.filter((lot) => {
-    if (
-      lot.status === 'available' ||
-      lot.status === 'reserved' ||
-      lot.status === 'in_transit'
-    ) {
-      return true;
-    }
-    // expired | delivered — retain only a short window for debugging
-    return (
-      typeof lot.expiresAtTick === 'number' && lot.expiresAtTick >= keepFrom
-    );
-  });
+  world.lots = world.lots.filter((lot) =>
+    shouldRetainLot(lot, world.tick, { retentionTicks: retention }),
+  );
 
   // Drop orphan/stale player inbound so soft-fill cannot linger forever.
   if (Array.isArray(world.inboundPending) && world.inboundPending.length > 0) {

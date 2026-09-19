@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **PG skip-dead persist** — delivered/completed drop; expired ~48 ticks; PG full-replace filtra. Re-medir lots/charter counts + pulse ms. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
+Atualizado 2026-09-19: **PG measure prod** — lots 150MB/33k; charter_offers 21MB com 6772 expired vs 2492 available; pulse ~3s/tick baseline, spikes ~70s. Next: skip dead rows no full-replace / upsert. Detail: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+
 Atualizado 2026-09-18: **Charter board depth vs freights** — ~800 lia magro vs Freights multi-k. Fix: target hubs×2, max 4000, form 48 / warm 96. Re-medir available + Fit após deploy. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-18: **Charter Domestic thin** — ~9 vs ~800 world; form intl-heavy + country cap 10%/8. Fix: deficit → ~85% domestic form (intl floor 15%), steady 70%, cap 25%/28, floor 18. Detail: [`08-economy.md`](./08-economy.md).

@@ -5335,10 +5335,24 @@ describe('pruneDeadLots', () => {
         reason: 'delivered',
         status: 'delivered',
       },
+      {
+        id: 'delivered-future-expiry',
+        commodityId: 'machinery',
+        originIcao: 'SBPA',
+        destIcao: 'SBSP',
+        quantityKg: 900,
+        reservedKg: 0,
+        createdAtTick: 90,
+        expiresAtTick: world.tick + 200,
+        payUsd: 30,
+        urgency: 'normal',
+        reason: 'delivered-future',
+        status: 'delivered',
+      },
     ];
 
     const { removed, kept } = pruneDeadLots(world);
-    assert.equal(removed, 2);
+    assert.equal(removed, 3);
     assert.equal(kept, 3);
     assert.deepEqual(
       world.lots.map((l) => l.id).sort(),

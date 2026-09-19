@@ -26,7 +26,7 @@ const agro = {
   consume: { electronics: 0.9, machinery: 0.85 },
 } as const;
 
-/** ES densify (+8) → 23 total. */
+/** ES densify (+18) → 33 total (incl. Wave 1 +7). */
 export const ES_DENSIFY_HUBS: readonly EsDensifyHub[] = [
   {
     icao: 'LESO',
@@ -131,6 +131,73 @@ export const ES_DENSIFY_HUBS: readonly EsDensifyHub[] = [
     lon: 2.76177,
     produce: {"general":1.2,"electronics":1.1,"supplies":1},
     consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  // Wave 1 EU-1 densify (+7)
+  {
+    // Homolog: LEZG absent stock MSFS → Burgos commercial fill
+    icao: 'LEBG',
+    name: 'Burgos',
+    region: 'ES-N',
+    hubTier: 'regional',
+    lat: 42.3575,
+    lon: -3.61361,
+    ...agro,
+  },
+  {
+    icao: 'LEPP',
+    name: 'Pamplona',
+    region: 'ES-N',
+    hubTier: 'spoke',
+    lat: 42.77,
+    lon: -1.6464,
+    ...drySpoke,
+  },
+  {
+    icao: 'LERJ',
+    name: 'Logrono Agoncillo',
+    region: 'ES-N',
+    hubTier: 'spoke',
+    lat: 42.4606,
+    lon: -2.3206,
+    ...agro,
+  },
+  {
+    icao: 'LEVT',
+    name: 'Vitoria',
+    region: 'ES-N',
+    hubTier: 'spoke',
+    lat: 42.8828,
+    lon: -2.7244,
+    produce: { machinery: 1.25, general: 1.1, supplies: 1.0 },
+    consume: { perishables: 1.05, electronics: 0.9 },
+  },
+  {
+    // Homolog: LEBZ absent stock MSFS → Leon commercial fill
+    icao: 'LELN',
+    name: 'Leon',
+    region: 'ES-N',
+    hubTier: 'spoke',
+    lat: 42.5886,
+    lon: -5.65611,
+    ...drySpoke,
+  },
+  {
+    icao: 'LECH',
+    name: 'Castellon Costa Azahar',
+    region: 'ES-E',
+    hubTier: 'spoke',
+    lat: 40.2142,
+    lon: 0.0736,
+    ...agro,
+  },
+  {
+    icao: 'LESA',
+    name: 'Salamanca Matacan',
+    region: 'ES-C',
+    hubTier: 'spoke',
+    lat: 40.9519,
+    lon: -5.5019,
+    ...drySpoke,
   },
 
 ];

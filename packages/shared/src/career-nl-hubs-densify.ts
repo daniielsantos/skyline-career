@@ -26,7 +26,7 @@ const industrial = {
   consume: { perishables: 1.05, supplies: 1.0 },
 } as const;
 
-/** NL densify (+6) → 10 total. */
+/** NL densify (+11) → 15 total (incl. Wave 1 +3). */
 export const NL_DENSIFY_HUBS: readonly NlDensifyHub[] = [
   {
     icao: 'EHBK',
@@ -102,6 +102,34 @@ export const NL_DENSIFY_HUBS: readonly NlDensifyHub[] = [
     lon: 5.87306,
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
+  },
+  // Wave 1 EU-1 densify (+3)
+  {
+    icao: 'EHTX',
+    name: 'Texel',
+    region: 'NL-C',
+    hubTier: 'spoke',
+    lat: 53.1153,
+    lon: 4.83361,
+    ...drySpoke,
+  },
+  {
+    icao: 'EHAL',
+    name: 'Ameland',
+    region: 'NL-C',
+    hubTier: 'spoke',
+    lat: 53.4517,
+    lon: 5.67722,
+    ...drySpoke,
+  },
+  {
+    icao: 'EHMZ',
+    name: 'Midden-Zeeland',
+    region: 'NL-C',
+    hubTier: 'spoke',
+    lat: 51.5122,
+    lon: 3.73056,
+    ...drySpoke,
   },
 
 ];

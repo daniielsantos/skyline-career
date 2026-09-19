@@ -26,7 +26,7 @@ const city = {
   consume: { perishables: 1.1, machinery: 0.9 },
 } as const;
 
-/** GB densify (+10) → 22 total. */
+/** GB densify (+21) → 33 total (incl. Wave 1 +8). */
 export const GB_DENSIFY_HUBS: readonly GbDensifyHub[] = [
   {
     icao: 'EGPK',
@@ -149,6 +149,80 @@ export const GB_DENSIFY_HUBS: readonly GbDensifyHub[] = [
     lon: -7.44306,
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
+  },
+  // Wave 1 EU-1 densify (+8)
+  {
+    icao: 'EGLC',
+    name: 'London City',
+    region: 'GB-S',
+    hubTier: 'regional',
+    lat: 51.5053,
+    lon: 0.055278,
+    ...city,
+  },
+  {
+    icao: 'EGPE',
+    name: 'Inverness',
+    region: 'GB-N',
+    hubTier: 'regional',
+    lat: 57.5425,
+    lon: -4.0475,
+    ...drySpoke,
+  },
+  {
+    icao: 'EGBE',
+    name: 'Coventry',
+    region: 'GB-M',
+    hubTier: 'spoke',
+    lat: 52.3697,
+    lon: -1.47972,
+    ...city,
+  },
+  {
+    icao: 'EGNH',
+    name: 'Blackpool',
+    region: 'GB-M',
+    hubTier: 'spoke',
+    lat: 53.7717,
+    lon: -3.02861,
+    ...drySpoke,
+  },
+  {
+    icao: 'EGNV',
+    name: 'Teesside International',
+    region: 'GB-N',
+    hubTier: 'spoke',
+    lat: 54.5092,
+    lon: -1.42944,
+    ...city,
+  },
+  {
+    icao: 'EGSC',
+    name: 'Cambridge',
+    region: 'GB-S',
+    hubTier: 'spoke',
+    lat: 52.205,
+    lon: 0.175,
+    ...city,
+  },
+  {
+    icao: 'EGTK',
+    name: 'Oxford Kidlington',
+    region: 'GB-S',
+    hubTier: 'spoke',
+    lat: 51.8369,
+    lon: -1.32,
+    ...drySpoke,
+  },
+  {
+    icao: 'EGNR',
+    name: 'Hawarden',
+    region: 'GB-M',
+    hubTier: 'spoke',
+    lat: 53.1781,
+    lon: -2.97778,
+    produce: { machinery: 1.2, general: 1.1, supplies: 1.0 },
+    consume: { perishables: 1.05, electronics: 0.9 },
   },
 
 ];

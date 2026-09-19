@@ -31,7 +31,7 @@ const city = {
   consume: { perishables: 1.1, machinery: 0.9 },
 } as const;
 
-/** DE densify (+12) → 24 total. */
+/** DE densify (+22) → 34 total (incl. Wave 1 +7). */
 export const DE_DENSIFY_HUBS: readonly DeDensifyHub[] = [
   {
     icao: 'EDDG',
@@ -172,6 +172,72 @@ export const DE_DENSIFY_HUBS: readonly DeDensifyHub[] = [
     lon: 8.61746,
     produce: {"general":1.2,"electronics":1.1,"supplies":1},
     consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  // Wave 1 EU-1 densify (+7)
+  {
+    // Homolog: EDFE=Egelsbach (~30 nm); Mannheim City in stock MSFS is EDFM
+    icao: 'EDFM',
+    name: 'Mannheim City',
+    region: 'DE-W',
+    hubTier: 'regional',
+    lat: 49.4727,
+    lon: 8.51426,
+    ...city,
+  },
+  {
+    icao: 'EDLN',
+    name: 'Monchengladbach',
+    region: 'DE-W',
+    hubTier: 'spoke',
+    lat: 51.2303,
+    lon: 6.50444,
+    ...industrial,
+  },
+  {
+    icao: 'EDGS',
+    name: 'Siegerland',
+    region: 'DE-W',
+    hubTier: 'spoke',
+    lat: 50.7077,
+    lon: 8.08297,
+    ...drySpoke,
+  },
+  {
+    icao: 'EDTL',
+    name: 'Lahr Black Forest',
+    region: 'DE-S',
+    hubTier: 'spoke',
+    lat: 48.3693,
+    lon: 7.82772,
+    ...drySpoke,
+  },
+  {
+    icao: 'EDXW',
+    name: 'Sylt',
+    region: 'DE-N',
+    hubTier: 'spoke',
+    lat: 54.9132,
+    lon: 8.34047,
+    produce: { perishables: 1.2, general: 1.05, supplies: 1.0 },
+    consume: { electronics: 0.9, machinery: 0.85 },
+  },
+  {
+    icao: 'EDBM',
+    name: 'Magdeburg City',
+    region: 'DE-E',
+    hubTier: 'spoke',
+    lat: 52.0736,
+    lon: 11.6264,
+    ...city,
+  },
+  {
+    icao: 'EDXH',
+    name: 'Helgoland Dune',
+    region: 'DE-N',
+    hubTier: 'spoke',
+    lat: 54.1853,
+    lon: 7.91583,
+    ...drySpoke,
   },
 
 ];

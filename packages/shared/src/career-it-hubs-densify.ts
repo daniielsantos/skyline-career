@@ -31,7 +31,7 @@ const industrial = {
   consume: { perishables: 1.05, supplies: 1.0 },
 } as const;
 
-/** IT densify (+10) → 22 total. */
+/** IT densify (+19) → 31 total (incl. Wave 1 +6). */
 export const IT_DENSIFY_HUBS: readonly ItDensifyHub[] = [
   {
     icao: 'LIMF',
@@ -155,6 +155,61 @@ export const IT_DENSIFY_HUBS: readonly ItDensifyHub[] = [
     lon: 9.51846,
     produce: {"general":1.2,"electronics":1.1,"supplies":1},
     consume: {"perishables":1.1,"general":1,"machinery":0.9},
+  },
+  // Wave 1 EU-1 densify (+6)
+  {
+    icao: 'LIPH',
+    name: 'Treviso Sant Angelo',
+    region: 'IT-N',
+    hubTier: 'regional',
+    lat: 45.6484,
+    lon: 12.1944,
+    ...industrial,
+  },
+  {
+    icao: 'LIMZ',
+    name: 'Cuneo Levaldigi',
+    region: 'IT-N',
+    hubTier: 'spoke',
+    lat: 44.547,
+    lon: 7.62322,
+    ...drySpoke,
+  },
+  {
+    icao: 'LIPB',
+    name: 'Bolzano',
+    region: 'IT-N',
+    hubTier: 'spoke',
+    lat: 46.4602,
+    lon: 11.3264,
+    ...drySpoke,
+  },
+  {
+    icao: 'LICR',
+    name: 'Reggio Calabria',
+    region: 'IT-S',
+    hubTier: 'spoke',
+    lat: 38.0712,
+    lon: 15.6516,
+    ...agro,
+  },
+  {
+    icao: 'LIBC',
+    name: 'Crotone',
+    region: 'IT-S',
+    hubTier: 'spoke',
+    lat: 38.9972,
+    lon: 17.0802,
+    ...drySpoke,
+  },
+  {
+    icao: 'LICG',
+    name: 'Pantelleria',
+    region: 'IT-S',
+    hubTier: 'spoke',
+    lat: 36.8165,
+    lon: 11.9689,
+    ...drySpoke,
   },
 
 ];

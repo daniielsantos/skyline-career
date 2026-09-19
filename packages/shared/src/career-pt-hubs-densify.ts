@@ -26,7 +26,7 @@ const agro = {
   consume: { electronics: 0.9, machinery: 0.85 },
 } as const;
 
-/** PT densify (+5) → 14 total. */
+/** PT densify (+12) → 21 total (incl. Wave 1 +4 Azores). */
 export const PT_DENSIFY_HUBS: readonly PtDensifyHub[] = [
   {
     // Viseu = LPVZ (not LPVL Vilar de Luz / Maia — ~44 nm off)
@@ -105,6 +105,43 @@ export const PT_DENSIFY_HUBS: readonly PtDensifyHub[] = [
     lon: -31.1314,
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
+  },
+  // Wave 1 EU-1 densify (+4 Azores secondary; not LPPS)
+  {
+    icao: 'LPAZ',
+    name: 'Santa Maria',
+    region: 'PT-A',
+    hubTier: 'regional',
+    lat: 36.9714,
+    lon: -25.1706,
+    ...drySpoke,
+  },
+  {
+    icao: 'LPHR',
+    name: 'Horta',
+    region: 'PT-A',
+    hubTier: 'spoke',
+    lat: 38.5199,
+    lon: -28.7159,
+    ...drySpoke,
+  },
+  {
+    icao: 'LPPI',
+    name: 'Pico',
+    region: 'PT-A',
+    hubTier: 'spoke',
+    lat: 38.5543,
+    lon: -28.4413,
+    ...drySpoke,
+  },
+  {
+    icao: 'LPGR',
+    name: 'Graciosa',
+    region: 'PT-A',
+    hubTier: 'spoke',
+    lat: 39.0922,
+    lon: -28.0297,
+    ...drySpoke,
   },
 
 ];

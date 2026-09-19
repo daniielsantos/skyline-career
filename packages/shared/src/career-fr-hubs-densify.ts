@@ -31,7 +31,7 @@ const city = {
   consume: { perishables: 1.1, machinery: 0.9 },
 } as const;
 
-/** FR densify (+10) → 24 total. */
+/** FR densify (+23) → 37 total (incl. Wave 1 +10; +2 redirected from BE). */
 export const FR_DENSIFY_HUBS: readonly FrDensifyHub[] = [
   {
     icao: 'LFRN',
@@ -154,6 +154,98 @@ export const FR_DENSIFY_HUBS: readonly FrDensifyHub[] = [
     lon: 8.80292,
     produce: {"general":1.1,"supplies":1,"perishables":1.05},
     consume: {"electronics":0.9,"machinery":0.85},
+  },
+  // Wave 1 EU-1 densify (+10; includes +2 redirected from BE)
+  {
+    icao: 'LFOT',
+    name: 'Tours Val de Loire',
+    region: 'FR-C',
+    hubTier: 'regional',
+    lat: 47.4322,
+    lon: 0.727606,
+    ...city,
+  },
+  {
+    icao: 'LFLB',
+    name: 'Chambery Aix-les-Bains',
+    region: 'FR-E',
+    hubTier: 'spoke',
+    lat: 45.6381,
+    lon: 5.88028,
+    ...city,
+  },
+  {
+    icao: 'LFLP',
+    name: 'Annecy Meythet',
+    region: 'FR-E',
+    hubTier: 'spoke',
+    lat: 45.9306,
+    lon: 6.10639,
+    ...city,
+  },
+  {
+    icao: 'LFMK',
+    name: 'Carcassonne Salvaza',
+    region: 'FR-S',
+    hubTier: 'spoke',
+    lat: 43.2159,
+    lon: 2.30632,
+    ...agro,
+  },
+  {
+    icao: 'LFMP',
+    name: 'Perpignan Rivesaltes',
+    region: 'FR-S',
+    hubTier: 'regional',
+    lat: 42.7404,
+    lon: 2.87067,
+    ...agro,
+  },
+  {
+    icao: 'LFBE',
+    name: 'Bergerac Dordogne Perigord',
+    region: 'FR-C',
+    hubTier: 'spoke',
+    lat: 44.8253,
+    lon: 0.518611,
+    ...agro,
+  },
+  {
+    icao: 'LFBL',
+    name: 'Limoges Bellegarde',
+    region: 'FR-C',
+    hubTier: 'spoke',
+    lat: 45.8628,
+    lon: 1.17944,
+    ...city,
+  },
+  {
+    icao: 'LFRD',
+    name: 'Dinard Pleurtuit Saint-Malo',
+    region: 'FR-N',
+    hubTier: 'spoke',
+    lat: 48.5877,
+    lon: -2.07846,
+    ...drySpoke,
+  },
+  {
+    icao: 'LFOH',
+    name: 'Le Havre Octeville',
+    region: 'FR-N',
+    hubTier: 'spoke',
+    lat: 49.5339,
+    lon: 0.088056,
+    ...drySpoke,
+  },
+  {
+    icao: 'LFRZ',
+    name: 'Saint-Nazaire Montoir',
+    region: 'FR-N',
+    hubTier: 'spoke',
+    lat: 47.3122,
+    lon: -2.14944,
+    produce: { machinery: 1.25, general: 1.1, supplies: 1.0 },
+    consume: { perishables: 1.05, electronics: 0.9 },
   },
 
 ];

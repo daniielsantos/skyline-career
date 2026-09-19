@@ -199,6 +199,478 @@
       }
     ]
   },
+  "EDBM": {
+    "name": "Magdeburg",
+    "lat": 52.07365840673447,
+    "lon": 11.626466810703278,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "8",
+        "headingTrueDeg": 88.21533203125,
+        "lengthM": 701.2123413085938,
+        "widthM": 25,
+        "lat": 52.07467697560787,
+        "lon": 11.626904457807541,
+        "identReciprocal": "26",
+        "surface": "grass"
+      },
+      {
+        "ident": "9",
+        "headingTrueDeg": 88.21597290039062,
+        "lengthM": 1056.6563720703125,
+        "widthM": 27.76978302001953,
+        "lat": 52.07365304231644,
+        "lon": 11.626028269529343,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EDFM": {
+    "name": "Mannheim City",
+    "lat": 49.47270557284355,
+    "lon": 8.514263927936554,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 273.03515625,
+        "lengthM": 1090.4010009765625,
+        "widthM": 25,
+        "lat": 49.472752176225185,
+        "lon": 8.513123542070389,
+        "identReciprocal": "9",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "27C",
+        "headingTrueDeg": 273.1078186035156,
+        "lengthM": 822.3961181640625,
+        "widthM": 30,
+        "lat": 49.47349615395069,
+        "lon": 8.51526752114296,
+        "identReciprocal": "9C",
+        "surface": "grass"
+      },
+      {
+        "ident": "27R",
+        "headingTrueDeg": 271.1534118652344,
+        "lengthM": 506.68988037109375,
+        "widthM": 35.82151794433594,
+        "lat": 49.47463475167751,
+        "lon": 8.51390540599823,
+        "identReciprocal": "9L",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EDGS": {
+    "name": "Siegerland",
+    "lat": 50.7076583057642,
+    "lon": 8.082969635725021,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "31",
+        "headingTrueDeg": 308.1007995605469,
+        "lengthM": 1625.234130859375,
+        "widthM": 28.614459991455078,
+        "lat": 50.7082886248827,
+        "lon": 8.081698715686798,
+        "identReciprocal": "13",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "4",
+        "headingTrueDeg": 37.75933837890625,
+        "lengthM": 511.3974304199219,
+        "widthM": 28.116111755371094,
+        "lat": 50.70561982691288,
+        "lon": 8.085824847221375,
+        "identReciprocal": "22",
+        "surface": "grass"
+      },
+      {
+        "ident": "31R",
+        "headingTrueDeg": 308.0216979980469,
+        "lengthM": 659.5035400390625,
+        "widthM": 28.29684066772461,
+        "lat": 50.71085415780544,
+        "lon": 8.078967332839966,
+        "identReciprocal": "13L",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EDLN": {
+    "name": "Monchengladbach",
+    "lat": 51.230355463922024,
+    "lon": 6.504494547843933,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "13",
+        "headingTrueDeg": 128.72007751464844,
+        "lengthM": 1197.7110595703125,
+        "widthM": 31.272457122802734,
+        "lat": 51.23036049306393,
+        "lon": 6.504497677087784,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EDTL": {
+    "name": "Lahr",
+    "lat": 48.369250148534775,
+    "lon": 7.827722132205963,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "3",
+        "headingTrueDeg": 28.238868713378906,
+        "lengthM": 2997.536865234375,
+        "widthM": 49.307369232177734,
+        "lat": 48.36925584822893,
+        "lon": 7.8277333080768585,
+        "identReciprocal": "21",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EDXH": {
+    "name": "Helgoland Airport",
+    "lat": 54.18534681200981,
+    "lon": 7.915911376476288,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "21",
+        "headingTrueDeg": 206.3999786376953,
+        "lengthM": 419.3976135253906,
+        "widthM": 20,
+        "lat": 54.18630234897137,
+        "lon": 7.915714234113693,
+        "identReciprocal": "3",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "24",
+        "headingTrueDeg": 234.0999755859375,
+        "lengthM": 266.7091369628906,
+        "widthM": 12,
+        "lat": 54.18639924377203,
+        "lon": 7.9149967432022095,
+        "identReciprocal": "6",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "33",
+        "headingTrueDeg": 324.5,
+        "lengthM": 473.63330078125,
+        "widthM": 30,
+        "lat": 54.18485529720783,
+        "lon": 7.914823293685913,
+        "identReciprocal": "15",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EDXW": {
+    "name": "Westerland/Sylt",
+    "lat": 54.91163603961468,
+    "lon": 8.342386186122894,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "6",
+        "headingTrueDeg": 59.578521728515625,
+        "lengthM": 1691.074951171875,
+        "widthM": 44.24323272705078,
+        "lat": 54.91326782852411,
+        "lon": 8.340582847595215,
+        "identReciprocal": "24",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "14",
+        "headingTrueDeg": 144.51756286621094,
+        "lengthM": 2118.587646484375,
+        "widthM": 44.748966217041016,
+        "lat": 54.911599829792976,
+        "lon": 8.342504650354385,
+        "identReciprocal": "32",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "15",
+        "headingTrueDeg": 133.1651611328125,
+        "lengthM": 674.4337768554688,
+        "widthM": 28,
+        "lat": 54.909548945724964,
+        "lon": 8.35051640868187,
+        "identReciprocal": "33",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EGBE": {
+    "name": "Coventry",
+    "lat": 52.369722314178944,
+    "lon": -1.479722410440445,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 227.29757690429688,
+        "lengthM": 1825.81640625,
+        "widthM": 44.32151412963867,
+        "lat": 52.370454892516136,
+        "lon": -1.4785265922546387,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGLC": {
+    "name": "London City",
+    "lat": 51.50527786463499,
+    "lon": 0.05527764558792114,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 92.8771743774414,
+        "lengthM": 1501.8975830078125,
+        "widthM": 29.748693466186523,
+        "lat": 51.5052393078804,
+        "lon": 0.05516812205314636,
+        "identReciprocal": "27",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGNH": {
+    "name": "Blackpool",
+    "lat": 53.77166669815779,
+    "lon": -3.028610944747925,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "10",
+        "headingTrueDeg": 94.617431640625,
+        "lengthM": 1870.1292724609375,
+        "widthM": 44,
+        "lat": 53.77156510949135,
+        "lon": -3.028561770915985,
+        "identReciprocal": "28",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "13",
+        "headingTrueDeg": 127.32672119140625,
+        "lengthM": 854.9403076171875,
+        "widthM": 25,
+        "lat": 53.771423287689686,
+        "lon": -3.0368757247924805,
+        "identReciprocal": "31",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGNR": {
+    "name": "Hawarden",
+    "lat": 53.1780556216836,
+    "lon": -2.9777777194976807,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "22",
+        "headingTrueDeg": 220.88868713378906,
+        "lengthM": 2093.086669921875,
+        "widthM": 41.321990966796875,
+        "lat": 53.17830607295036,
+        "lon": -2.9773959517478943,
+        "identReciprocal": "4",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGNV": {
+    "name": "Durham Tees Valley",
+    "lat": 54.509166553616524,
+    "lon": -1.4294444024562836,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 227.3934783935547,
+        "lengthM": 2287.594482421875,
+        "widthM": 44.9814338684082,
+        "lat": 54.509196393191814,
+        "lon": -1.4294055104255676,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGPE": {
+    "name": "Inverness",
+    "lat": 57.542499862611294,
+    "lon": -4.047499895095825,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 229.46031188964844,
+        "lengthM": 1885.6351318359375,
+        "widthM": 44.26742172241211,
+        "lat": 57.54251427948475,
+        "lon": -4.0475137531757355,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "29",
+        "headingTrueDeg": 289.61395263671875,
+        "lengthM": 703.612548828125,
+        "widthM": 18,
+        "lat": 57.54359118640423,
+        "lon": -4.054343551397324,
+        "identReciprocal": "11",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EGSC": {
+    "name": "Cambridge",
+    "lat": 52.20500014722347,
+    "lon": 0.17499983310699463,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "23",
+        "headingTrueDeg": 229.80514526367188,
+        "lengthM": 1963.2227783203125,
+        "widthM": 44.121681213378906,
+        "lat": 52.20503568649292,
+        "lon": 0.17503157258033752,
+        "identReciprocal": "5",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "23L",
+        "headingTrueDeg": 229.89768981933594,
+        "lengthM": 1049.275634765625,
+        "widthM": 34.06696319580078,
+        "lat": 52.20572467893362,
+        "lon": 0.18067628145217896,
+        "identReciprocal": "5R",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EGTK": {
+    "name": "Kidlington",
+    "lat": 51.83694440871477,
+    "lon": -1.3199999928474426,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "19",
+        "headingTrueDeg": 190.6656951904297,
+        "lengthM": 1508.4300537109375,
+        "widthM": 31.912872314453125,
+        "lat": 51.836702674627304,
+        "lon": -1.3200286030769348,
+        "identReciprocal": "1",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "EHAL": {
+    "name": "Ameland",
+    "lat": 53.45166675746441,
+    "lon": 5.677222162485123,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "27",
+        "headingTrueDeg": 267.31597900390625,
+        "lengthM": 672.203125,
+        "widthM": 35.2499885559082,
+        "lat": 53.4533216804266,
+        "lon": 5.678285658359528,
+        "identReciprocal": "9",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EHMZ": {
+    "name": "Midden-Zeeland",
+    "lat": 51.51222210377455,
+    "lon": 3.731110990047455,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "9",
+        "headingTrueDeg": 87.9001235961914,
+        "lengthM": 1122.056640625,
+        "widthM": 30.219526290893555,
+        "lat": 51.51225160807371,
+        "lon": 3.7320207059383392,
+        "identReciprocal": "27",
+        "surface": "grass"
+      }
+    ]
+  },
+  "EHTX": {
+    "name": "Texel",
+    "lat": 53.11527784913778,
+    "lon": 4.833611100912094,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "12",
+        "headingTrueDeg": 125.85260772705078,
+        "lengthM": 667.9918212890625,
+        "widthM": 50.58387756347656,
+        "lat": 53.112100437283516,
+        "lon": 4.828227013349533,
+        "identReciprocal": "30",
+        "surface": "grass"
+      },
+      {
+        "ident": "21",
+        "headingTrueDeg": 215.7374725341797,
+        "lengthM": 1214.7227783203125,
+        "widthM": 73.83538055419922,
+        "lat": 53.11599735170603,
+        "lon": 4.831932932138443,
+        "identReciprocal": "3",
+        "surface": "grass"
+      }
+    ]
+  },
   "H37": {
     "name": "Herlong",
     "lat": 40.13872213661671,
@@ -219,6 +691,248 @@
     "lon": -116.2692779302597,
     "source": "msfs_facility",
     "validatedAt": "2026-08-16"
+  },
+  "LEAM": {
+    "name": "Almeria",
+    "lat": 36.84393614530563,
+    "lon": -2.370094656944275,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "7",
+        "headingTrueDeg": 72.93334197998047,
+        "lengthM": 3194.395263671875,
+        "widthM": 44.42930221557617,
+        "lat": 36.84396129101515,
+        "lon": -2.3700830340385437,
+        "identReciprocal": "25",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LEBG": {
+    "name": "Burgos",
+    "lat": 42.357500083744526,
+    "lon": -3.61361101269722,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "4",
+        "headingTrueDeg": 42.99400329589844,
+        "lengthM": 2086.245849609375,
+        "widthM": 43.3149299621582,
+        "lat": 42.35739313066006,
+        "lon": -3.6136293411254883,
+        "identReciprocal": "22",
+        "surface": "asphalt"
+      }
+    ]
+  },
+  "LECH": {
+    "name": "Castellon Costa Azahar",
+    "lat": 40.21416664123535,
+    "lon": 0.07361099123954773,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LELN": {
+    "name": "LeÃ³n",
+    "lat": 42.58861094713211,
+    "lon": -5.656110942363739,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19",
+    "runways": [
+      {
+        "ident": "5",
+        "headingTrueDeg": 45.20498275756836,
+        "lengthM": 2991.484130859375,
+        "widthM": 43.03004455566406,
+        "lat": 42.59147185832262,
+        "lon": -5.652241408824921,
+        "identReciprocal": "23",
+        "surface": "asphalt"
+      },
+      {
+        "ident": "6",
+        "headingTrueDeg": 59.45063781738281,
+        "lengthM": 1056.9708251953125,
+        "widthM": 50.90275573730469,
+        "lat": 42.592195719480515,
+        "lon": -5.656224936246872,
+        "identReciprocal": "24",
+        "surface": "dirt"
+      }
+    ]
+  },
+  "LEPP": {
+    "name": "Pamplona",
+    "lat": 42.77000002563,
+    "lon": -1.6463890671730042,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LERJ": {
+    "name": "Logrono Agoncillo",
+    "lat": 42.4605555832386,
+    "lon": -2.3205555975437164,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LESA": {
+    "name": "Salamanca Matacan",
+    "lat": 40.951944440603256,
+    "lon": -5.501944273710251,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LEVT": {
+    "name": "Vitoria",
+    "lat": 42.882777862250805,
+    "lon": -2.724444419145584,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFBE": {
+    "name": "Bergerac Dordogne Perigord",
+    "lat": 44.82444439083338,
+    "lon": 0.5205555260181427,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFBL": {
+    "name": "Limoges Bellegarde",
+    "lat": 45.86083319038153,
+    "lon": 1.1802779138088226,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFLB": {
+    "name": "Chambery Aix-les-Bains",
+    "lat": 45.639166720211506,
+    "lon": 5.8799998462200165,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFLP": {
+    "name": "Annecy Meythet",
+    "lat": 45.93083348125219,
+    "lon": 6.10638901591301,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFMK": {
+    "name": "Carcassonne Salvaza",
+    "lat": 43.21583345532417,
+    "lon": 2.308611273765564,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFMP": {
+    "name": "Perpignan Rivesaltes",
+    "lat": 42.74083334952593,
+    "lon": 2.8697222471237183,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFOH": {
+    "name": "Le Havre Octeville",
+    "lat": 49.53388877213001,
+    "lon": 0.0880555808544159,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFOT": {
+    "name": "Tours Val de Loire",
+    "lat": 47.43291947990656,
+    "lon": 0.7245679199695587,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFRD": {
+    "name": "Dinard Pleurtuit Saint-Malo",
+    "lat": 48.58777776360512,
+    "lon": -2.0799998939037323,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LFRZ": {
+    "name": "Saint-Nazaire Montoir",
+    "lat": 47.310555428266525,
+    "lon": -2.1566668152809143,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LIBC": {
+    "name": "Crotone",
+    "lat": 38.996666707098484,
+    "lon": 17.079166620969772,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LICG": {
+    "name": "Pantelleria",
+    "lat": 36.81305553764105,
+    "lon": 11.960833221673965,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LICR": {
+    "name": "Reggio Calabria",
+    "lat": 38.0719443038106,
+    "lon": 15.653610974550247,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LIMZ": {
+    "name": "Cuneo Levaldigi",
+    "lat": 44.54749993979931,
+    "lon": 7.623055726289749,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LIPB": {
+    "name": "Bolzano",
+    "lat": 46.46027773618698,
+    "lon": 11.326388865709305,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LIPH": {
+    "name": "Treviso Sant Angelo",
+    "lat": 45.65083332359791,
+    "lon": 12.197777777910233,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LPAZ": {
+    "name": "Santa Maria",
+    "lat": 36.97388883680105,
+    "lon": -25.171110928058624,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LPGR": {
+    "name": "Graciosa",
+    "lat": 39.092500023543835,
+    "lon": -28.02861124277115,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LPHR": {
+    "name": "Horta",
+    "lat": 38.51999994367361,
+    "lon": -28.71638908982277,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "LPPI": {
+    "name": "Pico",
+    "lat": 38.554444536566734,
+    "lon": -28.44138890504837,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
   },
   "M45": {
     "name": "Alpine County",
@@ -561,6 +1275,27 @@
         "surface": "dirt"
       }
     ]
+  },
+  "SAMR": {
+    "name": "San Rafael",
+    "lat": -34.58777792751789,
+    "lon": -68.4036111831665,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "SANE": {
+    "name": "Santiago del Estero",
+    "lat": -27.76555549353361,
+    "lon": -64.31000009179115,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
+  },
+  "SCGZ": {
+    "name": "Puerto Williams",
+    "lat": -54.931111223995686,
+    "lon": -67.62611120939255,
+    "source": "msfs_facility",
+    "validatedAt": "2026-09-19"
   },
   "WV09": {
     "name": "Mike Ferrell Field",

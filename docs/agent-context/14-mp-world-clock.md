@@ -466,3 +466,46 @@ Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em
 - [x] Accept concorrente → exatamente um 200, resto 409 (Phase 3 unit + Phase 5 staging/board)
 - [x] `offlineFeeSummary` usa delta de **world.tick** (Phase 0)
 - [x] Admin/debug tick isolado de client remoto (`POST /api/world/pulse` + `/api/tick` → 403 on mp-remote)
+
+## Client update kill switch (ops)
+
+Rare critical-only gate. App still opens; **Prepare / Accept** refuse until desktop ≥ `minClientVersion`.
+
+Policy lives on `economy_meta.misc_json` (no schema bump), key `clientUpdatePolicy`:
+
+```json
+{
+  "forceUpdate": false,
+  "minClientVersion": "0.0.0"
+}
+```
+
+**Enable** (prod Postgres; replace version with the fixed build):
+
+```sql
+UPDATE economy_meta
+SET misc_json = jsonb_set(
+  COALESCE(misc_json, '{}'::jsonb),
+  '{clientUpdatePolicy}',
+  '{"forceUpdate":true,"minClientVersion":"0.3.105"}'::jsonb,
+  true
+)
+WHERE world_id = 'local';
+```
+
+World API reads the key live on `/api/health` and on accept paths (`POST /api/staging/commit`, `/api/accept`, `/api/charters/accept` → **426** `client_update_required`). Desktop sends `X-Skyline-Client-Version`.
+
+**Disable** after soak:
+
+```sql
+UPDATE economy_meta
+SET misc_json = jsonb_set(
+  COALESCE(misc_json, '{}'::jsonb),
+  '{clientUpdatePolicy}',
+  '{"forceUpdate":false,"minClientVersion":"0.0.0"}'::jsonb,
+  true
+)
+WHERE world_id = 'local';
+```
+
+Do **not** use day-to-day. Does not block login, browse, Hangar, or Watch settle of an already-accepted mission.

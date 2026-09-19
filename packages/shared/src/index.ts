@@ -10,8 +10,10 @@ export * from './career-auth.js';
 export * from './career-store-v10.js';
 export * from './career-world-tick-service.js';
 export * from './career-clock.js';
+export * from './career-client-update-policy.js';
 export * from './career-economy.js';
 export * from './career-charter.js';
+
 export * from './career-economy-pulse.js';
 export * from './career-economy-recovery-probe.js';
 export * from './career-br-hubs.js';

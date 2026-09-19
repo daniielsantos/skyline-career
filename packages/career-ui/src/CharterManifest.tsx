@@ -22,6 +22,8 @@ type CharterManifestProps = {
   onCancel: () => void;
   onFerry: (aircraftId: string, legDest: string, finalDest: string) => Promise<void>;
   onAccept: (draft: CharterManifestDraft) => Promise<void>;
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
 };
 
 export function CharterManifest(props: CharterManifestProps) {
@@ -35,9 +37,11 @@ export function CharterManifest(props: CharterManifestProps) {
     aircraft?.status === 'parked' &&
     aircraft.locationIcao.trim().toUpperCase() === origin;
   const fit = props.draft.offer.fit;
+  const updateBlocked = Boolean(props.clientUpdateRequiredMin);
   const valid = Boolean(
     aircraft &&
       atOrigin &&
+      !updateBlocked &&
       fit?.aircraftId === aircraft.id &&
       fit.compatible &&
       props.draft.offer.status === 'available',
@@ -199,6 +203,23 @@ export function CharterManifest(props: CharterManifestProps) {
         <div>
           <p>{props.draft.offer.paxCount} pax · {boardMoneyLabel(props.draft.offer.payUsd, props.formatMoney)}</p>
           {!atOrigin ? <p className="cargo-dialog-error">Aircraft must be at {origin} — ferry first.</p> : null}
+          {updateBlocked ? (
+            <p className="cargo-dialog-error">
+              Update required · v{props.clientUpdateRequiredMin}+
+              {props.onOpenUpdates ? (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="action ghost compact"
+                    onClick={() => props.onOpenUpdates?.()}
+                  >
+                    Settings → Updates
+                  </button>
+                </>
+              ) : null}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -206,7 +227,11 @@ export function CharterManifest(props: CharterManifestProps) {
           disabled={props.busy || fitLoading || !valid}
           onClick={() => void props.onAccept(props.draft)}
         >
-          {props.busy ? 'Accepting…' : 'Accept & Dispatch'}
+          {props.busy
+            ? 'Accepting…'
+            : updateBlocked
+              ? 'Update required'
+              : 'Accept & Dispatch'}
         </button>
       </div>
 

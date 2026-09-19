@@ -819,6 +819,19 @@ export class PostgresCareerStore implements CareerStore {
     return this.ram;
   }
 
+  async readEconomyMiscField(key: string): Promise<unknown> {
+    await this.ready;
+    const field = key.trim();
+    if (!field) return undefined;
+    const { rows } = await this.pool.query<{ value: unknown }>(
+      `SELECT misc_json -> $2 AS value
+       FROM economy_meta
+       WHERE world_id = $1`,
+      [LOCAL_WORLD_ID, field],
+    );
+    return rows[0]?.value;
+  }
+
   loadCommandWorldSlice(_opts: CommandWorldSliceOpts): CareerEconomyWorld | null {
     return this.ram;
   }

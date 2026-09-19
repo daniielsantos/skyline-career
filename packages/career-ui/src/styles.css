@@ -537,6 +537,14 @@ body {
   color: var(--ink);
 }
 
+.sidebar-footer-version {
+  justify-self: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
 .sidebar-backdrop {
   display: none;
 }

@@ -1,6 +1,10 @@
 import { getStoredCompanyId } from './career-company-client';
 import { getAuthToken, signalAuthRequired } from './career-auth-client';
 import { parseApiResponse } from './api-response';
+import {
+  isClientUpdateRequired,
+  parseClientUpdatePolicy,
+} from '@msfs-compat/shared';
 
 export type AircraftClass =
   | 'narrow_freighter'
@@ -1095,6 +1099,38 @@ export type AirportView = ClockSync & {
 };
 
 /** All Career API requests must pass here so MP auth/company headers are uniform. */
+let cachedClientVersion: string | null = null;
+let clientVersionPromise: Promise<string> | null = null;
+
+async function resolveClientVersionHeader(): Promise<string> {
+  if (cachedClientVersion != null) return cachedClientVersion;
+  if (!clientVersionPromise) {
+    clientVersionPromise = (async () => {
+      const desktop = window.skylineDesktop;
+      if (desktop?.getVersion) {
+        try {
+          const version = await desktop.getVersion();
+          if (typeof version === 'string' && version.trim()) {
+            return version.trim();
+          }
+        } catch {
+          /* fall through */
+        }
+      }
+      return '0.0.0';
+    })().then((version) => {
+      cachedClientVersion = version;
+      return version;
+    });
+  }
+  return clientVersionPromise;
+}
+
+/** Cached desktop (or browser fallback) build version for UI + API header. */
+export function getCareerClientVersion(): Promise<string> {
+  return resolveClientVersionHeader();
+}
+
 async function careerFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -1122,6 +1158,11 @@ async function careerFetch(path: string, init?: RequestInit): Promise<Response> 
     }
   } catch {
     /* ignore */
+  }
+  try {
+    headers['X-Skyline-Client-Version'] = await resolveClientVersionHeader();
+  } catch {
+    headers['X-Skyline-Client-Version'] = '0.0.0';
   }
   const res = await fetch(path, {
     ...init,
@@ -1324,10 +1365,32 @@ export type CareerHealth = {
   authRequired?: boolean;
   npcFleetTarget?: number;
   store?: string | null;
+  clientUpdatePolicy?: {
+    forceUpdate: boolean;
+    minClientVersion: string;
+  };
 };
 
 export function fetchCareerHealth() {
   return api<CareerHealth>('/api/health');
+}
+
+export type ClientUpdateBlock = {
+  minClientVersion: string;
+};
+
+export function formatClientUpdateRequiredLabel(minClientVersion: string): string {
+  return `Update required · v${minClientVersion}+`;
+}
+
+/** Compare health policy to this desktop build; null when Prepare/accept allowed. */
+export async function resolveClientUpdateBlock(
+  policy: CareerHealth['clientUpdatePolicy'] | undefined,
+): Promise<ClientUpdateBlock | null> {
+  const parsed = parseClientUpdatePolicy(policy ?? null);
+  const version = await resolveClientVersionHeader();
+  if (!isClientUpdateRequired(parsed, version)) return null;
+  return { minClientVersion: parsed.minClientVersion };
 }
 
 export function postAuthRegister(body: {

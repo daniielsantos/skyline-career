@@ -36,15 +36,16 @@ describe('parseApiResponse', () => {
     );
   });
 
-  it('does not expose HTML as a JSON parsing error', async () => {
+  it('formats client_update_required with min version', async () => {
     await assert.rejects(
       () =>
         parseApiResponse(
-          new Response('<!DOCTYPE html><title>bad gateway</title>', {
-            status: 503,
-          }),
+          Response.json(
+            { error: 'client_update_required', minClientVersion: '0.3.105' },
+            { status: 426 },
+          ),
         ),
-      /non-JSON response \(HTTP 503\)/,
+      /Update required · v0\.3\.105\+/,
     );
   });
 });

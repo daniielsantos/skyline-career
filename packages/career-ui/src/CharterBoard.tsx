@@ -80,6 +80,8 @@ type CharterBoardProps = {
   selectedOfferId?: string | null;
   onSelectOffer?: (offer: CharterOfferView | null) => void;
   onOpenAirport?: (icao: string) => void;
+  /** When set, Prepare is disabled (world force-update kill switch). */
+  clientUpdateRequiredMin?: string | null;
 };
 
 const SORT_TITLE =
@@ -439,10 +441,12 @@ export function CharterBoard(props: CharterBoardProps) {
                 {offers.map((offer) => {
                   const fit = offer.fit;
                   const fitLabel = charterFitLabel(offer);
+                  const updateBlocked = Boolean(props.clientUpdateRequiredMin);
                   const canPrepare =
                     Boolean(aircraftId) &&
                     offer.status === 'available' &&
-                    fit?.compatible === true;
+                    fit?.compatible === true &&
+                    !updateBlocked;
                   return (
                     <tr
                       key={offer.id}
@@ -530,18 +534,20 @@ export function CharterBoard(props: CharterBoardProps) {
                           className="accept"
                           disabled={props.busy || !canPrepare}
                           title={
-                            fit && !fit.compatible
-                              ? fit.reasons.join(' · ')
-                              : !aircraftId
-                                ? 'Select a parked aircraft'
-                                : `Prepare ${offer.originIcao} → ${offer.destIcao}`
+                            updateBlocked
+                              ? `Update required · v${props.clientUpdateRequiredMin}+`
+                              : fit && !fit.compatible
+                                ? fit.reasons.join(' · ')
+                                : !aircraftId
+                                  ? 'Select a parked aircraft'
+                                  : `Prepare ${offer.originIcao} → ${offer.destIcao}`
                           }
                           onClick={(event) => {
                             event.stopPropagation();
                             props.onPrepare(offer, aircraftId);
                           }}
                         >
-                          Prepare
+                          {updateBlocked ? 'Update' : 'Prepare'}
                         </button>
                       </td>
                     </tr>

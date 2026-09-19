@@ -3,6 +3,7 @@ const PROXY_TIMEOUT_STATUSES = new Set([502, 504, 522, 524]);
 type ApiErrorPayload = {
   error?: unknown;
   code?: unknown;
+  minClientVersion?: unknown;
 };
 
 /**
@@ -25,6 +26,17 @@ export async function parseApiResponse<T>(res: Response): Promise<T> {
     );
   }
   if (!res.ok) {
+    if (data.error === 'client_update_required') {
+      const min =
+        typeof data.minClientVersion === 'string' && data.minClientVersion.trim()
+          ? data.minClientVersion.trim()
+          : '';
+      throw new Error(
+        min
+          ? `Update required · v${min}+ — open Settings → Updates`
+          : 'Update required — open Settings → Updates',
+      );
+    }
     throw new Error(
       typeof data.error === 'string' && data.error.trim()
         ? data.error

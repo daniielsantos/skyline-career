@@ -287,6 +287,11 @@ import {
   fuelBurnMultFromAircraft,
   padOfpBlockFuelKgForMx,
   bumpMissionOfpCheckSeq,
+  parseClientUpdatePolicy,
+  clientUpdateGateRejection,
+  DEFAULT_CLIENT_UPDATE_POLICY,
+  CLIENT_VERSION_HEADER,
+  type ClientUpdatePolicy,
   isOfpCargoUnderOnlyFailure,
   missionOfpCheckSeq,
   trimMissionCargoToKg,
@@ -1862,9 +1867,52 @@ function send(res: import('node:http').ServerResponse, status: number, body: unk
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Skyline-Dev-Mode',
+    'Access-Control-Allow-Headers':
+      'Content-Type, Authorization, X-Skyline-Dev-Mode, X-Skyline-Company-Id, X-Skyline-Client-Version',
   });
   res.end(json);
+}
+
+async function resolveClientUpdatePolicy(
+  active: CareerStore | null,
+): Promise<ClientUpdatePolicy> {
+  if (!active) return { ...DEFAULT_CLIENT_UPDATE_POLICY };
+  if (typeof active.readEconomyMiscField === 'function') {
+    try {
+      const raw = await active.readEconomyMiscField('clientUpdatePolicy');
+      const policy = parseClientUpdatePolicy(raw);
+      const peeked = active.peekEconomyWorld?.() ?? null;
+      if (peeked) peeked.clientUpdatePolicy = policy;
+      return policy;
+    } catch {
+      /* fall through to peeked world */
+    }
+  }
+  return parseClientUpdatePolicy(active.peekEconomyWorld()?.clientUpdatePolicy);
+}
+
+function clientVersionFromRequest(
+  req: import('node:http').IncomingMessage,
+): string | null {
+  const raw = req.headers[CLIENT_VERSION_HEADER];
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  if (Array.isArray(raw)) {
+    const first = raw.find((v) => typeof v === 'string' && v.trim());
+    if (first) return first.trim();
+  }
+  return null;
+}
+
+/** Returns true when the response was already sent (426). */
+function rejectIfClientUpdateRequired(
+  res: import('node:http').ServerResponse,
+  policy: ClientUpdatePolicy,
+  clientVersion: string | null,
+): boolean {
+  const rejection = clientUpdateGateRejection(policy, clientVersion);
+  if (!rejection) return false;
+  send(res, rejection.status, rejection.body);
+  return true;
 }
 
 /** Preserve upstream auth/status contracts for sim-local gateway handlers. */
@@ -2692,6 +2740,11 @@ export function createCareerApiServer(port = 8787) {
               typeof worldHealth.homeCountryId === 'string'
                 ? worldHealth.homeCountryId
                 : undefined,
+            clientUpdatePolicy:
+              worldHealth.clientUpdatePolicy &&
+              typeof worldHealth.clientUpdatePolicy === 'object'
+                ? worldHealth.clientUpdatePolicy
+                : DEFAULT_CLIENT_UPDATE_POLICY,
           });
           return;
         }
@@ -2828,6 +2881,7 @@ export function createCareerApiServer(port = 8787) {
             countries: [],
             internationalLaneCount: 0,
             authRequired: isCareerAuthRequired(),
+            clientUpdatePolicy: DEFAULT_CLIENT_UPDATE_POLICY,
           });
           return;
         }
@@ -2843,6 +2897,7 @@ export function createCareerApiServer(port = 8787) {
           store.hasWorldWriterLease?.() !== false;
         const writerReady =
           !writerRequired || writerLeaseHeld;
+        const clientUpdatePolicy = await resolveClientUpdatePolicy(store);
         send(res, writerReady ? 200 : 503, {
           ok: writerReady,
           ...(!writerReady
@@ -2877,6 +2932,7 @@ export function createCareerApiServer(port = 8787) {
           countries: peeked ? listWorldCountryIds(peeked) : [],
           internationalLaneCount: peeked?.internationalLanes?.length ?? 0,
           authRequired: isCareerAuthRequired(),
+          clientUpdatePolicy,
         });
         return;
       }
@@ -5151,6 +5207,16 @@ export function createCareerApiServer(port = 8787) {
         };
         if (!body.offerId?.trim() || !body.aircraftId?.trim()) {
           send(res, 400, { error: 'offerId and aircraftId required' });
+          return;
+        }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
           return;
         }
         const acceptCompanyId = companyIdFromRequest(req, body.companyId);
@@ -8647,6 +8713,16 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'lotId required' });
           return;
         }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         const aircraft =
           (parseFreighterClassId(body.aircraft) as FreighterClassId | undefined) ??
           'narrow_freighter';
@@ -8988,6 +9064,16 @@ export function createCareerApiServer(port = 8787) {
           companyId?: string;
           lines?: Array<{ lotId?: string; cargoKg?: number }>;
         };
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         const stagingCompanyId = companyIdFromRequest(req, body.companyId);
         const lines = (body.lines ?? [])
           .filter((line) => line.lotId)

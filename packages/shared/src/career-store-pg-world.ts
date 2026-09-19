@@ -12,6 +12,7 @@
 
 import type pg from 'pg';
 import { CHARTER_GROUP_SIZE_MAX } from './career-charter.js';
+import { parseClientUpdatePolicy } from './career-client-update-policy.js';
 import { CAREER_COMMODITIES } from './career-economy.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
@@ -847,6 +848,7 @@ const PG_ECONOMY_MISC_KEYS = [
   'tourLotSoftHolds',
   'aircraftPoolCatalogHash',
   'regionalRecovery',
+  'clientUpdatePolicy',
   'version',
 ] as const;
 
@@ -857,7 +859,12 @@ export function pickPgEconomyMisc(
   const out: Record<string, unknown> = {};
   for (const key of PG_ECONOMY_MISC_KEYS) {
     const v = src[key];
-    if (v !== undefined) out[key] = v;
+    if (v === undefined) continue;
+    if (key === 'clientUpdatePolicy') {
+      out[key] = parseClientUpdatePolicy(v);
+      continue;
+    }
+    out[key] = v;
   }
   return out;
 }
@@ -870,7 +877,12 @@ export function applyPgEconomyMisc(
   const src = misc as Record<string, unknown>;
   const dst = world as unknown as Record<string, unknown>;
   for (const key of PG_ECONOMY_MISC_KEYS) {
-    if (src[key] !== undefined) dst[key] = src[key];
+    if (src[key] === undefined) continue;
+    if (key === 'clientUpdatePolicy') {
+      dst[key] = parseClientUpdatePolicy(src[key]);
+      continue;
+    }
+    dst[key] = src[key];
   }
 }
 

@@ -580,7 +580,16 @@ export interface CareerEconomyWorld {
    * Keeps low-live streaks and active windows per `XX-*` region.
    */
   regionalRecovery?: Record<string, RegionalRecoveryState>;
+  /**
+   * Rare ops kill switch (misc_json). When forceUpdate is true, world API
+   * refuses Prepare/accept until desktop ≥ minClientVersion.
+   */
+  clientUpdatePolicy?: {
+    forceUpdate: boolean;
+    minClientVersion: string;
+  };
 }
+
 
 /** Dealer-owned airframe in the world pool (one physical tail number). */
 export type AircraftInstanceStatus = 'available' | 'sold';

@@ -132,6 +132,10 @@ import {
   postAuthRegister,
   postAuthLogout,
   fetchCareerHealth,
+  resolveClientUpdateBlock,
+  formatClientUpdateRequiredLabel,
+  getCareerClientVersion,
+  type ClientUpdateBlock,
 } from './api';
 import {
   companyIdFromUrl,
@@ -3634,6 +3638,10 @@ export function App() {
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [authRegisterEnabled, setAuthRegisterEnabled] = useState(true);
   const [authInviteRequired, setAuthInviteRequired] = useState(false);
+  /** World kill switch: Prepare/Accept blocked until desktop ≥ min. */
+  const [clientUpdateBlock, setClientUpdateBlock] =
+    useState<ClientUpdateBlock | null>(null);
+  const [clientVersion, setClientVersion] = useState<string | null>(null);
   /** Bumps when token is set/cleared so ProfileGate Sign out UI refreshes. */
   const [authSessionEpoch, setAuthSessionEpoch] = useState(0);
   const [profilesLoading, setProfilesLoading] = useState(true);
@@ -4565,6 +4573,9 @@ export function App() {
         const fixed = Boolean(health.worldFixed);
         setWorldFixed(fixed);
         setAuthRequired(Boolean(health.authRequired));
+        void resolveClientUpdateBlock(health.clientUpdatePolicy).then((block) => {
+          if (!cancelled) setClientUpdateBlock(block);
+        });
 
         if (fixed) {
           if (health.needsProfile || !health.activeProfileId) {
@@ -4576,6 +4587,11 @@ export function App() {
                 try {
                   const again = await fetchCareerHealth();
                   if (cancelled) return;
+                  void resolveClientUpdateBlock(again.clientUpdatePolicy).then(
+                    (block) => {
+                      if (!cancelled) setClientUpdateBlock(block);
+                    },
+                  );
                   if (!again.needsProfile && again.activeProfileId) {
                     if (pollTimer) clearInterval(pollTimer);
                     pollTimer = undefined;
@@ -4638,6 +4654,40 @@ export function App() {
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
+    };
+  }, []);
+
+  // Rare force-update kill switch: re-check world health while in-session.
+  useEffect(() => {
+    if (showProfileGate || showAuthGate || profilesLoading) return;
+    let cancelled = false;
+    const poll = () => {
+      void (async () => {
+        try {
+          const health = await fetchCareerHealth();
+          if (cancelled) return;
+          const block = await resolveClientUpdateBlock(health.clientUpdatePolicy);
+          if (!cancelled) setClientUpdateBlock(block);
+        } catch {
+          /* keep last known */
+        }
+      })();
+    };
+    poll();
+    const timer = window.setInterval(poll, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [showProfileGate, showAuthGate, profilesLoading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCareerClientVersion().then((version) => {
+      if (!cancelled) setClientVersion(version);
+    });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -11962,6 +12012,11 @@ export function App() {
           >
             Settings
           </button>
+          {clientVersion ? (
+            <span className="sidebar-footer-version" title="Installed app version">
+              v{clientVersion}
+            </span>
+          ) : null}
         </div>
       </aside>
 
@@ -14930,6 +14985,9 @@ export function App() {
                           selectedOfferId={selectedCharterOffer?.id}
                           onSelectOffer={setSelectedCharterOffer}
                           onOpenAirport={openAirport}
+                          clientUpdateRequiredMin={
+                            clientUpdateBlock?.minClientVersion ?? null
+                          }
                         />
                         </div>
                       </div>
@@ -15424,6 +15482,7 @@ export function App() {
                                     className="accept"
                                     disabled={
                                       busy ||
+                                      Boolean(clientUpdateBlock) ||
                                       Boolean(playerDispatchMission) ||
                                       cargoLocked ||
                                       (lot.npcClaim?.crewNeeded
@@ -15440,7 +15499,11 @@ export function App() {
                                       }
                                     }}
                                     title={
-                                      cargoLocked
+                                      clientUpdateBlock
+                                        ? formatClientUpdateRequiredLabel(
+                                            clientUpdateBlock.minClientVersion,
+                                          )
+                                        : cargoLocked
                                         ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                                         : playerDispatchMission
                                         ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
@@ -15454,7 +15517,9 @@ export function App() {
                                             : `Prepare ${lot.originIcao} → ${lot.destIcao}`
                                     }
                                   >
-                                    {cargoLocked
+                                    {clientUpdateBlock
+                                      ? 'Update'
+                                      : cargoLocked
                                       ? 'Locked'
                                       : playerDispatchMission
                                         ? 'Flight busy'
@@ -15581,6 +15646,7 @@ export function App() {
             formatMass={(kg) => formatMass(kg, weightSystem)}
             onPrepare={enterCharterManifest}
             onOpenAirport={openAirport}
+            clientUpdateRequiredMin={clientUpdateBlock?.minClientVersion ?? null}
           />
         </section>
       ) : hubSelected && tab === 'market' ? (
@@ -16402,6 +16468,7 @@ export function App() {
                         className="accept"
                         disabled={
                           busy ||
+                          Boolean(clientUpdateBlock) ||
                           Boolean(playerDispatchMission) ||
                           cargoLocked ||
                           (fleet.length === 0 && !lot.npcClaim?.crewNeeded)
@@ -16412,7 +16479,11 @@ export function App() {
                             : enterStaging(lot)
                         }
                         title={
-                          cargoLocked
+                          clientUpdateBlock
+                            ? formatClientUpdateRequiredLabel(
+                                clientUpdateBlock.minClientVersion,
+                              )
+                            : cargoLocked
                             ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                             : playerDispatchMission
                             ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
@@ -16429,7 +16500,9 @@ export function App() {
                                 : 'Open Dispatch'
                         }
                       >
-                        {cargoLocked
+                        {clientUpdateBlock
+                          ? 'Update'
+                          : cargoLocked
                           ? 'Locked'
                           : playerDispatchMission
                           ? 'Flight busy'
@@ -16833,6 +16906,10 @@ export function App() {
                   onFerry(aircraftId, legDest, { finalDest })
                 }
                 onAccept={onAcceptCharter}
+                clientUpdateRequiredMin={
+                  clientUpdateBlock?.minClientVersion ?? null
+                }
+                onOpenUpdates={() => selectTab('settings')}
               />
             </>
           ) : stagingMode === 'empty' ? (
@@ -17389,6 +17466,20 @@ export function App() {
                             : 'Finish the manifest before saving.'}
                     </p>
                   ) : null}
+                  {clientUpdateBlock ? (
+                    <p className="cargo-dialog-error">
+                      {formatClientUpdateRequiredLabel(
+                        clientUpdateBlock.minClientVersion,
+                      )}{' '}
+                      <button
+                        type="button"
+                        className="action ghost compact"
+                        onClick={() => selectTab('settings')}
+                      >
+                        Settings → Updates
+                      </button>
+                    </p>
+                  ) : null}
                 </div>
                 <div className="cargo-dialog-actions">
                   {staging.replaceManifest ? (
@@ -17404,7 +17495,7 @@ export function App() {
                   <button
                     type="button"
                     className="accept"
-                    disabled={busy || !stagingValid}
+                    disabled={busy || !stagingValid || Boolean(clientUpdateBlock)}
                     onClick={() => void onCommitStaging()}
                   >
                     {busy ? (
@@ -17415,6 +17506,8 @@ export function App() {
                         />
                         {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
                       </>
+                    ) : clientUpdateBlock ? (
+                      'Update required'
                     ) : staging.replaceManifest ? (
                       'Save & re-dispatch'
                     ) : (

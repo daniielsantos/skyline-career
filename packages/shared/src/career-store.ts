@@ -351,6 +351,12 @@ export interface CareerStore {
   }): OfflineFeeSummary | null | Promise<OfflineFeeSummary | null>;
   /** In-process world after last load/save — skip blob parse on hot reads. */
   peekEconomyWorld(): CareerEconomyWorld | null;
+  /**
+   * Live read of one economy_meta.misc_json key (Postgres). Used for rare
+   * ops flags so SQL patches apply without waiting for a full rehydrate.
+   * SQLite/JSON omit this — callers fall back to peeked world.
+   */
+  readEconomyMiscField?(key: string): Promise<unknown>;
   /** Schema v4: hub + stock + lots by ICAO. JSON store uses RAM if present. */
   readAirportBoard(icao: string): AirportBoardSnapshot | null;
   /** Hub + stock + clock only (no lots). SQL, no economy blob. */

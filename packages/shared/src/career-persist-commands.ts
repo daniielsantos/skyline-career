@@ -569,6 +569,7 @@ export function executeBuyAircraft(
   try {
     const purchased = purchaseAircraftListing(missions, world, listingId, {
       deliver: opts.deliver,
+      ...(typeof opts.companyId === 'string' ? { companyId: opts.companyId } : {}),
       ...(typeof opts.deliverToIcao === 'string'
         ? { deliverToIcao: opts.deliverToIcao }
         : {}),

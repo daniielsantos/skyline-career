@@ -162,6 +162,7 @@ Não misturar MP, ferry internacional e lease flexível na primeira fatia. Playt
 - ~~Pool no blob~~ **feito (SP):** tabela `aircraft_instances`, unique `(world_id, registration)`, persist incremental; `persist: 'blob'` também grava o pool.
 - **2026-09-19:** claim atômico em RAM (`markDealerInstanceSold` + buy/lease antes do débito); `ownerCompanyId`; HTTP 409 `aircraft_claimed`. Presence board: [`27-mp-presence.md`](./27-mp-presence.md).
 - **2026-09-19 F7 resto:** PG schema **v20** `owner_company_id`; SQLite ALTER; `claimAircraftInstance` / `releaseAircraftInstanceClaim` (PG `FOR UPDATE`, SQLite `BEGIN IMMEDIATE`); buy/lease claim DB before wallet, release on fail.
+- **Diag 2026-09-19 — MP buy 409 after claim:** sintoma `Listing acinst_… is not available` na 2ª conta (ou qualquer buy MP). Causa: claim F7 marca instância `sold` no RAM/DB **antes** do wallet; `resolveAvailableMarketListing` só aceitava `available`, e `executeBuyAircraft` dropava `companyId`. Fix: resolver `sold` + mesmo `companyId` como buyable; passar `companyId` no buy/lease.
 
 ---
 

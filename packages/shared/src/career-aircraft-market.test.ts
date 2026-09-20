@@ -37,7 +37,10 @@ import {
   PLAYER_LEASE_OUT_ENABLED,
 } from './career-aircraft-market.js';
 import { createSeedEconomyWorld } from './career-economy.js';
-import { ensureWorldAircraftPool } from './career-aircraft-pool.js';
+import {
+  ensureWorldAircraftPool,
+  markDealerInstanceSold,
+} from './career-aircraft-pool.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { CONDITION_PRICE_MULT, ECONOMIC_LIFE_HOURS } from './career-aircraft-pricing.js';
 import { economyDayIndex } from './career-weather.js';
@@ -173,6 +176,42 @@ describe('aircraft market', () => {
     assert.equal(aircraft.label, usedGa!.label);
     assert.equal(aircraft.registration, usedGa!.registration);
     assert.equal(state.walletUsd, 0);
+    assert.ok(state.fleet.some((a) => a.id === aircraft.id));
+  });
+
+  it('F7 pre-claim: buyer can still purchase after RAM/DB claim marks sold', () => {
+    const world = createSeedEconomyWorld({ seed: 'acf-mkt-f7-preclaim' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'F7Buyer',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const listings = listAircraftMarket(state, world);
+    const usedGa = listings.find(
+      (l) => l.kind === 'used' && l.aircraftClassId === 'light_ga',
+    );
+    assert.ok(usedGa, 'expected a used light_ga listing');
+    state.walletUsd = usedGa!.askingUsd + 5_000;
+    assert.equal(
+      markDealerInstanceSold(world, usedGa!.id, { companyId: 'co_buyer' }),
+      true,
+    );
+    assert.throws(
+      () =>
+        purchaseAircraftListing(state, world, usedGa!.id, {
+          companyId: 'co_other',
+        }),
+      /not available/i,
+    );
+    const { aircraft, debitUsd } = purchaseAircraftListing(
+      state,
+      world,
+      usedGa!.id,
+      { companyId: 'co_buyer' },
+    );
+    assert.equal(debitUsd, usedGa!.askingUsd);
+    assert.equal(aircraft.ownership, 'owned');
+    assert.equal(aircraft.registration, usedGa!.registration);
     assert.ok(state.fleet.some((a) => a.id === aircraft.id));
   });
 

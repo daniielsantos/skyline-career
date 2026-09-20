@@ -26,6 +26,7 @@ Order: presence UI → online chip → aircraft pool F7 claim.
 - `markDealerInstanceSold(..., { companyId })` stamps `ownerCompanyId` (idempotent same company).
 - Buy/lease: DB `claimAircraftInstance` (PG `FOR UPDATE` / SQLite `BEGIN IMMEDIATE`) **before** wallet; release on fail; HTTP **409** `aircraft_claimed`.
 - PG schema **v20** `owner_company_id` on `aircraft_instances`.
+- **Diag 2026-09-19:** claim marks RAM `sold` before wallet → `resolveAvailableMarketListing` / `executeBuyAircraft` must accept **sold + same `companyId`** (and pass `companyId` through buy). Without that, every MP buy 409s `Listing … is not available` after a successful claim.
 
 ## Non-goals (this wave)
 

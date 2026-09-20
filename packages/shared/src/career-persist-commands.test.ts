@@ -142,6 +142,37 @@ describe('persist commands Accept / Depart / Buy', () => {
     }
   });
 
+  it('BuyAircraft completes after F7 pre-claim when companyId is passed', () => {
+    const world = createSeedEconomyWorld({ seed: 'cmd-buy-f7-preclaim' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'BuyerF7',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.aircraftMarketDemandDay = economyDayIndex(world.tick);
+    const listings = listAircraftMarket(state, world);
+    const usedGa = listings.find(
+      (row) => row.kind === 'used' && row.aircraftClassId === 'light_ga',
+    );
+    assert.ok(usedGa, 'expected a used light_ga listing');
+    state.walletUsd = usedGa!.askingUsd + 5_000;
+    const inst = world.aircraftInstances?.find((row) => row.id === usedGa!.id);
+    assert.ok(inst);
+    inst!.status = 'sold';
+    inst!.ownerCompanyId = 'co_buyer';
+    const withoutCompany = executeBuyAircraft(world, state, {
+      listingId: usedGa!.id,
+    });
+    assert.equal(withoutCompany.kind, 'unavailable');
+    const withCompany = executeBuyAircraft(world, state, {
+      listingId: usedGa!.id,
+      companyId: 'co_buyer',
+    });
+    assert.equal(withCompany.kind, 'applied');
+    if (withCompany.kind !== 'applied') return;
+    assert.equal(withCompany.aircraft.registration, usedGa!.registration);
+    assert.ok(state.fleet.some((a) => a.id === withCompany.aircraft.id));
+  });
+
   it('CancelMission replays without releasing the lot twice', () => {
     const world = createSeedEconomyWorld({ seed: 'cmd-cancel-idem' });
     tickEconomyN(world, 24);

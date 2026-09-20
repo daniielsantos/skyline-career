@@ -1340,14 +1340,23 @@ function resolveAvailableMarketListing(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
   listingId: string,
+  opts?: { companyId?: string },
 ): AircraftListing {
+  const companyId = opts?.companyId?.trim();
   const onBoard = state.aircraftMarket?.find(
     (l) => l.id === listingId && l.status === 'available',
   );
   if (onBoard) return onBoard;
-  const inst = (world.aircraftInstances ?? []).find(
-    (row) => row.id === listingId && row.status === 'available',
-  );
+  const inst = (world.aircraftInstances ?? []).find((row) => {
+    if (row.id !== listingId) return false;
+    if (row.status === 'available') return true;
+    // F7: DB/RAM claim runs before wallet — treat own sold claim as still buyable.
+    return (
+      row.status === 'sold' &&
+      Boolean(companyId) &&
+      row.ownerCompanyId === companyId
+    );
+  });
   if (inst) {
     return instanceToListing(world, inst, world.tick);
   }
@@ -1711,7 +1720,10 @@ export function purchaseAircraftListing(
   deliveryFeeUsd: number;
 } {
   ensureAircraftMarket(state, world);
-  const listing = resolveAvailableMarketListing(state, world, listingId);
+  const companyId = opts?.companyId?.trim();
+  const listing = resolveAvailableMarketListing(state, world, listingId, {
+    companyId,
+  });
   if (listing.kind === 'lease') {
     throw new Error('Use signLease for lease listings');
   }
@@ -1754,7 +1766,6 @@ export function purchaseAircraftListing(
   }
 
   // Claim the dealer hull before wallet debit (F7 race: second buyer sees unavailable).
-  const companyId = opts?.companyId?.trim();
   if (!markDealerInstanceSold(world, listing.id, { companyId })) {
     const boardListing = state.aircraftMarket?.find((l) => l.id === listing.id);
     if (boardListing && boardListing.status === 'available') {
@@ -1821,7 +1832,10 @@ export function signAircraftLease(
   deliveryFeeUsd: number;
 } {
   ensureAircraftMarket(state, world);
-  const listing = resolveAvailableMarketListing(state, world, listingId);
+  const companyId = opts?.companyId?.trim();
+  const listing = resolveAvailableMarketListing(state, world, listingId, {
+    companyId,
+  });
   if (listing.kind !== 'lease') {
     throw new Error('Listing is not a lease');
   }
@@ -1860,7 +1874,6 @@ export function signAircraftLease(
       `Lease entry $${debitUsd.toLocaleString()} exceeds wallet $${state.walletUsd.toLocaleString()}`,
     );
   }
-  const companyId = opts?.companyId?.trim();
   if (!markListingSold(state, world, listing, { companyId })) {
     throw new Error(`Listing ${listingId} is not available`);
   }

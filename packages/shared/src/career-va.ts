@@ -26,9 +26,19 @@ type SqliteDb = DatabaseSync;
 
 /** Soft seat cap (billing expansion later). */
 export const VA_MEMBER_CAP = 8;
-/** Invite TTL. */
-export const VA_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export const VA_INVITE_DEFAULT_MAX_USES = 8;
+/**
+ * Invites do not time-expire. One active code per company; renewing
+ * revokes the previous. `expires_at_ms` stays in schema for revoke/unlist.
+ * @deprecated Prefer {@link VA_INVITE_NEVER_EXPIRES_MS}; kept for callers.
+ */
+export const VA_INVITE_TTL_MS = 0;
+/** Far-future marker written as expires_at_ms for active invites. */
+export const VA_INVITE_NEVER_EXPIRES_MS = Number.MAX_SAFE_INTEGER;
+/**
+ * Soft use counter ceiling — roster {@link VA_MEMBER_CAP} is the real gate.
+ * High enough that reuse after leave/kick does not exhaust the code.
+ */
+export const VA_INVITE_DEFAULT_MAX_USES = 1_000_000;
 /** Ranking rolling window (calendar days). */
 export const VA_RANKING_WINDOW_DAYS = 7;
 
@@ -237,6 +247,7 @@ export function createCompanyInvite(
     createdByAccountId: string;
     role?: CareerAccountRole;
     maxUses?: number;
+    /** Optional timed expiry; omit for never-expires (default). */
     ttlMs?: number;
     nowMs?: number;
   },
@@ -255,9 +266,21 @@ export function createCompanyInvite(
   const now = opts.nowMs ?? Date.now();
   const maxUses = Math.max(
     1,
-    Math.min(VA_MEMBER_CAP, Math.floor(opts.maxUses ?? VA_INVITE_DEFAULT_MAX_USES)),
+    Math.min(
+      VA_INVITE_DEFAULT_MAX_USES,
+      Math.floor(opts.maxUses ?? VA_INVITE_DEFAULT_MAX_USES),
+    ),
   );
-  const expiresAtMs = now + (opts.ttlMs ?? VA_INVITE_TTL_MS);
+  const expiresAtMs =
+    opts.ttlMs != null && opts.ttlMs > 0
+      ? now + opts.ttlMs
+      : VA_INVITE_NEVER_EXPIRES_MS;
+  // One active code: revoke any still-open invites for this company.
+  db.prepare(
+    `UPDATE company_invites
+     SET expires_at_ms = ?
+     WHERE company_id = ? AND expires_at_ms > ?`,
+  ).run(now, opts.companyId, now);
   let code = mintInviteCode();
   for (let i = 0; i < 5; i++) {
     const existing = db

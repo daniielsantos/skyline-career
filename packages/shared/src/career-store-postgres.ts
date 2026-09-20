@@ -32,7 +32,7 @@ import {
 } from './career-auth.js';
 import {
   VA_INVITE_DEFAULT_MAX_USES,
-  VA_INVITE_TTL_MS,
+  VA_INVITE_NEVER_EXPIRES_MS,
   VA_ALREADY_IN_VA_MSG,
   VA_MEMBER_CAP,
   VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
@@ -939,11 +939,18 @@ export class PostgresCareerStore implements CareerStore {
     const maxUses = Math.max(
       1,
       Math.min(
-        VA_MEMBER_CAP,
+        VA_INVITE_DEFAULT_MAX_USES,
         Math.floor(opts.maxUses ?? VA_INVITE_DEFAULT_MAX_USES),
       ),
     );
-    const expiresAtMs = now + VA_INVITE_TTL_MS;
+    const expiresAtMs = VA_INVITE_NEVER_EXPIRES_MS;
+    // One active code: revoke any still-open invites for this company.
+    await this.pool.query(
+      `UPDATE company_invites
+       SET expires_at_ms = $1
+       WHERE company_id = $2 AND expires_at_ms > $1`,
+      [now, opts.companyId],
+    );
     let code = `VA-${randomBytes(4).toString('hex').toUpperCase()}`;
     for (let i = 0; i < 5; i++) {
       const exists = await this.pool.query(

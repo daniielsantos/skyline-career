@@ -5023,6 +5023,19 @@ export function postVaInvite(body: { role?: string; maxUses?: number }) {
   });
 }
 
+export function fetchVaInvites() {
+  return api<{
+    invites: Array<{
+      code: string;
+      companyId: string;
+      role: string;
+      expiresAtMs: number;
+      maxUses: number;
+      uses: number;
+    }>;
+  }>('/api/va/invites');
+}
+
 export function postVaJoin(code: string) {
   return api<{
     companyId: string;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   fetchVaMembers,
   fetchVaJoinRequests,
+  fetchVaInvites,
   postVaInvite,
   postVaAcceptJoinRequest,
   postVaRejectJoinRequest,
@@ -110,8 +111,15 @@ export function VaPage(props: Props) {
         } catch {
           setPendingRequests([]);
         }
+        try {
+          const inv = await fetchVaInvites();
+          setInviteCode(inv.invites[0]?.code ?? null);
+        } catch {
+          setInviteCode(null);
+        }
       } else {
         setPendingRequests([]);
+        setInviteCode(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -665,6 +673,15 @@ export function VaPage(props: Props) {
                 disabled={pageBusy}
                 onClick={() => {
                   void (async () => {
+                    if (inviteCode) {
+                      const ok = await confirm({
+                        title: 'Renew invite code?',
+                        body: 'The current code stops working. Anyone still using the old link will need the new one.',
+                        confirmLabel: 'Renew',
+                        tone: 'warn',
+                      });
+                      if (!ok) return;
+                    }
                     setBusy(true);
                     setError(null);
                     try {
@@ -680,7 +697,7 @@ export function VaPage(props: Props) {
                   })();
                 }}
               >
-                Create invite
+                {inviteCode ? 'Renew invite' : 'Create invite'}
               </button>
             ) : (
               <span className="settings-help">
@@ -700,8 +717,16 @@ export function VaPage(props: Props) {
           {inviteCode ? (
             <p className="settings-sample va-config-invite">
               Invite <strong>{inviteCode}</strong>
+              <span className="settings-help">
+                {' '}
+                · does not expire · renew replaces it
+              </span>
             </p>
-          ) : null}
+          ) : (
+            <p className="settings-help">
+              One invite code per VA. It stays valid until you renew or unlist.
+            </p>
+          )}
 
           <div className="va-config-danger">
             {isOwner ? (

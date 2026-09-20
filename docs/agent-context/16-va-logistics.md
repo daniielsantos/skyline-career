@@ -267,6 +267,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **Config UI (2026-09-19):** recruiting era botão “Stop recruiting” grande (`settings-choice-btn`). Agora checkbox “Open recruiting” + row compacta Create invite / Edit listing.
 
+**Invite code (2026-09-20):** sem TTL. Um código ativo por VA; Create/Renew invalida o anterior (`expires_at_ms = now`). Unlist ainda mata invites. Cap de roster é o gate real (maxUses alto). UI: carrega código ativo + **Renew invite**.
+
 **Leave / Unlist (2026-09-19):** membro já tinha `POST /api/va/leave` (Roster); owner não podia “desfazer VA”. Fix: `vaUnpublish` / `POST /api/va/unpublish` → `va_listed=0`, recruiting off, remove non-owners, reject pending, expire invites. Config: **Unlist VA** (owner) / **Leave VA** (membro) com confirm. Leave devolve `homeCompanyId` + companies pra trocar de tenant.
 
 **VA name reset to pilot (2026-09-19):** Save/select-hub escrevia `missions.pilotName` em `companies.display_name` (COALESCE), apagando Lamusine→Nothin. Fix: persist company state / select-hub só atualizam `home_hub_icao`; listing name só via `vaPublish`.

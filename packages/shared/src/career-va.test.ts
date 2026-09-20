@@ -164,6 +164,61 @@ describe('VA IH-2', () => {
     );
   });
 
+  it('invite never expires and renew revokes prior code', async () => {
+    const owner = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_invite_ttl',
+        displayName: 'Invite TTL',
+        password: 'secret1',
+      }),
+    );
+    assert.ok(owner.company);
+    const companyId = owner.company!.id;
+
+    const first = await Promise.resolve(
+      store.vaCreateInvite({
+        companyId,
+        createdByAccountId: owner.account.id,
+      }),
+    );
+    assert.ok(first.expiresAtMs > Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+    const second = await Promise.resolve(
+      store.vaCreateInvite({
+        companyId,
+        createdByAccountId: owner.account.id,
+      }),
+    );
+    assert.notEqual(first.code, second.code);
+
+    const open = await Promise.resolve(store.vaListInvites(companyId));
+    assert.equal(open.length, 1);
+    assert.equal(open[0]?.code, second.code);
+
+    const pilot = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_invite_ttl_p',
+        displayName: 'Invite Pilot',
+        password: 'secret1',
+      }),
+    );
+    await assert.rejects(
+      async () =>
+        store.vaJoinInvite({
+          code: first.code,
+          accountId: pilot.account.id,
+        }),
+      /expired/i,
+    );
+    const joined = await Promise.resolve(
+      store.vaJoinInvite({
+        code: second.code,
+        accountId: pilot.account.id,
+      }),
+    );
+    assert.equal(joined.companyId, companyId);
+  });
+
   it('lists open Internal Haul holds on the VA board', () => {
     const world = createSeedEconomyWorld({ seed: 'va-board' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {

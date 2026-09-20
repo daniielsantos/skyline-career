@@ -25,7 +25,7 @@ export type PlayerAircraft = {
   locationIcao: string;
   fuelKg: number;
   fuelCapacityKg: number;
-  status: 'parked' | 'assigned' | 'maintenance' | 'listed' | 'leased_out';
+  status: 'parked' | 'assigned' | 'maintenance' | 'listed' | 'leased_out' | 'ferry';
   assignedMissionId?: string;
   ownership?: 'owned' | 'leased';
   condition?: 'excellent' | 'good' | 'fair' | 'tired';
@@ -57,6 +57,12 @@ export type PlayerAircraft = {
   };
   /** Daily hangar fee when parked/maintenance; null when exempt. */
   parkingUsdPerDay?: number | null;
+  npcFerry?: {
+    originIcao: string;
+    destIcao: string;
+    arriveAtTick: number;
+    distanceNm?: number;
+  };
 };
 
 export type CareerLedgerKind =
@@ -4958,9 +4964,45 @@ export function fetchVaMembers() {
     members: VaMember[];
     listed: boolean;
     recruiting: boolean;
+    memberRouteCutPct: number;
     displayName: string;
     homeHubIcao: string;
+    lineCrew: {
+      hired: boolean;
+      allowance: number;
+      used: number;
+      remaining: number;
+      hireUsd: number;
+      salaryUsdPerWeek: number;
+      fireSeveranceUsd: number;
+    } | null;
   }>('/api/va/members');
+}
+
+export function postVaRouteCut(memberRouteCutPct: number) {
+  return api<{ memberRouteCutPct: number }>('/api/va/route-cut', {
+    method: 'POST',
+    body: JSON.stringify({ memberRouteCutPct }),
+  });
+}
+
+export function postVaLineCrew(action: 'hire' | 'fire') {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    lineCrew: {
+      hired: boolean;
+      allowance: number;
+      used: number;
+      remaining: number;
+      hireUsd: number;
+      salaryUsdPerWeek: number;
+      fireSeveranceUsd: number;
+    };
+  }>('/api/va/line-crew', {
+    method: 'POST',
+    body: JSON.stringify({ action }),
+  });
 }
 
 export function postVaInvite(body: { role?: string; maxUses?: number }) {
@@ -4991,7 +5033,11 @@ export function postVaJoin(code: string) {
 }
 
 export function postVaLeave() {
-  return api<{ ok: boolean }>('/api/va/leave', {
+  return api<{
+    ok: boolean;
+    homeCompanyId: string | null;
+    companies: Array<{ id: string; displayName: string }>;
+  }>('/api/va/leave', {
     method: 'POST',
     body: '{}',
   });
@@ -5039,6 +5085,8 @@ export type VaDirectoryEntry = {
   aircraftCount?: number;
   recruiting: boolean;
   listed?: boolean;
+  /** % of Freights/Demand/Charter route net paid to the flying member. */
+  memberRouteCutPct?: number;
   seatsOpen: number;
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
 };
@@ -5056,7 +5104,10 @@ export type VaJoinRequest = {
 
 export function fetchVaDirectory(opts?: { includeClosed?: boolean }) {
   const q = opts?.includeClosed ? '?includeClosed=1' : '';
-  return api<{ directory: VaDirectoryEntry[] }>(`/api/va/directory${q}`);
+  return api<{
+    directory: VaDirectoryEntry[];
+    memberOfVaCompanyId: string | null;
+  }>(`/api/va/directory${q}`);
 }
 
 export function postVaJoinRequest(companyId: string) {
@@ -5107,5 +5158,16 @@ export function postVaPublish(body: {
   }>('/api/va/publish', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export function postVaUnpublish() {
+  return api<{
+    companyId: string;
+    listed: false;
+    removedMembers: number;
+  }>('/api/va/unpublish', {
+    method: 'POST',
+    body: '{}',
   });
 }

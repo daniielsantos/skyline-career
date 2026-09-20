@@ -325,6 +325,28 @@ export function normalizeMissionsState(
     lastSeenTickRaw >= 0
       ? Math.floor(lastSeenTickRaw)
       : undefined;
+  const vaLineCrewRaw = (raw as CareerMissionsState).vaLineCrew;
+  const vaLineCrew =
+    vaLineCrewRaw && typeof vaLineCrewRaw === 'object'
+      ? {
+          hired: vaLineCrewRaw.hired === true,
+          hiredAtTick:
+            typeof vaLineCrewRaw.hiredAtTick === 'number' &&
+            Number.isFinite(vaLineCrewRaw.hiredAtTick)
+              ? Math.max(0, Math.floor(vaLineCrewRaw.hiredAtTick))
+              : 0,
+          weekKey:
+            typeof vaLineCrewRaw.weekKey === 'number' &&
+            Number.isFinite(vaLineCrewRaw.weekKey)
+              ? Math.floor(vaLineCrewRaw.weekKey)
+              : 0,
+          usedThisWeek:
+            typeof vaLineCrewRaw.usedThisWeek === 'number' &&
+            Number.isFinite(vaLineCrewRaw.usedThisWeek)
+              ? Math.max(0, Math.floor(vaLineCrewRaw.usedThisWeek))
+              : 0,
+        }
+      : undefined;
   const result: CareerMissionsState = {
     version: 2,
     walletUsd,
@@ -346,6 +368,7 @@ export function normalizeMissionsState(
     groundStaff,
     ferrySoftNmUsed,
     ...(lastSeenTick !== undefined ? { lastSeenTick } : {}),
+    ...(vaLineCrew ? { vaLineCrew } : {}),
     portPickups: Array.isArray((raw as CareerMissionsState).portPickups)
       ? (raw as CareerMissionsState).portPickups
       : [],
@@ -495,7 +518,9 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
           ? 'listed'
           : raw.status === 'leased_out'
             ? 'leased_out'
-            : 'parked';
+            : raw.status === 'ferry'
+              ? 'ferry'
+              : 'parked';
   const ownership =
     raw.ownership === 'leased' || raw.ownership === 'owned'
       ? raw.ownership
@@ -625,7 +650,27 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
       Number.isFinite(raw.hoursSinceInspection)
         ? Math.max(0, raw.hoursSinceInspection)
         : undefined,
+    npcFerry:
+      raw.npcFerry &&
+      typeof raw.npcFerry === 'object' &&
+      typeof raw.npcFerry.destIcao === 'string' &&
+      typeof raw.npcFerry.originIcao === 'string' &&
+      typeof raw.npcFerry.arriveAtTick === 'number'
+        ? {
+            originIcao: String(raw.npcFerry.originIcao).trim().toUpperCase(),
+            destIcao: String(raw.npcFerry.destIcao).trim().toUpperCase(),
+            arriveAtTick: Math.max(0, Math.floor(raw.npcFerry.arriveAtTick)),
+            distanceNm:
+              typeof raw.npcFerry.distanceNm === 'number' &&
+              Number.isFinite(raw.npcFerry.distanceNm)
+                ? Math.max(0, raw.npcFerry.distanceNm)
+                : undefined,
+          }
+        : undefined,
   };
+  if (normalized.npcFerry && normalized.status !== 'ferry') {
+    normalized.status = 'ferry';
+  }
   ensureAircraftConditionPcts(normalized);
   const reg = normalizeAircraftRegistration(raw.registration);
   if (reg) normalized.registration = reg;
@@ -1344,6 +1389,11 @@ export function quoteFerry(
   if (aircraft.status !== 'parked') {
     throw new Error(`Aircraft ${aircraft.id} is not parked`);
   }
+  if (aircraft.npcFerry) {
+    throw new Error(
+      `Aircraft ${aircraft.id} is already on an NPC ferry to ${aircraft.npcFerry.destIcao}`,
+    );
+  }
   const dest = opts.destIcao.trim().toUpperCase();
   if (!isKnownFerryPoint(dest)) {
     throw new Error(`Unknown career hub: ${dest}`);
@@ -1421,14 +1471,25 @@ export function quoteFerry(
 export function executeFerry(
   world: CareerEconomyWorld,
   state: CareerMissionsState,
-  opts: { aircraftId: string; destIcao: string },
+  opts: {
+    aircraftId: string;
+    destIcao: string;
+    /** Skip VA/ops wallet debit (Line-crew allowance or cross-company overflow). */
+    skipWalletDebit?: boolean;
+    /**
+     * NPC Line-crew reposition: burn fuel now, arrive at tick (status `ferry`).
+     * When omitted, ferry completes instantly (paid Hangar ferry).
+     */
+    npcArriveAtTick?: number;
+  },
 ): {
   aircraft: PlayerAircraft;
   quote: FerryQuote;
   walletDebitUsd: number;
 } {
   const quote = quoteFerry(world, state, opts);
-  if (state.walletUsd < quote.totalCostUsd) {
+  const skipWallet = opts.skipWalletDebit === true;
+  if (!skipWallet && state.walletUsd < quote.totalCostUsd) {
     throw new Error(
       `Ferry costs $${quote.totalCostUsd.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
     );
@@ -1466,21 +1527,42 @@ export function executeFerry(
     0,
     Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg - quote.fuelNeededKg),
   );
-  aircraft.locationIcao = quote.destIcao;
-  aircraft.status = 'parked';
   aircraft.assignedMissionId = undefined;
 
-  applyWalletDelta(state, {
-    amountUsd: -quote.totalCostUsd,
-    kind: 'ferry',
-    atTick: world.tick,
-    aircraftId: aircraft.id,
-    icao: quote.destIcao,
-    note:
-      quote.softNmApplied > 0
-        ? `${quote.originIcao}→${quote.destIcao} (early soft ${Math.round(quote.softNmApplied)} nm)`
-        : `${quote.originIcao}→${quote.destIcao}`,
-  });
+  const npcArrive =
+    typeof opts.npcArriveAtTick === 'number' &&
+    Number.isFinite(opts.npcArriveAtTick)
+      ? Math.max(world.tick + 1, Math.floor(opts.npcArriveAtTick))
+      : undefined;
+
+  if (npcArrive != null) {
+    aircraft.status = 'ferry';
+    aircraft.npcFerry = {
+      originIcao: quote.originIcao,
+      destIcao: quote.destIcao,
+      arriveAtTick: npcArrive,
+      distanceNm: quote.distanceNm,
+    };
+  } else {
+    aircraft.locationIcao = quote.destIcao;
+    aircraft.status = 'parked';
+    aircraft.npcFerry = undefined;
+  }
+
+  const walletDebitUsd = skipWallet ? 0 : quote.totalCostUsd;
+  if (walletDebitUsd > 0) {
+    applyWalletDelta(state, {
+      amountUsd: -walletDebitUsd,
+      kind: 'ferry',
+      atTick: world.tick,
+      aircraftId: aircraft.id,
+      icao: quote.destIcao,
+      note:
+        quote.softNmApplied > 0
+          ? `${quote.originIcao}→${quote.destIcao} (early soft ${Math.round(quote.softNmApplied)} nm)`
+          : `${quote.originIcao}→${quote.destIcao}`,
+    });
+  }
 
   if (quote.softNmApplied > 0) {
     state.ferrySoftNmUsed =
@@ -1491,6 +1573,6 @@ export function executeFerry(
   return {
     aircraft,
     quote,
-    walletDebitUsd: quote.totalCostUsd,
+    walletDebitUsd,
   };
 }

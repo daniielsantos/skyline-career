@@ -132,6 +132,7 @@ import {
   postAuthLogin,
   postAuthRegister,
   postAuthLogout,
+  fetchVaMembers,
   fetchCareerHealth,
   resolveClientUpdateBlock,
   formatClientUpdateRequiredLabel,
@@ -3531,6 +3532,8 @@ export function App() {
   const [devMode, setDevMode] = useState(loadDevMode);
   const [companies, setCompanies] = useState<CareerCompanyView[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState(getStoredCompanyId);
+  /** VA-listed company + non-owner → Hangar MX/sell locked (ferry ok). */
+  const [vaHangarMutationsLocked, setVaHangarMutationsLocked] = useState(false);
   const [worldPresence, setWorldPresence] = useState<{
     onlineCount: number;
     recent: Array<{ companyDisplayName: string; summary: string }>;
@@ -3538,6 +3541,27 @@ export function App() {
 
   useEffect(() => {
     setActiveCompanyIdForRequests(activeCompanyId);
+  }, [activeCompanyId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeCompanyId || !getAuthToken()) {
+      setVaHangarMutationsLocked(false);
+      return;
+    }
+    void fetchVaMembers()
+      .then((m) => {
+        if (cancelled) return;
+        setVaHangarMutationsLocked(
+          Boolean(m.listed) && m.role !== 'owner',
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setVaHangarMutationsLocked(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [activeCompanyId]);
 
   const [ofpAutoStatus, setOfpAutoStatus] =
@@ -18374,13 +18398,33 @@ export function App() {
           busy={busy}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
-          renderHangarCard={(acf) => (
+          onLeftVa={async ({ homeCompanyId, companies }) => {
+            setCompanies(
+              companies.map((c) => ({
+                id: c.id,
+                displayName: c.displayName,
+              })),
+            );
+            const next =
+              homeCompanyId?.trim() ||
+              companies.find((c) => c.id !== activeCompanyId)?.id ||
+              null;
+            if (next) {
+              await switchCompany(next);
+            }
+            selectTab('vaDirectory');
+          }}
+          onUnpublished={() => {
+            selectTab('pilot');
+          }}
+          renderHangarCard={(acf, hangarOpts) => (
             <HangarAircraftCard
               key={acf.id}
               aircraft={acf}
               catalog={hangarCatalogEntry(acf)}
               cabinStatus={hangarCabinStatus(acf)}
               busy={busy}
+              mutationsLocked={hangarOpts.mutationsLocked}
               hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({
                 icao: hub.icao,
                 name: hub.name,
@@ -18880,6 +18924,7 @@ export function App() {
                       catalog={hangarCatalogEntry(acf)}
                       cabinStatus={hangarCabinStatus(acf)}
                       busy={busy}
+                      mutationsLocked={vaHangarMutationsLocked}
                       hubOptions={ferryDestinationHubs(hubOptions).map(
                         (hub) => ({
                           icao: hub.icao,

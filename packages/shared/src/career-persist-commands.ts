@@ -24,6 +24,7 @@ import {
   type SettleMissionResult,
 } from './career-mission.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
+import { quoteMemberRouteCutUsd } from './career-va.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
@@ -164,6 +165,11 @@ export function applySettleWalletDeltas(
   opts?: {
     /** Active VA / ops company id for this settle write. */
     companyId?: string;
+    /**
+     * VA member Freights/Demand/Charter cut % (route net = payout − fuel).
+     * Applied when pilotHomeCompanyId ≠ ops company and mission is not Internal Haul.
+     */
+    memberRouteCutPct?: number;
   },
 ): ApplySettleWalletDeltasResult {
   const mission = result.mission;
@@ -174,12 +180,11 @@ export function applySettleWalletDeltas(
     const pilotHome = mission.pilotHomeCompanyId?.trim() || '';
     const opsCompany = opts?.companyId?.trim() || '';
     const crossCompany =
-      internalHaul &&
       Boolean(pilotHome) &&
       Boolean(opsCompany) &&
       pilotHome !== opsCompany;
 
-    if (crossCompany) {
+    if (internalHaul && crossCompany) {
       // VA pays the pilot's home company — debit only on this wallet.
       applyWalletDelta(missions, {
         amountUsd: -result.walletCreditUsd,
@@ -240,13 +245,54 @@ export function applySettleWalletDeltas(
       note: 'settlement fuel',
     });
   }
+
+  // Member route cut: Freights/Demand/Charter only (not Internal Haul).
+  const internalHaul =
+    mission.warehouseBridge === true && mission.internalHaul === true;
+  const pilotHome = mission.pilotHomeCompanyId?.trim() || '';
+  const opsCompany = opts?.companyId?.trim() || '';
+  const cutPct = opts?.memberRouteCutPct;
+  if (
+    !internalHaul &&
+    result.walletCreditUsd > 0 &&
+    typeof cutPct === 'number' &&
+    pilotHome &&
+    opsCompany &&
+    pilotHome !== opsCompany
+  ) {
+    const pilotUsd = quoteMemberRouteCutUsd(
+      result.walletCreditUsd,
+      result.fuelDebitUsd,
+      cutPct,
+    );
+    if (pilotUsd > 0) {
+      applyWalletDelta(missions, {
+        amountUsd: -pilotUsd,
+        kind: 'va_member_cut',
+        atTick,
+        missionId: mission.id,
+        icao: mission.originIcao,
+        note: `VA member cut ${cutPct}% · ${mission.originIcao}→${mission.destIcao}`,
+      });
+      out.pilotPayCredit = {
+        companyId: pilotHome,
+        amountUsd: pilotUsd,
+        missionId: mission.id,
+        originIcao: mission.originIcao,
+        destIcao: mission.destIcao,
+      };
+    }
+  }
+
   return out;
 }
 
 export type ExecuteSettleFlightOpts = SettleMissionOpts & {
   missionId: string;
-  /** Ops company for Internal Haul cross-wallet pay. */
+  /** Ops company for Internal Haul / member-cut cross-wallet pay. */
   companyId?: string;
+  /** VA member Freights/Demand/Charter cut % of route net. */
+  memberRouteCutPct?: number;
 };
 
 export type ExecuteSettleFlightResult =
@@ -285,7 +331,7 @@ export function executeSettleFlight(
       },
     };
   }
-  const { missionId: _id, companyId, ...settleOpts } = opts;
+  const { missionId: _id, companyId, memberRouteCutPct, ...settleOpts } = opts;
   const result = settleMission(world, open, {
     ...settleOpts,
     fleet: settleOpts.fleet ?? missions,
@@ -293,6 +339,7 @@ export function executeSettleFlight(
   missions.missions[idx] = result.mission;
   const wallet = applySettleWalletDeltas(missions, world.tick, result, {
     companyId,
+    memberRouteCutPct,
   });
   return {
     kind: 'applied',
@@ -312,6 +359,10 @@ export type ExecuteAcceptLotOpts = {
   classOps?: CareerMissionsState['classOps'];
   /** Claiming company — SP defaults to LOCAL_COMPANY_ID. */
   companyId?: string;
+  /** Flying account — used for VA member route cut on settle. */
+  pilotAccountId?: string;
+  /** Pilot home company — cut credits here when ≠ ops company. */
+  pilotHomeCompanyId?: string;
 };
 
 export type ExecuteAcceptLotResult =
@@ -353,7 +404,7 @@ export function executeAcceptLot(
 
   const beforeLots = intoMission?.lots.length ?? 0;
   try {
-    const mission = acceptMission(world, {
+    let mission = acceptMission(world, {
       lotId,
       cargoKg: opts.cargoKg,
       aircraftClassId: opts.aircraftClassId,
@@ -364,6 +415,7 @@ export function executeAcceptLot(
       classOps: opts.classOps,
       companyId,
     });
+    mission = stampMissionPilot(mission, opts);
     const appended = Boolean(intoMission) && mission.lots.length > beforeLots;
     upsertCompanyMission(missions, mission);
     return { kind: 'applied', mission, appended };
@@ -373,6 +425,23 @@ export function executeAcceptLot(
     }
     throw err;
   }
+}
+
+function stampMissionPilot(
+  mission: MissionIntent,
+  opts: {
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+  },
+): MissionIntent {
+  const pilotAccountId = opts.pilotAccountId?.trim() || undefined;
+  const pilotHomeCompanyId = opts.pilotHomeCompanyId?.trim() || undefined;
+  if (!pilotAccountId && !pilotHomeCompanyId) return mission;
+  return {
+    ...mission,
+    ...(pilotAccountId ? { pilotAccountId } : {}),
+    ...(pilotHomeCompanyId ? { pilotHomeCompanyId } : {}),
+  };
 }
 
 export type ExecuteAcceptManifestOpts = {
@@ -386,6 +455,8 @@ export type ExecuteAcceptManifestOpts = {
   classOps?: CareerMissionsState['classOps'];
   /** Claiming company — SP defaults to LOCAL_COMPANY_ID. */
   companyId?: string;
+  pilotAccountId?: string;
+  pilotHomeCompanyId?: string;
 };
 
 export type ExecuteAcceptManifestResult =
@@ -457,10 +528,11 @@ export function executeAcceptManifest(
       classOps: opts.classOps,
       companyId,
     });
-    upsertCompanyMission(missions, staged.mission);
+    const mission = stampMissionPilot(staged.mission, opts);
+    upsertCompanyMission(missions, mission);
     return {
       kind: 'applied',
-      mission: staged.mission,
+      mission,
       appended: staged.appended,
       lineCount: staged.lineCount,
     };

@@ -2113,6 +2113,49 @@ describe('settleMission', () => {
     assert.equal(result.settlement.destStockAfterKg, destAfter);
   });
 
+  it('VA member progression XP applies to progression bag, not ops fleet', () => {
+    const world = createSeedEconomyWorld({ seed: 'settle-va-prog' });
+    tickEconomyN(world, 24);
+    const lot = firstBookableLot(world, 5_000);
+    const mission = acceptMission(world, {
+      lotId: lot.id,
+      cargoKg: 5_000,
+      aircraftClassId: 'narrow_freighter',
+      missionId: 'msn_settle_va_prog',
+    });
+    const departed = departMission(world, { ...mission, status: 'dispatched' });
+    const vaFleet = emptyMissionsStateV2();
+    const homeProg = {
+      cargoOps: structuredClone(vaFleet.cargoOps),
+      classOps: structuredClone(vaFleet.classOps),
+    };
+    const vaCargoSnap = JSON.stringify(vaFleet.cargoOps);
+    const vaClassSnap = JSON.stringify(vaFleet.classOps);
+    const homeCargoSnap = JSON.stringify(homeProg.cargoOps);
+    const result = settleMission(world, departed.mission, {
+      skipMinAirborneGate: true,
+      fleet: vaFleet,
+      progression: homeProg,
+      flightScore: { earned: 45, max: 51, pct: 90, categories: [] },
+    });
+    assert.ok((result.cargoOpsDeltas?.length ?? 0) > 0);
+    assert.equal(
+      JSON.stringify(vaFleet.cargoOps),
+      vaCargoSnap,
+      'VA ops company must not receive member Cargo Ops XP',
+    );
+    assert.equal(
+      JSON.stringify(vaFleet.classOps),
+      vaClassSnap,
+      'VA ops company must not receive member Class Ops XP',
+    );
+    assert.notEqual(
+      JSON.stringify(homeProg.cargoOps),
+      homeCargoSnap,
+      'pilot home progression bag receives Cargo Ops XP',
+    );
+  });
+
   it('SettleFlight replays a settled mission without a second payout', () => {
     const world = createSeedEconomyWorld({ seed: 'settle-flight-idem' });
     tickEconomyN(world, 24);

@@ -2397,6 +2397,11 @@ export interface SettleMissionOpts {
   skipMinAirborneGate?: boolean;
   /** Multiply airframe/engine hours applied on settle (crew wear perk). */
   hoursMult?: number;
+  /**
+   * When set (VA member), Cargo/Class Ops XP applies here instead of `fleet`.
+   * Fleet still relocates aircraft / fuel. Caller persists this bag to pilot home.
+   */
+  progression?: Pick<CareerMissionsState, 'cargoOps' | 'classOps'>;
 }
 
 export interface SettleMissionResult {
@@ -2914,12 +2919,13 @@ export function settleMission(
     !working.contractPilotReposition &&
     !working.emptyFlight
   ) {
-    const applied = applyCargoOpsOnSettle(opts.fleet.cargoOps, settled, {
+    const progressionHost = opts.progression ?? opts.fleet;
+    const applied = applyCargoOpsOnSettle(progressionHost.cargoOps, settled, {
       onTime: pay.onTime,
       lateTicks: pay.lateTicks,
       flightScore: opts.flightScore ?? settled.settledFlightScore,
     });
-    opts.fleet.cargoOps = applied.cargoOps;
+    progressionHost.cargoOps = applied.cargoOps;
     cargoOpsDeltas = applied.deltas;
 
     const blockHours = estimateMissionBlockHours(
@@ -2934,12 +2940,12 @@ export function settleMission(
       opts.hoursMult > 0
         ? opts.hoursMult
         : 1;
-    const classApplied = applyClassOpsOnSettle(opts.fleet.classOps, settled, {
+    const classApplied = applyClassOpsOnSettle(progressionHost.classOps, settled, {
       onTime: pay.onTime,
       blockHours: blockHours * hoursMult,
       flightScore: opts.flightScore ?? settled.settledFlightScore,
     });
-    opts.fleet.classOps = classApplied.classOps;
+    progressionHost.classOps = classApplied.classOps;
     classOpsDeltas = classApplied.deltas;
   }
 

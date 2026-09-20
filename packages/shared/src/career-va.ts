@@ -14,6 +14,7 @@ import {
 } from './career-auth.js';
 import { ensureV12Ddl } from './career-store-v12.js';
 import { ensureV13Ddl } from './career-store-v13.js';
+import { ensureV14Ddl } from './career-store-v14.js';
 import type {
   CareerMissionsState,
   MissionIntent,
@@ -30,6 +31,72 @@ export const VA_INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const VA_INVITE_DEFAULT_MAX_USES = 8;
 /** Ranking rolling window (calendar days). */
 export const VA_RANKING_WINDOW_DAYS = 7;
+
+/** Pilot share of Freights/Demand/Charter route net (payout − fuel). */
+export const VA_MEMBER_ROUTE_CUT_DEFAULT_PCT = 30;
+export const VA_MEMBER_ROUTE_CUT_MIN_PCT = 10;
+export const VA_MEMBER_ROUTE_CUT_MAX_PCT = 50;
+
+export function clampMemberRouteCutPct(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n)) return VA_MEMBER_ROUTE_CUT_DEFAULT_PCT;
+  return Math.max(
+    VA_MEMBER_ROUTE_CUT_MIN_PCT,
+    Math.min(VA_MEMBER_ROUTE_CUT_MAX_PCT, Math.round(n)),
+  );
+}
+
+/** One listed VA membership per account (join / request gate). */
+export const VA_ALREADY_IN_VA_MSG =
+  'Already in a VA — leave it (or unlist if you own it) before joining another';
+
+export function findAccountListedVaMembership(
+  db: SqliteDb,
+  accountId: string,
+): { companyId: string; role: CareerAccountRole } | null {
+  ensureV13Ddl(db);
+  const row = db
+    .prepare(
+      `SELECT m.company_id, m.role
+       FROM company_members m
+       JOIN companies c ON c.id = m.company_id
+       WHERE m.account_id = ? AND IFNULL(c.va_listed, 0) != 0
+       ORDER BY m.created_at_ms ASC
+       LIMIT 1`,
+    )
+    .get(accountId) as { company_id: string; role: string } | undefined;
+  if (!row) return null;
+  return {
+    companyId: row.company_id,
+    role: normalizeRole(row.role),
+  };
+}
+
+/**
+ * Block joining / requesting a different listed VA while already a member
+ * of any `va_listed` company (including owning your own published VA).
+ */
+export function assertAccountCanJoinVa(
+  db: SqliteDb,
+  accountId: string,
+  targetCompanyId: string,
+): void {
+  const current = findAccountListedVaMembership(db, accountId);
+  if (!current) return;
+  if (current.companyId === targetCompanyId.trim()) return;
+  throw new Error(VA_ALREADY_IN_VA_MSG);
+}
+
+export function quoteMemberRouteCutUsd(
+  payoutUsd: number,
+  fuelDebitUsd: number,
+  cutPct: number,
+): number {
+  const routeNet = Math.max(0, payoutUsd - Math.max(0, fuelDebitUsd));
+  const pct = clampMemberRouteCutPct(cutPct);
+  if (routeNet <= 0 || pct <= 0) return 0;
+  return Math.round((routeNet * pct) / 100);
+}
 
 export type CareerCompanyInvite = {
   code: string;
@@ -291,6 +358,7 @@ export function joinCompanyWithInvite(
   if (getCompanyMembership(db, opts.accountId, row.company_id)) {
     throw new Error('Already a member of this company');
   }
+  assertAccountCanJoinVa(db, opts.accountId, row.company_id);
   const count = countCompanyMembers(db, row.company_id);
   if (count >= VA_MEMBER_CAP) {
     throw new Error(`Company is full (max ${VA_MEMBER_CAP} members)`);
@@ -514,6 +582,8 @@ export type VaDirectoryEntry = {
   aircraftCount: number;
   recruiting: boolean;
   listed: boolean;
+  /** % of Freights/Demand/Charter route net paid to the flying member. */
+  memberRouteCutPct: number;
   seatsOpen: number;
   /** Pending request from the viewing account, if any. */
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
@@ -532,6 +602,39 @@ export type VaJoinRequestRow = {
 
 function mintJoinRequestId(): string {
   return `jr_${randomBytes(8).toString('hex')}`;
+}
+
+export function getCompanyMemberRouteCutPct(
+  db: SqliteDb,
+  companyId: string,
+): number {
+  ensureV14Ddl(db);
+  const row = db
+    .prepare(`SELECT member_route_cut_pct FROM companies WHERE id = ?`)
+    .get(companyId) as { member_route_cut_pct: number } | undefined;
+  if (!row) return VA_MEMBER_ROUTE_CUT_DEFAULT_PCT;
+  return clampMemberRouteCutPct(row.member_route_cut_pct);
+}
+
+export function setCompanyMemberRouteCutPct(
+  db: SqliteDb,
+  opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberRouteCutPct: number;
+  },
+): number {
+  ensureV14Ddl(db);
+  const actor = getCompanyMembership(db, opts.actorAccountId, opts.companyId);
+  if (!actor || actor.role !== 'owner') {
+    throw new Error('Only owner can change member route cut');
+  }
+  const pct = clampMemberRouteCutPct(opts.memberRouteCutPct);
+  db.prepare(`UPDATE companies SET member_route_cut_pct = ? WHERE id = ?`).run(
+    pct,
+    opts.companyId,
+  );
+  return pct;
 }
 
 export function isCompanyRecruiting(db: SqliteDb, companyId: string): boolean {
@@ -566,6 +669,7 @@ export type VaPublishResult = {
   homeHubIcao: string;
   recruiting: boolean;
   listed: boolean;
+  memberRouteCutPct: number;
 };
 
 /**
@@ -580,9 +684,10 @@ export function publishCompanyAsVa(
     displayName: string;
     homeHubIcao: string;
     recruiting?: boolean;
+    memberRouteCutPct?: number;
   },
 ): VaPublishResult {
-  ensureV13Ddl(db);
+  ensureV14Ddl(db);
   const companyId = opts.companyId.trim();
   if (!companyId) throw new Error('companyId required');
   const actor = getCompanyMembership(db, opts.actorAccountId, companyId);
@@ -601,15 +706,74 @@ export function publishCompanyAsVa(
     throw new Error('homeHubIcao must be a 3–4 letter ICAO');
   }
   const recruiting = opts.recruiting !== false;
+  const memberRouteCutPct = clampMemberRouteCutPct(
+    opts.memberRouteCutPct ?? VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
+  );
   db.prepare(
-    `UPDATE companies SET display_name = ?, home_hub_icao = ?, recruiting = ?, va_listed = 1 WHERE id = ?`,
-  ).run(displayName, homeHubIcao, recruiting ? 1 : 0, companyId);
+    `UPDATE companies SET display_name = ?, home_hub_icao = ?, recruiting = ?, va_listed = 1, member_route_cut_pct = ? WHERE id = ?`,
+  ).run(
+    displayName,
+    homeHubIcao,
+    recruiting ? 1 : 0,
+    memberRouteCutPct,
+    companyId,
+  );
   return {
     companyId,
     displayName,
     homeHubIcao,
     recruiting,
     listed: true,
+    memberRouteCutPct,
+  };
+}
+
+/**
+ * Owner unlists the company as a VA. Wallet/fleet/owner stay.
+ * Non-owner roster members are removed; pending requests rejected; invites expired.
+ */
+export function unpublishCompanyAsVa(
+  db: SqliteDb,
+  opts: {
+    companyId: string;
+    actorAccountId: string;
+    nowMs?: number;
+  },
+): { companyId: string; listed: false; removedMembers: number } {
+  ensureV13Ddl(db);
+  const companyId = opts.companyId.trim();
+  if (!companyId) throw new Error('companyId required');
+  const actor = getCompanyMembership(db, opts.actorAccountId, companyId);
+  if (!actor || actor.role !== 'owner') {
+    throw new Error('Only owner can unlist this VA');
+  }
+  if (!isCompanyVaListed(db, companyId)) {
+    throw new Error('Company is not listed as a VA');
+  }
+  const now = opts.nowMs ?? Date.now();
+  db.prepare(
+    `UPDATE company_join_requests
+     SET status = 'rejected', decided_at_ms = ?, decided_by_account_id = ?
+     WHERE company_id = ? AND status = 'pending'`,
+  ).run(now, opts.actorAccountId, companyId);
+  db.prepare(
+    `UPDATE company_invites
+     SET expires_at_ms = ?
+     WHERE company_id = ? AND expires_at_ms > ?`,
+  ).run(now, companyId, now);
+  const removed = db
+    .prepare(
+      `DELETE FROM company_members
+       WHERE company_id = ? AND role != 'owner'`,
+    )
+    .run(companyId);
+  db.prepare(
+    `UPDATE companies SET va_listed = 0, recruiting = 0 WHERE id = ?`,
+  ).run(companyId);
+  return {
+    companyId,
+    listed: false,
+    removedMembers: Number(removed.changes ?? 0),
   };
 }
 
@@ -632,13 +796,14 @@ export function listVaDirectory(
     limit?: number;
   } = {},
 ): VaDirectoryEntry[] {
-  ensureV13Ddl(db);
+  ensureV14Ddl(db);
   const limit = Math.max(1, Math.min(100, opts.limit ?? 50));
   const includeClosed = opts.includeClosed === true;
   const worldId = opts.worldId?.trim() || null;
   const rows = db
     .prepare(
       `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
+              c.member_route_cut_pct,
               (SELECT COUNT(*) FROM company_members m WHERE m.company_id = c.id) AS member_count,
               (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.company_id = c.id) AS aircraft_count
        FROM companies c
@@ -654,6 +819,7 @@ export function listVaDirectory(
     home_hub_icao: string;
     recruiting: number;
     va_listed: number;
+    member_route_cut_pct: number;
     member_count: number;
     aircraft_count: number;
   }>;
@@ -689,6 +855,7 @@ export function listVaDirectory(
       aircraftCount,
       recruiting,
       listed: Number(row.va_listed) !== 0,
+      memberRouteCutPct: clampMemberRouteCutPct(row.member_route_cut_pct),
       seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
       myRequestStatus,
     });
@@ -706,6 +873,7 @@ export function createJoinRequest(
   if (getCompanyMembership(db, opts.accountId, companyId)) {
     throw new Error('Already a member of this company');
   }
+  assertAccountCanJoinVa(db, opts.accountId, companyId);
   if (!isCompanyRecruiting(db, companyId)) {
     throw new Error('This company is not recruiting');
   }
@@ -817,6 +985,7 @@ export function acceptJoinRequest(
       member: getCompanyMembership(db, row.account_id, row.company_id)!,
     };
   }
+  assertAccountCanJoinVa(db, row.account_id, row.company_id);
   const count = countCompanyMembers(db, row.company_id);
   if (count >= VA_MEMBER_CAP) {
     throw new Error(`Company is full (max ${VA_MEMBER_CAP} members)`);

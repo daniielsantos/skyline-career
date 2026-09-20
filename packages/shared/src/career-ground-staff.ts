@@ -8,6 +8,7 @@ import {
   refreshBaseDispatcherHirePool,
   settleBaseDispatcherSalaries,
 } from './career-base-dispatcher.js';
+import { settleVaLineCrewSalary } from './career-va-line-crew.js';
 import { applyWalletDelta } from './career-ledger.js';
 import { ensurePlayerWarehouses } from './career-warehouse-stock.js';
 import { economyDayIndex } from './career-weather.js';
@@ -935,12 +936,14 @@ export function settleGroundStaffDailyOps(
 ): {
   salary: GroundStaffSalarySettleResult;
   baseDispatcherSalary: ReturnType<typeof settleBaseDispatcherSalaries>;
+  vaLineCrewSalary: ReturnType<typeof settleVaLineCrewSalary>;
 } {
   refreshGroundStaffHirePool(state, world);
   const salary = settleGroundStaffSalaries(state, opts);
   refreshBaseDispatcherHirePool(state, world);
   const baseDispatcherSalary = settleBaseDispatcherSalaries(state, opts);
-  return { salary, baseDispatcherSalary };
+  const vaLineCrewSalary = settleVaLineCrewSalary(state, opts);
+  return { salary, baseDispatcherSalary, vaLineCrewSalary };
 }
 
 export function groundStaffSnapshot(

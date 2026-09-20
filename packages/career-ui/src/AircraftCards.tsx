@@ -729,6 +729,10 @@ function hangarStatusNote(acf: PlayerAircraft): string | null {
       return 'Listed on Airframes — unlist to fly again.';
     case 'leased_out':
       return 'Returns with utilization wear when the term ends.';
+    case 'ferry':
+      return acf.npcFerry
+        ? `Line crew ferry to ${acf.npcFerry.destIcao} — arrives at tick ${acf.npcFerry.arriveAtTick}.`
+        : 'Line crew ferry in progress.';
     default:
       return null;
   }
@@ -864,10 +868,13 @@ export function HangarAircraftCard(props: {
   onTravel: (destIcao: string) => void;
   /** Open freight route when the airframe is actually assigned. */
   missionRoute?: { originIcao: string; destIcao: string } | null;
+  /** VA pilot hangar — hide sell/lease/MX mutations; ferry stays. */
+  mutationsLocked?: boolean;
 }) {
   const acf = props.aircraft;
   const catalog = props.catalog;
   const weightSystem = props.weightSystem ?? 'metric';
+  const mutationsLocked = props.mutationsLocked === true;
   const fuelPct =
     (acf.fuelKg / Math.max(1, acf.fuelCapacityKg)) * 100;
   const afPct = acf.airframeConditionPct ?? 100;
@@ -932,12 +939,13 @@ export function HangarAircraftCard(props: {
   const journeyOriginRef = useRef<string | null>(null);
   const showMove = acf.status === 'parked' || acf.status === 'maintenance';
   const showManage =
-    canRepair ||
-    canList ||
-    canSell ||
-    canBuyout ||
-    canPayLeaseOverdue ||
-    canReturnLease;
+    !mutationsLocked &&
+    (canRepair ||
+      canList ||
+      canSell ||
+      canBuyout ||
+      canPayLeaseOverdue ||
+      canReturnLease);
 
   // Prefill from App navigation (market/board → Hangar) without syncing
   // every card while the player types a dest on one of them.
@@ -1010,8 +1018,16 @@ export function HangarAircraftCard(props: {
     };
   }, [acf.id, acf.locationIcao, acf.status, ferryFinal]);
 
-  const primaryAction =
-    acf.status === 'maintenance'
+  const primaryAction = mutationsLocked
+    ? acf.status === 'parked' && !pilotHere
+      ? {
+          label: 'Travel here',
+          title: `Travel to ${acf.locationIcao} (pilot reposition)`,
+          onClick: () => props.onTravel(acf.locationIcao),
+          tone: 'quiet' as const,
+        }
+      : null
+    : acf.status === 'maintenance'
       ? {
           label: 'Inspect',
           title: 'Pay inspection to clear AOG',

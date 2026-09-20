@@ -17,6 +17,7 @@ import { settlePortYardHoldFees } from './career-ports.js';
 import { settleWarehouseStorageFees } from './career-warehouse.js';
 import { listCompaniesForWorld } from './career-companies.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
+import { completeNpcFerries } from './career-va-line-crew.js';
 import {
   assembleMissionsFromTables,
   persistCompanyTables,
@@ -84,6 +85,7 @@ export function settleCompanyPassiveFeesForTickRange(
   });
   settleCrewOpsDue(missions, world, nowMs);
   listAircraftMarket(missions, world);
+  completeNpcFerries(missions, to);
 
   const passiveDebitUsd =
     hangarOps.debitUsd +
@@ -91,7 +93,8 @@ export function settleCompanyPassiveFeesForTickRange(
     whOps.debitUsd +
     yardOps.debitUsd +
     (crewDaily.salary?.debitUsd ?? 0) +
-    (groundStaffDaily.salary?.debitUsd ?? 0);
+    (groundStaffDaily.salary?.debitUsd ?? 0) +
+    (groundStaffDaily.vaLineCrewSalary?.debitUsd ?? 0);
 
   return buildOfflineFeeSummary({
     feeRange,

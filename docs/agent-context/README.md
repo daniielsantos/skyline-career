@@ -35,7 +35,7 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [11-persist-commands.md](./11-persist-commands.md) | Settle/comandos SQL incrementais; pré-req MP |
 | [14-mp-world-clock.md](./14-mp-world-clock.md) | MP: relógio autoritativo, tick server-side, fim do catch-up client |
 | [15-business-model.md](./15-business-model.md) | Produto: B2P único, SP+MP, sem paywall de mapa; extras opcionais |
-| [16-va-logistics.md](./16-va-logistics.md) | VA: Internal Haul IH-1 pay; desk auto-buy/scout; tiers; IH-2/3 backlog |
+| [16-va-logistics.md](./16-va-logistics.md) | VA: dual-tenant membro; IH pay; desk; fees OPEN; IH-2/3 |
 | [17-inject-regression.md](./17-inject-regression.md) | Pack GA/TP/light jet + checklist inject/read; Payload Lab (dev); freighter vs pax_and_cargo; mission `airframeLabel` enrichment |
 | [18-aircraft-pricing-balance.md](./18-aircraft-pricing-balance.md) | Buy/lease: balancear por pay da classe (perna ref., voos/sem, voos p/ comprar) |
 | [19-hub-stats.md](./19-hub-stats.md) | Aba Stats (hub) + Economy pulse tab (dev); samples SQLite v7/v8 |

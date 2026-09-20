@@ -162,11 +162,13 @@ import { ensureV10Ddl, migrateV9toV10IfNeeded } from './career-store-v10.js';
 import { ensureV11Ddl, migrateV10toV11IfNeeded } from './career-store-v11.js';
 import { ensureV12Ddl, migrateV11toV12IfNeeded } from './career-store-v12.js';
 import { ensureV13Ddl, migrateV12toV13IfNeeded } from './career-store-v13.js';
+import { ensureV14Ddl, migrateV13toV14IfNeeded } from './career-store-v14.js';
 import {
   acceptJoinRequest,
   createCompanyInvite,
   createJoinRequest,
   getCompanyMembership,
+  getCompanyMemberRouteCutPct,
   homeCompanyIdForAccount,
   isCompanyRecruiting,
   joinCompanyWithInvite,
@@ -179,11 +181,14 @@ import {
   listPilotHaulRankingForCompany,
   isCompanyVaListed,
   listVaDirectory,
+  findAccountListedVaMembership,
   recordInternalHaulStats,
   rejectJoinRequest,
   setCompanyMemberRole,
+  setCompanyMemberRouteCutPct,
   setCompanyRecruiting,
   publishCompanyAsVa,
+  unpublishCompanyAsVa,
   type CareerCompanyInvite,
   type VaCompanyRankRow,
   type VaDirectoryEntry,
@@ -196,7 +201,7 @@ import {
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '13';
+export const CAREER_STORE_SCHEMA_VERSION = '14';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -453,9 +458,27 @@ export interface CareerStore {
     displayName: string;
     homeHubIcao: string;
     recruiting?: boolean;
+    memberRouteCutPct?: number;
   }): VaPublishResult | Promise<VaPublishResult>;
+  vaUnpublish(opts: {
+    companyId: string;
+    actorAccountId: string;
+  }):
+    | { companyId: string; listed: false; removedMembers: number }
+    | Promise<{ companyId: string; listed: false; removedMembers: number }>;
+  vaGetMemberRouteCutPct(companyId: string): number | Promise<number>;
+  vaSetMemberRouteCutPct(opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberRouteCutPct: number;
+  }): number | Promise<number>;
   vaIsListed(companyId: string): boolean | Promise<boolean>;
   vaIsRecruiting(companyId: string): boolean | Promise<boolean>;
+  /** Listed VA the account already belongs to (owner or member), if any. */
+  vaListedMembership(accountId: string):
+    | { companyId: string; role: CareerCompanyMember['role'] }
+    | null
+    | Promise<{ companyId: string; role: CareerCompanyMember['role'] } | null>;
   vaCreateJoinRequest(opts: {
     companyId: string;
     accountId: string;
@@ -819,7 +842,27 @@ class JsonCareerStore implements CareerStore {
     displayName: string;
     homeHubIcao: string;
     recruiting?: boolean;
+    memberRouteCutPct?: number;
   }): VaPublishResult {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaUnpublish(_opts: {
+    companyId: string;
+    actorAccountId: string;
+  }): { companyId: string; listed: false; removedMembers: number } {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaGetMemberRouteCutPct(_companyId: string): number {
+    return 30;
+  }
+
+  vaSetMemberRouteCutPct(_opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberRouteCutPct: number;
+  }): number {
     throw new Error('VA requires SQLite career store');
   }
 
@@ -829,6 +872,12 @@ class JsonCareerStore implements CareerStore {
 
   vaIsRecruiting(_companyId: string): boolean {
     return false;
+  }
+
+  vaListedMembership(
+    _accountId: string,
+  ): { companyId: string; role: CareerCompanyMember['role'] } | null {
+    return null;
   }
 
   vaCreateJoinRequest(_opts: {
@@ -1151,6 +1200,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV11Ddl(db);
   ensureV12Ddl(db);
   ensureV13Ddl(db);
+  ensureV14Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -1237,7 +1287,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV12 = Number.parseInt(afterV12?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV12) || verAfterV12 < 13) {
-    migrateV12toV13IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV12toV13IfNeeded(db, metaSet, '13');
+  }
+  const afterV13 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV13 = Number.parseInt(afterV13?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV13) || verAfterV13 < 14) {
+    migrateV13toV14IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -1566,8 +1623,28 @@ class SqliteCareerStore implements CareerStore {
     displayName: string;
     homeHubIcao: string;
     recruiting?: boolean;
+    memberRouteCutPct?: number;
   }): VaPublishResult {
     return publishCompanyAsVa(this.db, opts);
+  }
+
+  vaUnpublish(opts: {
+    companyId: string;
+    actorAccountId: string;
+  }): { companyId: string; listed: false; removedMembers: number } {
+    return unpublishCompanyAsVa(this.db, opts);
+  }
+
+  vaGetMemberRouteCutPct(companyId: string): number {
+    return getCompanyMemberRouteCutPct(this.db, companyId);
+  }
+
+  vaSetMemberRouteCutPct(opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberRouteCutPct: number;
+  }): number {
+    return setCompanyMemberRouteCutPct(this.db, opts);
   }
 
   vaIsListed(companyId: string): boolean {
@@ -1576,6 +1653,12 @@ class SqliteCareerStore implements CareerStore {
 
   vaIsRecruiting(companyId: string): boolean {
     return isCompanyRecruiting(this.db, companyId);
+  }
+
+  vaListedMembership(
+    accountId: string,
+  ): { companyId: string; role: CareerCompanyMember['role'] } | null {
+    return findAccountListedVaMembership(this.db, accountId);
   }
 
   vaCreateJoinRequest(opts: {

@@ -1028,6 +1028,10 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS va_listed BOOLEAN NOT NULL DEFAULT FALSE`,
   );
+  // Schema v24 — VA member Freights/Demand/Charter route cut %.
+  await pool.query(
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS member_route_cut_pct INTEGER NOT NULL DEFAULT 30`,
+  );
   await pool.query(`
     CREATE TABLE IF NOT EXISTS company_join_requests (
       id TEXT PRIMARY KEY NOT NULL,
@@ -3503,7 +3507,7 @@ async function readCompanyStateScalars(
             aircraft_market_demand_day, airframe_perf_json, player_fbos_json,
             company_crew_json, ground_staff_json, active_bush_trip_json, port_pickups_json,
             player_warehouses_json, player_port_concessions_json,
-            port_auto_buy_orders_json, last_seen_tick
+            port_auto_buy_orders_json, va_line_crew_json, last_seen_tick
      FROM company_state WHERE company_id = $1`,
     [companyId],
   );
@@ -3576,6 +3580,10 @@ async function readCompanyStateScalars(
     row.ground_staff_json,
   );
   if (ground) out.groundStaff = ground;
+  const lineCrew = parseJson<CareerMissionsState['vaLineCrew']>(
+    row.va_line_crew_json,
+  );
+  if (lineCrew) out.vaLineCrew = lineCrew;
   // Column kept for migrate; bush trips removed — never hydrate activeBushTrip.
   void row.active_bush_trip_json;
 
@@ -3745,14 +3753,14 @@ export async function persistMissionsTablesToPg(
          aircraft_market_day, aircraft_market_demand_day, airframe_perf_json,
          player_fbos_json, company_crew_json, ground_staff_json, active_bush_trip_json,
          port_pickups_json, player_warehouses_json, player_port_concessions_json,
-         port_auto_buy_orders_json, last_seen_tick, updated_at_ms
+         port_auto_buy_orders_json, va_line_crew_json, last_seen_tick, updated_at_ms
        ) VALUES (
          $1, $2, $3, $4, $5,
          $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb,
          $10, $11, $12::jsonb,
          $13::jsonb, $14::jsonb, $15::jsonb, $16::jsonb,
          $17::jsonb, $18::jsonb, $19::jsonb,
-         $20::jsonb, $21, $22
+         $20::jsonb, $21::jsonb, $22, $23
        )
        ON CONFLICT (company_id) DO UPDATE SET
          wallet_usd = EXCLUDED.wallet_usd,
@@ -3780,6 +3788,7 @@ export async function persistMissionsTablesToPg(
          player_warehouses_json = EXCLUDED.player_warehouses_json,
          player_port_concessions_json = EXCLUDED.player_port_concessions_json,
          port_auto_buy_orders_json = EXCLUDED.port_auto_buy_orders_json,
+         va_line_crew_json = EXCLUDED.va_line_crew_json,
          last_seen_tick = EXCLUDED.last_seen_tick,
          updated_at_ms = EXCLUDED.updated_at_ms`,
       [
@@ -3813,6 +3822,7 @@ export async function persistMissionsTablesToPg(
         ),
         jsonParam(state.playerPortConcessions ?? []),
         jsonParam(state.portAutoBuyOrders ?? []),
+        jsonParam(state.vaLineCrew ?? null),
         typeof state.lastSeenTick === 'number' &&
           Number.isFinite(state.lastSeenTick)
           ? Math.max(0, Math.floor(state.lastSeenTick))

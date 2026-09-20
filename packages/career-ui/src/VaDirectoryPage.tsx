@@ -21,6 +21,9 @@ export function VaDirectoryPage(props: Props) {
   const companyId = props.activeCompanyId || getStoredCompanyId();
   const canShow = Boolean(token) || props.authRequired;
   const [directory, setDirectory] = useState<VaDirectoryEntry[]>([]);
+  const [memberOfVaCompanyId, setMemberOfVaCompanyId] = useState<string | null>(
+    null,
+  );
   const [query, setQuery] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +35,7 @@ export function VaDirectoryPage(props: Props) {
     try {
       const d = await fetchVaDirectory({ includeClosed: true });
       setDirectory(d.directory);
+      setMemberOfVaCompanyId(d.memberOfVaCompanyId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -51,6 +55,7 @@ export function VaDirectoryPage(props: Props) {
   }, [directory, query]);
 
   const hiringCount = directory.filter((r) => r.recruiting).length;
+  const alreadyInVa = Boolean(memberOfVaCompanyId);
 
   if (!canShow) {
     return (
@@ -66,6 +71,8 @@ export function VaDirectoryPage(props: Props) {
         <p className="va-directory-meta">
           {directory.length} airline{directory.length === 1 ? '' : 's'}
           {hiringCount > 0 ? ` · ${hiringCount} hiring` : ''}
+          {' · '}
+          joining keeps your personal company, wallet, and fleet
         </p>
         <input
           type="search"
@@ -82,11 +89,17 @@ export function VaDirectoryPage(props: Props) {
             placeholder="VA-XXXXXXXX"
             onChange={(e) => setJoinCode(e.target.value)}
             aria-label="Private invite code"
+            disabled={alreadyInVa}
           />
           <button
             type="button"
             className="action"
-            disabled={busy || !joinCode.trim()}
+            disabled={busy || alreadyInVa || !joinCode.trim()}
+            title={
+              alreadyInVa
+                ? 'Leave your current VA before joining another'
+                : undefined
+            }
             onClick={() => {
               void (async () => {
                 setBusy(true);
@@ -113,6 +126,12 @@ export function VaDirectoryPage(props: Props) {
           </button>
         </div>
       </div>
+      {alreadyInVa ? (
+        <p className="settings-help">
+          You are already in a VA — leave it (or unlist if you own it) before
+          joining or requesting another.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="error" role="alert">
@@ -129,8 +148,11 @@ export function VaDirectoryPage(props: Props) {
       ) : (
         <ul className="va-directory-list">
           {filtered.map((row) => {
-            const isMine = row.companyId === companyId;
+            const isMine =
+              row.companyId === companyId ||
+              row.companyId === memberOfVaCompanyId;
             const canRequest =
+              !alreadyInVa &&
               !isMine &&
               row.recruiting &&
               row.seatsOpen > 0 &&
@@ -178,6 +200,14 @@ export function VaDirectoryPage(props: Props) {
                         className={`va-stat-value${row.recruiting ? ' is-open' : ' is-closed'}`}
                       >
                         {row.recruiting ? 'Open' : 'Closed'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="va-stat-label">Pilot cut</span>
+                      <span className="va-stat-value">
+                        {row.memberRouteCutPct != null
+                          ? `${row.memberRouteCutPct}%`
+                          : '—'}
                       </span>
                     </div>
                   </div>

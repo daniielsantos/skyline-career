@@ -11,6 +11,7 @@ import {
 import {
   VA_MEMBER_CAP,
   listOpenInternalHaulHolds,
+  quoteMemberRouteCutUsd,
   vaDayKeyFromTick,
 } from './career-va.js';
 import { applySettleWalletDeltas } from './career-persist-commands.js';
@@ -41,14 +42,18 @@ describe('VA IH-2', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('bumps schema to v13 with va_listed', () => {
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '13');
+  it('bumps schema to v14 with member_route_cut_pct', () => {
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '14');
     const dbPath = store.sqlitePath!;
     const db = new DatabaseSync(dbPath);
     const row = db
       .prepare(`SELECT value FROM meta WHERE key = 'schema_version'`)
       .get() as { value: string };
-    assert.equal(row.value, '13');
+    assert.equal(row.value, '14');
+    const cols = db.prepare(`PRAGMA table_info(companies)`).all() as Array<{
+      name: string;
+    }>;
+    assert.ok(cols.some((c) => c.name === 'member_route_cut_pct'));
     const tables = db
       .prepare(
         `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('company_invites','company_haul_stats')`,
@@ -382,6 +387,97 @@ describe('VA IH-2', () => {
     );
   });
 
+  it('blocks joining or requesting a second VA', async () => {
+    const ownerA = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_one_a',
+        displayName: 'Owner A',
+        password: 'secret1',
+      }),
+    );
+    const ownerB = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_one_b',
+        displayName: 'Owner B',
+        password: 'secret1',
+      }),
+    );
+    const vaA = ownerA.company!.id;
+    const vaB = ownerB.company!.id;
+    await Promise.resolve(
+      store.vaPublish({
+        companyId: vaA,
+        actorAccountId: ownerA.account.id,
+        displayName: 'Airline A',
+        homeHubIcao: 'SBGR',
+      }),
+    );
+    await Promise.resolve(
+      store.vaPublish({
+        companyId: vaB,
+        actorAccountId: ownerB.account.id,
+        displayName: 'Airline B',
+        homeHubIcao: 'SBSP',
+      }),
+    );
+    const pilot = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_one_pilot',
+        displayName: 'One Pilot',
+        password: 'secret1',
+      }),
+    );
+    const inviteA = await Promise.resolve(
+      store.vaCreateInvite({
+        companyId: vaA,
+        createdByAccountId: ownerA.account.id,
+      }),
+    );
+    await Promise.resolve(
+      store.vaJoinInvite({
+        code: inviteA.code,
+        accountId: pilot.account.id,
+      }),
+    );
+    const listed = await Promise.resolve(
+      store.vaListedMembership(pilot.account.id),
+    );
+    assert.equal(listed?.companyId, vaA);
+
+    const inviteB = await Promise.resolve(
+      store.vaCreateInvite({
+        companyId: vaB,
+        createdByAccountId: ownerB.account.id,
+      }),
+    );
+    await assert.rejects(
+      async () =>
+        store.vaJoinInvite({
+          code: inviteB.code,
+          accountId: pilot.account.id,
+        }),
+      /Already in a VA/i,
+    );
+    await assert.rejects(
+      async () =>
+        store.vaCreateJoinRequest({
+          companyId: vaB,
+          accountId: pilot.account.id,
+        }),
+      /Already in a VA/i,
+    );
+
+    // Owner of a listed VA also cannot join another.
+    await assert.rejects(
+      async () =>
+        store.vaJoinInvite({
+          code: inviteB.code,
+          accountId: ownerA.account.id,
+        }),
+      /Already in a VA/i,
+    );
+  });
+
   it('publish lists existing company as VA', async () => {
     const owner = await Promise.resolve(
       store.authRegister({
@@ -413,5 +509,167 @@ describe('VA IH-2', () => {
     assert.equal(row!.homeHubIcao, 'SBGR');
     assert.equal(row!.recruiting, true);
     assert.equal(row!.listed, true);
+  });
+
+  it('unpublish removes listing and non-owner members', async () => {
+    const owner = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_unpub_owner',
+        displayName: 'Unpub Owner',
+        password: 'secret1',
+      }),
+    );
+    const pilot = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_unpub_pilot',
+        displayName: 'Unpub Pilot',
+        password: 'secret1',
+      }),
+    );
+    const companyId = owner.company!.id;
+    await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: owner.account.id,
+        displayName: 'Temp Bridge',
+        homeHubIcao: 'SBSP',
+      }),
+    );
+    const invite = await Promise.resolve(
+      store.vaCreateInvite({
+        companyId,
+        createdByAccountId: owner.account.id,
+      }),
+    );
+    await Promise.resolve(
+      store.vaJoinInvite({
+        code: invite.code,
+        accountId: pilot.account.id,
+      }),
+    );
+    const beforeMembers = await Promise.resolve(
+      store.vaListMembers(companyId),
+    );
+    assert.ok(beforeMembers.length >= 2);
+
+    const result = await Promise.resolve(
+      store.vaUnpublish({
+        companyId,
+        actorAccountId: owner.account.id,
+      }),
+    );
+    assert.equal(result.listed, false);
+    assert.ok(result.removedMembers >= 1);
+    assert.equal(await Promise.resolve(store.vaIsListed(companyId)), false);
+    const dir = await Promise.resolve(store.vaDirectory({}));
+    assert.ok(!dir.some((e) => e.companyId === companyId));
+    const afterMembers = await Promise.resolve(store.vaListMembers(companyId));
+    assert.equal(afterMembers.length, 1);
+    assert.equal(afterMembers[0]!.role, 'owner');
+    assert.equal(
+      await Promise.resolve(
+        store.vaGetMembership(pilot.account.id, companyId),
+      ),
+      null,
+    );
+  });
+
+  it('owner can set member route cut; directory exposes it', async () => {
+    const owner = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_cut_owner',
+        displayName: 'Cut Owner',
+        password: 'secret1',
+      }),
+    );
+    const companyId = owner.company!.id;
+    await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: owner.account.id,
+        displayName: 'Cut Airways',
+        homeHubIcao: 'SBGR',
+      }),
+    );
+    assert.equal(
+      await Promise.resolve(store.vaGetMemberRouteCutPct(companyId)),
+      30,
+    );
+    const set = await Promise.resolve(
+      store.vaSetMemberRouteCutPct({
+        companyId,
+        actorAccountId: owner.account.id,
+        memberRouteCutPct: 40,
+      }),
+    );
+    assert.equal(set, 40);
+    assert.equal(
+      await Promise.resolve(store.vaGetMemberRouteCutPct(companyId)),
+      40,
+    );
+    const dir = await Promise.resolve(store.vaDirectory({}));
+    const row = dir.find((e) => e.companyId === companyId);
+    assert.ok(row);
+    assert.equal(row!.memberRouteCutPct, 40);
+  });
+
+  it('quotes member route cut from route net', () => {
+    assert.equal(quoteMemberRouteCutUsd(1000, 200, 30), 240);
+    assert.equal(quoteMemberRouteCutUsd(100, 200, 30), 0);
+    assert.equal(quoteMemberRouteCutUsd(1000, 0, 10), 100);
+  });
+
+  it('freights settle applies member cut to pilot home', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-member-cut' });
+    const va = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    va.walletUsd = 500_000;
+    const mission = {
+      id: 'msn_cut_test',
+      lots: [],
+      shipmentLotId: 'lot_x',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      cargoKg: 100,
+      pax: 0,
+      aircraftClassId: 'narrow_freighter',
+      rolesPackRelPath: '',
+      deadlineTick: world.tick + 100,
+      payUsd: 1000,
+      urgency: 'normal',
+      reason: 'test',
+      status: 'settled',
+      acceptedAtTick: world.tick,
+      pilotHomeCompanyId: 'co_pilot_home',
+      pilotAccountId: 'acc_pilot',
+    } as import('./types/career-economy.js').MissionIntent;
+    const before = va.walletUsd;
+    const wallet = applySettleWalletDeltas(
+      va,
+      world.tick,
+      {
+        mission,
+        settlement: {
+          missionId: mission.id,
+          payoutUsd: 1000,
+          penaltyUsd: 0,
+          lateTicks: 0,
+          deliveredKg: 100,
+          onTime: true,
+          originStockAfterKg: 0,
+          destStockAfterKg: 100,
+        },
+        walletCreditUsd: 1000,
+        fuelDebitUsd: 200,
+      },
+      { companyId: 'co_va_ops', memberRouteCutPct: 30 },
+    );
+    assert.ok(wallet.pilotPayCredit);
+    assert.equal(wallet.pilotPayCredit!.companyId, 'co_pilot_home');
+    assert.equal(wallet.pilotPayCredit!.amountUsd, 240);
+    assert.equal(va.walletUsd, before + 1000 - 200 - 240);
   });
 });

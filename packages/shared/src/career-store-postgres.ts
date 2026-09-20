@@ -33,7 +33,10 @@ import {
 import {
   VA_INVITE_DEFAULT_MAX_USES,
   VA_INVITE_TTL_MS,
+  VA_ALREADY_IN_VA_MSG,
   VA_MEMBER_CAP,
+  VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
+  clampMemberRouteCutPct,
   type CareerCompanyInvite,
   type VaCompanyRankRow,
   type VaDirectoryEntry,
@@ -118,7 +121,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '22';
+const CAREER_PG_SCHEMA_VERSION = '25';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -389,6 +392,7 @@ CREATE INDEX IF NOT EXISTS company_pilot_haul_stats_day_idx
   ON company_pilot_haul_stats(company_id, day_key);
 
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE company_state ADD COLUMN IF NOT EXISTS va_line_crew_json JSONB;
 
 CREATE TABLE IF NOT EXISTS company_join_requests (
   id TEXT PRIMARY KEY NOT NULL,
@@ -1032,6 +1036,19 @@ export class PostgresCareerStore implements CareerStore {
         [opts.accountId, row.company_id],
       );
       if (existing.rows[0]) throw new Error('Already a member of this company');
+      const listed = await client.query(
+        `SELECT m.company_id
+         FROM company_members m
+         JOIN companies c ON c.id = m.company_id
+         WHERE m.account_id = $1
+           AND COALESCE(c.va_listed, false) = true
+           AND m.company_id <> $2
+         LIMIT 1`,
+        [opts.accountId, row.company_id],
+      );
+      if (listed.rows[0]) {
+        throw new Error(VA_ALREADY_IN_VA_MSG);
+      }
       const countRes = await client.query(
         `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
         [row.company_id],
@@ -1261,6 +1278,7 @@ export class PostgresCareerStore implements CareerStore {
     displayName: string;
     homeHubIcao: string;
     recruiting?: boolean;
+    memberRouteCutPct?: number;
   }): Promise<VaPublishResult> {
     await this.ready;
     const companyId = opts.companyId.trim();
@@ -1281,11 +1299,95 @@ export class PostgresCareerStore implements CareerStore {
       throw new Error('homeHubIcao must be a 3–4 letter ICAO');
     }
     const recruiting = opts.recruiting !== false;
-    await this.pool.query(
-      `UPDATE companies SET display_name = $1, home_hub_icao = $2, recruiting = $3, va_listed = TRUE WHERE id = $4`,
-      [displayName, homeHubIcao, recruiting, companyId],
+    const memberRouteCutPct = clampMemberRouteCutPct(
+      opts.memberRouteCutPct ?? VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
     );
-    return { companyId, displayName, homeHubIcao, recruiting, listed: true };
+    await this.pool.query(
+      `UPDATE companies SET display_name = $1, home_hub_icao = $2, recruiting = $3, va_listed = TRUE, member_route_cut_pct = $4 WHERE id = $5`,
+      [displayName, homeHubIcao, recruiting, memberRouteCutPct, companyId],
+    );
+    return {
+      companyId,
+      displayName,
+      homeHubIcao,
+      recruiting,
+      listed: true,
+      memberRouteCutPct,
+    };
+  }
+
+  async vaUnpublish(opts: {
+    companyId: string;
+    actorAccountId: string;
+  }): Promise<{ companyId: string; listed: false; removedMembers: number }> {
+    await this.ready;
+    const companyId = opts.companyId.trim();
+    if (!companyId) throw new Error('companyId required');
+    const actor = await this.vaGetMembership(opts.actorAccountId, companyId);
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can unlist this VA');
+    }
+    if (!(await this.vaIsListed(companyId))) {
+      throw new Error('Company is not listed as a VA');
+    }
+    const now = Date.now();
+    await this.pool.query(
+      `UPDATE company_join_requests
+       SET status = 'rejected', decided_at_ms = $1, decided_by_account_id = $2
+       WHERE company_id = $3 AND status = 'pending'`,
+      [now, opts.actorAccountId, companyId],
+    );
+    await this.pool.query(
+      `UPDATE company_invites
+       SET expires_at_ms = $1
+       WHERE company_id = $2 AND expires_at_ms > $1`,
+      [now, companyId],
+    );
+    const removed = await this.pool.query(
+      `DELETE FROM company_members
+       WHERE company_id = $1 AND role <> 'owner'`,
+      [companyId],
+    );
+    await this.pool.query(
+      `UPDATE companies SET va_listed = FALSE, recruiting = FALSE WHERE id = $1`,
+      [companyId],
+    );
+    return {
+      companyId,
+      listed: false,
+      removedMembers: removed.rowCount ?? 0,
+    };
+  }
+
+  async vaGetMemberRouteCutPct(companyId: string): Promise<number> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT member_route_cut_pct FROM companies WHERE id = $1`,
+      [companyId],
+    );
+    if (!rows[0]) return VA_MEMBER_ROUTE_CUT_DEFAULT_PCT;
+    return clampMemberRouteCutPct(rows[0].member_route_cut_pct);
+  }
+
+  async vaSetMemberRouteCutPct(opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberRouteCutPct: number;
+  }): Promise<number> {
+    await this.ready;
+    const actor = await this.vaGetMembership(
+      opts.actorAccountId,
+      opts.companyId,
+    );
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can change member route cut');
+    }
+    const pct = clampMemberRouteCutPct(opts.memberRouteCutPct);
+    await this.pool.query(
+      `UPDATE companies SET member_route_cut_pct = $1 WHERE id = $2`,
+      [pct, opts.companyId],
+    );
+    return pct;
   }
 
   async vaIsListed(companyId: string): Promise<boolean> {
@@ -1296,6 +1398,28 @@ export class PostgresCareerStore implements CareerStore {
     );
     if (!rows[0]) return false;
     return Boolean(rows[0].va_listed);
+  }
+
+  async vaListedMembership(
+    accountId: string,
+  ): Promise<{ companyId: string; role: CareerCompanyMember['role'] } | null> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT m.company_id, m.role
+       FROM company_members m
+       JOIN companies c ON c.id = m.company_id
+       WHERE m.account_id = $1 AND COALESCE(c.va_listed, false) = true
+       ORDER BY m.created_at_ms ASC
+       LIMIT 1`,
+      [accountId],
+    );
+    const row = rows[0] as { company_id: string; role: string } | undefined;
+    if (!row) return null;
+    const role =
+      row.role === 'owner' || row.role === 'dispatcher' || row.role === 'pilot'
+        ? row.role
+        : 'pilot';
+    return { companyId: row.company_id, role };
   }
 
   async vaDirectory(opts?: {
@@ -1310,6 +1434,7 @@ export class PostgresCareerStore implements CareerStore {
     const worldId = opts?.worldId?.trim() || null;
     const { rows } = await this.pool.query(
       `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
+              c.member_route_cut_pct,
               (SELECT COUNT(*)::int FROM company_members m WHERE m.company_id = c.id) AS member_count,
               (SELECT COUNT(*)::int FROM fleet_aircraft f WHERE f.company_id = c.id) AS aircraft_count
        FROM companies c
@@ -1347,6 +1472,7 @@ export class PostgresCareerStore implements CareerStore {
         aircraftCount,
         recruiting,
         listed: Boolean(r.va_listed),
+        memberRouteCutPct: clampMemberRouteCutPct(r.member_route_cut_pct),
         seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
         myRequestStatus,
       });
@@ -1364,6 +1490,17 @@ export class PostgresCareerStore implements CareerStore {
     if (await this.vaGetMembership(opts.accountId, companyId)) {
       throw new Error('Already a member of this company');
     }
+    const otherVa = await this.pool.query(
+      `SELECT m.company_id
+       FROM company_members m
+       JOIN companies c ON c.id = m.company_id
+       WHERE m.account_id = $1
+         AND COALESCE(c.va_listed, false) = true
+         AND m.company_id <> $2
+       LIMIT 1`,
+      [opts.accountId, companyId],
+    );
+    if (otherVa.rows[0]) throw new Error(VA_ALREADY_IN_VA_MSG);
     if (!(await this.vaIsRecruiting(companyId))) {
       throw new Error('This company is not recruiting');
     }
@@ -1458,6 +1595,17 @@ export class PostgresCareerStore implements CareerStore {
       if (existing) {
         member = existing;
       } else {
+        const otherVa = await client.query(
+          `SELECT m.company_id
+           FROM company_members m
+           JOIN companies c ON c.id = m.company_id
+           WHERE m.account_id = $1
+             AND COALESCE(c.va_listed, false) = true
+             AND m.company_id <> $2
+           LIMIT 1`,
+          [row.account_id, row.company_id],
+        );
+        if (otherVa.rows[0]) throw new Error(VA_ALREADY_IN_VA_MSG);
         const countRes = await client.query(
           `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
           [row.company_id],

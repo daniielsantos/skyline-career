@@ -13892,6 +13892,49 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 .va-pane-card {
   margin-top: 0.25rem;
 }
+.va-config-card .settings-help {
+  margin-bottom: 0.75rem;
+}
+.va-config-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+}
+.va-config-check input {
+  margin-top: 0.2rem;
+  accent-color: var(--accent, #c97b3a);
+}
+.va-config-check .muted {
+  opacity: 0.65;
+  font-size: 0.8rem;
+}
+.va-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.85rem;
+}
+.va-config-row .action.ghost {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+}
+.va-config-invite {
+  margin: 0.55rem 0 0;
+}
+.va-config-danger {
+  margin-top: 1.1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--border, #444) 70%, transparent);
+}
+.va-config-danger-btn {
+  color: color-mix(in srgb, #e07070 85%, white);
+  border-color: color-mix(in srgb, #e07070 35%, transparent);
+}
 
 .company-va-card .company-va-fields {
   display: grid;

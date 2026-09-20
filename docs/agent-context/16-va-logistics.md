@@ -1,7 +1,8 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-09-19. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator, ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
+Atualizado 2026-09-19. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
+**Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -11,6 +12,132 @@ VA (ou company solo) compra barato no porto → guarda no WH → **ponte aérea 
 **Port XL / T4 (solo+VA):** WH **T4 Port Bonded** (45 t) só em pickup hubs fecha a fantasia oceânica → tronco; saída gorda = **Wide haul** a partir do WH (não Demand 90 t). Market XL enviesado em origins de porto. Ver [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
 **Port FBO (solo first):** Phase 0–10 shipped — chão desk + Scout (bridge+Demand+Haul) + Port shuttle; Base = perks; **1ª Base free**; **Base Dispatcher seat** + fleet Market scout (single-leg). Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+---
+
+## Membro dual-tenant (frota pessoal vs VA) — **DECIDIDO · shipped**
+
+Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). Join só adiciona membership na company da VA.
+
+| | Home company (owner) | VA company (pilot/dispatcher) |
+|--|--|--|
+| Wallet | Sua | Da VA |
+| Frota | Seus cascos (buy/lease) | Hangar da VA |
+| Market / Freights / Charter / Demand | Seu board (solo) | Com tail VA + cut % → home (**shipped**) |
+| **Cargo Ops / Class Ops** | Ladder própria | **Gate + XP = home do piloto** (não herda unlock da VA) |
+| Internal Haul board | — | Aceita hauls da VA |
+| Pay de IH (cross-company) | **Credita aqui** (`pilotHomeCompanyId`) | **Debita** o pay do haul |
+
+**Avião pessoal:** fica na home. Não “entra” na VA nem fica inutilizável — troca o seletor de company e voa solo. Em contexto VA, o Hangar mostra a frota da VA.
+
+**Progressão (DECIDIDO · shipped):** membro só aceita commodities/classes que **a home dele** já liberou; settle de voos VA aplica `cargoOps`/`classOps` deltas na **home** (mesmo padrão do cut). Owner na própria VA = ladder da VA (é a home dele). Board Freights + `/api/state` leem a ladder home quando `companyId` ativo ≠ home.
+
+**Non-goal (agora):** contractor com casco pessoal em missão da VA (ownership/MX/seguro) — outro desenho.
+
+**UX:** directory + Leave copy dizem que join mantém company/wallet/frota pessoais. **Uma VA por conta** — join/request bloqueados se já for membro (ou owner) de qualquer company `va_listed`; Leave (membro) ou Unlist (owner) libera.
+
+---
+
+## Perspectivas My VA (owner vs membro) — **DECIDIDO · UI parcial shipped**
+
+My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Config). API já rejeita ações fora do role; UI deve **esconder** controles, não só falhar no click.
+
+| Ação | Owner | Dispatcher | Pilot (membro) |
+|--|--|--|--|
+| Ver roster / hangar (frota VA) | sim | sim | sim (read; mutações Hangar = ver nota) |
+| Accept/reject join requests | sim | sim | não |
+| Create invite | sim | sim | não |
+| Kick / change role | sim | não | não |
+| Open recruiting on/off | sim | não | read-only |
+| Publish / rename / hub (Company card) | sim | não | não |
+| Unlist VA | sim | não | não |
+| Leave VA | — | sim | sim |
+| Config `memberRouteCutPct` | sim | não | read-only (vê o %) |
+| **Inspect / repair (MX)** | **sim** (debita wallet VA) | **não** | **não** |
+| Voar IH / Freights com tail VA | sim | sim | sim |
+
+**Nota Hangar / MX — DECIDIDO · shipped parcial:**
+
+- **Inspect + repair** debitam o **wallet da VA** (company ativa = VA). Fora do net do cut.
+- **Só owner** autoriza MX (UI + API `403` em `/api/aircraft-market/maintenance` e `/repair`). Dispatcher e pilot = sem botão / sem API.
+- Sell / lease / unlist: também owner-only na UI quando company listada; ferry / travel / assign missão ficam para membros.
+- Solo (company não listada como VA): comportamento Hangar inalterado.
+
+---
+
+## Por que entrar numa VA? (valor)
+
+### Shipped (IH-2)
+
+1. **Board Internal Haul** — voar pontes WH→WH que a VA montou; pay interno → wallet home.
+2. **Roster / roles** — pilot ou dispatcher; invite / request.
+3. **Ranking 7d** — company + strip de pilots.
+4. **Hangar da VA** — ver/usar cascos da company listada (mesmo wallet/frota do owner).
+
+### Decidido no Tier 1, ainda não é o gancho principal do join
+
+5. **Buff de concessão herdado** no porto home da VA (membros herdam) — **DECIDIDO** na tabela de prioridade; implementação member-aware = backlog.
+6. Desk Fase 3 (auto-haul) — só com VA; depois.
+
+### Contratos com avião da VA — **DECIDIDO (2026-09-19) · shipped**
+
+Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail da VA**, company ativa = VA.
+
+| Contrato | Ops | Dinheiro do piloto |
+|--|--|--|
+| **Internal Haul** | VA: fuel da perna | Pay stamp IH → home (**shipped**; sem % extra) |
+| **Freights / Demand / Charter** | VA: fuel da perna de receita | **`memberRouteCutPct` do lucro net** → home; resto na VA |
+| **Empty ferry / Hangar reposition** | Ver **Ferry ops** abaixo | — |
+| **Solo** (teu tail, company home) | Você | 100% você |
+
+**Fatia (`memberRouteCutPct`):**
+
+1. Owner configura o % (inteiro) = parte do **lucro da rota** que vai pro piloto (home) — Config My VA + `POST /api/va/route-cut`.
+2. **Visível no directory** (`Pilot cut N%`) + Config My VA.
+3. **Lucro** = no settle `max(0, payoutUsd − fuelDebitUsd)` desta missão. MX/inspeção e **empty ferry** fora do net por perna.
+4. `pilotUsd = round(routeNet × pct / 100)` → credita home (`va_member_cut`); debita VA.
+5. Faixa **10–50%**; default publish **30%**.
+6. Owner voando o próprio VA: **sem cut** (`pilotHomeCompanyId` = ops).
+7. IH **não** recebe esse % em cima do pay stamp.
+8. Accept Freights/Demand/Charter **stamp** `pilotHomeCompanyId` / `pilotAccountId`.
+
+```
+VA ──(+payout)──►  VA ──(−fuel missão)──►  VA ──(−pilotUsd)──► home
+```
+
+---
+
+### Ferry ops (empty reposition) — **DECIDIDO (2026-09-19) · shipped**
+
+Problema: 8 membros ferryando tails da VA com fuel no wallet da company = tragedy of the commons.
+
+**Separar:**
+
+| | Quem paga | Notas |
+|--|--|--|
+| **Fuel da perna de receita** (missão) | **VA** | Já no settle; entra no net do cut |
+| **Empty ferry / Hangar reposition** | Line crew allowance **ou** overflow home | **Não** é missão de receita |
+
+**Overhead semanal (“Line crew” / ferry desk)** — narrativa: staff da VA reposiciona cascos; **não** é ground staff de WH nem Crew needed do board.
+
+1. Owner **hire** via Config My VA (`POST /api/va/line-crew` hire) — signing + salary/semana no wallet VA.
+2. Hire dá **allowance** `K = max(2, min(2×memberCap, parked hulls))` empty NPC ferries/semana.
+3. Reposition no allowance: **sem debit** VA; status `ferry` + ETA ticks; completa no catch-up/passive settle.
+4. Acima do cap / sem hire → **overflow**: empty ferry **pago na home do piloto** (`va_line_crew_ferry`). Owner sem allowance: VA paga ferry instantâneo (comportamento solo).
+5. Fire: severance 1 semana (`POST /api/va/line-crew` fire).
+6. MX/hours no complete NPC: wear leve por nm.
+
+**Non-goals v1:** ferry infinito grátis; misturar com Port FBO ground staff; IAP seat.
+
+---
+
+## Sustento da VA — **DECIDIDO parcial**
+
+Ops de missão + IH pay + cut + **MX/inspect** = custo VA (shipped; MX só owner). Empty ferry = Line crew + overflow no piloto (**shipped**).
+
+Ainda OPEN (não bloqueia cut nem ferry desk): rake no IH; salary dispatcher humano; cap hauls/dia.
+
+---
 
 ## Loops de economia
 
@@ -138,6 +265,10 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** UI monólito; directory filtrava só recruiting, não “listada”.
 **Fix:** `va_listed` (SQLite **v13** / PG **v23**). Sidebar **VAs** (cards) / **My VA** (roster) / **Ranking**. Publish em **Company → Become a VA**. Directory só `va_listed`. My VA tabs: Roster / Hangar (frota company) / Config (recruiting + invite).
 
+**Config UI (2026-09-19):** recruiting era botão “Stop recruiting” grande (`settings-choice-btn`). Agora checkbox “Open recruiting” + row compacta Create invite / Edit listing.
+
+**Leave / Unlist (2026-09-19):** membro já tinha `POST /api/va/leave` (Roster); owner não podia “desfazer VA”. Fix: `vaUnpublish` / `POST /api/va/unpublish` → `va_listed=0`, recruiting off, remove non-owners, reject pending, expire invites. Config: **Unlist VA** (owner) / **Leave VA** (membro) com confirm. Leave devolve `homeCompanyId` + companies pra trocar de tenant.
+
 **VA name reset to pilot (2026-09-19):** Save/select-hub escrevia `missions.pilotName` em `companies.display_name` (COALESCE), apagando Lamusine→Nothin. Fix: persist company state / select-hub só atualizam `home_hub_icao`; listing name só via `vaPublish`.
 
 ### VA pages + publish (2026-09-19)
@@ -164,6 +295,30 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** members table existia (auth) mas sem invite/join, board, pay cross-company, ranking.
 **Fix:** schema v11 / PG v21 company_invites + haul stats; career-va.ts; APIs /api/va/*; UI sidebar **VA** + **Ranking** (publish reusa company); settle pilotAccountId/pilotHomeCompanyId + credit home quando ≠ VA.
 
+### Member route cut — shipped (2026-09-19)
+
+**Sintoma / gap:** membro voava Freights/Demand/Charter com tail VA e 100% do payout ficava na VA (só IH pagava home).
+**Causa:** sem `memberRouteCutPct`, sem stamp de home no accept de freights, settle sem cut.
+**Fix:** SQLite v14 / PG companies.member_route_cut_pct; Config + directory chip; accept stamp `pilotHomeCompanyId`; settle `va_member_cut` (net = payout−fuel); hangar pilot mutationsLocked UI.
+
+### Ferry ops + fleet owner gates — shipped (2026-09-19)
+
+**Sintoma / gap:** empty ferry na VA debitava company → 8 membros podiam esvaziar wallet; membros podiam sell/MX.
+**Causa:** ferry sempre no ops company; sem overhead/allowance; API fleet sem role check.
+**Fix:** Line crew hire/salary (`va_line_crew_*`); allowance NPC `ferry`+ETA; overflow → home (`va_line_crew_ferry`); API owner-only MX/sell/list/unlist; Config UI.
+
+### Member progression home ladder — shipped (2026-09-19)
+
+**Sintoma / gap:** membro voando VA herdava unlock da VA (ou não progredia na home).
+**Causa:** gates/XP usavam `cargoOps`/`classOps` da company ativa (= VA).
+**Fix:** `resolvePilotProgressionOps` + `withProgressionGates`; market/accept/staging/demand/WH/state usam home; `settleMission({ progression })` + write-back home; teste isolation em `career-mission.test.ts`.
+### One VA per account — shipped (2026-09-19)
+
+**Sintoma / gap:** piloto podia join/request em várias VAs ao mesmo tempo.
+**Causa:** invite + join request só checavam membership da company alvo.
+**Fix:** `assertAccountCanJoinVa` / `vaListedMembership`; block invite+request+accept; directory UI desabilita quando já em VA.
+
+
 ## Checklist quando for implementar
 
 - [x] InternalHaul pay (IH-1)
@@ -173,3 +328,11 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] IH-2 members + board interno + ranking 7d
 - [ ] Fase 3 / IH-3: só com VA; caps AI vs humano Dispatcher
 - [x] Testes IH-1 + VA invite/cap/cross-pay/ranking
+- [x] Copy join / My VA: dual-tenant (frota home vs VA)
+- [x] **memberRouteCutPct** — schema v14 + Config + directory + settle Freights/Demand/Charter (net após fuel)
+- [x] Hangar VA: member read-only UI (sell/lease/MX; ferry ok) + **API gate MX + sell/list/unlist owner-only**
+- [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
+- [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
+- [x] **One VA per account** — block join/request while already in a listed VA
+- [ ] Buff concessão herdada no porto home da VA (member-aware)
+- [ ] Buff concessão herdado por membros (Tier 1)

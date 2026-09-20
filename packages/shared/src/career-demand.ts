@@ -1074,6 +1074,8 @@ export function acceptDemandOrder(
     aircraftId: string;
     /** Optional kg (defaults to min(remaining, warehouse, aircraft)). */
     kg?: number;
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
   },
 ): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
   ensureDemandOrders(world);
@@ -1279,6 +1281,8 @@ export function acceptDemandOrder(
     warehouseId: withdrawn.warehouseId,
     warehouseAvgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
+    pilotAccountId: opts.pilotAccountId?.trim() || undefined,
+    pilotHomeCompanyId: opts.pilotHomeCompanyId?.trim() || undefined,
   });
 
   assignAircraftToMission(state, aircraft.id, mission.id, origin);

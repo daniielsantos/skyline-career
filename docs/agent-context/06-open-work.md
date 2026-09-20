@@ -1,5 +1,15 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-19: **One VA per account shipped** — join/request/accept bloqueados se já membro de VA listada; directory UI. Spec: [16-va-logistics.md](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA member progression home ladder shipped** — gates Freights/Demand/staging/WH + settle XP na home do piloto (não herda unlock da VA). Spec: [16-va-logistics.md](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA ferry ops + fleet API gates shipped** — Line crew hire/salary/allowance NPC ETA; overflow empty ferry → home; sell/list/unlist/MX owner-only na VA. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA MX owner-only** — inspect/repair debitam wallet VA; membros (pilot/dispatcher) sem permissão (UI + API 403). Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA memberRouteCutPct shipped** — Config + directory + settle `va_member_cut`; stamp accept; hangar pilot RO UI. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
 Atualizado 2026-09-19: **VA split** — VAs directory (cards) / My VA / Ranking; Become a VA na Company; `va_listed` v13/PG v23. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 Atualizado 2026-09-19: **VA pages** — sidebar VA + Ranking; publish = listar company ativa (sem 2º tenant); Settings card removido. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
@@ -7,6 +17,10 @@ Atualizado 2026-09-19: **VA pages** — sidebar VA + Ranking; publish = listar c
 Atualizado 2026-09-19: **VA directory + join requests** — lista de VAs, Request join, Accept/Reject, Stop recruiting (sem spam). Invite code fica como atalho privado. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 Atualizado 2026-09-19: **IH-2 VA multi-piloto + ranking leve** — invite/join/kick/role; Internal Haul board; settle fee-to-operator; 7d company ranking + pilots strip. Sem chat/crew. Spec: [16-va-logistics.md](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA member dual-tenant + fees OPEN** — frota home fica; join = IH (+ frota/desk VA); Freights-under-VA e rake/seat fee ainda não fechados (default doc = sem rake v1). Spec: [16-va-logistics.md](./16-va-logistics.md).
+
+Atualizado 2026-09-19: **VA memberRouteCutPct DECIDIDO** — membro voa Freights/Demand/Charter com tail VA; % do lucro net (payout−fuel−ferry) → home; config owner + chip no directory; default 30%; IH sem rake extra. Implementação ainda não. Spec: [16-va-logistics.md](./16-va-logistics.md).
 
 Atualizado 2026-09-19: **Desktop slim hotfix** — 0.3.117 API exit: drop de `packages/agent` quebrou imports relativos `../../agent/src` (dispatch/preflight/watch). Agent `src` volta no pack. Detail: `packages/desktop/README.md`.
 

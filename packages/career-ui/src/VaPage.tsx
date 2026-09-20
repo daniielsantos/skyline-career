@@ -6,15 +6,19 @@ import {
   postVaAcceptJoinRequest,
   postVaRejectJoinRequest,
   postVaRecruiting,
+  postVaRouteCut,
+  postVaLineCrew,
   postVaLeave,
   postVaKick,
   postVaRole,
+  postVaUnpublish,
   type VaMember,
   type VaJoinRequest,
   type PlayerAircraft,
 } from './api';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
+import { useConfirm } from './ConfirmDialog';
 
 type VaPane = 'roster' | 'hangar' | 'config';
 
@@ -23,9 +27,17 @@ type Props = {
   activeCompanyId: string | null;
   fleet: PlayerAircraft[];
   busy?: boolean;
-  renderHangarCard: (aircraft: PlayerAircraft) => ReactNode;
+  renderHangarCard: (
+    aircraft: PlayerAircraft,
+    opts: { mutationsLocked: boolean },
+  ) => ReactNode;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
+  onLeftVa?: (opts: {
+    homeCompanyId: string | null;
+    companies: Array<{ id: string; displayName: string }>;
+  }) => void | Promise<void>;
+  onUnpublished?: () => void | Promise<void>;
 };
 
 export function VaPage(props: Props) {
@@ -37,6 +49,17 @@ export function VaPage(props: Props) {
   const [memberCap, setMemberCap] = useState(8);
   const [listed, setListed] = useState(false);
   const [recruiting, setRecruiting] = useState(true);
+  const [memberRouteCutPct, setMemberRouteCutPct] = useState(30);
+  const [cutDraft, setCutDraft] = useState('30');
+  const [lineCrew, setLineCrew] = useState<{
+    hired: boolean;
+    allowance: number;
+    used: number;
+    remaining: number;
+    hireUsd: number;
+    salaryUsdPerWeek: number;
+    fireSeveranceUsd: number;
+  } | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -44,10 +67,12 @@ export function VaPage(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
 
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';
   const isOwner = role === 'owner';
+  const hangarReadOnly = !isOwner;
   const pageBusy = busy || Boolean(props.busy);
 
   const refresh = useCallback(async () => {
@@ -63,6 +88,9 @@ export function VaPage(props: Props) {
       setMemberCap(m.memberCap);
       setListed(m.listed);
       setRecruiting(m.recruiting);
+      setMemberRouteCutPct(m.memberRouteCutPct ?? 30);
+      setCutDraft(String(m.memberRouteCutPct ?? 30));
+      setLineCrew(m.lineCrew ?? null);
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
       if (m.listed && (m.role === 'owner' || m.role === 'dispatcher')) {
@@ -83,6 +111,58 @@ export function VaPage(props: Props) {
       setLoaded(true);
     }
   }, [canShow, companyId]);
+
+  const leaveVa = useCallback(async () => {
+    const ok = await confirm({
+      title: 'Leave this VA?',
+      body: 'You leave the roster and switch back to your own company. Your personal wallet and fleet stay with you — VA money and hangar stay with the VA.',
+      confirmLabel: 'Leave',
+      tone: 'warn',
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await postVaLeave();
+      await props.onLeftVa?.({
+        homeCompanyId: res.homeCompanyId,
+        companies: res.companies,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [confirm, props]);
+
+  const unlistVa = useCallback(async () => {
+    const others = members.filter((m) => m.role !== 'owner').length;
+    const ok = await confirm({
+      title: 'Unlist this VA?',
+      body:
+        others > 0
+          ? `Removes the listing from the VAs directory and drops ${others} other pilot${others === 1 ? '' : 's'} from the roster. Your company, wallet, and fleet stay.`
+          : 'Removes the listing from the VAs directory. Your company, wallet, and fleet stay — you can publish again later.',
+      confirmLabel: 'Unlist VA',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await postVaUnpublish();
+      setListed(false);
+      setRecruiting(false);
+      setMembers((prev) => prev.filter((m) => m.role === 'owner'));
+      setPendingRequests([]);
+      setInviteCode(null);
+      await props.onUnpublished?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }, [confirm, members, props]);
 
   useEffect(() => {
     void refresh();
@@ -354,17 +434,7 @@ export function VaPage(props: Props) {
               disabled={pageBusy}
               style={{ marginTop: '0.5rem' }}
               onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  try {
-                    await postVaLeave();
-                    await refresh();
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : String(err));
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
+                void leaveVa();
               }}
             >
               Leave this VA
@@ -375,37 +445,53 @@ export function VaPage(props: Props) {
 
       {pane === 'hangar' ? (
         <div className="va-pane-card">
+          {hangarReadOnly ? (
+            <p className="settings-help">
+              Hangar is view-only for members — ferry for flights is still
+              available. Sell, lease, inspection, and repair are owner-only
+              (MX comes from the VA wallet).
+            </p>
+          ) : null}
           {props.fleet.length === 0 ? (
             <p className="empty">
               No aircraft yet — buy or lease on Airframes for this company.
             </p>
           ) : (
             <ul className="hangar-list">
-              {props.fleet.map((acf) => props.renderHangarCard(acf))}
+              {props.fleet.map((acf) =>
+                props.renderHangarCard(acf, {
+                  mutationsLocked: hangarReadOnly,
+                }),
+              )}
             </ul>
           )}
         </div>
       ) : null}
 
       {pane === 'config' ? (
-        <div className="settings-card va-pane-card">
+        <div className="settings-card va-pane-card va-config-card">
           <h3>Config</h3>
           <p className="settings-help">
-            Hiring visibility and private invites. Update the public name/hub
-            from Company.
+            {isOwner
+              ? 'Hiring, invites, and listing. Name and hub live on Company.'
+              : canManage
+                ? 'Invites and join requests. Listing and recruiting are owner-only.'
+                : 'Your seat on this VA. Recruiting and listing are owner-only.'}
           </p>
+
           {isOwner ? (
-            <div className="settings-choice">
-              <button
-                type="button"
-                className={`settings-choice-btn${recruiting ? ' active' : ''}`}
+            <label className="va-config-check">
+              <input
+                type="checkbox"
+                checked={recruiting}
                 disabled={pageBusy}
-                onClick={() => {
+                onChange={(e) => {
+                  const next = e.target.checked;
                   void (async () => {
                     setBusy(true);
                     setError(null);
                     try {
-                      const res = await postVaRecruiting(!recruiting);
+                      const res = await postVaRecruiting(next);
                       setRecruiting(res.recruiting);
                       await refresh();
                     } catch (err) {
@@ -417,68 +503,226 @@ export function VaPage(props: Props) {
                     }
                   })();
                 }}
-              >
-                {recruiting ? 'Stop recruiting' : 'Open recruiting'}
-                <small>
-                  {recruiting
-                    ? 'Hide from open hiring · invite code still works'
-                    : 'Show as hiring in the VAs directory'}
-                </small>
-              </button>
+              />
+              <span>
+                Open recruiting
+                <span className="muted">
+                  {' '}
+                  · listed in VAs when on; invite still works when off
+                </span>
+              </span>
+            </label>
+          ) : (
+            <p className="settings-sample">
+              Recruiting is <strong>{recruiting ? 'on' : 'off'}</strong> (owner
+              only).
+            </p>
+          )}
+
+          {isOwner ? (
+            <div className="va-config-row" style={{ alignItems: 'center' }}>
+              <label className="settings-help" htmlFor="va-route-cut">
+                Pilot cut on Freights / Demand / Charter
+              </label>
+              <input
+                id="va-route-cut"
+                type="number"
+                min={10}
+                max={50}
+                step={1}
+                value={cutDraft}
+                disabled={pageBusy}
+                style={{ width: '4.5rem' }}
+                onChange={(e) => setCutDraft(e.target.value)}
+                onBlur={() => {
+                  void (async () => {
+                    const n = Number(cutDraft);
+                    if (!Number.isFinite(n) || n === memberRouteCutPct) {
+                      setCutDraft(String(memberRouteCutPct));
+                      return;
+                    }
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      const res = await postVaRouteCut(n);
+                      setMemberRouteCutPct(res.memberRouteCutPct);
+                      setCutDraft(String(res.memberRouteCutPct));
+                    } catch (err) {
+                      setCutDraft(String(memberRouteCutPct));
+                      setError(
+                        err instanceof Error ? err.message : String(err),
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })();
+                }}
+              />
+              <span className="muted">% of route net → pilot home (10–50)</span>
             </div>
           ) : (
             <p className="settings-sample">
-              Only the owner can change recruiting. Hiring is{' '}
-              <strong>{recruiting ? 'on' : 'off'}</strong>.
+              Pilot cut <strong>{memberRouteCutPct}%</strong> of Freights /
+              Demand / Charter route net (owner sets this).
             </p>
           )}
 
-          {canManage ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={pageBusy}
-              style={{ marginTop: '0.75rem' }}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    const { invite } = await postVaInvite({});
-                    setInviteCode(invite.code);
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : String(err));
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
-            >
-              Create invite code
-            </button>
-          ) : (
-            <p className="settings-help" style={{ marginTop: '0.75rem' }}>
-              Owner or dispatcher can mint invite codes.
+          <div className="va-config-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
+            <p className="settings-help" style={{ margin: 0 }}>
+              Line crew (empty ferry desk)
             </p>
-          )}
+            {lineCrew?.hired ? (
+              <>
+                <p className="settings-sample" style={{ margin: 0 }}>
+                  Hired · allowance{' '}
+                  <strong>
+                    {lineCrew.remaining}/{lineCrew.allowance}
+                  </strong>{' '}
+                  NPC ferries left this week · ${lineCrew.salaryUsdPerWeek.toLocaleString()}/wk
+                </p>
+                {isOwner ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={pageBusy}
+                    onClick={() => {
+                      void (async () => {
+                        const ok = await confirm({
+                          title: 'Fire Line crew?',
+                          body: `Severance $${lineCrew.fireSeveranceUsd.toLocaleString()}. Empty ferries then debit member home wallets.`,
+                          confirmLabel: 'Fire',
+                          tone: 'warn',
+                        });
+                        if (!ok) return;
+                        setBusy(true);
+                        setError(null);
+                        try {
+                          const res = await postVaLineCrew('fire');
+                          setLineCrew(res.lineCrew);
+                        } catch (err) {
+                          setError(
+                            err instanceof Error ? err.message : String(err),
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      })();
+                    }}
+                  >
+                    Fire Line crew
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="settings-sample" style={{ margin: 0 }}>
+                  Not hired — empty ferries debit the flying member&apos;s home
+                  wallet (VA does not pay).
+                </p>
+                {isOwner ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={pageBusy}
+                    onClick={() => {
+                      void (async () => {
+                        setBusy(true);
+                        setError(null);
+                        try {
+                          const res = await postVaLineCrew('hire');
+                          setLineCrew(res.lineCrew);
+                        } catch (err) {
+                          setError(
+                            err instanceof Error ? err.message : String(err),
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      })();
+                    }}
+                  >
+                    Hire Line crew ($
+                    {(lineCrew?.hireUsd ?? 2500).toLocaleString()})
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          <div className="va-config-row">
+            {canManage ? (
+              <button
+                type="button"
+                className="action ghost"
+                disabled={pageBusy}
+                onClick={() => {
+                  void (async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      const { invite } = await postVaInvite({});
+                      setInviteCode(invite.code);
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : String(err),
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })();
+                }}
+              >
+                Create invite
+              </button>
+            ) : (
+              <span className="settings-help">
+                Owner or dispatcher can mint invites.
+              </span>
+            )}
+            {isOwner && props.onGoCompany ? (
+              <button
+                type="button"
+                className="action ghost"
+                onClick={props.onGoCompany}
+              >
+                Edit listing
+              </button>
+            ) : null}
+          </div>
           {inviteCode ? (
-            <p className="settings-sample">
-              Invite: <strong>{inviteCode}</strong>
+            <p className="settings-sample va-config-invite">
+              Invite <strong>{inviteCode}</strong>
             </p>
           ) : null}
 
-          {props.onGoCompany ? (
-            <button
-              type="button"
-              className="action ghost"
-              style={{ marginTop: '0.75rem' }}
-              onClick={props.onGoCompany}
-            >
-              Edit VA listing on Company
-            </button>
-          ) : null}
+          <div className="va-config-danger">
+            {isOwner ? (
+              <button
+                type="button"
+                className="action ghost va-config-danger-btn"
+                disabled={pageBusy}
+                onClick={() => {
+                  void unlistVa();
+                }}
+              >
+                Unlist VA
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="action ghost va-config-danger-btn"
+                disabled={pageBusy}
+                onClick={() => {
+                  void leaveVa();
+                }}
+              >
+                Leave VA
+              </button>
+            )}
+          </div>
         </div>
       ) : null}
+      {confirmDialog}
     </section>
   );
 }

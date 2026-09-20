@@ -1386,6 +1386,16 @@ export interface CareerMissionsState {
    * SP: updated after each catch-up fee settlement.
    */
   lastSeenTick?: number;
+  /**
+   * VA Line crew (ferry desk) — weekly salary + empty-ferry allowance.
+   * Only meaningful on VA-listed companies; solo ignores.
+   */
+  vaLineCrew?: {
+    hired: boolean;
+    hiredAtTick: number;
+    weekKey: number;
+    usedThisWeek: number;
+  };
 };
 
 /** Player FBO ownership + bonded warehouse holds. */
@@ -1960,7 +1970,8 @@ export type PlayerAircraftStatus =
   | 'assigned'
   | 'maintenance'
   | 'listed'
-  | 'leased_out';
+  | 'leased_out'
+  | 'ferry';
 export type AircraftOwnership = 'owned' | 'leased';
 
 /** Signed company cashflow row (see career-ledger). */
@@ -1988,6 +1999,11 @@ export type CareerLedgerKind =
   | 'port_drayage'
   | 'port_shuttle'
   | 'internal_haul_pay'
+  | 'va_member_cut'
+  | 'va_line_crew_hire'
+  | 'va_line_crew_fire'
+  | 'va_line_crew_salary'
+  | 'va_line_crew_ferry'
   | 'port_concession_claim'
   | 'port_concession_lease'
   | 'port_concession_upgrade'
@@ -2067,4 +2083,14 @@ export interface PlayerAircraft {
   listedListingId?: string;
   /** Active when status === 'leased_out' (NPC/market holds the airframe). */
   leaseOut?: AircraftLeaseOutContract;
+  /**
+   * NPC Line-crew reposition in progress (status === 'ferry').
+   * Completes when world.tick >= arriveAtTick.
+   */
+  npcFerry?: {
+    originIcao: string;
+    destIcao: string;
+    arriveAtTick: number;
+    distanceNm?: number;
+  };
 }

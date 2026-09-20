@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **0f6c79e** / desktop **0.3.133** shipped: Fix My VA for members and tidy the roster layout. Release: [v0.3.133](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.133).
+
+
 `main` **3e18e10** / desktop **0.3.132** shipped: Fix My VA hang by dropping world lock from members Line crew. Release: [v0.3.132](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.132).
 
 

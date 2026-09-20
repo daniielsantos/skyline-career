@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **2671508** / desktop **0.3.140** shipped: Add VA hangar aircraft reservation and roster presence. Release: [v0.3.140](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.140).
+
+
 `main` **85d94d7** / desktop **0.3.139** shipped: Fix My VA ledger race and highlight the company wallet. Release: [v0.3.139](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.139).
 
 

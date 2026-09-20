@@ -30,7 +30,8 @@ describe('VA Line crew ferry ops', () => {
     assert.equal(state.walletUsd, before - VA_LINE_CREW_HIRE_USD);
     assert.equal(state.vaLineCrew?.hired, true);
     const allowance = vaLineCrewAllowanceRemaining(state, world.tick);
-    assert.ok(allowance.remaining >= 2);
+    assert.ok(allowance.remaining >= 4);
+    assert.equal(allowance.allowance, 4); // 1 parked starter → floor 4
     assert.ok(consumeVaLineCrewAllowance(state, world.tick));
     assert.equal(
       vaLineCrewAllowanceRemaining(state, world.tick).used,
@@ -85,5 +86,47 @@ describe('VA Line crew ferry ops', () => {
     assert.equal(aircraft.status, 'parked');
     assert.equal(aircraft.locationIcao, 'SBSP');
     assert.equal(aircraft.npcFerry, undefined);
+  });
+
+  it('allowance floor 4 and scales 2× parked up to 16', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-line-allow' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 100_000;
+    hireVaLineCrew(state, world.tick);
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 4);
+
+    const base = state.fleet[0]!;
+    state.fleet.push({
+      ...base,
+      id: 'acf_second',
+      registration: 'PP-TWO',
+      status: 'parked',
+    });
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 4);
+
+    for (let i = 0; i < 3; i++) {
+      state.fleet.push({
+        ...base,
+        id: `acf_extra_${i}`,
+        registration: `PP-X${i}`,
+        status: 'parked',
+      });
+    }
+    // 5 parked → 10
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 10);
+
+    for (let i = 0; i < 5; i++) {
+      state.fleet.push({
+        ...base,
+        id: `acf_more_${i}`,
+        registration: `PP-Y${i}`,
+        status: 'parked',
+      });
+    }
+    // 10 parked → cap 16
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 16);
   });
 });

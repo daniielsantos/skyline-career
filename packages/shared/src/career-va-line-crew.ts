@@ -75,6 +75,11 @@ export function ensureVaLineCrew(
 }
 
 /** Allowance K = min(2×memberCap, parked hulls), floor 2 when hired. */
+/**
+ * Weekly NPC empty-ferry budget while Line crew is hired.
+ * Floor 4 so a 2-hull starter VA can reposition more than once/week;
+ * scales 2× parked up to 2× member cap (16).
+ */
 export function quoteVaLineCrewAllowance(
   state: CareerMissionsState,
 ): number {
@@ -82,9 +87,9 @@ export function quoteVaLineCrewAllowance(
     (a) => a.status === 'parked' && !a.npcFerry,
   ).length;
   const byCap = 2 * VA_MEMBER_CAP;
-  const byFleet = Math.max(0, parked);
+  const byFleet = Math.max(0, parked) * 2;
   const raw = Math.min(byCap, byFleet);
-  return Math.max(2, raw);
+  return Math.max(4, raw);
 }
 
 export function vaLineCrewAllowanceRemaining(

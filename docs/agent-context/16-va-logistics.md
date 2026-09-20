@@ -144,13 +144,31 @@ Problema: 8 membros ferryando tails da VA com fuel no wallet da company = traged
 **Overhead semanal (“Line crew” / ferry desk)** — narrativa: staff da VA reposiciona cascos; **não** é ground staff de WH nem Crew needed do board.
 
 1. Owner **hire** via Config My VA (`POST /api/va/line-crew` hire) — signing + salary/semana no wallet VA.
-2. Hire dá **allowance** `K = max(2, min(2×memberCap, parked hulls))` empty NPC ferries/semana.
+2. Hire dá **allowance** `K = max(4, min(2×memberCap, 2×parked))` empty NPC ferries/semana (retune 2026-09-20: piso 4, 2× parked; cap 16).
 3. Reposition no allowance: **sem debit** VA; status `ferry` + ETA ticks; completa no catch-up/passive settle.
 4. Acima do cap / sem hire → **overflow**: empty ferry **pago na home do piloto** (`va_line_crew_ferry`). Owner sem allowance: VA paga ferry instantâneo (comportamento solo).
 5. Fire: severance 1 semana (`POST /api/va/line-crew` fire).
 6. MX/hours no complete NPC: wear leve por nm.
 
 **Non-goals v1:** ferry infinito grátis; misturar com Port FBO ground staff; IAP seat.
+
+### Line crew tiers (Desk / Ops / Network) — **DECIDIDO design (2026-09-20) · not shipped**
+
+v1 continua **um** hire flat. Próximo passo de produto (antes de polish de layout Config):
+
+| Tier | Nome | Hire (VA) | $/semana | Allowance NPC/semana | Notas |
+|--|--|--|--|--|--|
+| **T1** | Desk | $2 500 (atual) | $1 800 | `max(4, min(16, 2×parked))` | Default ao hire |
+| **T2** | Ops | +$4 000 upgrade | $3 200 | `max(8, min(24, 3×parked))` | Upgrade owner-only; fire volta a “sem crew” (não auto-downgrade) |
+| **T3** | Network | +$7 500 from T2 | $5 500 | `max(12, min(32, 4×parked))` | Top; still overflow home beyond cap |
+
+**Regras**
+- Só **owner** upgrade/fire; salary no wallet VA; week key igual v1.
+- Downgrade **não** no v2 — só fire (severance = 1× salary do tier atual) e re-hire T1.
+- Overflow / owner instantâneo **inalterados**.
+- UI Config: uma linha de tier + botão Upgrade / Fire (layout polish = turno separado).
+
+**Backlog UI:** ~~melhorar layout da página Config~~ — **shipped 2026-09-20** (seções Hiring / Line crew / Invites / Danger).
 
 ---
 
@@ -358,6 +376,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** (1) `switchToCompanyId` bloqueava atrás de `switchCompany` = clear paint + full `/api/state` refresh; (2) Line crew ainda usava `companyLock` (fila atrás do pulse) para todo membro.
 **Fix:** pintar roster antes do switch; `switchCompanyForVa` só session/open + fleet/wallet leve; Line crew só para owner e sem companyLock; reads em paralelo.
 
+### Member Config shows Line crew as not hired (2026-09-20)
+
+**Sintoma:** owner hired Line crew; member Config ainda dizia Not hired.
+**Causa:** `/api/va/members` só montava `lineCrew` quando `role === 'owner'` (otimização antiga); UI tratava `null` como not hired.
+**Fix:** snapshot Line crew para qualquer membro listado (mesmo load de missions do roster); hire/fire continua owner-only; null ≠ not hired na UI.
+
 ### My VA empty for members + YOURS badge (2026-09-20)
 
 **Sintoma:** membro entra na VA mas My VA mostra Become a VA; directory marca YOURS na VA alheia; risco de pilotName = nome da VA.
@@ -478,6 +502,9 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **VA home_country_id on publish** — derive from hub + backfill
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
+- [x] **Line crew allowance retune** — piso 4, 2×parked, cap 16 (2026-09-20)
+- [ ] **Line crew tiers** Desk/Ops/Network — design in 16; not shipped
+- [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA
 - [ ] Buff concessão herdada no porto home da VA (member-aware)

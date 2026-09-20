@@ -807,116 +807,144 @@ export function VaPage(props: Props) {
 
       {pane === 'config' ? (
         <div className="settings-card va-pane-card va-config-card">
-          <h3>Config</h3>
-          <p className="settings-help">
-            {isOwner
-              ? 'Hiring, invites, and listing. Name and hub live on Company.'
-              : canManage
-                ? 'Invites and join requests. Listing and recruiting are owner-only.'
-                : 'Your seat on this VA. Recruiting and listing are owner-only.'}
-          </p>
+          <header className="va-config-head">
+            <h3>Config</h3>
+            <p className="settings-help">
+              {isOwner
+                ? 'Hiring, ferry desk, invites, and listing. Name and hub live on Company.'
+                : canManage
+                  ? 'Invites. Recruiting, cut, and listing are owner-only.'
+                  : 'Your seat on this VA. Most controls are owner-only.'}
+            </p>
+          </header>
 
-          {isOwner ? (
-            <label className="va-config-check">
-              <input
-                type="checkbox"
-                checked={recruiting}
-                disabled={pageBusy}
-                onChange={(e) => {
-                  const next = e.target.checked;
-                  void (async () => {
-                    setBusy(true);
-                    setError(null);
-                    try {
-                      const res = await postVaRecruiting(next);
-                      setRecruiting(res.recruiting);
-                      await refresh();
-                    } catch (err) {
-                      setError(
-                        err instanceof Error ? err.message : String(err),
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  })();
-                }}
-              />
-              <span>
-                Open recruiting
-                <span className="muted">
-                  {' '}
-                  · listed in VAs when on; invite still works when off
+          <section className="va-config-section">
+            <h4 className="va-config-section-title">Hiring</h4>
+            {isOwner ? (
+              <label className="va-config-check">
+                <input
+                  type="checkbox"
+                  checked={recruiting}
+                  disabled={pageBusy}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    void (async () => {
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        const res = await postVaRecruiting(next);
+                        setRecruiting(res.recruiting);
+                        await refresh();
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : String(err),
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                />
+                <span>
+                  Open recruiting
+                  <span className="muted">
+                    {' '}
+                    · listed in VAs when on; invite still works when off
+                  </span>
                 </span>
-              </span>
-            </label>
-          ) : (
-            <p className="settings-sample">
-              Recruiting is <strong>{recruiting ? 'on' : 'off'}</strong> (owner
-              only).
-            </p>
-          )}
-
-          {isOwner ? (
-            <div className="va-config-row" style={{ alignItems: 'center' }}>
-              <label className="settings-help" htmlFor="va-route-cut">
-                Pilot cut on Freights / Demand / Charter
               </label>
-              <input
-                id="va-route-cut"
-                type="number"
-                min={10}
-                max={50}
-                step={1}
-                value={cutDraft}
-                disabled={pageBusy}
-                style={{ width: '4.5rem' }}
-                onChange={(e) => setCutDraft(e.target.value)}
-                onBlur={() => {
-                  void (async () => {
-                    const n = Number(cutDraft);
-                    if (!Number.isFinite(n) || n === memberRouteCutPct) {
-                      setCutDraft(String(memberRouteCutPct));
-                      return;
-                    }
-                    setBusy(true);
-                    setError(null);
-                    try {
-                      const res = await postVaRouteCut(n);
-                      setMemberRouteCutPct(res.memberRouteCutPct);
-                      setCutDraft(String(res.memberRouteCutPct));
-                    } catch (err) {
-                      setCutDraft(String(memberRouteCutPct));
-                      setError(
-                        err instanceof Error ? err.message : String(err),
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  })();
-                }}
-              />
-              <span className="muted">% of route net → pilot home (10–50)</span>
-            </div>
-          ) : (
-            <p className="settings-sample">
-              Pilot cut <strong>{memberRouteCutPct}%</strong> of Freights /
-              Demand / Charter route net (owner sets this).
-            </p>
-          )}
+            ) : (
+              <p className="settings-sample va-config-readonly">
+                Recruiting is <strong>{recruiting ? 'on' : 'off'}</strong>
+              </p>
+            )}
+            {isOwner ? (
+              <div className="va-config-field">
+                <label className="va-config-field-label" htmlFor="va-route-cut">
+                  Pilot cut
+                </label>
+                <div className="va-config-field-row">
+                  <input
+                    id="va-route-cut"
+                    type="number"
+                    min={10}
+                    max={50}
+                    step={1}
+                    value={cutDraft}
+                    disabled={pageBusy}
+                    className="va-config-cut-input"
+                    onChange={(e) => setCutDraft(e.target.value)}
+                    onBlur={() => {
+                      void (async () => {
+                        const n = Number(cutDraft);
+                        if (!Number.isFinite(n) || n === memberRouteCutPct) {
+                          setCutDraft(String(memberRouteCutPct));
+                          return;
+                        }
+                        setBusy(true);
+                        setError(null);
+                        try {
+                          const res = await postVaRouteCut(n);
+                          setMemberRouteCutPct(res.memberRouteCutPct);
+                          setCutDraft(String(res.memberRouteCutPct));
+                        } catch (err) {
+                          setCutDraft(String(memberRouteCutPct));
+                          setError(
+                            err instanceof Error
+                              ? err.message
+                              : String(err),
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      })();
+                    }}
+                  />
+                  <span className="va-config-field-suffix">%</span>
+                  <span className="muted va-config-field-hint">
+                    of Freights / Demand / Charter route net → pilot home
+                    (10–50)
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="settings-sample va-config-readonly">
+                Pilot cut <strong>{memberRouteCutPct}%</strong> of route net
+              </p>
+            )}
+          </section>
 
-          <div className="va-config-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
-            <p className="settings-help" style={{ margin: 0 }}>
-              Line crew (empty ferry desk)
+          <section className="va-config-section">
+            <h4 className="va-config-section-title">Line crew</h4>
+            <p className="va-config-section-blurb">
+              Empty ferry desk — NPC repositions under weekly allowance.
             </p>
-            {lineCrew?.hired ? (
-              <>
-                <p className="settings-sample" style={{ margin: 0 }}>
-                  Hired · allowance{' '}
-                  <strong>
-                    {lineCrew.remaining}/{lineCrew.allowance}
-                  </strong>{' '}
-                  NPC ferries left this week · ${lineCrew.salaryUsdPerWeek.toLocaleString()}/wk
-                </p>
+            {lineCrew == null ? (
+              <p className="settings-sample va-config-readonly">
+                Line crew status unavailable right now.
+              </p>
+            ) : lineCrew.hired ? (
+              <div className="va-config-line-crew is-hired">
+                <div className="va-config-line-crew-stats">
+                  <div>
+                    <span className="va-config-stat-label">Status</span>
+                    <span className="va-config-stat-value">Hired</span>
+                  </div>
+                  <div>
+                    <span className="va-config-stat-label">Allowance</span>
+                    <span className="va-config-stat-value">
+                      {lineCrew.remaining}/{lineCrew.allowance}
+                      <span className="muted"> NPC / wk</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="va-config-stat-label">Salary</span>
+                    <span className="va-config-stat-value">
+                      ${lineCrew.salaryUsdPerWeek.toLocaleString()}
+                      <span className="muted"> / wk</span>
+                    </span>
+                  </div>
+                </div>
                 {isOwner ? (
                   <button
                     type="button"
@@ -938,7 +966,9 @@ export function VaPage(props: Props) {
                           setLineCrew(res.lineCrew);
                         } catch (err) {
                           setError(
-                            err instanceof Error ? err.message : String(err),
+                            err instanceof Error
+                              ? err.message
+                              : String(err),
                           );
                         } finally {
                           setBusy(false);
@@ -948,18 +978,23 @@ export function VaPage(props: Props) {
                   >
                     Fire Line crew
                   </button>
-                ) : null}
-              </>
+                ) : (
+                  <p className="muted va-config-readonly">
+                    Owner manages hire / fire. Empty ferries under allowance do
+                    not debit your home wallet.
+                  </p>
+                )}
+              </div>
             ) : (
-              <>
-                <p className="settings-sample" style={{ margin: 0 }}>
+              <div className="va-config-line-crew">
+                <p className="settings-sample va-config-readonly">
                   Not hired — empty ferries debit the flying member&apos;s home
-                  wallet (VA does not pay).
+                  wallet.
                 </p>
                 {isOwner ? (
                   <button
                     type="button"
-                    className="action ghost"
+                    className="action"
                     disabled={pageBusy}
                     onClick={() => {
                       void (async () => {
@@ -970,7 +1005,9 @@ export function VaPage(props: Props) {
                           setLineCrew(res.lineCrew);
                         } catch (err) {
                           setError(
-                            err instanceof Error ? err.message : String(err),
+                            err instanceof Error
+                              ? err.message
+                              : String(err),
                           );
                         } finally {
                           setBusy(false);
@@ -982,74 +1019,76 @@ export function VaPage(props: Props) {
                     {(lineCrew?.hireUsd ?? 2500).toLocaleString()})
                   </button>
                 ) : null}
-              </>
+              </div>
             )}
-          </div>
+          </section>
 
-          <div className="va-config-row">
-            {canManage ? (
-              <button
-                type="button"
-                className="action ghost"
-                disabled={pageBusy}
-                onClick={() => {
-                  void (async () => {
-                    if (inviteCode) {
-                      const ok = await confirm({
-                        title: 'Renew invite code?',
-                        body: 'The current code stops working. Anyone still using the old link will need the new one.',
-                        confirmLabel: 'Renew',
-                        tone: 'warn',
-                      });
-                      if (!ok) return;
-                    }
-                    setBusy(true);
-                    setError(null);
-                    try {
-                      const { invite } = await postVaInvite({});
-                      setInviteCode(invite.code);
-                    } catch (err) {
-                      setError(
-                        err instanceof Error ? err.message : String(err),
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  })();
-                }}
-              >
-                {inviteCode ? 'Renew invite' : 'Create invite'}
-              </button>
+          <section className="va-config-section">
+            <h4 className="va-config-section-title">Invites &amp; listing</h4>
+            <div className="va-config-actions">
+              {canManage ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={pageBusy}
+                  onClick={() => {
+                    void (async () => {
+                      if (inviteCode) {
+                        const ok = await confirm({
+                          title: 'Renew invite code?',
+                          body: 'The current code stops working. Anyone still using the old link will need the new one.',
+                          confirmLabel: 'Renew',
+                          tone: 'warn',
+                        });
+                        if (!ok) return;
+                      }
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        const { invite } = await postVaInvite({});
+                        setInviteCode(invite.code);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : String(err),
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  {inviteCode ? 'Renew invite' : 'Create invite'}
+                </button>
+              ) : (
+                <span className="settings-help">
+                  Owner or dispatcher can mint invites.
+                </span>
+              )}
+              {isOwner && props.onGoCompany ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  onClick={props.onGoCompany}
+                >
+                  Edit listing
+                </button>
+              ) : null}
+            </div>
+            {inviteCode ? (
+              <p className="va-config-invite">
+                <span className="va-config-stat-label">Invite code</span>
+                <strong className="va-config-invite-code">{inviteCode}</strong>
+                <span className="muted"> · does not expire · renew replaces it</span>
+              </p>
             ) : (
-              <span className="settings-help">
-                Owner or dispatcher can mint invites.
-              </span>
+              <p className="settings-help">
+                One invite code per VA. Stays valid until you renew or unlist.
+              </p>
             )}
-            {isOwner && props.onGoCompany ? (
-              <button
-                type="button"
-                className="action ghost"
-                onClick={props.onGoCompany}
-              >
-                Edit listing
-              </button>
-            ) : null}
-          </div>
-          {inviteCode ? (
-            <p className="settings-sample va-config-invite">
-              Invite <strong>{inviteCode}</strong>
-              <span className="settings-help">
-                {' '}
-                · does not expire · renew replaces it
-              </span>
-            </p>
-          ) : (
-            <p className="settings-help">
-              One invite code per VA. It stays valid until you renew or unlist.
-            </p>
-          )}
+          </section>
 
           <div className="va-config-danger">
+            <h4 className="va-config-section-title">Danger zone</h4>
             {isOwner ? (
               <button
                 type="button"

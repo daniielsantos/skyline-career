@@ -3581,8 +3581,8 @@ export function createCareerApiServer(port = 8787) {
             flight: flightByAccount.get(m.accountId) ?? null,
           };
         });
-        // Line crew only for owner Config — skip for pilots (was companyLock
-        // behind pulse → My VA ~20s). Soft-fail → null.
+        // Line crew snapshot for all members (read-only Config). Missions already
+        // loaded for roster presence — no world lock. Soft-fail → null.
         let lineCrew: {
           hired: boolean;
           allowance: number;
@@ -3592,7 +3592,7 @@ export function createCareerApiServer(port = 8787) {
           salaryUsdPerWeek: number;
           fireSeveranceUsd: number;
         } | null = null;
-        if (listed && membership.role === 'owner') {
+        if (listed) {
           try {
             const tick =
               typeof store.peekEconomyWorld === 'function'

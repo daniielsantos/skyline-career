@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **6aea32d** / desktop **0.3.142** shipped: Fix My VA hangar open delay and persist aircraft reservations. Release: [v0.3.142](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.142).
+
+
 `main` **79949ab** / desktop **0.3.141** shipped: Fill VA home country from hub and scale economy event caps. Release: [v0.3.141](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.141).
 
 

@@ -448,6 +448,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** Hangar do owner ainda podia pintar chrome `fleet`; `onFleet` só atualizava `vaSessionFleet`; busy do botão era o App `busy`, não o da VaPage.
 **Fix:** hangar local em VaPage + sync chrome/session no owner; `busy` no card; badge aceita reserve sem `reservedAtMs` (TTL só quando presente).
 
+### My VA Ledger slow + chrome wallet overwritten (2026-09-20)
+
+**Sintoma:** abrir Ledger demora (atrás do pulse); chrome Wallet / sidebar do membro viram o saldo da VA.
+**Causa:** (1) `GET /api/cashflow` usava `withCareerRead` (economy lock + crew settle) e ainda `summarizeCashflow` → segundo `loadMissions`. (2) `loadLedger` chamava `onWallet(snap.walletUsd)`; dezenas de mutações usavam `setWallet` cru, bypassando sticky de `paintWallet`/`commitWallet`.
+**Fix:** cashflow = `loadMissions(company)` + `peekEconomyWorld` + `summarizeCareerLedger` (sem lock); Ledger não empurra wallet pro chrome; todo paint de wallet no App passa por `commitWallet`/`paintWallet` (sticky `active ≠ home` → só `vaSessionWallet`).
+
 ### Member Ledger empty then fills (2026-09-20)
 
 **Sintoma:** membro no Ledger via wallet/credit da VA mas “No ledger yet”; depois as linhas aparecem.
@@ -498,6 +504,7 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
+- [x] **Ledger cashflow light + wallet audit** — GET /api/cashflow sem world lock; setWallet→commitWallet sticky
 - [x] **Roster presence** — online / last seen / flight na row
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **VA home_country_id on publish** — derive from hub + backfill

@@ -180,9 +180,8 @@ export function AuthGate(props: {
             onChange={(e) => setRememberMe(e.target.checked)}
             disabled={busy}
           />
-          <span>
-            Stay signed in on this device (keeps your login name — never stores
-            the password)
+          <span title="Remembers your login name on this device. Password is never stored.">
+            Remember me
           </span>
         </label>
 

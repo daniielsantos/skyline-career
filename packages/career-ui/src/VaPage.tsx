@@ -182,10 +182,8 @@ export function VaPage(props: Props) {
       // Drop stale responses from a pre-switch (home) fetch.
       if (gen !== ledgerFetchGenRef.current) return;
       setCashflow(snap);
-      // Keep VA wallet in-page (parent routes to vaSession or chrome by tenant).
-      if (typeof snap.walletUsd === 'number' && Number.isFinite(snap.walletUsd)) {
-        onWalletRef.current?.(snap.walletUsd);
-      }
+      // Do NOT push snap.walletUsd to chrome — VA cash stays in-page via
+      // cashflow.walletUsd / props.walletUsd (vaSessionWallet).
       if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
       setFlightQuality(snap.flightQuality ?? null);
     } catch (err) {
@@ -752,7 +750,7 @@ export function VaPage(props: Props) {
                 {formatBoardMoney(cashflow?.walletUsd ?? props.walletUsd)}
               </p>
               <p className="va-ledger-wallet-hint">
-                Shared company cash — same wallet the owner uses.
+                Shared company cash (owner wallet).
               </p>
             </div>
             <div className="va-ledger-quality">

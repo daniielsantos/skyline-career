@@ -5288,41 +5288,52 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/cashflow') {
         const cashflowCompanyId = companyIdFromRequest(req);
-        const payload = await withCareerRead(async (world, missions) => {
-          const cashflow = await requireStore().summarizeCashflow(world.tick);
-          const toDay = vaDayKeyFromTick(world.tick);
-          const fromDay = Math.max(
-            0,
-            toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1),
+        // Light read: company missions + peeked tick. Avoid withCareerRead —
+        // My VA Ledger was queueing behind the world pulse (~20s) for a P&L
+        // that only needs ledger rows + credit (no crew settle / economy lock).
+        const world =
+          careerApiMode === 'gateway' && gatewayWorldClient
+            ? gatewayEconomyShell()
+            : requireStore().peekEconomyWorld();
+        if (!world) {
+          send(res, 503, { error: 'Economy not loaded' });
+          return;
+        }
+        const missions = await loadMissions(
+          cashflowCompanyId ? { companyId: cashflowCompanyId } : undefined,
+        );
+        const cashflow = summarizeCareerLedger(missions, world.tick);
+        const toDay = vaDayKeyFromTick(world.tick);
+        const fromDay = Math.max(
+          0,
+          toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1),
+        );
+        let flightQuality = null;
+        if (cashflowCompanyId && store) {
+          const listed = await Promise.resolve(
+            store.vaIsListed(cashflowCompanyId),
           );
-          let flightQuality = null;
-          if (cashflowCompanyId && store) {
-            const listed = await Promise.resolve(
-              store.vaIsListed(cashflowCompanyId),
+          if (listed) {
+            flightQuality = await Promise.resolve(
+              store.vaFlightQuality({
+                companyId: cashflowCompanyId,
+                fromDayKey: fromDay,
+                toDayKey: toDay,
+              }),
             );
-            if (listed) {
-              flightQuality = await Promise.resolve(
-                store.vaFlightQuality({
-                  companyId: cashflowCompanyId,
-                  fromDayKey: fromDay,
-                  toDayKey: toDay,
-                }),
-              );
-            }
           }
-          return {
-            walletUsd: missions.walletUsd,
-            tick: world.tick,
-            dayIndex: economyDayIndex(world.tick),
-            homeCountryId: world.homeCountryId ?? null,
-            store: requireStore().kind,
-            labels: LEDGER_KIND_LABEL,
-            companyCredit: companyCreditSnapshot(missions),
-            flightQuality,
-            ...cashflow,
-          };
-        }, { companyId: cashflowCompanyId });
-        send(res, 200, payload);
+        }
+        send(res, 200, {
+          walletUsd: missions.walletUsd,
+          tick: world.tick,
+          dayIndex: economyDayIndex(world.tick),
+          homeCountryId: world.homeCountryId ?? null,
+          store: requireStore().kind,
+          labels: LEDGER_KIND_LABEL,
+          companyCredit: companyCreditSnapshot(missions),
+          flightQuality,
+          ...cashflow,
+        });
         return;
       }
 

@@ -3403,7 +3403,7 @@ export function App() {
   const [msPerTick, setMsPerTick] = useState(MS_PER_TICK_DEFAULT);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [displayNowMs, setDisplayNowMs] = useState(Date.now());
-  const [wallet, setWallet] = useState(0);
+  const [wallet, setWalletState] = useState(0);
   const walletRef = useRef(0);
   walletRef.current = wallet;
   const [lots, setLots] = useState<MarketLot[]>([]);
@@ -3530,7 +3530,7 @@ export function App() {
       if (Math.abs(next - hold.usd) > 0.5) return;
       walletCommitHoldRef.current = null;
     }
-    setWallet(next);
+    setWalletState(next);
   }, []);
   /** Authoritative wallet from a mutation — holds ambient refresh from regressing. */
   const commitWallet = useCallback((next: number) => {
@@ -3545,7 +3545,7 @@ export function App() {
       usd: next,
       untilMs: Date.now() + 12_000,
     };
-    setWallet(next);
+    setWalletState(next);
   }, []);
   /** Local lock for Crew fly — avoids app-wide busy flash on every button. */
   const [crewDispatchBusy, setCrewDispatchBusy] = useState(false);
@@ -6491,7 +6491,7 @@ export function App() {
             ),
           );
           setFleet(purchased.fleet);
-          setWallet(purchased.walletUsd);
+          commitWallet(purchased.walletUsd);
           setMissionFuelQuote(null);
           setMissionFuelQuoteStatus('ready');
           return;
@@ -7361,7 +7361,7 @@ export function App() {
     bootProfileKeyRef.current = null;
     // Unknown until /api/state — default true used to flash Freights before hub picker.
     setHubSelected(false);
-    // Do not setWallet(0): careerStateReady is false so chrome shows "…" —
+    // Do not commitWallet(0): careerStateReady is false so chrome shows "…" —
     // painting $0 here made +Nd / session switches look like a wipe.
     setMissions([]);
     setFleet([]);
@@ -7912,7 +7912,7 @@ export function App() {
       setPilotName(result.pilotName);
       setHomeHubIcao(result.homeHubIcao);
       setPilotIcao(result.pilotIcao ?? result.homeHubIcao);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
         `${result.pilotName} registered at ${result.homeHubIcao} · fly Operator aircraft offers until you buy your first aircraft`,
@@ -7972,7 +7972,7 @@ export function App() {
         deliver: opts?.deliver === true,
       });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setAircraftDeliveryQuotes({});
       setToastKind('ok');
@@ -7997,7 +7997,7 @@ export function App() {
         deliver: opts?.deliver === true,
       });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setAircraftDeliveryQuotes({});
       if (result.leaseUnlock) setLeaseUnlock(result.leaseUnlock);
@@ -8040,7 +8040,7 @@ export function App() {
     await run(async () => {
       const result = await postAircraftSell({ aircraftId });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       if (result.listings) setAircraftListings(result.listings);
       setToastKind('ok');
       setToast(`Dealer paid ${formatMoney(result.creditUsd)}`);
@@ -8090,7 +8090,7 @@ export function App() {
         askingUsd: askRef.current,
       });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setToastKind('ok');
       setToast(
@@ -8135,7 +8135,7 @@ export function App() {
         monthlyUsd: leaseRef.monthlyUsd,
       });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setToastKind('ok');
       setToast(
@@ -8148,7 +8148,7 @@ export function App() {
     await run(async () => {
       const result = await postAircraftUnlist({ aircraftId });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setAircraftListings(result.listings);
       setToastKind('ok');
       setToast('Listing removed');
@@ -8167,7 +8167,7 @@ export function App() {
     await run(async () => {
       const result = await postAircraftMaintenance({ aircraftId });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind(result.needsRepair ? 'warn' : 'ok');
       const mroNote =
         result.mro?.scarcity === 'dry'
@@ -8210,7 +8210,7 @@ export function App() {
         enginePts: engPts || undefined,
       });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind(result.mro?.scarcity === 'ok' ? 'ok' : 'warn');
       const mroNote =
         result.mro?.scarcity === 'dry'
@@ -8237,7 +8237,7 @@ export function App() {
     await run(async () => {
       const result = await postAircraftBuyout({ aircraftId });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(`Lease bought out · ${formatMoney(result.debitUsd)}`);
     });
@@ -8257,7 +8257,7 @@ export function App() {
     await run(async () => {
       const result = await postAircraftPayLease({ aircraftId });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
         `Lease catch-up · ${result.weeksPaid} wk · ${formatMoney(result.paidUsd)}`,
@@ -8289,7 +8289,7 @@ export function App() {
       await run(async () => {
         const result = await postAircraftReturnLease({ aircraftId });
         setFleet(result.fleet);
-        setWallet(result.walletUsd);
+        commitWallet(result.walletUsd);
         setToastKind('ok');
         setToast('Lease returned · term ended');
       }, { sync: { aircraftMarket: true } });
@@ -8305,7 +8305,7 @@ export function App() {
     await run(async () => {
       const result = await postAircraftReturnLease({ aircraftId });
       setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
         `Lease returned · ${formatMoney(result.debitUsd)} penalty · ${result.remainingMonths} mo left`,
@@ -8337,7 +8337,7 @@ export function App() {
     if (!ok) return;
     await run(async () => {
       const result = await postFboBuy({ icao: target });
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setPlayerFbos(result.playerFbos);
       if (result.companyCrew) setCompanyCrew(result.companyCrew);
       if (result.dispatcher) setBaseDispatcher(result.dispatcher);
@@ -9108,7 +9108,7 @@ export function App() {
         fboId,
         candidateId,
       });
-      if (result.walletUsd != null) setWallet(result.walletUsd);
+      if (result.walletUsd != null) commitWallet(result.walletUsd);
       if (result.dispatcher) setBaseDispatcher(result.dispatcher);
       if (result.policy) setDispatchScoutPolicy(result.policy);
       setDispatchTours([]);
@@ -9135,7 +9135,7 @@ export function App() {
         action: 'fire',
         memberId,
       });
-      if (result.walletUsd != null) setWallet(result.walletUsd);
+      if (result.walletUsd != null) commitWallet(result.walletUsd);
       if (result.dispatcher) setBaseDispatcher(result.dispatcher);
       if (result.policy) setDispatchScoutPolicy(result.policy);
       setDispatchTours([]);
@@ -9161,7 +9161,7 @@ export function App() {
     if (!ok) return;
     await run(async () => {
       const result = await postFboUpgrade({ fboId });
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setPlayerFbos(result.playerFbos);
       if (result.companyCrew) setCompanyCrew(result.companyCrew);
       if (result.fleet) setFleet(result.fleet);
@@ -9273,7 +9273,7 @@ export function App() {
       const result = await postFboRelease({ holdId });
       setPlayerFbos(result.playerFbos);
       setMissions(result.missions.slice().reverse());
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       selectTab('staging');
     }, { sync: { market: true } });
   }
@@ -9295,7 +9295,7 @@ export function App() {
       setPlayerFbos(result.playerFbos);
       if (result.fleet) setFleet(result.fleet);
       setMissions(result.allMissions.slice().reverse());
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setSplitHoldId(null);
       setToastKind('ok');
       setToast(
@@ -9320,7 +9320,7 @@ export function App() {
       setPlayerFbos(result.playerFbos);
       if (result.fleet) setFleet(result.fleet);
       setMissions(result.missions.slice().reverse());
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
         `Returned ${formatTonnes(mission.cargoKg)} to Base` +
@@ -9396,7 +9396,7 @@ export function App() {
           setCompanyCrew(result.companyCrew);
           setPlayerFbos(result.playerFbos);
           setMissions(result.missions.slice().reverse());
-          setWallet(result.walletUsd);
+          commitWallet(result.walletUsd);
           if (result.fleet) setFleet(result.fleet);
           setToastKind('ok');
           setToast(
@@ -9423,7 +9423,7 @@ export function App() {
     await run(async () => {
       const result = await postCrewHire({ candidateId });
       setCompanyCrew(result.companyCrew);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
         `Hired ${result.member.displayName} · ${formatMoney(result.debitUsd)}`,
@@ -9443,7 +9443,7 @@ export function App() {
     await run(async () => {
       const result = await postCrewFire({ memberId });
       setCompanyCrew(result.companyCrew);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
     });
   }
 
@@ -9463,7 +9463,7 @@ export function App() {
         destIcao: dest,
       });
       if (result.fleet) setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       const arrivedAt =
         result.aircraft?.locationIcao?.trim().toUpperCase() ?? dest;
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
@@ -9488,7 +9488,7 @@ export function App() {
     await run(async () => {
       const result = await postEmptyFlight({ aircraftId, destIcao: dest });
       if (result.fleet) setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setMissions((prev) => {
         const others = prev.filter((m) => m.id !== result.mission.id);
         return [...others, result.mission];
@@ -9528,7 +9528,7 @@ export function App() {
       setError(null);
       const result = await postPilotTravel({ destIcao: dest });
       if (result.fleet) setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       else setPilotIcao(dest);
       setToastKind('ok');
@@ -9824,7 +9824,7 @@ export function App() {
           aircraftId: draft.aircraftId,
         });
         setFleet(result.fleet);
-        setWallet(result.walletUsd);
+        commitWallet(result.walletUsd);
         if (result.charterActiveTour !== undefined) {
           setCharterActiveTour(result.charterActiveTour ?? null);
         }
@@ -10318,7 +10318,7 @@ export function App() {
               return [result.mission, ...prev];
             });
           }
-          if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+          if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
           if (activeCareerProfile?.id) {
             clearPersistedStagingDraft(activeCareerProfile.id);
           }
@@ -10451,7 +10451,7 @@ export function App() {
           return [result.mission, ...prev];
         });
       }
-      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       setStaging(null);
       setWatchAutoPaused(false);
@@ -10660,7 +10660,7 @@ export function App() {
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       if (result.activeTour !== undefined) {
         setActiveTour(result.activeTour ?? null);
       }
@@ -10714,7 +10714,7 @@ export function App() {
     await run(async () => {
       const result = await postBushTripAccept({ tripId: trip.id, aircraftId });
       if (Array.isArray(result.fleet)) setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       await refreshBushTrips();
       selectTab('staging');
     });
@@ -10742,7 +10742,7 @@ export function App() {
     await run(async () => {
       const result = await postBushTripAbandon();
       if (Array.isArray(result.fleet)) setFleet(result.fleet);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       setActiveBushTrip(null);
       setBushWatch(null);
       await refreshBushTrips();
@@ -10942,7 +10942,7 @@ export function App() {
     setMissionFuelQuoteStatus('loading');
     await run(async () => {
       const result = await postFuelPurchase(mission.id);
-      setWallet(result.walletUsd);
+      commitWallet(result.walletUsd);
       if (result.fleet) setFleet(result.fleet);
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
@@ -10995,7 +10995,7 @@ export function App() {
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
-      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
       setToastKind(
         override || result.mission.fuelUplift?.scarcity === 'dry'
           ? 'warn'
@@ -11027,7 +11027,7 @@ export function App() {
       const result = await postSettle({ missionId: mission.id });
       if (Array.isArray(result.fleet)) setFleet(result.fleet);
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
-      if (typeof result.walletUsd === 'number') setWallet(result.walletUsd);
+      if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
       if (result.activeTour !== undefined) {
         setActiveTour(result.activeTour ?? null);
       }
@@ -18685,20 +18685,21 @@ export function App() {
           }
           busy={busy}
           onWallet={(usd) => {
+            // Always cache VA wallet for My VA panes.
             setVaSessionWallet(usd);
-            // Chrome shares wallet only when My VA is the home company (owner).
             const home = homeCompanyIdRef.current?.trim();
-            if (!home || home === activeCompanyIdRef.current?.trim()) {
-              commitWallet(usd);
-            }
+            const active = activeCompanyIdRef.current?.trim();
+            // Member dual-tenant pin: never overwrite chrome home wallet.
+            if (home && active && home !== active) return;
+            commitWallet(usd);
           }}
           onFleet={(nextFleet) => {
             setVaSessionFleet(nextFleet);
             // Owner hangar may still be bound to chrome fleet — keep both in sync.
             const home = homeCompanyIdRef.current?.trim();
-            if (!home || home === activeCompanyIdRef.current?.trim()) {
-              setFleet(nextFleet);
-            }
+            const active = activeCompanyIdRef.current?.trim();
+            if (home && active && home !== active) return;
+            setFleet(nextFleet);
           }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
@@ -19106,11 +19107,8 @@ export function App() {
                     void fetchCashflow()
                       .then((snap) => {
                         setCashflow(snap);
-                        const home = homeCompanyIdRef.current?.trim();
-                        const active = activeCompanyIdRef.current?.trim();
-                        if (!home || !active || home === active) {
-                          setWallet(snap.walletUsd);
-                        }
+                        // commitWallet is chrome-sticky when active ≠ home.
+                        commitWallet(snap.walletUsd);
                         if (snap.companyCredit) {
                           setCompanyCredit(snap.companyCredit);
                         }

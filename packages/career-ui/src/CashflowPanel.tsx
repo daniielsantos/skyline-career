@@ -193,8 +193,8 @@ function CompanyCreditBlock(props: {
       <p className="aircraft-card-section-label">Credit</p>
       <p className="company-credit-blurb">
         {ownerOps
-          ? 'Line from fleet value + owner Ops (company Cargo Ops ladder). Interest accrues daily while drawn.'
-          : 'Line from fleet value + Ops rep. Interest accrues daily while drawn.'}
+          ? 'Fleet value + owner Ops. Daily interest while drawn.'
+          : 'Fleet value + Ops rep. Daily interest while drawn.'}
       </p>
       {overdue ? (
         <p className="banner warn">
@@ -230,7 +230,7 @@ function CompanyCreditBlock(props: {
       </dl>
       {props.actionsLocked ? (
         <p className="settings-help company-credit-locked-hint">
-          Owner-only — members can view credit, not draw or repay.
+          Owner-only — members can view, not draw/repay.
         </p>
       ) : (
         <div className="company-credit-actions">

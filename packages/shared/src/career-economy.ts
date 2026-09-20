@@ -3131,10 +3131,11 @@ export const INTERNATIONAL_DISTANCE_BIAS = 1.55;
 /** Extra lot lifetime for long-haul international freights (dial A 2026-09-18). */
 export const INTERNATIONAL_LIFE_MULT = 1.55;
 /**
- * Extra open lots per OD×SKU on intl formation only (dial B 2026-09-18).
+ * Extra open lots per OD×SKU on intl formation only (dial B 2026-09-18;
+ * dial B2 2026-09-20: 1→2 — Pulse d70 room-to-form, maxLots rejects ~0).
  * Stacks on the corridor weight ≥1.8 bonus inside tryFormPair.
  */
-export const INTL_LANE_MAX_LOTS_BONUS = 1;
+export const INTL_LANE_MAX_LOTS_BONUS = 2;
 
 /**
  * Freight board pay (2026-08-20+): living arbitrage + haul, with hard total

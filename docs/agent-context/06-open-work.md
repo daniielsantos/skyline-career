@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-20: **Intl maxLots dial B2 shipped (code)** — `INTL_LANE_MAX_LOTS_BONUS` 1→2. **Measure pending +2–3d pós VPS:** intl % ~9–11%; shelf vs d70 **1702**; live BR/US; `skipAllByKg` false. Detail: [`08-economy.md`](./08-economy.md).
+
 Atualizado 2026-09-19: **One VA per account shipped** — join/request/accept bloqueados se já membro de VA listada; directory UI. Spec: [16-va-logistics.md](./16-va-logistics.md).
 
 Atualizado 2026-09-19: **VA member progression home ladder shipped** — gates Freights/Demand/staging/WH + settle XP na home do piloto (não herda unlock da VA). Spec: [16-va-logistics.md](./16-va-logistics.md).

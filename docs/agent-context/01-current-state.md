@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **4c44dd1** / desktop **0.3.159** shipped: Keep VA tails out of home Manifest fleet paint. Release: [v0.3.159](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.159).
+
+
 `main` **43b1670** / desktop **0.3.158** shipped: Land stuck Line crew ferries when opening My VA Hangar. Release: [v0.3.158](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.158).
 
 

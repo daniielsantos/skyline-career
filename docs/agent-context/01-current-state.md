@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **1352dfc** / desktop **0.3.160** shipped: Fix VA Manifest cargo limit using the wrong airframe. Release: [v0.3.160](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.160).
+
+
 `main` **4c44dd1** / desktop **0.3.159** shipped: Keep VA tails out of home Manifest fleet paint. Release: [v0.3.159](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.159).
 
 

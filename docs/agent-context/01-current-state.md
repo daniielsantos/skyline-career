@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **73909ef** / desktop **0.3.138** shipped: Keep chrome wallet and company on home across VA pages. Release: [v0.3.138](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.138).
+
+
 `main` **13ae2d4** / desktop **0.3.137** shipped: Add VA Flight quality and clarify Owner ops on credit. Release: [v0.3.137](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.137).
 
 

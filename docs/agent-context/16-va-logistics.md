@@ -273,6 +273,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **VA name reset to pilot (2026-09-19):** Save/select-hub escrevia `missions.pilotName` em `companies.display_name` (COALESCE), apagando Lamusine→Nothin. Fix: persist company state / select-hub só atualizam `home_hub_icao`; listing name só via `vaPublish`.
 
+**Pilot name sticky across register (2026-09-20):** Conta nova `nullable` mostrava Identity/who `Nothin`. Causa: `signupName` React não limpava no switch de sessão e `setSignupName(prev => prev || fromAuth)` preservava o draft; select-hub gravava isso em `pilotName` enquanto `companies.display_name` ficava correto. Fix: clear `signupName` no session paint; auth sempre sobrescreve draft; resolve do hub-picker prefer company; assemble alinha pilotName↔display_name em company pre-fleet não listada; seed register seta pilotName.
+
 ### VA pages + publish (2026-09-19)
 
 **Sintoma:** Settings card VA zoado (directory+roster+hauls+ranking numa coluna); jogador não achava a página.

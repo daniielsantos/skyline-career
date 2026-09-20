@@ -122,6 +122,12 @@ e stock/lot no instante**.
 - Chip: `Next market pulse · 8m` (derivado de `lastBatchAtMs + MS_PER_TICK - now`)
 - Reconnect banner: “While you were away: world +37 ticks · fees $X” (não “catch-up 1/37”).
 
+### Away banner on brand-new account (2026-09-20)
+
+**Sintoma:** ao criar conta nova (ainda no Choose Home Hub) aparecia `Away ~N economy days · passive fees charged for 7 days ($0…)`.
+**Causa:** (1) `last_seen_tick` default 0 → settle herdava o gap offline do world SP; (2) `settleAllCompaniesPassiveFees` devolvia `preferred ?? first` e podia vazar banner de outra company; (3) `buildOfflineFeeSummary` emitia banner só por `capped` mesmo com debit $0.
+**Fix:** seed `lastSeenTick = world.tick` no register/ensure company; banner só da company ativa; summary null quando debit $0 e sem soft lease.
+
 ## API sketch (futuro)
 
 ```
@@ -268,6 +274,7 @@ interface WorldTickService {
 - **Auth medium harden (2026-09-14):** `CAREER_AUTH_REGISTER=0` closes register; `CAREER_AUTH_INVITE` requires matching `inviteCode`; `claimCompanyId` needs `CAREER_AUTH_ALLOW_CLAIM=1`. `/api/map/satellite-style` not public (Bearer when auth on). Gateway keeps map **local** (loads repo `.env`); world-api gets `MAPTILER_KEY` from compose. Remember me default **off** → sessionStorage.
 - **Prod invite wiring (2026-09-15):** root `.env` auth policy is passed explicitly into `world-api` by `docker-compose.yml` (`CAREER_AUTH_REGISTER`, `CAREER_AUTH_INVITE`, `CAREER_AUTH_ALLOW_CLAIM`, `CAREER_AUTH_SESSIONS_LIST_ALL`). Private beta: register `1` + long random invite; public launch may leave invite empty; fully closed signup uses register `0`. Recreate `world-api` after changing `.env`. **Verified 2026-09-17:** `GET /api/auth/status` on `world.playairframe.com` → `inviteRequired:true`, `registerEnabled:true`.
 - **Diag 2026-09-15 — MP restart stuck “Listening for host”:** fixed-world boot fetched authenticated `/api/career/profiles` before AuthGate had a Bearer; `401` was mislabeled as world-not-ready and left the gate stuck although `/api/health` was healthy. Fix: synthesize the fixed `World` profile directly from health, then run AuthGate; AuthGate now awaits post-login warm and renders its error instead of fire-and-forget.
+- **Diag 2026-09-20 — deploy mid-login stuck forever:** poll only ran on boot `needsProfile`; `attachFixedWorld` failure set `worldWaiting` with no retry. Fix: dedicated `worldWaiting` effect polls health+attach every 2s; boot health failures also enter Listening instead of a dead ProfileGate; copy says it retries.
 - **Diag 2026-09-15 — HTTPS world login “Failed to fetch”:** Caddy compressed JSON; Node `fetch` in the desktop gateway transparently decoded the body but `gateway-proxy.ts` forwarded stale `Content-Encoding: gzip`, so Chromium attempted a second decode (`ERR_CONTENT_DECODING_FAILED`). Fix: request upstream `Accept-Encoding: identity`, always strip decoded `content-encoding`/`content-length`, regression test `gateway-proxy.test.ts`.
 - Env: `CAREER_AUTH=1` enforces; **host mode defaults on** (`dev.mjs --host`). SP `career:ui` stays off.
 - HTTP: `GET /api/auth/status`, `POST /api/auth/register|login|logout`, `GET /api/auth/me`, `GET /api/auth/sessions`.

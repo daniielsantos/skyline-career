@@ -1972,12 +1972,19 @@ export function assembleMissionsFromTables(
       | undefined;
     if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
     // Never backfill pilotName from a listed VA display_name (airline ≠ pilot).
-    if (
-      company?.display_name &&
-      !merged.pilotName &&
-      Number(company.va_listed) === 0
-    ) {
-      merged.pilotName = company.display_name;
+    // Pre-fleet auth companies: keep pilotName aligned with company identity so a
+    // sticky UI draft (other save) cannot leave "Nothin" on a new "nullable" tenant.
+    if (company?.display_name && Number(company.va_listed) === 0) {
+      const dn = company.display_name.trim();
+      if (
+        dn.length >= 2 &&
+        cid !== LOCAL_COMPANY_ID &&
+        (merged.fleet?.length ?? 0) === 0
+      ) {
+        merged.pilotName = dn;
+      } else if (!merged.pilotName) {
+        merged.pilotName = company.display_name;
+      }
     }
     return merged;
   }

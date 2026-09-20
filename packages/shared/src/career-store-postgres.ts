@@ -2112,7 +2112,6 @@ export class PostgresCareerStore implements CareerStore {
     if (companies.length === 0) return null;
     const nowMs = opts.nowMs ?? Date.now();
     let preferred: OfflineFeeSummary | null = null;
-    let first: OfflineFeeSummary | null = null;
     for (const company of companies) {
       const missions = await this.loadMissions({ companyId: company.id });
       const fromTick = companySessionFromTick(
@@ -2129,12 +2128,11 @@ export class PostgresCareerStore implements CareerStore {
       );
       missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
       await this.saveMissions(missions, { companyId: company.id });
-      if (summary) {
-        if (!first) first = summary;
-        if (company.id === this.activeCompanyId) preferred = summary;
+      if (summary && company.id === this.activeCompanyId) {
+        preferred = summary;
       }
     }
-    return preferred ?? first;
+    return preferred;
   }
 
   readHubEconomySamples(opts: {

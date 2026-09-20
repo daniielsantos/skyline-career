@@ -1293,7 +1293,6 @@ async function applyCompanySessionSettlement(opts: {
       );
       missions.lastSeenTick = opts.toTick;
       await saveMissions(missions, { companyId: company.id });
-      if (summary && !preferred) preferred = summary;
       if (
         summary &&
         company.id === activeStore.getActiveCompanyId()
@@ -3285,6 +3284,20 @@ export function createCareerApiServer(port = 8787) {
             const seeded = await store.loadMissions({
               companyId: result.company.id,
             });
+            // Anchor watermark to current world tick so a brand-new tenant
+            // does not inherit the SP world's offline catch-up gap as "Away".
+            const worldTick = store.peekEconomyWorld()?.tick;
+            if (typeof worldTick === 'number' && Number.isFinite(worldTick)) {
+              seeded.lastSeenTick = Math.max(0, Math.floor(worldTick));
+            }
+            const identity =
+              result.company.displayName?.trim() ||
+              result.account.displayName?.trim() ||
+              result.account.loginName?.trim() ||
+              '';
+            if (identity.length >= 2) {
+              seeded.pilotName = identity;
+            }
             await store.saveMissions(seeded, { companyId: result.company.id });
             store.setActiveCompanyId(result.company.id);
           }
@@ -4843,6 +4856,10 @@ export function createCareerApiServer(port = 8787) {
           }
           // Seed empty company_state so load/save works for the new tenant.
           const seeded = await store.loadMissions({ companyId: company.id });
+          const worldTick = store.peekEconomyWorld()?.tick;
+          if (typeof worldTick === 'number' && Number.isFinite(worldTick)) {
+            seeded.lastSeenTick = Math.max(0, Math.floor(worldTick));
+          }
           await store.saveMissions(seeded, { companyId: company.id });
           if (body.activate !== false) {
             store.setActiveCompanyId(company.id);

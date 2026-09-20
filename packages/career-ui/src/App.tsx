@@ -3446,6 +3446,10 @@ export function App() {
   const attachOpenWorldRef = useRef<(profile: CareerProfileMeta) => Promise<void>>(
     async () => undefined,
   );
+  /** Boot/retry entry for fixed-world attach (Listening for host poll). */
+  const attachFixedWorldRef = useRef<
+    (activeProfileId: string, nameHint?: string | null) => Promise<boolean>
+  >(async () => false);
   const [marketEvents, setMarketEvents] = useState<EconomyEvent[]>([]);
   const [marketEventsExpanded, setMarketEventsExpanded] = useState(false);
   const [npcActivity, setNpcActivity] = useState<NpcActivity[]>([]);
@@ -4620,9 +4624,11 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    let pollTimer: ReturnType<typeof setInterval> | undefined;
 
-    async function attachFixedWorld(activeProfileId: string, nameHint?: string | null) {
+    async function attachFixedWorld(
+      activeProfileId: string,
+      nameHint?: string | null,
+    ): Promise<boolean> {
       // A fixed MP world has no client-side save picker. Do not fetch the
       // authenticated profiles endpoint before AuthGate has a Bearer token.
       const last = {
@@ -4640,11 +4646,14 @@ export function App() {
       setBusy(true);
       try {
         await attachOpenWorldRef.current(last);
+        return true;
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
+          // Host may be mid-deploy — WorldWaitingGate poll retries attach.
           setWorldWaiting(true);
         }
+        return false;
       } finally {
         if (!cancelled) {
           setBusy(false);
@@ -4652,101 +4661,142 @@ export function App() {
         }
       }
     }
+    attachFixedWorldRef.current = attachFixedWorld;
+
+    async function bootFromHealth(): Promise<'done' | 'wait-host'> {
+      const health = await fetchCareerHealth();
+      if (cancelled) return 'done';
+      const fixed = Boolean(health.worldFixed);
+      setWorldFixed(fixed);
+      setAuthRequired(Boolean(health.authRequired));
+      void resolveClientUpdateBlock(health.clientUpdatePolicy).then((block) => {
+        if (!cancelled) setClientUpdateBlock(block);
+      });
+
+      if (fixed) {
+        if (health.needsProfile || !health.activeProfileId) {
+          setProfilesLoading(false);
+          setWorldWaiting(true);
+          setShowProfileGate(false);
+          return 'wait-host';
+        }
+        // Stay on ProfileGateLoading until Auth/company warm finishes.
+        const ok = await attachFixedWorld(
+          health.activeProfileId,
+          health.activeProfileName,
+        );
+        return ok ? 'done' : 'wait-host';
+      }
+
+      const data = await fetchCareerProfiles();
+      if (cancelled) return 'done';
+      setCareerProfiles(data.profiles ?? []);
+      const last =
+        data.profiles?.find((p) => p.id === data.activeId) ?? null;
+      setActiveCareerProfile(last);
+      setError((prev) =>
+        prev && isNeedsProfileMessage(prev) ? null : prev,
+      );
+      if (last) {
+        // Ctrl+R / tab restore: reopen last save instead of ProfileGate.
+        setProfileGateBusyLabel('Resuming save…');
+        setShowProfileGate(true);
+        setProfilesLoading(false);
+        setBusy(true);
+        try {
+          await enterCareerProfileRef.current(last.id);
+        } catch (err) {
+          if (!cancelled) {
+            setShowProfileGate(true);
+            setShowAuthGate(false);
+            setError(err instanceof Error ? err.message : String(err));
+          }
+        } finally {
+          if (!cancelled) setBusy(false);
+        }
+      } else {
+        setShowProfileGate(true);
+      }
+      return 'done';
+    }
 
     void (async () => {
-      try {
-        const health = await fetchCareerHealth();
+      // Deploy/restart: keep probing health instead of a one-shot ProfileGate.
+      for (;;) {
         if (cancelled) return;
-        const fixed = Boolean(health.worldFixed);
-        setWorldFixed(fixed);
-        setAuthRequired(Boolean(health.authRequired));
-        void resolveClientUpdateBlock(health.clientUpdatePolicy).then((block) => {
-          if (!cancelled) setClientUpdateBlock(block);
-        });
-
-        if (fixed) {
-          if (health.needsProfile || !health.activeProfileId) {
-            setProfilesLoading(false);
-            setWorldWaiting(true);
-            setShowProfileGate(false);
-            pollTimer = setInterval(() => {
-              void (async () => {
-                try {
-                  const again = await fetchCareerHealth();
-                  if (cancelled) return;
-                  void resolveClientUpdateBlock(again.clientUpdatePolicy).then(
-                    (block) => {
-                      if (!cancelled) setClientUpdateBlock(block);
-                    },
-                  );
-                  if (!again.needsProfile && again.activeProfileId) {
-                    if (pollTimer) clearInterval(pollTimer);
-                    pollTimer = undefined;
-                    setProfilesLoading(true);
-                    await attachFixedWorld(
-                      again.activeProfileId,
-                      again.activeProfileName,
-                    );
-                  }
-                } catch {
-                  /* keep polling */
-                }
-              })();
-            }, 2000);
-            return;
-          }
-          // Stay on ProfileGateLoading until Auth/company warm finishes.
-          await attachFixedWorld(health.activeProfileId, health.activeProfileName);
+        try {
+          const outcome = await bootFromHealth();
+          if (cancelled) return;
+          if (outcome === 'wait-host') return;
           return;
-        }
-
-        const data = await fetchCareerProfiles();
-        if (cancelled) return;
-        setCareerProfiles(data.profiles ?? []);
-        const last =
-          data.profiles?.find((p) => p.id === data.activeId) ?? null;
-        setActiveCareerProfile(last);
-        setError((prev) =>
-          prev && isNeedsProfileMessage(prev) ? null : prev,
-        );
-        if (last) {
-          // Ctrl+R / tab restore: reopen last save instead of ProfileGate.
-          setProfileGateBusyLabel('Resuming save…');
-          setShowProfileGate(true);
-          setProfilesLoading(false);
-          setBusy(true);
-          try {
-            await enterCareerProfileRef.current(last.id);
-          } catch (err) {
-            if (!cancelled) {
-              setShowProfileGate(true);
-              setShowAuthGate(false);
-              setError(err instanceof Error ? err.message : String(err));
-            }
-          } finally {
-            if (!cancelled) setBusy(false);
-          }
-        } else {
-          setShowProfileGate(true);
-        }
-      } catch (err) {
-        if (!cancelled) {
+        } catch (err) {
+          if (cancelled) return;
           setError(err instanceof Error ? err.message : String(err));
-          setShowProfileGate(true);
+          setProfilesLoading(false);
+          setShowProfileGate(false);
+          setWorldWaiting(true);
+          await new Promise((r) => setTimeout(r, 2000));
+        } finally {
+          if (!cancelled) setProfilesLoading(false);
         }
-      } finally {
-        if (!cancelled) setProfilesLoading(false);
       }
     })();
     return () => {
       cancelled = true;
-      if (pollTimer) clearInterval(pollTimer);
     };
   }, []);
 
+  // While Listening for host — retry health + attach (boot wait, attach fail, deploy).
+  useEffect(() => {
+    if (!worldWaiting) return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = () => {
+      if (inFlight) return;
+      inFlight = true;
+      void (async () => {
+        try {
+          const health = await fetchCareerHealth();
+          if (cancelled) return;
+          setWorldFixed(Boolean(health.worldFixed));
+          setAuthRequired(Boolean(health.authRequired));
+          void resolveClientUpdateBlock(health.clientUpdatePolicy).then(
+            (block) => {
+              if (!cancelled) setClientUpdateBlock(block);
+            },
+          );
+          if (!health.worldFixed) {
+            // Unexpected SP health while waiting — drop gate so ProfileGate can run.
+            setWorldWaiting(false);
+            setShowProfileGate(true);
+            return;
+          }
+          if (health.needsProfile || !health.activeProfileId) return;
+          setProfilesLoading(true);
+          await attachFixedWorldRef.current(
+            health.activeProfileId,
+            health.activeProfileName,
+          );
+        } catch {
+          /* host still down — keep Listening */
+        } finally {
+          inFlight = false;
+        }
+      })();
+    };
+
+    tick();
+    const pollTimer = window.setInterval(tick, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollTimer);
+    };
+  }, [worldWaiting]);
+
   // Rare force-update kill switch: re-check world health while in-session.
   useEffect(() => {
-    if (showProfileGate || showAuthGate || profilesLoading) return;
+    if (showProfileGate || showAuthGate || profilesLoading || worldWaiting) return;
     let cancelled = false;
     const poll = () => {
       void (async () => {
@@ -4766,7 +4816,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [showProfileGate, showAuthGate, profilesLoading]);
+  }, [showProfileGate, showAuthGate, profilesLoading, worldWaiting]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7181,6 +7231,9 @@ export function App() {
     setPilotIcao('');
     setHomeHubIcao('');
     setPilotName('');
+    // Drop callsign draft so a prior save (e.g. "Nothin") cannot stick onto a
+    // newly registered account's locked hub-picker name.
+    setSignupName('');
     setStaging(null);
     setActiveBushTrip(null);
     setBushWatch(null);
@@ -7344,7 +7397,7 @@ export function App() {
         withToken.companies[0]?.displayName?.trim() ||
         '';
       if (fromAuth.length >= 2) {
-        setSignupName((prev) => (prev.trim().length >= 2 ? prev : fromAuth));
+        setSignupName(fromAuth);
       }
       if (withToken.companies[0]) {
         setStoredCompanyId(withToken.companies[0].id);
@@ -7391,7 +7444,7 @@ export function App() {
       result.companies[0]?.displayName?.trim() ||
       '';
     if (fromAuth.length >= 2) {
-      setSignupName((prev) => (prev.trim().length >= 2 ? prev : fromAuth));
+      setSignupName(fromAuth);
     }
     if (result.companies[0]) {
       setStoredCompanyId(result.companies[0].id);
@@ -7608,6 +7661,15 @@ export function App() {
   }
 
   function resolvedSignupPilotName(): string {
+    // Auth locks the callsign to the account/company identity — never prefer a
+    // stale React draft left over from another save/session.
+    if (authRequired) {
+      const fromCompany =
+        companies.find((c) => c.id === activeCompanyId)?.displayName?.trim() ||
+        companies[0]?.displayName?.trim() ||
+        '';
+      if (fromCompany.length >= 2) return fromCompany;
+    }
     const fromField = signupName.trim();
     if (fromField.length >= 2) return fromField;
     const company =

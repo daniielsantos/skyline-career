@@ -17,6 +17,7 @@ import {
   type VaJoinRequest,
   type PlayerAircraft,
 } from './api';
+import { BusyStatus } from './Busy';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
 import { useConfirm } from './ConfirmDialog';
@@ -197,7 +198,7 @@ export function VaPage(props: Props) {
   if (!loaded) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">Loading roster…</p>
+        <BusyStatus label="Loading VA…" />
       </section>
     );
   }
@@ -443,19 +444,6 @@ export function VaPage(props: Props) {
               ))}
             </ul>
           )}
-          {role !== 'owner' ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={pageBusy}
-              style={{ marginTop: '0.5rem' }}
-              onClick={() => {
-                void leaveVa();
-              }}
-            >
-              Leave this VA
-            </button>
-          ) : null}
         </div>
       ) : null}
 

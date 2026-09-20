@@ -134,7 +134,6 @@ export function settleAllCompaniesPassiveFees(opts: {
   if (companies.length === 0) return null;
   const nowMs = opts.nowMs ?? Date.now();
   let preferred: OfflineFeeSummary | null = null;
-  let first: OfflineFeeSummary | null = null;
   for (const company of companies) {
     const missions = assembleMissionsFromTables(
       opts.db,
@@ -153,11 +152,11 @@ export function settleAllCompaniesPassiveFees(opts: {
     persistCompanyTables(opts.db, missions, { companyId: company.id });
     persistLedgerIncremental(opts.db, missions.ledger ?? [], company.id);
     if (summary) {
-      if (!first) first = summary;
       if (opts.preferCompanyId && company.id === opts.preferCompanyId) {
         preferred = summary;
       }
     }
   }
-  return preferred ?? first;
+  // Never surface another tenant's offline banner on the active company.
+  return preferred;
 }

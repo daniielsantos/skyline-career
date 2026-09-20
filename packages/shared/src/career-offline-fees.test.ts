@@ -48,13 +48,17 @@ describe('effectiveFeeTickRange', () => {
     assert.equal(hangarDays, 7);
   });
 
-  it('buildOfflineFeeSummary only when capped or soft lease term', () => {
+  it('buildOfflineFeeSummary only when capped with debit or soft lease term', () => {
     const short = effectiveFeeTickRange(0, 2 * TICKS_PER_DAY);
     assert.equal(
       buildOfflineFeeSummary({ feeRange: short, passiveDebitUsd: 10 }),
       null,
     );
     const long = effectiveFeeTickRange(0, 20 * TICKS_PER_DAY);
+    assert.equal(
+      buildOfflineFeeSummary({ feeRange: long, passiveDebitUsd: 0 }),
+      null,
+    );
     const summary = buildOfflineFeeSummary({
       feeRange: long,
       passiveDebitUsd: 99,

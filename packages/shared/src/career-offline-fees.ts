@@ -86,7 +86,8 @@ export function buildOfflineFeeSummary(opts: {
 }): OfflineFeeSummary | null {
   const { feeRange, passiveDebitUsd, debitUsdByKind, lease } = opts;
   const termSoft = lease?.termEndedSoftIds?.length ?? 0;
-  if (!feeRange.capped && termSoft === 0) return null;
+  // Cap alone is not enough — empty new companies / $0 windows should stay quiet.
+  if (termSoft === 0 && (!feeRange.capped || passiveDebitUsd <= 0)) return null;
   return {
     daysAway: feeRange.daysCrossed,
     daysBilled: feeRange.daysBilled,

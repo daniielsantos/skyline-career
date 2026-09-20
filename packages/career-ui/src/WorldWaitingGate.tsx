@@ -11,7 +11,7 @@ export function WorldWaitingGate(props: {
         <h1>Waiting for world</h1>
         <p className="muted auth-gate-lead">
           {props.message ??
-            'The host opens one shared world DB (profiles/career/world/skyline.sqlite). Restart career:host if this stays here — there is nothing to create on the client.'}
+            'The host opens one shared world DB. This screen retries every few seconds after a deploy or restart — you do not need to refresh.'}
         </p>
       </div>
       <div className="profile-gate-busy" role="status" aria-live="polite">

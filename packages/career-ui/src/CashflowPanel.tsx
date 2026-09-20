@@ -116,6 +116,11 @@ function CompanyCreditBlock(props: {
   busy: boolean;
   /** Hide draw/repay (VA members — same wallet, owner-only credit). */
   actionsLocked?: boolean;
+  /**
+   * VA listed: Cargo Ops on this company is the owner's ladder — label
+   * honestly; formula unchanged.
+   */
+  vaOwnerOpsLabels?: boolean;
   formatMoney: (n: number) => string;
   onUpdated: (next: {
     walletUsd: number;
@@ -124,6 +129,7 @@ function CompanyCreditBlock(props: {
   onError: (message: string) => void;
 }) {
   const { credit, busy, formatMoney } = props;
+  const ownerOps = Boolean(props.vaOwnerOpsLabels);
   const [drawAmount, setDrawAmount] = useState('');
   const [repayAmount, setRepayAmount] = useState('');
   const [localBusy, setLocalBusy] = useState(false);
@@ -132,8 +138,8 @@ function CompanyCreditBlock(props: {
   if (!credit) {
     return (
       <div className="company-credit-block">
-        <p className="aircraft-card-section-label">Company credit</p>
-        <p className="empty">Credit line unavailable until hangar is ready.</p>
+        <p className="aircraft-card-section-label">Credit</p>
+        <p className="empty">Unavailable until hangar is ready.</p>
       </div>
     );
   }
@@ -184,15 +190,16 @@ function CompanyCreditBlock(props: {
 
   return (
     <div className={`company-credit-block${overdue ? ' is-overdue' : ''}`}>
-      <p className="aircraft-card-section-label">Company credit</p>
+      <p className="aircraft-card-section-label">Credit</p>
       <p className="company-credit-blurb">
-        Revolving line from owned fleet sell-back + Cargo Ops reputation. Daily
-        interest ~{(0.08).toFixed(2)}%/day. Overdue blocks buy, ferry, and accept.
+        {ownerOps
+          ? 'Line from fleet value + owner Ops (company Cargo Ops ladder). Interest accrues daily while drawn.'
+          : 'Line from fleet value + Ops rep. Interest accrues daily while drawn.'}
       </p>
       {overdue ? (
         <p className="banner warn">
           Overdue {credit.overdueDays} day{credit.overdueDays === 1 ? '' : 's'} —
-          repay from wallet to clear interest shortfall before ops.
+          repay to unlock buy, ferry, and accept.
         </p>
       ) : null}
       <dl className="company-credit-dl">
@@ -211,83 +218,87 @@ function CompanyCreditBlock(props: {
           <dd className="cashflow-pos">{formatMoney(credit.availableUsd)}</dd>
         </div>
         <div>
-          <dt>Day interest</dt>
-          <dd>{formatMoney(credit.dailyInterestUsd)}</dd>
-        </div>
-        <div>
-          <dt>Collateral</dt>
-          <dd>{formatMoney(credit.collateralUsd)}</dd>
-        </div>
-        <div>
-          <dt>Ops rep</dt>
+          <dt>{ownerOps ? 'Owner ops' : 'Ops rep'}</dt>
           <dd>{Math.round(credit.repScore * 100)}%</dd>
         </div>
+        {credit.dailyInterestUsd > 0 ? (
+          <div>
+            <dt>Day interest</dt>
+            <dd>{formatMoney(credit.dailyInterestUsd)}</dd>
+          </div>
+        ) : null}
       </dl>
       {props.actionsLocked ? (
-        <p className="settings-help" style={{ marginTop: '0.5rem' }}>
-          Credit draw and repay are owner-only on a listed VA.
+        <p className="settings-help company-credit-locked-hint">
+          Owner-only — members can view credit, not draw or repay.
         </p>
       ) : (
         <div className="company-credit-actions">
-          <label>
-            Draw
-            <input
-              type="number"
-              min={0}
-              step={100}
-              value={drawAmount}
-              disabled={locked || overdue || credit.availableUsd <= 0}
-              placeholder={String(Math.floor(credit.availableUsd))}
-              onChange={(e) => setDrawAmount(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className="accept"
-            disabled={locked || overdue || credit.availableUsd <= 0}
-            onClick={() => void runDraw()}
-          >
-            Draw
-          </button>
-          <label>
-            Repay
-            <input
-              type="number"
-              min={0}
-              step={100}
-              value={repayAmount}
-              disabled={locked || credit.principalUsd <= 0}
-              placeholder={String(Math.floor(credit.principalUsd))}
-              onChange={(e) => setRepayAmount(e.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className="accept"
-            disabled={locked || credit.principalUsd <= 0}
-            onClick={() => void runRepay()}
-          >
-            Repay
-          </button>
-          {credit.principalUsd > 0 ? (
-            <button
-              type="button"
-              className="ghost"
-              disabled={locked || props.walletUsd <= 0}
-              onClick={() => {
-                setRepayAmount(
-                  String(
-                    Math.min(
-                      Math.floor(credit.principalUsd),
-                      Math.floor(props.walletUsd),
-                    ),
-                  ),
-                );
-              }}
-            >
-              Max repay
-            </button>
-          ) : null}
+          <div className="company-credit-action">
+            <span className="company-credit-action-label">Draw</span>
+            <div className="company-credit-action-row">
+              <input
+                type="number"
+                min={0}
+                step={100}
+                value={drawAmount}
+                disabled={locked || overdue || credit.availableUsd <= 0}
+                placeholder={String(Math.floor(credit.availableUsd))}
+                aria-label="Draw amount"
+                onChange={(e) => setDrawAmount(e.target.value)}
+              />
+              <button
+                type="button"
+                className="accept"
+                disabled={locked || overdue || credit.availableUsd <= 0}
+                onClick={() => void runDraw()}
+              >
+                Draw
+              </button>
+            </div>
+          </div>
+          <div className="company-credit-action">
+            <span className="company-credit-action-label">Repay</span>
+            <div className="company-credit-action-row">
+              <input
+                type="number"
+                min={0}
+                step={100}
+                value={repayAmount}
+                disabled={locked || credit.principalUsd <= 0}
+                placeholder={String(Math.floor(credit.principalUsd))}
+                aria-label="Repay amount"
+                onChange={(e) => setRepayAmount(e.target.value)}
+              />
+              <button
+                type="button"
+                className="accept"
+                disabled={locked || credit.principalUsd <= 0}
+                onClick={() => void runRepay()}
+              >
+                Repay
+              </button>
+              {credit.principalUsd > 0 ? (
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={locked || props.walletUsd <= 0}
+                  onClick={() => {
+                    setRepayAmount(
+                      String(
+                        Math.min(
+                          Math.floor(credit.principalUsd),
+                          Math.floor(props.walletUsd),
+                        ),
+                      ),
+                    );
+                  }}
+                >
+                  Max
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -301,6 +312,8 @@ export function HangarCashflowPanel(props: {
   busy: boolean;
   /** When true, show credit status but no draw/repay controls. */
   creditActionsLocked?: boolean;
+  /** VA listed: label credit Cargo Ops as owner ladder (formula unchanged). */
+  vaOwnerOpsLabels?: boolean;
   formatMoney: (n: number) => string;
   onCreditUpdated: (next: {
     walletUsd: number;
@@ -343,6 +356,7 @@ export function HangarCashflowPanel(props: {
         walletUsd={props.walletUsd}
         busy={props.busy}
         actionsLocked={props.creditActionsLocked}
+        vaOwnerOpsLabels={props.vaOwnerOpsLabels}
         formatMoney={props.formatMoney}
         onUpdated={props.onCreditUpdated}
         onError={props.onCreditError}

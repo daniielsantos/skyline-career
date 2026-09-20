@@ -368,6 +368,92 @@ describe('VA IH-2', () => {
     assert.ok(pilots.some((p) => p.accountId === reg.account.id));
   });
 
+  it('records flight quality and publishes composite after sample floor', async () => {
+    const day = vaDayKeyFromTick(960);
+    const reg = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_quality',
+        displayName: 'Quality',
+        password: 'secret1',
+      }),
+    );
+    const companyId = reg.company!.id;
+    await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: reg.account.id,
+        displayName: 'Quality Air',
+        homeHubIcao: 'SBGR',
+      }),
+    );
+    const thin = await Promise.resolve(
+      store.vaFlightQuality({
+        companyId,
+        fromDayKey: day,
+        toDayKey: day,
+      }),
+    );
+    assert.equal(thin.qualityScore, null);
+    assert.equal(thin.flightCount, 0);
+
+    await Promise.resolve(
+      store.vaRecordFlightQuality({
+        companyId,
+        dayKey: day,
+        scorePct: 90,
+        onTime: true,
+      }),
+    );
+    await Promise.resolve(
+      store.vaRecordFlightQuality({
+        companyId,
+        dayKey: day,
+        scorePct: 80,
+        onTime: true,
+      }),
+    );
+    const mid = await Promise.resolve(
+      store.vaFlightQuality({
+        companyId,
+        fromDayKey: day,
+        toDayKey: day,
+      }),
+    );
+    assert.equal(mid.flightCount, 2);
+    assert.equal(mid.qualityScore, null);
+    assert.equal(mid.avgFlightScorePct, 85);
+    assert.equal(mid.onTimePct, 100);
+
+    await Promise.resolve(
+      store.vaRecordFlightQuality({
+        companyId,
+        dayKey: day,
+        scorePct: 70,
+        onTime: false,
+      }),
+    );
+    const full = await Promise.resolve(
+      store.vaFlightQuality({
+        companyId,
+        fromDayKey: day,
+        toDayKey: day,
+      }),
+    );
+    assert.equal(full.flightCount, 3);
+    assert.ok(full.qualityScore != null);
+    // avg 80, on-time 66.7 → 0.7*80 + 0.3*66.7 ≈ 76
+    assert.ok(full.qualityScore! >= 75 && full.qualityScore! <= 77);
+
+    const dir = await Promise.resolve(
+      store.vaDirectory({
+        fromDayKey: day,
+        toDayKey: day,
+      }),
+    );
+    const entry = dir.find((e) => e.companyId === companyId);
+    assert.ok(entry?.flightQuality?.qualityScore != null);
+  });
+
   it('directory request accept and stop recruiting', async () => {
     const owner = await Promise.resolve(
       store.authRegister({

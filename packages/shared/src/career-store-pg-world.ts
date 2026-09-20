@@ -1078,6 +1078,19 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
       pay_usd DOUBLE PRECISION NOT NULL DEFAULT 0,
       PRIMARY KEY (company_id, account_id, day_key)
     )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS company_flight_quality_stats (
+      company_id TEXT NOT NULL REFERENCES companies(id),
+      day_key INTEGER NOT NULL,
+      flights INTEGER NOT NULL DEFAULT 0,
+      score_sum DOUBLE PRECISION NOT NULL DEFAULT 0,
+      on_time INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (company_id, day_key)
+    )`);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS company_flight_quality_stats_day_idx
+       ON company_flight_quality_stats(day_key)`,
+  );
   // Schema v16 — promote fleet payload fields (idempotent on existing worlds).
   const fleetAlters = [
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS registration TEXT`,

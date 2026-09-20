@@ -177,6 +177,7 @@ import {
   listInternalHaulMissions,
   vaDayKeyFromTick,
   VA_RANKING_WINDOW_DAYS,
+  VA_FLIGHT_QUALITY_WINDOW_DAYS,
   VA_MEMBER_CAP,
   canManageVaRoster,
   hireVaLineCrew,
@@ -3502,6 +3503,29 @@ export function createCareerApiServer(port = 8787) {
             lineCrew = null;
           }
         }
+        let flightQuality = null;
+        if (listed) {
+          try {
+            const tick =
+              typeof store.peekEconomyWorld === 'function'
+                ? (store.peekEconomyWorld()?.tick ?? 0)
+                : 0;
+            const toDay = vaDayKeyFromTick(tick);
+            const fromDay = Math.max(
+              0,
+              toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1),
+            );
+            flightQuality = await Promise.resolve(
+              store.vaFlightQuality({
+                companyId,
+                fromDayKey: fromDay,
+                toDayKey: toDay,
+              }),
+            );
+          } catch {
+            flightQuality = null;
+          }
+        }
         send(res, 200, {
           companyId,
           memberCap: VA_MEMBER_CAP,
@@ -3513,6 +3537,7 @@ export function createCareerApiServer(port = 8787) {
           displayName: co?.displayName?.trim() || companyId,
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
+          flightQuality,
           ...(switchedFromCompanyId
             ? { switchToCompanyId: companyId }
             : {}),
@@ -4990,6 +5015,26 @@ export function createCareerApiServer(port = 8787) {
         const cashflowCompanyId = companyIdFromRequest(req);
         const payload = await withCareerRead(async (world, missions) => {
           const cashflow = await requireStore().summarizeCashflow(world.tick);
+          const toDay = vaDayKeyFromTick(world.tick);
+          const fromDay = Math.max(
+            0,
+            toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1),
+          );
+          let flightQuality = null;
+          if (cashflowCompanyId && store) {
+            const listed = await Promise.resolve(
+              store.vaIsListed(cashflowCompanyId),
+            );
+            if (listed) {
+              flightQuality = await Promise.resolve(
+                store.vaFlightQuality({
+                  companyId: cashflowCompanyId,
+                  fromDayKey: fromDay,
+                  toDayKey: toDay,
+                }),
+              );
+            }
+          }
           return {
             walletUsd: missions.walletUsd,
             tick: world.tick,
@@ -4998,6 +5043,7 @@ export function createCareerApiServer(port = 8787) {
             store: requireStore().kind,
             labels: LEDGER_KIND_LABEL,
             companyCredit: companyCreditSnapshot(missions),
+            flightQuality,
             ...cashflow,
           };
         }, { companyId: cashflowCompanyId });
@@ -12504,6 +12550,31 @@ export function createCareerApiServer(port = 8787) {
                 payUsd: settled.settlement.payoutUsd ?? 0,
               }),
             );
+          }
+          const flightScorePct = settled.mission.settledFlightScore?.pct;
+          if (
+            settleCompanyId &&
+            store &&
+            typeof flightScorePct === 'number' &&
+            Number.isFinite(flightScorePct)
+          ) {
+            const listed = await Promise.resolve(
+              store.vaIsListed(settleCompanyId),
+            );
+            if (listed) {
+              const onTime =
+                typeof settled.settlement.onTime === 'boolean'
+                  ? settled.settlement.onTime
+                  : true;
+              await Promise.resolve(
+                store.vaRecordFlightQuality({
+                  companyId: settleCompanyId,
+                  dayKey: vaDayKeyFromTick(settled.settleTick),
+                  scorePct: flightScorePct,
+                  onTime,
+                }),
+              );
+            }
           }
           send(res, 200, {
             mission: await toClientMission(settled.mission),

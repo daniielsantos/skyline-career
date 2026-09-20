@@ -15,6 +15,7 @@ import {
 import { ensureV12Ddl } from './career-store-v12.js';
 import { ensureV13Ddl } from './career-store-v13.js';
 import { ensureV14Ddl } from './career-store-v14.js';
+import { ensureV15Ddl } from './career-store-v15.js';
 import type {
   CareerMissionsState,
   MissionIntent,
@@ -41,6 +42,16 @@ export const VA_INVITE_NEVER_EXPIRES_MS = Number.MAX_SAFE_INTEGER;
 export const VA_INVITE_DEFAULT_MAX_USES = 1_000_000;
 /** Ranking rolling window (calendar days). */
 export const VA_RANKING_WINDOW_DAYS = 7;
+
+/** Flight-quality rolling window (same as ranking). */
+export const VA_FLIGHT_QUALITY_WINDOW_DAYS = VA_RANKING_WINDOW_DAYS;
+
+/** Min settles in window before composite qualityScore is published. */
+export const VA_FLIGHT_QUALITY_MIN_FLIGHTS = 3;
+
+/** Weight of mean flight score vs on-time % in qualityScore. */
+export const VA_FLIGHT_QUALITY_SCORE_WEIGHT = 0.7;
+export const VA_FLIGHT_QUALITY_ONTIME_WEIGHT = 0.3;
 
 /** Pilot share of Freights/Demand/Charter route net (payout − fuel). */
 export const VA_MEMBER_ROUTE_CUT_DEFAULT_PCT = 30;
@@ -124,13 +135,163 @@ export type VaMemberRow = CareerCompanyMember & {
   displayName: string;
 };
 
+export type VaFlightQualitySnapshot = {
+  windowDays: number;
+  flightCount: number;
+  avgFlightScorePct: number | null;
+  onTimePct: number | null;
+  /** 0–100 composite, or null when sample below floor. */
+  qualityScore: number | null;
+};
+
 export type VaCompanyRankRow = {
   companyId: string;
   displayName: string;
   hauls: number;
   nm: number;
   payUsd: number;
+  flightQuality?: VaFlightQualitySnapshot | null;
 };
+
+export function summarizeVaFlightQuality(opts: {
+  flightCount: number;
+  scoreSum: number;
+  onTimeCount: number;
+  windowDays?: number;
+}): VaFlightQualitySnapshot {
+  const windowDays = opts.windowDays ?? VA_FLIGHT_QUALITY_WINDOW_DAYS;
+  const flightCount = Math.max(0, Math.floor(opts.flightCount));
+  if (flightCount <= 0) {
+    return {
+      windowDays,
+      flightCount: 0,
+      avgFlightScorePct: null,
+      onTimePct: null,
+      qualityScore: null,
+    };
+  }
+  const avgFlightScorePct =
+    Math.round((opts.scoreSum / flightCount) * 10) / 10;
+  const onTimePct =
+    Math.round(((100 * opts.onTimeCount) / flightCount) * 10) / 10;
+  const qualityScore =
+    flightCount >= VA_FLIGHT_QUALITY_MIN_FLIGHTS
+      ? Math.round(
+          (VA_FLIGHT_QUALITY_SCORE_WEIGHT * avgFlightScorePct +
+            VA_FLIGHT_QUALITY_ONTIME_WEIGHT * onTimePct) *
+            10,
+        ) / 10
+      : null;
+  return {
+    windowDays,
+    flightCount,
+    avgFlightScorePct,
+    onTimePct,
+    qualityScore,
+  };
+}
+
+export function recordCompanyFlightQuality(
+  db: SqliteDb,
+  opts: {
+    companyId: string;
+    dayKey: number;
+    scorePct: number;
+    onTime: boolean;
+  },
+): void {
+  ensureV15Ddl(db);
+  const score = Math.max(0, Math.min(100, opts.scorePct));
+  const onTime = opts.onTime ? 1 : 0;
+  db.prepare(
+    `INSERT INTO company_flight_quality_stats
+       (company_id, day_key, flights, score_sum, on_time)
+     VALUES (?, ?, 1, ?, ?)
+     ON CONFLICT(company_id, day_key) DO UPDATE SET
+       flights = flights + 1,
+       score_sum = score_sum + excluded.score_sum,
+       on_time = on_time + excluded.on_time`,
+  ).run(opts.companyId, opts.dayKey, score, onTime);
+}
+
+export function getCompanyFlightQuality(
+  db: SqliteDb,
+  opts: { companyId: string; fromDayKey: number; toDayKey: number },
+): VaFlightQualitySnapshot {
+  ensureV15Ddl(db);
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(flights), 0) AS flights,
+              COALESCE(SUM(score_sum), 0) AS score_sum,
+              COALESCE(SUM(on_time), 0) AS on_time
+       FROM company_flight_quality_stats
+       WHERE company_id = ? AND day_key >= ? AND day_key <= ?`,
+    )
+    .get(opts.companyId, opts.fromDayKey, opts.toDayKey) as {
+    flights: number;
+    score_sum: number;
+    on_time: number;
+  };
+  return summarizeVaFlightQuality({
+    flightCount: Number(row.flights) || 0,
+    scoreSum: Number(row.score_sum) || 0,
+    onTimeCount: Number(row.on_time) || 0,
+    windowDays: Math.max(1, opts.toDayKey - opts.fromDayKey + 1),
+  });
+}
+
+/** Batch flight-quality for many companies (directory / ranking). */
+export function mapCompanyFlightQuality(
+  db: SqliteDb,
+  opts: { companyIds: string[]; fromDayKey: number; toDayKey: number },
+): Map<string, VaFlightQualitySnapshot> {
+  ensureV15Ddl(db);
+  const out = new Map<string, VaFlightQualitySnapshot>();
+  const ids = opts.companyIds.filter((id) => id.trim());
+  if (ids.length === 0) return out;
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db
+    .prepare(
+      `SELECT company_id,
+              COALESCE(SUM(flights), 0) AS flights,
+              COALESCE(SUM(score_sum), 0) AS score_sum,
+              COALESCE(SUM(on_time), 0) AS on_time
+       FROM company_flight_quality_stats
+       WHERE company_id IN (${placeholders})
+         AND day_key >= ? AND day_key <= ?
+       GROUP BY company_id`,
+    )
+    .all(...ids, opts.fromDayKey, opts.toDayKey) as Array<{
+    company_id: string;
+    flights: number;
+    score_sum: number;
+    on_time: number;
+  }>;
+  const windowDays = Math.max(1, opts.toDayKey - opts.fromDayKey + 1);
+  for (const id of ids) {
+    out.set(
+      id,
+      summarizeVaFlightQuality({
+        flightCount: 0,
+        scoreSum: 0,
+        onTimeCount: 0,
+        windowDays,
+      }),
+    );
+  }
+  for (const row of rows) {
+    out.set(
+      row.company_id,
+      summarizeVaFlightQuality({
+        flightCount: Number(row.flights) || 0,
+        scoreSum: Number(row.score_sum) || 0,
+        onTimeCount: Number(row.on_time) || 0,
+        windowDays,
+      }),
+    );
+  }
+  return out;
+}
 
 export type VaPilotRankRow = {
   accountId: string;
@@ -547,12 +708,18 @@ export function listCompanyHaulRanking(
     nm: number;
     pay_usd: number;
   }>;
+  const quality = mapCompanyFlightQuality(db, {
+    companyIds: rows.map((r) => r.company_id),
+    fromDayKey: opts.fromDayKey,
+    toDayKey: opts.toDayKey,
+  });
   return rows.map((row) => ({
     companyId: row.company_id,
     displayName: row.display_name || row.company_id,
     hauls: Number(row.hauls) || 0,
     nm: Math.round(Number(row.nm) || 0),
     payUsd: Math.round((Number(row.pay_usd) || 0) * 100) / 100,
+    flightQuality: quality.get(row.company_id) ?? null,
   }));
 }
 
@@ -608,6 +775,8 @@ export type VaDirectoryEntry = {
   /** % of Freights/Demand/Charter route net paid to the flying member. */
   memberRouteCutPct: number;
   seatsOpen: number;
+  /** Settle flight-quality rolling window (null qualityScore until sample floor). */
+  flightQuality?: VaFlightQualitySnapshot | null;
   /** Pending request from the viewing account, if any. */
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
   /** Roster role when the viewer is already a member of this VA. */
@@ -819,6 +988,9 @@ export function listVaDirectory(
     /** When true, include closed (not recruiting) listed VAs as read-only. */
     includeClosed?: boolean;
     limit?: number;
+    /** Economy day window for flightQuality (defaults to last 7 keys ending at toDayKey). */
+    fromDayKey?: number;
+    toDayKey?: number;
   } = {},
 ): VaDirectoryEntry[] {
   ensureV14Ddl(db);
@@ -888,6 +1060,24 @@ export function listVaDirectory(
       myRequestStatus,
       myRole,
     });
+  }
+  if (out.length > 0) {
+    const toDay =
+      typeof opts.toDayKey === 'number' && Number.isFinite(opts.toDayKey)
+        ? Math.max(0, Math.floor(opts.toDayKey))
+        : 0;
+    const fromDay =
+      typeof opts.fromDayKey === 'number' && Number.isFinite(opts.fromDayKey)
+        ? Math.max(0, Math.floor(opts.fromDayKey))
+        : Math.max(0, toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1));
+    const quality = mapCompanyFlightQuality(db, {
+      companyIds: out.map((e) => e.companyId),
+      fromDayKey: fromDay,
+      toDayKey: toDay,
+    });
+    for (const entry of out) {
+      entry.flightQuality = quality.get(entry.companyId) ?? null;
+    }
   }
   return out;
 }

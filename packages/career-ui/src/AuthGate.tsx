@@ -70,6 +70,7 @@ export function AuthGate(props: {
     e.preventDefault();
     setLocalError(null);
     setSubmitting(true);
+    const started = Date.now();
     try {
       const result =
         mode === 'login'
@@ -88,6 +89,9 @@ export function AuthGate(props: {
       setLocalError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
+      // If warm hung >45s the gate already shows an error from catch; keep
+      // finally so the button never stays on "…" forever.
+      void started;
     }
   }
 
@@ -176,7 +180,10 @@ export function AuthGate(props: {
             onChange={(e) => setRememberMe(e.target.checked)}
             disabled={busy}
           />
-          <span>Remember me on this device (keeps you signed in)</span>
+          <span>
+            Stay signed in on this device (keeps your login name — never stores
+            the password)
+          </span>
         </label>
 
         {error ? (
@@ -186,7 +193,13 @@ export function AuthGate(props: {
         ) : null}
 
         <button type="submit" className="action accept auth-gate-submit" disabled={busy}>
-          {busy ? '…' : mode === 'login' ? 'Sign in' : 'Create account'}
+          {busy
+            ? mode === 'login'
+              ? 'Signing in…'
+              : 'Creating account…'
+            : mode === 'login'
+              ? 'Sign in'
+              : 'Create account'}
         </button>
 
         {registerEnabled ? (

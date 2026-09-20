@@ -19,6 +19,7 @@ import {
   type PlayerAircraft,
   type CareerCashflowSnapshot,
   type CompanyCreditSnapshot,
+  type VaFlightQualitySnapshot,
 } from './api';
 import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
@@ -75,9 +76,13 @@ export function VaPage(props: Props) {
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<VaJoinRequest[]>([]);
-  const [cashflow, setCashflow] = useState<CareerCashflowSnapshot | null>(null);
+  const [cashflow, setCashflow] = useState<
+    (CareerCashflowSnapshot & { walletUsd?: number }) | null
+  >(null);
   const [companyCredit, setCompanyCredit] =
     useState<CompanyCreditSnapshot | null>(null);
+  const [flightQuality, setFlightQuality] =
+    useState<VaFlightQualitySnapshot | null>(null);
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,14 +103,16 @@ export function VaPage(props: Props) {
     try {
       const snap = await fetchCashflow();
       setCashflow(snap);
-      props.onWallet?.(snap.walletUsd);
+      // Do NOT paint chrome wallet here — active tenant may differ from home.
+      // Ledger shows VA wallet locally; chrome follows activeCompanyId only.
       if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
+      setFlightQuality(snap.flightQuality ?? null);
     } catch (err) {
       setLedgerError(err instanceof Error ? err.message : String(err));
     } finally {
       setLedgerBusy(false);
     }
-  }, [canShow, companyId, props.onWallet]);
+  }, [canShow, companyId]);
 
   const refresh = useCallback(async () => {
     if (!canShow || !companyId) {
@@ -519,12 +526,36 @@ export function VaPage(props: Props) {
       {pane === 'ledger' ? (
         <div className="va-pane-card">
           <p className="settings-help">
-            Shared VA wallet and company ledger — same cash as the owner. Week
-            and month use simulated economy days.
+            Shared company wallet — same cash the owner uses.
           </p>
           <p className="settings-sample" style={{ marginBottom: '0.75rem' }}>
-            Wallet <strong>{formatBoardMoney(props.walletUsd)}</strong>
+            VA wallet{' '}
+            <strong>
+              {formatBoardMoney(cashflow?.walletUsd ?? props.walletUsd)}
+            </strong>
           </p>
+          <div className="va-rep-strip">
+            <div>
+              <p className="aircraft-card-section-label" style={{ margin: 0 }}>
+                Flight quality
+              </p>
+              <p className="settings-sample" style={{ margin: '0.2rem 0 0' }}>
+                <strong>
+                  {flightQuality?.qualityScore != null
+                    ? Math.round(flightQuality.qualityScore)
+                    : '—'}
+                </strong>
+                {flightQuality && flightQuality.flightCount > 0 ? (
+                  <span className="muted">
+                    {' '}
+                    · {flightQuality.flightCount} flights
+                  </span>
+                ) : (
+                  <span className="muted"> · building</span>
+                )}
+              </p>
+            </div>
+          </div>
           {ledgerError ? (
             <p className="error" role="alert">
               {ledgerError}
@@ -539,6 +570,7 @@ export function VaPage(props: Props) {
               walletUsd={props.walletUsd}
               busy={pageBusy || ledgerBusy}
               creditActionsLocked={!isOwner}
+              vaOwnerOpsLabels
               formatMoney={formatBoardMoney}
               onCreditUpdated={({ walletUsd, companyCredit: next }) => {
                 props.onWallet?.(walletUsd);

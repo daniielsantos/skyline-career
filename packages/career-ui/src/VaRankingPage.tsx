@@ -53,7 +53,8 @@ export function VaRankingPage(props: Props) {
         <div className="settings-card">
           <h3>VA ranking · {windowDays} days</h3>
           <p className="settings-help">
-            Internal Haul distance and count. Dispatch hauls from Ports.
+            Internal Haul distance and count. Flight quality is settle score +
+            on-time over the same window (shown when enough flights).
           </p>
           {error ? (
             <p className="error" role="alert">
@@ -83,6 +84,9 @@ export function VaRankingPage(props: Props) {
                   hauls
                   {row.payUsd > 0
                     ? ` · $${Math.round(row.payUsd).toLocaleString()}`
+                    : ''}
+                  {row.flightQuality?.qualityScore != null
+                    ? ` · quality ${Math.round(row.flightQuality.qualityScore)}`
                     : ''}
                 </li>
               ))}

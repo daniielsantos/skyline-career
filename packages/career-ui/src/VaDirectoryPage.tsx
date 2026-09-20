@@ -190,6 +190,14 @@ export function VaDirectoryPage(props: Props) {
                       </span>
                     </div>
                     <div>
+                      <span className="va-stat-label">Quality</span>
+                      <span className="va-stat-value">
+                        {row.flightQuality?.qualityScore != null
+                          ? Math.round(row.flightQuality.qualityScore)
+                          : '—'}
+                      </span>
+                    </div>
+                    <div>
                       <span className="va-stat-label">Seats</span>
                       <span className="va-stat-value">{row.seatsOpen}</span>
                     </div>

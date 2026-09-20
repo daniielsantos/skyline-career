@@ -163,6 +163,7 @@ import { ensureV11Ddl, migrateV10toV11IfNeeded } from './career-store-v11.js';
 import { ensureV12Ddl, migrateV11toV12IfNeeded } from './career-store-v12.js';
 import { ensureV13Ddl, migrateV12toV13IfNeeded } from './career-store-v13.js';
 import { ensureV14Ddl, migrateV13toV14IfNeeded } from './career-store-v14.js';
+import { ensureV15Ddl, migrateV14toV15IfNeeded } from './career-store-v15.js';
 import {
   acceptJoinRequest,
   createCompanyInvite,
@@ -182,6 +183,8 @@ import {
   isCompanyVaListed,
   listVaDirectory,
   findAccountListedVaMembership,
+  recordCompanyFlightQuality,
+  getCompanyFlightQuality,
   recordInternalHaulStats,
   rejectJoinRequest,
   setCompanyMemberRole,
@@ -189,9 +192,12 @@ import {
   setCompanyRecruiting,
   publishCompanyAsVa,
   unpublishCompanyAsVa,
+  vaDayKeyFromTick,
+  VA_FLIGHT_QUALITY_WINDOW_DAYS,
   type CareerCompanyInvite,
   type VaCompanyRankRow,
   type VaDirectoryEntry,
+  type VaFlightQualitySnapshot,
   type VaJoinRequestRow,
   type VaMemberRow,
   type VaPilotRankRow,
@@ -201,7 +207,7 @@ import {
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '14';
+export const CAREER_STORE_SCHEMA_VERSION = '15';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -430,6 +436,17 @@ export interface CareerStore {
     nm: number;
     payUsd: number;
   }): void | Promise<void>;
+  vaRecordFlightQuality(opts: {
+    companyId: string;
+    dayKey: number;
+    scorePct: number;
+    onTime: boolean;
+  }): void | Promise<void>;
+  vaFlightQuality(opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+  }): VaFlightQualitySnapshot | Promise<VaFlightQualitySnapshot>;
   vaCompanyRanking(opts: {
     fromDayKey: number;
     toDayKey: number;
@@ -446,6 +463,8 @@ export interface CareerStore {
     accountId?: string;
     includeClosed?: boolean;
     limit?: number;
+    fromDayKey?: number;
+    toDayKey?: number;
   }): VaDirectoryEntry[] | Promise<VaDirectoryEntry[]>;
   vaSetRecruiting(opts: {
     companyId: string;
@@ -806,6 +825,27 @@ class JsonCareerStore implements CareerStore {
     nm: number;
     payUsd: number;
   }): void {}
+
+  vaRecordFlightQuality(_opts: {
+    companyId: string;
+    dayKey: number;
+    scorePct: number;
+    onTime: boolean;
+  }): void {}
+
+  vaFlightQuality(_opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+  }): VaFlightQualitySnapshot {
+    return {
+      windowDays: VA_FLIGHT_QUALITY_WINDOW_DAYS,
+      flightCount: 0,
+      avgFlightScorePct: null,
+      onTimePct: null,
+      qualityScore: null,
+    };
+  }
 
   vaCompanyRanking(_opts: {
     fromDayKey: number;
@@ -1201,6 +1241,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV12Ddl(db);
   ensureV13Ddl(db);
   ensureV14Ddl(db);
+  ensureV15Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -1294,7 +1335,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV13 = Number.parseInt(afterV13?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV13) || verAfterV13 < 14) {
-    migrateV13toV14IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV13toV14IfNeeded(db, metaSet, '14');
+  }
+  const afterV14 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV14 = Number.parseInt(afterV14?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV14) || verAfterV14 < 15) {
+    migrateV14toV15IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -1583,6 +1631,23 @@ class SqliteCareerStore implements CareerStore {
     recordInternalHaulStats(this.db, opts);
   }
 
+  vaRecordFlightQuality(opts: {
+    companyId: string;
+    dayKey: number;
+    scorePct: number;
+    onTime: boolean;
+  }): void {
+    recordCompanyFlightQuality(this.db, opts);
+  }
+
+  vaFlightQuality(opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+  }): VaFlightQualitySnapshot {
+    return getCompanyFlightQuality(this.db, opts);
+  }
+
   vaCompanyRanking(opts: {
     fromDayKey: number;
     toDayKey: number;
@@ -1605,8 +1670,23 @@ class SqliteCareerStore implements CareerStore {
     accountId?: string;
     includeClosed?: boolean;
     limit?: number;
+    fromDayKey?: number;
+    toDayKey?: number;
   }): VaDirectoryEntry[] {
-    return listVaDirectory(this.db, opts ?? {});
+    const tick = this.peekEconomyWorld()?.tick ?? 0;
+    const toDay =
+      typeof opts?.toDayKey === 'number'
+        ? opts.toDayKey
+        : vaDayKeyFromTick(tick);
+    const fromDay =
+      typeof opts?.fromDayKey === 'number'
+        ? opts.fromDayKey
+        : Math.max(0, toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1));
+    return listVaDirectory(this.db, {
+      ...(opts ?? {}),
+      fromDayKey: fromDay,
+      toDayKey: toDay,
+    });
   }
 
   vaSetRecruiting(opts: {

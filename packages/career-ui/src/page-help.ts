@@ -58,7 +58,7 @@ export const PAGE_HELP = {
     title: 'How My VA works',
     kicker: 'Page guide',
     bullets: [
-      'Manage roster, hangar (company fleet), ledger (shared VA wallet), invites, recruiting, leave or unlist.',
+      'Manage roster, hangar (company fleet), ledger (shared VA wallet + Flight quality), invites, recruiting, leave or unlist.',
       'Your company is not a VA until you publish it from Company (name + home hub).',
       'Buy/lease aircraft on Airframes — costs hit this company wallet. Full ferry/MX stays in Hangar.',
       'Internal Hauls stay on Ports — this page is people, fleet overview, cashflow, and hiring.',
@@ -70,6 +70,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Lists only published virtual airlines — not every company in the world.',
+      'Quality chip is settle flight score + on-time over ~7 days (needs a few flights).',
       'Request to join when hiring is open, or use a private invite code anytime.',
       'Owners publish from Company; manage seats under My VA.',
     ],
@@ -80,6 +81,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Seven-day Internal Haul stats across VAs — distance and haul count.',
+      'Flight quality rides along when the VA has enough scored settles.',
       'Pilot strip shows members of your active company when you have one.',
       'Settle hauls from Dispatch after flying WH→WH bridges from Ports.',
     ],

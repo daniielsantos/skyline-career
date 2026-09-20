@@ -1242,6 +1242,14 @@ export type CompanyCreditSnapshot = {
   lastSettledDayIndex: number;
 };
 
+export type VaFlightQualitySnapshot = {
+  windowDays: number;
+  flightCount: number;
+  avgFlightScorePct: number | null;
+  onTimePct: number | null;
+  qualityScore: number | null;
+};
+
 export type StarterHubOption = {
   icao: string;
   name: string;
@@ -1572,6 +1580,7 @@ export function fetchCashflow() {
       dayIndex: number;
       labels?: Record<string, string>;
       companyCredit?: CompanyCreditSnapshot;
+      flightQuality?: VaFlightQualitySnapshot | null;
     }
   >('/api/cashflow');
 }
@@ -4923,6 +4932,7 @@ export type VaCompanyRank = {
   hauls: number;
   nm: number;
   payUsd: number;
+  flightQuality?: VaFlightQualitySnapshot | null;
 };
 
 export type VaPilotRank = {
@@ -4976,6 +4986,7 @@ export function fetchVaMembers() {
       salaryUsdPerWeek: number;
       fireSeveranceUsd: number;
     } | null;
+    flightQuality?: VaFlightQualitySnapshot | null;
     /** Active company was home/solo — switch UI tenant to this listed VA. */
     switchToCompanyId?: string;
   }>('/api/va/members');
@@ -5103,6 +5114,7 @@ export type VaDirectoryEntry = {
   /** % of Freights/Demand/Charter route net paid to the flying member. */
   memberRouteCutPct?: number;
   seatsOpen: number;
+  flightQuality?: VaFlightQualitySnapshot | null;
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
   myRole?: 'owner' | 'dispatcher' | 'pilot' | null;
 };

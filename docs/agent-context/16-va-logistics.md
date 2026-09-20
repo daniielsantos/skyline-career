@@ -45,7 +45,8 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 | Ação | Owner | Dispatcher | Pilot (membro) |
 |--|--|--|--|
 | Ver roster / hangar (frota VA) | sim | sim | sim (read; mutações Hangar = ver nota) |
-| **Ver Ledger (wallet + cashflow VA)** | **sim** | **sim** | **sim** |
+| Ver Ledger (wallet + cashflow VA) | sim | sim | sim |
+| Ver Flight quality (+ Owner ops no credit) | sim | sim | sim |
 | Accept/reject join requests | sim | sim | não |
 | Create invite | sim | sim | não |
 | Kick / change role | sim | não | não |
@@ -71,6 +72,19 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - Aba **Ledger** em My VA reusa o painel do Hangar Cashflow (`GET /api/cashflow` no tenant VA ativo).
 - Credit draw/repay: owner-only (UI + API gate em `/api/credit/draw` e `/repay` quando `va_listed`).
 - Membros veem saldo, credit status e recent activity; não mutam credit.
+
+**Nota reputação VA — DECIDIDO · shipped:**
+
+- **Owner ops** (credit) = `companyCredit.repScore` (média Cargo Ops da company). Em VA listada = ladder do owner nessa company; membros **não** dual-write unlock. Fórmula de limit **inalterada** — só copy honesta (`Owner ops` no credit block; strip do Ledger **não** promove Ops como reputação de marca).
+- **Flight quality** = rolling 7d de settle `flightScore.pct` + `onTime` (`company_flight_quality_stats`). Composite `0.7*avg + 0.3*onTimePct` só com ≥3 settles — sinal de org (membros contribuem).
+- Settle em company `va_listed` grava quality (Freights/Demand/Charter/IH com score). UI: My VA Ledger strip = Flight quality; directory/ranking chip Quality; credit = Owner ops.
+
+**Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
+
+- Abrir My VA faz `switchCompanyForVa` e grava `?company=` da VA — necessário para hangar/ledger.
+- **Sair de My VA** restaura a **home** do piloto (company owner) + wallet chrome.
+- Ledger **não** chama `setWallet` no load (só mostra VA wallet local); paint de `/api/state` ignora resposta cujo `companyId` ≠ tenant esperado.
+- Chrome label **VA wallet** quando active ≠ home. Login sempre re-pinna home e limpa tenant VA residual da sessão anterior.
 
 ---
 
@@ -356,6 +370,30 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** wallet é a mesma company do owner, mas My VA só tinha Roster / Hangar / Config — Hangar Cashflow ficava escondido no Hangar pessoal ou exigia saber trocar de contexto.
 **Fix:** aba **Ledger** em My VA reusa `HangarCashflowPanel` + `GET /api/cashflow`; credit draw/repay owner-only (UI + API).
 
+### VA Ops rep + Flight quality (2026-09-20)
+
+**Sintoma / gap:** settle já mostra flight score, mas VA não tinha reputação de org; Ops rep do credit só refletia ladder do owner e não aparecia como sinal público.
+**Causa:** quality era efêmera no debrief; Cargo Ops XP de membros vai pra home (certo) e não alimenta um score de marca.
+**Fix:** tabela `company_flight_quality_stats` (SQLite v15 / PG v26); settle em VA listed grava score+onTime; snapshot 7d em cashflow/members/directory/ranking; UI labels **Ops rep** vs **Flight quality** (sem dual-write de unlock).
+
+### Credit / Ledger UI sanitize (2026-09-20)
+
+**Sintoma:** bloco Credit no Hangar e My VA Ledger com blurb longo (taxa %, collateral, sell-back) e Draw/Repay amontoados numa row.
+**Causa:** copy de debug/economia vazava pro painel; layout era flex wrap de labels+botões.
+**Fix:** blurb curto (fleet + Ops); métricas Limit/Drawn/Available/Ops (+ Day interest só se >0); Draw/Repay em duas colunas; strip enxuta.
+
+### VA credit labels = Owner ops (2026-09-20)
+
+**Sintoma:** Ops no Ledger/credit da VA lia como reputação de org, mas é ladder Cargo Ops do owner (membros não alimentam).
+**Causa:** mesmo `companyCredit.repScore` do Hangar solo, sem dual-write de unlock na VA.
+**Fix (copy only):** strip do Ledger = só Flight quality; credit block na VA = **Owner ops** + blurb; fórmula de limit inalterada.
+
+### My VA Ledger painted personal wallet (2026-09-20)
+
+**Sintoma:** alt abre Ledger da VA e o chrome Wallet vira o saldo da VA; ao sair continua “errado”.
+**Causa:** `switchCompanyForVa` pinava `?company=` na VA sem restaurar home; Ledger chamava `onWallet(snap.walletUsd)`; refresh pintava qualquer `/api/state` sem checar tenant.
+**Fix:** restaurar home ao sair de My VA; Ledger sem paint no load; paint só se `state.companyId` bate com tenant esperado; label **VA wallet**; login re-pinna home.
+
 
 
 
@@ -372,6 +410,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **memberRouteCutPct** — schema v14 + Config + directory + settle Freights/Demand/Charter (net após fuel)
 - [x] Hangar VA: member read-only UI (sell/lease/MX; ferry ok) + **API gate MX + sell/list/unlist owner-only**
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
+- [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

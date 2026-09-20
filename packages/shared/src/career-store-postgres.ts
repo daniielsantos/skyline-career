@@ -2,6 +2,7 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v26 adds company_flight_quality_stats (VA settle quality rolling).
  * Schema v22 adds companies.recruiting + company_join_requests (VA directory).
  * Schema v21 adds company_invites + haul ranking stats (VA IH-2).
  * Schema v20 adds aircraft_instances.owner_company_id (F7 dealer claim).
@@ -34,12 +35,16 @@ import {
   VA_INVITE_DEFAULT_MAX_USES,
   VA_INVITE_NEVER_EXPIRES_MS,
   VA_ALREADY_IN_VA_MSG,
+  VA_FLIGHT_QUALITY_WINDOW_DAYS,
   VA_MEMBER_CAP,
   VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
   clampMemberRouteCutPct,
+  summarizeVaFlightQuality,
+  vaDayKeyFromTick,
   type CareerCompanyInvite,
   type VaCompanyRankRow,
   type VaDirectoryEntry,
+  type VaFlightQualitySnapshot,
   type VaJoinRequestRow,
   type VaMemberRow,
   type VaPilotRankRow,
@@ -121,7 +126,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '25';
+const CAREER_PG_SCHEMA_VERSION = '26';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -390,6 +395,17 @@ CREATE TABLE IF NOT EXISTS company_pilot_haul_stats (
 );
 CREATE INDEX IF NOT EXISTS company_pilot_haul_stats_day_idx
   ON company_pilot_haul_stats(company_id, day_key);
+
+CREATE TABLE IF NOT EXISTS company_flight_quality_stats (
+  company_id TEXT NOT NULL REFERENCES companies(id),
+  day_key INTEGER NOT NULL,
+  flights INTEGER NOT NULL DEFAULT 0,
+  score_sum DOUBLE PRECISION NOT NULL DEFAULT 0,
+  on_time INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (company_id, day_key)
+);
+CREATE INDEX IF NOT EXISTS company_flight_quality_stats_day_idx
+  ON company_flight_quality_stats(day_key);
 
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE company_state ADD COLUMN IF NOT EXISTS va_line_crew_json JSONB;
@@ -1198,6 +1214,95 @@ export class PostgresCareerStore implements CareerStore {
     }
   }
 
+  async vaRecordFlightQuality(opts: {
+    companyId: string;
+    dayKey: number;
+    scorePct: number;
+    onTime: boolean;
+  }): Promise<void> {
+    await this.ready;
+    const score = Math.max(0, Math.min(100, opts.scorePct));
+    const onTime = opts.onTime ? 1 : 0;
+    await this.pool.query(
+      `INSERT INTO company_flight_quality_stats
+         (company_id, day_key, flights, score_sum, on_time)
+       VALUES ($1, $2, 1, $3, $4)
+       ON CONFLICT (company_id, day_key) DO UPDATE SET
+         flights = company_flight_quality_stats.flights + 1,
+         score_sum = company_flight_quality_stats.score_sum + EXCLUDED.score_sum,
+         on_time = company_flight_quality_stats.on_time + EXCLUDED.on_time`,
+      [opts.companyId, opts.dayKey, score, onTime],
+    );
+  }
+
+  async vaFlightQuality(opts: {
+    companyId: string;
+    fromDayKey: number;
+    toDayKey: number;
+  }): Promise<VaFlightQualitySnapshot> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT COALESCE(SUM(flights), 0)::int AS flights,
+              COALESCE(SUM(score_sum), 0) AS score_sum,
+              COALESCE(SUM(on_time), 0)::int AS on_time
+       FROM company_flight_quality_stats
+       WHERE company_id = $1 AND day_key >= $2 AND day_key <= $3`,
+      [opts.companyId, opts.fromDayKey, opts.toDayKey],
+    );
+    const r = rows[0];
+    return summarizeVaFlightQuality({
+      flightCount: Number(r?.flights) || 0,
+      scoreSum: Number(r?.score_sum) || 0,
+      onTimeCount: Number(r?.on_time) || 0,
+      windowDays: Math.max(1, opts.toDayKey - opts.fromDayKey + 1),
+    });
+  }
+
+  private async mapPgFlightQuality(
+    companyIds: string[],
+    fromDayKey: number,
+    toDayKey: number,
+  ): Promise<Map<string, VaFlightQualitySnapshot>> {
+    const out = new Map<string, VaFlightQualitySnapshot>();
+    const ids = companyIds.filter((id) => id.trim());
+    const windowDays = Math.max(1, toDayKey - fromDayKey + 1);
+    for (const id of ids) {
+      out.set(
+        id,
+        summarizeVaFlightQuality({
+          flightCount: 0,
+          scoreSum: 0,
+          onTimeCount: 0,
+          windowDays,
+        }),
+      );
+    }
+    if (ids.length === 0) return out;
+    const { rows } = await this.pool.query(
+      `SELECT company_id,
+              COALESCE(SUM(flights), 0)::int AS flights,
+              COALESCE(SUM(score_sum), 0) AS score_sum,
+              COALESCE(SUM(on_time), 0)::int AS on_time
+       FROM company_flight_quality_stats
+       WHERE company_id = ANY($1::text[])
+         AND day_key >= $2 AND day_key <= $3
+       GROUP BY company_id`,
+      [ids, fromDayKey, toDayKey],
+    );
+    for (const r of rows) {
+      out.set(
+        r.company_id as string,
+        summarizeVaFlightQuality({
+          flightCount: Number(r.flights) || 0,
+          scoreSum: Number(r.score_sum) || 0,
+          onTimeCount: Number(r.on_time) || 0,
+          windowDays,
+        }),
+      );
+    }
+    return out;
+  }
+
   async vaCompanyRanking(opts: {
     fromDayKey: number;
     toDayKey: number;
@@ -1216,12 +1321,18 @@ export class PostgresCareerStore implements CareerStore {
        LIMIT $3`,
       [opts.fromDayKey, opts.toDayKey, limit],
     );
+    const quality = await this.mapPgFlightQuality(
+      rows.map((r) => r.company_id as string),
+      opts.fromDayKey,
+      opts.toDayKey,
+    );
     return rows.map((r) => ({
       companyId: r.company_id as string,
       displayName: (r.display_name as string) || (r.company_id as string),
       hauls: Number(r.hauls) || 0,
       nm: Math.round(Number(r.nm) || 0),
       payUsd: Math.round((Number(r.pay_usd) || 0) * 100) / 100,
+      flightQuality: quality.get(r.company_id as string) ?? null,
     }));
   }
 
@@ -1436,6 +1547,8 @@ export class PostgresCareerStore implements CareerStore {
     accountId?: string;
     includeClosed?: boolean;
     limit?: number;
+    fromDayKey?: number;
+    toDayKey?: number;
   }): Promise<VaDirectoryEntry[]> {
     await this.ready;
     const limit = Math.max(1, Math.min(100, opts?.limit ?? 50));
@@ -1492,6 +1605,25 @@ export class PostgresCareerStore implements CareerStore {
         myRequestStatus,
         myRole,
       });
+    }
+    if (out.length > 0) {
+      const tick = this.peekEconomyWorld()?.tick ?? 0;
+      const toDay =
+        typeof opts?.toDayKey === 'number'
+          ? opts.toDayKey
+          : vaDayKeyFromTick(tick);
+      const fromDay =
+        typeof opts?.fromDayKey === 'number'
+          ? opts.fromDayKey
+          : Math.max(0, toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1));
+      const quality = await this.mapPgFlightQuality(
+        out.map((e) => e.companyId),
+        fromDay,
+        toDay,
+      );
+      for (const entry of out) {
+        entry.flightQuality = quality.get(entry.companyId) ?? null;
+      }
     }
     return out;
   }

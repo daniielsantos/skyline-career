@@ -2035,7 +2035,9 @@ function isAuthRequiredMessage(message: string): boolean {
 /** Skip banners that the gate already handled or that lost a race to a new login. */
 function shouldSurfaceApiError(message: string): boolean {
   if (isNeedsProfileMessage(message)) return false;
-  if (isAuthRequiredMessage(message) && getAuthToken()) return false;
+  // AuthGate is the UX for 401 — never paint a red banner (esp. after logout
+  // when in-flight polls return Authentication required with no Bearer).
+  if (isAuthRequiredMessage(message)) return false;
   return true;
 }
 
@@ -3548,6 +3550,14 @@ export function App() {
   const [devMode, setDevMode] = useState(loadDevMode);
   const [companies, setCompanies] = useState<CareerCompanyView[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState(getStoredCompanyId);
+  /** Owner home company — restore when leaving My VA (member dual-tenant). */
+  const [homeCompanyId, setHomeCompanyId] = useState<string | null>(null);
+  const homeCompanyIdRef = useRef<string | null>(null);
+  const activeCompanyIdRef = useRef(activeCompanyId);
+  activeCompanyIdRef.current = activeCompanyId;
+  const viewingVaTenant = Boolean(
+    homeCompanyId && activeCompanyId && homeCompanyId !== activeCompanyId,
+  );
   /** VA-listed company + non-owner → Hangar MX/sell locked (ferry ok). */
   const [vaHangarMutationsLocked, setVaHangarMutationsLocked] = useState(false);
   const [worldPresence, setWorldPresence] = useState<{
@@ -4147,6 +4157,7 @@ export function App() {
 
   useEffect(() => {
     const handleAuthRequired = () => {
+      setError(null);
       setAuthRequired(true);
       setAuthChecked(true);
       setBusy(false);
@@ -4336,15 +4347,27 @@ export function App() {
     setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
     setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
     setDisplayNowMs(serverNow);
-    paintWallet(state.walletUsd);
+    const stateCompanyId =
+      typeof state.companyId === 'string' ? state.companyId.trim() : '';
+    const expectedTenant =
+      companyIdFromUrl() ||
+      activeCompanyIdRef.current ||
+      getStoredCompanyId();
+    const tenantMatches =
+      !stateCompanyId ||
+      !expectedTenant ||
+      stateCompanyId === expectedTenant;
+    if (tenantMatches) {
+      paintWallet(state.walletUsd);
+    }
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
-    if (state.companyId) {
-      setActiveCompanyId(state.companyId);
-      setActiveCompanyIdForRequests(state.companyId);
+    if (stateCompanyId && tenantMatches) {
+      setActiveCompanyId(stateCompanyId);
+      setActiveCompanyIdForRequests(stateCompanyId);
       // Persist only when the tab is not pinned by ?company= (shared storage).
       if (!companyIdFromUrl()) {
-        setStoredCompanyId(state.companyId);
+        setStoredCompanyId(stateCompanyId);
       }
     }
     if (state.leaseUnlock) setLeaseUnlock(state.leaseUnlock);
@@ -7095,11 +7118,26 @@ export function App() {
   function selectTab(next: Tab) {
     setAirportReturn(null);
     setSidebarOpen(false);
+    const prev = tabRef.current;
     goToTab(next);
     // Soft refresh in background — don't flash disabled on every nav button.
-    void run(() => refresh(liveRefreshScope(next, false)), {
-      lockUi: false,
-    });
+    void (async () => {
+      // Member dual-tenant: My VA pins ?company= to the VA. Leaving must
+      // restore home or Freights/Wallet stay on the VA company forever.
+      if (prev === 'va' && next !== 'va') {
+        const home = homeCompanyIdRef.current?.trim();
+        if (home && home !== activeCompanyIdRef.current) {
+          try {
+            await switchCompanyForVa(home);
+          } catch {
+            /* soft — refresh below may still heal */
+          }
+        }
+      }
+      await run(() => refresh(liveRefreshScope(next, false)), {
+        lockUi: false,
+      });
+    })();
   }
 
   async function returnToAirport() {
@@ -7388,7 +7426,14 @@ export function App() {
   /** VA My VA: open tenant without wiping the shell (full refresh was ~20s). */
   async function switchCompanyForVa(nextId: string): Promise<void> {
     const id = nextId.trim() || LOCAL_COMPANY_ID;
-    if (!id || id === activeCompanyId) return;
+    if (!id || id === activeCompanyIdRef.current) return;
+    // Remember home before pinning the VA so leaving My VA can restore it.
+    if (!homeCompanyIdRef.current) {
+      const prev =
+        activeCompanyIdRef.current || getStoredCompanyId();
+      homeCompanyIdRef.current = prev;
+      setHomeCompanyId(prev);
+    }
     setStoredCompanyId(id);
     try {
       const url = new URL(window.location.href);
@@ -7410,10 +7455,14 @@ export function App() {
     setActiveCompanyIdForRequests(id);
     try {
       const state = await fetchState();
-      setWallet(state.walletUsd);
-      setFleet(state.fleet ?? []);
-      setHomeHubIcao(state.homeHubIcao ?? '');
-      setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
+      const stateCompanyId =
+        typeof state.companyId === 'string' ? state.companyId.trim() : '';
+      if (!stateCompanyId || stateCompanyId === id) {
+        setWallet(state.walletUsd);
+        setFleet(state.fleet ?? []);
+        setHomeHubIcao(state.homeHubIcao ?? '');
+        setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
+      }
       // Keep authAccountLabel — do not adopt VA owner pilotName into the chrome.
       if (!authRequired || !authAccountLabel) {
         setPilotName(state.pilotName ?? '');
@@ -7528,7 +7577,23 @@ export function App() {
       setAuthAccountLabel(fromAuth);
     }
     if (result.companies[0]) {
-      setStoredCompanyId(result.companies[0].id);
+      const homeId = result.companies[0].id;
+      homeCompanyIdRef.current = homeId;
+      setHomeCompanyId(homeId);
+      setStoredCompanyId(homeId);
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('company', homeId);
+        window.history.replaceState(
+          {},
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        );
+      } catch {
+        /* ignore */
+      }
+      setActiveCompanyId(homeId);
+      setActiveCompanyIdForRequests(homeId);
       setCompanies(
         result.companies.map((c) => ({
           id: c.id,
@@ -7543,18 +7608,24 @@ export function App() {
     const profileId =
       activeCareerProfile?.id ?? bootProfileKeyRef.current ?? '';
     setProfileGateBusyLabel('Loading company & board…');
-    await ensureCompanySessionForUi({ authEnforced: true });
-    const scope = liveRefreshScope(tabRef.current, Boolean(airportIcao));
-    await refreshRef.current({
-      ...scope,
-      market: true,
-      missions: true,
-    });
-    setMarketBoardLoading(false);
-    if (profileId) bootProfileKeyRef.current = profileId;
-    setError(null);
-    setShowProfileGate(false);
-    setShowAuthGate(false);
+    try {
+      await ensureCompanySessionForUi({ authEnforced: true });
+      const scope = liveRefreshScope(tabRef.current, Boolean(airportIcao));
+      await refreshRef.current({
+        ...scope,
+        market: true,
+        missions: true,
+      });
+      setMarketBoardLoading(false);
+      if (profileId) bootProfileKeyRef.current = profileId;
+      setError(null);
+      setShowProfileGate(false);
+      setShowAuthGate(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      // Leave AuthGate visible with the error so Sign in is not stuck forever.
+      throw err;
+    }
   }
 
   /** Open (or re-open) a save then Auth/company warm — used by Continue and Ctrl+R resume. */
@@ -7684,6 +7755,7 @@ export function App() {
 
   async function onSignOutAccount() {
     await run(async () => {
+      setError(null);
       try {
         await postAuthLogout();
       } catch {
@@ -7726,6 +7798,7 @@ export function App() {
       }
       if (worldFixed) {
         // Stay on the host world — only re-prompt Auth.
+        setError(null);
         setShowAuthGate(true);
         setShowProfileGate(false);
         setStaging(null);
@@ -11922,8 +11995,10 @@ export function App() {
     return (
       <div className="app-shell profile-gate-shell">
         <AuthGate
-          busy={busy}
-          error={error}
+          busy={false}
+          error={
+            error && shouldSurfaceApiError(error) ? error : null
+          }
           registerEnabled={authRegisterEnabled}
           inviteRequired={authInviteRequired}
           onLogin={async (opts) => {
@@ -12578,7 +12653,9 @@ export function App() {
               </button>
             ) : null}
             <div className="metric">
-              <span className="label">Wallet</span>
+              <span className="label">
+                {viewingVaTenant ? 'VA wallet' : 'Wallet'}
+              </span>
               <strong>{careerStateReady ? formatMoney(wallet) : '…'}</strong>
             </div>
             <div className="metric world-clock" title={worldClockTitle}>
@@ -18929,7 +19006,7 @@ export function App() {
                   ? 'Unlock freights by commodity and freighter class. Dry and Light starters are open; Medium is optional beside Jet.'
                   : hangarPane === 'crew' && COMPANY_CREW_ENABLED
                     ? 'Company crew is based at your Base. Send them on holds or accepted missions — they settle on wall-clock ETA.'
-                    : 'Company income, expenses, and revolving credit — freights, parking, fuel, leases, shop visits. Week and month use simulated economy days.'}
+                    : 'Income, expenses, and credit for this company.'}
             </p>
             <div className="hangar-head-actions">
               <div className="hangar-pane-toggle" role="tablist" aria-label="Hangar views">

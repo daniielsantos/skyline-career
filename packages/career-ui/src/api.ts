@@ -1776,6 +1776,7 @@ export function fetchCharters(opts: {
 export function postCharterAccept(opts: {
   offerId: string;
   aircraftId: string;
+  companyId?: string;
 }) {
   return api<{
     mission: Mission;
@@ -2383,6 +2384,8 @@ export function postStagingCommit(opts: {
   openDispatch?: boolean;
   replace?: boolean;
   weightSystem?: 'metric' | 'imperial';
+  /** Dual-tenant: VA tail ops while chrome stays on home. */
+  companyId?: string;
   lines: Array<{ lotId: string; cargoKg: number }>;
 }) {
   return api<{
@@ -3578,6 +3581,7 @@ export function postWarehouseBridgeAccept(opts: {
   aircraftId: string;
   kg?: number;
   pilotPayUsd?: number | null;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -3597,6 +3601,7 @@ export function postWarehouseBridgeDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
   pilotPayUsd?: number | null;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -3665,6 +3670,7 @@ export function postWarehouseHaulAccept(opts: {
   commodityId: string;
   aircraftId: string;
   kg?: number;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -3683,6 +3689,7 @@ export function postWarehouseHaulAccept(opts: {
 export function postWarehouseHaulDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -3707,6 +3714,7 @@ export function postDemandAccept(opts: {
   originIcao: string;
   aircraftId: string;
   kg?: number;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -3756,6 +3764,7 @@ export function postDemandHoldCancel(opts: { holdId: string }) {
 export function postDemandDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;
@@ -3964,6 +3973,7 @@ export function postFerry(opts: {
   aircraftId: string;
   destIcao: string;
   quoteOnly?: boolean;
+  companyId?: string;
 }) {
   return api<{
     quote: FerryQuote;
@@ -3974,6 +3984,7 @@ export function postFerry(opts: {
     fleet?: PlayerAircraft[];
     hubs?: StarterHubOption[];
     pilotIcao?: string;
+    ferryMode?: 'solo' | 'allowance' | 'overflow';
   }>('/api/fleet/ferry', {
     method: 'POST',
     body: JSON.stringify(opts),

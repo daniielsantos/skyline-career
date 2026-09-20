@@ -668,6 +668,7 @@ describe('VA aircraft reservation', () => {
       actorAccountId: 'acc_holder',
       nowMs: t0,
     });
+    assert.equal(acf.reservedByAccountId, 'acc_holder');
     releaseAircraftOnCancel(state, {
       id: 'msn_ok',
       aircraftId: acf.id,
@@ -683,6 +684,18 @@ describe('VA aircraft reservation', () => {
       actorIsVaOwner: true,
       nowMs: t0,
     });
+  });
+
+  it('auto-reserves on assign when actorAccountId is set', () => {
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const acf = state.fleet[0]!;
+    const t0 = Date.now();
+    assignAircraftToMission(state, acf.id, 'msn_auto', 'SBGR', {
+      actorAccountId: 'acc_pilot',
+      nowMs: t0,
+    });
+    assert.equal(acf.reservedByAccountId, 'acc_pilot');
+    assert.equal(acf.reservedAtMs, t0);
   });
 
   it('release clears hold', () => {

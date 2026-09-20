@@ -122,7 +122,7 @@ Atualizado 2026-09-18: **Charter `group_size_check` 1…12** — +1d / form med-
 
 Atualizado 2026-09-18: **Charter pax só ~7–9 no board** — pools rasas + bandas light drenavam antes de med/narrow. Fix: bandas deep→narrow-first, refill/floor. Detail: [`08-economy.md`](./08-economy.md).
 
-Atualizado 2026-09-18: **Client update kill switch** — rare `misc_json.clientUpdatePolicy` (`forceUpdate` + `minClientVersion`); health + 426 on Prepare/accept; UI CTA → Settings Updates. Ops SQL: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
+Atualizado 2026-09-20: **Client update kill switch** — rare `misc_json.clientUpdatePolicy` (`forceUpdate` + `minClientVersion`); health + 426 on Prepare/Accept/Fly now across Freights, Charter, Ports Demand/Bridge/Haul/shuttle, Base Dispatcher; Hold at WH stays open. Ops SQL + surface table: [`14-mp-world-clock.md`](./14-mp-world-clock.md).
 
 Atualizado 2026-09-18: **Charter group size 1…230 + pay taper** — bands light/med/narrow; √ pay past 12 pax so Freights stay competitive. Detail: [`08-economy.md`](./08-economy.md).
 

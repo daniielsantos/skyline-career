@@ -69,6 +69,7 @@ export function charterNetLabel(
 
 type CharterBoardProps = {
   fleet: PlayerAircraft[];
+  vaAircraftIds?: ReadonlySet<string>;
   initialAircraftId?: string;
   /** Exact origin lock (Terminal outbound / Base dispatcher). */
   origin?: string;
@@ -274,11 +275,15 @@ export function CharterBoard(props: CharterBoardProps) {
                 ? 'Gross pay (no aircraft)'
                 : 'Gross pay only'}
             </option>
-            {parked.map((aircraft) => (
+            {parked.map((aircraft) => {
+              const isVa = props.vaAircraftIds?.has(aircraft.id);
+              const prefix = isVa ? 'VA' : 'Yours';
+              return (
               <option key={aircraft.id} value={aircraft.id}>
-                {aircraft.label} · {aircraft.locationIcao}
+                {prefix} · {aircraft.label} · {aircraft.locationIcao}
               </option>
-            ))}
+              );
+            })}
           </select>
         </label>
         <span className="charter-count">{total} offers</span>

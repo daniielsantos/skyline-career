@@ -488,7 +488,7 @@ Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em
 
 ## Client update kill switch (ops)
 
-Rare critical-only gate. App still opens; **Prepare / Accept** refuse until desktop ≥ `minClientVersion`.
+Rare critical-only gate. App still opens; **Prepare / Accept / Fly now** refuse until desktop ≥ `minClientVersion`.
 
 Policy lives on `economy_meta.misc_json` (no schema bump), key `clientUpdatePolicy`:
 
@@ -512,7 +512,21 @@ SET misc_json = jsonb_set(
 WHERE world_id = 'local';
 ```
 
-World API reads the key live on `/api/health` and on accept paths (`POST /api/staging/commit`, `/api/accept`, `/api/charters/accept` → **426** `client_update_required`). Desktop sends `X-Skyline-Client-Version`.
+World API reads the key live on `/api/health` and on accept paths → **426** `client_update_required`. Desktop sends `X-Skyline-Client-Version`.
+
+**Gated surfaces** (UI CTA → Settings → Updates; Hold at WH stays allowed):
+
+| Surface | API |
+| --- | --- |
+| Freights Prepare / Manifest commit | `POST /api/accept`, `/api/staging/commit` |
+| Terminal Contracts / contract pilot | `POST /api/accept`, contract-pilot accept |
+| Charter board / manifest | `POST /api/charters/accept` |
+| Ports Demand Fly now / dispatch-hold | `POST /api/demand/accept`, `/api/demand/dispatch-hold` |
+| Ports Bridge / Haul Fly now (+ dispatch-hold) | `POST /api/warehouses/bridge|haul/accept`, `…/dispatch-hold` |
+| Ports shuttle launch | `POST /api/ports/shuttle` |
+| Base Dispatcher Accept / prepare / accept-leg | `POST /api/base/dispatch-tours|dispatch-charters` (`prepare`, `accept-leg`, `confirm`) |
+
+**Not gated:** login, browse boards, Hangar, Hold at WH, Watch settle of an already-accepted mission.
 
 **Disable** after soak:
 
@@ -527,4 +541,4 @@ SET misc_json = jsonb_set(
 WHERE world_id = 'local';
 ```
 
-Do **not** use day-to-day. Does not block login, browse, Hangar, or Watch settle of an already-accepted mission.
+Do **not** use day-to-day.

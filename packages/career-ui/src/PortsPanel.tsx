@@ -3,6 +3,7 @@ import {
   fetchPorts,
   fetchWarehouses,
   fetchCargoLimit,
+  formatClientUpdateRequiredLabel,
   postDemandAccept,
   postDemandHold,
   postDemandHoldCancel,
@@ -404,6 +405,12 @@ export function PortsPanel(props: {
   formatMoney: (n: number) => string;
   formatTonnes: (kg: number) => string;
   fleet: PlayerAircraft[];
+  /** Ids belonging to the member VA — for picker labels. */
+  vaAircraftIds?: ReadonlySet<string>;
+  /** Dual-tenant: company for Accept/Fly when the tail is VA-owned. */
+  resolveOpsCompanyId?: (aircraftId: string) => string | undefined;
+  /** Pin VA tenant before Accept so Dispatch loads the right missions. */
+  ensureOpsCompany?: (aircraftId: string) => Promise<void>;
   /** Aircraft cargo ceiling (kg); 0 = treat as unlimited for preview. */
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   economyTick?: number;
@@ -411,10 +418,16 @@ export function PortsPanel(props: {
   onOpenCargoOps?: () => void;
   onWallet?: (usd: number) => void;
   onFleet?: (fleet: PlayerAircraft[]) => void;
+  /** When Accept used a VA tail, update VA hangar cache instead of home. */
+  onVaFleet?: (fleet: PlayerAircraft[]) => void;
+  onVaWallet?: (usd: number) => void;
   onMissions?: (missions: Mission[]) => void;
   onOpenAirport?: (icao: string) => void;
   onStaged?: (mission: Mission) => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
+  /** World kill switch — Fly now / Dispatch blocked until desktop ≥ min. */
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
 }) {
   const [snap, setSnap] = useState<PortsSnapshot | null>(null);
   const [demand, setDemand] = useState<DemandOrderView[]>([]);
@@ -1759,15 +1772,30 @@ export function PortsPanel(props: {
       props.onOpenCargoOps?.();
       return;
     }
+    if (props.clientUpdateRequiredMin) {
+      props.onToast?.(
+        'fail',
+        formatClientUpdateRequiredLabel(props.clientUpdateRequiredMin),
+      );
+      return;
+    }
     setLoading(true);
     try {
+      await props.ensureOpsCompany?.(acceptAircraftId);
       const result = await postDemandAccept({
         orderId: acceptOrder.id,
         originIcao: acceptOrigin,
         aircraftId: acceptAircraftId,
+        companyId: props.resolveOpsCompanyId?.(acceptAircraftId),
       });
-      props.onWallet?.(result.walletUsd);
-      props.onFleet?.(result.fleet);
+      const vaTail = props.vaAircraftIds?.has(acceptAircraftId);
+      if (vaTail) {
+        props.onVaFleet?.(result.fleet);
+        props.onVaWallet?.(result.walletUsd);
+      } else {
+        props.onWallet?.(result.walletUsd);
+        props.onFleet?.(result.fleet);
+      }
       props.onMissions?.(result.missions.slice().reverse());
       setWarehouses(result.warehouses);
       setDemand(result.demand.orders);
@@ -1830,16 +1858,39 @@ export function PortsPanel(props: {
 
   async function onConfirmDispatchHold() {
     if (!dispatchHold || !dispatchAircraftId || props.busy || loading) return;
+    if (props.clientUpdateRequiredMin) {
+      props.onToast?.(
+        'fail',
+        formatClientUpdateRequiredLabel(props.clientUpdateRequiredMin),
+      );
+      return;
+    }
     setLoading(true);
+    const paintOpsResult = (fleet: PlayerAircraft[], walletUsd: number) => {
+      const vaTail = props.vaAircraftIds?.has(dispatchAircraftId);
+      if (vaTail) {
+        props.onVaFleet?.(fleet);
+        props.onVaWallet?.(walletUsd);
+      } else {
+        props.onWallet?.(walletUsd);
+        props.onFleet?.(fleet);
+      }
+    };
+    const opsCompanyId = props.resolveOpsCompanyId?.(dispatchAircraftId);
     try {
+      await props.ensureOpsCompany?.(dispatchAircraftId);
       if (dispatchHold.kind === 'bridge' && dispatchMode === 'shuttle') {
         const result = await postPortShuttle({
           action: 'dispatch',
           holdId: dispatchHold.id,
           aircraftId: dispatchAircraftId,
         });
-        if (result.walletUsd != null) props.onWallet?.(result.walletUsd);
-        if (result.fleet) props.onFleet?.(result.fleet);
+        if (result.walletUsd != null && result.fleet) {
+          paintOpsResult(result.fleet, result.walletUsd);
+        } else {
+          if (result.walletUsd != null) props.onWallet?.(result.walletUsd);
+          if (result.fleet) props.onFleet?.(result.fleet);
+        }
         if (result.missions) props.onMissions?.(result.missions.slice().reverse());
         if (result.warehouses) setWarehouses(result.warehouses);
         setDispatchHold(null);
@@ -1854,9 +1905,9 @@ export function PortsPanel(props: {
         const result = await postWarehouseBridgeDispatchHold({
           holdId: dispatchHold.id,
           aircraftId: dispatchAircraftId,
+          companyId: opsCompanyId,
         });
-        props.onWallet?.(result.walletUsd);
-        props.onFleet?.(result.fleet);
+        paintOpsResult(result.fleet, result.walletUsd);
         props.onMissions?.(result.missions.slice().reverse());
         setWarehouses(result.warehouses);
         setDispatchHold(null);
@@ -1880,9 +1931,9 @@ export function PortsPanel(props: {
         const result = await postWarehouseHaulDispatchHold({
           holdId: dispatchHold.id,
           aircraftId: dispatchAircraftId,
+          companyId: opsCompanyId,
         });
-        props.onWallet?.(result.walletUsd);
-        props.onFleet?.(result.fleet);
+        paintOpsResult(result.fleet, result.walletUsd);
         props.onMissions?.(result.missions.slice().reverse());
         setWarehouses(result.warehouses);
         setDispatchHold(null);
@@ -1896,9 +1947,9 @@ export function PortsPanel(props: {
         const result = await postDemandDispatchHold({
           holdId: dispatchHold.id,
           aircraftId: dispatchAircraftId,
+          companyId: opsCompanyId,
         });
-        props.onWallet?.(result.walletUsd);
-        props.onFleet?.(result.fleet);
+        paintOpsResult(result.fleet, result.walletUsd);
         props.onMissions?.(result.missions.slice().reverse());
         setWarehouses(result.warehouses);
         setDemand(result.demand.orders);
@@ -1959,6 +2010,13 @@ export function PortsPanel(props: {
   async function onConfirmBridge() {
     if (!bridgeDraft || !bridgeDest || props.busy || loading) return;
     if (bridgeMode === 'fly' && !bridgeAircraftId) return;
+    if (bridgeMode === 'fly' && props.clientUpdateRequiredMin) {
+      props.onToast?.(
+        'fail',
+        formatClientUpdateRequiredLabel(props.clientUpdateRequiredMin),
+      );
+      return;
+    }
     setLoading(true);
     try {
       const pilotPayUsd =
@@ -1983,15 +2041,23 @@ export function PortsPanel(props: {
           }`,
         );
       } else {
+        await props.ensureOpsCompany?.(bridgeAircraftId);
         const result = await postWarehouseBridgeAccept({
           originIcao: bridgeDraft.originIcao,
           destIcao: bridgeDest,
           commodityId: bridgeDraft.commodityId,
           aircraftId: bridgeAircraftId,
           pilotPayUsd: pilotPayUsd ?? undefined,
+          companyId: props.resolveOpsCompanyId?.(bridgeAircraftId),
         });
-        props.onWallet?.(result.walletUsd);
-        props.onFleet?.(result.fleet);
+        const vaTail = props.vaAircraftIds?.has(bridgeAircraftId);
+        if (vaTail) {
+          props.onVaFleet?.(result.fleet);
+          props.onVaWallet?.(result.walletUsd);
+        } else {
+          props.onWallet?.(result.walletUsd);
+          props.onFleet?.(result.fleet);
+        }
         props.onMissions?.(result.missions.slice().reverse());
         setWarehouses(result.warehouses);
         setBridgeDraft(null);
@@ -2033,6 +2099,13 @@ export function PortsPanel(props: {
       );
       return;
     }
+    if (haulMode === 'fly' && props.clientUpdateRequiredMin) {
+      props.onToast?.(
+        'fail',
+        formatClientUpdateRequiredLabel(props.clientUpdateRequiredMin),
+      );
+      return;
+    }
     setLoading(true);
     try {
       const dest = haulDest.trim().toUpperCase();
@@ -2051,15 +2124,23 @@ export function PortsPanel(props: {
           `Held ${props.formatTonnes(result.kg)} haul ${result.hold.originIcao}→${result.hold.destIcao} · ${props.formatMoney(result.payUsd)}`,
         );
       } else {
+        await props.ensureOpsCompany?.(haulAircraftId);
         const result = await postWarehouseHaulAccept({
           originIcao: haulDraft.originIcao,
           destIcao: dest,
           commodityId: haulDraft.commodityId,
           aircraftId: haulAircraftId,
           kg: haulKg,
+          companyId: props.resolveOpsCompanyId?.(haulAircraftId),
         });
-        props.onWallet?.(result.walletUsd);
-        props.onFleet?.(result.fleet);
+        const vaTail = props.vaAircraftIds?.has(haulAircraftId);
+        if (vaTail) {
+          props.onVaFleet?.(result.fleet);
+          props.onVaWallet?.(result.walletUsd);
+        } else {
+          props.onWallet?.(result.walletUsd);
+          props.onFleet?.(result.fleet);
+        }
         props.onMissions?.(result.missions.slice().reverse());
         setWarehouses(result.warehouses);
         setHaulDraft(null);
@@ -5711,6 +5792,7 @@ export function PortsPanel(props: {
           aircraftId={acceptAircraftId}
           originOptions={acceptOriginOptions}
           aircraftOptions={acceptAircraftOptions}
+          vaAircraftIds={props.vaAircraftIds}
           selectedOriginStockKg={selectedOriginStockKg}
           pullPreview={acceptPullPreview}
           intlPreview={acceptIntlPreview}
@@ -5744,6 +5826,8 @@ export function PortsPanel(props: {
           onCancel={closeAcceptModal}
           onConfirmHold={() => void onConfirmHold()}
           onConfirmFly={() => void onConfirmAccept()}
+          clientUpdateRequiredMin={props.clientUpdateRequiredMin}
+          onOpenUpdates={props.onOpenUpdates}
         />
       ) : null}
 
@@ -5770,6 +5854,8 @@ export function PortsPanel(props: {
             setShuttleQuote(null);
           }}
           onConfirm={() => void onConfirmDispatchHold()}
+          clientUpdateRequiredMin={props.clientUpdateRequiredMin}
+          onOpenUpdates={props.onOpenUpdates}
         />
       ) : null}
 
@@ -5803,6 +5889,8 @@ export function PortsPanel(props: {
             setBridgePayQuote(null);
           }}
           onConfirm={() => void onConfirmBridge()}
+          clientUpdateRequiredMin={props.clientUpdateRequiredMin}
+          onOpenUpdates={props.onOpenUpdates}
         />
       ) : null}
 
@@ -5834,6 +5922,8 @@ export function PortsPanel(props: {
             setHaulOpsMaxCargoKg(null);
           }}
           onConfirm={() => void onConfirmHaul()}
+          clientUpdateRequiredMin={props.clientUpdateRequiredMin}
+          onOpenUpdates={props.onOpenUpdates}
         />
       ) : null}
 
@@ -6113,6 +6203,7 @@ function DemandAcceptDialog(props: {
     lon?: number | null;
   }>;
   aircraftOptions: PlayerAircraft[];
+  vaAircraftIds?: ReadonlySet<string>;
   selectedOriginStockKg: number;
   pullPreview: {
     takeKg: number;
@@ -6143,6 +6234,8 @@ function DemandAcceptDialog(props: {
   onCancel: () => void;
   onConfirmHold: () => void;
   onConfirmFly: () => void;
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
 }) {
   const titleId = useId();
   const bodyId = useId();
@@ -6154,10 +6247,12 @@ function DemandAcceptDialog(props: {
   const intlOk = !props.intlPreview || props.intlPreview.allowed;
   const canHold =
     Boolean(selectedOrigin) && hasUsableOrigin && intlOk && !props.busy;
+  const updateBlocked = Boolean(props.clientUpdateRequiredMin);
   const canFly =
     canHold &&
     Boolean(props.aircraftId) &&
-    props.aircraftOptions.length > 0;
+    props.aircraftOptions.length > 0 &&
+    !updateBlocked;
   const preview = props.pullPreview;
   const intl = props.intlPreview;
   const deskMult =
@@ -6345,6 +6440,9 @@ function DemandAcceptDialog(props: {
               <div className="demand-accept-picks" role="listbox" aria-label="Aircraft">
                 {props.aircraftOptions.map((a) => {
                   const active = a.id === props.aircraftId;
+                  const prefix = props.vaAircraftIds?.has(a.id)
+                    ? 'VA · '
+                    : 'Yours · ';
                   return (
                     <button
                       key={a.id}
@@ -6355,7 +6453,10 @@ function DemandAcceptDialog(props: {
                       disabled={props.busy}
                       onClick={() => props.onAircraftChange(a.id)}
                     >
-                      <strong>{a.label ?? a.id}</strong>
+                      <strong>
+                        {prefix}
+                        {a.label ?? a.id}
+                      </strong>
                       <span>{a.locationIcao}</span>
                     </button>
                   );
@@ -6444,12 +6545,34 @@ function DemandAcceptDialog(props: {
               type="button"
               className="accept"
               disabled={!canFly}
+              title={
+                updateBlocked
+                  ? `Update required · v${props.clientUpdateRequiredMin}+`
+                  : undefined
+              }
               onClick={props.onConfirmFly}
             >
-              Fly now
+              {updateBlocked ? 'Update' : 'Fly now'}
             </button>
           )}
         </div>
+        {updateBlocked ? (
+          <p className="demand-accept-hint cargo-dialog-error">
+            Update required · v{props.clientUpdateRequiredMin}+
+            {props.onOpenUpdates ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="action ghost compact"
+                  onClick={() => props.onOpenUpdates?.()}
+                >
+                  Settings → Updates
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -6468,6 +6591,8 @@ function DemandDispatchHoldDialog(props: {
   onModeChange: (mode: 'fly' | 'shuttle') => void;
   onCancel: () => void;
   onConfirm: () => void;
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
 }) {
   const titleId = useId();
   const isBridge = (props.hold.kind ?? 'demand') === 'bridge';
@@ -6478,10 +6603,12 @@ function DemandDispatchHoldDialog(props: {
         ? Math.round(props.hold.unitPriceUsd * props.hold.kg * 100) / 100
         : 0;
   const paidInternalHaul = isBridge && bridgePilotPay > 0;
+  const updateBlocked = Boolean(props.clientUpdateRequiredMin);
   const canConfirm =
     Boolean(props.aircraftId) &&
     props.aircraftOptions.length > 0 &&
-    !props.busy;
+    !props.busy &&
+    !updateBlocked;
   return (
     <div
       className="confirm-overlay"
@@ -6617,11 +6744,37 @@ function DemandDispatchHoldDialog(props: {
             type="button"
             className="accept"
             disabled={!canConfirm}
+            title={
+              updateBlocked
+                ? `Update required · v${props.clientUpdateRequiredMin}+`
+                : undefined
+            }
             onClick={props.onConfirm}
           >
-            {props.mode === 'shuttle' && isBridge ? 'Launch shuttle' : 'Fly now'}
+            {updateBlocked
+              ? 'Update'
+              : props.mode === 'shuttle' && isBridge
+                ? 'Launch shuttle'
+                : 'Fly now'}
           </button>
         </div>
+        {updateBlocked ? (
+          <p className="demand-accept-hint cargo-dialog-error">
+            Update required · v{props.clientUpdateRequiredMin}+
+            {props.onOpenUpdates ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="action ghost compact"
+                  onClick={() => props.onOpenUpdates?.()}
+                >
+                  Settings → Updates
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -6646,15 +6799,20 @@ function WarehouseBridgeDialog(props: {
   onPilotPayChange: (n: number | null) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
 }) {
   const titleId = useId();
   const dest = props.destOptions.find((d) => d.icao === props.destIcao);
   const quote = props.payQuote;
   const payUsd = props.pilotPayUsd ?? quote?.suggestedPayUsd ?? 0;
+  const updateBlocked =
+    props.mode === 'fly' && Boolean(props.clientUpdateRequiredMin);
   const canConfirm =
     Boolean(props.destIcao) &&
     props.destOptions.length > 0 &&
     !props.busy &&
+    !updateBlocked &&
     (props.mode === 'hold' ||
       (Boolean(props.aircraftId) && props.aircraftOptions.length > 0));
   return (
@@ -6842,11 +7000,37 @@ function WarehouseBridgeDialog(props: {
             type="button"
             className="accept"
             disabled={!canConfirm}
+            title={
+              updateBlocked
+                ? `Update required · v${props.clientUpdateRequiredMin}+`
+                : undefined
+            }
             onClick={props.onConfirm}
           >
-            {props.mode === 'hold' ? 'Hold' : 'Fly now'}
+            {updateBlocked
+              ? 'Update'
+              : props.mode === 'hold'
+                ? 'Hold'
+                : 'Fly now'}
           </button>
         </div>
+        {updateBlocked ? (
+          <p className="demand-accept-hint cargo-dialog-error">
+            Update required · v{props.clientUpdateRequiredMin}+
+            {props.onOpenUpdates ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="action ghost compact"
+                  onClick={() => props.onOpenUpdates?.()}
+                >
+                  Settings → Updates
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -6875,6 +7059,8 @@ function WarehouseHaulDialog(props: {
   onAmountChange: (text: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
 }) {
   const titleId = useId();
   const unit = massUnitLabel(props.weightSystem);
@@ -6894,11 +7080,14 @@ function WarehouseHaulDialog(props: {
     props.mode === 'fly' &&
     props.opsMaxCargoKg != null &&
     props.kg > props.opsMaxCargoKg;
+  const updateBlocked =
+    props.mode === 'fly' && Boolean(props.clientUpdateRequiredMin);
   const canConfirm =
     destOk &&
     props.kg > 0 &&
     !overOps &&
     !props.busy &&
+    !updateBlocked &&
     (props.mode === 'hold' ||
       (Boolean(props.aircraftId) && props.aircraftOptions.length > 0));
   return (
@@ -7094,11 +7283,37 @@ function WarehouseHaulDialog(props: {
             type="button"
             className="accept"
             disabled={!canConfirm}
+            title={
+              updateBlocked
+                ? `Update required · v${props.clientUpdateRequiredMin}+`
+                : undefined
+            }
             onClick={props.onConfirm}
           >
-            {props.mode === 'hold' ? 'Hold' : 'Fly now'}
+            {updateBlocked
+              ? 'Update'
+              : props.mode === 'hold'
+                ? 'Hold'
+                : 'Fly now'}
           </button>
         </div>
+        {updateBlocked ? (
+          <p className="demand-accept-hint cargo-dialog-error">
+            Update required · v{props.clientUpdateRequiredMin}+
+            {props.onOpenUpdates ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="action ghost compact"
+                  onClick={() => props.onOpenUpdates?.()}
+                >
+                  Settings → Updates
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
     </div>
   );

@@ -507,7 +507,12 @@ export function cancelDemandHold(
 export function dispatchDemandHold(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
-  opts: { holdId: string; aircraftId: string },
+  opts: {
+    holdId: string;
+    aircraftId: string;
+    pilotAccountId?: string;
+    actorIsVaOwner?: boolean;
+  },
 ): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
   ensureDemandOrders(world);
   expireDemandHolds(state, world);
@@ -592,6 +597,8 @@ export function dispatchDemandHold(
     originCountryId: demandHubCountryId(world, hold.originIcao) ?? '',
     destCountryId: demandHubCountryId(world, hold.destIcao) ?? '',
     deadlineTick,
+    pilotAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
   });
 
   return {
@@ -693,6 +700,8 @@ function createDemandMission(
     originCountryId: string;
     destCountryId: string;
     deadlineTick: number;
+    pilotAccountId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): MissionIntent {
   const classDef = getAircraftClass(opts.aircraft.aircraftClassId);
@@ -743,7 +752,10 @@ function createDemandMission(
     warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
   });
-  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin);
+  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
+    actorAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
   state.missions = [...(state.missions ?? []), mission];
   syncPlayerInbound(world, mission);
   return mission;

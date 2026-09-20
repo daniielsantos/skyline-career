@@ -4,6 +4,7 @@ Atualizado 2026-09-20. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. Buff concessão herdado = ainda backlog.
+**Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -80,6 +81,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - **Flight quality** = rolling 7d de settle `flightScore.pct` + `onTime` (`company_flight_quality_stats`). Composite `0.7*avg + 0.3*onTimePct` só com ≥3 settles — sinal de org (membros contribuem).
 - Settle em company `va_listed` grava quality (Freights/Demand/Charter/IH com score). UI: My VA Ledger strip = Flight quality; directory/ranking chip Quality; credit = Owner ops.
 - **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. Não confundir com **buff de concessão herdado** (Port FBO P# no porto home — membros herdam buy/ETA/listings; ainda backlog).
+- **Prepare Yours+VA (shipped 2026-09-20):** chrome sticky-home escondia frota VA em Freights/Charter/Ports. Fix: prefetch `/api/va/members` → `vaSessionFleet`; `ops-fleet.ts` merge Yours+VA nos pickers; ferry Journey **não** abre no Prepare (só CTA); Accept/`companyId` no tenant do tail + pin VA enquanto Dispatch ativo. **Operator aircraft** = NPC (não VA). **Base Dispatcher** = home-only (CAPEX pessoal).
 
 **Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
 
@@ -408,6 +410,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** sem tabela quality→perk; MX/ferry overflow não liam org score; UI sem chip.
 **Fix:** `career-va-perks.ts` (Proven/Reliable/Elite); API members/cashflow/directory/ranking + MX `extraServiceMult` + ferry overflow mult; UI My VA head/Ledger + directory Perks + ranking. Sem Jet-A org (Base/Port). Buff concessão herdado continua backlog separado.
 
+### Prepare hides VA fleet + auto ferry (2026-09-20)
+
+**Sintoma:** membro clica Prepare no Freights → Ferry Journey do Aerostar pessoal; dropdown do Manifest sem tails da VA. Mesmo gap em Charter/Ports.
+**Causa:** chrome sticky-home → `fleet` só home; `enterStaging`/`CharterManifest` abriam ferry modal no off-origin; Operator aircraft = NPC (não VA).
+**Fix:** `ops-fleet.ts` + prefetch members fleet; pickers Yours/VA; sem auto-modal; Accept/ferry com `companyId` do tail; pin VA enquanto missão Dispatch ativa; Base Dispatcher home-only.
+
 ### Credit / Ledger UI sanitize (2026-09-20)
 
 **Sintoma:** bloco Credit no Hangar e My VA Ledger com blurb longo (taxa %, collateral, sell-back) e Draw/Repay amontoados numa row.
@@ -489,13 +497,17 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** /api/va/members devolvia membership puro; UI não tinha coluna de status.
 **Fix:** enrich members com uthListSessions → online/lastSeenAtMs (AUTH_ONLINE_WINDOW_MS) + melhor missão VA ativa do piloto (ccepted/dispatched/in_flight); row com Online/Offline + last seen + flight line; soft-poll 30s na aba Roster.
 
+### Prepare picker + Accept auto-reserve (2026-09-20)
+
+**Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.
+**Causa:** picker `opsFleet` listava todo `parked` (incl. reserved alheio); Accept só fazia `assign` sem gravar hold.
+**Fix:** Manifest/Ports/Charter filtram tails reserved por outro (owner ainda vê); `assignAircraftToMission` com `actorAccountId` chama `ensureAircraftReservedForActor` (refresh TTL / owner pode tomar hold). Sem auto-reserve enquanto só navega o Manifest.
+
 ### VA hangar aircraft reservation (2026-09-20)
 
 **Sintoma / gap:** membros competiam first-come no mesmo casco; Hangar nao sinalizava hold.
 **Causa:** fleet so tinha assign de missao; sem soft-hold por conta.
-**Fix:** SQLite **v16** / PG **v27** 
-eserved_by_account_id + 
-eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em assign/ferry; badge + Reserve/Release no Hangar VA.
+**Fix:** SQLite **v16** / PG **v27** `reserved_by_account_id` + `reserved_at_ms`; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em assign/ferry; badge + Reserve/Release no Hangar VA.
 
 ### VA publish missing home_country_id (2026-09-20)
 
@@ -518,11 +530,13 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
 - [x] **VA org perks** — quality → Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking
+- [x] **Prepare Yours+VA** — Freights/Charter/Ports pickers; ferry CTA only; Base Dispatcher home-only
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
 - [x] **Ledger cashflow light + wallet audit** — GET /api/cashflow sem world lock; setWallet→commitWallet sticky
 - [x] **Chrome wallet ref lag** — sync activeCompanyIdRef + getStoredCompanyId no sticky; fleet/wallet após pin
 - [x] **Roster presence** — online / last seen / flight na row
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
+- [x] **Prepare filter reserved + Accept auto-reserve** — picker esconde hold alheio; assign grava reserve
 - [x] **VA home_country_id on publish** — derive from hub + backfill
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Line crew allowance retune** — piso 4, 2×parked, cap 16 (2026-09-20)

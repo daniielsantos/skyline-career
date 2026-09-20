@@ -23,7 +23,7 @@ export const PAGE_HELP = {
     title: 'How Freights works',
     kicker: 'Page guide',
     bullets: [
-      'Cargo board for your company. Your aircraft = lot pay on hulls you own or lease; Operator aircraft = pilot fee on NPC holds.',
+      'Cargo board for your company. Your aircraft = lot pay on hulls you own/lease or VA tails (Yours/VA in Manifest); Operator aircraft = pilot fee on NPC holds.',
       'Pick a lot (or several on the same route), then Dispatch to build the flight.',
       'Urgent and idle chips are economy pressure — same commodity, different pay and clock.',
       'A lock means Hangar → Cargo Ops has not unlocked that commodity yet.',

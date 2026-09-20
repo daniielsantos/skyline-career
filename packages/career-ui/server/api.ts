@@ -8469,6 +8469,22 @@ export function createCareerApiServer(port = 8787) {
             send(res, 200, result);
             return;
           }
+          if (
+            action === 'prepare' ||
+            action === 'accept-leg' ||
+            action === 'confirm'
+          ) {
+            const updatePolicy = await resolveClientUpdatePolicy(store);
+            if (
+              rejectIfClientUpdateRequired(
+                res,
+                updatePolicy,
+                clientVersionFromRequest(req),
+              )
+            ) {
+              return;
+            }
+          }
           if (action === 'prepare') {
             if (
               !body.aircraftId?.trim() ||
@@ -8795,6 +8811,22 @@ export function createCareerApiServer(port = 8787) {
             });
             send(res, 200, result);
             return;
+          }
+          if (
+            action === 'prepare' ||
+            action === 'accept-leg' ||
+            action === 'confirm'
+          ) {
+            const updatePolicy = await resolveClientUpdatePolicy(store);
+            if (
+              rejectIfClientUpdateRequired(
+                res,
+                updatePolicy,
+                clientVersionFromRequest(req),
+              )
+            ) {
+              return;
+            }
           }
           if (action === 'prepare') {
             if (
@@ -9148,6 +9180,16 @@ export function createCareerApiServer(port = 8787) {
           }
           if (!body.aircraftId?.trim()) {
             send(res, 400, { error: 'aircraftId required' });
+            return;
+          }
+          const updatePolicy = await resolveClientUpdatePolicy(store);
+          if (
+            rejectIfClientUpdateRequired(
+              res,
+              updatePolicy,
+              clientVersionFromRequest(req),
+            )
+          ) {
             return;
           }
           const result = await withCareerWrite((world, missions) => {
@@ -9576,6 +9618,16 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         try {
           const session = authSessionFromRequest(req);
           const pilotHome =
@@ -9599,6 +9651,10 @@ export function createCareerApiServer(port = 8787) {
             warehouses_bridge_acceptCompanyId,
             bridgeProgPeek,
           );
+          const bridgeActor = await resolveVaFleetActor(
+            req,
+            warehouses_bridge_acceptCompanyId,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () =>
@@ -9616,6 +9672,7 @@ export function createCareerApiServer(port = 8787) {
                         ? Number(body.pilotPayUsd)
                         : undefined,
                   ...pilotStamp,
+                  actorIsVaOwner: bridgeActor.isOwner,
                 });
                 const warehouses = playerWarehouseSnapshot(missions, world);
                 return {
@@ -9655,6 +9712,16 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         try {
           const session = authSessionFromRequest(req);
           const pilotHome =
@@ -9669,6 +9736,10 @@ export function createCareerApiServer(port = 8787) {
                 pilotHomeCompanyId: pilotHome ?? undefined,
               }
             : {};
+          const bridgeHoldActor = await resolveVaFleetActor(
+            req,
+            warehouses_bridge_dispatch_holdCompanyId,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
@@ -9682,6 +9753,7 @@ export function createCareerApiServer(port = 8787) {
                       ? Number(body.pilotPayUsd)
                       : undefined,
                 ...pilotStamp,
+                actorIsVaOwner: bridgeHoldActor.isOwner,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -9854,6 +9926,16 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         try {
           const haulSession = authSessionFromRequest(req);
           const haulPilotHome =
@@ -9936,13 +10018,29 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         try {
+          const haulHoldActor = await resolveVaFleetActor(
+            req,
+            warehouses_haul_dispatch_holdCompanyId,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
               const dispatched = dispatchWarehouseHaulHold(missions, world, {
                 holdId: body.holdId!,
                 aircraftId: body.aircraftId!,
+                pilotAccountId: haulHoldActor.accountId ?? undefined,
+                actorIsVaOwner: haulHoldActor.isOwner,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -10009,6 +10107,16 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, {
             error: 'orderId, originIcao and aircraftId required',
           });
+          return;
+        }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
           return;
         }
         try {
@@ -10177,13 +10285,29 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
+          return;
+        }
         try {
+          const demandHoldActor = await resolveVaFleetActor(
+            req,
+            demand_dispatch_holdCompanyId,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
               const dispatched = dispatchDemandHold(missions, world, {
                 holdId: body.holdId!,
                 aircraftId: body.aircraftId!,
+                pilotAccountId: demandHoldActor.accountId ?? undefined,
+                actorIsVaOwner: demandHoldActor.isOwner,
               });
               const warehouses = playerWarehouseSnapshot(missions, world);
               return {
@@ -11031,6 +11155,16 @@ export function createCareerApiServer(port = 8787) {
         }
         if (!body.airframeTypeId?.trim()) {
           send(res, 400, { error: 'airframeTypeId required' });
+          return;
+        }
+        const updatePolicy = await resolveClientUpdatePolicy(store);
+        if (
+          rejectIfClientUpdateRequired(
+            res,
+            updatePolicy,
+            clientVersionFromRequest(req),
+          )
+        ) {
           return;
         }
         const cpAcceptCompanyId = companyIdFromRequest(req, body.companyId);

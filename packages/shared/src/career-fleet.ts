@@ -1006,6 +1006,42 @@ export function assertPilotWithAircraftAtOrigin(
   assertPilotAtIcao(state, originIcao);
 }
 
+/**
+ * After Accept / staging commit: hold the tail for this pilot (4h TTL).
+ * Owner may take over a member hold. No-op when accountId is empty.
+ */
+export function ensureAircraftReservedForActor(
+  state: CareerMissionsState,
+  aircraftId: string,
+  opts: {
+    accountId: string;
+    isOwner?: boolean;
+    nowMs?: number;
+  },
+): PlayerAircraft {
+  const nowMs = opts.nowMs ?? Date.now();
+  const account = opts.accountId.trim();
+  if (!account) throw new Error('accountId required to reserve');
+  const aircraft = findPlayerAircraft(state, aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  clearExpiredAircraftReservations(state.fleet, nowMs);
+  if (isAircraftReservationActive(aircraft, nowMs)) {
+    const holder = aircraft.reservedByAccountId!.trim();
+    if (holder === account) {
+      aircraft.reservedAtMs = nowMs;
+      return aircraft;
+    }
+    if (opts.isOwner === true) {
+      clearAircraftReservationFields(aircraft);
+    } else {
+      throw new Error(
+        `Aircraft ${aircraft.registration ?? aircraft.label} is reserved by another pilot`,
+      );
+    }
+  }
+  return reserveAircraftForMember(state, aircraftId, account, nowMs);
+}
+
 export function assignAircraftToMission(
   state: CareerMissionsState,
   aircraftId: string,
@@ -1020,11 +1056,12 @@ export function assignAircraftToMission(
 ): PlayerAircraft {
   const aircraft = findPlayerAircraft(state, aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
-  clearExpiredAircraftReservations(state.fleet, opts.nowMs ?? Date.now());
+  const nowMs = opts.nowMs ?? Date.now();
+  clearExpiredAircraftReservations(state.fleet, nowMs);
   assertAircraftReservationAllowsActor(aircraft, {
     accountId: opts.actorAccountId,
     isOwner: opts.actorIsVaOwner === true,
-    nowMs: opts.nowMs,
+    nowMs,
   });
   if (aircraft.status === 'maintenance') {
     throw new Error(
@@ -1051,6 +1088,14 @@ export function assignAircraftToMission(
     assertPilotWithAircraftAtOrigin(state, aircraft, originIcao);
   } else {
     assertAircraftAtOrigin(aircraft, originIcao);
+  }
+  const actor = opts.actorAccountId?.trim();
+  if (actor) {
+    ensureAircraftReservedForActor(state, aircraft.id, {
+      accountId: actor,
+      isOwner: opts.actorIsVaOwner === true,
+      nowMs,
+    });
   }
   aircraft.status = 'assigned';
   aircraft.assignedMissionId = missionId;

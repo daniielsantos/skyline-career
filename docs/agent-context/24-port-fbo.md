@@ -1,6 +1,7 @@
 # Port FBO — chão, não ar
 
-Atualizado 2026-09-07. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + unified **Search** (1 freight ou tour 2–4 legs) + **Active Tour** (Accept L2+, no multi-reserve).
+Atualizado 2026-09-20. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + unified **Search** (1 freight ou tour 2–4 legs) + **Active Tour** (Accept L2+, no multi-reserve).
+**Doc 2026-09-20:** Base `playerFbos` sticky-home (VA tenant não pinta sidebar Base) + preserve `canBuyAtIcao` no poll `/api/state`.
 Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md), [`10-aircraft-pool.md`](./10-aircraft-pool.md) (lease-out).
 
 - **Base Dispatcher flexível por lot (2026-09-07):** `Any parked` = aeronaves realmente `parked`, mas **tamanho/tipo do lot não fixa classe**: aceita lift parcial (ex.: C680 em lot 20.000 kg) e deixa payload operacional/range/fuel/net/ferry decidirem. Removida exclusão automática de `last-mile` para não-GA, inclusive no rebind. Dev Mode agora abre Cargo/Class Ops também no `dispatch-tours` list (antes Market mostrava aberto e Dispatcher usava progresso real). Toast vazio explicita gates. Teste `lets a light jet take a profitable partial last-mile lot`; smoke save Daniel/SBMO passou com 5 sugestões.
@@ -184,6 +185,7 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - **UI Base:** sem barra/capacidade bonded (legado); T# + perks parking/Jet-A ficam como subtítulo sob o h2 **Base** (não soltos acima do Dispatcher). Holds grandfather só se ainda existirem na save.
 - **Base Charter Search table parity (2026-09-19):** mesma moldura do Freight Search — `is-selected`, Dist/Ferry com `nm`/`—`, Pay/Net via `boardMoneyLabel`/`boardNetClassName`, ferry tag `describeTourFerry`, Accept em `td.actions`. Coluna Pax permanece (só Charter).
 - **Base perk line float (2026-09-19):** sintoma = `T1 · −15% parking · −5% Jet-A/MRO` parecia solto no meio do panel. Causa = segundo `panel-head` acima do Dispatcher. Fix: subtítulo do h2 Base.
+- **Base Buy T1 missing after VA (2026-09-20):** sintoma = Base em SBCT sem **Buy T1 · Free**; ou copy “Unlock Cargo Ops Value… second base” / “No Base at this hub” apesar da home sem Base. Causa = (1) `/api/state` da VA pintava `playerFbos` no chrome (não era `isHomeState`) → frota FBO da VA; (2) poll home usava snapshot global sem `canBuyAtIcao` e apagava o affordance do GET airport. Fix: `setPlayerFbos` só em home state; merge preserva `canBuyAtIcao`/`buyAtIcaoReason` se ownership não mudou; empty hint fallback “First base must be at home hub …”.
 
 ### Base Dispatcher seat + Search — shipped
 

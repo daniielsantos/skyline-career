@@ -301,6 +301,7 @@ function createBridgeMission(
     avgCostUsdPerKg: number;
     pilotAccountId?: string;
     pilotHomeCompanyId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): MissionIntent {
   const classDef = getAircraftClass(opts.aircraft.aircraftClassId);
@@ -353,7 +354,10 @@ function createBridgeMission(
     pilotAccountId: opts.pilotAccountId?.trim() || undefined,
     pilotHomeCompanyId: opts.pilotHomeCompanyId?.trim() || undefined,
   });
-  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin);
+  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
+    actorAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
   state.missions = [...(state.missions ?? []), mission];
   syncPlayerInbound(world, mission);
   return mission;
@@ -413,6 +417,7 @@ export function acceptWarehouseBridge(
     pilotPayUsd?: number | null;
     pilotAccountId?: string;
     pilotHomeCompanyId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; pilotPayUsd: number } {
   expireDemandHolds(state, world);
@@ -465,6 +470,7 @@ export function acceptWarehouseBridge(
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
     pilotAccountId: opts.pilotAccountId,
     pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg, pilotPayUsd: pay.pilotPayUsd };
 }
@@ -479,6 +485,7 @@ export function dispatchWarehouseBridgeHold(
     pilotPayUsd?: number | null;
     pilotAccountId?: string;
     pilotHomeCompanyId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; pilotPayUsd: number } {
   expireDemandHolds(state, world);
@@ -539,6 +546,7 @@ export function dispatchWarehouseBridgeHold(
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
     pilotAccountId: opts.pilotAccountId,
     pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg: hold.kg, pilotPayUsd };
 }

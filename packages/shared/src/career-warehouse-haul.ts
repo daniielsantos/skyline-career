@@ -402,7 +402,12 @@ export function acceptWarehouseHaul(
 export function dispatchWarehouseHaulHold(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
-  opts: { holdId: string; aircraftId: string },
+  opts: {
+    holdId: string;
+    aircraftId: string;
+    pilotAccountId?: string;
+    actorIsVaOwner?: boolean;
+  },
 ): { mission: MissionIntent; kg: number; payUsd: number } {
   expireDemandHolds(state, world);
   const holds = listDemandHolds(state);
@@ -437,6 +442,8 @@ export function dispatchWarehouseHaulHold(
     aircraft,
     warehouseId: withdrawn.warehouseId,
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
+    pilotAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg: hold.kg, payUsd };
 }

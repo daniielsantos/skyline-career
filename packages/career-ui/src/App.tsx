@@ -154,6 +154,14 @@ import {
   setAuthToken,
   setRememberedLoginName,
 } from './career-auth-client';
+import {
+  buildOpsFleet,
+  filterOpsFleetForPrepare,
+  findOpsEntry,
+  opsAircraftSelectLabel,
+  opsFleetAircraft,
+  pickOpsAircraftForOrigin,
+} from './ops-fleet';
 import { AuthGate } from './AuthGate';
 import { WorldWaitingGate } from './WorldWaitingGate';
 import {
@@ -3506,6 +3514,14 @@ export function App() {
    */
   const [vaSessionWallet, setVaSessionWallet] = useState<number | null>(null);
   const [vaSessionFleet, setVaSessionFleet] = useState<PlayerAircraft[]>([]);
+  /** Listed VA company id when this account is a member (chrome stays home). */
+  const [memberVaCompanyId, setMemberVaCompanyId] = useState<string | null>(
+    null,
+  );
+  const [authAccountId, setAuthAccountId] = useState<string | null>(null);
+  const [memberVaIsOwner, setMemberVaIsOwner] = useState(false);
+  const memberVaCompanyIdRef = useRef<string | null>(null);
+  memberVaCompanyIdRef.current = memberVaCompanyId;
 
   /** Paint wallet without flashing $0 from ambient-tenant / empty shells mid +Nd. */
   const walletCommitHoldRef = useRef<{ usd: number; untilMs: number } | null>(
@@ -3817,6 +3833,46 @@ export function App() {
   const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
   const [hubSelected, setHubSelected] = useState(false);
   const [fleet, setFleet] = useState<PlayerAircraft[]>([]);
+  const opsFleetEntries = useMemo(
+    () => buildOpsFleet(fleet, vaSessionFleet),
+    [fleet, vaSessionFleet],
+  );
+  const prepareOpsFleetEntries = useMemo(
+    () =>
+      filterOpsFleetForPrepare(opsFleetEntries, {
+        accountId: authAccountId,
+        isVaOwner: memberVaIsOwner,
+      }),
+    [opsFleetEntries, authAccountId, memberVaIsOwner],
+  );
+  const opsFleet = useMemo(
+    () => opsFleetAircraft(opsFleetEntries),
+    [opsFleetEntries],
+  );
+  const prepareOpsFleet = useMemo(
+    () => opsFleetAircraft(prepareOpsFleetEntries),
+    [prepareOpsFleetEntries],
+  );
+  const vaAircraftIdSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of opsFleetEntries) {
+      if (e.owner === 'va') s.add(e.aircraft.id);
+    }
+    return s;
+  }, [opsFleetEntries]);
+
+  function resolveOpsCompanyId(aircraftId: string | null | undefined): string {
+    const entry = findOpsEntry(opsFleetEntries, aircraftId);
+    const home =
+      homeCompanyIdRef.current?.trim() ||
+      homeCompanyId?.trim() ||
+      getStoredCompanyId();
+    if (entry?.owner === 'va' && memberVaCompanyIdRef.current) {
+      return memberVaCompanyIdRef.current;
+    }
+    return home;
+  }
+
   const [hangarPane, setHangarPane] = useState<
     'aircraft' | 'cashflow' | 'cargo' | 'crew'
   >('aircraft');
@@ -4150,6 +4206,40 @@ export function App() {
     if (fleet.length === 0) setFreightsBoard('crew');
   }, [activeCareerProfile, showProfileGate, fleet.length]);
 
+  // Prefetch listed-VA fleet for Prepare pickers (does not pin chrome).
+  useEffect(() => {
+    if (!careerStateReady || showProfileGate || showAuthGate) return;
+    if (!authRequired && !getAuthToken()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snap = await fetchVaMembers();
+        if (cancelled) return;
+        if (snap.viewerAccountId?.trim()) {
+          setAuthAccountId(snap.viewerAccountId.trim());
+        }
+        if (snap.listed && snap.companyId) {
+          setMemberVaCompanyId(snap.companyId);
+          setMemberVaIsOwner(snap.role === 'owner');
+          if (Array.isArray(snap.fleet)) {
+            setVaSessionFleet(snap.fleet);
+          }
+        } else {
+          setMemberVaCompanyId(null);
+          setMemberVaIsOwner(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setMemberVaCompanyId(null);
+          setMemberVaIsOwner(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [careerStateReady, showProfileGate, showAuthGate, authRequired]);
+
   useEffect(() => {
     if (!selectedFboHoldId) return;
     const stillThere = (playerFbos?.holds ?? []).some(
@@ -4433,54 +4523,85 @@ export function App() {
       setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
       if (state.cashflow) setCashflow(state.cashflow);
       if (state.companyCredit) setCompanyCredit(state.companyCredit);
+      // Base/FBO is home-company only — never paint VA tenant fbos into sidebar Base
+      // (that showed VA's "second base" gate / hid personal Buy T1 · Free).
+      if (state.playerFbos) {
+        setPlayerFbos((prev) => {
+          const next = state.playerFbos!;
+          // /api/state uses global snapshot (no canBuyAtIcao). Preserve terminal
+          // buy affordance from GET /api/airport until fleet ownership changes.
+          const prevOwned = (prev?.fbos ?? [])
+            .map((f) => f.icao.toUpperCase())
+            .sort()
+            .join(',');
+          const nextOwned = (next.fbos ?? [])
+            .map((f) => f.icao.toUpperCase())
+            .sort()
+            .join(',');
+          if (
+            prev &&
+            prevOwned === nextOwned &&
+            next.canBuyAtIcao === undefined &&
+            next.buyAtIcaoReason === undefined &&
+            (prev.canBuyAtIcao !== undefined ||
+              prev.buyAtIcaoReason != null ||
+              prev.buyAtIcaoUsd !== undefined)
+          ) {
+            return {
+              ...next,
+              canBuyAtIcao: prev.canBuyAtIcao,
+              buyAtIcaoUsd: prev.buyAtIcaoUsd,
+              buyAtIcaoReason: prev.buyAtIcaoReason,
+            };
+          }
+          return next;
+        });
+        // Raw persist snapshot has no canAcceptNextLeg / resumeState. Never
+        // overwrite a rich ActiveTourView with it — that made Accept flicker off
+        // on every /api/state poll after Base Refresh.
+        const snapTour = state.playerFbos.activeTour;
+        if (!snapTour || snapTour.status !== 'active') {
+          setActiveTour(null);
+        } else {
+          setActiveTour((prev) => {
+            if (
+              prev &&
+              prev.id === snapTour.id &&
+              prev.status === 'active' &&
+              (prev.resumeState != null || prev.canAcceptNextLeg != null)
+            ) {
+              return prev;
+            }
+            return snapTour as ActiveTourView;
+          });
+        }
+        const snapCharter = state.playerFbos.charterActiveTour;
+        if (!snapCharter || snapCharter.status !== 'active') {
+          setCharterActiveTour(null);
+        } else {
+          setCharterActiveTour((prev) => {
+            if (
+              prev &&
+              prev.id === snapCharter.id &&
+              prev.status === 'active' &&
+              prev.resumeHint != null
+            ) {
+              return prev;
+            }
+            // Raw persist has no resumeHint / Accept gates — status fetch fills them.
+            return {
+              ...snapCharter,
+              nextLegIndex:
+                snapCharter.legs.find(
+                  (l) => l.status === 'planned' || l.status === 'active',
+                )?.index ?? null,
+              canAcceptNextLeg: false,
+            } as CharterActiveTourView;
+          });
+        }
+      }
     } else if (tenantMatches) {
       setVaSessionFleet(state.fleet ?? []);
-    }
-    if (state.playerFbos) {
-      setPlayerFbos(state.playerFbos);
-      // Raw persist snapshot has no canAcceptNextLeg / resumeState. Never
-      // overwrite a rich ActiveTourView with it — that made Accept flicker off
-      // on every /api/state poll after Base Refresh.
-      const snapTour = state.playerFbos.activeTour;
-      if (!snapTour || snapTour.status !== 'active') {
-        setActiveTour(null);
-      } else {
-        setActiveTour((prev) => {
-          if (
-            prev &&
-            prev.id === snapTour.id &&
-            prev.status === 'active' &&
-            (prev.resumeState != null || prev.canAcceptNextLeg != null)
-          ) {
-            return prev;
-          }
-          return snapTour as ActiveTourView;
-        });
-      }
-      const snapCharter = state.playerFbos.charterActiveTour;
-      if (!snapCharter || snapCharter.status !== 'active') {
-        setCharterActiveTour(null);
-      } else {
-        setCharterActiveTour((prev) => {
-          if (
-            prev &&
-            prev.id === snapCharter.id &&
-            prev.status === 'active' &&
-            prev.resumeHint != null
-          ) {
-            return prev;
-          }
-          // Raw persist has no resumeHint / Accept gates — status fetch fills them.
-          return {
-            ...snapCharter,
-            nextLegIndex:
-              snapCharter.legs.find(
-                (l) => l.status === 'planned' || l.status === 'active',
-              )?.index ?? null,
-            canAcceptNextLeg: false,
-          } as CharterActiveTourView;
-        });
-      }
     }
     if (state.companyCrew) setCompanyCrew(state.companyCrew);
     careerStateReadyRef.current = true;
@@ -5194,7 +5315,9 @@ export function App() {
   useEffect(() => {
     if (!staging || staging.replaceManifest) return;
     if (!staging.aircraftId) return;
-    const acf = fleet.find((a) => a.id === staging.aircraftId);
+    const acf =
+      findOpsEntry(opsFleetEntries, staging.aircraftId)?.aircraft ??
+      fleet.find((a) => a.id === staging.aircraftId);
     if (!acf || acf.status !== 'parked') return;
     const atOrigin =
       acf.locationIcao.trim().toUpperCase() ===
@@ -5224,6 +5347,7 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     fleet,
+    vaSessionFleet,
     staging?.aircraftId,
     staging?.originIcao,
     staging?.destIcao,
@@ -7176,10 +7300,19 @@ export function App() {
     setSelectedContractLotId(null);
     setTab(next);
     writeCareerLocation({ tab: next, airportIcao: null }, opts);
-    // Sidebar / deep-link Hangar must never show VA fleet while session is VA.
+    // Sidebar / deep-link Hangar must never show VA fleet while session is VA
+    // — unless a VA Dispatch mission is active (ops tenant must stay).
     if (next === 'hangar') {
       const home = homeCompanyIdRef.current?.trim();
-      if (home && home !== activeCompanyIdRef.current) {
+      const activeVaDispatch = missions.some(
+        (m) =>
+          isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
+      );
+      if (
+        home &&
+        home !== activeCompanyIdRef.current &&
+        !activeVaDispatch
+      ) {
         void switchCompanyForVa(home).catch(() => undefined);
       }
     }
@@ -7194,9 +7327,14 @@ export function App() {
       const home = homeCompanyIdRef.current?.trim();
       const onVaTenant =
         Boolean(home) && home !== activeCompanyIdRef.current;
-      // Any tab except My VA must run on home — VAs / Freights / Ranking /
-      // Hangar / etc. must not keep the VA session painting chrome.
-      const mustRestoreHome = onVaTenant && next !== 'va';
+      // Keep VA tenant while an active Dispatch mission needs that company
+      // (member accepted Freights/Charter/Ports on a VA tail).
+      const activeVaDispatch = missions.some(
+        (m) =>
+          isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
+      );
+      const mustRestoreHome =
+        onVaTenant && next !== 'va' && !activeVaDispatch;
       if (mustRestoreHome && home) {
         try {
           await switchCompanyForVa(home);
@@ -7579,6 +7717,7 @@ export function App() {
           clearAuthToken();
           setAuthSessionEpoch((n) => n + 1);
           setAuthAccountLabel('');
+          setAuthAccountId(null);
         }
         setShowAuthGate(true);
         setShowProfileGate(false);
@@ -7586,6 +7725,9 @@ export function App() {
         return;
       }
       authEnforced = true;
+      if (withToken.account?.id?.trim()) {
+        setAuthAccountId(withToken.account.id.trim());
+      }
       const fromAuth =
         withToken.account?.displayName?.trim() ||
         withToken.account?.loginName?.trim() ||
@@ -7620,7 +7762,7 @@ export function App() {
 
   async function finishAuthAndEnter(result: {
     token: string;
-    account?: { displayName?: string; loginName?: string };
+    account?: { id?: string; displayName?: string; loginName?: string };
     companies: Array<{ id: string; displayName: string }>;
     rememberMe?: boolean;
   }): Promise<void> {
@@ -7632,6 +7774,9 @@ export function App() {
     setAuthSessionEpoch((n) => n + 1);
     setAuthRequired(true);
     setAuthChecked(true);
+    if (result.account?.id?.trim()) {
+      setAuthAccountId(result.account.id.trim());
+    }
     // Keep AuthGate up until company state is warm — otherwise Freights paints
     // with hubSelected still unknown (new accounts need Choose home hub first).
     clearCareerSessionPaint();
@@ -8453,6 +8598,13 @@ export function App() {
 
   async function onConfirmDispatchTour(tour: BaseDispatchTour) {
     if (busy || dispatchTourBusy) return;
+    if (clientUpdateBlock) {
+      setToastKind('fail');
+      setToast(
+        formatClientUpdateRequiredLabel(clientUpdateBlock.minClientVersion),
+      );
+      return;
+    }
     if (charterActiveTour?.status === 'active') {
       setToastKind('fail');
       setToast('Drop the Charter tour before starting a Freight tour');
@@ -8588,6 +8740,13 @@ export function App() {
 
   async function onConfirmCharterTour(tour: BaseCharterTour) {
     if (busy || dispatchTourBusy) return;
+    if (clientUpdateBlock) {
+      setToastKind('fail');
+      setToast(
+        formatClientUpdateRequiredLabel(clientUpdateBlock.minClientVersion),
+      );
+      return;
+    }
     if (activeTour?.status === 'active') {
       setToastKind('fail');
       setToast('Drop the Freight tour before starting a Charter tour');
@@ -9010,8 +9169,8 @@ export function App() {
       },
     ];
     setFlightDebrief(null);
-    // Tour off-origin: open Ferry dialog immediately (same CTA as Manifest).
-    setStagingFerryOpen(!atOrigin && preferred.status === 'parked');
+    // Ferry only via Manifest CTA — do not block the pilot with an auto modal.
+    setStagingFerryOpen(false);
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
@@ -9471,15 +9630,32 @@ export function App() {
     if (!destIcao.trim()) return;
     const dest = destIcao.trim().toUpperCase();
     const finalDest = opts?.finalDest?.trim().toUpperCase() || dest;
+    const opsCompanyId = resolveOpsCompanyId(aircraftId);
+    const vaOps =
+      Boolean(memberVaCompanyIdRef.current) &&
+      opsCompanyId === memberVaCompanyIdRef.current;
     setBusy(true);
     setError(null);
     try {
       const result = await postFerry({
         aircraftId,
         destIcao: dest,
+        companyId: opsCompanyId,
       });
-      if (result.fleet) setFleet(result.fleet);
-      commitWallet(result.walletUsd);
+      if (result.fleet) {
+        if (vaOps) setVaSessionFleet(result.fleet);
+        else setFleet(result.fleet);
+      }
+      // Overflow debit hits home wallet; allowance/solo on VA must not paint
+      // VA cash onto chrome.
+      if (!vaOps) {
+        commitWallet(result.walletUsd);
+      } else {
+        setVaSessionWallet(result.walletUsd);
+        if (result.ferryMode === 'overflow') {
+          void refresh({ missions: false }).catch(() => undefined);
+        }
+      }
       const arrivedAt =
         result.aircraft?.locationIcao?.trim().toUpperCase() ?? dest;
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
@@ -9708,18 +9884,28 @@ export function App() {
       goToTab('staging');
       return;
     }
-    const parkedHere = fleetTailAtOrigin(lot.originIcao, boardAircraftId);
-    const selectedParked = boardAircraftId
-      ? fleet.find(
-          (a) => a.id === boardAircraftId && a.status === 'parked',
-        )
-      : undefined;
-    const selectedAircraft =
-      parkedHere ?? selectedParked ?? fleet.find((a) => a.status === 'parked');
-    if (!selectedAircraft) {
+    const preferEntry = boardAircraftId
+      ? findOpsEntry(opsFleetEntries, boardAircraftId)
+      : null;
+    const atOriginPrefer =
+      preferEntry &&
+      preferEntry.aircraft.status === 'parked' &&
+      preferEntry.aircraft.locationIcao.trim().toUpperCase() ===
+        lot.originIcao.trim().toUpperCase()
+        ? preferEntry
+        : null;
+    const picked =
+      atOriginPrefer ??
+      pickOpsAircraftForOrigin(
+        prepareOpsFleetEntries,
+        lot.originIcao,
+        boardAircraftId,
+      );
+    if (!picked) {
       setError(`No parked aircraft available for ${lot.originIcao}`);
       return;
     }
+    const selectedAircraft = picked.aircraft;
     const atOrigin =
       selectedAircraft.locationIcao.trim().toUpperCase() ===
       lot.originIcao.trim().toUpperCase();
@@ -9772,7 +9958,8 @@ export function App() {
       },
     ];
     setFlightDebrief(null);
-    setStagingFerryOpen(!atOrigin);
+    // Never auto-open Ferry Journey — pilot picks aircraft first, then CTA.
+    setStagingFerryOpen(false);
     setStaging(draft);
     setPreferredAircraft(aircraft);
     setError(null);
@@ -9786,7 +9973,7 @@ export function App() {
     if (!atOrigin) {
       setToastKind('warn');
       setToast(
-        `Manifest · ${selectedAircraft.label} is at ${selectedAircraft.locationIcao} — ferry to ${lot.originIcao} before Accept & Dispatch`,
+        `Manifest · ${selectedAircraft.label} is at ${selectedAircraft.locationIcao} — pick aircraft or ferry to ${lot.originIcao} before Accept & Dispatch`,
       );
     }
   }
@@ -9807,10 +9994,12 @@ export function App() {
       goToTab('staging');
       return;
     }
-    const aircraft = fleet.find(
-      (item) => item.id === aircraftId && item.status === 'parked',
-    );
-    if (!aircraft) {
+    const aircraft =
+      findOpsEntry(opsFleetEntries, aircraftId)?.aircraft ??
+      fleet.find(
+        (item) => item.id === aircraftId && item.status === 'parked',
+      );
+    if (!aircraft || aircraft.status !== 'parked') {
       setError('Select a parked aircraft for this charter');
       return;
     }
@@ -9835,12 +10024,22 @@ export function App() {
   async function onAcceptCharter(draft: CharterManifestDraft) {
     await run(
       async () => {
+        const opsCompanyId = resolveOpsCompanyId(draft.aircraftId);
+        const vaOps =
+          Boolean(memberVaCompanyIdRef.current) &&
+          opsCompanyId === memberVaCompanyIdRef.current;
+        if (vaOps && memberVaCompanyIdRef.current) {
+          await switchCompanyForVa(memberVaCompanyIdRef.current);
+        }
         const result = await postCharterAccept({
           offerId: draft.offer.id,
           aircraftId: draft.aircraftId,
+          companyId: opsCompanyId,
         });
-        setFleet(result.fleet);
-        commitWallet(result.walletUsd);
+        if (vaOps) setVaSessionFleet(result.fleet);
+        else setFleet(result.fleet);
+        if (vaOps) setVaSessionWallet(result.walletUsd);
+        else commitWallet(result.walletUsd);
         if (result.charterActiveTour !== undefined) {
           setCharterActiveTour(result.charterActiveTour ?? null);
         }
@@ -10091,7 +10290,9 @@ export function App() {
   function changeStagingAircraft(nextAircraftId: string) {
     if (!staging || busy || nextAircraftId === staging.aircraftId) return;
     if (staging.replaceManifest || staging.intoMissionId) return;
-    const selected = fleet.find((aircraft) => aircraft.id === nextAircraftId);
+    const selected =
+      findOpsEntry(opsFleetEntries, nextAircraftId)?.aircraft ??
+      fleet.find((aircraft) => aircraft.id === nextAircraftId);
     if (!selected) return;
     // Allow off-origin parked airframes — Ferry CTA on Manifest brings them in.
     if (
@@ -10310,6 +10511,14 @@ export function App() {
     await run(
       async () => {
         try {
+          const opsCompanyId = resolveOpsCompanyId(clamped.aircraftId);
+          const vaOps =
+            Boolean(memberVaCompanyIdRef.current) &&
+            opsCompanyId === memberVaCompanyIdRef.current;
+          // Pin VA tenant for Dispatch/OFP while chrome stays home-sticky.
+          if (vaOps && memberVaCompanyIdRef.current) {
+            await switchCompanyForVa(memberVaCompanyIdRef.current);
+          }
           const result = await postStagingCommit({
             aircraft: clamped.aircraft,
             aircraftId: clamped.aircraftId,
@@ -10317,12 +10526,16 @@ export function App() {
             openDispatch: false,
             replace: Boolean(clamped.replaceManifest),
             weightSystem,
+            companyId: opsCompanyId,
             lines: clamped.lines.map((line) => ({
               lotId: line.lot.id,
               cargoKg: line.cargoKg,
             })),
           });
-          if (result.fleet) setFleet(result.fleet);
+          if (result.fleet) {
+            if (vaOps) setVaSessionFleet(result.fleet);
+            else setFleet(result.fleet);
+          }
           if (result.mission) {
             setMissions((prev) => {
               const idx = prev.findIndex((m) => m.id === result.mission.id);
@@ -10334,7 +10547,10 @@ export function App() {
               return [result.mission, ...prev];
             });
           }
-          if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
+          if (typeof result.walletUsd === 'number') {
+            if (vaOps) setVaSessionWallet(result.walletUsd);
+            else commitWallet(result.walletUsd);
+          }
           if (activeCareerProfile?.id) {
             clearPersistedStagingDraft(activeCareerProfile.id);
           }
@@ -11064,6 +11280,19 @@ export function App() {
       setFlightDebrief(debrief);
       setSettleOverlaySticky(false);
       setStaging(null);
+      // After VA ops flight, restore home tenant for chrome boards.
+      const home = homeCompanyIdRef.current?.trim();
+      if (
+        home &&
+        activeCompanyIdRef.current &&
+        home !== activeCompanyIdRef.current
+      ) {
+        try {
+          await switchCompanyForVa(home);
+        } catch {
+          /* soft */
+        }
+      }
       goToTab('staging');
       // Debrief sheet is the settle summary — skip the duplicate toast.
     }, { sync: { missions: true } });
@@ -11513,7 +11742,8 @@ export function App() {
     ? Math.max(0, aircraftCapKg(staging.aircraft) - stagingTotalKg)
     : 0;
   const stagingAssignedAircraft = staging?.aircraftId
-    ? fleet.find((a) => a.id === staging.aircraftId)
+    ? findOpsEntry(opsFleetEntries, staging.aircraftId)?.aircraft ??
+      fleet.find((a) => a.id === staging.aircraftId)
     : undefined;
   const stagingAircraftAtOrigin = Boolean(
     staging &&
@@ -11547,7 +11777,8 @@ export function App() {
       )
     : [];
   const stagingAssignedLabel = staging
-    ? fleet.find((aircraft) => aircraft.id === staging.aircraftId)?.label ??
+    ? findOpsEntry(opsFleetEntries, staging.aircraftId)?.aircraft.label ??
+      fleet.find((aircraft) => aircraft.id === staging.aircraftId)?.label ??
       aircraftClassLabel(staging.aircraft)
     : '';
 
@@ -13149,13 +13380,15 @@ export function App() {
                           (airportIcao ?? '').toUpperCase(),
                       );
                       if (!localFbo) {
-                        return (
-                          <p className="empty">
-                            {playerFbos?.buyAtIcaoReason
-                              ? playerFbos.buyAtIcaoReason
-                              : 'No Base at this hub'}
-                          </p>
-                        );
+                        const hub = (airportIcao ?? '').toUpperCase();
+                        const home = homeHubIcao.trim().toUpperCase();
+                        const emptyHint =
+                          playerFbos?.buyAtIcaoReason ||
+                          (playerFbos?.canBuyAtHome && hub && hub !== home
+                            ? `First base must be at home hub ${home}`
+                            : null) ||
+                          'No Base at this hub';
+                        return <p className="empty">{emptyHint}</p>;
                       }
                       const seat =
                         (baseDispatcher?.members ?? []).find(
@@ -14225,7 +14458,17 @@ export function App() {
                                                       className="accept"
                                                       disabled={
                                                         busy ||
-                                                        dispatchTourBusy
+                                                        dispatchTourBusy ||
+                                                        Boolean(
+                                                          clientUpdateBlock,
+                                                        )
+                                                      }
+                                                      title={
+                                                        clientUpdateBlock
+                                                          ? formatClientUpdateRequiredLabel(
+                                                              clientUpdateBlock.minClientVersion,
+                                                            )
+                                                          : undefined
                                                       }
                                                       onClick={(event) => {
                                                         event.stopPropagation();
@@ -14234,9 +14477,11 @@ export function App() {
                                                         );
                                                       }}
                                                     >
-                                                      {tour.legCount === 1
-                                                        ? 'Accept'
-                                                        : 'Accept L1'}
+                                                      {clientUpdateBlock
+                                                        ? 'Update'
+                                                        : tour.legCount === 1
+                                                          ? 'Accept'
+                                                          : 'Accept L1'}
                                                     </button>
                                                   </td>
                                                 </tr>
@@ -14660,8 +14905,18 @@ export function App() {
                                                         busy ||
                                                         dispatchTourBusy ||
                                                         Boolean(
+                                                          clientUpdateBlock,
+                                                        ) ||
+                                                        Boolean(
                                                           playerDispatchMission,
                                                         )
+                                                      }
+                                                      title={
+                                                        clientUpdateBlock
+                                                          ? formatClientUpdateRequiredLabel(
+                                                              clientUpdateBlock.minClientVersion,
+                                                            )
+                                                          : undefined
                                                       }
                                                       onClick={(event) => {
                                                         event.stopPropagation();
@@ -14670,9 +14925,11 @@ export function App() {
                                                         );
                                                       }}
                                                     >
-                                                      {tour.legCount === 1
-                                                        ? 'Accept'
-                                                        : 'Accept L1'}
+                                                      {clientUpdateBlock
+                                                        ? 'Update'
+                                                        : tour.legCount === 1
+                                                          ? 'Accept'
+                                                          : 'Accept L1'}
                                                     </button>
                                                   </td>
                                                 </tr>
@@ -15546,7 +15803,8 @@ export function App() {
                           </button>
                         </nav>
                         <CharterBoard
-                          fleet={fleet}
+                          fleet={prepareOpsFleet}
+                          vaAircraftIds={vaAircraftIdSet}
                           initialAircraftId={boardAircraftId}
                           origin={
                             contractsLane === 'outbound'
@@ -16219,7 +16477,8 @@ export function App() {
       ) : hubSelected && tab === 'charter' ? (
         <section className="panel freights-panel">
           <CharterBoard
-            fleet={fleet}
+            fleet={prepareOpsFleet}
+            vaAircraftIds={vaAircraftIdSet}
             initialAircraftId={boardAircraftId}
             busy={busy || Boolean(playerDispatchMission)}
             formatMoney={formatMoney}
@@ -17476,7 +17735,8 @@ export function App() {
               </p>
               <CharterManifest
                 draft={charterManifest}
-                fleet={fleet}
+                fleet={prepareOpsFleet}
+                vaAircraftIds={vaAircraftIdSet}
                 busy={busy}
                 formatMoney={formatMoney}
                 formatMass={(kg) => formatMass(kg, weightSystem)}
@@ -17606,27 +17866,23 @@ export function App() {
                           : undefined
                       }
                     >
-                      {fleet
+                      {prepareOpsFleetEntries
                         .filter(
-                          (aircraft) =>
-                            aircraft.id === staging.aircraftId ||
-                            aircraft.status === 'parked',
+                          (entry) =>
+                            entry.aircraft.id === staging.aircraftId ||
+                            entry.aircraft.status === 'parked',
                         )
-                        .map((aircraft) => {
-                          const atOrigin =
-                            aircraft.status === 'parked' &&
-                            aircraft.locationIcao.trim().toUpperCase() ===
-                              staging.originIcao.trim().toUpperCase();
-                          return (
-                            <option key={aircraft.id} value={aircraft.id}>
-                              {aircraft.label} ·{' '}
-                              {aircraftClassLabel(aircraft.aircraftClassId)}
-                              {atOrigin
-                                ? ` · @ ${aircraft.locationIcao}`
-                                : ` · ferry from ${aircraft.locationIcao}`}
-                            </option>
-                          );
-                        })}
+                        .map((entry) => (
+                          <option
+                            key={entry.aircraft.id}
+                            value={entry.aircraft.id}
+                          >
+                            {opsAircraftSelectLabel(
+                              entry,
+                              staging.originIcao,
+                            )}
+                          </option>
+                        ))}
                     </select>
                   </label>
                   {stagingAssignedAircraft &&
@@ -18640,7 +18896,20 @@ export function App() {
           weightSystem={weightSystem}
           formatMoney={formatMoney}
           formatTonnes={formatTonnes}
-          fleet={fleet}
+          fleet={prepareOpsFleet}
+          vaAircraftIds={vaAircraftIdSet}
+          resolveOpsCompanyId={(aircraftId) =>
+            resolveOpsCompanyId(aircraftId)
+          }
+          ensureOpsCompany={async (aircraftId) => {
+            const companyId = resolveOpsCompanyId(aircraftId);
+            if (
+              memberVaCompanyIdRef.current &&
+              companyId === memberVaCompanyIdRef.current
+            ) {
+              await switchCompanyForVa(companyId);
+            }
+          }}
           resolveMaxCargoKg={(acf) =>
             hangarCatalogEntry(acf)?.maxCargoKg ?? 0
           }
@@ -18652,6 +18921,8 @@ export function App() {
           }}
           onWallet={commitWallet}
           onFleet={setFleet}
+          onVaFleet={setVaSessionFleet}
+          onVaWallet={setVaSessionWallet}
           onMissions={setMissions}
           onOpenAirport={(icao) => {
             void openAirport(icao);
@@ -18663,6 +18934,10 @@ export function App() {
             setToastKind(kind);
             setToast(message);
           }}
+          clientUpdateRequiredMin={
+            clientUpdateBlock?.minClientVersion ?? null
+          }
+          onOpenUpdates={() => selectTab('settings')}
         />
       ) : hubSelected && tab === 'vaDirectory' ? (
         <VaDirectoryPage

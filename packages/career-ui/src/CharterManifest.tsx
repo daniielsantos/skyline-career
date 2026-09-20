@@ -15,6 +15,8 @@ export type CharterManifestDraft = {
 type CharterManifestProps = {
   draft: CharterManifestDraft;
   fleet: PlayerAircraft[];
+  /** Aircraft ids that belong to the member's VA (label prefix). */
+  vaAircraftIds?: ReadonlySet<string>;
   busy: boolean;
   formatMoney: (value: number) => string;
   formatMass: (kg: number) => string;
@@ -28,7 +30,6 @@ type CharterManifestProps = {
 
 export function CharterManifest(props: CharterManifestProps) {
   const [ferryOpen, setFerryOpen] = useState(false);
-  const [ferryPrompted, setFerryPrompted] = useState(false);
   const [fitLoading, setFitLoading] = useState(false);
   const [fitError, setFitError] = useState<string | null>(null);
   const aircraft = props.fleet.find((item) => item.id === props.draft.aircraftId);
@@ -47,14 +48,6 @@ export function CharterManifest(props: CharterManifestProps) {
       props.draft.offer.status === 'available',
   );
   const reasons = useMemo(() => fit?.reasons ?? [], [fit]);
-
-  useEffect(() => {
-    if (ferryPrompted || !aircraft || atOrigin || aircraft.status !== 'parked') {
-      return;
-    }
-    setFerryOpen(true);
-    setFerryPrompted(true);
-  }, [aircraft, atOrigin, ferryPrompted]);
 
   useEffect(() => {
     if (atOrigin) setFerryOpen(false);
@@ -132,7 +125,6 @@ export function CharterManifest(props: CharterManifestProps) {
               disabled={props.busy}
               onChange={(event) => {
                 setFerryOpen(false);
-                setFerryPrompted(false);
                 props.onChange({
                   offer: { ...props.draft.offer, fit: undefined },
                   aircraftId: event.target.value,
@@ -141,11 +133,15 @@ export function CharterManifest(props: CharterManifestProps) {
             >
               {props.fleet
                 .filter((item) => item.status === 'parked')
-                .map((item) => (
+                .map((item) => {
+                  const isVa = props.vaAircraftIds?.has(item.id);
+                  const prefix = isVa ? 'VA' : 'Yours';
+                  return (
                   <option key={item.id} value={item.id}>
-                    {item.label} · {item.locationIcao === origin ? `@ ${origin}` : `ferry from ${item.locationIcao}`}
+                    {prefix} · {item.label} · {item.locationIcao === origin ? `@ ${origin}` : `ferry from ${item.locationIcao}`}
                   </option>
-                ))}
+                  );
+                })}
             </select>
           </label>
           {aircraft && !atOrigin ? (

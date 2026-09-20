@@ -7,7 +7,7 @@ Electron shell around the local Career API + static UI.
 1. Download **`Airframe-Setup-x.y.z.exe`** from [GitHub Releases](https://github.com/daniielsantos/skyline-career/releases).
 2. Run the installer (Windows may warn — builds are **not code-signed** yet; choose More info → Run anyway). One-click Setup — no Next/Next wizard.
 3. Launch **Airframe Career** from the Start Menu / desktop shortcut.
-4. Create a profile and play. Saves live under `%AppData%\Skyline Career\` (legacy folder until migrator).
+4. Create a profile and play. Saves live under `%AppData%\Airframe Career\` (first launch copies from `%AppData%\Skyline Career\` if present; legacy folder kept as backup).
 
 ### Prerequisites
 
@@ -135,12 +135,12 @@ Unsigned builds hit Windows SmartScreen. In-app update opens the one-click Setup
 2. Publish a newer release with Setup + `.blockmap` + `latest.yml` as **Assets** (not in release notes).
 3. Open the installed app → topbar **Update** / Settings → Updates → Download → **Install**.
 4. Clear SmartScreen if prompted; watch the installer finish and reopen (or use Start Menu).
-5. Confirm the new version and that profiles under `%AppData%\Skyline Career\` survived.
+5. Confirm the new version and that profiles under `%AppData%\Airframe Career\` survived.
 6. **Differential check:** update again to N+2. Download should be much smaller than full Setup when the previous package is still in the updater cache; if delta fails, electron-updater falls back to full download (still OK).
 
 ## Logs
 
-`%AppData%\Skyline Career\logs\`
+`%AppData%\Airframe Career\logs\`
 
 - `desktop.log`
 - `career-api.log`

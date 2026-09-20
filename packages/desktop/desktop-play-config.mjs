@@ -1,6 +1,7 @@
 /**
  * Persisted SP vs MP choice for the Electron shell.
- * File: %APPDATA%/Skyline Career/career/desktop-play.json
+ * File: %APPDATA%/Airframe Career/career/desktop-play.json
+ * (legacy Skyline Career path is copied once by migrate-userdata.mjs)
  * (legacy folder name; display brand is Airframe Career)
  */
 

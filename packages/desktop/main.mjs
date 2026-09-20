@@ -4,7 +4,8 @@
  * SP (local SQLite) or MP gateway via desktop-play.json / CAREER_WORLD_API_URL.
  * Auto-update via electron-updater → GitHub Releases (no code signing yet).
  *
- * Display name is Airframe; appId + userData folder stay Skyline until Fase 3 migrator.
+ * Display + userData folder: Airframe Career. Legacy Skyline AppData is copied
+ * once on first launch (Fase 3). appId stays com.skyline.career (updater/AUMID).
  */
 import { createRequire } from 'node:module';
 import {
@@ -29,6 +30,10 @@ import {
   resolveDesktopPlayLaunch,
   writeDesktopPlayConfig,
 } from './desktop-play-config.mjs';
+import {
+  AIRFRAME_USER_DATA_DIRNAME,
+  migrateSkylineUserDataToAirframe,
+} from './migrate-userdata.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -48,10 +53,28 @@ function loadElectronUpdater() {
 
 const { autoUpdater } = loadElectronUpdater();
 
-// Display name (Task Manager / window). Keep legacy userData until Fase 3 migrator.
+// Display name (Task Manager / window) + AppData pin (Fase 3 migrator).
 app.setName('Airframe Career');
-app.setPath('userData', join(app.getPath('appData'), 'Skyline Career'));
+{
+  const appData = app.getPath('appData');
+  let migrateStatus = 'skipped';
+  try {
+    migrateStatus = migrateSkylineUserDataToAirframe(appData).status;
+  } catch (err) {
+    // Keep booting on Airframe path even if copy fails — player can recover
+    // from the leftover Skyline Career folder.
+    console.error('[desktop] userData migrate failed', err);
+    migrateStatus = 'error';
+  }
+  app.setPath('userData', join(appData, AIRFRAME_USER_DATA_DIRNAME));
+  if (migrateStatus === 'migrated') {
+    console.log(
+      '[desktop] Migrated AppData Skyline Career → Airframe Career (legacy folder kept as backup)',
+    );
+  }
+}
 if (process.platform === 'win32') {
+  // Keep legacy AUMID so taskbar pins / updater continuity stay stable.
   app.setAppUserModelId('com.skyline.career');
 }
 Menu.setApplicationMenu(null);

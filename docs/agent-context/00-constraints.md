@@ -13,7 +13,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 
 - Teste no desktop **instalado** costuma precisar de **release** (ou hot-swap consciente do Host).
 - Install típico: `%LOCALAPPDATA%\Programs\Airframe Career` (legado: `…\Skyline Career`)
-- Dados: `%APPDATA%\Skyline Career\career\` (display Airframe; path legado até migrator)
+- Dados: `%APPDATA%\Airframe Career\career\` (1ª abertura copia de `%APPDATA%\Skyline Career\` se existir; pasta legado fica de backup)
 - Host empacotado: `%LOCALAPPDATA%\Programs\Airframe Career\resources\host\` (ou legado Skyline)
 
 ## Twin Otter / fuel

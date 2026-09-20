@@ -1,6 +1,8 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-20: **Intl maxLots dial B2 shipped (code)** — `INTL_LANE_MAX_LOTS_BONUS` 1→2. **Measure pending +2–3d pós VPS:** intl % ~9–11%; shelf vs d70 **1702**; live BR/US; `skipAllByKg` false. Detail: [`08-economy.md`](./08-economy.md).
+Atualizado 2026-09-20: **Rebrand Fase 3 userData migrator** — AppData → `%APPDATA%\Airframe Career` (cópia one-shot de Skyline; `appId` fica). Smoke no próximo desktop release. Spec: [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).
+
+Atualizado 2026-09-20: **Intl maxLots dial B2 measure FAIL** — d70→d73 intl **8.3→8.4%** (alvo 9–11%); shelf **1702→1738**; claim-driven. Não dialar maxLots/lift/life de novo sem pedido. Detail: [`08-economy.md`](./08-economy.md).
 
 Atualizado 2026-09-19: **One VA per account shipped** — join/request/accept bloqueados se já membro de VA listada; directory UI. Spec: [16-va-logistics.md](./16-va-logistics.md).
 

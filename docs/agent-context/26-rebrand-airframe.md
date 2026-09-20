@@ -1,6 +1,7 @@
 # Rebranding — Skyline Career → Airframe
 
-Marca pública / domínio: **Airframe** (`playairframe.com`). Desktop display: **Airframe Career**; AppData/`appId` ainda legado Skyline.
+Marca pública / domínio: **Airframe** (`playairframe.com`). Desktop display: **Airframe Career**.  
+AppData: `%APPDATA%\Airframe Career\` (Fase 3 migrator). `appId` ainda `com.skyline.career` (updater/AUMID).
 
 Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo.
 
@@ -30,7 +31,8 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - [x] Hero no painel: inset + `mix-blend-mode: lighten` (sem slab); FRAME `#f0a35a`
 - [x] Compact sidebar **AIR|FRAME** (texto CSS + `md11f-mark`)
 - [x] Display name desktop → **Airframe Career** (productName / Setup / Start Menu / window)
-- [x] `userData` pin em `%APPDATA%\Skyline Career` + `appId` `com.skyline.career` intactos
+- [x] `userData` pin em `%APPDATA%\Airframe Career` + migrator one-shot (legado Skyline copiado; pasta antiga fica)
+- [x] `appId` `com.skyline.career` **mantido** (Fase 3b) — não mudar AUMID/updater no mesmo ship
 - [x] Setup artifact → `Airframe-Setup-…exe`
 - [x] Copy UI visível → Airframe (inject, help, hubs, updates, `index.html` title, SimBridge session names)
 - [x] Ícone installer: mantém MD-11F (`packages/desktop/build/icon.ico`)
@@ -57,15 +59,15 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 | `productName` / `executableName` / `shortcutName` | Airframe Career |
 | `artifactName` | `Airframe-Setup-…` |
 | `afterPack.cjs` / window / dialogs | Airframe Career |
-| `userData` | pin `%APPDATA%\Skyline Career` |
-| `appId` | `com.skyline.career` (legado) |
+| `userData` | pin `%APPDATA%\Airframe Career` (+ migrator) |
+| `appId` | `com.skyline.career` (legado — Fase 3b) |
 
-### Desktop — **não** no mesmo PR (quebra saves/updates)
+### Desktop — **adiado / legado OK**
 
-| Onde | Hoje | Risco |
+| Onde | Hoje | Notas |
 |------|------|-------|
-| `appId` | `com.skyline.career` | updates / AUMID |
-| `userData` via `app.setName` | `%APPDATA%\Skyline Career` | saves |
+| `appId` | `com.skyline.career` | Fase 3b — AUMID / taskbar pin |
+| `userData` | `%APPDATA%\Airframe Career` | Migrator shipped; Skyline folder backup |
 | npm `name` | `skyline-career-desktop` | workspace only |
 | `extraResources` → `skyline/` | path interno | pack scripts |
 | GitHub `repo` | `skyline-career` | publish URL OK |
@@ -77,7 +79,7 @@ Strings “Skyline inject”, “Skyline hubs”, placeholder “Ada Skyline”,
 ### Plano display name
 
 1. [x] Display → **Airframe Career** (installer, Start Menu, Task Manager title).
-2. [x] Manter `appId` + **pin** `app.setPath('userData', …\Skyline Career)` até Fase 3 migrator.
+2. [x] **Pin** `app.setPath('userData', …\Airframe Career)` + migrator one-shot de Skyline (Fase 3). `appId` permanece `com.skyline.career` até Fase 3b.
 3. [x] Setup artifact → `Airframe-Setup-${version}.exe` (updater lê `latest.yml`; OK no próximo release).
 
 Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anterior pode ficar em `…\Skyline Career`).
@@ -96,14 +98,17 @@ Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anter
 
 ## Fase 3 — paths / ids (migrar com cuidado)
 
-- [ ] `%APPDATA%\Skyline Career\` → novo path **com** migração de saves
-- [ ] Electron `appId` / protocol (quebra updates se mudarem sem plano)
+Atualizado 2026-09-20: **userData migrator shipped** — `migrate-userdata.mjs` copia `%APPDATA%\Skyline Career` → `%APPDATA%\Airframe Career` na 1ª abertura (staging+rename; marker `.airframe-userdata-migrated.json`; não apaga legado; não sobrescreve Airframe com dados). `main.mjs` pina o path novo. **Smoke:** install antigo → update → profiles em Airframe; pasta Skyline ainda presente.
+
+- [x] `%APPDATA%\Skyline Career\` → `%APPDATA%\Airframe Career\` **com** migração de saves
+- [ ] Electron `appId` / protocol → `com.airframe.career` (**Fase 3b** — quebra taskbar pin / AUMID se mudarem sem plano; updater GitHub OK pelo `publish.repo`)
 - [ ] Repo / packages `skyline-career` — pode ficar legado por muito tempo
 - [ ] Env `SKYLINE_*` / `skyline-paths` — **não** dia 1
 
 ## Não fazer no dia 1
 
 - Renomear monorepo GitHub só por estética
-- Mudar AppData sem migrator
+- Mudar AppData sem migrator *(feito — migrator shipped)*
+- Trocar `appId` no mesmo ship que o path (Fase 3b separado)
 - Trocar logo sem brief de arte (AIR|FRAME ≠ SKY|LINE simétrico)
 - Landing genérica sem direção visual (ver user design rules)

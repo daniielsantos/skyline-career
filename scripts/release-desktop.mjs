@@ -340,7 +340,7 @@ async function buildReleaseNotes(version, previousTag) {
     '- [ ] Short Dispatch hop: Watch → airborne → engines off → settle → debrief',
     '- [ ] Settings → Updates sees this release (from an older install)',
     '- [ ] Update download uses .blockmap delta when updater cache has prior Setup (else full fallback)',
-    '- [ ] `%AppData%\\Skyline Career\\` profiles survive update (legacy path until migrator)',
+    '- [ ] `%AppData%\\Airframe Career\\` profiles survive update (migrator from Skyline if first launch)',
     '',
   ];
   return lines.join('\n');
@@ -572,7 +572,7 @@ Smoke checklist (manual):
   [ ] App opens; create/select profile
   [ ] SimBridge + short Dispatch flight → settle
   [ ] From an older install: Settings → Updates → download/install this build
-  [ ] Confirm AppData profiles survived (%AppData%\\Skyline Career\\)
+  [ ] Confirm AppData profiles survived (%AppData%\\Airframe Career\\)
 `);
 }
 

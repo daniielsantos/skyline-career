@@ -13873,3 +13873,57 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+.va-my-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+.va-my-title {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.va-pane-card {
+  margin-top: 0.25rem;
+}
+
+.company-va-card .company-va-fields {
+  display: grid;
+  gap: 0.55rem;
+  max-width: 16rem;
+  margin-top: 0.35rem;
+}
+.company-va-card .company-va-fields .simbrief-field input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.company-va-card .company-va-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  margin-top: 0.85rem;
+}
+
+.va-directory-card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+.va-directory-yours {
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, var(--accent, #c4a574) 55%, var(--line));
+  color: var(--accent, #c4a574);
+  background: color-mix(in srgb, var(--accent, #c4a574) 12%, transparent);
+  padding: 0.12rem 0.4rem;
+}

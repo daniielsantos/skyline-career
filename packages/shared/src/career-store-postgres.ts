@@ -1310,7 +1310,8 @@ export class PostgresCareerStore implements CareerStore {
     const worldId = opts?.worldId?.trim() || null;
     const { rows } = await this.pool.query(
       `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
-              (SELECT COUNT(*)::int FROM company_members m WHERE m.company_id = c.id) AS member_count
+              (SELECT COUNT(*)::int FROM company_members m WHERE m.company_id = c.id) AS member_count,
+              (SELECT COUNT(*)::int FROM fleet_aircraft f WHERE f.company_id = c.id) AS aircraft_count
        FROM companies c
        WHERE c.va_listed IS TRUE
          AND ($1::text IS NULL OR COALESCE(c.world_id, 'local') = $1)
@@ -1322,6 +1323,7 @@ export class PostgresCareerStore implements CareerStore {
     const out: VaDirectoryEntry[] = [];
     for (const r of rows) {
       const memberCount = Number(r.member_count) || 0;
+      const aircraftCount = Number(r.aircraft_count) || 0;
       const recruiting = Boolean(r.recruiting);
       let myRequestStatus: VaDirectoryEntry['myRequestStatus'] = null;
       if (opts?.accountId) {
@@ -1342,6 +1344,7 @@ export class PostgresCareerStore implements CareerStore {
         homeHubIcao: (r.home_hub_icao as string) || '',
         memberCount,
         memberCap: VA_MEMBER_CAP,
+        aircraftCount,
         recruiting,
         listed: Boolean(r.va_listed),
         seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),

@@ -140,13 +140,14 @@ export function VaDirectoryPage(props: Props) {
               <li key={row.companyId} className="va-directory-card">
                 <div className="va-directory-card-main">
                   <div className="va-directory-card-id">
-                    <strong className="va-directory-card-name">
-                      {row.displayName}
-                    </strong>
-                    <span className="va-directory-card-code">
-                      {row.companyId}
-                      {isMine ? ' · yours' : ''}
-                    </span>
+                    <div className="va-directory-card-title-row">
+                      <strong className="va-directory-card-name">
+                        {row.displayName}
+                      </strong>
+                      {isMine ? (
+                        <span className="badge va-directory-yours">Yours</span>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="va-directory-card-stats">
                     <div>
@@ -159,6 +160,12 @@ export function VaDirectoryPage(props: Props) {
                       <span className="va-stat-label">Pilots</span>
                       <span className="va-stat-value">
                         {row.memberCount}/{row.memberCap}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="va-stat-label">Fleet</span>
+                      <span className="va-stat-value">
+                        {row.aircraftCount ?? 0}
                       </span>
                     </div>
                     <div>

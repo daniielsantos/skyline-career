@@ -1530,13 +1530,12 @@ export function upsertCompanyState(
     if (!row) {
       throw new Error(`Unknown company ${cid} — create it before saving state`);
     }
-    if (state.pilotName || state.homeHubIcao) {
+    if (state.homeHubIcao) {
       db.prepare(
         `UPDATE companies SET
-           display_name = COALESCE(NULLIF(?, ''), display_name),
            home_hub_icao = COALESCE(NULLIF(?, ''), home_hub_icao)
          WHERE id = ?`,
-      ).run(state.pilotName ?? '', state.homeHubIcao ?? '', cid);
+      ).run(state.homeHubIcao ?? '', cid);
     }
   }
   db.prepare(

@@ -11583,7 +11583,7 @@ export function App() {
                 : tab === 'ports'
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
                   : tab === 'va'
-                    ? 'Roster, invites, and recruiting for your listed airline.'
+                    ? 'Roster, hangar, and hiring config for your listed airline.'
                     : tab === 'vaDirectory'
                       ? 'Published virtual airlines — request to join or use an invite code.'
                     : tab === 'vaRanking'
@@ -18370,8 +18370,60 @@ export function App() {
         <VaPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
+          fleet={fleet}
+          busy={busy}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
+          renderHangarCard={(acf) => (
+            <HangarAircraftCard
+              key={acf.id}
+              aircraft={acf}
+              catalog={hangarCatalogEntry(acf)}
+              cabinStatus={hangarCabinStatus(acf)}
+              busy={busy}
+              hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({
+                icao: hub.icao,
+                name: hub.name,
+              }))}
+              preferredFerryDest={ferrySeed?.dest}
+              ferrySeedToken={ferrySeed?.token}
+              pilotIcao={pilotIcao}
+              ownedCount={ownedFleetCount}
+              hasListed={hasListedAircraft}
+              formatMoney={formatMoney}
+              formatMass={formatTonnes}
+              economyTick={tick}
+              formatClock={formatClock}
+              weightSystem={weightSystem}
+              onOpenAirport={openAirport}
+              onClearMaintenance={(id) => void onClearMaintenance(id)}
+              onRepair={(id) => void onRepairAircraft(id)}
+              onUnlist={(id) => void onUnlistAircraft(id)}
+              onBuyout={(id) => void onBuyoutLease(id)}
+              onPayLeaseOverdue={(id) => void onPayLeaseOverdue(id)}
+              onReturnLease={(id) => void onReturnLease(id)}
+              onListForLease={(id) => void onListForLease(id)}
+              onListForSale={(id) => void onListForSale(id)}
+              onSell={(id) => void onSellAircraft(id)}
+              onFerry={(id, dest, opts) => onFerry(id, dest, opts)}
+              onEmptyFlight={(id, dest) => onEmptyFlight(id, dest)}
+              onTravel={(dest) => openPilotTravel(dest)}
+              missionRoute={(() => {
+                if (acf.status !== 'assigned') return null;
+                const m = missions.find(
+                  (row) =>
+                    (acf.assignedMissionId &&
+                      row.id === acf.assignedMissionId) ||
+                    row.aircraftId === acf.id,
+                );
+                if (!m || !isActiveMissionStatus(m.status)) return null;
+                return {
+                  originIcao: m.originIcao,
+                  destIcao: m.destIcao,
+                };
+              })()}
+            />
+          )}
         />
       ) : hubSelected && tab === 'vaRanking' ? (
         <VaRankingPage authRequired={authRequired} />
@@ -18450,9 +18502,16 @@ export function App() {
               defaultHomeHubIcao={homeHubIcao}
               defaultDisplayName={
                 companies.find((c) => c.id === activeCompanyId)?.displayName ||
-                pilotName
+                ''
               }
               onGoVa={() => selectTab('va')}
+              onPublished={({ companyId, displayName }) => {
+                setCompanies((prev) =>
+                  prev.map((c) =>
+                    c.id === companyId ? { ...c, displayName } : c,
+                  ),
+                );
+              }}
             />
             <div className="pilot-card pilot-card-wide">
               <h3>Progression</h3>
@@ -18467,62 +18526,6 @@ export function App() {
                 </div>
               </dl>
             </div>
-          </div>
-          <div className="pilot-fleet-block">
-            <div className="panel-head missions-head">
-              <div>
-                <h3>Fleet snapshot</h3>
-                <p>Current parking and fuel. Ferry from Hangar.</p>
-              </div>
-              <button
-                type="button"
-                className="accept"
-                onClick={() => selectTab('hangar')}
-                disabled={busy}
-              >
-                Open Hangar
-              </button>
-            </div>
-            {fleet.length === 0 ? (
-              <p className="empty">
-                {!devMode && leaseUnlock && !leaseUnlock.unlocked
-                  ? `No aircraft yet — lease unlocks at ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights. Fly Operator aircraft, or buy a starter class on the Aircraft Market.`
-                  : 'No aircraft yet — accept Operator aircraft offers on Freights, or buy your first airframe on the Aircraft Market.'}
-              </p>
-            ) : (
-              <ul className="hangar-list">
-                {fleet.map((acf) => (
-                  <li key={acf.id} className="hangar-card">
-                    <div className="hangar-main">
-                      <div className="route">
-                        <strong>{acf.label}</strong>
-                        <span className={`status status-${acf.status}`}>{acf.status}</span>
-                      </div>
-                      <p>
-                        {aircraftClassLabel(acf.aircraftClassId)} · at{' '}
-                        <IcaoLink icao={acf.locationIcao} onOpen={openAirport} disabled={busy} />
-                      </p>
-                      <p className="payline">
-                        {(acf.ownership ?? 'owned') === 'leased' ? 'Leased' : 'Owned'}
-                        {acf.condition ? ` · ${acf.condition}` : ''}
-                        {' · '}
-                        Fuel {formatTonnes(acf.fuelKg)} / {formatTonnes(acf.fuelCapacityKg)}
-                      </p>
-                      <div className="fill-bar" aria-hidden="true">
-                        <span
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              (acf.fuelKg / Math.max(1, acf.fuelCapacityKg)) * 100,
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </section>
       ) : hubSelected && tab === 'aircraft' ? (

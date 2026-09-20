@@ -4736,7 +4736,7 @@ export function createCareerApiServer(port = 8787) {
                 id:
                   selectHubCompanyId?.trim() ||
                   selectHubStore.getActiveCompanyId(),
-                displayName: missions.pilotName,
+                // Do not pass displayName — pilot name ≠ VA listing name.
                 homeHubIcao: missions.homeHubIcao,
                 homeCountryId: selectedHomeCountryId ?? undefined,
               });

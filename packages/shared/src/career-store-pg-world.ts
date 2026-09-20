@@ -3729,13 +3729,12 @@ export async function persistMissionsTablesToPg(
       incoming: companyProgressFromState(state),
     });
 
-    if (state.pilotName || state.homeHubIcao) {
+    if (state.homeHubIcao) {
       await client.query(
         `UPDATE companies SET
-           display_name = COALESCE(NULLIF($1, ''), display_name),
-           home_hub_icao = COALESCE(NULLIF($2, ''), home_hub_icao)
-         WHERE id = $3`,
-        [state.pilotName ?? '', state.homeHubIcao ?? '', cid],
+           home_hub_icao = COALESCE(NULLIF($1, ''), home_hub_icao)
+         WHERE id = $2`,
+        [state.homeHubIcao ?? '', cid],
       );
     }
 

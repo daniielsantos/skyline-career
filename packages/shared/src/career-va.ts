@@ -511,6 +511,7 @@ export type VaDirectoryEntry = {
   homeHubIcao: string;
   memberCount: number;
   memberCap: number;
+  aircraftCount: number;
   recruiting: boolean;
   listed: boolean;
   seatsOpen: number;
@@ -638,7 +639,8 @@ export function listVaDirectory(
   const rows = db
     .prepare(
       `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
-              (SELECT COUNT(*) FROM company_members m WHERE m.company_id = c.id) AS member_count
+              (SELECT COUNT(*) FROM company_members m WHERE m.company_id = c.id) AS member_count,
+              (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.company_id = c.id) AS aircraft_count
        FROM companies c
        WHERE c.va_listed != 0
          AND (? IS NULL OR IFNULL(c.world_id, 'local') = ?)
@@ -653,11 +655,13 @@ export function listVaDirectory(
     recruiting: number;
     va_listed: number;
     member_count: number;
+    aircraft_count: number;
   }>;
 
   const out: VaDirectoryEntry[] = [];
   for (const row of rows) {
     const memberCount = Number(row.member_count) || 0;
+    const aircraftCount = Number(row.aircraft_count) || 0;
     const recruiting = Number(row.recruiting) !== 0;
     let myRequestStatus: VaDirectoryEntry['myRequestStatus'] = null;
     if (opts.accountId) {
@@ -682,6 +686,7 @@ export function listVaDirectory(
       homeHubIcao: row.home_hub_icao || '',
       memberCount,
       memberCap: VA_MEMBER_CAP,
+      aircraftCount,
       recruiting,
       listed: Number(row.va_listed) !== 0,
       seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),

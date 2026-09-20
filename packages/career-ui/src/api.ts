@@ -5036,6 +5036,7 @@ export type VaDirectoryEntry = {
   homeHubIcao: string;
   memberCount: number;
   memberCap: number;
+  aircraftCount?: number;
   recruiting: boolean;
   listed?: boolean;
   seatsOpen: number;

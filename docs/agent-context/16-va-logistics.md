@@ -136,7 +136,9 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **Sintoma:** uma página misturava directory + publish + My VA; companies sem publish apareciam como VA (`recruiting` default).
 **Causa:** UI monólito; directory filtrava só recruiting, não “listada”.
-**Fix:** `va_listed` (SQLite **v13** / PG **v23**). Sidebar **VAs** (cards) / **My VA** (roster) / **Ranking**. Publish em **Company → Become a VA**. Directory só `va_listed`.
+**Fix:** `va_listed` (SQLite **v13** / PG **v23**). Sidebar **VAs** (cards) / **My VA** (roster) / **Ranking**. Publish em **Company → Become a VA**. Directory só `va_listed`. My VA tabs: Roster / Hangar (frota company) / Config (recruiting + invite).
+
+**VA name reset to pilot (2026-09-19):** Save/select-hub escrevia `missions.pilotName` em `companies.display_name` (COALESCE), apagando Lamusine→Nothin. Fix: persist company state / select-hub só atualizam `home_hub_icao`; listing name só via `vaPublish`.
 
 ### VA pages + publish (2026-09-19)
 

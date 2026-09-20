@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   fetchVaMembers,
   fetchVaJoinRequests,
@@ -11,13 +11,19 @@ import {
   postVaRole,
   type VaMember,
   type VaJoinRequest,
+  type PlayerAircraft,
 } from './api';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
 
+type VaPane = 'roster' | 'hangar' | 'config';
+
 type Props = {
   authRequired: boolean;
   activeCompanyId: string | null;
+  fleet: PlayerAircraft[];
+  busy?: boolean;
+  renderHangarCard: (aircraft: PlayerAircraft) => ReactNode;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
 };
@@ -25,6 +31,7 @@ type Props = {
 export function VaPage(props: Props) {
   const token = getAuthToken();
   const companyId = props.activeCompanyId || getStoredCompanyId();
+  const [pane, setPane] = useState<VaPane>('roster');
   const [members, setMembers] = useState<VaMember[]>([]);
   const [role, setRole] = useState<string | null>(null);
   const [memberCap, setMemberCap] = useState(8);
@@ -41,6 +48,7 @@ export function VaPage(props: Props) {
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';
   const isOwner = role === 'owner';
+  const pageBusy = busy || Boolean(props.busy);
 
   const refresh = useCallback(async () => {
     if (!canShow || !companyId) {
@@ -141,90 +149,59 @@ export function VaPage(props: Props) {
 
   return (
     <section className="panel va-panel">
-      <div className="settings-grid">
-        <div className="settings-card">
-          <h3>{displayName || 'My VA'}</h3>
+      <div className="panel-head va-my-head">
+        <div>
+          <h3 className="va-my-title">{displayName || 'My VA'}</h3>
           <p className="settings-sample">
             {homeHubIcao || '—'} · {members.length}/{memberCap} seats · recruiting{' '}
             <strong>{recruiting ? 'on' : 'off'}</strong> · role{' '}
             <strong>{role}</strong>
           </p>
-          <p className="settings-help">
-            Internal Hauls dispatch from Ports. Browse other airlines under VAs.
-          </p>
-          {error ? (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          ) : null}
+        </div>
+        <div className="hangar-pane-toggle" role="tablist" aria-label="My VA views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'roster'}
+            className={pane === 'roster' ? 'tab active' : 'tab'}
+            onClick={() => setPane('roster')}
+          >
+            Roster
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'hangar'}
+            className={pane === 'hangar' ? 'tab active' : 'tab'}
+            onClick={() => setPane('hangar')}
+          >
+            Hangar
+            {props.fleet.length > 0 ? ` (${props.fleet.length})` : ''}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'config'}
+            className={pane === 'config' ? 'tab active' : 'tab'}
+            onClick={() => setPane('config')}
+          >
+            Config
+          </button>
+        </div>
+      </div>
 
-          {isOwner ? (
-            <div className="settings-choice" style={{ marginTop: '0.75rem' }}>
-              <button
-                type="button"
-                className={`settings-choice-btn${recruiting ? ' active' : ''}`}
-                disabled={busy}
-                onClick={() => {
-                  void (async () => {
-                    setBusy(true);
-                    setError(null);
-                    try {
-                      const res = await postVaRecruiting(!recruiting);
-                      setRecruiting(res.recruiting);
-                      await refresh();
-                    } catch (err) {
-                      setError(
-                        err instanceof Error ? err.message : String(err),
-                      );
-                    } finally {
-                      setBusy(false);
-                    }
-                  })();
-                }}
-              >
-                {recruiting ? 'Stop recruiting' : 'Open recruiting'}
-                <small>
-                  {recruiting
-                    ? 'Hide from open hiring · invite code still works'
-                    : 'Show as hiring in the VA directory'}
-                </small>
-              </button>
-            </div>
-          ) : null}
+      {error ? (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      ) : null}
 
-          {canManage ? (
-            <button
-              type="button"
-              className="action ghost"
-              disabled={busy}
-              style={{ marginTop: '0.5rem' }}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    const { invite } = await postVaInvite({});
-                    setInviteCode(invite.code);
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : String(err));
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
-            >
-              Create invite code
-            </button>
-          ) : null}
-          {inviteCode ? (
-            <p className="settings-sample">
-              Invite: <strong>{inviteCode}</strong>
-            </p>
-          ) : null}
-
+      {pane === 'roster' ? (
+        <div className="settings-card va-pane-card">
+          <h3>Roster</h3>
           {canManage && pendingRequests.length > 0 ? (
             <>
-              <h4 style={{ marginTop: '1rem', marginBottom: '0.35rem' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '0.35rem' }}>
                 Join requests
               </h4>
               <ul className="settings-sample" style={{ paddingLeft: '1.1rem' }}>
@@ -235,7 +212,7 @@ export function VaPage(props: Props) {
                     <button
                       type="button"
                       className="action ghost"
-                      disabled={busy}
+                      disabled={pageBusy}
                       style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem' }}
                       onClick={() => {
                         void (async () => {
@@ -260,7 +237,7 @@ export function VaPage(props: Props) {
                     <button
                       type="button"
                       className="action ghost"
-                      disabled={busy}
+                      disabled={pageBusy}
                       style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem' }}
                       onClick={() => {
                         void (async () => {
@@ -287,10 +264,6 @@ export function VaPage(props: Props) {
               </ul>
             </>
           ) : null}
-        </div>
-
-        <div className="settings-card">
-          <h3>Roster</h3>
           {members.length === 0 ? (
             <p className="settings-sample">No members.</p>
           ) : (
@@ -307,7 +280,7 @@ export function VaPage(props: Props) {
                       <button
                         type="button"
                         className="action ghost"
-                        disabled={busy}
+                        disabled={pageBusy}
                         style={{
                           fontSize: '0.75rem',
                           padding: '0.1rem 0.4rem',
@@ -343,7 +316,7 @@ export function VaPage(props: Props) {
                       <button
                         type="button"
                         className="action ghost"
-                        disabled={busy}
+                        disabled={pageBusy}
                         style={{
                           fontSize: '0.75rem',
                           padding: '0.1rem 0.4rem',
@@ -378,7 +351,7 @@ export function VaPage(props: Props) {
             <button
               type="button"
               className="action ghost"
-              disabled={busy}
+              disabled={pageBusy}
               style={{ marginTop: '0.5rem' }}
               onClick={() => {
                 void (async () => {
@@ -398,7 +371,114 @@ export function VaPage(props: Props) {
             </button>
           ) : null}
         </div>
-      </div>
+      ) : null}
+
+      {pane === 'hangar' ? (
+        <div className="va-pane-card">
+          {props.fleet.length === 0 ? (
+            <p className="empty">
+              No aircraft yet — buy or lease on Airframes for this company.
+            </p>
+          ) : (
+            <ul className="hangar-list">
+              {props.fleet.map((acf) => props.renderHangarCard(acf))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
+      {pane === 'config' ? (
+        <div className="settings-card va-pane-card">
+          <h3>Config</h3>
+          <p className="settings-help">
+            Hiring visibility and private invites. Update the public name/hub
+            from Company.
+          </p>
+          {isOwner ? (
+            <div className="settings-choice">
+              <button
+                type="button"
+                className={`settings-choice-btn${recruiting ? ' active' : ''}`}
+                disabled={pageBusy}
+                onClick={() => {
+                  void (async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      const res = await postVaRecruiting(!recruiting);
+                      setRecruiting(res.recruiting);
+                      await refresh();
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : String(err),
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })();
+                }}
+              >
+                {recruiting ? 'Stop recruiting' : 'Open recruiting'}
+                <small>
+                  {recruiting
+                    ? 'Hide from open hiring · invite code still works'
+                    : 'Show as hiring in the VAs directory'}
+                </small>
+              </button>
+            </div>
+          ) : (
+            <p className="settings-sample">
+              Only the owner can change recruiting. Hiring is{' '}
+              <strong>{recruiting ? 'on' : 'off'}</strong>.
+            </p>
+          )}
+
+          {canManage ? (
+            <button
+              type="button"
+              className="action ghost"
+              disabled={pageBusy}
+              style={{ marginTop: '0.75rem' }}
+              onClick={() => {
+                void (async () => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    const { invite } = await postVaInvite({});
+                    setInviteCode(invite.code);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : String(err));
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            >
+              Create invite code
+            </button>
+          ) : (
+            <p className="settings-help" style={{ marginTop: '0.75rem' }}>
+              Owner or dispatcher can mint invite codes.
+            </p>
+          )}
+          {inviteCode ? (
+            <p className="settings-sample">
+              Invite: <strong>{inviteCode}</strong>
+            </p>
+          ) : null}
+
+          {props.onGoCompany ? (
+            <button
+              type="button"
+              className="action ghost"
+              style={{ marginTop: '0.75rem' }}
+              onClick={props.onGoCompany}
+            >
+              Edit VA listing on Company
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

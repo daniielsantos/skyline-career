@@ -12,6 +12,11 @@ type Props = {
   defaultHomeHubIcao?: string | null;
   defaultDisplayName?: string | null;
   onGoVa?: () => void;
+  onPublished?: (opts: {
+    companyId: string;
+    displayName: string;
+    homeHubIcao: string;
+  }) => void;
 };
 
 /** Company panel: turn the active company into a listed VA (or update listing). */
@@ -21,12 +26,8 @@ export function CompanyVaPublishCard(props: Props) {
   const canShow = Boolean(token) || props.authRequired;
   const [role, setRole] = useState<string | null>(null);
   const [listed, setListed] = useState(false);
-  const [publishName, setPublishName] = useState(
-    props.defaultDisplayName?.trim() ?? '',
-  );
-  const [publishHub, setPublishHub] = useState(
-    props.defaultHomeHubIcao?.trim().toUpperCase() ?? '',
-  );
+  const [publishName, setPublishName] = useState('');
+  const [publishHub, setPublishHub] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -40,14 +41,24 @@ export function CompanyVaPublishCard(props: Props) {
       const m = await fetchVaMembers();
       setRole(m.role);
       setListed(m.listed);
-      setPublishName((prev) => prev || m.displayName || props.defaultDisplayName || '');
+      // Always prefer server company listing over stale pilot/default props.
+      setPublishName(
+        (m.displayName || props.defaultDisplayName || '').trim(),
+      );
       setPublishHub(
-        (prev) =>
-          prev || m.homeHubIcao || props.defaultHomeHubIcao?.toUpperCase() || '',
+        (
+          m.homeHubIcao ||
+          props.defaultHomeHubIcao ||
+          ''
+        )
+          .trim()
+          .toUpperCase(),
       );
     } catch {
       setRole(null);
       setListed(false);
+      setPublishName((props.defaultDisplayName || '').trim());
+      setPublishHub((props.defaultHomeHubIcao || '').trim().toUpperCase());
     } finally {
       setLoaded(true);
     }
@@ -61,7 +72,7 @@ export function CompanyVaPublishCard(props: Props) {
   if (!loaded) return null;
   if (role && role !== 'owner') {
     return (
-      <div className="pilot-card">
+      <div className="pilot-card company-va-card">
         <h3>Virtual airline</h3>
         <p className="settings-help">
           Only the company owner can publish or update the VA listing. Your role:{' '}
@@ -77,7 +88,7 @@ export function CompanyVaPublishCard(props: Props) {
   }
   if (!role) {
     return (
-      <div className="pilot-card">
+      <div className="pilot-card company-va-card">
         <h3>Virtual airline</h3>
         <p className="settings-help">
           Sign in as owner of this company to list it as a VA.
@@ -87,7 +98,7 @@ export function CompanyVaPublishCard(props: Props) {
   }
 
   return (
-    <div className="pilot-card">
+    <div className="pilot-card company-va-card">
       <h3>{listed ? 'VA listing' : 'Become a VA'}</h3>
       <p className="settings-help">
         Reuses this company — same wallet and fleet. Publishing puts you in the
@@ -98,62 +109,68 @@ export function CompanyVaPublishCard(props: Props) {
           {error}
         </p>
       ) : null}
-      <label className="simbrief-field">
-        <span>VA name</span>
-        <input
-          type="text"
-          value={publishName}
-          maxLength={64}
-          placeholder="e.g. Nothin Air Cargo"
-          onChange={(e) => setPublishName(e.target.value)}
-        />
-      </label>
-      <label className="simbrief-field" style={{ marginTop: '0.5rem' }}>
-        <span>Home hub ICAO</span>
-        <input
-          type="text"
-          value={publishHub}
-          maxLength={4}
-          placeholder="SBGR"
-          onChange={(e) => setPublishHub(e.target.value.toUpperCase())}
-        />
-      </label>
-      <button
-        type="button"
-        className="action"
-        disabled={busy || !publishName.trim() || !publishHub.trim()}
-        style={{ marginTop: '0.75rem' }}
-        onClick={() => {
-          void (async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              await postVaPublish({
-                displayName: publishName,
-                homeHubIcao: publishHub,
-                recruiting: true,
-              });
-              await refresh();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : String(err));
-            } finally {
-              setBusy(false);
-            }
-          })();
-        }}
-      >
-        {listed ? 'Save listing' : 'Publish as VA'}
-      </button>
-      {listed && props.onGoVa ? (
+      <div className="company-va-fields">
+        <label className="simbrief-field">
+          <span>VA name</span>
+          <input
+            type="text"
+            value={publishName}
+            maxLength={64}
+            placeholder="e.g. Lamusine Air"
+            onChange={(e) => setPublishName(e.target.value)}
+          />
+        </label>
+        <label className="simbrief-field">
+          <span>Home hub ICAO</span>
+          <input
+            type="text"
+            value={publishHub}
+            maxLength={4}
+            placeholder="SBGR"
+            onChange={(e) => setPublishHub(e.target.value.toUpperCase())}
+          />
+        </label>
+      </div>
+      <div className="company-va-actions">
         <button
           type="button"
-          className="action ghost"
-          style={{ marginTop: '0.5rem' }}
-          onClick={props.onGoVa}
+          className="action"
+          disabled={busy || !publishName.trim() || !publishHub.trim()}
+          onClick={() => {
+            void (async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await postVaPublish({
+                  displayName: publishName,
+                  homeHubIcao: publishHub,
+                  recruiting: true,
+                });
+                setPublishName(res.company.displayName);
+                setPublishHub(res.company.homeHubIcao);
+                setListed(true);
+                props.onPublished?.({
+                  companyId: res.company.companyId,
+                  displayName: res.company.displayName,
+                  homeHubIcao: res.company.homeHubIcao,
+                });
+                await refresh();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err));
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
         >
-          Manage roster
+          {listed ? 'Save listing' : 'Publish as VA'}
         </button>
-      ) : null}
+        {listed && props.onGoVa ? (
+          <button type="button" className="action ghost" onClick={props.onGoVa}>
+            Manage roster
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

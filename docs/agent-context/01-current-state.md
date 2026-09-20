@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **3e18e10** / desktop **0.3.132** shipped: Fix My VA hang by dropping world lock from members Line crew. Release: [v0.3.132](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.132).
+
+
 `main` **4314eb6** / desktop **0.3.131** shipped: Ship VA member ops: route cut, Line crew, home progression, one-VA gate. Release: [v0.3.131](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.131).
 
 

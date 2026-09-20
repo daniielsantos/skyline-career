@@ -165,6 +165,12 @@ import { ensureV13Ddl, migrateV12toV13IfNeeded } from './career-store-v13.js';
 import { ensureV14Ddl, migrateV13toV14IfNeeded } from './career-store-v14.js';
 import { ensureV15Ddl, migrateV14toV15IfNeeded } from './career-store-v15.js';
 import { ensureV16Ddl, migrateV15toV16IfNeeded } from './career-store-v16.js';
+import { ensureV17Ddl, migrateV16toV17IfNeeded } from './career-store-v17.js';
+import {
+  mintAccessKeysSqlite,
+  revokeAccessKeySqlite,
+  type MintedAccessKey,
+} from './career-access-keys.js';
 import {
   acceptJoinRequest,
   createCompanyInvite,
@@ -209,7 +215,7 @@ import {
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '16';
+export const CAREER_STORE_SCHEMA_VERSION = '17';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -400,6 +406,17 @@ export interface CareerStore {
     accountId: string,
     companyId: string,
   ): boolean | Promise<boolean>;
+  /** Mint one-time MP product keys (plaintext returned once). */
+  mintAccessKeys(opts: {
+    count: number;
+    batchId?: string;
+    nowMs?: number;
+  }): MintedAccessKey[] | Promise<MintedAccessKey[]>;
+  /** Revoke an unused or unused-looking key by plaintext. */
+  revokeAccessKey(opts: {
+    code: string;
+    nowMs?: number;
+  }): boolean | Promise<boolean>;
   /** VA roster / invites (SQLite + Postgres). JSON store throws / empty. */
   vaListMembers(companyId: string): VaMemberRow[] | Promise<VaMemberRow[]>;
   vaCreateInvite(opts: {
@@ -761,6 +778,18 @@ class JsonCareerStore implements CareerStore {
   }
 
   authAccountOwnsCompany(_accountId: string, _companyId: string): boolean {
+    return false;
+  }
+
+  mintAccessKeys(_opts: {
+    count: number;
+    batchId?: string;
+    nowMs?: number;
+  }): MintedAccessKey[] {
+    throw new Error('Access keys require SQLite or Postgres career store');
+  }
+
+  revokeAccessKey(_opts: { code: string; nowMs?: number }): boolean {
     return false;
   }
 
@@ -1245,6 +1274,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV14Ddl(db);
   ensureV15Ddl(db);
   ensureV16Ddl(db);
+  ensureV17Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -1352,7 +1382,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV15 = Number.parseInt(afterV15?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV15) || verAfterV15 < 16) {
-    migrateV15toV16IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV15toV16IfNeeded(db, metaSet, '16');
+  }
+  const afterV16 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV16 = Number.parseInt(afterV16?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV16) || verAfterV16 < 17) {
+    migrateV16toV17IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -1574,6 +1611,18 @@ class SqliteCareerStore implements CareerStore {
 
   authAccountOwnsCompany(accountId: string, companyId: string): boolean {
     return accountOwnsCompany(this.db, accountId, companyId);
+  }
+
+  mintAccessKeys(opts: {
+    count: number;
+    batchId?: string;
+    nowMs?: number;
+  }): MintedAccessKey[] {
+    return mintAccessKeysSqlite(this.db, opts);
+  }
+
+  revokeAccessKey(opts: { code: string; nowMs?: number }): boolean {
+    return revokeAccessKeySqlite(this.db, opts);
   }
 
   vaListMembers(companyId: string): VaMemberRow[] {

@@ -277,6 +277,7 @@ import {
   applyWalletDelta,
   summarizeCareerLedger,
   LEDGER_KIND_LABEL,
+  AccessKeyError,
   openCareerStore,
   applyMsfsBushHubOverrideToTerminal,
   pruneOrphanCareerHubs,
@@ -378,10 +379,12 @@ import {
   isAuthSessionsListAllEnabled,
 } from './auth-rate-limit.ts';
 import {
-  authInviteCodeMatches,
   authInviteCodeRequired,
+  isAuthAccessKeysRequired,
   isAuthClaimCompanyAllowed,
+  isAuthInviteFieldRequired,
   isAuthRegisterEnabled,
+  resolveRegisterAccessGate,
 } from './auth-register-policy.ts';
 import {
   createGatewayWatchMutations,
@@ -3248,7 +3251,8 @@ export function createCareerApiServer(port = 8787) {
           account: session?.account ?? null,
           companies: session?.companies ?? [],
           registerEnabled: isAuthRegisterEnabled(),
-          inviteRequired: Boolean(authInviteCodeRequired()),
+          inviteRequired: isAuthInviteFieldRequired(),
+          accessKeysRequired: isAuthAccessKeysRequired(),
         });
         return;
       }
@@ -3301,12 +3305,16 @@ export function createCareerApiServer(port = 8787) {
             });
             return;
           }
-          if (!authInviteCodeMatches(body.inviteCode)) {
+          const gate = resolveRegisterAccessGate(body.inviteCode);
+          if (!gate.ok) {
             send(res, 403, {
-              error: authInviteCodeRequired()
-                ? 'Valid invite code required'
-                : 'Registration invite invalid',
-              code: 'invite_required',
+              error:
+                gate.code === 'access_key_required'
+                  ? 'Valid product key required'
+                  : authInviteCodeRequired()
+                    ? 'Valid invite code required'
+                    : 'Registration invite invalid',
+              code: gate.code,
             });
             return;
           }
@@ -3329,6 +3337,7 @@ export function createCareerApiServer(port = 8787) {
               claimCompanyId: body.claimCompanyId,
               homeHubIcao: body.homeHubIcao,
               homeCountryId: body.homeCountryId,
+              accessKeyCode: gate.accessKeyCode,
             }),
           );
           if (result.company) {
@@ -3362,6 +3371,18 @@ export function createCareerApiServer(port = 8787) {
             ),
           });
         } catch (err) {
+          if (err instanceof AccessKeyError) {
+            send(res, 403, {
+              error:
+                err.code === 'access_key_used'
+                  ? 'This product key was already used'
+                  : err.code === 'access_key_revoked'
+                    ? 'This product key was revoked'
+                    : 'Invalid product key',
+              code: err.code,
+            });
+            return;
+          }
           send(res, 400, {
             error: err instanceof Error ? err.message : String(err),
           });

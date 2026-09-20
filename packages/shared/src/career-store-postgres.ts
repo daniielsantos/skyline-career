@@ -2,6 +2,7 @@
  * MP Postgres career store (lab / hosted world).
  * Auth + companies relational; economy SoT is relational tables +
  * economy_meta.misc_json (see career-store-pg-world).
+ * Schema v28 adds access_keys (one-time MP product keys for register).
  * Schema v26 adds company_flight_quality_stats (VA settle quality rolling).
  * Schema v22 adds companies.recruiting + company_join_requests (VA directory).
  * Schema v21 adds company_invites + haul ranking stats (VA IH-2).
@@ -31,6 +32,12 @@ import {
   type RegisterAccountOpts,
   type RegisterAccountResult,
 } from './career-auth.js';
+import {
+  claimAccessKeyPg,
+  mintAccessKeysPg,
+  revokeAccessKeyPg,
+  type MintedAccessKey,
+} from './career-access-keys.js';
 import {
   VA_INVITE_DEFAULT_MAX_USES,
   VA_INVITE_NEVER_EXPIRES_MS,
@@ -127,7 +134,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '27';
+const CAREER_PG_SCHEMA_VERSION = '28';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -658,19 +665,48 @@ export class PostgresCareerStore implements CareerStore {
     const password = normalizePassword(opts.password);
     const now = opts.nowMs ?? Date.now();
     const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
+    const accessKey = opts.accessKeyCode?.trim();
 
-    const taken = await this.pool.query(
-      `SELECT 1 AS ok FROM accounts WHERE login_name = $1`,
-      [loginName],
-    );
-    if (taken.rows[0]) throw new Error('login name already taken');
+    const client = await this.pool.connect();
+    const q = (sql: string, params?: unknown[]) =>
+      client.query(sql, params).then((r) => ({
+        rows: r.rows as unknown[],
+        rowCount: r.rowCount,
+      }));
+    let accountId = '';
+    try {
+      await client.query('BEGIN');
+      const taken = await client.query(
+        `SELECT 1 AS ok FROM accounts WHERE login_name = $1`,
+        [loginName],
+      );
+      if (taken.rows[0]) throw new Error('login name already taken');
 
-    const accountId = suggestAccountId();
-    await this.pool.query(
-      `INSERT INTO accounts (id, login_name, display_name, password_hash, created_at_ms)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [accountId, loginName, displayName, hashPassword(password), now],
-    );
+      accountId = suggestAccountId();
+      if (accessKey) {
+        await claimAccessKeyPg(q, {
+          code: accessKey,
+          accountId,
+          nowMs: now,
+        });
+      }
+
+      await client.query(
+        `INSERT INTO accounts (id, login_name, display_name, password_hash, created_at_ms)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [accountId, loginName, displayName, hashPassword(password), now],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
 
     const account = rowToAccount({
       id: accountId,
@@ -699,6 +735,37 @@ export class PostgresCareerStore implements CareerStore {
 
     const session = await this.createSession(accountId, now, opts.sessionTtlMs);
     return { account, session, company };
+  }
+
+  async mintAccessKeys(opts: {
+    count: number;
+    batchId?: string;
+    nowMs?: number;
+  }): Promise<MintedAccessKey[]> {
+    await this.ready;
+    return mintAccessKeysPg(
+      (sql, params) =>
+        this.pool.query(sql, params).then((r) => ({
+          rows: r.rows as unknown[],
+          rowCount: r.rowCount,
+        })),
+      opts,
+    );
+  }
+
+  async revokeAccessKey(opts: {
+    code: string;
+    nowMs?: number;
+  }): Promise<boolean> {
+    await this.ready;
+    return revokeAccessKeyPg(
+      (sql, params) =>
+        this.pool.query(sql, params).then((r) => ({
+          rows: r.rows as unknown[],
+          rowCount: r.rowCount,
+        })),
+      opts,
+    );
   }
 
   async authLogin(opts: LoginAccountOpts): Promise<{

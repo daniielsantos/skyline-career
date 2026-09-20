@@ -14,6 +14,7 @@ import type { SqliteDb } from './career-store-v3.js';
 import { ensureCompany, type CareerCompanyRow } from './career-companies.js';
 import { LOCAL_WORLD_ID } from './career-store-v4.js';
 import { ensureV10Ddl } from './career-store-v10.js';
+import { claimAccessKeySqlite } from './career-access-keys.js';
 
 export type CareerAccountRole = 'owner' | 'dispatcher' | 'pilot';
 
@@ -211,6 +212,11 @@ export type RegisterAccountOpts = {
    * Ignored when createCompany creates a fresh id.
    */
   claimCompanyId?: string;
+  /**
+   * One-time product key (MP access keys). Claimed in the same SQLite
+   * transaction as account create when set.
+   */
+  accessKeyCode?: string;
   nowMs?: number;
   sessionTtlMs?: number;
 };
@@ -226,56 +232,80 @@ export function registerAccount(
   opts: RegisterAccountOpts,
 ): RegisterAccountResult {
   ensureV10Ddl(db);
-  const loginName = normalizeLoginName(opts.loginName);
-  const displayName = normalizeDisplayName(opts.displayName);
-  const password = normalizePassword(opts.password);
-  const now = opts.nowMs ?? Date.now();
-  const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
+  const accessKey = opts.accessKeyCode?.trim();
+  const run = (): RegisterAccountResult => {
+    const loginName = normalizeLoginName(opts.loginName);
+    const displayName = normalizeDisplayName(opts.displayName);
+    const password = normalizePassword(opts.password);
+    const now = opts.nowMs ?? Date.now();
+    const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
 
-  if (getAccountByLogin(db, loginName)) {
-    throw new Error('login name already taken');
-  }
+    if (getAccountByLogin(db, loginName)) {
+      throw new Error('login name already taken');
+    }
 
-  const accountId = suggestAccountId();
-  db.prepare(
-    `INSERT INTO accounts (id, login_name, display_name, password_hash, created_at_ms)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(accountId, loginName, displayName, hashPassword(password), now);
+    const accountId = suggestAccountId();
+    if (accessKey) {
+      claimAccessKeySqlite(db, { code: accessKey, accountId, nowMs: now });
+    }
 
-  const account = getAccountById(db, accountId)!;
-  let company: CareerCompanyRow | null = null;
+    db.prepare(
+      `INSERT INTO accounts (id, login_name, display_name, password_hash, created_at_ms)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(accountId, loginName, displayName, hashPassword(password), now);
 
-  const wantCreate = opts.createCompany !== false;
-  if (wantCreate) {
-    const companyId =
-      opts.companyId?.trim() || suggestCompanyIdFromLogin(loginName);
-    company = ensureCompany(db, {
-      id: companyId,
-      worldId,
-      displayName: opts.companyDisplayName?.trim() || displayName,
-      homeHubIcao: opts.homeHubIcao,
-      homeCountryId: opts.homeCountryId,
-    });
-    addCompanyMember(db, {
-      companyId: company.id,
+    const account = getAccountById(db, accountId)!;
+    let company: CareerCompanyRow | null = null;
+
+    const wantCreate = opts.createCompany !== false;
+    if (wantCreate) {
+      const companyId =
+        opts.companyId?.trim() || suggestCompanyIdFromLogin(loginName);
+      company = ensureCompany(db, {
+        id: companyId,
+        worldId,
+        displayName: opts.companyDisplayName?.trim() || displayName,
+        homeHubIcao: opts.homeHubIcao,
+        homeCountryId: opts.homeCountryId,
+      });
+      addCompanyMember(db, {
+        companyId: company.id,
+        accountId,
+        role: 'owner',
+        nowMs: now,
+      });
+    } else if (opts.claimCompanyId?.trim()) {
+      company = claimOrphanCompany(db, {
+        companyId: opts.claimCompanyId.trim(),
+        accountId,
+        nowMs: now,
+      });
+    }
+
+    const session = createSession(db, {
       accountId,
-      role: 'owner',
       nowMs: now,
+      ttlMs: opts.sessionTtlMs,
     });
-  } else if (opts.claimCompanyId?.trim()) {
-    company = claimOrphanCompany(db, {
-      companyId: opts.claimCompanyId.trim(),
-      accountId,
-      nowMs: now,
-    });
-  }
+    return { account, session, company };
+  };
 
-  const session = createSession(db, {
-    accountId,
-    nowMs: now,
-    ttlMs: opts.sessionTtlMs,
-  });
-  return { account, session, company };
+  if (accessKey) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = run();
+      db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      try {
+        db.exec('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
+      throw error;
+    }
+  }
+  return run();
 }
 
 export type LoginAccountOpts = {

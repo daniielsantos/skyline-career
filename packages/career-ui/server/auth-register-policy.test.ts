@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 import {
   authInviteCodeMatches,
   authInviteCodeRequired,
+  isAuthAccessKeysRequired,
   isAuthClaimCompanyAllowed,
+  isAuthInviteFieldRequired,
   isAuthRegisterEnabled,
+  resolveRegisterAccessGate,
 } from './auth-register-policy.ts';
 
 describe('auth register policy', () => {
@@ -34,5 +37,38 @@ describe('auth register policy', () => {
       isAuthClaimCompanyAllowed({ CAREER_AUTH_ALLOW_CLAIM: '1' }),
       true,
     );
+  });
+
+  it('access keys gate + staff invite bypass', () => {
+    assert.equal(isAuthAccessKeysRequired({}), false);
+    assert.equal(
+      isAuthAccessKeysRequired({ CAREER_AUTH_ACCESS_KEYS: '1' }),
+      true,
+    );
+    assert.equal(
+      isAuthInviteFieldRequired({ CAREER_AUTH_ACCESS_KEYS: '1' }),
+      true,
+    );
+
+    const needKey = resolveRegisterAccessGate('', {
+      CAREER_AUTH_ACCESS_KEYS: '1',
+    });
+    assert.equal(needKey.ok, false);
+    if (!needKey.ok) assert.equal(needKey.code, 'access_key_required');
+
+    const withKey = resolveRegisterAccessGate('AAAA-BBBB-CCCC-DDDD', {
+      CAREER_AUTH_ACCESS_KEYS: '1',
+    });
+    assert.equal(withKey.ok, true);
+    if (withKey.ok) {
+      assert.equal(withKey.accessKeyCode, 'AAAA-BBBB-CCCC-DDDD');
+    }
+
+    const staff = resolveRegisterAccessGate('staff-secret', {
+      CAREER_AUTH_ACCESS_KEYS: '1',
+      CAREER_AUTH_INVITE: 'staff-secret',
+    });
+    assert.equal(staff.ok, true);
+    if (staff.ok) assert.equal(staff.accessKeyCode, undefined);
   });
 });

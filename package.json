@@ -50,6 +50,7 @@
     "career:host:world": "node scripts/career-host-world.mjs",
     "career:stack:world": "node scripts/career-stack-world.mjs",
     "career:world:pg": "node scripts/career-world-worker-pg.mjs",
+    "career:access-keys": "node scripts/mint-access-keys.mjs",
     "career:client": "npm run dev:ui -w @msfs-compat/career-ui",
     "test:shared": "npm run test -w @msfs-compat/shared",
     "test:agent": "npm run test -w @msfs-compat/agent",

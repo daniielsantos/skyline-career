@@ -132,7 +132,7 @@ describe('career store schema v9', () => {
   it('hydrates charter demand/offers and canonical charter missions from SQLite', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-v9-charter-'));
     let store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '16');
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '17');
     const world = createSeedEconomyWorld({ seed: 'store-v9-charter' });
     generateDailyCharterOffers(world, 0);
     const offer = world.charterOffers![0]!;

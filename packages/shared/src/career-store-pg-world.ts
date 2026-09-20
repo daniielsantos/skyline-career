@@ -1117,6 +1117,23 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS fleet_registration_idx ON fleet_aircraft(registration)`,
   );
+  // Schema v28 — one-time MP product keys for register.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS access_keys (
+      code_hash TEXT PRIMARY KEY NOT NULL,
+      batch_id TEXT NOT NULL,
+      created_at_ms BIGINT NOT NULL,
+      claimed_by_account_id TEXT,
+      claimed_at_ms BIGINT,
+      revoked_at_ms BIGINT
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS access_keys_batch_idx ON access_keys(batch_id)`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS access_keys_claimed_idx ON access_keys(claimed_by_account_id)`,
+  );
   // One-shot backfill from legacy payload_json (only fill NULL columns).
   await pool.query(`
     UPDATE fleet_aircraft SET

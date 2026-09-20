@@ -3740,6 +3740,7 @@ export function App() {
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [authRegisterEnabled, setAuthRegisterEnabled] = useState(true);
   const [authInviteRequired, setAuthInviteRequired] = useState(false);
+  const [authAccessKeysRequired, setAuthAccessKeysRequired] = useState(false);
   /** World kill switch: Prepare/Accept blocked until desktop ≥ min. */
   const [clientUpdateBlock, setClientUpdateBlock] =
     useState<ClientUpdateBlock | null>(null);
@@ -7552,6 +7553,7 @@ export function App() {
     setAuthChecked(true);
     setAuthRegisterEnabled(status.registerEnabled !== false);
     setAuthInviteRequired(status.inviteRequired === true);
+    setAuthAccessKeysRequired(status.accessKeysRequired === true);
     let authEnforced = false;
     if (status.required) {
       const withToken = getAuthToken()
@@ -12054,6 +12056,7 @@ export function App() {
           }
           registerEnabled={authRegisterEnabled}
           inviteRequired={authInviteRequired}
+          accessKeysRequired={authAccessKeysRequired}
           onLogin={async (opts) => {
             const result = await postAuthLogin(opts);
             return {

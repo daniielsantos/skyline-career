@@ -42,14 +42,14 @@ describe('VA IH-2', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('bumps schema to v16 with VA + fleet reserve columns', () => {
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '16');
+  it('bumps schema to v17 with VA + fleet reserve + access_keys', () => {
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '17');
     const dbPath = store.sqlitePath!;
     const db = new DatabaseSync(dbPath);
     const row = db
       .prepare(`SELECT value FROM meta WHERE key = 'schema_version'`)
       .get() as { value: string };
-    assert.equal(row.value, '16');
+    assert.equal(row.value, '17');
     const cols = db.prepare(`PRAGMA table_info(companies)`).all() as Array<{
       name: string;
     }>;

@@ -1402,6 +1402,7 @@ export function fetchAuthStatus() {
     companies: CareerCompanyView[];
     registerEnabled?: boolean;
     inviteRequired?: boolean;
+    accessKeysRequired?: boolean;
   }>('/api/auth/status');
 }
 

@@ -34,8 +34,10 @@ export function AuthGate(props: {
   error?: string | null;
   /** When false, hide Create account (CAREER_AUTH_REGISTER=0). Default true. */
   registerEnabled?: boolean;
-  /** When true, show invite field on register (CAREER_AUTH_INVITE set). */
+  /** When true, show invite/product-key field on register. */
   inviteRequired?: boolean;
+  /** When true, label the field as Product key (CAREER_AUTH_ACCESS_KEYS). */
+  accessKeysRequired?: boolean;
   onLogin: (opts: {
     loginName: string;
     password: string;
@@ -63,6 +65,7 @@ export function AuthGate(props: {
 
   const registerEnabled = props.registerEnabled !== false;
   const inviteRequired = props.inviteRequired === true;
+  const accessKeysRequired = props.accessKeysRequired === true;
   const busy = props.busy || submitting;
   const error = props.error || localError;
 
@@ -146,14 +149,18 @@ export function AuthGate(props: {
             </label>
             {inviteRequired ? (
               <label className="pilot-field profile-gate-field">
-                Invite code
+                {accessKeysRequired ? 'Product key' : 'Invite code'}
                 <input
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   disabled={busy}
                   autoComplete="off"
                   required
-                  placeholder="World invite"
+                  placeholder={
+                    accessKeysRequired
+                      ? 'XXXX-XXXX-XXXX-XXXX'
+                      : 'World invite'
+                  }
                 />
               </label>
             ) : null}

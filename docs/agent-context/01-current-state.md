@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **98464d5** / desktop **0.3.154** shipped: Stop economy persist from wiping ops kill-switch columns. Release: [v0.3.154](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.154).
+
+
 `main` **f4e7fab** / desktop **0.3.153** shipped: Keep VA fleet in Prepare pickers after leaving My VA. Release: [v0.3.153](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.153).
 
 

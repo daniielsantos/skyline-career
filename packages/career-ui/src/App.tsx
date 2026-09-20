@@ -18694,6 +18694,11 @@ export function App() {
           }}
           onFleet={(nextFleet) => {
             setVaSessionFleet(nextFleet);
+            // Owner hangar may still be bound to chrome fleet — keep both in sync.
+            const home = homeCompanyIdRef.current?.trim();
+            if (!home || home === activeCompanyIdRef.current?.trim()) {
+              setFleet(nextFleet);
+            }
           }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
@@ -18738,7 +18743,7 @@ export function App() {
               aircraft={acf}
               catalog={hangarCatalogEntry(acf)}
               cabinStatus={hangarCabinStatus(acf)}
-              busy={busy}
+              busy={busy || Boolean(hangarOpts.busy)}
               mutationsLocked={hangarOpts.mutationsLocked}
               vaReserve={hangarOpts.vaReserve}
               hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({

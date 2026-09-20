@@ -887,14 +887,15 @@ export function HangarAircraftCard(props: {
   const mutationsLocked = props.mutationsLocked === true;
   const vaReserve = props.vaReserve;
   const reserveTtlMs = 4 * 60 * 60 * 1000;
+  const reservedBy = acf.reservedByAccountId?.trim() || '';
+  const reservedAt =
+    typeof acf.reservedAtMs === 'number' && Number.isFinite(acf.reservedAtMs)
+      ? acf.reservedAtMs
+      : 0;
   const reserveActive =
-    Boolean(acf.reservedByAccountId?.trim()) &&
-    typeof acf.reservedAtMs === 'number' &&
-    acf.reservedAtMs > 0 &&
-    Date.now() - acf.reservedAtMs < reserveTtlMs;
-  const reserveHolderId = reserveActive
-    ? acf.reservedByAccountId!.trim()
-    : null;
+    Boolean(reservedBy) &&
+    (reservedAt <= 0 || Date.now() - reservedAt < reserveTtlMs);
+  const reserveHolderId = reserveActive ? reservedBy : null;
   const reserveIsMine =
     Boolean(reserveHolderId) &&
     Boolean(vaReserve?.viewerAccountId) &&

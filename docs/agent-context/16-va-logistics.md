@@ -418,6 +418,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** doc já pedia fleet leve; código ainda fazia full state. Members já carregava missions da VA só para presence.
 **Fix:** `/api/va/members` devolve `fleet` + `walletUsd` do mesmo load; VaPage pinta hangar antes do pin; `switchCompanyForVa` só `session/open` (sem fetchState); hangar spinner só se fleet ainda vazia.
 
+### Owner reserve click no UI update (2026-09-20)
+
+**Sintoma:** owner clica Reserve — sem loading/badge; outra conta já via a tag.
+**Causa:** Hangar do owner ainda podia pintar chrome `fleet`; `onFleet` só atualizava `vaSessionFleet`; busy do botão era o App `busy`, não o da VaPage.
+**Fix:** hangar local em VaPage + sync chrome/session no owner; `busy` no card; badge aceita reserve sem `reservedAtMs` (TTL só quando presente).
+
 ### Member Ledger empty then fills (2026-09-20)
 
 **Sintoma:** membro no Ledger via wallet/credit da VA mas “No ledger yet”; depois as linhas aparecem.

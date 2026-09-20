@@ -83,6 +83,7 @@ type Props = {
     aircraft: PlayerAircraft,
     opts: {
       mutationsLocked: boolean;
+      busy?: boolean;
       vaReserve?: {
         viewerAccountId: string | null;
         isOwner: boolean;
@@ -143,6 +144,10 @@ export function VaPage(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  /** Local hangar — reserve must paint even when App still binds chrome fleet. */
+  const [hangarFleet, setHangarFleet] = useState<PlayerAircraft[]>(
+    () => props.fleet,
+  );
   /** True while My VA pins the listed company session (avoid empty-state flash). */
   const [tenantSwitching, setTenantSwitching] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
@@ -154,6 +159,12 @@ export function VaPage(props: Props) {
   onFleetRef.current = props.onFleet;
   const hasVaShellRef = useRef(false);
   const ledgerFetchGenRef = useRef(0);
+  const hangarFleetGenRef = useRef(0);
+
+  useEffect(() => {
+    // Sync from parent unless a newer local reserve/release already painted.
+    setHangarFleet(props.fleet);
+  }, [props.fleet]);
 
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';
@@ -207,6 +218,7 @@ export function VaPage(props: Props) {
       hasVaShellRef.current = Boolean(m.role && m.listed);
       // Hangar from members (missions already loaded) — paint before tenant pin.
       if (Array.isArray(m.fleet)) {
+        setHangarFleet(m.fleet);
         onFleetRef.current?.(m.fleet);
       }
       // Paint roster first — tenant switch used to block behind a full refresh (~20s).
@@ -636,7 +648,7 @@ export function VaPage(props: Props) {
 
       {pane === 'hangar' ? (
         <div className="va-pane-card">
-          {tenantSwitching && props.fleet.length === 0 ? (
+          {tenantSwitching && hangarFleet.length === 0 ? (
             <BusyStatus label="Opening VA hangar…" />
           ) : (
             <>
@@ -648,13 +660,13 @@ export function VaPage(props: Props) {
               VA wallet).
             </p>
           ) : null}
-          {props.fleet.length === 0 ? (
+          {hangarFleet.length === 0 ? (
             <p className="empty">
               No aircraft yet — buy or lease on Airframes for this company.
             </p>
           ) : (
             <ul className="hangar-list">
-              {props.fleet.map((acf) => {
+              {hangarFleet.map((acf) => {
                 const labelByAccountId: Record<string, string> = {};
                 for (const m of members) {
                   labelByAccountId[m.accountId] =
@@ -663,6 +675,7 @@ export function VaPage(props: Props) {
                 const missionInFlight = false;
                 return props.renderHangarCard(acf, {
                   mutationsLocked: hangarReadOnly,
+                  busy: pageBusy,
                   vaReserve: listed
                     ? {
                         viewerAccountId,
@@ -670,33 +683,47 @@ export function VaPage(props: Props) {
                         labelByAccountId,
                         inFlight: missionInFlight,
                         onReserve: async (aircraftId) => {
+                          const gen = ++hangarFleetGenRef.current;
                           setBusy(true);
+                          setError(null);
                           try {
                             const result = await postVaFleetReserve(aircraftId);
+                            if (gen !== hangarFleetGenRef.current) return;
+                            setHangarFleet(result.fleet);
                             onFleetRef.current?.(result.fleet);
                           } catch (err) {
+                            if (gen !== hangarFleetGenRef.current) return;
                             setError(
                               err instanceof Error
                                 ? err.message
                                 : String(err),
                             );
                           } finally {
-                            setBusy(false);
+                            if (gen === hangarFleetGenRef.current) {
+                              setBusy(false);
+                            }
                           }
                         },
                         onRelease: async (aircraftId) => {
+                          const gen = ++hangarFleetGenRef.current;
                           setBusy(true);
+                          setError(null);
                           try {
                             const result = await postVaFleetRelease(aircraftId);
+                            if (gen !== hangarFleetGenRef.current) return;
+                            setHangarFleet(result.fleet);
                             onFleetRef.current?.(result.fleet);
                           } catch (err) {
+                            if (gen !== hangarFleetGenRef.current) return;
                             setError(
                               err instanceof Error
                                 ? err.message
                                 : String(err),
                             );
                           } finally {
-                            setBusy(false);
+                            if (gen === hangarFleetGenRef.current) {
+                              setBusy(false);
+                            }
                           }
                         },
                       }

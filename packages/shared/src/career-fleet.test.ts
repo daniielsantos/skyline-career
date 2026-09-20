@@ -24,6 +24,10 @@ import {
   listAircraftMarket,
   purchaseAircraftListing,
   settleMission,
+  reserveAircraftForMember,
+  releaseAircraftReservation,
+  isAircraftReservationActive,
+  VA_AIRCRAFT_RESERVE_TTL_MS,
 } from './index.js';
 
 const pilot = {
@@ -604,5 +608,89 @@ describe('career fleet hangar', () => {
       resolved.fuelKg,
       Math.round(120 - 40 - resolved.mxFuelDrainAppliedKg),
     );
+  });
+});
+
+describe('VA aircraft reservation', () => {
+  it('reserves, TTL-expires, and swaps one-per-member', () => {
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const a = state.fleet[0]!;
+    const b = {
+      ...a,
+      id: 'acf_second',
+      registration: 'PP-TWO',
+      label: 'Second',
+    };
+    state.fleet.push(b);
+
+    const t0 = 1_700_000_000_000;
+    reserveAircraftForMember(state, a.id, 'acc_a', t0);
+    assert.equal(a.reservedByAccountId, 'acc_a');
+    assert.equal(isAircraftReservationActive(a, t0 + 60_000), true);
+    assert.equal(
+      isAircraftReservationActive(a, t0 + VA_AIRCRAFT_RESERVE_TTL_MS + 1),
+      false,
+    );
+
+    reserveAircraftForMember(state, b.id, 'acc_a', t0 + 1_000);
+    assert.equal(a.reservedByAccountId, undefined);
+    assert.equal(b.reservedByAccountId, 'acc_a');
+  });
+
+  it('blocks assign/ferry for other members; owner bypasses', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-reserve-lock' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    state.walletUsd = 50_000;
+    const acf = state.fleet[0]!;
+    const t0 = Date.now();
+    reserveAircraftForMember(state, acf.id, 'acc_holder', t0);
+
+    assert.throws(
+      () =>
+        assignAircraftToMission(state, acf.id, 'msn_x', 'SBGR', {
+          actorAccountId: 'acc_other',
+          nowMs: t0,
+        }),
+      /reserved/i,
+    );
+    assert.throws(
+      () =>
+        quoteFerry(world, state, {
+          aircraftId: acf.id,
+          destIcao: 'SBKP',
+          actorAccountId: 'acc_other',
+          nowMs: t0,
+        }),
+      /reserved/i,
+    );
+
+    assignAircraftToMission(state, acf.id, 'msn_ok', 'SBGR', {
+      actorAccountId: 'acc_holder',
+      nowMs: t0,
+    });
+    releaseAircraftOnCancel(state, {
+      id: 'msn_ok',
+      aircraftId: acf.id,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'accepted',
+    } as never);
+    assert.equal(acf.reservedByAccountId, 'acc_holder');
+
+    quoteFerry(world, state, {
+      aircraftId: acf.id,
+      destIcao: 'SBKP',
+      actorIsVaOwner: true,
+      nowMs: t0,
+    });
+  });
+
+  it('release clears hold', () => {
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const acf = state.fleet[0]!;
+    reserveAircraftForMember(state, acf.id, 'acc_a', Date.now());
+    releaseAircraftReservation(state, acf.id);
+    assert.equal(acf.reservedByAccountId, undefined);
+    assert.equal(acf.reservedAtMs, undefined);
   });
 });

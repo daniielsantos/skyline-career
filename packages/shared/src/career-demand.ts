@@ -1076,6 +1076,7 @@ export function acceptDemandOrder(
     kg?: number;
     pilotAccountId?: string;
     pilotHomeCompanyId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
   ensureDemandOrders(world);
@@ -1285,7 +1286,10 @@ export function acceptDemandOrder(
     pilotHomeCompanyId: opts.pilotHomeCompanyId?.trim() || undefined,
   });
 
-  assignAircraftToMission(state, aircraft.id, mission.id, origin);
+  assignAircraftToMission(state, aircraft.id, mission.id, origin, {
+    actorAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
   state.missions = [...(state.missions ?? []), mission];
   syncPlayerInbound(world, mission);
 

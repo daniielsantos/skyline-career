@@ -2093,4 +2093,11 @@ export interface PlayerAircraft {
     arriveAtTick: number;
     distanceNm?: number;
   };
+  /**
+   * VA hangar soft-hold: member who reserved this tail (hard lock for others).
+   * Cleared on release / TTL (`VA_AIRCRAFT_RESERVE_TTL_MS`).
+   */
+  reservedByAccountId?: string;
+  /** Wall-clock ms when the reservation was taken. */
+  reservedAtMs?: number;
 }

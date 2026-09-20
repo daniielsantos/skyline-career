@@ -870,11 +870,53 @@ export function HangarAircraftCard(props: {
   missionRoute?: { originIcao: string; destIcao: string } | null;
   /** VA pilot hangar — hide sell/lease/MX mutations; ferry stays. */
   mutationsLocked?: boolean;
+  /** VA hangar aircraft reservation controls. */
+  vaReserve?: {
+    viewerAccountId: string | null;
+    isOwner: boolean;
+    labelByAccountId: Record<string, string>;
+    /** True when this airframe's open mission is in_flight. */
+    inFlight: boolean;
+    onReserve: (aircraftId: string) => void | Promise<void>;
+    onRelease: (aircraftId: string) => void | Promise<void>;
+  };
 }) {
   const acf = props.aircraft;
   const catalog = props.catalog;
   const weightSystem = props.weightSystem ?? 'metric';
   const mutationsLocked = props.mutationsLocked === true;
+  const vaReserve = props.vaReserve;
+  const reserveTtlMs = 4 * 60 * 60 * 1000;
+  const reserveActive =
+    Boolean(acf.reservedByAccountId?.trim()) &&
+    typeof acf.reservedAtMs === 'number' &&
+    acf.reservedAtMs > 0 &&
+    Date.now() - acf.reservedAtMs < reserveTtlMs;
+  const reserveHolderId = reserveActive
+    ? acf.reservedByAccountId!.trim()
+    : null;
+  const reserveIsMine =
+    Boolean(reserveHolderId) &&
+    Boolean(vaReserve?.viewerAccountId) &&
+    reserveHolderId === vaReserve!.viewerAccountId;
+  const reserveBlocksMove =
+    Boolean(vaReserve) &&
+    reserveActive &&
+    !reserveIsMine &&
+    vaReserve!.isOwner !== true;
+  const reserveLabel = reserveHolderId
+    ? vaReserve?.labelByAccountId[reserveHolderId] ?? 'pilot'
+    : null;
+  const canReserve =
+    Boolean(vaReserve) &&
+    acf.status === 'parked' &&
+    !acf.npcFerry &&
+    (!reserveActive || reserveIsMine);
+  const canReleaseReserve =
+    Boolean(vaReserve) &&
+    reserveActive &&
+    !vaReserve!.inFlight &&
+    (reserveIsMine || vaReserve!.isOwner);
   const fuelPct =
     (acf.fuelKg / Math.max(1, acf.fuelCapacityKg)) * 100;
   const afPct = acf.airframeConditionPct ?? 100;
@@ -1084,6 +1126,18 @@ export function HangarAircraftCard(props: {
                 title={`Pilot is at ${pilotLabel} — travel here before dispatch`}
               >
                 pilot away
+              </span>
+            ) : null}
+            {reserveActive ? (
+              <span
+                className={`badge badge-reserved${reserveIsMine ? ' is-mine' : ''}`}
+                title={
+                  reserveIsMine
+                    ? 'You reserved this aircraft (4h hold)'
+                    : `Reserved by ${reserveLabel}`
+                }
+              >
+                {reserveIsMine ? 'reserved · you' : `reserved · ${reserveLabel}`}
               </span>
             ) : null}
           </>
@@ -1308,22 +1362,50 @@ export function HangarAircraftCard(props: {
                   />
                 </label>
                 <div className="hangar-move-actions">
+                  {vaReserve ? (
+                    canReleaseReserve ? (
+                      <button
+                        type="button"
+                        className="ghost hangar-move-go"
+                        disabled={props.busy}
+                        onClick={() => void vaReserve.onRelease(acf.id)}
+                        title="Release hangar reservation"
+                      >
+                        Release reserve
+                      </button>
+                    ) : canReserve && !reserveActive ? (
+                      <button
+                        type="button"
+                        className="ghost hangar-move-go"
+                        disabled={props.busy}
+                        onClick={() => void vaReserve.onReserve(acf.id)}
+                        title="Reserve this aircraft for your session (4h)"
+                      >
+                        Reserve
+                      </button>
+                    ) : null
+                  ) : null}
                   <button
                     type="button"
                     className="ghost hangar-move-go"
                     disabled={
-                      props.busy || !ferryReady || acf.status !== 'parked'
+                      props.busy ||
+                      !ferryReady ||
+                      acf.status !== 'parked' ||
+                      reserveBlocksMove
                     }
                     onClick={() => {
                       setFerryJourneyFinal(ferryFinal);
                       setFerryJourneyOpen(true);
                     }}
                     title={
-                      ferryBlockedForBush
-                        ? ferryPlanError ?? 'Instant ferry unavailable'
-                        : multiLeg
-                          ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
-                          : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
+                      reserveBlocksMove
+                        ? `Reserved by ${reserveLabel}`
+                        : ferryBlockedForBush
+                          ? ferryPlanError ?? 'Instant ferry unavailable'
+                          : multiLeg
+                            ? `Open ferry journey · ${ferryPlan?.legCount} legs to ${ferryFinal}`
+                            : `Instant ferry ${acf.locationIcao} → ${ferryFinal}`
                     }
                   >
                     {multiLeg && ferryReady
@@ -1336,12 +1418,17 @@ export function HangarAircraftCard(props: {
                     disabled={
                       props.busy ||
                       !emptyFlightReady ||
-                      acf.status !== 'parked'
+                      acf.status !== 'parked' ||
+                      reserveBlocksMove
                     }
                     onClick={() =>
                       void props.onEmptyFlight(acf.id, ferryFinal)
                     }
-                    title={`Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`}
+                    title={
+                      reserveBlocksMove
+                        ? `Reserved by ${reserveLabel}`
+                        : `Empty Watch flight ${acf.locationIcao} → ${ferryFinal} (no contract)`
+                    }
                   >
                     Plan empty flight
                   </button>

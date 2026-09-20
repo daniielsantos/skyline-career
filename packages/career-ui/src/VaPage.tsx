@@ -14,6 +14,8 @@ import {
   postVaKick,
   postVaRole,
   postVaUnpublish,
+  postVaFleetReserve,
+  postVaFleetRelease,
   type VaMember,
   type VaJoinRequest,
   type PlayerAircraft,
@@ -30,6 +32,47 @@ import { useConfirm } from './ConfirmDialog';
 
 type VaPane = 'roster' | 'hangar' | 'ledger' | 'config';
 
+function formatRosterLastSeen(
+  lastSeenAtMs: number | null | undefined,
+  nowMs: number,
+): string {
+  if (lastSeenAtMs == null || !(lastSeenAtMs > 0)) return 'Never';
+  const delta = Math.max(0, nowMs - lastSeenAtMs);
+  if (delta < 45_000) return 'Just now';
+  if (delta < 3600_000) return `${Math.max(1, Math.floor(delta / 60_000))}m ago`;
+  if (delta < 86400_000) {
+    return `${Math.max(1, Math.floor(delta / 3600_000))}h ago`;
+  }
+  if (delta < 7 * 86400_000) {
+    return `${Math.max(1, Math.floor(delta / 86400_000))}d ago`;
+  }
+  try {
+    return new Date(lastSeenAtMs).toLocaleDateString();
+  } catch {
+    return '—';
+  }
+}
+
+function formatRosterFlight(
+  flight: VaMember['flight'],
+): string {
+  if (!flight) return 'On the ground';
+  const od =
+    flight.originIcao && flight.destIcao
+      ? `${flight.originIcao}→${flight.destIcao}`
+      : '';
+  if (flight.status === 'in_flight') {
+    return od ? `In flight ${od}` : 'In flight';
+  }
+  if (flight.status === 'dispatched') {
+    return od ? `Dispatched ${od}` : 'Dispatched';
+  }
+  if (flight.status === 'accepted') {
+    return od ? `Assigned ${od}` : 'Assigned';
+  }
+  return od || flight.status;
+}
+
 type Props = {
   authRequired: boolean;
   activeCompanyId: string | null;
@@ -38,9 +81,20 @@ type Props = {
   busy?: boolean;
   renderHangarCard: (
     aircraft: PlayerAircraft,
-    opts: { mutationsLocked: boolean },
+    opts: {
+      mutationsLocked: boolean;
+      vaReserve?: {
+        viewerAccountId: string | null;
+        isOwner: boolean;
+        labelByAccountId: Record<string, string>;
+        inFlight: boolean;
+        onReserve: (aircraftId: string) => void | Promise<void>;
+        onRelease: (aircraftId: string) => void | Promise<void>;
+      };
+    },
   ) => ReactNode;
   onWallet?: (walletUsd: number) => void;
+  onFleet?: (fleet: PlayerAircraft[]) => void;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
   /** Switch active tenant to the listed VA (member dual-tenant). */
@@ -58,6 +112,7 @@ export function VaPage(props: Props) {
   const [pane, setPane] = useState<VaPane>('roster');
   const [members, setMembers] = useState<VaMember[]>([]);
   const [role, setRole] = useState<string | null>(null);
+  const [viewerAccountId, setViewerAccountId] = useState<string | null>(null);
   const [memberCap, setMemberCap] = useState(8);
   const [listed, setListed] = useState(false);
   const [recruiting, setRecruiting] = useState(true);
@@ -95,6 +150,8 @@ export function VaPage(props: Props) {
   onSwitchCompanyRef.current = props.onSwitchCompany;
   const onWalletRef = useRef(props.onWallet);
   onWalletRef.current = props.onWallet;
+  const onFleetRef = useRef(props.onFleet);
+  onFleetRef.current = props.onFleet;
   const hasVaShellRef = useRef(false);
   const ledgerFetchGenRef = useRef(0);
 
@@ -138,6 +195,7 @@ export function VaPage(props: Props) {
       const m = await fetchVaMembers();
       setMembers(m.members);
       setRole(m.role);
+      setViewerAccountId(m.viewerAccountId ?? null);
       setMemberCap(m.memberCap);
       setListed(m.listed);
       setRecruiting(m.recruiting);
@@ -250,6 +308,15 @@ export function VaPage(props: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Soft-poll roster presence while the pane is open (online / flight).
+  useEffect(() => {
+    if (pane !== 'roster' || !loaded || !listed) return;
+    const id = window.setInterval(() => {
+      void refresh();
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [pane, loaded, listed, refresh]);
 
   useEffect(() => {
     // Wait until the VA tenant is pinned — a home-tenant cashflow looks like
@@ -456,6 +523,25 @@ export function VaPage(props: Props) {
                     <span className="va-roster-name">{m.displayName}</span>
                     <span className="va-roster-login">@{m.loginName}</span>
                   </div>
+                  <div className="va-roster-status">
+                    <span
+                      className={`va-roster-online${m.online ? ' is-online' : ''}`}
+                    >
+                      {m.online ? 'Online' : 'Offline'}
+                    </span>
+                    <span className="va-roster-seen">
+                      {m.online
+                        ? 'Active now'
+                        : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`}
+                    </span>
+                    <span
+                      className={`va-roster-flight${
+                        m.flight?.status === 'in_flight' ? ' is-flying' : ''
+                      }`}
+                    >
+                      {formatRosterFlight(m.flight)}
+                    </span>
+                  </div>
                   <span
                     className={`va-roster-role va-roster-role-${m.role}`}
                   >
@@ -535,8 +621,9 @@ export function VaPage(props: Props) {
           {hangarReadOnly ? (
             <p className="settings-help">
               Hangar is view-only for members — ferry for flights is still
-              available. Sell, lease, inspection, and repair are owner-only
-              (MX comes from the VA wallet).
+              available. Reserve a parked tail for your session (4h). Sell,
+              lease, inspection, and repair are owner-only (MX comes from the
+              VA wallet).
             </p>
           ) : null}
           {props.fleet.length === 0 ? (
@@ -545,11 +632,55 @@ export function VaPage(props: Props) {
             </p>
           ) : (
             <ul className="hangar-list">
-              {props.fleet.map((acf) =>
-                props.renderHangarCard(acf, {
+              {props.fleet.map((acf) => {
+                const labelByAccountId: Record<string, string> = {};
+                for (const m of members) {
+                  labelByAccountId[m.accountId] =
+                    m.displayName?.trim() || m.loginName || m.accountId;
+                }
+                const missionInFlight = false;
+                return props.renderHangarCard(acf, {
                   mutationsLocked: hangarReadOnly,
-                }),
-              )}
+                  vaReserve: listed
+                    ? {
+                        viewerAccountId,
+                        isOwner,
+                        labelByAccountId,
+                        inFlight: missionInFlight,
+                        onReserve: async (aircraftId) => {
+                          setBusy(true);
+                          try {
+                            const result = await postVaFleetReserve(aircraftId);
+                            onFleetRef.current?.(result.fleet);
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : String(err),
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        },
+                        onRelease: async (aircraftId) => {
+                          setBusy(true);
+                          try {
+                            const result = await postVaFleetRelease(aircraftId);
+                            onFleetRef.current?.(result.fleet);
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : String(err),
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        },
+                      }
+                    : undefined,
+                });
+              })}
             </ul>
           )}
         </div>

@@ -421,6 +421,20 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 
 
+### Roster presence (online / flight / last seen) (2026-09-20)
+
+**Sintoma:** Roster só mostrava nome + role — sem sinal de quem está online ou voando.
+**Causa:** /api/va/members devolvia membership puro; UI não tinha coluna de status.
+**Fix:** enrich members com uthListSessions → online/lastSeenAtMs (AUTH_ONLINE_WINDOW_MS) + melhor missão VA ativa do piloto (ccepted/dispatched/in_flight); row com Online/Offline + last seen + flight line; soft-poll 30s na aba Roster.
+
+### VA hangar aircraft reservation (2026-09-20)
+
+**Sintoma / gap:** membros competiam first-come no mesmo casco; Hangar nao sinalizava hold.
+**Causa:** fleet so tinha assign de missao; sem soft-hold por conta.
+**Fix:** SQLite **v16** / PG **v27** 
+eserved_by_account_id + 
+eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em assign/ferry; badge + Reserve/Release no Hangar VA.
+
 ## Checklist quando for implementar
 
 - [x] InternalHaul pay (IH-1)
@@ -436,6 +450,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
+- [x] **Roster presence** — online / last seen / flight na row
+- [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

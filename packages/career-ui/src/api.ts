@@ -63,6 +63,9 @@ export type PlayerAircraft = {
     arriveAtTick: number;
     distanceNm?: number;
   };
+  /** VA hangar soft-hold (hard lock for other members). */
+  reservedByAccountId?: string;
+  reservedAtMs?: number;
 };
 
 export type CareerLedgerKind =
@@ -4917,6 +4920,12 @@ export function postLoadOfp(
   })();
 }
 
+export type VaMemberFlight = {
+  status: 'accepted' | 'dispatched' | 'in_flight' | string;
+  originIcao: string;
+  destIcao: string;
+};
+
 export type VaMember = {
   companyId: string;
   accountId: string;
@@ -4924,6 +4933,11 @@ export type VaMember = {
   createdAtMs: number;
   loginName: string;
   displayName: string;
+  /** Auth session last-seen within onlineWindowMs. */
+  online?: boolean;
+  lastSeenAtMs?: number | null;
+  /** Active mission on this VA company stamped to the pilot. */
+  flight?: VaMemberFlight | null;
 };
 
 export type VaCompanyRank = {
@@ -4987,9 +5001,32 @@ export function fetchVaMembers() {
       fireSeveranceUsd: number;
     } | null;
     flightQuality?: VaFlightQualitySnapshot | null;
+    viewerAccountId?: string;
+    nowMs?: number;
+    onlineWindowMs?: number;
     /** Active company was home/solo — switch UI tenant to this listed VA. */
     switchToCompanyId?: string;
   }>('/api/va/members');
+}
+
+export function postVaFleetReserve(aircraftId: string) {
+  return api<{ aircraft: PlayerAircraft; fleet: PlayerAircraft[] }>(
+    '/api/va/fleet/reserve',
+    {
+      method: 'POST',
+      body: JSON.stringify({ aircraftId }),
+    },
+  );
+}
+
+export function postVaFleetRelease(aircraftId: string) {
+  return api<{ aircraft: PlayerAircraft; fleet: PlayerAircraft[] }>(
+    '/api/va/fleet/release',
+    {
+      method: 'POST',
+      body: JSON.stringify({ aircraftId }),
+    },
+  );
 }
 
 export function postVaRouteCut(memberRouteCutPct: number) {

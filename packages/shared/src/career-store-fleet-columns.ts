@@ -40,6 +40,8 @@ export type FleetAircraftColumnFields = {
   rolesPackRelPath?: string;
   leaseOverdue?: boolean;
   listedListingId?: string;
+  reservedByAccountId?: string;
+  reservedAtMs?: number;
 };
 
 function finiteOrUndef(v: unknown): number | undefined {
@@ -84,6 +86,8 @@ export function splitFleetAircraftForPersist(a: PlayerAircraft): {
     rolesPackRelPath,
     leaseOverdue,
     listedListingId,
+    reservedByAccountId,
+    reservedAtMs,
     ...rest
   } = a;
 
@@ -114,6 +118,8 @@ export function splitFleetAircraftForPersist(a: PlayerAircraft): {
       rolesPackRelPath: strOrUndef(rolesPackRelPath),
       leaseOverdue: leaseOverdue === true ? true : undefined,
       listedListingId: strOrUndef(listedListingId),
+      reservedByAccountId: strOrUndef(reservedByAccountId),
+      reservedAtMs: finiteOrUndef(reservedAtMs),
     },
     leaseJson: lease ? JSON.stringify(lease) : null,
     leaseOutJson: leaseOut ? JSON.stringify(leaseOut) : null,
@@ -144,6 +150,8 @@ export type FleetAircraftRowInput = {
   roles_pack_rel_path?: string | null;
   lease_overdue?: boolean | number | null;
   listed_listing_id?: string | null;
+  reserved_by_account_id?: string | null;
+  reserved_at_ms?: number | null;
   lease_json?: string | null | unknown;
   lease_out_json?: string | null | unknown;
   payload_json?: string | null | unknown;
@@ -231,6 +239,13 @@ export function assembleFleetAircraftFromRow(
   const listed = strOrUndef(r.listed_listing_id);
   if (listed) aircraft.listedListingId = listed;
 
+  const reservedBy = strOrUndef(r.reserved_by_account_id);
+  if (reservedBy) aircraft.reservedByAccountId = reservedBy;
+  const reservedAt = finiteOrUndef(
+    r.reserved_at_ms == null ? undefined : Number(r.reserved_at_ms),
+  );
+  if (reservedAt != null) aircraft.reservedAtMs = reservedAt;
+
   const lease = parseJsonObject<PlayerAircraft['lease']>(r.lease_json);
   if (lease) aircraft.lease = lease;
   const leaseOut = parseJsonObject<PlayerAircraft['leaseOut']>(r.lease_out_json);
@@ -254,4 +269,6 @@ export const FLEET_AIRCRAFT_COLUMN_NAMES = [
   'lease_overdue',
   'listed_listing_id',
   'lease_out_json',
+  'reserved_by_account_id',
+  'reserved_at_ms',
 ] as const;

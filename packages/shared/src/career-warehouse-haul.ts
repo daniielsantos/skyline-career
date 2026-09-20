@@ -147,6 +147,8 @@ function createHaulMission(
     };
     warehouseId: string;
     avgCostUsdPerKg: number;
+    pilotAccountId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): MissionIntent {
   const classDef = getAircraftClass(opts.aircraft.aircraftClassId);
@@ -193,7 +195,10 @@ function createHaulMission(
     warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
   });
-  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin);
+  assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
+    actorAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
   state.missions = [...(state.missions ?? []), mission];
   syncPlayerInbound(world, mission);
   return mission;
@@ -339,6 +344,8 @@ export function acceptWarehouseHaul(
     commodityId: CommodityId;
     aircraftId: string;
     kg?: number;
+    pilotAccountId?: string;
+    actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; payUsd: number } {
   expireDemandHolds(state, world);
@@ -386,6 +393,8 @@ export function acceptWarehouseHaul(
     aircraft,
     warehouseId: withdrawn.warehouseId,
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
+    pilotAccountId: opts.pilotAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg, payUsd };
 }

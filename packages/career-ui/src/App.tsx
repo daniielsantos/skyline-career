@@ -18714,6 +18714,11 @@ export function App() {
               commitWallet(usd);
             }
           }}
+          onFleet={(nextFleet) => {
+            if (viewingVaTenant) {
+              setVaSessionFleet(nextFleet);
+            }
+          }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
           onSwitchCompany={async (companyId) => {
@@ -18759,6 +18764,7 @@ export function App() {
               cabinStatus={hangarCabinStatus(acf)}
               busy={busy}
               mutationsLocked={hangarOpts.mutationsLocked}
+              vaReserve={hangarOpts.vaReserve}
               hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({
                 icao: hub.icao,
                 name: hub.name,

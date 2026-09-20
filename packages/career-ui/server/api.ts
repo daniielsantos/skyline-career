@@ -10,6 +10,10 @@ import {
   listCareerPlayerAirframes,
   isCareerPlayerAirframeEnabled,
   assignAircraftToMission,
+  reserveAircraftForMember,
+  releaseAircraftReservation,
+  clearExpiredAircraftReservations,
+  isAircraftReservationActive,
   buyOutAircraftLease,
   returnAircraftLeaseEarly,
   payAircraftLeaseOverdue,
@@ -1557,6 +1561,52 @@ async function assertVaOwnerForFleetMx(
     companyId,
     'pay maintenance or repair on company aircraft',
   );
+}
+
+async function resolveVaFleetActor(
+  req: import('node:http').IncomingMessage,
+  companyId: string,
+): Promise<{
+  accountId: string | null;
+  isOwner: boolean;
+  isMember: boolean;
+}> {
+  if (!store?.supportsAuth) {
+    return { accountId: null, isOwner: true, isMember: true };
+  }
+  const session = authSessionFromRequest(req);
+  if (!session) {
+    return { accountId: null, isOwner: false, isMember: false };
+  }
+  const listed = await Promise.resolve(store.vaIsListed(companyId));
+  if (!listed) {
+    return {
+      accountId: session.account.id,
+      isOwner: true,
+      isMember: true,
+    };
+  }
+  const membership = await Promise.resolve(
+    store.vaGetMembership(session.account.id, companyId),
+  );
+  return {
+    accountId: session.account.id,
+    isOwner: membership?.role === 'owner',
+    isMember: Boolean(membership),
+  };
+}
+
+function missionIsInFlight(
+  missions: { missions?: Array<{ id: string; status?: string }> },
+  aircraft: { assignedMissionId?: string; status?: string },
+): boolean {
+  if (aircraft.status === 'assigned' && aircraft.assignedMissionId) {
+    const m = (missions.missions ?? []).find(
+      (row) => row.id === aircraft.assignedMissionId,
+    );
+    if (m?.status === 'in_flight') return true;
+  }
+  return false;
 }
 
 function requireAuthSession(
@@ -3473,6 +3523,64 @@ export function createCareerApiServer(port = 8787) {
             ),
           ]);
         const co = companies.find((c) => c.id === companyId);
+        // Roster presence: session last-seen + active VA missions per pilot.
+        const nowMs = Date.now();
+        const lastSeenByAccount = new Map<string, number>();
+        try {
+          const sessions = await Promise.resolve(
+            store.authListSessions({ nowMs }),
+          );
+          for (const s of sessions) {
+            const prev = lastSeenByAccount.get(s.accountId) ?? 0;
+            if (s.lastSeenAtMs > prev) {
+              lastSeenByAccount.set(s.accountId, s.lastSeenAtMs);
+            }
+          }
+        } catch {
+          /* presence soft-fail */
+        }
+        const flightRank: Record<string, number> = {
+          accepted: 1,
+          dispatched: 2,
+          in_flight: 3,
+        };
+        const flightByAccount = new Map<
+          string,
+          { status: string; originIcao: string; destIcao: string }
+        >();
+        let vaMissionsForRoster: Awaited<ReturnType<typeof loadMissions>> | null =
+          null;
+        try {
+          vaMissionsForRoster = await loadMissions({ companyId });
+          for (const mission of vaMissionsForRoster.missions ?? []) {
+            const status = String(mission.status ?? '');
+            if (!(status in flightRank)) continue;
+            const pilotId = mission.pilotAccountId?.trim();
+            if (!pilotId) continue;
+            const prev = flightByAccount.get(pilotId);
+            if (!prev || flightRank[status]! > flightRank[prev.status]!) {
+              flightByAccount.set(pilotId, {
+                status,
+                originIcao: String(mission.originIcao ?? '').toUpperCase(),
+                destIcao: String(mission.destIcao ?? '').toUpperCase(),
+              });
+            }
+          }
+        } catch {
+          vaMissionsForRoster = null;
+        }
+        const membersWithPresence = members.map((m) => {
+          const lastSeenAtMs = lastSeenByAccount.get(m.accountId) ?? null;
+          const online =
+            lastSeenAtMs != null &&
+            lastSeenAtMs >= nowMs - AUTH_ONLINE_WINDOW_MS;
+          return {
+            ...m,
+            online,
+            lastSeenAtMs,
+            flight: flightByAccount.get(m.accountId) ?? null,
+          };
+        });
         // Line crew only for owner Config — skip for pilots (was companyLock
         // behind pulse → My VA ~20s). Soft-fail → null.
         let lineCrew: {
@@ -3490,8 +3598,8 @@ export function createCareerApiServer(port = 8787) {
               typeof store.peekEconomyWorld === 'function'
                 ? (store.peekEconomyWorld()?.tick ?? 0)
                 : 0;
-            // Read-only: no companyLock (avoid queueing behind settle/pulse).
-            const missions = await loadMissions({ companyId });
+            const missions =
+              vaMissionsForRoster ?? (await loadMissions({ companyId }));
             const allowance = vaLineCrewAllowanceRemaining(missions, tick);
             lineCrew = {
               ...allowance,
@@ -3530,7 +3638,7 @@ export function createCareerApiServer(port = 8787) {
           companyId,
           memberCap: VA_MEMBER_CAP,
           role: membership.role,
-          members,
+          members: membersWithPresence,
           listed,
           recruiting,
           memberRouteCutPct,
@@ -3538,6 +3646,9 @@ export function createCareerApiServer(port = 8787) {
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
           flightQuality,
+          viewerAccountId: session.account.id,
+          onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
+          nowMs,
           ...(switchedFromCompanyId
             ? { switchToCompanyId: companyId }
             : {}),
@@ -4218,6 +4329,141 @@ export function createCareerApiServer(port = 8787) {
               actorAccountId: session.account.id,
             }),
           );
+          send(res, 200, result);
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/fleet/reserve') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
+        if (!body.aircraftId?.trim()) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          const listed = await Promise.resolve(store.vaIsListed(companyId));
+          if (!listed) {
+            send(res, 400, { error: 'Aircraft reserve is only for listed VAs' });
+            return;
+          }
+          const membership = await Promise.resolve(
+            store.vaGetMembership(session.account.id, companyId),
+          );
+          if (!membership) {
+            send(res, 403, { error: 'Not a member of this VA' });
+            return;
+          }
+          const result = await withCareerWrite((_world, missions) => {
+            clearExpiredAircraftReservations(missions.fleet);
+            const aircraft = reserveAircraftForMember(
+              missions,
+              body.aircraftId!,
+              session.account.id,
+            );
+            return {
+              aircraft,
+              fleet: withParkingRates(missions.fleet),
+            };
+          }, { persist: 'company', companyId });
+          send(res, 200, result);
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/fleet/release') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          companyId?: string;
+        };
+        if (!body.aircraftId?.trim()) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          const listed = await Promise.resolve(store.vaIsListed(companyId));
+          if (!listed) {
+            send(res, 400, { error: 'Aircraft release is only for listed VAs' });
+            return;
+          }
+          const membership = await Promise.resolve(
+            store.vaGetMembership(session.account.id, companyId),
+          );
+          if (!membership) {
+            send(res, 403, { error: 'Not a member of this VA' });
+            return;
+          }
+          const result = await withCareerWrite((_world, missions) => {
+            clearExpiredAircraftReservations(missions.fleet);
+            const aircraft = findPlayerAircraft(missions, body.aircraftId!);
+            if (!aircraft) {
+              throw new Error(`Unknown aircraft ${body.aircraftId}`);
+            }
+            if (missionIsInFlight(missions, aircraft)) {
+              throw new Error(
+                'Cannot release reservation while the aircraft is in flight',
+              );
+            }
+            const holder = aircraft.reservedByAccountId?.trim();
+            const isHolder = holder === session.account.id;
+            const isOwner = membership.role === 'owner';
+            if (
+              isAircraftReservationActive(aircraft) &&
+              !isHolder &&
+              !isOwner
+            ) {
+              throw new Error('Only the reserving pilot or VA owner can release');
+            }
+            releaseAircraftReservation(missions, aircraft.id);
+            return {
+              aircraft,
+              fleet: withParkingRates(missions.fleet),
+            };
+          }, { persist: 'company', companyId });
           send(res, 200, result);
         } catch (err) {
           send(res, 400, {
@@ -5826,6 +6072,7 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const ferryPlanCompanyId = companyIdFromRequest(req);
+        const ferryPlanActor = await resolveVaFleetActor(req, ferryPlanCompanyId);
         try {
           const result = await withCareerRead((world, missions) => {
             const aircraft = findPlayerAircraft(missions, aircraftId);
@@ -5869,6 +6116,8 @@ export function createCareerApiServer(port = 8787) {
               ? quoteFerry(world, missions, {
                   aircraftId,
                   destIcao: nextLeg.to,
+                  actorAccountId: ferryPlanActor.accountId,
+                  actorIsVaOwner: ferryPlanActor.isOwner,
                 })
               : null;
             const remainingNm =
@@ -5925,6 +6174,7 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const ferryCompanyId = companyIdFromRequest(req, body.companyId);
+        const ferryActor = await resolveVaFleetActor(req, ferryCompanyId);
         try {
           if (body.quoteOnly) {
             const quoted = await withCareerRead((world, missions) => {
@@ -5932,6 +6182,8 @@ export function createCareerApiServer(port = 8787) {
               const quote = quoteFerry(world, missions, {
                 aircraftId: body.aircraftId!,
                 destIcao: body.destIcao!,
+                actorAccountId: ferryActor.accountId,
+                actorIsVaOwner: ferryActor.isOwner,
               });
               return { quote, walletUsd: missions.walletUsd };
             }, { companyId: ferryCompanyId });
@@ -5959,6 +6211,8 @@ export function createCareerApiServer(port = 8787) {
               const quote = quoteFerry(world, missions, {
                 aircraftId: body.aircraftId!,
                 destIcao: body.destIcao!,
+                actorAccountId: ferryActor.accountId,
+                actorIsVaOwner: ferryActor.isOwner,
               });
               const allowance = vaLineCrewAllowanceRemaining(
                 missions,
@@ -6000,6 +6254,8 @@ export function createCareerApiServer(port = 8787) {
             const quote = quoteFerry(world, missions, {
               aircraftId: body.aircraftId!,
               destIcao: body.destIcao!,
+              actorAccountId: ferryActor.accountId,
+              actorIsVaOwner: ferryActor.isOwner,
             });
 
             let skipWalletDebit = false;
@@ -6041,6 +6297,8 @@ export function createCareerApiServer(port = 8787) {
               destIcao: body.destIcao!,
               skipWalletDebit,
               npcArriveAtTick,
+              actorAccountId: ferryActor.accountId,
+              actorIsVaOwner: ferryActor.isOwner,
             });
             const allowance = vaLineCrewAllowanceRemaining(
               missions,
@@ -6109,12 +6367,15 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const emptyFlightCompanyId = companyIdFromRequest(req, body.companyId);
+        const emptyActor = await resolveVaFleetActor(req, emptyFlightCompanyId);
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const accepted = acceptEmptyFlight(world, missions, {
               aircraftId: body.aircraftId!,
               destIcao: body.destIcao!,
+              actorAccountId: emptyActor.accountId,
+              actorIsVaOwner: emptyActor.isOwner,
             });
             return {
               mission: accepted.mission,
@@ -6754,6 +7015,7 @@ export function createCareerApiServer(port = 8787) {
                   store.vaHomeCompanyId(session.account.id),
                 )) ?? acceptCompanyId)
               : acceptCompanyId;
+          const charterActor = await resolveVaFleetActor(req, acceptCompanyId);
           const pilotStamp = session
             ? {
                 pilotAccountId: session.account.id,
@@ -6827,6 +7089,10 @@ export function createCareerApiServer(port = 8787) {
               aircraft.id,
               mission.id,
               mission.originIcao,
+              {
+                actorAccountId: charterActor.accountId,
+                actorIsVaOwner: charterActor.isOwner,
+              },
             );
             const charterTour = missions.playerFbos?.charterActiveTour;
             if (charterTour?.status === 'active') {
@@ -9509,6 +9775,10 @@ export function createCareerApiServer(port = 8787) {
             warehouses_haul_acceptCompanyId,
             haulProgPeek,
           );
+          const haulActor = await resolveVaFleetActor(
+            req,
+            warehouses_haul_acceptCompanyId,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () =>
@@ -9519,6 +9789,8 @@ export function createCareerApiServer(port = 8787) {
                   commodityId: body.commodityId as CommodityId,
                   aircraftId: body.aircraftId!,
                   kg: body.kg != null ? Number(body.kg) : undefined,
+                  ...haulPilotStamp,
+                  actorIsVaOwner: haulActor.isOwner,
                 });
                 const mission = {
                   ...accepted.mission,
@@ -9651,6 +9923,10 @@ export function createCareerApiServer(port = 8787) {
                 pilotHomeCompanyId: pilotHome ?? undefined,
               }
             : {};
+          const demandActor = await resolveVaFleetActor(
+            req,
+            demand_acceptCompanyId,
+          );
           const progPeek = await withCareerRead((_w, missions) => ({
             cargoOps: missions.cargoOps,
             classOps: missions.classOps,
@@ -9669,6 +9945,7 @@ export function createCareerApiServer(port = 8787) {
                 aircraftId: body.aircraftId!,
                 kg: body.kg != null ? Number(body.kg) : undefined,
                 ...pilotStamp,
+                actorIsVaOwner: demandActor.isOwner,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -10794,6 +11071,7 @@ export function createCareerApiServer(port = 8787) {
         }
         const stagingCompanyId = companyIdFromRequest(req, body.companyId);
         const stagingSession = authSessionFromRequest(req);
+        const stagingActor = await resolveVaFleetActor(req, stagingCompanyId);
         const stagingPilotHome =
           stagingSession && store
             ? ((await Promise.resolve(
@@ -11190,6 +11468,10 @@ export function createCareerApiServer(port = 8787) {
                   playerAircraft.id,
                   mission.id,
                   mission.originIcao,
+                  {
+                    actorAccountId: stagingActor.accountId,
+                    actorIsVaOwner: stagingActor.isOwner,
+                  },
                 );
               }
             }

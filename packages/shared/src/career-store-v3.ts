@@ -1217,14 +1217,16 @@ function upsertFleetAircraftRows(
        registration, condition, hours_airframe, hours_engine,
        airframe_condition_pct, engine_condition_pct, hours_since_inspection,
        maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
-       lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
+       lease_overdue, listed_listing_id, reserved_by_account_id, reserved_at_ms,
+       lease_json, lease_out_json, payload_json
      ) VALUES (
        @id, @company_id, @aircraft_class_id, @airframe_type_id, @label, @location_icao,
        @fuel_kg, @fuel_capacity_kg, @status, @assigned_mission_id, @ownership,
        @registration, @condition, @hours_airframe, @hours_engine,
        @airframe_condition_pct, @engine_condition_pct, @hours_since_inspection,
        @maintenance_due_at_hours, @airframe_configuration_id, @roles_pack_rel_path,
-       @lease_overdue, @listed_listing_id, @lease_json, @lease_out_json, @payload_json
+       @lease_overdue, @listed_listing_id, @reserved_by_account_id, @reserved_at_ms,
+       @lease_json, @lease_out_json, @payload_json
      )
      ON CONFLICT(id) DO UPDATE SET
        company_id = excluded.company_id,
@@ -1249,6 +1251,8 @@ function upsertFleetAircraftRows(
        roles_pack_rel_path = excluded.roles_pack_rel_path,
        lease_overdue = excluded.lease_overdue,
        listed_listing_id = excluded.listed_listing_id,
+       reserved_by_account_id = excluded.reserved_by_account_id,
+       reserved_at_ms = excluded.reserved_at_ms,
        lease_json = excluded.lease_json,
        lease_out_json = excluded.lease_out_json,
        payload_json = excluded.payload_json`,
@@ -1280,6 +1284,8 @@ function upsertFleetAircraftRows(
       roles_pack_rel_path: sqlVal(cols.rolesPackRelPath),
       lease_overdue: cols.leaseOverdue === true ? 1 : null,
       listed_listing_id: sqlVal(cols.listedListingId),
+      reserved_by_account_id: sqlVal(cols.reservedByAccountId),
+      reserved_at_ms: sqlVal(cols.reservedAtMs),
       lease_json: sqlVal(leaseJson),
       lease_out_json: sqlVal(leaseOutJson),
       payload_json: sqlVal(payloadJson),
@@ -1295,7 +1301,8 @@ export function readFleetAircraft(db: SqliteDb, companyId: string): PlayerAircra
               registration, condition, hours_airframe, hours_engine,
               airframe_condition_pct, engine_condition_pct, hours_since_inspection,
               maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
-              lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
+              lease_overdue, listed_listing_id, reserved_by_account_id, reserved_at_ms,
+              lease_json, lease_out_json, payload_json
        FROM fleet_aircraft WHERE company_id = ? ORDER BY id ASC`,
     )
     .all(companyId) as Array<{
@@ -1321,6 +1328,8 @@ export function readFleetAircraft(db: SqliteDb, companyId: string): PlayerAircra
     roles_pack_rel_path: string | null;
     lease_overdue: number | null;
     listed_listing_id: string | null;
+    reserved_by_account_id: string | null;
+    reserved_at_ms: number | null;
     lease_json: string | null;
     lease_out_json: string | null;
     payload_json: string | null;

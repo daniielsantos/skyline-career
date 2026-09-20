@@ -126,7 +126,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '26';
+const CAREER_PG_SCHEMA_VERSION = '27';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(

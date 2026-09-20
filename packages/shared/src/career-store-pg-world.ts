@@ -259,6 +259,8 @@ CREATE TABLE IF NOT EXISTS fleet_aircraft (
   roles_pack_rel_path TEXT,
   lease_overdue BOOLEAN,
   listed_listing_id TEXT,
+  reserved_by_account_id TEXT,
+  reserved_at_ms BIGINT,
   lease_json JSONB,
   lease_out_json JSONB,
   payload_json JSONB
@@ -1106,6 +1108,8 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS lease_overdue BOOLEAN`,
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS listed_listing_id TEXT`,
     `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS lease_out_json JSONB`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS reserved_by_account_id TEXT`,
+    `ALTER TABLE fleet_aircraft ADD COLUMN IF NOT EXISTS reserved_at_ms BIGINT`,
   ];
   for (const sql of fleetAlters) {
     await pool.query(sql);
@@ -3410,6 +3414,8 @@ function fleetPersistValues(
     cols.rolesPackRelPath ?? null,
     cols.leaseOverdue === true ? true : null,
     cols.listedListingId ?? null,
+    cols.reservedByAccountId ?? null,
+    cols.reservedAtMs ?? null,
     leaseJson,
     leaseOutJson,
     payloadJson,
@@ -3426,7 +3432,8 @@ async function readFleetAircraft(
             registration, condition, hours_airframe, hours_engine,
             airframe_condition_pct, engine_condition_pct, hours_since_inspection,
             maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
-            lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
+            lease_overdue, listed_listing_id, reserved_by_account_id, reserved_at_ms,
+            lease_json, lease_out_json, payload_json
      FROM fleet_aircraft WHERE company_id = $1 ORDER BY id ASC`,
     [companyId],
   );
@@ -3460,6 +3467,9 @@ async function readFleetAircraft(
       roles_pack_rel_path: r.roles_pack_rel_path as string | null,
       lease_overdue: r.lease_overdue as boolean | null,
       listed_listing_id: r.listed_listing_id as string | null,
+      reserved_by_account_id: r.reserved_by_account_id as string | null,
+      reserved_at_ms:
+        r.reserved_at_ms == null ? null : num(r.reserved_at_ms),
       lease_json: r.lease_json,
       lease_out_json: r.lease_out_json,
       payload_json: r.payload_json,
@@ -3869,9 +3879,10 @@ export async function persistMissionsTablesToPg(
              registration, condition, hours_airframe, hours_engine,
              airframe_condition_pct, engine_condition_pct, hours_since_inspection,
              maintenance_due_at_hours, airframe_configuration_id, roles_pack_rel_path,
-             lease_overdue, listed_listing_id, lease_json, lease_out_json, payload_json
+             lease_overdue, listed_listing_id, reserved_by_account_id, reserved_at_ms,
+             lease_json, lease_out_json, payload_json
            )`,
-          26,
+          28,
           fleetRows,
         );
       }

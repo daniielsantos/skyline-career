@@ -845,6 +845,129 @@ export function acquireCompanyAircraft(
   );
 }
 
+/** Soft-hold TTL for VA hangar aircraft reservations (wall clock). */
+export const VA_AIRCRAFT_RESERVE_TTL_MS = 4 * 60 * 60 * 1000;
+
+export function isAircraftReservationActive(
+  aircraft: PlayerAircraft,
+  nowMs: number = Date.now(),
+): boolean {
+  const by = aircraft.reservedByAccountId?.trim();
+  const at = aircraft.reservedAtMs;
+  if (!by || at == null || !(at > 0)) return false;
+  return nowMs - at < VA_AIRCRAFT_RESERVE_TTL_MS;
+}
+
+/** Clear expired reservation fields in-place. Returns true if any changed. */
+export function clearExpiredAircraftReservations(
+  fleet: PlayerAircraft[],
+  nowMs: number = Date.now(),
+): boolean {
+  let dirty = false;
+  for (const acf of fleet) {
+    if (!acf.reservedByAccountId && acf.reservedAtMs == null) continue;
+    if (isAircraftReservationActive(acf, nowMs)) continue;
+    acf.reservedByAccountId = undefined;
+    acf.reservedAtMs = undefined;
+    dirty = true;
+  }
+  return dirty;
+}
+
+export function clearAircraftReservationFields(aircraft: PlayerAircraft): void {
+  aircraft.reservedByAccountId = undefined;
+  aircraft.reservedAtMs = undefined;
+}
+
+export type AircraftReservationActorOpts = {
+  accountId?: string | null;
+  isOwner?: boolean;
+  nowMs?: number;
+};
+
+/**
+ * Hard lock: reserved tails may only be used by the reserver (or VA owner).
+ * When a reservation is active and no actor is provided, use is blocked.
+ */
+export function assertAircraftReservationAllowsActor(
+  aircraft: PlayerAircraft,
+  opts: AircraftReservationActorOpts = {},
+): void {
+  const nowMs = opts.nowMs ?? Date.now();
+  if (!isAircraftReservationActive(aircraft, nowMs)) return;
+  if (opts.isOwner === true) return;
+  const actor = opts.accountId?.trim() ?? '';
+  const holder = aircraft.reservedByAccountId!.trim();
+  if (actor && actor === holder) return;
+  throw new Error(
+    `Aircraft ${aircraft.registration ?? aircraft.label} is reserved by another pilot`,
+  );
+}
+
+export function assertAircraftReservable(
+  state: CareerMissionsState,
+  aircraftId: string,
+  accountId: string,
+  nowMs: number = Date.now(),
+): PlayerAircraft {
+  const aircraft = findPlayerAircraft(state, aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  if (aircraft.status !== 'parked') {
+    throw new Error(
+      `Aircraft ${aircraft.registration ?? aircraft.label} must be parked to reserve`,
+    );
+  }
+  if (aircraft.npcFerry) {
+    throw new Error(
+      `Aircraft ${aircraft.registration ?? aircraft.label} is on a Line crew ferry`,
+    );
+  }
+  clearExpiredAircraftReservations(state.fleet, nowMs);
+  if (
+    isAircraftReservationActive(aircraft, nowMs) &&
+    aircraft.reservedByAccountId?.trim() !== accountId.trim()
+  ) {
+    throw new Error(
+      `Aircraft ${aircraft.registration ?? aircraft.label} is already reserved`,
+    );
+  }
+  return aircraft;
+}
+
+/** One active reserve per account in this fleet; swaps to the new tail. */
+export function reserveAircraftForMember(
+  state: CareerMissionsState,
+  aircraftId: string,
+  accountId: string,
+  nowMs: number = Date.now(),
+): PlayerAircraft {
+  const account = accountId.trim();
+  if (!account) throw new Error('accountId required to reserve');
+  const aircraft = assertAircraftReservable(state, aircraftId, account, nowMs);
+  for (const other of state.fleet) {
+    if (other.id === aircraft.id) continue;
+    if (
+      other.reservedByAccountId?.trim() === account &&
+      isAircraftReservationActive(other, nowMs)
+    ) {
+      clearAircraftReservationFields(other);
+    }
+  }
+  aircraft.reservedByAccountId = account;
+  aircraft.reservedAtMs = nowMs;
+  return aircraft;
+}
+
+export function releaseAircraftReservation(
+  state: CareerMissionsState,
+  aircraftId: string,
+): PlayerAircraft {
+  const aircraft = findPlayerAircraft(state, aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  clearAircraftReservationFields(aircraft);
+  return aircraft;
+}
+
 export function assertAircraftAtOrigin(
   aircraft: PlayerAircraft,
   originIcao: string,
@@ -877,10 +1000,21 @@ export function assignAircraftToMission(
   aircraftId: string,
   missionId: string,
   originIcao: string,
-  opts: { requirePilotAtOrigin?: boolean } = {},
+  opts: {
+    requirePilotAtOrigin?: boolean;
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
+    nowMs?: number;
+  } = {},
 ): PlayerAircraft {
   const aircraft = findPlayerAircraft(state, aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  clearExpiredAircraftReservations(state.fleet, opts.nowMs ?? Date.now());
+  assertAircraftReservationAllowsActor(aircraft, {
+    accountId: opts.actorAccountId,
+    isOwner: opts.actorIsVaOwner === true,
+    nowMs: opts.nowMs,
+  });
   if (aircraft.status === 'maintenance') {
     throw new Error(
       `Aircraft ${aircraft.id} is in maintenance — clear the shop visit first`,
@@ -1382,10 +1516,22 @@ export function isCareerHubIcao(icao: string | null | undefined): boolean {
 export function quoteFerry(
   world: CareerEconomyWorld,
   state: CareerMissionsState,
-  opts: { aircraftId: string; destIcao: string },
+  opts: {
+    aircraftId: string;
+    destIcao: string;
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
+    nowMs?: number;
+  },
 ): FerryQuote {
   const aircraft = findPlayerAircraft(state, opts.aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  clearExpiredAircraftReservations(state.fleet, opts.nowMs ?? Date.now());
+  assertAircraftReservationAllowsActor(aircraft, {
+    accountId: opts.actorAccountId,
+    isOwner: opts.actorIsVaOwner === true,
+    nowMs: opts.nowMs,
+  });
   if (aircraft.status !== 'parked') {
     throw new Error(`Aircraft ${aircraft.id} is not parked`);
   }
@@ -1481,6 +1627,9 @@ export function executeFerry(
      * When omitted, ferry completes instantly (paid Hangar ferry).
      */
     npcArriveAtTick?: number;
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
+    nowMs?: number;
   },
 ): {
   aircraft: PlayerAircraft;

@@ -1184,7 +1184,14 @@ export function reconcileLotReservations(
 export function acceptEmptyFlight(
   world: CareerEconomyWorld,
   state: CareerMissionsState,
-  opts: { aircraftId: string; destIcao: string; missionId?: string },
+  opts: {
+    aircraftId: string;
+    destIcao: string;
+    missionId?: string;
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
+    nowMs?: number;
+  },
 ): { mission: MissionIntent; aircraft: PlayerAircraft } {
   const bush = state.activeBushTrip;
   if (bush && (bush.status === 'accepted' || bush.status === 'in_progress')) {
@@ -1263,7 +1270,11 @@ export function acceptEmptyFlight(
     emptyFlight: true,
   });
 
-  assignAircraftToMission(state, aircraft.id, mission.id, origin);
+  assignAircraftToMission(state, aircraft.id, mission.id, origin, {
+    actorAccountId: opts.actorAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+    nowMs: opts.nowMs,
+  });
   state.missions = [...(state.missions ?? []), mission];
   syncPlayerInbound(world, mission);
 

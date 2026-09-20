@@ -7379,6 +7379,14 @@ tr.lot-locked {
 .badge-warn {
   color: var(--danger);
 }
+.badge-reserved {
+  color: color-mix(in srgb, #7eb6d9 90%, white);
+  border-color: color-mix(in srgb, #7eb6d9 40%, transparent);
+}
+.badge-reserved.is-mine {
+  color: color-mix(in srgb, #6fbf73 90%, white);
+  border-color: color-mix(in srgb, #6fbf73 40%, transparent);
+}
 
 .hangar-lease-overdue-note {
   color: var(--danger);
@@ -13992,7 +14000,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 .va-roster-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1.1fr) minmax(9.5rem, 1.4fr) auto auto;
   gap: 0.65rem 0.85rem;
   align-items: center;
   padding: 0.65rem 0.75rem;
@@ -14023,6 +14031,51 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.va-roster-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.va-roster-online {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.va-roster-online.is-online {
+  color: #6fbf73;
+}
+.va-roster-seen {
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.va-roster-flight {
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.va-roster-flight.is-flying {
+  color: #d4a574;
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .va-roster-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .va-roster-status {
+    grid-column: 1 / -1;
+  }
+  .va-roster-actions {
+    grid-column: 1 / -1;
+  }
 }
 .va-roster-role {
   justify-self: end;

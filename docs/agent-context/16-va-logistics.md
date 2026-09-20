@@ -552,8 +552,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 ### Line crew allowance ferry left Duke stuck / missing from Manifest (2026-09-20)
 
 **Sintoma:** toast de sucesso (−$0), Duke não mudou de ICAO no Hangar VA; sumiu do picker Manifest.
-**Causa:** allowance aplicava `npcArriveAtTick` → status `ferry` sem mover location; Manifest/Prepare só listam `parked`. ETA NPC + UI “Instant” incongruentes.
-**Fix:** allowance = hop instantâneo $0 (consome slot); `finalizeStuckNpcFerries` no `withCareerRead`/settle limpa leftovers; picker mostra `ferry` desabilitado se ainda houver.
+**Causa:** allowance aplicava `npcArriveAtTick` → status `ferry` sem mover location; Manifest/Prepare só listam `parked`. ETA NPC + UI “Instant” incongruentes. Hangar VA vinha de `/api/va/members` (peek missions) sem finalizar hops.
+**Fix:** allowance = hop instantâneo $0; `finalizeStuckNpcFerries` no `withCareerRead`/settle **e** no load de `/api/va/members` (+save); picker mostra `ferry` desabilitado se ainda houver. Ferry pago sempre foi instantâneo — o ETA era só o path Line crew (revertido).
 
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 

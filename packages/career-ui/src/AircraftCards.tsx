@@ -731,7 +731,7 @@ function hangarStatusNote(acf: PlayerAircraft): string | null {
       return 'Returns with utilization wear when the term ends.';
     case 'ferry':
       return acf.npcFerry
-        ? `Line crew ferry to ${acf.npcFerry.destIcao} — arrives at tick ${acf.npcFerry.arriveAtTick}.`
+        ? `Line crew ferry to ${acf.npcFerry.destIcao} — delayed hop leftover; parks there on next Hangar refresh after world update.`
         : 'Line crew ferry in progress.';
     default:
       return null;

@@ -3641,6 +3641,14 @@ export function createCareerApiServer(port = 8787) {
           null;
         try {
           vaMissionsForRoster = await loadMissions({ companyId });
+          const tick =
+            typeof store.peekEconomyWorld === 'function'
+              ? (store.peekEconomyWorld()?.tick ?? 0)
+              : 0;
+          const landed = finalizeStuckNpcFerries(vaMissionsForRoster, tick);
+          if (landed.length > 0) {
+            await saveMissions(vaMissionsForRoster, { companyId });
+          }
           for (const mission of vaMissionsForRoster.missions ?? []) {
             const status = String(mission.status ?? '');
             if (!(status in flightRank)) continue;

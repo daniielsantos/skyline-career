@@ -232,6 +232,24 @@ export function completeNpcFerries(
   return done;
 }
 
+/**
+ * Land any in-progress NPC hops immediately.
+ * Player-initiated Line-crew ferry is instant now; this clears leftovers from
+ * the old ETA path so tails reappear as parked at dest.
+ */
+export function finalizeStuckNpcFerries(
+  state: CareerMissionsState,
+  tick: number,
+): PlayerAircraft[] {
+  const due = completeNpcFerries(state, tick);
+  for (const acf of state.fleet ?? []) {
+    if (!acf.npcFerry) continue;
+    acf.npcFerry = { ...acf.npcFerry, arriveAtTick: tick };
+  }
+  const forced = completeNpcFerries(state, tick);
+  return due.length || forced.length ? [...due, ...forced] : due;
+}
+
 export function aircraftBusyWithNpcFerry(aircraft: PlayerAircraft): boolean {
   return Boolean(aircraft.npcFerry);
 }

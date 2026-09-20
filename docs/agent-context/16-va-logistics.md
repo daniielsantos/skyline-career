@@ -148,8 +148,8 @@ Problema: 8 membros ferryando tails da VA com fuel no wallet da company = traged
 **Overhead semanal (“Line crew” / ferry desk)** — narrativa: staff da VA reposiciona cascos; **não** é ground staff de WH nem Crew needed do board.
 
 1. Owner **hire** via Config My VA (`POST /api/va/line-crew` hire) — signing + salary/semana no wallet VA.
-2. Hire dá **allowance** `K = max(4, min(2×memberCap, 2×parked))` empty NPC ferries/semana (retune 2026-09-20: piso 4, 2× parked; cap 16).
-3. Reposition no allowance: **sem debit** VA; status `ferry` + ETA ticks; completa no catch-up/passive settle.
+2. Hire dá **allowance** `K = max(4, min(2×memberCap, 2×parked))` empty ferries/semana (retune 2026-09-20: piso 4, 2× parked; cap 16).
+3. Reposition no allowance: **sem debit** VA; hop **instantâneo** (mesmo UX do ferry pago). ETA NPC legado é finalizado no load/settle.
 4. Acima do cap / sem hire → **overflow**: empty ferry **pago na home do piloto** (`va_line_crew_ferry`). Owner sem allowance: VA paga ferry instantâneo (comportamento solo).
 5. Fire: severance 1 semana (`POST /api/va/line-crew` fire).
 6. MX/hours no complete NPC: wear leve por nm.
@@ -536,6 +536,24 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** Manifest CTA Ferry to origin com tail VA → dialog `Unknown aircraft acf_…` (ex. Duke SBGL→SBSP).
 **Causa:** `POST /api/fleet/ferry` já mandava `companyId` do opsFleet; `GET /api/fleet/ferry-plan` (FerryJourneyDialog) só usava header chrome = home → frota errada.
 **Fix:** `fetchFerryPlan` + dialog aceitam `companyId`; handler lê query; Manifest/Charter/Hangar passam `resolveOpsCompanyId`.
+
+### Ferry plan card hides who pays (2026-09-20)
+
+**Sintoma:** VA com Line crew/allowance; card do ferry só mostrava o $ do hop — não dava para saber se saía do bolso do piloto ou da VA.
+**Causa:** `GET /api/fleet/ferry-plan` devolvia `nextQuote` sem espelhar a lógica Line crew / overflow / company do `POST /ferry`.
+**Fix:** `ferryBilling` no plan (`allowance` → $0 you + remaining; `overflow` → home wallet; `company` → VA wallet); Hangar meta + FerryJourneyDialog; toast `Line crew · $0` vs your wallet.
+
+### Ferry plan + pilot travel quote queue behind pulse (2026-09-20)
+
+**Sintoma:** planejar ferry / quote Travel do piloto lentos (às vezes dezenas de s).
+**Causa:** `GET ferry-plan`, ferry `quoteOnly`, peek pré-write e pilot `quoteOnly` usavam `withCareerRead` → world lock atrás do pulse (~20s+).
+**Fix:** `withCareerPeekRead` (peek economy + `loadMissions`, sem world lock / crew settle) nesses caminhos; write real continua em `withCareerWrite`.
+
+### Line crew allowance ferry left Duke stuck / missing from Manifest (2026-09-20)
+
+**Sintoma:** toast de sucesso (−$0), Duke não mudou de ICAO no Hangar VA; sumiu do picker Manifest.
+**Causa:** allowance aplicava `npcArriveAtTick` → status `ferry` sem mover location; Manifest/Prepare só listam `parked`. ETA NPC + UI “Instant” incongruentes.
+**Fix:** allowance = hop instantâneo $0 (consome slot); `finalizeStuckNpcFerries` no `withCareerRead`/settle limpa leftovers; picker mostra `ferry` desabilitado se ainda houver.
 
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 

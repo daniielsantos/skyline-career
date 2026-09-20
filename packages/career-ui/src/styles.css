@@ -6576,6 +6576,21 @@ tr.lot-locked {
   color: var(--ink);
 }
 
+.ferry-journey-billing {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.ferry-journey-billing.is-allowance {
+  color: var(--ink);
+}
+
+.ferry-journey-billing.is-overflow {
+  color: var(--warn, #b45309);
+}
+
 .ferry-journey-fuel-note {
   margin: 0;
   font-size: 0.82rem;

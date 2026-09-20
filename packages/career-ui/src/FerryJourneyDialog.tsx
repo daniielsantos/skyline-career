@@ -201,17 +201,53 @@ export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
           ) : null}
 
           {!arrived && nextQuote ? (
-            <p className="ferry-journey-cost">
-              Next leg{' '}
-              <strong>{props.formatMoney(nextQuote.totalCostUsd)}</strong>
-              {' · '}
-              fee {props.formatMoney(nextQuote.ferryFeeUsd)}
-              {' · '}
-              fuel {props.formatMoney(nextQuote.fuelCostUsd)}
-              {nextQuote.fuelUpliftKg > 0
-                ? ` (uplift ~${Math.round(nextQuote.fuelUpliftKg)} kg)`
-                : ''}
-            </p>
+            <>
+              <p className="ferry-journey-cost">
+                Next leg{' '}
+                <strong>{props.formatMoney(nextQuote.totalCostUsd)}</strong>
+                {' · '}
+                fee {props.formatMoney(nextQuote.ferryFeeUsd)}
+                {' · '}
+                fuel {props.formatMoney(nextQuote.fuelCostUsd)}
+                {nextQuote.fuelUpliftKg > 0
+                  ? ` (uplift ~${Math.round(nextQuote.fuelUpliftKg)} kg)`
+                  : ''}
+              </p>
+              {plan?.ferryBilling ? (
+                <p
+                  className={`ferry-journey-billing is-${plan.ferryBilling.mode}`}
+                  role="status"
+                >
+                  {plan.ferryBilling.mode === 'allowance' ? (
+                    <>
+                      Line crew covers this hop —{' '}
+                      <strong>$0 from your wallet</strong>
+                      {typeof plan.ferryBilling.remaining === 'number' &&
+                      typeof plan.ferryBilling.allowance === 'number'
+                        ? ` · ${plan.ferryBilling.remaining}/${plan.ferryBilling.allowance} allowance left this week`
+                        : ''}
+                    </>
+                  ) : plan.ferryBilling.mode === 'overflow' ? (
+                    <>
+                      <strong>
+                        {props.formatMoney(plan.ferryBilling.yourCostUsd)} from
+                        your wallet
+                      </strong>
+                      {plan.ferryBilling.hired
+                        ? ' · Line crew allowance used up'
+                        : ' · Line crew not hired'}
+                    </>
+                  ) : (
+                    <>
+                      Charged to the{' '}
+                      <strong>VA wallet</strong>
+                      {' · '}
+                      {props.formatMoney(plan.ferryBilling.yourCostUsd)}
+                    </>
+                  )}
+                </p>
+              ) : null}
+            </>
           ) : null}
 
           <p className="ferry-journey-fuel-note">

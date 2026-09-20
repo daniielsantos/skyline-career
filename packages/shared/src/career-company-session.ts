@@ -17,7 +17,7 @@ import { settlePortYardHoldFees } from './career-ports.js';
 import { settleWarehouseStorageFees } from './career-warehouse.js';
 import { listCompaniesForWorld } from './career-companies.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
-import { completeNpcFerries } from './career-va-line-crew.js';
+import { finalizeStuckNpcFerries } from './career-va-line-crew.js';
 import {
   assembleMissionsFromTables,
   persistCompanyTables,
@@ -85,7 +85,7 @@ export function settleCompanyPassiveFeesForTickRange(
   });
   settleCrewOpsDue(missions, world, nowMs);
   listAircraftMarket(missions, world);
-  completeNpcFerries(missions, to);
+  finalizeStuckNpcFerries(missions, to);
 
   const passiveDebitUsd =
     hangarOps.debitUsd +

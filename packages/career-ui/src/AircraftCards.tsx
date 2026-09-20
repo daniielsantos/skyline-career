@@ -1481,6 +1481,13 @@ export function HangarAircraftCard(props: {
                         {ferryPlan.nextQuote
                           ? ` · ferry next ${props.formatMoney(ferryPlan.nextQuote.totalCostUsd)}`
                           : ''}
+                        {ferryPlan.ferryBilling?.mode === 'allowance'
+                          ? ' · Line crew · $0 you'
+                          : ferryPlan.ferryBilling?.mode === 'overflow'
+                            ? ` · your wallet ${props.formatMoney(ferryPlan.ferryBilling.yourCostUsd)}`
+                            : ferryPlan.ferryBilling?.mode === 'company'
+                              ? ' · VA wallet'
+                              : ''}
                       </p>
                     </>
                   ) : null}

@@ -188,8 +188,7 @@ import {
   fireVaLineCrew,
   vaLineCrewAllowanceRemaining,
   consumeVaLineCrewAllowance,
-  quoteNpcFerryEtaTicks,
-  completeNpcFerries,
+  finalizeStuckNpcFerries,
   VA_LINE_CREW_HIRE_USD,
   VA_LINE_CREW_SALARY_USD_PER_WEEK,
   VA_LINE_CREW_FIRE_SEVERANCE_USD,
@@ -1726,11 +1725,39 @@ async function withCareerRead<T>(
     const companyId = opts?.companyId?.trim();
     const missions = await loadMissions(companyId ? { companyId } : undefined);
     const crew = settleCrewOpsDue(missions, world, Date.now());
-    if (crew.settled.length > 0) {
+    const landed = finalizeStuckNpcFerries(missions, world.tick);
+    if (crew.settled.length > 0 || landed.length > 0) {
       await saveMissions(missions, companyId ? { companyId } : undefined);
     }
     return fn(world, missions);
   });
+}
+
+/**
+ * Quote / plan reads that must not queue behind the world pulse.
+ * Peeks the in-memory economy (no world lock, no crew settle) + loads missions.
+ * Mutating writes still use withCareerWrite.
+ */
+async function withCareerPeekRead<T>(
+  fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
+  opts?: { companyId?: string },
+): Promise<T> {
+  if (careerApiMode === 'gateway' && gatewayWorldClient) {
+    const auth: WorldApiAuth = {
+      ...gatewayAuthOrThrow(),
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    };
+    const missions = await gatewayLoadMissions(gatewayWorldClient, auth);
+    return fn(gatewayEconomyShell(), missions);
+  }
+  const activeStore = requireStore();
+  const world = activeStore.peekEconomyWorld();
+  if (!world) {
+    throw new Error('Economy not loaded');
+  }
+  const companyId = opts?.companyId?.trim();
+  const missions = await loadMissions(companyId ? { companyId } : undefined);
+  return fn(world, missions);
 }
 
 type CareerWriteOpts = {
@@ -6170,8 +6197,23 @@ export function createCareerApiServer(port = 8787) {
           url.searchParams.get('companyId'),
         );
         const ferryPlanActor = await resolveVaFleetActor(req, ferryPlanCompanyId);
+        const ferryPlanVaListed =
+          Boolean(store?.supportsAuth) &&
+          Boolean(
+            await Promise.resolve(store!.vaIsListed(ferryPlanCompanyId)),
+          );
+        const ferryPlanSession = authSessionFromRequest(req);
+        const ferryPlanPilotHome =
+          ferryPlanVaListed && ferryPlanSession && store
+            ? ((await Promise.resolve(
+                store.vaHomeCompanyId(ferryPlanSession.account.id),
+              )) ?? ferryPlanCompanyId)
+            : ferryPlanCompanyId;
+        const ferryPlanOrgPerks = ferryPlanVaListed
+          ? (await loadVaOrgPerksForCompany(ferryPlanCompanyId)).orgPerks
+          : resolveVaOrgPerks(null);
         try {
-          const result = await withCareerRead((world, missions) => {
+          const result = await withCareerPeekRead((world, missions) => {
             const aircraft = findPlayerAircraft(missions, aircraftId);
             if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
             const origin = aircraft.locationIcao.trim().toUpperCase();
@@ -6197,6 +6239,7 @@ export function createCareerApiServer(port = 8787) {
                 ),
                 walletUsd: missions.walletUsd,
                 aircraftLocationIcao: origin,
+                ferryBilling: null,
               };
             }
             const maxRangeNm = resolveAirframeMaxRangeNm(
@@ -6226,6 +6269,54 @@ export function createCareerApiServer(port = 8787) {
             const legIndex = nextLeg
               ? Math.max(1, plan.hops.indexOf(origin) + 1)
               : plan.legCount;
+
+            let ferryBilling:
+              | {
+                  mode: 'allowance' | 'overflow' | 'company';
+                  yourCostUsd: number;
+                  hired?: boolean;
+                  remaining?: number;
+                  allowance?: number;
+                }
+              | null = null;
+            if (ferryPlanVaListed && nextQuote) {
+              const lineCrew = vaLineCrewAllowanceRemaining(
+                missions,
+                world.tick,
+              );
+              const memberCross =
+                Boolean(ferryPlanPilotHome) &&
+                ferryPlanPilotHome !== ferryPlanCompanyId;
+              if (lineCrew.hired && lineCrew.remaining > 0) {
+                ferryBilling = {
+                  mode: 'allowance',
+                  yourCostUsd: 0,
+                  hired: true,
+                  remaining: lineCrew.remaining,
+                  allowance: lineCrew.allowance,
+                };
+              } else if (memberCross) {
+                ferryBilling = {
+                  mode: 'overflow',
+                  yourCostUsd: applyVaOrgCostMult(
+                    nextQuote.totalCostUsd,
+                    ferryPlanOrgPerks.ferryOverflowCostMult,
+                  ),
+                  hired: lineCrew.hired,
+                  remaining: lineCrew.remaining,
+                  allowance: lineCrew.allowance,
+                };
+              } else {
+                ferryBilling = {
+                  mode: 'company',
+                  yourCostUsd: nextQuote.totalCostUsd,
+                  hired: lineCrew.hired,
+                  remaining: lineCrew.remaining,
+                  allowance: lineCrew.allowance,
+                };
+              }
+            }
+
             return {
               arrived: false,
               plan: {
@@ -6248,6 +6339,7 @@ export function createCareerApiServer(port = 8787) {
               maxRangeNm,
               walletUsd: missions.walletUsd,
               aircraftLocationIcao: origin,
+              ferryBilling,
             };
           }, { companyId: ferryPlanCompanyId });
           send(res, 200, result);
@@ -6274,8 +6366,7 @@ export function createCareerApiServer(port = 8787) {
         const ferryActor = await resolveVaFleetActor(req, ferryCompanyId);
         try {
           if (body.quoteOnly) {
-            const quoted = await withCareerRead((world, missions) => {
-              completeNpcFerries(missions, world.tick);
+            const quoted = await withCareerPeekRead((world, missions) => {
               const quote = quoteFerry(world, missions, {
                 aircraftId: body.aircraftId!,
                 destIcao: body.destIcao!,
@@ -6306,8 +6397,7 @@ export function createCareerApiServer(port = 8787) {
           let willOverflow = false;
           let overflowQuoteUsd = 0;
           if (vaListed) {
-            const peek = await withCareerRead((world, missions) => {
-              completeNpcFerries(missions, world.tick);
+            const peek = await withCareerPeekRead((world, missions) => {
               const quote = quoteFerry(world, missions, {
                 aircraftId: body.aircraftId!,
                 destIcao: body.destIcao!,
@@ -6331,7 +6421,7 @@ export function createCareerApiServer(port = 8787) {
               pilotHome &&
               pilotHome !== ferryCompanyId
             ) {
-              const homeWallet = await withCareerRead((_w, missions) => {
+              const homeWallet = await withCareerPeekRead((_w, missions) => {
                 return missions.walletUsd;
               }, { companyId: pilotHome });
               if (homeWallet < overflowQuoteUsd) {
@@ -6353,7 +6443,7 @@ export function createCareerApiServer(port = 8787) {
 
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            completeNpcFerries(missions, world.tick);
+            finalizeStuckNpcFerries(missions, world.tick);
             const quote = quoteFerry(world, missions, {
               aircraftId: body.aircraftId!,
               destIcao: body.destIcao!,
@@ -6362,7 +6452,6 @@ export function createCareerApiServer(port = 8787) {
             });
 
             let skipWalletDebit = false;
-            let npcArriveAtTick: number | undefined;
             let ferryMode: 'solo' | 'allowance' | 'overflow' = 'solo';
 
             if (vaListed) {
@@ -6371,9 +6460,9 @@ export function createCareerApiServer(port = 8787) {
                 world.tick,
               );
               if (usedAllowance) {
+                // Free hop, still instant — NPC ETA hid tails from Manifest and
+                // contradicted the Instant ferry journey UI.
                 skipWalletDebit = true;
-                npcArriveAtTick =
-                  world.tick + quoteNpcFerryEtaTicks(quote.distanceNm);
                 ferryMode = 'allowance';
               } else {
                 // Overflow: no VA debit; charge pilot home after write.
@@ -6402,7 +6491,6 @@ export function createCareerApiServer(port = 8787) {
               aircraftId: body.aircraftId!,
               destIcao: body.destIcao!,
               skipWalletDebit,
-              npcArriveAtTick,
               actorAccountId: ferryActor.accountId,
               actorIsVaOwner: ferryActor.isOwner,
             });
@@ -6451,6 +6539,7 @@ export function createCareerApiServer(port = 8787) {
                 catchUp: false,
               },
             );
+            result.walletDebitUsd = debit.amountUsd;
           }
 
           send(res, 200, result);
@@ -6646,7 +6735,7 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           if (body.quoteOnly) {
-            const quoted = await withCareerRead((world, missions) => {
+            const quoted = await withCareerPeekRead((world, missions) => {
               const quote = quotePilotTravel(world, missions, body.destIcao!);
               return {
                 quote,

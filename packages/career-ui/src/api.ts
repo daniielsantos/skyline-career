@@ -4070,6 +4070,16 @@ export type FerryPlanLeg = {
   distanceNm: number;
 };
 
+export type FerryPlanBilling = {
+  /** Who pays the next empty hop on a VA-listed company. */
+  mode: 'allowance' | 'overflow' | 'company';
+  /** What the pilot's home wallet pays (0 when Line crew covers). */
+  yourCostUsd: number;
+  hired?: boolean;
+  remaining?: number;
+  allowance?: number;
+};
+
 export type FerryPlanView = {
   arrived: boolean;
   plan: {
@@ -4092,6 +4102,8 @@ export type FerryPlanView = {
   maxRangeNm: number;
   walletUsd: number;
   aircraftLocationIcao: string;
+  /** Present when ops company is a listed VA. */
+  ferryBilling?: FerryPlanBilling | null;
 };
 
 export function fetchFerryPlan(opts: {

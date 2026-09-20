@@ -134,13 +134,28 @@ export function CharterManifest(props: CharterManifestProps) {
               }}
             >
               {props.fleet
-                .filter((item) => item.status === 'parked')
+                .filter(
+                  (item) =>
+                    item.status === 'parked' || item.status === 'ferry',
+                )
                 .map((item) => {
                   const isVa = props.vaAircraftIds?.has(item.id);
                   const prefix = isVa ? 'VA' : 'Yours';
+                  const enRoute =
+                    item.status === 'ferry' && item.npcFerry
+                      ? `Line crew → ${item.npcFerry.destIcao}`
+                      : item.status === 'ferry'
+                        ? 'Line crew en route'
+                        : item.locationIcao === origin
+                          ? `@ ${origin}`
+                          : `ferry from ${item.locationIcao}`;
                   return (
-                  <option key={item.id} value={item.id}>
-                    {prefix} · {item.label} · {item.locationIcao === origin ? `@ ${origin}` : `ferry from ${item.locationIcao}`}
+                  <option
+                    key={item.id}
+                    value={item.id}
+                    disabled={item.status !== 'parked'}
+                  >
+                    {prefix} · {item.label} · {enRoute}
                   </option>
                   );
                 })}

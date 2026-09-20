@@ -9702,10 +9702,20 @@ export function App() {
         result.aircraft?.locationIcao?.trim().toUpperCase() ?? dest;
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
       const fuelNote = ' · tanks usually empty after hop';
+      const payLabel =
+        result.ferryMode === 'allowance'
+          ? 'Line crew · $0'
+          : result.ferryMode === 'overflow'
+            ? `−${formatMoney(
+                result.walletDebitUsd && result.walletDebitUsd > 0
+                  ? result.walletDebitUsd
+                  : result.quote.totalCostUsd,
+              )} your wallet`
+            : `−${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}`;
       setToast(
         arrivedAt === finalDest
-          ? `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)}${fuelNote}`
-          : `Ferry leg · ${result.quote.originIcao}→${result.quote.destIcao} · −${formatMoney(result.walletDebitUsd ?? result.quote.totalCostUsd)} · continue toward ${finalDest}${fuelNote}`,
+          ? `Ferry complete · ${result.quote.originIcao}→${result.quote.destIcao} · ${payLabel}${fuelNote}`
+          : `Ferry leg · ${result.quote.originIcao}→${result.quote.destIcao} · ${payLabel} · continue toward ${finalDest}${fuelNote}`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -17942,19 +17952,32 @@ export function App() {
                         .filter(
                           (entry) =>
                             entry.aircraft.id === staging.aircraftId ||
-                            entry.aircraft.status === 'parked',
+                            entry.aircraft.status === 'parked' ||
+                            entry.aircraft.status === 'ferry',
                         )
-                        .map((entry) => (
-                          <option
-                            key={entry.aircraft.id}
-                            value={entry.aircraft.id}
-                          >
-                            {opsAircraftSelectLabel(
-                              entry,
-                              staging.originIcao,
-                            )}
-                          </option>
-                        ))}
+                        .map((entry) => {
+                          const enRoute =
+                            entry.aircraft.status === 'ferry' &&
+                            entry.aircraft.npcFerry
+                              ? `Line crew → ${entry.aircraft.npcFerry.destIcao}`
+                              : entry.aircraft.status === 'ferry'
+                                ? 'Line crew en route'
+                                : null;
+                          return (
+                            <option
+                              key={entry.aircraft.id}
+                              value={entry.aircraft.id}
+                              disabled={entry.aircraft.status !== 'parked'}
+                            >
+                              {enRoute
+                                ? `${entry.owner === 'va' ? 'VA' : 'Yours'} · ${entry.aircraft.label} · ${enRoute}`
+                                : opsAircraftSelectLabel(
+                                    entry,
+                                    staging.originIcao,
+                                  )}
+                            </option>
+                          );
+                        })}
                     </select>
                   </label>
                   {stagingAssignedAircraft &&

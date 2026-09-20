@@ -6,6 +6,7 @@ import {
   completeNpcFerries,
   consumeVaLineCrewAllowance,
   fireVaLineCrew,
+  finalizeStuckNpcFerries,
   hireVaLineCrew,
   quoteNpcFerryEtaTicks,
   settleVaLineCrewSalary,
@@ -86,6 +87,52 @@ describe('VA Line crew ferry ops', () => {
     assert.equal(aircraft.status, 'parked');
     assert.equal(aircraft.locationIcao, 'SBSP');
     assert.equal(aircraft.npcFerry, undefined);
+  });
+
+  it('finalizeStuckNpcFerries lands mid-ETA hops immediately', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-line-force' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    hireVaLineCrew(state, world.tick);
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const eta = quoteNpcFerryEtaTicks(300);
+    executeFerry(world, state, {
+      aircraftId: aircraft.id,
+      destIcao: 'SBSP',
+      skipWalletDebit: true,
+      npcArriveAtTick: world.tick + eta,
+    });
+    assert.equal(aircraft.status, 'ferry');
+    finalizeStuckNpcFerries(state, world.tick);
+    assert.equal(aircraft.status, 'parked');
+    assert.equal(aircraft.locationIcao, 'SBSP');
+    assert.equal(aircraft.npcFerry, undefined);
+  });
+
+  it('player allowance ferry without npcArriveAtTick is instant', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-line-instant' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    hireVaLineCrew(state, world.tick);
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    assert.ok(consumeVaLineCrewAllowance(state, world.tick));
+    const ferried = executeFerry(world, state, {
+      aircraftId: aircraft.id,
+      destIcao: 'SBSP',
+      skipWalletDebit: true,
+    });
+    assert.equal(ferried.walletDebitUsd, 0);
+    assert.equal(ferried.aircraft.status, 'parked');
+    assert.equal(ferried.aircraft.locationIcao, 'SBSP');
+    assert.equal(ferried.aircraft.npcFerry, undefined);
   });
 
   it('allowance floor 4 and scales 2× parked up to 16', () => {

@@ -693,4 +693,18 @@ describe('VA aircraft reservation', () => {
     assert.equal(acf.reservedByAccountId, undefined);
     assert.equal(acf.reservedAtMs, undefined);
   });
+
+  it('normalizeMissionsState keeps reserved fields through save/load path', () => {
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const acf = state.fleet[0]!;
+    const t0 = 1_700_000_000_000;
+    reserveAircraftForMember(state, acf.id, 'acc_norm', t0);
+    const roundTrip = normalizeMissionsState(
+      JSON.parse(JSON.stringify(state)),
+    );
+    const again = roundTrip.fleet.find((a) => a.id === acf.id);
+    assert.ok(again);
+    assert.equal(again!.reservedByAccountId, 'acc_norm');
+    assert.equal(again!.reservedAtMs, t0);
+  });
 });

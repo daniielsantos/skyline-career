@@ -334,12 +334,12 @@ export function VaPage(props: Props) {
     );
   }
 
-  if (!loaded || tenantSwitching) {
+  // Roster/config paint as soon as members load. Hangar/ledger wait on the
+  // VA tenant pin (fetchState) — do not block the whole My VA shell on that.
+  if (!loaded) {
     return (
       <section className="panel va-panel">
-        <BusyStatus
-          label={tenantSwitching ? 'Opening VA hangar…' : 'Loading VA…'}
-        />
+        <BusyStatus label="Loading VA…" />
       </section>
     );
   }
@@ -618,6 +618,10 @@ export function VaPage(props: Props) {
 
       {pane === 'hangar' ? (
         <div className="va-pane-card">
+          {tenantSwitching ? (
+            <BusyStatus label="Opening VA hangar…" />
+          ) : (
+            <>
           {hangarReadOnly ? (
             <p className="settings-help">
               Hangar is view-only for members — ferry for flights is still
@@ -683,11 +687,17 @@ export function VaPage(props: Props) {
               })}
             </ul>
           )}
+            </>
+          )}
         </div>
       ) : null}
 
       {pane === 'ledger' ? (
         <div className="va-pane-card">
+          {tenantSwitching ? (
+            <BusyStatus label="Opening VA ledger…" />
+          ) : (
+            <>
           <div className="va-ledger-hero">
             <div className="va-ledger-wallet">
               <p className="aircraft-card-section-label" style={{ margin: 0 }}>
@@ -744,6 +754,8 @@ export function VaPage(props: Props) {
                 setLedgerError(message);
               }}
             />
+          )}
+            </>
           )}
         </div>
       ) : null}

@@ -650,6 +650,17 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
       Number.isFinite(raw.hoursSinceInspection)
         ? Math.max(0, raw.hoursSinceInspection)
         : undefined,
+    reservedByAccountId:
+      typeof raw.reservedByAccountId === 'string' &&
+      raw.reservedByAccountId.trim()
+        ? raw.reservedByAccountId.trim()
+        : undefined,
+    reservedAtMs:
+      typeof raw.reservedAtMs === 'number' &&
+      Number.isFinite(raw.reservedAtMs) &&
+      raw.reservedAtMs > 0
+        ? Math.floor(raw.reservedAtMs)
+        : undefined,
     npcFerry:
       raw.npcFerry &&
       typeof raw.npcFerry === 'object' &&

@@ -406,6 +406,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** `onSwitchCompany` inline recriava `refresh` a cada render; switch era fire-and-forget; erro transitório fazia `setRole(null)` → empty state.
 **Fix:** ref estável para switch/wallet; `await` do tenant switch com BusyStatus “Opening VA hangar…”; soft-fail não limpa shell VA já carregado.
 
+### My VA slow open + reserve vanish (2026-09-20)
+
+**Sintoma:** My VA ficava em “Opening VA hangar…” por muito tempo; Reserve sumia ao sair/voltar da página.
+**Causa:** (1) UI bloqueava o shell inteiro em `tenantSwitching` enquanto `fetchState` da VA rodava — roster já estava pronto. (2) `normalizePlayerAircraft` reconstruía o casco **sem** `reservedByAccountId` / `reservedAtMs`, então todo `saveMissions`/`loadMissions` (normalize) apagava a reserva antes de gravar/devolver.
+**Fix:** shell My VA pinta Roster/Config assim que members chegam; Hangar/Ledger mostram BusyStatus só no pane; normalize preserva reserved*; teste round-trip.
+
 ### Member Ledger empty then fills (2026-09-20)
 
 **Sintoma:** membro no Ledger via wallet/credit da VA mas “No ledger yet”; depois as linhas aparecem.

@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **696ff07** / desktop **0.3.152** shipped: Add dual-tenant Prepare fleet and tighten VA reserve plus update gates. Release: [v0.3.152](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.152).
+
+
 `main` **59d87c6** / desktop **0.3.151** shipped: Add VA org perks from Flight quality for MX and ferry overflow. Release: [v0.3.151](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.151).
 
 

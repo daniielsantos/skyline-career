@@ -3544,6 +3544,8 @@ export function App() {
   const [memberVaIsOwner, setMemberVaIsOwner] = useState(false);
   const memberVaCompanyIdRef = useRef<string | null>(null);
   memberVaCompanyIdRef.current = memberVaCompanyId;
+  const vaSessionFleetRef = useRef(vaSessionFleet);
+  vaSessionFleetRef.current = vaSessionFleet;
 
   /** Paint wallet without flashing $0 from ambient-tenant / empty shells mid +Nd. */
   const walletCommitHoldRef = useRef<{ usd: number; untilMs: number } | null>(
@@ -3884,15 +3886,45 @@ export function App() {
   }, [opsFleetEntries]);
 
   function resolveOpsCompanyId(aircraftId: string | null | undefined): string {
-    const entry = findOpsEntry(opsFleetEntries, aircraftId);
     const home =
       homeCompanyIdRef.current?.trim() ||
       homeCompanyId?.trim() ||
       getStoredCompanyId();
-    if (entry?.owner === 'va' && memberVaCompanyIdRef.current) {
-      return memberVaCompanyIdRef.current;
+    const vaId = memberVaCompanyIdRef.current?.trim();
+    const id = aircraftId?.trim() ?? '';
+    // Prefer live VA session membership over home-first merge ghosts.
+    if (
+      vaId &&
+      id &&
+      vaSessionFleet.some((a) => a.id === id)
+    ) {
+      return vaId;
+    }
+    const entry = findOpsEntry(opsFleetEntries, aircraftId);
+    if (entry?.owner === 'va' && vaId) {
+      return vaId;
     }
     return home;
+  }
+
+  /** Mutation fleet payload: keep VA tails out of chrome home `fleet`. */
+  function paintOpsMutationFleet(
+    nextFleet: PlayerAircraft[] | null | undefined,
+    opsCompanyId: string,
+  ) {
+    if (!Array.isArray(nextFleet)) return;
+    const vaId = memberVaCompanyIdRef.current?.trim();
+    if (vaId && opsCompanyId === vaId) {
+      setVaSessionFleet(nextFleet);
+      const vaIds = new Set(
+        nextFleet.map((a) => a.id?.trim()).filter(Boolean) as string[],
+      );
+      if (vaIds.size > 0) {
+        setFleet((prev) => prev.filter((a) => !vaIds.has(a.id?.trim() ?? '')));
+      }
+      return;
+    }
+    setFleet(nextFleet);
   }
 
   const [hangarPane, setHangarPane] = useState<
@@ -4546,7 +4578,17 @@ export function App() {
     }
     setHubSelected(Boolean(state.hubSelected));
     if (isHomeState) {
-      setFleet(state.fleet ?? []);
+      const vaIds = new Set(
+        vaSessionFleetRef.current
+          .map((a) => a.id?.trim())
+          .filter(Boolean) as string[],
+      );
+      const homeFleet = state.fleet ?? [];
+      setFleet(
+        vaIds.size > 0
+          ? homeFleet.filter((a) => !vaIds.has(a.id?.trim() ?? ''))
+          : homeFleet,
+      );
       setHubOptions(normalizeStarterHubs(state.hubs));
       setPilotName(state.pilotName ?? '');
       setHomeHubIcao(state.homeHubIcao ?? '');
@@ -9667,12 +9709,13 @@ export function App() {
   async function onFerry(
     aircraftId: string,
     destIcao: string,
-    opts?: { finalDest?: string },
+    opts?: { finalDest?: string; companyId?: string },
   ) {
     if (!destIcao.trim()) return;
     const dest = destIcao.trim().toUpperCase();
     const finalDest = opts?.finalDest?.trim().toUpperCase() || dest;
-    const opsCompanyId = resolveOpsCompanyId(aircraftId);
+    const opsCompanyId =
+      opts?.companyId?.trim() || resolveOpsCompanyId(aircraftId);
     const vaOps =
       Boolean(memberVaCompanyIdRef.current) &&
       opsCompanyId === memberVaCompanyIdRef.current;
@@ -9684,10 +9727,7 @@ export function App() {
         destIcao: dest,
         companyId: opsCompanyId,
       });
-      if (result.fleet) {
-        if (vaOps) setVaSessionFleet(result.fleet);
-        else setFleet(result.fleet);
-      }
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
       // Overflow debit hits home wallet; allowance/solo on VA must not paint
       // VA cash onto chrome.
       if (!vaOps) {
@@ -9743,10 +9783,7 @@ export function App() {
         destIcao: dest,
         companyId: opsCompanyId,
       });
-      if (result.fleet) {
-        if (vaOps) setVaSessionFleet(result.fleet);
-        else setFleet(result.fleet);
-      }
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
       if (vaOps) setVaSessionWallet(result.walletUsd);
       else commitWallet(result.walletUsd);
       setMissions((prev) => {
@@ -10104,8 +10141,7 @@ export function App() {
           aircraftId: draft.aircraftId,
           companyId: opsCompanyId,
         });
-        if (vaOps) setVaSessionFleet(result.fleet);
-        else setFleet(result.fleet);
+        paintOpsMutationFleet(result.fleet, opsCompanyId);
         if (vaOps) setVaSessionWallet(result.walletUsd);
         else commitWallet(result.walletUsd);
         if (result.charterActiveTour !== undefined) {
@@ -10601,8 +10637,7 @@ export function App() {
             })),
           });
           if (result.fleet) {
-            if (vaOps) setVaSessionFleet(result.fleet);
-            else setFleet(result.fleet);
+            paintOpsMutationFleet(result.fleet, opsCompanyId);
           }
           if (result.mission) {
             setMissions((prev) => {
@@ -18018,6 +18053,9 @@ export function App() {
                   onFlyLeg={async (legDest) => {
                     await onFerry(stagingAssignedAircraft.id, legDest, {
                       finalDest: staging.originIcao,
+                      companyId: resolveOpsCompanyId(
+                        stagingAssignedAircraft.id,
+                      ),
                     });
                   }}
                 />

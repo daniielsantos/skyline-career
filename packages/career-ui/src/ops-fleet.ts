@@ -73,9 +73,16 @@ export function buildOpsFleet(
 ): OpsFleetEntry[] {
   const out: OpsFleetEntry[] = [];
   const seen = new Set<string>();
+  // VA ids win when chrome home was wrongly painted with a VA fleet response
+  // (same id would otherwise show as "Yours" and Accept against home → Unknown).
+  const vaIds = new Set<string>();
+  for (const aircraft of vaFleet) {
+    const id = aircraft.id?.trim();
+    if (id) vaIds.add(id);
+  }
   for (const aircraft of homeFleet) {
     const id = aircraft.id?.trim();
-    if (!id || seen.has(id)) continue;
+    if (!id || seen.has(id) || vaIds.has(id)) continue;
     seen.add(id);
     out.push({ aircraft, owner: 'home' });
   }

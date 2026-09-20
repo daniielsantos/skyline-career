@@ -555,6 +555,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** allowance aplicava `npcArriveAtTick` → status `ferry` sem mover location; Manifest/Prepare só listam `parked`. ETA NPC + UI “Instant” incongruentes. Hangar VA vinha de `/api/va/members` (peek missions) sem finalizar hops.
 **Fix:** allowance = hop instantâneo $0; `finalizeStuckNpcFerries` no `withCareerRead`/settle **e** no load de `/api/va/members` (+save); picker mostra `ferry` desabilitado se ainda houver. Ferry pago sempre foi instantâneo — o ETA era só o path Line crew (revertido).
 
+### Prepare Accept Unknown aircraft + Yours label on VA Duke (2026-09-20)
+
+**Sintoma:** Manifest mostra `Yours · Duke`; Aerostar some; Accept → `Unknown aircraft acf_…`.
+**Causa:** resposta de ferry/commit VA pintava `setFleet` (chrome home) quando o merge home-first marcava o id como Yours → Accept usava company home.
+**Fix:** `buildOpsFleet` prioriza ids da VA session; `resolveOpsCompanyId` consulta `vaSessionFleet`; `paintOpsMutationFleet` nunca grava frota VA em `fleet`; refresh home filtra ghosts VA.
+
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 
 **Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.

@@ -13974,6 +13974,20 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
+.va-org-perks {
+  margin-top: 0.55rem;
+}
+.va-org-perks-tier {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.va-org-perks-labels {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  max-width: 28rem;
+}
 @media (max-width: 640px) {
   .va-ledger-hero {
     grid-template-columns: 1fr;

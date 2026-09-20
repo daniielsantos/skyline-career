@@ -1253,6 +1253,19 @@ export type VaFlightQualitySnapshot = {
   qualityScore: number | null;
 };
 
+/** Org perks from Flight quality (listed VA only). */
+export type VaOrgPerks = {
+  tier: 0 | 1 | 2 | 3;
+  tierName: string;
+  qualityScore: number | null;
+  flightCount: number;
+  unlocked: boolean;
+  mxCostMult: number;
+  ferryOverflowCostMult: number;
+  labels: string[];
+  nextTierHint: string | null;
+};
+
 export type StarterHubOption = {
   icao: string;
   name: string;
@@ -1585,6 +1598,7 @@ export function fetchCashflow() {
       labels?: Record<string, string>;
       companyCredit?: CompanyCreditSnapshot;
       flightQuality?: VaFlightQualitySnapshot | null;
+      orgPerks?: VaOrgPerks | null;
     }
   >('/api/cashflow');
 }
@@ -4948,6 +4962,7 @@ export type VaCompanyRank = {
   nm: number;
   payUsd: number;
   flightQuality?: VaFlightQualitySnapshot | null;
+  orgPerks?: VaOrgPerks | null;
 };
 
 export type VaPilotRank = {
@@ -5002,6 +5017,7 @@ export function fetchVaMembers() {
       fireSeveranceUsd: number;
     } | null;
     flightQuality?: VaFlightQualitySnapshot | null;
+    orgPerks?: VaOrgPerks | null;
     viewerAccountId?: string;
     nowMs?: number;
     onlineWindowMs?: number;
@@ -5156,6 +5172,7 @@ export type VaDirectoryEntry = {
   memberRouteCutPct?: number;
   seatsOpen: number;
   flightQuality?: VaFlightQualitySnapshot | null;
+  orgPerks?: VaOrgPerks | null;
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
   myRole?: 'owner' | 'dispatcher' | 'pilot' | null;
 };

@@ -21,6 +21,7 @@ export {
 } from './career-store-v12.js';
 export * from './career-va.js';
 export * from './career-va-line-crew.js';
+export * from './career-va-perks.js';
 export * from './career-world-tick-service.js';
 export * from './career-clock.js';
 export * from './career-client-update-policy.js';

@@ -88,6 +88,9 @@ export function VaRankingPage(props: Props) {
                   {row.flightQuality?.qualityScore != null
                     ? ` · quality ${Math.round(row.flightQuality.qualityScore)}`
                     : ''}
+                  {row.orgPerks && row.orgPerks.tier > 0
+                    ? ` · ${row.orgPerks.tierName}`
+                    : ''}
                 </li>
               ))}
             </ol>

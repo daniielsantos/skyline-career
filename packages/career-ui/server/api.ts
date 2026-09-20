@@ -193,6 +193,10 @@ import {
   VA_LINE_CREW_HIRE_USD,
   VA_LINE_CREW_SALARY_USD_PER_WEEK,
   VA_LINE_CREW_FIRE_SEVERANCE_USD,
+  resolveVaOrgPerks,
+  applyVaOrgCostMult,
+  type VaOrgPerks,
+  type VaFlightQualitySnapshot,
   holdWarehouseHaul,
   cancelWarehouseHaulHold,
   acceptWarehouseHaul,
@@ -1564,6 +1568,43 @@ async function assertVaOwnerForFleetMx(
     companyId,
     'pay maintenance or repair on company aircraft',
   );
+}
+
+/** Flight-quality org perks for a listed VA (noop tiers for solo / missing). */
+async function loadVaOrgPerksForCompany(
+  companyId: string | null | undefined,
+): Promise<{
+  flightQuality: VaFlightQualitySnapshot | null;
+  orgPerks: VaOrgPerks;
+}> {
+  const empty = {
+    flightQuality: null as VaFlightQualitySnapshot | null,
+    orgPerks: resolveVaOrgPerks(null),
+  };
+  if (!companyId || !store?.supportsAuth) return empty;
+  try {
+    const listed = await Promise.resolve(store.vaIsListed(companyId));
+    if (!listed) return empty;
+    const tick =
+      typeof store.peekEconomyWorld === 'function'
+        ? (store.peekEconomyWorld()?.tick ?? 0)
+        : 0;
+    const toDay = vaDayKeyFromTick(tick);
+    const fromDay = Math.max(0, toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1));
+    const flightQuality = await Promise.resolve(
+      store.vaFlightQuality({
+        companyId,
+        fromDayKey: fromDay,
+        toDayKey: toDay,
+      }),
+    );
+    return {
+      flightQuality,
+      orgPerks: resolveVaOrgPerks(flightQuality),
+    };
+  } catch {
+    return empty;
+  }
 }
 
 async function resolveVaFleetActor(
@@ -3633,27 +3674,11 @@ export function createCareerApiServer(port = 8787) {
           }
         }
         let flightQuality = null;
+        let orgPerks = resolveVaOrgPerks(null);
         if (listed) {
-          try {
-            const tick =
-              typeof store.peekEconomyWorld === 'function'
-                ? (store.peekEconomyWorld()?.tick ?? 0)
-                : 0;
-            const toDay = vaDayKeyFromTick(tick);
-            const fromDay = Math.max(
-              0,
-              toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1),
-            );
-            flightQuality = await Promise.resolve(
-              store.vaFlightQuality({
-                companyId,
-                fromDayKey: fromDay,
-                toDayKey: toDay,
-              }),
-            );
-          } catch {
-            flightQuality = null;
-          }
+          const loaded = await loadVaOrgPerksForCompany(companyId);
+          flightQuality = loaded.flightQuality;
+          orgPerks = loaded.orgPerks;
         }
         // Hangar preview from the same missions load — avoids a second
         // withCareerRead(/api/state) behind the world pulse (~20s).
@@ -3694,6 +3719,7 @@ export function createCareerApiServer(port = 8787) {
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
           flightQuality,
+          orgPerks,
           fleet: hangarFleet,
           walletUsd,
           viewerAccountId: session.account.id,
@@ -4117,7 +4143,7 @@ export function createCareerApiServer(port = 8787) {
           url.searchParams.get('worldId')?.trim() ||
           world?.worldId ||
           undefined;
-        const directory = await Promise.resolve(
+        const directoryRaw = await Promise.resolve(
           store.vaDirectory({
             worldId,
             accountId: session.account.id,
@@ -4125,6 +4151,10 @@ export function createCareerApiServer(port = 8787) {
             limit: 80,
           }),
         );
+        const directory = directoryRaw.map((row) => ({
+          ...row,
+          orgPerks: resolveVaOrgPerks(row.flightQuality ?? null),
+        }));
         const listedMembership = await Promise.resolve(
           store.vaListedMembership(session.account.id),
         );
@@ -4545,13 +4575,17 @@ export function createCareerApiServer(port = 8787) {
         const toDay = vaDayKeyFromTick(tick);
         const fromDay = Math.max(0, toDay - (VA_RANKING_WINDOW_DAYS - 1));
         const companyId = companyIdFromRequest(req) ?? url.searchParams.get('companyId') ?? undefined;
-        const ranking = await Promise.resolve(
+        const rankingRaw = await Promise.resolve(
           store.vaCompanyRanking({
             fromDayKey: fromDay,
             toDayKey: toDay,
             limit: 20,
           }),
         );
+        const ranking = rankingRaw.map((row) => ({
+          ...row,
+          orgPerks: resolveVaOrgPerks(row.flightQuality ?? null),
+        }));
         let pilots: Awaited<ReturnType<typeof store.vaPilotRanking>> = [];
         if (companyId) {
           pilots = await Promise.resolve(
@@ -5328,25 +5362,12 @@ export function createCareerApiServer(port = 8787) {
           cashflowCompanyId ? { companyId: cashflowCompanyId } : undefined,
         );
         const cashflow = summarizeCareerLedger(missions, world.tick);
-        const toDay = vaDayKeyFromTick(world.tick);
-        const fromDay = Math.max(
-          0,
-          toDay - (VA_FLIGHT_QUALITY_WINDOW_DAYS - 1),
-        );
         let flightQuality = null;
+        let orgPerks = resolveVaOrgPerks(null);
         if (cashflowCompanyId && store) {
-          const listed = await Promise.resolve(
-            store.vaIsListed(cashflowCompanyId),
-          );
-          if (listed) {
-            flightQuality = await Promise.resolve(
-              store.vaFlightQuality({
-                companyId: cashflowCompanyId,
-                fromDayKey: fromDay,
-                toDayKey: toDay,
-              }),
-            );
-          }
+          const loaded = await loadVaOrgPerksForCompany(cashflowCompanyId);
+          flightQuality = loaded.flightQuality;
+          orgPerks = loaded.orgPerks;
         }
         send(res, 200, {
           walletUsd: missions.walletUsd,
@@ -5357,6 +5378,7 @@ export function createCareerApiServer(port = 8787) {
           labels: LEDGER_KIND_LABEL,
           companyCredit: companyCreditSnapshot(missions),
           flightQuality,
+          orgPerks,
           ...cashflow,
         });
         return;
@@ -5953,11 +5975,13 @@ export function createCareerApiServer(port = 8787) {
         const mxCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           await assertVaOwnerForFleetMx(req, mxCompanyId);
+          const { orgPerks } = await loadVaOrgPerksForCompany(mxCompanyId);
           const result = await withCareerWrite((world, missions) => {
             const mx = clearAircraftMaintenanceWithParts(
               missions,
               body.aircraftId!,
               world,
+              { extraServiceMult: orgPerks.mxCostMult },
             );
             return {
               walletUsd: missions.walletUsd,
@@ -5965,6 +5989,7 @@ export function createCareerApiServer(port = 8787) {
               needsRepair: mx.needsRepair,
               mro: mx.mro,
               fleet: withParkingRates(missions.fleet),
+              orgPerks,
             };
           }, {
             commandSliceAircraftId: body.aircraftId,
@@ -5994,6 +6019,7 @@ export function createCareerApiServer(port = 8787) {
         const repairCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           await assertVaOwnerForFleetMx(req, repairCompanyId);
+          const { orgPerks } = await loadVaOrgPerksForCompany(repairCompanyId);
           const result = await withCareerWrite((world, missions) => {
             const repaired = repairAircraftConditionWithParts(
               missions,
@@ -6002,6 +6028,7 @@ export function createCareerApiServer(port = 8787) {
               {
                 airframePts: body.airframePts,
                 enginePts: body.enginePts,
+                extraServiceMult: orgPerks.mxCostMult,
               },
             );
             return {
@@ -6010,6 +6037,7 @@ export function createCareerApiServer(port = 8787) {
               aircraft: repaired.aircraft,
               mro: repaired.mro,
               fleet: withParkingRates(missions.fleet),
+              orgPerks,
             };
           }, {
             commandSliceAircraftId: body.aircraftId,
@@ -6266,6 +6294,9 @@ export function createCareerApiServer(port = 8787) {
                   store.vaHomeCompanyId(session.account.id),
                 )) ?? ferryCompanyId)
               : ferryCompanyId;
+          const ferryOrgPerks = vaListed
+            ? (await loadVaOrgPerksForCompany(ferryCompanyId)).orgPerks
+            : resolveVaOrgPerks(null);
 
           // Peek quote + allowance to decide overflow before mutating VA fleet.
           let willOverflow = false;
@@ -6287,7 +6318,10 @@ export function createCareerApiServer(port = 8787) {
             }, { companyId: ferryCompanyId });
             willOverflow =
               !peek.allowance.hired || peek.allowance.remaining <= 0;
-            overflowQuoteUsd = peek.quote.totalCostUsd;
+            overflowQuoteUsd = applyVaOrgCostMult(
+              peek.quote.totalCostUsd,
+              ferryOrgPerks.ferryOverflowCostMult,
+            );
             if (
               willOverflow &&
               pilotHome &&
@@ -6344,7 +6378,10 @@ export function createCareerApiServer(port = 8787) {
                 if (pilotHome && pilotHome !== ferryCompanyId) {
                   overflowDebit = {
                     companyId: pilotHome,
-                    amountUsd: quote.totalCostUsd,
+                    amountUsd: applyVaOrgCostMult(
+                      quote.totalCostUsd,
+                      ferryOrgPerks.ferryOverflowCostMult,
+                    ),
                     note: `${quote.originIcao}→${quote.destIcao}`,
                     aircraftId: body.aircraftId!,
                     destIcao: quote.destIcao,

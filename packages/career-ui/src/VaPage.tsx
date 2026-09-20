@@ -22,6 +22,7 @@ import {
   type CareerCashflowSnapshot,
   type CompanyCreditSnapshot,
   type VaFlightQualitySnapshot,
+  type VaOrgPerks,
 } from './api';
 import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
@@ -139,6 +140,7 @@ export function VaPage(props: Props) {
     useState<CompanyCreditSnapshot | null>(null);
   const [flightQuality, setFlightQuality] =
     useState<VaFlightQualitySnapshot | null>(null);
+  const [orgPerks, setOrgPerks] = useState<VaOrgPerks | null>(null);
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export function VaPage(props: Props) {
       // cashflow.walletUsd / props.walletUsd (vaSessionWallet).
       if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
       setFlightQuality(snap.flightQuality ?? null);
+      setOrgPerks(snap.orgPerks ?? null);
     } catch (err) {
       if (gen !== ledgerFetchGenRef.current) return;
       setLedgerError(err instanceof Error ? err.message : String(err));
@@ -213,6 +216,8 @@ export function VaPage(props: Props) {
       setLineCrew(m.lineCrew ?? null);
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
+      setFlightQuality(m.flightQuality ?? null);
+      setOrgPerks(m.orgPerks ?? null);
       hasVaShellRef.current = Boolean(m.role && m.listed);
       // Hangar local first — do not push fleet to App until after tenant pin,
       // or chrome home fleet gets overwritten while active is still home.
@@ -422,6 +427,19 @@ export function VaPage(props: Props) {
             {homeHubIcao || '—'} · {members.length}/{memberCap} seats · recruiting{' '}
             <strong>{recruiting ? 'on' : 'off'}</strong> · role{' '}
             <strong>{role}</strong>
+            {orgPerks ? (
+              <>
+                {' '}
+                · org{' '}
+                <strong>
+                  {orgPerks.tierName}
+                  {orgPerks.tier > 0 ? ` T${orgPerks.tier}` : ''}
+                </strong>
+                {orgPerks.labels.length > 0
+                  ? ` (${orgPerks.labels.join(', ')})`
+                  : ''}
+              </>
+            ) : null}
           </p>
         </div>
         <div className="hangar-pane-toggle" role="tablist" aria-label="My VA views">
@@ -773,6 +791,23 @@ export function VaPage(props: Props) {
                   <span className="muted"> · building</span>
                 )}
               </p>
+              {orgPerks ? (
+                <div className="va-org-perks">
+                  <p className="va-org-perks-tier">
+                    Org perks · <strong>{orgPerks.tierName}</strong>
+                    {orgPerks.tier > 0 ? ` (T${orgPerks.tier})` : ''}
+                  </p>
+                  {orgPerks.labels.length > 0 ? (
+                    <p className="va-org-perks-labels muted">
+                      {orgPerks.labels.join(' · ')}
+                    </p>
+                  ) : orgPerks.nextTierHint ? (
+                    <p className="va-org-perks-labels muted">
+                      {orgPerks.nextTierHint}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
           {ledgerError ? (

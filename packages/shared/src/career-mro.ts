@@ -159,6 +159,7 @@ export function clearAircraftMaintenanceWithParts(
   state: CareerMissionsState,
   aircraftId: string,
   world: CareerEconomyWorld,
+  opts?: { extraServiceMult?: number },
 ): {
   state: CareerMissionsState;
   debitUsd: number;
@@ -176,7 +177,9 @@ export function clearAircraftMaintenanceWithParts(
     icao: aircraft.locationIcao,
     requestedKg: mroKgForInspection(aircraft.aircraftClassId),
   });
-  const serviceMult = fboServiceCostMult(state, aircraft.locationIcao);
+  const serviceMult =
+    fboServiceCostMult(state, aircraft.locationIcao) *
+    Math.max(0.01, opts?.extraServiceMult ?? 1);
   const debit =
     Math.round((labor * mro.laborSurcharge + mro.partsCostUsd) * serviceMult * 100) /
     100;
@@ -211,7 +214,11 @@ export function repairAircraftConditionWithParts(
   state: CareerMissionsState,
   aircraftId: string,
   world: CareerEconomyWorld,
-  opts: { airframePts?: number; enginePts?: number },
+  opts: {
+    airframePts?: number;
+    enginePts?: number;
+    extraServiceMult?: number;
+  },
 ): {
   state: CareerMissionsState;
   debitUsd: number;
@@ -243,7 +250,9 @@ export function repairAircraftConditionWithParts(
     icao: aircraft.locationIcao,
     requestedKg: mroKgForRepair(aircraft.aircraftClassId, afApply, engApply),
   });
-  const serviceMult = fboServiceCostMult(state, aircraft.locationIcao);
+  const serviceMult =
+    fboServiceCostMult(state, aircraft.locationIcao) *
+    Math.max(0.01, opts.extraServiceMult ?? 1);
   const debit =
     Math.round((labor * mro.laborSurcharge + mro.partsCostUsd) * serviceMult * 100) /
     100;

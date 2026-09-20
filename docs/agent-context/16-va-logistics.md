@@ -1,8 +1,9 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-09-19. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
+Atualizado 2026-09-20. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
+**Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. Buff concessão herdado = ainda backlog.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -78,6 +79,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - **Owner ops** (credit) = `companyCredit.repScore` (média Cargo Ops da company). Em VA listada = ladder do owner nessa company; membros **não** dual-write unlock. Fórmula de limit **inalterada** — só copy honesta (`Owner ops` no credit block; strip do Ledger **não** promove Ops como reputação de marca).
 - **Flight quality** = rolling 7d de settle `flightScore.pct` + `onTime` (`company_flight_quality_stats`). Composite `0.7*avg + 0.3*onTimePct` só com ≥3 settles — sinal de org (membros contribuem).
 - Settle em company `va_listed` grava quality (Freights/Demand/Charter/IH com score). UI: My VA Ledger strip = Flight quality; directory/ranking chip Quality; credit = Owner ops.
+- **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. Não confundir com **buff de concessão herdado** (Port FBO P# no porto home — membros herdam buy/ETA/listings; ainda backlog).
 
 **Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
 
@@ -400,6 +402,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** quality era efêmera no debrief; Cargo Ops XP de membros vai pra home (certo) e não alimenta um score de marca.
 **Fix:** tabela `company_flight_quality_stats` (SQLite v15 / PG v26); settle em VA listed grava score+onTime; snapshot 7d em cashflow/members/directory/ranking; UI labels **Ops rep** vs **Flight quality** (sem dual-write de unlock).
 
+### VA org perks from Flight quality (2026-09-20)
+
+**Sintoma / gap:** Flight quality era só display — VA “boa” não ganhava efeito operacional; join value ainda dependia só de IH/cut.
+**Causa:** sem tabela quality→perk; MX/ferry overflow não liam org score; UI sem chip.
+**Fix:** `career-va-perks.ts` (Proven/Reliable/Elite); API members/cashflow/directory/ranking + MX `extraServiceMult` + ferry overflow mult; UI My VA head/Ledger + directory Perks + ranking. Sem Jet-A org (Base/Port). Buff concessão herdado continua backlog separado.
+
 ### Credit / Ledger UI sanitize (2026-09-20)
 
 **Sintoma:** bloco Credit no Hangar e My VA Ledger com blurb longo (taxa %, collateral, sell-back) e Draw/Repay amontoados numa row.
@@ -509,6 +517,7 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] Hangar VA: member read-only UI (sell/lease/MX; ferry ok) + **API gate MX + sell/list/unlist owner-only**
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
+- [x] **VA org perks** — quality → Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
 - [x] **Ledger cashflow light + wallet audit** — GET /api/cashflow sem world lock; setWallet→commitWallet sticky
 - [x] **Chrome wallet ref lag** — sync activeCompanyIdRef + getStoredCompanyId no sticky; fleet/wallet após pin
@@ -521,5 +530,4 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA
-- [ ] Buff concessão herdada no porto home da VA (member-aware)
-- [ ] Buff concessão herdado por membros (Tier 1)
+- [ ] Buff concessão herdado no porto home da VA (member-aware; Tier 1)

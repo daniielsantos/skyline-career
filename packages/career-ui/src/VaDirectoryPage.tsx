@@ -198,6 +198,14 @@ export function VaDirectoryPage(props: Props) {
                       </span>
                     </div>
                     <div>
+                      <span className="va-stat-label">Perks</span>
+                      <span className="va-stat-value">
+                        {row.orgPerks && row.orgPerks.tier > 0
+                          ? row.orgPerks.tierName
+                          : '—'}
+                      </span>
+                    </div>
+                    <div>
                       <span className="va-stat-label">Seats</span>
                       <span className="va-stat-value">{row.seatsOpen}</span>
                     </div>

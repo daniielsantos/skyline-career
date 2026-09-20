@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **6a2c26a** / desktop **0.3.134** shipped: Make VA invite codes permanent until the owner renews. Release: [v0.3.134](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.134).
+
+
 `main` **0f6c79e** / desktop **0.3.133** shipped: Fix My VA for members and tidy the roster layout. Release: [v0.3.133](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.133).
 
 

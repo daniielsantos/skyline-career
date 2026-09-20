@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **9e13e16** / desktop **0.3.161** shipped: Speed up Dispatch fuel quote and Accept by skipping the world lock. Release: [v0.3.161](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.161).
+
+
 `main` **1352dfc** / desktop **0.3.160** shipped: Fix VA Manifest cargo limit using the wrong airframe. Release: [v0.3.160](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.160).
 
 

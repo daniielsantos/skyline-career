@@ -11447,7 +11447,7 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'missionId required when replace=true' });
           return;
         }
-        const peek = await withCareerRead((world, missions) => {
+        const peek = await withCareerPeekRead((world, missions) => {
           if (!missions.hubSelected || missions.fleet.length === 0) {
             return { kind: 'no_hub' as const };
           }
@@ -11522,7 +11522,7 @@ export function createCareerApiServer(port = 8787) {
           peek.aircraftClassId,
           peek.airframeTypeId,
         );
-        const stagingProgPeek = await withCareerRead((_w, missions) => ({
+        const stagingProgPeek = await withCareerPeekRead((_w, missions) => ({
           cargoOps: missions.cargoOps,
           classOps: missions.classOps,
         }), { companyId: stagingCompanyId });
@@ -12121,7 +12121,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const dispatchCompanyId = companyIdFromRequest(req, body.companyId);
-        const prep = await withCareerRead((world, missions) => {
+        // Peek — do not queue behind the world pulse for a read-only prep.
+        const prep = await withCareerPeekRead((world, missions) => {
           const mission = missions.missions.find((m) => m.id === body.missionId);
           if (!mission) return { kind: 'missing' as const };
           if (mission.status !== 'accepted' && mission.status !== 'dispatched') {
@@ -12524,7 +12525,8 @@ export function createCareerApiServer(port = 8787) {
         const fuelCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (path === '/api/fuel/quote') {
-            const quoted = await withCareerRead((world, missions) => {
+            // Peek — quote must not sit behind the world pulse (~15s).
+            const quoted = await withCareerPeekRead((world, missions) => {
               const idx = missions.missions.findIndex((m) => m.id === body.missionId);
               if (idx < 0) return { kind: 'missing' as const };
               const mission = missions.missions[idx]!;

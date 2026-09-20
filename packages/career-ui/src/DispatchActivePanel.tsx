@@ -453,15 +453,19 @@ export function DispatchActivePanel(props: {
             props.missionOpsCapacityHint > 0
               ? props.missionOpsCapacityHint
               : null;
-          const capacityLeftKg = Math.max(0, structuralMaxKg - mission.cargoKg);
+          // Booking bar matches Manifest (ops). Structural alone made Accept
+          // look like the Duke suddenly grew ~1 klb of payload.
+          const barCapKg =
+            opsCapKg !== null
+              ? Math.min(opsCapKg, structuralMaxKg)
+              : structuralMaxKg;
+          const capacityLeftKg = Math.max(0, barCapKg - mission.cargoKg);
           const routeOpsNote =
             opsCapKg !== null &&
             opsCapKg + 1 < structuralMaxKg
               ? mission.payloadLab
-                ? `Route ops estimate ${props.formatTonnes(opsCapKg)} (Lab keeps booked payload)`
-                : mission.cargoKg > opsCapKg + 1
-                  ? `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate — SimBrief may allow more)`
-                  : `Route ops cap ${props.formatTonnes(opsCapKg)} (Career fuel estimate)`
+                ? `Structural ${props.formatTonnes(structuralMaxKg)} (Lab keeps booked payload)`
+                : `Structural ${props.formatTonnes(structuralMaxKg)} · route ops is the booking cap`
               : undefined;
           const routeLabel =
             routeDistanceNm !== undefined
@@ -532,7 +536,7 @@ export function DispatchActivePanel(props: {
                   ? ((mission.pax ?? 0) * 175) / KG_TO_LB + (mission.baggageKg ?? 0)
                   : mission.cargoKg
               }
-              capKg={structuralMaxKg}
+              capKg={barCapKg}
               capacityNote={routeOpsNote}
               highlights={[
                 {
@@ -572,13 +576,17 @@ export function DispatchActivePanel(props: {
                       <span>
                         Capacity left
                         <strong>{props.formatTonnes(capacityLeftKg)}</strong>
-                        <em>structural</em>
+                        <em>
+                          {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg
+                            ? 'vs route ops cap'
+                            : 'structural'}
+                        </em>
                       </span>
                       {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg ? (
                         <span>
-                          Route ops cap
-                          <strong>{props.formatTonnes(opsCapKg)}</strong>
-                          <em>MTOW − fuel estimate for this leg</em>
+                          Structural max
+                          <strong>{props.formatTonnes(structuralMaxKg)}</strong>
+                          <em>airframe · not the booking cap</em>
                         </span>
                       ) : null}
                       <span>

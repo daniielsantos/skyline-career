@@ -6622,6 +6622,7 @@ export function App() {
         const result = await postConfirmOfp({
           missionId: activeMission.id,
           simbriefUser: username,
+          companyId: resolveOpsCompanyId(activeMission.aircraftId) || undefined,
         });
         if (cancelled) return;
         setMissions((current) =>
@@ -6712,17 +6713,22 @@ export function App() {
     setMissionFuelQuoteError(null);
     void (async () => {
       try {
-        const result = await postFuelQuote(mission.id);
+        const opsCompanyId = resolveOpsCompanyId(mission.aircraftId);
+        const result = await postFuelQuote(mission.id, {
+          companyId: opsCompanyId || undefined,
+        });
         if (cancelled) return;
         if (result.quote.shortfallKg <= 0) {
-          const purchased = await postFuelPurchase(mission.id);
+          const purchased = await postFuelPurchase(mission.id, {
+            companyId: opsCompanyId || undefined,
+          });
           if (cancelled) return;
           setMissions((current) =>
             current.map((m) =>
               m.id === purchased.mission.id ? purchased.mission : m,
             ),
           );
-          setFleet(purchased.fleet);
+          paintOpsMutationFleet(purchased.fleet, opsCompanyId);
           commitWallet(purchased.walletUsd);
           setMissionFuelQuote(null);
           setMissionFuelQuoteStatus('ready');
@@ -6747,6 +6753,7 @@ export function App() {
   }, [
     activeMission?.id,
     activeMission?.status,
+    activeMission?.aircraftId,
     activeMission?.contractPilot,
     activeMission?.fuelAuthorizedOfpId,
     activeMission?.lastOfpCheck?.ofpId,
@@ -6953,6 +6960,7 @@ export function App() {
         const result = await postPreflight({
           missionId: activeMission.id,
           simbriefUser: username,
+          companyId: resolveOpsCompanyId(activeMission.aircraftId) || undefined,
         });
         if (cancelled) return;
         setPreflightBootstrapError(null);
@@ -10635,10 +10643,8 @@ export function App() {
           const vaOps =
             Boolean(memberVaCompanyIdRef.current) &&
             opsCompanyId === memberVaCompanyIdRef.current;
-          // Pin VA tenant for Dispatch/OFP while chrome stays home-sticky.
-          if (vaOps && memberVaCompanyIdRef.current) {
-            await switchCompanyForVa(memberVaCompanyIdRef.current);
-          }
+          // Commit with explicit companyId first — do not wait on VA session
+          // pin (that was stacking ~session open ahead of the world write).
           const result = await postStagingCommit({
             aircraft: clamped.aircraft,
             aircraftId: clamped.aircraftId,
@@ -10669,6 +10675,10 @@ export function App() {
           if (typeof result.walletUsd === 'number') {
             if (vaOps) setVaSessionWallet(result.walletUsd);
             else commitWallet(result.walletUsd);
+          }
+          // Pin VA for Dispatch/OFP after paint so Accept is not blocked on it.
+          if (vaOps && memberVaCompanyIdRef.current) {
+            await switchCompanyForVa(memberVaCompanyIdRef.current);
           }
           if (activeCareerProfile?.id) {
             clearPersistedStagingDraft(activeCareerProfile.id);
@@ -10840,6 +10850,7 @@ export function App() {
         open: true,
         weightSystem,
         liveTitle: simBridgeRef.current?.aircraftTitle ?? null,
+        companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
       });
       if (result.mission) {
         setMissions((current) =>
@@ -10923,6 +10934,7 @@ export function App() {
     const result = await postConfirmOfp({
       missionId: mission.id,
       simbriefUser: username,
+      companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
     });
     setMissions((current) =>
       current.map((m) => (m.id === result.mission.id ? result.mission : m)),
@@ -10958,6 +10970,7 @@ export function App() {
       const result = await postAcceptOfpCargo({
         missionId: mission.id,
         simbriefUser: username,
+        companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
       });
       // Cargo changed — next Open SimBrief must rebuild the dispatch URL.
       setSimbriefLaunchUrl(null);
@@ -11007,7 +11020,10 @@ export function App() {
         /* watch may already be idle */
         setWatch(null);
       }
-      const result = await postCancel({ missionId: mission.id });
+      const result = await postCancel({
+        missionId: mission.id,
+        companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
+      });
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
@@ -11209,6 +11225,7 @@ export function App() {
             missionId: mission.id,
             simbriefUser: username,
             runPreflightAfter: true,
+            companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
           },
           { signal: abort.signal },
         );
@@ -11292,9 +11309,12 @@ export function App() {
   async function onBuyMissionFuel(mission: Mission) {
     setMissionFuelQuoteStatus('loading');
     await run(async () => {
-      const result = await postFuelPurchase(mission.id);
+      const opsCompanyId = resolveOpsCompanyId(mission.aircraftId);
+      const result = await postFuelPurchase(mission.id, {
+        companyId: opsCompanyId || undefined,
+      });
       commitWallet(result.walletUsd);
-      if (result.fleet) setFleet(result.fleet);
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
@@ -11342,10 +11362,16 @@ export function App() {
       override = true;
     }
     await run(async () => {
-      const result = await postDepart({ missionId: mission.id, override });
+      const opsCompanyId = resolveOpsCompanyId(mission.aircraftId);
+      const result = await postDepart({
+        missionId: mission.id,
+        override,
+        companyId: opsCompanyId || undefined,
+      });
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
       if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
       setToastKind(
         override || result.mission.fuelUplift?.scarcity === 'dry'
@@ -18083,6 +18109,12 @@ export function App() {
                 capacityLabel="Payload reserved"
                 totalKg={stagingTotalKg}
                 capKg={aircraftCapKg(staging.aircraft)}
+                capacityNote={
+                  structuralMaxCargoKg !== null &&
+                  aircraftCapKg(staging.aircraft) + 1 < structuralMaxCargoKg
+                    ? `Structural ${formatTonnes(structuralMaxCargoKg)} · route ops is the booking cap`
+                    : undefined
+                }
                 highlights={[
                   {
                     label: 'Contract pay',

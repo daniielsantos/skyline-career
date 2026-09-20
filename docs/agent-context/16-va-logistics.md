@@ -564,8 +564,34 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 ### VA Duke Manifest max ~0.9 klb then jumps after Accept (2026-09-20)
 
 **Sintoma:** Manifest cap 0.9 klb no Duke VA; pós-Accept barra vai 1.5 → 2.6 klb; Accept lento.
-**Causa:** `refreshCargoLimit` / Dispatch só olhavam `fleet` home → sem `airframeTypeId` do Duke; `/api/cargo-limit` usava chrome home + vários `withCareerRead` (fila do pulse). Genérico `light_ga` ≈ fallback 450 kg / ~0.9 klb.
-**Fix:** resolver airframe + `companyId` via opsFleet; cargo-limit query `companyId` + `withCareerPeekRead`; structural Dispatch usa `opsFleet`.
+**Causa:** `refreshCargoLimit` / Dispatch só olhavam `fleet` home → sem `airframeTypeId` do Duke; `/api/cargo-limit` usava chrome home + vários `withCareerRead` (fila do pulse). Genérico `light_ga` ≈ fallback 450 kg / ~0.9 klb. Dispatch barra usava **structural** enquanto Manifest usa **ops** → 1.7 vs 2.6. Accept aguardava `switchCompanyForVa` antes do commit + peeks com world lock.
+**Fix:** airframe + `companyId` via opsFleet; cargo-limit peek; Dispatch/Manifest barra = ops (+ nota structural); commit antes do pin VA; peeks do staging em `withCareerPeekRead`.
+
+### Dispatch / Buy fuel ~15s (2026-09-20)
+
+**Sintoma:** painel “FUEL PURCHASE REQUIRED” e botão **Buy fuel & continue** (~15s); mesma classe de lentidão em outros CTAs do Active Dispatch.
+
+**Causa:** `/api/fuel/quote` e o prep de `/api/dispatch` usavam `withCareerRead` (world lock atrás do pulse). Client de fuel/Dispatch omitia `companyId` do tail VA e pintava `setFleet` no chrome home. Purchase/Depart/Cancel/etc. são writes — ainda entram na fila do world lock (inevitável se o pulse segura o cadeado); o ganho é tirar peeks da fila e acertar tenant.
+
+**Fix:**
+- Quote fuel + prep Dispatch → `withCareerPeekRead`
+- Client: `companyId: resolveOpsCompanyId(aircraftId)` em quote/purchase, Dispatch, Confirm OFP, Accept OFP cargo, Cancel, Preflight, Load OFP, Depart
+- Purchase/Depart: `paintOpsMutationFleet` (não `setFleet` cru)
+
+**Audit Active Dispatch (botões / auto):**
+
+| Ação | Tipo | Otimizável? | Estado |
+|--|--|--|--|
+| Auto / Retry fuel quote | peek | sim (era world lock) | **feito** |
+| Buy fuel | write (stock Jet-A + wallet) | só companyId/paint; write ainda espera pulse | **feito** |
+| Open SimBrief / Dispatch | prep era read locked + write | prep → peek; companyId | **feito** |
+| Confirm / Load navlog (auto OFP) | SimBrief + company write | companyId (latência = rede SimBrief) | **feito** |
+| Accept OFP cargo | SimBrief + world write | companyId | **feito** |
+| Cancel / Abort | write | companyId | **feito** |
+| Preflight / Load fuel+payload | SimBridge + mission write | companyId (latência = pipe) | **feito** |
+| Depart | write | companyId + paint fleet | **feito** |
+| Settle | write | já tinha companyId + paint | ok |
+| Crew dispatch / assign | write home Base | home-only by design | n/a |
 
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 

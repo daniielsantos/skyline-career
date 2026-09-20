@@ -4145,7 +4145,7 @@ export function postPilotTravel(opts: {
   });
 }
 
-export function postCancel(opts: { missionId: string }) {
+export function postCancel(opts: { missionId: string; companyId?: string }) {
   return api<{
     mission: Mission;
     walletUsd: number;
@@ -4425,6 +4425,7 @@ export function postDispatch(opts: {
   weightSystem?: 'metric' | 'imperial';
   /** Live MSFS title — picks Bonanza BE36 vs BT36 (and other family glass). */
   liveTitle?: string | null;
+  companyId?: string;
 }) {
   return api<{
     mission: Mission;
@@ -4445,6 +4446,7 @@ export function postConfirmOfp(opts: {
   missionId: string;
   simbriefUser?: string;
   simbriefUserid?: string;
+  companyId?: string;
 }) {
   return api<{
     mission: Mission;
@@ -4476,6 +4478,7 @@ export function postAcceptOfpCargo(opts: {
   missionId: string;
   simbriefUser?: string;
   simbriefUserid?: string;
+  companyId?: string;
 }) {
   return api<{
     mission: Mission;
@@ -4526,18 +4529,27 @@ export type MissionFuelQuote = {
   };
 };
 
-export function postFuelQuote(missionId: string) {
+export function postFuelQuote(
+  missionId: string,
+  opts?: { companyId?: string },
+) {
   return api<{
     quote: MissionFuelQuote;
     walletUsd: number;
     walletAfterUsd: number;
   }>('/api/fuel/quote', {
     method: 'POST',
-    body: JSON.stringify({ missionId }),
+    body: JSON.stringify({
+      missionId,
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    }),
   });
 }
 
-export function postFuelPurchase(missionId: string) {
+export function postFuelPurchase(
+  missionId: string,
+  opts?: { companyId?: string },
+) {
   return api<{
     mission: Mission;
     quote: MissionFuelQuote;
@@ -4546,7 +4558,10 @@ export function postFuelPurchase(missionId: string) {
     fleet: PlayerAircraft[];
   }>('/api/fuel/purchase', {
     method: 'POST',
-    body: JSON.stringify({ missionId }),
+    body: JSON.stringify({
+      missionId,
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    }),
   });
 }
 
@@ -4724,11 +4739,16 @@ export type WatchStatus = {
   } | null;
 };
 
-export function postDepart(opts: { missionId: string; override?: boolean }) {
+export function postDepart(opts: {
+  missionId: string;
+  override?: boolean;
+  companyId?: string;
+}) {
   return api<{
     mission: Mission;
     walletUsd: number;
     fuelDebitUsd?: number;
+    fleet?: PlayerAircraft[];
     preflightOverride?: boolean;
   }>('/api/depart', {
     method: 'POST',
@@ -4740,6 +4760,7 @@ export function postPreflight(opts: {
   missionId: string;
   simbriefUser?: string;
   simbriefUserid?: string;
+  companyId?: string;
 }) {
   return api<{
     mission: Mission;
@@ -4950,6 +4971,7 @@ export function postLoadOfp(
     simbriefUser?: string;
     simbriefUserid?: string;
     runPreflightAfter?: boolean;
+    companyId?: string;
   },
   init?: { signal?: AbortSignal },
 ) {

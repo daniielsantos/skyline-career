@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **9b2dbbd** / desktop **0.3.147** shipped: Add one-time MP product keys for world register. Release: [v0.3.147](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.147).
+
+
 `main` **22766f9** / desktop **0.3.146** shipped: Speed up My VA Ledger and keep chrome wallet on home. Release: [v0.3.146](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.146).
 
 

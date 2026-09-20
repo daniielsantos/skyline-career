@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **22766f9** / desktop **0.3.146** shipped: Speed up My VA Ledger and keep chrome wallet on home. Release: [v0.3.146](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.146).
+
+
 `main` **2c4ca9b** / desktop **0.3.145** shipped: Raise Line crew allowance and polish My VA Config. Release: [v0.3.145](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.145).
 
 

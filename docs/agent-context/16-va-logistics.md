@@ -412,6 +412,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** (1) UI bloqueava o shell inteiro em `tenantSwitching` enquanto `fetchState` da VA rodava — roster já estava pronto. (2) `normalizePlayerAircraft` reconstruía o casco **sem** `reservedByAccountId` / `reservedAtMs`, então todo `saveMissions`/`loadMissions` (normalize) apagava a reserva antes de gravar/devolver.
 **Fix:** shell My VA pinta Roster/Config assim que members chegam; Hangar/Ledger mostram BusyStatus só no pane; normalize preserva reserved*; teste round-trip.
 
+### My VA hangar still slow after shell paint (2026-09-20)
+
+**Sintoma:** Roster/tabs ok, mas Hangar ficava em “Opening VA hangar…” — `switchCompanyForVa` ainda esperava `/api/state` (withCareerRead + world lock atrás do pulse).
+**Causa:** doc já pedia fleet leve; código ainda fazia full state. Members já carregava missions da VA só para presence.
+**Fix:** `/api/va/members` devolve `fleet` + `walletUsd` do mesmo load; VaPage pinta hangar antes do pin; `switchCompanyForVa` só `session/open` (sem fetchState); hangar spinner só se fleet ainda vazia.
+
 ### Member Ledger empty then fills (2026-09-20)
 
 **Sintoma:** membro no Ledger via wallet/credit da VA mas “No ledger yet”; depois as linhas aparecem.

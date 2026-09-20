@@ -205,6 +205,10 @@ export function VaPage(props: Props) {
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
       hasVaShellRef.current = Boolean(m.role && m.listed);
+      // Hangar from members (missions already loaded) — paint before tenant pin.
+      if (Array.isArray(m.fleet)) {
+        onFleetRef.current?.(m.fleet);
+      }
       // Paint roster first — tenant switch used to block behind a full refresh (~20s).
       setLoaded(true);
       if (
@@ -222,6 +226,15 @@ export function VaPage(props: Props) {
         } finally {
           setTenantSwitching(false);
         }
+      }
+      // Wallet after pin so chrome sticky home is already remembered.
+      if (typeof m.walletUsd === 'number' && Number.isFinite(m.walletUsd)) {
+        onWalletRef.current?.(m.walletUsd);
+      }
+      if (
+        m.switchToCompanyId &&
+        m.switchToCompanyId !== companyId
+      ) {
         return;
       }
       if (m.listed && (m.role === 'owner' || m.role === 'dispatcher')) {
@@ -516,7 +529,9 @@ export function VaPage(props: Props) {
           {members.length === 0 ? (
             <p className="settings-sample">No members.</p>
           ) : (
-            <ul className="va-roster-list">
+            <ul
+              className={`va-roster-list${isOwner ? ' is-manage' : ''}`}
+            >
               {members.map((m) => (
                 <li key={m.accountId} className="va-roster-row">
                   <div className="va-roster-id">
@@ -606,9 +621,12 @@ export function VaPage(props: Props) {
                         Kick
                       </button>
                     </div>
-                  ) : (
-                    <div className="va-roster-actions va-roster-actions-spacer" />
-                  )}
+                  ) : isOwner ? (
+                    <div
+                      className="va-roster-actions va-roster-actions-spacer"
+                      aria-hidden
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -618,7 +636,7 @@ export function VaPage(props: Props) {
 
       {pane === 'hangar' ? (
         <div className="va-pane-card">
-          {tenantSwitching ? (
+          {tenantSwitching && props.fleet.length === 0 ? (
             <BusyStatus label="Opening VA hangar…" />
           ) : (
             <>

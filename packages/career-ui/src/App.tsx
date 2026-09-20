@@ -7516,38 +7516,13 @@ export function App() {
     await postCompanySessionOpen({ companyId: id });
     setActiveCompanyId(id);
     setActiveCompanyIdForRequests(id);
-    try {
-      const state = await fetchState();
-      const stateCompanyId =
-        typeof state.companyId === 'string' ? state.companyId.trim() : '';
-      if (stateCompanyId && stateCompanyId !== id) return;
-      const home =
-        homeCompanyIdRef.current?.trim() ||
-        (switchingToHome ? id : '');
-      const paintChrome = !home || id === home;
-      if (paintChrome) {
-        paintWallet(state.walletUsd);
-        setFleet(state.fleet ?? []);
-        setHomeHubIcao(state.homeHubIcao ?? '');
-        setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
-        setVaSessionWallet(null);
-        setVaSessionFleet([]);
-        if (!authRequired || !authAccountLabel) {
-          setPilotName(state.pilotName ?? '');
-        }
-      } else {
-        if (
-          typeof state.walletUsd === 'number' &&
-          Number.isFinite(state.walletUsd)
-        ) {
-          setVaSessionWallet(state.walletUsd);
-        }
-        setVaSessionFleet(state.fleet ?? []);
-        // Keep authAccountLabel / home chrome — do not adopt VA owner pilotName.
-      }
-    } catch {
-      /* hangar may be empty until next poll */
+    if (switchingToHome) {
+      setVaSessionWallet(null);
+      setVaSessionFleet([]);
+      // Soft refresh paints home chrome; callers often refresh right after.
     }
+    // Hangar/wallet for VA pin already painted from /api/va/members.
+    // Do not await /api/state — withCareerRead queues behind world pulse.
   }
 
   async function createCompanyAndSwitch(): Promise<void> {
@@ -18700,24 +18675,25 @@ export function App() {
         <VaPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
-          fleet={viewingVaTenant ? vaSessionFleet : fleet}
+          fleet={
+            viewingVaTenant || vaSessionFleet.length > 0
+              ? vaSessionFleet
+              : fleet
+          }
           walletUsd={
-            viewingVaTenant && vaSessionWallet != null
-              ? vaSessionWallet
-              : wallet
+            vaSessionWallet != null ? vaSessionWallet : wallet
           }
           busy={busy}
           onWallet={(usd) => {
-            if (viewingVaTenant) {
-              setVaSessionWallet(usd);
-            } else {
+            setVaSessionWallet(usd);
+            // Chrome shares wallet only when My VA is the home company (owner).
+            const home = homeCompanyIdRef.current?.trim();
+            if (!home || home === activeCompanyIdRef.current?.trim()) {
               commitWallet(usd);
             }
           }}
           onFleet={(nextFleet) => {
-            if (viewingVaTenant) {
-              setVaSessionFleet(nextFleet);
-            }
+            setVaSessionFleet(nextFleet);
           }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}

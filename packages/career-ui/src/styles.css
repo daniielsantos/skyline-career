@@ -6148,8 +6148,8 @@ tr.lot-locked {
 }
 
 .company-credit-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem 1.25rem;
   align-items: end;
 }
@@ -6158,6 +6158,7 @@ tr.lot-locked {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  flex: 0 1 14rem;
   min-width: 0;
 }
 
@@ -14000,13 +14001,17 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 .va-roster-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(9.5rem, 1.4fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 1fr) max-content;
   gap: 0.65rem 0.85rem;
   align-items: center;
   padding: 0.65rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--border, #444) 75%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--panel, #141820) 88%, transparent);
+}
+/* Owner: reserve actions width so status aligns across badge-only vs button rows. */
+.va-roster-list.is-manage .va-roster-row {
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 1fr) max-content 13.5rem;
 }
 .va-roster-row-request {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -14102,13 +14107,17 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   flex-wrap: wrap;
   gap: 0.35rem;
   justify-content: flex-end;
+  width: 100%;
 }
 .va-roster-actions .action {
   font-size: 0.72rem;
   padding: 0.28rem 0.55rem;
 }
 .va-roster-actions-spacer {
-  min-width: 0;
+  width: 100%;
+  min-height: 1px;
+  visibility: hidden;
+  pointer-events: none;
 }
 .va-roster-kick {
   color: color-mix(in srgb, #e07070 85%, white);

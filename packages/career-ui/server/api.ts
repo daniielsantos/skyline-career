@@ -3634,6 +3634,33 @@ export function createCareerApiServer(port = 8787) {
             flightQuality = null;
           }
         }
+        // Hangar preview from the same missions load — avoids a second
+        // withCareerRead(/api/state) behind the world pulse (~20s).
+        let hangarFleet: Array<
+          PlayerAircraft & { parkingUsdPerDay: number | null }
+        > = [];
+        let walletUsd = 0;
+        if (vaMissionsForRoster) {
+          try {
+            clearExpiredAircraftReservations(vaMissionsForRoster.fleet);
+            const peeked =
+              typeof store.peekEconomyWorld === 'function'
+                ? store.peekEconomyWorld()
+                : null;
+            hangarFleet = withParkingRates(
+              vaMissionsForRoster.fleet,
+              peeked ?? undefined,
+              vaMissionsForRoster,
+            );
+            walletUsd =
+              typeof vaMissionsForRoster.walletUsd === 'number' &&
+              Number.isFinite(vaMissionsForRoster.walletUsd)
+                ? vaMissionsForRoster.walletUsd
+                : 0;
+          } catch {
+            hangarFleet = [];
+          }
+        }
         send(res, 200, {
           companyId,
           memberCap: VA_MEMBER_CAP,
@@ -3646,6 +3673,8 @@ export function createCareerApiServer(port = 8787) {
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
           flightQuality,
+          fleet: hangarFleet,
+          walletUsd,
           viewerAccountId: session.account.id,
           onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
           nowMs,

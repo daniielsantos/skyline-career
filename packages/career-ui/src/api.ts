@@ -5004,6 +5004,9 @@ export function fetchVaMembers() {
     viewerAccountId?: string;
     nowMs?: number;
     onlineWindowMs?: number;
+    /** VA hangar + wallet from the same missions load (no /api/state). */
+    fleet?: PlayerAircraft[];
+    walletUsd?: number;
     /** Active company was home/solo — switch UI tenant to this listed VA. */
     switchToCompanyId?: string;
   }>('/api/va/members');

@@ -3,6 +3,7 @@ import {
   fetchVaMembers,
   fetchVaJoinRequests,
   fetchVaInvites,
+  fetchCashflow,
   postVaInvite,
   postVaAcceptJoinRequest,
   postVaRejectJoinRequest,
@@ -16,23 +17,29 @@ import {
   type VaMember,
   type VaJoinRequest,
   type PlayerAircraft,
+  type CareerCashflowSnapshot,
+  type CompanyCreditSnapshot,
 } from './api';
 import { BusyStatus } from './Busy';
+import { HangarCashflowPanel } from './CashflowPanel';
+import { formatBoardMoney } from './board-money';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
 import { useConfirm } from './ConfirmDialog';
 
-type VaPane = 'roster' | 'hangar' | 'config';
+type VaPane = 'roster' | 'hangar' | 'ledger' | 'config';
 
 type Props = {
   authRequired: boolean;
   activeCompanyId: string | null;
   fleet: PlayerAircraft[];
+  walletUsd: number;
   busy?: boolean;
   renderHangarCard: (
     aircraft: PlayerAircraft,
     opts: { mutationsLocked: boolean },
   ) => ReactNode;
+  onWallet?: (walletUsd: number) => void;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
   /** Switch active tenant to the listed VA (member dual-tenant). */
@@ -68,6 +75,11 @@ export function VaPage(props: Props) {
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<VaJoinRequest[]>([]);
+  const [cashflow, setCashflow] = useState<CareerCashflowSnapshot | null>(null);
+  const [companyCredit, setCompanyCredit] =
+    useState<CompanyCreditSnapshot | null>(null);
+  const [ledgerBusy, setLedgerBusy] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -79,6 +91,22 @@ export function VaPage(props: Props) {
   const hangarReadOnly = !isOwner;
   const pageBusy = busy || Boolean(props.busy);
 
+  const loadLedger = useCallback(async () => {
+    if (!canShow || !companyId) return;
+    setLedgerBusy(true);
+    setLedgerError(null);
+    try {
+      const snap = await fetchCashflow();
+      setCashflow(snap);
+      props.onWallet?.(snap.walletUsd);
+      if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
+    } catch (err) {
+      setLedgerError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLedgerBusy(false);
+    }
+  }, [canShow, companyId, props.onWallet]);
+
   const refresh = useCallback(async () => {
     if (!canShow || !companyId) {
       setLoaded(true);
@@ -87,14 +115,6 @@ export function VaPage(props: Props) {
     setError(null);
     try {
       const m = await fetchVaMembers();
-      if (
-        m.switchToCompanyId &&
-        m.switchToCompanyId !== companyId &&
-        props.onSwitchCompany
-      ) {
-        await props.onSwitchCompany(m.switchToCompanyId);
-        return;
-      }
       setMembers(m.members);
       setRole(m.role);
       setMemberCap(m.memberCap);
@@ -105,6 +125,16 @@ export function VaPage(props: Props) {
       setLineCrew(m.lineCrew ?? null);
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
+      // Paint roster first — tenant switch used to block behind a full refresh (~20s).
+      setLoaded(true);
+      if (
+        m.switchToCompanyId &&
+        m.switchToCompanyId !== companyId &&
+        props.onSwitchCompany
+      ) {
+        void props.onSwitchCompany(m.switchToCompanyId);
+        return;
+      }
       if (m.listed && (m.role === 'owner' || m.role === 'dispatcher')) {
         try {
           const reqs = await fetchVaJoinRequests();
@@ -126,7 +156,6 @@ export function VaPage(props: Props) {
       setError(err instanceof Error ? err.message : String(err));
       setRole(null);
       setListed(false);
-    } finally {
       setLoaded(true);
     }
   }, [canShow, companyId, props.onSwitchCompany]);
@@ -186,6 +215,12 @@ export function VaPage(props: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (pane === 'ledger' && listed && role) {
+      void loadLedger();
+    }
+  }, [pane, listed, role, loadLedger]);
 
   if (!canShow) {
     return (
@@ -276,6 +311,15 @@ export function VaPage(props: Props) {
           >
             Hangar
             {props.fleet.length > 0 ? ` (${props.fleet.length})` : ''}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'ledger'}
+            className={pane === 'ledger' ? 'tab active' : 'tab'}
+            onClick={() => setPane('ledger')}
+          >
+            Ledger
           </button>
           <button
             type="button"
@@ -468,6 +512,43 @@ export function VaPage(props: Props) {
                 }),
               )}
             </ul>
+          )}
+        </div>
+      ) : null}
+
+      {pane === 'ledger' ? (
+        <div className="va-pane-card">
+          <p className="settings-help">
+            Shared VA wallet and company ledger — same cash as the owner. Week
+            and month use simulated economy days.
+          </p>
+          <p className="settings-sample" style={{ marginBottom: '0.75rem' }}>
+            Wallet <strong>{formatBoardMoney(props.walletUsd)}</strong>
+          </p>
+          {ledgerError ? (
+            <p className="error" role="alert">
+              {ledgerError}
+            </p>
+          ) : null}
+          {ledgerBusy && !cashflow ? (
+            <BusyStatus label="Loading ledger…" />
+          ) : (
+            <HangarCashflowPanel
+              cashflow={cashflow}
+              companyCredit={companyCredit}
+              walletUsd={props.walletUsd}
+              busy={pageBusy || ledgerBusy}
+              creditActionsLocked={!isOwner}
+              formatMoney={formatBoardMoney}
+              onCreditUpdated={({ walletUsd, companyCredit: next }) => {
+                props.onWallet?.(walletUsd);
+                setCompanyCredit(next);
+                void loadLedger();
+              }}
+              onCreditError={(message) => {
+                setLedgerError(message);
+              }}
+            />
           )}
         </div>
       ) : null}

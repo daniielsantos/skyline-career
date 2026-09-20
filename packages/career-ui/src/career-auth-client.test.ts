@@ -71,6 +71,12 @@ describe('client auth rejection', () => {
     assert.equal(getAuthToken(), 'new-token');
   });
 
+  it('does not let a no-Bearer 401 clear a newer login', () => {
+    setAuthToken('new-token', { remember: false });
+    signalAuthRequired(null);
+    assert.equal(getAuthToken(), 'new-token');
+  });
+
   it('clears the rejected token and notifies the app shell', () => {
     let events = 0;
     window.addEventListener(AUTH_REQUIRED_EVENT, () => {

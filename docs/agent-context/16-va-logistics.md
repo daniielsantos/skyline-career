@@ -40,11 +40,12 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 ## Perspectivas My VA (owner vs membro) — **DECIDIDO · UI parcial shipped**
 
-My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Config). API já rejeita ações fora do role; UI deve **esconder** controles, não só falhar no click.
+My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger / Config). API já rejeita ações fora do role; UI deve **esconder** controles, não só falhar no click.
 
 | Ação | Owner | Dispatcher | Pilot (membro) |
 |--|--|--|--|
 | Ver roster / hangar (frota VA) | sim | sim | sim (read; mutações Hangar = ver nota) |
+| **Ver Ledger (wallet + cashflow VA)** | **sim** | **sim** | **sim** |
 | Accept/reject join requests | sim | sim | não |
 | Create invite | sim | sim | não |
 | Kick / change role | sim | não | não |
@@ -54,6 +55,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Config)
 | Leave VA | — | sim | sim |
 | Config `memberRouteCutPct` | sim | não | read-only (vê o %) |
 | **Inspect / repair (MX)** | **sim** (debita wallet VA) | **não** | **não** |
+| **Credit draw / repay** | **sim** | **não** | **não** |
 | Voar IH / Freights com tail VA | sim | sim | sim |
 
 **Nota Hangar / MX — DECIDIDO · shipped parcial:**
@@ -62,6 +64,13 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Config)
 - **Só owner** autoriza MX (UI + API `403` em `/api/aircraft-market/maintenance` e `/repair`). Dispatcher e pilot = sem botão / sem API.
 - Sell / lease / unlist: também owner-only na UI quando company listada; ferry / travel / assign missão ficam para membros.
 - Solo (company não listada como VA): comportamento Hangar inalterado.
+
+**Nota Ledger — DECIDIDO · shipped:**
+
+- Wallet da VA é a **mesma** company wallet do owner — membros não têm wallet separada na VA.
+- Aba **Ledger** em My VA reusa o painel do Hangar Cashflow (`GET /api/cashflow` no tenant VA ativo).
+- Credit draw/repay: owner-only (UI + API gate em `/api/credit/draw` e `/repay` quando `va_listed`).
+- Membros veem saldo, credit status e recent activity; não mutam credit.
 
 ---
 
@@ -275,6 +284,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **Pilot name sticky across register (2026-09-20):** Conta nova `nullable` mostrava Identity/who `Nothin`. Causa: `signupName` React não limpava no switch de sessão e `setSignupName(prev => prev || fromAuth)` preservava o draft; select-hub gravava isso em `pilotName` enquanto `companies.display_name` ficava correto. Fix: clear `signupName` no session paint; auth sempre sobrescreve draft; resolve do hub-picker prefer company; assemble alinha pilotName↔display_name em company pre-fleet não listada; seed register seta pilotName.
 
+**Join invite “company not owned” + who=Nothin on VA (2026-09-20):** Join ok; `session/open` no PG exigia `role=owner` (SQLite aceita qualquer membership) → erro ao switch da VA. Sidebar usava `missions.pilotName` do tenant VA (= dono). Fix: PG `authAccountOwnsCompany` = membership; sidebar/Identity preferem `authAccountLabel`.
+
 ### VA pages + publish (2026-09-19)
 
 **Sintoma:** Settings card VA zoado (directory+roster+hauls+ranking numa coluna); jogador não achava a página.
@@ -326,11 +337,24 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** My VA fica em Loading… longo / indefinido.
 **Causa:** GET `/api/va/members` fazia `withCareerRead` só para snapshot Line crew → lock world+company + `loadEconomy` atrás do pulse/cold start.
 **Fix:** members lê Line crew com `companyLock` + `loadMissions` + `peekEconomyWorld().tick` (sem world lock); falha soft → `lineCrew: null`.
+
+### My VA ~20s for members (2026-09-20)
+
+**Sintoma:** abrir My VA demora ~20s (às vezes).
+**Causa:** (1) `switchToCompanyId` bloqueava atrás de `switchCompany` = clear paint + full `/api/state` refresh; (2) Line crew ainda usava `companyLock` (fila atrás do pulse) para todo membro.
+**Fix:** pintar roster antes do switch; `switchCompanyForVa` só session/open + fleet/wallet leve; Line crew só para owner e sem companyLock; reads em paralelo.
+
 ### My VA empty for members + YOURS badge (2026-09-20)
 
 **Sintoma:** membro entra na VA mas My VA mostra Become a VA; directory marca YOURS na VA alheia; risco de pilotName = nome da VA.
 **Causa:** My VA lia só company ativa (home solo); badge usava `memberOfVaCompanyId`; `assembleMissions` backfillava `pilotName` de `companies.display_name` inclusive `va_listed`.
 **Fix:** `/api/va/members` resolve listed membership + `switchToCompanyId`; join code troca tenant; badge Yours=owner / Joined=member; backfill pilotName só se company não listada.
+
+### My VA Ledger for members (2026-09-20)
+
+**Sintoma / gap:** membros não viam wallet/ledger da VA (só o chrome do owner quando tenant ativo; sem aba dedicada).
+**Causa:** wallet é a mesma company do owner, mas My VA só tinha Roster / Hangar / Config — Hangar Cashflow ficava escondido no Hangar pessoal ou exigia saber trocar de contexto.
+**Fix:** aba **Ledger** em My VA reusa `HangarCashflowPanel` + `GET /api/cashflow`; credit draw/repay owner-only (UI + API).
 
 
 
@@ -347,6 +371,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] Copy join / My VA: dual-tenant (frota home vs VA)
 - [x] **memberRouteCutPct** — schema v14 + Config + directory + settle Freights/Demand/Charter (net após fuel)
 - [x] Hangar VA: member read-only UI (sell/lease/MX; ferry ok) + **API gate MX + sell/list/unlist owner-only**
+- [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

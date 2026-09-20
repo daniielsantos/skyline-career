@@ -1508,7 +1508,7 @@ async function activateCompanyContext(
       activeStore.authAccountOwnsCompany(accountId, id),
     );
     if (!owns) {
-      throw new Error('company not owned by this account');
+      throw new Error('company not available to this account');
     }
   }
   const known = await Promise.resolve(
@@ -3462,17 +3462,18 @@ export function createCareerApiServer(port = 8787) {
         if (!listed) {
           listed = await Promise.resolve(store.vaIsListed(companyId));
         }
-        const members = await Promise.resolve(store.vaListMembers(companyId));
-        const recruiting = await Promise.resolve(store.vaIsRecruiting(companyId));
-        const memberRouteCutPct = await Promise.resolve(
-          store.vaGetMemberRouteCutPct(companyId),
-        );
-        const companies = await Promise.resolve(
-          store.authListCompaniesForAccount(session.account.id),
-        );
+        const [members, recruiting, memberRouteCutPct, companies] =
+          await Promise.all([
+            Promise.resolve(store.vaListMembers(companyId)),
+            Promise.resolve(store.vaIsRecruiting(companyId)),
+            Promise.resolve(store.vaGetMemberRouteCutPct(companyId)),
+            Promise.resolve(
+              store.authListCompaniesForAccount(session.account.id),
+            ),
+          ]);
         const co = companies.find((c) => c.id === companyId);
-        // Line crew is company JSON only — do NOT withCareerRead (world lock /
-        // loadEconomy). That made My VA hang behind pulse / cold world load.
+        // Line crew only for owner Config — skip for pilots (was companyLock
+        // behind pulse → My VA ~20s). Soft-fail → null.
         let lineCrew: {
           hired: boolean;
           allowance: number;
@@ -3482,18 +3483,14 @@ export function createCareerApiServer(port = 8787) {
           salaryUsdPerWeek: number;
           fireSeveranceUsd: number;
         } | null = null;
-        if (listed) {
+        if (listed && membership.role === 'owner') {
           try {
             const tick =
               typeof store.peekEconomyWorld === 'function'
                 ? (store.peekEconomyWorld()?.tick ?? 0)
                 : 0;
-            const missions =
-              careerApiMode === 'gateway' && gatewayWorldClient
-                ? await loadMissions({ companyId })
-                : await companyLock.withLock(() =>
-                    loadMissions({ companyId }),
-                  );
+            // Read-only: no companyLock (avoid queueing behind settle/pulse).
+            const missions = await loadMissions({ companyId });
             const allowance = vaLineCrewAllowanceRemaining(missions, tick);
             lineCrew = {
               ...allowance,
@@ -5019,6 +5016,11 @@ export function createCareerApiServer(port = 8787) {
             ? body.amountUsd
             : NaN;
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            credit_drawCompanyId,
+            'draw company credit on a listed VA',
+          );
           const result = await withCareerWrite((world, missions) => {
             const drawn = drawCompanyCredit(missions, amountUsd, world.tick);
             return {
@@ -5030,8 +5032,9 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: credit_drawCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, /Only the VA owner|Authentication required/i.test(message) ? 403 : 400, {
+            error: message,
           });
         }
         return;
@@ -5048,6 +5051,11 @@ export function createCareerApiServer(port = 8787) {
             ? body.amountUsd
             : NaN;
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            credit_repayCompanyId,
+            'repay company credit on a listed VA',
+          );
           const result = await withCareerWrite((world, missions) => {
             const repaid = repayCompanyCredit(missions, amountUsd, world.tick);
             return {
@@ -5059,8 +5067,9 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: credit_repayCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
-            error: error instanceof Error ? error.message : String(error),
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, /Only the VA owner|Authentication required/i.test(message) ? 403 : 400, {
+            error: message,
           });
         }
         return;

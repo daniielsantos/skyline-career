@@ -114,6 +114,8 @@ function CompanyCreditBlock(props: {
   credit: CompanyCreditSnapshot | null;
   walletUsd: number;
   busy: boolean;
+  /** Hide draw/repay (VA members — same wallet, owner-only credit). */
+  actionsLocked?: boolean;
   formatMoney: (n: number) => string;
   onUpdated: (next: {
     walletUsd: number;
@@ -125,7 +127,7 @@ function CompanyCreditBlock(props: {
   const [drawAmount, setDrawAmount] = useState('');
   const [repayAmount, setRepayAmount] = useState('');
   const [localBusy, setLocalBusy] = useState(false);
-  const locked = busy || localBusy;
+  const locked = busy || localBusy || Boolean(props.actionsLocked);
 
   if (!credit) {
     return (
@@ -221,67 +223,73 @@ function CompanyCreditBlock(props: {
           <dd>{Math.round(credit.repScore * 100)}%</dd>
         </div>
       </dl>
-      <div className="company-credit-actions">
-        <label>
-          Draw
-          <input
-            type="number"
-            min={0}
-            step={100}
-            value={drawAmount}
-            disabled={locked || overdue || credit.availableUsd <= 0}
-            placeholder={String(Math.floor(credit.availableUsd))}
-            onChange={(e) => setDrawAmount(e.target.value)}
-          />
-        </label>
-        <button
-          type="button"
-          className="accept"
-          disabled={locked || overdue || credit.availableUsd <= 0}
-          onClick={() => void runDraw()}
-        >
-          Draw
-        </button>
-        <label>
-          Repay
-          <input
-            type="number"
-            min={0}
-            step={100}
-            value={repayAmount}
-            disabled={locked || credit.principalUsd <= 0}
-            placeholder={String(Math.floor(credit.principalUsd))}
-            onChange={(e) => setRepayAmount(e.target.value)}
-          />
-        </label>
-        <button
-          type="button"
-          className="accept"
-          disabled={locked || credit.principalUsd <= 0}
-          onClick={() => void runRepay()}
-        >
-          Repay
-        </button>
-        {credit.principalUsd > 0 ? (
+      {props.actionsLocked ? (
+        <p className="settings-help" style={{ marginTop: '0.5rem' }}>
+          Credit draw and repay are owner-only on a listed VA.
+        </p>
+      ) : (
+        <div className="company-credit-actions">
+          <label>
+            Draw
+            <input
+              type="number"
+              min={0}
+              step={100}
+              value={drawAmount}
+              disabled={locked || overdue || credit.availableUsd <= 0}
+              placeholder={String(Math.floor(credit.availableUsd))}
+              onChange={(e) => setDrawAmount(e.target.value)}
+            />
+          </label>
           <button
             type="button"
-            className="ghost"
-            disabled={locked || props.walletUsd <= 0}
-            onClick={() => {
-              setRepayAmount(
-                String(
-                  Math.min(
-                    Math.floor(credit.principalUsd),
-                    Math.floor(props.walletUsd),
-                  ),
-                ),
-              );
-            }}
+            className="accept"
+            disabled={locked || overdue || credit.availableUsd <= 0}
+            onClick={() => void runDraw()}
           >
-            Max repay
+            Draw
           </button>
-        ) : null}
-      </div>
+          <label>
+            Repay
+            <input
+              type="number"
+              min={0}
+              step={100}
+              value={repayAmount}
+              disabled={locked || credit.principalUsd <= 0}
+              placeholder={String(Math.floor(credit.principalUsd))}
+              onChange={(e) => setRepayAmount(e.target.value)}
+            />
+          </label>
+          <button
+            type="button"
+            className="accept"
+            disabled={locked || credit.principalUsd <= 0}
+            onClick={() => void runRepay()}
+          >
+            Repay
+          </button>
+          {credit.principalUsd > 0 ? (
+            <button
+              type="button"
+              className="ghost"
+              disabled={locked || props.walletUsd <= 0}
+              onClick={() => {
+                setRepayAmount(
+                  String(
+                    Math.min(
+                      Math.floor(credit.principalUsd),
+                      Math.floor(props.walletUsd),
+                    ),
+                  ),
+                );
+              }}
+            >
+              Max repay
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -291,6 +299,8 @@ export function HangarCashflowPanel(props: {
   companyCredit: CompanyCreditSnapshot | null;
   walletUsd: number;
   busy: boolean;
+  /** When true, show credit status but no draw/repay controls. */
+  creditActionsLocked?: boolean;
   formatMoney: (n: number) => string;
   onCreditUpdated: (next: {
     walletUsd: number;
@@ -332,6 +342,7 @@ export function HangarCashflowPanel(props: {
         credit={props.companyCredit}
         walletUsd={props.walletUsd}
         busy={props.busy}
+        actionsLocked={props.creditActionsLocked}
         formatMoney={props.formatMoney}
         onUpdated={props.onCreditUpdated}
         onError={props.onCreditError}

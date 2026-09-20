@@ -2027,6 +2027,18 @@ function isNeedsProfileMessage(message: string): boolean {
   return /Select a career profile first/i.test(message);
 }
 
+/** 401 noise from in-flight polls during AuthGate / account switch. */
+function isAuthRequiredMessage(message: string): boolean {
+  return /authentication required/i.test(message);
+}
+
+/** Skip banners that the gate already handled or that lost a race to a new login. */
+function shouldSurfaceApiError(message: string): boolean {
+  if (isNeedsProfileMessage(message)) return false;
+  if (isAuthRequiredMessage(message) && getAuthToken()) return false;
+  return true;
+}
+
 /**
  * True when the player has started (or is flying) the Dispatch / Watch pipeline.
  * Bare Accepted / crew-operated legs do not count — Freights stays open and the
@@ -3710,7 +3722,7 @@ export function App() {
   const [worldWaiting, setWorldWaiting] = useState(false);
 
   useEffect(() => {
-    if (!careerReady || !(authRequired || worldFixed)) {
+    if (!careerReady || showAuthGate || !(authRequired || worldFixed)) {
       setWorldPresence(null);
       return;
     }
@@ -3737,7 +3749,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [careerReady, authRequired, worldFixed]);
+  }, [careerReady, authRequired, worldFixed, showAuthGate]);
 
   /** Electron: first-run / Settings switch between SP and MP. */
   const [playModeGate, setPlayModeGate] = useState<
@@ -3880,6 +3892,8 @@ export function App() {
     finalDest: string;
   } | null>(null);
   const [pilotName, setPilotName] = useState('');
+  /** Logged-in account label — sidebar must not show VA owner pilotName. */
+  const [authAccountLabel, setAuthAccountLabel] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [pilotIcao, setPilotIcao] = useState('');
   const [signupName, setSignupName] = useState('');
@@ -4202,7 +4216,7 @@ export function App() {
             setTerminalSection('inventory');
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
-            if (!isNeedsProfileMessage(message)) {
+            if (shouldSurfaceApiError(message)) {
               setError(message);
             }
             setAirportIcao(null);
@@ -4242,7 +4256,7 @@ export function App() {
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
-          if (!isNeedsProfileMessage(message)) {
+          if (shouldSurfaceApiError(message)) {
             setError(message);
           }
           setAirportIcao(null);
@@ -4818,6 +4832,29 @@ export function App() {
     };
   }, [showProfileGate, showAuthGate, profilesLoading, worldWaiting]);
 
+  // Keep chrome name on the logged-in account (not VA owner pilotName).
+  useEffect(() => {
+    if (!authRequired || showAuthGate || !getAuthToken()) return;
+    if (authAccountLabel.trim().length >= 2) return;
+    let cancelled = false;
+    void fetchAuthStatus()
+      .then((status) => {
+        if (cancelled || !status.authenticated) return;
+        const label =
+          status.account?.displayName?.trim() ||
+          status.account?.loginName?.trim() ||
+          status.companies[0]?.displayName?.trim() ||
+          '';
+        if (label.length >= 2) setAuthAccountLabel(label);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authRequired, showAuthGate, authAccountLabel, authSessionEpoch]);
+
   useEffect(() => {
     let cancelled = false;
     void getCareerClientVersion().then((version) => {
@@ -4846,7 +4883,7 @@ export function App() {
     setCareerStateReady(false);
     void refreshRef.current().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
-      if (!isNeedsProfileMessage(message)) setError(message);
+      if (shouldSurfaceApiError(message)) setError(message);
     });
   }, [showProfileGate, showAuthGate, profilesLoading, activeCareerProfile?.id]);
 
@@ -4968,7 +5005,7 @@ export function App() {
         .catch((err: unknown) => {
           if (cancelled || fetchSeq !== marketFetchSeqRef.current) return;
           const message = err instanceof Error ? err.message : String(err);
-          if (!isNeedsProfileMessage(message)) setError(message);
+          if (shouldSurfaceApiError(message)) setError(message);
         })
         .finally(() => {
           if (!cancelled && fetchSeq === marketFetchSeqRef.current) {
@@ -6898,7 +6935,8 @@ export function App() {
       await action();
     } catch (err) {
       failed = true;
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      if (shouldSurfaceApiError(message)) setError(message);
     } finally {
       // Unlock before board sync — holding busy through refresh() made every
       // confirm (buy/lease/contract/travel/…) feel stuck after OK.
@@ -6908,7 +6946,8 @@ export function App() {
       try {
         await refresh(opts.sync === 'full' ? undefined : opts.sync);
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        if (shouldSurfaceApiError(message)) setError(message);
       }
     }
   }
@@ -6985,7 +7024,7 @@ export function App() {
         if (airportOpenSeqRef.current !== seq) return;
         setAirportHydrating(false);
         const message = err instanceof Error ? err.message : String(err);
-        if (!isNeedsProfileMessage(message)) setError(message);
+        if (shouldSurfaceApiError(message)) setError(message);
       }
     })();
   }
@@ -7346,6 +7385,44 @@ export function App() {
     await refreshRef.current();
   }
 
+  /** VA My VA: open tenant without wiping the shell (full refresh was ~20s). */
+  async function switchCompanyForVa(nextId: string): Promise<void> {
+    const id = nextId.trim() || LOCAL_COMPANY_ID;
+    if (!id || id === activeCompanyId) return;
+    setStoredCompanyId(id);
+    try {
+      const url = new URL(window.location.href);
+      if (id !== LOCAL_COMPANY_ID) {
+        url.searchParams.set('company', id);
+      } else {
+        url.searchParams.delete('company');
+      }
+      window.history.replaceState(
+        {},
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    } catch {
+      /* ignore */
+    }
+    await postCompanySessionOpen({ companyId: id });
+    setActiveCompanyId(id);
+    setActiveCompanyIdForRequests(id);
+    try {
+      const state = await fetchState();
+      setWallet(state.walletUsd);
+      setFleet(state.fleet ?? []);
+      setHomeHubIcao(state.homeHubIcao ?? '');
+      setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
+      // Keep authAccountLabel — do not adopt VA owner pilotName into the chrome.
+      if (!authRequired || !authAccountLabel) {
+        setPilotName(state.pilotName ?? '');
+      }
+    } catch {
+      /* hangar may be empty until next poll */
+    }
+  }
+
   async function createCompanyAndSwitch(): Promise<void> {
     const id = suggestCompanyId();
     await postCompany({
@@ -7384,6 +7461,7 @@ export function App() {
         if (getAuthToken()) {
           clearAuthToken();
           setAuthSessionEpoch((n) => n + 1);
+          setAuthAccountLabel('');
         }
         setShowAuthGate(true);
         setShowProfileGate(false);
@@ -7398,6 +7476,7 @@ export function App() {
         '';
       if (fromAuth.length >= 2) {
         setSignupName(fromAuth);
+        setAuthAccountLabel(fromAuth);
       }
       if (withToken.companies[0]) {
         setStoredCompanyId(withToken.companies[0].id);
@@ -7428,6 +7507,7 @@ export function App() {
     companies: Array<{ id: string; displayName: string }>;
     rememberMe?: boolean;
   }): Promise<void> {
+    setError(null);
     setAuthToken(result.token, { remember: result.rememberMe === true });
     if (result.rememberMe === true && result.account?.loginName?.trim()) {
       setRememberedLoginName(result.account.loginName);
@@ -7445,6 +7525,7 @@ export function App() {
       '';
     if (fromAuth.length >= 2) {
       setSignupName(fromAuth);
+      setAuthAccountLabel(fromAuth);
     }
     if (result.companies[0]) {
       setStoredCompanyId(result.companies[0].id);
@@ -7471,6 +7552,7 @@ export function App() {
     });
     setMarketBoardLoading(false);
     if (profileId) bootProfileKeyRef.current = profileId;
+    setError(null);
     setShowProfileGate(false);
     setShowAuthGate(false);
   }
@@ -7609,6 +7691,7 @@ export function App() {
       }
       clearAuthToken();
       setAuthSessionEpoch((n) => n + 1);
+      setAuthAccountLabel('');
       setShowAuthGate(false);
       setCompanies([]);
       // Next Continue on a save will show AuthGate again when CAREER_AUTH=1.
@@ -7617,6 +7700,7 @@ export function App() {
 
   async function onSignOutAndSwitchProfile() {
     await run(async () => {
+      setError(null);
       try {
         await postAuthLogout();
       } catch {
@@ -7624,6 +7708,7 @@ export function App() {
       }
       clearAuthToken();
       setAuthSessionEpoch((n) => n + 1);
+      setAuthAccountLabel('');
       setCompanies([]);
       if (watch?.running) {
         try {
@@ -10316,7 +10401,7 @@ export function App() {
       // Happy path: SimBrief tab + Dispatch card are enough — no success toast.
       void refresh({ missions: true }).catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
-        if (!isNeedsProfileMessage(message)) setError(message);
+        if (shouldSurfaceApiError(message)) setError(message);
       });
     } catch (err) {
       if (pendingTab && !pendingTab.closed) {
@@ -11065,7 +11150,7 @@ export function App() {
         .catch((err: unknown) => {
           if (cancelled) return;
           const message = err instanceof Error ? err.message : String(err);
-          if (!isNeedsProfileMessage(message)) setError(message);
+          if (shouldSurfaceApiError(message)) setError(message);
         });
     }, 200);
     return () => {
@@ -11872,7 +11957,7 @@ export function App() {
 
   if (showProfileGate || !activeCareerProfile) {
     const gateError =
-      error && !isNeedsProfileMessage(error) ? error : null;
+      error && shouldSurfaceApiError(error) ? error : null;
     return (
       <div className="app-shell profile-gate-shell">
         {gateError || (toast && !isNeedsProfileMessage(toast)) ? (
@@ -12242,7 +12327,9 @@ export function App() {
           />
         ) : null}
         <div className="sidebar-footer">
-          <span className="who">{pilotName || 'Airframe'}</span>
+          <span className="who">
+            {(authRequired && authAccountLabel) || pilotName || 'Airframe'}
+          </span>
           <span className="wallet">
             {careerStateReady ? formatMoney(wallet) : '…'}
           </span>
@@ -12275,11 +12362,11 @@ export function App() {
       </aside>
 
       <div className="main-column">
-        {((error && !isNeedsProfileMessage(error)) ||
+        {((error && shouldSurfaceApiError(error)) ||
           (toast && toast !== error) ||
           offlineFeeBanner) ? (
           <div className="app-toast-stack">
-            {error && !isNeedsProfileMessage(error) ? (
+            {error && shouldSurfaceApiError(error) ? (
               <p className="banner error" role="alert">
                 <span>{error}</span>
                 <button
@@ -18461,11 +18548,13 @@ export function App() {
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
           fleet={fleet}
+          walletUsd={wallet}
           busy={busy}
+          onWallet={setWallet}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
           onSwitchCompany={async (companyId) => {
-            await switchCompany(companyId);
+            await switchCompanyForVa(companyId);
           }}
           onLeftVa={async ({ homeCompanyId, companies }) => {
             setCompanies((prev) =>
@@ -18557,8 +18646,21 @@ export function App() {
               <dl className="pilot-dl">
                 <div>
                   <dt>Name</dt>
-                  <dd>{pilotName || 'Pilot'}</dd>
+                  <dd>
+                    {(authRequired && authAccountLabel) || pilotName || 'Pilot'}
+                  </dd>
                 </div>
+                {authRequired ? (
+                  <div>
+                    <dt>Active company</dt>
+                    <dd>
+                      {companies.find((c) => c.id === activeCompanyId)
+                        ?.displayName ||
+                        activeCompanyId ||
+                        '—'}
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>Home hub</dt>
                   <dd>

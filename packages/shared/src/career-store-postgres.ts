@@ -866,9 +866,11 @@ export class PostgresCareerStore implements CareerStore {
     companyId: string,
   ): Promise<boolean> {
     await this.ready;
+    // Match SQLite accountOwnsCompany: any membership (owner/pilot/dispatcher).
+    // VA members must open the VA company session after invite join.
     const { rows } = await this.pool.query(
       `SELECT 1 AS ok FROM company_members
-       WHERE account_id = $1 AND company_id = $2 AND role = 'owner'`,
+       WHERE account_id = $1 AND company_id = $2`,
       [accountId, companyId],
     );
     return Boolean(rows[0]);

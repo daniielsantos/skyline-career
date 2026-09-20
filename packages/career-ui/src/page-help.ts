@@ -58,10 +58,10 @@ export const PAGE_HELP = {
     title: 'How My VA works',
     kicker: 'Page guide',
     bullets: [
-      'Manage roster, hangar (company fleet), invites, recruiting, leave or unlist.',
+      'Manage roster, hangar (company fleet), ledger (shared VA wallet), invites, recruiting, leave or unlist.',
       'Your company is not a VA until you publish it from Company (name + home hub).',
       'Buy/lease aircraft on Airframes — costs hit this company wallet. Full ferry/MX stays in Hangar.',
-      'Internal Hauls stay on Ports — this page is people, fleet overview, and hiring.',
+      'Internal Hauls stay on Ports — this page is people, fleet overview, cashflow, and hiring.',
     ],
   },
   vaDirectory: {

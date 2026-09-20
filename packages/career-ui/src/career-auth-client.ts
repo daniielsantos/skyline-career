@@ -108,7 +108,13 @@ export function clearAuthToken(): void {
  */
 export function signalAuthRequired(tokenUsed: string | null): void {
   const current = getAuthToken();
-  if (tokenUsed && current && current !== tokenUsed) return;
+  // Request had no Bearer (e.g. presence poll during AuthGate) — never wipe a
+  // session that logged in while that call was in flight.
+  if (!tokenUsed) {
+    if (current) return;
+  } else if (current && current !== tokenUsed) {
+    return;
+  }
   clearAuthToken();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));

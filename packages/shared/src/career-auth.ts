@@ -542,6 +542,7 @@ export function listCompaniesForAccount(
   }));
 }
 
+/** True when account is a company_members row (any role). */
 export function accountOwnsCompany(
   db: SqliteDb,
   accountId: string,

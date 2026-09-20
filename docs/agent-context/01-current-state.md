@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **2c4ca9b** / desktop **0.3.145** shipped: Raise Line crew allowance and polish My VA Config. Release: [v0.3.145](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.145).
+
+
 `main` **450b04b** / desktop **0.3.144** shipped: Fix VA hangar reserve UI not updating for the owner. Release: [v0.3.144](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.144).
 
 

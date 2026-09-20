@@ -1,8 +1,10 @@
 # Current state (2026-09-20)
 
-`main` **9c34be2** / desktop **0.3.162** shipped: Watch world debrief payout (was $0), VA Ledger Member column (`actor_account_id`), En route after depart, plus pack brace fix. Release: [v0.3.162](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.162).
+Local (ainda sem release desktop): **Line crew tiers** + **VA settle dual-tenant pilotIcao** + **My VA roster hub** (`At ICAO` per member). Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
-**World:** PG migrate **v30** (`ledger.actor_account_id`) — precisa deploy world se Member column for aparecer em prod MP.
+`main` **6c391b2** / desktop **0.3.162** shipped: Watch world debrief payout (was $0), VA Ledger Member column (`actor_account_id`), En route after depart, plus pack brace fix. Release: [v0.3.162](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.162).
+
+**World:** PG migrate **v30** (`ledger.actor_account_id`) — deployed.
 
 
 `main` **9e13e16** / desktop **0.3.161** shipped: Speed up Dispatch fuel quote and Accept by skipping the world lock. Release: [v0.3.161](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.161).

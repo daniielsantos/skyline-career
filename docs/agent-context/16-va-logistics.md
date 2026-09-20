@@ -156,21 +156,23 @@ Problema: 8 membros ferryando tails da VA com fuel no wallet da company = traged
 
 **Non-goals v1:** ferry infinito grátis; misturar com Port FBO ground staff; IAP seat.
 
-### Line crew tiers (Desk / Ops / Network) — **DECIDIDO design (2026-09-20) · not shipped**
+### Line crew tiers (Desk / Ops / Network) — **DECIDIDO design (2026-09-20) · shipped**
 
-v1 continua **um** hire flat. Próximo passo de produto (antes de polish de layout Config):
+v1 flat hire replaced by tiers (JSON `vaLineCrew.tier`; no PG migrate):
 
 | Tier | Nome | Hire (VA) | $/semana | Allowance NPC/semana | Notas |
 |--|--|--|--|--|--|
-| **T1** | Desk | $2 500 (atual) | $1 800 | `max(4, min(16, 2×parked))` | Default ao hire |
+| **T1** | Desk | $2 500 (hire) | $1 800 | `max(4, min(16, 2×parked))` | Default ao hire |
 | **T2** | Ops | +$4 000 upgrade | $3 200 | `max(8, min(24, 3×parked))` | Upgrade owner-only; fire volta a “sem crew” (não auto-downgrade) |
 | **T3** | Network | +$7 500 from T2 | $5 500 | `max(12, min(32, 4×parked))` | Top; still overflow home beyond cap |
 
 **Regras**
 - Só **owner** upgrade/fire; salary no wallet VA; week key igual v1.
-- Downgrade **não** no v2 — só fire (severance = 1× salary do tier atual) e re-hire T1.
+- Downgrade **não** — só fire (severance = 1× salary do tier atual) e re-hire T1.
 - Overflow / owner instantâneo **inalterados**.
-- UI Config: uma linha de tier + botão Upgrade / Fire (layout polish = turno separado).
+- Upgrade mid-week **mantém** `usedThisWeek` (allowance sobe).
+- UI Config: tier + Upgrade / Fire.
+- Ledger kind `va_line_crew_upgrade`.
 
 **Backlog UI:** ~~melhorar layout da página Config~~ — **shipped 2026-09-20** (seções Hiring / Line crew / Invites / Danger).
 
@@ -497,6 +499,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** /api/va/members devolvia membership puro; UI não tinha coluna de status.
 **Fix:** enrich members com uthListSessions → online/lastSeenAtMs (AUTH_ONLINE_WINDOW_MS) + melhor missão VA ativa do piloto (ccepted/dispatched/in_flight); row com Online/Offline + last seen + flight line; soft-poll 30s na aba Roster.
 
+### Roster member hub (pilotIcao) (2026-09-20)
+
+**Sintoma / gap:** Roster não mostrava onde cada membro está (hub).
+**Causa:** pilotIcao vive na company **home** (chrome sticky); members API só lia missões da VA.
+**Fix:** GET /api/va/members resolve aHomeCompanyId por membro (owner = VA), batch loadMissions por home única, devolve pilotIcao; UI At ICAO. Soft-fail se load falhar.
+
 ### Audit: VA-tail flight loop (2026-09-20)
 
 **Verdict:** **ready with caveats** — Freights/Charter/Demand/Bridge/Haul + cut + reserve + tenant pin are wired; a few dual-tenant UI/API edges remain.
@@ -554,6 +562,18 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** toast de sucesso (−$0), Duke não mudou de ICAO no Hangar VA; sumiu do picker Manifest.
 **Causa:** allowance aplicava `npcArriveAtTick` → status `ferry` sem mover location; Manifest/Prepare só listam `parked`. ETA NPC + UI “Instant” incongruentes. Hangar VA vinha de `/api/va/members` (peek missions) sem finalizar hops.
 **Fix:** allowance = hop instantâneo $0; `finalizeStuckNpcFerries` no `withCareerRead`/settle **e** no load de `/api/va/members` (+save); picker mostra `ferry` desabilitado se ainda houver. Ferry pago sempre foi instantâneo — o ETA era só o path Line crew (revertido).
+
+### Line crew tiers Desk/Ops/Network (2026-09-20)
+
+**Sintoma / gap:** Line crew era hire flat (Desk only); VAs grandes esgotavam allowance cedo sem path de escala.
+**Causa:** um único salary/allowance; sem upgrade.
+**Fix:** `vaLineCrew.tier` 1|2|3 no JSON (sem migrate); hire→Desk; `upgradeVaLineCrew` Ops/Network; fire→none com severance = salary do tier; allowance/salary por tabela; API `action=upgrade`; Config Upgrade/Fire; ledger `va_line_crew_upgrade`. Legacy hired sem tier = Desk.
+
+### VA settle moves aircraft but not pilot (dual-tenant) (2026-09-20)
+
+**Sintoma:** voo com tail VA; após settle o casco está no dest, mas “Pilot at …” fica no hub de origem.
+**Causa:** `relocateAircraftOnSettle` faz `syncPilotIcaoTo` só no tenant **ops** (VA). Chrome sticky home lê `pilotIcao` da **home**; pós-settle a UI restaura home e sobrescreve com o ICAO antigo. XP já dual-write; pilot location não.
+**Fix:** `/api/settle` após ops write, se `pilotHomeCompanyId ≠ ops` e não `crewOperated`, `syncPilotIcaoTo(home, dest)` no mesmo write-back da progression; response `pilotIcao` = dest.
 
 ### Prepare Accept Unknown aircraft + Yours label on VA Duke (2026-09-20)
 
@@ -654,13 +674,15 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Watch world settle debrief payout** — ler payout/penalty da missão settled (não hardcode 0)
 - [x] **Chrome wallet ref lag** — sync activeCompanyIdRef + getStoredCompanyId no sticky; fleet/wallet após pin
 - [x] **Roster presence** — online / last seen / flight na row
+- [x] **Roster member hub** — pilotIcao da home company (`At ICAO`)
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **Prepare filter reserved + Accept auto-reserve** — picker esconde hold alheio; assign grava reserve
 - [x] **Prepare VA fleet after My VA** — não limpar vaSessionFleet ao voltar home
 - [x] **VA home_country_id on publish** — derive from hub + backfill
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Line crew allowance retune** — piso 4, 2×parked, cap 16 (2026-09-20)
-- [ ] **Line crew tiers** Desk/Ops/Network — design in 16; not shipped
+- [x] **Line crew tiers** Desk/Ops/Network — hire Desk; upgrade Ops/Network; fire→none (severance = tier salary)
+- [x] **VA settle dual-tenant pilotIcao** — sync home company to dest (chrome sticky)
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

@@ -5012,6 +5012,8 @@ export type VaMember = {
   lastSeenAtMs?: number | null;
   /** Active mission on this VA company stamped to the pilot. */
   flight?: VaMemberFlight | null;
+  /** Current hub on the pilot's home company (chrome sticky location). */
+  pilotIcao?: string | null;
 };
 
 export type VaCompanyRank = {
@@ -5068,10 +5070,14 @@ export function fetchVaMembers() {
     homeHubIcao: string;
     lineCrew: {
       hired: boolean;
+      tier: 1 | 2 | 3;
+      tierName: 'Desk' | 'Ops' | 'Network' | null;
       allowance: number;
       used: number;
       remaining: number;
       hireUsd: number;
+      upgradeUsd: number | null;
+      nextTierName: 'Ops' | 'Network' | null;
       salaryUsdPerWeek: number;
       fireSeveranceUsd: number;
     } | null;
@@ -5115,16 +5121,20 @@ export function postVaRouteCut(memberRouteCutPct: number) {
   });
 }
 
-export function postVaLineCrew(action: 'hire' | 'fire') {
+export function postVaLineCrew(action: 'hire' | 'fire' | 'upgrade') {
   return api<{
     walletUsd: number;
     debitUsd: number;
     lineCrew: {
       hired: boolean;
+      tier: 1 | 2 | 3;
+      tierName: 'Desk' | 'Ops' | 'Network' | null;
       allowance: number;
       used: number;
       remaining: number;
       hireUsd: number;
+      upgradeUsd: number | null;
+      nextTierName: 'Ops' | 'Network' | null;
       salaryUsdPerWeek: number;
       fireSeveranceUsd: number;
     };

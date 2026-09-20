@@ -46,6 +46,7 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   internal_haul_pay: 'Internal haul pay',
   va_member_cut: 'VA member route cut',
   va_line_crew_hire: 'VA Line crew hire',
+  va_line_crew_upgrade: 'VA Line crew upgrade',
   va_line_crew_fire: 'VA Line crew severance',
   va_line_crew_salary: 'VA Line crew salary',
   va_line_crew_ferry: 'VA ferry (member home)',

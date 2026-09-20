@@ -74,6 +74,11 @@ function formatRosterFlight(
   return od || flight.status;
 }
 
+function formatRosterHub(pilotIcao: string | null | undefined): string {
+  const icao = (pilotIcao ?? '').trim().toUpperCase();
+  return icao ? `At ${icao}` : 'Hub —';
+}
+
 type Props = {
   authRequired: boolean;
   activeCompanyId: string | null;
@@ -122,10 +127,14 @@ export function VaPage(props: Props) {
   const [cutDraft, setCutDraft] = useState('30');
   const [lineCrew, setLineCrew] = useState<{
     hired: boolean;
+    tier: 1 | 2 | 3;
+    tierName: 'Desk' | 'Ops' | 'Network' | null;
     allowance: number;
     used: number;
     remaining: number;
     hireUsd: number;
+    upgradeUsd: number | null;
+    nextTierName: 'Ops' | 'Network' | null;
     salaryUsdPerWeek: number;
     fireSeveranceUsd: number;
   } | null>(null);
@@ -589,6 +598,7 @@ export function VaPage(props: Props) {
                         ? 'Active now'
                         : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`}
                     </span>
+                    <span className="va-roster-hub">{formatRosterHub(m.pilotIcao)}</span>
                     <span
                       className={`va-roster-flight${
                         m.flight?.status === 'in_flight' ? ' is-flying' : ''
@@ -973,8 +983,10 @@ export function VaPage(props: Props) {
               <div className="va-config-line-crew is-hired">
                 <div className="va-config-line-crew-stats">
                   <div>
-                    <span className="va-config-stat-label">Status</span>
-                    <span className="va-config-stat-value">Hired</span>
+                    <span className="va-config-stat-label">Tier</span>
+                    <span className="va-config-stat-value">
+                      {lineCrew.tierName ?? 'Desk'}
+                    </span>
                   </div>
                   <div>
                     <span className="va-config-stat-label">Allowance</span>
@@ -992,42 +1004,80 @@ export function VaPage(props: Props) {
                   </div>
                 </div>
                 {isOwner ? (
-                  <button
-                    type="button"
-                    className="action ghost"
-                    disabled={pageBusy}
-                    onClick={() => {
-                      void (async () => {
-                        const ok = await confirm({
-                          title: 'Fire Line crew?',
-                          body: `Severance $${lineCrew.fireSeveranceUsd.toLocaleString()}. Empty ferries then debit member home wallets.`,
-                          confirmLabel: 'Fire',
-                          tone: 'warn',
-                        });
-                        if (!ok) return;
-                        setBusy(true);
-                        setError(null);
-                        try {
-                          const res = await postVaLineCrew('fire');
-                          setLineCrew(res.lineCrew);
-                        } catch (err) {
-                          setError(
-                            err instanceof Error
-                              ? err.message
-                              : String(err),
-                          );
-                        } finally {
-                          setBusy(false);
-                        }
-                      })();
-                    }}
-                  >
-                    Fire Line crew
-                  </button>
+                  <div className="va-config-actions">
+                    {lineCrew.upgradeUsd != null && lineCrew.nextTierName ? (
+                      <button
+                        type="button"
+                        className="action"
+                        disabled={pageBusy}
+                        onClick={() => {
+                          void (async () => {
+                            const nextName = lineCrew.nextTierName!;
+                            const upgradeUsd = lineCrew.upgradeUsd!;
+                            const ok = await confirm({
+                              title: `Upgrade to ${nextName}?`,
+                              body: `Pays $${upgradeUsd.toLocaleString()} from the VA wallet. Weekly salary becomes higher; allowance scales up. Used hops this week stay counted.`,
+                              confirmLabel: `Upgrade · $${upgradeUsd.toLocaleString()}`,
+                            });
+                            if (!ok) return;
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              const res = await postVaLineCrew('upgrade');
+                              setLineCrew(res.lineCrew);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        Upgrade to {lineCrew.nextTierName} ($
+                        {lineCrew.upgradeUsd.toLocaleString()})
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="action ghost"
+                      disabled={pageBusy}
+                      onClick={() => {
+                        void (async () => {
+                          const ok = await confirm({
+                            title: 'Fire Line crew?',
+                            body: `Severance $${lineCrew.fireSeveranceUsd.toLocaleString()} (${lineCrew.tierName ?? 'Desk'} · 1 week). Empty ferries then debit member home wallets. Re-hire starts at Desk.`,
+                            confirmLabel: 'Fire',
+                            tone: 'warn',
+                          });
+                          if (!ok) return;
+                          setBusy(true);
+                          setError(null);
+                          try {
+                            const res = await postVaLineCrew('fire');
+                            setLineCrew(res.lineCrew);
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : String(err),
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        })();
+                      }}
+                    >
+                      Fire Line crew
+                    </button>
+                  </div>
                 ) : (
                   <p className="muted va-config-readonly">
-                    Owner manages hire / fire. Empty ferries under allowance do
-                    not debit your home wallet.
+                    Owner manages hire / upgrade / fire. Empty ferries under
+                    allowance do not debit your home wallet.
                   </p>
                 )}
               </div>
@@ -1035,7 +1085,7 @@ export function VaPage(props: Props) {
               <div className="va-config-line-crew">
                 <p className="settings-sample va-config-readonly">
                   Not hired — empty ferries debit the flying member&apos;s home
-                  wallet.
+                  wallet. Hire starts at Desk.
                 </p>
                 {isOwner ? (
                   <button
@@ -1061,7 +1111,7 @@ export function VaPage(props: Props) {
                       })();
                     }}
                   >
-                    Hire Line crew ($
+                    Hire Desk ($
                     {(lineCrew?.hireUsd ?? 2500).toLocaleString()})
                   </button>
                 ) : null}

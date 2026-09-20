@@ -1,31 +1,103 @@
 /**
  * VA Line crew — weekly overhead + empty-ferry allowance (NPC reposition).
- * Spec: docs/agent-context/16-va-logistics.md (Ferry ops).
+ * Tiers: Desk (T1) → Ops (T2) → Network (T3). Spec: docs/agent-context/16-va-logistics.md.
  */
 
 import { applyWalletDelta } from './career-ledger.js';
 import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
-import { VA_MEMBER_CAP } from './career-va.js';
 import type {
   CareerMissionsState,
   PlayerAircraft,
 } from './types/career-economy.js';
 
-/** Signing bonus when hiring Line crew (VA wallet). */
-export const VA_LINE_CREW_HIRE_USD = 2_500;
-/** Weekly salary debited from the VA wallet. */
-export const VA_LINE_CREW_SALARY_USD_PER_WEEK = 1_800;
-/** Fire severance = one week salary. */
-export const VA_LINE_CREW_FIRE_SEVERANCE_USD = VA_LINE_CREW_SALARY_USD_PER_WEEK;
+export type VaLineCrewTier = 1 | 2 | 3;
+
+export type VaLineCrewTierDef = {
+  tier: VaLineCrewTier;
+  name: 'Desk' | 'Ops' | 'Network';
+  /** Signing cost to reach this tier (hire for T1; upgrade for T2/T3). */
+  unlockUsd: number;
+  salaryUsdPerWeek: number;
+  allowanceFloor: number;
+  allowanceParkedMult: number;
+  allowanceCap: number;
+};
+
+export const VA_LINE_CREW_TIERS: readonly VaLineCrewTierDef[] = [
+  {
+    tier: 1,
+    name: 'Desk',
+    unlockUsd: 2_500,
+    salaryUsdPerWeek: 1_800,
+    allowanceFloor: 4,
+    allowanceParkedMult: 2,
+    allowanceCap: 16,
+  },
+  {
+    tier: 2,
+    name: 'Ops',
+    unlockUsd: 4_000,
+    salaryUsdPerWeek: 3_200,
+    allowanceFloor: 8,
+    allowanceParkedMult: 3,
+    allowanceCap: 24,
+  },
+  {
+    tier: 3,
+    name: 'Network',
+    unlockUsd: 7_500,
+    salaryUsdPerWeek: 5_500,
+    allowanceFloor: 12,
+    allowanceParkedMult: 4,
+    allowanceCap: 32,
+  },
+] as const;
+
+/** Signing bonus when hiring Line crew at Desk (VA wallet). */
+export const VA_LINE_CREW_HIRE_USD = VA_LINE_CREW_TIERS[0]!.unlockUsd;
+/** @deprecated Prefer tier salary via resolveVaLineCrewTier(1). Kept for T1 callers/tests. */
+export const VA_LINE_CREW_SALARY_USD_PER_WEEK =
+  VA_LINE_CREW_TIERS[0]!.salaryUsdPerWeek;
+/** @deprecated Prefer fireSeveranceForTier — fire uses current tier salary. */
+export const VA_LINE_CREW_FIRE_SEVERANCE_USD =
+  VA_LINE_CREW_TIERS[0]!.salaryUsdPerWeek;
 
 export type VaLineCrewState = {
   hired: boolean;
+  /** Desk=1 / Ops=2 / Network=3. Legacy hired without tier → 1. */
+  tier: VaLineCrewTier;
   hiredAtTick: number;
   /** Economy week key (floor(tick / TICKS_PER_DAY / 7)). */
   weekKey: number;
   /** Empty ferries consumed this week under allowance. */
   usedThisWeek: number;
 };
+
+export type VaLineCrewSnapshot = {
+  hired: boolean;
+  tier: VaLineCrewTier;
+  tierName: 'Desk' | 'Ops' | 'Network' | null;
+  allowance: number;
+  used: number;
+  remaining: number;
+  hireUsd: number;
+  upgradeUsd: number | null;
+  nextTierName: 'Ops' | 'Network' | null;
+  salaryUsdPerWeek: number;
+  fireSeveranceUsd: number;
+};
+
+export function resolveVaLineCrewTier(tier: VaLineCrewTier): VaLineCrewTierDef {
+  const def = VA_LINE_CREW_TIERS[tier - 1];
+  if (!def) return VA_LINE_CREW_TIERS[0]!;
+  return def;
+}
+
+export function normalizeVaLineCrewTier(raw: unknown): VaLineCrewTier {
+  if (raw === 2 || raw === '2') return 2;
+  if (raw === 3 || raw === '3') return 3;
+  return 1;
+}
 
 export function vaWeekKeyFromTick(tick: number): number {
   const day = Math.floor(Math.max(0, tick) / TICKS_PER_DAY);
@@ -41,6 +113,7 @@ export function ensureVaLineCrew(
   if (!raw || typeof raw !== 'object') {
     const fresh: VaLineCrewState = {
       hired: false,
+      tier: 1,
       hiredAtTick: 0,
       weekKey,
       usedThisWeek: 0,
@@ -49,6 +122,13 @@ export function ensureVaLineCrew(
     return fresh;
   }
   const hired = raw.hired === true;
+  const tier = hired
+    ? normalizeVaLineCrewTier(
+        (raw as { tier?: unknown }).tier !== undefined
+          ? (raw as { tier?: unknown }).tier
+          : 1,
+      )
+    : 1;
   const hiredAtTick =
     typeof raw.hiredAtTick === 'number' && Number.isFinite(raw.hiredAtTick)
       ? Math.max(0, Math.floor(raw.hiredAtTick))
@@ -66,6 +146,7 @@ export function ensureVaLineCrew(
   }
   const next: VaLineCrewState = {
     hired,
+    tier,
     hiredAtTick,
     weekKey,
     usedThisWeek,
@@ -74,36 +155,84 @@ export function ensureVaLineCrew(
   return next;
 }
 
-/** Allowance K = min(2×memberCap, parked hulls), floor 2 when hired. */
 /**
  * Weekly NPC empty-ferry budget while Line crew is hired.
- * Floor 4 so a 2-hull starter VA can reposition more than once/week;
- * scales 2× parked up to 2× member cap (16).
+ * Formula depends on tier (floor / parked mult / cap).
  */
 export function quoteVaLineCrewAllowance(
   state: CareerMissionsState,
+  tier: VaLineCrewTier = 1,
 ): number {
+  const def = resolveVaLineCrewTier(tier);
   const parked = (state.fleet ?? []).filter(
     (a) => a.status === 'parked' && !a.npcFerry,
   ).length;
-  const byCap = 2 * VA_MEMBER_CAP;
-  const byFleet = Math.max(0, parked) * 2;
-  const raw = Math.min(byCap, byFleet);
-  return Math.max(4, raw);
+  const byFleet = Math.max(0, parked) * def.allowanceParkedMult;
+  const raw = Math.min(def.allowanceCap, byFleet);
+  return Math.max(def.allowanceFloor, raw);
 }
 
 export function vaLineCrewAllowanceRemaining(
   state: CareerMissionsState,
   tick: number,
-): { hired: boolean; allowance: number; used: number; remaining: number } {
+): {
+  hired: boolean;
+  tier: VaLineCrewTier;
+  allowance: number;
+  used: number;
+  remaining: number;
+} {
   const crew = ensureVaLineCrew(state, tick);
-  const allowance = crew.hired ? quoteVaLineCrewAllowance(state) : 0;
+  const allowance = crew.hired
+    ? quoteVaLineCrewAllowance(state, crew.tier)
+    : 0;
   const used = crew.hired ? crew.usedThisWeek : 0;
   return {
     hired: crew.hired,
+    tier: crew.hired ? crew.tier : 1,
     allowance,
     used,
     remaining: Math.max(0, allowance - used),
+  };
+}
+
+export function buildVaLineCrewSnapshot(
+  state: CareerMissionsState,
+  tick: number,
+): VaLineCrewSnapshot {
+  const crew = ensureVaLineCrew(state, tick);
+  const allowance = vaLineCrewAllowanceRemaining(state, tick);
+  const hireUsd = VA_LINE_CREW_HIRE_USD;
+  if (!crew.hired) {
+    return {
+      hired: false,
+      tier: 1,
+      tierName: null,
+      allowance: 0,
+      used: 0,
+      remaining: 0,
+      hireUsd,
+      upgradeUsd: null,
+      nextTierName: null,
+      salaryUsdPerWeek: resolveVaLineCrewTier(1).salaryUsdPerWeek,
+      fireSeveranceUsd: resolveVaLineCrewTier(1).salaryUsdPerWeek,
+    };
+  }
+  const def = resolveVaLineCrewTier(crew.tier);
+  const next =
+    crew.tier < 3 ? resolveVaLineCrewTier((crew.tier + 1) as VaLineCrewTier) : null;
+  return {
+    hired: true,
+    tier: crew.tier,
+    tierName: def.name,
+    allowance: allowance.allowance,
+    used: allowance.used,
+    remaining: allowance.remaining,
+    hireUsd,
+    upgradeUsd: next ? next.unlockUsd : null,
+    nextTierName: next ? (next.name as 'Ops' | 'Network') : null,
+    salaryUsdPerWeek: def.salaryUsdPerWeek,
+    fireSeveranceUsd: def.salaryUsdPerWeek,
   };
 }
 
@@ -113,25 +242,56 @@ export function hireVaLineCrew(
 ): { debitUsd: number; crew: VaLineCrewState } {
   const crew = ensureVaLineCrew(state, tick);
   if (crew.hired) throw new Error('Line crew already hired');
-  if (state.walletUsd < VA_LINE_CREW_HIRE_USD) {
+  const cost = VA_LINE_CREW_HIRE_USD;
+  if (state.walletUsd < cost) {
     throw new Error(
-      `Line crew hire costs $${VA_LINE_CREW_HIRE_USD.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
+      `Line crew hire costs $${cost.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
     );
   }
   applyWalletDelta(state, {
-    amountUsd: -VA_LINE_CREW_HIRE_USD,
+    amountUsd: -cost,
     kind: 'va_line_crew_hire',
     atTick: tick,
-    note: 'Hire VA Line crew (ferry desk)',
+    note: 'Hire VA Line crew · Desk (ferry desk)',
   });
   const next: VaLineCrewState = {
     hired: true,
+    tier: 1,
     hiredAtTick: tick,
     weekKey: vaWeekKeyFromTick(tick),
     usedThisWeek: 0,
   };
   state.vaLineCrew = next;
-  return { debitUsd: VA_LINE_CREW_HIRE_USD, crew: next };
+  return { debitUsd: cost, crew: next };
+}
+
+export function upgradeVaLineCrew(
+  state: CareerMissionsState,
+  tick: number,
+): { debitUsd: number; crew: VaLineCrewState } {
+  const crew = ensureVaLineCrew(state, tick);
+  if (!crew.hired) throw new Error('Hire Line crew before upgrading');
+  if (crew.tier >= 3) throw new Error('Line crew already at Network');
+  const nextTier = (crew.tier + 1) as VaLineCrewTier;
+  const nextDef = resolveVaLineCrewTier(nextTier);
+  const cost = nextDef.unlockUsd;
+  if (state.walletUsd < cost) {
+    throw new Error(
+      `Upgrade to ${nextDef.name} costs $${cost.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
+    );
+  }
+  applyWalletDelta(state, {
+    amountUsd: -cost,
+    kind: 'va_line_crew_upgrade',
+    atTick: tick,
+    note: `Upgrade VA Line crew · ${nextDef.name}`,
+  });
+  const next: VaLineCrewState = {
+    ...crew,
+    tier: nextTier,
+  };
+  state.vaLineCrew = next;
+  return { debitUsd: cost, crew: next };
 }
 
 export function fireVaLineCrew(
@@ -140,25 +300,28 @@ export function fireVaLineCrew(
 ): { debitUsd: number; crew: VaLineCrewState } {
   const crew = ensureVaLineCrew(state, tick);
   if (!crew.hired) throw new Error('No Line crew to fire');
-  if (state.walletUsd < VA_LINE_CREW_FIRE_SEVERANCE_USD) {
+  const severance = resolveVaLineCrewTier(crew.tier).salaryUsdPerWeek;
+  if (state.walletUsd < severance) {
     throw new Error(
-      `Severance costs $${VA_LINE_CREW_FIRE_SEVERANCE_USD.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
+      `Severance costs $${severance.toLocaleString()} but wallet has $${state.walletUsd.toLocaleString()}`,
     );
   }
+  const tierName = resolveVaLineCrewTier(crew.tier).name;
   applyWalletDelta(state, {
-    amountUsd: -VA_LINE_CREW_FIRE_SEVERANCE_USD,
+    amountUsd: -severance,
     kind: 'va_line_crew_fire',
     atTick: tick,
-    note: 'Fire VA Line crew · 1 week severance',
+    note: `Fire VA Line crew · ${tierName} · 1 week severance`,
   });
   const next: VaLineCrewState = {
     hired: false,
+    tier: 1,
     hiredAtTick: 0,
     weekKey: vaWeekKeyFromTick(tick),
     usedThisWeek: 0,
   };
   state.vaLineCrew = next;
-  return { debitUsd: VA_LINE_CREW_FIRE_SEVERANCE_USD, crew: next };
+  return { debitUsd: severance, crew: next };
 }
 
 export function settleVaLineCrewSalary(
@@ -175,14 +338,16 @@ export function settleVaLineCrewSalary(
   if (weeksCharged <= 0) {
     return { debitUsd: 0, weeksCharged: 0, requestedUsd: 0 };
   }
-  const requestedUsd = weeksCharged * VA_LINE_CREW_SALARY_USD_PER_WEEK;
+  const salary = resolveVaLineCrewTier(crew.tier).salaryUsdPerWeek;
+  const requestedUsd = weeksCharged * salary;
   const debitUsd = Math.min(state.walletUsd, requestedUsd);
   if (debitUsd > 0) {
+    const tierName = resolveVaLineCrewTier(crew.tier).name;
     applyWalletDelta(state, {
       amountUsd: -debitUsd,
       kind: 'va_line_crew_salary',
       atTick: opts.toTick,
-      note: `${weeksCharged}w · VA Line crew`,
+      note: `${weeksCharged}w · VA Line crew · ${tierName}`,
     });
   }
   return { debitUsd, weeksCharged, requestedUsd };
@@ -194,7 +359,7 @@ export function consumeVaLineCrewAllowance(
 ): boolean {
   const crew = ensureVaLineCrew(state, tick);
   if (!crew.hired) return false;
-  const allowance = quoteVaLineCrewAllowance(state);
+  const allowance = quoteVaLineCrewAllowance(state, crew.tier);
   if (crew.usedThisWeek >= allowance) return false;
   crew.usedThisWeek += 1;
   state.vaLineCrew = { ...crew };

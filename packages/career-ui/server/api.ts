@@ -186,12 +186,12 @@ import {
   canManageVaRoster,
   hireVaLineCrew,
   fireVaLineCrew,
+  upgradeVaLineCrew,
+  buildVaLineCrewSnapshot,
   vaLineCrewAllowanceRemaining,
   consumeVaLineCrewAllowance,
   finalizeStuckNpcFerries,
-  VA_LINE_CREW_HIRE_USD,
-  VA_LINE_CREW_SALARY_USD_PER_WEEK,
-  VA_LINE_CREW_FIRE_SEVERANCE_USD,
+  syncPilotIcaoTo,
   resolveVaOrgPerks,
   applyVaOrgCostMult,
   type VaOrgPerks,
@@ -3685,6 +3685,61 @@ export function createCareerApiServer(port = 8787) {
         } catch {
           vaMissionsForRoster = null;
         }
+        // Pilot hub = home-company pilotIcao (chrome sticky). Cap 8 — batch by home.
+        const pilotIcaoByAccount = new Map<string, string>();
+        try {
+          const homeByAccount = new Map<string, string>();
+          await Promise.all(
+            members.map(async (m) => {
+              try {
+                const homeId =
+                  m.role === 'owner'
+                    ? companyId
+                    : ((await Promise.resolve(
+                        store.vaHomeCompanyId(m.accountId),
+                      )) ?? '');
+                if (homeId) homeByAccount.set(m.accountId, homeId);
+              } catch {
+                /* soft */
+              }
+            }),
+          );
+          const uniqueHomes = [...new Set(homeByAccount.values())];
+          const missionsByHome = new Map<
+            string,
+            Awaited<ReturnType<typeof loadMissions>>
+          >();
+          await Promise.all(
+            uniqueHomes.map(async (homeId) => {
+              try {
+                if (homeId === companyId && vaMissionsForRoster) {
+                  missionsByHome.set(homeId, vaMissionsForRoster);
+                  return;
+                }
+                missionsByHome.set(
+                  homeId,
+                  await loadMissions({ companyId: homeId }),
+                );
+              } catch {
+                /* soft */
+              }
+            }),
+          );
+          for (const m of members) {
+            const homeId = homeByAccount.get(m.accountId);
+            if (!homeId) continue;
+            const ms = missionsByHome.get(homeId);
+            if (!ms) continue;
+            const icao = (
+              ms.pilotIcao?.trim() ||
+              ms.homeHubIcao?.trim() ||
+              ''
+            ).toUpperCase();
+            if (icao) pilotIcaoByAccount.set(m.accountId, icao);
+          }
+        } catch {
+          /* soft-fail — roster still paints without hubs */
+        }
         const membersWithPresence = members.map((m) => {
           const lastSeenAtMs = lastSeenByAccount.get(m.accountId) ?? null;
           const online =
@@ -3695,19 +3750,12 @@ export function createCareerApiServer(port = 8787) {
             online,
             lastSeenAtMs,
             flight: flightByAccount.get(m.accountId) ?? null,
+            pilotIcao: pilotIcaoByAccount.get(m.accountId) ?? null,
           };
         });
         // Line crew snapshot for all members (read-only Config). Missions already
         // loaded for roster presence — no world lock. Soft-fail → null.
-        let lineCrew: {
-          hired: boolean;
-          allowance: number;
-          used: number;
-          remaining: number;
-          hireUsd: number;
-          salaryUsdPerWeek: number;
-          fireSeveranceUsd: number;
-        } | null = null;
+        let lineCrew: ReturnType<typeof buildVaLineCrewSnapshot> | null = null;
         if (listed) {
           try {
             const tick =
@@ -3716,13 +3764,7 @@ export function createCareerApiServer(port = 8787) {
                 : 0;
             const missions =
               vaMissionsForRoster ?? (await loadMissions({ companyId }));
-            const allowance = vaLineCrewAllowanceRemaining(missions, tick);
-            lineCrew = {
-              ...allowance,
-              hireUsd: VA_LINE_CREW_HIRE_USD,
-              salaryUsdPerWeek: VA_LINE_CREW_SALARY_USD_PER_WEEK,
-              fireSeveranceUsd: VA_LINE_CREW_FIRE_SEVERANCE_USD,
-            };
+            lineCrew = buildVaLineCrewSnapshot(missions, tick);
           } catch {
             lineCrew = null;
           }
@@ -3842,18 +3884,24 @@ export function createCareerApiServer(port = 8787) {
         }
         const body = (await readBody(req)) as {
           companyId?: string;
-          action?: 'hire' | 'fire';
+          action?: 'hire' | 'fire' | 'upgrade';
         };
         const companyId = companyIdFromRequest(req, body.companyId);
-        if (!companyId || (body.action !== 'hire' && body.action !== 'fire')) {
-          send(res, 400, { error: 'companyId and action (hire|fire) required' });
+        const action = body.action;
+        if (
+          !companyId ||
+          (action !== 'hire' && action !== 'fire' && action !== 'upgrade')
+        ) {
+          send(res, 400, {
+            error: 'companyId and action (hire|fire|upgrade) required',
+          });
           return;
         }
         try {
           await assertVaOwnerForFleetMutation(
             req,
             companyId,
-            'hire or fire Line crew',
+            'hire, upgrade, or fire Line crew',
           );
           const listed = await Promise.resolve(store.vaIsListed(companyId));
           if (!listed) {
@@ -3862,22 +3910,15 @@ export function createCareerApiServer(port = 8787) {
           }
           const result = await withCareerWrite((world, missions) => {
             const out =
-              body.action === 'hire'
+              action === 'hire'
                 ? hireVaLineCrew(missions, world.tick)
-                : fireVaLineCrew(missions, world.tick);
-            const allowance = vaLineCrewAllowanceRemaining(
-              missions,
-              world.tick,
-            );
+                : action === 'upgrade'
+                  ? upgradeVaLineCrew(missions, world.tick)
+                  : fireVaLineCrew(missions, world.tick);
             return {
               walletUsd: missions.walletUsd,
               debitUsd: out.debitUsd,
-              lineCrew: {
-                ...allowance,
-                hireUsd: VA_LINE_CREW_HIRE_USD,
-                salaryUsdPerWeek: VA_LINE_CREW_SALARY_USD_PER_WEEK,
-                fireSeveranceUsd: VA_LINE_CREW_FIRE_SEVERANCE_USD,
-              },
+              lineCrew: buildVaLineCrewSnapshot(missions, world.tick),
             };
           }, { persist: 'company', companyId });
           send(res, 200, result);
@@ -13133,28 +13174,51 @@ export function createCareerApiServer(port = 8787) {
             send(res, 409, { error: `Mission ${body.missionId} is already closed` });
             return;
           }
-          if (
+          // Dual-tenant: aircraft lives on VA ops; chrome pilot = home company.
+          // relocateAircraftOnSettle only moved VA.pilotIcao — write home too.
+          const homePilotSyncId =
+            pilotHomeForXp &&
+            settleCompanyId &&
+            pilotHomeForXp !== settleCompanyId &&
+            settled.mission.crewOperated !== true
+              ? pilotHomeForXp
+              : '';
+          const homeProgWrite =
             progressionBag &&
             settled.progressionHomeCompanyId &&
             (settled.cargoOpsDeltas.length > 0 ||
               settled.classOpsDeltas.length > 0)
-          ) {
-            const homeId = settled.progressionHomeCompanyId;
-            const nextCargo = progressionBag.cargoOps;
-            const nextClass = progressionBag.classOps;
+              ? settled.progressionHomeCompanyId
+              : '';
+          const homeWriteId = homePilotSyncId || homeProgWrite;
+          if (homeWriteId) {
+            const destIcao = (settled.mission.destIcao ?? '').trim().toUpperCase();
+            const nextCargo = progressionBag?.cargoOps;
+            const nextClass = progressionBag?.classOps;
             await withCareerWrite(
               (_world, missions) => {
-                missions.cargoOps = nextCargo;
-                missions.classOps = nextClass;
-                return { ok: true as const };
+                if (homePilotSyncId && destIcao) {
+                  syncPilotIcaoTo(missions, destIcao);
+                }
+                if (homeProgWrite && nextCargo && nextClass) {
+                  missions.cargoOps = nextCargo;
+                  missions.classOps = nextClass;
+                }
+                return {
+                  ok: true as const,
+                  pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
+                };
               },
               {
                 persist: 'company',
-                companyId: homeId,
+                companyId: homeWriteId,
                 housekeeping: false,
                 catchUp: false,
               },
             );
+            if (homePilotSyncId && destIcao) {
+              settled.pilotIcao = destIcao;
+            }
           }
           if (settled.pilotPayCredit && settled.pilotPayCredit.amountUsd > 0) {
             const credit = settled.pilotPayCredit;

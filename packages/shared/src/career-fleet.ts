@@ -330,6 +330,12 @@ export function normalizeMissionsState(
     vaLineCrewRaw && typeof vaLineCrewRaw === 'object'
       ? {
           hired: vaLineCrewRaw.hired === true,
+          tier: ((): 1 | 2 | 3 => {
+            const t = (vaLineCrewRaw as { tier?: unknown }).tier;
+            if (t === 2 || t === '2') return 2;
+            if (t === 3 || t === '3') return 3;
+            return 1;
+          })(),
           hiredAtTick:
             typeof vaLineCrewRaw.hiredAtTick === 'number' &&
             Number.isFinite(vaLineCrewRaw.hiredAtTick)

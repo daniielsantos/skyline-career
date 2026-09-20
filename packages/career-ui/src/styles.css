@@ -14090,6 +14090,15 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.va-roster-hub {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .va-roster-flight {
   font-size: 0.82rem;
   color: var(--ink);

@@ -1394,6 +1394,8 @@ export interface CareerMissionsState {
    */
   vaLineCrew?: {
     hired: boolean;
+    /** Desk=1 / Ops=2 / Network=3. Legacy hired without tier → treat as 1. */
+    tier?: 1 | 2 | 3;
     hiredAtTick: number;
     weekKey: number;
     usedThisWeek: number;
@@ -2003,6 +2005,7 @@ export type CareerLedgerKind =
   | 'internal_haul_pay'
   | 'va_member_cut'
   | 'va_line_crew_hire'
+  | 'va_line_crew_upgrade'
   | 'va_line_crew_fire'
   | 'va_line_crew_salary'
   | 'va_line_crew_ferry'

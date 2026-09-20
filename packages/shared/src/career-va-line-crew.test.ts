@@ -8,12 +8,15 @@ import {
   fireVaLineCrew,
   finalizeStuckNpcFerries,
   hireVaLineCrew,
+  upgradeVaLineCrew,
   quoteNpcFerryEtaTicks,
   settleVaLineCrewSalary,
   vaLineCrewAllowanceRemaining,
+  buildVaLineCrewSnapshot,
   vaWeekKeyFromTick,
   VA_LINE_CREW_HIRE_USD,
   VA_LINE_CREW_SALARY_USD_PER_WEEK,
+  resolveVaLineCrewTier,
 } from './career-va-line-crew.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 
@@ -30,6 +33,7 @@ describe('VA Line crew ferry ops', () => {
     assert.equal(hired.debitUsd, VA_LINE_CREW_HIRE_USD);
     assert.equal(state.walletUsd, before - VA_LINE_CREW_HIRE_USD);
     assert.equal(state.vaLineCrew?.hired, true);
+    assert.equal(state.vaLineCrew?.tier, 1);
     const allowance = vaLineCrewAllowanceRemaining(state, world.tick);
     assert.ok(allowance.remaining >= 4);
     assert.equal(allowance.allowance, 4); // 1 parked starter → floor 4
@@ -135,9 +139,9 @@ describe('VA Line crew ferry ops', () => {
     assert.equal(ferried.aircraft.npcFerry, undefined);
   });
 
-  it('allowance floor 4 and scales 2× parked up to 16', () => {
+  it('Desk allowance floor 4 and scales 2× parked up to 16', () => {
     const world = createSeedEconomyWorld({ seed: 'va-line-allow' });
-    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'VA',
       airframeTypeId: 'asobo-c172sp-cargo',
     });
@@ -175,5 +179,116 @@ describe('VA Line crew ferry ops', () => {
     }
     // 10 parked → cap 16
     assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 16);
+  });
+
+  it('upgrades Desk→Ops→Network, keeps used, fires at Ops severance', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-line-tiers' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    hireVaLineCrew(state, world.tick);
+    assert.ok(consumeVaLineCrewAllowance(state, world.tick));
+    assert.equal(state.vaLineCrew?.usedThisWeek, 1);
+
+    const beforeOps = state.walletUsd;
+    const ops = upgradeVaLineCrew(state, world.tick);
+    assert.equal(ops.debitUsd, resolveVaLineCrewTier(2).unlockUsd);
+    assert.equal(state.walletUsd, beforeOps - ops.debitUsd);
+    assert.equal(state.vaLineCrew?.tier, 2);
+    assert.equal(state.vaLineCrew?.usedThisWeek, 1);
+    const snapOps = buildVaLineCrewSnapshot(state, world.tick);
+    assert.equal(snapOps.tierName, 'Ops');
+    assert.equal(snapOps.upgradeUsd, resolveVaLineCrewTier(3).unlockUsd);
+    assert.equal(snapOps.nextTierName, 'Network');
+    assert.equal(
+      snapOps.salaryUsdPerWeek,
+      resolveVaLineCrewTier(2).salaryUsdPerWeek,
+    );
+
+    // 1 parked → Ops floor 8
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 8);
+
+    const beforeNet = state.walletUsd;
+    const net = upgradeVaLineCrew(state, world.tick);
+    assert.equal(net.debitUsd, resolveVaLineCrewTier(3).unlockUsd);
+    assert.equal(state.walletUsd, beforeNet - net.debitUsd);
+    assert.equal(state.vaLineCrew?.tier, 3);
+    assert.equal(buildVaLineCrewSnapshot(state, world.tick).upgradeUsd, null);
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 12);
+    assert.throws(() => upgradeVaLineCrew(state, world.tick));
+
+    // Fire from Network uses Network salary severance
+    const beforeFire = state.walletUsd;
+    fireVaLineCrew(state, world.tick);
+    assert.equal(
+      beforeFire - state.walletUsd,
+      resolveVaLineCrewTier(3).salaryUsdPerWeek,
+    );
+    assert.equal(state.vaLineCrew?.hired, false);
+
+    hireVaLineCrew(state, world.tick);
+    upgradeVaLineCrew(state, world.tick); // Ops
+    const beforeOpsFire = state.walletUsd;
+    fireVaLineCrew(state, world.tick);
+    assert.equal(
+      beforeOpsFire - state.walletUsd,
+      resolveVaLineCrewTier(2).salaryUsdPerWeek,
+    );
+  });
+
+  it('Ops/Network allowance scales with parked mult and caps', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-line-tier-allow' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    const base = state.fleet[0]!;
+    for (let i = 0; i < 9; i++) {
+      state.fleet.push({
+        ...base,
+        id: `acf_park_${i}`,
+        registration: `PP-P${i}`,
+        status: 'parked',
+      });
+    }
+    // 10 parked
+    hireVaLineCrew(state, world.tick);
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 16); // Desk cap
+    upgradeVaLineCrew(state, world.tick);
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 24); // Ops: 10×3 cap 24
+    upgradeVaLineCrew(state, world.tick);
+    assert.equal(vaLineCrewAllowanceRemaining(state, world.tick).allowance, 32); // Network: 10×4 cap 32
+  });
+
+  it('salary uses current tier rate', () => {
+    const state = emptyMissionsStateV2();
+    state.walletUsd = 100_000;
+    hireVaLineCrew(state, 0);
+    upgradeVaLineCrew(state, 0);
+    const pay = settleVaLineCrewSalary(state, {
+      fromTick: 0,
+      toTick: TICKS_PER_DAY * 7,
+    });
+    assert.equal(pay.weeksCharged, 1);
+    assert.equal(pay.requestedUsd, resolveVaLineCrewTier(2).salaryUsdPerWeek);
+  });
+
+  it('legacy hired without tier normalizes to Desk', () => {
+    const state = emptyMissionsStateV2();
+    state.walletUsd = 10_000;
+    state.vaLineCrew = {
+      hired: true,
+      hiredAtTick: 0,
+      weekKey: 0,
+      usedThisWeek: 2,
+    } as typeof state.vaLineCrew;
+    const snap = buildVaLineCrewSnapshot(state, 0);
+    assert.equal(snap.hired, true);
+    assert.equal(snap.tier, 1);
+    assert.equal(snap.tierName, 'Desk');
+    assert.equal(snap.used, 2);
   });
 });

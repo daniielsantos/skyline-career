@@ -15,6 +15,7 @@ import {
   assertPilotAtIcao,
   executePilotTravel,
   quotePilotTravel,
+  syncPilotIcaoTo,
 } from './career-pilot-travel.js';
 import { normalizeCareerLedger } from './career-ledger.js';
 import type { MissionIntent } from './types/career-economy.js';
@@ -158,6 +159,41 @@ describe('pilot travel', () => {
     relocateAircraftOnSettle(state, mission);
     assert.equal(state.fleet[0]!.locationIcao, 'SBGL');
     assert.equal(state.pilotIcao, 'SBGR');
+  });
+
+  it('dual-tenant: relocate moves ops pilot; home needs separate sync', () => {
+    const home = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'Home',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const va = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const mission = {
+      id: 'msn_va_dual',
+      originIcao: 'SBGR',
+      destIcao: 'SBGL',
+      aircraftId: va.fleet[0]!.id,
+      status: 'in_flight',
+      aircraftClassId: va.fleet[0]!.aircraftClassId,
+      pilotHomeCompanyId: 'co_home',
+      lots: [],
+      cargoKg: 100,
+      payUsd: 500,
+      acceptedAtTick: 0,
+    } as unknown as MissionIntent;
+    va.fleet[0]!.status = 'assigned';
+    va.fleet[0]!.assignedMissionId = mission.id;
+    home.pilotIcao = 'SBGR';
+    va.pilotIcao = 'SBGR';
+    relocateAircraftOnSettle(va, mission);
+    assert.equal(va.fleet[0]!.locationIcao, 'SBGL');
+    assert.equal(va.pilotIcao, 'SBGL');
+    // Chrome sticky reads home — still at origin until API dual-write.
+    assert.equal(home.pilotIcao, 'SBGR');
+    syncPilotIcaoTo(home, mission.destIcao);
+    assert.equal(home.pilotIcao, 'SBGL');
   });
 
   it('persists pilot_travel ledger kind', () => {

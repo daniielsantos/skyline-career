@@ -144,6 +144,7 @@ export type CareerLedgerEntry = {
   aircraftId?: string;
   missionId?: string;
   icao?: string;
+  actorAccountId?: string;
 };
 
 export type CareerLedgerSummary = {

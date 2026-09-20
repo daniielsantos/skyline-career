@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   fetchVaMembers,
   fetchVaJoinRequests,
@@ -171,6 +171,15 @@ export function VaPage(props: Props) {
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';
   const isOwner = role === 'owner';
+  const ledgerMemberNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of members) {
+      const id = m.accountId?.trim();
+      if (!id) continue;
+      map[id] = m.displayName?.trim() || m.loginName?.trim() || id;
+    }
+    return map;
+  }, [members]);
   const hangarReadOnly = !isOwner;
   const pageBusy = busy || Boolean(props.busy);
 
@@ -825,6 +834,7 @@ export function VaPage(props: Props) {
               busy={pageBusy || ledgerBusy}
               creditActionsLocked={!isOwner}
               vaOwnerOpsLabels
+              memberNamesByAccountId={ledgerMemberNames}
               formatMoney={formatBoardMoney}
               onCreditUpdated={({ walletUsd, companyCredit: next }) => {
                 props.onWallet?.(walletUsd);

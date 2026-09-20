@@ -593,6 +593,27 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 | Settle | write | já tinha companyId + paint | ok |
 | Crew dispatch / assign | write home Base | home-only by design | n/a |
 
+### VA Ledger Member column (2026-09-20)
+
+**Sintoma / gap:** Recent activity no My VA Ledger não mostra quem gerou Jet-A / travel / hire — vários membros compartilham o mesmo wallet.
+**Causa:** `CareerLedgerEntry` não tinha actor; `applyWalletDelta` só gravava kind/note/missionId.
+**Fix:**
+- Schema SQLite **v18** / PG **v30**: `ledger.actor_account_id`
+- Stamp em três camadas: `opts.actorAccountId` > ambient session (`enterLedgerActorAccountId` pós-auth) > `mission.pilotAccountId`
+- Kinds de pulse (`LEDGER_SYSTEM_KINDS`: salary, parking, interest, storage, …) nunca stampam membro → UI **System**
+- Watch tick limpa ambient (usa piloto da missão); pulse `catchUp` limpa ambient
+- UI: coluna **Member** só no My VA Ledger (roster map)
+
+**Audit applyWalletDelta:** todos os call sites passam pelo resolve acima — player HTTP herda session; System kinds ficam vazios de propósito; histórico pré-coluna = `—`.
+
+### Watch world auto-settle debrief PAYOUT $0 (2026-09-20)
+
+**Sintoma:** voo VA (SBSP→SBKP) com contract ~$1390; debrief mostrava Payout **$0**, Weather +$70, Fuel −$488, Net −$488.
+**Causa:** path `worldMutations.settleFlight` (desktop→world) só retorna `boolean`; após settle o Watch montava `this.settlement` com **`payoutUsd: 0` hardcoded**, enquanto lia weather/score da missão settled. Wallet no server credita certo — bug de UI/status. Path local `withCareerWrite` já usava `result.settlement.payoutUsd`.
+**Fix:** após world settle, preencher settlement de `snap.mission.payoutUsd` / `penaltyUsd` / `lateTicks` / `cargoKg` (mesmo espelho de `settlementFromSettledMission`).
+
+**Pilot cut vs prejuízo:** `quoteMemberRouteCutUsd` usa `max(0, payout − fuel)` — **prejuízo não é repartido**. Fuel + payout ficam 100% no wallet da VA; membro só leva % do lucro positivo (owner na própria VA = sem cut).
+
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 
 **Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.
@@ -629,6 +650,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Prepare Yours+VA** — Freights/Charter/Ports pickers; ferry CTA only; Base Dispatcher home-only
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
 - [x] **Ledger cashflow light + wallet audit** — GET /api/cashflow sem world lock; setWallet→commitWallet sticky
+- [x] **Ledger Member column** — actor_account_id (SQLite v18 / PG v30); ambient session + system kinds; My VA UI
+- [x] **Watch world settle debrief payout** — ler payout/penalty da missão settled (não hardcode 0)
 - [x] **Chrome wallet ref lag** — sync activeCompanyIdRef + getStoredCompanyId no sticky; fleet/wallet após pin
 - [x] **Roster presence** — online / last seen / flight na row
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge

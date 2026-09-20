@@ -37,7 +37,7 @@ describe('career auth', () => {
   it('migrates schema to v10 and registers account→company', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-auth-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '17');
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '18');
     assert.equal(store.supportsAuth, true);
 
     const registered = await Promise.resolve(

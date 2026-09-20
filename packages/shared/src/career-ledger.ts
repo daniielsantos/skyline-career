@@ -2,6 +2,7 @@
  * Career company cashflow ledger — signed wallet movements for P&L views.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { economyDayIndex } from './career-weather.js';
 import type {
   CareerLedgerEntry,
@@ -76,10 +77,58 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   other: 'Other',
 };
 
+/**
+ * Pulse / housekeeping kinds — never stamp a member (UI shows System).
+ * Hire/fire/fees remain attributable to the session actor.
+ */
+export const LEDGER_SYSTEM_KINDS = new Set<CareerLedgerKind>([
+  'hangar_parking',
+  'crew_salary',
+  'ground_staff_salary',
+  'base_dispatcher_salary',
+  'va_line_crew_salary',
+  'credit_interest',
+  'warehouse_storage',
+  'fbo_storage',
+  'port_yard_hold',
+  'port_concession_lease',
+  'fbo_hold_expire',
+  'lease_payment',
+  'lease_out_income',
+]);
+
+export function isLedgerSystemKind(kind: CareerLedgerKind): boolean {
+  return LEDGER_SYSTEM_KINDS.has(kind);
+}
+
 /** Soft cap so mission saves stay small. */
 export const CAREER_LEDGER_MAX_ENTRIES = 400;
 
 const KIND_SET = new Set<string>(Object.keys(LEDGER_KIND_LABEL));
+
+/** Request-scoped actor for applyWalletDelta (authenticated writes). */
+const ledgerActorAls = new AsyncLocalStorage<string | undefined>();
+
+/** Bind the current async context to this account (HTTP request after auth). */
+export function enterLedgerActorAccountId(
+  accountId: string | null | undefined,
+): void {
+  const id = accountId?.trim();
+  ledgerActorAls.enterWith(id || undefined);
+}
+
+export function peekLedgerActorAccountId(): string | undefined {
+  const id = ledgerActorAls.getStore()?.trim();
+  return id || undefined;
+}
+
+export function runWithLedgerActorAccountId<T>(
+  accountId: string | null | undefined,
+  fn: () => T,
+): T {
+  const id = accountId?.trim() || undefined;
+  return ledgerActorAls.run(id, fn);
+}
 
 let ledgerSeq = 0;
 
@@ -110,6 +159,27 @@ function nextLedgerId(atTick: number): string {
   return `led_${atTick}_${String(ledgerSeq).padStart(8, '0')}_${Math.floor(Math.random() * 1e6)}`;
 }
 
+function resolveLedgerActorAccountId(
+  state: CareerMissionsState,
+  opts: {
+    kind: CareerLedgerKind;
+    actorAccountId?: string | null;
+    missionId?: string;
+  },
+): string | undefined {
+  if (isLedgerSystemKind(opts.kind)) return undefined;
+  const explicit = opts.actorAccountId?.trim();
+  if (explicit) return explicit;
+  if (opts.actorAccountId === null) return undefined;
+  const ambient = peekLedgerActorAccountId();
+  if (ambient) return ambient;
+  const missionId = opts.missionId?.trim();
+  if (!missionId) return undefined;
+  const mission = state.missions?.find((m) => m.id === missionId);
+  const pilot = mission?.pilotAccountId?.trim();
+  return pilot || undefined;
+}
+
 export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: CareerLedgerEntry[] = [];
@@ -129,6 +199,12 @@ export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
         ? (r.kind as CareerLedgerKind)
         : null;
     if (amountUsd == null || atTick == null || !kind || amountUsd === 0) continue;
+    const actorRaw =
+      typeof r.actorAccountId === 'string'
+        ? r.actorAccountId.trim()
+        : typeof r.actor_account_id === 'string'
+          ? r.actor_account_id.trim()
+          : '';
     out.push({
       id: typeof r.id === 'string' && r.id ? r.id : nextLedgerId(atTick),
       atTick,
@@ -142,6 +218,7 @@ export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
       aircraftId: typeof r.aircraftId === 'string' ? r.aircraftId : undefined,
       missionId: typeof r.missionId === 'string' ? r.missionId : undefined,
       icao: typeof r.icao === 'string' ? r.icao.toUpperCase() : undefined,
+      ...(actorRaw ? { actorAccountId: actorRaw } : {}),
     });
   }
   return out
@@ -152,6 +229,7 @@ export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
 /**
  * Mutate wallet and append a signed ledger row.
  * amountUsd > 0 credits; amountUsd < 0 debits. Zero is a no-op.
+ * Actor: opts > ambient session > mission.pilotAccountId (system kinds skip).
  */
 export function applyWalletDelta(
   state: CareerMissionsState,
@@ -163,12 +241,15 @@ export function applyWalletDelta(
     aircraftId?: string;
     missionId?: string;
     icao?: string;
+    /** Explicit actor; omit to use ambient/mission. Pass null to force no actor. */
+    actorAccountId?: string | null;
   },
 ): CareerLedgerEntry | null {
   const amountUsd = Math.round(opts.amountUsd * 100) / 100;
   if (!Number.isFinite(amountUsd) || amountUsd === 0) return null;
   const atTick = Math.max(0, Math.floor(opts.atTick));
   state.walletUsd = Math.round((state.walletUsd + amountUsd) * 100) / 100;
+  const actorAccountId = resolveLedgerActorAccountId(state, opts);
   const entry: CareerLedgerEntry = {
     id: nextLedgerId(atTick),
     atTick,
@@ -179,6 +260,7 @@ export function applyWalletDelta(
     aircraftId: opts.aircraftId,
     missionId: opts.missionId,
     icao: opts.icao?.toUpperCase(),
+    ...(actorAccountId ? { actorAccountId } : {}),
   };
   const ledger = state.ledger ? [...state.ledger] : [];
   ledger.push(entry);

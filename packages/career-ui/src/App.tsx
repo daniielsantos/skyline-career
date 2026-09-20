@@ -12054,8 +12054,9 @@ export function App() {
       activeMission &&
       watch?.running &&
       watch.missionId === activeMission.id &&
-      watch.missionStatus === 'in_flight' &&
-      activeMission.status !== 'in_flight'
+      activeMission.status !== 'in_flight' &&
+      (watch.missionStatus === 'in_flight' ||
+        watch.lastEvent?.type === 'depart')
         ? { ...activeMission, status: 'in_flight' }
         : activeMission,
   });

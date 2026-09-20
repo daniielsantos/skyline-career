@@ -166,6 +166,7 @@ import { ensureV14Ddl, migrateV13toV14IfNeeded } from './career-store-v14.js';
 import { ensureV15Ddl, migrateV14toV15IfNeeded } from './career-store-v15.js';
 import { ensureV16Ddl, migrateV15toV16IfNeeded } from './career-store-v16.js';
 import { ensureV17Ddl, migrateV16toV17IfNeeded } from './career-store-v17.js';
+import { ensureV18Ddl, migrateV17toV18IfNeeded } from './career-store-v18.js';
 import {
   mintAccessKeysSqlite,
   revokeAccessKeySqlite,
@@ -215,7 +216,7 @@ import {
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '17';
+export const CAREER_STORE_SCHEMA_VERSION = '18';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -1276,6 +1277,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV15Ddl(db);
   ensureV16Ddl(db);
   ensureV17Ddl(db);
+  ensureV18Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -1390,7 +1392,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV16 = Number.parseInt(afterV16?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV16) || verAfterV16 < 17) {
-    migrateV16toV17IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV16toV17IfNeeded(db, metaSet, '17');
+  }
+  const afterV17 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV17 = Number.parseInt(afterV17?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV17) || verAfterV17 < 18) {
+    migrateV17toV18IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);

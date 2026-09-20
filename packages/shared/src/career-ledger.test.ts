@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   applyWalletDelta,
+  enterLedgerActorAccountId,
   ledgerEntriesInWindow,
   normalizeCareerLedger,
+  runWithLedgerActorAccountId,
   summarizeCareerLedger,
   summarizeLedgerEntries,
 } from './career-ledger.js';
@@ -39,6 +41,57 @@ describe('career ledger', () => {
     assert.equal(snap.month.expenseUsd, 200);
     assert.equal(snap.month.netUsd, 300);
     assert.equal(snap.recent[0]?.kind, 'fuel');
+  });
+
+  it('stamps actor from opts, ambient, then mission.pilotAccountId', () => {
+    const state = emptyMissionsStateV2();
+    state.missions.push({
+      id: 'msn_pilot',
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      aircraftClassId: 'light_ga',
+      cargoKg: 100,
+      payUsd: 100,
+      status: 'dispatched',
+      lots: [],
+      createdAtTick: 0,
+      deadlineTick: 100,
+      pilotAccountId: 'acc_mission',
+    } as unknown as (typeof state.missions)[number]);
+
+    applyWalletDelta(state, {
+      amountUsd: -10,
+      kind: 'fuel',
+      atTick: 1,
+      actorAccountId: 'acc_explicit',
+    });
+    assert.equal(state.ledger?.at(-1)?.actorAccountId, 'acc_explicit');
+
+    runWithLedgerActorAccountId('acc_ambient', () => {
+      applyWalletDelta(state, {
+        amountUsd: -11,
+        kind: 'fuel',
+        atTick: 2,
+      });
+    });
+    assert.equal(state.ledger?.at(-1)?.actorAccountId, 'acc_ambient');
+
+    enterLedgerActorAccountId(undefined);
+    applyWalletDelta(state, {
+      amountUsd: -12,
+      kind: 'fuel',
+      atTick: 3,
+      missionId: 'msn_pilot',
+    });
+    assert.equal(state.ledger?.at(-1)?.actorAccountId, 'acc_mission');
+
+    applyWalletDelta(state, {
+      amountUsd: -50,
+      kind: 'hangar_parking',
+      atTick: 4,
+      actorAccountId: 'acc_should_ignore',
+    });
+    assert.equal(state.ledger?.at(-1)?.actorAccountId, undefined);
   });
 
   it('windows by economy day for week/month', () => {

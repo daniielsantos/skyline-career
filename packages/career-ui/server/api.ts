@@ -280,6 +280,8 @@ import {
   applyWalletDelta,
   summarizeCareerLedger,
   LEDGER_KIND_LABEL,
+  enterLedgerActorAccountId,
+  runWithLedgerActorAccountId,
   AccessKeyError,
   openCareerStore,
   applyMsfsBushHubOverrideToTerminal,
@@ -1777,6 +1779,8 @@ type CareerWriteOpts = {
   lockQueuedAtMs?: number;
   /** Per-request company tenant (avoids ambient activeCompanyId thrash). */
   companyId?: string;
+  /** Stamp ledger rows for this account (overrides request ambient). */
+  actorAccountId?: string;
   /** Skip saveEconomy when the handler only mutates company/missions. */
   persist?:
     | 'economy'
@@ -1816,72 +1820,78 @@ async function withCareerWrite<T>(
       'gateway mode: economy writes must go to the world host (use HTTP proxy)',
     );
   }
-  return withCareerLock(async () => {
-    if (opts?.catchUpTiming && opts.lockQueuedAtMs != null) {
-      opts.catchUpTiming.lockWaitMs = performance.now() - opts.lockQueuedAtMs;
+  // Pulse / catch-up must not inherit a prior request's ledger actor.
+  const writeActor =
+    opts?.catchUp === true
+      ? undefined
+      : opts?.actorAccountId?.trim() || undefined;
+  const runWrite = () =>
+    withCareerLock(async () => {
+  if (opts?.catchUpTiming && opts.lockQueuedAtMs != null) {
+    opts.catchUpTiming.lockWaitMs = performance.now() - opts.lockQueuedAtMs;
+  }
+  const activeStore = requireStore();
+  if (careerApiMode === 'world' && activeStore.kind === 'postgres') {
+    const acquired =
+      activeStore.acquireWorldWriterLease &&
+      (await activeStore.acquireWorldWriterLease());
+    if (!acquired) {
+      worldWriterLeaseState = 'denied';
+      worldWriterLeaseError =
+        'Another process owns the Postgres world-writer lease';
+      throw new Error(worldWriterLeaseError);
     }
-    const activeStore = requireStore();
-    if (careerApiMode === 'world' && activeStore.kind === 'postgres') {
-      const acquired =
-        activeStore.acquireWorldWriterLease &&
-        (await activeStore.acquireWorldWriterLease());
-      if (!acquired) {
-        worldWriterLeaseState = 'denied';
-        worldWriterLeaseError =
-          'Another process owns the Postgres world-writer lease';
-        throw new Error(worldWriterLeaseError);
-      }
-      worldWriterLeaseState = 'acquired';
-      worldWriterLeaseError = null;
+    worldWriterLeaseState = 'acquired';
+    worldWriterLeaseError = null;
+  }
+  const companyId = opts?.companyId?.trim();
+  const companyOpts = companyId ? { companyId } : undefined;
+  const missions = await loadMissions(companyOpts);
+  // Phase 4 remote client: never simulate ticks locally — host owns the clock.
+  const skipCatchUp =
+    isRemoteWorldTickEnabled() || opts?.catchUp !== true;
+  const catchUpTicks =
+    !skipCatchUp && opts?.catchUp === true
+      ? (opts.catchUpTicks ?? CATCH_UP_TICKS_PER_PULSE)
+      : undefined;
+  const persistCompany = opts?.persist === 'company';
+  const persistBlob = opts?.persist === 'blob';
+  const persistAircraftMarket = opts?.persist === 'aircraftMarket';
+  const persistPortMarket = opts?.persist === 'portMarket';
+  const persistDemandBoard = opts?.persist === 'demandBoard';
+  const persistInbound = opts?.persist === 'inbound';
+  const persistNpcLive = opts?.persist === 'npcLive';
+  const demandOrderId = opts?.persistDemandOrderId?.trim();
+  const portListingId = opts?.persistPortListingId?.trim();
+  const persistPortConcessions = opts?.persistPortConcessions === true;
+  const sliceId = opts?.commandSliceMissionId?.trim();
+  const holdSliceId = opts?.commandSliceHoldId?.trim();
+  const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (holdSliceId) {
+    const hold = missions.playerFbos?.holds?.find((h) => h.id === holdSliceId);
+    const lotId = hold?.lotId?.trim();
+    if (lotId) sliceLotIdsOpt.push(lotId);
+  }
+  const acfId = opts?.commandSliceAircraftId?.trim();
+  if (acfId) {
+    const acf = missions.fleet.find((a) => a.id === acfId);
+    const loc = acf?.locationIcao?.trim().toUpperCase();
+    if (loc) {
+      opts = {
+        ...opts,
+        commandSliceIcaos: [...(opts?.commandSliceIcaos ?? []), loc],
+      };
     }
-    const companyId = opts?.companyId?.trim();
-    const companyOpts = companyId ? { companyId } : undefined;
-    const missions = await loadMissions(companyOpts);
-    // Phase 4 remote client: never simulate ticks locally — host owns the clock.
-    const skipCatchUp =
-      isRemoteWorldTickEnabled() || opts?.catchUp !== true;
-    const catchUpTicks =
-      !skipCatchUp && opts?.catchUp === true
-        ? (opts.catchUpTicks ?? CATCH_UP_TICKS_PER_PULSE)
-        : undefined;
-    const persistCompany = opts?.persist === 'company';
-    const persistBlob = opts?.persist === 'blob';
-    const persistAircraftMarket = opts?.persist === 'aircraftMarket';
-    const persistPortMarket = opts?.persist === 'portMarket';
-    const persistDemandBoard = opts?.persist === 'demandBoard';
-    const persistInbound = opts?.persist === 'inbound';
-    const persistNpcLive = opts?.persist === 'npcLive';
-    const demandOrderId = opts?.persistDemandOrderId?.trim();
-    const portListingId = opts?.persistPortListingId?.trim();
-    const persistPortConcessions = opts?.persistPortConcessions === true;
-    const sliceId = opts?.commandSliceMissionId?.trim();
-    const holdSliceId = opts?.commandSliceHoldId?.trim();
-    const sliceLotIdsOpt = (opts?.commandSliceLotIds ?? [])
-      .map((id) => id.trim())
-      .filter(Boolean);
-    if (holdSliceId) {
-      const hold = missions.playerFbos?.holds?.find((h) => h.id === holdSliceId);
-      const lotId = hold?.lotId?.trim();
-      if (lotId) sliceLotIdsOpt.push(lotId);
-    }
-    const acfId = opts?.commandSliceAircraftId?.trim();
-    if (acfId) {
-      const acf = missions.fleet.find((a) => a.id === acfId);
-      const loc = acf?.locationIcao?.trim().toUpperCase();
-      if (loc) {
-        opts = {
-          ...opts,
-          commandSliceIcaos: [...(opts?.commandSliceIcaos ?? []), loc],
-        };
-      }
-    }
-    const sliceIcaosOpt = [
-      ...new Set(
-        (opts?.commandSliceIcaos ?? [])
-          .map((c) => c.trim().toUpperCase())
-          .filter(Boolean),
-      ),
-    ];
+  }
+  const sliceIcaosOpt = [
+    ...new Set(
+      (opts?.commandSliceIcaos ?? [])
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ];
     let world: CareerEconomyWorld | undefined;
     let useCommandPersist = false;
     let sliceLotIds: string[] = [...sliceLotIdsOpt];
@@ -2083,9 +2093,15 @@ async function withCareerWrite<T>(
     await saveMissions(missions, companyOpts);
     return result;
   });
-}
 
-function requestDevMode(req: import('node:http').IncomingMessage): boolean {
+  if (opts?.catchUp === true) {
+    return runWithLedgerActorAccountId(undefined, runWrite);
+  }
+  if (writeActor) {
+    return runWithLedgerActorAccountId(writeActor, runWrite);
+  }
+  return runWrite();
+}
   const raw = req.headers['x-skyline-dev-mode'];
   const value = Array.isArray(raw) ? raw[0] : raw;
   return value === '1' || value === 'true';
@@ -3196,6 +3212,7 @@ export function createCareerApiServer(port = 8787) {
       }
 
       await primeAuthSession(req);
+      enterLedgerActorAccountId(authSessionFromRequest(req)?.account.id);
 
       if (
         isCareerAuthRequired() &&

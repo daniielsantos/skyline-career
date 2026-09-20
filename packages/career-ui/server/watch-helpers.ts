@@ -24,6 +24,7 @@ import {
   PARKED_GROUND_SPEED_KT,
   inferEnginesRunning,
   isSimPlaybackFrozen,
+  enterLedgerActorAccountId,
   mergeAirborneClockOntoMission,
   resolveLiveAirborneElapsedMs,
   resumeAirborneAtMs,
@@ -2132,6 +2133,8 @@ export class CareerWatchSession {
     this.tickInFlight = true;
     const tickStarted = Date.now();
     try {
+      // Do not inherit a leftover HTTP session actor — use mission.pilotAccountId.
+      enterLedgerActorAccountId(undefined);
       // Reopen only after backoff — never in the error handler (that ignored waitMs).
       const forceSimConnectReset = this.pendingSimConnectReset;
       this.pendingSimConnectReset = false;
@@ -3518,13 +3521,20 @@ export class CareerWatchSession {
       // Persist airborne clock as soon as Watch stamps it (accepted/dispatched/
       // in_flight) so closing the app mid-climb does not reset progress to 0%.
       // Sim-active elapsed: flush about every 30s of progress (not every tick).
+      // Skip when this tick is about to auto-depart — that write stamps the
+      // same fields and must not wait on company lock before the UI can flip.
       const elapsedBucket = Math.floor(
         (nextState.airborneElapsedMs ?? 0) / 30_000,
       );
       const prevElapsedBucket = Math.floor(
         (current.airborneElapsedMs ?? 0) / 30_000,
       );
+      const departingThisTick =
+        this.opts.autoDepart &&
+        event.type === 'depart' &&
+        (current.status === 'accepted' || current.status === 'dispatched');
       if (
+        !departingThisTick &&
         nextState.airborneAtMs !== undefined &&
         (current.airborneAtMs !== nextState.airborneAtMs ||
           current.expectedRouteMs !== nextState.expectedRouteMs ||
@@ -3634,6 +3644,14 @@ export class CareerWatchSession {
           };
           nextState = this.watchState;
           }
+          // Paint En route before the world write — same pattern as settling=true.
+          // Depart can sit behind the pulse lock for seconds; Dispatch must not.
+          this.missionStatus = 'in_flight';
+          this.lastEvent = event.type === 'depart'
+            ? event
+            : { type: 'depart', reason: 'wheels-up (catch-up)' };
+          this.lastEventAtIso = new Date().toISOString();
+          await new Promise<void>((resolve) => setTimeout(resolve, 150));
           const saved = this.cb.worldMutations
             ? await this.cb.worldMutations.departFlight({
                 missionId: this.missionId!,
@@ -3694,6 +3712,8 @@ export class CareerWatchSession {
           commandSliceMissionId: this.missionId ?? undefined,
         });
           if (!saved) {
+            // Revert optimistic En route paint if persist failed.
+            this.missionStatus = current.status;
             await this.stop();
             return;
           }
@@ -3995,12 +4015,14 @@ export class CareerWatchSession {
               if (!snap.mission) return false;
               this.missionStatus = snap.mission.status;
               this.walletUsd = snap.walletUsd;
+              // Mirror settlementFromSettledMission — world settle returns bool only.
+              const lateTicks = snap.mission.lateTicks ?? 0;
               this.settlement = {
-                payoutUsd: 0,
-                penaltyUsd: 0,
-                lateTicks: 0,
-                onTime: true,
-                deliveredKg: 0,
+                payoutUsd: snap.mission.payoutUsd ?? 0,
+                penaltyUsd: snap.mission.penaltyUsd ?? 0,
+                lateTicks,
+                onTime: lateTicks === 0,
+                deliveredKg: snap.mission.cargoKg ?? 0,
                 residualFuelKg: snap.mission.settledFuelKg ?? null,
                 landingFpm: snap.mission.settledLandingFpm ?? null,
                 flightDurationMs: snap.mission.settledFlightDurationMs ?? null,

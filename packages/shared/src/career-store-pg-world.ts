@@ -3,6 +3,7 @@
  * Hot economy slices (lots / airports / stock / inbound) + world-ops
  * (npc / fuel / demand / ports) + aircraft dealer pool + charter + company
  * tables are the economy SoT. Schema v29 promotes former misc_json leftovers
+ * to typed columns/tables; v30 adds ledger.actor_account_id.
  * (kill switch columns, flow_stats, international_lanes, port_inbound_ships,
  * tour_lot_soft_holds, regional_recovery, presence_events). misc_json remains
  * as an empty bag for rare future leftovers. Schema v16 promotes fleet_aircraft
@@ -313,7 +314,8 @@ CREATE TABLE IF NOT EXISTS ledger (
   note TEXT,
   aircraft_id TEXT,
   mission_id TEXT,
-  icao TEXT
+  icao TEXT,
+  actor_account_id TEXT
 );
 CREATE INDEX IF NOT EXISTS ledger_company_tick_idx ON ledger(company_id, at_tick);
 CREATE INDEX IF NOT EXISTS ledger_day_idx ON ledger(day_index);
@@ -1144,6 +1146,10 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   );
   // Schema v29 — promote misc_json leftovers to columns + tables.
   await ensurePgEconomyLeftoversDdl(pool);
+  // Schema v30 — ledger actor for VA Member column.
+  await pool.query(
+    `ALTER TABLE ledger ADD COLUMN IF NOT EXISTS actor_account_id TEXT`,
+  );
   // One-shot backfill from legacy payload_json (only fill NULL columns).
   await pool.query(`
     UPDATE fleet_aircraft SET
@@ -3690,7 +3696,8 @@ async function readLedgerRows(
   companyId: string,
 ): Promise<CareerLedgerEntry[]> {
   const { rows } = await pool.query(
-    `SELECT id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao
+    `SELECT id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao,
+            actor_account_id
      FROM ledger WHERE company_id = $1 ORDER BY at_tick ASC, id ASC`,
     [companyId],
   );
@@ -3705,6 +3712,7 @@ async function readLedgerRows(
       aircraftId: (r.aircraft_id as string | null) ?? undefined,
       missionId: (r.mission_id as string | null) ?? undefined,
       icao: (r.icao as string | null) ?? undefined,
+      actorAccountId: (r.actor_account_id as string | null) ?? undefined,
     })),
   );
 }
@@ -3991,15 +3999,16 @@ export async function persistMissionsTablesToPg(
           e.aircraftId ?? null,
           e.missionId ?? null,
           e.icao ?? null,
+          e.actorAccountId ?? null,
         ]);
       if (ledgerRows.length > 0) {
         await insertChunks(
           client,
           `INSERT INTO ledger (
              id, company_id, at_tick, day_index, amount_usd, kind, note,
-             aircraft_id, mission_id, icao
+             aircraft_id, mission_id, icao, actor_account_id
            )`,
-          10,
+          11,
           ledgerRows,
         );
       }

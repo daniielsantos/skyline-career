@@ -54,6 +54,12 @@ Sinais:
 - `timeout storm` / `unrecognized_id storm` → tear-down do hang mole (0.3.21+).
 - Watch tick error `0xC00000B0` ou `TIMEOUT` com pipe “ok” = Host zumbi; ping deve mostrar `sessionHealthy=false`.
 
+### En route lento pós-takeoff (2026-09-20)
+
+**Sintoma:** wheels-up no MSFS, Dispatch demora a sair de Ready → En route.
+**Causa:** auto-depart só pintava `missionStatus=in_flight` **depois** do `withCareerWrite` (fila do world lock / pulse). UI espelhava só esse status.
+**Fix:** no wheels-up, setar `missionStatus=in_flight` + `lastEvent=depart` e yield ~150ms (como Settling) **antes** do persist; pular `persistAirborneClock` no mesmo tick do depart (o write já grava o stamp). UI também trata `lastEvent=depart` como En route.
+
 ## Hot-swap (dev)
 
 Build Release → copiar `SimBridgeHost.dll` (+ exe/pdb) para  

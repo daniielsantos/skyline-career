@@ -10,6 +10,23 @@ import { boardMoneyLabel, isFiniteMoney } from './board-money';
 
 const CASHFLOW_PAGE_SIZE = 15;
 
+/** Mirror of shared LEDGER_SYSTEM_KINDS — keep in sync for Member column. */
+const LEDGER_SYSTEM_KINDS = new Set([
+  'hangar_parking',
+  'crew_salary',
+  'ground_staff_salary',
+  'base_dispatcher_salary',
+  'va_line_crew_salary',
+  'credit_interest',
+  'warehouse_storage',
+  'fbo_storage',
+  'port_yard_hold',
+  'port_concession_lease',
+  'fbo_hold_expire',
+  'lease_payment',
+  'lease_out_income',
+]);
+
 const KIND_LABEL: Record<string, string> = {
   freight_payout: 'Freight payout',
   hangar_parking: 'Hangar parking',
@@ -61,6 +78,18 @@ const KIND_LABEL: Record<string, string> = {
 
 function kindLabel(kind: string): string {
   return KIND_LABEL[kind] ?? kind.replace(/_/g, ' ');
+}
+
+function memberLabel(
+  entry: CareerLedgerEntry,
+  namesByAccountId: Record<string, string> | undefined,
+): string {
+  const id = entry.actorAccountId?.trim();
+  if (id) {
+    return namesByAccountId?.[id]?.trim() || id;
+  }
+  if (LEDGER_SYSTEM_KINDS.has(entry.kind)) return 'System';
+  return '—';
 }
 
 function SummaryCard(props: {
@@ -314,6 +343,11 @@ export function HangarCashflowPanel(props: {
   creditActionsLocked?: boolean;
   /** VA listed: label credit Cargo Ops as owner ladder (formula unchanged). */
   vaOwnerOpsLabels?: boolean;
+  /**
+   * My VA Ledger: show Member column. Map accountId → display name from roster.
+   * Omit on solo Hangar cashflow.
+   */
+  memberNamesByAccountId?: Record<string, string>;
   formatMoney: (n: number) => string;
   onCreditUpdated: (next: {
     walletUsd: number;
@@ -322,6 +356,7 @@ export function HangarCashflowPanel(props: {
   onCreditError: (message: string) => void;
 }) {
   const snap = props.cashflow;
+  const showMember = props.memberNamesByAccountId != null;
   const [page, setPage] = useState(1);
 
   const recent = snap?.recent ?? [];
@@ -399,6 +434,7 @@ export function HangarCashflowPanel(props: {
                       <tr>
                         <th scope="col">Day</th>
                         <th scope="col">Activity</th>
+                        {showMember ? <th scope="col">Member</th> : null}
                         <th scope="col">ICAO</th>
                         <th scope="col">Note</th>
                         <th scope="col" className="cashflow-col-amount">
@@ -411,6 +447,9 @@ export function HangarCashflowPanel(props: {
                         <tr key={entry.id}>
                           <td>{entry.dayIndex}</td>
                           <td>{kindLabel(entry.kind)}</td>
+                          {showMember ? (
+                            <td>{memberLabel(entry, props.memberNamesByAccountId)}</td>
+                          ) : null}
                           <td>{entry.icao ?? '—'}</td>
                           <td className="cashflow-col-note">
                             {entry.note?.trim() ? entry.note : '—'}

@@ -2044,6 +2044,8 @@ export interface CareerLedgerEntry {
   aircraftId?: string;
   missionId?: string;
   icao?: string;
+  /** Account that triggered this row (player action). Absent for System/pulse. */
+  actorAccountId?: string;
 }
 
 /** Player freighter parked at a career terminal when not on a mission. */

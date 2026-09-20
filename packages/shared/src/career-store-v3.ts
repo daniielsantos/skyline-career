@@ -2011,7 +2011,7 @@ export function readLedgerRowsV3(
   const cid = companyId.trim() || LOCAL_COMPANY_ID;
   const rows = db
     .prepare(
-      `SELECT id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao
+      `SELECT id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao, actor_account_id
        FROM ledger
        WHERE company_id = ? OR (company_id IS NULL AND ? = ?)
        ORDER BY at_tick ASC, id ASC`,
@@ -2026,6 +2026,7 @@ export function readLedgerRowsV3(
     aircraft_id: string | null;
     mission_id: string | null;
     icao: string | null;
+    actor_account_id: string | null;
   }>;
   return normalizeCareerLedger(
     rows.map((r) => ({
@@ -2038,6 +2039,7 @@ export function readLedgerRowsV3(
       aircraftId: r.aircraft_id ?? undefined,
       missionId: r.mission_id ?? undefined,
       icao: r.icao ?? undefined,
+      actorAccountId: r.actor_account_id ?? undefined,
     })),
   );
 }
@@ -2077,9 +2079,9 @@ export function persistLedgerIncremental(
   }
   const upsert = db.prepare(
     `INSERT INTO ledger (
-       id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao, company_id
+       id, at_tick, day_index, amount_usd, kind, note, aircraft_id, mission_id, icao, company_id, actor_account_id
      ) VALUES (
-       @id, @at_tick, @day_index, @amount_usd, @kind, @note, @aircraft_id, @mission_id, @icao, @company_id
+       @id, @at_tick, @day_index, @amount_usd, @kind, @note, @aircraft_id, @mission_id, @icao, @company_id, @actor_account_id
      )
      ON CONFLICT(id) DO UPDATE SET
        at_tick = excluded.at_tick,
@@ -2090,7 +2092,8 @@ export function persistLedgerIncremental(
        aircraft_id = excluded.aircraft_id,
        mission_id = excluded.mission_id,
        icao = excluded.icao,
-       company_id = excluded.company_id`,
+       company_id = excluded.company_id,
+       actor_account_id = excluded.actor_account_id`,
   );
   for (const e of entries) {
     if (!e.id) continue;
@@ -2105,6 +2108,7 @@ export function persistLedgerIncremental(
       mission_id: e.missionId ?? null,
       icao: e.icao ?? null,
       company_id: cid,
+      actor_account_id: e.actorAccountId ?? null,
     });
   }
 }

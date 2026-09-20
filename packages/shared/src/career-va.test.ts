@@ -43,13 +43,13 @@ describe('VA IH-2', () => {
   });
 
   it('bumps schema to v17 with VA + fleet reserve + access_keys', () => {
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '17');
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '18');
     const dbPath = store.sqlitePath!;
     const db = new DatabaseSync(dbPath);
     const row = db
       .prepare(`SELECT value FROM meta WHERE key = 'schema_version'`)
       .get() as { value: string };
-    assert.equal(row.value, '17');
+    assert.equal(row.value, '18');
     const cols = db.prepare(`PRAGMA table_info(companies)`).all() as Array<{
       name: string;
     }>;

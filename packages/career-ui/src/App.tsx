@@ -18406,11 +18406,20 @@ export function App() {
             await switchCompany(companyId);
           }}
           onLeftVa={async ({ homeCompanyId, companies }) => {
-            setCompanies(
-              companies.map((c) => ({
-                id: c.id,
-                displayName: c.displayName,
-              })),
+            setCompanies((prev) =>
+              companies.map((c) => {
+                const existing = prev.find((p) => p.id === c.id);
+                return existing
+                  ? { ...existing, displayName: c.displayName }
+                  : {
+                      id: c.id,
+                      displayName: c.displayName,
+                      homeHubIcao: '',
+                      homeCountryId: '',
+                      worldId: '',
+                      createdAtMs: Date.now(),
+                    };
+              }),
             );
             const next =
               homeCompanyId?.trim() ||

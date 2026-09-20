@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **13ae2d4** / desktop **0.3.137** shipped: Add VA Flight quality and clarify Owner ops on credit. Release: [v0.3.137](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.137).
+
+
 `main` **7dd5f23** / desktop **0.3.136** shipped: Add My VA Ledger and harden member VA session access. Release: [v0.3.136](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.136).
 
 

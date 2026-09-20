@@ -1,4 +1,7 @@
-# Current state (2026-09-19)
+# Current state (2026-09-20)
+
+`main` **4314eb6** / desktop **0.3.131** shipped: Ship VA member ops: route cut, Line crew, home progression, one-VA gate. Release: [v0.3.131](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.131).
+
 
 `main` **480cf88** / desktop **0.3.130** shipped: Add F7 dealer claim lock with owner_company_id persist. Release: [v0.3.130](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.130).
 

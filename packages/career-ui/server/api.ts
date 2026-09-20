@@ -6164,7 +6164,11 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'aircraftId and dest query required' });
           return;
         }
-        const ferryPlanCompanyId = companyIdFromRequest(req);
+        // Query companyId wins over chrome header (VA tail while sticky-home).
+        const ferryPlanCompanyId = companyIdFromRequest(
+          req,
+          url.searchParams.get('companyId'),
+        );
         const ferryPlanActor = await resolveVaFleetActor(req, ferryPlanCompanyId);
         try {
           const result = await withCareerRead((world, missions) => {

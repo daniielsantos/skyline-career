@@ -13,6 +13,8 @@ export type FerryJourneyDialogProps = {
   onClose: () => void;
   /** Execute one hop toward `legDest`; parent updates fleet/wallet. */
   onFlyLeg: (legDest: string) => Promise<void>;
+  /** Dual-tenant: load plan from VA fleet while chrome is on home. */
+  companyId?: string;
 };
 
 /**
@@ -68,6 +70,7 @@ export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
         aircraftId: props.aircraft.id,
         destIcao: finalDest,
         journeyOrigin: journeyOriginRef.current ?? here,
+        companyId: props.companyId,
       });
       setPlan(view);
     } catch (err) {
@@ -80,9 +83,15 @@ export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
 
   useEffect(() => {
     void refreshPlan();
-    // Re-fetch when the airframe moves or final dest changes.
+    // Re-fetch when the airframe moves or final dest / tenant changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.aircraft.id, props.aircraft.locationIcao, finalDest, arrived]);
+  }, [
+    props.aircraft.id,
+    props.aircraft.locationIcao,
+    finalDest,
+    arrived,
+    props.companyId,
+  ]);
 
   async function flyNext() {
     const legTo = plan?.nextLeg?.to;

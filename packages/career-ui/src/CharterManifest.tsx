@@ -26,6 +26,8 @@ type CharterManifestProps = {
   onAccept: (draft: CharterManifestDraft) => Promise<void>;
   clientUpdateRequiredMin?: string | null;
   onOpenUpdates?: () => void;
+  /** Dual-tenant: VA charter ferry plan while chrome is on home. */
+  resolveOpsCompanyId?: (aircraftId: string) => string | undefined;
 };
 
 export function CharterManifest(props: CharterManifestProps) {
@@ -237,6 +239,7 @@ export function CharterManifest(props: CharterManifestProps) {
           finalDestIcao={origin}
           formatMoney={props.formatMoney}
           busy={props.busy}
+          companyId={props.resolveOpsCompanyId?.(aircraft.id)}
           onClose={() => setFerryOpen(false)}
           onFlyLeg={(legDest) => props.onFerry(aircraft.id, legDest, origin)}
         />

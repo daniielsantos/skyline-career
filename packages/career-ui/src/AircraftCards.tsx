@@ -880,6 +880,8 @@ export function HangarAircraftCard(props: {
     onReserve: (aircraftId: string) => void | Promise<void>;
     onRelease: (aircraftId: string) => void | Promise<void>;
   };
+  /** Dual-tenant: ferry-plan company when chrome ≠ airframe owner. */
+  opsCompanyId?: string;
 }) {
   const acf = props.aircraft;
   const catalog = props.catalog;
@@ -1040,6 +1042,7 @@ export function HangarAircraftCard(props: {
         aircraftId: acf.id,
         destIcao: ferryFinal,
         journeyOrigin: journeyOriginRef.current ?? here,
+        companyId: props.opsCompanyId,
       })
         .then((view) => {
           if (cancelled) return;
@@ -1059,7 +1062,7 @@ export function HangarAircraftCard(props: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [acf.id, acf.locationIcao, acf.status, ferryFinal]);
+  }, [acf.id, acf.locationIcao, acf.status, ferryFinal, props.opsCompanyId]);
 
   const primaryAction = mutationsLocked
     ? acf.status === 'parked' && !pilotHere
@@ -1578,6 +1581,7 @@ export function HangarAircraftCard(props: {
           finalDestIcao={ferryJourneyFinal}
           formatMoney={props.formatMoney}
           busy={props.busy}
+          companyId={props.opsCompanyId}
           onClose={() => {
             setFerryJourneyOpen(false);
             setFerryJourneyFinal(null);

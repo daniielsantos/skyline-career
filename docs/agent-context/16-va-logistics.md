@@ -503,6 +503,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** `switchCompanyForVa(home)` limpava `vaSessionFleet` ao sair do My VA; prefetch de `/api/va/members` não re-rodava — `opsFleet` ficava só home.
 **Fix:** ao voltar home, manter `vaSessionFleet`/`vaSessionWallet` (chrome Hangar continua em `fleet`); prefetch também reage a `authSessionEpoch` / `homeCompanyId`.
 
+### Prepare ferry journey Unknown aircraft (2026-09-20)
+
+**Sintoma:** Manifest CTA Ferry to origin com tail VA → dialog `Unknown aircraft acf_…` (ex. Duke SBGL→SBSP).
+**Causa:** `POST /api/fleet/ferry` já mandava `companyId` do opsFleet; `GET /api/fleet/ferry-plan` (FerryJourneyDialog) só usava header chrome = home → frota errada.
+**Fix:** `fetchFerryPlan` + dialog aceitam `companyId`; handler lê query; Manifest/Charter/Hangar passam `resolveOpsCompanyId`.
+
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 
 **Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.

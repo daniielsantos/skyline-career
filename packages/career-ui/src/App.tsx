@@ -572,6 +572,27 @@ function proRataPayUsd(lot: MarketLot, cargoKg: number): number {
   return Math.max(1, Math.round((cargoKg / lotQuantityKg(lot)) * lot.payUsd));
 }
 
+/**
+ * Full-lot contract rate for Manifest compare ($/klb imperial, $/t metric).
+ * Independent of partial load — same rate as pro-rata pay.
+ */
+function formatLotPayRate(
+  payUsd: number,
+  quantityKg: number,
+  weightSystem: WeightSystem = activeWeightSystem,
+): string | null {
+  if (!(quantityKg > 0) || !Number.isFinite(payUsd) || payUsd < 0) return null;
+  const usdPerKg = payUsd / quantityKg;
+  if (weightSystem === 'imperial') {
+    const perKlb = usdPerKg * (1000 / KG_TO_LB);
+    if (!Number.isFinite(perKlb)) return null;
+    return `$${Math.round(perKlb).toLocaleString('en-US')}/klb`;
+  }
+  const perT = usdPerKg * 1000;
+  if (!Number.isFinite(perT)) return null;
+  return `$${Math.round(perT).toLocaleString('en-US')}/t`;
+}
+
 function defaultStagingKg(maxKg: number): number {
   if (maxKg <= 0) return 0;
   const half = Math.floor(maxKg / 200) * 100;
@@ -17755,6 +17776,9 @@ export function App() {
                   onFerry(aircraftId, legDest, { finalDest })
                 }
                 onAccept={onAcceptCharter}
+                resolveOpsCompanyId={(aircraftId) =>
+                  resolveOpsCompanyId(aircraftId)
+                }
                 clientUpdateRequiredMin={
                   clientUpdateBlock?.minClientVersion ?? null
                 }
@@ -17927,6 +17951,7 @@ export function App() {
                   finalDestIcao={staging.originIcao}
                   formatMoney={formatMoney}
                   busy={busy}
+                  companyId={resolveOpsCompanyId(stagingAssignedAircraft.id)}
                   onClose={() => setStagingFerryOpen(false)}
                   onFlyLeg={async (legDest) => {
                     await onFerry(stagingAssignedAircraft.id, legDest, {
@@ -18129,6 +18154,11 @@ export function App() {
                       kgToDisplay(line.cargoKg, weightSystem),
                     );
                     const unit = massUnitLabel(weightSystem);
+                    const payRate = formatLotPayRate(
+                      resolvedLot.payUsd,
+                      lotQuantityKg(resolvedLot),
+                      weightSystem,
+                    );
                     return (
                       <li key={line.lot.id} className="staging-line staging-line-compact">
                         <div className="staging-line-head">
@@ -18157,6 +18187,14 @@ export function App() {
                           {formatTonnes(resolvedLot.availableKg)} avail · max{' '}
                           {formatTonnes(maxKg)} · pay{' '}
                           {formatMoney(proRataPayUsd(resolvedLot, line.cargoKg))}
+                          {payRate ? (
+                            <>
+                              {' · '}
+                              <span title="Contract pay per bulk unit (full lot)">
+                                {payRate}
+                              </span>
+                            </>
+                          ) : null}
                         </p>
                         <div className="staging-line-controls">
                           <label className="cargo-amount staging-cargo-amount">
@@ -18242,6 +18280,11 @@ export function App() {
                       const cargoLocked = isCargoOpsCommodityLocked(
                         lot.commodityId,
                       );
+                      const payRate = formatLotPayRate(
+                        lot.payUsd,
+                        lotQuantityKg(lot),
+                        weightSystem,
+                      );
                       return (
                         <li
                           key={lot.id}
@@ -18261,7 +18304,9 @@ export function App() {
                               </span>
                             ) : null}
                             <small>
-                              {formatTonnes(lot.availableKg)} · {formatMoney(lot.payUsd)}
+                              {formatTonnes(lot.availableKg)} ·{' '}
+                              {formatMoney(lot.payUsd)}
+                              {payRate ? ` · ${payRate}` : ''}
                             </small>
                           </div>
                           <div className="staging-candidate-action">
@@ -19052,6 +19097,7 @@ export function App() {
               busy={busy || Boolean(hangarOpts.busy)}
               mutationsLocked={hangarOpts.mutationsLocked}
               vaReserve={hangarOpts.vaReserve}
+              opsCompanyId={resolveOpsCompanyId(acf.id)}
               hubOptions={ferryDestinationHubs(hubOptions).map((hub) => ({
                 icao: hub.icao,
                 name: hub.name,
@@ -19566,6 +19612,7 @@ export function App() {
                       cabinStatus={hangarCabinStatus(acf)}
                       busy={busy}
                       mutationsLocked={vaHangarMutationsLocked}
+                      opsCompanyId={resolveOpsCompanyId(acf.id)}
                       hubOptions={ferryDestinationHubs(hubOptions).map(
                         (hub) => ({
                           icao: hub.icao,

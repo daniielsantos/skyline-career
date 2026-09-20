@@ -4092,6 +4092,8 @@ export function fetchFerryPlan(opts: {
   aircraftId: string;
   destIcao: string;
   journeyOrigin?: string;
+  /** Dual-tenant: VA tail while chrome is on home. */
+  companyId?: string;
 }) {
   const qs = new URLSearchParams({
     aircraftId: opts.aircraftId,
@@ -4099,6 +4101,8 @@ export function fetchFerryPlan(opts: {
   });
   const journey = opts.journeyOrigin?.trim().toUpperCase();
   if (journey) qs.set('journeyOrigin', journey);
+  const companyId = opts.companyId?.trim();
+  if (companyId) qs.set('companyId', companyId);
   return api<FerryPlanView>(`/api/fleet/ferry-plan?${qs.toString()}`);
 }
 

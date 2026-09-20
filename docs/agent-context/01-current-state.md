@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **85d94d7** / desktop **0.3.139** shipped: Fix My VA ledger race and highlight the company wallet. Release: [v0.3.139](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.139).
+
+
 `main` **73909ef** / desktop **0.3.138** shipped: Keep chrome wallet and company on home across VA pages. Release: [v0.3.138](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.138).
 
 

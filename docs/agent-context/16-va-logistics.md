@@ -317,6 +317,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** piloto podia join/request em várias VAs ao mesmo tempo.
 **Causa:** invite + join request só checavam membership da company alvo.
 **Fix:** `assertAccountCanJoinVa` / `vaListedMembership`; block invite+request+accept; directory UI desabilita quando já em VA.
+### My VA Loading hung on /api/va/members (2026-09-19)
+
+**Sintoma:** My VA fica em Loading… longo / indefinido.
+**Causa:** GET `/api/va/members` fazia `withCareerRead` só para snapshot Line crew → lock world+company + `loadEconomy` atrás do pulse/cold start.
+**Fix:** members lê Line crew com `companyLock` + `loadMissions` + `peekEconomyWorld().tick` (sem world lock); falha soft → `lineCrew: null`.
+
 
 
 ## Checklist quando for implementar

@@ -3432,21 +3432,40 @@ export function createCareerApiServer(port = 8787) {
           store.authListCompaniesForAccount(session.account.id),
         );
         const co = companies.find((c) => c.id === companyId);
-        const lineCrew = listed
-          ? await withCareerRead((world, missions) => {
-              completeNpcFerries(missions, world.tick);
-              const allowance = vaLineCrewAllowanceRemaining(
-                missions,
-                world.tick,
-              );
-              return {
-                ...allowance,
-                hireUsd: VA_LINE_CREW_HIRE_USD,
-                salaryUsdPerWeek: VA_LINE_CREW_SALARY_USD_PER_WEEK,
-                fireSeveranceUsd: VA_LINE_CREW_FIRE_SEVERANCE_USD,
-              };
-            }, { companyId })
-          : null;
+        // Line crew is company JSON only — do NOT withCareerRead (world lock /
+        // loadEconomy). That made My VA hang behind pulse / cold world load.
+        let lineCrew: {
+          hired: boolean;
+          allowance: number;
+          used: number;
+          remaining: number;
+          hireUsd: number;
+          salaryUsdPerWeek: number;
+          fireSeveranceUsd: number;
+        } | null = null;
+        if (listed) {
+          try {
+            const tick =
+              typeof store.peekEconomyWorld === 'function'
+                ? (store.peekEconomyWorld()?.tick ?? 0)
+                : 0;
+            const missions =
+              careerApiMode === 'gateway' && gatewayWorldClient
+                ? await loadMissions({ companyId })
+                : await companyLock.withLock(() =>
+                    loadMissions({ companyId }),
+                  );
+            const allowance = vaLineCrewAllowanceRemaining(missions, tick);
+            lineCrew = {
+              ...allowance,
+              hireUsd: VA_LINE_CREW_HIRE_USD,
+              salaryUsdPerWeek: VA_LINE_CREW_SALARY_USD_PER_WEEK,
+              fireSeveranceUsd: VA_LINE_CREW_FIRE_SEVERANCE_USD,
+            };
+          } catch {
+            lineCrew = null;
+          }
+        }
         send(res, 200, {
           companyId,
           memberCap: VA_MEMBER_CAP,

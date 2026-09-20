@@ -126,12 +126,6 @@ export function VaDirectoryPage(props: Props) {
           </button>
         </div>
       </div>
-      {alreadyInVa ? (
-        <p className="settings-help">
-          You are already in a VA — leave it (or unlist if you own it) before
-          joining or requesting another.
-        </p>
-      ) : null}
 
       {error ? (
         <p className="error" role="alert">

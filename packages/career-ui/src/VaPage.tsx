@@ -179,7 +179,7 @@ export function VaPage(props: Props) {
   if (!loaded) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">Loading…</p>
+        <p className="settings-help">Loading roster…</p>
       </section>
     );
   }

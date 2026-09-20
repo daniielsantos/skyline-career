@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **5cb39d3** / desktop **0.3.150** shipped: Migrate AppData from Skyline Career to Airframe Career on first launch. Release: [v0.3.150](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.150).
+
+
 `main` **e555557** / desktop **0.3.149** shipped: Fix Hub Stats Jet-A history chip and Online count for multi-company pilots. Release: [v0.3.149](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.149).
 
 

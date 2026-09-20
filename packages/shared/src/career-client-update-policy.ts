@@ -1,6 +1,7 @@
 /**
  * Rare world kill switch: when forceUpdate is on, refuse Prepare/accept until
- * the desktop client is ≥ minClientVersion. Stored on economy_meta.misc_json.
+ * the desktop client is ≥ minClientVersion. PG: economy_meta columns
+ * force_client_update + min_client_version (schema v29).
  */
 
 export const CLIENT_UPDATE_REQUIRED = 'client_update_required';

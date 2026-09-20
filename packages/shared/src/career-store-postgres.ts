@@ -134,7 +134,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '28';
+const CAREER_PG_SCHEMA_VERSION = '29';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -1935,6 +1935,24 @@ export class PostgresCareerStore implements CareerStore {
     await this.ready;
     const field = key.trim();
     if (!field) return undefined;
+    // Schema v29: kill switch lives on typed columns (ops SQL + health gate).
+    if (field === 'clientUpdatePolicy') {
+      const { rows } = await this.pool.query<{
+        force_client_update: boolean | null;
+        min_client_version: string | null;
+      }>(
+        `SELECT force_client_update, min_client_version
+         FROM economy_meta
+         WHERE world_id = $1`,
+        [LOCAL_WORLD_ID],
+      );
+      const row = rows[0];
+      if (!row) return undefined;
+      return {
+        forceUpdate: Boolean(row.force_client_update),
+        minClientVersion: String(row.min_client_version ?? '0.0.0'),
+      };
+    }
     const { rows } = await this.pool.query<{ value: unknown }>(
       `SELECT misc_json -> $2 AS value
        FROM economy_meta

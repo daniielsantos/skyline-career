@@ -2,12 +2,14 @@
  * Postgres relational tables for career MP world (phase 2).
  * Hot economy slices (lots / airports / stock / inbound) + world-ops
  * (npc / fuel / demand / ports) + aircraft dealer pool + charter + company
- * tables are the economy SoT. Leftover scalars/arrays live in
- * economy_meta.misc_json. Schema v16 promotes fleet_aircraft payload fields
- * to columns (registration / hours / MX / config). v15 drops PG stubs
- * economy_json / company_missions (see career-store-postgres.ts). v18 adds
- * hub_economy_samples for Pulse / Hub Stats. SP SQLite mirrors fleet columns
- * via ensureV3Ddl ALTERs. Meta/auth stay in career-store-postgres.ts.
+ * tables are the economy SoT. Schema v29 promotes former misc_json leftovers
+ * (kill switch columns, flow_stats, international_lanes, port_inbound_ships,
+ * tour_lot_soft_holds, regional_recovery, presence_events). misc_json remains
+ * as an empty bag for rare future leftovers. Schema v16 promotes fleet_aircraft
+ * payload fields to columns. v15 drops PG stubs economy_json / company_missions
+ * (see career-store-postgres.ts). v18 adds hub_economy_samples. SP SQLite
+ * mirrors fleet columns via ensureV3Ddl ALTERs. Meta/auth stay in
+ * career-store-postgres.ts.
  */
 
 import type pg from 'pg';
@@ -16,7 +18,6 @@ import {
   CHARTER_GROUP_SIZE_MAX,
   shouldRetainCharterOffer,
 } from './career-charter.js';
-import { parseClientUpdatePolicy } from './career-client-update-policy.js';
 import {
   CAREER_COMMODITIES,
   DEAD_LOT_RETENTION_TICKS,
@@ -38,6 +39,13 @@ import {
   ensurePgHubEconomySamplesDdl,
   flushPendingHubEconomySamplesToPg,
 } from './career-store-pg-hub-economy.js';
+import {
+  applyEconomyMetaLeftoverColumns,
+  economyMetaLeftoverColumnParams,
+  ensurePgEconomyLeftoversDdl,
+  hydratePgEconomyLeftoverTables,
+  persistPgEconomyLeftoverTables,
+} from './career-store-pg-economy-leftovers.js';
 import type {
   AircraftInstance,
   AircraftInstanceStatus,
@@ -1134,6 +1142,8 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS access_keys_claimed_idx ON access_keys(claimed_by_account_id)`,
   );
+  // Schema v29 — promote misc_json leftovers to columns + tables.
+  await ensurePgEconomyLeftoversDdl(pool);
   // One-shot backfill from legacy payload_json (only fill NULL columns).
   await pool.query(`
     UPDATE fleet_aircraft SET
@@ -1195,51 +1205,22 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   `);
 }
 
-/** Leftover economy fields that are not yet relational tables. */
-const PG_ECONOMY_MISC_KEYS = [
-  'internationalLanes',
-  'flow',
-  'portInboundShips',
-  'tourLotSoftHolds',
-  'aircraftPoolCatalogHash',
-  'regionalRecovery',
-  'clientUpdatePolicy',
-  'version',
-  'presenceLog',
-] as const;
-
+/**
+ * Former misc_json leftovers — emptied in schema v29 (see
+ * career-store-pg-economy-leftovers.ts). pick/apply stay as no-ops so callers
+ * keep a stable API without inventing new blob keys.
+ */
 export function pickPgEconomyMisc(
-  world: CareerEconomyWorld,
+  _world: CareerEconomyWorld,
 ): Record<string, unknown> {
-  const src = world as unknown as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const key of PG_ECONOMY_MISC_KEYS) {
-    const v = src[key];
-    if (v === undefined) continue;
-    if (key === 'clientUpdatePolicy') {
-      out[key] = parseClientUpdatePolicy(v);
-      continue;
-    }
-    out[key] = v;
-  }
-  return out;
+  return {};
 }
 
 export function applyPgEconomyMisc(
-  world: CareerEconomyWorld,
-  misc: unknown,
+  _world: CareerEconomyWorld,
+  _misc: unknown,
 ): void {
-  if (misc == null || typeof misc !== 'object' || Array.isArray(misc)) return;
-  const src = misc as Record<string, unknown>;
-  const dst = world as unknown as Record<string, unknown>;
-  for (const key of PG_ECONOMY_MISC_KEYS) {
-    if (src[key] === undefined) continue;
-    if (key === 'clientUpdatePolicy') {
-      dst[key] = parseClientUpdatePolicy(src[key]);
-      continue;
-    }
-    dst[key] = src[key];
-  }
+  /* no-op — leftovers hydrate from typed columns/tables (v29) */
 }
 
 /**
@@ -1726,7 +1707,9 @@ export async function hydrateEconomyFromPg(
   const wid = worldId.trim() || LOCAL_WORLD_ID;
 
   const metaRes = await pool.query(
-    `SELECT seed, tick, last_batch_at_ms, home_country_id, misc_json
+    `SELECT seed, tick, last_batch_at_ms, home_country_id, misc_json,
+            economy_version, aircraft_pool_catalog_hash,
+            force_client_update, min_client_version, flow_stats
      FROM economy_meta WHERE world_id = $1`,
     [wid],
   );
@@ -1737,6 +1720,11 @@ export async function hydrateEconomyFromPg(
         last_batch_at_ms: string | number;
         home_country_id: string;
         misc_json: unknown;
+        economy_version?: number;
+        aircraft_pool_catalog_hash?: string | null;
+        force_client_update?: boolean;
+        min_client_version?: string;
+        flow_stats?: unknown;
       }
     | undefined;
   if (meta) {
@@ -1745,8 +1733,17 @@ export async function hydrateEconomyFromPg(
     world.lastBatchAtMs = num(meta.last_batch_at_ms);
     world.lastSyncedAtMs = world.lastBatchAtMs;
     if (meta.home_country_id) world.homeCountryId = meta.home_country_id;
+    applyEconomyMetaLeftoverColumns(world, {
+      economyVersion: num(meta.economy_version, 3),
+      aircraftPoolCatalogHash: meta.aircraft_pool_catalog_hash ?? null,
+      forceClientUpdate: Boolean(meta.force_client_update),
+      minClientVersion: String(meta.min_client_version ?? '0.0.0'),
+      flowStats: meta.flow_stats,
+    });
     applyPgEconomyMisc(world, meta.misc_json);
   }
+
+  await hydratePgEconomyLeftoverTables(pool, world, wid);
 
   const hubRes = await pool.query(
     `SELECT icao, name, region, hub_tier, bush, bush_trip_only, lat, lon,
@@ -2636,17 +2633,25 @@ export async function persistEconomyTablesToPg(
     await ensureWorldRow(client, wid);
     await lockEconomyRevision(client, wid, expectedRevision);
 
+    const leftoverCols = economyMetaLeftoverColumnParams(world);
     await client.query(
       `INSERT INTO economy_meta (
-         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json, revision
+         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json,
+         economy_version, aircraft_pool_catalog_hash,
+         force_client_update, min_client_version, flow_stats, revision
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, 1)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11::jsonb, 1)
        ON CONFLICT (world_id) DO UPDATE SET
          seed = EXCLUDED.seed,
          tick = EXCLUDED.tick,
          last_batch_at_ms = EXCLUDED.last_batch_at_ms,
          home_country_id = EXCLUDED.home_country_id,
          misc_json = EXCLUDED.misc_json,
+         economy_version = EXCLUDED.economy_version,
+         aircraft_pool_catalog_hash = EXCLUDED.aircraft_pool_catalog_hash,
+         force_client_update = EXCLUDED.force_client_update,
+         min_client_version = EXCLUDED.min_client_version,
+         flow_stats = EXCLUDED.flow_stats,
          revision = economy_meta.revision + 1`,
       [
         wid,
@@ -2655,8 +2660,15 @@ export async function persistEconomyTablesToPg(
         sqlBigint(world.lastBatchAtMs),
         world.homeCountryId ?? '',
         jsonParam(pickPgEconomyMisc(world)),
+        leftoverCols.economyVersion,
+        leftoverCols.aircraftPoolCatalogHash,
+        leftoverCols.forceClientUpdate,
+        leftoverCols.minClientVersion,
+        leftoverCols.flowStats,
       ],
     );
+
+    await persistPgEconomyLeftoverTables(client, world, wid);
 
     await flushPendingHubEconomySamplesToPg(client, world, wid);
 
@@ -3210,17 +3222,25 @@ export async function persistNpcLiveToPg(
   return withTx(pool, async (client) => {
     await ensureWorldRow(client, wid);
     await lockEconomyRevision(client, wid, expectedRevision);
+    const leftoverCols = economyMetaLeftoverColumnParams(world);
     await client.query(
       `INSERT INTO economy_meta (
-         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json, revision
+         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json,
+         economy_version, aircraft_pool_catalog_hash,
+         force_client_update, min_client_version, flow_stats, revision
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, 1)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11::jsonb, 1)
        ON CONFLICT (world_id) DO UPDATE SET
          seed = EXCLUDED.seed,
          tick = EXCLUDED.tick,
          last_batch_at_ms = EXCLUDED.last_batch_at_ms,
          home_country_id = EXCLUDED.home_country_id,
          misc_json = EXCLUDED.misc_json,
+         economy_version = EXCLUDED.economy_version,
+         aircraft_pool_catalog_hash = EXCLUDED.aircraft_pool_catalog_hash,
+         force_client_update = EXCLUDED.force_client_update,
+         min_client_version = EXCLUDED.min_client_version,
+         flow_stats = EXCLUDED.flow_stats,
          revision = economy_meta.revision + 1`,
       [
         wid,
@@ -3229,8 +3249,15 @@ export async function persistNpcLiveToPg(
         sqlBigint(world.lastBatchAtMs),
         world.homeCountryId ?? '',
         jsonParam(pickPgEconomyMisc(world)),
+        leftoverCols.economyVersion,
+        leftoverCols.aircraftPoolCatalogHash,
+        leftoverCols.forceClientUpdate,
+        leftoverCols.minClientVersion,
+        leftoverCols.flowStats,
       ],
     );
+
+    await persistPgEconomyLeftoverTables(client, world, wid);
 
     await flushPendingHubEconomySamplesToPg(client, world, wid);
 

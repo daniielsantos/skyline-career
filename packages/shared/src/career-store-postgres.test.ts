@@ -160,13 +160,33 @@ describe('career store postgres', () => {
         'company_missions stub table should be dropped (schema v15)',
       );
       const miscRes = await store['pool'].query(
-        `SELECT misc_json FROM economy_meta WHERE world_id = 'local'`,
+        `SELECT misc_json, force_client_update, min_client_version,
+                economy_version
+         FROM economy_meta WHERE world_id = 'local'`,
       );
       const misc = miscRes.rows[0]?.misc_json;
       assert.ok(
         misc != null && typeof misc === 'object' && !Array.isArray(misc),
         'economy_meta.misc_json should be an object',
       );
+      assert.equal(
+        typeof miscRes.rows[0]?.force_client_update,
+        'boolean',
+        'v29 force_client_update column',
+      );
+      assert.equal(
+        typeof miscRes.rows[0]?.min_client_version,
+        'string',
+        'v29 min_client_version column',
+      );
+      const lanesReg = await store['pool'].query(
+        `SELECT to_regclass('public.international_lanes') AS reg`,
+      );
+      assert.ok(lanesReg.rows[0]?.reg, 'international_lanes table (v29)');
+      const presenceReg = await store['pool'].query(
+        `SELECT to_regclass('public.presence_events') AS reg`,
+      );
+      assert.ok(presenceReg.rows[0]?.reg, 'presence_events table (v29)');
       const missions = emptyMissionsStateV2();
       missions.pilotName = 'Pg Pilot';
       missions.walletUsd = 12_500;

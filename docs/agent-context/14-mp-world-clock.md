@@ -490,29 +490,23 @@ Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em
 
 Rare critical-only gate. App still opens; **Prepare / Accept / Fly now** refuse until desktop ≥ `minClientVersion`.
 
-Policy lives on `economy_meta.misc_json` (no schema bump), key `clientUpdatePolicy`:
+Policy lives on typed `economy_meta` columns (schema **v29**; no longer `misc_json`):
 
-```json
-{
-  "forceUpdate": false,
-  "minClientVersion": "0.0.0"
-}
-```
+| Column | Type | Default |
+| --- | --- | --- |
+| `force_client_update` | boolean | false |
+| `min_client_version` | text | `'0.0.0'` |
 
 **Enable** (prod Postgres; replace version with the fixed build):
 
 ```sql
 UPDATE economy_meta
-SET misc_json = jsonb_set(
-  COALESCE(misc_json, '{}'::jsonb),
-  '{clientUpdatePolicy}',
-  '{"forceUpdate":true,"minClientVersion":"0.3.105"}'::jsonb,
-  true
-)
+SET force_client_update = true,
+    min_client_version = '0.3.105'
 WHERE world_id = 'local';
 ```
 
-World API reads the key live on `/api/health` and on accept paths → **426** `client_update_required`. Desktop sends `X-Skyline-Client-Version`.
+World API reads the columns live on `/api/health` and on accept paths → **426** `client_update_required`. Desktop sends `X-Skyline-Client-Version`.
 
 **Gated surfaces** (UI CTA → Settings → Updates; Hold at WH stays allowed):
 
@@ -532,13 +526,27 @@ World API reads the key live on `/api/health` and on accept paths → **426** `c
 
 ```sql
 UPDATE economy_meta
-SET misc_json = jsonb_set(
-  COALESCE(misc_json, '{}'::jsonb),
-  '{clientUpdatePolicy}',
-  '{"forceUpdate":false,"minClientVersion":"0.0.0"}'::jsonb,
-  true
-)
+SET force_client_update = false,
+    min_client_version = '0.0.0'
 WHERE world_id = 'local';
 ```
 
 Do **not** use day-to-day.
+
+### misc_json leftovers → v29
+
+Former `economy_meta.misc_json` bag is emptied. Promoted:
+
+| Former key | Target |
+| --- | --- |
+| `clientUpdatePolicy` | `force_client_update`, `min_client_version` |
+| `version` | `economy_version` |
+| `aircraftPoolCatalogHash` | `aircraft_pool_catalog_hash` |
+| `flow` | `flow_stats` JSONB |
+| `internationalLanes` | table `international_lanes` |
+| `portInboundShips` | table `port_inbound_ships` |
+| `tourLotSoftHolds` | table `tour_lot_soft_holds` |
+| `regionalRecovery` | table `regional_recovery` |
+| `presenceLog` | table `presence_events` |
+
+`misc_json` remains as `{}` for rare future leftovers. SP SQLite unchanged (still inside `economy_json`).

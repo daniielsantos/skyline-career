@@ -549,9 +549,10 @@ export interface CareerStore {
   /** In-process world after last load/save — skip blob parse on hot reads. */
   peekEconomyWorld(): CareerEconomyWorld | null;
   /**
-   * Live read of one economy_meta.misc_json key (Postgres). Used for rare
-   * ops flags so SQL patches apply without waiting for a full rehydrate.
-   * SQLite/JSON omit this — callers fall back to peeked world.
+   * Live read of a rare ops flag (Postgres). Prefer typed columns when
+   * present (e.g. clientUpdatePolicy → force_client_update /
+   * min_client_version). Other keys still read misc_json. SQLite/JSON omit
+   * this — callers fall back to peeked world.
    */
   readEconomyMiscField?(key: string): Promise<unknown>;
   /** Schema v4: hub + stock + lots by ICAO. JSON store uses RAM if present. */

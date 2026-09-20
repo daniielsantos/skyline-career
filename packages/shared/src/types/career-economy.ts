@@ -586,7 +586,8 @@ export interface CareerEconomyWorld {
    */
   regionalRecovery?: Record<string, RegionalRecoveryState>;
   /**
-   * Rare ops kill switch (misc_json). When forceUpdate is true, world API
+   * Rare ops kill switch. PG: economy_meta.force_client_update +
+   * min_client_version (schema v29). When forceUpdate is true, world API
    * refuses Prepare/accept until desktop ≥ minClientVersion.
    */
   clientUpdatePolicy?: {

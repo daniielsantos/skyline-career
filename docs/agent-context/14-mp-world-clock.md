@@ -497,6 +497,8 @@ Policy lives on typed `economy_meta` columns (schema **v29**; no longer `misc_js
 | `force_client_update` | boolean | false |
 | `min_client_version` | text | `'0.0.0'` |
 
+**Ops-owned.** Economy upsert inserts defaults on first world row only; later persists **do not** `SET` these columns (avoids tick/save wiping a live SQL flip from stale RAM). Health + accept gates always `SELECT` the columns.
+
 **Enable** (prod Postgres; replace version with the fixed build):
 
 ```sql
@@ -506,7 +508,11 @@ SET force_client_update = true,
 WHERE world_id = 'local';
 ```
 
+Then verify: `curl -fsS https://world.playairframe.com/api/health | jq .clientUpdatePolicy` → `forceUpdate: true`.
+
 World API reads the columns live on `/api/health` and on accept paths → **426** `client_update_required`. Desktop sends `X-Skyline-Client-Version`.
+
+**Until that persist fix is deployed:** stop world-api → run the `UPDATE` → start world-api (load hydrates RAM). A live `UPDATE` while the API is up gets clobbered on the next economy save.
 
 **Gated surfaces** (UI CTA → Settings → Updates; Hold at WH stays allowed):
 

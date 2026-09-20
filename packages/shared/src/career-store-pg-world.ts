@@ -2649,8 +2649,7 @@ export async function persistEconomyTablesToPg(
          misc_json = EXCLUDED.misc_json,
          economy_version = EXCLUDED.economy_version,
          aircraft_pool_catalog_hash = EXCLUDED.aircraft_pool_catalog_hash,
-         force_client_update = EXCLUDED.force_client_update,
-         min_client_version = EXCLUDED.min_client_version,
+         -- Ops-owned kill switch: never clobber SQL/ops flips from stale RAM.
          flow_stats = EXCLUDED.flow_stats,
          revision = economy_meta.revision + 1`,
       [
@@ -3238,8 +3237,7 @@ export async function persistNpcLiveToPg(
          misc_json = EXCLUDED.misc_json,
          economy_version = EXCLUDED.economy_version,
          aircraft_pool_catalog_hash = EXCLUDED.aircraft_pool_catalog_hash,
-         force_client_update = EXCLUDED.force_client_update,
-         min_client_version = EXCLUDED.min_client_version,
+         -- Ops-owned kill switch: never clobber SQL/ops flips from stale RAM.
          flow_stats = EXCLUDED.flow_stats,
          revision = economy_meta.revision + 1`,
       [

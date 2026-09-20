@@ -2,6 +2,9 @@
  * Rare world kill switch: when forceUpdate is on, refuse Prepare/accept until
  * the desktop client is ≥ minClientVersion. PG: economy_meta columns
  * force_client_update + min_client_version (schema v29).
+ *
+ * Ops-owned: flipped via SQL (or future ops API). Economy persist must not
+ * overwrite those columns from in-memory world state.
  */
 
 export const CLIENT_UPDATE_REQUIRED = 'client_update_required';

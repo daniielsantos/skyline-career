@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **dd73d6b** / desktop **0.3.148** shipped: Fix chrome wallet override when opening VAs and My VA. Release: [v0.3.148](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.148).
+
+
 `main` **9b2dbbd** / desktop **0.3.147** shipped: Add one-time MP product keys for world register. Release: [v0.3.147](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.147).
 
 

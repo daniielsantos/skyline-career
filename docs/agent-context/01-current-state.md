@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **3f4b7ef** / desktop **0.3.155** shipped: Fix VA ferry-plan tenant lookup and show Manifest pay per bulk unit. Release: [v0.3.155](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.155).
+
+
 `main` **98464d5** / desktop **0.3.154** shipped: Stop economy persist from wiping ops kill-switch columns. Release: [v0.3.154](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.154).
 
 

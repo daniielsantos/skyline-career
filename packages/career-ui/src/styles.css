@@ -13929,6 +13929,46 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   border-radius: 6px;
   background: color-mix(in srgb, var(--panel, #141820) 88%, transparent);
 }
+.va-ledger-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(8rem, 0.9fr);
+  gap: 0.85rem 1.5rem;
+  align-items: end;
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border, #444) 70%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel, #141820) 92%, #1a222c);
+}
+.va-ledger-wallet-value {
+  margin: 0.2rem 0 0.35rem;
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.55rem, 2.4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.va-ledger-wallet-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  max-width: 28rem;
+}
+.va-ledger-quality-value {
+  margin: 0.25rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .va-ledger-hero {
+    grid-template-columns: 1fr;
+  }
+}
 .va-roster-section {
   margin-bottom: 1rem;
   padding-bottom: 0.85rem;

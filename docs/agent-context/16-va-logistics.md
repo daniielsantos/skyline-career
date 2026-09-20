@@ -400,6 +400,18 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** restore home só ao sair de My VA→outros; `paintWallet` ainda aceitava tenant VA; Company chip lia `activeCompanyId`; join chamava `switchCompany(VA)`.
 **Fix:** restore home em **toda** tab ≠ `va`; `paintWallet`/`commitWallet` sticky; Company chip = home; join sem switch de tenant.
 
+### My VA empty flash mid hangar switch (2026-09-20)
+
+**Sintoma:** ao abrir Hangar da VA, ~10s de “Select a company first” antes dos aviões.
+**Causa:** `onSwitchCompany` inline recriava `refresh` a cada render; switch era fire-and-forget; erro transitório fazia `setRole(null)` → empty state.
+**Fix:** ref estável para switch/wallet; `await` do tenant switch com BusyStatus “Opening VA hangar…”; soft-fail não limpa shell VA já carregado.
+
+### Member Ledger empty then fills (2026-09-20)
+
+**Sintoma:** membro no Ledger via wallet/credit da VA mas “No ledger yet”; depois as linhas aparecem.
+**Causa:** `GET /api/cashflow` rodava ainda no tenant **home** (vazio) enquanto o switch para a VA estava em voo; resposta home pintava empty; refresh/VA fetch posterior corrigia. Wallet no header vinha de `props.walletUsd` (cache VA) mas `cashflow.recent` ficava do snap home.
+**Fix:** não fetch ledger durante `tenantSwitching`; invalidar gen no switch; ignorar respostas stale de cashflow.
+
 ### My VA Ledger painted personal wallet (2026-09-20)
 
 **Sintoma:** alt abre Ledger da VA e o chrome Wallet vira o saldo da VA; ao sair continua “errado”.

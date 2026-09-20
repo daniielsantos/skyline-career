@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   fetchVaMembers,
   fetchVaJoinRequests,
@@ -88,7 +88,15 @@ export function VaPage(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  /** True while My VA pins the listed company session (avoid empty-state flash). */
+  const [tenantSwitching, setTenantSwitching] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
+  const onSwitchCompanyRef = useRef(props.onSwitchCompany);
+  onSwitchCompanyRef.current = props.onSwitchCompany;
+  const onWalletRef = useRef(props.onWallet);
+  onWalletRef.current = props.onWallet;
+  const hasVaShellRef = useRef(false);
+  const ledgerFetchGenRef = useRef(0);
 
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';
@@ -98,23 +106,27 @@ export function VaPage(props: Props) {
 
   const loadLedger = useCallback(async () => {
     if (!canShow || !companyId) return;
+    const gen = ++ledgerFetchGenRef.current;
     setLedgerBusy(true);
     setLedgerError(null);
     try {
       const snap = await fetchCashflow();
+      // Drop stale responses from a pre-switch (home) fetch.
+      if (gen !== ledgerFetchGenRef.current) return;
       setCashflow(snap);
       // Keep VA wallet in-page (parent routes to vaSession or chrome by tenant).
       if (typeof snap.walletUsd === 'number' && Number.isFinite(snap.walletUsd)) {
-        props.onWallet?.(snap.walletUsd);
+        onWalletRef.current?.(snap.walletUsd);
       }
       if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
       setFlightQuality(snap.flightQuality ?? null);
     } catch (err) {
+      if (gen !== ledgerFetchGenRef.current) return;
       setLedgerError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLedgerBusy(false);
+      if (gen === ledgerFetchGenRef.current) setLedgerBusy(false);
     }
-  }, [canShow, companyId, props.onWallet]);
+  }, [canShow, companyId]);
 
   const refresh = useCallback(async () => {
     if (!canShow || !companyId) {
@@ -134,14 +146,24 @@ export function VaPage(props: Props) {
       setLineCrew(m.lineCrew ?? null);
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
+      hasVaShellRef.current = Boolean(m.role && m.listed);
       // Paint roster first — tenant switch used to block behind a full refresh (~20s).
       setLoaded(true);
       if (
         m.switchToCompanyId &&
         m.switchToCompanyId !== companyId &&
-        props.onSwitchCompany
+        onSwitchCompanyRef.current
       ) {
-        void props.onSwitchCompany(m.switchToCompanyId);
+        // Invalidate any in-flight home cashflow before pinning the VA.
+        ledgerFetchGenRef.current += 1;
+        setTenantSwitching(true);
+        try {
+          await onSwitchCompanyRef.current(m.switchToCompanyId);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+        } finally {
+          setTenantSwitching(false);
+        }
         return;
       }
       if (m.listed && (m.role === 'owner' || m.role === 'dispatcher')) {
@@ -163,11 +185,15 @@ export function VaPage(props: Props) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setRole(null);
-      setListed(false);
+      // Soft-fail: keep the last good VA shell so a blip mid-switch does not
+      // flash "Select a company first" for ~10s.
+      if (!hasVaShellRef.current) {
+        setRole(null);
+        setListed(false);
+      }
       setLoaded(true);
     }
-  }, [canShow, companyId, props.onSwitchCompany]);
+  }, [canShow, companyId]);
 
   const leaveVa = useCallback(async () => {
     const ok = await confirm({
@@ -226,10 +252,12 @@ export function VaPage(props: Props) {
   }, [refresh]);
 
   useEffect(() => {
-    if (pane === 'ledger' && listed && role) {
+    // Wait until the VA tenant is pinned — a home-tenant cashflow looks like
+    // "No ledger yet" while wallet/credit already show the VA from props.
+    if (pane === 'ledger' && listed && role && !tenantSwitching) {
       void loadLedger();
     }
-  }, [pane, listed, role, loadLedger]);
+  }, [pane, listed, role, tenantSwitching, loadLedger]);
 
   if (!canShow) {
     return (
@@ -239,10 +267,12 @@ export function VaPage(props: Props) {
     );
   }
 
-  if (!loaded) {
+  if (!loaded || tenantSwitching) {
     return (
       <section className="panel va-panel">
-        <BusyStatus label="Loading VA…" />
+        <BusyStatus
+          label={tenantSwitching ? 'Opening VA hangar…' : 'Loading VA…'}
+        />
       </section>
     );
   }
@@ -527,26 +557,26 @@ export function VaPage(props: Props) {
 
       {pane === 'ledger' ? (
         <div className="va-pane-card">
-          <p className="settings-help">
-            Shared company wallet — same cash the owner uses.
-          </p>
-          <p className="settings-sample" style={{ marginBottom: '0.75rem' }}>
-            VA wallet{' '}
-            <strong>
-              {formatBoardMoney(cashflow?.walletUsd ?? props.walletUsd)}
-            </strong>
-          </p>
-          <div className="va-rep-strip">
-            <div>
+          <div className="va-ledger-hero">
+            <div className="va-ledger-wallet">
+              <p className="aircraft-card-section-label" style={{ margin: 0 }}>
+                VA wallet
+              </p>
+              <p className="va-ledger-wallet-value">
+                {formatBoardMoney(cashflow?.walletUsd ?? props.walletUsd)}
+              </p>
+              <p className="va-ledger-wallet-hint">
+                Shared company cash — same wallet the owner uses.
+              </p>
+            </div>
+            <div className="va-ledger-quality">
               <p className="aircraft-card-section-label" style={{ margin: 0 }}>
                 Flight quality
               </p>
-              <p className="settings-sample" style={{ margin: '0.2rem 0 0' }}>
-                <strong>
-                  {flightQuality?.qualityScore != null
-                    ? Math.round(flightQuality.qualityScore)
-                    : '—'}
-                </strong>
+              <p className="va-ledger-quality-value">
+                {flightQuality?.qualityScore != null
+                  ? Math.round(flightQuality.qualityScore)
+                  : '—'}
                 {flightQuality && flightQuality.flightCount > 0 ? (
                   <span className="muted">
                     {' '}

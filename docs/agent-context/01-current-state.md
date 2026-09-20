@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **4521ec4** / desktop **0.3.163** shipped: Add Line crew tiers and fix VA dual-tenant pilot location. Release: [v0.3.163](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.163).
+
+
 Local (ainda sem release desktop): **Line crew tiers** + **VA settle dual-tenant pilotIcao** + **My VA roster hub** (`At ICAO` per member). Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 `main` **6c391b2** / desktop **0.3.162** shipped: Watch world debrief payout (was $0), VA Ledger Member column (`actor_account_id`), En route after depart, plus pack brace fix. Release: [v0.3.162](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.162).

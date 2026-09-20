@@ -288,9 +288,15 @@ export function TerminalHubStatsPanel(props: {
   const [historyPage, setHistoryPage] = useState(0);
 
   const now = props.stats?.now;
+  // Live terminal list includes Jet-A; daily samples only store CAREER_CARGO
+  // commodities (fuel is jetAFill, not spotUsd) — History chips must match.
   const commodityOptions = useMemo(
     () => (now?.commodities ?? []).filter((c) => c.kind !== 'mro'),
     [now?.commodities],
+  );
+  const historyCommodityOptions = useMemo(
+    () => commodityOptions.filter((c) => c.kind !== 'fuel'),
+    [commodityOptions],
   );
 
   const history = useMemo(() => {
@@ -307,14 +313,14 @@ export function TerminalHubStatsPanel(props: {
   const resolvedCommodityId = useMemo(() => {
     if (
       commodityId &&
-      commodityOptions.some((c) => c.id === commodityId)
+      historyCommodityOptions.some((c) => c.id === commodityId)
     ) {
       return commodityId;
     }
-    return pickDefaultCommodityId(commodityOptions, history);
-  }, [commodityId, commodityOptions, history]);
+    return pickDefaultCommodityId(historyCommodityOptions, history);
+  }, [commodityId, historyCommodityOptions, history]);
 
-  const selectedCommodity = commodityOptions.find(
+  const selectedCommodity = historyCommodityOptions.find(
     (c) => c.id === resolvedCommodityId,
   );
 
@@ -547,7 +553,7 @@ export function TerminalHubStatsPanel(props: {
                   role="group"
                   aria-label="Commodity for spot history"
                 >
-                  {commodityOptions.map((c) => (
+                  {historyCommodityOptions.map((c) => (
                     <button
                       key={c.id}
                       type="button"

@@ -801,8 +801,9 @@ body {
 }
 
 .topbar-metrics .metric.world-clock {
-  /* Fits "World · next 15m 00s" / "World · pulse due" without width jumps. */
-  min-width: 11.5rem;
+  /* Fits "World · 15m 00s" / "World · pulse due" without width jumps. */
+  min-width: 9.25rem;
+  padding-inline: 0.5rem 0.55rem;
   font-variant-numeric: tabular-nums;
 }
 

@@ -1,5 +1,7 @@
 # MP presence + contested scarcity
 
+Atualizado 2026-09-20: **Online chip = accounts** — `onlineCount` contava `onlineByCompany.size` (cada membership: home + VA = 2 com 1 piloto). Fix: `onlineCount` = contas com session live; lista `online` continua por company. Tooltip: pilots ≤5 min.
+
 Atualizado 2026-09-19.
 
 ## Goal
@@ -11,7 +13,7 @@ Order: presence UI → online chip → aircraft pool F7 claim.
 
 ### Presence
 
-- `GET /api/world/presence` — `online` companies (auth sessions × memberships), `portsHeld`, `recent` ring (≤30).
+- `GET /api/world/presence` — `online` companies (auth sessions × memberships), `onlineCount` = **unique accounts** online, `portsHeld`, `recent` ring (≤30).
 - Topbar **Online** chip (MP/auth) — hover shows last 5 presence lines.
 - Port FBO chip: `Port FBO · P# · CompanyName` when `held` / you (via `companyDisplayName` on port snapshot).
 - Lot Accept / staging **409** `lot_claimed` includes `claimedByCompanyDisplayName` and a named error string.
@@ -37,4 +39,4 @@ Order: presence UI → online chip → aircraft pool F7 claim.
 1. Two MP companies: A claims Port FBO → B sees name on Ports chip + presence recent.
 2. A accepts a lot B soft-held → B gets `Lot claimed by <A name>`.
 3. Dual buy same listing → one 200, one 409 `aircraft_claimed`.
-4. Topbar Online ≥1 when a second session is live.
+4. Topbar Online = **1** when only one account has a live session (even if that pilot is in home + VA).

@@ -4647,12 +4647,14 @@ export function createCareerApiServer(port = 8787) {
             string,
             { companyId: string; displayName: string; lastSeenAtMs: number }
           >();
+          const onlineAccountIds = new Set<string>();
           if (store.supportsAuth) {
             const sessions = await Promise.resolve(
               store.authListSessions({ nowMs }),
             );
             for (const s of sessions) {
               if (!s.online) continue;
+              onlineAccountIds.add(s.accountId);
               const companies = await Promise.resolve(
                 store.authListCompaniesForAccount(s.accountId),
               );
@@ -4694,7 +4696,9 @@ export function createCareerApiServer(port = 8787) {
           send(res, 200, {
             nowMs,
             onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
-            onlineCount: onlineByCompany.size,
+            // Chip = pilots (accounts), not companies — one player with
+            // home + VA membership must not read as "2 online".
+            onlineCount: onlineAccountIds.size,
             online: [...onlineByCompany.values()].sort(
               (a, b) => b.lastSeenAtMs - a.lastSeenAtMs,
             ),

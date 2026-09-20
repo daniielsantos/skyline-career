@@ -5992,7 +5992,7 @@ export function App() {
       : `World · ${tickAdvance.done}/${tickAdvance.total}`
     : msUntilNextPulse <= 0
       ? 'World · pulse due'
-      : `World · next ${formatNextPulseCountdown(msUntilNextPulse)}`;
+      : `World · ${formatNextPulseCountdown(msUntilNextPulse)}`;
   // Stable title — a changing `title` every second makes native tooltips flicker.
   const worldClockTitle = tickAdvance
     ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} economy batches`
@@ -12695,7 +12695,7 @@ export function App() {
                     ? worldPresence.recent
                         .map((r) => `${r.companyDisplayName}: ${r.summary}`)
                         .join('\n')
-                    : 'Companies with a live session on this world'
+                    : 'Pilots with a live session on this world (last seen ≤5 min)'
                 }
               >
                 <span className="label">Online</span>

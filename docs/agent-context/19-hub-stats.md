@@ -1,5 +1,7 @@
 # Hub Stats + histórico econômico
 
+Atualizado 2026-09-20: **History Jet-A chip dead** — chips vinham de `now.commodities` (inclui fuel); samples diários só gravam `CAREER_CARGO_COMMODITIES` (fuel fica em `jetAFill`, sem `spotUsd`). Sintoma: “No spot samples for Jet-A fuel…”. Fix: History chips excluem `kind === 'fuel'`; Terminal inventory continua mostrando Jet-A live.
+
 Atualizado 2026-08-31: **Pulse lenses** — World/BR/US/Spoke; Spoke dead (0 lots) + Quiet N absolutos; sparklines seguem a lente.
 
 Atualizado 2026-08-31: **Retenção samples 90d** — `HUB_ECONOMY_SAMPLE_RETENTION_DAYS=90`; Pulse toggle **90d**. Stats hub continua 7d/30d.
@@ -32,7 +34,7 @@ Atualizado 2026-08-31: **Network history pulse** — agrega `hub_economy_samples
 
 - **Terminal inventory:** fill % + spot do inventário do **hub** (`airport.inventory`) — mesmo tipo de dado que a aba Inventory do terminal, não o Warehouse do jogador.
 - **Board outbound:** lots saindo + pay p50 + size mix + soft-fill + Jet-A; hub level/quiet no head.
-- **Histórico (ICAO):** 1 amostra/dia/hub; toggle **7d / 30d**; tendência de **spotUsd por commodity**; tabela (lots / pay p50 / fill / spot / quiet).
+- **Histórico (ICAO):** 1 amostra/dia/hub; toggle **7d / 30d**; tendência de **spotUsd por commodity de carga** (sem Jet-A / MRO — samples não gravam spot de fuel); tabela (lots / pay p50 / fill / spot / quiet).
 - **Economy pulse (dev):** série diária global a partir das **mesmas** rows — tab **Pulse** (`/pulse`, Dev Mode). Stats do jogador não mostra o card de rede.
 - **Não** fica em `economy_json` / só-RAM. Sem Recharts/d3 — SVG hand-rolled.
 

@@ -1446,6 +1446,11 @@ export function formatClientUpdateRequiredLabel(minClientVersion: string): strin
   return `Update required · v${minClientVersion}+`;
 }
 
+/** Short board CTA when world force-update is on. */
+export function formatClientUpdateCtaLabel(): string {
+  return 'Update app';
+}
+
 /** Compare health policy to this desktop build; null when Prepare/accept allowed. */
 export async function resolveClientUpdateBlock(
   policy: CareerHealth['clientUpdatePolicy'] | undefined,
@@ -3995,6 +4000,7 @@ export function postFerry(opts: {
 export function postEmptyFlight(opts: {
   aircraftId: string;
   destIcao: string;
+  companyId?: string;
 }) {
   return api<{
     mission: Mission;
@@ -4758,7 +4764,7 @@ export function postPreflight(opts: {
   });
 }
 
-export function postSettle(opts: { missionId: string }) {
+export function postSettle(opts: { missionId: string; companyId?: string }) {
   return api<{
     mission: Mission;
     walletUsd: number;

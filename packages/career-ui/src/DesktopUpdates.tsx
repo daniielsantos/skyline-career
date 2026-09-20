@@ -197,7 +197,7 @@ function applyUpdateEvent(ev: DesktopUpdateEvent) {
   }
 }
 
-async function runUpdateCheck(opts?: { force?: boolean }): Promise<void> {
+export async function runUpdateCheck(opts?: { force?: boolean }): Promise<void> {
   const desktop = getDesktop();
   if (!desktop) return;
   const force = opts?.force === true;
@@ -317,7 +317,10 @@ export function useDesktopUpdateState(): DesktopUpdateState {
   );
 }
 
-export function desktopUpdateHeaderLabel(state: DesktopUpdateState): string | null {
+export function desktopUpdateHeaderLabel(
+  state: DesktopUpdateState,
+  opts?: { forceMinClientVersion?: string | null },
+): string | null {
   if (state.status === 'downloading') {
     return `Downloading ${state.progressPct.toFixed(0)}%`;
   }
@@ -330,6 +333,8 @@ export function desktopUpdateHeaderLabel(state: DesktopUpdateState): string | nu
   if (state.status === 'error' && state.remoteVersion) {
     return `Update ${state.remoteVersion}`;
   }
+  const force = opts?.forceMinClientVersion?.trim().replace(/^v/i, '') || '';
+  if (force) return `Update ${force}`;
   return null;
 }
 
@@ -473,53 +478,51 @@ export function DesktopUpdatesCard() {
 /**
  * Topbar control: check on shell entry (login), long-poll thereafter.
  * Click downloads with in-button progress, then installs — no Settings hop.
+ * World kill switch (`forceMinClientVersion`) keeps this same chip visible even
+ * before electron-updater reports a package.
  */
-export function DesktopUpdateHeaderButton() {
+export function DesktopUpdateHeaderButton(props: {
+  forceMinClientVersion?: string | null;
+  onOpenSettings?: () => void;
+}) {
   const desktop = getDesktop();
   const state = useDesktopUpdateState();
   const [actionError, setActionError] = useState<string | null>(null);
+  const forceMin =
+    props.forceMinClientVersion?.trim().replace(/^v/i, '') || null;
 
   useEffect(() => {
-    // ensure bridge + login check even if Settings card never mounts
     ensureDesktopUpdateBridge();
   }, []);
 
+  useEffect(() => {
+    if (!forceMin || !desktop) return;
+    void runUpdateCheck({ force: true });
+  }, [forceMin, desktop]);
+
   if (!desktop) return null;
 
-  const label = desktopUpdateHeaderLabel(state);
-  if (!label && state.status !== 'checking') return null;
-  // Hide quiet "checking" so the bar does not flash on every poll.
+  const label = desktopUpdateHeaderLabel(state, {
+    forceMinClientVersion: forceMin,
+  });
   if (!label) return null;
 
   const downloading = state.status === 'downloading';
   const ready = state.status === 'ready';
+  const canDownload =
+    state.status === 'available' ||
+    (state.status === 'error' && Boolean(state.remoteVersion));
   const title = downloading
     ? `Downloading ${state.remoteVersion ?? 'update'}… ${state.progressPct.toFixed(0)}%`
     : ready
       ? `Version ${state.remoteVersion} downloaded — click to install (SmartScreen → Run anyway, then watch the installer)`
-      : `Version ${state.remoteVersion} available — click to download and install`;
+      : canDownload
+        ? `Version ${state.remoteVersion} available — click to download and install`
+        : forceMin
+          ? `Desktop update required · v${forceMin}+ — click to check for the installer`
+          : `Version ${state.remoteVersion} available — click to download and install`;
 
-  async function onClick() {
-    setActionError(null);
-    if (ready) {
-      patchStore({ busy: true });
-      try {
-        const result = await desktop!.quitAndInstall();
-        if (!result.ok) {
-          patchStore({ busy: false });
-          if (result.reason && result.reason !== 'cancelled') {
-            setActionError(result.reason);
-            patchStore({ status: 'error', error: result.reason });
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setActionError(message);
-        patchStore({ busy: false, status: 'error', error: message });
-      }
-      return;
-    }
-    if (downloading || state.busy) return;
+  async function startDownload() {
     patchStore({
       busy: true,
       error: null,
@@ -542,6 +545,44 @@ export function DesktopUpdateHeaderButton() {
         patchStore({ busy: false });
       }
     }
+  }
+
+  async function onClick() {
+    setActionError(null);
+    if (ready) {
+      patchStore({ busy: true });
+      try {
+        const result = await desktop!.quitAndInstall();
+        if (!result.ok) {
+          patchStore({ busy: false });
+          if (result.reason && result.reason !== 'cancelled') {
+            setActionError(result.reason);
+            patchStore({ status: 'error', error: result.reason });
+          }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setActionError(message);
+        patchStore({ busy: false, status: 'error', error: message });
+      }
+      return;
+    }
+    if (downloading || state.busy) return;
+    if (canDownload) {
+      await startDownload();
+      return;
+    }
+    if (forceMin) {
+      await runUpdateCheck({ force: true });
+      const snap = getDesktopUpdateSnapshot();
+      if (snap.status === 'available' || Boolean(snap.remoteVersion)) {
+        await startDownload();
+        return;
+      }
+      props.onOpenSettings?.();
+      return;
+    }
+    await startDownload();
   }
 
   return (

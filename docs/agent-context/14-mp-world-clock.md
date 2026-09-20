@@ -488,7 +488,7 @@ Mesmo world no host. Cada UI **register/login** (companies distintas). Accept em
 
 ## Client update kill switch (ops)
 
-Rare critical-only gate. App still opens; **Prepare / Accept / Fly now** refuse until desktop ≥ `minClientVersion`.
+App still opens; **Prepare / Accept / Fly now** refuse until desktop ≥ `minClientVersion`. The same topbar updater chip shows (**Update X.Y.Z**) while force is on (and nudges electron-updater); board CTAs read **Update app**.
 
 Policy lives on typed `economy_meta` columns (schema **v29**; no longer `misc_json`):
 
@@ -514,7 +514,7 @@ World API reads the columns live on `/api/health` and on accept paths → **426*
 
 **Until that persist fix is deployed:** stop world-api → run the `UPDATE` → start world-api (load hydrates RAM). A live `UPDATE` while the API is up gets clobbered on the next economy save.
 
-**Gated surfaces** (UI CTA → Settings → Updates; Hold at WH stays allowed):
+**Gated surfaces** (CTA **Update app** + topbar **Update** chip → download/Settings; Hold at WH stays allowed):
 
 | Surface | API |
 | --- | --- |

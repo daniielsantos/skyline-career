@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   fetchCharters,
+  formatClientUpdateCtaLabel,
   type CharterOfferView,
   type PlayerAircraft,
 } from './api';
@@ -601,7 +602,7 @@ export function CharterBoard(props: CharterBoardProps) {
                             props.onPrepare(offer, aircraftId);
                           }}
                         >
-                          {updateBlocked ? 'Update' : 'Prepare'}
+                          {updateBlocked ? formatClientUpdateCtaLabel() : 'Prepare'}
                         </button>
                       </td>
                     </tr>

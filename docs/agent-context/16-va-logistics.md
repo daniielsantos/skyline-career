@@ -497,6 +497,34 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** /api/va/members devolvia membership puro; UI não tinha coluna de status.
 **Fix:** enrich members com uthListSessions → online/lastSeenAtMs (AUTH_ONLINE_WINDOW_MS) + melhor missão VA ativa do piloto (ccepted/dispatched/in_flight); row com Online/Offline + last seen + flight line; soft-poll 30s na aba Roster.
 
+### Audit: VA-tail flight loop (2026-09-20)
+
+**Verdict:** **ready with caveats** — Freights/Charter/Demand/Bridge/Haul + cut + reserve + tenant pin are wired; a few dual-tenant UI/API edges remain.
+
+| Step | Expected | Status |
+|--|--|--|
+| Prepare picker | Yours+VA; hide reserved-by-other | PASS (`ops-fleet` + filter) |
+| Accept / staging commit | `companyId` = VA; stamp `pilotHomeCompanyId`; auto-reserve; pin VA while Dispatch active | PASS |
+| Charter accept | same | PASS |
+| Ports Demand/Bridge/Haul | `resolveOpsCompanyId` on accept/dispatch | PASS |
+| Ferry POST | `companyId` ops | PASS |
+| Ferry plan GET | `companyId` for VA tail while chrome home | PASS in tree (needs ship) — was `Unknown aircraft` |
+| Empty flight | VA tail + companyId | PASS (`companyId` + pin + vaSession paint) |
+| Base Dispatcher | home-only | PASS (by design) |
+| Settle pay | VA +payout −fuel −cut%; cut → home `va_member_cut` | PASS (`applySettleWalletDeltas` + second write) |
+| Settle XP | cargo/class ops → home when dual-tenant | PASS |
+| Settle UI | restore home after; don’t clobber home fleet | PASS (`vaSessionFleet` + home restore; Watch too) |
+| Reserve | 1/member swap; 4h TTL; in-flight release blocked | PASS |
+| Config cut | 10–50%, default 30%; directory visible | PASS |
+| Owner on own VA | no cut (`pilotHome === ops`) | PASS |
+
+**Severity gaps**
+1. ~~**Empty flight**~~ **fixed** — `companyId` + pin VA + paint `vaSession*` (same pattern as ferry/Accept).
+2. ~~**Settle `setFleet`**~~ **fixed** — VA settle paints `vaSessionFleet`; home chrome untouched; Watch auto-settle restores home before refresh.
+3. ~~**postSettle** body `companyId`~~ **fixed** — ops company from mission aircraft / active pin.
+
+**Not live-smoked here:** end-to-end member Freights settle wallet math on prod; two members racing same tail.
+
 ### Prepare VA fleet vanish after My VA (2026-09-20)
 
 **Sintoma:** membro no Manifest só via "Yours"; Hangar My VA tinha cascos (sem reserve).

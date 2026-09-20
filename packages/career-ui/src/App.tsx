@@ -136,6 +136,7 @@ import {
   fetchCareerHealth,
   resolveClientUpdateBlock,
   formatClientUpdateRequiredLabel,
+  formatClientUpdateCtaLabel,
   getCareerClientVersion,
   type ClientUpdateBlock,
 } from './api';
@@ -5599,20 +5600,31 @@ export function App() {
                 );
               }
               goToTab('staging');
-              void refresh()
-                .catch(() => {
+              void (async () => {
+                const home = homeCompanyIdRef.current?.trim();
+                if (
+                  home &&
+                  activeCompanyIdRef.current &&
+                  home !== activeCompanyIdRef.current
+                ) {
+                  try {
+                    await switchCompanyForVa(home);
+                  } catch {
+                    /* soft */
+                  }
+                }
+                await refresh().catch(() => {
                   /* ignore */
-                })
-                .then(() =>
-                  postBaseDispatchTours({ action: 'status' })
-                    .then((r) => {
-                      setActiveTour(r.activeTour ?? null);
-                      if (r.playerFbos) setPlayerFbos(r.playerFbos);
-                    })
-                    .catch(() => {
-                      /* ignore */
-                    }),
-                );
+                });
+                await postBaseDispatchTours({ action: 'status' })
+                  .then((r) => {
+                    setActiveTour(r.activeTour ?? null);
+                    if (r.playerFbos) setPlayerFbos(r.playerFbos);
+                  })
+                  .catch(() => {
+                    /* ignore */
+                  });
+              })();
             });
           }
           // Skip no-op updates so the sticky footer doesn't re-render every poll
@@ -9708,9 +9720,25 @@ export function App() {
     if (!destIcao.trim()) return;
     const dest = destIcao.trim().toUpperCase();
     await run(async () => {
-      const result = await postEmptyFlight({ aircraftId, destIcao: dest });
-      if (result.fleet) setFleet(result.fleet);
-      commitWallet(result.walletUsd);
+      const opsCompanyId = resolveOpsCompanyId(aircraftId);
+      const vaOps =
+        Boolean(memberVaCompanyIdRef.current) &&
+        opsCompanyId === memberVaCompanyIdRef.current;
+      // Pin VA for Dispatch while chrome stays home-sticky.
+      if (vaOps && memberVaCompanyIdRef.current) {
+        await switchCompanyForVa(memberVaCompanyIdRef.current);
+      }
+      const result = await postEmptyFlight({
+        aircraftId,
+        destIcao: dest,
+        companyId: opsCompanyId,
+      });
+      if (result.fleet) {
+        if (vaOps) setVaSessionFleet(result.fleet);
+        else setFleet(result.fleet);
+      }
+      if (vaOps) setVaSessionWallet(result.walletUsd);
+      else commitWallet(result.walletUsd);
       setMissions((prev) => {
         const others = prev.filter((m) => m.id !== result.mission.id);
         return [...others, result.mission];
@@ -11286,8 +11314,19 @@ export function App() {
     });
     if (!ok) return;
     await run(async () => {
-      const result = await postSettle({ missionId: mission.id });
-      if (Array.isArray(result.fleet)) setFleet(result.fleet);
+      const home = homeCompanyIdRef.current?.trim();
+      const active = activeCompanyIdRef.current?.trim();
+      const settlingVa = Boolean(home && active && home !== active);
+      const opsCompanyId =
+        resolveOpsCompanyId(mission.aircraftId) || active || home || undefined;
+      const result = await postSettle({
+        missionId: mission.id,
+        companyId: opsCompanyId,
+      });
+      if (Array.isArray(result.fleet)) {
+        if (settlingVa) setVaSessionFleet(result.fleet);
+        else setFleet(result.fleet);
+      }
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
       if (result.activeTour !== undefined) {
@@ -11311,12 +11350,7 @@ export function App() {
       setSettleOverlaySticky(false);
       setStaging(null);
       // After VA ops flight, restore home tenant for chrome boards.
-      const home = homeCompanyIdRef.current?.trim();
-      if (
-        home &&
-        activeCompanyIdRef.current &&
-        home !== activeCompanyIdRef.current
-      ) {
+      if (settlingVa && home) {
         try {
           await switchCompanyForVa(home);
         } catch {
@@ -12837,7 +12871,12 @@ export function App() {
             <h1>
               {pageTitle}
               {pageHelp ? <PageHelpButton help={pageHelp} /> : null}
-              <DesktopUpdateHeaderButton />
+              <DesktopUpdateHeaderButton
+                forceMinClientVersion={
+                  clientUpdateBlock?.minClientVersion ?? null
+                }
+                onOpenSettings={() => selectTab('settings')}
+              />
             </h1>
             <p className="lede">
               {pageLede}
@@ -14508,7 +14547,7 @@ export function App() {
                                                       }}
                                                     >
                                                       {clientUpdateBlock
-                                                        ? 'Update'
+                                                        ? formatClientUpdateCtaLabel()
                                                         : tour.legCount === 1
                                                           ? 'Accept'
                                                           : 'Accept L1'}
@@ -14956,7 +14995,7 @@ export function App() {
                                                       }}
                                                     >
                                                       {clientUpdateBlock
-                                                        ? 'Update'
+                                                        ? formatClientUpdateCtaLabel()
                                                         : tour.legCount === 1
                                                           ? 'Accept'
                                                           : 'Accept L1'}
@@ -16386,7 +16425,7 @@ export function App() {
                                     }
                                   >
                                     {clientUpdateBlock
-                                      ? 'Update'
+                                      ? formatClientUpdateCtaLabel()
                                       : cargoLocked
                                       ? 'Locked'
                                       : playerDispatchMission
@@ -17370,7 +17409,7 @@ export function App() {
                         }
                       >
                         {clientUpdateBlock
-                          ? 'Update'
+                          ? formatClientUpdateCtaLabel()
                           : cargoLocked
                           ? 'Locked'
                           : playerDispatchMission

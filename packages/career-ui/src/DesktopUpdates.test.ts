@@ -57,6 +57,22 @@ describe('desktopUpdateHeaderLabel', () => {
   it('uses a long poll interval (30 minutes)', () => {
     assert.equal(DESKTOP_UPDATE_POLL_MS, 30 * 60 * 1000);
   });
+
+  it('shows force-min label when updater is idle', () => {
+    assert.equal(
+      desktopUpdateHeaderLabel(state({ status: 'idle' }), {
+        forceMinClientVersion: '0.3.155',
+      }),
+      'Update 0.3.155',
+    );
+    assert.equal(
+      desktopUpdateHeaderLabel(
+        state({ status: 'available', remoteVersion: '0.3.156' }),
+        { forceMinClientVersion: '0.3.155' },
+      ),
+      'Update 0.3.156',
+    );
+  });
 });
 
 describe('clampDesktopUpdateProgressPct', () => {

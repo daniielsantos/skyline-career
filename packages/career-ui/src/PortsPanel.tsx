@@ -4,6 +4,7 @@ import {
   fetchWarehouses,
   fetchCargoLimit,
   formatClientUpdateRequiredLabel,
+  formatClientUpdateCtaLabel,
   postDemandAccept,
   postDemandHold,
   postDemandHoldCancel,
@@ -6552,7 +6553,7 @@ function DemandAcceptDialog(props: {
               }
               onClick={props.onConfirmFly}
             >
-              {updateBlocked ? 'Update' : 'Fly now'}
+              {updateBlocked ? formatClientUpdateCtaLabel() : 'Fly now'}
             </button>
           )}
         </div>
@@ -6752,7 +6753,7 @@ function DemandDispatchHoldDialog(props: {
             onClick={props.onConfirm}
           >
             {updateBlocked
-              ? 'Update'
+              ? formatClientUpdateCtaLabel()
               : props.mode === 'shuttle' && isBridge
                 ? 'Launch shuttle'
                 : 'Fly now'}
@@ -7008,7 +7009,7 @@ function WarehouseBridgeDialog(props: {
             onClick={props.onConfirm}
           >
             {updateBlocked
-              ? 'Update'
+              ? formatClientUpdateCtaLabel()
               : props.mode === 'hold'
                 ? 'Hold'
                 : 'Fly now'}
@@ -7291,7 +7292,7 @@ function WarehouseHaulDialog(props: {
             onClick={props.onConfirm}
           >
             {updateBlocked
-              ? 'Update'
+              ? formatClientUpdateCtaLabel()
               : props.mode === 'hold'
                 ? 'Hold'
                 : 'Fly now'}

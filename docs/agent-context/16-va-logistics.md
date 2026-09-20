@@ -561,6 +561,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** resposta de ferry/commit VA pintava `setFleet` (chrome home) quando o merge home-first marcava o id como Yours → Accept usava company home.
 **Fix:** `buildOpsFleet` prioriza ids da VA session; `resolveOpsCompanyId` consulta `vaSessionFleet`; `paintOpsMutationFleet` nunca grava frota VA em `fleet`; refresh home filtra ghosts VA.
 
+### VA Duke Manifest max ~0.9 klb then jumps after Accept (2026-09-20)
+
+**Sintoma:** Manifest cap 0.9 klb no Duke VA; pós-Accept barra vai 1.5 → 2.6 klb; Accept lento.
+**Causa:** `refreshCargoLimit` / Dispatch só olhavam `fleet` home → sem `airframeTypeId` do Duke; `/api/cargo-limit` usava chrome home + vários `withCareerRead` (fila do pulse). Genérico `light_ga` ≈ fallback 450 kg / ~0.9 klb.
+**Fix:** resolver airframe + `companyId` via opsFleet; cargo-limit query `companyId` + `withCareerPeekRead`; structural Dispatch usa `opsFleet`.
+
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 
 **Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.

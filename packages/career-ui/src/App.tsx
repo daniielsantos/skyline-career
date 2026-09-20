@@ -4807,6 +4807,7 @@ export function App() {
         originIcao?: string;
         destIcao?: string;
         aircraftId?: string;
+        companyId?: string;
       },
     ) => {
       const requestGen = ++cargoLimitRequestGenRef.current;
@@ -4820,6 +4821,7 @@ export function App() {
             originIcao: route?.originIcao,
             destIcao: route?.destIcao,
             aircraftId: route?.aircraftId,
+            companyId: route?.companyId,
           },
         );
         if (requestGen !== cargoLimitRequestGenRef.current) return;
@@ -5322,15 +5324,20 @@ export function App() {
     if (!staging) {
       return;
     }
+    const opsEntry = findOpsEntry(opsFleetEntries, staging.aircraftId);
+    const typeId =
+      opsEntry?.aircraft.airframeTypeId?.trim() ||
+      fleet.find((aircraft) => aircraft.id === staging.aircraftId)
+        ?.airframeTypeId;
     void refreshCargoLimit(
       staging.aircraft,
       stagingRouteDistanceNm(staging),
-      fleet.find((aircraft) => aircraft.id === staging.aircraftId)
-        ?.airframeTypeId,
+      typeId,
       {
         originIcao: staging.originIcao,
         destIcao: staging.destIcao,
         aircraftId: staging.aircraftId,
+        companyId: resolveOpsCompanyId(staging.aircraftId),
       },
     );
   }, [
@@ -5340,6 +5347,7 @@ export function App() {
     staging?.destIcao,
     staging?.lines[0]?.lot.distanceNm,
     fleet,
+    opsFleetEntries,
     refreshCargoLimit,
   ]);
 
@@ -6320,8 +6328,13 @@ export function App() {
   useEffect(() => {
     if (staging) return;
     if (tab === 'staging' && activeMission) {
+      const opsEntry = findOpsEntry(
+        opsFleetEntries,
+        activeMission.aircraftId,
+      );
       const typeId =
         activeMission.airframeTypeId?.trim() ||
+        opsEntry?.aircraft.airframeTypeId?.trim() ||
         fleet.find((a) => a.id === activeMission.aircraftId)?.airframeTypeId
           ?.trim();
       void refreshCargoLimit(
@@ -6332,6 +6345,7 @@ export function App() {
           originIcao: activeMission.originIcao,
           destIcao: activeMission.destIcao,
           aircraftId: activeMission.aircraftId,
+          companyId: resolveOpsCompanyId(activeMission.aircraftId),
         },
       );
       return;
@@ -6358,6 +6372,7 @@ export function App() {
     activeMission?.originIcao,
     activeMission?.destIcao,
     fleet,
+    opsFleetEntries,
     refreshCargoLimit,
     staging,
     tab,
@@ -6366,9 +6381,10 @@ export function App() {
   const activeMissionMxFuelBurn = useMemo(
     () =>
       mxFuelBurnFromAircraft(
-        fleet.find((a) => a.id === activeMission?.aircraftId),
+        findOpsEntry(opsFleetEntries, activeMission?.aircraftId)?.aircraft ??
+          fleet.find((a) => a.id === activeMission?.aircraftId),
       ),
-    [fleet, activeMission?.aircraftId],
+    [opsFleetEntries, fleet, activeMission?.aircraftId],
   );
   /** Active Tour context while a tour leg is the current Dispatch flight. */
   const activeTourOnDispatch = useMemo(() => {
@@ -18579,7 +18595,7 @@ export function App() {
               missionMaxCargoKg={(mission) =>
                 resolveMissionStructuralMaxCargoKg(
                   mission,
-                  fleet,
+                  opsFleet,
                   airframePerf,
                   structuralMaxCargoKg,
                   activeMission?.id,

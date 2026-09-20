@@ -1874,11 +1874,14 @@ export function fetchCargoLimit(
     originIcao?: string;
     destIcao?: string;
     aircraftId?: string;
+    /** Dual-tenant: VA tail while chrome is on home. */
+    companyId?: string;
   } = {},
 ) {
   const qs = new URLSearchParams({ aircraft });
   if (airframeTypeId) qs.set('airframe', airframeTypeId);
   if (opts.aircraftId?.trim()) qs.set('aircraftId', opts.aircraftId.trim());
+  if (opts.companyId?.trim()) qs.set('companyId', opts.companyId.trim());
   if (distanceNm !== undefined && Number.isFinite(distanceNm)) {
     qs.set('distanceNm', String(distanceNm));
   }

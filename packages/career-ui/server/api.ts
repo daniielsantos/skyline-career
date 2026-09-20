@@ -6778,7 +6778,10 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/cargo-limit') {
-        const cargo_limitCompanyId = companyIdFromRequest(req);
+        const cargo_limitCompanyId = companyIdFromRequest(
+          req,
+          url.searchParams.get('companyId'),
+        );
 
         const aircraftRaw = url.searchParams.get('aircraft') ?? undefined;
         const aircraft = parseFreighterClassId(aircraftRaw ?? undefined);
@@ -6792,10 +6795,14 @@ export function createCareerApiServer(port = 8787) {
         const destIcao = url.searchParams.get('dest')?.trim().toUpperCase();
         let airframeTypeId = airframeTypeIdRaw?.trim() || undefined;
         if (!airframeTypeId && aircraftId) {
-          airframeTypeId = await withCareerRead((_world, missions) => {
-            const acf = missions.fleet.find((a) => a.id === aircraftId);
-            return acf?.airframeTypeId?.trim() || undefined;
-          }, { companyId: cargo_limitCompanyId });
+          try {
+            airframeTypeId = await withCareerPeekRead((_world, missions) => {
+              const acf = missions.fleet.find((a) => a.id === aircraftId);
+              return acf?.airframeTypeId?.trim() || undefined;
+            }, { companyId: cargo_limitCompanyId });
+          } catch {
+            airframeTypeId = undefined;
+          }
         }
         const cargoLimit = await resolveClassMaxCargoKg(
           aircraft,
@@ -6818,15 +6825,19 @@ export function createCareerApiServer(port = 8787) {
           destIcao &&
           originIcao !== destIcao
         ) {
-          distanceNm = await withCareerRead((world) =>
-            routeDistanceNm(world, originIcao, destIcao),
-          );
+          try {
+            distanceNm = await withCareerPeekRead((world) =>
+              routeDistanceNm(world, originIcao, destIcao),
+            );
+          } catch {
+            distanceNm = undefined;
+          }
         }
         const mxBurn = aircraftId
-          ? await withCareerRead((_world, missions) => {
+          ? await withCareerPeekRead((_world, missions) => {
               const acf = missions.fleet.find((a) => a.id === aircraftId);
               return acf ? fuelBurnMultFromAircraft(acf) : null;
-            }, { companyId: cargo_limitCompanyId })
+            }, { companyId: cargo_limitCompanyId }).catch(() => null)
           : null;
         // Hard tank/range gate uses healthy burn — MX only advises, never blocks.
         const routeLimit =
@@ -6863,7 +6874,7 @@ export function createCareerApiServer(port = 8787) {
           blockFuelKg > 0
         ) {
           try {
-            const fuelQuote = await withCareerRead((world, missions) =>
+            const fuelQuote = await withCareerPeekRead((world, missions) =>
               quoteFuelUplift(world, {
                 originIcao,
                 destIcao: destIcao || undefined,

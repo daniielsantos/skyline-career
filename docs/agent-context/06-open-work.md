@@ -891,11 +891,16 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 
 ## Handoff para chat novo
 
-Mensagem sugerida:
+Mensagem sugerida (2026-09-20 · pós **0.3.162**):
 
-> Continua Skyline Career. Lê `@docs/agent-context/project-overview.md`, `@docs/agent-context/README.md` e `@docs/agent-context/00-constraints.md`. Desktop shipped **0.3.47**; `main` @ **62b8ea9** tem Market ATR/Titan/Corvalis + BBJ2 off. Problema atual: …
+> Continua Skyline Career / Airframe. Lê `@AGENTS.md`, `@docs/agent-context/project-overview.md`, `@docs/agent-context/00-constraints.md`, `@docs/agent-context/01-current-state.md`. Desktop **0.3.162** / `main` **9c34be2**. Spec VA: `@docs/agent-context/16-va-logistics.md`. Host/Watch: `@docs/agent-context/03-simbridge-host.md`.
+>
+> Ship recente: (1) Watch world auto-settle debrief mostrava Payout **$0** — bug em `watch-helpers` após `worldMutations.settleFlight` (hardcode); wallet ok. (2) VA Ledger coluna **Member** — `actor_account_id` SQLite v18 / PG v30; ambient session; System kinds. (3) En route após depart — status otimista. (4) 0.3.161 — Dispatch fuel/Accept peeks sem world lock.
+>
+> **Pendente:** deploy **world** (PG v30) se Member column em prod; smoke debrief payout após update; Line crew tiers (design only).
 
 ### Market homologation (2026-08-21) — feito em `main`
+
 
 - SKUs: `microsoft-atr-72-600`, `microsoft-atr-42-600`, `microsoft-404-titan`, `microsoft-c400-corvalis`.
 - Família ATR: um pack OFP + `matchTitlePattern`; fingerprint `stol`/`highline`.

@@ -497,6 +497,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** /api/va/members devolvia membership puro; UI não tinha coluna de status.
 **Fix:** enrich members com uthListSessions → online/lastSeenAtMs (AUTH_ONLINE_WINDOW_MS) + melhor missão VA ativa do piloto (ccepted/dispatched/in_flight); row com Online/Offline + last seen + flight line; soft-poll 30s na aba Roster.
 
+### Prepare VA fleet vanish after My VA (2026-09-20)
+
+**Sintoma:** membro no Manifest só via "Yours"; Hangar My VA tinha cascos (sem reserve).
+**Causa:** `switchCompanyForVa(home)` limpava `vaSessionFleet` ao sair do My VA; prefetch de `/api/va/members` não re-rodava — `opsFleet` ficava só home.
+**Fix:** ao voltar home, manter `vaSessionFleet`/`vaSessionWallet` (chrome Hangar continua em `fleet`); prefetch também reage a `authSessionEpoch` / `homeCompanyId`.
+
 ### Prepare picker + Accept auto-reserve (2026-09-20)
 
 **Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.
@@ -537,6 +543,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Roster presence** — online / last seen / flight na row
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **Prepare filter reserved + Accept auto-reserve** — picker esconde hold alheio; assign grava reserve
+- [x] **Prepare VA fleet after My VA** — não limpar vaSessionFleet ao voltar home
 - [x] **VA home_country_id on publish** — derive from hub + backfill
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Line crew allowance retune** — piso 4, 2×parked, cap 16 (2026-09-20)

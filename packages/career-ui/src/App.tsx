@@ -4227,6 +4227,7 @@ export function App() {
         } else {
           setMemberVaCompanyId(null);
           setMemberVaIsOwner(false);
+          setVaSessionFleet([]);
         }
       } catch {
         if (!cancelled) {
@@ -4238,7 +4239,14 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [careerStateReady, showProfileGate, showAuthGate, authRequired]);
+  }, [
+    careerStateReady,
+    showProfileGate,
+    showAuthGate,
+    authRequired,
+    authSessionEpoch,
+    homeCompanyId,
+  ]);
 
   useEffect(() => {
     if (!selectedFboHoldId) return;
@@ -7669,9 +7677,10 @@ export function App() {
     setActiveCompanyId(id);
     setActiveCompanyIdForRequests(id);
     if (switchingToHome) {
-      setVaSessionWallet(null);
-      setVaSessionFleet([]);
-      // Soft refresh paints home chrome; callers often refresh right after.
+      // Keep vaSessionFleet / wallet — Prepare opsFleet needs VA tails while
+      // chrome Hangar stays on home `fleet`. Clearing here left members with
+      // only "Yours" after visiting My VA.
+      return;
     }
     // Hangar/wallet for VA pin already painted from /api/va/members.
     // Do not await /api/state — withCareerRead queues behind world pulse.

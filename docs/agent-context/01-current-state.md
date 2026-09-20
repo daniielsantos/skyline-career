@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **f4e7fab** / desktop **0.3.153** shipped: Keep VA fleet in Prepare pickers after leaving My VA. Release: [v0.3.153](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.153).
+
+
 `main` **696ff07** / desktop **0.3.152** shipped: Add dual-tenant Prepare fleet and tighten VA reserve plus update gates. Release: [v0.3.152](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.152).
 
 

@@ -3515,7 +3515,10 @@ export function App() {
     if (typeof next !== 'number' || !Number.isFinite(next)) return;
     // Chrome sticky: never paint home wallet from a VA-tenant response.
     const home = homeCompanyIdRef.current?.trim();
-    const active = activeCompanyIdRef.current?.trim();
+    // Prefer live request tenant (URL/memory) — ref can lag one tick behind setState.
+    const active =
+      getStoredCompanyId()?.trim() ||
+      activeCompanyIdRef.current?.trim();
     if (home && active && home !== active) {
       setVaSessionWallet(next);
       return;
@@ -3536,7 +3539,9 @@ export function App() {
   const commitWallet = useCallback((next: number) => {
     if (!Number.isFinite(next)) return;
     const home = homeCompanyIdRef.current?.trim();
-    const active = activeCompanyIdRef.current?.trim();
+    const active =
+      getStoredCompanyId()?.trim() ||
+      activeCompanyIdRef.current?.trim();
     if (home && active && home !== active) {
       setVaSessionWallet(next);
       return;
@@ -4316,7 +4321,9 @@ export function App() {
       setActiveBushTrip(data.active ?? null);
       if (Array.isArray(data.fleet)) {
         const home = homeCompanyIdRef.current?.trim();
-        const active = activeCompanyIdRef.current?.trim();
+        const active =
+          getStoredCompanyId()?.trim() ||
+          activeCompanyIdRef.current?.trim();
         if (!home || !active || home === active) {
           setFleet(data.fleet);
         } else {
@@ -4400,6 +4407,7 @@ export function App() {
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
     if (stateCompanyId && tenantMatches) {
+      activeCompanyIdRef.current = stateCompanyId;
       setActiveCompanyId(stateCompanyId);
       setActiveCompanyIdForRequests(stateCompanyId);
       // Persist only when the tab is not pinned by ?company= (shared storage).
@@ -7461,6 +7469,7 @@ export function App() {
     }
     await postCompanySessionOpen({ companyId });
     setCompanies(listed.companies);
+    activeCompanyIdRef.current = companyId;
     setActiveCompanyId(companyId);
     setActiveCompanyIdForRequests(companyId);
     return companyId;
@@ -7515,6 +7524,10 @@ export function App() {
       /* ignore */
     }
     await postCompanySessionOpen({ companyId: id });
+    // Sync ref immediately — sticky wallet/fleet must not wait for React render.
+    // Otherwise onWallet/refresh right after switch still see the old tenant and
+    // paint VA cash onto chrome (or home cash into vaSession).
+    activeCompanyIdRef.current = id;
     setActiveCompanyId(id);
     setActiveCompanyIdForRequests(id);
     if (switchingToHome) {
@@ -7647,6 +7660,7 @@ export function App() {
       } catch {
         /* ignore */
       }
+      activeCompanyIdRef.current = homeId;
       setActiveCompanyId(homeId);
       setActiveCompanyIdForRequests(homeId);
       setCompanies(
@@ -18691,7 +18705,9 @@ export function App() {
             // Always cache VA wallet for My VA panes.
             setVaSessionWallet(usd);
             const home = homeCompanyIdRef.current?.trim();
-            const active = activeCompanyIdRef.current?.trim();
+            const active =
+              getStoredCompanyId()?.trim() ||
+              activeCompanyIdRef.current?.trim();
             // Member dual-tenant pin: never overwrite chrome home wallet.
             if (home && active && home !== active) return;
             commitWallet(usd);
@@ -18700,7 +18716,9 @@ export function App() {
             setVaSessionFleet(nextFleet);
             // Owner hangar may still be bound to chrome fleet — keep both in sync.
             const home = homeCompanyIdRef.current?.trim();
-            const active = activeCompanyIdRef.current?.trim();
+            const active =
+              getStoredCompanyId()?.trim() ||
+              activeCompanyIdRef.current?.trim();
             if (home && active && home !== active) return;
             setFleet(nextFleet);
           }}

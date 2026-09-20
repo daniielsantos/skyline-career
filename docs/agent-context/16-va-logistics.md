@@ -454,6 +454,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** (1) `GET /api/cashflow` usava `withCareerRead` (economy lock + crew settle) e ainda `summarizeCashflow` → segundo `loadMissions`. (2) `loadLedger` chamava `onWallet(snap.walletUsd)`; dezenas de mutações usavam `setWallet` cru, bypassando sticky de `paintWallet`/`commitWallet`.
 **Fix:** cashflow = `loadMissions(company)` + `peekEconomyWorld` + `summarizeCareerLedger` (sem lock); Ledger não empurra wallet pro chrome; todo paint de wallet no App passa por `commitWallet`/`paintWallet` (sticky `active ≠ home` → só `vaSessionWallet`).
 
+### Chrome wallet override on VAs / My VA (ref lag) (2026-09-20)
+
+**Sintoma:** membro entra em VAs ou My VA e o Wallet do chrome vira o da VA (Company chip continua a home).
+**Causa:** `activeCompanyIdRef` só sincronizava no re-render; `switchCompanyForVa` atualizava state/URL/memory mas o sticky lia o ref velho. `onWallet`/`refresh` no mesmo tick pintavam VA→chrome (ou home→vaSession ao restaurar). `onFleet` dos members ainda rodava **antes** do pin.
+**Fix:** setar `activeCompanyIdRef` sync no switch; sticky usa `getStoredCompanyId()`; fleet/wallet dos members só após o pin.
+
 ### Member Ledger empty then fills (2026-09-20)
 
 **Sintoma:** membro no Ledger via wallet/credit da VA mas “No ledger yet”; depois as linhas aparecem.
@@ -505,6 +511,7 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
 - [x] **Ledger cashflow light + wallet audit** — GET /api/cashflow sem world lock; setWallet→commitWallet sticky
+- [x] **Chrome wallet ref lag** — sync activeCompanyIdRef + getStoredCompanyId no sticky; fleet/wallet após pin
 - [x] **Roster presence** — online / last seen / flight na row
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **VA home_country_id on publish** — derive from hub + backfill

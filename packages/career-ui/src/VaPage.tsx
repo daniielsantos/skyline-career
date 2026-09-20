@@ -214,10 +214,10 @@ export function VaPage(props: Props) {
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
       hasVaShellRef.current = Boolean(m.role && m.listed);
-      // Hangar from members (missions already loaded) — paint before tenant pin.
+      // Hangar local first — do not push fleet to App until after tenant pin,
+      // or chrome home fleet gets overwritten while active is still home.
       if (Array.isArray(m.fleet)) {
         setHangarFleet(m.fleet);
-        onFleetRef.current?.(m.fleet);
       }
       // Paint roster first — tenant switch used to block behind a full refresh (~20s).
       setLoaded(true);
@@ -237,7 +237,10 @@ export function VaPage(props: Props) {
           setTenantSwitching(false);
         }
       }
-      // Wallet after pin so chrome sticky home is already remembered.
+      // Fleet + wallet after pin so chrome sticky home already sees active ≠ home.
+      if (Array.isArray(m.fleet)) {
+        onFleetRef.current?.(m.fleet);
+      }
       if (typeof m.walletUsd === 'number' && Number.isFinite(m.walletUsd)) {
         onWalletRef.current?.(m.walletUsd);
       }

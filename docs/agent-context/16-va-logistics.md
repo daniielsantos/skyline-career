@@ -569,6 +569,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** um único salary/allowance; sem upgrade.
 **Fix:** `vaLineCrew.tier` 1|2|3 no JSON (sem migrate); hire→Desk; `upgradeVaLineCrew` Ops/Network; fire→none com severance = salary do tier; allowance/salary por tabela; API `action=upgrade`; Config Upgrade/Fire; ledger `va_line_crew_upgrade`. Legacy hired sem tier = Desk.
 
+### VA Accept ignores home pilot after Travel (2026-09-20)
+
+**Sintoma:** membro viaja para a origem (chip Pilot = SBJF); Accept de frete VA ainda diz Pilot is at SBKP, not SBJF.
+**Causa:** Travel grava pilotIcao na **home**; Accept/assign roda no tenant **VA** com pilotIcao velho; chrome sticky mostra home.
+**Fix:** mirrorHomePilotIcaoOntoOps em withCareerWrite / withCareerPeekRead — se home != ops, copia home.pilotIcao para missions da VA antes dos asserts de co-location.
+
 ### VA settle moves aircraft but not pilot (dual-tenant) (2026-09-20)
 
 **Sintoma:** voo com tail VA; após settle o casco está no dest, mas “Pilot at …” fica no hub de origem.
@@ -683,6 +689,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Line crew allowance retune** — piso 4, 2×parked, cap 16 (2026-09-20)
 - [x] **Line crew tiers** Desk/Ops/Network — hire Desk; upgrade Ops/Network; fire→none (severance = tier salary)
 - [x] **VA settle dual-tenant pilotIcao** — sync home company to dest (chrome sticky)
+- [x] **VA Accept dual-tenant pilotIcao** — mirror home onto ops before co-location assert
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

@@ -281,6 +281,7 @@ import {
   summarizeCareerLedger,
   LEDGER_KIND_LABEL,
   enterLedgerActorAccountId,
+  peekLedgerActorAccountId,
   runWithLedgerActorAccountId,
   AccessKeyError,
   openCareerStore,
@@ -1750,6 +1751,7 @@ async function withCareerPeekRead<T>(
       ...(opts?.companyId ? { companyId: opts.companyId } : {}),
     };
     const missions = await gatewayLoadMissions(gatewayWorldClient, auth);
+    await mirrorHomePilotIcaoOntoOps(missions, opts?.companyId);
     return fn(gatewayEconomyShell(), missions);
   }
   const activeStore = requireStore();
@@ -1759,6 +1761,7 @@ async function withCareerPeekRead<T>(
   }
   const companyId = opts?.companyId?.trim();
   const missions = await loadMissions(companyId ? { companyId } : undefined);
+  await mirrorHomePilotIcaoOntoOps(missions, companyId);
   return fn(world, missions);
 }
 
@@ -1800,6 +1803,37 @@ type CareerWriteOpts = {
   commandSliceIcaos?: string[];
   commandSliceAircraftId?: string;
 };
+
+/**
+ * Dual-tenant: chrome pilot lives on the home company. VA ops missions often
+ * keep a stale pilotIcao — mirror home onto ops before co-location asserts
+ * (Accept / fuel / depart) so Travel on home is honored.
+ */
+async function mirrorHomePilotIcaoOntoOps(
+  missions: MissionsFile,
+  opsCompanyId: string | undefined,
+  opts?: { accountId?: string | null },
+): Promise<void> {
+  const companyId = opsCompanyId?.trim();
+  if (!companyId || !store?.supportsAuth) return;
+  const accountId =
+    opts?.accountId?.trim() || peekLedgerActorAccountId() || '';
+  if (!accountId) return;
+  try {
+    const homeId =
+      (await Promise.resolve(store.vaHomeCompanyId(accountId))) ?? companyId;
+    if (!homeId || homeId === companyId) return;
+    const home = await loadMissions({ companyId: homeId });
+    const icao = (
+      home.pilotIcao?.trim() ||
+      home.homeHubIcao?.trim() ||
+      ''
+    ).toUpperCase();
+    if (icao) missions.pilotIcao = icao;
+  } catch {
+    /* soft — leave ops pilotIcao */
+  }
+}
 
 /**
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
@@ -1847,6 +1881,11 @@ async function withCareerWrite<T>(
   const companyId = opts?.companyId?.trim();
   const companyOpts = companyId ? { companyId } : undefined;
   const missions = await loadMissions(companyOpts);
+  if (opts?.catchUp !== true) {
+    await mirrorHomePilotIcaoOntoOps(missions, companyId, {
+      accountId: writeActor,
+    });
+  }
   // Phase 4 remote client: never simulate ticks locally — host owns the clock.
   const skipCatchUp =
     isRemoteWorldTickEnabled() || opts?.catchUp !== true;

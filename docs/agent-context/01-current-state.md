@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **3e8aa67** / desktop **0.3.157** shipped: Show ferry payer and make Line crew hops instant. Release: [v0.3.157](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.157).
+
+
 `main` **e32f8f6** / desktop **0.3.156** shipped: Harden VA dual-tenant empty/settle and clarify force-update chrome. Release: [v0.3.156](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.156).
 
 

@@ -14,6 +14,7 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 ## Em poucas linhas
 
+- **Economy events soft-cap (2026-09-20):** teto ativo escala com regioes (ceil(regions/10), min 4 / max 24); spawn base ~7%/h com catch-up leve se <50% cheio; prefere regiao sem evento; **multiplicadores inalterados** (sem Dry).
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
 - **MX fuel settle-only (2026-09-01):** wear &lt;90% → Watch **accrue** excess burn in flight (no sim writes); settle debita do tank career (`settledMxFuelDrainKg`). Inject e clássico iguais. Offline: `estimateMxFuelDrainKgForSettle`.
 - Lots / Market / NPC / fuel trucks / hub levels / aircraft market / wear / ledger / SQLite store.

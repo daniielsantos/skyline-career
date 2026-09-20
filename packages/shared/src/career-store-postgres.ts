@@ -86,6 +86,7 @@ import type {
 } from './career-store.js';
 import { MAX_LOAD_CATCH_UP_TICKS } from './career-clock.js';
 import { createHash, randomBytes } from 'node:crypto';
+import { countryIdForHubIcao } from './career-aircraft-registration.js';
 import { ensureHomeCountryId } from './career-partition.js';
 import {
   emptyPgEconomyShell,
@@ -145,6 +146,31 @@ export function assertCareerWorldSeedAllowed(
   throw new Error(
     'Postgres world is empty and CAREER_WORLD_ALLOW_SEED=0; refusing automatic world creation. Restore the database or explicitly set CAREER_WORLD_ALLOW_SEED=1 for the first bootstrap only.',
   );
+}
+
+/** Idempotent: fill empty companies.home_country_id from hub ICAO prefixes. */
+async function backfillCompanyHomeCountryIdsInPg(
+  pool: pg.Pool,
+): Promise<number> {
+  const { rows } = await pool.query<{
+    id: string;
+    home_hub_icao: string | null;
+    home_country_id: string | null;
+  }>(`SELECT id, home_hub_icao, home_country_id FROM companies`);
+  let n = 0;
+  for (const row of rows) {
+    if (String(row.home_country_id ?? '').trim()) continue;
+    const hub = String(row.home_hub_icao ?? '').trim().toUpperCase();
+    if (!hub) continue;
+    const country = countryIdForHubIcao(hub).trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country)) continue;
+    await pool.query(
+      `UPDATE companies SET home_country_id = $1 WHERE id = $2`,
+      [country, row.id],
+    );
+    n += 1;
+  }
+  return n;
 }
 
 function catchUpOpts(opts?: { maxCatchUpTicks?: number }) {
@@ -524,6 +550,7 @@ export class PostgresCareerStore implements CareerStore {
        ON CONFLICT (id) DO NOTHING`,
       [LOCAL_COMPANY_ID, LOCAL_WORLD_ID, Date.now()],
     );
+    await backfillCompanyHomeCountryIdsInPg(this.pool);
     assertCareerWorldSeedAllowed(
       await postgresWorldHasEconomy(this.pool),
     );
@@ -1418,18 +1445,27 @@ export class PostgresCareerStore implements CareerStore {
     if (!/^[A-Z0-9]{3,4}$/.test(homeHubIcao)) {
       throw new Error('homeHubIcao must be a 3–4 letter ICAO');
     }
+    const homeCountryId = countryIdForHubIcao(homeHubIcao).trim().toUpperCase();
     const recruiting = opts.recruiting !== false;
     const memberRouteCutPct = clampMemberRouteCutPct(
       opts.memberRouteCutPct ?? VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
     );
     await this.pool.query(
-      `UPDATE companies SET display_name = $1, home_hub_icao = $2, recruiting = $3, va_listed = TRUE, member_route_cut_pct = $4 WHERE id = $5`,
-      [displayName, homeHubIcao, recruiting, memberRouteCutPct, companyId],
+      `UPDATE companies SET display_name = $1, home_hub_icao = $2, home_country_id = $3, recruiting = $4, va_listed = TRUE, member_route_cut_pct = $5 WHERE id = $6`,
+      [
+        displayName,
+        homeHubIcao,
+        homeCountryId,
+        recruiting,
+        memberRouteCutPct,
+        companyId,
+      ],
     );
     return {
       companyId,
       displayName,
       homeHubIcao,
+      homeCountryId,
       recruiting,
       listed: true,
       memberRouteCutPct,

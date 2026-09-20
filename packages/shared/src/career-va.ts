@@ -5,6 +5,7 @@
 
 import { randomBytes } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { countryIdForHubIcao } from './career-aircraft-registration.js';
 import {
   addCompanyMember,
   countCompanyMembers,
@@ -861,10 +862,42 @@ export type VaPublishResult = {
   companyId: string;
   displayName: string;
   homeHubIcao: string;
+  homeCountryId: string;
   recruiting: boolean;
   listed: boolean;
   memberRouteCutPct: number;
 };
+
+/**
+ * Fill empty `companies.home_country_id` from `home_hub_icao` (ICAO prefix map).
+ * Idempotent — skips rows that already have a country.
+ */
+export function backfillCompanyHomeCountryIds(db: SqliteDb): number {
+  ensureV13Ddl(db);
+  const rows = db
+    .prepare(
+      `SELECT id, home_hub_icao, home_country_id FROM companies`,
+    )
+    .all() as Array<{
+    id: string;
+    home_hub_icao: string | null;
+    home_country_id: string | null;
+  }>;
+  const upd = db.prepare(
+    `UPDATE companies SET home_country_id = ? WHERE id = ?`,
+  );
+  let n = 0;
+  for (const row of rows) {
+    if ((row.home_country_id ?? '').trim()) continue;
+    const hub = (row.home_hub_icao ?? '').trim().toUpperCase();
+    if (!hub) continue;
+    const country = countryIdForHubIcao(hub).trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(country)) continue;
+    upd.run(country, row.id);
+    n += 1;
+  }
+  return n;
+}
 
 /**
  * Owner turns the existing company into a listed VA (no second tenant).
@@ -899,15 +932,17 @@ export function publishCompanyAsVa(
   if (!/^[A-Z0-9]{3,4}$/.test(homeHubIcao)) {
     throw new Error('homeHubIcao must be a 3–4 letter ICAO');
   }
+  const homeCountryId = countryIdForHubIcao(homeHubIcao).trim().toUpperCase();
   const recruiting = opts.recruiting !== false;
   const memberRouteCutPct = clampMemberRouteCutPct(
     opts.memberRouteCutPct ?? VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
   );
   db.prepare(
-    `UPDATE companies SET display_name = ?, home_hub_icao = ?, recruiting = ?, va_listed = 1, member_route_cut_pct = ? WHERE id = ?`,
+    `UPDATE companies SET display_name = ?, home_hub_icao = ?, home_country_id = ?, recruiting = ?, va_listed = 1, member_route_cut_pct = ? WHERE id = ?`,
   ).run(
     displayName,
     homeHubIcao,
+    homeCountryId,
     recruiting ? 1 : 0,
     memberRouteCutPct,
     companyId,
@@ -916,6 +951,7 @@ export function publishCompanyAsVa(
     companyId,
     displayName,
     homeHubIcao,
+    homeCountryId,
     recruiting,
     listed: true,
     memberRouteCutPct,

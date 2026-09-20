@@ -9258,19 +9258,48 @@ export function laneDemandShock(
   };
 }
 
+/**
+ * Soft active-event budget for densified worlds.
+ * ~1 concurrent regional shock per this many distinct airport regions.
+ * Floor 4 keeps legacy small-world feel; ceiling caps spam.
+ */
+export const ECONOMY_EVENT_REGIONS_PER_SLOT = 10;
+export const ECONOMY_EVENT_ACTIVE_MIN = 4;
+export const ECONOMY_EVENT_ACTIVE_MAX = 24;
+/** Base ~1.75%/15-min tick ≈ ~7%/hour when near capacity. */
+export const ECONOMY_EVENT_SPAWN_CHANCE = 0.0175;
+
+/** Concurrent event soft-cap from distinct airport region count. */
+export function economyEventActiveCap(regionCount: number): number {
+  const n = Math.max(0, Math.floor(regionCount));
+  const scaled = Math.ceil(n / ECONOMY_EVENT_REGIONS_PER_SLOT);
+  return Math.min(
+    ECONOMY_EVENT_ACTIVE_MAX,
+    Math.max(ECONOMY_EVENT_ACTIVE_MIN, scaled),
+  );
+}
+
 function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
   if (!world.events) world.events = [];
   // Drop finished events older than ~48 wall-hours (192 × 15-min ticks).
   world.events = world.events.filter(
     (e) => e.endsAtTick > world.tick - TICKS_PER_DAY * 2,
   );
+  const regions = [...new Set(world.airports.map((a) => a.region).filter(Boolean))];
+  const cap = economyEventActiveCap(regions.length);
   const active = activeEvents(world);
-  if (active.length >= 4) return;
-  // ~1.75%/15-min tick ≈ ~7%/hour — occasional overlapping shocks.
-  if (rng() > 0.0175) return;
+  if (active.length >= cap) return;
+  // Mild catch-up when well under capacity (≤1.5× base) — multipliers unchanged.
+  const fillFrac = active.length / Math.max(1, cap);
+  const chance =
+    ECONOMY_EVENT_SPAWN_CHANCE *
+    (fillFrac < 0.5 ? 1 + (0.5 - fillFrac) : 1);
+  if (rng() > chance) return;
 
-  const regions = [...new Set(world.airports.map((a) => a.region))];
-  const region = regions[Math.floor(rng() * regions.length)] ?? 'BR-SE';
+  const occupied = new Set(active.map((e) => e.region));
+  const free = regions.filter((r) => !occupied.has(r));
+  const pool = free.length > 0 ? free : regions;
+  const region = pool[Math.floor(rng() * pool.length)] ?? 'BR-SE';
   const kinds: EconomyEventKind[] = [
     'harvest_boost',
     'port_congestion',

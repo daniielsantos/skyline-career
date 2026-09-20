@@ -435,6 +435,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 eserved_by_account_id + 
 eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em assign/ferry; badge + Reserve/Release no Hangar VA.
 
+### VA publish missing home_country_id (2026-09-20)
+
+**Sintoma:** companies.home_country_id vazio na Lamusine (SBKP) enquanto hub estava setado; local stub tambem vazio.
+**Causa:** publishCompanyAsVa / PG aPublish gravavam hub/name/listed sem derivar pais; select-hub sim escrevia country.
+**Fix:** publish seta home_country_id via countryIdForHubIcao(hub); backfill idempotente no open (SQLite + PG) para hubs ja gravados.
+
 ## Checklist quando for implementar
 
 - [x] InternalHaul pay (IH-1)
@@ -452,6 +458,7 @@ eserved_at_ms; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em 
 - [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
 - [x] **Roster presence** — online / last seen / flight na row
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
+- [x] **VA home_country_id on publish** — derive from hub + backfill
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

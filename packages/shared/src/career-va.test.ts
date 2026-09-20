@@ -42,14 +42,14 @@ describe('VA IH-2', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('bumps schema to v14 with member_route_cut_pct', () => {
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '14');
+  it('bumps schema to v16 with VA + fleet reserve columns', () => {
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '16');
     const dbPath = store.sqlitePath!;
     const db = new DatabaseSync(dbPath);
     const row = db
       .prepare(`SELECT value FROM meta WHERE key = 'schema_version'`)
       .get() as { value: string };
-    assert.equal(row.value, '14');
+    assert.equal(row.value, '16');
     const cols = db.prepare(`PRAGMA table_info(companies)`).all() as Array<{
       name: string;
     }>;
@@ -61,6 +61,65 @@ describe('VA IH-2', () => {
       .all() as Array<{ name: string }>;
     assert.equal(tables.length, 2);
     db.close();
+  });
+
+  it('publish VA sets home_country_id from hub ICAO', async () => {
+    const reg = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_country_pub',
+        displayName: 'Country Pub',
+        password: 'secret1',
+      }),
+    );
+    const companyId = reg.company!.id;
+    const published = await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: reg.account.id,
+        displayName: 'Country Air',
+        homeHubIcao: 'SBKP',
+      }),
+    );
+    assert.equal(published.homeCountryId, 'BR');
+    const db = new DatabaseSync(store.sqlitePath!);
+    const row = db
+      .prepare(
+        `SELECT home_hub_icao, home_country_id FROM companies WHERE id = ?`,
+      )
+      .get(companyId) as {
+      home_hub_icao: string;
+      home_country_id: string;
+    };
+    assert.equal(row.home_hub_icao, 'SBKP');
+    assert.equal(row.home_country_id, 'BR');
+    db.close();
+  });
+
+  it('backfills empty home_country_id from home_hub_icao on open', async () => {
+    const dir2 = mkdtempSync(join(tmpdir(), 'career-va-bf-'));
+    const store2 = await openCareerStore({ careerDir: dir2, backend: 'sqlite' });
+    const dbPath = store2.sqlitePath!;
+    store2.close();
+    const db = new DatabaseSync(dbPath);
+    db.prepare(
+      `INSERT INTO companies (id, display_name, home_hub_icao, home_country_id, world_id, created_at_ms, va_listed, recruiting)
+       VALUES ('co_bf_gap', 'Gap Air', 'SBKP', '', 'local', ?, 1, 1)`,
+    ).run(Date.now());
+    db.close();
+    const reopened = await openCareerStore({
+      careerDir: dir2,
+      backend: 'sqlite',
+    });
+    const check = new DatabaseSync(reopened.sqlitePath!);
+    const row = check
+      .prepare(
+        `SELECT home_country_id FROM companies WHERE id = 'co_bf_gap'`,
+      )
+      .get() as { home_country_id: string };
+    assert.equal(row.home_country_id, 'BR');
+    check.close();
+    reopened.close();
+    rmSync(dir2, { recursive: true, force: true });
   });
 
   it('invite join kick and member cap', async () => {

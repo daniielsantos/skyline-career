@@ -81,6 +81,8 @@ import {
   laneDemandShock,
   laneLotCaps,
   listActiveEconomyEvents,
+  economyEventActiveCap,
+  ECONOMY_EVENT_ACTIVE_MAX,
   listAirportFuelInbound,
   listMarketLots,
   localPriceMultiplier,
@@ -2678,6 +2680,16 @@ describe('value-heavy soft-origin relief (Phase B/B2)', () => {
 });
 
 describe('demand shocks', () => {
+  it('scales active event soft-cap with region count', () => {
+    assert.equal(economyEventActiveCap(0), 4);
+    assert.equal(economyEventActiveCap(10), 4);
+    assert.equal(economyEventActiveCap(11), 4); // ceil(1.1)=2 → floor 4
+    assert.equal(economyEventActiveCap(40), 4);
+    assert.equal(economyEventActiveCap(50), 5);
+    assert.equal(economyEventActiveCap(200), 20);
+    assert.equal(economyEventActiveCap(10_000), ECONOMY_EVENT_ACTIVE_MAX);
+  });
+
   it('raises lane freight pay and urgency under festival demand at dest', () => {
     const world = createSeedEconomyWorld({ seed: 'shock-fest' });
     const event: EconomyEvent = {

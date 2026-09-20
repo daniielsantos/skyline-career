@@ -193,6 +193,7 @@ import {
   setCompanyRecruiting,
   publishCompanyAsVa,
   unpublishCompanyAsVa,
+  backfillCompanyHomeCountryIds,
   vaDayKeyFromTick,
   VA_FLIGHT_QUALITY_WINDOW_DAYS,
   type CareerCompanyInvite,
@@ -1356,6 +1357,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureLocalWorld(db);
   ensureLocalCompany(db);
   stampCompanyWorldId(db);
+  backfillCompanyHomeCountryIds(db);
 }
 
 function stripEconomyPersistBlob(world: CareerEconomyWorld): Record<string, unknown> {

@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **43b1670** / desktop **0.3.158** shipped: Land stuck Line crew ferries when opening My VA Hangar. Release: [v0.3.158](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.158).
+
+
 `main` **3e8aa67** / desktop **0.3.157** shipped: Show ferry payer and make Line crew hops instant. Release: [v0.3.157](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.157).
 
 

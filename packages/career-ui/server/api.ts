@@ -2102,6 +2102,8 @@ async function withCareerWrite<T>(
   }
   return runWrite();
 }
+
+function requestDevMode(req: import('node:http').IncomingMessage): boolean {
   const raw = req.headers['x-skyline-dev-mode'];
   const value = Array.isArray(raw) ? raw[0] : raw;
   return value === '1' || value === 'true';

@@ -8,7 +8,7 @@ import type {
 import { postCreditDraw, postCreditRepay } from './api';
 import { boardMoneyLabel, isFiniteMoney } from './board-money';
 
-const CASHFLOW_PAGE_SIZE = 20;
+const CASHFLOW_PAGE_SIZE = 15;
 
 const KIND_LABEL: Record<string, string> = {
   freight_payout: 'Freight payout',

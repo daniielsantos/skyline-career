@@ -3490,12 +3490,36 @@ export function App() {
   tickAdvanceRef.current = tickAdvance;
   const [tickAdvanceClockMs, setTickAdvanceClockMs] = useState(0);
 
+  const [companies, setCompanies] = useState<CareerCompanyView[]>([]);
+  const [activeCompanyId, setActiveCompanyId] = useState(getStoredCompanyId);
+  /** Owner home company — restore when leaving My VA (member dual-tenant). */
+  const [homeCompanyId, setHomeCompanyId] = useState<string | null>(null);
+  const homeCompanyIdRef = useRef<string | null>(null);
+  const activeCompanyIdRef = useRef(activeCompanyId);
+  activeCompanyIdRef.current = activeCompanyId;
+  const viewingVaTenant = Boolean(
+    homeCompanyId && activeCompanyId && homeCompanyId !== activeCompanyId,
+  );
+  /**
+   * VA overlay caches — My VA session may pin activeCompanyId to the listed
+   * company, but chrome wallet/fleet stay on home. These feed VaPage only.
+   */
+  const [vaSessionWallet, setVaSessionWallet] = useState<number | null>(null);
+  const [vaSessionFleet, setVaSessionFleet] = useState<PlayerAircraft[]>([]);
+
   /** Paint wallet without flashing $0 from ambient-tenant / empty shells mid +Nd. */
   const walletCommitHoldRef = useRef<{ usd: number; untilMs: number } | null>(
     null,
   );
   const paintWallet = useCallback((next: number | null | undefined) => {
     if (typeof next !== 'number' || !Number.isFinite(next)) return;
+    // Chrome sticky: never paint home wallet from a VA-tenant response.
+    const home = homeCompanyIdRef.current?.trim();
+    const active = activeCompanyIdRef.current?.trim();
+    if (home && active && home !== active) {
+      setVaSessionWallet(next);
+      return;
+    }
     if (next === 0 && walletRef.current > 0 && tickAdvanceRef.current) {
       return;
     }
@@ -3511,6 +3535,12 @@ export function App() {
   /** Authoritative wallet from a mutation — holds ambient refresh from regressing. */
   const commitWallet = useCallback((next: number) => {
     if (!Number.isFinite(next)) return;
+    const home = homeCompanyIdRef.current?.trim();
+    const active = activeCompanyIdRef.current?.trim();
+    if (home && active && home !== active) {
+      setVaSessionWallet(next);
+      return;
+    }
     walletCommitHoldRef.current = {
       usd: next,
       untilMs: Date.now() + 12_000,
@@ -3548,16 +3578,6 @@ export function App() {
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
   const [uiSoundMode, setUiSoundMode] = useState<UiSoundMode>(loadUiSoundMode);
   const [devMode, setDevMode] = useState(loadDevMode);
-  const [companies, setCompanies] = useState<CareerCompanyView[]>([]);
-  const [activeCompanyId, setActiveCompanyId] = useState(getStoredCompanyId);
-  /** Owner home company — restore when leaving My VA (member dual-tenant). */
-  const [homeCompanyId, setHomeCompanyId] = useState<string | null>(null);
-  const homeCompanyIdRef = useRef<string | null>(null);
-  const activeCompanyIdRef = useRef(activeCompanyId);
-  activeCompanyIdRef.current = activeCompanyId;
-  const viewingVaTenant = Boolean(
-    homeCompanyId && activeCompanyId && homeCompanyId !== activeCompanyId,
-  );
   /** VA-listed company + non-owner → Hangar MX/sell locked (ferry ok). */
   const [vaHangarMutationsLocked, setVaHangarMutationsLocked] = useState(false);
   const [worldPresence, setWorldPresence] = useState<{
@@ -4293,7 +4313,15 @@ export function App() {
       const data = await fetchBushTrips();
       setBushTrips(data.trips ?? []);
       setActiveBushTrip(data.active ?? null);
-      if (Array.isArray(data.fleet)) setFleet(data.fleet);
+      if (Array.isArray(data.fleet)) {
+        const home = homeCompanyIdRef.current?.trim();
+        const active = activeCompanyIdRef.current?.trim();
+        if (!home || !active || home === active) {
+          setFleet(data.fleet);
+        } else {
+          setVaSessionFleet(data.fleet);
+        }
+      }
     } catch {
       /* board optional until server rebuilt */
     }
@@ -4357,8 +4385,16 @@ export function App() {
       !stateCompanyId ||
       !expectedTenant ||
       stateCompanyId === expectedTenant;
-    if (tenantMatches) {
+    const homeId = homeCompanyIdRef.current?.trim() || '';
+    /** Chrome wallet/fleet follow home only — VA session paints VaPage caches. */
+    const isHomeState =
+      !homeId || !stateCompanyId || stateCompanyId === homeId;
+    if (tenantMatches && isHomeState) {
       paintWallet(state.walletUsd);
+    } else if (tenantMatches && !isHomeState) {
+      if (typeof state.walletUsd === 'number' && Number.isFinite(state.walletUsd)) {
+        setVaSessionWallet(state.walletUsd);
+      }
     }
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
@@ -4380,13 +4416,17 @@ export function App() {
       setCatchUpBanner(null);
     }
     setHubSelected(Boolean(state.hubSelected));
-    setFleet(state.fleet ?? []);
-    setHubOptions(normalizeStarterHubs(state.hubs));
-    setPilotName(state.pilotName ?? '');
-    setHomeHubIcao(state.homeHubIcao ?? '');
-    setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
-    if (state.cashflow) setCashflow(state.cashflow);
-    if (state.companyCredit) setCompanyCredit(state.companyCredit);
+    if (isHomeState) {
+      setFleet(state.fleet ?? []);
+      setHubOptions(normalizeStarterHubs(state.hubs));
+      setPilotName(state.pilotName ?? '');
+      setHomeHubIcao(state.homeHubIcao ?? '');
+      setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
+      if (state.cashflow) setCashflow(state.cashflow);
+      if (state.companyCredit) setCompanyCredit(state.companyCredit);
+    } else if (tenantMatches) {
+      setVaSessionFleet(state.fleet ?? []);
+    }
     if (state.playerFbos) {
       setPlayerFbos(state.playerFbos);
       // Raw persist snapshot has no canAcceptNextLeg / resumeState. Never
@@ -4454,7 +4494,11 @@ export function App() {
     ]);
     if (wantBush) void refreshBushTrips();
     if (missionState && typeof missionState.walletUsd === 'number') {
-      paintWallet(missionState.walletUsd);
+      if (isHomeState) {
+        paintWallet(missionState.walletUsd);
+      } else {
+        setVaSessionWallet(missionState.walletUsd);
+      }
     }
     if (market) {
       // Drop late polls that raced a filter edit (seq bumped in the board effect).
@@ -4509,7 +4553,12 @@ export function App() {
       setAircraftCatalog(acMarket.catalog);
       setAirframePerf(acMarket.airframePerf ?? {});
       setAircraftMarketDay(acMarket.dayIndex);
-      paintWallet(acMarket.walletUsd);
+      if (isHomeState) {
+        paintWallet(acMarket.walletUsd);
+        if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
+      } else if (Array.isArray(acMarket.fleet)) {
+        setVaSessionFleet(acMarket.fleet);
+      }
       if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
       if (acMarket.browseCountryId) {
         aircraftBrowseCountryRef.current = syncAircraftBrowseFromApi(
@@ -4519,7 +4568,6 @@ export function App() {
         setAircraftBrowseCountry(aircraftBrowseCountryRef.current);
       }
       if (acMarket.poolCountries) setAircraftPoolCountries(acMarket.poolCountries);
-      if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
       if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
     }
     if (!state.hubSelected && full) {
@@ -5282,7 +5330,13 @@ export function App() {
         if (cancelled) return;
         setMissions(missionState.missions.slice().reverse());
         if (typeof missionState.walletUsd === 'number') {
-          paintWallet(missionState.walletUsd);
+          const home = homeCompanyIdRef.current?.trim();
+          const active = activeCompanyIdRef.current?.trim();
+          if (!home || !active || home === active) {
+            paintWallet(missionState.walletUsd);
+          } else {
+            setVaSessionWallet(missionState.walletUsd);
+          }
         }
       })
       .catch(() => undefined);
@@ -5362,7 +5416,7 @@ export function App() {
               );
               if (debrief) setFlightDebrief(debrief);
               if (typeof status.walletUsd === 'number') {
-                setWallet(status.walletUsd);
+                commitWallet(status.walletUsd);
               }
               // Debrief sheet carries P&L — only toast when we could not build it.
               if (!debrief) {
@@ -7113,25 +7167,32 @@ export function App() {
     setSelectedContractLotId(null);
     setTab(next);
     writeCareerLocation({ tab: next, airportIcao: null }, opts);
+    // Sidebar / deep-link Hangar must never show VA fleet while session is VA.
+    if (next === 'hangar') {
+      const home = homeCompanyIdRef.current?.trim();
+      if (home && home !== activeCompanyIdRef.current) {
+        void switchCompanyForVa(home).catch(() => undefined);
+      }
+    }
   }
 
   function selectTab(next: Tab) {
     setAirportReturn(null);
     setSidebarOpen(false);
-    const prev = tabRef.current;
     goToTab(next);
     // Soft refresh in background — don't flash disabled on every nav button.
     void (async () => {
-      // Member dual-tenant: My VA pins ?company= to the VA. Leaving must
-      // restore home or Freights/Wallet stay on the VA company forever.
-      if (prev === 'va' && next !== 'va') {
-        const home = homeCompanyIdRef.current?.trim();
-        if (home && home !== activeCompanyIdRef.current) {
-          try {
-            await switchCompanyForVa(home);
-          } catch {
-            /* soft — refresh below may still heal */
-          }
+      const home = homeCompanyIdRef.current?.trim();
+      const onVaTenant =
+        Boolean(home) && home !== activeCompanyIdRef.current;
+      // Any tab except My VA must run on home — VAs / Freights / Ranking /
+      // Hangar / etc. must not keep the VA session painting chrome.
+      const mustRestoreHome = onVaTenant && next !== 'va';
+      if (mustRestoreHome && home) {
+        try {
+          await switchCompanyForVa(home);
+        } catch {
+          /* soft — refresh below may still heal */
         }
       }
       await run(() => refresh(liveRefreshScope(next, false)), {
@@ -7423,12 +7484,14 @@ export function App() {
     await refreshRef.current();
   }
 
-  /** VA My VA: open tenant without wiping the shell (full refresh was ~20s). */
+  /** VA My VA: open tenant without wiping the shell chrome (wallet/fleet = home). */
   async function switchCompanyForVa(nextId: string): Promise<void> {
     const id = nextId.trim() || LOCAL_COMPANY_ID;
     if (!id || id === activeCompanyIdRef.current) return;
+    const homeId = homeCompanyIdRef.current?.trim() || '';
+    const switchingToHome = Boolean(homeId && id === homeId);
     // Remember home before pinning the VA so leaving My VA can restore it.
-    if (!homeCompanyIdRef.current) {
+    if (!homeId && !switchingToHome) {
       const prev =
         activeCompanyIdRef.current || getStoredCompanyId();
       homeCompanyIdRef.current = prev;
@@ -7457,15 +7520,30 @@ export function App() {
       const state = await fetchState();
       const stateCompanyId =
         typeof state.companyId === 'string' ? state.companyId.trim() : '';
-      if (!stateCompanyId || stateCompanyId === id) {
-        setWallet(state.walletUsd);
+      if (stateCompanyId && stateCompanyId !== id) return;
+      const home =
+        homeCompanyIdRef.current?.trim() ||
+        (switchingToHome ? id : '');
+      const paintChrome = !home || id === home;
+      if (paintChrome) {
+        paintWallet(state.walletUsd);
         setFleet(state.fleet ?? []);
         setHomeHubIcao(state.homeHubIcao ?? '');
         setPilotIcao(state.pilotIcao ?? state.homeHubIcao ?? '');
-      }
-      // Keep authAccountLabel — do not adopt VA owner pilotName into the chrome.
-      if (!authRequired || !authAccountLabel) {
-        setPilotName(state.pilotName ?? '');
+        setVaSessionWallet(null);
+        setVaSessionFleet([]);
+        if (!authRequired || !authAccountLabel) {
+          setPilotName(state.pilotName ?? '');
+        }
+      } else {
+        if (
+          typeof state.walletUsd === 'number' &&
+          Number.isFinite(state.walletUsd)
+        ) {
+          setVaSessionWallet(state.walletUsd);
+        }
+        setVaSessionFleet(state.fleet ?? []);
+        // Keep authAccountLabel / home chrome — do not adopt VA owner pilotName.
       }
     } catch {
       /* hangar may be empty until next poll */
@@ -11543,7 +11621,7 @@ export function App() {
               : 'Bush trip complete',
           );
           if (typeof status.walletUsd === 'number') {
-            setWallet(status.walletUsd);
+            commitWallet(status.walletUsd);
           }
           setActiveBushTrip(null);
           setBushWatch(null);
@@ -12558,13 +12636,15 @@ export function App() {
               authRequired || worldFixed ? (
                 <div
                   className="metric"
-                  title="Your company on this world"
+                  title="Your personal company (home) — stays put while browsing a VA"
                 >
                   <span className="label">Company</span>
                   <strong>
-                    {companies.find((c) => c.id === activeCompanyId)
-                      ?.displayName ||
+                    {companies.find(
+                      (c) => c.id === (homeCompanyId || activeCompanyId),
+                    )?.displayName ||
                       companies[0]?.displayName ||
+                      homeCompanyId ||
                       activeCompanyId ||
                       '—'}
                   </strong>
@@ -12653,9 +12733,7 @@ export function App() {
               </button>
             ) : null}
             <div className="metric">
-              <span className="label">
-                {viewingVaTenant ? 'VA wallet' : 'Wallet'}
-              </span>
+              <span className="label">Wallet</span>
               <strong>{careerStateReady ? formatMoney(wallet) : '…'}</strong>
             </div>
             <div className="metric world-clock" title={worldClockTitle}>
@@ -18580,7 +18658,7 @@ export function App() {
             setHangarPane('cargo');
             goToTab('hangar');
           }}
-          onWallet={setWallet}
+          onWallet={commitWallet}
           onFleet={setFleet}
           onMissions={setMissions}
           onOpenAirport={(icao) => {
@@ -18598,7 +18676,7 @@ export function App() {
         <VaDirectoryPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
-          onCompaniesChanged={(next, opts) => {
+          onCompaniesChanged={(next) => {
             setCompanies((prev) =>
               next.map((c) => {
                 const existing = prev.find((p) => p.id === c.id);
@@ -18614,20 +18692,28 @@ export function App() {
                     };
               }),
             );
-            const switchId = opts?.switchToCompanyId?.trim();
-            if (switchId && switchId !== activeCompanyId) {
-              void run(() => switchCompany(switchId));
-            }
+            // Join must NOT pin the VA session — chrome stays on home.
+            // My VA opens the VA tenant when the pilot navigates there.
           }}
         />
       ) : hubSelected && tab === 'va' ? (
         <VaPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
-          fleet={fleet}
-          walletUsd={wallet}
+          fleet={viewingVaTenant ? vaSessionFleet : fleet}
+          walletUsd={
+            viewingVaTenant && vaSessionWallet != null
+              ? vaSessionWallet
+              : wallet
+          }
           busy={busy}
-          onWallet={setWallet}
+          onWallet={(usd) => {
+            if (viewingVaTenant) {
+              setVaSessionWallet(usd);
+            } else {
+              commitWallet(usd);
+            }
+          }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
           onSwitchCompany={async (companyId) => {
@@ -18656,9 +18742,13 @@ export function App() {
             if (next) {
               await switchCompany(next);
             }
+            setVaSessionWallet(null);
+            setVaSessionFleet([]);
             selectTab('vaDirectory');
           }}
           onUnpublished={() => {
+            setVaSessionWallet(null);
+            setVaSessionFleet([]);
             selectTab('pilot');
           }}
           renderHangarCard={(acf, hangarOpts) => (
@@ -19029,7 +19119,11 @@ export function App() {
                     void fetchCashflow()
                       .then((snap) => {
                         setCashflow(snap);
-                        setWallet(snap.walletUsd);
+                        const home = homeCompanyIdRef.current?.trim();
+                        const active = activeCompanyIdRef.current?.trim();
+                        if (!home || !active || home === active) {
+                          setWallet(snap.walletUsd);
+                        }
                         if (snap.companyCredit) {
                           setCompanyCredit(snap.companyCredit);
                         }

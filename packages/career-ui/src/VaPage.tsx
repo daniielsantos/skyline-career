@@ -103,8 +103,10 @@ export function VaPage(props: Props) {
     try {
       const snap = await fetchCashflow();
       setCashflow(snap);
-      // Do NOT paint chrome wallet here — active tenant may differ from home.
-      // Ledger shows VA wallet locally; chrome follows activeCompanyId only.
+      // Keep VA wallet in-page (parent routes to vaSession or chrome by tenant).
+      if (typeof snap.walletUsd === 'number' && Number.isFinite(snap.walletUsd)) {
+        props.onWallet?.(snap.walletUsd);
+      }
       if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
       setFlightQuality(snap.flightQuality ?? null);
     } catch (err) {
@@ -112,7 +114,7 @@ export function VaPage(props: Props) {
     } finally {
       setLedgerBusy(false);
     }
-  }, [canShow, companyId]);
+  }, [canShow, companyId, props.onWallet]);
 
   const refresh = useCallback(async () => {
     if (!canShow || !companyId) {

@@ -81,10 +81,10 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 
 **Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
 
-- Abrir My VA faz `switchCompanyForVa` e grava `?company=` da VA — necessário para hangar/ledger.
-- **Sair de My VA** restaura a **home** do piloto (company owner) + wallet chrome.
-- Ledger **não** chama `setWallet` no load (só mostra VA wallet local); paint de `/api/state` ignora resposta cujo `companyId` ≠ tenant esperado.
-- Chrome label **VA wallet** quando active ≠ home. Login sempre re-pinna home e limpa tenant VA residual da sessão anterior.
+- Abrir My VA faz `switchCompanyForVa` e grava `?company=` da VA — necessário para hangar/ledger/mutações.
+- **Chrome sticky = home:** topbar Company + Wallet + Hangar da sidebar leem sempre a **home**. Label do chip é sempre **Wallet** (nunca “VA wallet”). Sessão API pode estar na VA só dentro de My VA; `paintWallet`/`commitWallet` recusam pintar chrome se `active ≠ home` (mandam para `vaSessionWallet`).
+- Qualquer tab **≠ My VA** (incl. VAs directory) restaura session home antes do refresh.
+- Join por código **não** troca tenant — My VA é que abre a VA.
 
 ---
 
@@ -388,6 +388,18 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** mesmo `companyCredit.repScore` do Hangar solo, sem dual-write de unlock na VA.
 **Fix (copy only):** strip do Ledger = só Flight quality; credit block na VA = **Owner ops** + blurb; fórmula de limit inalterada.
 
+### Chrome sticky home (2026-09-20)
+
+**Sintoma:** entrar Ledger/Hangar My VA (membro) substituía wallet/frota do chrome pelo da VA; Hangar da sidebar misturava frota.
+**Causa:** um único `wallet`/`fleet` + `switchCompanyForVa` pintava state da VA no shell.
+**Fix:** caches `vaSessionWallet`/`vaSessionFleet`; paint de chrome só quando `state.companyId === home`; Hangar sidebar / leave My VA restaura home; My VA Hangar/Ledger usam caches VA.
+
+### Chrome flicker on VAs directory (2026-09-20)
+
+**Sintoma:** chip Wallet alternava valor (home ↔ VA) e Company virava Lamusine no My VA / NULLABLE na directory; join pinava sessão VA.
+**Causa:** restore home só ao sair de My VA→outros; `paintWallet` ainda aceitava tenant VA; Company chip lia `activeCompanyId`; join chamava `switchCompany(VA)`.
+**Fix:** restore home em **toda** tab ≠ `va`; `paintWallet`/`commitWallet` sticky; Company chip = home; join sem switch de tenant.
+
 ### My VA Ledger painted personal wallet (2026-09-20)
 
 **Sintoma:** alt abre Ledger da VA e o chrome Wallet vira o saldo da VA; ao sair continua “errado”.
@@ -411,6 +423,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] Hangar VA: member read-only UI (sell/lease/MX; ferry ok) + **API gate MX + sell/list/unlist owner-only**
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
+- [x] **Chrome sticky home** — wallet/fleet do shell = home; My VA usa caches VA
 - [x] **Ferry ops** — Line crew semanal + allowance NPC + overflow na home do piloto
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

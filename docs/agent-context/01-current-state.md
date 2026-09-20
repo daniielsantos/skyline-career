@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **450b04b** / desktop **0.3.144** shipped: Fix VA hangar reserve UI not updating for the owner. Release: [v0.3.144](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.144).
+
+
 `main` **c72822a** / desktop **0.3.143** shipped: Speed up VA hangar open and tidy My VA credit/roster layout. Release: [v0.3.143](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.143).
 
 

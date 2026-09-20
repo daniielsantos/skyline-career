@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **872f550** / desktop **0.3.164** shipped: Mirror home pilotIcao onto VA ops before Accept co-location checks. Release: [v0.3.164](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.164).
+
+
 Local (ainda sem release): **VA Accept mirrors home pilotIcao onto ops** (Travel→Accept stale SBKP). Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 `main` **82622cc** / desktop **0.3.163** shipped: Add Line crew tiers and fix VA dual-tenant pilot location. Release: [v0.3.163](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.163).

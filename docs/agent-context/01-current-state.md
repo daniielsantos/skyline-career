@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **e32f8f6** / desktop **0.3.156** shipped: Harden VA dual-tenant empty/settle and clarify force-update chrome. Release: [v0.3.156](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.156).
+
+
 `main` **3f4b7ef** / desktop **0.3.155** shipped: Fix VA ferry-plan tenant lookup and show Manifest pay per bulk unit. Release: [v0.3.155](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.155).
 
 

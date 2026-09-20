@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **e555557** / desktop **0.3.149** shipped: Fix Hub Stats Jet-A history chip and Online count for multi-company pilots. Release: [v0.3.149](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.149).
+
+
 `main` **dd73d6b** / desktop **0.3.148** shipped: Fix chrome wallet override when opening VAs and My VA. Release: [v0.3.148](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.148).
 
 

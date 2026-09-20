@@ -1,5 +1,8 @@
 # Current state (2026-09-20)
 
+`main` **79949ab** / desktop **0.3.141** shipped: Fill VA home country from hub and scale economy event caps. Release: [v0.3.141](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.141).
+
+
 `main` **2671508** / desktop **0.3.140** shipped: Add VA hangar aircraft reservation and roster presence. Release: [v0.3.140](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.140).
 
 

@@ -44,6 +44,7 @@ COPY --from=builder /app/packages/agent/src ./packages/agent/src
 COPY --from=builder /app/packages/career-ui/package.json ./packages/career-ui/package.json
 COPY --from=builder /app/packages/career-ui/server ./packages/career-ui/server
 COPY --from=builder /app/scripts/career-world-worker-pg.mjs ./scripts/career-world-worker-pg.mjs
+COPY --from=builder /app/scripts/mint-access-keys.mjs ./scripts/mint-access-keys.mjs
 COPY --from=builder /app/profiles/career ./profiles/career
 
 RUN mkdir -p node_modules/@msfs-compat /data/career/world \

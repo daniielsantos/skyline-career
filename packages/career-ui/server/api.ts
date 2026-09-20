@@ -3410,20 +3410,46 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const companyId = companyIdFromRequest(req);
-        if (!companyId) {
+        const companyIdRaw = companyIdFromRequest(req);
+        if (!companyIdRaw) {
           send(res, 400, { error: 'companyId required' });
           return;
         }
-        const membership = await Promise.resolve(
+        let companyId = companyIdRaw;
+        let membership = await Promise.resolve(
           store.vaGetMembership(session.account.id, companyId),
         );
+        let listed = membership
+          ? await Promise.resolve(store.vaIsListed(companyId))
+          : false;
+        // Member dual-tenant: active company is often home (not listed). Resolve
+        // to their listed VA membership so My VA shows the airline, not "Become a VA".
+        let switchedFromCompanyId: string | undefined;
+        if (!membership || !listed) {
+          const listedMem = await Promise.resolve(
+            store.vaListedMembership(session.account.id),
+          );
+          if (
+            listedMem &&
+            listedMem.companyId &&
+            listedMem.companyId !== companyId
+          ) {
+            switchedFromCompanyId = companyId;
+            companyId = listedMem.companyId;
+            membership = await Promise.resolve(
+              store.vaGetMembership(session.account.id, companyId),
+            );
+            listed = true;
+          }
+        }
         if (!membership) {
           send(res, 403, { error: 'Not a member of this company' });
           return;
         }
+        if (!listed) {
+          listed = await Promise.resolve(store.vaIsListed(companyId));
+        }
         const members = await Promise.resolve(store.vaListMembers(companyId));
-        const listed = await Promise.resolve(store.vaIsListed(companyId));
         const recruiting = await Promise.resolve(store.vaIsRecruiting(companyId));
         const memberRouteCutPct = await Promise.resolve(
           store.vaGetMemberRouteCutPct(companyId),
@@ -3477,6 +3503,9 @@ export function createCareerApiServer(port = 8787) {
           displayName: co?.displayName?.trim() || companyId,
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
+          ...(switchedFromCompanyId
+            ? { switchToCompanyId: companyId }
+            : {}),
         });
         return;
       }

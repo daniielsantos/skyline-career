@@ -18372,7 +18372,7 @@ export function App() {
         <VaDirectoryPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
-          onCompaniesChanged={(next) => {
+          onCompaniesChanged={(next, opts) => {
             setCompanies((prev) =>
               next.map((c) => {
                 const existing = prev.find((p) => p.id === c.id);
@@ -18388,6 +18388,10 @@ export function App() {
                     };
               }),
             );
+            const switchId = opts?.switchToCompanyId?.trim();
+            if (switchId && switchId !== activeCompanyId) {
+              void run(() => switchCompany(switchId));
+            }
           }}
         />
       ) : hubSelected && tab === 'va' ? (
@@ -18398,6 +18402,9 @@ export function App() {
           busy={busy}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
+          onSwitchCompany={async (companyId) => {
+            await switchCompany(companyId);
+          }}
           onLeftVa={async ({ homeCompanyId, companies }) => {
             setCompanies(
               companies.map((c) => ({

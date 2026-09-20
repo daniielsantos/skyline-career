@@ -13,6 +13,7 @@ type Props = {
   activeCompanyId: string | null;
   onCompaniesChanged?: (
     companies: Array<{ id: string; displayName: string }>,
+    opts?: { switchToCompanyId?: string },
   ) => void;
 };
 
@@ -112,6 +113,7 @@ export function VaDirectoryPage(props: Props) {
                       id: c.id,
                       displayName: c.displayName,
                     })),
+                    { switchToCompanyId: result.companyId },
                   );
                   await refresh();
                 } catch (err) {
@@ -142,12 +144,13 @@ export function VaDirectoryPage(props: Props) {
       ) : (
         <ul className="va-directory-list">
           {filtered.map((row) => {
-            const isMine =
-              row.companyId === companyId ||
-              row.companyId === memberOfVaCompanyId;
+            const isOwnerHere = row.myRole === 'owner';
+            const isMemberHere =
+              row.myRole === 'pilot' || row.myRole === 'dispatcher';
             const canRequest =
               !alreadyInVa &&
-              !isMine &&
+              !isOwnerHere &&
+              !isMemberHere &&
               row.recruiting &&
               row.seatsOpen > 0 &&
               row.myRequestStatus !== 'pending' &&
@@ -160,8 +163,10 @@ export function VaDirectoryPage(props: Props) {
                       <strong className="va-directory-card-name">
                         {row.displayName}
                       </strong>
-                      {isMine ? (
+                      {isOwnerHere ? (
                         <span className="badge va-directory-yours">Yours</span>
+                      ) : isMemberHere ? (
+                        <span className="badge va-directory-yours">Joined</span>
                       ) : null}
                     </div>
                   </div>

@@ -1963,12 +1963,20 @@ export function assembleMissionsFromTables(
       ledger,
     };
     const company = db
-      .prepare(`SELECT home_hub_icao, display_name FROM companies WHERE id = ?`)
+      .prepare(
+        `SELECT home_hub_icao, display_name, IFNULL(va_listed, 0) AS va_listed
+         FROM companies WHERE id = ?`,
+      )
       .get(cid) as
-      | { home_hub_icao: string; display_name: string }
+      | { home_hub_icao: string; display_name: string; va_listed: number }
       | undefined;
     if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
-    if (company?.display_name && !merged.pilotName) {
+    // Never backfill pilotName from a listed VA display_name (airline ≠ pilot).
+    if (
+      company?.display_name &&
+      !merged.pilotName &&
+      Number(company.va_listed) === 0
+    ) {
       merged.pilotName = company.display_name;
     }
     return merged;

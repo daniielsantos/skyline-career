@@ -3664,14 +3664,20 @@ export async function hydrateMissionsFromPg(
       ledger,
     };
     const companyRes = await pool.query(
-      `SELECT home_hub_icao, display_name FROM companies WHERE id = $1`,
+      `SELECT home_hub_icao, display_name, COALESCE(va_listed, false) AS va_listed
+       FROM companies WHERE id = $1`,
       [cid],
     );
     const company = companyRes.rows[0] as
-      | { home_hub_icao: string; display_name: string }
+      | {
+          home_hub_icao: string;
+          display_name: string;
+          va_listed: boolean;
+        }
       | undefined;
     if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
-    if (company?.display_name && !merged.pilotName) {
+    // Never backfill pilotName from a listed VA display_name (airline ≠ pilot).
+    if (company?.display_name && !merged.pilotName && !company.va_listed) {
       merged.pilotName = company.display_name;
     }
     // Heal: empty seed / bad company_state can clear hubSelected while

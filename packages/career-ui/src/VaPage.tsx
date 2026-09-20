@@ -33,6 +33,8 @@ type Props = {
   ) => ReactNode;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
+  /** Switch active tenant to the listed VA (member dual-tenant). */
+  onSwitchCompany?: (companyId: string) => void | Promise<void>;
   onLeftVa?: (opts: {
     homeCompanyId: string | null;
     companies: Array<{ id: string; displayName: string }>;
@@ -83,6 +85,14 @@ export function VaPage(props: Props) {
     setError(null);
     try {
       const m = await fetchVaMembers();
+      if (
+        m.switchToCompanyId &&
+        m.switchToCompanyId !== companyId &&
+        props.onSwitchCompany
+      ) {
+        await props.onSwitchCompany(m.switchToCompanyId);
+        return;
+      }
       setMembers(m.members);
       setRole(m.role);
       setMemberCap(m.memberCap);
@@ -110,7 +120,7 @@ export function VaPage(props: Props) {
     } finally {
       setLoaded(true);
     }
-  }, [canShow, companyId]);
+  }, [canShow, companyId, props.onSwitchCompany]);
 
   const leaveVa = useCallback(async () => {
     const ok = await confirm({
@@ -280,91 +290,91 @@ export function VaPage(props: Props) {
         <div className="settings-card va-pane-card">
           <h3>Roster</h3>
           {canManage && pendingRequests.length > 0 ? (
-            <>
-              <h4 style={{ marginTop: 0, marginBottom: '0.35rem' }}>
-                Join requests
-              </h4>
-              <ul className="settings-sample" style={{ paddingLeft: '1.1rem' }}>
+            <div className="va-roster-section">
+              <h4 className="va-roster-section-title">Join requests</h4>
+              <ul className="va-roster-list">
                 {pendingRequests.map((req) => (
-                  <li key={req.id} style={{ marginBottom: '0.35rem' }}>
-                    {req.displayName}{' '}
-                    <span style={{ opacity: 0.7 }}>@{req.loginName}</span>{' '}
-                    <button
-                      type="button"
-                      className="action ghost"
-                      disabled={pageBusy}
-                      style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem' }}
-                      onClick={() => {
-                        void (async () => {
-                          setBusy(true);
-                          try {
-                            await postVaAcceptJoinRequest(req.id);
-                            await refresh();
-                          } catch (err) {
-                            setError(
-                              err instanceof Error
-                                ? err.message
-                                : String(err),
-                            );
-                          } finally {
-                            setBusy(false);
-                          }
-                        })();
-                      }}
-                    >
-                      Accept
-                    </button>{' '}
-                    <button
-                      type="button"
-                      className="action ghost"
-                      disabled={pageBusy}
-                      style={{ fontSize: '0.75rem', padding: '0.1rem 0.4rem' }}
-                      onClick={() => {
-                        void (async () => {
-                          setBusy(true);
-                          try {
-                            await postVaRejectJoinRequest(req.id);
-                            await refresh();
-                          } catch (err) {
-                            setError(
-                              err instanceof Error
-                                ? err.message
-                                : String(err),
-                            );
-                          } finally {
-                            setBusy(false);
-                          }
-                        })();
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          {members.length === 0 ? (
-            <p className="settings-sample">No members.</p>
-          ) : (
-            <ul className="settings-sample" style={{ paddingLeft: '1.1rem' }}>
-              {members.map((m) => (
-                <li key={m.accountId} style={{ marginBottom: '0.35rem' }}>
-                  {m.displayName}{' '}
-                  <span style={{ opacity: 0.7 }}>
-                    @{m.loginName} · {m.role}
-                  </span>
-                  {isOwner && m.role !== 'owner' ? (
-                    <>
-                      {' '}
+                  <li key={req.id} className="va-roster-row va-roster-row-request">
+                    <div className="va-roster-id">
+                      <span className="va-roster-name">{req.displayName}</span>
+                      <span className="va-roster-login">@{req.loginName}</span>
+                    </div>
+                    <div className="va-roster-actions">
+                      <button
+                        type="button"
+                        className="action"
+                        disabled={pageBusy}
+                        onClick={() => {
+                          void (async () => {
+                            setBusy(true);
+                            try {
+                              await postVaAcceptJoinRequest(req.id);
+                              await refresh();
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        Accept
+                      </button>
                       <button
                         type="button"
                         className="action ghost"
                         disabled={pageBusy}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '0.1rem 0.4rem',
+                        onClick={() => {
+                          void (async () => {
+                            setBusy(true);
+                            try {
+                              await postVaRejectJoinRequest(req.id);
+                              await refresh();
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
                         }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {members.length === 0 ? (
+            <p className="settings-sample">No members.</p>
+          ) : (
+            <ul className="va-roster-list">
+              {members.map((m) => (
+                <li key={m.accountId} className="va-roster-row">
+                  <div className="va-roster-id">
+                    <span className="va-roster-name">{m.displayName}</span>
+                    <span className="va-roster-login">@{m.loginName}</span>
+                  </div>
+                  <span
+                    className={`va-roster-role va-roster-role-${m.role}`}
+                  >
+                    {m.role}
+                  </span>
+                  {isOwner && m.role !== 'owner' ? (
+                    <div className="va-roster-actions">
+                      <button
+                        type="button"
+                        className="action ghost"
+                        disabled={pageBusy}
                         onClick={() => {
                           void (async () => {
                             setBusy(true);
@@ -392,15 +402,11 @@ export function VaPage(props: Props) {
                         {m.role === 'dispatcher'
                           ? 'Make pilot'
                           : 'Make dispatcher'}
-                      </button>{' '}
+                      </button>
                       <button
                         type="button"
-                        className="action ghost"
+                        className="action ghost va-roster-kick"
                         disabled={pageBusy}
-                        style={{
-                          fontSize: '0.75rem',
-                          padding: '0.1rem 0.4rem',
-                        }}
                         onClick={() => {
                           void (async () => {
                             setBusy(true);
@@ -421,8 +427,10 @@ export function VaPage(props: Props) {
                       >
                         Kick
                       </button>
-                    </>
-                  ) : null}
+                    </div>
+                  ) : (
+                    <div className="va-roster-actions va-roster-actions-spacer" />
+                  )}
                 </li>
               ))}
             </ul>

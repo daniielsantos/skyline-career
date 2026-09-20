@@ -587,6 +587,8 @@ export type VaDirectoryEntry = {
   seatsOpen: number;
   /** Pending request from the viewing account, if any. */
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
+  /** Roster role when the viewer is already a member of this VA. */
+  myRole?: CareerAccountRole | null;
 };
 
 export type VaJoinRequestRow = {
@@ -830,7 +832,10 @@ export function listVaDirectory(
     const aircraftCount = Number(row.aircraft_count) || 0;
     const recruiting = Number(row.recruiting) !== 0;
     let myRequestStatus: VaDirectoryEntry['myRequestStatus'] = null;
+    let myRole: VaDirectoryEntry['myRole'] = null;
     if (opts.accountId) {
+      const membership = getCompanyMembership(db, opts.accountId, row.id);
+      if (membership) myRole = membership.role;
       const req = db
         .prepare(
           `SELECT status FROM company_join_requests
@@ -858,6 +863,7 @@ export function listVaDirectory(
       memberRouteCutPct: clampMemberRouteCutPct(row.member_route_cut_pct),
       seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
       myRequestStatus,
+      myRole,
     });
   }
   return out;

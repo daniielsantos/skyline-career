@@ -4976,6 +4976,8 @@ export function fetchVaMembers() {
       salaryUsdPerWeek: number;
       fireSeveranceUsd: number;
     } | null;
+    /** Active company was home/solo — switch UI tenant to this listed VA. */
+    switchToCompanyId?: string;
   }>('/api/va/members');
 }
 
@@ -5089,6 +5091,7 @@ export type VaDirectoryEntry = {
   memberRouteCutPct?: number;
   seatsOpen: number;
   myRequestStatus?: 'pending' | 'accepted' | 'rejected' | null;
+  myRole?: 'owner' | 'dispatcher' | 'pilot' | null;
 };
 
 export type VaJoinRequest = {

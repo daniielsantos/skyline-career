@@ -1451,7 +1451,13 @@ export class PostgresCareerStore implements CareerStore {
       const aircraftCount = Number(r.aircraft_count) || 0;
       const recruiting = Boolean(r.recruiting);
       let myRequestStatus: VaDirectoryEntry['myRequestStatus'] = null;
+      let myRole: VaDirectoryEntry['myRole'] = null;
       if (opts?.accountId) {
+        const membership = await this.vaGetMembership(
+          opts.accountId,
+          r.id as string,
+        );
+        if (membership) myRole = membership.role;
         const req = await this.pool.query(
           `SELECT status FROM company_join_requests
            WHERE company_id = $1 AND account_id = $2
@@ -1475,6 +1481,7 @@ export class PostgresCareerStore implements CareerStore {
         memberRouteCutPct: clampMemberRouteCutPct(r.member_route_cut_pct),
         seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
         myRequestStatus,
+        myRole,
       });
     }
     return out;

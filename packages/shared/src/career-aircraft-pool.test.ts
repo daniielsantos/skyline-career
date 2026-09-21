@@ -85,14 +85,14 @@ describe('aircraft pool', () => {
     const wideGlobal = countInstancesBySkuGlobally(world, 'wide_freighter');
     assert.equal(wideGlobal.size, wideSkus.length);
     const wideCounts = [...wideGlobal.values()];
-    assert.equal(Math.min(...wideCounts), 3);
-    assert.equal(Math.max(...wideCounts), 3);
-    assert.equal(wideGlobal.get('tfdi-md11f-family'), 3);
+    assert.equal(Math.min(...wideCounts), 5);
+    assert.equal(Math.max(...wideCounts), 5);
+    assert.equal(wideGlobal.get('tfdi-md11f-family'), 5);
 
     const narrowGlobal = countInstancesBySkuGlobally(world, 'narrow_freighter');
     const narrowCounts = [...narrowGlobal.values()];
-    assert.equal(Math.min(...narrowCounts), 3);
-    assert.equal(Math.max(...narrowCounts), 3);
+    assert.equal(Math.min(...narrowCounts), 5);
+    assert.equal(Math.max(...narrowCounts), 5);
   });
 
   it('backfills missing SKUs on existing worlds without wipe', () => {
@@ -110,7 +110,7 @@ describe('aircraft pool', () => {
     const md11 = (world.aircraftInstances ?? []).filter(
       (i) => i.airframeTypeId === 'tfdi-md11f-family' && i.status === 'available',
     );
-    assert.equal(md11.length, 3);
+    assert.equal(md11.length, 5);
     assert.equal(ensureAircraftPoolCatalogSync(world), false);
   });
 

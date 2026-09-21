@@ -6,6 +6,10 @@ Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `c
 
 **Diag MP 2026-09-16 — Worldwide ~833 vs ~500 antigo:** não é crescimento por tick. Seed atual com 1967 aeroportos/catálogo vigente = **834 available** (GA 413 / TP 203 / LJ 79 / medium 43 / narrow 60 / wide 36; BR 65). UI 833 / BR 64 = exatamente seed menos 1 casco adquirido. A alta vs saves antigos vem do mapa/catálogo ampliado e caps por país; pool só nasce vazio ou recebe floor incremental em mudança de catálogo.
 
+**Diag MP pool sizing (2026-09-21):** ~830 = seed por caps de país (`CLASS_ANCHOR` × `hubs/62` capped 1.5, densify 1-de-cada em país grande nas leves) + inflate `sku×CLASS_GLOBAL_MIN` se caps somam menos — **não** `sku×floor` sozinho. Compra → `sold` permanente no board; **sem** auto-respawn; `ensureDealerSkuFloor` conta sold+available (não repõe venda). Restock só trade-in dealer. Soft scarcity OK na escala MP; hard lockout só se todos available do SKU forem comprados.
+
+**Diag MP narrow/wide floor (2026-09-21):** medo de poucas unidades flagship no MP (737 BCF / MD-11F etc. a 3/mundo). Bump `CLASS_GLOBAL_MIN_PER_SKU` narrow/wide **3 → 5** (~+40 narrow / +24 wide no floor; mundos existentes backfill via `ensureDealerSkuFloor` sem wipe). Lights/medium intactos.
+
 ---
 
 ## Regras travadas
@@ -16,7 +20,7 @@ Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `c
 
 **Cota igual por modelo (classe)** — slots da classe no mundo (e extras no país) repartidos **round-robin** entre SKUs `enabled`. C172 ≈ Duke em **contagem global**. Sem peso de popularidade.
 
-**Piso / cota global por SKU (travado 2026-08-20)** — todo airframe `enabled` tem pelo menos `CLASS_GLOBAL_MIN_PER_SKU` instâncias no planeta (hoje: leves **1**, medium **2**, narrow/wide **3**). Se a soma dos caps de país for menor, o seed **infla** slots e espalha o overflow pelos países elegíveis. `ensureDealerSkuFloor` backfill em saves antigos sem wipe. Instâncias `sold` contam no piso (compra não respawna sozinha; restock = trade-in).
+**Piso / cota global por SKU (travado 2026-08-20; heavies 2026-09-21)** — todo airframe `enabled` tem pelo menos `CLASS_GLOBAL_MIN_PER_SKU` instâncias no planeta (hoje: leves **1**, medium **2**, narrow/wide **5**). Se a soma dos caps de país for menor, o seed **infla** slots e espalha o overflow pelos países elegíveis. `ensureDealerSkuFloor` backfill em saves antigos sem wipe. Instâncias `sold` contam no piso (compra não respawna sozinha; restock = trade-in).
 
 **Cobertura local (país grande)** — `hubCount >= floor(62×0.95)` **or** factor at POOL cap → **1 de cada** enabled SKU in that class (GA/TP/jet). BR (~60 hubs) qualifies.
 

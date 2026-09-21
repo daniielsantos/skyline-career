@@ -58,8 +58,8 @@ export const CLASS_GLOBAL_MIN_PER_SKU: Record<FreighterClassId, number> = {
   light_turboprop: 1,
   light_jet: 1,
   medium_piston: 2,
-  narrow_freighter: 3,
-  wide_freighter: 3,
+  narrow_freighter: 5,
+  wide_freighter: 5,
 };
 
 const LISTING_LIFE_TICKS = TICKS_PER_DAY * 30;

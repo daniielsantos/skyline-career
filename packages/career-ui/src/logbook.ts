@@ -195,6 +195,59 @@ export function mergeLogbookMissions(
   return [...byId.values()];
 }
 
+/**
+ * VA company missions file is shared — Logbook must only show legs this pilot flew.
+ * Prefer {@link Mission.pilotAccountId}; fall back to {@link Mission.pilotHomeCompanyId}.
+ * Fully unstamped legs: optional legacy include (VA owner only).
+ */
+export function filterVaMissionsForPilot(
+  missions: readonly Mission[],
+  opts: {
+    viewerAccountId: string;
+    viewerHomeCompanyId?: string | null;
+    includeUnstampedLegacy?: boolean;
+  },
+): Mission[] {
+  const accountId = opts.viewerAccountId.trim();
+  if (!accountId) return [];
+  const homeId = opts.viewerHomeCompanyId?.trim() || '';
+  return missions.filter((mission) => {
+    const pilot = mission.pilotAccountId?.trim();
+    if (pilot) return pilot === accountId;
+    const home = mission.pilotHomeCompanyId?.trim();
+    if (home && homeId) return home === homeId;
+    return opts.includeUnstampedLegacy === true;
+  });
+}
+
+/** Roster display name for a VA company logbook row. */
+export function vaLogbookPilotLabel(
+  mission: Mission,
+  namesByAccountId: Readonly<Record<string, string>>,
+): string {
+  const id = mission.pilotAccountId?.trim();
+  if (id) {
+    const named = namesByAccountId[id]?.trim();
+    if (named) return named;
+    return id;
+  }
+  return 'Unknown pilot';
+}
+
+/** Company Logbook pay — route gross, not the member cut. */
+export function logbookCompanyPayoutUsd(mission: Mission): number | null {
+  if (mission.status === 'cancelled' || mission.status === 'failed') {
+    return null;
+  }
+  if (typeof mission.payoutUsd === 'number' && Number.isFinite(mission.payoutUsd)) {
+    return mission.payoutUsd;
+  }
+  if (typeof mission.payUsd === 'number' && Number.isFinite(mission.payUsd)) {
+    return mission.payUsd;
+  }
+  return null;
+}
+
 const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 

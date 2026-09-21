@@ -4518,6 +4518,19 @@ tr.lot-locked {
   background: color-mix(in srgb, var(--accent, #6ea8d6) 12%, transparent);
 }
 
+.logbook-pilot {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.va-logbook-list {
+  margin-top: 0.75rem;
+}
+
 .logbook-summary {
   margin: 0.35rem 0 0;
   color: var(--muted);

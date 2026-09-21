@@ -276,6 +276,7 @@ import {
   logbookPayoutUsd,
   logbookStatusLabel,
   mergeLogbookMissions,
+  filterVaMissionsForPilot,
 } from './logbook';
 import {
   liveRefreshScope,
@@ -3547,6 +3548,10 @@ export function App() {
   const [memberVaIsOwner, setMemberVaIsOwner] = useState(false);
   const memberVaCompanyIdRef = useRef<string | null>(null);
   memberVaCompanyIdRef.current = memberVaCompanyId;
+  const authAccountIdRef = useRef<string | null>(null);
+  authAccountIdRef.current = authAccountId;
+  const memberVaIsOwnerRef = useRef(false);
+  memberVaIsOwnerRef.current = memberVaIsOwner;
   const vaSessionFleetRef = useRef(vaSessionFleet);
   vaSessionFleetRef.current = vaSessionFleet;
 
@@ -4493,8 +4498,7 @@ export function App() {
   /**
    * Logbook is dual-tenant: home solo legs + VA ops legs live in different
    * company files. Merge every known tenant that is not the primary response.
-   * Do not require homeCompanyId — warm enter used to leave it null and the
-   * merge never pulled VA history.
+   * VA company file is shared across members — filter to this pilot only.
    */
   const loadMissionsMerged = useCallback(async () => {
     const primary = await fetchMissions();
@@ -4506,15 +4510,35 @@ export function App() {
       home = active;
       homeCompanyIdRef.current = home;
     }
+    const viewerAccountId = authAccountIdRef.current?.trim() || '';
+    const filterVaSlice = (slice: Mission[]) => {
+      if (!va || !viewerAccountId) return [];
+      return filterVaMissionsForPilot(slice, {
+        viewerAccountId,
+        viewerHomeCompanyId: home,
+        includeUnstampedLegacy: memberVaIsOwnerRef.current,
+      });
+    };
+    let missions = primary.missions ?? [];
+    // Owner home === listed VA: primary is the shared company file.
+    if (va && active === va) {
+      missions = filterVaSlice(missions);
+    }
     const extraIds = [...new Set([home, va].filter(Boolean) as string[])].filter(
       (id) => id !== active,
     );
-    if (extraIds.length === 0) return primary;
-    let missions = primary.missions ?? [];
+    if (extraIds.length === 0) {
+      return { ...primary, missions };
+    }
     for (const companyId of extraIds) {
       try {
         const other = await fetchMissions({ companyId });
-        missions = mergeLogbookMissions(missions, other.missions ?? []);
+        let slice = other.missions ?? [];
+        if (va && companyId === va) {
+          if (!viewerAccountId) continue;
+          slice = filterVaSlice(slice);
+        }
+        missions = mergeLogbookMissions(missions, slice);
       } catch {
         /* soft — keep what we have */
       }
@@ -5600,6 +5624,7 @@ export function App() {
     showAuthGate,
     activeCareerProfile?.id,
     memberVaCompanyId,
+    authAccountId,
     loadMissionsMerged,
   ]);
 

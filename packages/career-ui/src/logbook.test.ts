@@ -13,6 +13,9 @@ import {
   logbookPayoutUsd,
   logbookStatusLabel,
   mergeLogbookMissions,
+  filterVaMissionsForPilot,
+  vaLogbookPilotLabel,
+  logbookCompanyPayoutUsd,
   formatEconomyClock,
 } from './logbook.js';
 
@@ -219,6 +222,77 @@ describe('mergeLogbookMissions', () => {
     const clash = merged.find((m) => m.id === 'msn_clash');
     assert.equal(clash?.vaFlight, true);
     assert.equal(clash?.pilotPayoutUsd, 3);
+  });
+});
+
+describe('filterVaMissionsForPilot', () => {
+  it('keeps only this pilot’s VA legs', () => {
+    const mine = mission({
+      id: 'msn_me',
+      pilotAccountId: 'acc_a',
+      vaFlight: true,
+    });
+    const theirs = mission({
+      id: 'msn_them',
+      pilotAccountId: 'acc_b',
+      vaFlight: true,
+    });
+    const byHome = mission({
+      id: 'msn_home',
+      pilotHomeCompanyId: 'co_a',
+      vaFlight: true,
+    });
+    const legacy = mission({ id: 'msn_legacy', vaFlight: true });
+    const filtered = filterVaMissionsForPilot([mine, theirs, byHome, legacy], {
+      viewerAccountId: 'acc_a',
+      viewerHomeCompanyId: 'co_a',
+    });
+    assert.deepEqual(
+      filtered.map((m) => m.id).sort(),
+      ['msn_home', 'msn_me'],
+    );
+    const asOwner = filterVaMissionsForPilot([legacy, theirs], {
+      viewerAccountId: 'acc_owner',
+      viewerHomeCompanyId: 'co_va',
+      includeUnstampedLegacy: true,
+    });
+    assert.equal(asOwner.length, 1);
+    assert.equal(asOwner[0]?.id, 'msn_legacy');
+  });
+});
+
+describe('vaLogbookPilotLabel', () => {
+  it('resolves roster name then account id', () => {
+    assert.equal(
+      vaLogbookPilotLabel(mission({ pilotAccountId: 'acc_a' }), {
+        acc_a: 'Nullable',
+      }),
+      'Nullable',
+    );
+    assert.equal(
+      vaLogbookPilotLabel(mission({ pilotAccountId: 'acc_x' }), {}),
+      'acc_x',
+    );
+    assert.equal(vaLogbookPilotLabel(mission(), {}), 'Unknown pilot');
+  });
+});
+
+describe('logbookCompanyPayoutUsd', () => {
+  it('uses route gross and hides cancelled', () => {
+    assert.equal(
+      logbookCompanyPayoutUsd(
+        mission({
+          payoutUsd: 1000,
+          pilotPayoutUsd: 240,
+          status: 'settled',
+        }),
+      ),
+      1000,
+    );
+    assert.equal(
+      logbookCompanyPayoutUsd(mission({ status: 'cancelled', payoutUsd: 10 })),
+      null,
+    );
   });
 });
 

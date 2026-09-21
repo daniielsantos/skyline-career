@@ -4,6 +4,7 @@ import {
   fetchVaJoinRequests,
   fetchVaInvites,
   fetchCashflow,
+  fetchMissions,
   postVaInvite,
   postVaAcceptJoinRequest,
   postVaRejectJoinRequest,
@@ -23,6 +24,7 @@ import {
   type CompanyCreditSnapshot,
   type VaFlightQualitySnapshot,
   type VaOrgPerks,
+  type Mission,
 } from './api';
 import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
@@ -30,8 +32,19 @@ import { formatBoardMoney } from './board-money';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
 import { useConfirm } from './ConfirmDialog';
+import {
+  logbookAircraftLabel,
+  logbookCargoLabel,
+  logbookCompanyPayoutUsd,
+  logbookDistanceNm,
+  logbookFlightDurationLabel,
+  logbookFlightKind,
+  logbookFlightWhenLabel,
+  logbookStatusLabel,
+  vaLogbookPilotLabel,
+} from './logbook';
 
-type VaPane = 'roster' | 'hangar' | 'ledger' | 'config';
+type VaPane = 'roster' | 'hangar' | 'ledger' | 'logbook' | 'config';
 
 function formatRosterLastSeen(
   lastSeenAtMs: number | null | undefined,
@@ -152,6 +165,9 @@ export function VaPage(props: Props) {
   const [orgPerks, setOrgPerks] = useState<VaOrgPerks | null>(null);
   const [ledgerBusy, setLedgerBusy] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [logbookMissions, setLogbookMissions] = useState<Mission[]>([]);
+  const [logbookBusy, setLogbookBusy] = useState(false);
+  const [logbookError, setLogbookError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -170,6 +186,7 @@ export function VaPage(props: Props) {
   onFleetRef.current = props.onFleet;
   const hasVaShellRef = useRef(false);
   const ledgerFetchGenRef = useRef(0);
+  const logbookFetchGenRef = useRef(0);
   const hangarFleetGenRef = useRef(0);
 
   useEffect(() => {
@@ -212,6 +229,24 @@ export function VaPage(props: Props) {
       setLedgerError(err instanceof Error ? err.message : String(err));
     } finally {
       if (gen === ledgerFetchGenRef.current) setLedgerBusy(false);
+    }
+  }, [canShow, companyId]);
+
+  const loadLogbook = useCallback(async () => {
+    if (!canShow || !companyId) return;
+    const gen = ++logbookFetchGenRef.current;
+    setLogbookBusy(true);
+    setLogbookError(null);
+    try {
+      const snap = await fetchMissions({ companyId });
+      if (gen !== logbookFetchGenRef.current) return;
+      setLogbookMissions(snap.missions ?? []);
+    } catch (err) {
+      if (gen !== logbookFetchGenRef.current) return;
+      setLogbookError(err instanceof Error ? err.message : String(err));
+      setLogbookMissions([]);
+    } finally {
+      if (gen === logbookFetchGenRef.current) setLogbookBusy(false);
     }
   }, [canShow, companyId]);
 
@@ -375,6 +410,20 @@ export function VaPage(props: Props) {
     }
   }, [pane, listed, role, tenantSwitching, loadLedger]);
 
+  useEffect(() => {
+    if (pane === 'logbook' && listed && role && !tenantSwitching) {
+      void loadLogbook();
+    }
+  }, [pane, listed, role, tenantSwitching, loadLogbook]);
+
+  const logbookRows = useMemo(() => {
+    return [...logbookMissions].sort(
+      (a, b) =>
+        (b.acceptedAtTick ?? 0) - (a.acceptedAtTick ?? 0) ||
+        b.id.localeCompare(a.id),
+    );
+  }, [logbookMissions]);
+
   if (!canShow) {
     return (
       <section className="panel va-panel">
@@ -488,6 +537,16 @@ export function VaPage(props: Props) {
             onClick={() => setPane('ledger')}
           >
             Ledger
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'logbook'}
+            className={pane === 'logbook' ? 'tab active' : 'tab'}
+            onClick={() => setPane('logbook')}
+          >
+            Logbook
+            {logbookMissions.length > 0 ? ` (${logbookMissions.length})` : ''}
           </button>
           <button
             type="button"
@@ -856,6 +915,95 @@ export function VaPage(props: Props) {
               }}
             />
           )}
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {pane === 'logbook' ? (
+        <div className="settings-card va-pane-card">
+          {tenantSwitching ? (
+            <BusyStatus label="Opening VA logbook…" />
+          ) : (
+            <>
+              <h3>Logbook</h3>
+              <p className="settings-help">
+                Flights flown on this airline — every member. Personal Logbook
+                only shows your own legs.
+              </p>
+              {logbookError ? (
+                <p className="error" role="alert">
+                  {logbookError}
+                </p>
+              ) : null}
+              {logbookBusy && logbookMissions.length === 0 ? (
+                <BusyStatus label="Loading flights…" />
+              ) : (
+                <>
+                  <p className="panel-stats">
+                    {logbookRows.length} flights recorded · company history.
+                  </p>
+                  <ul className="mission-list logbook-list va-logbook-list">
+                    {logbookRows.map((m) => {
+                      const kind = logbookFlightKind(m);
+                      const distanceNm = logbookDistanceNm(m);
+                      const duration = logbookFlightDurationLabel(m);
+                      const when = logbookFlightWhenLabel(m);
+                      const payout = logbookCompanyPayoutUsd(m);
+                      const pilot = vaLogbookPilotLabel(m, ledgerMemberNames);
+                      const fleetLabel = m.aircraftId
+                        ? hangarFleet.find((a) => a.id === m.aircraftId)?.label
+                        : null;
+                      return (
+                        <li key={m.id} className="mission logbook-entry">
+                          <div className="mission-main">
+                            <div className="route">
+                              <span>{m.originIcao}</span>
+                              <span className="arrow">→</span>
+                              <span>{m.destIcao}</span>
+                              <span className={`status status-${m.status}`}>
+                                {logbookStatusLabel(m.status)}
+                              </span>
+                              <span className="logbook-kind">{kind}</span>
+                              <span
+                                className="logbook-kind logbook-pilot"
+                                title="Pilot who flew this leg"
+                              >
+                                {pilot}
+                              </span>
+                            </div>
+                            <p className="logbook-summary">
+                              {logbookAircraftLabel(m, { fleetLabel })}
+                              {' · '}
+                              {logbookCargoLabel(m, (kg) =>
+                                `${Math.round(kg).toLocaleString('en-US')} kg`,
+                              )}
+                              {' · '}
+                              {distanceNm != null
+                                ? `${distanceNm.toLocaleString('en-US')} nm`
+                                : 'Distance —'}
+                              {' · '}
+                              {duration ?? 'Time —'}
+                              {' · '}
+                              {when ?? 'When —'}
+                              {' · '}
+                              {payout != null
+                                ? formatBoardMoney(payout)
+                                : '—'}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                    {logbookRows.length === 0 ? (
+                      <li className="empty">
+                        No VA flights yet — accept Freights, Charter, or Internal
+                        Haul on a company aircraft.
+                      </li>
+                    ) : null}
+                  </ul>
+                </>
+              )}
             </>
           )}
         </div>

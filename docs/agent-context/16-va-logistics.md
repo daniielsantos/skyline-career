@@ -42,12 +42,13 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 ## Perspectivas My VA (owner vs membro) — **DECIDIDO · UI parcial shipped**
 
-My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger / Config). API já rejeita ações fora do role; UI deve **esconder** controles, não só falhar no click.
+My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger / Logbook / Config). API já rejeita ações fora do role; UI deve **esconder** controles, não só falhar no click.
 
 | Ação | Owner | Dispatcher | Pilot (membro) |
 |--|--|--|--|
 | Ver roster / hangar (frota VA) | sim | sim | sim (read; mutações Hangar = ver nota) |
 | Ver Ledger (wallet + cashflow VA) | sim | sim | sim |
+| Ver Logbook (voos da company + membro) | sim | sim | sim |
 | Ver Flight quality (+ Owner ops no credit) | sim | sim | sim |
 | Accept/reject join requests | sim | sim | não |
 | Create invite | sim | sim | não |
@@ -131,6 +132,8 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 9. **Logbook (2026-09-20):** tag **VA** quando `vaFlight` (accept sob company `va_listed`) ou Internal Haul. Pay mostrado = `pilotPayoutUsd` (fatia home / fee IH) quando stampado no settle; senão `payoutUsd` bruto da rota. Membro Freights com cut: UI sufixo `cut`. Histórico pré-stamp: na company VA listada o GET `/api/missions` força `vaFlight` (tag), mas pay antigo continua bruto até novo settle.
 10. **Logbook merge home+VA (2026-09-20):** voos solo e VA vivem em arquivos de company distintos; `selectTab` restaura home → Logbook home-only ficava vazio se só voou VA. Fix: `loadMissionsMerged` busca home + VA (`fetchMissions({ companyId })`) e `mergeLogbookMissions` por id.
 11. **Logbook merge still empty (2026-09-20):** `warmCareerBeforeEnter` não setava `homeCompanyId`; merge exigia `home && va` → nunca puxava VA. Fix: stamp home no warm; merge todo tenant extra ≠ active; `GET /api/missions?companyId=` como Charter.
+12. **Logbook leaked other members’ VA flights (2026-09-20):** merge puxava o arquivo inteiro da company VA. Fix: `filterVaMissionsForPilot` (`pilotAccountId` / `pilotHomeCompanyId`; legacy unstamped só pro owner).
+13. **My VA Logbook tab (2026-09-20):** histórico da company (todos os membros) em My VA → Logbook; chip com nome do piloto; pay = bruto da rota. Logbook sidebar continua pessoal.
 
 ### Charter board infinite loading (VA tail) — **shipped (2026-09-20)**
 
@@ -702,6 +705,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **VA Accept dual-tenant pilotIcao** — mirror home onto ops before co-location assert
 - [x] **Logbook merge home+VA** — dual fetch + merge by id (chrome sticky home)
 - [x] **Logbook merge warm-enter** — stamp homeCompanyId; merge extras without requiring home; missions?companyId=
+- [x] **Logbook VA per-pilot filter** — shared VA file filtered by pilotAccountId / pilotHomeCompanyId
+- [x] **My VA Logbook** — company history + member chip; personal Logbook stays filtered
 - [x] **Charter board infinite load** — deps on resolved companyId string, not resolver fn
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)

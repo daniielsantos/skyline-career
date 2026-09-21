@@ -481,6 +481,7 @@ export function PortsPanel(props: {
   const [scoutHaulSuggestions, setScoutHaulSuggestions] = useState<
     PortScoutHaulSuggestion[]
   >([]);
+  const [scoutEmptyHint, setScoutEmptyHint] = useState<string[] | null>(null);
   const [scoutFocusId, setScoutFocusId] = useState<string | null>(null);
   const [scoutFocusToken, setScoutFocusToken] = useState(0);
   const [scoutFilter, setScoutFilter] = useState<
@@ -556,10 +557,12 @@ export function PortsPanel(props: {
         setScoutSuggestions(scout.suggestions ?? []);
         setScoutDemandSuggestions(scout.demandSuggestions ?? []);
         setScoutHaulSuggestions(scout.haulSuggestions ?? []);
+        setScoutEmptyHint(scout.emptyHint?.lines ?? null);
       } catch {
         setScoutSuggestions([]);
         setScoutDemandSuggestions([]);
         setScoutHaulSuggestions([]);
+        setScoutEmptyHint(null);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -585,6 +588,7 @@ export function PortsPanel(props: {
       setScoutSuggestions(result.suggestions ?? []);
       setScoutDemandSuggestions(result.demandSuggestions ?? []);
       setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      setScoutEmptyHint(result.emptyHint?.lines ?? null);
       const pilotPay = result.hold?.pilotPayUsd ?? 0;
       props.onToast?.(
         'ok',
@@ -619,6 +623,7 @@ export function PortsPanel(props: {
       setScoutSuggestions(result.suggestions ?? []);
       setScoutDemandSuggestions(result.demandSuggestions ?? []);
       setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      setScoutEmptyHint(result.emptyHint?.lines ?? null);
       props.onToast?.(
         'ok',
         `Scout Demand hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(s.payUsd)} — Dispatch when ready`,
@@ -650,6 +655,7 @@ export function PortsPanel(props: {
       setScoutSuggestions(result.suggestions ?? []);
       setScoutDemandSuggestions(result.demandSuggestions ?? []);
       setScoutHaulSuggestions(result.haulSuggestions ?? []);
+      setScoutEmptyHint(result.emptyHint?.lines ?? null);
       props.onToast?.(
         'ok',
         `Scout Haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)} — Dispatch when ready`,
@@ -3623,144 +3629,150 @@ export function PortsPanel(props: {
                   <div className="ports-listings ports-fbo-panel">
                     {port.concession?.status === 'yours' ? (
                       <>
-                        {scoutMergedRows.length > 0 ||
-                        scoutHaulSuggestions.length +
-                          scoutDemandSuggestions.length +
-                          scoutSuggestions.length >
-                          0 ? (
-                          <div
-                            className="ports-scout-desk"
-                            aria-label="Port FBO scout suggestions"
-                          >
-                            <div className="ports-scout-head">
-                              <p className="ports-scout-title">Scout</p>
-                              <div
-                                className="ports-scout-filters"
-                                role="tablist"
-                                aria-label="Scout kind"
-                              >
-                                {(
-                                  [
-                                    ['all', 'All'],
-                                    ['haul', 'Haul'],
-                                    ['demand', 'Demand'],
-                                    ['bridge', 'Bridge'],
-                                  ] as const
-                                ).map(([id, label]) => (
-                                  <button
-                                    key={id}
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={scoutFilter === id}
-                                    className={
-                                      scoutFilter === id
-                                        ? 'fbo-icao-chip active'
-                                        : 'fbo-icao-chip'
-                                    }
-                                    disabled={props.busy || loading}
-                                    onClick={() => setScoutFilter(id)}
-                                  >
-                                    {label}
-                                  </button>
-                                ))}
-                              </div>
+                        <div
+                          className="ports-scout-desk"
+                          aria-label="Port FBO scout suggestions"
+                        >
+                          <div className="ports-scout-head">
+                            <p className="ports-scout-title">Scout</p>
+                            <div
+                              className="ports-scout-filters"
+                              role="tablist"
+                              aria-label="Scout kind"
+                            >
+                              {(
+                                [
+                                  ['all', 'All'],
+                                  ['haul', 'Haul'],
+                                  ['demand', 'Demand'],
+                                  ['bridge', 'Bridge'],
+                                ] as const
+                              ).map(([id, label]) => (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  role="tab"
+                                  aria-selected={scoutFilter === id}
+                                  className={
+                                    scoutFilter === id
+                                      ? 'fbo-icao-chip active'
+                                      : 'fbo-icao-chip'
+                                  }
+                                  disabled={props.busy || loading}
+                                  onClick={() => setScoutFilter(id)}
+                                >
+                                  {label}
+                                </button>
+                              ))}
                             </div>
-                            {scoutMergedRows.length === 0 ? (
-                              <p className="muted ports-warehouse-hint">
-                                No {scoutFilter} ideas — try All.
-                              </p>
-                            ) : (
-                              <div className="table-wrap ports-scout-table-wrap">
-                                <table className="data-table ports-scout-table">
-                                  <thead>
-                                    <tr>
-                                      <th>Kind</th>
-                                      <th>Route</th>
-                                      <th>Commodity</th>
-                                      <th>Mass</th>
-                                      <th>Pay</th>
-                                      <th>Nm</th>
-                                      <th />
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {scoutMergedRows.map((row) => (
-                                      <tr
-                                        key={`${row.kind}-${row.id}`}
-                                        className={
-                                          scoutFocusId === row.id
-                                            ? 'ports-scout-tr is-selected'
-                                            : 'ports-scout-tr'
-                                        }
-                                        onClick={() => focusScoutRow(row.id)}
-                                      >
-                                        <td className="muted">
-                                          {row.kind === 'haul'
-                                            ? 'Haul'
-                                            : row.kind === 'demand'
-                                              ? 'Demand'
-                                              : 'Bridge'}
-                                        </td>
-                                        <td>
-                                          <strong>
-                                            {row.originIcao}→{row.destIcao}
-                                          </strong>
-                                        </td>
-                                        <td>
-                                          {commodityLabel({
-                                            commodityId: row.commodityId,
-                                          })}
-                                        </td>
-                                        <td>
-                                          {props.formatTonnes(row.kg)}
-                                        </td>
-                                        <td>
-                                          {row.payUsd != null
-                                            ? props.formatMoney(row.payUsd)
-                                            : '—'}
-                                        </td>
-                                        <td className="muted">
-                                          {row.distanceNm > 0
-                                            ? row.distanceNm
-                                            : '—'}
-                                        </td>
-                                        <td>
-                                          <button
-                                            type="button"
-                                            className="accept"
-                                            disabled={props.busy || loading}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              if (row.kind === 'haul') {
-                                                void onScoutHaulConfirm(
-                                                  row.raw,
-                                                );
-                                              } else if (
-                                                row.kind === 'demand'
-                                              ) {
-                                                void onScoutDemandConfirm(
-                                                  row.raw,
-                                                );
-                                              } else {
-                                                void onScoutConfirm(row.raw);
-                                              }
-                                            }}
-                                          >
-                                            Hold
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
                           </div>
-                        ) : (
-                          <p className="muted ports-warehouse-hint">
-                            No Scout ideas — buy stock or wait for a tick.
-                          </p>
-                        )}
+                          {scoutMergedRows.length === 0 ? (
+                            <div className="ports-scout-empty">
+                              {(scoutFilter !== 'all'
+                                ? [
+                                    `No ${scoutFilter} ideas right now — try All.`,
+                                  ]
+                                : scoutEmptyHint && scoutEmptyHint.length > 0
+                                  ? scoutEmptyHint
+                                  : [
+                                      'No Scout ideas right now — check stock, Demand board, or wait for a tick.',
+                                    ]
+                              ).map((line) => (
+                                <p
+                                  key={line}
+                                  className="muted ports-warehouse-hint"
+                                >
+                                  {line}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="table-wrap ports-scout-table-wrap">
+                              <table className="data-table ports-scout-table">
+                                <thead>
+                                  <tr>
+                                    <th>Kind</th>
+                                    <th>Route</th>
+                                    <th>Commodity</th>
+                                    <th>Mass</th>
+                                    <th>Pay</th>
+                                    <th>Nm</th>
+                                    <th />
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {scoutMergedRows.map((row) => (
+                                    <tr
+                                      key={`${row.kind}-${row.id}`}
+                                      className={
+                                        scoutFocusId === row.id
+                                          ? 'ports-scout-tr is-selected'
+                                          : 'ports-scout-tr'
+                                      }
+                                      onClick={() => focusScoutRow(row.id)}
+                                    >
+                                      <td className="muted">
+                                        {row.kind === 'haul'
+                                          ? 'Haul'
+                                          : row.kind === 'demand'
+                                            ? 'Demand'
+                                            : 'Bridge'}
+                                      </td>
+                                      <td>
+                                        <strong>
+                                          {row.originIcao}→{row.destIcao}
+                                        </strong>
+                                      </td>
+                                      <td>
+                                        {commodityLabel({
+                                          commodityId: row.commodityId,
+                                        })}
+                                      </td>
+                                      <td>
+                                        {props.formatTonnes(row.kg)}
+                                      </td>
+                                      <td>
+                                        {row.payUsd != null
+                                          ? props.formatMoney(row.payUsd)
+                                          : '—'}
+                                      </td>
+                                      <td className="muted">
+                                        {row.distanceNm > 0
+                                          ? row.distanceNm
+                                          : '—'}
+                                      </td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="accept"
+                                          disabled={props.busy || loading}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (row.kind === 'haul') {
+                                              void onScoutHaulConfirm(
+                                                row.raw,
+                                              );
+                                            } else if (
+                                              row.kind === 'demand'
+                                            ) {
+                                              void onScoutDemandConfirm(
+                                                row.raw,
+                                              );
+                                            } else {
+                                              void onScoutConfirm(row.raw);
+                                            }
+                                          }}
+                                        >
+                                          Hold
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
 
                         {(() => {
                           const deskOrders = (snap?.autoBuyOrders ?? []).filter(

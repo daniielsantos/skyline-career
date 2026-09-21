@@ -53,8 +53,11 @@ export const PORT_SCOUT_MAX_SUGGESTIONS = 8;
 /** Max nm for haul dest candidates (P2 corridor-ish). */
 export const PORT_SCOUT_HAUL_MAX_NM = 1_800;
 
-/** Only suggest haul to terminals below this fill fraction. */
-export const PORT_SCOUT_HAUL_DEST_FILL_MAX = 0.4;
+/**
+ * Prefer emptier terminals in haul score — not a hard gate.
+ * Densify Dry sits ~92–94% fill; a 40% cap emptied Haul Scout everywhere.
+ */
+export const PORT_SCOUT_HAUL_DEST_FILL_SOFT = 0.4;
 
 export type PortScoutBridgeSuggestion = {
   /** Stable key: ORIGIN|DEST|commodity */
@@ -549,13 +552,17 @@ export function listPortScoutHaulSuggestions(
 
         const pile = ap.inventory[commodityId];
         if (!pile || pile.capacityKg <= 0) continue;
-        const fill = pile.stockKg / pile.capacityKg;
-        if (fill > PORT_SCOUT_HAUL_DEST_FILL_MAX) continue;
+        const roomKg = Math.max(0, pile.capacityKg - pile.stockKg);
+        // Absolute room (same densify lesson as last-mile): % fill gates kill
+        // every hub when Dry sits ~92–94% full.
+        if (roomKg < PORT_SCOUT_MIN_KG) continue;
 
         const distanceNm = moneyNm(world, origin, dest);
         if (distanceNm <= 0 || distanceNm > PORT_SCOUT_HAUL_MAX_NM) continue;
 
-        const kg = free;
+        const kg = Math.min(free, roomKg);
+        if (kg < PORT_SCOUT_MIN_KG) continue;
+        const fill = pile.stockKg / pile.capacityKg;
         const payUsd = quoteWarehouseHaulPayUsd(world, {
           originIcao: origin,
           destIcao: dest,
@@ -566,8 +573,12 @@ export function listPortScoutHaulSuggestions(
 
         const unitPriceUsd = money(payUsd / kg);
         const nm = Math.round(distanceNm);
-        const score =
-          payUsd - Math.min(nm, 800) * 0.2 - fill * 500;
+        // Soft preference for emptier dests (legacy 40% band), still allow full hubs with room.
+        const fillSoft =
+          fill > PORT_SCOUT_HAUL_DEST_FILL_SOFT
+            ? (fill - PORT_SCOUT_HAUL_DEST_FILL_SOFT) * 800
+            : 0;
+        const score = payUsd - Math.min(nm, 800) * 0.2 - fillSoft;
         out.push({
           id: `${origin}|${dest}|${commodityId}`,
           originIcao: origin,
@@ -653,5 +664,159 @@ export function confirmPortScoutHaul(
     kg: held.kg,
     payUsd: held.payUsd,
     suggestion: match ?? null,
+  };
+}
+
+export type PortScoutEmptyHint = {
+  /** Short player-facing lines (1–3). */
+  lines: string[];
+  warehouseCount: number;
+  stockKgAtOwnedHubs: number;
+  openDemandOrders: number;
+  demandReachableMatches: number;
+  haulRoomDests: number;
+};
+
+/**
+ * Why Scout is empty — used for UI copy (not a second suggestion engine).
+ */
+export function diagnosePortScoutEmpty(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { companyId?: string } = {},
+): PortScoutEmptyHint {
+  const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const warehouses = ensurePlayerWarehouses(state).warehouses;
+  let stockKgAtOwnedHubs = 0;
+  const ownedOrigins: string[] = [];
+  for (const wh of warehouses) {
+    const origin = wh.icao.trim().toUpperCase();
+    if (!playerOperatesPortTouchingHub(world, origin, companyId)) continue;
+    ownedOrigins.push(origin);
+    for (const pile of ensurePlayerWarehouses(state).stock) {
+      if (pile.warehouseId !== wh.id || pile.kg <= 0) continue;
+      if (!isWarehouseCommodityAllowed(pile.commodityId)) continue;
+      stockKgAtOwnedHubs += pile.kg;
+    }
+  }
+
+  const open = listOpenDemandOrders(world);
+  let demandReachableMatches = 0;
+  for (const origin of ownedOrigins) {
+    for (const order of open) {
+      if (!cargoOpsIsUnlocked(state.cargoOps, order.commodityId)) continue;
+      if (!isWarehouseCommodityAllowed(order.commodityId)) continue;
+      const dest = order.destIcao.trim().toUpperCase();
+      if (dest === origin) continue;
+      const free = warehouseFreeCommodityKg(state, origin, order.commodityId);
+      if (Math.min(free, order.remainingKg) < PORT_SCOUT_MIN_KG) continue;
+      if (demandRouteReachable(state, world, origin, dest, order.portId)) {
+        demandReachableMatches += 1;
+      }
+    }
+  }
+
+  let haulRoomDests = 0;
+  for (const origin of ownedOrigins) {
+    for (const pile of ensurePlayerWarehouses(state).stock) {
+      const wh = warehouses.find((w) => w.id === pile.warehouseId);
+      if (!wh || wh.icao.trim().toUpperCase() !== origin) continue;
+      if (pile.kg < PORT_SCOUT_MIN_KG) continue;
+      if (!cargoOpsIsUnlocked(state.cargoOps, pile.commodityId)) continue;
+      for (const ap of world.airports ?? []) {
+        const dest = ap.icao.trim().toUpperCase();
+        if (!dest || dest === origin) continue;
+        if (isBushHub(dest) || isBushTripOnlyHub(dest)) continue;
+        const inv = ap.inventory[pile.commodityId];
+        if (!inv || inv.capacityKg <= 0) continue;
+        const roomKg = Math.max(0, inv.capacityKg - inv.stockKg);
+        if (roomKg < PORT_SCOUT_MIN_KG) continue;
+        const nm = moneyNm(world, origin, dest);
+        if (nm <= 0 || nm > PORT_SCOUT_HAUL_MAX_NM) continue;
+        haulRoomDests += 1;
+        if (haulRoomDests >= 3) break;
+      }
+      if (haulRoomDests >= 3) break;
+    }
+    if (haulRoomDests >= 3) break;
+  }
+
+  const lines: string[] = [];
+  if (ownedOrigins.length === 0) {
+    lines.push('Claim Port FBO first — Scout only runs from hubs you operate.');
+  } else if (stockKgAtOwnedHubs < PORT_SCOUT_MIN_KG) {
+    lines.push(
+      'No usable stock at your Port FBO hubs yet — buy from Catalog or wait for inbound.',
+    );
+  } else {
+    if (warehouses.length < 2) {
+      lines.push(
+        'Bridge needs a 2nd company warehouse (WH→WH). Demand / Haul use this stock.',
+      );
+    }
+    if (open.length === 0) {
+      lines.push('Demand board is empty — wait for a tick or check another desk.');
+    } else if (demandReachableMatches === 0) {
+      lines.push(
+        'No open Demand matches your stock + corridor from this hub.',
+      );
+    }
+    if (haulRoomDests === 0) {
+      lines.push(
+        'No terminal within range has room for a Wide haul (≥200 kg free).',
+      );
+    }
+  }
+  if (lines.length === 0) {
+    lines.push('No Scout ideas right now — try again after the next tick.');
+  }
+
+  return {
+    lines: lines.slice(0, 3),
+    warehouseCount: warehouses.length,
+    stockKgAtOwnedHubs,
+    openDemandOrders: open.length,
+    demandReachableMatches,
+    haulRoomDests,
+  };
+}
+
+/** Bridge + Demand + Haul scout desk payload (API / UI). */
+export function listPortScoutDesk(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { companyId?: string; max?: number } = {},
+): {
+  suggestions: PortScoutBridgeSuggestion[];
+  demandSuggestions: PortScoutDemandSuggestion[];
+  haulSuggestions: PortScoutHaulSuggestion[];
+  emptyHint: PortScoutEmptyHint | null;
+} {
+  const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const max = opts.max;
+  const suggestions = listPortScoutBridgeSuggestions(state, world, {
+    companyId,
+    max,
+  });
+  const demandSuggestions = listPortScoutDemandSuggestions(state, world, {
+    companyId,
+    max,
+  });
+  const haulSuggestions = listPortScoutHaulSuggestions(state, world, {
+    companyId,
+    max,
+  });
+  const empty =
+    suggestions.length +
+      demandSuggestions.length +
+      haulSuggestions.length ===
+    0;
+  return {
+    suggestions,
+    demandSuggestions,
+    haulSuggestions,
+    emptyHint: empty
+      ? diagnosePortScoutEmpty(state, world, { companyId })
+      : null,
   };
 }

@@ -232,12 +232,10 @@ import {
   quotePortStevedoreHaul,
   startPortStevedoreHaul,
   listPortStevedoreDestinations,
-  listPortScoutBridgeSuggestions,
   confirmPortScoutBridge,
-  listPortScoutDemandSuggestions,
   confirmPortScoutDemand,
-  listPortScoutHaulSuggestions,
   confirmPortScoutHaul,
+  listPortScoutDesk,
   listBaseDispatchScoutSuggestions,
   confirmBaseDispatchScout,
   listBaseDispatchTours,
@@ -8910,6 +8908,7 @@ export function createCareerApiServer(port = 8787) {
                     ? Number(body.walletFloorUsd)
                     : undefined,
                 paused: body.paused === true,
+                companyId: ports_auto_buyCompanyId,
               });
             }
             return {
@@ -9806,14 +9805,13 @@ export function createCareerApiServer(port = 8787) {
               send(res, 503, { error: 'Economy not loaded' });
               return;
             }
-            send(res, 200, {
-              suggestions: listPortScoutBridgeSuggestions(missions, world),
-              demandSuggestions: listPortScoutDemandSuggestions(
-                missions,
-                world,
-              ),
-              haulSuggestions: listPortScoutHaulSuggestions(missions, world),
-            });
+            send(
+              res,
+              200,
+              listPortScoutDesk(missions, world, {
+                companyId: ports_scoutCompanyId,
+              }),
+            );
             return;
           }
           if (kind === 'demand') {
@@ -9829,16 +9827,14 @@ export function createCareerApiServer(port = 8787) {
                 orderId: body.orderId!,
                 originIcao: body.originIcao!,
                 kg: body.kg != null ? Number(body.kg) : undefined,
+                companyId: ports_scoutCompanyId,
               });
               return {
                 hold: confirmed.hold,
                 kg: confirmed.kg,
-                suggestions: listPortScoutBridgeSuggestions(missions, world),
-                demandSuggestions: listPortScoutDemandSuggestions(
-                  missions,
-                  world,
-                ),
-                haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+                ...listPortScoutDesk(missions, world, {
+                  companyId: ports_scoutCompanyId,
+                }),
                 ports: portSnapshot(world, missions),
                 warehouses: playerWarehouseSnapshot(missions, world),
                 demand: demandSnapshot(world, {
@@ -9872,17 +9868,15 @@ export function createCareerApiServer(port = 8787) {
                   typeof confirmPortScoutHaul
                 >[2]['commodityId'],
                 kg: body.kg != null ? Number(body.kg) : undefined,
+                companyId: ports_scoutCompanyId,
               });
               return {
                 hold: confirmed.hold,
                 kg: confirmed.kg,
                 payUsd: confirmed.payUsd,
-                suggestions: listPortScoutBridgeSuggestions(missions, world),
-                demandSuggestions: listPortScoutDemandSuggestions(
-                  missions,
-                  world,
-                ),
-                haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+                ...listPortScoutDesk(missions, world, {
+                  companyId: ports_scoutCompanyId,
+                }),
                 ports: portSnapshot(world, missions),
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
@@ -9909,16 +9903,14 @@ export function createCareerApiServer(port = 8787) {
                 typeof confirmPortScoutBridge
               >[2]['commodityId'],
               kg: body.kg != null ? Number(body.kg) : undefined,
+              companyId: ports_scoutCompanyId,
             });
             return {
               hold: confirmed.hold,
               kg: confirmed.kg,
-              suggestions: listPortScoutBridgeSuggestions(missions, world),
-              demandSuggestions: listPortScoutDemandSuggestions(
-                missions,
-                world,
-              ),
-              haulSuggestions: listPortScoutHaulSuggestions(missions, world),
+              ...listPortScoutDesk(missions, world, {
+                companyId: ports_scoutCompanyId,
+              }),
               ports: portSnapshot(world, missions),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
@@ -9956,6 +9948,7 @@ export function createCareerApiServer(port = 8787) {
             send(res, 200, {
               quote: quotePortShuttleBridgeHold(missions, world, {
                 holdId: body.holdId,
+                companyId: ports_shuttleCompanyId,
               }),
             });
             return;
@@ -9980,6 +9973,7 @@ export function createCareerApiServer(port = 8787) {
               holdId: body.holdId!,
               aircraftId: body.aircraftId!,
               nowMs: Date.now(),
+              companyId: ports_shuttleCompanyId,
             });
             return {
               mission: dispatched.mission,
@@ -10030,6 +10024,7 @@ export function createCareerApiServer(port = 8787) {
                   missions,
                   world,
                   body.pickupId,
+                  ports_stevedoreCompanyId,
                 ),
               });
               return;
@@ -10039,11 +10034,16 @@ export function createCareerApiServer(port = 8787) {
               return;
             }
             send(res, 200, {
-              quote: quotePortStevedoreHaul(missions, world, {
-                pickupId: body.pickupId,
-                destWarehouseId: body.destWarehouseId,
-                kg: body.kg != null ? Number(body.kg) : undefined,
-              }),
+              quote: quotePortStevedoreHaul(
+                missions,
+                world,
+                {
+                  pickupId: body.pickupId,
+                  destWarehouseId: body.destWarehouseId,
+                  kg: body.kg != null ? Number(body.kg) : undefined,
+                },
+                ports_stevedoreCompanyId,
+              ),
             });
             return;
           }
@@ -10053,11 +10053,16 @@ export function createCareerApiServer(port = 8787) {
           }
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const started = startPortStevedoreHaul(missions, world, {
-              pickupId: body.pickupId!,
-              destWarehouseId: body.destWarehouseId!,
-              kg: body.kg != null ? Number(body.kg) : undefined,
-            });
+            const started = startPortStevedoreHaul(
+              missions,
+              world,
+              {
+                pickupId: body.pickupId!,
+                destWarehouseId: body.destWarehouseId!,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+              },
+              ports_stevedoreCompanyId,
+            );
             return {
               walletUsd: missions.walletUsd,
               quote: started.quote,

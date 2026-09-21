@@ -3248,6 +3248,14 @@ export function postPortScout(opts: {
     suggestions?: PortScoutBridgeSuggestion[];
     demandSuggestions?: PortScoutDemandSuggestion[];
     haulSuggestions?: PortScoutHaulSuggestion[];
+    emptyHint?: {
+      lines: string[];
+      warehouseCount: number;
+      stockKgAtOwnedHubs: number;
+      openDemandOrders: number;
+      demandReachableMatches: number;
+      haulRoomDests: number;
+    } | null;
     hold?: {
       id: string;
       kind?: string;

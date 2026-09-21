@@ -77,6 +77,36 @@ describe('port auto-buy desk', () => {
     );
   });
 
+  it('rejects upsert when companyId does not match Port FBO operator', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = grantT3PickupWarehouse(state);
+    claimPortConcession(state, world, {
+      portId: 'BRSSZ',
+      companyId: 'co_lamusine',
+    });
+    assert.throws(
+      () =>
+        upsertPortAutoBuyOrder(state, world, {
+          portId: 'BRSSZ',
+          commodityId: 'supplies',
+          maxPriceUsdPerKg: 2,
+          maxKgPerDay: 8000,
+          warehouseId,
+        }),
+      /active Port FBO/,
+    );
+    const order = upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'supplies',
+      maxPriceUsdPerKg: 2,
+      maxKgPerDay: 8000,
+      warehouseId,
+      companyId: 'co_lamusine',
+    });
+    assert.equal(order.portId, 'BRSSZ');
+    assert.equal(order.commodityId, 'supplies');
+  });
+
   function seedSbgrGeneralListing(
     world: ReturnType<typeof createSeedEconomyWorld>,
     availableKg = 5_000,

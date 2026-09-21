@@ -214,6 +214,43 @@ describe('port scout', () => {
     assert.equal(listPortScoutHaulSuggestions(state, world).length, 0);
   });
 
+  it('Haul scout suggests even when dest fill is high if room remains', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 1_500,
+      avgCostUsdPerKg: 1.0,
+      tick: world.tick,
+    });
+    // Densify reality: hubs sit ~90%+ full; old 40% gate emptied Scout.
+    // Fill every other hub to capacity so only SBGL has room (top-8 ranking).
+    for (const ap of world.airports) {
+      ap.inventory.general = {
+        capacityKg: 80_000,
+        stockKg: 80_000,
+      };
+    }
+    const dest = world.airports.find((a) => a.icao === 'SBGL');
+    assert.ok(dest);
+    dest!.inventory.general = {
+      capacityKg: 80_000,
+      stockKg: 73_000, // 91% fill, 7t room
+    };
+    const suggestions = listPortScoutHaulSuggestions(state, world);
+    const hit = suggestions.find(
+      (s) =>
+        s.originIcao === 'SBGR' &&
+        s.destIcao === 'SBGL' &&
+        s.commodityId === 'general',
+    );
+    assert.ok(hit, 'expected Haul scout row despite high fill');
+    assert.ok(hit!.kg >= PORT_SCOUT_MIN_KG);
+    assert.ok(hit!.kg <= 7_000);
+  });
+
   it('Haul scout suggests and confirms holdWarehouseHaul', () => {
     const { world, state } = missionsAtSantos();
     grantWh(state, 'SBGR');
@@ -226,13 +263,9 @@ describe('port scout', () => {
       tick: world.tick,
     });
     for (const ap of world.airports) {
-      const pile = ap.inventory.general ?? {
-        stockKg: 0,
-        capacityKg: 80_000,
-      };
       ap.inventory.general = {
-        capacityKg: Math.max(pile.capacityKg, 80_000),
-        stockKg: Math.max(pile.capacityKg, 80_000) * 0.9,
+        capacityKg: 80_000,
+        stockKg: 80_000,
       };
     }
     const dest = world.airports.find((a) => a.icao === 'SBGL');

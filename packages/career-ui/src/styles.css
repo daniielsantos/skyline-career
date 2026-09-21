@@ -14224,6 +14224,47 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   display: none;
 }
 
+.va-port-path {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.va-port-path-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.va-port-path-head .va-config-section-title {
+  margin: 0;
+}
+
+.va-port-path-blurb {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.va-port-path .settings-help {
+  margin: 0 0 0.55rem;
+}
+
+.va-port-path .va-checklist {
+  margin: 0.35rem 0 0;
+}
+
+.va-port-path-done {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+}
+
 .va-checklist li.is-done {
   color: var(--ink);
 }

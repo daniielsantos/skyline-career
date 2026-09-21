@@ -30,6 +30,7 @@ import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
 import { VaHaulsBoard } from './VaHaulsBoard';
+import { VaPortPathCard } from './VaPortPathCard';
 import { formatBoardMoney } from './board-money';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
@@ -896,6 +897,8 @@ export function VaPage(props: Props) {
           companyId={companyId || ''}
           homeHubIcao={homeHubIcao}
           fleet={hangarFleet}
+          walletUsd={props.walletUsd}
+          isOwner={isOwner}
           busy={pageBusy}
           onWallet={props.onWallet}
           onFleet={(next) => {
@@ -1162,6 +1165,10 @@ export function VaPage(props: Props) {
                       ? `Line crew · ${lineCrew.tierName ?? 'Desk'} (${lineCrew.remaining}/${lineCrew.allowance} ferry/wk)`
                       : 'Hire Line crew so empty ferry does not drain the VA wallet'}
                   </li>
+                  <li>
+                    Path to Port FBO · see Hauls — WH T3 at hub, then claim on
+                    Ports (company CAPEX)
+                  </li>
                 </>
               ) : (
                 <>
@@ -1173,7 +1180,8 @@ export function VaPage(props: Props) {
                     My VA Hangar · Reserve a parked tail (4h) before Prepare
                   </li>
                   <li>
-                    Hauls · Accept Internal Haul with a VA tail at origin
+                    Hauls · Accept Internal Haul when the company posts bridges
+                    (after Port FBO + stock)
                   </li>
                   <li>
                     Freights · pick an aircraft labeled VA · settle pays your
@@ -1183,6 +1191,15 @@ export function VaPage(props: Props) {
               )}
             </ul>
           </section>
+
+          <VaPortPathCard
+            companyId={companyId || ''}
+            homeHubIcao={homeHubIcao}
+            walletUsd={props.walletUsd}
+            isOwner={isOwner}
+            busy={pageBusy}
+            onGoPorts={props.onGoPorts}
+          />
 
           <section className="va-config-section">
             <h4 className="va-config-section-title">Hiring</h4>

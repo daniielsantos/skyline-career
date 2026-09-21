@@ -9,6 +9,7 @@ import {
   type VaHaulMission,
 } from './api';
 import { formatBoardMoney } from './board-money';
+import { VaPortPathCard } from './VaPortPathCard';
 
 function formatMassKg(kg: number): string {
   if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`;
@@ -25,6 +26,8 @@ type Props = {
   companyId: string;
   homeHubIcao: string;
   fleet: PlayerAircraft[];
+  walletUsd: number;
+  isOwner: boolean;
   busy?: boolean;
   onWallet?: (walletUsd: number) => void;
   onFleet?: (fleet: PlayerAircraft[]) => void;
@@ -193,9 +196,9 @@ export function VaHaulsBoard(props: Props) {
         <div>
           <h3>Hauls</h3>
           <p className="settings-help">
-            Internal Haul board for this company — WH→WH bridges with pilot pay.
-            Accept with a parked VA tail at origin, then open Dispatch. Desk buy
-            and Scout stay on Ports.
+            Paid WH→WH Internal Hauls for this company. Accept with a parked VA
+            tail at origin, then Dispatch. Until Port FBO + stock exist, fly
+            Freights with a VA-labeled aircraft — desk buy/Scout stay on Ports.
           </p>
         </div>
         {props.onGoPorts ? (
@@ -209,6 +212,15 @@ export function VaHaulsBoard(props: Props) {
           </button>
         ) : null}
       </header>
+
+      <VaPortPathCard
+        companyId={props.companyId}
+        homeHubIcao={props.homeHubIcao}
+        walletUsd={props.walletUsd}
+        isOwner={props.isOwner}
+        busy={pageBusy}
+        onGoPorts={props.onGoPorts}
+      />
 
       {portStrip ? (
         <p className="va-hauls-port-strip" role="status">
@@ -247,8 +259,9 @@ export function VaHaulsBoard(props: Props) {
             </h4>
             {holds.length === 0 ? (
               <p className="empty">
-                No paid Internal Hauls waiting. Owner/dispatcher creates them
-                from Ports (Scout / Hold bridge).
+                No paid Internal Hauls waiting. After Port FBO + company stock,
+                owner/dispatcher posts bridges from Ports (Scout / Hold). Until
+                then, fly Freights with a VA tail for cut pay.
               </p>
             ) : (
               <ul className="va-hauls-list">

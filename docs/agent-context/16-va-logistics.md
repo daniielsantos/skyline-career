@@ -451,6 +451,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** IH-2 shipou board API + Ports dispatch; My VA ficou Roster/Hangar/Ledger/Config.
 **Fix:** aba **Hauls** — `fetchVaHauls` + Accept via `postWarehouseBridgeDispatchHold`; strip Port FBO/WH room do home hub; CTA Open Ports desk; Accept → staging.
 
+### Path to Port FBO checklist (2026-09-21)
+
+**Sintoma / gap:** VA fresca sem WH T3 / Port FBO — Hauls vazio parecia feature principal; cliff do owner sem escada; join pitch não dizia que Portos é fase 2.
+**Causa:** fantasia porto→WH→IH shipou sem narrativa de bootstrap (Freights VA primeiro).
+**Fix:** `VaPortPathCard` em Hauls + Config (WH / T3 / shipped / cash / claim); empty Hauls + directory/page-help honestos (cut+fleet early; FBO later).
+
 ### VA loop clarity — money map + Prepare chip (2026-09-21)
 
 **Sintoma / gap:** dual-tenant (home Wallet vs VA Ledger, Hangar vs My VA Hangar, cut vs Jet-A) ainda era mental model; Prepare mostrava prefixo VA sem explicar cut.
@@ -785,3 +791,4 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Company ≈ VA vocabulary** — publish card as directory status; Identity Published; no tenant merge (2026-09-21)
 - [x] **Buff concessão herdado** — hasPortOperatorBenefits + buy/ETA/yours; desk exact operator (2026-09-21)
 - [x] **My VA Hauls board** — Internal Haul open/active + Accept + Port strip + Ports CTA (2026-09-21)
+- [x] **Path to Port FBO** — VaPortPathCard Hauls/Config + empty/join pitch (2026-09-21)

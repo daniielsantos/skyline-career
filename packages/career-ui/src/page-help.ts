@@ -59,11 +59,11 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'My VA is the crew desk for one company — yours when published, or the airline you joined. It is not a second company.',
-      'Hauls lists paid Internal Haul bridges (WH→WH) for this company — Accept with a parked VA tail, then Dispatch. Ports desk stays for buy/Scout.',
+      'Fresh VA = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls.',
+      'Hauls lists paid Internal Haul bridges after desk stock; Accept with a parked VA tail, then Dispatch. Ports keeps buy/Scout.',
       'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Money map shows who pays Jet-A, cut, ferry, and MX.',
       'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
       'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',
-      'Config Next steps walks owner invite + roster + Line crew, or member Reserve → Hauls / Freights.',
     ],
   },
   vaDirectory: {
@@ -72,6 +72,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Lists only companies that published — not every company in the world.',
+      'Joining keeps your personal company, wallet, and fleet. Early value is VA aircraft + cut; Port FBO desk/Hauls come after the company builds WH T3 and claims a port.',
       'Quality chip is settle flight score + on-time over ~7 days (needs a few flights).',
       'Request to join when hiring is open, or use a private invite code anytime.',
       'Owners publish from Company; manage seats under My VA (same company, crew desk).',

@@ -73,7 +73,9 @@ export function VaDirectoryPage(props: Props) {
           {directory.length} airline{directory.length === 1 ? '' : 's'}
           {hiringCount > 0 ? ` · ${hiringCount} hiring` : ''}
           {' · '}
-          joining keeps your personal company, wallet, and fleet
+          joining keeps your personal company, wallet, and fleet. Early
+          value is VA aircraft and pilot cut — Port FBO desk and Internal
+          Hauls come after the company builds warehouse T3 and claims a port
         </p>
         <input
           type="search"

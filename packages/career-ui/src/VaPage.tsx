@@ -102,7 +102,7 @@ type Props = {
   authRequired: boolean;
   activeCompanyId: string | null;
   fleet: PlayerAircraft[];
-  walletUsd: number;
+  walletUsd: number | null;
   busy?: boolean;
   renderHangarCard: (
     aircraft: PlayerAircraft,
@@ -258,6 +258,14 @@ export function VaPage(props: Props) {
   }, [members]);
   const hangarReadOnly = !isOwner;
   const pageBusy = busy || Boolean(props.busy);
+  /** Never invent home cash — null until VA session / cashflow warms. */
+  const resolvedWalletUsd =
+    typeof props.walletUsd === 'number' && Number.isFinite(props.walletUsd)
+      ? props.walletUsd
+      : typeof cashflow?.walletUsd === 'number' &&
+          Number.isFinite(cashflow.walletUsd)
+        ? cashflow.walletUsd
+        : null;
 
   const loadLedger = useCallback(async () => {
     if (!canShow || !companyId) return;
@@ -269,6 +277,10 @@ export function VaPage(props: Props) {
       // Drop stale responses from a pre-switch (home) fetch.
       if (gen !== ledgerFetchGenRef.current) return;
       setCashflow(snap);
+      // Warm vaSessionWallet only (App onWallet is chrome-sticky for members).
+      if (typeof snap.walletUsd === 'number' && Number.isFinite(snap.walletUsd)) {
+        onWalletRef.current?.(snap.walletUsd);
+      }
       // Do NOT push snap.walletUsd to chrome — VA cash stays in-page via
       // cashflow.walletUsd / props.walletUsd (vaSessionWallet).
       if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
@@ -938,7 +950,7 @@ export function VaPage(props: Props) {
           companyId={companyId || ''}
           homeHubIcao={homeHubIcao}
           fleet={hangarFleet}
-          walletUsd={props.walletUsd}
+          walletUsd={resolvedWalletUsd ?? 0}
           isOwner={isOwner}
           busy={pageBusy}
           onWallet={props.onWallet}
@@ -965,11 +977,11 @@ export function VaPage(props: Props) {
                 VA wallet
               </p>
               <p className="va-ledger-wallet-value">
-                {formatBoardMoney(
-                  Number.isFinite(props.walletUsd)
-                    ? props.walletUsd
-                    : cashflow?.walletUsd,
-                )}
+                {resolvedWalletUsd != null
+                  ? formatBoardMoney(resolvedWalletUsd)
+                  : ledgerBusy || tenantSwitching
+                    ? '…'
+                    : '—'}
               </p>
               <p className="va-ledger-wallet-hint">
                 Shared company cash (owner wallet).
@@ -1052,7 +1064,7 @@ export function VaPage(props: Props) {
             <HangarCashflowPanel
               cashflow={cashflow}
               companyCredit={companyCredit}
-              walletUsd={props.walletUsd}
+              walletUsd={resolvedWalletUsd ?? 0}
               busy={pageBusy || ledgerBusy}
               creditActionsLocked={!isOwner}
               vaOwnerOpsLabels
@@ -1246,7 +1258,7 @@ export function VaPage(props: Props) {
           <VaPortPathCard
             companyId={companyId || ''}
             homeHubIcao={homeHubIcao}
-            walletUsd={props.walletUsd}
+            walletUsd={resolvedWalletUsd ?? 0}
             isOwner={isOwner}
             busy={pageBusy}
             onGoPorts={props.onGoPorts}

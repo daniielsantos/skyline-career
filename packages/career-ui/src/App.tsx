@@ -4354,6 +4354,34 @@ export function App() {
     homeCompanyId,
   ]);
 
+  // Member on Ports: pin VA tenant so Scout/WH see company logistics (not home).
+  useEffect(() => {
+    if (tab !== 'ports') return;
+    const va = memberVaCompanyId?.trim();
+    if (!va) return;
+    if (va === activeCompanyIdRef.current?.trim()) return;
+    let cancelled = false;
+    void (async () => {
+      if (!homeCompanyIdRef.current) {
+        const prev =
+          activeCompanyIdRef.current?.trim() || getStoredCompanyId();
+        if (prev && prev !== va) {
+          homeCompanyIdRef.current = prev;
+          setHomeCompanyId(prev);
+        }
+      }
+      try {
+        await switchCompanyForVa(va);
+      } catch {
+        /* soft */
+      }
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, memberVaCompanyId]);
+
   useEffect(() => {
     if (!selectedFboHoldId) return;
     const stillThere = (playerFbos?.holds ?? []).some(
@@ -7572,27 +7600,49 @@ export function App() {
   function selectTab(next: Tab) {
     setAirportReturn(null);
     setSidebarOpen(false);
-    goToTab(next);
     // Soft refresh in background — don't flash disabled on every nav button.
     void (async () => {
       const home = homeCompanyIdRef.current?.trim();
-      const onVaTenant =
-        Boolean(home) && home !== activeCompanyIdRef.current;
+      const va = memberVaCompanyIdRef.current?.trim();
       // Keep VA tenant while an active Dispatch mission needs that company
       // (member accepted Freights/Charter/Ports on a VA tail).
       const activeVaDispatch = missions.some(
         (m) =>
           isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
       );
-      const mustRestoreHome =
-        onVaTenant && next !== 'va' && !activeVaDispatch;
-      if (mustRestoreHome && home) {
-        try {
-          await switchCompanyForVa(home);
-        } catch {
-          /* soft — refresh below may still heal */
+      // Ports desk (Scout / WH / FBO) is company logistics — members must use
+      // the VA tenant or they see empty WH + "Claim Port FBO first" while the
+      // chip still says yours via allied benefits.
+      if (next === 'ports' && va) {
+        if (!homeCompanyIdRef.current) {
+          const prev =
+            activeCompanyIdRef.current?.trim() || getStoredCompanyId();
+          if (prev && prev !== va) {
+            homeCompanyIdRef.current = prev;
+            setHomeCompanyId(prev);
+          }
+        }
+        if (va !== activeCompanyIdRef.current?.trim()) {
+          try {
+            await switchCompanyForVa(va);
+          } catch {
+            /* soft — Ports may still fail closed */
+          }
+        }
+      } else {
+        const onVaTenant =
+          Boolean(home) && home !== activeCompanyIdRef.current;
+        const mustRestoreHome =
+          onVaTenant && next !== 'va' && !activeVaDispatch;
+        if (mustRestoreHome && home) {
+          try {
+            await switchCompanyForVa(home);
+          } catch {
+            /* soft — refresh below may still heal */
+          }
         }
       }
+      goToTab(next);
       await run(() => refresh(liveRefreshScope(next, false)), {
         lockUi: false,
       });
@@ -19384,6 +19434,7 @@ export function App() {
           formatTonnes={formatTonnes}
           fleet={prepareOpsFleet}
           vaAircraftIds={vaAircraftIdSet}
+          logisticsCompanyId={activeCompanyId}
           resolveOpsCompanyId={(aircraftId) =>
             resolveOpsCompanyId(aircraftId)
           }
@@ -19459,7 +19510,15 @@ export function App() {
               : fleet
           }
           walletUsd={
-            vaSessionWallet != null ? vaSessionWallet : wallet
+            // Members: never flash home Wallet into VA Ledger — wait for
+            // vaSessionWallet / cashflow. Owners (home === VA) may use chrome.
+            memberVaCompanyId &&
+            homeCompanyId &&
+            memberVaCompanyId !== homeCompanyId
+              ? vaSessionWallet
+              : vaSessionWallet != null
+                ? vaSessionWallet
+                : wallet
           }
           busy={busy}
           onWallet={(usd) => {

@@ -54,10 +54,18 @@ export const PORT_SCOUT_MAX_SUGGESTIONS = 8;
 export const PORT_SCOUT_HAUL_MAX_NM = 1_800;
 
 /**
- * Prefer emptier terminals in haul score — not a hard gate.
- * Densify Dry sits ~92–94% fill; a 40% cap emptied Haul Scout everywhere.
+ * Haul = short-fill only: dest warehouse fill must be ≤ this (hard gate).
+ * Absolute room alone is not enough — large hubs near full still have tons
+ * of free kg without "needing" a 50 klb dump.
  */
-export const PORT_SCOUT_HAUL_DEST_FILL_SOFT = 0.4;
+export const PORT_SCOUT_HAUL_MAX_DEST_FILL = 0.4;
+/** @deprecated alias — same as PORT_SCOUT_HAUL_MAX_DEST_FILL */
+export const PORT_SCOUT_HAUL_DEST_FILL_SOFT = PORT_SCOUT_HAUL_MAX_DEST_FILL;
+/**
+ * Size haul kg to bring dest toward this fill (not dump all free room).
+ * Must stay above MAX_DEST_FILL so eligible hubs always have positive need.
+ */
+export const PORT_SCOUT_HAUL_DEST_FILL_TARGET = 0.55;
 
 export type PortScoutBridgeSuggestion = {
   /** Stable key: ORIGIN|DEST|commodity */
@@ -552,17 +560,23 @@ export function listPortScoutHaulSuggestions(
 
         const pile = ap.inventory[commodityId];
         if (!pile || pile.capacityKg <= 0) continue;
+        const fill = pile.stockKg / pile.capacityKg;
+        if (fill > PORT_SCOUT_HAUL_MAX_DEST_FILL) continue;
         const roomKg = Math.max(0, pile.capacityKg - pile.stockKg);
-        // Absolute room (same densify lesson as last-mile): % fill gates kill
-        // every hub when Dry sits ~92–94% full.
         if (roomKg < PORT_SCOUT_MIN_KG) continue;
+        // Cap lot to what the dest still "needs" toward target fill.
+        const needKg = Math.max(
+          0,
+          Math.floor(pile.capacityKg * PORT_SCOUT_HAUL_DEST_FILL_TARGET) -
+            pile.stockKg,
+        );
+        if (needKg < PORT_SCOUT_MIN_KG) continue;
 
         const distanceNm = moneyNm(world, origin, dest);
         if (distanceNm <= 0 || distanceNm > PORT_SCOUT_HAUL_MAX_NM) continue;
 
-        const kg = Math.min(free, roomKg);
+        const kg = Math.min(free, roomKg, needKg);
         if (kg < PORT_SCOUT_MIN_KG) continue;
-        const fill = pile.stockKg / pile.capacityKg;
         const payUsd = quoteWarehouseHaulPayUsd(world, {
           originIcao: origin,
           destIcao: dest,
@@ -573,12 +587,8 @@ export function listPortScoutHaulSuggestions(
 
         const unitPriceUsd = money(payUsd / kg);
         const nm = Math.round(distanceNm);
-        // Soft preference for emptier dests (legacy 40% band), still allow full hubs with room.
-        const fillSoft =
-          fill > PORT_SCOUT_HAUL_DEST_FILL_SOFT
-            ? (fill - PORT_SCOUT_HAUL_DEST_FILL_SOFT) * 800
-            : 0;
-        const score = payUsd - Math.min(nm, 800) * 0.2 - fillSoft;
+        // Prefer emptier dests among the short-fill band.
+        const score = payUsd - Math.min(nm, 800) * 0.2 - fill * 800;
         out.push({
           id: `${origin}|${dest}|${commodityId}`,
           originIcao: origin,
@@ -729,8 +739,16 @@ export function diagnosePortScoutEmpty(
         if (isBushHub(dest) || isBushTripOnlyHub(dest)) continue;
         const inv = ap.inventory[pile.commodityId];
         if (!inv || inv.capacityKg <= 0) continue;
+        const fill = inv.stockKg / inv.capacityKg;
+        if (fill > PORT_SCOUT_HAUL_MAX_DEST_FILL) continue;
         const roomKg = Math.max(0, inv.capacityKg - inv.stockKg);
         if (roomKg < PORT_SCOUT_MIN_KG) continue;
+        const needKg = Math.max(
+          0,
+          Math.floor(inv.capacityKg * PORT_SCOUT_HAUL_DEST_FILL_TARGET) -
+            inv.stockKg,
+        );
+        if (needKg < PORT_SCOUT_MIN_KG) continue;
         const nm = moneyNm(world, origin, dest);
         if (nm <= 0 || nm > PORT_SCOUT_HAUL_MAX_NM) continue;
         haulRoomDests += 1;
@@ -763,7 +781,7 @@ export function diagnosePortScoutEmpty(
     }
     if (haulRoomDests === 0) {
       lines.push(
-        'No terminal within range has room for a Wide haul (≥200 kg free).',
+        'No short-fill terminal in range (dest ≤40% full with need toward 55%).',
       );
     }
   }

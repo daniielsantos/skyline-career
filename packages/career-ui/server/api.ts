@@ -8914,7 +8914,7 @@ export function createCareerApiServer(port = 8787) {
             return {
               walletUsd: missions.walletUsd,
               maxActive: PORT_AUTO_BUY_MAX_ACTIVE,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_auto_buyCompanyId }),
             };
           }, { persist: 'company', companyId: ports_auto_buyCompanyId });
           send(res, 200, result);
@@ -8998,7 +8998,7 @@ export function createCareerApiServer(port = 8787) {
             return {
               walletUsd: missions.walletUsd,
               concession,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_concession_renewCompanyId }),
             };
           }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_renewCompanyId });
           send(res, 200, result);
@@ -9028,7 +9028,7 @@ export function createCareerApiServer(port = 8787) {
             return {
               walletUsd: missions.walletUsd,
               concession,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_concession_upgradeCompanyId }),
             };
           }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_upgradeCompanyId });
           send(res, 200, result);
@@ -9835,7 +9835,7 @@ export function createCareerApiServer(port = 8787) {
                 ...listPortScoutDesk(missions, world, {
                   companyId: ports_scoutCompanyId,
                 }),
-                ports: portSnapshot(world, missions),
+                ports: portSnapshot(world, missions, { viewerCompanyId: ports_scoutCompanyId }),
                 warehouses: playerWarehouseSnapshot(missions, world),
                 demand: demandSnapshot(world, {
                   warehouseIcaos: (missions.playerWarehouses?.warehouses ?? []).map(
@@ -9877,7 +9877,7 @@ export function createCareerApiServer(port = 8787) {
                 ...listPortScoutDesk(missions, world, {
                   companyId: ports_scoutCompanyId,
                 }),
-                ports: portSnapshot(world, missions),
+                ports: portSnapshot(world, missions, { viewerCompanyId: ports_scoutCompanyId }),
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             }, { persist: 'company', companyId: ports_scoutCompanyId });
@@ -9911,7 +9911,7 @@ export function createCareerApiServer(port = 8787) {
               ...listPortScoutDesk(missions, world, {
                 companyId: ports_scoutCompanyId,
               }),
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_scoutCompanyId }),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
           }, { persist: 'company', companyId: ports_scoutCompanyId });
@@ -9981,7 +9981,7 @@ export function createCareerApiServer(port = 8787) {
               feeUsd: dispatched.feeUsd,
               fuelDebitUsd: dispatched.fuelDebitUsd,
               walletUsd: missions.walletUsd,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_shuttleCompanyId }),
               warehouses: playerWarehouseSnapshot(missions, world),
               fleet: missions.fleet ?? [],
               missions: listActivePlayerMissions(missions.missions ?? []),
@@ -10068,7 +10068,7 @@ export function createCareerApiServer(port = 8787) {
               quote: started.quote,
               inboundTransfer: started.inboundTransfer,
               remainingYardKg: started.remainingYardKg,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_stevedoreCompanyId }),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
           }, { persist: 'company', companyId: ports_stevedoreCompanyId });
@@ -10105,7 +10105,7 @@ export function createCareerApiServer(port = 8787) {
               hubIcao: deposited.hubIcao,
               remainingYardKg: deposited.remainingYardKg,
               pile: deposited.pile,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_depositCompanyId }),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
           }, { persist: 'company', companyId: ports_depositCompanyId });
@@ -10137,7 +10137,7 @@ export function createCareerApiServer(port = 8787) {
               kg: abandoned.kg,
               hubIcao: abandoned.hubIcao,
               commodityId: abandoned.commodityId,
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: ports_pickup_abandonCompanyId }),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
           }, { persist: 'company', companyId: ports_pickup_abandonCompanyId });
@@ -10198,7 +10198,7 @@ export function createCareerApiServer(port = 8787) {
               warehouse: bought.warehouse,
               quoteUsd: quoteWarehouseBuyUsd(world, body.icao!),
               warehouses: playerWarehouseSnapshot(missions, world),
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: warehouses_buyCompanyId }),
             };
           }, { persist: 'company', companyId: warehouses_buyCompanyId });
           send(res, 200, result);
@@ -10231,7 +10231,7 @@ export function createCareerApiServer(port = 8787) {
               debitUsd: upgraded.debitUsd,
               warehouse: upgraded.warehouse,
               warehouses: playerWarehouseSnapshot(missions, world),
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: warehouses_upgradeCompanyId }),
             };
           }, { persist: 'company', companyId: warehouses_upgradeCompanyId });
           send(res, 200, result);
@@ -10264,7 +10264,7 @@ export function createCareerApiServer(port = 8787) {
               commodityId: abandoned.commodityId,
               warehouseId: abandoned.warehouseId,
               warehouses: playerWarehouseSnapshot(missions, world),
-              ports: portSnapshot(world, missions),
+              ports: portSnapshot(world, missions, { viewerCompanyId: warehouses_stock_abandonCompanyId }),
             };
           }, { persist: 'company', companyId: warehouses_stock_abandonCompanyId });
           send(res, 200, result);
@@ -11331,7 +11331,9 @@ export function createCareerApiServer(port = 8787) {
               groundStaff,
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: {
-                ...portSnapshot(world, missions),
+                ...portSnapshot(world, missions, {
+                  viewerCompanyId: ground_staff_hireCompanyId,
+                }),
                 groundStaff,
               },
             };
@@ -11368,7 +11370,9 @@ export function createCareerApiServer(port = 8787) {
               groundStaff,
               warehouses: playerWarehouseSnapshot(missions, world),
               ports: {
-                ...portSnapshot(world, missions),
+                ...portSnapshot(world, missions, {
+                  viewerCompanyId: ground_staff_fireCompanyId,
+                }),
                 groundStaff,
               },
             };

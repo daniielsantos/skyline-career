@@ -5,7 +5,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA/yours UI; desk mutations ainda owner/exact operator).
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
-**Doc 2026-09-21 (c):** **Airline labor cut shipped** — dois cuts: market hire (`memberRouteCutPct` default 30%, Freights/Charter) vs airline desk (`memberAirlineCutPct` default 50% max 60%, Demand/Wide haul). Solo empire = 100%. Hauls board lista desk holds (bridge+Demand+Haul). Anti-mandatory-VA: airline cut nunca ≥ solo.
+**Doc 2026-09-21 (d):** **Ports pin VA for members** — abrir Ports troca tenant para a VA listada (Scout/WH/desk); sair restaura home. Allied benefits sozinhos não bastam (`isPortOperator` exact).
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -608,6 +608,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** alt abre Ledger da VA e o chrome Wallet vira o saldo da VA; ao sair continua “errado”.
 **Causa:** `switchCompanyForVa` pinava `?company=` na VA sem restaurar home; Ledger chamava `onWallet(snap.walletUsd)`; refresh pintava qualquer `/api/state` sem checar tenant.
 **Fix:** restaurar home ao sair de My VA; Ledger sem paint no load; paint só se `state.companyId` bate com tenant esperado; label **VA wallet**; login re-pinna home.
+
+### Member VA wallet flash home cash (2026-09-21)
+
+**Sintoma:** membro abre Ledger — VA wallet mostra saldo home (~$310k) por alguns segundos, depois VA (~$139k).
+**Causa:** `walletUsd={vaSessionWallet ?? wallet}` — cache VA null no 1º paint → fallback home.
+**Fix:** membro (home ≠ VA) passa só `vaSessionWallet` (null ok); hero mostra `…` até members/cashflow; `loadLedger` aquece `onWallet(snap.walletUsd)` (App sticky → só vaSession).
 
 
 

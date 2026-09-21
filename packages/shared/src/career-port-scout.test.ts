@@ -214,7 +214,7 @@ describe('port scout', () => {
     assert.equal(listPortScoutHaulSuggestions(state, world).length, 0);
   });
 
-  it('Haul scout suggests even when dest fill is high if room remains', () => {
+  it('Haul scout skips high-fill dests even when room remains', () => {
     const { world, state } = missionsAtSantos();
     grantWh(state, 'SBGR');
     claimPortConcession(state, world, { portId: 'BRSSZ' });
@@ -225,8 +225,6 @@ describe('port scout', () => {
       avgCostUsdPerKg: 1.0,
       tick: world.tick,
     });
-    // Densify reality: hubs sit ~90%+ full; old 40% gate emptied Scout.
-    // Fill every other hub to capacity so only SBGL has room (top-8 ranking).
     for (const ap of world.airports) {
       ap.inventory.general = {
         capacityKg: 80_000,
@@ -237,7 +235,7 @@ describe('port scout', () => {
     assert.ok(dest);
     dest!.inventory.general = {
       capacityKg: 80_000,
-      stockKg: 73_000, // 91% fill, 7t room
+      stockKg: 73_000, // 91% fill, 7t room — not a short-fill
     };
     const suggestions = listPortScoutHaulSuggestions(state, world);
     const hit = suggestions.find(
@@ -246,9 +244,43 @@ describe('port scout', () => {
         s.destIcao === 'SBGL' &&
         s.commodityId === 'general',
     );
-    assert.ok(hit, 'expected Haul scout row despite high fill');
-    assert.ok(hit!.kg >= PORT_SCOUT_MIN_KG);
-    assert.ok(hit!.kg <= 7_000);
+    assert.equal(hit, undefined, 'high-fill dest must not appear on Haul scout');
+  });
+
+  it('Haul scout caps kg to dest need toward target fill', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 6_000,
+      avgCostUsdPerKg: 1.0,
+      tick: world.tick,
+    });
+    for (const ap of world.airports) {
+      ap.inventory.general = {
+        capacityKg: 20_000,
+        stockKg: 20_000,
+      };
+    }
+    const dest = world.airports.find((a) => a.icao === 'SBGL');
+    assert.ok(dest);
+    // 35% fill → need to 55% = 11_000 − 7_000 = 4_000 (not all 13t room / 6t free)
+    dest!.inventory.general = {
+      capacityKg: 20_000,
+      stockKg: 7_000,
+    };
+    const suggestions = listPortScoutHaulSuggestions(state, world);
+    const hit = suggestions.find(
+      (s) =>
+        s.originIcao === 'SBGR' &&
+        s.destIcao === 'SBGL' &&
+        s.commodityId === 'general',
+    );
+    assert.ok(hit, 'expected short-fill Haul row');
+    assert.equal(hit!.kg, 4_000);
+    assert.ok(hit!.destFillPct <= 40);
   });
 
   it('Haul scout suggests and confirms holdWarehouseHaul', () => {

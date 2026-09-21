@@ -7,10 +7,17 @@ import {
   postWarehouseHaulDispatchHold,
   type Mission,
   type PlayerAircraft,
+  type PortsSnapshot,
   type VaHaulHold,
   type VaHaulMission,
 } from './api';
 import { formatBoardMoney } from './board-money';
+import {
+  buildCompanyNetworkNodes,
+  findNetworkNode,
+  hubInNetworkFocus,
+} from './company-network';
+import { VaCompanyNetwork } from './VaCompanyNetwork';
 import { VaPortPathCard } from './VaPortPathCard';
 
 function formatMassKg(kg: number): string {
@@ -67,14 +74,9 @@ export function VaHaulsBoard(props: Props) {
   const [aircraftByHold, setAircraftByHold] = useState<Record<string, string>>(
     {},
   );
-  const [portStrip, setPortStrip] = useState<{
-    portName: string;
-    level: number | null;
-    status: 'yours' | 'held' | 'vacant';
-    pressure: string | null;
-    whRoom: string | null;
-  } | null>(null);
-  const [portKnown, setPortKnown] = useState(false);
+  const [portsSnap, setPortsSnap] = useState<PortsSnapshot | null>(null);
+  const [networkKnown, setNetworkKnown] = useState(false);
+  const [networkFocusId, setNetworkFocusId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -96,73 +98,59 @@ export function VaHaulsBoard(props: Props) {
   }, [refresh, props.companyId]);
 
   useEffect(() => {
-    const hub = props.homeHubIcao.trim().toUpperCase();
-    setPortKnown(false);
-    if (!hub) {
-      setPortStrip(null);
-      setPortKnown(true);
-      return;
-    }
     let cancelled = false;
+    setNetworkKnown(false);
     void (async () => {
       try {
         const snap = await fetchPorts();
         if (cancelled) return;
-        // Only surface Port FBO when this company actually operates one —
-        // never fall back to a vacant nearby port (home hub pickup ≠ ownership).
-        const port = snap.ports.find(
-          (p) =>
-            p.concession?.status === 'yours' ||
-            (p.concession?.companyId &&
-              p.concession.companyId === props.companyId),
-        );
-        const wh = (snap.warehouses?.warehouses ?? []).find(
-          (w) => w.icao.trim().toUpperCase() === hub,
-        );
-        const whRoom = wh
-          ? `WH ${hub} · ${formatMassKg(wh.freeKg)} free / ${formatMassKg(wh.capacityKg)}`
-          : null;
-        if (!port) {
-          setPortStrip(
-            whRoom
-              ? {
-                  portName: `Home hub ${hub}`,
-                  level: null,
-                  status: 'vacant',
-                  pressure: null,
-                  whRoom,
-                }
-              : null,
-          );
-          return;
-        }
-        const signals = (port.marketSignals ?? []).filter(
-          (s) => s.hubIcao?.toUpperCase() === hub,
-        );
-        const tight = signals.find((s) => s.balance === 'shortage');
-        const fat = signals.find((s) => s.balance === 'surplus');
-        const pressure = tight
-          ? `${hub} · ${tight.commodityName} tight`
-          : fat
-            ? `${hub} · ${fat.commodityName} surplus`
-            : null;
-        setPortStrip({
-          portName: port.name,
-          level: port.concession?.level ?? null,
-          status: port.concession?.status ?? 'yours',
-          pressure,
-          whRoom,
-        });
+        setPortsSnap(snap);
       } catch {
-        if (!cancelled) setPortStrip(null);
+        if (!cancelled) setPortsSnap(null);
       } finally {
-        if (!cancelled) setPortKnown(true);
+        if (!cancelled) setNetworkKnown(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [props.companyId, props.homeHubIcao]);
+  }, [props.companyId]);
+
+  const networkNodes = useMemo(
+    () =>
+      portsSnap
+        ? buildCompanyNetworkNodes(portsSnap, props.companyId)
+        : [],
+    [portsSnap, props.companyId],
+  );
+
+  const focusNode = findNetworkNode(networkNodes, networkFocusId);
+  const hasPortFbo = networkNodes.some((n) => n.kind === 'fbo');
+
+  useEffect(() => {
+    if (
+      networkFocusId &&
+      !networkNodes.some((n) => n.id === networkFocusId)
+    ) {
+      setNetworkFocusId(null);
+    }
+  }, [networkFocusId, networkNodes]);
+
+  const filteredHolds = useMemo(
+    () =>
+      holds.filter((h) =>
+        hubInNetworkFocus(focusNode, h.originIcao),
+      ),
+    [holds, focusNode],
+  );
+
+  const filteredActive = useMemo(
+    () =>
+      active.filter((m) =>
+        hubInNetworkFocus(focusNode, m.originIcao),
+      ),
+    [active, focusNode],
+  );
 
   const parkedByOrigin = useMemo(() => {
     const map = new Map<string, PlayerAircraft[]>();
@@ -231,9 +219,6 @@ export function VaHaulsBoard(props: Props) {
   }
 
   const pageBusy = Boolean(props.busy) || busyHoldId != null;
-  const hasPortFbo =
-    portStrip != null &&
-    (portStrip.status === 'yours' || portStrip.status === 'held');
 
   return (
     <div className="va-pane-card va-hauls-pane">
@@ -241,10 +226,10 @@ export function VaHaulsBoard(props: Props) {
         <div>
           <h3>Hauls</h3>
           <p className="settings-help">
-            {!portKnown
+            {!networkKnown
               ? 'Airline desk — bridges, Demand, and Wide hauls.'
               : hasPortFbo
-                ? 'Airline desk · Accept with a parked VA tail at origin, then Dispatch.'
+                ? 'Airline desk · Pick a network node, Accept with a parked VA tail at origin, then Dispatch.'
                 : 'Until Port FBO + stock, fly Freights with a VA tail (market hire).'}
           </p>
         </div>
@@ -260,8 +245,7 @@ export function VaHaulsBoard(props: Props) {
         ) : null}
       </header>
 
-      {/* Ladder only while climbing; after claim the strip below is enough. */}
-      {portKnown && !hasPortFbo ? (
+      {networkKnown && !hasPortFbo ? (
         <VaPortPathCard
           companyId={props.companyId}
           homeHubIcao={props.homeHubIcao}
@@ -272,24 +256,14 @@ export function VaHaulsBoard(props: Props) {
         />
       ) : null}
 
-      {portStrip ? (
-        <p className="va-hauls-port-strip" role="status">
-          {portStrip.status === 'vacant' ? (
-            <>
-              <strong>{portStrip.portName}</strong>
-              {portStrip.whRoom ? ` · ${portStrip.whRoom}` : ''}
-              <span className="muted"> · no Port FBO yet</span>
-            </>
-          ) : (
-            <>
-              <strong>{portStrip.portName}</strong>
-              {portStrip.level != null ? ` · Port FBO P${portStrip.level}` : ''}
-              {portStrip.status === 'yours' ? ' · yours' : ' · held'}
-              {portStrip.pressure ? ` · ${portStrip.pressure}` : ''}
-              {portStrip.whRoom ? ` · ${portStrip.whRoom}` : ''}
-            </>
-          )}
-        </p>
+      {networkKnown && networkNodes.length > 0 ? (
+        <VaCompanyNetwork
+          nodes={networkNodes}
+          selectedId={networkFocusId}
+          onSelect={setNetworkFocusId}
+          showMap={networkNodes.length > 1 || hasPortFbo}
+          disabled={pageBusy}
+        />
       ) : null}
 
       {error ? (
@@ -305,17 +279,25 @@ export function VaHaulsBoard(props: Props) {
           <section className="va-hauls-section">
             <h4 className="va-config-section-title">
               Open desk work
-              {holds.length > 0 ? ` (${holds.length})` : ''}
+              {filteredHolds.length > 0
+                ? ` (${filteredHolds.length}${
+                    focusNode && filteredHolds.length !== holds.length
+                      ? ` / ${holds.length}`
+                      : ''
+                  })`
+                : ''}
             </h4>
-            {holds.length === 0 ? (
+            {filteredHolds.length === 0 ? (
               <p className="empty">
                 {hasPortFbo
-                  ? 'No desk holds open. Post from Ports (Scout / Hold) — needs company stock.'
+                  ? focusNode
+                    ? `No open holds from ${focusNode.title} — try All, or post Scout Hold from Ports.`
+                    : 'No desk holds open. Post from Ports (Scout / Hold) — needs company stock.'
                   : 'No desk work yet. Fly Freights with a VA tail, or finish the Port FBO path above.'}
               </p>
             ) : (
               <ul className="va-hauls-list">
-                {holds.map((hold) => {
+                {filteredHolds.map((hold) => {
                   const origin = hold.originIcao.trim().toUpperCase();
                   const candidates = parkedByOrigin.get(origin) ?? [];
                   const selected =
@@ -382,13 +364,15 @@ export function VaHaulsBoard(props: Props) {
           <section className="va-hauls-section">
             <h4 className="va-config-section-title">
               Active
-              {active.length > 0 ? ` (${active.length})` : ''}
+              {filteredActive.length > 0
+                ? ` (${filteredActive.length})`
+                : ''}
             </h4>
-            {active.length === 0 ? (
+            {filteredActive.length === 0 ? (
               <p className="empty">None in progress.</p>
             ) : (
               <ul className="va-hauls-list">
-                {active.map((m) => (
+                {filteredActive.map((m) => (
                   <li key={m.id} className="va-hauls-row">
                     <div className="va-hauls-route">
                       <strong>

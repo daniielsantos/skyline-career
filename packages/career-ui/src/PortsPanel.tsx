@@ -51,6 +51,12 @@ import {
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
+import {
+  buildCompanyNetworkNodes,
+  findNetworkNode,
+  hubInNetworkFocus,
+} from './company-network';
+import { VaCompanyNetwork } from './VaCompanyNetwork';
 import { BusyBlock } from './Busy';
 import { CommodityIcon } from './CommodityIcon';
 import { CrewPortrait } from './CrewPanel';
@@ -408,6 +414,12 @@ export function PortsPanel(props: {
   fleet: PlayerAircraft[];
   /** Ids belonging to the member VA — for picker labels. */
   vaAircraftIds?: ReadonlySet<string>;
+  /**
+   * Dual-tenant: company whose Port FBO / WH / Scout to load.
+   * Members should pass the VA id (App pins it on Ports); falls back to
+   * request header company when omitted.
+   */
+  logisticsCompanyId?: string | null;
   /** Dual-tenant: company for Accept/Fly when the tail is VA-owned. */
   resolveOpsCompanyId?: (aircraftId: string) => string | undefined;
   /** Pin VA tenant before Accept so Dispatch loads the right missions. */
@@ -487,6 +499,8 @@ export function PortsPanel(props: {
   const [scoutFilter, setScoutFilter] = useState<
     'all' | 'haul' | 'demand' | 'bridge'
   >('all');
+  /** Company network focus on Port FBO (null = all origins). */
+  const [networkFocusId, setNetworkFocusId] = useState<string | null>(null);
   const [deskOpen, setDeskOpen] = useState(false);
   const [haulDraft, setHaulDraft] = useState<{
     originIcao: string;
@@ -832,8 +846,8 @@ export function PortsPanel(props: {
 
   useEffect(() => {
     void refresh().catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load + refresh when clock advances
-  }, [props.economyTick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load + refresh when clock / tenant advances
+  }, [props.economyTick, props.logisticsCompanyId]);
 
   const port = snap?.ports.find((p) => p.id === portId) ?? snap?.ports[0];
   const amountDisplay = Math.max(0, Math.floor(Number(amountText) || 0));
@@ -901,6 +915,19 @@ export function PortsPanel(props: {
         ];
       }),
     [warehouses?.warehouses, mapPorts],
+  );
+
+  const companyNetworkNodes = useMemo(() => {
+    if (!snap) return [];
+    const viewerCid =
+      snap.ports.find((p) => p.concession?.status === 'yours')?.concession
+        ?.companyId ?? '';
+    return buildCompanyNetworkNodes(snap, viewerCid);
+  }, [snap]);
+
+  const networkFocusNode = findNetworkNode(
+    companyNetworkNodes,
+    networkFocusId,
   );
 
   const acceptOriginOptions = useMemo(() => {
@@ -1149,6 +1176,41 @@ export function PortsPanel(props: {
     setMapFocusToken((n) => n + 1);
     setConcessionOpen(false);
     closeBuyModal();
+    const candidate = `fbo:${id.trim().toUpperCase()}`;
+    setNetworkFocusId((prev) => {
+      // Prefer matching owned FBO chip; leave focus alone on vacant ports.
+      if (
+        snap &&
+        buildCompanyNetworkNodes(
+          snap,
+          snap.ports.find((p) => p.concession?.status === 'yours')?.concession
+            ?.companyId ?? '',
+        ).some((n) => n.id === candidate)
+      ) {
+        return candidate;
+      }
+      return prev;
+    });
+  }
+
+  function selectNetworkNode(id: string | null) {
+    setNetworkFocusId(id);
+    if (!id || !snap) return;
+    const viewerCid =
+      snap.ports.find((p) => p.concession?.status === 'yours')?.concession
+        ?.companyId ?? '';
+    const node = findNetworkNode(
+      buildCompanyNetworkNodes(snap, viewerCid),
+      id,
+    );
+    // Only jump the Port FBO panel to ports we operate — remote WH focus
+    // filters Scout/holds without flipping chrome to vacant.
+    if (node?.kind === 'fbo' && node.portId) {
+      setPortId(node.portId);
+      setMapFocusToken((n) => n + 1);
+      setConcessionOpen(false);
+      closeBuyModal();
+    }
   }
 
   function openAcceptModal(order: DemandOrderView) {
@@ -2614,13 +2676,18 @@ export function PortsPanel(props: {
         a.distanceNm - b.distanceNm ||
         a.id.localeCompare(b.id),
     );
-    if (scoutFilter === 'all') return rows;
-    return rows.filter((r) => r.kind === scoutFilter);
+    const kindFiltered =
+      scoutFilter === 'all' ? rows : rows.filter((r) => r.kind === scoutFilter);
+    if (!networkFocusNode) return kindFiltered;
+    return kindFiltered.filter((r) =>
+      hubInNetworkFocus(networkFocusNode, r.originIcao),
+    );
   }, [
     scoutHaulSuggestions,
     scoutDemandSuggestions,
     scoutSuggestions,
     scoutFilter,
+    networkFocusNode,
   ]);
 
   useEffect(() => {
@@ -3629,6 +3696,16 @@ export function PortsPanel(props: {
                   <div className="ports-listings ports-fbo-panel">
                     {port.concession?.status === 'yours' ? (
                       <>
+                        {companyNetworkNodes.length > 1 ? (
+                          <VaCompanyNetwork
+                            className="ports-fbo-network"
+                            nodes={companyNetworkNodes}
+                            selectedId={networkFocusId}
+                            onSelect={selectNetworkNode}
+                            showMap={false}
+                            disabled={props.busy || loading}
+                          />
+                        ) : null}
                         <div
                           className="ports-scout-desk"
                           aria-label="Port FBO scout suggestions"
@@ -3697,6 +3774,9 @@ export function PortsPanel(props: {
                                     <th>Mass</th>
                                     <th>Pay</th>
                                     <th>Nm</th>
+                                    <th title="Destination hub warehouse fill">
+                                      Fill
+                                    </th>
                                     <th />
                                   </tr>
                                 </thead>
@@ -3739,6 +3819,11 @@ export function PortsPanel(props: {
                                       <td className="muted">
                                         {row.distanceNm > 0
                                           ? row.distanceNm
+                                          : '—'}
+                                      </td>
+                                      <td className="muted">
+                                        {row.destFillPct != null
+                                          ? `${row.destFillPct}%`
                                           : '—'}
                                       </td>
                                       <td>

@@ -14220,6 +14220,105 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   line-height: 1.4;
 }
 
+.va-company-network {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.va-company-network-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.va-company-network-label {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #9a9a9a);
+  flex: 1 1 auto;
+}
+
+.va-company-network-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.va-company-network-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface, #1a1a1a) 88%, transparent);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  min-width: 7.5rem;
+  max-width: 14rem;
+}
+
+.va-company-network-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent, #f0a35a) 55%, var(--line));
+}
+
+.va-company-network-chip.is-selected {
+  border-color: var(--accent, #f0a35a);
+  background: color-mix(in srgb, var(--accent, #f0a35a) 14%, transparent);
+}
+
+.va-company-network-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.va-company-network-chip-kind {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent, #f0a35a);
+}
+
+.va-company-network-chip-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.va-company-network-chip-sub {
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.va-company-network-detail {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.va-company-network-map {
+  margin-top: 0.65rem;
+  height: 11.5rem;
+  min-height: 11.5rem;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.ports-fbo-network {
+  margin: 0 0 0.75rem;
+}
+
 .va-hauls-section {
   margin-top: 1rem;
 }

@@ -26,9 +26,17 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Port FBO quiet by state (2026-09-21):** Yours → Scout first (one ranked table + All/Haul/Demand/Bridge filter); Desk auto-buy in `<details>`; Port stock collapsed. Vacant/Held → one-line hint (Claim CTA stays in title). Less desk prose.
 
-**Scout empty + Haul fill (2026-09-21):** sintoma = Scout “No ideas” com stock no WH. Causas = (1) API list/confirm **não** passava `companyId` → gate Port FBO usava `local` e zerava desks auth; (2) Haul hard-gate fill ≤40% enquanto densify Dry ~92–94% → Haul sempre vazio; (3) Bridge precisa ≥2 WH. Fix = passar `companyId`; Haul gate = room absoluto ≥200 kg (score ainda prefere destinos mais vazios); empty copy via `diagnosePortScoutEmpty` / `emptyHint`.
+**Scout empty + Haul fill (2026-09-21):** sintoma = Scout “No ideas” com stock no WH. Causas = (1) API list/confirm **não** passava `companyId` → gate Port FBO usava `local` e zerava desks auth; (2) Bridge precisa ≥2 WH; (3) Haul tinha hard-gate fill ≤40%. Fix principal = `companyId`. Desktop 0.3.197 chegou a usar só room ≥200 kg (erro de realismo: WH grande quase cheio ainda “cabe” 50 klb). **Revertido** para short-fill: dest fill ≤**40%** hard + `kg = min(free, room, need→55% fill)`.
+
+**Scout Fill column (2026-09-21):** tabela unificada All/Haul/Demand/Bridge carregava `destFillPct` no merge mas não renderizava — coluna **Fill** de volta (Haul só; Demand/Bridge = —).
 
 **Desk auto-buy / stevedore / shuttle companyId (2026-09-21):** sintoma = “Port FBO desk requires an active Port FBO” com Port FBO P1 yours na UI. Causa = `upsertPortAutoBuyOrder` (e stevedore/shuttle) default `local` enquanto concession é `co_*`. Fix = passar `companyId` do request. Ground staff **não** é gate de Scout/desk — só perk de preço/yard.
+
+**Desk order save → “Held by another company” (2026-09-21):** sintoma = toast “desk order saved” + Port FBO some (Scout some); Hauls ainda vazio. Causa = (1) confusão UX: desk auto-buy ≠ Scout Hold (Hauls só lista holds); (2) `POST /api/ports/auto-buy` (e outros mutators Ports) devolvia `portSnapshot` **sem** `viewerCompanyId` → default `local` → status `held`. Fix = passar `viewerCompanyId` no snapshot de resposta. Refresh GET `/api/ports` já estava certo.
+
+**Company network chrome Phase 1 (2026-09-21):** My VA Hauls + Ports FBO — inventário interativo FBO+WH (`VaCompanyNetwork` / `buildCompanyNetworkNodes`). Chips + mapa compacto no Hauls; filtro de holds/Scout por nó (`All` = rede inteira). Ports mostra chips quando ≥2 assets (mapa Ports já existe). Sem retune economia.
+
+**Member Ports empty Scout/WH (2026-09-21):** sintoma = membro vê Port FBO P1 / “Claim Port FBO first” e Warehouse “No warehouses”. Causa = chrome sticky-home: `GET /api/ports` herda `yours` via `alliedCompanyIds`, mas Scout/WH usam tenant **home** (`isPortOperator` exact + missions WH da home vazia). Fix = `selectTab('ports')` pinna VA (`switchCompanyForVa`) antes de montar Ports; sair de Ports restaura home (igual My VA), salvo Dispatch VA ativo.
 
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
@@ -133,7 +141,7 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 
 ### Phase 10 — shipped (Port Scout Haul)
 
-- `listPortScoutHaulSuggestions` / `confirmPortScoutHaul` → `holdWarehouseHaul` (trunk pay; dest fill ≤40%; ≤1800 nm).
+- `listPortScoutHaulSuggestions` / `confirmPortScoutHaul` → `holdWarehouseHaul` (trunk pay; dest fill ≤40%; kg capped to need→55% fill; ≤1800 nm).
 - Caps: max **8**; min **200 kg**; Port FBO on origin; score by pay − nm − fill.
 - API `POST /api/ports/scout` returns `haulSuggestions`; confirm `kind: 'haul'`.
 - Ports desk: **Hold Haul**. Player flies (not shuttle).

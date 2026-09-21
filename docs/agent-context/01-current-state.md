@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **e14548d** / desktop **0.3.175** shipped: Allow Freights Prepare when the pilot only has VA aircraft. Release: [v0.3.175](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.175).
+
+
 `main` **3285b94** / desktop **0.3.174** shipped: Omit redundant 1d from Ledger fee notes; keep Nd only for multi-day settles. Release: [v0.3.174](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.174).
 
 

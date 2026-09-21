@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **ea090ec** / desktop **0.3.181** shipped: Show VA Flight quality tier ladder and next step in My VA. Release: [v0.3.181](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.181).
+
+
 `main` **c516155** / desktop **0.3.180** shipped: Rotate charter OD sampling via freight intl lanes and domestic explore. Release: [v0.3.180](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.180).
 
 

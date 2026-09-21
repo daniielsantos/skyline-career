@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **c4370b5** / desktop **0.3.182** shipped: Bill every company on economy +Nd and watermark lastSeenTick. Release: [v0.3.182](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.182).
+
+
 `main` **ea090ec** / desktop **0.3.181** shipped: Show VA Flight quality tier ladder and next step in My VA. Release: [v0.3.181](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.181).
 
 

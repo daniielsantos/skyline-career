@@ -1,4 +1,7 @@
-# Current state (2026-09-20)
+# Current state (2026-09-21)
+
+`main` **c57a993** / desktop **0.3.165** shipped: Fix inject engines-off false positive and speed Waiting for Preflight. Release: [v0.3.165](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.165).
+
 
 `main` **7155cec** / desktop **0.3.164** shipped: Mirror home pilotIcao onto VA ops before Accept co-location checks. Release: [v0.3.164](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.164).
 

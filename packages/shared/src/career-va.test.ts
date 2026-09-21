@@ -937,6 +937,7 @@ describe('VA IH-2', () => {
     const mission = {
       id: 'msn_airline_cut',
       lots: [],
+      shipmentLotId: 'lot_airline',
       demandOrderId: 'ord_x',
       commodityId: 'general',
       originIcao: 'SBGR',

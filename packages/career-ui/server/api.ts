@@ -38,6 +38,8 @@ import {
   clearAircraftMaintenanceWithParts,
   repairAircraftConditionWithParts,
   hoursUntilInspection,
+  startAircraftOverhaul,
+  finalizeAircraftOverhaulsDue,
   inspectionCostUsd,
   ensureSeedMarketFormed,
   executeFerry,
@@ -1844,7 +1846,8 @@ async function withCareerRead<T>(
     const missions = await loadMissions(companyId ? { companyId } : undefined);
     const crew = settleCrewOpsDue(missions, world, Date.now());
     const landed = finalizeStuckNpcFerries(missions, world.tick);
-    if (crew.settled.length > 0 || landed.length > 0) {
+    const overhauled = finalizeAircraftOverhaulsDue(missions, world.tick);
+    if (crew.settled.length > 0 || landed.length > 0 || overhauled.length > 0) {
       await saveMissions(missions, companyId ? { companyId } : undefined);
     }
     return fn(world, missions);
@@ -3954,7 +3957,11 @@ export function createCareerApiServer(port = 8787) {
               ? (store.peekEconomyWorld()?.tick ?? 0)
               : 0;
           const landed = finalizeStuckNpcFerries(vaMissionsForRoster, tick);
-          if (landed.length > 0) {
+          const overhauled = finalizeAircraftOverhaulsDue(
+            vaMissionsForRoster,
+            tick,
+          );
+          if (landed.length > 0 || overhauled.length > 0) {
             await saveMissions(vaMissionsForRoster, { companyId });
           }
           for (const mission of vaMissionsForRoster.missions ?? []) {
@@ -6409,6 +6416,65 @@ export function createCareerApiServer(port = 8787) {
           }, {
             commandSliceAircraftId: body.aircraftId,
             companyId: repairCompanyId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, /Only the VA owner|Authentication required/i.test(message) ? 403 : 400, {
+            error: message,
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/aircraft-market/overhaul') {
+        const body = (await readBody(req)) as {
+          aircraftId?: string;
+          which?: string;
+          companyId?: string;
+        };
+        if (!body.aircraftId) {
+          send(res, 400, { error: 'aircraftId required' });
+          return;
+        }
+        const which =
+          body.which === 'airframe' || body.which === 'engine'
+            ? body.which
+            : null;
+        if (!which) {
+          send(res, 400, { error: 'which must be engine or airframe' });
+          return;
+        }
+        const ohCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            ohCompanyId,
+            'overhaul company aircraft',
+          );
+          const { orgPerks } = await loadVaOrgPerksForCompany(ohCompanyId);
+          const result = await withCareerWrite((world, missions) => {
+            finalizeAircraftOverhaulsDue(missions, world.tick);
+            const started = startAircraftOverhaul(
+              missions,
+              body.aircraftId!,
+              which,
+              {
+                atTick: world.tick,
+                extraServiceMult: orgPerks.mxCostMult,
+              },
+            );
+            return {
+              walletUsd: missions.walletUsd,
+              debitUsd: started.debitUsd,
+              quote: started.quote,
+              aircraft: started.aircraft,
+              fleet: withParkingRates(missions.fleet),
+              orgPerks,
+            };
+          }, {
+            persist: 'company',
+            companyId: ohCompanyId,
           });
           send(res, 200, result);
         } catch (error) {

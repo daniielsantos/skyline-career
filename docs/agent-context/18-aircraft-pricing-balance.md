@@ -94,6 +94,22 @@ Depósito = **4 semanas** (`PLAYER_LEASE_DEPOSIT_WEEKS`). Termo 1–3 meses.
 
 **Off** (Port FBO Phase 0 / `PLAYER_LEASE_OUT_ENABLED`). Não usa esta banda enquanto o flag estiver false.
 
+### Engine / airframe overhaul (CAPEX sink)
+
+Late-game shop jobs that **reset hours** (not condition %). Shared: `career-aircraft-overhaul.ts`.
+
+| | Engine | Airframe |
+|--|--------|----------|
+| Gate | `hoursEngine ≥ 0.45 × life` | `hoursAirframe ≥ 0.55 × life` |
+| Price | `MSRP × OH_ENG_RATE[class] × lifeFrac` | `MSRP × OH_AF_RATE[class] × lifeFrac` |
+| Downtime | GA/TP 1d · jet/med 2d · n/w 3d | **2×** engine band |
+| Effect | `hoursEngine → 0` | `hoursAirframe → 0` |
+| Also | reset `hoursSinceInspection`; leave `%` alone | same |
+
+- Owned only (lease-in blocked). Status `parked`/`maintenance`. During OH: `maintenance` + `overhaulKind` / `overhaulReadyAtTick`.
+- Ledger: `engine_overhaul` / `airframe_overhaul`. VA: **owner-only**, debit ops company wallet (same as inspect/repair); `mxCostMult` applies.
+- Sanity (GA MSRP 140k @ full eng life): ENG OH ≈ $30.8k (~15–30× heavy inspect); keeps buy-new attractive.
+
 ---
 
 ## Probe rápido (dev)
@@ -137,3 +153,13 @@ Testes de regressão: `packages/shared/src/career-aircraft-pricing.test.ts` (ant
 - Cherry-pick `electronics` / urgent / gap extremo para achar snowball.
 - Esquecer **depósito 4 sem** no custo de entrada do lease.
 - UI mirror `packages/career-ui/src/aircraft-pricing.ts` pode estar stale vs shared — conferir após mudança.
+
+---
+
+## Diagnóstico — overhaul (2026-09-21)
+
+**Sintoma:** Used / high-hours hulls stuck at MX age mult up to 1.6× forever; inspect/repair only reset since-insp or % — no CAPEX path to reset hours.
+
+**Causa:** Product gap (no shop OH). Hours drive `hoursMxCostMult` / resale; burn stays on condition %.
+
+**Fix:** `career-aircraft-overhaul.ts` — ENG + AF OH (labor-only), eligibility gates, MSRP×rate×lifeFrac, downtime by class band (AF 2×). API `POST /api/aircraft-market/overhaul` owner-only; finalize on tick / hangar load. Hangar Manage buttons + confirm. Ledger `engine_overhaul` / `airframe_overhaul`. Tests in `career-aircraft-overhaul.test.ts`.

@@ -167,7 +167,152 @@ export function estimateSellBackUsd(
 }
 
 /** Career clock: 96 ticks/day × 7 days. */
-const TICKS_PER_WEEK = 96 * 7;
+const TICKS_PER_DAY = 96;
+const TICKS_PER_WEEK = TICKS_PER_DAY * 7;
+
+/** Min life-frac before Hangar offers engine / airframe overhaul. */
+const OH_ENGINE_MIN_LIFE_FRAC = 0.45;
+const OH_AIRFRAME_MIN_LIFE_FRAC = 0.55;
+
+const OH_ENG_MSRP_RATE: Record<FreighterClassId, number> = {
+  light_ga: 0.22,
+  light_turboprop: 0.2,
+  light_jet: 0.18,
+  medium_piston: 0.16,
+  narrow_freighter: 0.14,
+  wide_freighter: 0.12,
+};
+
+const OH_AF_MSRP_RATE: Record<FreighterClassId, number> = {
+  light_ga: 0.38,
+  light_turboprop: 0.35,
+  light_jet: 0.32,
+  medium_piston: 0.3,
+  narrow_freighter: 0.28,
+  wide_freighter: 0.25,
+};
+
+export type OverhaulKind = 'engine' | 'airframe';
+
+export type OverhaulQuoteEstimate = {
+  which: OverhaulKind;
+  eligible: boolean;
+  reason?: string;
+  debitUsd: number;
+  downtimeDays: number;
+  hoursBefore: number;
+  mxMultBefore: number;
+  mxMultAfter: number;
+  minHoursRequired: number;
+};
+
+function overhaulDowntimeDays(
+  classId: FreighterClassId,
+  which: OverhaulKind,
+): number {
+  const band =
+    classId === 'light_ga' || classId === 'light_turboprop'
+      ? 1
+      : classId === 'light_jet' || classId === 'medium_piston'
+        ? 2
+        : 3;
+  return which === 'airframe' ? band * 2 : band;
+}
+
+function overhaulMinHours(
+  classId: FreighterClassId,
+  which: OverhaulKind,
+): number {
+  const life = ECONOMIC_LIFE_HOURS[classId];
+  const frac =
+    which === 'engine' ? OH_ENGINE_MIN_LIFE_FRAC : OH_AIRFRAME_MIN_LIFE_FRAC;
+  return Math.ceil(life * frac);
+}
+
+/** Browser-side quote mirror of shared `quoteAircraftOverhaul` (labor-only). */
+export function estimateOverhaulQuote(
+  aircraft: {
+    aircraftClassId: FreighterClassId;
+    ownership?: 'owned' | 'leased' | null;
+    status?: string | null;
+    overhaulKind?: OverhaulKind | null;
+    hoursAirframe?: number | null;
+    hoursEngine?: number | null;
+  },
+  which: OverhaulKind,
+  opts?: { maxCargoKg?: number | null; extraServiceMult?: number },
+): OverhaulQuoteEstimate {
+  const hoursBefore = finiteHours(
+    which === 'engine' ? aircraft.hoursEngine : aircraft.hoursAirframe,
+  );
+  const minHours = overhaulMinHours(aircraft.aircraftClassId, which);
+  const downtimeDays = overhaulDowntimeDays(aircraft.aircraftClassId, which);
+  const mxMultBefore = estimateHoursMxCostMult(aircraft);
+  const mxMultAfter = estimateHoursMxCostMult({
+    aircraftClassId: aircraft.aircraftClassId,
+    hoursAirframe: which === 'airframe' ? 0 : aircraft.hoursAirframe,
+    hoursEngine: which === 'engine' ? 0 : aircraft.hoursEngine,
+  });
+  const base = {
+    which,
+    debitUsd: 0,
+    downtimeDays,
+    hoursBefore,
+    mxMultBefore,
+    mxMultAfter,
+    minHoursRequired: minHours,
+  };
+  if ((aircraft.ownership ?? 'owned') !== 'owned') {
+    return {
+      ...base,
+      eligible: false,
+      reason: 'Leased aircraft — buy out before overhaul',
+    };
+  }
+  if (aircraft.overhaulKind) {
+    return {
+      ...base,
+      eligible: false,
+      reason: 'Overhaul already in progress',
+    };
+  }
+  if (aircraft.status !== 'parked' && aircraft.status !== 'maintenance') {
+    return {
+      ...base,
+      eligible: false,
+      reason: 'Aircraft must be parked (or in maintenance)',
+    };
+  }
+  if (hoursBefore < minHours) {
+    return {
+      ...base,
+      eligible: false,
+      reason: `Need ≥${minHours.toLocaleString()} ${which === 'engine' ? 'engine' : 'airframe'} hours`,
+    };
+  }
+  const life = ECONOMIC_LIFE_HOURS[aircraft.aircraftClassId];
+  const frac = Math.min(1, Math.max(0, hoursBefore / Math.max(1, life)));
+  const rate =
+    which === 'engine'
+      ? OH_ENG_MSRP_RATE[aircraft.aircraftClassId]
+      : OH_AF_MSRP_RATE[aircraft.aircraftClassId];
+  const serviceMult =
+    typeof opts?.extraServiceMult === 'number' &&
+    Number.isFinite(opts.extraServiceMult) &&
+    opts.extraServiceMult > 0
+      ? opts.extraServiceMult
+      : 1;
+  const debitUsd = Math.max(
+    1,
+    Math.round(
+      resolveMsrpUsd(aircraft.aircraftClassId, opts?.maxCargoKg) *
+        rate *
+        frac *
+        serviceMult,
+    ),
+  );
+  return { ...base, eligible: true, debitUsd };
+}
 
 /** Weekly installments past due while `leaseOverdue` is set. */
 export function estimateLeaseOverdueWeeks(

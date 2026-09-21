@@ -54,6 +54,7 @@ import {
   postAircraftUnlist,
   postAircraftMaintenance,
   postAircraftRepair,
+  postAircraftOverhaul,
   postAircraftBuyout,
   postAircraftPayLease,
   postAircraftReturnLease,
@@ -181,7 +182,7 @@ import {
   pickLivePayloadLb,
   holdWrittenFuelLb,
 } from './load-verification';
-import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimateLeaseEarlyReturnUsd, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks } from './aircraft-pricing';
+import { estimateFairUsd, estimateLeaseMonthlyUsd, estimateSellBackUsd, estimateLeaseEarlyReturnUsd, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks, estimateOverhaulQuote } from './aircraft-pricing';
 import {
   boardNetSortUsd,
   contractPilotFeePctLabel,
@@ -8631,6 +8632,46 @@ export function App() {
               : '';
       setToast(`Repaired · ${formatMoney(result.debitUsd)}${mroNote}`);
     }, { sync: { airport: true } });
+  }
+
+  async function onOverhaulAircraft(
+    aircraftId: string,
+    which: 'engine' | 'airframe',
+  ) {
+    const acf =
+      fleet.find((a) => a.id === aircraftId) ??
+      vaSessionFleet.find((a) => a.id === aircraftId);
+    if (!acf) return;
+    const quote = estimateOverhaulQuote(acf, which, {
+      maxCargoKg: hangarCatalogEntry(acf)?.maxCargoKg,
+    });
+    if (!quote.eligible) {
+      setToastKind('warn');
+      setToast(quote.reason ?? 'Overhaul not available');
+      return;
+    }
+    const kindLabel = which === 'engine' ? 'Engine' : 'Airframe';
+    const hoursLabel = which === 'engine' ? 'engine' : 'airframe';
+    const ok = await confirm({
+      title: `${kindLabel} overhaul on ${acf.label}?`,
+      body: `Pay ${formatMoney(quote.debitUsd)} and ground the airframe for ${quote.downtimeDays} economy day${quote.downtimeDays === 1 ? '' : 's'}. Resets ${hoursLabel} hours (${Math.round(quote.hoursBefore).toLocaleString()} → 0). MX age mult ≈ ×${quote.mxMultBefore.toFixed(2)} → ×${quote.mxMultAfter.toFixed(2)}. Does not restore condition % — use Repair for that.`,
+      confirmLabel: `Start ${kindLabel.toLowerCase()} overhaul`,
+    });
+    if (!ok) return;
+    const opsCompanyId = resolveOpsCompanyId(aircraftId);
+    await run(async () => {
+      const result = await postAircraftOverhaul({
+        aircraftId,
+        which,
+        companyId: opsCompanyId || undefined,
+      });
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
+      commitWallet(result.walletUsd);
+      setToastKind('ok');
+      setToast(
+        `${kindLabel} overhaul started · ${formatMoney(result.debitUsd)} · ready after ${result.quote.downtimeDays}d`,
+      );
+    });
   }
 
   async function onBuyoutLease(aircraftId: string) {
@@ -19443,6 +19484,7 @@ export function App() {
               onOpenAirport={openAirport}
               onClearMaintenance={(id) => void onClearMaintenance(id)}
               onRepair={(id) => void onRepairAircraft(id)}
+              onOverhaul={(id, which) => void onOverhaulAircraft(id, which)}
               onUnlist={(id) => void onUnlistAircraft(id)}
               onBuyout={(id) => void onBuyoutLease(id)}
               onPayLeaseOverdue={(id) => void onPayLeaseOverdue(id)}
@@ -19960,6 +20002,7 @@ export function App() {
                       onOpenAirport={openAirport}
                       onClearMaintenance={(id) => void onClearMaintenance(id)}
                       onRepair={(id) => void onRepairAircraft(id)}
+                      onOverhaul={(id, which) => void onOverhaulAircraft(id, which)}
                       onUnlist={(id) => void onUnlistAircraft(id)}
                       onBuyout={(id) => void onBuyoutLease(id)}
                       onPayLeaseOverdue={(id) => void onPayLeaseOverdue(id)}

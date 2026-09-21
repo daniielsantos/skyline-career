@@ -2041,6 +2041,8 @@ export type CareerLedgerKind =
   | 'fuel'
   | 'inspection'
   | 'repair'
+  | 'engine_overhaul'
+  | 'airframe_overhaul'
   | 'credit_draw'
   | 'credit_repay'
   | 'credit_interest'
@@ -2093,6 +2095,13 @@ export interface PlayerAircraft {
   engineConditionPct?: number;
   /** Flight hours since last workshop inspection. */
   hoursSinceInspection?: number;
+  /**
+   * Active shop overhaul (`engine` | `airframe`). Hours reset when
+   * world.tick >= overhaulReadyAtTick.
+   */
+  overhaulKind?: 'engine' | 'airframe';
+  /** Economy tick when the overhaul completes. */
+  overhaulReadyAtTick?: number;
   lease?: AircraftLeaseContract;
   /** Set when lease payment is overdue — blocks dispatch until paid/caught up. */
   leaseOverdue?: boolean;

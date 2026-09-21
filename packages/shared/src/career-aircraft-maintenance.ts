@@ -476,6 +476,9 @@ export function clearAircraftMaintenance(
 } {
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  if (aircraft.overhaulKind) {
+    throw new Error('Overhaul in progress — wait for the shop to finish');
+  }
   if (aircraft.status !== 'maintenance') {
     throw new Error('Aircraft is not in maintenance');
   }
@@ -518,6 +521,9 @@ export function repairAircraftCondition(
 } {
   const aircraft = state.fleet.find((a) => a.id === aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${aircraftId}`);
+  if (aircraft.overhaulKind) {
+    throw new Error('Overhaul in progress — wait for the shop to finish');
+  }
   if (aircraft.status === 'assigned' || aircraft.status === 'listed' || aircraft.status === 'leased_out') {
     throw new Error(`Cannot repair aircraft while ${aircraft.status} — park at a terminal`);
   }

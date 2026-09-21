@@ -1923,6 +1923,9 @@ function assertCanDisposeOwnedAircraft(
   if (aircraft.ownership === 'leased') {
     throw new Error('Cannot sell a leased aircraft — return or buy out the lease');
   }
+  if (aircraft.overhaulKind) {
+    throw new Error('Overhaul in progress — wait for the shop to finish');
+  }
   if (countOwned(state) <= 1) {
     throw new Error(
       'Keep at least one owned aircraft — buy another before selling this one',

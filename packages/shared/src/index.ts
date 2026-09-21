@@ -238,6 +238,7 @@ export * from './career-hub-economy-sample.js';
 export * from './career-hub-economy-history-pulse.js';
 export * from './career-aircraft-registration.js';
 export * from './career-aircraft-market.js';
+export * from './career-aircraft-overhaul.js';
 export * from './career-aircraft-pool.js';
 export * from './career-country-names.js';
 export * from './career-mro.js';

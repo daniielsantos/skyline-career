@@ -35,6 +35,9 @@ export type PlayerAircraft = {
   airframeConditionPct?: number;
   engineConditionPct?: number;
   hoursSinceInspection?: number;
+  /** Active shop overhaul; hours reset when tick >= overhaulReadyAtTick. */
+  overhaulKind?: 'engine' | 'airframe';
+  overhaulReadyAtTick?: number;
   leaseOverdue?: boolean;
   lease?: {
     monthlyUsd: number;
@@ -93,6 +96,8 @@ export type CareerLedgerKind =
   | 'fuel'
   | 'inspection'
   | 'repair'
+  | 'engine_overhaul'
+  | 'airframe_overhaul'
   | 'other';
 
 /** OnAir-style flight scorecard (mirrors @msfs-compat/shared FlightScoreSnapshot). */
@@ -2721,6 +2726,37 @@ export function postAircraftRepair(opts: {
     mro?: MroPartsQuote;
     fleet: PlayerAircraft[];
   }>('/api/aircraft-market/repair', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export type AircraftOverhaulQuoteView = {
+  which: 'engine' | 'airframe';
+  eligible: boolean;
+  reason?: string;
+  debitUsd: number;
+  downtimeDays: number;
+  readyAtTick: number;
+  hoursBefore: number;
+  hoursAfter: number;
+  mxMultBefore: number;
+  mxMultAfter: number;
+  minHoursRequired: number;
+};
+
+export function postAircraftOverhaul(opts: {
+  aircraftId: string;
+  which: 'engine' | 'airframe';
+  companyId?: string;
+}) {
+  return api<{
+    walletUsd: number;
+    debitUsd: number;
+    quote: AircraftOverhaulQuoteView;
+    aircraft: PlayerAircraft;
+    fleet: PlayerAircraft[];
+  }>('/api/aircraft-market/overhaul', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

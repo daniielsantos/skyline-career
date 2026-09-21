@@ -81,6 +81,8 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   fuel: 'Jet-A',
   inspection: 'Inspection',
   repair: 'Repair',
+  engine_overhaul: 'Engine overhaul',
+  airframe_overhaul: 'Airframe overhaul',
   credit_draw: 'Credit draw',
   credit_repay: 'Credit repay',
   credit_interest: 'Credit interest',

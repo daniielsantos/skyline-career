@@ -656,6 +656,15 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
       Number.isFinite(raw.hoursSinceInspection)
         ? Math.max(0, raw.hoursSinceInspection)
         : undefined,
+    overhaulKind:
+      raw.overhaulKind === 'engine' || raw.overhaulKind === 'airframe'
+        ? raw.overhaulKind
+        : undefined,
+    overhaulReadyAtTick:
+      typeof raw.overhaulReadyAtTick === 'number' &&
+      Number.isFinite(raw.overhaulReadyAtTick)
+        ? Math.max(0, Math.floor(raw.overhaulReadyAtTick))
+        : undefined,
     reservedByAccountId:
       typeof raw.reservedByAccountId === 'string' &&
       raw.reservedByAccountId.trim()

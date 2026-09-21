@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { listAirframeAddons } from './airframe-addons';
-import { estimateFairUsd, estimateHoursMxCostMult, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks, estimateSellBackUsd } from './aircraft-pricing';
+import { estimateFairUsd, estimateHoursMxCostMult, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks, estimateOverhaulQuote, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
 import { IcaoLink } from './IcaoLink';
 import { FerryJourneyDialog } from './FerryJourneyDialog';
@@ -719,11 +719,29 @@ function hangarWhereLabel(
   }
 }
 
-function hangarStatusNote(acf: PlayerAircraft): string | null {
+function hangarStatusNote(
+  acf: PlayerAircraft,
+  opts?: { economyTick?: number; formatClock?: (tick: number) => string },
+): string | null {
   switch (acf.status) {
     case 'assigned':
       return 'Finish or cancel the flight in Dispatch before moving this airframe.';
     case 'maintenance':
+      if (acf.overhaulKind) {
+        const kindLabel =
+          acf.overhaulKind === 'engine' ? 'Engine' : 'Airframe';
+        const ready =
+          typeof acf.overhaulReadyAtTick === 'number'
+            ? acf.overhaulReadyAtTick
+            : null;
+        const readyLabel =
+          ready != null && opts?.formatClock
+            ? opts.formatClock(ready)
+            : ready != null
+              ? `tick ${ready}`
+              : 'soon';
+        return `Overhaul · ${kindLabel} · ready ${readyLabel}. Resets ${acf.overhaulKind === 'engine' ? 'engine' : 'airframe'} hours when the shop finishes.`;
+      }
       return 'Pay inspection and/or repair before dispatch.';
     case 'listed':
       return 'Listed on Airframes — unlist to fly again.';
@@ -851,6 +869,7 @@ export function HangarAircraftCard(props: {
   onOpenAirport: (icao: string) => void;
   onClearMaintenance: (id: string) => void;
   onRepair: (id: string) => void;
+  onOverhaul: (id: string, which: 'engine' | 'airframe') => void;
   onUnlist: (id: string) => void;
   onBuyout: (id: string) => void;
   onPayLeaseOverdue: (id: string) => void;
@@ -931,9 +950,23 @@ export function HangarAircraftCard(props: {
           Math.round((acf.maintenanceDueAtHours ?? 0) - (acf.hoursAirframe ?? 0)),
         )
       : null;
-  const note = hangarStatusNote(acf);
+  const note = hangarStatusNote(acf, {
+    economyTick: props.economyTick,
+    formatClock: props.formatClock,
+  });
   const registration = formatAircraftRegistration(acf.registration);
   const hoursMxMult = estimateHoursMxCostMult(acf);
+  const engOhQuote = estimateOverhaulQuote(acf, 'engine', {
+    maxCargoKg: catalog?.maxCargoKg,
+  });
+  const afOhQuote = estimateOverhaulQuote(acf, 'airframe', {
+    maxCargoKg: catalog?.maxCargoKg,
+  });
+  const showOverhaulActions =
+    !mutationsLocked &&
+    (acf.ownership ?? 'owned') === 'owned' &&
+    (acf.status === 'parked' || acf.status === 'maintenance') &&
+    !acf.overhaulKind;
   const canList =
     PLAYER_LEASE_OUT_ENABLED &&
     (acf.ownership ?? 'owned') === 'owned' &&
@@ -943,13 +976,15 @@ export function HangarAircraftCard(props: {
   const canSell =
     (acf.ownership ?? 'owned') === 'owned' &&
     (acf.status === 'parked' || acf.status === 'maintenance') &&
-    props.ownedCount >= 2;
+    props.ownedCount >= 2 &&
+    !acf.overhaulKind;
   const sellBackUsd = canSell
     ? estimateSellBackUsd(acf, { maxCargoKg: catalog?.maxCargoKg })
     : null;
   const canRepair =
     (acf.status === 'parked' || acf.status === 'maintenance') &&
-    (afPct < 100 || engPct < 100);
+    (afPct < 100 || engPct < 100) &&
+    !acf.overhaulKind;
   const canBuyout = acf.ownership === 'leased' && Boolean(acf.lease);
   const softTermEnded = acf.lease?.termEndedSoft === true;
   const economyTick = props.economyTick ?? 0;
@@ -986,6 +1021,7 @@ export function HangarAircraftCard(props: {
   const showManage =
     !mutationsLocked &&
     (canRepair ||
+      showOverhaulActions ||
       canList ||
       canSell ||
       canBuyout ||
@@ -1074,12 +1110,14 @@ export function HangarAircraftCard(props: {
         }
       : null
     : acf.status === 'maintenance'
-      ? {
-          label: 'Inspect',
-          title: 'Pay inspection to clear AOG',
-          onClick: () => props.onClearMaintenance(acf.id),
-          tone: 'accent' as const,
-        }
+      ? acf.overhaulKind
+        ? null
+        : {
+            label: 'Inspect',
+            title: 'Pay inspection to clear AOG',
+            onClick: () => props.onClearMaintenance(acf.id),
+            tone: 'accent' as const,
+          }
       : acf.status === 'listed'
         ? {
             label: 'Unlist',
@@ -1512,6 +1550,42 @@ export function HangarAircraftCard(props: {
                     onClick={() => props.onRepair(acf.id)}
                   >
                     Repair
+                  </button>
+                ) : null}
+                {showOverhaulActions ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy || !engOhQuote.eligible}
+                    title={
+                      engOhQuote.eligible
+                        ? `${props.formatMoney(engOhQuote.debitUsd)} · ${engOhQuote.downtimeDays}d AOG · resets engine hours (MX ×${engOhQuote.mxMultBefore.toFixed(2)} → ×${engOhQuote.mxMultAfter.toFixed(2)})`
+                        : engOhQuote.reason
+                    }
+                    onClick={() => props.onOverhaul(acf.id, 'engine')}
+                  >
+                    Engine overhaul
+                    {engOhQuote.eligible
+                      ? ` · ${props.formatMoney(engOhQuote.debitUsd)}`
+                      : ''}
+                  </button>
+                ) : null}
+                {showOverhaulActions ? (
+                  <button
+                    type="button"
+                    className="action ghost"
+                    disabled={props.busy || !afOhQuote.eligible}
+                    title={
+                      afOhQuote.eligible
+                        ? `${props.formatMoney(afOhQuote.debitUsd)} · ${afOhQuote.downtimeDays}d AOG · resets airframe hours (MX ×${afOhQuote.mxMultBefore.toFixed(2)} → ×${afOhQuote.mxMultAfter.toFixed(2)})`
+                        : afOhQuote.reason
+                    }
+                    onClick={() => props.onOverhaul(acf.id, 'airframe')}
+                  >
+                    Airframe overhaul
+                    {afOhQuote.eligible
+                      ? ` · ${props.formatMoney(afOhQuote.debitUsd)}`
+                      : ''}
                   </button>
                 ) : null}
                 {canBuyout ? (

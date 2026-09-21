@@ -59,13 +59,15 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 | Leave VA | — | sim | sim |
 | Config `memberRouteCutPct` | sim | não | read-only (vê o %) |
 | **Inspect / repair (MX)** | **sim** (debita wallet VA) | **não** | **não** |
+| **Engine / airframe overhaul** | **sim** (debita wallet VA) | **não** | **não** |
 | **Credit draw / repay** | **sim** | **não** | **não** |
 | Voar IH / Freights com tail VA | sim | sim | sim |
 
 **Nota Hangar / MX — DECIDIDO · shipped parcial:**
 
 - **Inspect + repair** debitam o **wallet da VA** (company ativa = VA). Fora do net do cut.
-- **Só owner** autoriza MX (UI + API `403` em `/api/aircraft-market/maintenance` e `/repair`). Dispatcher e pilot = sem botão / sem API.
+- **Engine / airframe overhaul** (Hangar CAPEX): mesmo gate **owner-only** + API `POST /api/aircraft-market/overhaul`; debita wallet VA; aplica `mxCostMult`. Reseta horas ENG ou AF (não %).
+- **Só owner** autoriza MX (UI + API `403` em `/api/aircraft-market/maintenance`, `/repair`, `/overhaul`). Dispatcher e pilot = sem botão / sem API.
 - Sell / lease / unlist: também owner-only na UI quando company listada; ferry / travel / assign missão ficam para membros.
 - Solo (company não listada como VA): comportamento Hangar inalterado.
 
@@ -81,7 +83,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - **Owner ops** (credit) = `companyCredit.repScore` (média Cargo Ops da company). Em VA listada = ladder do owner nessa company; membros **não** dual-write unlock. Fórmula de limit **inalterada** — só copy honesta (`Owner ops` no credit block; strip do Ledger **não** promove Ops como reputação de marca).
 - **Flight quality** = rolling 7d de settle `flightScore.pct` + `onTime` (`company_flight_quality_stats`). Composite `0.7*avg + 0.3*onTimePct` só com ≥3 settles — sinal de org (membros contribuem).
 - Settle em company `va_listed` grava quality (Freights/Demand/Charter/IH com score). UI: My VA Ledger strip = Flight quality; directory/ranking chip Quality; credit = Owner ops.
-- **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. Não confundir com **buff de concessão herdado** (Port FBO P# no porto home — membros herdam buy/ETA/listings; ainda backlog).
+- **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair/**overhaul** VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. Não confundir com **buff de concessão herdado** (Port FBO P# no porto home — membros herdam buy/ETA/listings; ainda backlog).
 - **Prepare Yours+VA (shipped 2026-09-20):** chrome sticky-home escondia frota VA em Freights/Charter/Ports. Fix: prefetch `/api/va/members` → `vaSessionFleet`; `ops-fleet.ts` merge Yours+VA nos pickers; ferry Journey **não** abre no Prepare (só CTA); Accept/`companyId` no tenant do tail + pin VA enquanto Dispatch ativo. **Operator aircraft** = NPC (não VA). **Base Dispatcher** = home-only (CAPEX pessoal).
 - **Freights Prepare blocked with empty home + VA fleet (2026-09-21):** sintoma = membro sem avião próprio via **Need aircraft** em Your aircraft apesar da VA ter cascos. Causa = CTA usava `fleet.length === 0` (home only), não `boardEstimateFleet` (Yours+VA); auto-tab Operator disparava antes do prefetch VA. Fix = gate/copy no `boardEstimateFleet`/`prepareOpsFleet`; init Freights espera prefetch VA.
 
@@ -720,7 +722,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] Testes IH-1 + VA invite/cap/cross-pay/ranking
 - [x] Copy join / My VA: dual-tenant (frota home vs VA)
 - [x] **memberRouteCutPct** — schema v14 + Config + directory + settle Freights/Demand/Charter (net após fuel)
-- [x] Hangar VA: member read-only UI (sell/lease/MX; ferry ok) + **API gate MX + sell/list/unlist owner-only**
+- [x] Hangar VA: member read-only UI (sell/lease/MX/overhaul; ferry ok) + **API gate MX + overhaul + sell/list/unlist owner-only**
 - [x] **My VA Ledger** — wallet + cashflow para membros; credit draw/repay owner-only
 - [x] **VA Flight quality + Ops rep surface** — settle score rolling; directory/ranking/ledger
 - [x] **VA org perks** — quality → Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking

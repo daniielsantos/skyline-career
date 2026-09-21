@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **0bd0e41** / desktop **0.3.191** shipped: Frame VA publish as company directory status, not a second entity. Release: [v0.3.191](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.191).
+
+
 `main` **82399bb** / desktop **0.3.190** shipped: Clarify dual-tenant VA money flow in My VA and Prepare. Release: [v0.3.190](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.190).
 
 

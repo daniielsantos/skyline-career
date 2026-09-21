@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **620a00f** / desktop **0.3.197** shipped: Fix Port FBO desk companyId and Haul Scout densify fill gate. Release: [v0.3.197](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.197).
+
+
 `main` **56bcd34** / desktop **0.3.196** shipped: Fix MissionIntent cast in airline cut settle test. Release: [v0.3.196](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.196).
 
 

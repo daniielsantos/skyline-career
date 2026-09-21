@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **10d2eb0** / desktop **0.3.173** shipped: Fix Base sidebar opening home without the owned hub, and shrink the update pill. Release: [v0.3.173](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.173).
+
+
 `main` **8d4f55b** / desktop **0.3.172** shipped: Gate VA Charter on home Class Ops and spread offer formation like Freights. Release: [v0.3.172](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.172).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **56bcd34** / desktop **0.3.196** shipped: Fix MissionIntent cast in airline cut settle test. Release: [v0.3.196](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.196).
+
+
 `main` **c634911** / desktop **0.3.195** shipped: Add VA Auto-haul desk and quiet Hauls after Port FBO. Release: [v0.3.195](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.195).
 
 

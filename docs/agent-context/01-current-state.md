@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **3285b94** / desktop **0.3.174** shipped: Omit redundant 1d from Ledger fee notes; keep Nd only for multi-day settles. Release: [v0.3.174](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.174).
+
+
 `main` **10d2eb0** / desktop **0.3.173** shipped: Fix Base sidebar opening home without the owned hub, and shrink the update pill. Release: [v0.3.173](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.173).
 
 

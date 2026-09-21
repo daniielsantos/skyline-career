@@ -303,6 +303,7 @@ import {
   stockTrend,
   companySessionFromTick,
   settleCompanyPassiveFeesForTickRange,
+  applyEconomyAdvanceToCrewAirborne,
   resolveCompanyId,
   isCareerAuthRequired,
   AUTH_ONLINE_WINDOW_MS,
@@ -1355,10 +1356,19 @@ async function applyCompanySessionSettlement(opts: {
   toTick: number;
   /** Pulse/headless: bill every company on the world. Session open: active only. */
   allCompanies?: boolean;
+  /** Prefer this tenant's OfflineFeeSummary (defaults to store active). */
+  preferCompanyId?: string;
+  /** Debug +Nd: shift crew airborne clocks on every company. */
+  economyAdvanceMs?: number;
 }): Promise<OfflineFeeSummary | undefined> {
   const activeStore = requireStore();
   const world = activeStore.peekEconomyWorld();
   if (!world) return undefined;
+  const prefer =
+    opts.preferCompanyId?.trim() ||
+    activeStore.getActiveCompanyId?.() ||
+    activeStore.activeCompanyId ||
+    undefined;
   if (opts.allCompanies === true) {
     if (typeof activeStore.settleWorldCompaniesPassiveFees === 'function') {
       const summary = await Promise.resolve(
@@ -1367,6 +1377,8 @@ async function applyCompanySessionSettlement(opts: {
           fromTick: opts.fromTick,
           toTick: opts.toTick,
           worldId: LOCAL_WORLD_ID,
+          preferCompanyId: prefer,
+          economyAdvanceMs: opts.economyAdvanceMs,
         }),
       );
       return summary ?? undefined;
@@ -1380,6 +1392,9 @@ async function applyCompanySessionSettlement(opts: {
     for (const company of companies) {
       try {
         const missions = await loadMissions({ companyId: company.id });
+        if (opts.economyAdvanceMs) {
+          applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+        }
         const fromTick = companySessionFromTick(
           missions,
           opts.fromTick,
@@ -1393,10 +1408,7 @@ async function applyCompanySessionSettlement(opts: {
         );
         missions.lastSeenTick = opts.toTick;
         await saveMissions(missions, { companyId: company.id });
-        if (
-          summary &&
-          company.id === activeStore.getActiveCompanyId()
-        ) {
+        if (summary && prefer && company.id === prefer) {
           preferred = summary;
         }
       } catch (error) {
@@ -1408,7 +1420,12 @@ async function applyCompanySessionSettlement(opts: {
     }
     return preferred;
   }
-  const missions = await loadMissions();
+  const missions = await loadMissions(
+    prefer ? { companyId: prefer } : undefined,
+  );
+  if (opts.economyAdvanceMs) {
+    applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+  }
   const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
   const summary = settleCompanyPassiveFeesForTickRange(
     missions,
@@ -1417,7 +1434,7 @@ async function applyCompanySessionSettlement(opts: {
     opts.toTick,
   );
   missions.lastSeenTick = opts.toTick;
-  await saveMissions(missions);
+  await saveMissions(missions, prefer ? { companyId: prefer } : undefined);
   return summary ?? undefined;
 }
 
@@ -11135,93 +11152,29 @@ export function createCareerApiServer(port = 8787) {
         // Same mold as market/fleet: never fall through to ambient
         // activeCompanyId (can paint/save another tenant's $0 shell).
         const tickCompanyId = companyIdFromRequest(req, body.companyId);
-        const payload = await withCareerWrite(async (world, missions) => {
+        const tickBefore =
+          store?.peekEconomyWorld()?.tick ?? 0;
+        const advanceMs = n * MS_PER_TICK;
+        const tickPayload = await withCareerWrite(async (world, _missions) => {
           const profile = wantProfile
             ? createEmptyTickPhaseProfile()
             : undefined;
           const tickStartedAt = performance.now();
           await tickEconomyNCooperative(world, n, { profile });
           const tickWallMs = performance.now() - tickStartedAt;
-          const leaseOps = settleAircraftMarketOps(missions, world.tick, world);
-          const hangarOps = settleHangarParkingFees(missions, world, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          const fboOps = settleFboOps(missions, world, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          settleWarehouseStorageFees(missions, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          settleWarehouseInboundTransfers(missions, world);
-          settlePortYardHoldFees(missions, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          tickPortConcessions(missions, world);
+          // World-scoped market hygiene only — company passive fees settle
+          // for every tenant below (home vs VA wallets) with lastSeenTick.
           ensurePortInventoryRestock(world);
           ensurePortListings(world);
-          tickPortAutoBuyOrders(missions, world);
-          expireDemandHolds(missions, world);
+          expireDemandHolds(_missions, world);
           ensureDemandOrders(world, {
             operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
           });
-          const crewDaily = settleCrewDailyOps(missions, world, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          const groundStaffDaily = settleGroundStaffDailyOps(missions, world, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          const creditOps = settleCompanyCredit(missions, {
-            fromTick: world.tick - n,
-            toTick: world.tick,
-          });
-          listAircraftMarket(missions, world);
-          // Debug time skip: crew legs use wall-clock, not economy ticks.
-          const advanceMs = n * MS_PER_TICK;
-          for (const mission of missions.missions) {
-            if (
-              mission.crewOperated === true &&
-              mission.status === 'in_flight' &&
-              typeof mission.airborneAtMs === 'number' &&
-              Number.isFinite(mission.airborneAtMs)
-            ) {
-              mission.airborneAtMs = Math.max(
-                0,
-                mission.airborneAtMs - advanceMs,
-              );
-            }
-          }
-          const crewOps = settleCrewOpsDue(missions, world, Date.now());
           const nowMs = Date.now();
           return {
             ...clockPayload(world, nowMs),
-            availableLots: world.lots.filter((l) => l.status === 'available').length,
-            leasePaidUsd: leaseOps.paidUsd,
-            leaseRepossessed: leaseOps.repossessed,
-            leaseOutEarnedUsd: leaseOps.leaseOutEarnedUsd,
-            hangarDebitUsd: hangarOps.debitUsd,
-            hangarRequestedUsd: hangarOps.requestedUsd,
-            hangarShortfallUsd: hangarOps.shortfallUsd,
-            hangarDaysCharged: hangarOps.daysCharged,
-            fboStorageDebitUsd: fboOps.storage.debitUsd,
-            fboHoldsExpired: fboOps.expired.length,
-            fboExpirePenaltyUsd: fboOps.expirePenaltyUsd,
-            crewSalaryDebitUsd: crewDaily.salary.debitUsd,
-            groundStaffSalaryDebitUsd: groundStaffDaily.salary.debitUsd,
-            crewSettled: crewOps.settled.length,
-            creditInterestPaidUsd: creditOps.interestPaidUsd,
-            creditInterestCompoundedUsd: creditOps.interestCompoundedUsd,
-            creditOverdueDays: creditOps.overdueDays,
-            creditPrincipalUsd: creditOps.principalUsd,
-            companyCredit: companyCreditSnapshot(missions),
-            playerFbos: playerFboSnapshot(missions, world),
-            companyCrew: companyCrewSnapshot(missions, world),
-            walletUsd: missions.walletUsd,
+            availableLots: world.lots.filter((l) => l.status === 'available')
+              .length,
             tickWallMs: Math.round(tickWallMs),
             ...(profile
               ? { tickProfile: summarizeTickPhaseProfile(profile) }
@@ -11231,7 +11184,53 @@ export function createCareerApiServer(port = 8787) {
           catchUp: true,
           ...(tickCompanyId ? { companyId: tickCompanyId } : {}),
         });
-        send(res, 200, payload);
+        const toTick = store?.peekEconomyWorld()?.tick ?? tickPayload.tick;
+        const feeSummary = await withCareerLock(async () =>
+          applyCompanySessionSettlement({
+            fromTick: tickBefore,
+            toTick,
+            allCompanies: true,
+            preferCompanyId: tickCompanyId || undefined,
+            economyAdvanceMs: advanceMs,
+          }),
+        );
+        const responseCompanyId =
+          tickCompanyId ||
+          store?.getActiveCompanyId?.() ||
+          undefined;
+        const missions = await loadMissions(
+          responseCompanyId ? { companyId: responseCompanyId } : undefined,
+        );
+        const world = store?.peekEconomyWorld();
+        if (!world) {
+          send(res, 500, { error: 'World missing after tick' });
+          return;
+        }
+        send(res, 200, {
+          ...tickPayload,
+          leasePaidUsd: 0,
+          leaseRepossessed: feeSummary?.lease?.repossessedIds ?? [],
+          leaseOutEarnedUsd: 0,
+          hangarDebitUsd: feeSummary?.debitUsdByKind?.hangar ?? 0,
+          hangarRequestedUsd: feeSummary?.debitUsdByKind?.hangar ?? 0,
+          hangarShortfallUsd: 0,
+          hangarDaysCharged: feeSummary?.daysBilled ?? 0,
+          fboStorageDebitUsd: feeSummary?.debitUsdByKind?.fboStorage ?? 0,
+          fboHoldsExpired: 0,
+          fboExpirePenaltyUsd: 0,
+          crewSalaryDebitUsd: feeSummary?.debitUsdByKind?.crewSalary ?? 0,
+          groundStaffSalaryDebitUsd:
+            feeSummary?.debitUsdByKind?.groundStaffSalary ?? 0,
+          crewSettled: 0,
+          creditInterestPaidUsd: 0,
+          creditInterestCompoundedUsd: 0,
+          creditOverdueDays: missions.companyCredit?.overdueDays ?? 0,
+          creditPrincipalUsd: missions.companyCredit?.principalUsd ?? 0,
+          companyCredit: companyCreditSnapshot(missions),
+          playerFbos: playerFboSnapshot(missions, world),
+          companyCrew: companyCrewSnapshot(missions, world),
+          walletUsd: missions.walletUsd,
+        });
         return;
       }
 

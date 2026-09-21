@@ -431,11 +431,11 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** quality era efêmera no debrief; Cargo Ops XP de membros vai pra home (certo) e não alimenta um score de marca.
 **Fix:** tabela `company_flight_quality_stats` (SQLite v15 / PG v26); settle em VA listed grava score+onTime; snapshot 7d em cashflow/members/directory/ranking; UI labels **Ops rep** vs **Flight quality** (sem dual-write de unlock).
 
-### VA Flight quality ladder UI (2026-09-21)
+### VA parking / +Nd tick only bills one company (2026-09-21)
 
-**Sintoma:** bloco Flight quality no Ledger só mostrava score + tier atual + perks; em Proven o `nextTierHint` sumia (UI só renderizava hint quando `labels` vazios) → T2/T3 invisíveis.
-**Causa:** copy/layout one-shot sem escada.
-**Fix:** `ladder` em `resolveVaOrgPerks`; Ledger mostra janela 7d, tier+perks, steps Proven/Reliable/Elite com gates, e **Next ·** sempre; head My VA = tier + next name. Sem mudança de fórmula/perk.
+**Sintoma:** +7 day no My VA Ledger — wallet VA “não muda”; parking/dispatcher aparecem só em alguns dias (ex. D75 1d), às vezes **duplicados** (2× hangar / 2× Base Dispatcher no mesmo day).
+**Causa:** (1) `POST /api/tick` debita fees só no `missions` do **companyId do request** (header sticky = home na maior parte do tempo) — **não** `allCompanies` como o pulse; frota VA não é cobrada nesse advance. (2) `/api/tick` cobra com `fromTick=world.tick−n` e **não** atualiza `lastSeenTick` → session/pulse settle depois pode **re-cobrar** a mesma janela (explica 2× no D75). Path correto de débito VA existe (`settleHangarParkingFees` / Base Dispatcher / Line crew → `applyWalletDelta` na company) e o Ledger D75 prova que, quando a VA é o tenant settleado, o $ sai da wallet VA.
+**Fix (2026-09-21):** `/api/tick` avança world + higiene global; depois `applyCompanySessionSettlement({ allCompanies:true })` com `companySessionFromTick` + `lastSeenTick=toTick` (home e VA cada um na sua wallet). `settleCompanyPassiveFeesForTickRange` também cobre credit / port auto-buy / inbound WH / Base Dispatcher no passive sum. Sem Dry.
 
 ### Prepare hides VA fleet + auto ferry (2026-09-20)
 

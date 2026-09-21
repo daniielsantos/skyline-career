@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { companySessionFromTick } from './career-company-session.js';
+import {
+  companySessionFromTick,
+  settleCompanyPassiveFeesForTickRange,
+} from './career-company-session.js';
+import { createSeedEconomyWorld } from './career-economy.js';
+import { emptyMissionsStateV2 } from './career-fleet.js';
+import { TICKS_PER_DAY } from './career-clock.js';
 
 describe('companySessionFromTick', () => {
   it('uses persisted lastSeenTick when set', () => {
@@ -16,5 +22,59 @@ describe('companySessionFromTick', () => {
   it('returns 0 when toTick equals from', () => {
     const from = companySessionFromTick({ lastSeenTick: 200 }, 100, 200);
     assert.equal(from, 200);
+  });
+});
+
+describe('settleCompanyPassiveFees watermark', () => {
+  it('does not double-bill hangar when lastSeenTick already caught up', () => {
+    const world = createSeedEconomyWorld({ seed: 'fee-watermark' });
+    const missions = emptyMissionsStateV2();
+    missions.walletUsd = 50_000;
+    const hub =
+      world.airports.find((a) => a.hubTier === 'major') ?? world.airports[0]!;
+    missions.fleet.push({
+      id: 'acf_fee_wm_1',
+      aircraftClassId: 'light_ga',
+      label: 'Fee Probe',
+      locationIcao: hub.icao,
+      fuelKg: 100,
+      fuelCapacityKg: 200,
+      status: 'parked',
+      ownership: 'owned',
+    });
+    const day0 = Math.floor(world.tick / TICKS_PER_DAY) * TICKS_PER_DAY;
+    const day7 = day0 + TICKS_PER_DAY * 7;
+    world.tick = day7;
+
+    const walletBefore = missions.walletUsd;
+    const first = settleCompanyPassiveFeesForTickRange(
+      missions,
+      world,
+      day0,
+      day7,
+    );
+    // Uncapped windows return null summary (banner quiet) but still debit.
+    void first;
+    assert.ok(missions.walletUsd < walletBefore);
+    const hangarEntries = (missions.ledger ?? []).filter(
+      (e) => e.kind === 'hangar_parking',
+    );
+    assert.ok(hangarEntries.length >= 1);
+    const walletAfterFirst = missions.walletUsd;
+
+    missions.lastSeenTick = day7;
+    const secondFrom = companySessionFromTick(missions, day0, day7);
+    const second = settleCompanyPassiveFeesForTickRange(
+      missions,
+      world,
+      secondFrom,
+      day7,
+    );
+    assert.equal(second, null);
+    assert.equal(missions.walletUsd, walletAfterFirst);
+    assert.equal(
+      (missions.ledger ?? []).filter((e) => e.kind === 'hangar_parking').length,
+      hangarEntries.length,
+    );
   });
 });

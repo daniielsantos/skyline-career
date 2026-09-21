@@ -124,6 +124,7 @@ import {
 import {
   companySessionFromTick,
   settleCompanyPassiveFeesForTickRange,
+  applyEconomyAdvanceToCrewAirborne,
 } from './career-company-session.js';
 import type { OfflineFeeSummary } from './career-offline-fees.js';
 import { CAREER_PG_WORLD_WRITER_LOCK_KEY } from './career-postgres-retry.js';
@@ -2483,16 +2484,23 @@ export class PostgresCareerStore implements CareerStore {
     toTick: number;
     worldId?: string;
     nowMs?: number;
+    preferCompanyId?: string;
+    economyAdvanceMs?: number;
   }): Promise<OfflineFeeSummary | null> {
     await this.ready;
     const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
     const companies = await this.listWorldCompanies(worldId);
     if (companies.length === 0) return null;
     const nowMs = opts.nowMs ?? Date.now();
+    const prefer =
+      opts.preferCompanyId?.trim() || this.activeCompanyId || undefined;
     let preferred: OfflineFeeSummary | null = null;
     for (const company of companies) {
       try {
         const missions = await this.loadMissions({ companyId: company.id });
+        if (opts.economyAdvanceMs) {
+          applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+        }
         const fromTick = companySessionFromTick(
           missions,
           opts.fromTick,
@@ -2507,7 +2515,7 @@ export class PostgresCareerStore implements CareerStore {
         );
         missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
         await this.saveMissions(missions, { companyId: company.id });
-        if (summary && company.id === this.activeCompanyId) {
+        if (summary && prefer && company.id === prefer) {
           preferred = summary;
         }
       } catch (error) {

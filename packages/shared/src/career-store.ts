@@ -566,6 +566,8 @@ export interface CareerStore {
     toTick: number;
     worldId?: string;
     nowMs?: number;
+    preferCompanyId?: string;
+    economyAdvanceMs?: number;
   }): OfflineFeeSummary | null | Promise<OfflineFeeSummary | null>;
   /** In-process world after last load/save — skip blob parse on hot reads. */
   peekEconomyWorld(): CareerEconomyWorld | null;
@@ -1868,6 +1870,8 @@ class SqliteCareerStore implements CareerStore {
     toTick: number;
     worldId?: string;
     nowMs?: number;
+    preferCompanyId?: string;
+    economyAdvanceMs?: number;
   }): OfflineFeeSummary | null {
     return settleAllCompaniesPassiveFees({
       db: this.db,
@@ -1875,8 +1879,9 @@ class SqliteCareerStore implements CareerStore {
       fromTick: opts.fromTick,
       toTick: opts.toTick,
       worldId: opts.worldId ?? LOCAL_WORLD_ID,
-      preferCompanyId: this.activeCompanyId,
+      preferCompanyId: opts.preferCompanyId ?? this.activeCompanyId,
       nowMs: opts.nowMs,
+      economyAdvanceMs: opts.economyAdvanceMs,
     });
   }
 

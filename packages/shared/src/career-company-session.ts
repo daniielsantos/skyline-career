@@ -9,12 +9,18 @@ import {
   type OfflineFeeSummary,
 } from './career-offline-fees.js';
 import { listAircraftMarket, settleAircraftMarketOps } from './career-aircraft-market.js';
+import { settleCompanyCredit } from './career-company-credit.js';
 import { settleCrewDailyOps, settleCrewOpsDue } from './career-crew.js';
 import { settleFboOps } from './career-fbo.js';
 import { settleGroundStaffDailyOps } from './career-ground-staff.js';
 import { settleHangarParkingFees } from './career-hangar-fees.js';
+import { tickPortAutoBuyOrders } from './career-port-auto-buy.js';
+import { tickPortConcessions } from './career-port-concessions.js';
 import { settlePortYardHoldFees } from './career-ports.js';
-import { settleWarehouseStorageFees } from './career-warehouse.js';
+import {
+  settleWarehouseInboundTransfers,
+  settleWarehouseStorageFees,
+} from './career-warehouse.js';
 import { listCompaniesForWorld } from './career-companies.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
 import { finalizeStuckNpcFerries } from './career-va-line-crew.js';
@@ -37,6 +43,25 @@ export function companySessionFromTick(
       ? missions.lastSeenTick
       : undefined;
   return Math.max(0, Math.floor(persisted ?? fallbackFromTick));
+}
+
+/** Shift crew-operated airborne clocks when economy is force-advanced. */
+export function applyEconomyAdvanceToCrewAirborne(
+  missions: CareerMissionsState,
+  economyAdvanceMs: number,
+): void {
+  const advanceMs = Math.max(0, Math.floor(economyAdvanceMs));
+  if (advanceMs <= 0) return;
+  for (const mission of missions.missions) {
+    if (
+      mission.crewOperated === true &&
+      mission.status === 'in_flight' &&
+      typeof mission.airborneAtMs === 'number' &&
+      Number.isFinite(mission.airborneAtMs)
+    ) {
+      mission.airborneAtMs = Math.max(0, mission.airborneAtMs - advanceMs);
+    }
+  }
 }
 
 /**
@@ -83,6 +108,13 @@ export function settleCompanyPassiveFeesForTickRange(
     fromTick: feeRange.fromTick,
     toTick: feeRange.toTick,
   });
+  const creditOps = settleCompanyCredit(missions, {
+    fromTick: feeRange.fromTick,
+    toTick: feeRange.toTick,
+  });
+  settleWarehouseInboundTransfers(missions, world);
+  tickPortConcessions(missions, world);
+  tickPortAutoBuyOrders(missions, world);
   settleCrewOpsDue(missions, world, nowMs);
   listAircraftMarket(missions, world);
   finalizeStuckNpcFerries(missions, to);
@@ -94,7 +126,9 @@ export function settleCompanyPassiveFeesForTickRange(
     yardOps.debitUsd +
     (crewDaily.salary?.debitUsd ?? 0) +
     (groundStaffDaily.salary?.debitUsd ?? 0) +
-    (groundStaffDaily.vaLineCrewSalary?.debitUsd ?? 0);
+    (groundStaffDaily.vaLineCrewSalary?.debitUsd ?? 0) +
+    (groundStaffDaily.baseDispatcherSalary?.debitUsd ?? 0) +
+    creditOps.interestPaidUsd;
 
   return buildOfflineFeeSummary({
     feeRange,
@@ -105,7 +139,9 @@ export function settleCompanyPassiveFeesForTickRange(
       yard: yardOps.debitUsd,
       fboStorage: fboOps.storage?.debitUsd ?? 0,
       crewSalary: crewDaily.salary?.debitUsd ?? 0,
-      groundStaffSalary: groundStaffDaily.salary?.debitUsd ?? 0,
+      groundStaffSalary:
+        (groundStaffDaily.salary?.debitUsd ?? 0) +
+        (groundStaffDaily.baseDispatcherSalary?.debitUsd ?? 0),
     },
     lease: {
       installmentsPaid: leaseOps.installmentsPaid,
@@ -128,11 +164,14 @@ export function settleAllCompaniesPassiveFees(opts: {
   worldId?: string;
   preferCompanyId?: string;
   nowMs?: number;
+  /** Wall-clock shift for crew-operated airborne legs (debug +Nd). */
+  economyAdvanceMs?: number;
 }): OfflineFeeSummary | null {
   const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
   const companies = listCompaniesForWorld(opts.db, worldId);
   if (companies.length === 0) return null;
   const nowMs = opts.nowMs ?? Date.now();
+  const prefer = opts.preferCompanyId?.trim() || undefined;
   let preferred: OfflineFeeSummary | null = null;
   for (const company of companies) {
     try {
@@ -141,6 +180,9 @@ export function settleAllCompaniesPassiveFees(opts: {
         emptyMissionsStateV2(),
         company.id,
       );
+      if (opts.economyAdvanceMs) {
+        applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+      }
       const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
       const summary = settleCompanyPassiveFeesForTickRange(
         missions,
@@ -152,10 +194,8 @@ export function settleAllCompaniesPassiveFees(opts: {
       missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
       persistCompanyTables(opts.db, missions, { companyId: company.id });
       persistLedgerIncremental(opts.db, missions.ledger ?? [], company.id);
-      if (summary) {
-        if (opts.preferCompanyId && company.id === opts.preferCompanyId) {
-          preferred = summary;
-        }
+      if (summary && prefer && company.id === prefer) {
+        preferred = summary;
       }
     } catch (error) {
       console.error(

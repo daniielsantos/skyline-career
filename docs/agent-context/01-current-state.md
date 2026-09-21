@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **afd5a8e** / desktop **0.3.177** shipped: Split pulse save off the world lock and persist real PG command slices. Release: [v0.3.177](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.177).
+
+
 `main` **7def71b** / desktop **0.3.176** shipped: Fill Hangar range, cruise, and burn from fleet specs, and persist MP cruise samples. Release: [v0.3.176](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.176).
 
 

@@ -306,6 +306,68 @@ describe('Charter economy', () => {
     );
   });
 
+  it('forms intl charter ODs from the dynamic lane graph', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-intl-lanes' });
+    assert.ok(
+      (world.internationalLanes?.length ?? 0) >= 90,
+      'seed world needs a live intl lane graph',
+    );
+    generateDailyCharterOffers(world, 0);
+    const laneOds = new Set(
+      (world.internationalLanes ?? []).map(
+        (lane) =>
+          `${lane.originIcao.trim().toUpperCase()}>${lane.destIcao.trim().toUpperCase()}`,
+      ),
+    );
+    const intl = (world.charterOffers ?? []).filter(
+      (offer) => offer.status === 'available' && offer.international,
+    );
+    assert.ok(intl.length >= 20, `intl offers=${intl.length}`);
+    const onGraph = intl.filter((offer) =>
+      laneOds.has(
+        `${offer.originIcao.trim().toUpperCase()}>${offer.destIcao.trim().toUpperCase()}`,
+      ),
+    ).length;
+    assert.ok(
+      onGraph / intl.length >= 0.85,
+      `intl on lane graph ${onGraph}/${intl.length}`,
+    );
+  });
+
+  it('rotates domestic origin sample across ticks instead of only top hubs', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-dom-rotate' });
+    // Warm pools without dumping the full board target.
+    for (let i = 0; i < 8; i += 1) tickCharterEconomy(world);
+    for (const offer of world.charterOffers ?? []) {
+      if (offer.status === 'available') offer.expiresAtTick = world.tick;
+    }
+    expireCharterOffers(world);
+
+    const origins = new Set<string>();
+    for (let i = 0; i < 24; i += 1) {
+      world.tick += 1;
+      formCharterOffersForTick(world, { quota: 16 });
+      for (const offer of world.charterOffers ?? []) {
+        if (
+          offer.status === 'available' &&
+          !offer.international &&
+          offer.createdAtTick === world.tick
+        ) {
+          origins.add(offer.originIcao.toUpperCase());
+        }
+      }
+      for (const offer of world.charterOffers ?? []) {
+        if (offer.status === 'available') offer.expiresAtTick = world.tick + 1;
+      }
+      world.tick += 1;
+      expireCharterOffers(world);
+    }
+    assert.ok(
+      origins.size >= 40,
+      `domestic origin diversity across rotated ticks=${origins.size}`,
+    );
+  });
+
   it('returns passengers to hubs on expiry and reduces OD heat only through settlement', () => {
     const world = createSeedEconomyWorld({ seed: 'charter-pressure' });
     generateDailyCharterOffers(world, 0);

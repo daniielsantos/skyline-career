@@ -4,11 +4,18 @@
  * Terminal passenger pools (waiting / attract) drive continuous offer formation
  * the way commodity stock imbalances drive freights. Never mutates freight
  * inventory, ShipmentLots, quotas, or NPC state.
+ *
+ * Intl formation borrows the daily dynamic lane graph (OD rotation) and filters
+ * to charter range; domestic uses pressure+tick-rotated hub samples so cold
+ * airports get attempts without abandoning pool heat.
  */
 
 import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
 import { countryIdFromRegion } from './career-partition.js';
-import { orderIntlDirsOriginRoundRobin } from './career-international-lanes.js';
+import {
+  ensureDynamicInternationalLanes,
+  orderIntlDirsOriginRoundRobin,
+} from './career-international-lanes.js';
 import { regionalWeatherIndex } from './career-weather.js';
 import type {
   AirportTerminal,
@@ -154,6 +161,40 @@ function hubCapacityPax(airport: AirportTerminal): number {
         : 64;
   const level = clamp(Number(airport.level) || 1, 1, 5);
   return Math.round(base * (0.85 + level * 0.05));
+}
+
+/**
+ * Domestic / fallback sampling: keep a pressure head (hottest pools) and mix
+ * in a tick-rotated explore tail so cold hubs get OD attempts instead of the
+ * same top-N forever.
+ */
+function rotatingHubSample<T>(
+  rows: readonly T[],
+  window: number,
+  salt: string,
+): T[] {
+  if (window <= 0 || rows.length === 0) return [];
+  if (rows.length <= window) return rows.slice();
+  const pressure = Math.max(1, Math.ceil(window / 2));
+  const explore = Math.max(0, window - pressure);
+  const head = rows.slice(0, pressure);
+  if (explore <= 0) return head;
+  const rest = rows.slice(pressure);
+  if (rest.length === 0) return head;
+  const start = hashSeed(salt) % rest.length;
+  const mid: T[] = [];
+  for (let i = 0; i < explore; i += 1) {
+    mid.push(rest[(start + i) % rest.length]!);
+  }
+  return [...head, ...mid];
+}
+
+function rotateArrayInPlace<T>(rows: T[], start: number): void {
+  if (rows.length <= 1) return;
+  const offset = ((start % rows.length) + rows.length) % rows.length;
+  if (offset === 0) return;
+  const head = rows.splice(0, offset);
+  rows.push(...head);
 }
 
 /** Soft pax capacity for a Terminal (waiting and attract share this ceiling). */
@@ -906,44 +947,106 @@ export function formCharterOffersForTick(
     dest: AirportTerminal;
   };
 
-  // Intl candidates: per-origin-country top waiting hubs × attract pool, then
-  // origin-country round-robin so short-border hubs cannot monopolize intl slots.
-  const originsByCountry = new Map<string, HubRow[]>();
-  for (const row of origins) {
-    const country = countryIdFromRegion(row.ap.region);
-    if (!/^[A-Z]{2}$/.test(country)) continue;
-    const list = originsByCountry.get(country);
-    if (list) list.push(row);
-    else originsByCountry.set(country, [row]);
-  }
-  const destPool = dests.slice(0, 64);
+  // Intl candidates: daily dynamic freight lane graph (rotates each economy
+  // day), filtered to charter range + live pools. Tick-rotate the attempt
+  // order so same-day formation still walks different free ODs. Hot-hub
+  // fallback only when the graph is empty / too thin.
+  ensureDynamicInternationalLanes(world);
+  const byIcao = new Map(
+    airports.map((ap) => [ap.icao.toUpperCase(), ap] as const),
+  );
   const intlDirs: IntlDir[] = [];
-  for (const [originCountry, localOrigins] of originsByCountry) {
-    for (const originRow of localOrigins.slice(0, 8)) {
-      let added = 0;
-      for (const destRow of destPool) {
-        if (added >= 4) break;
-        const destCountry = countryIdFromRegion(destRow.ap.region);
-        if (!destCountry || destCountry === originCountry) continue;
-        const nm = distanceNm(originRow.ap, destRow.ap);
-        if (nm < CHARTER_MIN_DISTANCE_NM || nm > CHARTER_MAX_DISTANCE_NM) {
-          continue;
+  for (const lane of world.internationalLanes ?? []) {
+    const originIcao = lane.originIcao.trim().toUpperCase();
+    const destIcao = lane.destIcao.trim().toUpperCase();
+    const origin = byIcao.get(originIcao);
+    const dest = byIcao.get(destIcao);
+    if (!origin || !dest) continue;
+    const originCountry = countryIdFromRegion(origin.region);
+    const destCountry = countryIdFromRegion(dest.region);
+    if (!originCountry || !destCountry || originCountry === destCountry) {
+      continue;
+    }
+    const nm = distanceNm(origin, dest);
+    if (nm < CHARTER_MIN_DISTANCE_NM || nm > CHARTER_MAX_DISTANCE_NM) {
+      continue;
+    }
+    if (openOd.has(demandId(originIcao, destIcao))) continue;
+    const originHub = hubFor(world, origin);
+    const destHub = hubFor(world, dest);
+    if (
+      Math.floor(originHub.waitingPax) < 1 ||
+      Math.floor(destHub.attractPax) < 1
+    ) {
+      continue;
+    }
+    const originCountryId = /^[A-Z]{2}$/.test(lane.originCountryId.trim())
+      ? lane.originCountryId.trim().toUpperCase()
+      : originCountry;
+    intlDirs.push({
+      originCountryId,
+      nm,
+      originIcao,
+      destIcao,
+      origin,
+      dest,
+    });
+  }
+
+  if (intlDirs.length < 8) {
+    // Legacy hot-hub scan — keeps cold/offline worlds from starving intl.
+    const originsByCountry = new Map<string, HubRow[]>();
+    for (const row of origins) {
+      const country = countryIdFromRegion(row.ap.region);
+      if (!/^[A-Z]{2}$/.test(country)) continue;
+      const list = originsByCountry.get(country);
+      if (list) list.push(row);
+      else originsByCountry.set(country, [row]);
+    }
+    const destPool = rotatingHubSample(
+      dests,
+      64,
+      `${world.seed}:charter-intl-fallback-dest:${world.tick}`,
+    );
+    const seen = new Set(intlDirs.map((d) => demandId(d.originIcao, d.destIcao)));
+    for (const [originCountry, localOrigins] of originsByCountry) {
+      const originSample = rotatingHubSample(
+        localOrigins,
+        8,
+        `${world.seed}:charter-intl-fallback-origin:${originCountry}:${world.tick}`,
+      );
+      for (const originRow of originSample) {
+        let added = 0;
+        for (const destRow of destPool) {
+          if (added >= 4) break;
+          const destCountry = countryIdFromRegion(destRow.ap.region);
+          if (!destCountry || destCountry === originCountry) continue;
+          const nm = distanceNm(originRow.ap, destRow.ap);
+          if (nm < CHARTER_MIN_DISTANCE_NM || nm > CHARTER_MAX_DISTANCE_NM) {
+            continue;
+          }
+          const od = demandId(originRow.ap.icao, destRow.ap.icao);
+          if (openOd.has(od) || seen.has(od)) continue;
+          seen.add(od);
+          intlDirs.push({
+            originCountryId: originCountry,
+            nm,
+            originIcao: originRow.ap.icao.toUpperCase(),
+            destIcao: destRow.ap.icao.toUpperCase(),
+            origin: originRow.ap,
+            dest: destRow.ap,
+          });
+          added += 1;
         }
-        const od = demandId(originRow.ap.icao, destRow.ap.icao);
-        if (openOd.has(od)) continue;
-        intlDirs.push({
-          originCountryId: originCountry,
-          nm,
-          originIcao: originRow.ap.icao.toUpperCase(),
-          destIcao: destRow.ap.icao.toUpperCase(),
-          origin: originRow.ap,
-          dest: destRow.ap,
-        });
-        added += 1;
       }
     }
   }
+
   const intlQueue = orderIntlDirsOriginRoundRobin(intlDirs);
+  rotateArrayInPlace(
+    intlQueue,
+    hashSeed(`${world.seed}:charter-intl-walk:${world.tick}`),
+  );
   let intlQueueIdx = 0;
 
   const tryNextIntl = (): boolean => {
@@ -978,8 +1081,13 @@ export function formCharterOffersForTick(
             a.ap.icao.localeCompare(b.ap.icao),
         );
       if (localOrigins.length === 0 || localDests.length === 0) continue;
+      const originSample = rotatingHubSample(
+        localOrigins,
+        16,
+        `${world.seed}:charter-dom-origin:${country}:${world.tick}:${attempt}`,
+      );
       const originRow =
-        localOrigins[Math.floor(rng() * Math.min(localOrigins.length, 16))]!;
+        originSample[Math.floor(rng() * originSample.length)]!;
       // Large countries (BR/US) often fail a random OD on range — pick a
       // distance-viable dest instead of wasting the domestic slot on BO/AU luck.
       const viableDests = localDests.filter((row) => {
@@ -990,8 +1098,12 @@ export function formCharterOffersForTick(
         );
       });
       if (viableDests.length === 0) continue;
-      const destRow =
-        viableDests[Math.floor(rng() * Math.min(viableDests.length, 16))]!;
+      const destSample = rotatingHubSample(
+        viableDests,
+        16,
+        `${world.seed}:charter-dom-dest:${country}:${world.tick}:${attempt}:${originRow.ap.icao}`,
+      );
+      const destRow = destSample[Math.floor(rng() * destSample.length)]!;
       if (tryPair(originRow.ap, destRow.ap, false)) {
         formed += 1;
         domesticFormed += 1;
@@ -1013,24 +1125,30 @@ export function formCharterOffersForTick(
     for (const { country } of domesticCountryWeights) {
       if (formed >= room) break;
       const local = byCountry.get(country) ?? [];
-      const localOrigins = local
-        .map((ap) => ({ ap, hub: hubFor(world, ap) }))
-        .filter((row) => row.hub.waitingPax >= 1)
-        .sort(
-          (a, b) =>
-            b.hub.waitingPax - a.hub.waitingPax ||
-            a.ap.icao.localeCompare(b.ap.icao),
-        )
-        .slice(0, 12);
-      const localDests = local
-        .map((ap) => ({ ap, hub: hubFor(world, ap) }))
-        .filter((row) => row.hub.attractPax >= 1)
-        .sort(
-          (a, b) =>
-            b.hub.attractPax - a.hub.attractPax ||
-            a.ap.icao.localeCompare(b.ap.icao),
-        )
-        .slice(0, 12);
+      const localOrigins = rotatingHubSample(
+        local
+          .map((ap) => ({ ap, hub: hubFor(world, ap) }))
+          .filter((row) => row.hub.waitingPax >= 1)
+          .sort(
+            (a, b) =>
+              b.hub.waitingPax - a.hub.waitingPax ||
+              a.ap.icao.localeCompare(b.ap.icao),
+          ),
+        12,
+        `${world.seed}:charter-dom-fb-origin:${country}:${world.tick}`,
+      );
+      const localDests = rotatingHubSample(
+        local
+          .map((ap) => ({ ap, hub: hubFor(world, ap) }))
+          .filter((row) => row.hub.attractPax >= 1)
+          .sort(
+            (a, b) =>
+              b.hub.attractPax - a.hub.attractPax ||
+              a.ap.icao.localeCompare(b.ap.icao),
+          ),
+        12,
+        `${world.seed}:charter-dom-fb-dest:${country}:${world.tick}`,
+      );
       for (const originRow of localOrigins) {
         if (formed >= room) break;
         for (const destRow of localDests) {

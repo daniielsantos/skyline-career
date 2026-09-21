@@ -1410,7 +1410,26 @@ export interface CareerMissionsState {
     weekKey: number;
     usedThisWeek: number;
   };
+  /**
+   * IH-3 VA desk auto-haul — posts Internal Haul bridges from Scout on tick.
+   * Only meaningful on va_listed companies with members.
+   */
+  vaAutoHaul?: VaAutoHaulState;
 };
+
+/** Owner-configured VA desk that auto-posts WH→WH Internal Hauls (IH-3). */
+export interface VaAutoHaulState {
+  enabled: boolean;
+  /** Hard cap posts per economy day (AI desk — keep low). */
+  maxHaulsPerDay: number;
+  /** Multiplier on suggested Internal Haul pay (clamped 0.8–1.5). */
+  payMult: number;
+  /** Skip posting when wallet − pay would fall below this. */
+  walletFloorUsd: number;
+  postedToday: number;
+  /** `economyDayIndex(tick)` when `postedToday` last applied. */
+  postedDayIndex: number;
+}
 
 /** Player FBO ownership + bonded warehouse holds. */
 export type PlayerFboTier = 1 | 2;

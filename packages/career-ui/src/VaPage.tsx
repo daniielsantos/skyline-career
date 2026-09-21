@@ -11,6 +11,7 @@ import {
   postVaRecruiting,
   postVaRouteCut,
   postVaLineCrew,
+  postVaAutoHaul,
   postVaLeave,
   postVaKick,
   postVaRole,
@@ -179,6 +180,15 @@ export function VaPage(props: Props) {
     salaryUsdPerWeek: number;
     fireSeveranceUsd: number;
   } | null>(null);
+  const [autoHaul, setAutoHaul] = useState<{
+    enabled: boolean;
+    maxHaulsPerDay: number;
+    payMult: number;
+    walletFloorUsd: number;
+    postedToday: number;
+    postedDayIndex: number;
+  } | null>(null);
+  const [autoHaulMinMembers, setAutoHaulMinMembers] = useState(2);
   const [displayName, setDisplayName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -300,6 +310,8 @@ export function VaPage(props: Props) {
       setCutDraft(String(m.memberRouteCutPct ?? 30));
       onMemberRouteCutPctRef.current?.(m.memberRouteCutPct ?? 30);
       setLineCrew(m.lineCrew ?? null);
+      setAutoHaul(m.autoHaul ?? null);
+      setAutoHaulMinMembers(m.autoHaulMinMembers ?? 2);
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
       setFlightQuality(m.flightQuality ?? null);
@@ -1442,6 +1454,122 @@ export function VaPage(props: Props) {
                     Hire Desk ($
                     {(lineCrew?.hireUsd ?? 2500).toLocaleString()})
                   </button>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          <section className="va-config-section">
+            <h4 className="va-config-section-title">Auto-haul desk</h4>
+            <p className="va-config-section-blurb">
+              Posts Internal Hauls from Scout on the day tick (max{' '}
+              {autoHaul?.maxHaulsPerDay ?? 2}/day). Needs ≥{autoHaulMinMembers}{' '}
+              members + Port FBO stock. Manual Scout Confirm has no AI daily
+              cap.
+            </p>
+            {autoHaul == null ? (
+              <p className="settings-sample va-config-readonly">
+                Auto-haul status unavailable right now.
+              </p>
+            ) : (
+              <div className="va-config-line-crew">
+                <div className="va-config-line-crew-stats">
+                  <div>
+                    <span className="va-config-stat-label">Today</span>
+                    <span className="va-config-stat-value">
+                      {autoHaul.postedToday}/{autoHaul.maxHaulsPerDay}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="va-config-stat-label">Pay</span>
+                    <span className="va-config-stat-value">
+                      {Math.round(autoHaul.payMult * 100)}%
+                      <span className="muted"> suggest</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="va-config-stat-label">Floor</span>
+                    <span className="va-config-stat-value">
+                      {formatBoardMoney(autoHaul.walletFloorUsd)}
+                    </span>
+                  </div>
+                </div>
+                {isOwner ? (
+                  <div className="va-config-actions">
+                    <label className="va-config-check">
+                      <input
+                        type="checkbox"
+                        checked={autoHaul.enabled}
+                        disabled={pageBusy}
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          void (async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              const res = await postVaAutoHaul({
+                                enabled: next,
+                              });
+                              setAutoHaul(res.autoHaul);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      />
+                      <span>Enable auto-haul</span>
+                    </label>
+                    <label className="va-config-field">
+                      <span>Max / day</span>
+                      <select
+                        value={autoHaul.maxHaulsPerDay}
+                        disabled={pageBusy}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          void (async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              const res = await postVaAutoHaul({
+                                maxHaulsPerDay: n,
+                              });
+                              setAutoHaul(res.autoHaul);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                      </select>
+                    </label>
+                  </div>
+                ) : (
+                  <p className="settings-sample va-config-readonly">
+                    {autoHaul.enabled
+                      ? 'Desk on — bridges appear on Hauls when stock allows.'
+                      : 'Desk off — owner enables in Config.'}
+                  </p>
+                )}
+                {members.length < autoHaulMinMembers ? (
+                  <p className="muted va-config-field-hint">
+                    Recruit at least {autoHaulMinMembers} members before the
+                    desk posts (you have {members.length}).
+                  </p>
                 ) : null}
               </div>
             )}

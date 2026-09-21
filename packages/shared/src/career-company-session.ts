@@ -15,6 +15,7 @@ import { settleFboOps } from './career-fbo.js';
 import { settleGroundStaffDailyOps } from './career-ground-staff.js';
 import { settleHangarParkingFees } from './career-hangar-fees.js';
 import { tickPortAutoBuyOrders } from './career-port-auto-buy.js';
+import { tickVaAutoHaul } from './career-va-auto-haul.js';
 import { tickPortConcessions } from './career-port-concessions.js';
 import { settlePortYardHoldFees } from './career-ports.js';
 import {
@@ -27,11 +28,14 @@ import { finalizeStuckNpcFerries } from './career-va-line-crew.js';
 import { finalizeAircraftOverhaulsDue } from './career-aircraft-overhaul.js';
 import {
   assembleMissionsFromTables,
+  LOCAL_COMPANY_ID,
   persistCompanyTables,
   persistLedgerIncremental,
   type SqliteDb,
 } from './career-store-v3.js';
 import { LOCAL_WORLD_ID } from './career-store-v4.js';
+import { countCompanyMembers } from './career-auth.js';
+import { isCompanyVaListed } from './career-va.js';
 
 /** Resolve billing window: persisted watermark, else legacy catch-up anchor. */
 export function companySessionFromTick(
@@ -75,6 +79,11 @@ export function settleCompanyPassiveFeesForTickRange(
   fromTick: number,
   toTick: number,
   nowMs = Date.now(),
+  deskOpts?: {
+    companyId?: string;
+    vaListed?: boolean;
+    memberCount?: number;
+  },
 ): OfflineFeeSummary | null {
   const from = Math.max(0, Math.floor(fromTick));
   const to = Math.max(from, Math.floor(toTick));
@@ -128,7 +137,16 @@ export function settleCompanyPassiveFeesForTickRange(
   try {
     settleWarehouseInboundTransfers(missions, world);
     tickPortConcessions(missions, world);
-    tickPortAutoBuyOrders(missions, world);
+    tickPortAutoBuyOrders(
+      missions,
+      world,
+      deskOpts?.companyId ?? LOCAL_COMPANY_ID,
+    );
+    tickVaAutoHaul(missions, world, {
+      companyId: deskOpts?.companyId,
+      vaListed: deskOpts?.vaListed,
+      memberCount: deskOpts?.memberCount,
+    });
   } catch (error) {
     console.error(
       '[career] company passive hygiene skipped:',
@@ -216,6 +234,11 @@ export function settleAllCompaniesPassiveFees(opts: {
           fromTick,
           opts.toTick,
           nowMs,
+          {
+            companyId: company.id,
+            vaListed: isCompanyVaListed(opts.db, company.id),
+            memberCount: countCompanyMembers(opts.db, company.id),
+          },
         );
         if (summary && prefer && company.id === prefer) {
           preferred = summary;

@@ -5200,6 +5200,15 @@ export function fetchVaMembers() {
       salaryUsdPerWeek: number;
       fireSeveranceUsd: number;
     } | null;
+    autoHaul?: {
+      enabled: boolean;
+      maxHaulsPerDay: number;
+      payMult: number;
+      walletFloorUsd: number;
+      postedToday: number;
+      postedDayIndex: number;
+    } | null;
+    autoHaulMinMembers?: number;
     flightQuality?: VaFlightQualitySnapshot | null;
     orgPerks?: VaOrgPerks | null;
     viewerAccountId?: string;
@@ -5285,6 +5294,27 @@ export function postVaLineCrew(action: 'hire' | 'fire' | 'upgrade') {
   }>('/api/va/line-crew', {
     method: 'POST',
     body: JSON.stringify({ action }),
+  });
+}
+
+export function postVaAutoHaul(opts: {
+  enabled?: boolean;
+  maxHaulsPerDay?: number;
+  payMult?: number;
+  walletFloorUsd?: number;
+}) {
+  return api<{
+    autoHaul: {
+      enabled: boolean;
+      maxHaulsPerDay: number;
+      payMult: number;
+      walletFloorUsd: number;
+      postedToday: number;
+      postedDayIndex: number;
+    };
+  }>('/api/va/auto-haul', {
+    method: 'POST',
+    body: JSON.stringify(opts),
   });
 }
 

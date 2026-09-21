@@ -229,7 +229,7 @@ Reusa missões / Watch / settle / WH. **Não** exige vender no porto. Solo pode 
 |-------|--------|--------|
 | **IH-1** | Quote + stamp + settle ±pay; UI Ports/Scout | **shipped** |
 | **IH-2** | Schema members fino + board interno + accept outro piloto + ranking 7d | **shipped** |
-| **IH-3** | Desk AI cria hauls (Fase 3) sob caps Owner | Depois de IH-2 |
+| **IH-3** | Desk AI cria hauls (Fase 3) sob caps Owner | **shipped v1** (2026-09-21) |
 | **NPC** | Só shuttle/bridge unpaid | Phase 8 |
 
 ### B) Especialização regional legível — **DECIDIDO · motor da arbitragem / Tier 1**
@@ -284,19 +284,20 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 | **Caps** | Max 8 por lista; min 200 kg; Port FBO no origin; haul dest fill ≤40% / ≤1800 nm |
 | **Não faz** | Criar haul sozinho sem confirm; voar Demand/Market/Haul via NPC |
 
-**Next:** VA Fase 3 auto-haul (só com members). Market→WH redirect continua backlog ([`24`](./24-port-fbo.md)).
+**Next:** Market→WH redirect continua backlog ([`24`](./24-port-fbo.md)).
 
-### Fase 3 — Desk AI cria hauls (VA)
+### Fase 3 — Desk AI cria hauls (VA) — **shipped IH-3 v1 (2026-09-21)**
 
-**Status:** fechada como fase **só com VA/MP**; depois de Fase 1–2 estáveis.
+**Status:** v1 shipped — owner opt-in Auto-haul desk; tick posts Scout WH→WH Internal Hauls.
 
 | | |
 |--|--|
-| **O que** | Sob regras do Owner (spread min, OD allowlist, max hauls/dia, pay interno formula), o desk **cria** Internal Hauls automaticamente |
-| **Quem voa** | Pilots humanos (board interno da VA); AI **não** completa a ponte sozinha |
-| **Equilíbrio social** | AI desk compete com Dispatcher humano: humano sem cap apertado / assign nominal; AI com cap baixo — senão ninguém convida player desk |
-| **Monetização** | VA pack / desk seat / Ops Autopilot — capacidade de automação, não vantagem de preço |
-| **Não faz** | Aceitar Demand/Market NPC por conta própria além das regras; voar; snipar board global |
+| **O que** | Desk cria Internal Hauls automaticamente a partir de `listPortScoutBridgeSuggestions` |
+| **Quem voa** | Pilots humanos (board Hauls); AI **não** voa |
+| **Caps** | max 1–3/dia (default 2); max 3 open bridge holds; pay = suggest × mult (0.8–1.5); wallet floor |
+| **Gates** | `va_listed` + **≥2 members** + Port FBO (Scout) + enabled |
+| **UI** | My VA Config → Auto-haul desk; Hauls board unchanged |
+| **Não faz (v1)** | OD allowlist; Demand/Haul auto; IAP desk seat; snipar board global |
 
 ### Ordem de build (automação)
 
@@ -456,6 +457,18 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** VA fresca sem WH T3 / Port FBO — Hauls vazio parecia feature principal; cliff do owner sem escada; join pitch não dizia que Portos é fase 2.
 **Causa:** fantasia porto→WH→IH shipou sem narrativa de bootstrap (Freights VA primeiro).
 **Fix:** `VaPortPathCard` em Hauls + Config (WH / T3 / shipped / cash / claim); empty Hauls + directory/page-help honestos (cut+fleet early; FBO later).
+
+### Hauls quiet after Port FBO (2026-09-21)
+
+**Sintoma:** Lamusine com Santos P1 — Hauls ainda mostrava Path card “Unlocked”, blurb longo, CTA Ports ×2, empty copy de pré-FBO.
+**Causa:** Path card tratava pós-claim como vitória narrada; header/empty não eram state-aware.
+**Fix:** Path card `null` com FBO; Hauls só strip + 1 CTA; help/empty curtos (pós-FBO = “Post from Ports”).
+
+### IH-3 VA Auto-haul desk v1 (2026-09-21)
+
+**Sintoma / gap:** Scout confirma à mão; Hauls vazio até owner postar; Fase 3 doc aberta.
+**Causa:** automação desk parou em Fase 2 (suggest + confirm).
+**Fix:** `vaAutoHaul` em company_state; `tickVaAutoHaul` no day settle (com auto-buy); gates listed+≥2 members; Config enable + max/day; pay suggest×mult; não voa.
 
 ### VA loop clarity — money map + Prepare chip (2026-09-21)
 
@@ -750,11 +763,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 ## Checklist quando for implementar
 
 - [x] InternalHaul pay (IH-1)
-- [ ] UI surplus/tight por commodity no Ports / região
 - [x] Fase 1 auto-buy
 - [x] Fase 2 scout
 - [x] IH-2 members + board interno + ranking 7d
-- [ ] Fase 3 / IH-3: só com VA; caps AI vs humano Dispatcher
+- [x] Fase 3 / IH-3: VA auto-haul desk (Scout bridges, caps, ≥2 members) (2026-09-21)
+- [ ] UI surplus/tight por commodity no Ports / região
+- [ ] IH-3 extras: OD allowlist / pay fine-tune UI / Demand auto
 - [x] Testes IH-1 + VA invite/cap/cross-pay/ranking
 - [x] Copy join / My VA: dual-tenant (frota home vs VA)
 - [x] **memberRouteCutPct** — schema v14 + Config + directory + settle Freights/Demand/Charter (net após fuel)
@@ -792,3 +806,5 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Buff concessão herdado** — hasPortOperatorBenefits + buy/ETA/yours; desk exact operator (2026-09-21)
 - [x] **My VA Hauls board** — Internal Haul open/active + Accept + Port strip + Ports CTA (2026-09-21)
 - [x] **Path to Port FBO** — VaPortPathCard Hauls/Config + empty/join pitch (2026-09-21)
+- [x] **Hauls quiet após FBO** — Path some pós-claim; copy curta (2026-09-21)
+- [x] **IH-3 Auto-haul desk** — tick Scout bridges; Config opt-in; ≥2 members (2026-09-21)

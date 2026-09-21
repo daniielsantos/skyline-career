@@ -445,6 +445,7 @@ CREATE INDEX IF NOT EXISTS company_flight_quality_stats_day_idx
 
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS recruiting BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE company_state ADD COLUMN IF NOT EXISTS va_line_crew_json JSONB;
+ALTER TABLE company_state ADD COLUMN IF NOT EXISTS va_auto_haul_json JSONB;
 
 CREATE TABLE IF NOT EXISTS company_join_requests (
   id TEXT PRIMARY KEY NOT NULL,
@@ -2507,12 +2508,23 @@ export class PostgresCareerStore implements CareerStore {
             opts.fromTick,
             opts.toTick,
           );
+          const listed = await this.vaIsListed(company.id);
+          const { rows: memRows } = await this.pool.query(
+            `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
+            [company.id],
+          );
+          const memberCount = Number(memRows[0]?.n) || 0;
           const summary = settleCompanyPassiveFeesForTickRange(
             missions,
             opts.world,
             fromTick,
             opts.toTick,
             nowMs,
+            {
+              companyId: company.id,
+              vaListed: listed,
+              memberCount,
+            },
           );
           if (summary && prefer && company.id === prefer) {
             preferred = summary;

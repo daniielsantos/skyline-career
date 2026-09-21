@@ -221,6 +221,10 @@ import {
   syncWorldPortConcessions,
   ensurePortInventoryRestock,
   tickPortAutoBuyOrders,
+  tickVaAutoHaul,
+  upsertVaAutoHaul,
+  ensureVaAutoHaul,
+  VA_AUTO_HAUL_MIN_MEMBERS,
   upsertPortAutoBuyOrder,
   setPortAutoBuyOrderPaused,
   removePortAutoBuyOrder,
@@ -1328,7 +1332,32 @@ async function loadEconomyUnlocked(opts?: {
     tickPortConcessions(missions, caught);
     ensurePortInventoryRestock(caught);
     ensurePortListings(caught);
-    tickPortAutoBuyOrders(missions, caught);
+    const deskCompanyId =
+      activeStore.getActiveCompanyId?.() ||
+      activeStore.activeCompanyId ||
+      undefined;
+    tickPortAutoBuyOrders(missions, caught, deskCompanyId);
+    if (deskCompanyId && typeof activeStore.vaIsListed === 'function') {
+      try {
+        const listed = await Promise.resolve(
+          activeStore.vaIsListed(deskCompanyId),
+        );
+        let memberCount = 0;
+        if (typeof activeStore.vaListMembers === 'function') {
+          const members = await Promise.resolve(
+            activeStore.vaListMembers(deskCompanyId),
+          );
+          memberCount = Array.isArray(members) ? members.length : 0;
+        }
+        tickVaAutoHaul(missions, caught, {
+          companyId: deskCompanyId,
+          vaListed: Boolean(listed),
+          memberCount,
+        });
+      } catch {
+        /* auto-haul is best-effort on catch-up */
+      }
+    }
     expireDemandHolds(missions, caught);
     ensureDemandOrders(caught, {
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(caught),
@@ -1404,11 +1433,30 @@ async function applyCompanySessionSettlement(opts: {
             opts.fromTick,
             opts.toTick,
           );
+          let vaListed = false;
+          let memberCount = 0;
+          if (typeof activeStore.vaIsListed === 'function') {
+            vaListed = Boolean(
+              await Promise.resolve(activeStore.vaIsListed(company.id)),
+            );
+          }
+          if (typeof activeStore.vaListMembers === 'function') {
+            const members = await Promise.resolve(
+              activeStore.vaListMembers(company.id),
+            );
+            memberCount = Array.isArray(members) ? members.length : 0;
+          }
           const summary = settleCompanyPassiveFeesForTickRange(
             missions,
             world,
             fromTick,
             opts.toTick,
+            Date.now(),
+            {
+              companyId: company.id,
+              vaListed,
+              memberCount,
+            },
           );
           if (summary && prefer && company.id === prefer) {
             preferred = summary;
@@ -1434,11 +1482,32 @@ async function applyCompanySessionSettlement(opts: {
       applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
     }
     const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
+    let vaListed = false;
+    let memberCount = 0;
+    const deskCompanyId = prefer;
+    if (deskCompanyId && typeof activeStore.vaIsListed === 'function') {
+      vaListed = Boolean(
+        await Promise.resolve(activeStore.vaIsListed(deskCompanyId)),
+      );
+    }
+    if (
+      deskCompanyId &&
+      typeof activeStore.vaListMembers === 'function'
+    ) {
+      const members = await Promise.resolve(
+        activeStore.vaListMembers(deskCompanyId),
+      );
+      memberCount = Array.isArray(members) ? members.length : 0;
+    }
     const summary = settleCompanyPassiveFeesForTickRange(
       missions,
       world,
       fromTick,
       opts.toTick,
+      Date.now(),
+      deskCompanyId
+        ? { companyId: deskCompanyId, vaListed, memberCount }
+        : undefined,
     );
     return summary ?? undefined;
   } finally {
@@ -4074,6 +4143,7 @@ export function createCareerApiServer(port = 8787) {
         // Line crew snapshot for all members (read-only Config). Missions already
         // loaded for roster presence — no world lock. Soft-fail → null.
         let lineCrew: ReturnType<typeof buildVaLineCrewSnapshot> | null = null;
+        let autoHaul: ReturnType<typeof ensureVaAutoHaul> | null = null;
         if (listed) {
           try {
             const tick =
@@ -4083,8 +4153,10 @@ export function createCareerApiServer(port = 8787) {
             const missions =
               vaMissionsForRoster ?? (await loadMissions({ companyId }));
             lineCrew = buildVaLineCrewSnapshot(missions, tick);
+            autoHaul = ensureVaAutoHaul(missions);
           } catch {
             lineCrew = null;
+            autoHaul = null;
           }
         }
         let flightQuality = null;
@@ -4139,6 +4211,8 @@ export function createCareerApiServer(port = 8787) {
           displayName: co?.displayName?.trim() || companyId,
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
+          autoHaul,
+          autoHaulMinMembers: VA_AUTO_HAUL_MIN_MEMBERS,
           flightQuality,
           orgPerks,
           fleet: hangarFleet,
@@ -4253,6 +4327,68 @@ export function createCareerApiServer(port = 8787) {
           send(res, /Only the VA owner|Authentication required/i.test(message) ? 403 : 400, {
             error: message,
           });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/auto-haul') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          enabled?: boolean;
+          maxHaulsPerDay?: number;
+          payMult?: number;
+          walletFloorUsd?: number;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            companyId,
+            'configure Auto-haul desk',
+          );
+          const listed = await Promise.resolve(store.vaIsListed(companyId));
+          if (!listed) {
+            send(res, 400, {
+              error: 'Publish as a VA before enabling Auto-haul',
+            });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            const autoHaul = upsertVaAutoHaul(missions, {
+              enabled: body.enabled,
+              maxHaulsPerDay: body.maxHaulsPerDay,
+              payMult: body.payMult,
+              walletFloorUsd: body.walletFloorUsd,
+            });
+            void world;
+            return { autoHaul };
+          }, { persist: 'company', companyId });
+          send(res, 200, result);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          send(
+            res,
+            /Only the VA owner|Authentication required/i.test(message)
+              ? 403
+              : 400,
+            { error: message },
+          );
         }
         return;
       }

@@ -53,6 +53,7 @@ export function VaHaulsBoard(props: Props) {
     pressure: string | null;
     whRoom: string | null;
   } | null>(null);
+  const [portKnown, setPortKnown] = useState(false);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -75,8 +76,10 @@ export function VaHaulsBoard(props: Props) {
 
   useEffect(() => {
     const hub = props.homeHubIcao.trim().toUpperCase();
+    setPortKnown(false);
     if (!hub) {
       setPortStrip(null);
+      setPortKnown(true);
       return;
     }
     let cancelled = false;
@@ -131,6 +134,8 @@ export function VaHaulsBoard(props: Props) {
         });
       } catch {
         if (!cancelled) setPortStrip(null);
+      } finally {
+        if (!cancelled) setPortKnown(true);
       }
     })();
     return () => {
@@ -189,6 +194,9 @@ export function VaHaulsBoard(props: Props) {
   }
 
   const pageBusy = Boolean(props.busy) || busyHoldId != null;
+  const hasPortFbo =
+    portStrip != null &&
+    (portStrip.status === 'yours' || portStrip.status === 'held');
 
   return (
     <div className="va-pane-card va-hauls-pane">
@@ -196,9 +204,11 @@ export function VaHaulsBoard(props: Props) {
         <div>
           <h3>Hauls</h3>
           <p className="settings-help">
-            Paid WH→WH Internal Hauls for this company. Accept with a parked VA
-            tail at origin, then Dispatch. Until Port FBO + stock exist, fly
-            Freights with a VA-labeled aircraft — desk buy/Scout stay on Ports.
+            {!portKnown
+              ? 'Company WH→WH Internal Hauls.'
+              : hasPortFbo
+                ? 'Internal Hauls · Accept with a parked VA tail at origin, then Dispatch.'
+                : 'Until Port FBO + stock, fly Freights with a VA tail.'}
           </p>
         </div>
         {props.onGoPorts ? (
@@ -213,14 +223,17 @@ export function VaHaulsBoard(props: Props) {
         ) : null}
       </header>
 
-      <VaPortPathCard
-        companyId={props.companyId}
-        homeHubIcao={props.homeHubIcao}
-        walletUsd={props.walletUsd}
-        isOwner={props.isOwner}
-        busy={pageBusy}
-        onGoPorts={props.onGoPorts}
-      />
+      {/* Ladder only while climbing; after claim the strip below is enough. */}
+      {portKnown && !hasPortFbo ? (
+        <VaPortPathCard
+          companyId={props.companyId}
+          homeHubIcao={props.homeHubIcao}
+          walletUsd={props.walletUsd}
+          isOwner={props.isOwner}
+          busy={pageBusy}
+          onGoPorts={props.onGoPorts}
+        />
+      ) : null}
 
       {portStrip ? (
         <p className="va-hauls-port-strip" role="status">
@@ -259,9 +272,9 @@ export function VaHaulsBoard(props: Props) {
             </h4>
             {holds.length === 0 ? (
               <p className="empty">
-                No paid Internal Hauls waiting. After Port FBO + company stock,
-                owner/dispatcher posts bridges from Ports (Scout / Hold). Until
-                then, fly Freights with a VA tail for cut pay.
+                {hasPortFbo
+                  ? 'No bridges open. Post from Ports (Scout / Hold).'
+                  : 'No bridges yet. Fly Freights with a VA tail, or finish the Port FBO path above.'}
               </p>
             ) : (
               <ul className="va-hauls-list">
@@ -336,7 +349,7 @@ export function VaHaulsBoard(props: Props) {
               {active.length > 0 ? ` (${active.length})` : ''}
             </h4>
             {active.length === 0 ? (
-              <p className="empty">No Internal Haul missions in progress.</p>
+              <p className="empty">None in progress.</p>
             ) : (
               <ul className="va-hauls-list">
                 {active.map((m) => (

@@ -25,7 +25,7 @@ type Props = {
 
 /**
  * Company ladder: WH → T3 → Port FBO claim → desk/Hauls.
- * Reads Ports snapshot while My VA has the company tenant pinned.
+ * Returns null once the company already operates a Port FBO.
  */
 export function VaPortPathCard(props: Props) {
   const [loaded, setLoaded] = useState(false);
@@ -34,7 +34,6 @@ export function VaPortPathCard(props: Props) {
   const [detail, setDetail] = useState<string>('');
   const [claimReady, setClaimReady] = useState(false);
   const [hasFbo, setHasFbo] = useState(false);
-  const [portName, setPortName] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const hub = props.homeHubIcao.trim().toUpperCase();
@@ -45,7 +44,6 @@ export function VaPortPathCard(props: Props) {
       setDetail('');
       setClaimReady(false);
       setHasFbo(false);
-      setPortName(null);
       return;
     }
     try {
@@ -57,21 +55,12 @@ export function VaPortPathCard(props: Props) {
             p.concession.companyId === props.companyId),
       );
       if (owned) {
-        const level = owned.concession?.level ?? 1;
+        // Climb done — Hauls strip / Ports desk cover the live FBO.
         setHasFbo(true);
         setClaimReady(false);
-        setPortName(owned.name);
-        setHeadline(
-          `Port FBO P${level} · ${owned.name} — desk buy/Scout on Ports; post Internal Hauls for the board.`,
-        );
-        setDetail(
-          props.isOwner
-            ? 'Members inherit buy/ETA at this port. Create paid bridges so Hauls has work.'
-            : 'Company Port FBO is live — you inherit buy discount/ETA here; fly Freights VA or Accept Hauls.',
-        );
-        setSteps([
-          { id: 'fbo', done: true, label: `Port FBO · ${owned.name} · P${level}` },
-        ]);
+        setSteps([]);
+        setHeadline('');
+        setDetail('');
         setLoaded(true);
         return;
       }
@@ -89,8 +78,7 @@ export function VaPortPathCard(props: Props) {
         wh?.lifetimeShippedKg ?? 0,
         claim?.shippedKg ?? 0,
       );
-      const shippedNeed =
-        claim?.shippedNeededKg ?? 25_000;
+      const shippedNeed = claim?.shippedNeededKg ?? 25_000;
       const hasT3 = Boolean(claim?.hasTier3Warehouse) || tier >= 3;
       const dueUsd =
         claim != null
@@ -101,7 +89,6 @@ export function VaPortPathCard(props: Props) {
 
       setHasFbo(false);
       setClaimReady(ready);
-      setPortName(port?.name ?? null);
 
       const next: PathStep[] = [
         {
@@ -146,13 +133,13 @@ export function VaPortPathCard(props: Props) {
       if (ready) {
         setHeadline(
           port
-            ? `Ready to claim ${port.name} — Port FBO unlocks desk buy/Scout and richer Hauls.`
+            ? `Ready to claim ${port.name}.`
             : 'Ready to claim Port FBO on Ports.',
         );
         setDetail(
           props.isOwner
-            ? 'Open Ports desk and claim. Until then Freights with VA tails still work.'
-            : 'Owner claims on Ports when the company hits the gates — you can fly Freights VA meanwhile.',
+            ? 'Claim on Ports. Freights with VA tails still work until then.'
+            : 'Owner claims when gates pass — fly Freights VA meanwhile.',
         );
       } else {
         const blocker =
@@ -171,8 +158,8 @@ export function VaPortPathCard(props: Props) {
         );
         setDetail(
           props.isOwner
-            ? 'This is company CAPEX on the VA Ledger — not your home wallet. Freights VA work before Port FBO.'
-            : 'Shared company goal. Fly VA freights; owner builds WH/Port FBO. Hauls fill after desk stock + bridges.',
+            ? 'Company CAPEX on the VA Ledger — not your home wallet.'
+            : 'Shared company goal. Fly VA freights while the owner builds WH/Port FBO.',
         );
       }
     } catch {
@@ -181,7 +168,6 @@ export function VaPortPathCard(props: Props) {
       setSteps([]);
       setClaimReady(false);
       setHasFbo(false);
-      setPortName(null);
     } finally {
       setLoaded(true);
     }
@@ -200,10 +186,12 @@ export function VaPortPathCard(props: Props) {
     return (
       <section className="va-port-path">
         <h4 className="va-config-section-title">Path to Port FBO</h4>
-        <p className="settings-help">Loading company port path…</p>
+        <p className="settings-help">Loading…</p>
       </section>
     );
   }
+
+  if (hasFbo) return null;
 
   return (
     <section className="va-port-path">
@@ -216,32 +204,20 @@ export function VaPortPathCard(props: Props) {
             disabled={props.busy}
             onClick={props.onGoPorts}
           >
-            {claimReady && props.isOwner
-              ? 'Claim on Ports'
-              : hasFbo
-                ? 'Open Ports desk'
-                : 'Open Ports'}
+            {claimReady && props.isOwner ? 'Claim on Ports' : 'Open Ports'}
           </button>
         ) : null}
       </div>
       <p className="va-port-path-blurb">{headline}</p>
       {detail ? <p className="settings-help">{detail}</p> : null}
-      {steps.length > 0 && !hasFbo ? (
+      {steps.length > 0 ? (
         <ul className="va-checklist">
           {steps.map((s) => (
-            <li
-              key={s.id}
-              className={s.done ? 'is-done' : undefined}
-            >
+            <li key={s.id} className={s.done ? 'is-done' : undefined}>
               {s.label}
             </li>
           ))}
         </ul>
-      ) : null}
-      {hasFbo && portName ? (
-        <p className="va-port-path-done muted">
-          Unlocked · {portName}
-        </p>
       ) : null}
     </section>
   );

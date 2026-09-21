@@ -353,6 +353,41 @@ export function normalizeMissionsState(
               : 0,
         }
       : undefined;
+  const vaAutoHaulRaw = (raw as CareerMissionsState).vaAutoHaul;
+  const vaAutoHaul =
+    vaAutoHaulRaw && typeof vaAutoHaulRaw === 'object'
+      ? {
+          enabled: vaAutoHaulRaw.enabled === true,
+          maxHaulsPerDay: ((): number => {
+            const n = (vaAutoHaulRaw as { maxHaulsPerDay?: unknown })
+              .maxHaulsPerDay;
+            if (typeof n !== 'number' || !Number.isFinite(n)) return 2;
+            return Math.max(1, Math.min(3, Math.round(n)));
+          })(),
+          payMult: ((): number => {
+            const n = (vaAutoHaulRaw as { payMult?: unknown }).payMult;
+            if (typeof n !== 'number' || !Number.isFinite(n)) return 1;
+            return Math.round(Math.max(0.8, Math.min(1.5, n)) * 100) / 100;
+          })(),
+          walletFloorUsd: ((): number => {
+            const n = (vaAutoHaulRaw as { walletFloorUsd?: unknown })
+              .walletFloorUsd;
+            if (typeof n !== 'number' || !Number.isFinite(n)) return 0;
+            return Math.round(Math.max(0, n) * 100) / 100;
+          })(),
+          postedToday: ((): number => {
+            const n = (vaAutoHaulRaw as { postedToday?: unknown }).postedToday;
+            if (typeof n !== 'number' || !Number.isFinite(n)) return 0;
+            return Math.max(0, Math.floor(n));
+          })(),
+          postedDayIndex: ((): number => {
+            const n = (vaAutoHaulRaw as { postedDayIndex?: unknown })
+              .postedDayIndex;
+            if (typeof n !== 'number' || !Number.isFinite(n)) return 0;
+            return Math.floor(n);
+          })(),
+        }
+      : undefined;
   const result: CareerMissionsState = {
     version: 2,
     walletUsd,
@@ -375,6 +410,7 @@ export function normalizeMissionsState(
     ferrySoftNmUsed,
     ...(lastSeenTick !== undefined ? { lastSeenTick } : {}),
     ...(vaLineCrew ? { vaLineCrew } : {}),
+    ...(vaAutoHaul ? { vaAutoHaul } : {}),
     portPickups: Array.isArray((raw as CareerMissionsState).portPickups)
       ? (raw as CareerMissionsState).portPickups
       : [],

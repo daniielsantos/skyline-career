@@ -557,6 +557,18 @@ export type Mission = {
   warehouseHaul?: boolean;
   /** WH→WH company bridge / Internal Haul. */
   warehouseBridge?: boolean;
+  /** Internal Haul (VA spine) — payUsd is company→pilot fee. */
+  internalHaul?: boolean;
+  /** Accepted under a listed VA (VA aircraft / VA ops). */
+  vaFlight?: boolean;
+  /**
+   * What the pilot’s home wallet received on settle (member cut / IH fee).
+   * Prefer this over payoutUsd in the logbook when present.
+   */
+  pilotPayoutUsd?: number;
+  /** Dual-tenant stamp — home company that receives member cut / IH pay. */
+  pilotHomeCompanyId?: string;
+  pilotAccountId?: string;
   warehouseId?: string;
   warehouseAvgCostUsdPerKg?: number;
   /**
@@ -1746,6 +1758,8 @@ export function fetchCharters(opts: {
   pax?: '' | 'light' | 'med' | 'narrow';
   distanceMaxNm?: number | string;
   aircraftId?: string;
+  /** Dual-tenant: VA tail while chrome is on home. */
+  companyId?: string;
   page?: number;
   pageSize?: number;
   sort?: string;
@@ -1766,6 +1780,7 @@ export function fetchCharters(opts: {
   const distanceMaxNm = String(opts.distanceMaxNm ?? '').trim();
   if (distanceMaxNm) qs.set('distanceMaxNm', distanceMaxNm);
   if (aircraftId) qs.set('aircraftId', aircraftId);
+  if (opts.companyId?.trim()) qs.set('companyId', opts.companyId.trim());
   if (opts.page !== undefined) qs.set('page', String(opts.page));
   if (opts.pageSize !== undefined) qs.set('pageSize', String(opts.pageSize));
   if (opts.sort?.trim()) qs.set('sort', opts.sort.trim());

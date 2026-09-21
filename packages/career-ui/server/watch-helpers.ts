@@ -4288,8 +4288,19 @@ export class CareerWatchSession {
     const dtMs =
       this.lastMxFuelDrainAtMs > 0
         ? nowMs - this.lastMxFuelDrainAtMs
-        : MX_ACCRUE_INTERVAL_MS;
-    const dtHours = Math.min(0.05, Math.max(0, dtMs / 3_600_000));
+        : typeof mission.airborneAtMs === 'number' &&
+            Number.isFinite(mission.airborneAtMs) &&
+            mission.airborneAtMs > 0 &&
+            nowMs > mission.airborneAtMs
+          ? nowMs - mission.airborneAtMs
+          : MX_ACCRUE_INTERVAL_MS;
+    // Cap one step so a stalled pipe does not invent hours of burn, but allow
+    // longer than the old 3 min so late ticks / first airborne backfill count.
+    const MX_ACCRUE_MAX_DT_HOURS = 0.25; // 15 min
+    const dtHours = Math.min(
+      MX_ACCRUE_MAX_DT_HOURS,
+      Math.max(0, dtMs / 3_600_000),
+    );
     const stepKg = flowKgPerHour * burn.excessFrac * dtHours;
     this.mxFuelDrainAccruedKg += stepKg;
     this.lastMxFuelDrainAtMs = nowMs;

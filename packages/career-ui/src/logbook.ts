@@ -129,10 +129,17 @@ function humanizeCommodityId(id: string | undefined): string {
     .replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
-/** Settled payout when known; otherwise offered contract pay (active legs). */
+/** Settled payout when known; otherwise offered contract pay (active legs).
+ * Prefer {@link Mission.pilotPayoutUsd} (member cut / IH fee) over route gross. */
 export function logbookPayoutUsd(mission: Mission): number | null {
   if (mission.status === 'cancelled' || mission.status === 'failed') {
     return null;
+  }
+  if (
+    typeof mission.pilotPayoutUsd === 'number' &&
+    Number.isFinite(mission.pilotPayoutUsd)
+  ) {
+    return mission.pilotPayoutUsd;
   }
   if (typeof mission.payoutUsd === 'number' && Number.isFinite(mission.payoutUsd)) {
     return mission.payoutUsd;
@@ -141,6 +148,31 @@ export function logbookPayoutUsd(mission: Mission): number | null {
     return mission.payUsd;
   }
   return null;
+}
+
+/** True when the shown pay is the pilot home cut (below route gross). */
+export function logbookPayoutIsPilotCut(mission: Mission): boolean {
+  if (
+    typeof mission.pilotPayoutUsd !== 'number' ||
+    !Number.isFinite(mission.pilotPayoutUsd)
+  ) {
+    return false;
+  }
+  if (
+    typeof mission.payoutUsd !== 'number' ||
+    !Number.isFinite(mission.payoutUsd)
+  ) {
+    return false;
+  }
+  return mission.pilotPayoutUsd < mission.payoutUsd - 0.5;
+}
+
+/** VA aircraft / VA ops (listed company or Internal Haul). */
+export function logbookIsVaFlight(mission: Mission): boolean {
+  return (
+    mission.vaFlight === true ||
+    (mission.warehouseBridge === true && mission.internalHaul === true)
+  );
 }
 
 const HOURS_PER_TICK = 0.25;

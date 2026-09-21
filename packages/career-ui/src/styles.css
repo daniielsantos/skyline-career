@@ -4495,6 +4495,12 @@ tr.lot-locked {
   color: var(--muted);
 }
 
+.logbook-va {
+  border-color: color-mix(in srgb, var(--accent, #6ea8d6) 50%, var(--line));
+  color: var(--accent, #6ea8d6);
+  background: color-mix(in srgb, var(--accent, #6ea8d6) 12%, transparent);
+}
+
 .logbook-summary {
   margin: 0.35rem 0 0;
   color: var(--muted);

@@ -1008,6 +1008,16 @@ export interface MissionIntent {
    */
   internalHaul?: boolean;
   /**
+   * Accepted under a `va_listed` company (VA aircraft / VA ops).
+   * Logbook shows a VA tag; surviving stamp when the tenant list is viewed later.
+   */
+  vaFlight?: boolean;
+  /**
+   * What the pilot’s home wallet received on settle (member cut or IH fee).
+   * When omitted, logbook falls back to {@link payoutUsd} (solo / owner full route).
+   */
+  pilotPayoutUsd?: number;
+  /**
    * Account that accepted/flew the Internal Haul (IH-2 multi-pilot).
    * Settle credits `pilotHomeCompanyId` when it differs from the VA company.
    */

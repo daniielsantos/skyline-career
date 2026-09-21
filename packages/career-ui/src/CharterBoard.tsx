@@ -71,6 +71,8 @@ export function charterNetLabel(
 type CharterBoardProps = {
   fleet: PlayerAircraft[];
   vaAircraftIds?: ReadonlySet<string>;
+  /** Dual-tenant: resolve ops company for Fit when a VA tail is selected. */
+  resolveAircraftCompanyId?: (aircraftId: string) => string | undefined;
   initialAircraftId?: string;
   /** Exact origin lock (Terminal outbound / Base dispatcher). */
   origin?: string;
@@ -156,6 +158,9 @@ export function CharterBoard(props: CharterBoardProps) {
         pax: paxFilter || undefined,
         distanceMaxNm: distanceMaxNm || undefined,
         aircraftId,
+        companyId: aircraftId
+          ? props.resolveAircraftCompanyId?.(aircraftId)
+          : undefined,
         page,
         pageSize: CHARTER_PAGE_SIZE,
         sort: formatCharterBoardSorts(sorts),
@@ -195,6 +200,7 @@ export function CharterBoard(props: CharterBoardProps) {
     paxFilter,
     distanceMaxNm,
     sorts,
+    props.resolveAircraftCompanyId,
   ]);
 
   function toggleSort(key: CharterBoardSortKey) {

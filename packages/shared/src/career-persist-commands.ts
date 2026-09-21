@@ -341,6 +341,27 @@ export function executeSettleFlight(
     companyId,
     memberRouteCutPct,
   });
+  // Stamp what the pilot’s home actually received (cut / IH fee / full route).
+  const pilotPayoutUsd =
+    wallet.pilotPayCredit?.amountUsd ??
+    (result.walletCreditUsd > 0 ? result.walletCreditUsd : undefined);
+  const openAfter = missions.missions[idx]!;
+  const vaFlight =
+    openAfter.vaFlight === true ||
+    (openAfter.warehouseBridge === true && openAfter.internalHaul === true);
+  if (typeof pilotPayoutUsd === 'number' || vaFlight) {
+    const stamped = {
+      ...openAfter,
+      ...(typeof pilotPayoutUsd === 'number' ? { pilotPayoutUsd } : {}),
+      ...(vaFlight ? { vaFlight: true as const } : {}),
+    };
+    missions.missions[idx] = stamped;
+    return {
+      kind: 'applied',
+      result: { ...result, mission: stamped },
+      pilotPayCredit: wallet.pilotPayCredit,
+    };
+  }
   return {
     kind: 'applied',
     result,
@@ -363,6 +384,8 @@ export type ExecuteAcceptLotOpts = {
   pilotAccountId?: string;
   /** Pilot home company — cut credits here when ≠ ops company. */
   pilotHomeCompanyId?: string;
+  /** Accepted under a listed VA. */
+  vaFlight?: boolean;
 };
 
 export type ExecuteAcceptLotResult =
@@ -432,15 +455,19 @@ function stampMissionPilot(
   opts: {
     pilotAccountId?: string;
     pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
   },
 ): MissionIntent {
   const pilotAccountId = opts.pilotAccountId?.trim() || undefined;
   const pilotHomeCompanyId = opts.pilotHomeCompanyId?.trim() || undefined;
-  if (!pilotAccountId && !pilotHomeCompanyId) return mission;
+  if (!pilotAccountId && !pilotHomeCompanyId && opts.vaFlight !== true) {
+    return mission;
+  }
   return {
     ...mission,
     ...(pilotAccountId ? { pilotAccountId } : {}),
     ...(pilotHomeCompanyId ? { pilotHomeCompanyId } : {}),
+    ...(opts.vaFlight === true ? { vaFlight: true as const } : {}),
   };
 }
 
@@ -457,6 +484,7 @@ export type ExecuteAcceptManifestOpts = {
   companyId?: string;
   pilotAccountId?: string;
   pilotHomeCompanyId?: string;
+  vaFlight?: boolean;
 };
 
 export type ExecuteAcceptManifestResult =

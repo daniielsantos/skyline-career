@@ -1168,12 +1168,10 @@ export function resolveSettledAircraftFuelKg(
   const clamp = (kg: number) =>
     Math.round(Math.max(0, Math.min(capacity, kg)));
 
-  const mxTotal = Math.max(
+  const watchMx = Math.max(
     0,
     opts.mxFuelDrainTotalKg ?? opts.mxFuelDrainUnsettledKg ?? 0,
   );
-  const hasWatchMx = mxTotal > 0;
-
   const estimateMx = () =>
     estimateMxFuelDrainKgForSettle({
       aircraft,
@@ -1181,31 +1179,52 @@ export function resolveSettledAircraftFuelKg(
       world,
       cruiseFuelFlowKgPerHour: opts.cruiseFuelFlowKgPerHour,
     });
+  // Partial Watch ledger must not under-debit vs a full-flight estimate.
+  const mxLedger = Math.max(watchMx, estimateMx());
+
+  const resolveTripBurnKg = (): number => {
+    const stamped = mission.tripFuelBurnKg;
+    if (typeof stamped === 'number' && Number.isFinite(stamped) && stamped > 0) {
+      return stamped;
+    }
+    if (world) {
+      const distanceNm =
+        routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
+      return estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
+    }
+    return 0;
+  };
 
   if (
     typeof opts.residualFuelKg === 'number' &&
     Number.isFinite(opts.residualFuelKg)
   ) {
-    const mxLedger = hasWatchMx ? mxTotal : estimateMx();
+    const hangarBefore = Math.max(0, aircraft.fuelKg);
+    // Never credit unpaid sim fuel above the hangar tank.
+    const residualUse = Math.min(
+      Math.max(0, opts.residualFuelKg),
+      hangarBefore,
+    );
+    let next = residualUse - mxLedger;
+    // Preserve hangar surplus that never entered the sim (OFP inject < hangar).
+    const tripBurn = resolveTripBurnKg();
+    if (tripBurn > 0) {
+      next = Math.max(next, hangarBefore - tripBurn - mxLedger);
+    }
+    next = Math.min(next, hangarBefore);
     return {
-      fuelKg: clamp(opts.residualFuelKg - mxLedger),
+      fuelKg: clamp(next),
       mxFuelDrainAppliedKg: Math.round(mxLedger * 10) / 10,
     };
   }
 
-  let tripBurn = mission.tripFuelBurnKg;
-  if (!(typeof tripBurn === 'number' && tripBurn > 0) && world) {
-    const distanceNm =
-      routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
-    tripBurn = estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
-  }
-  const mxTotalFallback = hasWatchMx ? mxTotal : estimateMx();
+  const tripBurn = resolveTripBurnKg();
   let fuel = aircraft.fuelKg;
-  if (typeof tripBurn === 'number' && tripBurn > 0) fuel -= tripBurn;
-  fuel -= mxTotalFallback;
+  if (tripBurn > 0) fuel -= tripBurn;
+  fuel -= mxLedger;
   return {
     fuelKg: clamp(fuel),
-    mxFuelDrainAppliedKg: Math.round(mxTotalFallback * 10) / 10,
+    mxFuelDrainAppliedKg: Math.round(mxLedger * 10) / 10,
   };
 }
 

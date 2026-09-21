@@ -271,6 +271,8 @@ import {
   logbookFlightDurationLabel,
   logbookFlightKind,
   logbookFlightWhenLabel,
+  logbookIsVaFlight,
+  logbookPayoutIsPilotCut,
   logbookPayoutUsd,
   logbookStatusLabel,
 } from './logbook';
@@ -5174,7 +5176,9 @@ export function App() {
       setMarketBoardLoading(false);
       return;
     }
-    const boardAcf = fleet.find((a) => a.id === boardAircraftId);
+    const boardAcf =
+      findOpsEntry(opsFleetEntries, boardAircraftId)?.aircraft ??
+      fleet.find((a) => a.id === boardAircraftId);
     const originQuery = originFilter.trim();
     const focusIcao = (
       boardAcf?.locationIcao ||
@@ -5301,6 +5305,7 @@ export function App() {
     distanceMaxNm,
     expiresWithinHours,
     fleet,
+    opsFleetEntries,
     freightsBoard,
     laneFilter,
     loadMinKg,
@@ -11628,13 +11633,13 @@ export function App() {
   }, [fleet, hangarQuery]);
   const boardEstimateFleet = useMemo(
     () =>
-      fleet.filter(
+      prepareOpsFleet.filter(
         (a) =>
           a.status === 'parked' ||
           a.status === 'assigned' ||
           a.status === 'maintenance',
       ),
-    [fleet],
+    [prepareOpsFleet],
   );
   const boardAircraft = useMemo(
     () => boardEstimateFleet.find((a) => a.id === boardAircraftId) ?? null,
@@ -15843,6 +15848,8 @@ export function App() {
                               </option>
                               {boardEstimateFleet.map((acf) => (
                                 <option key={acf.id} value={acf.id}>
+                                  {vaAircraftIdSet.has(acf.id) ? 'VA' : 'Yours'}
+                                  {' · '}
                                   {acf.label}
                                   {acf.status === 'parked'
                                     ? ` · ${acf.locationIcao}`
@@ -15965,6 +15972,9 @@ export function App() {
                         <CharterBoard
                           fleet={prepareOpsFleet}
                           vaAircraftIds={vaAircraftIdSet}
+                          resolveAircraftCompanyId={(id) =>
+                            resolveOpsCompanyId(id) || undefined
+                          }
                           initialAircraftId={boardAircraftId}
                           origin={
                             contractsLane === 'outbound'
@@ -16639,6 +16649,9 @@ export function App() {
           <CharterBoard
             fleet={prepareOpsFleet}
             vaAircraftIds={vaAircraftIdSet}
+            resolveAircraftCompanyId={(id) =>
+              resolveOpsCompanyId(id) || undefined
+            }
             initialAircraftId={boardAircraftId}
             busy={busy || Boolean(playerDispatchMission)}
             formatMoney={formatMoney}
@@ -16892,14 +16905,18 @@ export function App() {
                   }}
                 >
                   <option value="">
-                    {fleet.length === 0
+                    {boardEstimateFleet.length === 0
                       ? 'Gross pay (no aircraft)'
                       : 'Gross pay only'}
                   </option>
                   {boardEstimateFleet.map((acf) => (
                     <option key={acf.id} value={acf.id}>
+                      {vaAircraftIdSet.has(acf.id) ? 'VA' : 'Yours'}
+                      {' · '}
                       {acf.label}
-                      {acf.status === 'parked' ? ` · ${acf.locationIcao}` : ` · ${acf.status}`}
+                      {acf.status === 'parked'
+                        ? ` · ${acf.locationIcao}`
+                        : ` · ${acf.status}`}
                     </option>
                   ))}
                 </select>
@@ -19886,6 +19903,8 @@ export function App() {
                 const duration = logbookFlightDurationLabel(m);
                 const when = logbookFlightWhenLabel(m);
                 const payout = logbookPayoutUsd(m);
+                const payoutIsCut = logbookPayoutIsPilotCut(m);
+                const vaFlight = logbookIsVaFlight(m);
                 const fleetLabel = m.aircraftId
                   ? fleet.find((a) => a.id === m.aircraftId)?.label
                   : null;
@@ -19908,6 +19927,11 @@ export function App() {
                           {logbookStatusLabel(m.status)}
                         </span>
                         <span className="logbook-kind">{kind}</span>
+                        {vaFlight ? (
+                          <span className="logbook-kind logbook-va" title="Flown for a Virtual Airline">
+                            VA
+                          </span>
+                        ) : null}
                         {isActiveMissionStatus(m.status) ? (
                           <button
                             type="button"
@@ -19932,7 +19956,11 @@ export function App() {
                         {' · '}
                         {when ?? 'When —'}
                         {' · '}
-                        {payout != null ? formatMoney(payout) : '—'}
+                        {payout != null
+                          ? payoutIsCut
+                            ? `${formatMoney(payout)} cut`
+                            : formatMoney(payout)
+                          : '—'}
                       </p>
                     </div>
                   </li>

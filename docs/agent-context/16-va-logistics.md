@@ -82,6 +82,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - Settle em company `va_listed` grava quality (Freights/Demand/Charter/IH com score). UI: My VA Ledger strip = Flight quality; directory/ranking chip Quality; credit = Owner ops.
 - **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. Não confundir com **buff de concessão herdado** (Port FBO P# no porto home — membros herdam buy/ETA/listings; ainda backlog).
 - **Prepare Yours+VA (shipped 2026-09-20):** chrome sticky-home escondia frota VA em Freights/Charter/Ports. Fix: prefetch `/api/va/members` → `vaSessionFleet`; `ops-fleet.ts` merge Yours+VA nos pickers; ferry Journey **não** abre no Prepare (só CTA); Accept/`companyId` no tenant do tail + pin VA enquanto Dispatch ativo. **Operator aircraft** = NPC (não VA). **Base Dispatcher** = home-only (CAPEX pessoal).
+- **Charter/Freights board VA (2026-09-20):** sintoma — Charter `Unknown aircraft acf_…` ao selecionar tail VA; Freights dropdown só home. Causa — `GET /api/charters` lia chrome home; `boardEstimateFleet` filtrava `fleet` home. Fix — query `companyId` no Fit + `resolveAircraftCompanyId`; Freights/Contracts picker usa `prepareOpsFleet` com prefixo VA/Yours.
 
 **Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
 
@@ -127,6 +128,7 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 6. Owner voando o próprio VA: **sem cut** (`pilotHomeCompanyId` = ops).
 7. IH **não** recebe esse % em cima do pay stamp.
 8. Accept Freights/Demand/Charter **stamp** `pilotHomeCompanyId` / `pilotAccountId`.
+9. **Logbook (2026-09-20):** tag **VA** quando `vaFlight` (accept sob company `va_listed`) ou Internal Haul. Pay mostrado = `pilotPayoutUsd` (fatia home / fee IH) quando stampado no settle; senão `payoutUsd` bruto da rota. Membro Freights com cut: UI sufixo `cut`. Histórico pré-stamp: na company VA listada o GET `/api/missions` força `vaFlight` (tag), mas pay antigo continua bruto até novo settle.
 
 ```
 VA ──(+payout)──►  VA ──(−fuel missão)──►  VA ──(−pilotUsd)──► home

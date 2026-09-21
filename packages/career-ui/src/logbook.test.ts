@@ -8,6 +8,8 @@ import {
   logbookFlightDurationLabel,
   logbookFlightKind,
   logbookFlightWhenLabel,
+  logbookIsVaFlight,
+  logbookPayoutIsPilotCut,
   logbookPayoutUsd,
   logbookStatusLabel,
   formatEconomyClock,
@@ -160,6 +162,40 @@ describe('logbookPayoutUsd', () => {
     assert.equal(
       logbookPayoutUsd(mission({ status: 'dispatched', payoutUsd: undefined })),
       32_164,
+    );
+  });
+
+  it('prefers pilot cut over route gross', () => {
+    assert.equal(
+      logbookPayoutUsd(
+        mission({ payoutUsd: 1000, pilotPayoutUsd: 240, vaFlight: true }),
+      ),
+      240,
+    );
+    assert.equal(
+      logbookPayoutIsPilotCut(
+        mission({ payoutUsd: 1000, pilotPayoutUsd: 240, vaFlight: true }),
+      ),
+      true,
+    );
+    assert.equal(
+      logbookPayoutIsPilotCut(
+        mission({ payoutUsd: 1000, pilotPayoutUsd: 1000, vaFlight: true }),
+      ),
+      false,
+    );
+  });
+});
+
+describe('logbookIsVaFlight', () => {
+  it('tags listed VA ops and Internal Haul', () => {
+    assert.equal(logbookIsVaFlight(mission()), false);
+    assert.equal(logbookIsVaFlight(mission({ vaFlight: true })), true);
+    assert.equal(
+      logbookIsVaFlight(
+        mission({ warehouseBridge: true, internalHaul: true }),
+      ),
+      true,
     );
   });
 });

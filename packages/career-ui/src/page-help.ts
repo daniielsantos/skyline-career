@@ -141,7 +141,9 @@ export const PAGE_HELP = {
     title: 'How Logbook works',
     kicker: 'Page guide',
     bullets: [
-      'Settled flights only — aircraft, cargo, distance, payout. It does not change the live board.',
+      'Settled flights — aircraft, cargo, distance, payout. It does not change the live board.',
+      'VA tag marks flights flown for a listed Virtual Airline (VA aircraft / Internal Haul).',
+      'Pay is what your home wallet received: solo/owner = full route; member Freights show your cut (not VA gross).',
     ],
   },
   settings: {

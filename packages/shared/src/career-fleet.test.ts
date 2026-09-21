@@ -442,6 +442,10 @@ describe('career fleet hangar', () => {
       { fleet: state },
     );
     assert.ok(departed.mission.tripFuelBurnKg! > 0);
+    // Hangar already holds paid fuel near the live residual (no surplus / unpaid).
+    state.fleet[0]!.fuelKg = 140;
+    state.fleet[0]!.airframeConditionPct = 100;
+    state.fleet[0]!.engineConditionPct = 100;
     const settled = settleMission(world, departed.mission, {
       fleet: state,
       residualFuelKg: 137.6,
@@ -562,6 +566,8 @@ describe('career fleet hangar', () => {
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
     const aircraft = state.fleet[0]!;
     aircraft.fuelKg = 120;
+    aircraft.airframeConditionPct = 100;
+    aircraft.engineConditionPct = 100;
     const mission = {
       id: 'msn_mx_live',
       aircraftId: aircraft.id,
@@ -580,6 +586,80 @@ describe('career fleet hangar', () => {
     });
     assert.equal(resolved.fuelKg, 35);
     assert.equal(resolved.mxFuelDrainAppliedKg, 45.2);
+  });
+
+  it('settle uses max of Watch ledger and full-flight MX estimate', () => {
+    const world = createSeedEconomyWorld({ seed: 'mx-drain-max' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    aircraft.fuelKg = 200;
+    aircraft.airframeConditionPct = 40;
+    aircraft.engineConditionPct = 40;
+    const mission = {
+      id: 'msn_mx_max',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      airframeTypeId: aircraft.airframeTypeId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'in_flight',
+      tripFuelBurnKg: 40,
+      expectedRouteMs: 3_600_000,
+    } as never;
+    const flowOpts = { cruiseFuelFlowKgPerHour: 120 };
+
+    const estimatedAlone = resolveSettledAircraftFuelKg(
+      aircraft,
+      mission,
+      world,
+      { residualFuelKg: 160, ...flowOpts },
+    );
+    assert.ok(estimatedAlone.mxFuelDrainAppliedKg > 5);
+
+    const resolved = resolveSettledAircraftFuelKg(aircraft, mission, world, {
+      residualFuelKg: 160,
+      mxFuelDrainTotalKg: 5,
+      ...flowOpts,
+    });
+    assert.equal(
+      resolved.mxFuelDrainAppliedKg,
+      estimatedAlone.mxFuelDrainAppliedKg,
+    );
+    assert.ok(resolved.mxFuelDrainAppliedKg > 5);
+  });
+
+  it('settle preserves hangar surplus and rejects unpaid sim fuel', () => {
+    const world = createSeedEconomyWorld({ seed: 'mx-surplus' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    aircraft.fuelKg = 200;
+    aircraft.airframeConditionPct = 100;
+    aircraft.engineConditionPct = 100;
+    const mission = {
+      id: 'msn_mx_surplus',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'in_flight',
+      tripFuelBurnKg: 60,
+    } as never;
+
+    const surplus = resolveSettledAircraftFuelKg(aircraft, mission, world, {
+      residualFuelKg: 40,
+      mxFuelDrainTotalKg: 10,
+    });
+    // hangar 200 − trip 60 − mx 10 = 130 (surplus kept; not residual−mx = 30)
+    assert.equal(surplus.fuelKg, 130);
+    assert.equal(surplus.mxFuelDrainAppliedKg, 10);
+
+    aircraft.fuelKg = 100;
+    const unpaid = resolveSettledAircraftFuelKg(aircraft, mission, world, {
+      residualFuelKg: 150,
+      mxFuelDrainTotalKg: 10,
+    });
+    // Cap residual to hangar → 100 − 10 = 90 (no free fuel from sim)
+    assert.equal(unpaid.fuelKg, 90);
   });
 
   it('settle debits estimated MX drain when live residual is unavailable', () => {

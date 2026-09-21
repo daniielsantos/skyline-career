@@ -845,6 +845,7 @@ describe('VA IH-2', () => {
       acceptedAtTick: world.tick,
       pilotHomeCompanyId: 'co_pilot_home',
       pilotAccountId: 'acc_pilot',
+      vaFlight: true,
     } as import('./types/career-economy.js').MissionIntent;
     const before = va.walletUsd;
     const wallet = applySettleWalletDeltas(

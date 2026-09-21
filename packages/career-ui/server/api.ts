@@ -761,6 +761,7 @@ function withMissionClientView(
   world: CareerEconomyWorld,
   missions: MissionsFile,
   mission: MissionIntent,
+  opts?: { forceVaFlight?: boolean },
 ) {
   const normalized = normalizeMissionIntent(mission);
   const typeId =
@@ -795,12 +796,17 @@ function withMissionClientView(
         : undefined;
     return lotQuantityKg !== undefined ? { ...line, lotQuantityKg } : line;
   });
+  const vaFlight =
+    opts?.forceVaFlight === true ||
+    normalized.vaFlight === true ||
+    (normalized.warehouseBridge === true && normalized.internalHaul === true);
   return {
     ...base,
     lots,
     ...(airframeLabel ? { airframeLabel } : {}),
     ...(distanceNm !== undefined ? { distanceNm } : {}),
     ...(demandEditMaxKg !== undefined ? { demandEditMaxKg } : {}),
+    ...(vaFlight ? { vaFlight: true as const } : {}),
   };
 }
 
@@ -2164,6 +2170,36 @@ function classOpsForRequest(
 ): CareerMissionsState['classOps'] {
   if (!requestDevMode(req)) return ops;
   return unlockAllCareerClassOps(ops ?? undefined);
+}
+
+/**
+ * Stamp dual-tenant pilot + VA tag onto Accept / Dispatch mission creates.
+ * `vaFlight` is set when the ops company is `va_listed` (VA aircraft / VA ops).
+ */
+async function vaPilotMissionStamp(
+  req: import('node:http').IncomingMessage,
+  opsCompanyId: string | undefined,
+): Promise<{
+  pilotAccountId?: string;
+  pilotHomeCompanyId?: string;
+  vaFlight?: boolean;
+}> {
+  const session = authSessionFromRequest(req);
+  const cid = opsCompanyId?.trim();
+  if (!session || !cid) return {};
+  const pilotHome =
+    store?.supportsAuth
+      ? ((await Promise.resolve(store.vaHomeCompanyId(session.account.id))) ??
+        cid)
+      : cid;
+  const listed =
+    Boolean(store?.supportsAuth) &&
+    (await Promise.resolve(store!.vaIsListed(cid)));
+  return {
+    pilotAccountId: session.account.id,
+    ...(pilotHome ? { pilotHomeCompanyId: pilotHome } : {}),
+    ...(listed ? { vaFlight: true as const } : {}),
+  };
 }
 
 /**
@@ -6670,6 +6706,10 @@ export function createCareerApiServer(port = 8787) {
         }
         const emptyFlightCompanyId = companyIdFromRequest(req, body.companyId);
         const emptyActor = await resolveVaFleetActor(req, emptyFlightCompanyId);
+        const emptyPilotStamp = await vaPilotMissionStamp(
+          req,
+          emptyFlightCompanyId,
+        );
         try {
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
@@ -6679,8 +6719,14 @@ export function createCareerApiServer(port = 8787) {
               actorAccountId: emptyActor.accountId,
               actorIsVaOwner: emptyActor.isOwner,
             });
+            const mission = {
+              ...accepted.mission,
+              ...emptyPilotStamp,
+            };
+            const idx = missions.missions.findIndex((m) => m.id === mission.id);
+            if (idx >= 0) missions.missions[idx] = mission;
             return {
-              mission: accepted.mission,
+              mission,
               aircraft: accepted.aircraft,
               walletUsd: missions.walletUsd,
               ...fleetPayload(missions, world),
@@ -7069,7 +7115,11 @@ export function createCareerApiServer(port = 8787) {
           1,
           Math.floor(Number(url.searchParams.get('page')) || 1),
         );
-        const chartersCompanyId = companyIdFromRequest(req);
+        // Query companyId wins over chrome header (VA tail while sticky-home).
+        const chartersCompanyId = companyIdFromRequest(
+          req,
+          url.searchParams.get('companyId'),
+        );
         try {
           // Read-only board query — never tickCharterEconomy + full economy save here.
           // Sort/filter used withCareerWrite (default persist), which rewrote the whole
@@ -7321,20 +7371,8 @@ export function createCareerApiServer(port = 8787) {
         }
         const acceptCompanyId = companyIdFromRequest(req, body.companyId);
         try {
-          const session = authSessionFromRequest(req);
-          const pilotHome =
-            session && store
-              ? ((await Promise.resolve(
-                  store.vaHomeCompanyId(session.account.id),
-                )) ?? acceptCompanyId)
-              : acceptCompanyId;
           const charterActor = await resolveVaFleetActor(req, acceptCompanyId);
-          const pilotStamp = session
-            ? {
-                pilotAccountId: session.account.id,
-                pilotHomeCompanyId: pilotHome ?? undefined,
-              }
-            : {};
+          const pilotStamp = await vaPilotMissionStamp(req, acceptCompanyId);
           const peek = await withCareerRead((_world, missions) => {
             const aircraft = findPlayerAircraft(missions, body.aircraftId!);
             if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
@@ -9840,19 +9878,10 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          const session = authSessionFromRequest(req);
-          const pilotHome =
-            session && store
-              ? ((await Promise.resolve(
-                  store.vaHomeCompanyId(session.account.id),
-                )) ?? warehouses_bridge_acceptCompanyId)
-              : warehouses_bridge_acceptCompanyId;
-          const pilotStamp = session
-            ? {
-                pilotAccountId: session.account.id,
-                pilotHomeCompanyId: pilotHome ?? undefined,
-              }
-            : {};
+          const pilotStamp = await vaPilotMissionStamp(
+            req,
+            warehouses_bridge_acceptCompanyId,
+          );
           const bridgeProgPeek = await withCareerRead((_w, missions) => ({
             cargoOps: missions.cargoOps,
             classOps: missions.classOps,
@@ -9934,19 +9963,10 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          const session = authSessionFromRequest(req);
-          const pilotHome =
-            session && store
-              ? ((await Promise.resolve(
-                  store.vaHomeCompanyId(session.account.id),
-                )) ?? warehouses_bridge_dispatch_holdCompanyId)
-              : warehouses_bridge_dispatch_holdCompanyId;
-          const pilotStamp = session
-            ? {
-                pilotAccountId: session.account.id,
-                pilotHomeCompanyId: pilotHome ?? undefined,
-              }
-            : {};
+          const pilotStamp = await vaPilotMissionStamp(
+            req,
+            warehouses_bridge_dispatch_holdCompanyId,
+          );
           const bridgeHoldActor = await resolveVaFleetActor(
             req,
             warehouses_bridge_dispatch_holdCompanyId,
@@ -10148,19 +10168,10 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          const haulSession = authSessionFromRequest(req);
-          const haulPilotHome =
-            haulSession && store
-              ? ((await Promise.resolve(
-                  store.vaHomeCompanyId(haulSession.account.id),
-                )) ?? warehouses_haul_acceptCompanyId)
-              : warehouses_haul_acceptCompanyId;
-          const haulPilotStamp = haulSession
-            ? {
-                pilotAccountId: haulSession.account.id,
-                pilotHomeCompanyId: haulPilotHome ?? undefined,
-              }
-            : {};
+          const haulPilotStamp = await vaPilotMissionStamp(
+            req,
+            warehouses_haul_acceptCompanyId,
+          );
           const haulProgPeek = await withCareerRead((_w, missions) => ({
             cargoOps: missions.cargoOps,
             classOps: missions.classOps,
@@ -10331,19 +10342,10 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
-          const session = authSessionFromRequest(req);
-          const pilotHome =
-            session && store
-              ? ((await Promise.resolve(
-                  store.vaHomeCompanyId(session.account.id),
-                )) ?? demand_acceptCompanyId)
-              : demand_acceptCompanyId;
-          const pilotStamp = session
-            ? {
-                pilotAccountId: session.account.id,
-                pilotHomeCompanyId: pilotHome ?? undefined,
-              }
-            : {};
+          const pilotStamp = await vaPilotMissionStamp(
+            req,
+            demand_acceptCompanyId,
+          );
           const demandActor = await resolveVaFleetActor(
             req,
             demand_acceptCompanyId,
@@ -10844,10 +10846,14 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/missions') {
         const missionsCompanyId = companyIdFromRequest(req);
+        const forceVaFlight =
+          Boolean(missionsCompanyId) &&
+          Boolean(store) &&
+          (await Promise.resolve(store!.vaIsListed(missionsCompanyId!)));
         const payload = await withCareerRead((world, missions) => ({
           ...missions,
           missions: missions.missions.map((m) =>
-            withMissionClientView(world, missions, m),
+            withMissionClientView(world, missions, m, { forceVaFlight }),
           ),
         }), { companyId: missionsCompanyId });
         send(res, 200, payload);
@@ -11126,19 +11132,7 @@ export function createCareerApiServer(port = 8787) {
               requireStore(),
               acceptCompanyId,
             )) ?? acceptCompanyId;
-          const session = authSessionFromRequest(req);
-          const pilotHome =
-            session && store
-              ? ((await Promise.resolve(
-                  store.vaHomeCompanyId(session.account.id),
-                )) ?? acceptCompanyId)
-              : acceptCompanyId;
-          const pilotStamp = session
-            ? {
-                pilotAccountId: session.account.id,
-                pilotHomeCompanyId: pilotHome ?? undefined,
-              }
-            : {};
+          const pilotStamp = await vaPilotMissionStamp(req, acceptCompanyId);
           const progPeek = await withCareerRead((_w, missions) => ({
             cargoOps: missions.cargoOps,
             classOps: missions.classOps,
@@ -11517,20 +11511,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         const stagingCompanyId = companyIdFromRequest(req, body.companyId);
-        const stagingSession = authSessionFromRequest(req);
         const stagingActor = await resolveVaFleetActor(req, stagingCompanyId);
-        const stagingPilotHome =
-          stagingSession && store
-            ? ((await Promise.resolve(
-                store.vaHomeCompanyId(stagingSession.account.id),
-              )) ?? stagingCompanyId)
-            : stagingCompanyId;
-        const stagingPilotStamp = stagingSession
-          ? {
-              pilotAccountId: stagingSession.account.id,
-              pilotHomeCompanyId: stagingPilotHome ?? undefined,
-            }
-          : {};
+        const stagingPilotStamp = await vaPilotMissionStamp(
+          req,
+          stagingCompanyId,
+        );
         const lines = (body.lines ?? [])
           .filter((line) => line.lotId)
           .map((line) => ({

@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **c0a5e37** / desktop **0.3.186** shipped: Add engine and airframe overhaul as Hangar CAPEX sinks. Release: [v0.3.186](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.186).
+
+
 **Local (unreleased):** Engine + airframe overhaul Hangar CAPEX (reset hours, VA owner-only). See `18-aircraft-pricing-balance.md`.
 
 `main` **c43906e** / desktop **0.3.185** shipped: Persist forced +Nd ticks on Postgres catch-up writes. Release: [v0.3.185](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.185).

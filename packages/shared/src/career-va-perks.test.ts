@@ -32,6 +32,10 @@ describe('resolveVaOrgPerks', () => {
     assert.equal(p.mxCostMult, 0.95);
     assert.equal(p.ferryOverflowCostMult, 0.9);
     assert.deepEqual(p.labels, ['−5% VA MX', '−10% overflow ferry']);
+    assert.ok(p.nextTierHint?.includes('Reliable'));
+    assert.equal(p.ladder.length, 3);
+    assert.equal(p.ladder[0]?.tierName, 'Proven');
+    assert.equal(p.ladder[2]?.tierName, 'Elite');
   });
 
   it('reaches Elite at 85 / 15', () => {
@@ -46,6 +50,7 @@ describe('resolveVaOrgPerks', () => {
     assert.equal(p.mxCostMult, 0.85);
     assert.equal(p.ferryOverflowCostMult, 0.7);
     assert.equal(p.nextTierHint, null);
+    assert.equal(p.ladder.length, 3);
   });
 
   it('applyVaOrgCostMult rounds cents', () => {

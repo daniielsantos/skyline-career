@@ -431,11 +431,11 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** quality era efêmera no debrief; Cargo Ops XP de membros vai pra home (certo) e não alimenta um score de marca.
 **Fix:** tabela `company_flight_quality_stats` (SQLite v15 / PG v26); settle em VA listed grava score+onTime; snapshot 7d em cashflow/members/directory/ranking; UI labels **Ops rep** vs **Flight quality** (sem dual-write de unlock).
 
-### VA org perks from Flight quality (2026-09-20)
+### VA Flight quality ladder UI (2026-09-21)
 
-**Sintoma / gap:** Flight quality era só display — VA “boa” não ganhava efeito operacional; join value ainda dependia só de IH/cut.
-**Causa:** sem tabela quality→perk; MX/ferry overflow não liam org score; UI sem chip.
-**Fix:** `career-va-perks.ts` (Proven/Reliable/Elite); API members/cashflow/directory/ranking + MX `extraServiceMult` + ferry overflow mult; UI My VA head/Ledger + directory Perks + ranking. Sem Jet-A org (Base/Port). Buff concessão herdado continua backlog separado.
+**Sintoma:** bloco Flight quality no Ledger só mostrava score + tier atual + perks; em Proven o `nextTierHint` sumia (UI só renderizava hint quando `labels` vazios) → T2/T3 invisíveis.
+**Causa:** copy/layout one-shot sem escada.
+**Fix:** `ladder` em `resolveVaOrgPerks`; Ledger mostra janela 7d, tier+perks, steps Proven/Reliable/Elite com gates, e **Next ·** sempre; head My VA = tier + next name. Sem mudança de fórmula/perk.
 
 ### Prepare hides VA fleet + auto ferry (2026-09-20)
 

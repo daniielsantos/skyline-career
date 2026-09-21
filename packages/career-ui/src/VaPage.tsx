@@ -520,9 +520,15 @@ export function VaPage(props: Props) {
                   {orgPerks.tierName}
                   {orgPerks.tier > 0 ? ` T${orgPerks.tier}` : ''}
                 </strong>
-                {orgPerks.labels.length > 0
-                  ? ` (${orgPerks.labels.join(', ')})`
-                  : ''}
+                {orgPerks.nextTierHint ? (
+                  <span className="muted">
+                    {' '}
+                    · next{' '}
+                    {(orgPerks.ladder ?? []).find(
+                      (step) => step.tier === orgPerks.tier + 1,
+                    )?.tierName ?? 'tier'}
+                  </span>
+                ) : null}
               </>
             ) : null}
           </p>
@@ -889,19 +895,45 @@ export function VaPage(props: Props) {
                   <span className="muted"> · building</span>
                 )}
               </p>
+              <p className="va-ledger-quality-window muted">
+                Rolling 7 days · settle score + on-time
+              </p>
               {orgPerks ? (
                 <div className="va-org-perks">
                   <p className="va-org-perks-tier">
-                    Org perks · <strong>{orgPerks.tierName}</strong>
-                    {orgPerks.tier > 0 ? ` (T${orgPerks.tier})` : ''}
+                    <strong>{orgPerks.tierName}</strong>
+                    {orgPerks.tier > 0 ? ` · T${orgPerks.tier}` : ''}
+                    {orgPerks.labels.length > 0
+                      ? ` · ${orgPerks.labels.join(' · ')}`
+                      : ''}
                   </p>
-                  {orgPerks.labels.length > 0 ? (
-                    <p className="va-org-perks-labels muted">
-                      {orgPerks.labels.join(' · ')}
+                  <ol className="va-org-perks-ladder" aria-label="Org perk tiers">
+                    {(orgPerks.ladder ?? []).map((step) => {
+                      const state =
+                        orgPerks.tier === step.tier
+                          ? 'is-current'
+                          : orgPerks.tier > step.tier
+                            ? 'is-done'
+                            : 'is-ahead';
+                      return (
+                        <li key={step.tier} className={state}>
+                          <span className="va-org-perks-ladder-name">
+                            {step.tierName}
+                          </span>
+                          <span className="va-org-perks-ladder-gate muted">
+                            ≥{step.minQuality} · {step.minFlights}+
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                  {orgPerks.nextTierHint ? (
+                    <p className="va-org-perks-next">
+                      Next · {orgPerks.nextTierHint}
                     </p>
-                  ) : orgPerks.nextTierHint ? (
-                    <p className="va-org-perks-labels muted">
-                      {orgPerks.nextTierHint}
+                  ) : orgPerks.tier >= 3 ? (
+                    <p className="va-org-perks-next muted">
+                      Top tier — keep quality in the 7-day window
                     </p>
                   ) : null}
                 </div>

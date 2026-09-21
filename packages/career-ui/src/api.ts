@@ -1277,6 +1277,13 @@ export type VaOrgPerks = {
   ferryOverflowCostMult: number;
   labels: string[];
   nextTierHint: string | null;
+  ladder: Array<{
+    tier: 1 | 2 | 3;
+    tierName: string;
+    minQuality: number;
+    minFlights: number;
+    labels: string[];
+  }>;
 };
 
 export type StarterHubOption = {

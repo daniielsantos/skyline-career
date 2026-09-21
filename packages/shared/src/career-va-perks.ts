@@ -8,6 +8,14 @@ import type { VaFlightQualitySnapshot } from './career-va.js';
 
 export type VaOrgPerkTierId = 0 | 1 | 2 | 3;
 
+export type VaOrgPerkLadderStep = {
+  tier: Exclude<VaOrgPerkTierId, 0>;
+  tierName: string;
+  minQuality: number;
+  minFlights: number;
+  labels: string[];
+};
+
 export type VaOrgPerks = {
   tier: VaOrgPerkTierId;
   /** Short label for chips. */
@@ -22,8 +30,10 @@ export type VaOrgPerks = {
   ferryOverflowCostMult: number;
   /** One-line effects for UI. */
   labels: string[];
-  /** How to reach the next tier, or null at Elite / locked. */
+  /** How to reach the next tier, or null at Elite. */
   nextTierHint: string | null;
+  /** Proven → Reliable → Elite (for ladder UI). */
+  ladder: VaOrgPerkLadderStep[];
 };
 
 const TIER_TABLE: ReadonlyArray<{
@@ -73,6 +83,17 @@ const TIER_TABLE: ReadonlyArray<{
   },
 ];
 
+/** Proven / Reliable / Elite steps for UI ladders (excludes Building). */
+export function listVaOrgPerkLadder(): VaOrgPerkLadderStep[] {
+  return TIER_TABLE.filter((row) => row.tier > 0).map((row) => ({
+    tier: row.tier as Exclude<VaOrgPerkTierId, 0>,
+    tierName: row.tierName,
+    minQuality: row.minQuality,
+    minFlights: row.minFlights,
+    labels: [...row.labels],
+  }));
+}
+
 function tierAtOrBelow(qualityScore: number, flightCount: number): (typeof TIER_TABLE)[number] {
   let best = TIER_TABLE[0]!;
   for (const row of TIER_TABLE) {
@@ -111,6 +132,7 @@ export function resolveVaOrgPerks(
       ferryOverflowCostMult: 1,
       labels: [],
       nextTierHint: `Reach ${first.minFlights}+ scored flights and quality ≥${first.minQuality} for ${first.tierName}`,
+      ladder: listVaOrgPerkLadder(),
     };
   }
 
@@ -128,6 +150,7 @@ export function resolveVaOrgPerks(
     nextTierHint: next
       ? `Quality ≥${next.minQuality} and ${next.minFlights}+ flights → ${next.tierName}`
       : null,
+    ladder: listVaOrgPerkLadder(),
   };
 }
 

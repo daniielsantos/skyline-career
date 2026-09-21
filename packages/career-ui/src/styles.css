@@ -13995,9 +13995,9 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 .va-ledger-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(8rem, 0.9fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(11rem, 1.1fr);
   gap: 0.85rem 1.5rem;
-  align-items: end;
+  align-items: start;
   margin: 0 0 1.1rem;
   padding: 0.85rem 1rem;
   border: 1px solid color-mix(in srgb, var(--border, #444) 70%, transparent);
@@ -14028,6 +14028,11 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
+.va-ledger-quality-window {
+  margin: 0.2rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
 .va-org-perks {
   margin-top: 0.55rem;
 }
@@ -14035,6 +14040,52 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   margin: 0;
   font-size: 0.88rem;
   color: var(--ink);
+  line-height: 1.35;
+}
+.va-org-perks-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+}
+.va-org-perks-ladder li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 4.6rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--border, #444) 65%, transparent);
+  background: color-mix(in srgb, var(--panel, #141820) 70%, transparent);
+}
+.va-org-perks-ladder li.is-done {
+  opacity: 0.72;
+}
+.va-org-perks-ladder li.is-current {
+  border-color: color-mix(in srgb, var(--accent, #6ea8fe) 55%, var(--border, #444));
+  background: color-mix(in srgb, var(--accent, #6ea8fe) 12%, transparent);
+}
+.va-org-perks-ladder li.is-ahead {
+  opacity: 0.55;
+}
+.va-org-perks-ladder-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.va-org-perks-ladder-gate {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.va-org-perks-next {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--ink);
+  max-width: 28rem;
 }
 .va-org-perks-labels {
   margin: 0.2rem 0 0;

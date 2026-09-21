@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **60e8bd9** / desktop **0.3.171** shipped: Make the centered topbar update control wider and more rectangular. Release: [v0.3.171](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.171).
+
+
 `main` **2942adf** / desktop **0.3.170** shipped: Filter personal Logbook to this pilot and add My VA company Logbook. Release: [v0.3.170](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.170).
 
 

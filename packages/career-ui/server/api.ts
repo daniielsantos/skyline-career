@@ -12472,6 +12472,7 @@ export function createCareerApiServer(port = 8787) {
               liveTitle,
             },
           );
+          const needsCargoTrim = flyable.cargoKg < prep.mission.cargoKg;
           const mission = await withCareerWrite((world, missions) => {
             const idx = missions.missions.findIndex((m) => m.id === body.missionId);
             if (idx < 0) {
@@ -12506,7 +12507,12 @@ export function createCareerApiServer(port = 8787) {
             missions.missions[idx] = dispatched;
             return dispatched;
           }, {
-            commandSliceMissionId: body.missionId,
+            // Open SimBrief usually only flips accepted→dispatched + staticId.
+            // That is company-only — do not touch economy_meta CAS / command slice
+            // (pulse off-lock save bumps revision continuously now).
+            ...(needsCargoTrim
+              ? { commandSliceMissionId: body.missionId }
+              : { persist: 'company' as const }),
             companyId: dispatchCompanyId,
           });
 

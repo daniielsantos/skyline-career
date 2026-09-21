@@ -27,6 +27,10 @@ import {
 import { countryIdFromRegion } from './career-partition.js';
 import { normalizeCareerLedger } from './career-ledger.js';
 import {
+  logFleetPersistSanitized,
+  sanitizeFleetForPersist,
+} from './career-fleet-persist-sanitize.js';
+import {
   assertCompanyPersistSafe,
   companyProgressFromState,
 } from './career-store-company-guard.js';
@@ -1154,6 +1158,9 @@ async function lockEconomyRevision(
     [worldId],
   );
   const actual = revisionBigInt(result.rows[0]?.revision);
+  // Tip CAS is optional. Lease-holding world-api passes undefined (FOR UPDATE
+  // only) so pulse+commands in one process do not false-conflict. Peers /
+  // legacy worker pass their ram tip to refuse stale overwrites.
   if (
     expectedRevision !== undefined &&
     actual !== expectedRevision
@@ -4100,7 +4107,31 @@ export async function persistMissionsTablesToPg(
     await client.query(`DELETE FROM fleet_aircraft WHERE company_id = $1`, [
       cid,
     ]);
-    const fleet = state.fleet ?? [];
+    const fleetRaw = state.fleet ?? [];
+    const foreignOwners = new Map<string, string>();
+    const candidateIds = [
+      ...new Set(
+        fleetRaw
+          .map((a) => a.id?.trim())
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (candidateIds.length > 0) {
+      const foreignRes = await client.query(
+        `SELECT id, company_id FROM fleet_aircraft
+         WHERE id = ANY($1::text[])`,
+        [candidateIds],
+      );
+      for (const row of foreignRes.rows as Array<{
+        id: string;
+        company_id: string;
+      }>) {
+        foreignOwners.set(String(row.id), String(row.company_id));
+      }
+    }
+    const sanitized = sanitizeFleetForPersist(fleetRaw, foreignOwners);
+    logFleetPersistSanitized(cid, sanitized);
+    const fleet = sanitized.kept;
     if (fleet.length > 0) {
       const fleetRows: unknown[][] = [];
       for (const a of fleet) {

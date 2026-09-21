@@ -27,7 +27,9 @@ Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 
 **Causa:** (1) pulse segurava `worldLock` durante o UPSERT PG do planeta; (2) no Postgres `persistCommandWorldSlice` era stub → `saveEconomy` full.
 
-**Fix:** fatia real no PG (`persistCommandWorldSliceToPg`); tick sob lock + `saveEconomy(snapshot, { applyToRam:false })` fora do lock + `flushDirtyCommandLots`; Accept patcha RAM sob lock e faz UPSERT da fatia **depois** de soltar o lock; settle de companies no pulse isola fail de shell vazio por company. **Ship MP = deploy world-api** (desktop release não basta).
+**Fix:** fatia real no PG (`persistCommandWorldSliceToPg`); tick sob lock + `saveEconomy(snapshot, { applyToRam:false })` fora do lock + `flushDirtyCommandLots`; Accept patcha RAM sob lock e faz UPSERT da fatia **depois** de soltar o lock; settle de companies no pulse isola fail de shell vazio por company.
+
+**Revision:** lease holder (world-api) não passa expected tip — só `FOR UPDATE` + bump. CAS tip = defesa de peer/worker sem lease. Assim Accept/Dispatch/fuel/settle/ports/… não toastam `expected N, actual N+1` enquanto o pulse bumpa revision off-lock. Dispatch sem trim de cargo → `persist:'company'`. **Ship MP = deploy world-api**.
 
 ## Comando `SettleFlight`
 

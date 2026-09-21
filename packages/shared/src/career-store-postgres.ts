@@ -116,7 +116,6 @@ import {
   persistPortConcessionsToPg,
   persistPortListingToPg,
   persistPortMarketToPg,
-  PgEconomyRevisionConflictError,
 } from './career-store-pg-world.js';
 import {
   readHubEconomySamplesFromPg,
@@ -576,40 +575,27 @@ export class PostgresCareerStore implements CareerStore {
     this.activeCompanyId = companyId.trim() || LOCAL_COMPANY_ID;
   }
 
+  /**
+   * Persist under `economy_meta` FOR UPDATE, then bump revision into `ramRevision`.
+   *
+   * Expected-tip CAS is only for peers that do **not** hold the world-writer
+   * lease (legacy worker / second process). The lease holder is sole authority:
+   * pulse and commands already serialize on `worldLock` + the row lock. Passing
+   * a stale tip would false-positive whenever pulse bumps revision off-lock
+   * (two-queue). FOR UPDATE still serializes same-process writers.
+   */
   private async persistRevisioned(
     persist: (expectedRevision: bigint | undefined) => Promise<bigint>,
     applyToRam: () => void,
-    opts?: { softCas?: boolean },
   ): Promise<void> {
-    const run = async (expected: bigint | undefined) => {
+    const expected = this.hasWorldWriterLease()
+      ? undefined
+      : (this.ramRevision ?? undefined);
+    try {
       const revision = await persist(expected);
       applyToRam();
       this.ramRevision = revision;
-    };
-    try {
-      await run(this.ramRevision ?? undefined);
     } catch (error) {
-      // Command slice / pulse snapshot may race on economy_meta revision. Retry
-      // once with a fresh CAS tip instead of wiping live RAM.
-      if (
-        opts?.softCas !== false &&
-        error instanceof PgEconomyRevisionConflictError &&
-        this.ram
-      ) {
-        try {
-          const tip = await this.pool.query(
-            `SELECT revision FROM economy_meta WHERE world_id = $1`,
-            [LOCAL_WORLD_ID],
-          );
-          this.ramRevision = pgRevision(tip.rows[0]?.revision);
-          await run(this.ramRevision ?? undefined);
-          return;
-        } catch (retryError) {
-          this.ram = null;
-          this.ramRevision = null;
-          throw retryError;
-        }
-      }
       // The caller may already have mutated the shared object. Never serve it
       // after a failed/conflicting commit; the next read rehydrates from PG.
       this.ram = null;
@@ -2120,8 +2106,8 @@ export class PostgresCareerStore implements CareerStore {
           this.pool,
           toSave,
           LOCAL_WORLD_ID,
-          // Pulse snapshot: do not CAS against a tip that command slices may
-          // have already advanced while this save was queued off-lock.
+          // Pulse snapshot off-lock: never CAS against a tip commands may have
+          // advanced; lease holder already skips tip via persistRevisioned.
           applyToRam ? expected : undefined,
         ),
       () => {
@@ -2130,7 +2116,6 @@ export class PostgresCareerStore implements CareerStore {
           world.pendingHubEconomySamples = undefined;
         } else {
           // Pulse snapshot: keep live RAM (may include newer command slices).
-          // Still clear pending samples on the snapshot object.
           world.pendingHubEconomySamples = undefined;
           if (this.ram) {
             this.ram.tick = toSave.tick;

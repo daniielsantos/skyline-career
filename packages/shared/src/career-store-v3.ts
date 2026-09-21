@@ -12,6 +12,10 @@ import {
   companyProgressFromState,
 } from './career-store-company-guard.js';
 import {
+  logFleetPersistSanitized,
+  sanitizeFleetForPersist,
+} from './career-fleet-persist-sanitize.js';
+import {
   assembleFleetAircraftFromRow,
   splitFleetAircraftForPersist,
 } from './career-store-fleet-columns.js';
@@ -1156,7 +1160,26 @@ export function replaceFleetAircraft(
   companyId: string,
   fleet: PlayerAircraft[],
 ): void {
-  const ids = fleet.map((a) => a.id).filter(Boolean);
+  const foreignOwners = new Map<string, string>();
+  const candidateIds = [
+    ...new Set(fleet.map((a) => a.id?.trim()).filter((id): id is string => Boolean(id))),
+  ];
+  if (candidateIds.length > 0) {
+    const placeholders = candidateIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(
+        `SELECT id, company_id FROM fleet_aircraft
+         WHERE id IN (${placeholders}) AND company_id <> ?`,
+      )
+      .all(...candidateIds, companyId) as Array<{ id: string; company_id: string }>;
+    for (const row of rows) {
+      foreignOwners.set(String(row.id), String(row.company_id));
+    }
+  }
+  const sanitized = sanitizeFleetForPersist(fleet, foreignOwners);
+  logFleetPersistSanitized(companyId, sanitized);
+  const cleaned = sanitized.kept;
+  const ids = cleaned.map((a) => a.id).filter(Boolean);
   if (ids.length === 0) {
     db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ?`).run(companyId);
     return;
@@ -1169,7 +1192,7 @@ export function replaceFleetAircraft(
       `DELETE FROM fleet_aircraft WHERE company_id = ? AND id NOT IN (${placeholders})`,
     ).run(companyId, ...ids);
   }
-  upsertFleetAircraftRows(db, companyId, fleet);
+  upsertFleetAircraftRows(db, companyId, cleaned);
 }
 
 export function fleetPersistSignature(a: PlayerAircraft): string {
@@ -1182,13 +1205,32 @@ export function persistFleetIncremental(
   fleet: PlayerAircraft[],
   previous: Map<string, string> | null,
 ): void {
+  const foreignOwners = new Map<string, string>();
+  const candidateIds = [
+    ...new Set(fleet.map((a) => a.id?.trim()).filter((id): id is string => Boolean(id))),
+  ];
+  if (candidateIds.length > 0) {
+    const placeholders = candidateIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(
+        `SELECT id, company_id FROM fleet_aircraft
+         WHERE id IN (${placeholders}) AND company_id <> ?`,
+      )
+      .all(...candidateIds, companyId) as Array<{ id: string; company_id: string }>;
+    for (const row of rows) {
+      foreignOwners.set(String(row.id), String(row.company_id));
+    }
+  }
+  const sanitized = sanitizeFleetForPersist(fleet, foreignOwners);
+  logFleetPersistSanitized(companyId, sanitized);
+  const cleaned = sanitized.kept;
   if (!previous || previous.size === 0) {
-    replaceFleetAircraft(db, companyId, fleet);
+    replaceFleetAircraft(db, companyId, cleaned);
     return;
   }
-  const nextIds = new Set(fleet.map((a) => a.id).filter(Boolean));
+  const nextIds = new Set(cleaned.map((a) => a.id).filter(Boolean));
   const upsert: PlayerAircraft[] = [];
-  for (const a of fleet) {
+  for (const a of cleaned) {
     if (!a.id) continue;
     if (previous.get(a.id) !== fleetPersistSignature(a)) upsert.push(a);
   }
@@ -1197,7 +1239,7 @@ export function persistFleetIncremental(
     if (!nextIds.has(id)) remove.push(id);
   }
   if (upsert.length + remove.length >= LIVE_PATCH_FULL_THRESHOLD) {
-    replaceFleetAircraft(db, companyId, fleet);
+    replaceFleetAircraft(db, companyId, cleaned);
     return;
   }
   const del = db.prepare(`DELETE FROM fleet_aircraft WHERE company_id = ? AND id = ?`);

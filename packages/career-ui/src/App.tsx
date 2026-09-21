@@ -4261,14 +4261,24 @@ export function App() {
     }
   }, [freightsBoard]);
 
-  // Empty hangar: open Operator aircraft board once per profile session.
+  // Empty hangar (home + VA): open Operator aircraft board once per profile.
   const freightsBoardInitRef = useRef(false);
+  const [vaOpsPrefetchGen, setVaOpsPrefetchGen] = useState(0);
   useEffect(() => {
     if (freightsBoardInitRef.current) return;
-    if (!activeCareerProfile || showProfileGate) return;
+    if (!activeCareerProfile || showProfileGate || !careerStateReady) return;
+    // Auth: wait VA members prefetch so empty-home + VA fleet stays on Your aircraft.
+    if (authRequired && vaOpsPrefetchGen === 0) return;
     freightsBoardInitRef.current = true;
-    if (fleet.length === 0) setFreightsBoard('crew');
-  }, [activeCareerProfile, showProfileGate, fleet.length]);
+    if (prepareOpsFleet.length === 0) setFreightsBoard('crew');
+  }, [
+    activeCareerProfile,
+    showProfileGate,
+    careerStateReady,
+    authRequired,
+    vaOpsPrefetchGen,
+    prepareOpsFleet.length,
+  ]);
 
   // Prefetch listed-VA fleet for Prepare pickers (does not pin chrome).
   useEffect(() => {
@@ -4298,6 +4308,8 @@ export function App() {
           setMemberVaCompanyId(null);
           setMemberVaIsOwner(false);
         }
+      } finally {
+        if (!cancelled) setVaOpsPrefetchGen((n) => n + 1);
       }
     })();
     return () => {
@@ -7730,6 +7742,8 @@ export function App() {
     // flash on co_a before airport/state refresh lands.
     setPlayerFbos(null);
     setAirportView(null);
+    freightsBoardInitRef.current = false;
+    setVaOpsPrefetchGen(0);
   }
 
   /**
@@ -17167,14 +17181,14 @@ export function App() {
                       type="button"
                       className={`sort-header${marketSorts.some((l) => l.key === 'net') ? ' is-sorted' : ''}`}
                       title={
-                        fleet.length === 0
+                        boardEstimateFleet.length === 0
                           ? 'Net needs an aircraft estimate — crew Pay is your fee'
                           : boardAircraft
                             ? `Sort by estimated net (pay − Jet-A) for ${boardAircraft.label}`
                             : 'Select an aircraft above to estimate net (pay − Jet-A)'
                       }
                       onClick={() => toggleMarketSort('net')}
-                      disabled={fleet.length > 0 && !boardAircraft}
+                      disabled={boardEstimateFleet.length > 0 && !boardAircraft}
                     >
                       Net <span>{sortIndicator('net')}</span>
                     </button>
@@ -17596,7 +17610,8 @@ export function App() {
                           Boolean(clientUpdateBlock) ||
                           Boolean(playerDispatchMission) ||
                           cargoLocked ||
-                          (fleet.length === 0 && !lot.npcClaim?.crewNeeded)
+                          (boardEstimateFleet.length === 0 &&
+                            !lot.npcClaim?.crewNeeded)
                         }
                         onClick={() =>
                           lot.npcClaim?.crewNeeded
@@ -17612,8 +17627,9 @@ export function App() {
                             ? 'Locked — unlock this commodity in Hangar → Cargo Ops'
                             : playerDispatchMission
                             ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
-                            : fleet.length === 0 && !lot.npcClaim?.crewNeeded
-                              ? 'Need an aircraft — fly Operator aircraft, or buy a starter'
+                            : boardEstimateFleet.length === 0 &&
+                                !lot.npcClaim?.crewNeeded
+                              ? 'Need an aircraft — join a VA with a hangar, fly Operator aircraft, or buy a starter'
                             : lot.npcClaim?.crewNeeded
                               ? lot.npcClaim.crewReposition
                                 ? 'Ferry empty aircraft home'
@@ -17631,7 +17647,8 @@ export function App() {
                           ? 'Locked'
                           : playerDispatchMission
                           ? 'Flight busy'
-                          : fleet.length === 0 && !lot.npcClaim?.crewNeeded
+                          : boardEstimateFleet.length === 0 &&
+                              !lot.npcClaim?.crewNeeded
                             ? 'Need aircraft'
                             : lot.npcClaim?.crewNeeded
                               ? lot.npcClaim.crewReposition
@@ -17655,8 +17672,8 @@ export function App() {
                             marketSorts.length === 0
                           ? freightsBoard === 'crew'
                             ? 'No Operator aircraft offers nearby — advance time or try Your aircraft.'
-                            : fleet.length === 0
-                              ? 'No Your aircraft lots you can take yet — open Operator aircraft, or buy a starter airframe.'
+                            : boardEstimateFleet.length === 0
+                              ? 'No Your aircraft lots you can take yet — open Operator aircraft, join a VA with a hangar, or buy a starter airframe.'
                               : 'No freights yet — advance time (+15 min) or wait for a pulse.'
                           : freightsBoard === 'crew'
                             ? 'No Operator aircraft offers match the selected filters.'

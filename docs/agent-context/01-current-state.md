@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **c634911** / desktop **0.3.195** shipped: Add VA Auto-haul desk and quiet Hauls after Port FBO. Release: [v0.3.195](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.195).
+
+
 `main` **1d0cb18** / desktop **0.3.194** shipped: Show Path to Port FBO so fresh VAs have a clear ladder. Release: [v0.3.194](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.194).
 
 

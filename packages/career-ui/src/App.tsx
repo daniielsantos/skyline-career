@@ -79,6 +79,7 @@ import {
   postStagingCommit,
   postTick,
   postDebugCreditWallet,
+  postDebugClaimPort,
   postWatchStart,
   postWatchStop,
   type AircraftClass,
@@ -7631,6 +7632,17 @@ export function App() {
     });
   }
 
+  async function onDebugClaimSantos() {
+    await run(async () => {
+      const result = await postDebugClaimPort({ portId: 'BRSSZ' });
+      commitWallet(result.walletUsd);
+      setToastKind('ok');
+      setToast(
+        `Debug Port FBO · ${result.concession.portId} P${result.concession.level}`,
+      );
+    });
+  }
+
   async function onTick(ticks = 1) {
     const hoursLabel =
       ticks === 1
@@ -13396,6 +13408,15 @@ export function App() {
                 title="Dev Mode — add $100,000 to the wallet"
               >
                 +$100K
+              </button>
+              <button
+                type="button"
+                className="action ghost"
+                onClick={() => void onDebugClaimSantos()}
+                disabled={busy}
+                title="Dev Mode — force Port FBO at Port of Santos (BRSSZ) for the active company"
+              >
+                Claim Santos
               </button>
             </div>
           ) : null}

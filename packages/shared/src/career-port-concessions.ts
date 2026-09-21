@@ -819,6 +819,73 @@ export function claimPortConcession(
   return row;
 }
 
+/**
+ * Dev Mode aid — grant Port FBO without claim gates / cash.
+ * Ensures a T3 WH on the first pickup hub. Does not displace another operator.
+ */
+export function debugForceClaimPortConcession(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { portId: string; companyId?: string },
+): PlayerPortConcession {
+  const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const port = getCareerPort(opts.portId);
+  if (!port) throw new Error(`Unknown port ${opts.portId}`);
+  const occupied = findActivePortOperator(world, port.id);
+  if (occupied && occupied.companyId !== companyId) {
+    throw new Error(
+      `Port FBO already held by ${occupied.companyId} — cannot debug-claim`,
+    );
+  }
+  const existing = ensurePlayerPortConcessions(state).find(
+    (c) =>
+      c.portId === port.id &&
+      c.companyId === companyId &&
+      c.leasePaidThroughTick > world.tick,
+  );
+  if (existing) return existing;
+
+  const hub = port.pickupHubs[0]?.trim().toUpperCase();
+  if (!hub) throw new Error(`Port ${port.id} has no pickup hubs`);
+  const warehouses = ensurePlayerWarehouses(state);
+  let wh = warehouses.warehouses.find(
+    (w) => w.icao.trim().toUpperCase() === hub,
+  );
+  if (!wh) {
+    wh = {
+      id: `wh_${hub.toLowerCase()}_debug_t3`,
+      icao: hub,
+      capacityKg: 6_804,
+      tier: 3,
+      lifetimeShippedKg: PORT_CONCESSION_SHIPPED_KG,
+    };
+    warehouses.warehouses.push(wh);
+  } else {
+    wh.tier = Math.max(wh.tier ?? 1, 3) as 1 | 2 | 3 | 4;
+    if ((wh.capacityKg ?? 0) < 6_804) wh.capacityKg = 6_804;
+    wh.lifetimeShippedKg = Math.max(
+      wh.lifetimeShippedKg ?? 0,
+      PORT_CONCESSION_SHIPPED_KG,
+    );
+  }
+
+  const row: PlayerPortConcession = {
+    portId: port.id,
+    companyId,
+    level: 1,
+    claimedAtTick: world.tick,
+    leasePaidThroughTick: world.tick + PORT_CONCESSION_LEASE_TICKS,
+    lifetimeThroughputKg: 0,
+  };
+  state.playerPortConcessions = ensurePlayerPortConcessions(state).filter(
+    (c) =>
+      !(c.companyId === companyId && c.leasePaidThroughTick <= world.tick),
+  );
+  state.playerPortConcessions.push(row);
+  syncWorldPortConcessions(world, state, { companyId });
+  return row;
+}
+
 export function renewPortConcession(
   state: CareerMissionsState,
   world: CareerEconomyWorld,

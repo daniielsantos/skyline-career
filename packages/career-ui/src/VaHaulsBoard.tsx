@@ -81,18 +81,32 @@ export function VaHaulsBoard(props: Props) {
       try {
         const snap = await fetchPorts();
         if (cancelled) return;
-        const port =
-          snap.ports.find(
-            (p) =>
-              p.concession?.status === 'yours' ||
-              (p.concession?.companyId &&
-                p.concession.companyId === props.companyId),
-          ) ??
-          snap.ports.find((p) =>
-            (p.pickupHubs ?? []).some((h) => h.toUpperCase() === hub),
-          );
+        // Only surface Port FBO when this company actually operates one —
+        // never fall back to a vacant nearby port (home hub pickup ≠ ownership).
+        const port = snap.ports.find(
+          (p) =>
+            p.concession?.status === 'yours' ||
+            (p.concession?.companyId &&
+              p.concession.companyId === props.companyId),
+        );
+        const wh = (snap.warehouses?.warehouses ?? []).find(
+          (w) => w.icao.trim().toUpperCase() === hub,
+        );
+        const whRoom = wh
+          ? `WH ${hub} · ${formatMassKg(wh.freeKg)} free / ${formatMassKg(wh.capacityKg)}`
+          : null;
         if (!port) {
-          setPortStrip(null);
+          setPortStrip(
+            whRoom
+              ? {
+                  portName: `Home hub ${hub}`,
+                  level: null,
+                  status: 'vacant',
+                  pressure: null,
+                  whRoom,
+                }
+              : null,
+          );
           return;
         }
         const signals = (port.marketSignals ?? []).filter(
@@ -105,17 +119,10 @@ export function VaHaulsBoard(props: Props) {
           : fat
             ? `${hub} · ${fat.commodityName} surplus`
             : null;
-        const wh = (snap.warehouses?.warehouses ?? []).find(
-          (w) => w.icao.trim().toUpperCase() === hub,
-        );
-        const whRoom = wh
-          ? `WH ${hub} · ${formatMassKg(wh.freeKg)} free / ${formatMassKg(wh.capacityKg)}`
-          : null;
-        const status = port.concession?.status ?? 'vacant';
         setPortStrip({
           portName: port.name,
           level: port.concession?.level ?? null,
-          status,
+          status: port.concession?.status ?? 'yours',
           pressure,
           whRoom,
         });
@@ -205,20 +212,21 @@ export function VaHaulsBoard(props: Props) {
 
       {portStrip ? (
         <p className="va-hauls-port-strip" role="status">
-          <strong>{portStrip.portName}</strong>
-          {portStrip.level != null ? ` · Port FBO P${portStrip.level}` : ''}
-          {portStrip.status === 'yours'
-            ? ' · yours'
-            : portStrip.status === 'held'
-              ? ' · held'
-              : ' · vacant'}
-          {portStrip.pressure ? ` · ${portStrip.pressure}` : ''}
-          {portStrip.whRoom ? ` · ${portStrip.whRoom}` : ''}
-        </p>
-      ) : props.homeHubIcao ? (
-        <p className="va-hauls-port-strip muted" role="status">
-          Home hub {props.homeHubIcao.trim().toUpperCase()} · no Port FBO strip
-          yet
+          {portStrip.status === 'vacant' ? (
+            <>
+              <strong>{portStrip.portName}</strong>
+              {portStrip.whRoom ? ` · ${portStrip.whRoom}` : ''}
+              <span className="muted"> · no Port FBO yet</span>
+            </>
+          ) : (
+            <>
+              <strong>{portStrip.portName}</strong>
+              {portStrip.level != null ? ` · Port FBO P${portStrip.level}` : ''}
+              {portStrip.status === 'yours' ? ' · yours' : ' · held'}
+              {portStrip.pressure ? ` · ${portStrip.pressure}` : ''}
+              {portStrip.whRoom ? ` · ${portStrip.whRoom}` : ''}
+            </>
+          )}
         </p>
       ) : null}
 

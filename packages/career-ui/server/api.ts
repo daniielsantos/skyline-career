@@ -213,6 +213,7 @@ import {
   demandMissionEditableMaxKg,
   ensurePortListings,
   claimPortConcession,
+  debugForceClaimPortConcession,
   renewPortConcession,
   upgradePortConcession,
   tickPortConcessions,
@@ -11381,6 +11382,47 @@ export function createCareerApiServer(port = 8787) {
           return { walletUsd: missions.walletUsd, creditedUsd: amountUsd };
         }, { persist: 'company', companyId: creditCompanyId });
         send(res, 200, payload);
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/debug/claim-port') {
+        if (!requestDevMode(req)) {
+          send(res, 403, { error: 'Dev Mode is required' });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          portId?: string;
+          companyId?: string;
+        };
+        const portId = (body.portId ?? 'BRSSZ').trim().toUpperCase();
+        const claimCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          const payload = await withCareerWrite(
+            (world, missions) => {
+              const concession = debugForceClaimPortConcession(missions, world, {
+                portId,
+                companyId: claimCompanyId,
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                concession,
+                ports: portSnapshot(world, missions, {
+                  viewerCompanyId: claimCompanyId,
+                }),
+              };
+            },
+            {
+              persist: 'company',
+              persistPortConcessions: true,
+              companyId: claimCompanyId,
+            },
+          );
+          send(res, 200, payload);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         return;
       }
 

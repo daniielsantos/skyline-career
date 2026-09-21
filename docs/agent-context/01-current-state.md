@@ -3,8 +3,6 @@
 `main` **fac751b** / desktop **0.3.189** shipped: Align Hangar card footers and VA Roster columns. Release: [v0.3.189](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.189).
 
 
-**Local (unreleased):** Align Hangar card footers and VA Roster role/action columns.
-
 `main` **cc4c999** / desktop **0.3.188** shipped: Sync My VA Ledger wallet after hangar overhaul and MX. Release: [v0.3.188](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.188).
 
 

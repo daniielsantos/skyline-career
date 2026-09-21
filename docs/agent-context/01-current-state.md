@@ -1,5 +1,7 @@
 # Current state (2026-09-21)
 
+**Local (unreleased):** Sync My VA Ledger wallet card after hangar OH/MX (stale vaSessionWallet). See `16-va-logistics.md`.
+
 `main` **106943b** / desktop **0.3.187** shipped: Raise dealer pool floor for narrow and wide freighters. Release: [v0.3.187](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.187).
 
 

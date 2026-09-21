@@ -427,6 +427,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** wallet é a mesma company do owner, mas My VA só tinha Roster / Hangar / Config — Hangar Cashflow ficava escondido no Hangar pessoal ou exigia saber trocar de contexto.
 **Fix:** aba **Ledger** em My VA reusa `HangarCashflowPanel` + `GET /api/cashflow`; credit draw/repay owner-only (UI + API).
 
+### VA Ledger hero wallet stale after OH/MX (2026-09-21)
+
+**Sintoma:** Engine overhaul debita na Recent activity e o chip WALLET do chrome atualiza, mas o card **VA wallet** no Ledger fica no valor pré-debit até sair/voltar da página.
+**Causa:** Hangar OH/inspect/repair só chamavam `commitWallet` (estado chrome); o hero do Ledger prefere `vaSessionWallet` sticky, que não era atualizado. Cashflow snapshot também não refetchava.
+**Fix:** `paintOpsMutationWallet` em App — se ops company = VA listada, `setVaSessionWallet` + bump `vaLedgerRefreshEpoch`; inspect/repair/OH passam a usá-lo (com `companyId` ops).
+
 ### VA Ops rep + Flight quality (2026-09-20)
 
 **Sintoma / gap:** settle já mostra flight score, mas VA não tinha reputação de org; Ops rep do credit só refletia ladder do owner e não aparecia como sinal público.

@@ -3940,6 +3940,16 @@ export function App() {
     setFleet(nextFleet);
   }
 
+  /** Keep My VA Ledger wallet card in sync when ops debit/credit the VA. */
+  function paintOpsMutationWallet(opsCompanyId: string, nextUsd: number) {
+    const vaId = memberVaCompanyIdRef.current?.trim();
+    if (vaId && opsCompanyId === vaId) {
+      setVaSessionWallet(nextUsd);
+      setVaLedgerRefreshEpoch((n) => n + 1);
+    }
+    commitWallet(nextUsd);
+  }
+
   const [hangarPane, setHangarPane] = useState<
     'aircraft' | 'cashflow' | 'cargo' | 'crew'
   >('aircraft');
@@ -8566,7 +8576,9 @@ export function App() {
   }
 
   async function onClearMaintenance(aircraftId: string) {
-    const acf = fleet.find((a) => a.id === aircraftId);
+    const acf =
+      fleet.find((a) => a.id === aircraftId) ??
+      vaSessionFleet.find((a) => a.id === aircraftId);
     if (!acf) return;
     const ok = await confirm({
       title: `Workshop inspection on ${acf.label}?`,
@@ -8574,10 +8586,14 @@ export function App() {
       confirmLabel: 'Pay inspection',
     });
     if (!ok) return;
+    const opsCompanyId = resolveOpsCompanyId(aircraftId);
     await run(async () => {
-      const result = await postAircraftMaintenance({ aircraftId });
-      setFleet(result.fleet);
-      commitWallet(result.walletUsd);
+      const result = await postAircraftMaintenance({
+        aircraftId,
+        companyId: opsCompanyId || undefined,
+      });
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
+      paintOpsMutationWallet(opsCompanyId, result.walletUsd);
       setToastKind(result.needsRepair ? 'warn' : 'ok');
       const mroNote =
         result.mro?.scarcity === 'dry'
@@ -8596,7 +8612,9 @@ export function App() {
   }
 
   async function onRepairAircraft(aircraftId: string) {
-    const acf = fleet.find((a) => a.id === aircraftId);
+    const acf =
+      fleet.find((a) => a.id === aircraftId) ??
+      vaSessionFleet.find((a) => a.id === aircraftId);
     if (!acf) return;
     const afNeed = Math.max(0, Math.ceil(100 - (acf.airframeConditionPct ?? 100)));
     const engNeed = Math.max(0, Math.ceil(100 - (acf.engineConditionPct ?? 100)));
@@ -8613,14 +8631,16 @@ export function App() {
       confirmLabel: 'Repair',
     });
     if (!ok) return;
+    const opsCompanyId = resolveOpsCompanyId(aircraftId);
     await run(async () => {
       const result = await postAircraftRepair({
         aircraftId,
         airframePts: afPts || undefined,
         enginePts: engPts || undefined,
+        companyId: opsCompanyId || undefined,
       });
-      setFleet(result.fleet);
-      commitWallet(result.walletUsd);
+      paintOpsMutationFleet(result.fleet, opsCompanyId);
+      paintOpsMutationWallet(opsCompanyId, result.walletUsd);
       setToastKind(result.mro?.scarcity === 'ok' ? 'ok' : 'warn');
       const mroNote =
         result.mro?.scarcity === 'dry'
@@ -8666,7 +8686,7 @@ export function App() {
         companyId: opsCompanyId || undefined,
       });
       paintOpsMutationFleet(result.fleet, opsCompanyId);
-      commitWallet(result.walletUsd);
+      paintOpsMutationWallet(opsCompanyId, result.walletUsd);
       setToastKind('ok');
       setToast(
         `${kindLabel} overhaul started · ${formatMoney(result.debitUsd)} · ready after ${result.quote.downtimeDays}d`,

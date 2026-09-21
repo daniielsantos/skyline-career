@@ -2701,7 +2701,10 @@ export type MroPartsQuote = {
   capacityKg: number;
 };
 
-export function postAircraftMaintenance(opts: { aircraftId: string }) {
+export function postAircraftMaintenance(opts: {
+  aircraftId: string;
+  companyId?: string;
+}) {
   return api<{
     walletUsd: number;
     debitUsd: number;
@@ -2718,6 +2721,7 @@ export function postAircraftRepair(opts: {
   aircraftId: string;
   airframePts?: number;
   enginePts?: number;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;

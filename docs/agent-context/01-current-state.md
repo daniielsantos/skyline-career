@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **82df9fd** / desktop **0.3.193** shipped: Fix Hauls vacant port strip and add Dev Mode Santos claim. Release: [v0.3.193](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.193).
+
+
 `main` **8082f6c** / desktop **0.3.192** shipped: Add VA Port FBO inheritance and My VA Hauls board. Release: [v0.3.192](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.192).
 
 

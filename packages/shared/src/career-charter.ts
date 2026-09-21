@@ -48,13 +48,14 @@ export const CHARTER_BOARD_MAX = 4_000;
 /**
  * Steady-state formation (freight-like trickle).
  * Old 48/tick made same-tick death waves → board full of identical Expires.
- * Mean life ~19h ≈ 76 ticks → 10×76 ≈ 760 equilibrium; catch-up fills deeper.
+ * 2026-09-21: 10→20 (catch-up 40 / warm 48) to deepen shelf without a dump.
+ * Mean life ~19h ≈ 76 ticks → 20×76 ≈ 1.5k equilibrium before catch-up.
  */
-export const CHARTER_FORM_QUOTA_PER_TICK = 10;
+export const CHARTER_FORM_QUOTA_PER_TICK = 20;
 /** Soft catch-up while live board is under half of target (still a trickle). */
-export const CHARTER_CATCH_UP_QUOTA_PER_TICK = 20;
+export const CHARTER_CATCH_UP_QUOTA_PER_TICK = 40;
 /** Cold-board fill when below MIN — burst, not a full dump. */
-export const CHARTER_WARM_QUOTA_PER_TICK = 28;
+export const CHARTER_WARM_QUOTA_PER_TICK = 48;
 
 /**
  * Classes that may accept charter offers.

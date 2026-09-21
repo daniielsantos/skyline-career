@@ -2253,8 +2253,14 @@ export function fetchNetworkHubs() {
   return api<{ homeHubIcao: string | null; hubs: NetworkHub[] }>('/api/hubs');
 }
 
-export function fetchMissions() {
-  return api<{ walletUsd: number; missions: Mission[] }>('/api/missions');
+export function fetchMissions(opts?: { companyId?: string }) {
+  const companyId = opts?.companyId?.trim();
+  return api<{ walletUsd: number; missions: Mission[] }>(
+    '/api/missions',
+    companyId
+      ? { headers: { 'X-Skyline-Company-Id': companyId } }
+      : undefined,
+  );
 }
 
 /** Advance economy batches; default one 15-min tick. */

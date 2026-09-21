@@ -129,6 +129,13 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 7. IH **não** recebe esse % em cima do pay stamp.
 8. Accept Freights/Demand/Charter **stamp** `pilotHomeCompanyId` / `pilotAccountId`.
 9. **Logbook (2026-09-20):** tag **VA** quando `vaFlight` (accept sob company `va_listed`) ou Internal Haul. Pay mostrado = `pilotPayoutUsd` (fatia home / fee IH) quando stampado no settle; senão `payoutUsd` bruto da rota. Membro Freights com cut: UI sufixo `cut`. Histórico pré-stamp: na company VA listada o GET `/api/missions` força `vaFlight` (tag), mas pay antigo continua bruto até novo settle.
+10. **Logbook merge home+VA (2026-09-20):** voos solo e VA vivem em arquivos de company distintos; `selectTab` restaura home → Logbook home-only ficava vazio se só voou VA. Fix: `loadMissionsMerged` busca home + VA (`fetchMissions({ companyId })`) e `mergeLogbookMissions` por id.
+
+### Charter board infinite loading (VA tail) — **shipped (2026-09-20)**
+
+**Sintoma:** Charter com aircraft VA selecionado (ex. `VA · Duke B60`) fica em skeleton / “Loading charters” para sempre; `0 records`.
+**Causa:** `CharterBoard` punha `props.resolveAircraftCompanyId` (arrow inline do App) nas deps do `useEffect` de fetch → cada re-render do App cancelava o timer e rearmava `setLoading(true)`.
+**Fix:** depender do `charterCompanyId` string resolvido, não da identidade da função.
 
 ```
 VA ──(+payout)──►  VA ──(−fuel missão)──►  VA ──(−pilotUsd)──► home
@@ -692,6 +699,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Line crew tiers** Desk/Ops/Network — hire Desk; upgrade Ops/Network; fire→none (severance = tier salary)
 - [x] **VA settle dual-tenant pilotIcao** — sync home company to dest (chrome sticky)
 - [x] **VA Accept dual-tenant pilotIcao** — mirror home onto ops before co-location assert
+- [x] **Logbook merge home+VA** — dual fetch + merge by id (chrome sticky home)
+- [x] **Charter board infinite load** — deps on resolved companyId string, not resolver fn
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA

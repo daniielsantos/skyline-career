@@ -143,6 +143,13 @@ export function CharterBoard(props: CharterBoardProps) {
     distanceMaxNm !== '' ||
     sorts.length > 0;
 
+  // Depend on the resolved id string — not the resolver fn. App passes an
+  // inline arrow; putting that in deps re-fired this effect every parent
+  // render → infinite Loading charters skeleton when a VA/home tail is selected.
+  const charterCompanyId = aircraftId
+    ? props.resolveAircraftCompanyId?.(aircraftId)?.trim() || undefined
+    : undefined;
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -158,9 +165,7 @@ export function CharterBoard(props: CharterBoardProps) {
         pax: paxFilter || undefined,
         distanceMaxNm: distanceMaxNm || undefined,
         aircraftId,
-        companyId: aircraftId
-          ? props.resolveAircraftCompanyId?.(aircraftId)
-          : undefined,
+        companyId: charterCompanyId,
         page,
         pageSize: CHARTER_PAGE_SIZE,
         sort: formatCharterBoardSorts(sorts),
@@ -188,6 +193,7 @@ export function CharterBoard(props: CharterBoardProps) {
     };
   }, [
     aircraftId,
+    charterCompanyId,
     destExact,
     destLocked,
     destQuery,
@@ -200,7 +206,6 @@ export function CharterBoard(props: CharterBoardProps) {
     paxFilter,
     distanceMaxNm,
     sorts,
-    props.resolveAircraftCompanyId,
   ]);
 
   function toggleSort(key: CharterBoardSortKey) {

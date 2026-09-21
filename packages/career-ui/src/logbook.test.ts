@@ -12,6 +12,7 @@ import {
   logbookPayoutIsPilotCut,
   logbookPayoutUsd,
   logbookStatusLabel,
+  mergeLogbookMissions,
   formatEconomyClock,
 } from './logbook.js';
 
@@ -197,6 +198,27 @@ describe('logbookIsVaFlight', () => {
       ),
       true,
     );
+  });
+});
+
+describe('mergeLogbookMissions', () => {
+  it('unions by id and lets secondary win collisions', () => {
+    const home = mission({ id: 'msn_home', payoutUsd: 100 });
+    const vaOnly = mission({ id: 'msn_va', vaFlight: true, payoutUsd: 50 });
+    const homeDup = mission({ id: 'msn_clash', payoutUsd: 10 });
+    const vaDup = mission({
+      id: 'msn_clash',
+      vaFlight: true,
+      pilotPayoutUsd: 3,
+      payoutUsd: 10,
+    });
+    const merged = mergeLogbookMissions([home, homeDup], [vaOnly, vaDup]);
+    assert.equal(merged.length, 3);
+    assert.ok(merged.some((m) => m.id === 'msn_home'));
+    assert.ok(merged.some((m) => m.id === 'msn_va' && m.vaFlight));
+    const clash = merged.find((m) => m.id === 'msn_clash');
+    assert.equal(clash?.vaFlight, true);
+    assert.equal(clash?.pilotPayoutUsd, 3);
   });
 });
 

@@ -175,6 +175,26 @@ export function logbookIsVaFlight(mission: Mission): boolean {
   );
 }
 
+/**
+ * Union home + VA tenant mission lists for Logbook (unique by id).
+ * Later list wins on id collision so VA enrichment (`vaFlight`) can override.
+ */
+export function mergeLogbookMissions(
+  primary: readonly Mission[],
+  secondary: readonly Mission[],
+): Mission[] {
+  const byId = new Map<string, Mission>();
+  for (const mission of primary) {
+    const id = mission.id?.trim();
+    if (id) byId.set(id, mission);
+  }
+  for (const mission of secondary) {
+    const id = mission.id?.trim();
+    if (id) byId.set(id, mission);
+  }
+  return [...byId.values()];
+}
+
 const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **2942adf** / desktop **0.3.170** shipped: Filter personal Logbook to this pilot and add My VA company Logbook. Release: [v0.3.170](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.170).
+
+
 `main` **fdc3c75** / desktop **0.3.169** shipped: Fix Logbook VA merge on warm enter and center the topbar update pill. Release: [v0.3.169](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.169).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **c43906e** / desktop **0.3.185** shipped: Persist forced +Nd ticks on Postgres catch-up writes. Release: [v0.3.185](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.185).
+
+
 `main` **46152fe** / desktop **0.3.184** shipped: Refresh VA Ledger after debug wallet credit. Release: [v0.3.184](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.184).
 
 **Local (unreleased):** MP Day-76 stuck — `/api/tick` catchUp was isolating a Postgres clone then saving stale RAM peek (forced +Nd discarded). Needs desktop + **world-api redeploy**. See `16-va-logistics.md` / `deploy/README.md`.

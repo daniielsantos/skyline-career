@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **1d0cb18** / desktop **0.3.194** shipped: Show Path to Port FBO so fresh VAs have a clear ladder. Release: [v0.3.194](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.194).
+
+
 `main` **82df9fd** / desktop **0.3.193** shipped: Fix Hauls vacant port strip and add Dev Mode Santos claim. Release: [v0.3.193](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.193).
 
 

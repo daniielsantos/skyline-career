@@ -1018,7 +1018,7 @@ export function HangarAircraftCard(props: {
   );
   const journeyOriginRef = useRef<string | null>(null);
   const showMove = acf.status === 'parked' || acf.status === 'maintenance';
-  const showManage =
+  const hasManageActions =
     !mutationsLocked &&
     (canRepair ||
       showOverhaulActions ||
@@ -1027,6 +1027,8 @@ export function HangarAircraftCard(props: {
       canBuyout ||
       canPayLeaseOverdue ||
       canReturnLease);
+  /** Keep Manage row on every owned hangar card so neighbors stay aligned. */
+  const showManageChrome = !mutationsLocked;
 
   // Prefill from App navigation (market/board → Hangar) without syncing
   // every card while the player types a dest on one of them.
@@ -1383,7 +1385,9 @@ export function HangarAircraftCard(props: {
             >
               {primaryAction.label}
             </button>
-          ) : null}
+          ) : (
+            <div className="hangar-primary-spacer" aria-hidden="true" />
+          )}
         </div>
 
         <div className="hangar-footer-move">
@@ -1403,7 +1407,13 @@ export function HangarAircraftCard(props: {
                     disabled={props.busy || acf.status !== 'parked'}
                   />
                 </label>
-                <div className="hangar-move-actions">
+                <div
+                  className={
+                    vaReserve
+                      ? 'hangar-move-actions has-reserve'
+                      : 'hangar-move-actions'
+                  }
+                >
                   {vaReserve ? (
                     canReleaseReserve ? (
                       <button
@@ -1425,7 +1435,12 @@ export function HangarAircraftCard(props: {
                       >
                         Reserve
                       </button>
-                    ) : null
+                    ) : (
+                      <span
+                        className="hangar-move-go hangar-move-slot"
+                        aria-hidden="true"
+                      />
+                    )
                   ) : null}
                   <button
                     type="button"
@@ -1534,13 +1549,16 @@ export function HangarAircraftCard(props: {
             </div>
           ) : note ? (
             <p className="hangar-card-note">{note}</p>
-          ) : null}
+          ) : (
+            <div className="hangar-move-spacer" aria-hidden="true" />
+          )}
         </div>
 
         <div className="hangar-footer-manage">
-          {showManage ? (
+          {showManageChrome ? (
             <details className="hangar-manage">
               <summary>Manage</summary>
+              {hasManageActions ? (
               <div className="hangar-manage-actions">
                 {canRepair ? (
                   <button
@@ -1652,8 +1670,17 @@ export function HangarAircraftCard(props: {
                   </button>
                 ) : null}
               </div>
+              ) : (
+                <p className="hangar-manage-empty">
+                  {acf.overhaulKind
+                    ? 'Overhaul in progress — actions unlock when the shop finishes.'
+                    : 'No hangar actions right now.'}
+                </p>
+              )}
             </details>
-          ) : null}
+          ) : (
+            <div className="hangar-manage-spacer" aria-hidden="true" />
+          )}
         </div>
       </div>
       {ferryJourneyOpen && ferryJourneyFinal && acf.status === 'parked' ? (

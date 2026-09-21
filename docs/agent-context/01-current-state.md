@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **9cc01a3** / desktop **0.3.198** shipped: Fix VA member Ports tenant and company logistics chrome. Release: [v0.3.198](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.198).
+
+
 `main` **620a00f** / desktop **0.3.197** shipped: Fix Port FBO desk companyId and Haul Scout densify fill gate. Release: [v0.3.197](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.197).
 
 

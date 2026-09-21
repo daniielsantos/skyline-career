@@ -15861,7 +15861,7 @@ export function App() {
                             {contractPilotFeePctLabel()} crew cut on freight;
                             the operator keeps the rest and pays fuel &amp; MX.
                           </p>
-                        ) : contractsProduct === 'freight' ? (
+                        ) : boardEstimateFleet.length > 0 ? (
                         <div className="board-aircraft">
                           <label className="board-aircraft-picker">
                             Aircraft
@@ -16008,6 +16008,9 @@ export function App() {
                           resolveAircraftCompanyId={(id) =>
                             resolveOpsCompanyId(id) || undefined
                           }
+                          aircraftId={boardAircraftId}
+                          onAircraftIdChange={setBoardAircraftId}
+                          hideAircraftPicker
                           initialAircraftId={boardAircraftId}
                           origin={
                             contractsLane === 'outbound'

@@ -74,6 +74,14 @@ type CharterBoardProps = {
   /** Dual-tenant: resolve ops company for Fit when a VA tail is selected. */
   resolveAircraftCompanyId?: (aircraftId: string) => string | undefined;
   initialAircraftId?: string;
+  /**
+   * Controlled selection (Terminal Contracts). When set with
+   * {@link onAircraftIdChange}, the internal Aircraft row is hidden so the
+   * parent can keep the picker above Freight/Charter tabs.
+   */
+  aircraftId?: string;
+  onAircraftIdChange?: (aircraftId: string) => void;
+  hideAircraftPicker?: boolean;
   /** Exact origin lock (Terminal outbound / Base dispatcher). */
   origin?: string;
   /** Exact destination lock (Terminal inbound). */
@@ -96,11 +104,18 @@ export function CharterBoard(props: CharterBoardProps) {
   const parked = props.fleet.filter((aircraft) => aircraft.status === 'parked');
   const originLocked = props.origin !== undefined;
   const destLocked = props.dest !== undefined;
-  const [aircraftId, setAircraftId] = useState(
+  const controlled =
+    props.onAircraftIdChange != null && props.aircraftId !== undefined;
+  const [internalAircraftId, setInternalAircraftId] = useState(
     props.initialAircraftId && parked.some((a) => a.id === props.initialAircraftId)
       ? props.initialAircraftId
       : '',
   );
+  const aircraftId = controlled ? (props.aircraftId ?? '') : internalAircraftId;
+  const setAircraftId = (next: string) => {
+    if (controlled) props.onAircraftIdChange?.(next);
+    else setInternalAircraftId(next);
+  };
   const [originQuery, setOriginQuery] = useState('');
   const [destQuery, setDestQuery] = useState('');
   const [lane, setLane] = useState<CharterLaneFilter>('');
@@ -114,6 +129,7 @@ export function CharterBoard(props: CharterBoardProps) {
   const [sorts, setSorts] = useState<CharterBoardSortLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hideAircraftPicker = Boolean(props.hideAircraftPicker && controlled);
 
   const originExact = originLocked
     ? (props.origin ?? '').trim().toUpperCase()
@@ -123,12 +139,19 @@ export function CharterBoard(props: CharterBoardProps) {
   useEffect(() => {
     if (!aircraftId) return;
     if (parked.some((a) => a.id === aircraftId)) return;
+    // Controlled Terminal picker may list non-parked tails for Freight parity —
+    // keep selection; Fit/Net stay empty until parked.
+    if (controlled) return;
     setAircraftId('');
-  }, [aircraftId, parked]);
+  }, [aircraftId, parked, controlled]);
 
   useEffect(() => {
     setPage(1);
   }, [props.origin, props.dest]);
+
+  useEffect(() => {
+    if (controlled) setPage(1);
+  }, [aircraftId, controlled]);
 
   useEffect(() => {
     if (!aircraftId && fitFilter) setFitFilter('');
@@ -270,36 +293,38 @@ export function CharterBoard(props: CharterBoardProps) {
 
   return (
     <div className="charter-board">
-      <div className="board-aircraft charter-board-aircraft">
-        <label className="board-aircraft-picker">
-          Aircraft
-          <select
-            aria-label="Aircraft for Charter net estimate"
-            value={aircraftId}
-            disabled={parked.length === 0}
-            onChange={(event) => {
-              setAircraftId(event.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">
-              {parked.length === 0
-                ? 'Gross pay (no aircraft)'
-                : 'Gross pay only'}
-            </option>
-            {parked.map((aircraft) => {
-              const isVa = props.vaAircraftIds?.has(aircraft.id);
-              const prefix = isVa ? 'VA' : 'Yours';
-              return (
-              <option key={aircraft.id} value={aircraft.id}>
-                {prefix} · {aircraft.label} · {aircraft.locationIcao}
+      {hideAircraftPicker ? null : (
+        <div className="board-aircraft charter-board-aircraft">
+          <label className="board-aircraft-picker">
+            Aircraft
+            <select
+              aria-label="Aircraft for Charter net estimate"
+              value={aircraftId}
+              disabled={parked.length === 0}
+              onChange={(event) => {
+                setAircraftId(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">
+                {parked.length === 0
+                  ? 'Gross pay (no aircraft)'
+                  : 'Gross pay only'}
               </option>
-              );
-            })}
-          </select>
-        </label>
-        <span className="charter-count">{total} offers</span>
-      </div>
+              {parked.map((aircraft) => {
+                const isVa = props.vaAircraftIds?.has(aircraft.id);
+                const prefix = isVa ? 'VA' : 'Yours';
+                return (
+                  <option key={aircraft.id} value={aircraft.id}>
+                    {prefix} · {aircraft.label} · {aircraft.locationIcao}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <span className="charter-count">{total} offers</span>
+        </div>
+      )}
 
       {error ? <p className="banner error">{error}</p> : null}
       <div

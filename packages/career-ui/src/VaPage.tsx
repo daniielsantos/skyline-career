@@ -137,6 +137,11 @@ type Props = {
     companies: Array<{ id: string; displayName: string }>;
   }) => void | Promise<void>;
   onUnpublished?: () => void | Promise<void>;
+  /**
+   * Bump after VA wallet mutations outside this page (e.g. debug +$5K) so the
+   * Ledger pane refetches instead of keeping a stale cashflow snapshot.
+   */
+  ledgerRefreshEpoch?: number;
 };
 
 export function VaPage(props: Props) {
@@ -426,7 +431,7 @@ export function VaPage(props: Props) {
     if (pane === 'ledger' && listed && role && !tenantSwitching) {
       void loadLedger();
     }
-  }, [pane, listed, role, tenantSwitching, loadLedger]);
+  }, [pane, listed, role, tenantSwitching, loadLedger, props.ledgerRefreshEpoch]);
 
   useEffect(() => {
     if (pane === 'logbook' && listed && role && !tenantSwitching) {
@@ -872,7 +877,11 @@ export function VaPage(props: Props) {
                 VA wallet
               </p>
               <p className="va-ledger-wallet-value">
-                {formatBoardMoney(cashflow?.walletUsd ?? props.walletUsd)}
+                {formatBoardMoney(
+                  Number.isFinite(props.walletUsd)
+                    ? props.walletUsd
+                    : cashflow?.walletUsd,
+                )}
               </p>
               <p className="va-ledger-wallet-hint">
                 Shared company cash (owner wallet).

@@ -2423,7 +2423,9 @@ class SqliteCareerStore implements CareerStore {
     }
     const fleetKey = JSON.stringify(normalized.fleet ?? []);
     const missionsKey = JSON.stringify(normalized.missions ?? []);
-    const ledgerKey = JSON.stringify(ledger);
+    // Scope by company — an unscoped key can skip VA ledger writes after a
+    // home save with the same JSON shape (or vice versa).
+    const ledgerKey = `${companyId}:${JSON.stringify(ledger)}`;
     const companyStateKey = JSON.stringify({
       ...normalized,
       fleet: undefined,

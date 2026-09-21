@@ -442,7 +442,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** após 0.3.182, +3/+7 day “não sai” do dia (ex. Day 76); Ledger spam de Hangar parking + Base Dispatcher repetidos no **mesmo** day.
 **Causa:** +Nd é chunked (~24 ticks × N). Cada chunk rodava `allCompanies` settle completo (port auto-buy / WH / todos os tenants). Se o settle debitava e depois throw/timeout **antes** de persistir `lastSeenTick`, o chunk seguinte re-cobrava o mesmo day — e o request travava o avanço na UI.
 **Fix:** (1) `lastSeenTick` sempre persiste em `finally` após tentativa (SQLite + PG + fallback API). (2) `settleCompanyPassiveFeesForTickRange` early-out no mesmo economy day (sem hangar/salary/credit; só crew/ferry leves). (3) `/api/tick` só usa `allCompanies:true` quando `economyDayIndex` cruza; chunks intra-day settam só o tenant do request.
-### Prepare hides VA fleet + auto ferry (2026-09-20)
+
+### Debug +$5K on VA wallet but Ledger blank (2026-09-21)
+
+**Sintoma:** Dev +$5K/+100K credita a VA (tenant pinado no My VA) mas Recent activity não mostra linha; wallet do hero às vezes não atualiza.
+**Causa:** `applyWalletDelta` grava `kind=other` + note, mas `onDebugCreditWallet` só fazia `commitWallet` — Hangar/My VA Ledger mantêm snapshot próprio. Hero preferia `cashflow.walletUsd` stale sobre `props.walletUsd`.
+**Fix:** após credit, `fetchCashflow` + bump `ledgerRefreshEpoch` no VaPage; hero usa `props.walletUsd`; label “Debug credit” quando note começa com Debug; `lastLedgerPersistKey` scoped por companyId.### Prepare hides VA fleet + auto ferry (2026-09-20)
 
 **Sintoma:** membro clica Prepare no Freights → Ferry Journey do Aerostar pessoal; dropdown do Manifest sem tails da VA. Mesmo gap em Charter/Ports.
 **Causa:** chrome sticky-home → `fleet` só home; `enterStaging`/`CharterManifest` abriam ferry modal no off-origin; Operator aircraft = NPC (não VA).

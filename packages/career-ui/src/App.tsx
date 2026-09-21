@@ -3539,6 +3539,8 @@ export function App() {
    * company, but chrome wallet/fleet stay on home. These feed VaPage only.
    */
   const [vaSessionWallet, setVaSessionWallet] = useState<number | null>(null);
+  /** Bump so My VA Ledger refetches after external wallet credits. */
+  const [vaLedgerRefreshEpoch, setVaLedgerRefreshEpoch] = useState(0);
   const [vaSessionFleet, setVaSessionFleet] = useState<PlayerAircraft[]>([]);
   /** Listed VA company id when this account is a member (chrome stays home). */
   const [memberVaCompanyId, setMemberVaCompanyId] = useState<string | null>(
@@ -7595,6 +7597,15 @@ export function App() {
     await run(async () => {
       const result = await postDebugCreditWallet({ amountUsd });
       commitWallet(result.walletUsd);
+      // Hangar cashflow + My VA Ledger keep their own snapshots — refresh both.
+      try {
+        const snap = await fetchCashflow();
+        setCashflow(snap);
+        if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
+      } catch {
+        /* soft — wallet paint already committed */
+      }
+      setVaLedgerRefreshEpoch((n) => n + 1);
       setToastKind('ok');
       setToast(`Debug credit +${formatMoney(result.creditedUsd)}`);
     });
@@ -19404,6 +19415,7 @@ export function App() {
             setVaSessionFleet([]);
             selectTab('pilot');
           }}
+          ledgerRefreshEpoch={vaLedgerRefreshEpoch}
           renderHangarCard={(acf, hangarOpts) => (
             <HangarAircraftCard
               key={acf.id}

@@ -76,7 +76,14 @@ const KIND_LABEL: Record<string, string> = {
   other: 'Other',
 };
 
-function kindLabel(kind: string): string {
+function kindLabel(kind: string, note?: string): string {
+  if (
+    kind === 'other' &&
+    note &&
+    /^debug\b/i.test(note.trim())
+  ) {
+    return 'Debug credit';
+  }
   return KIND_LABEL[kind] ?? kind.replace(/_/g, ' ');
 }
 
@@ -446,7 +453,7 @@ export function HangarCashflowPanel(props: {
                       {pageEntries.map((entry) => (
                         <tr key={entry.id}>
                           <td>{entry.dayIndex}</td>
-                          <td>{kindLabel(entry.kind)}</td>
+                          <td>{kindLabel(entry.kind, entry.note)}</td>
                           {showMember ? (
                             <td>{memberLabel(entry, props.memberNamesByAccountId)}</td>
                           ) : null}

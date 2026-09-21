@@ -20,6 +20,15 @@ export type CareerLedgerSummary = {
   byKind: Partial<Record<CareerLedgerKind, number>>;
 };
 
+/**
+ * Multi-day passive fee notes keep `Nd · …`; single-day omits the prefix
+ * (Ledger Day column already shows the day).
+ */
+export function formatLedgerDaysNotePrefix(daysCharged: number): string {
+  const days = Math.max(0, Math.floor(Number(daysCharged) || 0));
+  return days > 1 ? `${days}d · ` : '';
+}
+
 export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   freight_payout: 'Freight payout',
   charter_payout: 'Charter payout',

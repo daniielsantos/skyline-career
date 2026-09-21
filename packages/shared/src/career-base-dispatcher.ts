@@ -5,7 +5,7 @@
 
 import { resolveCrewPortraitId } from './career-crew.js';
 import { ensurePlayerFbos } from './career-fbo.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   BaseDispatcherCandidate,
@@ -594,7 +594,7 @@ export function settleBaseDispatcherSalaries(
       amountUsd: -debitUsd,
       kind: 'base_dispatcher_salary',
       atTick: opts.toTick,
-      note: `${daysCharged}d · ${members.length} Base Dispatcher`,
+      note: `${formatLedgerDaysNotePrefix(daysCharged)}${members.length} Base Dispatcher`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };

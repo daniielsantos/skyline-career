@@ -11,7 +11,7 @@ import {
   localUnitPriceUsd,
 } from './career-economy.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import { isFboHoldCommodityAllowed, ensurePlayerFbos } from './career-fbo.js';
 import {
   depositCargoToWarehouse,
@@ -2584,7 +2584,7 @@ export function settlePortYardHoldFees(
       amountUsd: -debitUsd,
       kind: 'port_yard_hold',
       atTick: opts.toTick,
-      note: `Yard hold ${daysCharged}d · ${pickups.length} lot(s) · $${requestedUsd.toFixed(2)} due`,
+      note: `Yard hold ${formatLedgerDaysNotePrefix(daysCharged)}${pickups.length} lot(s) · $${requestedUsd.toFixed(2)} due`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };

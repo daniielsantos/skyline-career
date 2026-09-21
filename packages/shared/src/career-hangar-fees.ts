@@ -4,7 +4,7 @@
 
 import { hubTierOf, type CareerEconomyWorld } from './career-economy.js';
 import { fboParkingFeeMult } from './career-fbo-perks.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
   CareerMissionsState,
@@ -129,14 +129,15 @@ export function settleHangarParkingFees(
   const shortfallUsd = Math.round((requestedUsd - debitUsd) * 100) / 100;
   if (debitUsd > 0) {
     const labels = lines.map((l) => l.label).slice(0, 3).join(', ');
+    const daysPrefix = formatLedgerDaysNotePrefix(daysCharged);
     applyWalletDelta(state, {
       amountUsd: -debitUsd,
       kind: 'hangar_parking',
       atTick: opts.toTick,
       note:
         shortfallUsd > 0
-          ? `${daysCharged}d · ${lines.length} acf · short $${shortfallUsd}`
-          : `${daysCharged}d · ${lines.length} acf${labels ? ` · ${labels}` : ''}`,
+          ? `${daysPrefix}${lines.length} acf · short $${shortfallUsd}`
+          : `${daysPrefix}${lines.length} acf${labels ? ` · ${labels}` : ''}`,
     });
   }
 

@@ -9,7 +9,7 @@ import {
   settleBaseDispatcherSalaries,
 } from './career-base-dispatcher.js';
 import { settleVaLineCrewSalary } from './career-va-line-crew.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import { ensurePlayerWarehouses } from './career-warehouse-stock.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -923,7 +923,7 @@ export function settleGroundStaffSalaries(
       amountUsd: -debitUsd,
       kind: 'ground_staff_salary',
       atTick: opts.toTick,
-      note: `${daysCharged}d · ${roster.members.length} ground staff`,
+      note: `${formatLedgerDaysNotePrefix(daysCharged)}${roster.members.length} ground staff`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };

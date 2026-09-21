@@ -10,7 +10,7 @@ import {
   resolveAirportCoords,
   type CareerEconomyWorld,
 } from './career-economy.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { economyDayIndex } from './career-weather.js';
 import {
@@ -421,7 +421,7 @@ export function settleWarehouseStorageFees(
       amountUsd: -debitUsd,
       kind: 'warehouse_storage',
       atTick: opts.toTick,
-      note: `${daysCharged}d · ${whs.stock.length} pile(s)`,
+      note: `${formatLedgerDaysNotePrefix(daysCharged)}${whs.stock.length} pile(s)`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };

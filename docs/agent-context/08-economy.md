@@ -14,6 +14,8 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 - **Charter board Expires look synced (2026-09-20):** sintoma — página cheia de URGENT com **15 min** iguais. Causa — (1) TTL de board é tick discreto (1 tick = 15 min); (2) formação em lote no mesmo `world.tick` (quota 48) → coorte com o mesmo `expiresAtTick`; (3) label arredonda &lt;1 h. **Fix shipped:** form trickle **10**/catch-up **20**/warm **28**; TTL **12–26 h**; stagger `+formed` no expires. Deadline de voo = Expires no Accept (igual Freights).
 
+- **Ledger fee notes omit `1d` (2026-09-21):** sintoma = Note `1d · 2 acf · …` redundante com coluna Day. Fix = `formatLedgerDaysNotePrefix` só prefixa `Nd ·` quando days&gt;1 (hangar, Dispatcher, WH, FBO hold, crew, ground, yard). MP/SP no login/catch-up ainda **agrupa** até 7d (`OFFLINE_FEE_CAP_DAYS`) → aí aparece `3d ·` / `7d ·`.
+
 ## Em poucas linhas
 
 - **Economy events soft-cap (2026-09-20):** teto ativo escala com regioes (ceil(regions/10), min 4 / max 24); spawn base ~7%/h com catch-up leve se <50% cheio; prefere regiao sem evento; **multiplicadores inalterados** (sem Dry).

@@ -10,7 +10,7 @@ import {
   assignAircraftToMission,
   findPlayerAircraft,
 } from './career-fleet.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import {
   departMission,
   listActivePlayerMissions,
@@ -787,7 +787,7 @@ export function settleCrewSalaries(
       amountUsd: -debitUsd,
       kind: 'crew_salary',
       atTick: opts.toTick,
-      note: `${daysCharged}d · ${roster.members.length} crew`,
+      note: `${formatLedgerDaysNotePrefix(daysCharged)}${roster.members.length} crew`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };

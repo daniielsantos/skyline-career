@@ -22,7 +22,7 @@ import {
   findPlayerFboAtIcao,
 } from './career-fbo-perks.js';
 import { ensureCompanyCrew, refreshCrewHirePool, isCompanyCrewEnabled } from './career-crew.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import {
   getAircraftClass,
   recomputeMissionTotals,
@@ -1409,7 +1409,7 @@ export function settleFboStorageFees(
       amountUsd: -debitUsd,
       kind: 'fbo_storage',
       atTick: opts.toTick,
-      note: `${daysCharged}d · ${fbos.holds.length} hold(s)`,
+      note: `${formatLedgerDaysNotePrefix(daysCharged)}${fbos.holds.length} hold(s)`,
     });
   }
   return { debitUsd, requestedUsd, shortfallUsd, daysCharged };

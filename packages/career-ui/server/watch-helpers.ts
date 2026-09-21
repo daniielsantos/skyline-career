@@ -10,7 +10,6 @@ import {
   createFlightScoreAccumulator,
   clearFlightScoreLanding,
   cruiseSampleStatus,
-  DEFAULT_CRUISE_EMA_ALPHA,
   DEFAULT_CRUISE_MAX_VS_FPM,
   revertFalseDepartMission,
   distanceNm as greatCircleDistanceNm,
@@ -34,7 +33,8 @@ import {
   loadVerificationDrifted,
   schematicStationsForLivePayload,
   stationWeightsDrifted,
-  mergeAirframePerfOverride,
+  applyCruiseSampleOverride,
+  type CruiseSampleCommit,
   clampCruiseFuelFlowToCatalog,
   DEFAULT_JET_A_LB_PER_GAL,
   pickFuelTankBreakdown,
@@ -279,6 +279,7 @@ export type WatchWorldMutations = {
     touchdownLat?: number;
     touchdownLon?: number;
     touchdownHeadingTrueDeg?: number;
+    cruiseCommit?: CruiseSampleCommit;
   }) => Promise<boolean>;
 };
 
@@ -1503,6 +1504,11 @@ export class CareerWatchSession {
   getCapturedLandingFpm(): number | undefined {
     const fpm = this.watchState.landingFpm;
     return typeof fpm === 'number' && Number.isFinite(fpm) ? fpm : undefined;
+  }
+
+  /** Stable-cruise sample committed this Watch session, if any. */
+  getCapturedCruiseCommit(): CruiseSampleCommit | undefined {
+    return this.cruiseState.committed;
   }
 
   /** Touchdown wall-clock from Watch, if wheels-down was observed. */
@@ -3982,6 +3988,7 @@ export class CareerWatchSession {
           expectedRouteMs:
             current.expectedRouteMs ?? this.watchState.expectedRouteMs,
         });
+        const cruiseCommit = this.cruiseState.committed;
         const saved = this.cb.worldMutations
           ? await this.cb.worldMutations.settleFlight({
               missionId: this.missionId!,
@@ -4002,6 +4009,7 @@ export class CareerWatchSession {
               touchdownLat: touchdownLat ?? undefined,
               touchdownLon: touchdownLon ?? undefined,
               touchdownHeadingTrueDeg,
+              ...(cruiseCommit ? { cruiseCommit } : {}),
             }).then(async (ok) => {
               if (!ok) return false;
               const snap = await this.cb.withCareerRead((_w, missions) => {
@@ -4077,24 +4085,16 @@ export class CareerWatchSession {
             }
             const result = executed.result;
             syncActiveTour(freshMissions, worldFresh);
-            const cruiseCommit = this.cruiseState.committed;
-            const airframeTypeId = openMission.airframeTypeId?.trim();
-            if (cruiseCommit && airframeTypeId) {
-              const prev =
-                freshMissions.airframePerfOverrides?.[airframeTypeId];
-              const catalogFlow =
-                findCareerPlayerAirframe(airframeTypeId)?.cruiseFuelFlowKgPerHour;
-              const merged = mergeAirframePerfOverride(
-                prev,
-                cruiseCommit,
-                DEFAULT_CRUISE_EMA_ALPHA,
-                { catalogCruiseFuelFlowKgPerHour: catalogFlow },
-              );
-              freshMissions.airframePerfOverrides = {
-                ...(freshMissions.airframePerfOverrides ?? {}),
-                [airframeTypeId]: merged,
-              };
-            }
+            applyCruiseSampleOverride(
+              freshMissions,
+              openMission.airframeTypeId,
+              this.cruiseState.committed,
+              {
+                catalogCruiseFuelFlowKgPerHour: findCareerPlayerAirframe(
+                  openMission.airframeTypeId,
+                )?.cruiseFuelFlowKgPerHour,
+              },
+            );
             this.missionStatus = result.mission.status;
             this.walletUsd = freshMissions.walletUsd;
             this.settlement = {

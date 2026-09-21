@@ -48,6 +48,7 @@ import {
   findCareerAirframeConfiguration,
   findCareerPlayerAirframe,
   listCareerPlayerAirframes,
+  resolveAirframePerfForUi,
 } from './career-player-airframes.js';
 import {
   allocateAircraftRegistration,
@@ -2571,6 +2572,57 @@ export function listAircraftClassCatalog(): Array<{
     maxCargoKg: CLASS_SPECS[id].maxCargoKg,
     maxRangeNm: CLASS_SPECS[id].maxRangeNm,
   }));
+}
+
+export type AirframePerfUiRow = ReturnType<typeof resolveAirframePerfForUi>;
+
+/**
+ * Specs for Hangar / Market cards. Catalog + live cruise override per typeId.
+ * Pass fleet (and optional listing type ids) so Hangar does not depend on the
+ * market board having been opened.
+ */
+export function buildAirframePerfMapForUi(
+  rows: Array<{
+    airframeTypeId?: string | null;
+    aircraftClassId: FreighterClassId | string;
+  }>,
+  opts?: {
+    overrides?: CareerMissionsState['airframePerfOverrides'] | null;
+    extraTypeIds?: Iterable<string | null | undefined>;
+  },
+): Record<string, AirframePerfUiRow> {
+  const catalog = listAircraftClassCatalog();
+  const catalogByClass = new Map(catalog.map((row) => [row.id, row]));
+  const typeIds = new Set<string>();
+  const classByType = new Map<string, FreighterClassId | string>();
+  for (const row of rows) {
+    const typeId = row.airframeTypeId?.trim();
+    if (!typeId) continue;
+    typeIds.add(typeId);
+    if (!classByType.has(typeId)) {
+      classByType.set(typeId, row.aircraftClassId);
+    }
+  }
+  for (const raw of opts?.extraTypeIds ?? []) {
+    const typeId = typeof raw === 'string' ? raw.trim() : '';
+    if (!typeId) continue;
+    typeIds.add(typeId);
+  }
+  const out: Record<string, AirframePerfUiRow> = {};
+  for (const typeId of typeIds) {
+    const classId =
+      classByType.get(typeId) ??
+      findCareerPlayerAirframe(typeId)?.aircraftClassId ??
+      'light_ga';
+    const classRow = catalogByClass.get(classId as FreighterClassId);
+    out[typeId] = resolveAirframePerfForUi(
+      typeId,
+      classId,
+      classRow,
+      opts?.overrides?.[typeId] ?? null,
+    );
+  }
+  return out;
 }
 
 /** Test helper: force abstract demand against current available listings. */

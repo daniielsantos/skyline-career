@@ -88,6 +88,8 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - **Charter/Freights board VA (2026-09-20):** sintoma — Charter `Unknown aircraft acf_…` ao selecionar tail VA; Freights dropdown só home. Causa — `GET /api/charters` lia chrome home; `boardEstimateFleet` filtrava `fleet` home. Fix — query `companyId` no Fit + `resolveAircraftCompanyId`; Freights/Contracts picker usa `prepareOpsFleet` com prefixo VA/Yours.
 - **Charter Class Ops + Manifest Unknown aircraft (2026-09-20):** sintoma — membro sem light jet liberado ainda via Prepare em Citation C680 VA; Manifest `Unknown aircraft acf_…` com Fit READY. Causa — (1) Charter Fit/accept **não** usavam ladder home (`resolvePilotProgressionOps`), só Freights/staging; (2) `CharterManifest` refresh omitia `companyId` → tenant home sem o casco VA. Fix — `withCharterClassOpsGate` no Fit + `assertClassOpsUnlocked` no accept; Manifest passa `resolveOpsCompanyId`.
 
+- **Roster row spacing (2026-09-21):** sintoma = card de membro com Online/Last seen/At ICAO/On the ground empilhados (gap 0.12rem). Fix = colunas Nome | presença | local | role; gap interno 0.28rem; padding do card maior. Mobile empilha presença e local.
+
 **Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
 
 - Abrir My VA faz `switchCompanyForVa` e grava `?company=` da VA — necessário para hangar/ledger/mutações.
@@ -640,6 +642,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 | Preflight / Load fuel+payload | SimBridge + mission write | companyId (latência = pipe) | **feito** |
 | Depart | write | companyId + paint fleet | **feito** |
 | Settle | write | já tinha companyId + paint | ok |
+| Accept Manifest | write | medir fila vs trabalho antes de split de lock | **diag** `staging/commit` `lockWait` / `inLock` / `outside` — ver `14-mp-world-clock.md` |
 | Crew dispatch / assign | write home Base | home-only by design | n/a |
 
 ### VA Ledger Member column (2026-09-20)
@@ -668,6 +671,16 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** dois membros podiam escolher o mesmo casco VA no Manifest; reserve Hangar era opt-in.
 **Causa:** picker `opsFleet` listava todo `parked` (incl. reserved alheio); Accept só fazia `assign` sem gravar hold.
 **Fix:** Manifest/Ports/Charter filtram tails reserved por outro (owner ainda vê); `assignAircraftToMission` com `actorAccountId` chama `ensureAircraftReservedForActor` (refresh TTL / owner pode tomar hold). Sem auto-reserve enquanto só navega o Manifest.
+
+### Hangar Range / Cruise / Burn em branco (2026-09-21)
+
+**Sintoma:** card do Hangar (VA ou home) mostra Range, Cruise e Burn como `—`. O card do mesmo SKU em Airframes traz os números (ex. Duke 1,100 nm / 230 kt / 265 lb/h).
+
+**Causa:** o Hangar já tem os três campos (`HangarAircraftCard`). Eles só preenchem se `hangarCatalogEntry` achar uma entrada. Essa entrada **não vem no avião**. É montada no client a partir do payload de `GET /api/aircraft-market`: catálogo de classe (tem range, não tem cruise/burn) + `airframePerf` (range/cruise/burn por `airframeTypeId`). O mapa de perf só inclui type ids das listings daquela resposta e da frota da company do request. O card de Airframes funciona porque a listing está dentro dessa resposta. Os três traços = nem a classe nem o type id desse casco estavam nesse cache.
+
+**Fix:**
+1. **Display.** `buildAirframePerfMapForUi` (catálogo + `airframePerfOverrides`) anexado em `/api/state` (`fleetPayload`), `/api/va/members` e `/api/aircraft-market`. Client faz merge no cache `airframePerf`; Hangar deixa de depender de ter aberto Airframes. Range `≤0` → `—`.
+2. **Sample MP.** Watch passa `cruiseCommit` no `settleFlight` (gateway enrich + world-api client). `/api/settle` valida com `parseCruiseSampleCommit` e grava EMA via `applyCruiseSampleOverride` na company da missão. SP usa o mesmo helper. Range não sai do sample.
 
 ### VA hangar aircraft reservation (2026-09-20)
 

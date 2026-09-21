@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createServer } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { access, readdir, stat } from 'node:fs/promises';
@@ -61,14 +62,16 @@ import {
   findNpcAirframe,
   listActivePlayerMissions,
   listAircraftClassCatalog,
+  buildAirframePerfMapForUi,
   listAircraftMarket,
   resolveMarketCountryId,
   dealerPoolCountryCounts,
   listCareerHubIcaos,
   listParkedAt,
   listStarterCareerPlayerAirframes,
-  resolveAirframePerfForUi,
   resolveAirframeFuelBurnKgPerNm,
+  applyCruiseSampleOverride,
+  parseCruiseSampleCommit,
   getCommodity,
   getAirportRunways,
   evaluateRunwayTouchdown,
@@ -1033,6 +1036,9 @@ function fleetPayload(
   return {
     hubSelected: missions.hubSelected,
     fleet: withParkingRates(missions.fleet, world, missions),
+    airframePerf: buildAirframePerfMapForUi(missions.fleet, {
+      overrides: missions.airframePerfOverrides,
+    }),
     hubs,
     pilotName: missions.pilotName,
     homeHubIcao: missions.homeHubIcao,
@@ -1134,8 +1140,50 @@ async function saveMissions(
 const worldLock = createPromiseLock();
 const companyLock = createPromiseLock();
 
+/** Request-scoped Accept timing. Only set around POST /api/staging/commit. */
+type CareerWriteDiag = {
+  startedAt: number;
+  lockWaitMs: number;
+  inLockMs: number;
+  failed: boolean;
+};
+
+const careerWriteDiag = new AsyncLocalStorage<CareerWriteDiag>();
+
+function logCareerWriteDiag(label: string, diag: CareerWriteDiag): void {
+  const wallMs = performance.now() - diag.startedAt;
+  const outsideMs = Math.max(0, wallMs - diag.lockWaitMs - diag.inLockMs);
+  // Skip validation rejects that never touched the lock.
+  if (
+    !diag.failed &&
+    diag.lockWaitMs === 0 &&
+    diag.inLockMs === 0 &&
+    wallMs < 50
+  ) {
+    return;
+  }
+  console.log(
+    `[career] ${label}${diag.failed ? ' fail' : ''} ${Math.round(wallMs)}ms` +
+      ` lockWait=${Math.round(diag.lockWaitMs)}ms` +
+      ` inLock=${Math.round(diag.inLockMs)}ms` +
+      ` outside=${Math.round(outsideMs)}ms`,
+  );
+}
+
 function withWorldThenCompany<T>(fn: () => Promise<T> | T): Promise<T> {
-  return worldLock.withLock(() => companyLock.withLock(fn));
+  const diag = careerWriteDiag.getStore();
+  const queuedAt = diag ? performance.now() : 0;
+  return worldLock.withLock(() =>
+    companyLock.withLock(async () => {
+      if (diag) diag.lockWaitMs += performance.now() - queuedAt;
+      const holdAt = performance.now();
+      try {
+        return await fn();
+      } finally {
+        if (diag) diag.inLockMs += performance.now() - holdAt;
+      }
+    }),
+  );
 }
 
 function withCareerLock<T>(fn: () => Promise<T> | T): Promise<T> {
@@ -3252,11 +3300,13 @@ export function createCareerApiServer(port = 8787) {
             const weatherOps = watchSession.getCapturedWeatherOps();
             const mx = watchSession.getCapturedMxFuelDrain();
             const td = watchSession.getCapturedTouchdownPosition();
+            const cruiseCommit = watchSession.getCapturedCruiseCommit();
             Object.assign(body, {
               ...(landingFpm != null ? { landingFpm } : {}),
               ...(airborneEndedAtMs != null ? { airborneEndedAtMs } : {}),
               ...(flightScore ? { flightScore } : {}),
               ...(weatherOps ? { weatherOps } : {}),
+              ...(cruiseCommit ? { cruiseCommit } : {}),
               mxFuelDrainUnsettledKg: mx.unsettledKg,
               mxFuelDrainTotalKg: mx.totalKg,
               ...(td
@@ -3880,6 +3930,8 @@ export function createCareerApiServer(port = 8787) {
         let hangarFleet: Array<
           PlayerAircraft & { parkingUsdPerDay: number | null }
         > = [];
+        let hangarAirframePerf: ReturnType<typeof buildAirframePerfMapForUi> =
+          {};
         let walletUsd = 0;
         if (vaMissionsForRoster) {
           try {
@@ -3893,6 +3945,10 @@ export function createCareerApiServer(port = 8787) {
               peeked ?? undefined,
               vaMissionsForRoster,
             );
+            hangarAirframePerf = buildAirframePerfMapForUi(
+              vaMissionsForRoster.fleet,
+              { overrides: vaMissionsForRoster.airframePerfOverrides },
+            );
             walletUsd =
               typeof vaMissionsForRoster.walletUsd === 'number' &&
               Number.isFinite(vaMissionsForRoster.walletUsd)
@@ -3900,6 +3956,7 @@ export function createCareerApiServer(port = 8787) {
                 : 0;
           } catch {
             hangarFleet = [];
+            hangarAirframePerf = {};
           }
         }
         send(res, 200, {
@@ -3916,6 +3973,7 @@ export function createCareerApiServer(port = 8787) {
           flightQuality,
           orgPerks,
           fleet: hangarFleet,
+          airframePerf: hangarAirframePerf,
           walletUsd,
           viewerAccountId: session.account.id,
           onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
@@ -5735,39 +5793,14 @@ export function createCareerApiServer(port = 8787) {
           const acquireEnabled = browseCountryId === homeCountryId;
           const nowMs = Date.now();
           const catalog = listAircraftClassCatalog();
-          const catalogByClass = new Map(catalog.map((row) => [row.id, row]));
           const typeIds = new Set<string>();
           for (const listing of listings) {
             if (listing.airframeTypeId) typeIds.add(listing.airframeTypeId);
           }
-          for (const acf of missions.fleet) {
-            if (acf.airframeTypeId) typeIds.add(acf.airframeTypeId);
-          }
-          const airframePerf = Object.fromEntries(
-            [...typeIds].map((typeId) => {
-              const listing = listings.find((row) => row.airframeTypeId === typeId);
-              const fleetAcf = missions.fleet.find(
-                (row) => row.airframeTypeId === typeId,
-              );
-              const classId =
-                listing?.aircraftClassId ??
-                fleetAcf?.aircraftClassId ??
-                findCareerPlayerAirframe(typeId)?.aircraftClassId ??
-                'light_ga';
-              const classRow = catalogByClass.get(classId);
-              const liveOverride =
-                missions.airframePerfOverrides?.[typeId] ?? null;
-              return [
-                typeId,
-                resolveAirframePerfForUi(
-                  typeId,
-                  classId,
-                  classRow,
-                  liveOverride,
-                ),
-              ] as const;
-            }),
-          );
+          const airframePerf = buildAirframePerfMapForUi(missions.fleet, {
+            overrides: missions.airframePerfOverrides,
+            extraTypeIds: typeIds,
+          });
           return {
             ...clockPayload(world, nowMs),
             walletUsd: missions.walletUsd,
@@ -11554,6 +11587,14 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'POST' && path === '/api/staging/commit') {
+        const stagingDiag: CareerWriteDiag = {
+          startedAt: performance.now(),
+          lockWaitMs: 0,
+          inLockMs: 0,
+          failed: false,
+        };
+        await careerWriteDiag.run(stagingDiag, async () => {
+        try {
         const body = (await readBody(req)) as {
           aircraft?: string;
           aircraftId?: string;
@@ -12109,6 +12150,7 @@ export function createCareerApiServer(port = 8787) {
             fleet: committed.fleet,
           });
         } catch (error) {
+          stagingDiag.failed = true;
           const message = error instanceof Error ? error.message : String(error);
           const notFound =
             /^Unknown (lot|mission|aircraft) /.test(message) ||
@@ -12117,6 +12159,13 @@ export function createCareerApiServer(port = 8787) {
             message.startsWith('Unknown aircraft');
           send(res, notFound ? 404 : 400, { error: message });
         }
+        } catch (error) {
+          stagingDiag.failed = true;
+          throw error;
+        } finally {
+          logCareerWriteDiag('staging/commit', stagingDiag);
+        }
+        });
         return;
       }
 
@@ -13038,6 +13087,7 @@ export function createCareerApiServer(port = 8787) {
           touchdownLon?: number;
           touchdownHeadingTrueDeg?: number;
           nowMs?: number;
+          cruiseCommit?: unknown;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -13226,6 +13276,19 @@ export function createCareerApiServer(port = 8787) {
             if (executed.kind === 'missing') return { kind: 'missing' as const };
             if (executed.kind === 'closed') return { kind: 'closed' as const };
             const result = executed.result;
+            const cruiseCommit = parseCruiseSampleCommit(body.cruiseCommit);
+            if (cruiseCommit) {
+              applyCruiseSampleOverride(
+                missions,
+                openMission.airframeTypeId,
+                cruiseCommit,
+                {
+                  catalogCruiseFuelFlowKgPerHour: findCareerPlayerAirframe(
+                    openMission.airframeTypeId,
+                  )?.cruiseFuelFlowKgPerHour,
+                },
+              );
+            }
             syncActiveTour(missions, world);
             syncCharterActiveTour(missions, world);
             return {

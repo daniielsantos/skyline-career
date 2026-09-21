@@ -115,6 +115,19 @@ type Props = {
   ) => ReactNode;
   onWallet?: (walletUsd: number) => void;
   onFleet?: (fleet: PlayerAircraft[]) => void;
+  /** Hangar Range/Cruise/Burn for VA fleet typeIds (catalog + learned). */
+  onAirframePerf?: (
+    perf: Record<
+      string,
+      {
+        maxCargoKg: number;
+        maxRangeNm: number;
+        cruiseFuelFlowKgPerHour?: number;
+        cruiseSpeedKt?: number;
+        fuelBurnKgPerNm: number;
+      }
+    >,
+  ) => void;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
   /** Switch active tenant to the listed VA (member dual-tenant). */
@@ -184,6 +197,8 @@ export function VaPage(props: Props) {
   onWalletRef.current = props.onWallet;
   const onFleetRef = useRef(props.onFleet);
   onFleetRef.current = props.onFleet;
+  const onAirframePerfRef = useRef(props.onAirframePerf);
+  onAirframePerfRef.current = props.onAirframePerf;
   const hasVaShellRef = useRef(false);
   const ledgerFetchGenRef = useRef(0);
   const logbookFetchGenRef = useRef(0);
@@ -298,6 +313,9 @@ export function VaPage(props: Props) {
       // Fleet + wallet after pin so chrome sticky home already sees active ≠ home.
       if (Array.isArray(m.fleet)) {
         onFleetRef.current?.(m.fleet);
+      }
+      if (m.airframePerf) {
+        onAirframePerfRef.current?.(m.airframePerf);
       }
       if (typeof m.walletUsd === 'number' && Number.isFinite(m.walletUsd)) {
         onWalletRef.current?.(m.walletUsd);
@@ -646,7 +664,7 @@ export function VaPage(props: Props) {
                     <span className="va-roster-name">{m.displayName}</span>
                     <span className="va-roster-login">@{m.loginName}</span>
                   </div>
-                  <div className="va-roster-status">
+                  <div className="va-roster-presence">
                     <span
                       className={`va-roster-online${m.online ? ' is-online' : ''}`}
                     >
@@ -657,6 +675,8 @@ export function VaPage(props: Props) {
                         ? 'Active now'
                         : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`}
                     </span>
+                  </div>
+                  <div className="va-roster-place">
                     <span className="va-roster-hub">{formatRosterHub(m.pilotIcao)}</span>
                     <span
                       className={`va-roster-flight${

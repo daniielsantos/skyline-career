@@ -385,3 +385,66 @@ export function mergeAirframePerfOverride(
     sampleCount: (prev?.sampleCount ?? 0) + 1,
   };
 }
+
+/** Validate a settle-body cruise commit from the desktop Watch. */
+export function parseCruiseSampleCommit(
+  raw: unknown,
+): CruiseSampleCommit | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const row = raw as Record<string, unknown>;
+  const cruiseSpeedKt = Number(row.cruiseSpeedKt);
+  const cruiseFuelFlowKgPerHour = Number(row.cruiseFuelFlowKgPerHour);
+  const fuelBurnKgPerNm = Number(row.fuelBurnKgPerNm);
+  const sampleCount = Number(row.sampleCount);
+  const durationSec = Number(row.durationSec);
+  const committedAtMs = Number(row.committedAtMs);
+  if (
+    !(cruiseSpeedKt > 0) ||
+    !(cruiseFuelFlowKgPerHour > 0) ||
+    !(fuelBurnKgPerNm > 0) ||
+    !(sampleCount > 0) ||
+    !(durationSec > 0) ||
+    !(committedAtMs > 0)
+  ) {
+    return undefined;
+  }
+  return {
+    cruiseSpeedKt: Math.round(cruiseSpeedKt),
+    cruiseFuelFlowKgPerHour:
+      Math.round(cruiseFuelFlowKgPerHour * 10) / 10,
+    fuelBurnKgPerNm: Math.round(fuelBurnKgPerNm * 1000) / 1000,
+    sampleCount: Math.floor(sampleCount),
+    durationSec: Math.round(durationSec),
+    committedAtMs: Math.floor(committedAtMs),
+  };
+}
+
+/**
+ * Persist a Watch cruise sample onto company `airframePerfOverrides[typeId]`.
+ * Shared by SP settle and MP world `/api/settle`.
+ */
+export function applyCruiseSampleOverride(
+  missions: {
+    airframePerfOverrides?: Record<string, AirframePerfOverride>;
+  },
+  airframeTypeId: string | null | undefined,
+  sample: CruiseSampleCommit | undefined,
+  opts?: { catalogCruiseFuelFlowKgPerHour?: number; alpha?: number },
+): boolean {
+  const typeId = airframeTypeId?.trim();
+  if (!typeId || !sample) return false;
+  const prev = missions.airframePerfOverrides?.[typeId];
+  const merged = mergeAirframePerfOverride(
+    prev,
+    sample,
+    opts?.alpha ?? DEFAULT_CRUISE_EMA_ALPHA,
+    {
+      catalogCruiseFuelFlowKgPerHour: opts?.catalogCruiseFuelFlowKgPerHour,
+    },
+  );
+  missions.airframePerfOverrides = {
+    ...(missions.airframePerfOverrides ?? {}),
+    [typeId]: merged,
+  };
+  return true;
+}

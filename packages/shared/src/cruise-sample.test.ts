@@ -6,6 +6,8 @@ import {
   mergeAirframePerfOverride,
   clampCruiseFuelFlowToCatalog,
   pushCruiseTick,
+  parseCruiseSampleCommit,
+  applyCruiseSampleOverride,
   type CruiseTick,
 } from './cruise-sample.js';
 
@@ -242,5 +244,35 @@ describe('mergeAirframePerfOverride', () => {
       { catalogCruiseFuelFlowKgPerHour: 66.5 },
     );
     assert.equal(learned.cruiseFuelFlowKgPerHour, 116.4);
+  });
+});
+
+describe('parseCruiseSampleCommit / applyCruiseSampleOverride', () => {
+  it('rejects incomplete settle payloads', () => {
+    assert.equal(parseCruiseSampleCommit(null), undefined);
+    assert.equal(parseCruiseSampleCommit({ cruiseSpeedKt: 180 }), undefined);
+  });
+
+  it('merges a valid commit onto company overrides by typeId', () => {
+    const commit = parseCruiseSampleCommit({
+      cruiseSpeedKt: 230,
+      cruiseFuelFlowKgPerHour: 120.2,
+      fuelBurnKgPerNm: 0.523,
+      sampleCount: 18,
+      durationSec: 180,
+      committedAtMs: 1_700_000_000_000,
+    });
+    assert.ok(commit);
+    const missions: {
+      airframePerfOverrides?: Record<string, { cruiseSpeedKt?: number }>;
+    } = {};
+    assert.equal(
+      applyCruiseSampleOverride(missions, 'blacksquare-b60-duke', commit),
+      true,
+    );
+    assert.equal(
+      missions.airframePerfOverrides?.['blacksquare-b60-duke']?.cruiseSpeedKt,
+      230,
+    );
   });
 });

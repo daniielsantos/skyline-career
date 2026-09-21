@@ -1304,6 +1304,32 @@ export function fetchState() {
       npcFlights?: number;
       hubSelected?: boolean;
       fleet?: PlayerAircraft[];
+      /** Specs for Hangar cards (catalog + learned cruise). */
+      airframePerf?: Record<
+        string,
+        {
+          maxCargoKg: number;
+          maxRangeNm: number;
+          cruiseFuelFlowKgPerHour?: number;
+          cruiseSpeedKt?: number;
+          fuelBurnKgPerNm: number;
+          cabin?: {
+            passengerSeats: number;
+            hasCargoConfig: boolean;
+            hasPassengerConfig: boolean;
+            dualLayout: boolean;
+            defaultConfigurationId?: string;
+            defaultRole?: 'cargo' | 'passenger';
+            configurations: Array<{
+              id: string;
+              label: string;
+              role: 'cargo' | 'passenger';
+              passengerCapacity: number;
+              rolesPackRelPath: string;
+            }>;
+          };
+        }
+      >;
       hubs?: StarterHubOption[];
       pilotName?: string;
       homeHubIcao?: string;
@@ -5112,6 +5138,31 @@ export function fetchVaMembers() {
     onlineWindowMs?: number;
     /** VA hangar + wallet from the same missions load (no /api/state). */
     fleet?: PlayerAircraft[];
+    airframePerf?: Record<
+      string,
+      {
+        maxCargoKg: number;
+        maxRangeNm: number;
+        cruiseFuelFlowKgPerHour?: number;
+        cruiseSpeedKt?: number;
+        fuelBurnKgPerNm: number;
+        cabin?: {
+          passengerSeats: number;
+          hasCargoConfig: boolean;
+          hasPassengerConfig: boolean;
+          dualLayout: boolean;
+          defaultConfigurationId?: string;
+          defaultRole?: 'cargo' | 'passenger';
+          configurations: Array<{
+            id: string;
+            label: string;
+            role: 'cargo' | 'passenger';
+            passengerCapacity: number;
+            rolesPackRelPath: string;
+          }>;
+        };
+      }
+    >;
     walletUsd?: number;
     /** Active company was home/solo — switch UI tenant to this listed VA. */
     switchToCompanyId?: string;

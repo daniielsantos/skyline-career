@@ -4298,6 +4298,12 @@ export function App() {
           if (Array.isArray(snap.fleet)) {
             setVaSessionFleet(snap.fleet);
           }
+          if (snap.airframePerf) {
+            setAirframePerf((prev) => ({
+              ...prev,
+              ...snap.airframePerf,
+            }));
+          }
         } else {
           setMemberVaCompanyId(null);
           setMemberVaIsOwner(false);
@@ -4662,6 +4668,9 @@ export function App() {
           ? homeFleet.filter((a) => !vaIds.has(a.id?.trim() ?? ''))
           : homeFleet,
       );
+      if (state.airframePerf) {
+        setAirframePerf((prev) => ({ ...prev, ...state.airframePerf }));
+      }
       setHubOptions(normalizeStarterHubs(state.hubs));
       setPilotName(state.pilotName ?? '');
       setHomeHubIcao(state.homeHubIcao ?? '');
@@ -4747,6 +4756,9 @@ export function App() {
       }
     } else if (tenantMatches) {
       setVaSessionFleet(state.fleet ?? []);
+      if (state.airframePerf) {
+        setAirframePerf((prev) => ({ ...prev, ...state.airframePerf }));
+      }
     }
     if (state.companyCrew) setCompanyCrew(state.companyCrew);
     careerStateReadyRef.current = true;
@@ -4826,7 +4838,10 @@ export function App() {
       setAircraftListings(acMarket.listings);
       setAircraftDeliveryQuotes(acMarket.deliveryQuotes ?? {});
       setAircraftCatalog(acMarket.catalog);
-      setAirframePerf(acMarket.airframePerf ?? {});
+      setAirframePerf((prev) => ({
+        ...prev,
+        ...(acMarket.airframePerf ?? {}),
+      }));
       setAircraftMarketDay(acMarket.dayIndex);
       if (isHomeState) {
         paintWallet(acMarket.walletUsd);
@@ -8310,7 +8325,10 @@ export function App() {
       setAircraftListings(acMarket.listings);
       setAircraftDeliveryQuotes(acMarket.deliveryQuotes ?? {});
       setAircraftCatalog(acMarket.catalog);
-      setAirframePerf(acMarket.airframePerf ?? {});
+      setAirframePerf((prev) => ({
+        ...prev,
+        ...(acMarket.airframePerf ?? {}),
+      }));
       setAircraftMarketDay(acMarket.dayIndex);
       paintWallet(acMarket.walletUsd);
       if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
@@ -19345,6 +19363,9 @@ export function App() {
               activeCompanyIdRef.current?.trim();
             if (home && active && home !== active) return;
             setFleet(nextFleet);
+          }}
+          onAirframePerf={(perf) => {
+            setAirframePerf((prev) => ({ ...prev, ...perf }));
           }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}

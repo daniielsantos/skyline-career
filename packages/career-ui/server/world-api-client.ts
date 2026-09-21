@@ -192,6 +192,7 @@ export class WorldApiClient {
       touchdownLat?: number;
       touchdownLon?: number;
       touchdownHeadingTrueDeg?: number;
+      cruiseCommit?: unknown;
       nowMs?: number;
     },
     auth?: WorldApiAuth,

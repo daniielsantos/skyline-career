@@ -20,6 +20,7 @@ import {
   resolveAirframePerfForUi,
   simconnectCabinOvershootLb,
 } from './career-player-airframes.js';
+import { buildAirframePerfMapForUi } from './career-aircraft-market.js';
 
 describe('career player airframes', () => {
   it('makes every current homologated pack available to the player market', () => {
@@ -392,6 +393,23 @@ describe('career player airframes', () => {
 
     const perf = resolveAirframePerfForUi('blacksquare-b60-duke', 'light_ga');
     assert.equal(perf.cabin.passengerSeats, 5);
+    assert.ok((perf.maxRangeNm ?? 0) > 0);
+    assert.ok((perf.cruiseSpeedKt ?? 0) > 0);
+    assert.ok((perf.cruiseFuelFlowKgPerHour ?? 0) > 0);
+  });
+
+  it('builds hangar perf map from fleet typeIds without market listings', () => {
+    const map = buildAirframePerfMapForUi([
+      {
+        airframeTypeId: 'blacksquare-b60-duke',
+        aircraftClassId: 'light_ga',
+      },
+    ]);
+    const duke = map['blacksquare-b60-duke'];
+    assert.ok(duke);
+    assert.ok(duke.maxRangeNm > 0);
+    assert.ok((duke.cruiseSpeedKt ?? 0) > 0);
+    assert.ok((duke.cruiseFuelFlowKgPerHour ?? 0) > 0);
   });
 
   it('blocks cargo-family packs from passenger capacity', () => {

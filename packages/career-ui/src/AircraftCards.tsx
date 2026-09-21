@@ -1221,7 +1221,7 @@ export function HangarAircraftCard(props: {
             <li>
               <span>Range</span>
               <strong>
-                {catalog
+                {catalog && catalog.maxRangeNm > 0
                   ? `${catalog.maxRangeNm.toLocaleString()} nm`
                   : '—'}
               </strong>

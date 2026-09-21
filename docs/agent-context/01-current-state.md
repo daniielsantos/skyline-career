@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **8d4f55b** / desktop **0.3.172** shipped: Gate VA Charter on home Class Ops and spread offer formation like Freights. Release: [v0.3.172](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.172).
+
+
 `main` **60e8bd9** / desktop **0.3.171** shipped: Make the centered topbar update control wider and more rectangular. Release: [v0.3.171](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.171).
 
 

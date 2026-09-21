@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **395ba37** / desktop **0.3.166** shipped: Tag VA logbook flights, harden MX fuel settle, and fix VA board pickers. Release: [v0.3.166](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.166).
+
+
 `main` **c57a993** / desktop **0.3.165** shipped: Fix inject engines-off false positive and speed Waiting for Preflight. Release: [v0.3.165](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.165).
 
 

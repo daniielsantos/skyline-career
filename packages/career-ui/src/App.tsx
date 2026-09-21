@@ -3854,6 +3854,8 @@ export function App() {
   const boardAircraftInitRef = useRef(false);
   /** Bumps on each airport open so stale FBO hydrates are ignored. */
   const airportOpenSeqRef = useRef(0);
+  /** Sidebar Base opened home with empty client FBO list — jump to owned hub after hydrate. */
+  const fboBoardRedirectOwnedRef = useRef(false);
   const [nearMe, setNearMe] = useState(false);
   const [marketSorts, setMarketSorts] =
     useState<MarketSortLevel[]>(DEFAULT_BOARD_SORTS);
@@ -7408,7 +7410,23 @@ export function App() {
         const view = await fetchAirportView(next);
         if (airportOpenSeqRef.current !== seq) return;
         setAirportView(view);
-        if (view.playerFbos) setPlayerFbos(view.playerFbos);
+        if (view.playerFbos) {
+          setPlayerFbos(view.playerFbos);
+          if (fboBoardRedirectOwnedRef.current && section === 'fbo') {
+            fboBoardRedirectOwnedRef.current = false;
+            const ownedIcaos = (view.playerFbos.fbos ?? []).map((f) =>
+              f.icao.trim().toUpperCase(),
+            );
+            if (ownedIcaos.length > 0 && !ownedIcaos.includes(next)) {
+              const home = homeHubIcao.trim().toUpperCase();
+              const prefer =
+                (home && ownedIcaos.includes(home) ? home : null) ??
+                ownedIcaos[0]!;
+              void openAirport(prefer, { section: 'fbo' });
+              return;
+            }
+          }
+        }
         setAirportHydrating(false);
       } catch (err: unknown) {
         if (airportOpenSeqRef.current !== seq) return;
@@ -7441,6 +7459,9 @@ export function App() {
       setToast('Set a home hub before opening Base');
       return;
     }
+    // Client FBO list can be empty before first airport hydrate — open home,
+    // then redirect to the owned Base once /api/airport returns the fleet.
+    fboBoardRedirectOwnedRef.current = owned.length === 0;
     void openAirport(target, { section: 'fbo' });
   }
 
@@ -13549,11 +13570,17 @@ export function App() {
                             </p>
                           );
                         })()}
-                        {(playerFbos?.fbos.length ?? 0) > 1 ? (
+                        {(playerFbos?.fbos.length ?? 0) >= 1 &&
+                        (!(playerFbos?.fbos ?? []).some(
+                          (f) =>
+                            f.icao.toUpperCase() ===
+                            (airportIcao ?? '').toUpperCase(),
+                        ) ||
+                          (playerFbos?.fbos.length ?? 0) > 1) ? (
                           <div
                             className="fbo-icao-switcher"
                             role="group"
-                            aria-label="Owned FBOs"
+                            aria-label="Owned Bases"
                           >
                             {playerFbos!.fbos.map((f) => {
                               const active =
@@ -13617,12 +13644,21 @@ export function App() {
                       if (!localFbo) {
                         const hub = (airportIcao ?? '').toUpperCase();
                         const home = homeHubIcao.trim().toUpperCase();
+                        const ownedElsewhere = (playerFbos?.fbos ?? [])
+                          .map((f) => f.icao.trim().toUpperCase())
+                          .filter((icao) => icao && icao !== hub);
                         const emptyHint =
-                          playerFbos?.buyAtIcaoReason ||
-                          (playerFbos?.canBuyAtHome && hub && hub !== home
-                            ? `First base must be at home hub ${home}`
-                            : null) ||
-                          'No Base at this hub';
+                          ownedElsewhere.length > 0
+                            ? `Your Base is at ${ownedElsewhere.join(', ')}. Open it above${
+                                playerFbos?.buyAtIcaoReason
+                                  ? ` — ${playerFbos.buyAtIcaoReason}`
+                                  : ''
+                              }.`
+                            : playerFbos?.buyAtIcaoReason ||
+                              (playerFbos?.canBuyAtHome && hub && hub !== home
+                                ? `First base must be at home hub ${home}`
+                                : null) ||
+                              'No Base at this hub';
                         return <p className="empty">{emptyHint}</p>;
                       }
                       const seat =

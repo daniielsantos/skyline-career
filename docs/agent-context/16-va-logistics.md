@@ -437,6 +437,11 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** (1) `POST /api/tick` debita fees só no `missions` do **companyId do request** (header sticky = home na maior parte do tempo) — **não** `allCompanies` como o pulse; frota VA não é cobrada nesse advance. (2) `/api/tick` cobra com `fromTick=world.tick−n` e **não** atualiza `lastSeenTick` → session/pulse settle depois pode **re-cobrar** a mesma janela (explica 2× no D75). Path correto de débito VA existe (`settleHangarParkingFees` / Base Dispatcher / Line crew → `applyWalletDelta` na company) e o Ledger D75 prova que, quando a VA é o tenant settleado, o $ sai da wallet VA.
 **Fix (2026-09-21):** `/api/tick` avança world + higiene global; depois `applyCompanySessionSettlement({ allCompanies:true })` com `companySessionFromTick` + `lastSeenTick=toTick` (home e VA cada um na sua wallet). `settleCompanyPassiveFeesForTickRange` também cobre credit / port auto-buy / inbound WH / Base Dispatcher no passive sum. Sem Dry.
 
+### Day stuck + repeated Day N fees after allCompanies tick (2026-09-21)
+
+**Sintoma:** após 0.3.182, +3/+7 day “não sai” do dia (ex. Day 76); Ledger spam de Hangar parking + Base Dispatcher repetidos no **mesmo** day.
+**Causa:** +Nd é chunked (~24 ticks × N). Cada chunk rodava `allCompanies` settle completo (port auto-buy / WH / todos os tenants). Se o settle debitava e depois throw/timeout **antes** de persistir `lastSeenTick`, o chunk seguinte re-cobrava o mesmo day — e o request travava o avanço na UI.
+**Fix:** (1) `lastSeenTick` sempre persiste em `finally` após tentativa (SQLite + PG + fallback API). (2) `settleCompanyPassiveFeesForTickRange` early-out no mesmo economy day (sem hangar/salary/credit; só crew/ferry leves). (3) `/api/tick` só usa `allCompanies:true` quando `economyDayIndex` cruza; chunks intra-day settam só o tenant do request.
 ### Prepare hides VA fleet + auto ferry (2026-09-20)
 
 **Sintoma:** membro clica Prepare no Freights → Ferry Journey do Aerostar pessoal; dropdown do Manifest sem tails da VA. Mesmo gap em Charter/Ports.

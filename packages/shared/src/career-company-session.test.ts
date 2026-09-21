@@ -77,4 +77,39 @@ describe('settleCompanyPassiveFees watermark', () => {
       hangarEntries.length,
     );
   });
+
+  it('skips hangar/salary when the settle window stays on the same economy day', () => {
+    const world = createSeedEconomyWorld({ seed: 'fee-same-day' });
+    const missions = emptyMissionsStateV2();
+    missions.walletUsd = 50_000;
+    const hub =
+      world.airports.find((a) => a.hubTier === 'major') ?? world.airports[0]!;
+    missions.fleet.push({
+      id: 'acf_fee_sd_1',
+      aircraftClassId: 'light_ga',
+      label: 'Same Day Probe',
+      locationIcao: hub.icao,
+      fuelKg: 100,
+      fuelCapacityKg: 200,
+      status: 'parked',
+      ownership: 'owned',
+    });
+    const dayStart = Math.floor(world.tick / TICKS_PER_DAY) * TICKS_PER_DAY;
+    const midA = dayStart + 24;
+    const midB = dayStart + 48;
+    world.tick = midB;
+    const walletBefore = missions.walletUsd;
+    const summary = settleCompanyPassiveFeesForTickRange(
+      missions,
+      world,
+      midA,
+      midB,
+    );
+    assert.equal(summary, null);
+    assert.equal(missions.walletUsd, walletBefore);
+    assert.equal(
+      (missions.ledger ?? []).filter((e) => e.kind === 'hangar_parking').length,
+      0,
+    );
+  });
 });

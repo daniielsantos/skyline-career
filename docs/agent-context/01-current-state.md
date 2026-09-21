@@ -2,6 +2,8 @@
 
 `main` **c4370b5** / desktop **0.3.182** shipped: Bill every company on economy +Nd and watermark lastSeenTick. Release: [v0.3.182](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.182).
 
+**Local (unreleased):** Day-76 stuck / repeated hangar+dispatcher on same day after 0.3.182 — watermark `finally`, same-day settle early-out, `/api/tick` `allCompanies` only on economy-day cross. See `16-va-logistics.md`.
+
 
 `main` **ea090ec** / desktop **0.3.181** shipped: Show VA Flight quality tier ladder and next step in My VA. Release: [v0.3.181](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.181).
 

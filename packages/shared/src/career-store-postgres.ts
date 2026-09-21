@@ -2498,25 +2498,30 @@ export class PostgresCareerStore implements CareerStore {
     for (const company of companies) {
       try {
         const missions = await this.loadMissions({ companyId: company.id });
-        if (opts.economyAdvanceMs) {
-          applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
-        }
-        const fromTick = companySessionFromTick(
-          missions,
-          opts.fromTick,
-          opts.toTick,
-        );
-        const summary = settleCompanyPassiveFeesForTickRange(
-          missions,
-          opts.world,
-          fromTick,
-          opts.toTick,
-          nowMs,
-        );
-        missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
-        await this.saveMissions(missions, { companyId: company.id });
-        if (summary && prefer && company.id === prefer) {
-          preferred = summary;
+        try {
+          if (opts.economyAdvanceMs) {
+            applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+          }
+          const fromTick = companySessionFromTick(
+            missions,
+            opts.fromTick,
+            opts.toTick,
+          );
+          const summary = settleCompanyPassiveFeesForTickRange(
+            missions,
+            opts.world,
+            fromTick,
+            opts.toTick,
+            nowMs,
+          );
+          if (summary && prefer && company.id === prefer) {
+            preferred = summary;
+          }
+        } finally {
+          // Always advance watermark after an attempt so a mid-settle throw
+          // cannot re-bill the same day on the next +Nd chunk.
+          missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
+          await this.saveMissions(missions, { companyId: company.id });
         }
       } catch (error) {
         console.error(

@@ -1392,24 +1392,27 @@ async function applyCompanySessionSettlement(opts: {
     for (const company of companies) {
       try {
         const missions = await loadMissions({ companyId: company.id });
-        if (opts.economyAdvanceMs) {
-          applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
-        }
-        const fromTick = companySessionFromTick(
-          missions,
-          opts.fromTick,
-          opts.toTick,
-        );
-        const summary = settleCompanyPassiveFeesForTickRange(
-          missions,
-          world,
-          fromTick,
-          opts.toTick,
-        );
-        missions.lastSeenTick = opts.toTick;
-        await saveMissions(missions, { companyId: company.id });
-        if (summary && prefer && company.id === prefer) {
-          preferred = summary;
+        try {
+          if (opts.economyAdvanceMs) {
+            applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+          }
+          const fromTick = companySessionFromTick(
+            missions,
+            opts.fromTick,
+            opts.toTick,
+          );
+          const summary = settleCompanyPassiveFeesForTickRange(
+            missions,
+            world,
+            fromTick,
+            opts.toTick,
+          );
+          if (summary && prefer && company.id === prefer) {
+            preferred = summary;
+          }
+        } finally {
+          missions.lastSeenTick = opts.toTick;
+          await saveMissions(missions, { companyId: company.id });
         }
       } catch (error) {
         console.error(
@@ -1423,19 +1426,22 @@ async function applyCompanySessionSettlement(opts: {
   const missions = await loadMissions(
     prefer ? { companyId: prefer } : undefined,
   );
-  if (opts.economyAdvanceMs) {
-    applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+  try {
+    if (opts.economyAdvanceMs) {
+      applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+    }
+    const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
+    const summary = settleCompanyPassiveFeesForTickRange(
+      missions,
+      world,
+      fromTick,
+      opts.toTick,
+    );
+    return summary ?? undefined;
+  } finally {
+    missions.lastSeenTick = opts.toTick;
+    await saveMissions(missions, prefer ? { companyId: prefer } : undefined);
   }
-  const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
-  const summary = settleCompanyPassiveFeesForTickRange(
-    missions,
-    world,
-    fromTick,
-    opts.toTick,
-  );
-  missions.lastSeenTick = opts.toTick;
-  await saveMissions(missions, prefer ? { companyId: prefer } : undefined);
-  return summary ?? undefined;
 }
 
 type IncomingWithAuth = import('node:http').IncomingMessage & {
@@ -11185,11 +11191,17 @@ export function createCareerApiServer(port = 8787) {
           ...(tickCompanyId ? { companyId: tickCompanyId } : {}),
         });
         const toTick = store?.peekEconomyWorld()?.tick ?? tickPayload.tick;
+        // +Nd is chunked (~24 ticks). Full allCompanies settle is heavy (port
+        // auto-buy / WH / every tenant). Only bill every company when the
+        // economy day actually crosses; same-day chunks settle the request
+        // tenant lightly (watermark + crew clocks).
+        const crossedEconomyDay =
+          economyDayIndex(tickBefore) < economyDayIndex(toTick);
         const feeSummary = await withCareerLock(async () =>
           applyCompanySessionSettlement({
             fromTick: tickBefore,
             toTick,
-            allCompanies: true,
+            allCompanies: crossedEconomyDay,
             preferCompanyId: tickCompanyId || undefined,
             economyAdvanceMs: advanceMs,
           }),

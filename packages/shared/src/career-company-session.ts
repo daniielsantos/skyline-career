@@ -80,6 +80,15 @@ export function settleCompanyPassiveFeesForTickRange(
   if (to <= from) return null;
 
   const feeRange = effectiveFeeTickRange(from, to);
+  // Same economy day: no hangar/salary/credit window. Still keep ferries/crew
+  // wall-clock healthy without running port auto-buy for every +Nd chunk.
+  if (feeRange.daysCrossed <= 0) {
+    settleCrewOpsDue(missions, world, nowMs);
+    listAircraftMarket(missions, world);
+    finalizeStuckNpcFerries(missions, to);
+    return null;
+  }
+
   const leaseOps = settleAircraftMarketOps(missions, world.tick, world, {
     maxInstallments: feeRange.capped ? 1 : undefined,
     deferTermRepossess: feeRange.capped,
@@ -112,9 +121,18 @@ export function settleCompanyPassiveFeesForTickRange(
     fromTick: feeRange.fromTick,
     toTick: feeRange.toTick,
   });
-  settleWarehouseInboundTransfers(missions, world);
-  tickPortConcessions(missions, world);
-  tickPortAutoBuyOrders(missions, world);
+  // Hygiene must not block the watermark — a throw here used to re-bill the
+  // same day on the next +Nd chunk.
+  try {
+    settleWarehouseInboundTransfers(missions, world);
+    tickPortConcessions(missions, world);
+    tickPortAutoBuyOrders(missions, world);
+  } catch (error) {
+    console.error(
+      '[career] company passive hygiene skipped:',
+      error instanceof Error ? error.message : error,
+    );
+  }
   settleCrewOpsDue(missions, world, nowMs);
   listAircraftMarket(missions, world);
   finalizeStuckNpcFerries(missions, to);
@@ -180,22 +198,31 @@ export function settleAllCompaniesPassiveFees(opts: {
         emptyMissionsStateV2(),
         company.id,
       );
-      if (opts.economyAdvanceMs) {
-        applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
-      }
-      const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
-      const summary = settleCompanyPassiveFeesForTickRange(
-        missions,
-        opts.world,
-        fromTick,
-        opts.toTick,
-        nowMs,
-      );
-      missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
-      persistCompanyTables(opts.db, missions, { companyId: company.id });
-      persistLedgerIncremental(opts.db, missions.ledger ?? [], company.id);
-      if (summary && prefer && company.id === prefer) {
-        preferred = summary;
+      try {
+        if (opts.economyAdvanceMs) {
+          applyEconomyAdvanceToCrewAirborne(missions, opts.economyAdvanceMs);
+        }
+        const fromTick = companySessionFromTick(
+          missions,
+          opts.fromTick,
+          opts.toTick,
+        );
+        const summary = settleCompanyPassiveFeesForTickRange(
+          missions,
+          opts.world,
+          fromTick,
+          opts.toTick,
+          nowMs,
+        );
+        if (summary && prefer && company.id === prefer) {
+          preferred = summary;
+        }
+      } finally {
+        // Always advance watermark after an attempt so a mid-settle throw
+        // cannot re-bill the same day on the next +Nd chunk.
+        missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
+        persistCompanyTables(opts.db, missions, { companyId: company.id });
+        persistLedgerIncremental(opts.db, missions.ledger ?? [], company.id);
       }
     } catch (error) {
       console.error(

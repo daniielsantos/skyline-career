@@ -651,22 +651,39 @@ body {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
+.topbar-update-slot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  max-width: min(42vw, 22rem);
+}
+
+.topbar-update-slot > .topbar-update-btn {
+  pointer-events: auto;
+}
+
 .topbar-update-btn {
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
   margin: 0;
-  padding: 0.28rem 0.65rem;
+  padding: 0.42rem 1rem;
   border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 18%, var(--surface));
   color: var(--ink);
   font-family: var(--font-ui, inherit);
-  font-size: 0.72rem;
+  font-size: 0.88rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: none;
-  line-height: 1.2;
+  line-height: 1.25;
   cursor: pointer;
   white-space: nowrap;
 }

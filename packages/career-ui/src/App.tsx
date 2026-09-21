@@ -4492,27 +4492,34 @@ export function App() {
 
   /**
    * Logbook is dual-tenant: home solo legs + VA ops legs live in different
-   * company files. Merge both when the account has a listed VA membership.
+   * company files. Merge every known tenant that is not the primary response.
+   * Do not require homeCompanyId — warm enter used to leave it null and the
+   * merge never pulled VA history.
    */
   const loadMissionsMerged = useCallback(async () => {
     const primary = await fetchMissions();
-    const home = homeCompanyIdRef.current?.trim();
-    const va = memberVaCompanyIdRef.current?.trim();
     const active =
       activeCompanyIdRef.current?.trim() || getStoredCompanyId();
-    if (!home || !va || home === va) return primary;
-    const otherId = active === va ? home : va;
-    try {
-      const other = await fetchMissions({ companyId: otherId });
-      // VA list second when chrome is home so forceVaFlight enrichment wins on id clash.
-      const missions =
-        active === va
-          ? mergeLogbookMissions(other.missions, primary.missions)
-          : mergeLogbookMissions(primary.missions, other.missions);
-      return { ...primary, missions };
-    } catch {
-      return primary;
+    const va = memberVaCompanyIdRef.current?.trim();
+    let home = homeCompanyIdRef.current?.trim();
+    if (!home && va && active && active !== va) {
+      home = active;
+      homeCompanyIdRef.current = home;
     }
+    const extraIds = [...new Set([home, va].filter(Boolean) as string[])].filter(
+      (id) => id !== active,
+    );
+    if (extraIds.length === 0) return primary;
+    let missions = primary.missions ?? [];
+    for (const companyId of extraIds) {
+      try {
+        const other = await fetchMissions({ companyId });
+        missions = mergeLogbookMissions(missions, other.missions ?? []);
+      } catch {
+        /* soft — keep what we have */
+      }
+    }
+    return { ...primary, missions };
   }, []);
 
   const refresh = useCallback(async (scope?: CareerRefreshScope) => {
@@ -7887,7 +7894,10 @@ export function App() {
         setAuthAccountLabel(fromAuth);
       }
       if (withToken.companies[0]) {
-        setStoredCompanyId(withToken.companies[0].id);
+        const homeId = withToken.companies[0].id;
+        homeCompanyIdRef.current = homeId;
+        setHomeCompanyId(homeId);
+        setStoredCompanyId(homeId);
         setCompanies(withToken.companies);
       }
       setShowAuthGate(false);
@@ -13000,12 +13010,6 @@ export function App() {
             <h1>
               {pageTitle}
               {pageHelp ? <PageHelpButton help={pageHelp} /> : null}
-              <DesktopUpdateHeaderButton
-                forceMinClientVersion={
-                  clientUpdateBlock?.minClientVersion ?? null
-                }
-                onOpenSettings={() => selectTab('settings')}
-              />
             </h1>
             <p className="lede">
               {pageLede}
@@ -13048,6 +13052,14 @@ export function App() {
                 </>
               ) : null}
             </p>
+          </div>
+          <div className="topbar-update-slot">
+            <DesktopUpdateHeaderButton
+              forceMinClientVersion={
+                clientUpdateBlock?.minClientVersion ?? null
+              }
+              onOpenSettings={() => selectTab('settings')}
+            />
           </div>
           <div className="topbar-metrics">
             {catchUpBanner ? (

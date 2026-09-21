@@ -2255,8 +2255,11 @@ export function fetchNetworkHubs() {
 
 export function fetchMissions(opts?: { companyId?: string }) {
   const companyId = opts?.companyId?.trim();
+  const qs = companyId
+    ? `?companyId=${encodeURIComponent(companyId)}`
+    : '';
   return api<{ walletUsd: number; missions: Mission[] }>(
-    '/api/missions',
+    `/api/missions${qs}`,
     companyId
       ? { headers: { 'X-Skyline-Company-Id': companyId } }
       : undefined,

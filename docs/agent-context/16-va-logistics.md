@@ -130,6 +130,7 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 8. Accept Freights/Demand/Charter **stamp** `pilotHomeCompanyId` / `pilotAccountId`.
 9. **Logbook (2026-09-20):** tag **VA** quando `vaFlight` (accept sob company `va_listed`) ou Internal Haul. Pay mostrado = `pilotPayoutUsd` (fatia home / fee IH) quando stampado no settle; senão `payoutUsd` bruto da rota. Membro Freights com cut: UI sufixo `cut`. Histórico pré-stamp: na company VA listada o GET `/api/missions` força `vaFlight` (tag), mas pay antigo continua bruto até novo settle.
 10. **Logbook merge home+VA (2026-09-20):** voos solo e VA vivem em arquivos de company distintos; `selectTab` restaura home → Logbook home-only ficava vazio se só voou VA. Fix: `loadMissionsMerged` busca home + VA (`fetchMissions({ companyId })`) e `mergeLogbookMissions` por id.
+11. **Logbook merge still empty (2026-09-20):** `warmCareerBeforeEnter` não setava `homeCompanyId`; merge exigia `home && va` → nunca puxava VA. Fix: stamp home no warm; merge todo tenant extra ≠ active; `GET /api/missions?companyId=` como Charter.
 
 ### Charter board infinite loading (VA tail) — **shipped (2026-09-20)**
 
@@ -700,6 +701,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **VA settle dual-tenant pilotIcao** — sync home company to dest (chrome sticky)
 - [x] **VA Accept dual-tenant pilotIcao** — mirror home onto ops before co-location assert
 - [x] **Logbook merge home+VA** — dual fetch + merge by id (chrome sticky home)
+- [x] **Logbook merge warm-enter** — stamp homeCompanyId; merge extras without requiring home; missions?companyId=
 - [x] **Charter board infinite load** — deps on resolved companyId string, not resolver fn
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)

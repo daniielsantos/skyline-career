@@ -10845,7 +10845,11 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'GET' && path === '/api/missions') {
-        const missionsCompanyId = companyIdFromRequest(req);
+        // Query companyId wins over chrome header (Logbook merge home+VA).
+        const missionsCompanyId = companyIdFromRequest(
+          req,
+          url.searchParams.get('companyId'),
+        );
         const forceVaFlight =
           Boolean(missionsCompanyId) &&
           Boolean(store) &&

@@ -90,6 +90,8 @@ Install path novo: `%LOCALAPPDATA%\Programs\Airframe Career` (instalação anter
 **Causa:** header só escutava IPC e não re-checava no login; download ficava no card de Settings.  
 **Fix:** store compartilhado em `DesktopUpdates.tsx` — check ao entrar no shell (pós-login) + poll **30 min**; clique no botão faz download (barra no próprio pill) e depois `Install` lança o Setup one-click com `/S` (unsigned: ainda precisa SmartScreen → Run anyway; `runAfterFinish` tenta reabrir). Settings card continua como manual fallback. Check IPC agora devolve `updateAvailable` via semver (não só eventos); CDN stale que dispara `update-not-available` com remote &gt; installed ainda mostra Update.
 
+**Layout (2026-09-20):** pill saiu do `h1` (esquerda) → slot absoluto centrado no `.topbar`; padding/font um pouco maiores.
+
 ### Dois checks / “2 atualizações” no boot (2026-09-19)
 
 **Sintoma:** na app Airframe (Settings → Updates / flash do header) parece que a atualização roda **duas vezes** ao abrir.  

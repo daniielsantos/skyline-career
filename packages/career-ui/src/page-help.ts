@@ -23,10 +23,10 @@ export const PAGE_HELP = {
     title: 'How Freights works',
     kicker: 'Page guide',
     bullets: [
-      'Cargo board for your company. Your aircraft = lot pay on hulls you own/lease or VA tails (Yours/VA in Manifest); Operator aircraft = pilot fee on NPC holds.',
+      'Cargo board. Pick Yours or VA in the aircraft list — VA tails pay Jet-A from the VA and send your cut % home.',
       'Pick a lot (or several on the same route), then Dispatch to build the flight.',
       'Urgent and idle chips are economy pressure — same commodity, different pay and clock.',
-      'A lock means Hangar → Cargo Ops has not unlocked that commodity yet.',
+      'A lock means Hangar → Cargo Ops has not unlocked that commodity yet (your home ladder).',
       'Passenger work is under Charter in the sidebar — separate from cargo freights.',
     ],
   },
@@ -58,10 +58,10 @@ export const PAGE_HELP = {
     title: 'How My VA works',
     kicker: 'Page guide',
     bullets: [
-      'Manage roster, hangar (company fleet), ledger (shared VA wallet + Flight quality), invites, recruiting, leave or unlist.',
-      'Your company is not a VA until you publish it from Company (name + home hub).',
-      'Buy/lease aircraft on Airframes — costs hit this company wallet. Full ferry/MX stays in Hangar.',
-      'Internal Hauls stay on Ports — this page is people, fleet overview, cashflow, and hiring.',
+      'Topbar Wallet = your home company. Ledger here = shared VA cash. Money map on Ledger shows who pays Jet-A, cut, ferry, and MX.',
+      'Hangar here is company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
+      'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the VA.',
+      'Config Next steps walks owner invite + roster + Line crew, or member Reserve → fly VA.',
     ],
   },
   vaDirectory: {

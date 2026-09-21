@@ -28,6 +28,7 @@ import {
 } from './api';
 import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
+import { VaMoneyMap } from './VaMoneyMap';
 import { formatBoardMoney } from './board-money';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
@@ -137,6 +138,8 @@ type Props = {
     companies: Array<{ id: string; displayName: string }>;
   }) => void | Promise<void>;
   onUnpublished?: () => void | Promise<void>;
+  /** Keep Freights Prepare chip in sync with Config cut %. */
+  onMemberRouteCutPct?: (pct: number) => void;
   /**
    * Bump after VA wallet mutations outside this page (e.g. debug +$5K) so the
    * Ledger pane refetches instead of keeping a stale cashflow snapshot.
@@ -204,6 +207,8 @@ export function VaPage(props: Props) {
   onFleetRef.current = props.onFleet;
   const onAirframePerfRef = useRef(props.onAirframePerf);
   onAirframePerfRef.current = props.onAirframePerf;
+  const onMemberRouteCutPctRef = useRef(props.onMemberRouteCutPct);
+  onMemberRouteCutPctRef.current = props.onMemberRouteCutPct;
   const hasVaShellRef = useRef(false);
   const ledgerFetchGenRef = useRef(0);
   const logbookFetchGenRef = useRef(0);
@@ -286,6 +291,7 @@ export function VaPage(props: Props) {
       setRecruiting(m.recruiting);
       setMemberRouteCutPct(m.memberRouteCutPct ?? 30);
       setCutDraft(String(m.memberRouteCutPct ?? 30));
+      onMemberRouteCutPctRef.current?.(m.memberRouteCutPct ?? 30);
       setLineCrew(m.lineCrew ?? null);
       setDisplayName(m.displayName);
       setHomeHubIcao(m.homeHubIcao);
@@ -782,12 +788,17 @@ export function VaPage(props: Props) {
             <>
           {hangarReadOnly ? (
             <p className="settings-help">
-              Hangar is view-only for members — ferry for flights is still
-              available. Reserve a parked tail for your session (4h). Sell,
-              lease, inspection, and repair are owner-only (MX comes from the
-              VA wallet).
+              Company hangar (shared VA fleet). Sidebar Hangar is your home
+              fleet. View-only for members — ferry still works. Reserve a parked
+              tail for your session (4h). Sell, lease, inspect, repair, and
+              overhaul are owner-only (MX from the VA wallet).
             </p>
-          ) : null}
+          ) : (
+            <p className="settings-help">
+              Company hangar (shared VA fleet). Sidebar Hangar stays on your
+              home company — chrome Wallet never switches here.
+            </p>
+          )}
           {hangarFleet.length === 0 ? (
             <p className="empty">
               No aircraft yet — buy or lease on Airframes for this company.
@@ -949,6 +960,7 @@ export function VaPage(props: Props) {
               ) : null}
             </div>
           </div>
+          <VaMoneyMap pilotCutPct={memberRouteCutPct} />
           {ledgerError ? (
             <p className="error" role="alert">
               {ledgerError}
@@ -1083,6 +1095,59 @@ export function VaPage(props: Props) {
             </p>
           </header>
 
+          <section className="va-config-section va-config-checklist">
+            <h4 className="va-config-section-title">Next steps</h4>
+            <ul className="va-checklist">
+              {isOwner ? (
+                <>
+                  <li className="is-done">
+                    VA listed · {displayName || 'company'}
+                    {homeHubIcao ? ` · ${homeHubIcao}` : ''}
+                  </li>
+                  <li className={inviteCode ? 'is-done' : undefined}>
+                    {inviteCode
+                      ? 'Invite code ready (share or renew below)'
+                      : 'Create an invite code so pilots can join'}
+                  </li>
+                  <li
+                    className={
+                      members.length >= 2 ? 'is-done' : undefined
+                    }
+                  >
+                    {members.length >= 2
+                      ? `Roster ${members.length}/${memberCap}`
+                      : pendingRequests.length > 0
+                        ? `${pendingRequests.length} join request${pendingRequests.length === 1 ? '' : 's'} on Roster`
+                        : 'Get a second pilot on the roster'}
+                  </li>
+                  <li
+                    className={
+                      lineCrew?.hired ? 'is-done' : undefined
+                    }
+                  >
+                    {lineCrew?.hired
+                      ? `Line crew · ${lineCrew.tierName ?? 'Desk'} (${lineCrew.remaining}/${lineCrew.allowance} ferry/wk)`
+                      : 'Hire Line crew so empty ferry does not drain the VA wallet'}
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="is-done">
+                    Joined · pilot cut {memberRouteCutPct}% of route net → your
+                    home Wallet
+                  </li>
+                  <li>
+                    My VA Hangar · Reserve a parked tail (4h) before Prepare
+                  </li>
+                  <li>
+                    Freights · pick an aircraft labeled VA · settle pays your
+                    cut home
+                  </li>
+                </>
+              )}
+            </ul>
+          </section>
+
           <section className="va-config-section">
             <h4 className="va-config-section-title">Hiring</h4>
             {isOwner ? (
@@ -1152,6 +1217,7 @@ export function VaPage(props: Props) {
                           const res = await postVaRouteCut(n);
                           setMemberRouteCutPct(res.memberRouteCutPct);
                           setCutDraft(String(res.memberRouteCutPct));
+                          onMemberRouteCutPctRef.current?.(res.memberRouteCutPct);
                         } catch (err) {
                           setCutDraft(String(memberRouteCutPct));
                           setError(

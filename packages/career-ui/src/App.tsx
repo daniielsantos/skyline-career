@@ -3549,6 +3549,10 @@ export function App() {
   );
   const [authAccountId, setAuthAccountId] = useState<string | null>(null);
   const [memberVaIsOwner, setMemberVaIsOwner] = useState(false);
+  /** Listed VA pilot cut % for Freights Prepare chip (from /api/va/members). */
+  const [vaMemberRouteCutPct, setVaMemberRouteCutPct] = useState<number | null>(
+    null,
+  );
   const memberVaCompanyIdRef = useRef<string | null>(null);
   memberVaCompanyIdRef.current = memberVaCompanyId;
   const authAccountIdRef = useRef<string | null>(null);
@@ -4110,7 +4114,6 @@ export function App() {
       }
     >
   >({});
-  const [aircraftMarketDay, setAircraftMarketDay] = useState(0);
   const [aircraftMarketClass, setAircraftMarketClass] = useState<
     '' | AircraftClass
   >('');
@@ -4308,6 +4311,9 @@ export function App() {
         if (snap.listed && snap.companyId) {
           setMemberVaCompanyId(snap.companyId);
           setMemberVaIsOwner(snap.role === 'owner');
+          if (typeof snap.memberRouteCutPct === 'number') {
+            setVaMemberRouteCutPct(snap.memberRouteCutPct);
+          }
           if (Array.isArray(snap.fleet)) {
             setVaSessionFleet(snap.fleet);
           }
@@ -4320,12 +4326,14 @@ export function App() {
         } else {
           setMemberVaCompanyId(null);
           setMemberVaIsOwner(false);
+          setVaMemberRouteCutPct(null);
           setVaSessionFleet([]);
         }
       } catch {
         if (!cancelled) {
           setMemberVaCompanyId(null);
           setMemberVaIsOwner(false);
+          setVaMemberRouteCutPct(null);
         }
       } finally {
         if (!cancelled) setVaOpsPrefetchGen((n) => n + 1);
@@ -4855,7 +4863,6 @@ export function App() {
         ...prev,
         ...(acMarket.airframePerf ?? {}),
       }));
-      setAircraftMarketDay(acMarket.dayIndex);
       if (isHomeState) {
         paintWallet(acMarket.walletUsd);
         if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
@@ -8351,7 +8358,6 @@ export function App() {
         ...prev,
         ...(acMarket.airframePerf ?? {}),
       }));
-      setAircraftMarketDay(acMarket.dayIndex);
       paintWallet(acMarket.walletUsd);
       if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
       if (acMarket.browseCountryId) {
@@ -16068,6 +16074,15 @@ export function App() {
                               ))}
                             </select>
                           </label>
+                          {boardAircraftId &&
+                          vaAircraftIdSet.has(boardAircraftId) ? (
+                            <p className="board-va-ops-chip" role="status">
+                              VA tail
+                              {vaMemberRouteCutPct != null
+                                ? ` · ${vaMemberRouteCutPct}% route net → your home Wallet`
+                                : ' · Jet-A from VA · cut → your home Wallet'}
+                            </p>
+                          ) : null}
                           {(() => {
                             const dest =
                               airportView.airport.icao.trim().toUpperCase();
@@ -17134,6 +17149,15 @@ export function App() {
                   ))}
                 </select>
               </label>
+              {boardAircraftId && vaAircraftIdSet.has(boardAircraftId) ? (
+                <p className="board-va-ops-chip" role="status">
+                  VA tail
+                  {vaMemberRouteCutPct != null
+                    ? ` · ${vaMemberRouteCutPct}% route net → your home Wallet`
+                    : ' · Jet-A from VA · cut → your home Wallet'}
+                  {memberVaIsOwner ? ' · you are owner' : ''}
+                </p>
+              ) : null}
               <div
                 className="board-aircraft-scope"
                 role="group"
@@ -19477,6 +19501,7 @@ export function App() {
             selectTab('pilot');
           }}
           ledgerRefreshEpoch={vaLedgerRefreshEpoch}
+          onMemberRouteCutPct={setVaMemberRouteCutPct}
           renderHangarCard={(acf, hangarOpts) => (
             <HangarAircraftCard
               key={acf.id}
@@ -19650,11 +19675,7 @@ export function App() {
         </section>
       ) : hubSelected && tab === 'aircraft' ? (
         <section className="panel">
-          <div className="panel-head">
-            <p className="panel-stats">
-              Day {aircraftMarketDay || '—'} · {aircraftListings.length} listings · wallet{' '}
-              {formatMoney(wallet)}
-            </p>
+          <div className="panel-head panel-head-end">
             <button
               type="button"
               className="action ghost"

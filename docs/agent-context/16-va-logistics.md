@@ -433,6 +433,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** Hangar OH/inspect/repair só chamavam `commitWallet` (estado chrome); o hero do Ledger prefere `vaSessionWallet` sticky, que não era atualizado. Cashflow snapshot também não refetchava.
 **Fix:** `paintOpsMutationWallet` em App — se ops company = VA listada, `setVaSessionWallet` + bump `vaLedgerRefreshEpoch`; inspect/repair/OH passam a usá-lo (com `companyId` ops).
 
+### VA loop clarity — money map + Prepare chip (2026-09-21)
+
+**Sintoma / gap:** dual-tenant (home Wallet vs VA Ledger, Hangar vs My VA Hangar, cut vs Jet-A) ainda era mental model; Prepare mostrava prefixo VA sem explicar cut.
+**Causa:** feature shipou antes da narrativa UI.
+**Fix:** Ledger **Money map**; Config **Next steps**; Hangar copy company vs chrome home; Freights/Contracts `board-va-ops-chip` com cut %; page-help My VA / Freights.
+
 ### VA Ops rep + Flight quality (2026-09-20)
 
 **Sintoma / gap:** settle já mostra flight score, mas VA não tinha reputação de org; Ops rep do credit só refletia ladder do owner e não aparecia como sinal público.
@@ -757,4 +763,5 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **My VA Config layout polish** — Hiring / Line crew / Invites / Danger
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA
+- [x] **VA loop clarity UI** — Money map + Config Next steps + Hangar hint + Freights VA chip (2026-09-21)
 - [ ] Buff concessão herdado no porto home da VA (member-aware; Tier 1)

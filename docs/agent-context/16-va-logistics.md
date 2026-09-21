@@ -443,6 +443,11 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** +Nd é chunked (~24 ticks × N). Cada chunk rodava `allCompanies` settle completo (port auto-buy / WH / todos os tenants). Se o settle debitava e depois throw/timeout **antes** de persistir `lastSeenTick`, o chunk seguinte re-cobrava o mesmo day — e o request travava o avanço na UI.
 **Fix:** (1) `lastSeenTick` sempre persiste em `finally` após tentativa (SQLite + PG + fallback API). (2) `settleCompanyPassiveFeesForTickRange` early-out no mesmo economy day (sem hangar/salary/credit; só crew/ferry leves). (3) `/api/tick` só usa `allCompanies:true` quando `economyDayIndex` cruza; chunks intra-day settam só o tenant do request.
 
+### POST /api/tick discarded on Postgres RAM isolate (2026-09-21)
+
+**Sintoma:** ainda preso no Day 76 após 0.3.183/184 (MP / world PG); +Nd “não avança”; debug credit na VA funciona; Ledger cheio de fees D76 legados.
+**Causa:** `withCareerWrite` faz `isolatePostgresWorldSnapshot` (clone) em **todo** write. `/api/tick` usa `catchUp:true` → muta o **clone**, depois `deferred.pulseSnapshot = peekEconomyWorld()` (RAM velha) e `saveEconomy(applyToRam:false)` **grava o tick antigo** e ainda copia o tip velho de volta pro RAM. O JSON da response lia o clone (tick novo) → UI mentia / refresh voltava. Pulse cooperative escapava porque o catch-up muta o RAM **antes** do isolate.
+**Fix:** em `isCatchUp`, não isolar — mutar `peekEconomyWorld()`; snapshot deferred = `structuredClone(world)` pós-handler; `toTick` prefere `tickPayload.tick`. **Requer redeploy do world-api (VPS)**, não só desktop update.
 ### Debug +$5K on VA wallet but Ledger blank (2026-09-21)
 
 **Sintoma:** Dev +$5K/+100K credita a VA (tenant pinado no My VA) mas Recent activity não mostra linha; wallet do hero às vezes não atualiza.

@@ -28,6 +28,10 @@ Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
   release alone does not change the hosted world lock. After deploy, Accept
   during pulse should show `lockWait` on the order of the tick (~2s), not the
   ~30s PG save.
+- **Forced +Nd on PG:** `/api/tick` must mutate live RAM (no
+  `isolatePostgresWorldSnapshot` on `catchUp`). Desktop-only update is not
+  enough for MP — redeploy **world-api** or Day stays stuck while the client
+  JSON briefly lies about the tick.
 
 ## Host preparation
 

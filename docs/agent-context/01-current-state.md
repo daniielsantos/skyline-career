@@ -2,6 +2,8 @@
 
 `main` **46152fe** / desktop **0.3.184** shipped: Refresh VA Ledger after debug wallet credit. Release: [v0.3.184](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.184).
 
+**Local (unreleased):** MP Day-76 stuck — `/api/tick` catchUp was isolating a Postgres clone then saving stale RAM peek (forced +Nd discarded). Needs desktop + **world-api redeploy**. See `16-va-logistics.md` / `deploy/README.md`.
+
 
 `main` **3a1167b** / desktop **0.3.183** shipped: Stop re-billing the same economy day on chunked +Nd ticks. Release: [v0.3.183](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.183).
 

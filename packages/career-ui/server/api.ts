@@ -2165,7 +2165,14 @@ async function withCareerWrite<T>(
         deferPersist: isCatchUp,
       });
     }
-    world = isolatePostgresWorldSnapshot(activeStore, world);
+    // Catch-up / POST /api/tick must mutate live Postgres RAM. Isolating a clone
+    // then deferred-saving peekEconomyWorld() discarded forced +Nd ticks (world
+    // day stuck) while the JSON response still reported the clone's advanced tick.
+    if (isCatchUp) {
+      world = activeStore.peekEconomyWorld() ?? world;
+    } else {
+      world = isolatePostgresWorldSnapshot(activeStore, world);
+    }
     if (sliceLotIdsOpt.length > 0 && !useCommandPersist) {
       for (const id of sliceLotIdsOpt) {
         const lot = world.lots.find((row) => row.id === id);
@@ -2291,11 +2298,10 @@ async function withCareerWrite<T>(
         }
       }
     } else if (isCatchUp) {
-      // Tick already mutated live RAM (cooperative) or loadEconomy promoted it.
-      // Persist a frozen snapshot outside the lock.
-      deferred.pulseSnapshot = structuredClone(
-        activeStore.peekEconomyWorld() ?? world,
-      );
+      // Tick already mutated live RAM (cooperative load or /api/tick handler).
+      // Persist a frozen snapshot outside the lock — must be the mutated world,
+      // not a stale pre-isolate peek.
+      deferred.pulseSnapshot = structuredClone(world);
     } else {
       const timing = opts?.catchUpTiming;
       if (timing) {
@@ -11190,7 +11196,10 @@ export function createCareerApiServer(port = 8787) {
           catchUp: true,
           ...(tickCompanyId ? { companyId: tickCompanyId } : {}),
         });
-        const toTick = store?.peekEconomyWorld()?.tick ?? tickPayload.tick;
+        const toTick =
+          typeof tickPayload.tick === 'number' && Number.isFinite(tickPayload.tick)
+            ? tickPayload.tick
+            : (store?.peekEconomyWorld()?.tick ?? 0);
         // +Nd is chunked (~24 ticks). Full allCompanies settle is heavy (port
         // auto-buy / WH / every tenant). Only bill every company when the
         // economy day actually crosses; same-day chunks settle the request

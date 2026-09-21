@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **c516155** / desktop **0.3.180** shipped: Rotate charter OD sampling via freight intl lanes and domestic explore. Release: [v0.3.180](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.180).
+
+
 `main` **34acdae** / desktop **0.3.179** shipped: Raise charter formation quotas to deepen the board without synced expires. Release: [v0.3.179](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.179).
 
 

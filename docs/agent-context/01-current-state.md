@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **7def71b** / desktop **0.3.176** shipped: Fill Hangar range, cruise, and burn from fleet specs, and persist MP cruise samples. Release: [v0.3.176](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.176).
+
+
 `main` **e14548d** / desktop **0.3.175** shipped: Allow Freights Prepare when the pilot only has VA aircraft. Release: [v0.3.175](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.175).
 
 

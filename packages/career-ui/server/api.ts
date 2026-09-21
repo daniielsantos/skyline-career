@@ -12808,7 +12808,7 @@ export function createCareerApiServer(port = 8787) {
           const fleetAcf = probeMission.aircraftId
             ? probe.fleet?.find((a) => a.id === probeMission.aircraftId)
             : undefined;
-          const originCoords = await withCareerRead((world) => {
+          const originCoords = await withCareerPeekRead((world) => {
             const terminal = airportByIcao(world, probeMission.originIcao);
             return resolveAirportCoords(probeMission.originIcao, terminal);
           });

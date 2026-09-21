@@ -1007,11 +1007,21 @@ export async function readLiveLoad(
     enginesRunning = inferEnginesRunningFromProbeBatch(
       engineProbe,
       snapshot.enginesRunning,
+      {
+        onGround: snapshot.onGround,
+        parkingBrake: snapshot.parkingBrake ?? null,
+        groundSpeedKt: null,
+      },
     );
   } catch {
     enginesRunning = inferEnginesRunningFromProbeBatch(
       [],
       snapshot.enginesRunning,
+      {
+        onGround: snapshot.onGround,
+        parkingBrake: snapshot.parkingBrake ?? null,
+        groundSpeedKt: null,
+      },
     );
   }
 

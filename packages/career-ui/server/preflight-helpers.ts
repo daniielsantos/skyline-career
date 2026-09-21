@@ -203,8 +203,9 @@ export async function runMissionPreflight(
     );
   }
 
-  const expectation = await loadPreflightOfp(mission, { username, userid });
-  const ofpBase = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
+  // Kick SimBrief OFP fetch before we take the SimBridge exclusive gate so a
+  // cold cache does not serialize behind pipe open.
+  const ofpPromise = loadPreflightOfp(mission, { username, userid });
 
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
@@ -212,7 +213,11 @@ export async function runMissionPreflight(
   return withSimBridgeExclusive(async () => {
   try {
     await bridge.open('Airframe Career UI Preflight');
-    const identity = await bridge.getAircraftIdentity();
+    const [expectation, identity] = await Promise.all([
+      ofpPromise,
+      bridge.getAircraftIdentity(),
+    ]);
+    const ofpBase = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
     const liveTitle = normalizeAircraftTitle(identity.title ?? '');
     let ofp = ofpBase;
     try {

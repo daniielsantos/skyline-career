@@ -19,9 +19,7 @@ import {
   evaluateOriginProximity,
   evaluateMinAirborneElapsed,
   evaluateMissionFlightTransition,
-  ENGINE_N1_OFF_PCT,
-  ENGINE_RPM_OFF,
-  PARKED_GROUND_SPEED_KT,
+  forceEnginesOffWhenParkedSpoolDead,
   inferEnginesRunning,
   isSimPlaybackFrozen,
   enterLedgerActorAccountId,
@@ -628,16 +626,14 @@ export async function sampleLiveFlight(
     fuelFlowKgPerHour: enginesFuelFlowKgPerHour,
   });
   // Parked + dead spool: ignore residual flow after fuel inject settling.
-  const parkedStill =
-    snap.onGround === true &&
-    snap.parkingBrake === true &&
-    (groundSpeedKt == null || groundSpeedKt < PARKED_GROUND_SPEED_KT);
-  const spoolDead =
-    (n1Pct.length === 0 || n1Pct.every((n) => n < ENGINE_N1_OFF_PCT)) &&
-    (rpm.length === 0 || rpm.every((r) => r < ENGINE_RPM_OFF));
-  if (parkedStill && spoolDead) {
-    enginesRunning = false;
-  }
+  // Shared with inject/probe — see forceEnginesOffWhenParkedSpoolDead.
+  enginesRunning = forceEnginesOffWhenParkedSpoolDead(enginesRunning, {
+    onGround: snap.onGround,
+    parkingBrake: snap.parkingBrake,
+    groundSpeedKt,
+    n1Pct,
+    rpm,
+  });
 
   return {
     onGround: snap.onGround,

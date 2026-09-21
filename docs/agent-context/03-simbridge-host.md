@@ -60,6 +60,12 @@ Sinais:
 **Causa:** auto-depart só pintava `missionStatus=in_flight` **depois** do `withCareerWrite` (fila do world lock / pulse). UI espelhava só esse status.
 **Fix:** no wheels-up, setar `missionStatus=in_flight` + `lastEvent=depart` e yield ~150ms (como Settling) **antes** do persist; pular `persistAirborneClock` no mesmo tick do depart (o write já grava o stamp). UI também trata `lastEvent=depart` como En route.
 
+### Waiting for Preflight lento (2026-09-20)
+
+**Sintoma:** Load inject mostra título live (“Reading …”) mas o card Preflight demora (às vezes ~15s+).
+**Causa:** (1) `/api/preflight` lia originCoords com `withCareerRead` (world lock atrás do pulse); (2) SimBrief OFP serializado antes do pipe open; (3) UI retentava a cada 5s no bootstrap.
+**Fix:** coords via `withCareerPeekRead`; `loadPreflightOfp` em paralelo com open+identity; poll bootstrap 1.5s até `lastPreflightCheck`, depois 5s.
+
 ## Hot-swap (dev)
 
 Build Release → copiar `SimBridgeHost.dll` (+ exe/pdb) para  

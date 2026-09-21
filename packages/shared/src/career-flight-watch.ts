@@ -134,12 +134,53 @@ function finiteProbeSample(n: unknown): number | undefined {
 }
 
 /**
+ * Parked + parking brake + dead N1/RPM → force engines off.
+ *
+ * Accu-Sim / GA twins often leave sticky PPH (or residual flow) after cutoff
+ * that still trips {@link inferEnginesRunning}. Watch already applied this
+ * override; inject/probe must share it or the Aircraft tile shows “Engines off”
+ * while fuel inject rejects with “Shut down engines…”.
+ */
+export function forceEnginesOffWhenParkedSpoolDead(
+  enginesRunning: boolean,
+  input: {
+    onGround?: boolean | null;
+    parkingBrake?: boolean | null;
+    groundSpeedKt?: number | null;
+    n1Pct?: readonly number[];
+    rpm?: readonly number[];
+  },
+): boolean {
+  if (!enginesRunning) return false;
+  const gs = input.groundSpeedKt;
+  const parkedStill =
+    input.onGround === true &&
+    input.parkingBrake === true &&
+    (gs == null || (Number.isFinite(gs) && gs < PARKED_GROUND_SPEED_KT));
+  if (!parkedStill) return enginesRunning;
+  const n1Pct = input.n1Pct ?? [];
+  const rpm = input.rpm ?? [];
+  const spoolDead =
+    (n1Pct.length === 0 || n1Pct.every((n) => n < ENGINE_N1_OFF_PCT)) &&
+    (rpm.length === 0 || rpm.every((r) => r < ENGINE_RPM_OFF));
+  return spoolDead ? false : enginesRunning;
+}
+
+/**
  * Map an {@link ENGINE_RUNNING_PROBE_SIMVARS} result array into
  * {@link inferEnginesRunning}. Values may be sparse/undefined when a read fails.
+ *
+ * Pass `parked` (onGround + parkingBrake + optional GS) so sticky post-cutoff
+ * fuel flow cannot override a parked dead spool — same policy as Watch.
  */
 export function inferEnginesRunningFromProbeBatch(
   values: readonly unknown[],
   snapshotRunning: boolean,
+  parked?: {
+    onGround?: boolean | null;
+    parkingBrake?: boolean | null;
+    groundSpeedKt?: number | null;
+  },
 ): boolean {
   const n1Eng1 = finiteProbeSample(values[0]);
   const n1Eng2 = finiteProbeSample(values[1]);
@@ -165,12 +206,20 @@ export function inferEnginesRunningFromProbeBatch(
     pph.length > 0
       ? Math.round(pph.reduce((s, n) => s + n, 0) * 0.45359237 * 10) / 10
       : undefined;
-  return inferEnginesRunning({
+  const running = inferEnginesRunning({
     snapshotRunning,
     n1Pct,
     rpm,
     combustion,
     fuelFlowKgPerHour,
+  });
+  if (!parked) return running;
+  return forceEnginesOffWhenParkedSpoolDead(running, {
+    onGround: parked.onGround,
+    parkingBrake: parked.parkingBrake,
+    groundSpeedKt: parked.groundSpeedKt,
+    n1Pct,
+    rpm,
   });
 }
 
@@ -224,9 +273,11 @@ export function inferEnginesRunning(input: {
     return false;
   }
   if (rpm.some((r) => r >= ENGINE_RPM_OFF)) return true;
+  // Dead RPM samples beat sticky residual PPH after cutoff (Accu-Sim / GA
+  // twins). Must run before the flow gate — otherwise inject rejects while
+  // Watch already shows Engines off via the parked+spool override.
+  if (rpmRaw.length > 0 && rpmRaw.every((r) => r < ENGINE_RPM_OFF)) return false;
   if (flow !== undefined && flow >= ENGINE_FUEL_FLOW_ON_KG_H) return true;
-
-  if (rpm.length > 0 && rpm.every((r) => r < ENGINE_RPM_OFF)) return false;
   // Host snapshot is ENG COMBUSTION:1 — same sticky bit after menu spawn.
   // Accu-Sim with engines actually running should have hit RPM or fuel flow.
   // Empty samples (read failed / not probed) → false; do not revive sticky Host.

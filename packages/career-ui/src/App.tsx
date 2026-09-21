@@ -6984,9 +6984,11 @@ export function App() {
     }
 
     void refreshLiveLoad();
+    // Bootstrap: retry ~1.5s until the Preflight card exists; steady 5s after.
+    const bootstrap = !activeMission.lastPreflightCheck;
     const id = window.setInterval(() => {
       void refreshLiveLoad();
-    }, 5_000);
+    }, bootstrap ? 1_500 : 5_000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') void refreshLiveLoad();
     };
@@ -7003,6 +7005,7 @@ export function App() {
     activeMission?.fuelAuthorizedOfpId,
     activeMission?.lastOfpCheck?.ofpId,
     activeMission?.lastOfpCheck?.verdict,
+    activeMission?.lastPreflightCheck,
     airportIcao,
     holdWatchOffForPreflight,
     loadOfpAutoStatus,

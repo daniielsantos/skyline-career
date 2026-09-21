@@ -9,6 +9,7 @@ import {
   flightPhaseFromSample,
   inferEnginesRunning,
   inferEnginesRunningFromProbeBatch,
+  forceEnginesOffWhenParkedSpoolDead,
   isNearAirport,
   mergeAirborneClockOntoMission,
   parseBlockTimeToMs,
@@ -565,6 +566,89 @@ describe('evaluateMissionFlightTransition', () => {
     );
   });
 
+  it('inferEnginesRunning prefers dead RPM over sticky residual PPH', () => {
+    // Accu-Sim post-cutoff: comb=0, RPM=0, PPH still reporting — not running.
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: false,
+        n1Pct: [0, 0],
+        rpm: [0, 0],
+        combustion: [false, false],
+        fuelFlowKgPerHour: 40,
+      }),
+      false,
+    );
+    // No RPM samples → flow alone can still mean running (Accu-Sim quirk).
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: false,
+        combustion: [false, false],
+        fuelFlowKgPerHour: 40,
+      }),
+      true,
+    );
+  });
+
+  it('forceEnginesOffWhenParkedSpoolDead clears sticky flow when parked', () => {
+    assert.equal(
+      forceEnginesOffWhenParkedSpoolDead(true, {
+        onGround: true,
+        parkingBrake: true,
+        groundSpeedKt: 0,
+        n1Pct: [0, 0],
+        rpm: [0, 0],
+      }),
+      false,
+    );
+    // Without parking brake, leave the raw inference alone.
+    assert.equal(
+      forceEnginesOffWhenParkedSpoolDead(true, {
+        onGround: true,
+        parkingBrake: false,
+        groundSpeedKt: 0,
+        n1Pct: [0, 0],
+        rpm: [0, 0],
+      }),
+      true,
+    );
+    // Spool still alive → stay running even when parked.
+    assert.equal(
+      forceEnginesOffWhenParkedSpoolDead(true, {
+        onGround: true,
+        parkingBrake: true,
+        groundSpeedKt: 0,
+        n1Pct: [0, 0],
+        rpm: [1200, 1180],
+      }),
+      true,
+    );
+  });
+
+  it('inferEnginesRunningFromProbeBatch applies parked override', () => {
+    // Sticky PPH (~22 lb/h each ≈ 20 kg/h) with dead spool, no parked ctx →
+    // dead RPM already wins (see prefer dead RPM test). Empty RPM + sticky
+    // PPH needs parked override.
+    assert.equal(
+      inferEnginesRunningFromProbeBatch(
+        [0, 0, undefined, undefined, 0, 0, 50, 50],
+        false,
+      ),
+      true,
+    );
+    assert.equal(
+      inferEnginesRunningFromProbeBatch(
+        [0, 0, undefined, undefined, 0, 0, 50, 50],
+        false,
+        {
+          onGround: true,
+          parkingBrake: true,
+          groundSpeedKt: 0,
+        },
+      ),
+      false,
+    );
+  });
+
   it('inferEnginesRunning treats empty samples as off despite sticky Host', () => {
     assert.equal(
       inferEnginesRunning({ snapshotRunning: true }),
@@ -612,11 +696,22 @@ describe('evaluateMissionFlightTransition', () => {
       }),
       true,
     );
+    // Dead RPM samples beat residual PPH (post-cutoff Accu-Sim).
     assert.equal(
       inferEnginesRunning({
         snapshotRunning: false,
         n1Pct: [0, 0],
         rpm: [0, 0],
+        combustion: [false, false],
+        fuelFlowKgPerHour: 18,
+      }),
+      false,
+    );
+    // No RPM evidence at all → flow alone still counts as running.
+    assert.equal(
+      inferEnginesRunning({
+        snapshotRunning: false,
+        n1Pct: [0, 0],
         combustion: [false, false],
         fuelFlowKgPerHour: 18,
       }),

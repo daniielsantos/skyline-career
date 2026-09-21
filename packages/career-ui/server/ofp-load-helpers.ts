@@ -416,13 +416,18 @@ function phaseFromFlags(
 async function inferProbeEnginesRunning(
   bridge: NamedPipeSimBridge,
   snapshotRunning: boolean,
+  parked?: {
+    onGround?: boolean | null;
+    parkingBrake?: boolean | null;
+    groundSpeedKt?: number | null;
+  },
 ): Promise<boolean> {
   try {
     const v = await bridge.readSimVars([...ENGINE_RUNNING_PROBE_SIMVARS]);
-    return inferEnginesRunningFromProbeBatch(v, snapshotRunning);
+    return inferEnginesRunningFromProbeBatch(v, snapshotRunning, parked);
   } catch {
     // No spool/flow evidence — do not revive Host sticky bit.
-    return inferEnginesRunningFromProbeBatch([], snapshotRunning);
+    return inferEnginesRunningFromProbeBatch([], snapshotRunning, parked);
   }
 }
 
@@ -796,6 +801,11 @@ async function probeSimBridgeStatusUnlocked(opts: {
     const enginesRunning = await inferProbeEnginesRunning(
       bridge,
       snap.enginesRunning,
+      {
+        onGround: snap.onGround,
+        parkingBrake: snap.parkingBrake ?? null,
+        groundSpeedKt,
+      },
     );
     const status: SimBridgeStatusPayload = {
       connected: Boolean(ping.connected ?? true),
@@ -1102,6 +1112,12 @@ async function applyMissionOfpLoadExclusive(
     const enginesRunning = await inferProbeEnginesRunning(
       bridge,
       snap.enginesRunning,
+      {
+        onGround: snap.onGround,
+        parkingBrake: snap.parkingBrake ?? null,
+        // Planning sample has no GS yet; null is OK for the parked override.
+        groundSpeedKt: null,
+      },
     );
     beforeLive = {
       tanks: planningLive.tanks,

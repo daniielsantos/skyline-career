@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **a01e177** / desktop **0.3.168** shipped: Keep Terminal Contracts aircraft picker above Freight/Charter tabs. Release: [v0.3.168](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.168).
+
+
 `main` **751f2db** / desktop **0.3.167** shipped: Merge home+VA logbook missions and stop Charter infinite loading. Release: [v0.3.167](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.167).
 
 

@@ -84,6 +84,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. Não confundir com **buff de concessão herdado** (Port FBO P# no porto home — membros herdam buy/ETA/listings; ainda backlog).
 - **Prepare Yours+VA (shipped 2026-09-20):** chrome sticky-home escondia frota VA em Freights/Charter/Ports. Fix: prefetch `/api/va/members` → `vaSessionFleet`; `ops-fleet.ts` merge Yours+VA nos pickers; ferry Journey **não** abre no Prepare (só CTA); Accept/`companyId` no tenant do tail + pin VA enquanto Dispatch ativo. **Operator aircraft** = NPC (não VA). **Base Dispatcher** = home-only (CAPEX pessoal).
 - **Charter/Freights board VA (2026-09-20):** sintoma — Charter `Unknown aircraft acf_…` ao selecionar tail VA; Freights dropdown só home. Causa — `GET /api/charters` lia chrome home; `boardEstimateFleet` filtrava `fleet` home. Fix — query `companyId` no Fit + `resolveAircraftCompanyId`; Freights/Contracts picker usa `prepareOpsFleet` com prefixo VA/Yours.
+- **Charter Class Ops + Manifest Unknown aircraft (2026-09-20):** sintoma — membro sem light jet liberado ainda via Prepare em Citation C680 VA; Manifest `Unknown aircraft acf_…` com Fit READY. Causa — (1) Charter Fit/accept **não** usavam ladder home (`resolvePilotProgressionOps`), só Freights/staging; (2) `CharterManifest` refresh omitia `companyId` → tenant home sem o casco VA. Fix — `withCharterClassOpsGate` no Fit + `assertClassOpsUnlocked` no accept; Manifest passa `resolveOpsCompanyId`.
 
 **Nota dual-tenant wallet / companyId — DECIDIDO · shipped (2026-09-20):**
 
@@ -378,6 +379,13 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** membro voando VA herdava unlock da VA (ou não progredia na home).
 **Causa:** gates/XP usavam `cargoOps`/`classOps` da company ativa (= VA).
 **Fix:** `resolvePilotProgressionOps` + `withProgressionGates`; market/accept/staging/demand/WH/state usam home; `settleMission({ progression })` + write-back home; teste isolation em `career-mission.test.ts`.
+
+### Charter skipped Class Ops on VA (2026-09-20)
+
+**Sintoma:** Prepare Charter com jet VA (ex. C680) mesmo sem light jet na home; Manifest `Unknown aircraft acf_*`.
+**Causa:** board/accept Charter não passavam pela ladder home; refresh do Manifest lia chrome home sem `companyId`.
+**Fix:** Fit gated com `withCharterClassOpsGate`; accept com `assertClassOpsUnlocked` + `withProgressionGates`; Manifest `fetchCharters({ companyId })`.
+
 ### One VA per account — shipped (2026-09-19)
 
 **Sintoma / gap:** piloto podia join/request em várias VAs ao mesmo tempo.

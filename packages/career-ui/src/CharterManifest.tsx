@@ -35,6 +35,9 @@ export function CharterManifest(props: CharterManifestProps) {
   const [fitLoading, setFitLoading] = useState(false);
   const [fitError, setFitError] = useState<string | null>(null);
   const aircraft = props.fleet.find((item) => item.id === props.draft.aircraftId);
+  const charterCompanyId = aircraft
+    ? props.resolveOpsCompanyId?.(aircraft.id)
+    : undefined;
   const origin = props.draft.offer.originIcao.trim().toUpperCase();
   const atOrigin =
     aircraft?.status === 'parked' &&
@@ -64,6 +67,7 @@ export function CharterManifest(props: CharterManifestProps) {
       origin: props.draft.offer.originIcao,
       dest: props.draft.offer.destIcao,
       aircraftId: aircraft.id,
+      companyId: charterCompanyId,
       page: 1,
       pageSize: 100,
     })
@@ -89,6 +93,7 @@ export function CharterManifest(props: CharterManifestProps) {
     aircraft?.id,
     aircraft?.locationIcao,
     aircraft?.status,
+    charterCompanyId,
     props.draft.offer.id,
     props.draft.offer.originIcao,
     props.draft.offer.destIcao,

@@ -24,10 +24,12 @@ import type {
 
 export const CHARTER_MIN_DISTANCE_NM = 80;
 export const CHARTER_MAX_DISTANCE_NM = 2_000;
-/** Soft upper bound for a single offer life (~24h). */
+/** Soft upper bound for a single offer life (~26h, freight-like). */
 export const CHARTER_OFFER_LIFE_TICKS = TICKS_PER_DAY;
-export const CHARTER_OFFER_LIFE_MIN_TICKS = 8 * TICKS_PER_HOUR;
-export const CHARTER_OFFER_LIFE_MAX_TICKS = 24 * TICKS_PER_HOUR;
+/** Board TTL band — mirrors freight non-perishable lives (~18–26h) with a
+ * slightly wider floor so urgency cuts still leave multi-hour Accept windows. */
+export const CHARTER_OFFER_LIFE_MIN_TICKS = 12 * TICKS_PER_HOUR;
+export const CHARTER_OFFER_LIFE_MAX_TICKS = 26 * TICKS_PER_HOUR;
 export const CHARTER_DEMAND_RETENTION_DAYS = 45;
 /** Keep expired/completed/cancelled offers this many ticks, then drop (~12h). */
 export const CHARTER_DEAD_OFFER_RETENTION_TICKS = 48;
@@ -44,13 +46,15 @@ export const CHARTER_BOARD_MIN = 120;
 /** Hard ceiling on live available offers (formation stops at target or this). */
 export const CHARTER_BOARD_MAX = 4_000;
 /**
- * Steady-state formation once the board is warm.
- * Sized so form×TTL can approach boardTarget (~hubs*2 / commodity-like)
- * — mean life ~16h ≈ 64 ticks → 48×64 ≈ 3k equilibrium.
+ * Steady-state formation (freight-like trickle).
+ * Old 48/tick made same-tick death waves → board full of identical Expires.
+ * Mean life ~19h ≈ 76 ticks → 10×76 ≈ 760 equilibrium; catch-up fills deeper.
  */
-export const CHARTER_FORM_QUOTA_PER_TICK = 48;
-/** Catch-up when the live board is below MIN. */
-export const CHARTER_WARM_QUOTA_PER_TICK = 96;
+export const CHARTER_FORM_QUOTA_PER_TICK = 10;
+/** Soft catch-up while live board is under half of target (still a trickle). */
+export const CHARTER_CATCH_UP_QUOTA_PER_TICK = 20;
+/** Cold-board fill when below MIN — burst, not a full dump. */
+export const CHARTER_WARM_QUOTA_PER_TICK = 28;
 
 /**
  * Classes that may accept charter offers.
@@ -618,7 +622,9 @@ export function formCharterOffersForTick(
     opts.quota ??
     (available < CHARTER_BOARD_MIN
       ? CHARTER_WARM_QUOTA_PER_TICK
-      : CHARTER_FORM_QUOTA_PER_TICK);
+      : available < Math.floor(target * 0.5)
+        ? CHARTER_CATCH_UP_QUOTA_PER_TICK
+        : CHARTER_FORM_QUOTA_PER_TICK);
   const room = Math.min(quota, CHARTER_BOARD_MAX - available, target - available);
   if (room <= 0) return 0;
 
@@ -661,6 +667,8 @@ export function formCharterOffersForTick(
 
   const rng = mulberry32(hashSeed(`${world.seed}:charter-form:${world.tick}`));
   let formed = 0;
+  /** Same-tick cohort must not share one expiresAtTick (freight-like ages). */
+  const usedExpires = new Set<number>();
   // When the live board is intl-heavy, bias formation hard toward domestic —
   // but keep a floor for intl so a cold board (share=0) does not lock out
   // international until the first TTL wave.
@@ -851,6 +859,12 @@ export function formCharterOffersForTick(
 
     const createdAtTick = world.tick;
     const offerId = `charter-offer:${createdAtTick}:${world.charterOffers!.length}:${origin.icao}:${dest.icao}`;
+    // Unique expiry inside this form tick — life RNG alone can collide across
+    // offers; bump until free so the board ages like freights (no page of
+    // identical "15 min").
+    let expiresAtTick = createdAtTick + life;
+    while (usedExpires.has(expiresAtTick)) expiresAtTick += 1;
+    usedExpires.add(expiresAtTick);
     world.charterOffers!.push({
       id: offerId,
       demandId: demand.id,
@@ -870,7 +884,7 @@ export function formCharterOffersForTick(
         international: demand.international,
       }),
       createdAtTick,
-      expiresAtTick: createdAtTick + life,
+      expiresAtTick,
       status: 'available',
     });
     openOd.add(od);

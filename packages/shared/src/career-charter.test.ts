@@ -203,6 +203,29 @@ describe('Charter economy', () => {
     );
   });
 
+  it('staggers expires inside a same-tick form cohort', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-expire-stagger' });
+    for (let i = 0; i < 12; i += 1) tickCharterEconomy(world);
+    // Clear live board so the next form tick builds a fresh same-tick cohort.
+    for (const offer of world.charterOffers ?? []) {
+      if (offer.status === 'available') offer.expiresAtTick = world.tick;
+    }
+    expireCharterOffers(world);
+    world.tick += 1;
+    const formed = formCharterOffersForTick(world, { quota: 12 });
+    assert.ok(formed >= 2, `formed=${formed}`);
+    const cohort = world.charterOffers!.filter(
+      (offer) => offer.createdAtTick === world.tick && offer.status === 'available',
+    );
+    assert.ok(cohort.length >= 2);
+    const expires = new Set(cohort.map((offer) => offer.expiresAtTick));
+    assert.equal(
+      expires.size,
+      cohort.length,
+      'same-tick offers must not share one expiresAtTick',
+    );
+  });
+
   it('keeps a multi-day charter soak bounded without changing freight state', () => {
     const world = createSeedEconomyWorld({ seed: 'charter-soak-14d' });
     const freightBefore = JSON.stringify({

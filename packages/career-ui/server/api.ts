@@ -24,6 +24,9 @@ import {
   unlockAllCareerClassOps,
   classOpsIsUnlocked,
   classOpsHidesBoardLot,
+  assertClassOpsUnlocked,
+  classOpsUnlockProgress,
+  emptyCareerClassOps,
   CLASS_OPS_STARTER_IDS,
   LEASE_UNLOCK_CLEAN_DRY_SETTLES,
   dryCleanSettlesOk,
@@ -965,6 +968,27 @@ function charterAircraftFit(
         : Math.max(0, Math.round(Number(offer.payUsd) || 0));
     })(),
     reasons,
+  };
+}
+
+/** Class Ops (home ladder) — Charter Fit must match Freights / staging gates. */
+function withCharterClassOpsGate(
+  fit: ReturnType<typeof charterAircraftFit>,
+  classOps: CareerMissionsState['classOps'] | undefined,
+  classId: FreighterClassId,
+): ReturnType<typeof charterAircraftFit> {
+  if (classOpsIsUnlocked(classOps, classId)) return fit;
+  const progress = classOpsUnlockProgress(
+    classOps ?? emptyCareerClassOps(),
+    classId,
+  );
+  const reason = progress.summary
+    ? `Class locked: ${progress.label}. ${progress.summary}`
+    : `Class locked: ${progress.label}`;
+  return {
+    ...fit,
+    compatible: false,
+    reasons: [reason, ...fit.reasons.filter((entry) => entry !== reason)],
   };
 }
 
@@ -7139,6 +7163,16 @@ export function createCareerApiServer(port = 8787) {
             send(res, 404, { error: `Unknown aircraft ${aircraftId}` });
             return;
           }
+          // Class Ops = pilot home ladder (VA member), same as Freights board.
+          const charterProgression = await resolvePilotProgressionOps(
+            req,
+            chartersCompanyId,
+            {
+              cargoOps: snapshot.missions.cargoOps,
+              classOps: snapshot.missions.classOps,
+            },
+          );
+          const gateClassOps = charterProgression.classOps;
           const cargoLimit = snapshot.aircraft
             ? await resolveClassMaxCargoKg(
                 snapshot.aircraft.aircraftClassId,
@@ -7255,13 +7289,17 @@ export function createCareerApiServer(port = 8787) {
             for (const offer of filtered) {
               fitById.set(
                 offer.id,
-                charterAircraftFit(
-                  snapshot.world,
-                  snapshot.missions,
-                  offer,
-                  snapshot.aircraft,
-                  cargoLimit.maxCargoKg,
-                  ferryPlanner,
+                withCharterClassOpsGate(
+                  charterAircraftFit(
+                    snapshot.world,
+                    snapshot.missions,
+                    offer,
+                    snapshot.aircraft,
+                    cargoLimit.maxCargoKg,
+                    ferryPlanner,
+                  ),
+                  gateClassOps,
+                  snapshot.aircraft.aircraftClassId,
                 ),
               );
             }
@@ -7300,12 +7338,16 @@ export function createCareerApiServer(port = 8787) {
                 cargoLimit &&
                 !needFitForAll
               ) {
-                fit = charterAircraftFit(
-                  snapshot.world,
-                  snapshot.missions,
-                  offer,
-                  snapshot.aircraft,
-                  cargoLimit.maxCargoKg,
+                fit = withCharterClassOpsGate(
+                  charterAircraftFit(
+                    snapshot.world,
+                    snapshot.missions,
+                    offer,
+                    snapshot.aircraft,
+                    cargoLimit.maxCargoKg,
+                  ),
+                  gateClassOps,
+                  snapshot.aircraft.aircraftClassId,
                 );
               }
               return {
@@ -7376,98 +7418,117 @@ export function createCareerApiServer(port = 8787) {
           const peek = await withCareerRead((_world, missions) => {
             const aircraft = findPlayerAircraft(missions, body.aircraftId!);
             if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
-            return aircraft;
+            return {
+              aircraft,
+              cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
+            };
           }, { companyId: acceptCompanyId });
           const cargoLimit = await resolveClassMaxCargoKg(
-            peek.aircraftClassId,
-            peek.airframeTypeId,
+            peek.aircraft.aircraftClassId,
+            peek.aircraft.airframeTypeId,
+          );
+          const charterProgression = await resolvePilotProgressionOps(
+            req,
+            acceptCompanyId,
+            { cargoOps: peek.cargoOps, classOps: peek.classOps },
           );
           const accepted = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const offer = (world.charterOffers ?? []).find(
-              (row) => row.id === body.offerId,
-            );
-            if (!offer) throw new Error(`Unknown charter offer ${body.offerId}`);
-            const aircraft = findPlayerAircraft(missions, body.aircraftId!);
-            if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
-            if (
-              aircraft.status !== 'parked' ||
-              aircraft.locationIcao.toUpperCase() !== offer.originIcao
-            ) {
-              throw new Error(
-                `Aircraft ${aircraft.label} must be parked at ${offer.originIcao}`,
+            return withProgressionGates(missions, charterProgression, () => {
+              const offer = (world.charterOffers ?? []).find(
+                (row) => row.id === body.offerId,
               );
-            }
-            const active = listActivePlayerMissions(missions.missions);
-            if (active.length > 0) {
-              throw new Error(blockReasonAnotherActiveFlight(missions, active[0]!));
-            }
-            const fit = charterAircraftFit(
-              world,
-              missions,
-              offer,
-              aircraft,
-              cargoLimit.maxCargoKg,
-            );
-            if (!fit.compatible) {
-              throw new Error(fit.reasons.join(' · ') || 'Aircraft is not compatible');
-            }
-            const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
-            const configuration = findCareerAirframeConfiguration(
-              airframe,
-              aircraft.airframeConfigurationId,
-              aircraft.rolesPackRelPath,
-            );
-            if (!configuration) throw new Error('Passenger configuration not found');
-            const missionId = `msn_charter_${world.tick}_${Math.floor(
-              Math.random() * 1e9,
-            )}`;
-            const mission = {
-              ...reserveCharterOffer(world, {
-                offerId: offer.id,
-                missionId,
-                aircraftClassId: aircraft.aircraftClassId,
-                aircraftId: aircraft.id,
-                airframeTypeId: aircraft.airframeTypeId,
-                airframeConfigurationId: configuration.id,
-                rolesPackRelPath: configuration.rolesPackRelPath,
-              }),
-              ...pilotStamp,
-            };
-            missions.missions.push(mission);
-            assignAircraftToMission(
-              missions,
-              aircraft.id,
-              mission.id,
-              mission.originIcao,
-              {
-                actorAccountId: charterActor.accountId,
-                actorIsVaOwner: charterActor.isOwner,
-              },
-            );
-            const charterTour = missions.playerFbos?.charterActiveTour;
-            if (charterTour?.status === 'active') {
-              const planned = charterTour.legs.find(
-                (leg) =>
-                  leg.status === 'planned' &&
-                  !leg.missionId &&
-                  leg.offerId === offer.id,
+              if (!offer) throw new Error(`Unknown charter offer ${body.offerId}`);
+              const aircraft = findPlayerAircraft(missions, body.aircraftId!);
+              if (!aircraft) throw new Error(`Unknown aircraft ${body.aircraftId}`);
+              assertClassOpsUnlocked(
+                missions.classOps,
+                aircraft.aircraftClassId,
               );
-              if (planned) {
-                bindCharterTourLegMission(missions, {
-                  legIndex: planned.index,
-                  missionId: mission.id,
-                  offerId: offer.id,
-                });
+              if (
+                aircraft.status !== 'parked' ||
+                aircraft.locationIcao.toUpperCase() !== offer.originIcao
+              ) {
+                throw new Error(
+                  `Aircraft ${aircraft.label} must be parked at ${offer.originIcao}`,
+                );
               }
-            }
-            syncCharterActiveTour(missions, world);
-            return {
-              mission: withMissionClientView(world, missions, mission),
-              walletUsd: missions.walletUsd,
-              fleet: withParkingRates(missions.fleet, world, missions),
-              charterActiveTour: charterActiveTourView(missions, world),
-            };
+              const active = listActivePlayerMissions(missions.missions);
+              if (active.length > 0) {
+                throw new Error(blockReasonAnotherActiveFlight(missions, active[0]!));
+              }
+              const fit = withCharterClassOpsGate(
+                charterAircraftFit(
+                  world,
+                  missions,
+                  offer,
+                  aircraft,
+                  cargoLimit.maxCargoKg,
+                ),
+                missions.classOps,
+                aircraft.aircraftClassId,
+              );
+              if (!fit.compatible) {
+                throw new Error(fit.reasons.join(' · ') || 'Aircraft is not compatible');
+              }
+              const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
+              const configuration = findCareerAirframeConfiguration(
+                airframe,
+                aircraft.airframeConfigurationId,
+                aircraft.rolesPackRelPath,
+              );
+              if (!configuration) throw new Error('Passenger configuration not found');
+              const missionId = `msn_charter_${world.tick}_${Math.floor(
+                Math.random() * 1e9,
+              )}`;
+              const mission = {
+                ...reserveCharterOffer(world, {
+                  offerId: offer.id,
+                  missionId,
+                  aircraftClassId: aircraft.aircraftClassId,
+                  aircraftId: aircraft.id,
+                  airframeTypeId: aircraft.airframeTypeId,
+                  airframeConfigurationId: configuration.id,
+                  rolesPackRelPath: configuration.rolesPackRelPath,
+                }),
+                ...pilotStamp,
+              };
+              missions.missions.push(mission);
+              assignAircraftToMission(
+                missions,
+                aircraft.id,
+                mission.id,
+                mission.originIcao,
+                {
+                  actorAccountId: charterActor.accountId,
+                  actorIsVaOwner: charterActor.isOwner,
+                },
+              );
+              const charterTour = missions.playerFbos?.charterActiveTour;
+              if (charterTour?.status === 'active') {
+                const planned = charterTour.legs.find(
+                  (leg) =>
+                    leg.status === 'planned' &&
+                    !leg.missionId &&
+                    leg.offerId === offer.id,
+                );
+                if (planned) {
+                  bindCharterTourLegMission(missions, {
+                    legIndex: planned.index,
+                    missionId: mission.id,
+                    offerId: offer.id,
+                  });
+                }
+              }
+              syncCharterActiveTour(missions, world);
+              return {
+                mission: withMissionClientView(world, missions, mission),
+                walletUsd: missions.walletUsd,
+                fleet: withParkingRates(missions.fleet, world, missions),
+                charterActiveTour: charterActiveTourView(missions, world),
+              };
+            });
           }, { housekeeping: false, companyId: acceptCompanyId });
           send(res, 200, accepted);
         } catch (error) {

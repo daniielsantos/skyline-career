@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchVaMembers,
   postVaPublish,
@@ -17,9 +17,11 @@ type Props = {
     displayName: string;
     homeHubIcao: string;
   }) => void;
+  /** Notify Company Identity when this company is in the VAs directory. */
+  onListingState?: (state: { listed: boolean }) => void;
 };
 
-/** Company panel: turn the active company into a listed VA (or update listing). */
+/** Company panel: publish the active company to the VAs directory (or update listing). */
 export function CompanyVaPublishCard(props: Props) {
   const token = getAuthToken();
   const companyId = props.activeCompanyId || getStoredCompanyId();
@@ -31,16 +33,22 @@ export function CompanyVaPublishCard(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const onListingStateRef = useRef(props.onListingState);
+  onListingStateRef.current = props.onListingState;
 
   const refresh = useCallback(async () => {
     if (!canShow || !companyId) {
       setLoaded(true);
+      onListingStateRef.current?.({ listed: false });
       return;
     }
     try {
       const m = await fetchVaMembers();
       setRole(m.role);
       setListed(m.listed);
+      onListingStateRef.current?.({
+        listed: Boolean(m.listed) && m.role === 'owner',
+      });
       // Always prefer server company listing over stale pilot/default props.
       setPublishName(
         (m.displayName || props.defaultDisplayName || '').trim(),
@@ -57,6 +65,7 @@ export function CompanyVaPublishCard(props: Props) {
     } catch {
       setRole(null);
       setListed(false);
+      onListingStateRef.current?.({ listed: false });
       setPublishName((props.defaultDisplayName || '').trim());
       setPublishHub((props.defaultHomeHubIcao || '').trim().toUpperCase());
     } finally {
@@ -73,14 +82,14 @@ export function CompanyVaPublishCard(props: Props) {
   if (role && role !== 'owner') {
     return (
       <div className="pilot-card company-va-card">
-        <h3>Virtual airline</h3>
+        <h3>Directory listing</h3>
         <p className="settings-help">
-          Only the company owner can publish or update the VA listing. Your role:{' '}
-          <strong>{role}</strong>.
+          Only the company owner can publish or update the directory listing.
+          Your role: <strong>{role}</strong>.
         </p>
         {listed && props.onGoVa ? (
           <button type="button" className="action ghost" onClick={props.onGoVa}>
-            Open My VA
+            My VA · roster and ledger
           </button>
         ) : null}
       </div>
@@ -89,9 +98,9 @@ export function CompanyVaPublishCard(props: Props) {
   if (!role) {
     return (
       <div className="pilot-card company-va-card">
-        <h3>Virtual airline</h3>
+        <h3>Directory listing</h3>
         <p className="settings-help">
-          Sign in as owner of this company to list it as a VA.
+          Sign in as owner of this company to publish it in the VAs directory.
         </p>
       </div>
     );
@@ -99,10 +108,10 @@ export function CompanyVaPublishCard(props: Props) {
 
   return (
     <div className="pilot-card company-va-card">
-      <h3>{listed ? 'VA listing' : 'Become a VA'}</h3>
+      <h3>{listed ? 'In the directory' : 'Open for pilots'}</h3>
       <p className="settings-help">
-        Reuses this company — same wallet and fleet. Publishing puts you in the
-        VAs directory so other pilots can request to join.
+        Still this company — same wallet and fleet. Publishing lists it under
+        VAs so pilots can join.
       </p>
       {error ? (
         <p className="error" role="alert">
@@ -111,7 +120,7 @@ export function CompanyVaPublishCard(props: Props) {
       ) : null}
       <div className="company-va-fields">
         <label className="simbrief-field">
-          <span>VA name</span>
+          <span>Public name</span>
           <input
             type="text"
             value={publishName}
@@ -149,6 +158,7 @@ export function CompanyVaPublishCard(props: Props) {
                 setPublishName(res.company.displayName);
                 setPublishHub(res.company.homeHubIcao);
                 setListed(true);
+                onListingStateRef.current?.({ listed: true });
                 props.onPublished?.({
                   companyId: res.company.companyId,
                   displayName: res.company.displayName,
@@ -163,11 +173,11 @@ export function CompanyVaPublishCard(props: Props) {
             })();
           }}
         >
-          {listed ? 'Save listing' : 'Publish as VA'}
+          {listed ? 'Update listing' : 'Publish'}
         </button>
         {listed && props.onGoVa ? (
           <button type="button" className="action ghost" onClick={props.onGoVa}>
-            Manage roster
+            My VA · roster and ledger
           </button>
         ) : null}
       </div>

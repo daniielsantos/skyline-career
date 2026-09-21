@@ -489,15 +489,15 @@ export function VaPage(props: Props) {
   if (!listed) {
     return (
       <section className="panel va-panel">
-        <h3>Not a VA yet</h3>
+        <h3>Not published yet</h3>
         <p className="settings-help">
-          Your company exists, but it is not listed as a virtual airline.
-          Publish it from Company (name + home hub) — same wallet and fleet.
+          Your company exists, but it is not in the VAs directory. Publish from
+          Company (public name + home hub) — still the same wallet and fleet.
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {props.onGoCompany ? (
             <button type="button" className="action" onClick={props.onGoCompany}>
-              Become a VA
+              Publish from Company
             </button>
           ) : null}
           {props.onGoDirectory ? (

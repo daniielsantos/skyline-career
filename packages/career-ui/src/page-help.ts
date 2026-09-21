@@ -58,10 +58,11 @@ export const PAGE_HELP = {
     title: 'How My VA works',
     kicker: 'Page guide',
     bullets: [
-      'Topbar Wallet = your home company. Ledger here = shared VA cash. Money map on Ledger shows who pays Jet-A, cut, ferry, and MX.',
-      'Hangar here is company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
-      'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the VA.',
-      'Config Next steps walks owner invite + roster + Line crew, or member Reserve → fly VA.',
+      'My VA is the crew desk for one company — yours when published, or the airline you joined. It is not a second company.',
+      'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Money map shows who pays Jet-A, cut, ferry, and MX.',
+      'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
+      'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',
+      'Config Next steps walks owner invite + roster + Line crew, or member Reserve → fly that fleet.',
     ],
   },
   vaDirectory: {
@@ -69,10 +70,10 @@ export const PAGE_HELP = {
     title: 'How VAs directory works',
     kicker: 'Page guide',
     bullets: [
-      'Lists only published virtual airlines — not every company in the world.',
+      'Lists only companies that published — not every company in the world.',
       'Quality chip is settle flight score + on-time over ~7 days (needs a few flights).',
       'Request to join when hiring is open, or use a private invite code anytime.',
-      'Owners publish from Company; manage seats under My VA.',
+      'Owners publish from Company; manage seats under My VA (same company, crew desk).',
     ],
   },
   vaRanking: {
@@ -114,7 +115,8 @@ export const PAGE_HELP = {
     title: 'How Company works',
     kicker: 'Page guide',
     bullets: [
-      'Home hub, name, and company snapshot live here. Progression follows traffic, fleet, and Cargo Ops — not a separate XP bar on this page.',
+      'This is your airline — home hub, name, wallet snapshot. Publishing puts the same company in the VAs directory; it does not create a second company.',
+      'Open for pilots / In the directory controls the public listing. My VA is the crew desk (roster, ledger, hangar) for that listing.',
       'You need a Base and cash to grow; the Hangar cashflow tab is the detailed ledger.',
     ],
   },

@@ -3553,6 +3553,8 @@ export function App() {
   const [vaMemberRouteCutPct, setVaMemberRouteCutPct] = useState<number | null>(
     null,
   );
+  /** Home company listed in VAs directory (Company Identity status). */
+  const [companyDirectoryListed, setCompanyDirectoryListed] = useState(false);
   const memberVaCompanyIdRef = useRef<string | null>(null);
   memberVaCompanyIdRef.current = memberVaCompanyId;
   const authAccountIdRef = useRef<string | null>(null);
@@ -12899,7 +12901,7 @@ export function App() {
             }
             onClick={() => selectTab('vaDirectory')}
             disabled={busy}
-            title="Browse published virtual airlines"
+            title="Browse published companies in the VAs directory"
           >
             VAs
           </button>
@@ -12908,7 +12910,7 @@ export function App() {
             className={!showAirport && tab === 'va' ? 'tab active' : 'tab'}
             onClick={() => selectTab('va')}
             disabled={busy}
-            title="Manage your VA roster and recruiting"
+            title="Crew desk for your published company, or the company you joined"
           >
             My VA
           </button>
@@ -19602,6 +19604,12 @@ export function App() {
                     )}
                   </dd>
                 </div>
+                {companyDirectoryListed ? (
+                  <div>
+                    <dt>Directory</dt>
+                    <dd>Published</dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>Status</dt>
                   <dd>Registered</dd>
@@ -19650,12 +19658,14 @@ export function App() {
                 ''
               }
               onGoVa={() => selectTab('va')}
+              onListingState={({ listed }) => setCompanyDirectoryListed(listed)}
               onPublished={({ companyId, displayName }) => {
                 setCompanies((prev) =>
                   prev.map((c) =>
                     c.id === companyId ? { ...c, displayName } : c,
                   ),
                 );
+                setCompanyDirectoryListed(true);
               }}
             />
             <div className="pilot-card pilot-card-wide">

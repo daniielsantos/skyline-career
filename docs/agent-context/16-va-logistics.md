@@ -433,6 +433,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** Hangar OH/inspect/repair só chamavam `commitWallet` (estado chrome); o hero do Ledger prefere `vaSessionWallet` sticky, que não era atualizado. Cashflow snapshot também não refetchava.
 **Fix:** `paintOpsMutationWallet` em App — se ops company = VA listada, `setVaSessionWallet` + bump `vaLedgerRefreshEpoch`; inspect/repair/OH passam a usá-lo (com `companyId` ops).
 
+### Company ≈ VA vocabulary (2026-09-21)
+
+**Sintoma:** Company e VA pareciam duas entidades (Identity Lamusine + “VA listing / VA name Lamusine”).
+**Causa:** publish card brandava “Become a VA” / “VA name” como produto paralelo; dual-tenant real (home vs membership) misturava com o framing.
+**Fix:** UX only — card = **Open for pilots** / **In the directory** (Public name); Identity **Directory: Published**; My VA empty → Publish from Company; page-help/nav tooltips. Sem merge de tenant nem fold My VA→Company.
+
 ### VA loop clarity — money map + Prepare chip (2026-09-21)
 
 **Sintoma / gap:** dual-tenant (home Wallet vs VA Ledger, Hangar vs My VA Hangar, cut vs Jet-A) ainda era mental model; Prepare mostrava prefixo VA sem explicar cut.
@@ -764,4 +770,5 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Member progression** — gates + settle XP na home do piloto (não ladder da VA)
 - [x] **One VA per account** — block join/request while already in a listed VA
 - [x] **VA loop clarity UI** — Money map + Config Next steps + Hangar hint + Freights VA chip (2026-09-21)
+- [x] **Company ≈ VA vocabulary** — publish card as directory status; Identity Published; no tenant merge (2026-09-21)
 - [ ] Buff concessão herdado no porto home da VA (member-aware; Tier 1)

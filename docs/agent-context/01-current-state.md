@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **34acdae** / desktop **0.3.179** shipped: Raise charter formation quotas to deepen the board without synced expires. Release: [v0.3.179](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.179).
+
+
 `main` **0b643a3** / desktop **0.3.178** shipped: Stop lease-holder tip CAS and harden fleet persist against duplicate hull ids. Release: [v0.3.178](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.178).
 
 

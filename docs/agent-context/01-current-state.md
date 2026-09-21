@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **82399bb** / desktop **0.3.190** shipped: Clarify dual-tenant VA money flow in My VA and Prepare. Release: [v0.3.190](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.190).
+
+
 `main` **fac751b** / desktop **0.3.189** shipped: Align Hangar card footers and VA Roster columns. Release: [v0.3.189](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.189).
 
 

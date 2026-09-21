@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **8082f6c** / desktop **0.3.192** shipped: Add VA Port FBO inheritance and My VA Hauls board. Release: [v0.3.192](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.192).
+
+
 `main` **0bd0e41** / desktop **0.3.191** shipped: Frame VA publish as company directory status, not a second entity. Release: [v0.3.191](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.191).
 
 

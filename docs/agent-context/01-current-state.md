@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **fdc3c75** / desktop **0.3.169** shipped: Fix Logbook VA merge on warm enter and center the topbar update pill. Release: [v0.3.169](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.169).
+
+
 `main` **a01e177** / desktop **0.3.168** shipped: Keep Terminal Contracts aircraft picker above Freight/Charter tabs. Release: [v0.3.168](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.168).
 
 

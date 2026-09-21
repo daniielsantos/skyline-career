@@ -3,8 +3,6 @@
 `main` **106943b** / desktop **0.3.187** shipped: Raise dealer pool floor for narrow and wide freighters. Release: [v0.3.187](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.187).
 
 
-**Local (unreleased):** Raise dealer pool floor for narrow/wide freighters to 5 hulls per SKU (MP scarcity). See `10-aircraft-pool.md`.
-
 `main` **c0a5e37** / desktop **0.3.186** shipped: Add engine and airframe overhaul as Hangar CAPEX sinks. Release: [v0.3.186](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.186).
 
 

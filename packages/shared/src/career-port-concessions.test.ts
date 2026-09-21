@@ -36,6 +36,7 @@ import {
   getPortInventoryStock,
   healMissingPortConcessionFromLedger,
   isPortOperator,
+  hasPortOperatorBenefits,
   portInventoryCapKg,
   portListingSlotCap,
   portOperatorEtaMult,
@@ -378,5 +379,29 @@ describe('port concessions', () => {
     assert.equal(healed, 'restored');
     assert.equal(state.playerPortConcessions?.length, 1);
     assert.equal(isPortOperator(world, 'BRSSZ'), true);
+  });
+
+  it('VA members inherit Port FBO buy/ETA benefits without desk ownership', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state);
+    claimPortConcession(state, world, {
+      portId: 'BRSSZ',
+      companyId: 'co_va',
+    });
+    assert.equal(isPortOperator(world, 'BRSSZ', 'co_va'), true);
+    assert.equal(isPortOperator(world, 'BRSSZ', 'co_home'), false);
+    assert.equal(
+      hasPortOperatorBenefits(world, 'BRSSZ', 'co_home', ['co_va']),
+      true,
+    );
+    assert.equal(
+      hasPortOperatorBenefits(world, 'BRSSZ', 'co_home', ['co_other']),
+      false,
+    );
+    assert.equal(
+      portOperatorEtaMult(world, 'BRSSZ', 'co_home', ['co_va']),
+      PORT_OPERATOR_ETA_MULT,
+    );
+    assert.equal(portOperatorEtaMult(world, 'BRSSZ', 'co_home'), 1);
   });
 });

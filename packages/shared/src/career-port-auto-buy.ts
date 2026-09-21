@@ -264,6 +264,7 @@ export function tickPortAutoBuyOrders(
         const result = buyPortListing(state, world, {
           listingId: listing.id,
           kg: buyKg,
+          companyId,
         });
         order.boughtKgToday += result.kg;
         buys += 1;

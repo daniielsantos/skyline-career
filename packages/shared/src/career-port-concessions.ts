@@ -310,6 +310,26 @@ export function isPortOperator(
   return Boolean(op && op.companyId === companyId);
 }
 
+/**
+ * Operator pricing / ETA / UI “yours” — exact operator **or** allied company
+ * (VA members inherit Port FBO buy/ETA at ports the listed VA operates).
+ * Desk mutations (auto-buy, scout, shuttle, claim) stay on {@link isPortOperator}.
+ */
+export function hasPortOperatorBenefits(
+  world: CareerEconomyWorld,
+  portId: string,
+  companyId: string = LOCAL_COMPANY_ID,
+  alliedCompanyIds?: readonly string[] | null,
+): boolean {
+  const op = findActivePortOperator(world, portId);
+  if (!op?.companyId) return false;
+  if (op.companyId === companyId) return true;
+  if (!alliedCompanyIds?.length) return false;
+  return alliedCompanyIds.some(
+    (id) => id.trim() !== '' && id.trim() === op.companyId,
+  );
+}
+
 export function portListingSlotCap(
   world: CareerEconomyWorld,
   portId: string,
@@ -338,8 +358,11 @@ export function portOperatorEtaMult(
   world: CareerEconomyWorld,
   portId: string,
   companyId: string = LOCAL_COMPANY_ID,
+  alliedCompanyIds?: readonly string[] | null,
 ): number {
-  if (!isPortOperator(world, portId, companyId)) return 1;
+  if (!hasPortOperatorBenefits(world, portId, companyId, alliedCompanyIds)) {
+    return 1;
+  }
   return portOperatorLevel(world, portId) >= 3
     ? PORT_P3_ETA_MULT
     : PORT_OPERATOR_ETA_MULT;

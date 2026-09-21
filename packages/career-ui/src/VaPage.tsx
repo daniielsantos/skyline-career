@@ -29,6 +29,7 @@ import {
 import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
+import { VaHaulsBoard } from './VaHaulsBoard';
 import { formatBoardMoney } from './board-money';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
@@ -45,7 +46,7 @@ import {
   vaLogbookPilotLabel,
 } from './logbook';
 
-type VaPane = 'roster' | 'hangar' | 'ledger' | 'logbook' | 'config';
+type VaPane = 'roster' | 'hangar' | 'hauls' | 'ledger' | 'logbook' | 'config';
 
 function formatRosterLastSeen(
   lastSeenAtMs: number | null | undefined,
@@ -131,6 +132,11 @@ type Props = {
   ) => void;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
+  onGoPorts?: () => void;
+  /** After Accept Internal Haul — open Dispatch / staging. */
+  onHaulStaged?: (mission: Mission) => void;
+  onMissions?: (missions: Mission[]) => void;
+  onToast?: (kind: 'ok' | 'fail', message: string) => void;
   /** Switch active tenant to the listed VA (member dual-tenant). */
   onSwitchCompany?: (companyId: string) => void | Promise<void>;
   onLeftVa?: (opts: {
@@ -567,6 +573,15 @@ export function VaPage(props: Props) {
           <button
             type="button"
             role="tab"
+            aria-selected={pane === 'hauls'}
+            className={pane === 'hauls' ? 'tab active' : 'tab'}
+            onClick={() => setPane('hauls')}
+          >
+            Hauls
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={pane === 'ledger'}
             className={pane === 'ledger' ? 'tab active' : 'tab'}
             onClick={() => setPane('ledger')}
@@ -876,6 +891,24 @@ export function VaPage(props: Props) {
         </div>
       ) : null}
 
+      {pane === 'hauls' ? (
+        <VaHaulsBoard
+          companyId={companyId || ''}
+          homeHubIcao={homeHubIcao}
+          fleet={hangarFleet}
+          busy={pageBusy}
+          onWallet={props.onWallet}
+          onFleet={(next) => {
+            setHangarFleet(next);
+            props.onFleet?.(next);
+          }}
+          onMissions={props.onMissions}
+          onStaged={props.onHaulStaged}
+          onGoPorts={props.onGoPorts}
+          onToast={props.onToast}
+        />
+      ) : null}
+
       {pane === 'ledger' ? (
         <div className="va-pane-card">
           {tenantSwitching ? (
@@ -1138,6 +1171,9 @@ export function VaPage(props: Props) {
                   </li>
                   <li>
                     My VA Hangar · Reserve a parked tail (4h) before Prepare
+                  </li>
+                  <li>
+                    Hauls · Accept Internal Haul with a VA tail at origin
                   </li>
                   <li>
                     Freights · pick an aircraft labeled VA · settle pays your

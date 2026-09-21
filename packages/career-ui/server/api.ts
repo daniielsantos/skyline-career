@@ -1563,6 +1563,27 @@ async function companyDisplayNameMap(
   return map;
 }
 
+/**
+ * Listed VA company ids for this account — Port FBO buy/ETA inheritance.
+ * Empty when not a member/owner of any va_listed company.
+ */
+async function portOperatorAlliedCompanyIds(
+  req: import('node:http').IncomingMessage,
+): Promise<string[]> {
+  if (!store?.supportsAuth) return [];
+  const session = authSessionFromRequest(req);
+  if (!session) return [];
+  try {
+    const listed = await Promise.resolve(
+      store.vaListedMembership(session.account.id),
+    );
+    const id = listed?.companyId?.trim();
+    return id ? [id] : [];
+  } catch {
+    return [];
+  }
+}
+
 async function resolveCompanyDisplayName(
   store: CareerStore,
   companyId: string | null | undefined,
@@ -8552,12 +8573,15 @@ export function createCareerApiServer(port = 8787) {
           // ensurePortListings may expire/refill; persist those tables only so
           // buy can find the same listing IDs after reload.
           const companyNames = await companyDisplayNameMap(requireStore());
+          const alliedCompanyIds = await portOperatorAlliedCompanyIds(req);
           const result = await withCareerWrite(
             (world, missions) => {
               settleWarehouseInboundTransfers(missions, world);
               const groundStaff = groundStaffSnapshot(missions, world);
               const ports = portSnapshot(world, missions, {
                 companyDisplayNames: companyNames,
+                viewerCompanyId: portsCompanyId,
+                alliedCompanyIds,
               });
               return {
                 ...ports,
@@ -8588,12 +8612,15 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const alliedCompanyIds = await portOperatorAlliedCompanyIds(req);
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
               const bought = buyPortListing(missions, world, {
                 listingId: body.listingId!,
                 kg: Number(body.kg),
+                companyId: ports_buyCompanyId,
+                alliedCompanyIds,
               });
               return {
                 walletUsd: missions.walletUsd,
@@ -8608,7 +8635,10 @@ export function createCareerApiServer(port = 8787) {
                 pickup: bought.pickup,
                 inboundTransfer: bought.inboundTransfer,
                 warehousePile: bought.warehousePile,
-                ports: portSnapshot(world, missions),
+                ports: portSnapshot(world, missions, {
+                  viewerCompanyId: ports_buyCompanyId,
+                  alliedCompanyIds,
+                }),
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             });
@@ -8728,6 +8758,7 @@ export function createCareerApiServer(port = 8787) {
               concession,
               ports: portSnapshot(world, missions, {
                 companyDisplayNames: companyNames,
+                viewerCompanyId: ports_concession_claimCompanyId,
               }),
             };
           }, {

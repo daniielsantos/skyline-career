@@ -59,10 +59,11 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'My VA is the crew desk for one company — yours when published, or the airline you joined. It is not a second company.',
+      'Hauls lists paid Internal Haul bridges (WH→WH) for this company — Accept with a parked VA tail, then Dispatch. Ports desk stays for buy/Scout.',
       'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Money map shows who pays Jet-A, cut, ferry, and MX.',
       'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
       'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',
-      'Config Next steps walks owner invite + roster + Line crew, or member Reserve → fly that fleet.',
+      'Config Next steps walks owner invite + roster + Line crew, or member Reserve → Hauls / Freights.',
     ],
   },
   vaDirectory: {

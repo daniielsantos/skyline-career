@@ -19467,6 +19467,15 @@ export function App() {
           }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
+          onGoPorts={() => selectTab('ports')}
+          onHaulStaged={() => {
+            goToTab('staging');
+          }}
+          onMissions={setMissions}
+          onToast={(kind, message) => {
+            setToastKind(kind);
+            setToast(message);
+          }}
           onSwitchCompany={async (companyId) => {
             await switchCompanyForVa(companyId);
           }}

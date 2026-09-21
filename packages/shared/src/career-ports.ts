@@ -37,7 +37,7 @@ import {
   evaluatePortConcessionClaim,
   evaluatePortConcessionUpgrade,
   findActivePortOperator,
-  isPortOperator,
+  hasPortOperatorBenefits,
   nextPortDischargeTick,
   portInventorySnapshot,
   portListingSlotCap,
@@ -2254,12 +2254,18 @@ export function effectivePortBuyUnitPriceUsd(
   world: CareerEconomyWorld,
   listing: Pick<PortListing, 'unitPriceUsd' | 'allocatedHubIcao' | 'portId'>,
   companyId = LOCAL_COMPANY_ID,
+  alliedCompanyIds?: readonly string[] | null,
 ): number {
   const hub = listing.allocatedHubIcao.trim().toUpperCase();
   const rawUnit = money(
     listing.unitPriceUsd *
       procurementMultForHub(state, hub) *
-      (isPortOperator(world, listing.portId, companyId)
+      (hasPortOperatorBenefits(
+        world,
+        listing.portId,
+        companyId,
+        alliedCompanyIds,
+      )
         ? PORT_OPERATOR_PRICE_MULT
         : 1),
   );
@@ -2273,7 +2279,13 @@ export function effectivePortBuyUnitPriceUsd(
 export function buyPortListing(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
-  opts: { listingId: string; kg: number },
+  opts: {
+    listingId: string;
+    kg: number;
+    companyId?: string;
+    /** VA companies this pilot belongs to — inherit Port FBO buy/ETA. */
+    alliedCompanyIds?: readonly string[] | null;
+  },
 ): {
   debitUsd: number;
   unitPriceUsd: number;
@@ -2328,11 +2340,14 @@ export function buyPortListing(
     throw new Error(`Unknown pickup hub ${hub}`);
   }
 
+  const companyId = opts.companyId?.trim() || LOCAL_COMPANY_ID;
+  const alliedCompanyIds = opts.alliedCompanyIds;
   const unitPriceUsd = effectivePortBuyUnitPriceUsd(
     state,
     world,
     listing,
-    LOCAL_COMPANY_ID,
+    companyId,
+    alliedCompanyIds,
   );
   const debitUsd = money(unitPriceUsd * qty);
   if (state.walletUsd < debitUsd) {
@@ -2368,7 +2383,8 @@ export function buyPortListing(
   const operatorEta = portOperatorEtaMult(
     world,
     listing.portId,
-    LOCAL_COMPANY_ID,
+    companyId,
+    alliedCompanyIds,
   );
   const transferTicks =
     inboundKg > 0
@@ -2668,6 +2684,10 @@ export function portSnapshot(
   opts?: {
     /** Map companyId → displayName for MP Port FBO presence chips. */
     companyDisplayNames?: ReadonlyMap<string, string>;
+    /** Acting company (chrome / write tenant) for Port FBO “yours”. */
+    viewerCompanyId?: string | null;
+    /** Listed VA company ids this pilot belongs to — inherit operator UI. */
+    alliedCompanyIds?: readonly string[] | null;
   },
 ): {
   ports: Array<
@@ -2750,6 +2770,9 @@ export function portSnapshot(
     syncWorldPortConcessions(world, state);
   }
   const companyDisplayNames = opts?.companyDisplayNames;
+  const viewerCompanyId =
+    opts?.viewerCompanyId?.trim() || LOCAL_COMPANY_ID;
+  const alliedCompanyIds = opts?.alliedCompanyIds;
   ensurePortListings(world);
   ensureDemandOrders(world, {
     operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
@@ -2808,13 +2831,23 @@ export function portSnapshot(
   return {
     ports: CAREER_PORTS.map((port) => {
       const op = findActivePortOperator(world, port.id);
+      const operatorExact = Boolean(
+        op && op.companyId === viewerCompanyId,
+      );
       const yours = Boolean(
-        state && op && op.companyId === LOCAL_COMPANY_ID,
+        state &&
+          op &&
+          hasPortOperatorBenefits(
+            world,
+            port.id,
+            viewerCompanyId,
+            alliedCompanyIds,
+          ),
       );
       const yoursConc = state?.playerPortConcessions?.find(
         (c) =>
           c.portId === port.id &&
-          c.companyId === LOCAL_COMPANY_ID &&
+          c.companyId === viewerCompanyId &&
           c.leasePaidThroughTick > world.tick,
       );
       const arrivesAtTick = nextPortDischargeTick(world, port.id);
@@ -2886,7 +2919,7 @@ export function portSnapshot(
             ? evaluatePortConcessionClaim(state, world, port.id)
             : null,
           upgrade:
-            state && yours
+            state && operatorExact
               ? evaluatePortConcessionUpgrade(state, world, port.id)
               : null,
         },

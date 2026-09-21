@@ -16102,7 +16102,7 @@ export function App() {
                             <p className="board-va-ops-chip" role="status">
                               VA tail
                               {vaMemberRouteCutPct != null
-                                ? ` · ${vaMemberRouteCutPct}% route net → your home Wallet`
+                                ? ` · ${vaMemberRouteCutPct}% market hire → your home Wallet`
                                 : ' · Jet-A from VA · cut → your home Wallet'}
                             </p>
                           ) : null}
@@ -17176,7 +17176,7 @@ export function App() {
                 <p className="board-va-ops-chip" role="status">
                   VA tail
                   {vaMemberRouteCutPct != null
-                    ? ` · ${vaMemberRouteCutPct}% route net → your home Wallet`
+                                ? ` · ${vaMemberRouteCutPct}% market hire → your home Wallet`
                     : ' · Jet-A from VA · cut → your home Wallet'}
                   {memberVaIsOwner ? ' · you are owner' : ''}
                 </p>

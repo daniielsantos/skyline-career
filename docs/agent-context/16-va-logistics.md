@@ -1,10 +1,11 @@
 # VA logistics — air bridge + desk automation
 
-Atualizado 2026-09-20. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
+Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA/yours UI; desk mutations ainda owner/exact operator).
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
+**Doc 2026-09-21 (c):** **Airline labor cut shipped** — dois cuts: market hire (`memberRouteCutPct` default 30%, Freights/Charter) vs airline desk (`memberAirlineCutPct` default 50% max 60%, Demand/Wide haul). Solo empire = 100%. Hauls board lista desk holds (bridge+Demand+Haul). Anti-mandatory-VA: airline cut nunca ≥ solo.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -57,7 +58,8 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 | Publish / rename / hub (Company card) | sim | não | não |
 | Unlist VA | sim | não | não |
 | Leave VA | — | sim | sim |
-| Config `memberRouteCutPct` | sim | não | read-only (vê o %) |
+| Config `memberRouteCutPct` (market hire) | sim | não | read-only |
+| Config `memberAirlineCutPct` (desk labor) | sim | não | read-only |
 | **Inspect / repair (MX)** | **sim** (debita wallet VA) | **não** | **não** |
 | **Engine / airframe overhaul** | **sim** (debita wallet VA) | **não** | **não** |
 | **Credit draw / repay** | **sim** | **não** | **não** |
@@ -103,17 +105,28 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 
 ## Por que entrar numa VA? (valor)
 
+### Ladder de pay (DECIDIDO · shipped 2026-09-21)
+
+| Caminho | Pay |
+|--|--|
+| **Solo empire** (teu porto / WH / frota) | **100%** |
+| **Airline desk** (Demand / Wide haul / IH fee) | `memberAirlineCutPct` default **50%** (clamp 40–60) — IH fee continua 100% da fee |
+| **Market hire** (Freights / Charter no casco VA) | `memberRouteCutPct` default **30%** (clamp 10–50) |
+
+Hard rule: airline cut **max 60** — nunca ≥ solo. Listar VA vazia **não** desbloqueia pay mágico; cliff = Port FBO + stock + frota. Hauls = board do desk (bridges + Demand + haul holds).
+
 ### Shipped (IH-2)
 
 1. **Board Internal Haul** — voar pontes WH→WH que a VA montou; pay interno → wallet home.
 2. **Roster / roles** — pilot ou dispatcher; invite / request.
 3. **Ranking 7d** — company + strip de pilots.
 4. **Hangar da VA** — ver/usar cascos da company listada (mesmo wallet/frota do owner).
+5. **Airline labor cut** — Demand/Haul pagam melhor que Freights no mesmo casco VA.
 
 ### Decidido no Tier 1, ainda não é o gancho principal do join
 
-5. **Buff de concessão herdado** no porto da VA (membros herdam buy/ETA) — **shipped 2026-09-21**
-6. Desk Fase 3 (auto-haul) — só com VA; depois.
+6. **Buff de concessão herdado** no porto da VA (membros herdam buy/ETA) — **shipped 2026-09-21**
+7. Desk Fase 3 (auto-haul) — só com VA; depois.
 
 ### Contratos com avião da VA — **DECIDIDO (2026-09-19) · shipped**
 
@@ -122,20 +135,29 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 | Contrato | Ops | Dinheiro do piloto |
 |--|--|--|
 | **Internal Haul** | VA: fuel da perna | Pay stamp IH → home (**shipped**; sem % extra) |
-| **Freights / Demand / Charter** | VA: fuel da perna de receita | **`memberRouteCutPct` do lucro net** → home; resto na VA |
+| **Demand / Wide haul** (desk stock) | VA: fuel | **`memberAirlineCutPct`** do lucro net → home (default 50%, max 60) |
+| **Freights / Charter** (market hire) | VA: fuel | **`memberRouteCutPct`** do lucro net → home (default 30%) |
 | **Empty ferry / Hangar reposition** | Ver **Ferry ops** abaixo | — |
 | **Solo** (teu tail, company home) | Você | 100% você |
 
-**Fatia (`memberRouteCutPct`):**
+**Market hire (`memberRouteCutPct`):**
 
 1. Owner configura o % (inteiro) = parte do **lucro da rota** que vai pro piloto (home) — Config My VA + `POST /api/va/route-cut`.
-2. **Visível no directory** (`Pilot cut N%`) + Config My VA.
+2. **Visível no directory** (`Cuts N% / M%`) + Config My VA.
 3. **Lucro** = no settle `max(0, payoutUsd − fuelDebitUsd)` desta missão. MX/inspeção e **empty ferry** fora do net por perna.
 4. `pilotUsd = round(routeNet × pct / 100)` → credita home (`va_member_cut`); debita VA.
 5. Faixa **10–50%**; default publish **30%**.
 6. Owner voando o próprio VA: **sem cut** (`pilotHomeCompanyId` = ops).
 7. IH **não** recebe esse % em cima do pay stamp.
 8. Accept Freights/Demand/Charter **stamp** `pilotHomeCompanyId` / `pilotAccountId`.
+
+**Airline desk (`memberAirlineCutPct`) — shipped 2026-09-21:**
+
+1. Owner configura via Config + `POST /api/va/airline-cut` (40–60, default 50).
+2. Settle usa airline cut quando missão é Demand (`demandOrderId`) ou Wide haul (`warehouseHaul`); Freights/Charter ficam no route cut.
+3. Solo empire continua 100% — airline cut nunca ≥ 100 (hard max 60).
+4. Hauls board lista holds desk (bridge + Demand + haul).
+
 9. **Logbook (2026-09-20):** tag **VA** quando `vaFlight` (accept sob company `va_listed`) ou Internal Haul. Pay mostrado = `pilotPayoutUsd` (fatia home / fee IH) quando stampado no settle; senão `payoutUsd` bruto da rota. Membro Freights com cut: UI sufixo `cut`. Histórico pré-stamp: na company VA listada o GET `/api/missions` força `vaFlight` (tag), mas pay antigo continua bruto até novo settle.
 10. **Logbook merge home+VA (2026-09-20):** voos solo e VA vivem em arquivos de company distintos; `selectTab` restaura home → Logbook home-only ficava vazio se só voou VA. Fix: `loadMissionsMerged` busca home + VA (`fetchMissions({ companyId })`) e `mergeLogbookMissions` por id.
 11. **Logbook merge still empty (2026-09-20):** `warmCareerBeforeEnter` não setava `homeCompanyId`; merge exigia `home && va` → nunca puxava VA. Fix: stamp home no warm; merge todo tenant extra ≠ active; `GET /api/missions?companyId=` como Charter.
@@ -463,6 +485,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** Lamusine com Santos P1 — Hauls ainda mostrava Path card “Unlocked”, blurb longo, CTA Ports ×2, empty copy de pré-FBO.
 **Causa:** Path card tratava pós-claim como vitória narrada; header/empty não eram state-aware.
 **Fix:** Path card `null` com FBO; Hauls só strip + 1 CTA; help/empty curtos (pós-FBO = “Post from Ports”).
+
+### Config Next steps Port FBO stale (2026-09-21)
+
+**Sintoma:** Owner com Santos P1 + WH T3 ainda via “Path to Port FBO · see Hauls…” unchecked no Config.
+**Causa:** checklist item hardcoded sem ler concessão.
+**Fix:** `fetchPorts` no refresh My VA; step `is-done` com nome/P#; próximo tip = stock WH → Scout/Auto-haul.
 
 ### IH-3 VA Auto-haul desk v1 (2026-09-21)
 

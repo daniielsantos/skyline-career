@@ -24,7 +24,7 @@ describe('career access keys', () => {
   it('mints, claims once, rejects reuse', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'skyline-access-keys-'));
     const store = await openCareerStore({ careerDir: dir, backend: 'sqlite' });
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '18');
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '19');
 
     const minted = (await Promise.resolve(
       store.mintAccessKeys({ count: 2, batchId: 'test-batch' }),

@@ -185,8 +185,8 @@ import {
   acceptWarehouseBridge,
   dispatchWarehouseBridgeHold,
   quoteInternalHaulForRoute,
-  listOpenInternalHaulHolds,
-  listInternalHaulMissions,
+  listOpenAirlineDeskHolds,
+  listAirlineDeskMissions,
   vaDayKeyFromTick,
   VA_RANKING_WINDOW_DAYS,
   VA_FLIGHT_QUALITY_WINDOW_DAYS,
@@ -4004,15 +4004,21 @@ export function createCareerApiServer(port = 8787) {
         if (!listed) {
           listed = await Promise.resolve(store.vaIsListed(companyId));
         }
-        const [members, recruiting, memberRouteCutPct, companies] =
-          await Promise.all([
-            Promise.resolve(store.vaListMembers(companyId)),
-            Promise.resolve(store.vaIsRecruiting(companyId)),
-            Promise.resolve(store.vaGetMemberRouteCutPct(companyId)),
-            Promise.resolve(
-              store.authListCompaniesForAccount(session.account.id),
-            ),
-          ]);
+        const [
+          members,
+          recruiting,
+          memberRouteCutPct,
+          memberAirlineCutPct,
+          companies,
+        ] = await Promise.all([
+          Promise.resolve(store.vaListMembers(companyId)),
+          Promise.resolve(store.vaIsRecruiting(companyId)),
+          Promise.resolve(store.vaGetMemberRouteCutPct(companyId)),
+          Promise.resolve(store.vaGetMemberAirlineCutPct(companyId)),
+          Promise.resolve(
+            store.authListCompaniesForAccount(session.account.id),
+          ),
+        ]);
         const co = companies.find((c) => c.id === companyId);
         // Roster presence: session last-seen + active VA missions per pilot.
         const nowMs = Date.now();
@@ -4208,6 +4214,7 @@ export function createCareerApiServer(port = 8787) {
           listed,
           recruiting,
           memberRouteCutPct,
+          memberAirlineCutPct,
           displayName: co?.displayName?.trim() || companyId,
           homeHubIcao: co?.homeHubIcao?.trim() || '',
           lineCrew,
@@ -4261,6 +4268,47 @@ export function createCareerApiServer(port = 8787) {
             }),
           );
           send(res, 200, { memberRouteCutPct });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/airline-cut') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          memberAirlineCutPct?: number;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId || typeof body.memberAirlineCutPct !== 'number') {
+          send(res, 400, {
+            error: 'companyId and memberAirlineCutPct required',
+          });
+          return;
+        }
+        try {
+          const memberAirlineCutPct = await Promise.resolve(
+            store.vaSetMemberAirlineCutPct({
+              companyId,
+              actorAccountId: session.account.id,
+              memberAirlineCutPct: body.memberAirlineCutPct,
+            }),
+          );
+          send(res, 200, { memberAirlineCutPct });
         } catch (err) {
           send(res, 400, {
             error: err instanceof Error ? err.message : String(err),
@@ -4656,13 +4704,30 @@ export function createCareerApiServer(port = 8787) {
           }
         }
         const missions = await store.loadMissions({ companyId });
-        const openHolds = listOpenInternalHaulHolds(missions);
-        const active = listInternalHaulMissions(missions);
+        const openHolds = listOpenAirlineDeskHolds(missions);
+        const active = listAirlineDeskMissions(missions);
         send(res, 200, {
           companyId,
-          openHolds,
+          openHolds: openHolds.map((h) => ({
+            id: h.id,
+            kind: h.kind ?? 'demand',
+            originIcao: h.originIcao,
+            destIcao: h.destIcao,
+            kg: h.kg,
+            commodityId: h.commodityId,
+            pilotPayUsd: h.pilotPayUsd,
+            unitPriceUsd: h.unitPriceUsd,
+          })),
           activeMissions: active.map((m) => ({
             id: m.id,
+            kind:
+              m.warehouseBridge && m.internalHaul
+                ? 'bridge'
+                : m.warehouseHaul
+                  ? 'haul'
+                  : m.demandOrderId
+                    ? 'demand'
+                    : 'other',
             originIcao: m.originIcao,
             destIcao: m.destIcao,
             commodityId: m.commodityId,
@@ -13613,6 +13678,12 @@ export function createCareerApiServer(port = 8787) {
                   store.vaGetMemberRouteCutPct(settleCompanyId),
                 )
               : undefined;
+          const memberAirlineCutPct =
+            settleCompanyId && store
+              ? await Promise.resolve(
+                  store.vaGetMemberAirlineCutPct(settleCompanyId),
+                )
+              : undefined;
           // Peek mission for pilot home before write (cross-company XP).
           const settlePeek = await withCareerRead((_world, missions) => {
             const m = missions.missions.find((row) => row.id === body.missionId);
@@ -13664,6 +13735,7 @@ export function createCareerApiServer(port = 8787) {
               missionId: body.missionId,
               companyId: settleCompanyId,
               memberRouteCutPct,
+              memberAirlineCutPct,
               residualFuelKg,
               mxFuelDrainUnsettledKg: mxFuelDrain.unsettledKg,
               mxFuelDrainTotalKg: mxFuelDrain.totalKg,

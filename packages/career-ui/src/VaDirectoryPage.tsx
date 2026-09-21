@@ -220,11 +220,14 @@ export function VaDirectoryPage(props: Props) {
                       </span>
                     </div>
                     <div>
-                      <span className="va-stat-label">Pilot cut</span>
+                      <span className="va-stat-label">Cuts</span>
                       <span className="va-stat-value">
                         {row.memberRouteCutPct != null
                           ? `${row.memberRouteCutPct}%`
                           : '—'}
+                        {row.memberAirlineCutPct != null
+                          ? ` / ${row.memberAirlineCutPct}%`
+                          : ''}
                       </span>
                     </div>
                   </div>

@@ -17,6 +17,7 @@ import { ensureV12Ddl } from './career-store-v12.js';
 import { ensureV13Ddl } from './career-store-v13.js';
 import { ensureV14Ddl } from './career-store-v14.js';
 import { ensureV15Ddl } from './career-store-v15.js';
+import { ensureV19Ddl } from './career-store-v19.js';
 import type {
   CareerMissionsState,
   MissionIntent,
@@ -54,10 +55,18 @@ export const VA_FLIGHT_QUALITY_MIN_FLIGHTS = 3;
 export const VA_FLIGHT_QUALITY_SCORE_WEIGHT = 0.7;
 export const VA_FLIGHT_QUALITY_ONTIME_WEIGHT = 0.3;
 
-/** Pilot share of Freights/Demand/Charter route net (payout − fuel). */
+/** Pilot share of Freights/Charter route net (payout − fuel) — market hire. */
 export const VA_MEMBER_ROUTE_CUT_DEFAULT_PCT = 30;
 export const VA_MEMBER_ROUTE_CUT_MIN_PCT = 10;
 export const VA_MEMBER_ROUTE_CUT_MAX_PCT = 50;
+
+/**
+ * Pilot share of Demand / Wide haul route net — airline desk labor.
+ * Always above market hire defaults; always below solo 100%.
+ */
+export const VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT = 50;
+export const VA_MEMBER_AIRLINE_CUT_MIN_PCT = 40;
+export const VA_MEMBER_AIRLINE_CUT_MAX_PCT = 60;
 
 export function clampMemberRouteCutPct(raw: unknown): number {
   const n = typeof raw === 'number' ? raw : Number(raw);
@@ -66,6 +75,46 @@ export function clampMemberRouteCutPct(raw: unknown): number {
     VA_MEMBER_ROUTE_CUT_MIN_PCT,
     Math.min(VA_MEMBER_ROUTE_CUT_MAX_PCT, Math.round(n)),
   );
+}
+
+export function clampMemberAirlineCutPct(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n)) return VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT;
+  return Math.max(
+    VA_MEMBER_AIRLINE_CUT_MIN_PCT,
+    Math.min(VA_MEMBER_AIRLINE_CUT_MAX_PCT, Math.round(n)),
+  );
+}
+
+/**
+ * Desk work on the VA tenant: Internal Haul fee, Demand board, Wide haul.
+ * Freights/Charter market lots are market hire (route cut).
+ */
+export function isVaAirlineLaborMission(mission: {
+  warehouseBridge?: boolean;
+  internalHaul?: boolean;
+  warehouseHaul?: boolean;
+  demandOrderId?: string;
+}): boolean {
+  if (mission.warehouseBridge === true && mission.internalHaul === true) {
+    return true;
+  }
+  if (mission.warehouseHaul === true) return true;
+  if (typeof mission.demandOrderId === 'string' && mission.demandOrderId.trim()) {
+    return true;
+  }
+  return false;
+}
+
+export function quoteMemberAirlineCutUsd(
+  payoutUsd: number,
+  fuelDebitUsd: number,
+  cutPct: number,
+): number {
+  const routeNet = Math.max(0, payoutUsd - Math.max(0, fuelDebitUsd));
+  const pct = clampMemberAirlineCutPct(cutPct);
+  if (routeNet <= 0 || pct <= 0) return 0;
+  return Math.round((routeNet * pct) / 100);
 }
 
 /** One listed VA membership per account (join / request gate). */
@@ -638,6 +687,21 @@ export function listOpenInternalHaulHolds(
   );
 }
 
+/**
+ * Airline desk board: paid Internal Haul bridges + open Demand / Wide haul holds.
+ */
+export function listOpenAirlineDeskHolds(
+  state: CareerMissionsState,
+): PlayerDemandHold[] {
+  return listDemandHolds(state).filter((h) => {
+    const kind = h.kind ?? 'demand';
+    if (kind === 'bridge') {
+      return (h.pilotPayUsd ?? 0) > 0 && Boolean(h.destWarehouseId);
+    }
+    return kind === 'demand' || kind === 'haul';
+  });
+}
+
 /** Active Internal Haul missions for the VA desk. */
 export function listInternalHaulMissions(
   state: CareerMissionsState,
@@ -648,6 +712,19 @@ export function listInternalHaulMissions(
       m.internalHaul === true &&
       m.status !== 'settled' &&
       m.status !== 'cancelled',
+  );
+}
+
+/** Active airline-desk missions (IH + Demand + Wide haul). */
+export function listAirlineDeskMissions(
+  state: CareerMissionsState,
+): MissionIntent[] {
+  return (state.missions ?? []).filter(
+    (m) =>
+      m.status !== 'settled' &&
+      m.status !== 'cancelled' &&
+      m.status !== 'failed' &&
+      isVaAirlineLaborMission(m),
   );
 }
 
@@ -773,8 +850,10 @@ export type VaDirectoryEntry = {
   aircraftCount: number;
   recruiting: boolean;
   listed: boolean;
-  /** % of Freights/Demand/Charter route net paid to the flying member. */
+  /** % of Freights/Charter route net paid to the flying member (market hire). */
   memberRouteCutPct: number;
+  /** % of Demand / Wide haul route net paid to the flying member (airline labor). */
+  memberAirlineCutPct: number;
   seatsOpen: number;
   /** Settle flight-quality rolling window (null qualityScore until sample floor). */
   flightQuality?: VaFlightQualitySnapshot | null;
@@ -832,6 +911,38 @@ export function setCompanyMemberRouteCutPct(
   return pct;
 }
 
+export function getCompanyMemberAirlineCutPct(
+  db: SqliteDb,
+  companyId: string,
+): number {
+  ensureV19Ddl(db);
+  const row = db
+    .prepare(`SELECT member_airline_cut_pct FROM companies WHERE id = ?`)
+    .get(companyId) as { member_airline_cut_pct: number } | undefined;
+  if (!row) return VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT;
+  return clampMemberAirlineCutPct(row.member_airline_cut_pct);
+}
+
+export function setCompanyMemberAirlineCutPct(
+  db: SqliteDb,
+  opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberAirlineCutPct: number;
+  },
+): number {
+  ensureV19Ddl(db);
+  const actor = getCompanyMembership(db, opts.actorAccountId, opts.companyId);
+  if (!actor || actor.role !== 'owner') {
+    throw new Error('Only owner can change member airline cut');
+  }
+  const pct = clampMemberAirlineCutPct(opts.memberAirlineCutPct);
+  db.prepare(
+    `UPDATE companies SET member_airline_cut_pct = ? WHERE id = ?`,
+  ).run(pct, opts.companyId);
+  return pct;
+}
+
 export function isCompanyRecruiting(db: SqliteDb, companyId: string): boolean {
   ensureV12Ddl(db);
   const row = db
@@ -866,6 +977,7 @@ export type VaPublishResult = {
   recruiting: boolean;
   listed: boolean;
   memberRouteCutPct: number;
+  memberAirlineCutPct: number;
 };
 
 /**
@@ -912,9 +1024,10 @@ export function publishCompanyAsVa(
     homeHubIcao: string;
     recruiting?: boolean;
     memberRouteCutPct?: number;
+    memberAirlineCutPct?: number;
   },
 ): VaPublishResult {
-  ensureV14Ddl(db);
+  ensureV19Ddl(db);
   const companyId = opts.companyId.trim();
   if (!companyId) throw new Error('companyId required');
   const actor = getCompanyMembership(db, opts.actorAccountId, companyId);
@@ -937,14 +1050,18 @@ export function publishCompanyAsVa(
   const memberRouteCutPct = clampMemberRouteCutPct(
     opts.memberRouteCutPct ?? VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
   );
+  const memberAirlineCutPct = clampMemberAirlineCutPct(
+    opts.memberAirlineCutPct ?? VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT,
+  );
   db.prepare(
-    `UPDATE companies SET display_name = ?, home_hub_icao = ?, home_country_id = ?, recruiting = ?, va_listed = 1, member_route_cut_pct = ? WHERE id = ?`,
+    `UPDATE companies SET display_name = ?, home_hub_icao = ?, home_country_id = ?, recruiting = ?, va_listed = 1, member_route_cut_pct = ?, member_airline_cut_pct = ? WHERE id = ?`,
   ).run(
     displayName,
     homeHubIcao,
     homeCountryId,
     recruiting ? 1 : 0,
     memberRouteCutPct,
+    memberAirlineCutPct,
     companyId,
   );
   return {
@@ -955,6 +1072,7 @@ export function publishCompanyAsVa(
     recruiting,
     listed: true,
     memberRouteCutPct,
+    memberAirlineCutPct,
   };
 }
 
@@ -1029,14 +1147,14 @@ export function listVaDirectory(
     toDayKey?: number;
   } = {},
 ): VaDirectoryEntry[] {
-  ensureV14Ddl(db);
+  ensureV19Ddl(db);
   const limit = Math.max(1, Math.min(100, opts.limit ?? 50));
   const includeClosed = opts.includeClosed === true;
   const worldId = opts.worldId?.trim() || null;
   const rows = db
     .prepare(
       `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
-              c.member_route_cut_pct,
+              c.member_route_cut_pct, c.member_airline_cut_pct,
               (SELECT COUNT(*) FROM company_members m WHERE m.company_id = c.id) AS member_count,
               (SELECT COUNT(*) FROM fleet_aircraft f WHERE f.company_id = c.id) AS aircraft_count
        FROM companies c
@@ -1053,6 +1171,7 @@ export function listVaDirectory(
     recruiting: number;
     va_listed: number;
     member_route_cut_pct: number;
+    member_airline_cut_pct: number;
     member_count: number;
     aircraft_count: number;
   }>;
@@ -1092,6 +1211,7 @@ export function listVaDirectory(
       recruiting,
       listed: Number(row.va_listed) !== 0,
       memberRouteCutPct: clampMemberRouteCutPct(row.member_route_cut_pct),
+      memberAirlineCutPct: clampMemberAirlineCutPct(row.member_airline_cut_pct),
       seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
       myRequestStatus,
       myRole,

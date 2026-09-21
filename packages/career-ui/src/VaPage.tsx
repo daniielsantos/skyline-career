@@ -5,11 +5,13 @@ import {
   fetchVaInvites,
   fetchCashflow,
   fetchMissions,
+  fetchPorts,
   postVaInvite,
   postVaAcceptJoinRequest,
   postVaRejectJoinRequest,
   postVaRecruiting,
   postVaRouteCut,
+  postVaAirlineCut,
   postVaLineCrew,
   postVaAutoHaul,
   postVaLeave,
@@ -167,6 +169,8 @@ export function VaPage(props: Props) {
   const [recruiting, setRecruiting] = useState(true);
   const [memberRouteCutPct, setMemberRouteCutPct] = useState(30);
   const [cutDraft, setCutDraft] = useState('30');
+  const [memberAirlineCutPct, setMemberAirlineCutPct] = useState(50);
+  const [airlineCutDraft, setAirlineCutDraft] = useState('50');
   const [lineCrew, setLineCrew] = useState<{
     hired: boolean;
     tier: 1 | 2 | 3;
@@ -189,6 +193,10 @@ export function VaPage(props: Props) {
     postedDayIndex: number;
   } | null>(null);
   const [autoHaulMinMembers, setAutoHaulMinMembers] = useState(2);
+  const [portFbo, setPortFbo] = useState<{
+    name: string;
+    level: number;
+  } | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -309,6 +317,8 @@ export function VaPage(props: Props) {
       setMemberRouteCutPct(m.memberRouteCutPct ?? 30);
       setCutDraft(String(m.memberRouteCutPct ?? 30));
       onMemberRouteCutPctRef.current?.(m.memberRouteCutPct ?? 30);
+      setMemberAirlineCutPct(m.memberAirlineCutPct ?? 50);
+      setAirlineCutDraft(String(m.memberAirlineCutPct ?? 50));
       setLineCrew(m.lineCrew ?? null);
       setAutoHaul(m.autoHaul ?? null);
       setAutoHaulMinMembers(m.autoHaulMinMembers ?? 2);
@@ -317,6 +327,25 @@ export function VaPage(props: Props) {
       setFlightQuality(m.flightQuality ?? null);
       setOrgPerks(m.orgPerks ?? null);
       hasVaShellRef.current = Boolean(m.role && m.listed);
+      try {
+        const portsSnap = await fetchPorts();
+        const owned = portsSnap.ports.find(
+          (p) =>
+            p.concession?.status === 'yours' ||
+            (p.concession?.companyId &&
+              p.concession.companyId === m.companyId),
+        );
+        setPortFbo(
+          owned
+            ? {
+                name: owned.name,
+                level: owned.concession?.level ?? 1,
+              }
+            : null,
+        );
+      } catch {
+        setPortFbo(null);
+      }
       // Hangar local first — do not push fleet to App until after tenant pin,
       // or chrome home fleet gets overwritten while active is still home.
       if (Array.isArray(m.fleet)) {
@@ -1008,7 +1037,10 @@ export function VaPage(props: Props) {
               ) : null}
             </div>
           </div>
-          <VaMoneyMap pilotCutPct={memberRouteCutPct} />
+          <VaMoneyMap
+            marketHireCutPct={memberRouteCutPct}
+            airlineLaborCutPct={memberAirlineCutPct}
+          />
           {ledgerError ? (
             <p className="error" role="alert">
               {ledgerError}
@@ -1177,27 +1209,34 @@ export function VaPage(props: Props) {
                       ? `Line crew · ${lineCrew.tierName ?? 'Desk'} (${lineCrew.remaining}/${lineCrew.allowance} ferry/wk)`
                       : 'Hire Line crew so empty ferry does not drain the VA wallet'}
                   </li>
-                  <li>
-                    Path to Port FBO · see Hauls — WH T3 at hub, then claim on
-                    Ports (company CAPEX)
+                  <li className={portFbo ? 'is-done' : undefined}>
+                    {portFbo
+                      ? `Port FBO · ${portFbo.name} · P${portFbo.level}`
+                      : 'Path to Port FBO · WH T3 at hub, then claim on Ports (company CAPEX)'}
                   </li>
+                  {portFbo ? (
+                    <li>
+                      Stock company WH (inbound deposits when it arrives) —
+                      then Scout Hold or Auto-haul fills Hauls
+                    </li>
+                  ) : null}
                 </>
               ) : (
                 <>
                   <li className="is-done">
-                    Joined · pilot cut {memberRouteCutPct}% of route net → your
-                    home Wallet
+                    Joined · market hire {memberRouteCutPct}% · airline desk{' '}
+                    {memberAirlineCutPct}% → your home Wallet
                   </li>
                   <li>
                     My VA Hangar · Reserve a parked tail (4h) before Prepare
                   </li>
                   <li>
-                    Hauls · Accept Internal Haul when the company posts bridges
-                    (after Port FBO + stock)
+                    Hauls · Accept desk work (bridges / Demand / Wide haul) when
+                    the company has stock
                   </li>
                   <li>
-                    Freights · pick an aircraft labeled VA · settle pays your
-                    cut home
+                    Freights · pick an aircraft labeled VA · settle pays market
+                    hire cut home
                   </li>
                 </>
               )}
@@ -1256,7 +1295,7 @@ export function VaPage(props: Props) {
             {isOwner ? (
               <div className="va-config-field">
                 <label className="va-config-field-label" htmlFor="va-route-cut">
-                  Pilot cut
+                  Market hire cut
                 </label>
                 <div className="va-config-field-row">
                   <input
@@ -1298,16 +1337,71 @@ export function VaPage(props: Props) {
                   />
                   <span className="va-config-field-suffix">%</span>
                   <span className="muted va-config-field-hint">
-                    of Freights / Demand / Charter route net → pilot home
-                    (10–50)
+                    Freights / Charter on a VA tail (10–50)
                   </span>
                 </div>
               </div>
             ) : (
               <p className="settings-sample va-config-readonly">
-                Pilot cut <strong>{memberRouteCutPct}%</strong> of route net
+                Market hire <strong>{memberRouteCutPct}%</strong> · airline desk{' '}
+                <strong>{memberAirlineCutPct}%</strong>
               </p>
             )}
+            {isOwner ? (
+              <div className="va-config-field">
+                <label
+                  className="va-config-field-label"
+                  htmlFor="va-airline-cut"
+                >
+                  Airline desk cut
+                </label>
+                <div className="va-config-field-row">
+                  <input
+                    id="va-airline-cut"
+                    type="number"
+                    min={40}
+                    max={60}
+                    step={1}
+                    value={airlineCutDraft}
+                    disabled={pageBusy}
+                    className="va-config-cut-input"
+                    onChange={(e) => setAirlineCutDraft(e.target.value)}
+                    onBlur={() => {
+                      void (async () => {
+                        const n = Number(airlineCutDraft);
+                        if (
+                          !Number.isFinite(n) ||
+                          n === memberAirlineCutPct
+                        ) {
+                          setAirlineCutDraft(String(memberAirlineCutPct));
+                          return;
+                        }
+                        setBusy(true);
+                        setError(null);
+                        try {
+                          const res = await postVaAirlineCut(n);
+                          setMemberAirlineCutPct(res.memberAirlineCutPct);
+                          setAirlineCutDraft(String(res.memberAirlineCutPct));
+                        } catch (err) {
+                          setAirlineCutDraft(String(memberAirlineCutPct));
+                          setError(
+                            err instanceof Error
+                              ? err.message
+                              : String(err),
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      })();
+                    }}
+                  />
+                  <span className="va-config-field-suffix">%</span>
+                  <span className="muted va-config-field-hint">
+                    Demand / Wide haul from company WH (40–60; below solo 100%)
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="va-config-section">

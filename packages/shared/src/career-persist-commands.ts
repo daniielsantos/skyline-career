@@ -24,7 +24,11 @@ import {
   type SettleMissionResult,
 } from './career-mission.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
-import { quoteMemberRouteCutUsd } from './career-va.js';
+import {
+  isVaAirlineLaborMission,
+  quoteMemberAirlineCutUsd,
+  quoteMemberRouteCutUsd,
+} from './career-va.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
@@ -166,10 +170,15 @@ export function applySettleWalletDeltas(
     /** Active VA / ops company id for this settle write. */
     companyId?: string;
     /**
-     * VA member Freights/Demand/Charter cut % (route net = payout − fuel).
-     * Applied when pilotHomeCompanyId ≠ ops company and mission is not Internal Haul.
+     * VA member Freights/Charter cut % (route net = payout − fuel).
+     * Applied when pilotHomeCompanyId ≠ ops company and mission is market hire.
      */
     memberRouteCutPct?: number;
+    /**
+     * VA member Demand / Wide haul cut % (route net). Airline desk labor.
+     * Internal Haul keeps full fee pay (already labor-shaped).
+     */
+    memberAirlineCutPct?: number;
   },
 ): ApplySettleWalletDeltasResult {
   const mission = result.mission;
@@ -246,12 +255,15 @@ export function applySettleWalletDeltas(
     });
   }
 
-  // Member route cut: Freights/Demand/Charter only (not Internal Haul).
+  // Member route / airline cut: Freights/Charter/Demand/Haul (not Internal Haul fee).
   const internalHaul =
     mission.warehouseBridge === true && mission.internalHaul === true;
   const pilotHome = mission.pilotHomeCompanyId?.trim() || '';
   const opsCompany = opts?.companyId?.trim() || '';
-  const cutPct = opts?.memberRouteCutPct;
+  const airlineLabor = isVaAirlineLaborMission(mission);
+  const cutPct = airlineLabor
+    ? opts?.memberAirlineCutPct
+    : opts?.memberRouteCutPct;
   if (
     !internalHaul &&
     result.walletCreditUsd > 0 &&
@@ -260,11 +272,17 @@ export function applySettleWalletDeltas(
     opsCompany &&
     pilotHome !== opsCompany
   ) {
-    const pilotUsd = quoteMemberRouteCutUsd(
-      result.walletCreditUsd,
-      result.fuelDebitUsd,
-      cutPct,
-    );
+    const pilotUsd = airlineLabor
+      ? quoteMemberAirlineCutUsd(
+          result.walletCreditUsd,
+          result.fuelDebitUsd,
+          cutPct,
+        )
+      : quoteMemberRouteCutUsd(
+          result.walletCreditUsd,
+          result.fuelDebitUsd,
+          cutPct,
+        );
     if (pilotUsd > 0) {
       applyWalletDelta(missions, {
         amountUsd: -pilotUsd,
@@ -272,7 +290,9 @@ export function applySettleWalletDeltas(
         atTick,
         missionId: mission.id,
         icao: mission.originIcao,
-        note: `VA member cut ${cutPct}% · ${mission.originIcao}→${mission.destIcao}`,
+        note: airlineLabor
+          ? `VA airline cut ${cutPct}% · ${mission.originIcao}→${mission.destIcao}`
+          : `VA member cut ${cutPct}% · ${mission.originIcao}→${mission.destIcao}`,
       });
       out.pilotPayCredit = {
         companyId: pilotHome,
@@ -291,8 +311,10 @@ export type ExecuteSettleFlightOpts = SettleMissionOpts & {
   missionId: string;
   /** Ops company for Internal Haul / member-cut cross-wallet pay. */
   companyId?: string;
-  /** VA member Freights/Demand/Charter cut % of route net. */
+  /** VA member Freights/Charter cut % of route net. */
   memberRouteCutPct?: number;
+  /** VA member Demand / Wide haul cut % of route net. */
+  memberAirlineCutPct?: number;
 };
 
 export type ExecuteSettleFlightResult =
@@ -331,7 +353,13 @@ export function executeSettleFlight(
       },
     };
   }
-  const { missionId: _id, companyId, memberRouteCutPct, ...settleOpts } = opts;
+  const {
+    missionId: _id,
+    companyId,
+    memberRouteCutPct,
+    memberAirlineCutPct,
+    ...settleOpts
+  } = opts;
   const result = settleMission(world, open, {
     ...settleOpts,
     fleet: settleOpts.fleet ?? missions,
@@ -340,6 +368,7 @@ export function executeSettleFlight(
   const wallet = applySettleWalletDeltas(missions, world.tick, result, {
     companyId,
     memberRouteCutPct,
+    memberAirlineCutPct,
   });
   // Stamp what the pilot’s home actually received (cut / IH fee / full route).
   const pilotPayoutUsd =

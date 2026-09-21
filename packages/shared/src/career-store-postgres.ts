@@ -45,7 +45,9 @@ import {
   VA_FLIGHT_QUALITY_WINDOW_DAYS,
   VA_MEMBER_CAP,
   VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
+  VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT,
   clampMemberRouteCutPct,
+  clampMemberAirlineCutPct,
   summarizeVaFlightQuality,
   vaDayKeyFromTick,
   type CareerCompanyInvite,
@@ -137,7 +139,7 @@ export {
   isCareerLabDatabaseUrl,
 } from './career-database-url.js';
 
-const CAREER_PG_SCHEMA_VERSION = '29';
+const CAREER_PG_SCHEMA_VERSION = '30';
 const { Pool } = pg;
 
 export function isCareerWorldSeedAllowed(
@@ -1511,6 +1513,7 @@ export class PostgresCareerStore implements CareerStore {
     homeHubIcao: string;
     recruiting?: boolean;
     memberRouteCutPct?: number;
+    memberAirlineCutPct?: number;
   }): Promise<VaPublishResult> {
     await this.ready;
     const companyId = opts.companyId.trim();
@@ -1535,14 +1538,18 @@ export class PostgresCareerStore implements CareerStore {
     const memberRouteCutPct = clampMemberRouteCutPct(
       opts.memberRouteCutPct ?? VA_MEMBER_ROUTE_CUT_DEFAULT_PCT,
     );
+    const memberAirlineCutPct = clampMemberAirlineCutPct(
+      opts.memberAirlineCutPct ?? VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT,
+    );
     await this.pool.query(
-      `UPDATE companies SET display_name = $1, home_hub_icao = $2, home_country_id = $3, recruiting = $4, va_listed = TRUE, member_route_cut_pct = $5 WHERE id = $6`,
+      `UPDATE companies SET display_name = $1, home_hub_icao = $2, home_country_id = $3, recruiting = $4, va_listed = TRUE, member_route_cut_pct = $5, member_airline_cut_pct = $6 WHERE id = $7`,
       [
         displayName,
         homeHubIcao,
         homeCountryId,
         recruiting,
         memberRouteCutPct,
+        memberAirlineCutPct,
         companyId,
       ],
     );
@@ -1554,6 +1561,7 @@ export class PostgresCareerStore implements CareerStore {
       recruiting,
       listed: true,
       memberRouteCutPct,
+      memberAirlineCutPct,
     };
   }
 
@@ -1631,6 +1639,37 @@ export class PostgresCareerStore implements CareerStore {
     return pct;
   }
 
+  async vaGetMemberAirlineCutPct(companyId: string): Promise<number> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT member_airline_cut_pct FROM companies WHERE id = $1`,
+      [companyId],
+    );
+    if (!rows[0]) return VA_MEMBER_AIRLINE_CUT_DEFAULT_PCT;
+    return clampMemberAirlineCutPct(rows[0].member_airline_cut_pct);
+  }
+
+  async vaSetMemberAirlineCutPct(opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberAirlineCutPct: number;
+  }): Promise<number> {
+    await this.ready;
+    const actor = await this.vaGetMembership(
+      opts.actorAccountId,
+      opts.companyId,
+    );
+    if (!actor || actor.role !== 'owner') {
+      throw new Error('Only owner can change member airline cut');
+    }
+    const pct = clampMemberAirlineCutPct(opts.memberAirlineCutPct);
+    await this.pool.query(
+      `UPDATE companies SET member_airline_cut_pct = $1 WHERE id = $2`,
+      [pct, opts.companyId],
+    );
+    return pct;
+  }
+
   async vaIsListed(companyId: string): Promise<boolean> {
     await this.ready;
     const { rows } = await this.pool.query(
@@ -1677,7 +1716,7 @@ export class PostgresCareerStore implements CareerStore {
     const worldId = opts?.worldId?.trim() || null;
     const { rows } = await this.pool.query(
       `SELECT c.id, c.display_name, c.home_hub_icao, c.recruiting, c.va_listed,
-              c.member_route_cut_pct,
+              c.member_route_cut_pct, c.member_airline_cut_pct,
               (SELECT COUNT(*)::int FROM company_members m WHERE m.company_id = c.id) AS member_count,
               (SELECT COUNT(*)::int FROM fleet_aircraft f WHERE f.company_id = c.id) AS aircraft_count
        FROM companies c
@@ -1722,6 +1761,7 @@ export class PostgresCareerStore implements CareerStore {
         recruiting,
         listed: Boolean(r.va_listed),
         memberRouteCutPct: clampMemberRouteCutPct(r.member_route_cut_pct),
+        memberAirlineCutPct: clampMemberAirlineCutPct(r.member_airline_cut_pct),
         seatsOpen: Math.max(0, VA_MEMBER_CAP - memberCount),
         myRequestStatus,
         myRole,

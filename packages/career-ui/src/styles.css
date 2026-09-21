@@ -11972,6 +11972,50 @@ span.dispatch-route-hub-dest {
   margin-left: 0.15rem;
 }
 
+.ports-desk-details {
+  margin: 0.55rem 0 0;
+  border: 1px solid color-mix(in srgb, var(--border, #444) 70%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-2, #121820) 88%, transparent);
+  padding: 0.35rem 0.65rem 0.55rem;
+}
+.ports-desk-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  list-style: none;
+  padding: 0.25rem 0;
+}
+.ports-desk-details > summary::-webkit-details-marker {
+  display: none;
+}
+.ports-desk-details .ports-desk-panel {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.ports-scout-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+  margin: 0 0 0.45rem;
+}
+.ports-scout-head .ports-scout-title {
+  margin: 0;
+}
+.ports-scout-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+}
+.ports-scout-filters .fbo-icao-chip {
+  font-size: 0.75rem;
+  padding: 0.18rem 0.55rem;
+}
+
 .ports-desk-panel {
   margin: 0.75rem 0 0.35rem;
   padding: 0.65rem 0.7rem;

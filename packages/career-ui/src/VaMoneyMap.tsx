@@ -1,12 +1,27 @@
 /** Compact VA money map — who pays / who receives. */
 
-export function VaMoneyMap(props: { pilotCutPct: number }) {
-  const cut = Math.max(0, Math.min(100, Math.round(props.pilotCutPct)));
+export function VaMoneyMap(props: {
+  marketHireCutPct: number;
+  airlineLaborCutPct: number;
+}) {
+  const market = Math.max(
+    0,
+    Math.min(100, Math.round(props.marketHireCutPct)),
+  );
+  const airline = Math.max(
+    0,
+    Math.min(100, Math.round(props.airlineLaborCutPct)),
+  );
   const rows: { job: string; pays: string; earns: string }[] = [
     {
-      job: 'Freights / Demand / Charter (VA tail)',
+      job: 'Freights / Charter (VA tail)',
       pays: 'VA · Jet-A',
-      earns: `${cut}% route net → your home · rest VA`,
+      earns: `${market}% route net → your home · rest VA`,
+    },
+    {
+      job: 'Demand / Wide haul (desk stock)',
+      pays: 'VA · Jet-A',
+      earns: `${airline}% route net → your home · rest VA`,
     },
     {
       job: 'Internal Haul (WH→WH)',
@@ -24,7 +39,7 @@ export function VaMoneyMap(props: { pilotCutPct: number }) {
       earns: '—',
     },
     {
-      job: 'Solo (your own tail)',
+      job: 'Solo empire (your port / WH)',
       pays: 'Your home wallet',
       earns: '100% → your home',
     },
@@ -35,8 +50,10 @@ export function VaMoneyMap(props: { pilotCutPct: number }) {
         Money map
       </p>
       <p className="va-money-map-blurb">
-        Topbar Wallet is always your <strong>home</strong> company. This Ledger is
-        the shared <strong>VA</strong> wallet. Cut is owner-set ({cut}% now).
+        Topbar Wallet is always your <strong>home</strong> company. This Ledger
+        is the shared <strong>VA</strong> wallet. Solo keeps 100% after CAPEX;
+        airline desk pays better than market hire on a VA tail — never above
+        solo.
       </p>
       <table className="va-money-map-table">
         <thead>

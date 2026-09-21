@@ -1234,9 +1234,13 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS va_listed BOOLEAN NOT NULL DEFAULT FALSE`,
   );
-  // Schema v24 — VA member Freights/Demand/Charter route cut %.
+  // Schema v24 — VA member Freights/Charter route cut %.
   await pool.query(
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS member_route_cut_pct INTEGER NOT NULL DEFAULT 30`,
+  );
+  // Schema v30 — VA member airline-labor (Demand/Haul) cut %.
+  await pool.query(
+    `ALTER TABLE companies ADD COLUMN IF NOT EXISTS member_airline_cut_pct INTEGER NOT NULL DEFAULT 50`,
   );
   await pool.query(`
     CREATE TABLE IF NOT EXISTS company_join_requests (

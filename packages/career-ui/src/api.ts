@@ -5156,15 +5156,18 @@ export type VaPilotRank = {
 
 export type VaHaulHold = {
   id: string;
+  kind?: 'demand' | 'bridge' | 'haul';
   originIcao: string;
   destIcao: string;
   kg: number;
   commodityId: string;
   pilotPayUsd?: number;
+  unitPriceUsd?: number;
 };
 
 export type VaHaulMission = {
   id: string;
+  kind?: 'bridge' | 'demand' | 'haul' | 'other';
   originIcao: string;
   destIcao: string;
   commodityId: string;
@@ -5185,6 +5188,7 @@ export function fetchVaMembers() {
     listed: boolean;
     recruiting: boolean;
     memberRouteCutPct: number;
+    memberAirlineCutPct: number;
     displayName: string;
     homeHubIcao: string;
     lineCrew: {
@@ -5271,6 +5275,13 @@ export function postVaRouteCut(memberRouteCutPct: number) {
   return api<{ memberRouteCutPct: number }>('/api/va/route-cut', {
     method: 'POST',
     body: JSON.stringify({ memberRouteCutPct }),
+  });
+}
+
+export function postVaAirlineCut(memberAirlineCutPct: number) {
+  return api<{ memberAirlineCutPct: number }>('/api/va/airline-cut', {
+    method: 'POST',
+    body: JSON.stringify({ memberAirlineCutPct }),
   });
 }
 
@@ -5411,8 +5422,10 @@ export type VaDirectoryEntry = {
   aircraftCount?: number;
   recruiting: boolean;
   listed?: boolean;
-  /** % of Freights/Demand/Charter route net paid to the flying member. */
+  /** % of Freights/Charter route net paid to the flying member (market hire). */
   memberRouteCutPct?: number;
+  /** % of Demand / Wide haul route net (airline labor). */
+  memberAirlineCutPct?: number;
   seatsOpen: number;
   flightQuality?: VaFlightQualitySnapshot | null;
   orgPerks?: VaOrgPerks | null;

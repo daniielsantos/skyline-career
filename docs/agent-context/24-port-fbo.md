@@ -24,6 +24,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **UI Port FBO tab (2026-09-12):** Ports sections = Catalog | **Port FBO** | Warehouse | Demand. Scout + desk auto-buy + port stock on Port FBO; Catalog = map + listings BUY + discharge ETA.
 
+**Port FBO quiet by state (2026-09-21):** Yours → Scout first (one ranked table + All/Haul/Demand/Bridge filter); Desk auto-buy in `<details>`; Port stock collapsed. Vacant/Held → one-line hint (Claim CTA stays in title). Less desk prose.
+
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
 **Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.

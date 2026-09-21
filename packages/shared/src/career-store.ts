@@ -167,6 +167,7 @@ import { ensureV15Ddl, migrateV14toV15IfNeeded } from './career-store-v15.js';
 import { ensureV16Ddl, migrateV15toV16IfNeeded } from './career-store-v16.js';
 import { ensureV17Ddl, migrateV16toV17IfNeeded } from './career-store-v17.js';
 import { ensureV18Ddl, migrateV17toV18IfNeeded } from './career-store-v18.js';
+import { ensureV19Ddl, migrateV18toV19IfNeeded } from './career-store-v19.js';
 import {
   mintAccessKeysSqlite,
   revokeAccessKeySqlite,
@@ -178,6 +179,8 @@ import {
   createJoinRequest,
   getCompanyMembership,
   getCompanyMemberRouteCutPct,
+  getCompanyMemberAirlineCutPct,
+  setCompanyMemberAirlineCutPct,
   homeCompanyIdForAccount,
   isCompanyRecruiting,
   joinCompanyWithInvite,
@@ -216,7 +219,7 @@ import {
 export type CareerStoreKind = 'json' | 'sqlite' | 'postgres';
 
 /** Bumped when DDL changes; existing DBs upgrade via ensureSqliteSchema. */
-export const CAREER_STORE_SCHEMA_VERSION = '18';
+export const CAREER_STORE_SCHEMA_VERSION = '19';
 export { LOCAL_WORLD_ID, HUB_ECONOMY_SAMPLE_RETENTION_DAYS };
 export { LOCAL_COMPANY_ID } from './career-store-v3.js';
 export type { AirportBoardSnapshot, AirportInventorySnapshot };
@@ -518,6 +521,7 @@ export interface CareerStore {
     homeHubIcao: string;
     recruiting?: boolean;
     memberRouteCutPct?: number;
+    memberAirlineCutPct?: number;
   }): VaPublishResult | Promise<VaPublishResult>;
   vaUnpublish(opts: {
     companyId: string;
@@ -530,6 +534,12 @@ export interface CareerStore {
     companyId: string;
     actorAccountId: string;
     memberRouteCutPct: number;
+  }): number | Promise<number>;
+  vaGetMemberAirlineCutPct(companyId: string): number | Promise<number>;
+  vaSetMemberAirlineCutPct(opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberAirlineCutPct: number;
   }): number | Promise<number>;
   vaIsListed(companyId: string): boolean | Promise<boolean>;
   vaIsRecruiting(companyId: string): boolean | Promise<boolean>;
@@ -938,6 +948,7 @@ class JsonCareerStore implements CareerStore {
     homeHubIcao: string;
     recruiting?: boolean;
     memberRouteCutPct?: number;
+    memberAirlineCutPct?: number;
   }): VaPublishResult {
     throw new Error('VA requires SQLite career store');
   }
@@ -957,6 +968,18 @@ class JsonCareerStore implements CareerStore {
     companyId: string;
     actorAccountId: string;
     memberRouteCutPct: number;
+  }): number {
+    throw new Error('VA requires SQLite career store');
+  }
+
+  vaGetMemberAirlineCutPct(_companyId: string): number {
+    return 50;
+  }
+
+  vaSetMemberAirlineCutPct(_opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberAirlineCutPct: number;
   }): number {
     throw new Error('VA requires SQLite career store');
   }
@@ -1306,6 +1329,7 @@ function ensureSqliteSchema(db: SqliteDb): void {
   ensureV16Ddl(db);
   ensureV17Ddl(db);
   ensureV18Ddl(db);
+  ensureV19Ddl(db);
 
   const ver = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -1427,7 +1451,14 @@ function ensureSqliteSchema(db: SqliteDb): void {
     | undefined;
   const verAfterV17 = Number.parseInt(afterV17?.value ?? ver.value, 10);
   if (!Number.isFinite(verAfterV17) || verAfterV17 < 18) {
-    migrateV17toV18IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
+    migrateV17toV18IfNeeded(db, metaSet, '18');
+  }
+  const afterV18 = db.prepare(`SELECT value FROM meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+  const verAfterV18 = Number.parseInt(afterV18?.value ?? ver.value, 10);
+  if (!Number.isFinite(verAfterV18) || verAfterV18 < 19) {
+    migrateV18toV19IfNeeded(db, metaSet, CAREER_STORE_SCHEMA_VERSION);
   }
   ensureLocalWorld(db);
   ensureLocalCompany(db);
@@ -1802,6 +1833,7 @@ class SqliteCareerStore implements CareerStore {
     homeHubIcao: string;
     recruiting?: boolean;
     memberRouteCutPct?: number;
+    memberAirlineCutPct?: number;
   }): VaPublishResult {
     return publishCompanyAsVa(this.db, opts);
   }
@@ -1823,6 +1855,18 @@ class SqliteCareerStore implements CareerStore {
     memberRouteCutPct: number;
   }): number {
     return setCompanyMemberRouteCutPct(this.db, opts);
+  }
+
+  vaGetMemberAirlineCutPct(companyId: string): number {
+    return getCompanyMemberAirlineCutPct(this.db, companyId);
+  }
+
+  vaSetMemberAirlineCutPct(opts: {
+    companyId: string;
+    actorAccountId: string;
+    memberAirlineCutPct: number;
+  }): number {
+    return setCompanyMemberAirlineCutPct(this.db, opts);
   }
 
   vaIsListed(companyId: string): boolean {

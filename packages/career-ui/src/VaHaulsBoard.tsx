@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   fetchPorts,
   fetchVaHauls,
+  postDemandDispatchHold,
   postWarehouseBridgeDispatchHold,
+  postWarehouseHaulDispatchHold,
   type Mission,
   type PlayerAircraft,
   type VaHaulHold,
@@ -20,6 +22,25 @@ function commodityLabel(id: string): string {
   const raw = id.trim();
   if (!raw) return 'Cargo';
   return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function holdKindLabel(kind: VaHaulHold['kind']): string {
+  if (kind === 'bridge') return 'Bridge';
+  if (kind === 'haul') return 'Wide haul';
+  return 'Demand';
+}
+
+function holdPayLabel(hold: VaHaulHold): string {
+  const kind = hold.kind ?? 'demand';
+  if (kind === 'bridge') {
+    const pay = hold.pilotPayUsd ?? 0;
+    return pay > 0 ? ` · pilot ${formatBoardMoney(pay)}` : '';
+  }
+  const unit = hold.unitPriceUsd ?? 0;
+  if (unit > 0 && hold.kg > 0) {
+    return ` · ~${formatBoardMoney(Math.round(unit * hold.kg))}`;
+  }
+  return '';
 }
 
 type Props = {
@@ -167,22 +188,38 @@ export function VaHaulsBoard(props: Props) {
     }
     setBusyHoldId(hold.id);
     setError(null);
+    const kind = hold.kind ?? 'demand';
     try {
-      const result = await postWarehouseBridgeDispatchHold({
-        holdId: hold.id,
-        aircraftId,
-        companyId: props.companyId,
-      });
+      const result =
+        kind === 'bridge'
+          ? await postWarehouseBridgeDispatchHold({
+              holdId: hold.id,
+              aircraftId,
+              companyId: props.companyId,
+            })
+          : kind === 'haul'
+            ? await postWarehouseHaulDispatchHold({
+                holdId: hold.id,
+                aircraftId,
+                companyId: props.companyId,
+              })
+            : await postDemandDispatchHold({
+                holdId: hold.id,
+                aircraftId,
+                companyId: props.companyId,
+              });
       props.onWallet?.(result.walletUsd);
       props.onFleet?.(result.fleet);
       props.onMissions?.(result.missions.slice().reverse());
+      const payNote =
+        kind === 'bridge' && (result as { pilotPayUsd?: number }).pilotPayUsd
+          ? ` · pilot ${formatBoardMoney((result as { pilotPayUsd?: number }).pilotPayUsd ?? 0)}`
+          : 'payUsd' in result && typeof result.payUsd === 'number'
+            ? ` · ${formatBoardMoney(result.payUsd)}`
+            : '';
       props.onToast?.(
         'ok',
-        `Internal haul ${result.mission.originIcao}→${result.mission.destIcao} · ${formatMassKg(result.kg)}${
-          (result.pilotPayUsd ?? 0) > 0
-            ? ` · pilot ${formatBoardMoney(result.pilotPayUsd ?? 0)}`
-            : ''
-        } · open Dispatch`,
+        `${holdKindLabel(kind)} ${result.mission.originIcao}→${result.mission.destIcao} · ${formatMassKg(result.kg)}${payNote} · open Dispatch`,
       );
       props.onStaged?.(result.mission);
       await refresh();
@@ -205,10 +242,10 @@ export function VaHaulsBoard(props: Props) {
           <h3>Hauls</h3>
           <p className="settings-help">
             {!portKnown
-              ? 'Company WH→WH Internal Hauls.'
+              ? 'Airline desk — bridges, Demand, and Wide hauls.'
               : hasPortFbo
-                ? 'Internal Hauls · Accept with a parked VA tail at origin, then Dispatch.'
-                : 'Until Port FBO + stock, fly Freights with a VA tail.'}
+                ? 'Airline desk · Accept with a parked VA tail at origin, then Dispatch.'
+                : 'Until Port FBO + stock, fly Freights with a VA tail (market hire).'}
           </p>
         </div>
         {props.onGoPorts ? (
@@ -267,14 +304,14 @@ export function VaHaulsBoard(props: Props) {
         <>
           <section className="va-hauls-section">
             <h4 className="va-config-section-title">
-              Open bridges
+              Open desk work
               {holds.length > 0 ? ` (${holds.length})` : ''}
             </h4>
             {holds.length === 0 ? (
               <p className="empty">
                 {hasPortFbo
-                  ? 'No bridges open. Post from Ports (Scout / Hold).'
-                  : 'No bridges yet. Fly Freights with a VA tail, or finish the Port FBO path above.'}
+                  ? 'No desk holds open. Post from Ports (Scout / Hold) — needs company stock.'
+                  : 'No desk work yet. Fly Freights with a VA tail, or finish the Port FBO path above.'}
               </p>
             ) : (
               <ul className="va-hauls-list">
@@ -283,7 +320,7 @@ export function VaHaulsBoard(props: Props) {
                   const candidates = parkedByOrigin.get(origin) ?? [];
                   const selected =
                     aircraftByHold[hold.id] || candidates[0]?.id || '';
-                  const pay = hold.pilotPayUsd ?? 0;
+                  const kind = hold.kind ?? 'demand';
                   return (
                     <li key={hold.id} className="va-hauls-row">
                       <div className="va-hauls-route">
@@ -291,11 +328,10 @@ export function VaHaulsBoard(props: Props) {
                           {origin}→{hold.destIcao.trim().toUpperCase()}
                         </strong>
                         <span className="muted">
+                          {holdKindLabel(kind)} ·{' '}
                           {commodityLabel(hold.commodityId)} ·{' '}
                           {formatMassKg(hold.kg)}
-                          {pay > 0
-                            ? ` · pilot ${formatBoardMoney(pay)}`
-                            : ''}
+                          {holdPayLabel(hold)}
                         </span>
                       </div>
                       <div className="va-hauls-actions">

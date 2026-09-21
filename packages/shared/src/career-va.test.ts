@@ -10,7 +10,9 @@ import {
 } from './career-store.js';
 import {
   VA_MEMBER_CAP,
+  listOpenAirlineDeskHolds,
   listOpenInternalHaulHolds,
+  quoteMemberAirlineCutUsd,
   quoteMemberRouteCutUsd,
   vaDayKeyFromTick,
 } from './career-va.js';
@@ -42,18 +44,19 @@ describe('VA IH-2', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('bumps schema to v17 with VA + fleet reserve + access_keys', () => {
-    assert.equal(CAREER_STORE_SCHEMA_VERSION, '18');
+  it('bumps schema to v19 with VA airline cut', () => {
+    assert.equal(CAREER_STORE_SCHEMA_VERSION, '19');
     const dbPath = store.sqlitePath!;
     const db = new DatabaseSync(dbPath);
     const row = db
       .prepare(`SELECT value FROM meta WHERE key = 'schema_version'`)
       .get() as { value: string };
-    assert.equal(row.value, '18');
+    assert.equal(row.value, '19');
     const cols = db.prepare(`PRAGMA table_info(companies)`).all() as Array<{
       name: string;
     }>;
     assert.ok(cols.some((c) => c.name === 'member_route_cut_pct'));
+    assert.ok(cols.some((c) => c.name === 'member_airline_cut_pct'));
     const tables = db
       .prepare(
         `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('company_invites','company_haul_stats')`,
@@ -811,12 +814,62 @@ describe('VA IH-2', () => {
     const row = dir.find((e) => e.companyId === companyId);
     assert.ok(row);
     assert.equal(row!.memberRouteCutPct, 40);
+    assert.equal(row!.memberAirlineCutPct, 50);
+  });
+
+  it('owner can set airline desk cut (40–60)', async () => {
+    const owner = await Promise.resolve(
+      store.authRegister({
+        loginName: 'va_airline_cut_owner',
+        displayName: 'Airline Cut Owner',
+        password: 'secret1',
+      }),
+    );
+    const companyId = owner.company!.id;
+    await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: owner.account.id,
+        displayName: 'Airline Cut Airways',
+        homeHubIcao: 'SBGR',
+      }),
+    );
+    assert.equal(
+      await Promise.resolve(store.vaGetMemberAirlineCutPct(companyId)),
+      50,
+    );
+    const set = await Promise.resolve(
+      store.vaSetMemberAirlineCutPct({
+        companyId,
+        actorAccountId: owner.account.id,
+        memberAirlineCutPct: 55,
+      }),
+    );
+    assert.equal(set, 55);
+    assert.equal(
+      await Promise.resolve(store.vaGetMemberAirlineCutPct(companyId)),
+      55,
+    );
+    const clamped = await Promise.resolve(
+      store.vaSetMemberAirlineCutPct({
+        companyId,
+        actorAccountId: owner.account.id,
+        memberAirlineCutPct: 70,
+      }),
+    );
+    assert.equal(clamped, 60);
   });
 
   it('quotes member route cut from route net', () => {
     assert.equal(quoteMemberRouteCutUsd(1000, 200, 30), 240);
     assert.equal(quoteMemberRouteCutUsd(100, 200, 30), 0);
     assert.equal(quoteMemberRouteCutUsd(1000, 0, 10), 100);
+  });
+
+  it('quotes airline desk cut from route net', () => {
+    assert.equal(quoteMemberAirlineCutUsd(1000, 200, 50), 400);
+    assert.equal(quoteMemberAirlineCutUsd(1000, 200, 30), 320); // clamps to 40
+    assert.equal(quoteMemberAirlineCutUsd(100, 200, 50), 0);
   });
 
   it('freights settle applies member cut to pilot home', () => {
@@ -872,5 +925,116 @@ describe('VA IH-2', () => {
     assert.equal(wallet.pilotPayCredit!.companyId, 'co_pilot_home');
     assert.equal(wallet.pilotPayCredit!.amountUsd, 240);
     assert.equal(va.walletUsd, before + 1000 - 200 - 240);
+  });
+
+  it('demand settle applies airline cut (not market hire)', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-airline-cut' });
+    const va = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    va.walletUsd = 500_000;
+    const mission = {
+      id: 'msn_airline_cut',
+      lots: [],
+      demandOrderId: 'ord_x',
+      commodityId: 'general',
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      cargoKg: 100,
+      pax: 0,
+      aircraftClassId: 'narrow_freighter',
+      rolesPackRelPath: '',
+      deadlineTick: world.tick + 100,
+      payUsd: 1000,
+      urgency: 'normal',
+      reason: 'test',
+      status: 'settled',
+      acceptedAtTick: world.tick,
+      pilotHomeCompanyId: 'co_pilot_home',
+      pilotAccountId: 'acc_pilot',
+      vaFlight: true,
+    } as import('./types/career-economy.js').MissionIntent;
+    const before = va.walletUsd;
+    const wallet = applySettleWalletDeltas(
+      va,
+      world.tick,
+      {
+        mission,
+        settlement: {
+          missionId: mission.id,
+          payoutUsd: 1000,
+          penaltyUsd: 0,
+          lateTicks: 0,
+          deliveredKg: 100,
+          onTime: true,
+          originStockAfterKg: 0,
+          destStockAfterKg: 100,
+        },
+        walletCreditUsd: 1000,
+        fuelDebitUsd: 200,
+      },
+      {
+        companyId: 'co_va_ops',
+        memberRouteCutPct: 30,
+        memberAirlineCutPct: 50,
+      },
+    );
+    assert.ok(wallet.pilotPayCredit);
+    assert.equal(wallet.pilotPayCredit!.amountUsd, 400);
+    assert.equal(va.walletUsd, before + 1000 - 200 - 400);
+  });
+
+  it('airline desk holds include demand and haul kinds', () => {
+    const state = emptyMissionsStateV2();
+    state.playerWarehouses = {
+      warehouses: [],
+      stock: [],
+      demandHolds: [
+        {
+          id: 'h_bridge',
+          kind: 'bridge',
+          warehouseId: 'wh_a',
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+          destWarehouseId: 'wh_b',
+          commodityId: 'general',
+          kg: 500,
+          unitPriceUsd: 1,
+          pilotPayUsd: 200,
+          heldAtTick: 1,
+          expiresAtTick: 100,
+        },
+        {
+          id: 'h_demand',
+          kind: 'demand',
+          orderId: 'ord_1',
+          warehouseId: 'wh_a',
+          originIcao: 'SBGR',
+          destIcao: 'SBCT',
+          commodityId: 'general',
+          kg: 300,
+          unitPriceUsd: 2,
+          heldAtTick: 1,
+          expiresAtTick: 100,
+        },
+        {
+          id: 'h_haul',
+          kind: 'haul',
+          warehouseId: 'wh_a',
+          originIcao: 'SBGR',
+          destIcao: 'SBGL',
+          commodityId: 'general',
+          kg: 800,
+          unitPriceUsd: 1.5,
+          heldAtTick: 1,
+          expiresAtTick: 100,
+        },
+      ],
+    };
+    const bridges = listOpenInternalHaulHolds(state);
+    assert.equal(bridges.length, 1);
+    const desk = listOpenAirlineDeskHolds(state);
+    assert.equal(desk.length, 3);
   });
 });

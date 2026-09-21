@@ -1,5 +1,8 @@
 # Current state (2026-09-21)
 
+`main` **751f2db** / desktop **0.3.167** shipped: Merge home+VA logbook missions and stop Charter infinite loading. Release: [v0.3.167](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.167).
+
+
 `main` **395ba37** / desktop **0.3.166** shipped: Tag VA logbook flights, harden MX fuel settle, and fix VA board pickers. Release: [v0.3.166](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.166).
 
 

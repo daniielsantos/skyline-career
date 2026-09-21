@@ -23,6 +23,11 @@ Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
 - `world-api` is the single writer: it owns HTTP commands and the background
   economy clock. A failed health check rolls the application image back, but
   never restores or deletes a database volume.
+- **Two-queue lock (pulse vs Accept):** MP latency fixes in `withCareerWrite` /
+  Postgres command slice live only after **world-api** is redeployed. A desktop
+  release alone does not change the hosted world lock. After deploy, Accept
+  during pulse should show `lockWait` on the order of the tick (~2s), not the
+  ~30s PG save.
 
 ## Host preparation
 

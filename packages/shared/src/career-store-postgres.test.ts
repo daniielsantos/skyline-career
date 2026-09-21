@@ -287,6 +287,62 @@ describe('career store postgres', () => {
         (beforeLots.rows[0] as { n: number }).n,
         'persistInboundPending must not rewrite lots',
       );
+
+      // Accept-like command slice: mutate one lot without rewriting the planet.
+      const sliceLot = economy.world.lots.find((l) => l.status === 'available');
+      assert.ok(sliceLot, 'seed world should have an available lot');
+      const lotCountBeforeSlice = (
+        await store['pool'].query(`SELECT COUNT(*)::int AS n FROM lots`)
+      ).rows[0] as { n: number };
+      sliceLot.status = 'reserved';
+      sliceLot.reservedKg = sliceLot.quantityKg;
+      sliceLot.claimedByCompanyId = companyId;
+      await store.persistCommandWorldSlice(economy.world, {
+        missionId: 'pg-cmd-slice',
+        lotIds: [sliceLot.id],
+        icaos: [sliceLot.originIcao, sliceLot.destIcao],
+      });
+      const lotCountAfterSlice = (
+        await store['pool'].query(`SELECT COUNT(*)::int AS n FROM lots`)
+      ).rows[0] as { n: number };
+      assert.equal(
+        lotCountAfterSlice.n,
+        lotCountBeforeSlice.n,
+        'persistCommandWorldSlice must not orphan-delete other lots',
+      );
+      const lotRow = await store['pool'].query(
+        `SELECT status, reserved_kg, claimed_by_company_id
+         FROM lots WHERE world_id = 'local' AND id = $1`,
+        [sliceLot.id],
+      );
+      assert.equal(lotRow.rows[0]?.status, 'reserved');
+      assert.equal(Number(lotRow.rows[0]?.reserved_kg), sliceLot.quantityKg);
+      assert.equal(lotRow.rows[0]?.claimed_by_company_id, companyId);
+
+      // Pulse snapshot save must not clobber live RAM after a command slice.
+      const pulseSnap = structuredClone(economy.world);
+      const liveLot = store.peekEconomyWorld()?.lots.find((l) => l.id === sliceLot.id);
+      assert.equal(liveLot?.status, 'reserved');
+      // Snapshot still has the pre-accept status if we rewind it.
+      const snapLot = pulseSnap.lots.find((l) => l.id === sliceLot.id);
+      if (snapLot) {
+        snapLot.status = 'available';
+        snapLot.reservedKg = 0;
+        delete snapLot.claimedByCompanyId;
+      }
+      await store.saveEconomy(pulseSnap, { applyToRam: false });
+      assert.equal(
+        store.peekEconomyWorld()?.lots.find((l) => l.id === sliceLot.id)?.status,
+        'reserved',
+        'applyToRam:false must keep command claim in live RAM',
+      );
+      await store.flushDirtyCommandLots?.();
+      const lotRowAfterFlush = await store['pool'].query(
+        `SELECT status FROM lots WHERE world_id = 'local' AND id = $1`,
+        [sliceLot.id],
+      );
+      assert.equal(lotRowAfterFlush.rows[0]?.status, 'reserved');
+
       await store.persistDemandBoardTables(economy.world);
       const afterDemand = await store['pool'].query(
         `SELECT COUNT(*)::int AS n FROM demand_orders`,

@@ -19,7 +19,15 @@ Hoje os dois estão em `worldLock` + `companyLock`. Acquire **world then company
 
 Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 
-`withCareerWrite` default: `catchUp !== true`. `persist: 'company'` = só `saveMissions`. `commandSlice*` = patch origin/dest + lots.
+`withCareerWrite` default: `catchUp !== true`. `persist: 'company'` = só `saveMissions` (e **só `companyLock`** quando não há `commandSlice*` / demand / listing / concessions). `commandSlice*` = patch origin/dest + lots.
+
+## Duas filas (pulse vs comando) — 2026-09-21
+
+**Sintoma:** Accept/`staging/commit` `lockWait` ~15s + `inLock` ~5s atrás de `economy-pulse … save=~34s`.
+
+**Causa:** (1) pulse segurava `worldLock` durante o UPSERT PG do planeta; (2) no Postgres `persistCommandWorldSlice` era stub → `saveEconomy` full.
+
+**Fix:** fatia real no PG (`persistCommandWorldSliceToPg`); tick sob lock + `saveEconomy(snapshot, { applyToRam:false })` fora do lock + `flushDirtyCommandLots`; Accept patcha RAM sob lock e faz UPSERT da fatia **depois** de soltar o lock; settle de companies no pulse isola fail de shell vazio por company. **Ship MP = deploy world-api** (desktop release não basta).
 
 ## Comando `SettleFlight`
 

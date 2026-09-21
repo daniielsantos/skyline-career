@@ -264,8 +264,28 @@ export interface CareerStore {
   loadEconomy(opts?: { maxCatchUpTicks?: number }): Promise<EconomyLoadResult>;
   saveEconomy(
     world: CareerEconomyWorld,
-    opts?: { liveTables?: boolean },
+    opts?: {
+      liveTables?: boolean;
+      /**
+       * When false (pulse snapshot save), write PG without replacing live RAM.
+       * Default true — promote the saved world into the hot cache.
+       */
+      applyToRam?: boolean;
+    },
   ): Promise<void>;
+  /**
+   * After an off-lock pulse snapshot save: re-UPSERT lots touched by commands
+   * while the snapshot was writing (PG only).
+   */
+  flushDirtyCommandLots?(): Promise<void>;
+  /**
+   * Promote a command slice into live RAM (+ dirty lot ids) without waiting on
+   * PG — used so worldLock can release before the slice UPSERT.
+   */
+  applyCommandWorldSliceToRam?(
+    world: CareerEconomyWorld,
+    opts: PersistCommandWorldSliceOpts,
+  ): void;
   persistDemandOrder(order: DemandOrder): Promise<void>;
   persistPortListing(listing: PortListing): Promise<void>;
   persistPortConcessionIndex(rows: PortConcessionIndexRow[]): Promise<void>;
@@ -1085,13 +1105,19 @@ class JsonCareerStore implements CareerStore {
 
   async saveEconomy(
     world: CareerEconomyWorld,
-    _opts?: { liveTables?: boolean },
+    opts?: { liveTables?: boolean; applyToRam?: boolean },
   ): Promise<void> {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;
     ensureHomeCountryId(toSave);
-    this.ram = toSave;
+    if (opts?.applyToRam !== false) {
+      this.ram = toSave;
+    } else if (this.ram) {
+      this.ram.tick = toSave.tick;
+      this.ram.lastBatchAtMs = toSave.lastBatchAtMs;
+      this.ram.lastSyncedAtMs = toSave.lastSyncedAtMs;
+    }
     await writeJsonFileAtomic(this.economyPath, toSave);
   }
 
@@ -2217,7 +2243,7 @@ class SqliteCareerStore implements CareerStore {
 
   async saveEconomy(
     world: CareerEconomyWorld,
-    opts?: { liveTables?: boolean },
+    opts?: { liveTables?: boolean; applyToRam?: boolean },
   ): Promise<void> {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
@@ -2234,6 +2260,16 @@ class SqliteCareerStore implements CareerStore {
     const blob = stripEconomyPersistBlob(toSave);
     const json = JSON.stringify(blob);
     const now = Date.now();
+    const applyToRam = opts?.applyToRam !== false;
+    const promoteRam = () => {
+      if (applyToRam) {
+        this.ram = toSave;
+      } else if (this.ram) {
+        this.ram.tick = toSave.tick;
+        this.ram.lastBatchAtMs = toSave.lastBatchAtMs;
+        this.ram.lastSyncedAtMs = toSave.lastSyncedAtMs;
+      }
+    };
     if (opts?.liveTables === false) {
       runInTransaction(this.db, () => {
         if (json !== this.lastEconomyBlobJson) {
@@ -2248,7 +2284,7 @@ class SqliteCareerStore implements CareerStore {
         persistCharterTables(this.db, toSave);
       });
       world.pendingHubEconomySamples = undefined;
-      this.ram = toSave;
+      promoteRam();
       this.lastEconomyBlobJson = json;
       return;
     }
@@ -2309,7 +2345,7 @@ class SqliteCareerStore implements CareerStore {
       metaSet(this.db, 'economy_tick', String(toSave.tick));
     });
     world.pendingHubEconomySamples = undefined;
-    this.ram = toSave;
+    promoteRam();
     this.rememberPersistedWorld(toSave, json);
   }
 

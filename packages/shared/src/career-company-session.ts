@@ -135,26 +135,33 @@ export function settleAllCompaniesPassiveFees(opts: {
   const nowMs = opts.nowMs ?? Date.now();
   let preferred: OfflineFeeSummary | null = null;
   for (const company of companies) {
-    const missions = assembleMissionsFromTables(
-      opts.db,
-      emptyMissionsStateV2(),
-      company.id,
-    );
-    const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
-    const summary = settleCompanyPassiveFeesForTickRange(
-      missions,
-      opts.world,
-      fromTick,
-      opts.toTick,
-      nowMs,
-    );
-    missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
-    persistCompanyTables(opts.db, missions, { companyId: company.id });
-    persistLedgerIncremental(opts.db, missions.ledger ?? [], company.id);
-    if (summary) {
-      if (opts.preferCompanyId && company.id === opts.preferCompanyId) {
-        preferred = summary;
+    try {
+      const missions = assembleMissionsFromTables(
+        opts.db,
+        emptyMissionsStateV2(),
+        company.id,
+      );
+      const fromTick = companySessionFromTick(missions, opts.fromTick, opts.toTick);
+      const summary = settleCompanyPassiveFeesForTickRange(
+        missions,
+        opts.world,
+        fromTick,
+        opts.toTick,
+        nowMs,
+      );
+      missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
+      persistCompanyTables(opts.db, missions, { companyId: company.id });
+      persistLedgerIncremental(opts.db, missions.ledger ?? [], company.id);
+      if (summary) {
+        if (opts.preferCompanyId && company.id === opts.preferCompanyId) {
+          preferred = summary;
+        }
       }
+    } catch (error) {
+      console.error(
+        `[career] pulse company settle skipped company=${company.id}:`,
+        error instanceof Error ? error.message : error,
+      );
     }
   }
   // Never surface another tenant's offline banner on the active company.

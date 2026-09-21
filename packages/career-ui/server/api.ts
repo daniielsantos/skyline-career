@@ -1237,12 +1237,18 @@ async function loadEconomyUnlocked(opts?: {
   cooperative?: boolean;
   /** Pulse spike diag — optional accumulator. */
   catchUpTiming?: Pick<PulseChunkTiming, 'tickMs' | 'saveMs' | 'lots'>;
+  /**
+   * Tick / heal under worldLock but skip economy PG/SQLite saves — caller
+   * persists a snapshot after releasing the lock (two-queue pulse).
+   */
+  deferPersist?: boolean;
 }): Promise<CareerEconomyWorld> {
   const activeStore = requireStore();
   let caught: CareerEconomyWorld;
   let advancedTicks: number;
   let dirty: boolean;
   const timing = opts?.catchUpTiming;
+  const deferPersist = opts?.deferPersist === true;
 
   const useCooperative =
     opts?.cooperative === true &&
@@ -1251,6 +1257,7 @@ async function loadEconomyUnlocked(opts?: {
     opts.maxCatchUpTicks > 0;
 
   const timedSave = async (fn: () => Promise<void>): Promise<void> => {
+    if (deferPersist) return;
     if (!timing) {
       await fn();
       return;
@@ -1371,25 +1378,32 @@ async function applyCompanySessionSettlement(opts: {
     );
     let preferred: OfflineFeeSummary | undefined;
     for (const company of companies) {
-      const missions = await loadMissions({ companyId: company.id });
-      const fromTick = companySessionFromTick(
-        missions,
-        opts.fromTick,
-        opts.toTick,
-      );
-      const summary = settleCompanyPassiveFeesForTickRange(
-        missions,
-        world,
-        fromTick,
-        opts.toTick,
-      );
-      missions.lastSeenTick = opts.toTick;
-      await saveMissions(missions, { companyId: company.id });
-      if (
-        summary &&
-        company.id === activeStore.getActiveCompanyId()
-      ) {
-        preferred = summary;
+      try {
+        const missions = await loadMissions({ companyId: company.id });
+        const fromTick = companySessionFromTick(
+          missions,
+          opts.fromTick,
+          opts.toTick,
+        );
+        const summary = settleCompanyPassiveFeesForTickRange(
+          missions,
+          world,
+          fromTick,
+          opts.toTick,
+        );
+        missions.lastSeenTick = opts.toTick;
+        await saveMissions(missions, { companyId: company.id });
+        if (
+          summary &&
+          company.id === activeStore.getActiveCompanyId()
+        ) {
+          preferred = summary;
+        }
+      } catch (error) {
+        console.error(
+          `[career] pulse company settle skipped company=${company.id}:`,
+          error instanceof Error ? error.message : error,
+        );
       }
     }
     return preferred;
@@ -1937,8 +1951,48 @@ async function withCareerWrite<T>(
     opts?.catchUp === true
       ? undefined
       : opts?.actorAccountId?.trim() || undefined;
+  const isCatchUp = opts?.catchUp === true;
+  const companyOnly =
+    opts?.persist === 'company' &&
+    !opts?.commandSliceMissionId?.trim() &&
+    !(opts?.commandSliceLotIds?.length) &&
+    !(opts?.commandSliceIcaos?.length) &&
+    !opts?.commandSliceHoldId?.trim() &&
+    !opts?.commandSliceAircraftId?.trim() &&
+    !opts?.persistDemandOrderId?.trim() &&
+    !opts?.persistPortListingId?.trim() &&
+    opts?.persistPortConcessions !== true;
+
+  type DeferredPersist = {
+    pulseSnapshot?: CareerEconomyWorld;
+    commandSlice?: {
+      world: CareerEconomyWorld;
+      missionId: string;
+      lotIds: string[];
+      icaos: string[];
+      demandOrderId?: string;
+      contractPilot?: boolean;
+    };
+  };
+  const deferred: DeferredPersist = {};
+
+  const withWriteLock = <R>(body: () => Promise<R>): Promise<R> => {
+    if (!companyOnly) return withCareerLock(body);
+    const diag = careerWriteDiag.getStore();
+    const queuedAt = diag ? performance.now() : 0;
+    return companyLock.withLock(async () => {
+      if (diag) diag.lockWaitMs += performance.now() - queuedAt;
+      const holdAt = performance.now();
+      try {
+        return await body();
+      } finally {
+        if (diag) diag.inLockMs += performance.now() - holdAt;
+      }
+    });
+  };
+
   const runWrite = () =>
-    withCareerLock(async () => {
+    withWriteLock(async () => {
   if (opts?.catchUpTiming && opts.lockQueuedAtMs != null) {
     opts.catchUpTiming.lockWaitMs = performance.now() - opts.lockQueuedAtMs;
   }
@@ -2085,6 +2139,7 @@ async function withCareerWrite<T>(
         maxCatchUpTicks: catchUpTicks,
         cooperative: opts?.cooperative,
         catchUpTiming: opts?.catchUpTiming,
+        deferPersist: isCatchUp,
       });
     }
     world = isolatePostgresWorldSnapshot(activeStore, world);
@@ -2179,23 +2234,45 @@ async function withCareerWrite<T>(
       return result;
     }
     if (useCommandPersist) {
-      await activeStore.persistCommandWorldSlice(world, {
-        missionId: sliceMissionId,
-        lotIds: sliceLotIds,
-        icaos: sliceIcaos,
-      });
       const sliceMission = sliceMissionId
         ? missions.missions.find((row) => row.id === sliceMissionId)
         : undefined;
-      const demandId =
-        demandOrderId || sliceMission?.demandOrderId?.trim() || '';
-      if (demandId) {
-        const order = world.demandOrders?.find((row) => row.id === demandId);
-        if (order) await activeStore.persistDemandOrder(order);
+      const sliceOpts = {
+        missionId: sliceMissionId,
+        lotIds: sliceLotIds,
+        icaos: sliceIcaos,
+      };
+      if (
+        activeStore.kind === 'postgres' &&
+        typeof activeStore.applyCommandWorldSliceToRam === 'function'
+      ) {
+        // Publish claim/stock into live RAM under worldLock; PG UPSERT after unlock.
+        activeStore.applyCommandWorldSliceToRam(world, sliceOpts);
+        deferred.commandSlice = {
+          world,
+          ...sliceOpts,
+          demandOrderId:
+            demandOrderId || sliceMission?.demandOrderId?.trim() || undefined,
+          contractPilot: Boolean(sliceMission?.contractPilot),
+        };
+      } else {
+        await activeStore.persistCommandWorldSlice(world, sliceOpts);
+        const demandId =
+          demandOrderId || sliceMission?.demandOrderId?.trim() || '';
+        if (demandId) {
+          const order = world.demandOrders?.find((row) => row.id === demandId);
+          if (order) await activeStore.persistDemandOrder(order);
+        }
+        if (sliceMission?.contractPilot) {
+          await activeStore.persistNpcLiveWorld(world);
+        }
       }
-      if (sliceMission?.contractPilot) {
-        await activeStore.persistNpcLiveWorld(world);
-      }
+    } else if (isCatchUp) {
+      // Tick already mutated live RAM (cooperative) or loadEconomy promoted it.
+      // Persist a frozen snapshot outside the lock.
+      deferred.pulseSnapshot = structuredClone(
+        activeStore.peekEconomyWorld() ?? world,
+      );
     } else {
       const timing = opts?.catchUpTiming;
       if (timing) {
@@ -2211,13 +2288,47 @@ async function withCareerWrite<T>(
     return result;
   });
 
-  if (opts?.catchUp === true) {
-    return runWithLedgerActorAccountId(undefined, runWrite);
+  const result =
+    isCatchUp
+      ? await runWithLedgerActorAccountId(undefined, runWrite)
+      : writeActor
+        ? await runWithLedgerActorAccountId(writeActor, runWrite)
+        : await runWrite();
+
+  const activeStore = requireStore();
+  if (deferred.pulseSnapshot) {
+    const timing = opts?.catchUpTiming;
+    const t0 = performance.now();
+    await activeStore.saveEconomy(deferred.pulseSnapshot, {
+      applyToRam: false,
+    });
+    if (timing) {
+      timing.saveMs += performance.now() - t0;
+      timing.lots = Math.max(
+        timing.lots,
+        deferred.pulseSnapshot.lots?.length ?? 0,
+      );
+    }
+    await activeStore.flushDirtyCommandLots?.();
   }
-  if (writeActor) {
-    return runWithLedgerActorAccountId(writeActor, runWrite);
+  if (deferred.commandSlice) {
+    const slice = deferred.commandSlice;
+    await activeStore.persistCommandWorldSlice(slice.world, {
+      missionId: slice.missionId,
+      lotIds: slice.lotIds,
+      icaos: slice.icaos,
+    });
+    if (slice.demandOrderId) {
+      const order = slice.world.demandOrders?.find(
+        (row) => row.id === slice.demandOrderId,
+      );
+      if (order) await activeStore.persistDemandOrder(order);
+    }
+    if (slice.contractPilot) {
+      await activeStore.persistNpcLiveWorld(slice.world);
+    }
   }
-  return runWrite();
+  return result;
 }
 
 function requestDevMode(req: import('node:http').IncomingMessage): boolean {

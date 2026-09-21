@@ -106,6 +106,8 @@ import {
   persistAircraftPoolToPg,
   claimAircraftInstanceInPg,
   releaseAircraftInstanceClaimInPg,
+  persistCommandWorldSliceToPg,
+  upsertLotsSliceToPg,
   persistDemandBoardToPg,
   persistDemandOrderToPg,
   persistInboundPendingToPg,
@@ -114,6 +116,7 @@ import {
   persistPortConcessionsToPg,
   persistPortListingToPg,
   persistPortMarketToPg,
+  PgEconomyRevisionConflictError,
 } from './career-store-pg-world.js';
 import {
   readHubEconomySamplesFromPg,
@@ -498,6 +501,8 @@ export class PostgresCareerStore implements CareerStore {
   private ram: CareerEconomyWorld | null = null;
   /** Revision of `ram`; null means no authoritative PG snapshot is cached. */
   private ramRevision: bigint | null = null;
+  /** Lot ids patched by command slices while a pulse snapshot may be saving. */
+  private dirtyCommandLotIds = new Set<string>();
   private writerLeaseClient: pg.PoolClient | null = null;
   private ready: Promise<void>;
 
@@ -574,12 +579,37 @@ export class PostgresCareerStore implements CareerStore {
   private async persistRevisioned(
     persist: (expectedRevision: bigint | undefined) => Promise<bigint>,
     applyToRam: () => void,
+    opts?: { softCas?: boolean },
   ): Promise<void> {
-    try {
-      const revision = await persist(this.ramRevision ?? undefined);
+    const run = async (expected: bigint | undefined) => {
+      const revision = await persist(expected);
       applyToRam();
       this.ramRevision = revision;
+    };
+    try {
+      await run(this.ramRevision ?? undefined);
     } catch (error) {
+      // Command slice / pulse snapshot may race on economy_meta revision. Retry
+      // once with a fresh CAS tip instead of wiping live RAM.
+      if (
+        opts?.softCas !== false &&
+        error instanceof PgEconomyRevisionConflictError &&
+        this.ram
+      ) {
+        try {
+          const tip = await this.pool.query(
+            `SELECT revision FROM economy_meta WHERE world_id = $1`,
+            [LOCAL_WORLD_ID],
+          );
+          this.ramRevision = pgRevision(tip.rows[0]?.revision);
+          await run(this.ramRevision ?? undefined);
+          return;
+        } catch (retryError) {
+          this.ram = null;
+          this.ramRevision = null;
+          throw retryError;
+        }
+      }
       // The caller may already have mutated the shared object. Never serve it
       // after a failed/conflicting commit; the next read rehydrates from PG.
       this.ram = null;
@@ -1966,11 +1996,150 @@ export class PostgresCareerStore implements CareerStore {
     return this.ram;
   }
 
+  applyCommandWorldSliceToRam(
+    world: CareerEconomyWorld,
+    opts: PersistCommandWorldSliceOpts,
+  ): void {
+    const lotIdSet = new Set(
+      opts.lotIds.map((id) => id.trim()).filter(Boolean),
+    );
+    const icaoSet = new Set(
+      opts.icaos.map((c) => c.trim().toUpperCase()).filter(Boolean),
+    );
+    const airports = (world.airports ?? []).filter((ap) =>
+      icaoSet.has(String(ap.icao ?? '').trim().toUpperCase()),
+    );
+    const lots = (world.lots ?? []).filter((lot) => lotIdSet.has(lot.id));
+    const remainingLotIds = new Set(lots.map((lot) => lot.id));
+    const inbound = (world.inboundPending ?? []).filter(
+      (row) => row.missionId === opts.missionId,
+    );
+    if (!this.ram) {
+      this.ram = world;
+    } else {
+      for (const lot of lots) {
+        const i = this.ram.lots.findIndex((row) => row.id === lot.id);
+        if (i >= 0) this.ram.lots[i] = lot;
+        else this.ram.lots.push(lot);
+      }
+      if (lotIdSet.size > 0) {
+        this.ram.lots = this.ram.lots.filter(
+          (row) => remainingLotIds.has(row.id) || !lotIdSet.has(row.id),
+        );
+      }
+      for (const ap of airports) {
+        const icao = String(ap.icao ?? '').trim().toUpperCase();
+        const i = this.ram.airports.findIndex(
+          (row) => String(row.icao ?? '').trim().toUpperCase() === icao,
+        );
+        if (i >= 0) this.ram.airports[i] = ap;
+        else this.ram.airports.push(ap);
+      }
+      if (opts.missionId.trim()) {
+        const mid = opts.missionId.trim();
+        const kept = (this.ram.inboundPending ?? []).filter(
+          (row) => row.missionId !== mid,
+        );
+        this.ram.inboundPending = [...kept, ...inbound];
+      }
+      this.ram.tick = world.tick;
+      this.ram.lastBatchAtMs = world.lastBatchAtMs;
+    }
+    for (const id of lotIdSet) this.dirtyCommandLotIds.add(id);
+  }
+
   async persistCommandWorldSlice(
     world: CareerEconomyWorld,
-    _opts: PersistCommandWorldSliceOpts,
+    opts: PersistCommandWorldSliceOpts,
   ): Promise<void> {
-    await this.saveEconomy(world);
+    await this.ready;
+    const lotIdSet = new Set(
+      opts.lotIds.map((id) => id.trim()).filter(Boolean),
+    );
+    await this.persistRevisioned(
+      (expected) =>
+        persistCommandWorldSliceToPg(
+          this.pool,
+          world,
+          {
+            missionId: opts.missionId,
+            lotIds: [...lotIdSet],
+            icaos: opts.icaos
+              .map((c) => c.trim().toUpperCase())
+              .filter(Boolean),
+          },
+          LOCAL_WORLD_ID,
+          expected,
+        ),
+      () => {
+        this.applyCommandWorldSliceToRam(world, opts);
+      },
+    );
+  }
+
+  async flushDirtyCommandLots(): Promise<void> {
+    await this.ready;
+    if (!this.ram || this.dirtyCommandLotIds.size === 0) return;
+    const lotIds = [...this.dirtyCommandLotIds];
+    this.dirtyCommandLotIds.clear();
+    await this.persistRevisioned(
+      (expected) =>
+        upsertLotsSliceToPg(
+          this.pool,
+          this.ram!,
+          lotIds,
+          LOCAL_WORLD_ID,
+          expected,
+        ),
+      () => {
+        /* ram already has the lots */
+      },
+    );
+  }
+
+  async saveEconomy(
+    world: CareerEconomyWorld,
+    opts?: { liveTables?: boolean; applyToRam?: boolean },
+  ): Promise<void> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    toSave.lastBatchAtMs = world.lastBatchAtMs;
+    toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    if (
+      (!toSave.pendingHubEconomySamples ||
+        toSave.pendingHubEconomySamples.length === 0) &&
+      world.pendingHubEconomySamples?.length
+    ) {
+      toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
+    }
+    ensureHomeCountryId(toSave);
+    const applyToRam = opts?.applyToRam !== false;
+    await this.persistRevisioned(
+      (expected) =>
+        persistEconomyTablesToPg(
+          this.pool,
+          toSave,
+          LOCAL_WORLD_ID,
+          // Pulse snapshot: do not CAS against a tip that command slices may
+          // have already advanced while this save was queued off-lock.
+          applyToRam ? expected : undefined,
+        ),
+      () => {
+        if (applyToRam) {
+          this.ram = toSave;
+          world.pendingHubEconomySamples = undefined;
+        } else {
+          // Pulse snapshot: keep live RAM (may include newer command slices).
+          // Still clear pending samples on the snapshot object.
+          world.pendingHubEconomySamples = undefined;
+          if (this.ram) {
+            this.ram.tick = toSave.tick;
+            this.ram.lastBatchAtMs = toSave.lastBatchAtMs;
+            this.ram.lastSyncedAtMs = toSave.lastSyncedAtMs;
+          }
+        }
+      },
+    );
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {
@@ -2135,37 +2304,6 @@ export class PostgresCareerStore implements CareerStore {
     await this.saveEconomy(fresh);
     this.ram = fresh;
     return { world: fresh, advancedTicks: 0, settledFlights: 0, dirty: false };
-  }
-
-  async saveEconomy(
-    world: CareerEconomyWorld,
-    _opts?: { liveTables?: boolean },
-  ): Promise<void> {
-    await this.ready;
-    const toSave = migrateEconomyWorld(world);
-    toSave.lastBatchAtMs = world.lastBatchAtMs;
-    toSave.lastSyncedAtMs = world.lastBatchAtMs;
-    if (
-      (!toSave.pendingHubEconomySamples ||
-        toSave.pendingHubEconomySamples.length === 0) &&
-      world.pendingHubEconomySamples?.length
-    ) {
-      toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
-    }
-    ensureHomeCountryId(toSave);
-    await this.persistRevisioned(
-      (expected) =>
-        persistEconomyTablesToPg(
-          this.pool,
-          toSave,
-          LOCAL_WORLD_ID,
-          expected,
-        ),
-      () => {
-        this.ram = toSave;
-        world.pendingHubEconomySamples = undefined;
-      },
-    );
   }
 
   async persistDemandOrder(order: DemandOrder): Promise<void> {
@@ -2368,23 +2506,30 @@ export class PostgresCareerStore implements CareerStore {
     const nowMs = opts.nowMs ?? Date.now();
     let preferred: OfflineFeeSummary | null = null;
     for (const company of companies) {
-      const missions = await this.loadMissions({ companyId: company.id });
-      const fromTick = companySessionFromTick(
-        missions,
-        opts.fromTick,
-        opts.toTick,
-      );
-      const summary = settleCompanyPassiveFeesForTickRange(
-        missions,
-        opts.world,
-        fromTick,
-        opts.toTick,
-        nowMs,
-      );
-      missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
-      await this.saveMissions(missions, { companyId: company.id });
-      if (summary && company.id === this.activeCompanyId) {
-        preferred = summary;
+      try {
+        const missions = await this.loadMissions({ companyId: company.id });
+        const fromTick = companySessionFromTick(
+          missions,
+          opts.fromTick,
+          opts.toTick,
+        );
+        const summary = settleCompanyPassiveFeesForTickRange(
+          missions,
+          opts.world,
+          fromTick,
+          opts.toTick,
+          nowMs,
+        );
+        missions.lastSeenTick = Math.max(0, Math.floor(opts.toTick));
+        await this.saveMissions(missions, { companyId: company.id });
+        if (summary && company.id === this.activeCompanyId) {
+          preferred = summary;
+        }
+      } catch (error) {
+        console.error(
+          `[career] pulse company settle skipped company=${company.id}:`,
+          error instanceof Error ? error.message : error,
+        );
       }
     }
     return preferred;

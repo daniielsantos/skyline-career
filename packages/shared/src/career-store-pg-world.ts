@@ -875,6 +875,193 @@ export async function syncLotsTableToPg(
   return stats;
 }
 
+const AIRPORT_UPSERT_ON_CONFLICT = `ON CONFLICT (world_id, icao) DO UPDATE SET
+  name = EXCLUDED.name,
+  region = EXCLUDED.region,
+  country_id = EXCLUDED.country_id,
+  hub_tier = EXCLUDED.hub_tier,
+  bush = EXCLUDED.bush,
+  bush_trip_only = EXCLUDED.bush_trip_only,
+  lat = EXCLUDED.lat,
+  lon = EXCLUDED.lon,
+  level = EXCLUDED.level,
+  level_xp = EXCLUDED.level_xp,
+  level_curve_version = EXCLUDED.level_curve_version,
+  activity_score = EXCLUDED.activity_score,
+  last_activity_tick = EXCLUDED.last_activity_tick
+WHERE airports.name IS DISTINCT FROM EXCLUDED.name
+   OR airports.region IS DISTINCT FROM EXCLUDED.region
+   OR airports.country_id IS DISTINCT FROM EXCLUDED.country_id
+   OR airports.hub_tier IS DISTINCT FROM EXCLUDED.hub_tier
+   OR airports.bush IS DISTINCT FROM EXCLUDED.bush
+   OR airports.bush_trip_only IS DISTINCT FROM EXCLUDED.bush_trip_only
+   OR airports.lat IS DISTINCT FROM EXCLUDED.lat
+   OR airports.lon IS DISTINCT FROM EXCLUDED.lon
+   OR airports.level IS DISTINCT FROM EXCLUDED.level
+   OR airports.level_xp IS DISTINCT FROM EXCLUDED.level_xp
+   OR airports.level_curve_version IS DISTINCT FROM EXCLUDED.level_curve_version
+   OR airports.activity_score IS DISTINCT FROM EXCLUDED.activity_score
+   OR airports.last_activity_tick IS DISTINCT FROM EXCLUDED.last_activity_tick`;
+
+/**
+ * Command hot path — patch only listed lotIds / ICAOs / mission inbound.
+ * Never orphan-deletes the rest of the world (unlike syncLotsTableToPg).
+ */
+export async function persistCommandWorldSliceToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  opts: {
+    missionId: string;
+    lotIds: string[];
+    icaos: string[];
+  },
+  worldId: string = LOCAL_WORLD_ID,
+  expectedRevision?: bigint,
+): Promise<bigint> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const icaoSet = new Set(
+    opts.icaos.map((c) => c.trim().toUpperCase()).filter(Boolean),
+  );
+  const lotIdSet = new Set(
+    opts.lotIds.map((id) => id.trim()).filter(Boolean),
+  );
+  const airports = (world.airports ?? []).filter((ap) =>
+    icaoSet.has(String(ap.icao ?? '').trim().toUpperCase()),
+  );
+  const lots = (world.lots ?? []).filter((lot) => lotIdSet.has(lot.id));
+  const remainingLotIds = new Set(lots.map((lot) => lot.id));
+  const missingLotIds = [...lotIdSet].filter((id) => !remainingLotIds.has(id));
+  const inbound = (world.inboundPending ?? []).filter(
+    (row) => row.missionId === opts.missionId,
+  );
+  const { hubRows, stockRows } = airportTableRows(wid, airports);
+  const lotRows = lotTableRows(
+    wid,
+    lots,
+    world.airports ?? airports,
+    sqlNum(world.tick),
+  );
+  const inboundRows = inboundTableRows(wid, inbound);
+  const icaoList = [...icaoSet];
+
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
+    if (hubRows.length > 0) {
+      await upsertChunks(
+        client,
+        `INSERT INTO airports (
+           world_id, icao, name, region, country_id, hub_tier, bush, bush_trip_only,
+           lat, lon, level, level_xp, level_curve_version, activity_score, last_activity_tick
+         )`,
+        15,
+        hubRows,
+        AIRPORT_UPSERT_ON_CONFLICT,
+      );
+    }
+    if (icaoList.length > 0) {
+      await client.query(
+        `DELETE FROM airport_stock WHERE world_id = $1 AND icao = ANY($2::text[])`,
+        [wid, icaoList],
+      );
+      if (stockRows.length > 0) {
+        await insertChunks(
+          client,
+          `INSERT INTO airport_stock (
+             world_id, icao, commodity_id, stock_kg, capacity_kg,
+             base_production_per_tick_kg, base_consumption_per_tick_kg,
+             production_per_tick_kg, consumption_per_tick_kg
+           )`,
+          9,
+          stockRows,
+        );
+      }
+    }
+    if (lotRows.length > 0) {
+      await upsertChunks(
+        client,
+        `INSERT INTO lots (
+           id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+           created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+           origin_country_id, dest_country_id, world_id, claimed_by_company_id
+         )`,
+        17,
+        lotRows,
+        LOT_UPSERT_ON_CONFLICT,
+      );
+    }
+    if (missingLotIds.length > 0) {
+      await client.query(
+        `DELETE FROM lots WHERE world_id = $1 AND id = ANY($2::text[])`,
+        [wid, missingLotIds],
+      );
+    }
+    const missionId = opts.missionId.trim();
+    if (missionId) {
+      await client.query(
+        `DELETE FROM inbound_pending WHERE world_id = $1 AND mission_id = $2`,
+        [wid, missionId],
+      );
+      if (inboundRows.length > 0) {
+        await insertChunks(
+          client,
+          `INSERT INTO inbound_pending (
+             id, mission_id, origin_icao, dest_icao, commodity_id, cargo_kg,
+             expires_at_tick, source, payload_json, world_id
+           )`,
+          10,
+          inboundRows,
+        );
+      }
+    }
+  });
+}
+
+/**
+ * Re-UPSERT specific lots from live RAM after a pulse snapshot save, so an
+ * Accept that ran during the off-lock save is not clobbered.
+ */
+export async function upsertLotsSliceToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  lotIds: string[],
+  worldId: string = LOCAL_WORLD_ID,
+  expectedRevision?: bigint,
+): Promise<bigint> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const idSet = new Set(lotIds.map((id) => id.trim()).filter(Boolean));
+  if (idSet.size === 0) {
+    return expectedRevision ?? 0n;
+  }
+  const lots = (world.lots ?? []).filter((lot) => idSet.has(lot.id));
+  const lotRows = lotTableRows(
+    wid,
+    lots,
+    world.airports ?? [],
+    sqlNum(world.tick),
+  );
+  const missing = [...idSet].filter((id) => !lots.some((l) => l.id === id));
+  return withRevisionedTx(pool, wid, expectedRevision, async (client) => {
+    if (lotRows.length > 0) {
+      await upsertChunks(
+        client,
+        `INSERT INTO lots (
+           id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+           created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+           origin_country_id, dest_country_id, world_id, claimed_by_company_id
+         )`,
+        17,
+        lotRows,
+        LOT_UPSERT_ON_CONFLICT,
+      );
+    }
+    if (missing.length > 0) {
+      await client.query(
+        `DELETE FROM lots WHERE world_id = $1 AND id = ANY($2::text[])`,
+        [wid, missing],
+      );
+    }
+  });
+}
+
 /**
  * Sync RAM retained charter offers → PG without full wipe.
  */

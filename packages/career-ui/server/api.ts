@@ -193,6 +193,7 @@ import {
   VA_FLIGHT_QUALITY_WINDOW_DAYS,
   VA_MEMBER_CAP,
   canManageVaRoster,
+  canMutateVaPortDeskOps,
   hireVaLineCrew,
   fireVaLineCrew,
   upgradeVaLineCrew,
@@ -1765,6 +1766,42 @@ async function assertVaOwnerForFleetMutation(
   if (!membership || membership.role !== 'owner') {
     throw new Error(`Only the VA owner can ${actionLabel}`);
   }
+}
+
+/**
+ * Port FBO desk ops (auto-buy / stevedore / shuttle / yard abandon):
+ * owner or dispatcher when company is VA-listed. Solo companies skip.
+ */
+async function assertVaPortDeskOps(
+  req: import('node:http').IncomingMessage,
+  companyId: string,
+  actionLabel = 'run Port FBO desk ops',
+): Promise<void> {
+  if (!store?.supportsAuth) return;
+  const listed = await Promise.resolve(store.vaIsListed(companyId));
+  if (!listed) return;
+  const session = authSessionFromRequest(req);
+  if (!session) {
+    throw new Error(`Authentication required to ${actionLabel}`);
+  }
+  const membership = await Promise.resolve(
+    store.vaGetMembership(session.account.id, companyId),
+  );
+  if (!membership || !canMutateVaPortDeskOps(membership.role)) {
+    throw new Error(`Owner or dispatcher only — ${actionLabel}`);
+  }
+}
+
+function vaPermissionStatus(error: unknown): number {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    /Only the VA owner|Owner or dispatcher|Authentication required/i.test(
+      message,
+    )
+  ) {
+    return 403;
+  }
+  return 400;
 }
 
 /** @deprecated alias — MX uses the same owner gate. */
@@ -8878,6 +8915,11 @@ export function createCareerApiServer(port = 8787) {
         const ports_auto_buyCompanyId = companyIdFromRequest(req, body.companyId);
         const action = body.action ?? 'upsert';
         try {
+          await assertVaPortDeskOps(
+            req,
+            ports_auto_buyCompanyId,
+            'manage Port FBO desk auto-buy',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             if (action === 'remove') {
@@ -8925,7 +8967,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: ports_auto_buyCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -8941,6 +8983,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            ports_concession_claimCompanyId,
+            'claim a Port FBO for the VA',
+          );
           const companyNames = await companyDisplayNameMap(requireStore());
           const displayName =
             companyNames.get(ports_concession_claimCompanyId) ??
@@ -8975,7 +9022,7 @@ export function createCareerApiServer(port = 8787) {
           });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -8994,6 +9041,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            ports_concession_renewCompanyId,
+            'renew a Port FBO lease',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const concession = renewPortConcession(missions, world, {
@@ -9009,7 +9061,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_renewCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -9025,6 +9077,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            ports_concession_upgradeCompanyId,
+            'upgrade a Port FBO',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const concession = upgradePortConcession(missions, world, {
@@ -9034,12 +9091,18 @@ export function createCareerApiServer(port = 8787) {
             return {
               walletUsd: missions.walletUsd,
               concession,
-              ports: portSnapshot(world, missions, { viewerCompanyId: ports_concession_upgradeCompanyId }),
+              ports: portSnapshot(world, missions, {
+                viewerCompanyId: ports_concession_upgradeCompanyId,
+              }),
             };
-          }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_upgradeCompanyId });
+          }, {
+            persist: 'company',
+            persistPortConcessions: true,
+            companyId: ports_concession_upgradeCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -9963,6 +10026,11 @@ export function createCareerApiServer(port = 8787) {
             send(res, 400, { error: 'aircraftId required' });
             return;
           }
+          await assertVaPortDeskOps(
+            req,
+            ports_shuttleCompanyId,
+            'dispatch a Port shuttle',
+          );
           const updatePolicy = await resolveClientUpdatePolicy(store);
           if (
             rejectIfClientUpdateRequired(
@@ -9995,7 +10063,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: ports_shuttleCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -10057,6 +10125,11 @@ export function createCareerApiServer(port = 8787) {
             send(res, 400, { error: 'destWarehouseId required' });
             return;
           }
+          await assertVaPortDeskOps(
+            req,
+            ports_stevedoreCompanyId,
+            'start a Port FBO stevedore haul',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const started = startPortStevedoreHaul(
@@ -10080,7 +10153,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: ports_stevedoreCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -10133,6 +10206,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaPortDeskOps(
+            req,
+            ports_pickup_abandonCompanyId,
+            'abandon Port yard cargo',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const abandoned = abandonPortPickup(missions, {
@@ -10149,7 +10227,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: ports_pickup_abandonCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -10195,6 +10273,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            warehouses_buyCompanyId,
+            'buy a warehouse for the VA',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const bought = buyWarehouseAtPickupHub(missions, world, body.icao!);
@@ -10209,7 +10292,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: warehouses_buyCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -10225,6 +10308,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            warehouses_upgradeCompanyId,
+            'upgrade a VA warehouse',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const upgraded = upgradeWarehouse(
@@ -10242,7 +10330,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: warehouses_upgradeCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }
@@ -10258,6 +10346,11 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          await assertVaPortDeskOps(
+            req,
+            warehouses_stock_abandonCompanyId,
+            'abandon warehouse stock',
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const abandoned = abandonWarehouseStock(missions, {
@@ -10275,7 +10368,7 @@ export function createCareerApiServer(port = 8787) {
           }, { persist: 'company', companyId: warehouses_stock_abandonCompanyId });
           send(res, 200, result);
         } catch (error) {
-          send(res, 400, {
+          send(res, vaPermissionStatus(error), {
             error: error instanceof Error ? error.message : String(error),
           });
         }

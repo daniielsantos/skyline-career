@@ -312,35 +312,34 @@ function portsLoopMessage(
 ): string {
   switch (step.kind) {
     case 'buy_warehouse':
-      return 'Buy a warehouse at a port pickup hub before cargo can leave the yard.';
+      return 'Need a warehouse at a pickup hub.';
     case 'store_yard': {
       const fee =
         yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
           ? yardHoldUsdPerDayTotal
           : step.holdUsdPerDay;
-      const feeBit =
-        fee > 0 ? ` Yard holding ${formatMoney(fee)}/day.` : '';
-      return `Store ${formatTonnes(step.kg)} of ${commodityLabel(step)} from yard at ${step.hubIcao} into your warehouse.${feeBit}`;
+      const feeBit = fee > 0 ? ` · yard ${formatMoney(fee)}/day` : '';
+      return `Yard ${formatTonnes(step.kg)} ${commodityLabel(step)} @ ${step.hubIcao}${feeBit}`;
     }
     case 'wait_inbound': {
       const eta =
         step.ticksLeft <= 0
-          ? 'any moment'
+          ? 'soon'
           : ticksToHours
             ? `~${ticksToHours(step.ticksLeft)}`
             : `${step.ticksLeft} ticks`;
-      return `${formatTonnes(step.kg)} in transit to ${step.hubIcao} — arrives ${eta}. Then open Demand Board.`;
+      return `${formatTonnes(step.kg)} in transit → ${step.hubIcao} · ${eta}`;
     }
     case 'fulfill_demand':
       return step.matchCount === 1
-        ? '1 order on this port Demand desk matches your WH stock — accept to stage a flight.'
-        : `${step.matchCount} orders on this port Demand desk match your WH stock — accept to stage a flight.`;
+        ? '1 Demand match on this desk'
+        : `${step.matchCount} Demand matches on this desk`;
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? `${formatTonnes(step.stockKg)} in WH — this port has open Demand, but none match your stock yet. Buy matching cargo or check Scout on Port FBO.`
-        : `${formatTonnes(step.stockKg)} in WH — Demand posts when hub terminals run low (economy tick). Check back after a tick.`;
+        ? `${formatTonnes(step.stockKg)} in WH · no desk match`
+        : `${formatTonnes(step.stockKg)} in WH · waiting on Demand`;
     case 'buy_port':
-      return 'Buy factory cargo at a seaport to start the loop.';
+      return 'Buy cargo at the seaport.';
   }
 }
 
@@ -361,6 +360,7 @@ function portsLoopCtaLabel(step: PortsLoopStep): string | null {
   }
 }
 
+/** On-section hint — skip tutoring; empty = hide the line. */
 function portsLoopSectionHint(
   step: PortsLoopStep,
   formatMoney?: (n: number) => string,
@@ -370,37 +370,35 @@ function portsLoopSectionHint(
 ): string {
   switch (step.kind) {
     case 'buy_warehouse':
-      return 'Next: buy warehouse space on Available, then store yard cargo here.';
+      return 'Available · buy WH space';
     case 'store_yard': {
       const fee =
         yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
           ? yardHoldUsdPerDayTotal
           : step.holdUsdPerDay;
-      const feeBit =
-        fee > 0 && formatMoney
-          ? ` Yard is charging ${formatMoney(fee)}/day until you Store.`
-          : '';
-      return `Next: use Store on a yard lot below to move cargo into the warehouse.${feeBit}`;
+      return fee > 0 && formatMoney
+        ? `Yard hold ${formatMoney(fee)}/day`
+        : '';
     }
     case 'wait_inbound': {
       const eta =
         step.ticksLeft <= 0
           ? 'soon'
           : ticksToHours
-            ? `in ~${ticksToHours(step.ticksLeft)}`
-            : `in ${step.ticksLeft} ticks`;
+            ? `~${ticksToHours(step.ticksLeft)}`
+            : `${step.ticksLeft} ticks`;
       const mass =
         formatTonnes != null ? formatTonnes(step.kg) : `${step.kg} kg`;
-      return `Next: wait for ${mass} to arrive at ${step.hubIcao} (${eta}). In transit is listed below — not Demand-ready yet.`;
+      return `${mass} → ${step.hubIcao} · ${eta}`;
     }
     case 'fulfill_demand':
-      return 'Next: accept a matching order on this port desk to pull WH stock and stage a flight.';
+      return '';
     case 'wait_demand':
       return step.openDemandCount > 0
-        ? 'Stock is ready — nothing on this port desk matches yet. Buy matching cargo or check Scout on Port FBO.'
-        : 'Stock is ready — Demand appears after economy ticks when terminals run low. Check back soon.';
+        ? 'No stock match on this desk'
+        : 'Waiting on catchment Demand';
     case 'buy_port':
-      return 'Next: pick a listing and buy into a warehouse (overflow goes to yard).';
+      return '';
   }
 }
 
@@ -423,6 +421,11 @@ export function PortsPanel(props: {
    * Home Ports: "Yours". My VA Ports: "Company".
    */
   ownedShelfLabel?: string;
+  /**
+   * My VA membership role. Omit on home Ports (solo = full access).
+   * When set, VA-listed gates apply: desk ops = owner|dispatcher; CAPEX = owner.
+   */
+  vaMemberRole?: 'owner' | 'dispatcher' | 'pilot' | null;
   /** Nested under My VA — drop outer panel chrome. */
   embedded?: boolean;
   /** Dual-tenant: company for Accept/Fly when the tail is VA-owned. */
@@ -448,6 +451,12 @@ export function PortsPanel(props: {
   onOpenUpdates?: () => void;
 }) {
   const ownedShelfLabel = props.ownedShelfLabel?.trim() || 'Yours';
+  const vaRole = props.vaMemberRole ?? null;
+  /** Solo / home Ports: full. VA: owner + dispatcher. */
+  const canPortDeskOps =
+    !vaRole || vaRole === 'owner' || vaRole === 'dispatcher';
+  /** Solo / home Ports: full. VA: owner only. */
+  const canPortCapex = !vaRole || vaRole === 'owner';
   const [snap, setSnap] = useState<PortsSnapshot | null>(null);
   const [demand, setDemand] = useState<DemandOrderView[]>([]);
   const [warehouses, setWarehouses] = useState<PlayerWarehouseSnapshot | null>(
@@ -461,9 +470,9 @@ export function PortsPanel(props: {
   const [buyListing, setBuyListing] = useState<PortListingView | null>(null);
   const [concessionOpen, setConcessionOpen] = useState(false);
   const [deskCommodity, setDeskCommodity] = useState('general');
-  const [deskMaxPrice, setDeskMaxPrice] = useState('2');
-  const [deskMaxKgDay, setDeskMaxKgDay] = useState('5000');
-  const [deskWalletFloor, setDeskWalletFloor] = useState('5000');
+  const [deskMaxPrice, setDeskMaxPrice] = useState('');
+  const [deskMaxKgDay, setDeskMaxKgDay] = useState('');
+  const [deskWalletFloor, setDeskWalletFloor] = useState('');
   const [deskWarehouseId, setDeskWarehouseId] = useState('');
   const [amountText, setAmountText] = useState('1000');
   const [acceptOrder, setAcceptOrder] = useState<DemandOrderView | null>(null);
@@ -1303,6 +1312,10 @@ export function PortsPanel(props: {
 
   async function onClaimConcession(portIdToClaim: string) {
     if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the VA owner can claim a Port FBO');
+      return;
+    }
     setLoading(true);
     try {
       const result = await postPortConcessionClaim({ portId: portIdToClaim });
@@ -1332,6 +1345,10 @@ export function PortsPanel(props: {
 
   async function onRenewConcession(portIdToRenew: string, leaseUsd: number) {
     if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the VA owner can renew a Port FBO lease');
+      return;
+    }
     const ok = await confirm({
       title: 'Renew Port FBO lease?',
       body: (
@@ -1373,6 +1390,10 @@ export function PortsPanel(props: {
     toLevel: number,
   ) {
     if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the VA owner can upgrade a Port FBO');
+      return;
+    }
     const p3 = toLevel >= 3;
     const ok = await confirm({
       title: p3 ? 'Unlock P3 terminal cadence?' : 'Enlarge port yard (P2)?',
@@ -1419,6 +1440,33 @@ export function PortsPanel(props: {
 
   async function onDeskUpsert(portIdForDesk: string) {
     if (props.busy || loading) return;
+    if (!canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — manage Port FBO desk auto-buy',
+      );
+      return;
+    }
+    const maxPriceUsdPerKg = Number(deskMaxPrice);
+    const maxKgPerDay = Number(deskMaxKgDay);
+    const walletFloorUsd =
+      deskWalletFloor.trim() === '' ? 0 : Number(deskWalletFloor);
+    if (
+      !Number.isFinite(maxPriceUsdPerKg) ||
+      maxPriceUsdPerKg < 0.01 ||
+      !Number.isFinite(maxKgPerDay) ||
+      maxKgPerDay < 1
+    ) {
+      props.onToast?.(
+        'fail',
+        'Set max price and max mass/day before adding a desk order',
+      );
+      return;
+    }
+    if (!Number.isFinite(walletFloorUsd) || walletFloorUsd < 0) {
+      props.onToast?.('fail', 'Wallet floor must be zero or more');
+      return;
+    }
     const warehouseId =
       deskWarehouseId ||
       (warehouses?.warehouses ?? []).find((w) => {
@@ -1444,15 +1492,18 @@ export function PortsPanel(props: {
         action: 'upsert',
         portId: portIdForDesk,
         commodityId: deskCommodity,
-        maxPriceUsdPerKg: Number(deskMaxPrice),
-        maxKgPerDay: Number(deskMaxKgDay),
+        maxPriceUsdPerKg,
+        maxKgPerDay,
         warehouseId,
-        walletFloorUsd: Number(deskWalletFloor),
+        walletFloorUsd,
         paused: false,
       });
       props.onWallet?.(result.walletUsd);
       setSnap(result.ports);
       setWarehouses(result.ports.warehouses ?? warehouses);
+      setDeskMaxPrice('');
+      setDeskMaxKgDay('');
+      setDeskWalletFloor('');
       setDeskOpen(true);
       props.onToast?.('ok', 'Port FBO desk order saved');
     } catch (err) {
@@ -1467,6 +1518,13 @@ export function PortsPanel(props: {
 
   async function onDeskPause(orderId: string, paused: boolean) {
     if (props.busy || loading) return;
+    if (!canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — manage Port FBO desk auto-buy',
+      );
+      return;
+    }
     setLoading(true);
     try {
       const result = await postPortAutoBuy({
@@ -1489,6 +1547,13 @@ export function PortsPanel(props: {
 
   async function onDeskRemove(orderId: string) {
     if (props.busy || loading) return;
+    if (!canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — manage Port FBO desk auto-buy',
+      );
+      return;
+    }
     setLoading(true);
     try {
       const result = await postPortAutoBuy({ action: 'remove', id: orderId });
@@ -1511,6 +1576,13 @@ export function PortsPanel(props: {
     destHubIcao: string,
   ) {
     if (props.busy || loading) return;
+    if (!canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — start a Port FBO stevedore haul',
+      );
+      return;
+    }
     try {
       const quoted = await postPortStevedore({
         action: 'quote',
@@ -1583,6 +1655,13 @@ export function PortsPanel(props: {
 
   async function onAbandonPickup(pickupId: string, label: string) {
     if (props.busy || loading) return;
+    if (!canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — abandon Port yard cargo',
+      );
+      return;
+    }
     const ok = await confirm({
       title: 'Abandon yard hold?',
       body: (
@@ -1620,6 +1699,10 @@ export function PortsPanel(props: {
 
   async function onBuyWarehouse(icao: string) {
     if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the VA owner can buy a warehouse');
+      return;
+    }
     setLoading(true);
     try {
       const result = await postWarehouseBuy({
@@ -1715,6 +1798,10 @@ export function PortsPanel(props: {
 
   async function onUpgradeWarehouse(warehouseId: string, icao: string) {
     if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the VA owner can upgrade a warehouse');
+      return;
+    }
     const wh = (warehouses?.warehouses ?? []).find((w) => w.id === warehouseId);
     const nextTier = wh?.nextTier ?? (wh?.tier === 1 ? 2 : wh?.tier === 2 ? 3 : wh?.tier === 3 ? 4 : null);
     if (!nextTier) return;
@@ -1763,6 +1850,13 @@ export function PortsPanel(props: {
     hubIcao: string,
   ) {
     if (props.busy || loading) return;
+    if (!canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — abandon warehouse stock',
+      );
+      return;
+    }
     const ok = await confirm({
       title: 'Abandon warehouse stock?',
       body: (
@@ -1911,6 +2005,14 @@ export function PortsPanel(props: {
 
   async function onConfirmDispatchHold() {
     if (!dispatchHold || !dispatchAircraftId || props.busy || loading) return;
+    if (dispatchMode === 'shuttle' && !canPortDeskOps) {
+      props.onToast?.(
+        'fail',
+        'Owner or dispatcher only — dispatch a Port shuttle',
+      );
+      setDispatchMode('fly');
+      return;
+    }
     if (props.clientUpdateRequiredMin) {
       props.onToast?.(
         'fail',
@@ -3289,15 +3391,18 @@ export function PortsPanel(props: {
                 ) : null}
               </>
             ) : (
-              <p className="ports-loop-banner-text">
-                {portsLoopSectionHint(
+              (() => {
+                const hint = portsLoopSectionHint(
                   loopStep,
                   props.formatMoney,
                   snap.yardHoldUsdPerDay,
                   props.formatTonnes,
                   ticksToHoursLabel,
-                )}
-              </p>
+                );
+                return hint ? (
+                  <p className="ports-loop-banner-text">{hint}</p>
+                ) : null;
+              })()
             )}
           </div>
 
@@ -3340,7 +3445,7 @@ export function PortsPanel(props: {
                 </h3>
               ) : (
                 <p className="ports-stage-title is-muted">
-                  Select a port on the map or grid.
+                  Select a port on the map.
                 </p>
               )}
 
@@ -3551,10 +3656,14 @@ export function PortsPanel(props: {
                     onClick={() => setConcessionOpen(true)}
                   >
                     {port.concession?.status === 'yours'
-                      ? 'Lease · Upgrade'
+                      ? canPortCapex
+                        ? 'Lease · Upgrade'
+                        : 'Details'
                       : port.concession?.status === 'held'
                         ? 'Details'
-                        : 'Claim'}
+                        : canPortCapex
+                          ? 'Claim'
+                          : 'Details'}
                   </button>
                 </h3>
               ) : (
@@ -3772,31 +3881,34 @@ export function PortsPanel(props: {
                                         {o.maxKgPerDay} kg/day · today{' '}
                                         {o.boughtKgToday} kg
                                       </span>
-                                      <span className="ports-desk-order-actions">
-                                        <button
-                                          type="button"
-                                          className="action ghost"
-                                          disabled={props.busy || loading}
-                                          onClick={() =>
-                                            void onDeskPause(o.id, !o.paused)
-                                          }
-                                        >
-                                          {o.paused ? 'Resume' : 'Pause'}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="action ghost"
-                                          disabled={props.busy || loading}
-                                          onClick={() =>
-                                            void onDeskRemove(o.id)
-                                          }
-                                        >
-                                          Remove
-                                        </button>
-                                      </span>
+                                      {canPortDeskOps ? (
+                                        <span className="ports-desk-order-actions">
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={props.busy || loading}
+                                            onClick={() =>
+                                              void onDeskPause(o.id, !o.paused)
+                                            }
+                                          >
+                                            {o.paused ? 'Resume' : 'Pause'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="action ghost"
+                                            disabled={props.busy || loading}
+                                            onClick={() =>
+                                              void onDeskRemove(o.id)
+                                            }
+                                          >
+                                            Remove
+                                          </button>
+                                        </span>
+                                      ) : null}
                                     </li>
                                   ))}
                                 </ul>
+                                {canPortDeskOps ? (
                                 <div className="ports-desk-form">
                                   <label>
                                     Commodity
@@ -3823,6 +3935,7 @@ export function PortsPanel(props: {
                                       type="number"
                                       min={0.01}
                                       step={0.01}
+                                      placeholder="e.g. 2"
                                       value={deskMaxPrice}
                                       onChange={(e) =>
                                         setDeskMaxPrice(e.target.value)
@@ -3836,6 +3949,7 @@ export function PortsPanel(props: {
                                       type="number"
                                       min={1}
                                       step={100}
+                                      placeholder="e.g. 5000"
                                       value={deskMaxKgDay}
                                       onChange={(e) =>
                                         setDeskMaxKgDay(e.target.value)
@@ -3849,6 +3963,7 @@ export function PortsPanel(props: {
                                       type="number"
                                       min={0}
                                       step={100}
+                                      placeholder="0"
                                       value={deskWalletFloor}
                                       onChange={(e) =>
                                         setDeskWalletFloor(e.target.value)
@@ -3888,6 +4003,12 @@ export function PortsPanel(props: {
                                     Add desk order
                                   </button>
                                 </div>
+                                ) : (
+                                  <p className="muted ports-warehouse-hint">
+                                    Owner or dispatcher manages desk auto-buy.
+                                    You can Scout Hold and fly.
+                                  </p>
+                                )}
                               </div>
                             </details>
                           );
@@ -4317,7 +4438,8 @@ export function PortsPanel(props: {
                                         />
                                       </div>
                                       {wh.canUpgrade &&
-                                      wh.upgradeUsd != null ? (
+                                      wh.upgradeUsd != null &&
+                                      canPortCapex ? (
                                         <>
                                           <button
                                             type="button"
@@ -4454,6 +4576,7 @@ export function PortsPanel(props: {
                                             >
                                               Haul
                                             </button>
+                                            {canPortDeskOps ? (
                                             <button
                                               type="button"
                                               className="action ghost"
@@ -4469,6 +4592,7 @@ export function PortsPanel(props: {
                                             >
                                               Abandon
                                             </button>
+                                            ) : null}
                                           </div>
                                         </li>
                                       );
@@ -4934,6 +5058,7 @@ export function PortsPanel(props: {
                                     ? props.formatMoney(buyUsd)
                                     : '—'}
                                 </span>
+                                {canPortCapex ? (
                                 <button
                                   type="button"
                                   className="ports-wh-buy-btn"
@@ -4945,6 +5070,9 @@ export function PortsPanel(props: {
                                 >
                                   Buy
                                 </button>
+                                ) : (
+                                  <span className="muted">Owner only</span>
+                                )}
                               </div>
                             </div>
                           );
@@ -4961,10 +5089,6 @@ export function PortsPanel(props: {
               {(warehouses?.inboundTransfers?.length ?? 0) > 0 ? (
                 <>
                   <h4 className="ports-inbound-heading">In transit to WH</h4>
-                  <p className="muted ports-warehouse-hint">
-                    Factory cargo is moving from the port apron into your
-                    warehouse — not Demand-ready until it arrives.
-                  </p>
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -5030,20 +5154,18 @@ export function PortsPanel(props: {
               ) : null}
               {portPickups.length === 0 ? (
                 <p className="empty">
-                  No cargo waiting in the yard — buys go in transit to WH when
-                  space is reserved, otherwise yard hold.
+                  No yard cargo.
                 </p>
               ) : (
                 <>
                   <p className="muted ports-warehouse-hint">
-                    Yard hold: charged daily until you Store in WH (higher than
-                    warehouse storage).
+                    Yard hold
                     {snap.yardHoldUsdPerDay != null &&
                     snap.yardHoldUsdPerDay > 0
-                      ? ` Currently ${props.formatMoney(snap.yardHoldUsdPerDay)}/day across all yard lots.`
-                      : ''}{' '}
-                    Lots larger than WH capacity can never fully store — Abandon
-                    (no refund) stops the fee.
+                      ? ` · ${props.formatMoney(snap.yardHoldUsdPerDay)}/day`
+                      : ''}
+                    {' · '}
+                    Store into WH or Abandon (no refund).
                   </p>
                   <table className="data-table ports-yard-table">
                     <thead>
@@ -5101,6 +5223,7 @@ export function PortsPanel(props: {
                           ),
                         );
                         const stevedoreOk =
+                          canPortDeskOps &&
                           portDef?.concession?.status === 'yours';
                         const altWhAtPort = (warehouses?.warehouses ?? []).filter(
                           (w) => {
@@ -5242,6 +5365,7 @@ export function PortsPanel(props: {
                                     Truck → {w.icao}
                                   </button>
                                 ))}
+                                {canPortDeskOps ? (
                                 <button
                                   type="button"
                                   className="action ghost"
@@ -5255,6 +5379,7 @@ export function PortsPanel(props: {
                                 >
                                   Abandon
                                 </button>
+                                ) : null}
                               </div>
                             </td>
                           </tr>
@@ -5410,12 +5535,12 @@ export function PortsPanel(props: {
                         <td colSpan={7}>
                           <p className="empty">
                             {!port
-                              ? 'Select a port to open its Demand desk.'
+                              ? 'Select a port.'
                               : portDeskOrders.length === 0 && demand.length === 0
-                                ? 'No open demand right now — desks post when hubs in the port catchment run low (economy tick, ~15 min).'
+                                ? 'No open Demand — check after a tick.'
                                 : demandCountryFilter
-                                  ? 'No demand in this country on this desk — clear the country filter.'
-                                  : 'No Demand on this port’s desk yet — wait for catchment hubs to run low, or upgrade WH / Port FBO to extend spawn range.'}
+                                  ? 'No Demand in this country — clear the filter.'
+                                  : 'No Demand on this desk yet.'}
                           </p>
                         </td>
                       </tr>
@@ -5686,7 +5811,8 @@ export function PortsPanel(props: {
                   >
                     Close
                   </button>
-                  {port.concession.upgrade &&
+                  {canPortCapex &&
+                  port.concession.upgrade &&
                   (port.concession.level ?? 1) < 3 ? (
                     <button
                       type="button"
@@ -5719,6 +5845,7 @@ export function PortsPanel(props: {
                         : ''}
                     </button>
                   ) : null}
+                  {canPortCapex ? (
                   <button
                     type="button"
                     className="accept"
@@ -5739,6 +5866,9 @@ export function PortsPanel(props: {
                         ? ` · ${props.formatMoney(port.concession.claim.leaseUsd)}`
                         : ''}
                   </button>
+                  ) : (
+                    <p className="muted">Only the VA owner can renew or upgrade.</p>
+                  )}
                 </div>
               </>
             ) : port.concession?.status === 'held' ? (
@@ -5784,6 +5914,7 @@ export function PortsPanel(props: {
                   >
                     Close
                   </button>
+                  {canPortCapex ? (
                   <button
                     type="button"
                     className="accept"
@@ -5808,6 +5939,9 @@ export function PortsPanel(props: {
                         )}`
                       : ''}
                   </button>
+                  ) : (
+                    <p className="muted">Only the VA owner can claim Port FBO.</p>
+                  )}
                 </div>
               </>
             )}
@@ -5868,9 +6002,12 @@ export function PortsPanel(props: {
           aircraftOptions={dispatchAircraftOptions}
           mode={
             (dispatchHold.kind ?? 'demand') === 'bridge'
-              ? dispatchMode
+              ? canPortDeskOps
+                ? dispatchMode
+                : 'fly'
               : 'fly'
           }
+          allowShuttle={canPortDeskOps}
           shuttleQuote={shuttleQuote}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
@@ -6613,6 +6750,8 @@ function DemandDispatchHoldDialog(props: {
   aircraftId: string;
   aircraftOptions: PlayerAircraft[];
   mode: 'fly' | 'shuttle';
+  /** Owner/dispatcher only on VA — pilots fly. Default true (solo). */
+  allowShuttle?: boolean;
   shuttleQuote: PortShuttleQuote | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
@@ -6626,6 +6765,7 @@ function DemandDispatchHoldDialog(props: {
 }) {
   const titleId = useId();
   const isBridge = (props.hold.kind ?? 'demand') === 'bridge';
+  const allowShuttle = props.allowShuttle !== false;
   const bridgePilotPay =
     props.hold.pilotPayUsd != null
       ? props.hold.pilotPayUsd
@@ -6685,6 +6825,7 @@ function DemandDispatchHoldDialog(props: {
                   <strong>You fly</strong>
                   <span>Watch / Dispatch</span>
                 </button>
+                {allowShuttle ? (
                 <button
                   type="button"
                   role="option"
@@ -6700,6 +6841,7 @@ function DemandDispatchHoldDialog(props: {
                       : 'Fee + fuel · wall-clock'}
                   </span>
                 </button>
+                ) : null}
               </div>
             </div>
           ) : null}

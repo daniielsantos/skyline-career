@@ -438,6 +438,15 @@ export function canCreateVaInvite(role: CareerAccountRole): boolean {
 }
 
 /**
+ * Port FBO desk ops that automate or move company cargo/cash without flying:
+ * auto-buy, stevedore, port shuttle, yard abandon.
+ * Scout Hold stays open to pilots (posts a job; human flies).
+ */
+export function canMutateVaPortDeskOps(role: CareerAccountRole): boolean {
+  return role === 'owner' || role === 'dispatcher';
+}
+
+/**
  * Home company for Internal Haul pilot pay: prefer owner membership
  * (register creates co_<login>), else first membership.
  */

@@ -1018,6 +1018,13 @@ export function VaPage(props: Props) {
               fleet={hangarFleet}
               vaAircraftIds={props.vaAircraftIds}
               logisticsCompanyId={companyId}
+              vaMemberRole={
+                role === 'owner' ||
+                role === 'dispatcher' ||
+                role === 'pilot'
+                  ? role
+                  : null
+              }
               ownedShelfLabel="Company"
               resolveOpsCompanyId={props.resolveOpsCompanyId}
               ensureOpsCompany={props.ensureOpsCompany}

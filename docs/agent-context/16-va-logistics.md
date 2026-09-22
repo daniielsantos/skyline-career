@@ -69,6 +69,11 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 | **Engine / airframe overhaul** | **sim** (debita wallet VA) | **não** | **não** |
 | **Credit draw / repay** | **sim** | **não** | **não** |
 | Voar IH / Freights com tail VA | sim | sim | sim |
+| Catalog buy (listing) | sim | sim | sim |
+| Scout Hold | sim | sim | sim |
+| Desk auto-buy / stevedore / shuttle / abandon | sim | sim | **não** |
+| Claim / renew / upgrade Port FBO | **sim** | **não** | **não** |
+| Buy / upgrade warehouse (VA) | **sim** | **não** | **não** |
 
 **Nota Hangar / MX — DECIDIDO · shipped parcial:**
 
@@ -90,7 +95,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 - **Owner ops** (credit) = `companyCredit.repScore` (média Cargo Ops da company). Em VA listada = ladder do owner nessa company; membros **não** dual-write unlock. Fórmula de limit **inalterada** — só copy honesta (`Owner ops` no credit block; strip do Ledger **não** promove Ops como reputação de marca).
 - **Flight quality** = rolling 7d de settle `flightScore.pct` + `onTime` (`company_flight_quality_stats`). Composite `0.7*avg + 0.3*onTimePct` só com ≥3 settles — sinal de org (membros contribuem).
 - Settle em company `va_listed` grava quality (Freights/Demand/Charter/IH com score). UI: My VA Ledger strip = Flight quality; directory/ranking chip Quality; credit = Owner ops.
-- **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair/**overhaul** VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. **Buff de concessão herdado (shipped 2026-09-21):** `hasPortOperatorBenefits` — membros herdam buy −10% / ETA nos portos onde a VA é operador; **status snapshot `yours` = exact operator only** (2026-09-21 g — sidebar home não pinta FBO da VA; desk em My VA → Ports). Desk mutations continuam exact `isPortOperator`.
+- **Org perks (shipped 2026-09-20):** `resolveVaOrgPerks` em `career-va-perks.ts` mapeia quality → tier Building / Proven (≥55, 3+) / Reliable (≥70, 8+) / Elite (≥85, 15+). Efeitos: `mxCostMult` (inspect/repair/**overhaul** VA, stacks com Base FBO) + `ferryOverflowCostMult` (overflow Line-crew cobrado no home do piloto). **Sem** Jet-A global (Base/Port já cobrem combustível). UI: chip no head My VA + bloco sob Flight quality no Ledger; directory Perks; ranking `· Proven`. **Buff de concessão herdado (shipped 2026-09-21):** `hasPortOperatorBenefits` — membros herdam buy −10% / ETA nos portos onde a VA é operador; **status snapshot `yours` = exact operator only** (2026-09-21 g — sidebar home não pinta FBO da VA; desk em My VA → Ports). **Port desk roles (DECIDIDO · shipped 2026-09-21):** VA-listed → auto-buy / stevedore / shuttle / abandon = **owner|dispatcher** (`canMutateVaPortDeskOps`); Scout Hold + Catalog buy = pilot OK; claim/renew/upgrade FBO + buy/upgrade WH = **owner**. Solo sem gate.
 - **Prepare Yours+VA (shipped 2026-09-20):** chrome sticky-home escondia frota VA em Freights/Charter/Ports. Fix: prefetch `/api/va/members` → `vaSessionFleet`; `ops-fleet.ts` merge Yours+VA nos pickers; ferry Journey **não** abre no Prepare (só CTA); Accept/`companyId` no tenant do tail + pin VA enquanto Dispatch ativo. **Operator aircraft** = NPC (não VA). **Base Dispatcher** = home-only (CAPEX pessoal).
 - **Freights Prepare blocked with empty home + VA fleet (2026-09-21):** sintoma = membro sem avião próprio via **Need aircraft** em Your aircraft apesar da VA ter cascos. Causa = CTA usava `fleet.length === 0` (home only), não `boardEstimateFleet` (Yours+VA); auto-tab Operator disparava antes do prefetch VA. Fix = gate/copy no `boardEstimateFleet`/`prepareOpsFleet`; init Freights espera prefetch VA.
 
@@ -467,7 +472,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** publish card brandava “Become a VA” / “VA name” como produto paralelo; dual-tenant real (home vs membership) misturava com o framing.
 **Fix:** UX only — card = **Open for pilots** / **In the directory** (Public name); Identity **Directory: Published**; My VA empty → Publish from Company; page-help/nav tooltips. Sem merge de tenant nem fold My VA→Company.
 
-### Port FBO concession inherit for VA members (2026-09-21)
+### Port FBO desk role gates (2026-09-21)
+
+**Sintoma / gap:** qualquer membro em My VA → Ports podia auto-buy / stevedore / shuttle / claim (wallet VA).
+**Decisão:** Scout Hold + Catalog buy = todos; desk ops = owner|dispatcher; CAPEX FBO/WH = owner.
+**Fix:** `canMutateVaPortDeskOps` + `assertVaPortDeskOps` / `assertVaOwnerForFleetMutation` nas APIs; `vaMemberRole` no `PortsPanel`.
+
 
 **Sintoma / gap:** Port FBO buy (−10%) / ETA só quando `companyId ===` operador; membros no chrome home não herdavam; buy/snapshot ainda hardcodavam `LOCAL_COMPANY_ID` (MP owner também perdia buff).
 **Causa:** `isPortOperator` exact-match; desk mutations e pricing no mesmo gate; buy não recebia companyId do write tenant.

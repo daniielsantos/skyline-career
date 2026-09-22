@@ -313,7 +313,9 @@ export function isPortOperator(
 /**
  * Operator pricing / ETA / UI “yours” — exact operator **or** allied company
  * (VA members inherit Port FBO buy/ETA at ports the listed VA operates).
- * Desk mutations (auto-buy, scout, shuttle, claim) stay on {@link isPortOperator}.
+ * Desk mutations that spend/automate (auto-buy, stevedore, shuttle) use
+ * {@link isPortOperator} plus VA role gates (`canMutateVaPortDeskOps`).
+ * Scout Hold stays open to any member on the operator tenant.
  */
 export function hasPortOperatorBenefits(
   world: CareerEconomyWorld,

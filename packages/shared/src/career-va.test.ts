@@ -10,6 +10,7 @@ import {
 } from './career-store.js';
 import {
   VA_MEMBER_CAP,
+  canMutateVaPortDeskOps,
   listOpenAirlineDeskHolds,
   listOpenInternalHaulHolds,
   quoteMemberAirlineCutUsd,
@@ -1037,5 +1038,12 @@ describe('VA IH-2', () => {
     assert.equal(bridges.length, 1);
     const desk = listOpenAirlineDeskHolds(state);
     assert.equal(desk.length, 3);
+  });
+});
+describe('canMutateVaPortDeskOps', () => {
+  it('allows owner and dispatcher; blocks pilot', () => {
+    assert.equal(canMutateVaPortDeskOps('owner'), true);
+    assert.equal(canMutateVaPortDeskOps('dispatcher'), true);
+    assert.equal(canMutateVaPortDeskOps('pilot'), false);
   });
 });

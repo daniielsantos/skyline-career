@@ -68,6 +68,12 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **All ports table removed (2026-09-21):** tabela “All ports” no Catalog (sidebar + My VA Ports) removida — seleção fica no mapa / porto focado.
 
+**Ports loop copy trim (2026-09-21):** banner/hints enxutos (só massa/hub/ETA/fee/match count); on-target Demand/catalog sem tutorial óbvio; inbound/yard hints curtos.
+
+**Desk auto-buy inputs empty by default (2026-09-21):** Max $/kg, Max kg/day e Wallet floor abrem vazios (placeholders só); submit valida preço/massa; floor vazio = $0; limpa após save.
+
+**Desk auto-buy ≠ owner-only (2026-09-21):** ~~gate = `isPortOperator` only~~ → **DECIDIDO**: VA-listed → desk ops (auto-buy / stevedore / shuttle / abandon) = **owner|dispatcher**; Scout Hold + Catalog buy = qualquer membro; CAPEX (claim/renew/upgrade FBO, buy/upgrade WH) = **owner**. Solo/home sem gate. Helper `canMutateVaPortDeskOps`.
+
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
 **Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.

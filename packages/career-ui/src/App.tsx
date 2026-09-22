@@ -6572,21 +6572,14 @@ export function App() {
   // Independent SimBridge probe — does not require Watch to be running.
   // When Watch is already sampling, skip probing entirely (server would only
   // mirror Watch anyway, and the extra poll re-rendered the status bar).
+  // Keep probing on Ready after Loaded vs Due: this is what feeds SIMBRIDGE
+  // footer chips + Crew Live until Watch binds. Preflight (heavy) yields after
+  // the first LV; probe is light (8s) and stops as soon as watch.running.
   useEffect(() => {
     if (watch?.running) return;
     // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
     // fight with Watch resume left settle dead after landing.
     if (activeMission?.status === 'in_flight') return;
-    // Ready / Loaded vs Due: yield the pipe so Watch auto-start can bind.
-    // Probe + Preflight contention left Dispatch on SIMBRIDGE/AIRBORNE for
-    // minutes with no takeoff/climb and no auto-depart → En route.
-    if (
-      activeMission?.status === 'dispatched' &&
-      activeMission.lastPreflightCheck?.loadVerification &&
-      !holdWatchOffForPreflight
-    ) {
-      return;
-    }
     let cancelled = false;
     let consecutiveFailures = 0;
     async function pollBridge() {
@@ -6656,12 +6649,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [
-    watch?.running,
-    holdWatchOffForPreflight,
-    activeMission?.status,
-    Boolean(activeMission?.lastPreflightCheck?.loadVerification),
-  ]);
+  }, [watch?.running, activeMission?.status]);
 
   useEffect(() => {
     if (

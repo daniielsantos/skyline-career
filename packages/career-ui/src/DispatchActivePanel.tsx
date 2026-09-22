@@ -718,9 +718,6 @@ export function DispatchActivePanel(props: {
               cruise ? ['Cruise', cruise] : null,
               briefing?.blockTime ? ['Block', briefing.blockTime] : null,
               briefing?.airTime ? ['Air', briefing.airTime] : null,
-              briefing?.alternateIcao
-                ? ['Alternate', briefing.alternateIcao]
-                : null,
               ofpPax !== undefined ? ['Pax', String(ofpPax)] : null,
               payloadKg !== undefined
                 ? ['Payload', formatMassExact(payloadKg, weightSystem)]
@@ -1438,9 +1435,6 @@ export function DispatchActivePanel(props: {
                   : null,
                 ofpBriefing?.airTime
                   ? ['Air', ofpBriefing.airTime]
-                  : null,
-                ofpBriefing?.alternateIcao
-                  ? ['Alternate', ofpBriefing.alternateIcao]
                   : null,
                 typeof mission.lastOfpCheck?.passengerCount === 'number'
                   ? [

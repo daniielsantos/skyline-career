@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-22: **Dispatch OFP card (Ready/Load)** — sintoma: OFP passed ficava em `<details>` e escondia Route + metrics. Causa: fold pós–flight_plan. Fix: card sempre aberto com Distance/Cruise/Block/Air/Alternate/Pax/Payload + Route; Hangar/OFP type/Tail sob “Aircraft details”. En route metrics alinhados (sem hangar/type).
+Atualizado 2026-09-22: **Dispatch OFP card (Ready/Load)** — sintoma: OFP passed ficava em `<details>` e escondia Route + metrics. Causa: fold pós–flight_plan. Fix: card sempre aberto com Distance/Cruise/Block/Air/Pax/Payload + Route (sem Alternate); Hangar/OFP type/Tail sob “Aircraft details”. En route metrics alinhados (sem hangar/type/alternate).
 
 Atualizado 2026-09-20: **Rebrand Fase 3 userData migrator** — AppData → `%APPDATA%\Airframe Career` (cópia one-shot de Skyline; `appId` fica). Smoke no próximo desktop release. Spec: [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).
 

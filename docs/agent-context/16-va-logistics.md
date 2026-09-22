@@ -744,6 +744,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **2026-09-22 (n):** sintoma = Live “Waiting for position” com missão `dispatched` / motores no Preflight. Causa = Watch fica **off** até `loadVerification` (pipe do Preflight); upload só lia `/api/watch/status` → zero samples. Fix = `/api/preflight` devolve `live.position`; App posta track no poll de Preflight (mesmo throttle 15s); copy Live menciona flyer Watch/Preflight.
 **2026-09-22 (o):** remove Close do pane Live (fecha pelo botão Live da row).
 **2026-09-22 (p/q):** Live fase ≠ footer (airborne / “On ground · engines” vs TAXIING). Causa = Preflight inventava phase / OFP compliance. Fix = `reportVaCrewLive` só a partir do status SimBridge (Watch poll + probe com lat/lon + `phaseFromFlags`/taxi); labels = mapa do PHASE chip, sem coerce.
+**2026-09-22 (r):** Ready→En route demorou ~2 min; footer `SIMBRIDGE`/`AIRBORNE` sem takeoff/climb. Causa = Preflight 5s + probe 8s seguravam o pipe após Loaded vs Due → Watch auto-start falhava (retry 15s). Sem Watch: fase coarse do probe (`airborne`) e sem auto-depart. Fix = parar Preflight/probe depois do 1º LV (yield pipe); Watch retry 2s com LV.
 
 ### Roster presence (online / flight / last seen) (2026-09-20)
 

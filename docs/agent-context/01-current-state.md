@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **3e5164e5** / desktop **0.3.218** shipped: Keep hangar fuel on ferry and lift Crew Ledger P&L. Release: [v0.3.218](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.218).
+
+
 `main` **fccc324c** / desktop **0.3.217** shipped: Rename VA chrome to Airlines/Crew and show hangar overhaul ETA. Release: [v0.3.217](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.217).
 
 

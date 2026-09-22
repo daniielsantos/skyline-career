@@ -40,6 +40,7 @@ import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
 import { PortsPanel } from './PortsPanel';
 import { DispatchRouteMap } from './DispatchRouteMap';
+import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 import { formatBoardMoney } from './board-money';
 import type { WeightSystem } from './weight-units';
 import { getAuthToken } from './career-auth-client';
@@ -638,12 +639,29 @@ export function VaPage(props: Props) {
       setLiveDest(null);
       setLiveFresh(false);
       setLiveError(null);
+      setLiveBusy(false);
       return;
     }
     let cancelled = false;
-    async function loadLive() {
-      setLiveBusy(true);
-      setLiveError(null);
+    let resolvedOnce = false;
+
+    async function resolveOdFallback() {
+      const originIcao =
+        livePilot!.live?.originIcao || livePilot!.flight?.originIcao || '';
+      const destIcao =
+        livePilot!.live?.destIcao || livePilot!.flight?.destIcao || '';
+      if (!originIcao || !destIcao) return;
+      const [origin, dest] = await Promise.all([
+        resolveAirportEndpoint(originIcao),
+        resolveAirportEndpoint(destIcao),
+      ]);
+      if (cancelled) return;
+      if (origin) setLiveOrigin((prev) => prev ?? origin);
+      if (dest) setLiveDest((prev) => prev ?? dest);
+    }
+
+    async function loadLive(opts?: { initial?: boolean }) {
+      if (opts?.initial) setLiveBusy(true);
       try {
         const snap = await fetchVaFlightTrack({
           companyId: listedCompanyId!,
@@ -651,17 +669,24 @@ export function VaPage(props: Props) {
         });
         if (cancelled) return;
         setLiveTrack(snap.track);
-        setLiveOrigin(snap.origin ?? null);
-        setLiveDest(snap.dest ?? null);
+        if (snap.origin) setLiveOrigin(snap.origin);
+        if (snap.dest) setLiveDest(snap.dest);
         setLiveFresh(Boolean(snap.fresh));
+        setLiveError(null);
+        if (!snap.origin || !snap.dest) {
+          await resolveOdFallback();
+        }
       } catch (err) {
         if (cancelled) return;
         setLiveError(err instanceof Error ? err.message : String(err));
+        if (!resolvedOnce) await resolveOdFallback();
       } finally {
-        if (!cancelled) setLiveBusy(false);
+        if (!cancelled && opts?.initial) setLiveBusy(false);
+        resolvedOnce = true;
       }
     }
-    void loadLive();
+
+    void loadLive({ initial: true });
     const id = window.setInterval(() => {
       void loadLive();
     }, 15_000);
@@ -1096,7 +1121,7 @@ export function VaPage(props: Props) {
                   </span>
                 </div>
                 <div className="va-live-meta">
-                  {liveBusy && !liveTrack ? (
+                  {liveBusy && !liveOrigin ? (
                     <span>Loading…</span>
                   ) : liveError ? (
                     <span className="va-live-stale">{liveError}</span>
@@ -1160,7 +1185,7 @@ export function VaPage(props: Props) {
                       </span>
                     </>
                   ) : (
-                    <span>Waiting for track…</span>
+                    <span>Waiting for engines…</span>
                   )}
                   <button
                     type="button"
@@ -1217,10 +1242,11 @@ export function VaPage(props: Props) {
                   />
                 </div>
               ) : liveBusy ? (
-                <BusyBlock label="Loading live map…" />
+                <BusyBlock label="Loading route…" />
               ) : (
                 <p className="settings-help">
-                  No position yet — pilot needs Watch running in flight.
+                  Planned route unavailable. Telemetry starts when the pilot
+                  starts engines with Watch connected.
                 </p>
               )}
             </div>

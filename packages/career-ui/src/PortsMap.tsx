@@ -457,7 +457,8 @@ export function PortsMap(props: {
       /* feeders still show if transfer lines fail */
     }
 
-    const bridgeEndpoints = new Map<
+    // Must be the JS Map — never shadow with maplibre's `Map` import.
+    const bridgeEndpoints = new globalThis.Map<
       string,
       { icao: string; lat: number; lon: number; kind: 'dep' | 'arr' }
     >();

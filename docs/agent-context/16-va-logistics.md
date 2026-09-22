@@ -54,7 +54,7 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **VA parallel cargo per pilot (2026-09-22):** sintoma = amigo não Accept enquanto outro membro tem missão na VA (fatiar hold / voar junto). Causa = gate `listActivePlayerMissions` company-wide em haul/bridge/demand + staging/commit + Charter. Fix = `listActivePlayerMissionsForPilot(pilotAccountId)` (legado sem stamp ainda bloqueia todos); Dispatch/Watch/Prepare usam só a missão do account logado.
 
-**Hauls / Ports route dest markers (2026-09-22):** sintoma = plotar hold/transfer só desenhava a linha — destino fácil de perder no zoom. Causa = `CompanyNetworkMap` / `PortsMap` tinham line layer sem endpoint labels. Fix = markers DEP/ARR com ICAO (estilo Dispatch) nos ends da desk route / bridgeLegs.
+**Hauls / Ports route dest markers (2026-09-22):** sintoma = plotar hold/transfer só desenhava a linha — destino fácil de perder no zoom. Causa = `CompanyNetworkMap` / `PortsMap` tinham line layer sem endpoint labels. Fix = markers DEP/ARR com ICAO (estilo Dispatch) nos ends da desk route / bridgeLegs. CI: `new Map` em PortsMap colidia com MapLibre `Map` → `globalThis.Map` (igual CompanyNetworkMap).
 
 **My VA chrome title = airline name (2026-09-22):** sintoma = “MY VA” no h1 + “LAMUSINE” no head do pane (herói duplicado). Causa = chrome `pageTitle` fixo + `va-my-title` com displayName. Fix = h1 = nome da VA (`onVaIdentity`); sidebar continua My VA; head do pane só meta (hub/seats/role/org).
 

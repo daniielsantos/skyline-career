@@ -187,6 +187,7 @@ import {
   quoteInternalHaulForRoute,
   listOpenAirlineDeskHolds,
   listAirlineDeskMissions,
+  buildCompanyNetworkNodesFromState,
   vaDayKeyFromTick,
   VA_RANKING_WINDOW_DAYS,
   VA_FLIGHT_QUALITY_WINDOW_DAYS,
@@ -4704,8 +4705,13 @@ export function createCareerApiServer(port = 8787) {
         const missions = await store.loadMissions({ companyId });
         const openHolds = listOpenAirlineDeskHolds(missions);
         const active = listAirlineDeskMissions(missions);
+        const world = store.peekEconomyWorld();
+        const companyNetwork = world
+          ? buildCompanyNetworkNodesFromState(world, missions, companyId)
+          : [];
         send(res, 200, {
           companyId,
+          companyNetwork,
           openHolds: openHolds.map((h) => ({
             id: h.id,
             kind: h.kind ?? 'demand',

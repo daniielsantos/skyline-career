@@ -70,16 +70,19 @@ export function buildCompanyNetworkNodes(
     const details = port.pickupHubDetails ?? [];
     let primary =
       hubs.find((h) => whByIcao.has(h)) ?? hubs[0] ?? port.id.toUpperCase();
+    // Prefer geographic port pin; hub details only if port coords missing.
     let lat = port.lat;
     let lon = port.lon;
-    const detail = details.find(
-      (d) => d.icao.trim().toUpperCase() === primary,
-    );
-    if (detail && hasCoords(detail.lat, detail.lon)) {
-      lat = detail.lat;
-      lon = detail.lon;
-    } else if (!hasCoords(lat, lon)) {
-      continue;
+    if (!hasCoords(lat, lon)) {
+      const detail = details.find(
+        (d) => d.icao.trim().toUpperCase() === primary,
+      );
+      if (detail && hasCoords(detail.lat, detail.lon)) {
+        lat = detail.lat;
+        lon = detail.lon;
+      } else {
+        continue;
+      }
     }
 
     let freeKg = 0;

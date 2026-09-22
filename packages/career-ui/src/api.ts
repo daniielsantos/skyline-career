@@ -5198,6 +5198,22 @@ export type VaHaulMission = {
   aircraftId?: string;
 };
 
+/** Light company footprint from GET /api/va/hauls (no /api/ports write). */
+export type VaCompanyNetworkNode = {
+  id: string;
+  kind: 'fbo' | 'wh';
+  title: string;
+  subtitle: string;
+  portId: string | null;
+  hubIcaos: string[];
+  primaryHubIcao: string;
+  lat: number;
+  lon: number;
+  level: number | null;
+  freeKg: number | null;
+  capacityKg: number | null;
+};
+
 export function fetchVaMembers() {
   return api<{
     companyId: string;
@@ -5419,6 +5435,7 @@ export function postVaRole(body: {
 export function fetchVaHauls() {
   return api<{
     companyId: string;
+    companyNetwork: VaCompanyNetworkNode[];
     openHolds: VaHaulHold[];
     activeMissions: VaHaulMission[];
   }>('/api/va/hauls');

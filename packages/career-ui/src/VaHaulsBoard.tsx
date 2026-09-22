@@ -1,29 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  fetchPorts,
   fetchVaHauls,
   postDemandDispatchHold,
   postWarehouseBridgeDispatchHold,
   postWarehouseHaulDispatchHold,
   type Mission,
   type PlayerAircraft,
-  type PortsSnapshot,
+  type VaCompanyNetworkNode,
   type VaHaulHold,
   type VaHaulMission,
 } from './api';
 import { formatBoardMoney } from './board-money';
 import {
-  buildCompanyNetworkNodes,
   findNetworkNode,
   hubInNetworkFocus,
+  type CompanyNetworkNode,
 } from './company-network';
 import { VaCompanyNetwork } from './VaCompanyNetwork';
 import { VaPortPathCard } from './VaPortPathCard';
-
-function formatMassKg(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`;
-  return `${Math.round(kg)} kg`;
-}
+import { formatMass, type WeightSystem } from './weight-units';
 
 function commodityLabel(id: string): string {
   const raw = id.trim();
@@ -50,12 +45,19 @@ function holdPayLabel(hold: VaHaulHold): string {
   return '';
 }
 
+function asNetworkNodes(
+  nodes: VaCompanyNetworkNode[] | undefined,
+): CompanyNetworkNode[] {
+  return nodes ?? [];
+}
+
 type Props = {
   companyId: string;
   homeHubIcao: string;
   fleet: PlayerAircraft[];
   walletUsd: number;
   isOwner: boolean;
+  weightSystem: WeightSystem;
   busy?: boolean;
   onWallet?: (walletUsd: number) => void;
   onFleet?: (fleet: PlayerAircraft[]) => void;
@@ -68,15 +70,15 @@ type Props = {
 export function VaHaulsBoard(props: Props) {
   const [holds, setHolds] = useState<VaHaulHold[]>([]);
   const [active, setActive] = useState<VaHaulMission[]>([]);
+  const [networkNodes, setNetworkNodes] = useState<CompanyNetworkNode[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyHoldId, setBusyHoldId] = useState<string | null>(null);
   const [aircraftByHold, setAircraftByHold] = useState<Record<string, string>>(
     {},
   );
-  const [portsSnap, setPortsSnap] = useState<PortsSnapshot | null>(null);
-  const [networkKnown, setNetworkKnown] = useState(false);
   const [networkFocusId, setNetworkFocusId] = useState<string | null>(null);
+  const mass = (kg: number) => formatMass(kg, props.weightSystem);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -84,45 +86,21 @@ export function VaHaulsBoard(props: Props) {
       const board = await fetchVaHauls();
       setHolds(board.openHolds ?? []);
       setActive(board.activeMissions ?? []);
+      setNetworkNodes(asNetworkNodes(board.companyNetwork));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setHolds([]);
       setActive([]);
+      setNetworkNodes([]);
     } finally {
       setLoaded(true);
     }
   }, []);
 
   useEffect(() => {
+    setLoaded(false);
     void refresh();
   }, [refresh, props.companyId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setNetworkKnown(false);
-    void (async () => {
-      try {
-        const snap = await fetchPorts();
-        if (cancelled) return;
-        setPortsSnap(snap);
-      } catch {
-        if (!cancelled) setPortsSnap(null);
-      } finally {
-        if (!cancelled) setNetworkKnown(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [props.companyId]);
-
-  const networkNodes = useMemo(
-    () =>
-      portsSnap
-        ? buildCompanyNetworkNodes(portsSnap, props.companyId)
-        : [],
-    [portsSnap, props.companyId],
-  );
 
   const focusNode = findNetworkNode(networkNodes, networkFocusId);
   const hasPortFbo = networkNodes.some((n) => n.kind === 'fbo');
@@ -207,7 +185,7 @@ export function VaHaulsBoard(props: Props) {
             : '';
       props.onToast?.(
         'ok',
-        `${holdKindLabel(kind)} ${result.mission.originIcao}→${result.mission.destIcao} · ${formatMassKg(result.kg)}${payNote} · open Dispatch`,
+        `${holdKindLabel(kind)} ${result.mission.originIcao}→${result.mission.destIcao} · ${mass(result.kg)}${payNote} · open Dispatch`,
       );
       props.onStaged?.(result.mission);
       await refresh();
@@ -226,7 +204,7 @@ export function VaHaulsBoard(props: Props) {
         <div>
           <h3>Hauls</h3>
           <p className="settings-help">
-            {!networkKnown
+            {!loaded
               ? 'Airline desk — bridges, Demand, and Wide hauls.'
               : hasPortFbo
                 ? 'Airline desk · Pick a network node, Accept with a parked VA tail at origin, then Dispatch.'
@@ -245,7 +223,7 @@ export function VaHaulsBoard(props: Props) {
         ) : null}
       </header>
 
-      {networkKnown && !hasPortFbo ? (
+      {loaded && !hasPortFbo ? (
         <VaPortPathCard
           companyId={props.companyId}
           homeHubIcao={props.homeHubIcao}
@@ -256,13 +234,14 @@ export function VaHaulsBoard(props: Props) {
         />
       ) : null}
 
-      {networkKnown && networkNodes.length > 0 ? (
+      {loaded && networkNodes.length > 0 ? (
         <VaCompanyNetwork
           nodes={networkNodes}
           selectedId={networkFocusId}
           onSelect={setNetworkFocusId}
           showMap={networkNodes.length > 1 || hasPortFbo}
           disabled={pageBusy}
+          weightSystem={props.weightSystem}
         />
       ) : null}
 
@@ -312,7 +291,7 @@ export function VaHaulsBoard(props: Props) {
                         <span className="muted">
                           {holdKindLabel(kind)} ·{' '}
                           {commodityLabel(hold.commodityId)} ·{' '}
-                          {formatMassKg(hold.kg)}
+                          {mass(hold.kg)}
                           {holdPayLabel(hold)}
                         </span>
                       </div>
@@ -380,7 +359,7 @@ export function VaHaulsBoard(props: Props) {
                       </strong>
                       <span className="muted">
                         {commodityLabel(m.commodityId)} ·{' '}
-                        {formatMassKg(m.cargoKg)} · {m.status}
+                        {mass(m.cargoKg)} · {m.status}
                         {m.payUsd > 0
                           ? ` · ${formatBoardMoney(m.payUsd)}`
                           : ''}

@@ -8,6 +8,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
 **Doc 2026-09-21 (e):** ~~Available personal WH under VA pin~~ — **superseded (f)**; no mix on one shelf.
 **Doc 2026-09-21 (h):** My VA open — não await `/api/ports` no Roster (defer Hauls/Config); selectTab(`va`) não espera App refresh. Ports — aba Port FBO só com concession `yours`.
+**Doc 2026-09-21 (i):** Hauls Company Network — intencional; payload leve em `GET /api/va/hauls` (sem `fetchPorts`/write); mapa ~20rem.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -488,6 +489,18 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** Internal Haul para membros só via Ports WH holds; `GET /api/va/hauls` existia sem UI em My VA.
 **Causa:** IH-2 shipou board API + Ports dispatch; My VA ficou Roster/Hangar/Ledger/Config.
 **Fix:** aba **Hauls** — `fetchVaHauls` + Accept via `postWarehouseBridgeDispatchHold`; strip Port FBO/WH room do home hub; CTA Open Ports desk; Accept → staging.
+
+### Hauls Company Network load (2026-09-21)
+
+**Sintoma:** Company Network certo no Hauls, mas ~10s; mapa baixo.
+**Causa:** segundo request `fetchPorts()` (write path) só para chips/mapa.
+**Fix:** `companyNetwork` embutido em `GET /api/va/hauls` via `buildCompanyNetworkNodesFromState`; mapa `.va-company-network-map` 20rem.
+
+### Company Network map stack + imperial + glyphs (2026-09-21)
+
+**Sintoma:** FBO+WH no mesmo pin; Hauls em t com UI imperial; chips só texto.
+**Causa:** mapa desenhava FBO em `ports` e de novo em `ownedFbos`; mass metric hardcoded.
+**Fix:** `ownedFbos` só `kind===wh`; pin FBO = coords do porto; `weightSystem`/`formatMass`; ícones SVG nos chips.
 
 ### Path to Port FBO checklist (2026-09-21)
 

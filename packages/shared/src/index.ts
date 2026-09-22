@@ -257,6 +257,7 @@ export * from './career-warehouse-bridge.js';
 export * from './career-warehouse-haul.js';
 export * from './career-demand.js';
 export * from './career-ports.js';
+export * from './career-company-network.js';
 export * from './career-port-concessions.js';
 export * from './career-presence.js';
 export * from './career-port-auto-buy.js';

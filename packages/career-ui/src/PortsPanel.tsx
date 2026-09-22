@@ -3769,6 +3769,7 @@ export function PortsPanel(props: {
                             onSelect={selectNetworkNode}
                             showMap={false}
                             disabled={props.busy || loading}
+                            weightSystem={props.weightSystem}
                           />
                         ) : null}
                         <div

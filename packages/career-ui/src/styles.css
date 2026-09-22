@@ -14307,9 +14307,9 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .va-company-network-chip {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
   margin: 0;
   padding: 0.4rem 0.55rem;
   border: 1px solid var(--line);
@@ -14318,8 +14318,24 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   color: inherit;
   cursor: pointer;
   text-align: left;
-  min-width: 7.5rem;
-  max-width: 14rem;
+  min-width: 8.5rem;
+  max-width: 15rem;
+}
+
+.va-company-network-chip-icon {
+  flex: 0 0 auto;
+  width: 1.85rem;
+  height: 1.85rem;
+  color: var(--accent, #f0a35a);
+  opacity: 0.92;
+}
+
+.va-company-network-chip-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.08rem;
+  min-width: 0;
 }
 
 .va-company-network-chip:hover:not(:disabled) {
@@ -14362,8 +14378,8 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .va-company-network-map {
   margin-top: 0.65rem;
-  height: 11.5rem;
-  min-height: 11.5rem;
+  height: 20rem;
+  min-height: 18rem;
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid var(--line);

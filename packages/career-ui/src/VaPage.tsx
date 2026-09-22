@@ -990,6 +990,7 @@ export function VaPage(props: Props) {
           fleet={hangarFleet}
           walletUsd={resolvedWalletUsd ?? 0}
           isOwner={isOwner}
+          weightSystem={props.weightSystem}
           busy={pageBusy}
           onWallet={props.onWallet}
           onFleet={(next) => {

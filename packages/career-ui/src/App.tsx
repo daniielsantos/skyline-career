@@ -13244,6 +13244,21 @@ export function App() {
             {catchUpBanner ? (
               <EconomySyncIndicator status={catchUpBanner} />
             ) : null}
+            {careerReady && (authRequired || worldFixed) && worldPresence ? (
+              <div
+                className="metric"
+                title={
+                  worldPresence.recent.length > 0
+                    ? worldPresence.recent
+                        .map((r) => `${r.companyDisplayName}: ${r.summary}`)
+                        .join('\n')
+                    : 'Pilots with a live session on this world (last seen ≤5 min)'
+                }
+              >
+                <span className="label">Online</span>
+                <strong>{worldPresence.onlineCount}</strong>
+              </div>
+            ) : null}
             {careerReady ? (
               authRequired || worldFixed ? (
                 <div
@@ -13306,21 +13321,6 @@ export function App() {
                   </span>
                 </label>
               )
-            ) : null}
-            {careerReady && (authRequired || worldFixed) && worldPresence ? (
-              <div
-                className="metric"
-                title={
-                  worldPresence.recent.length > 0
-                    ? worldPresence.recent
-                        .map((r) => `${r.companyDisplayName}: ${r.summary}`)
-                        .join('\n')
-                    : 'Pilots with a live session on this world (last seen ≤5 min)'
-                }
-              >
-                <span className="label">Online</span>
-                <strong>{worldPresence.onlineCount}</strong>
-              </div>
             ) : null}
             {careerReady && pilotIcao ? (
               <button

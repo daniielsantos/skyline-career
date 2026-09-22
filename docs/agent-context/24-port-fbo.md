@@ -34,7 +34,11 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Desk order save → “Held by another company” (2026-09-21):** sintoma = toast “desk order saved” + Port FBO some (Scout some); Hauls ainda vazio. Causa = (1) confusão UX: desk auto-buy ≠ Scout Hold (Hauls só lista holds); (2) `POST /api/ports/auto-buy` (e outros mutators Ports) devolvia `portSnapshot` **sem** `viewerCompanyId` → default `local` → status `held`. Fix = passar `viewerCompanyId` no snapshot de resposta. Refresh GET `/api/ports` já estava certo.
 
-**Company network chrome Phase 1 (2026-09-21):** My VA Hauls + Ports FBO — inventário interativo FBO+WH (`VaCompanyNetwork` / `buildCompanyNetworkNodes`). Chips + mapa compacto no Hauls; filtro de holds/Scout por nó (`All` = rede inteira). Ports mostra chips quando ≥2 assets (mapa Ports já existe). Sem retune economia.
+**Company network chrome Phase 1 (2026-09-21):** My VA Hauls + Ports FBO — inventário interativo FBO+WH (`VaCompanyNetwork` / `buildCompanyNetworkNodes`). Chips + mapa no Hauls; filtro de holds/Scout por nó (`All` = rede inteira). Ports mostra chips quando ≥2 assets (mapa Ports já existe). Sem retune economia.
+
+**Hauls Company Network slow + short map (2026-09-21):** sintoma = ~10s no Hauls + mapa ~11.5rem. Causa = `VaHaulsBoard` chamava `fetchPorts()` (`withCareerWrite` / portSnapshot) só para montar chips. Fix = `buildCompanyNetworkNodesFromState` no `GET /api/va/hauls` (missions + peek world); cliente só usa `companyNetwork`; CSS mapa `20rem` / min `18rem`.
+
+**Company Network map stack + mass + glyphs (2026-09-21):** sintoma = porto e WH no mesmo pin; mass em t/kg com UI imperial; chips só texto. Causa = `ownedFbos` incluía nós FBO (já em `ports`); subtitle/`formatMassKg` metric hardcoded. Fix = mapa só WH remotos; FBO pin em lat/lon do porto; `weightSystem` + `formatMass` no detail/holds; ícones SVG FBO/WH (não foto).
 
 **Member Ports empty Scout/WH (2026-09-21):** sintoma = membro vê Port FBO P1 / “Claim Port FBO first” e Warehouse “No warehouses”. Causa = chrome sticky-home: `GET /api/ports` herda `yours` via `alliedCompanyIds`, mas Scout/WH usam tenant **home** (`isPortOperator` exact + missions WH da home vazia). Fix = `selectTab('ports')` pinna VA (`switchCompanyForVa`) antes de montar Ports; sair de Ports restaura home (igual My VA), salvo Dispatch VA ativo.
 

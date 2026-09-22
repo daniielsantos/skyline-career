@@ -690,9 +690,10 @@ export function VaPage(props: Props) {
     }
 
     void loadLive({ initial: true });
+    // Match flyer POST cadence (FLIGHT_TRACK_POST_MIN_MS = 5s).
     const id = window.setInterval(() => {
       void loadLive();
-    }, 15_000);
+    }, 5_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);

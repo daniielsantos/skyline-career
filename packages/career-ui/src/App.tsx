@@ -3904,7 +3904,8 @@ export function App() {
       return;
     }
     const now = Date.now();
-    if (now - flightTrackLastPostRef.current < 15_000) return;
+    // Keep in sync with FLIGHT_TRACK_POST_MIN_MS (5s) in career-flight-track.
+    if (now - flightTrackLastPostRef.current < 5_000) return;
     flightTrackLastPostRef.current = now;
     void postVaFlightTrack({
       companyId: vaCompanyId,

@@ -746,6 +746,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **2026-09-22 (p/q):** Live fase ≠ footer (airborne / “On ground · engines” vs TAXIING). Causa = Preflight inventava phase / OFP compliance. Fix = `reportVaCrewLive` só a partir do status SimBridge (Watch poll + probe com lat/lon + `phaseFromFlags`/taxi); labels = mapa do PHASE chip, sem coerce.
 **2026-09-22 (r):** Ready→En route demorou ~2 min; footer `SIMBRIDGE`/`AIRBORNE` sem takeoff/climb. Causa = Preflight 5s + probe 8s seguravam o pipe após Loaded vs Due → Watch auto-start falhava (retry 15s). Sem Watch: fase coarse do probe (`airborne`) e sem auto-depart. Fix = parar Preflight/probe depois do 1º LV (yield pipe); Watch retry 2s com LV.
 **2026-09-22 (s):** Live mapa com risco azul continente + AC “travado”. Causa = crumb teleporte (probe/SimConnect ruim) entrava na trilha; LineString ligava lixo↔posição. Fix = `FLIGHT_TRACK_MAX_JUMP_NM` (75) reseta a trilha no salto.
+**2026-09-22 (t):** Live POST/poll 15s→**5s** (alinhar Watch tick); trilha e fase menos “travadas”.
 
 ### Roster presence (online / flight / last seen) (2026-09-20)
 

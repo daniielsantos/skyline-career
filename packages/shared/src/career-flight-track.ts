@@ -30,13 +30,14 @@ export type FlightTrackSnapshot = {
 };
 
 export const FLIGHT_TRACK_FRESH_MS = 90_000;
-export const FLIGHT_TRACK_POST_MIN_MS = 15_000;
+/** Min interval between posted crumbs (matches Watch tick / Live poll). */
+export const FLIGHT_TRACK_POST_MIN_MS = 5_000;
 /** Ignore samples closer than this to the previous point (noise). */
 export const FLIGHT_TRACK_MIN_MOVE_NM = 0.35;
 /**
- * Max great-circle jump between consecutive crumbs (~300 kt × 15s ≈ 75 nm).
- * Larger gaps are treated as teleports (bad SimConnect / stale probe) — reset
- * the trail so Live does not draw a continent-spanning spike.
+ * Max great-circle jump between consecutive crumbs (~300 kt × 5s ≈ 25 nm;
+ * 75 nm still catches teleports without clipping fast jets).
+ * Larger gaps reset the trail so Live does not draw a continent-spanning spike.
  */
 export const FLIGHT_TRACK_MAX_JUMP_NM = 75;
 export const FLIGHT_TRACK_MAX_POINTS = 180;

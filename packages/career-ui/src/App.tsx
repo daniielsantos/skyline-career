@@ -166,6 +166,7 @@ import {
   buildOpsFleet,
   filterOpsFleetForPrepare,
   findOpsEntry,
+  isOpsAircraftBoardSelectable,
   opsAircraftSelectLabel,
   opsFleetAircraft,
   pickOpsAircraftForOrigin,
@@ -3612,7 +3613,7 @@ export function App() {
   const [vaSessionWallet, setVaSessionWallet] = useState<number | null>(null);
   /** Bump so My VA Ledger refetches after external wallet credits. */
   const [vaLedgerRefreshEpoch, setVaLedgerRefreshEpoch] = useState(0);
-  /** Chrome h1 while My VA is open — public VA name (sidebar stays My VA). */
+  /** Chrome h1 while Crew is open — public airline name (sidebar stays Crew). */
   const [vaChromeTitle, setVaChromeTitle] = useState<string | null>(null);
   const [vaSessionFleet, setVaSessionFleet] = useState<PlayerAircraft[]>([]);
   /** Listed VA company id when this account is a member (chrome stays home). */
@@ -12227,13 +12228,7 @@ export function App() {
     );
   }, [fleet, hangarQuery]);
   const boardEstimateFleet = useMemo(
-    () =>
-      prepareOpsFleet.filter(
-        (a) =>
-          a.status === 'parked' ||
-          a.status === 'assigned' ||
-          a.status === 'maintenance',
-      ),
+    () => prepareOpsFleet.filter(isOpsAircraftBoardSelectable),
     [prepareOpsFleet],
   );
   const boardAircraft = useMemo(
@@ -12857,9 +12852,9 @@ export function App() {
                 : tab === 'ports'
                   ? 'Ports'
                   : tab === 'va'
-                    ? vaChromeTitle?.trim() || 'My VA'
+                    ? vaChromeTitle?.trim() || 'Crew'
                     : tab === 'vaDirectory'
-                      ? 'VAs'
+                      ? 'Airlines'
                     : tab === 'vaRanking'
                       ? 'Ranking'
                   : tab === 'missions'
@@ -12908,9 +12903,9 @@ export function App() {
                 : tab === 'ports'
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
                   : tab === 'va'
-                    ? 'Roster, hangar, and hiring config for your listed airline.'
+                    ? 'Roster, hangar, and hiring for your company crew desk.'
                     : tab === 'vaDirectory'
-                      ? 'Published virtual airlines — request to join or use an invite code.'
+                      ? 'Published airlines — request to join or use an invite code.'
                     : tab === 'vaRanking'
                       ? 'Internal Haul distance and count over the last week.'
                   : tab === 'missions'
@@ -13323,18 +13318,18 @@ export function App() {
             }
             onClick={() => selectTab('vaDirectory')}
             disabled={busy}
-            title="Browse published companies in the VAs directory"
+            title="Browse published airlines"
           >
-            VAs
+            Airlines
           </button>
           <button
             type="button"
             className={!showAirport && tab === 'va' ? 'tab active' : 'tab'}
             onClick={() => selectTab('va')}
             disabled={busy}
-            title="Crew desk for your published company, or the company you joined"
+            title="Crew desk for your published company, or the one you joined"
           >
-            My VA
+            Crew
           </button>
           <button
             type="button"
@@ -13343,7 +13338,7 @@ export function App() {
             }
             onClick={() => selectTab('vaRanking')}
             disabled={busy}
-            title="VA Internal Haul ranking · 7 days"
+            title="Airline Internal Haul ranking · 7 days"
           >
             Ranking
           </button>
@@ -13673,7 +13668,7 @@ export function App() {
               authRequired || worldFixed ? (
                 <div
                   className="metric"
-                  title="Your personal company (home) — stays put while browsing a VA"
+                  title="Your personal company (home) — stays put while browsing an airline"
                 >
                   <span className="label">Company</span>
                   <strong>
@@ -16506,7 +16501,7 @@ export function App() {
                               </option>
                               {boardEstimateFleet.map((acf) => (
                                 <option key={acf.id} value={acf.id}>
-                                  {vaAircraftIdSet.has(acf.id) ? 'VA' : 'Yours'}
+                                  {vaAircraftIdSet.has(acf.id) ? 'Airline' : 'Yours'}
                                   {' · '}
                                   {acf.label}
                                   {acf.status === 'parked'
@@ -16519,10 +16514,10 @@ export function App() {
                           {boardAircraftId &&
                           vaAircraftIdSet.has(boardAircraftId) ? (
                             <p className="board-va-ops-chip" role="status">
-                              VA tail
+                              Airline tail
                               {vaMemberRouteCutPct != null
                                 ? ` · ${vaMemberRouteCutPct}% market hire → your home Wallet`
-                                : ' · Jet-A from VA · cut → your home Wallet'}
+                                : ' · Jet-A from company · cut → your home Wallet'}
                             </p>
                           ) : null}
                           {(() => {
@@ -17581,7 +17576,7 @@ export function App() {
                   </option>
                   {boardEstimateFleet.map((acf) => (
                     <option key={acf.id} value={acf.id}>
-                      {vaAircraftIdSet.has(acf.id) ? 'VA' : 'Yours'}
+                      {vaAircraftIdSet.has(acf.id) ? 'Airline' : 'Yours'}
                       {' · '}
                       {acf.label}
                       {acf.status === 'parked'
@@ -17593,10 +17588,10 @@ export function App() {
               </label>
               {boardAircraftId && vaAircraftIdSet.has(boardAircraftId) ? (
                 <p className="board-va-ops-chip" role="status">
-                  VA tail
+                  Airline tail
                   {vaMemberRouteCutPct != null
                                 ? ` · ${vaMemberRouteCutPct}% market hire → your home Wallet`
-                    : ' · Jet-A from VA · cut → your home Wallet'}
+                    : ' · Jet-A from company · cut → your home Wallet'}
                   {memberVaIsOwner ? ' · you are owner' : ''}
                 </p>
               ) : null}
@@ -18185,7 +18180,7 @@ export function App() {
                             ? `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch first`
                             : boardEstimateFleet.length === 0 &&
                                 !lot.npcClaim?.crewNeeded
-                              ? 'Need an aircraft — join a VA with a hangar, fly Operator aircraft, or buy a starter'
+                              ? 'Need an aircraft — join an airline with a hangar, fly Operator aircraft, or buy a starter'
                             : lot.npcClaim?.crewNeeded
                               ? lot.npcClaim.crewReposition
                                 ? 'Ferry empty aircraft home'
@@ -18229,7 +18224,7 @@ export function App() {
                           ? freightsBoard === 'crew'
                             ? 'No Operator aircraft offers nearby — advance time or try Your aircraft.'
                             : boardEstimateFleet.length === 0
-                              ? 'No Your aircraft lots you can take yet — open Operator aircraft, join a VA with a hangar, or buy a starter airframe.'
+                              ? 'No Your aircraft lots you can take yet — open Operator aircraft, join an airline with a hangar, or buy a starter airframe.'
                               : 'No freights yet — advance time (+15 min) or wait for a pulse.'
                           : freightsBoard === 'crew'
                             ? 'No Operator aircraft offers match the selected filters.'
@@ -18750,7 +18745,7 @@ export function App() {
                               disabled={entry.aircraft.status !== 'parked'}
                             >
                               {enRoute
-                                ? `${entry.owner === 'va' ? 'VA' : 'Yours'} · ${entry.aircraft.label} · ${enRoute}`
+                                ? `${entry.owner === 'va' ? 'Airline' : 'Yours'} · ${entry.aircraft.label} · ${enRoute}`
                                 : opsAircraftSelectLabel(
                                     entry,
                                     staging.originIcao,
@@ -18969,7 +18964,7 @@ export function App() {
 
               {staging.deskHold ? (
                 <div className="staging-section">
-                  <h3>VA desk hold</h3>
+                  <h3>Airline desk hold</h3>
                   <ul className="staging-lines">
                     <li className="staging-line staging-line-compact">
                       <div className="staging-line-head">
@@ -20160,6 +20155,7 @@ export function App() {
               formatMoney={formatMoney}
               formatMass={formatTonnes}
               economyTick={tick}
+              economyClock={continuousHours}
               formatClock={formatClock}
               weightSystem={weightSystem}
               onOpenAirport={openAirport}
@@ -20682,6 +20678,7 @@ export function App() {
                       formatMoney={formatMoney}
                       formatMass={formatTonnes}
                       economyTick={tick}
+                      economyClock={continuousHours}
                       formatClock={formatClock}
                       weightSystem={weightSystem}
                       onOpenAirport={openAirport}
@@ -20815,8 +20812,8 @@ export function App() {
                         </span>
                         <span className="logbook-kind">{kind}</span>
                         {vaFlight ? (
-                          <span className="logbook-kind logbook-va" title="Flown for a Virtual Airline">
-                            VA
+                          <span className="logbook-kind logbook-va" title="Flown for a listed airline">
+                            Airline
                           </span>
                         ) : null}
                         {isActiveMissionStatus(m.status) ? (

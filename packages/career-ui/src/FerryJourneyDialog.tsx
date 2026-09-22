@@ -240,7 +240,7 @@ export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
                   ) : (
                     <>
                       Charged to the{' '}
-                      <strong>VA wallet</strong>
+                      <strong>company wallet</strong>
                       {' · '}
                       {props.formatMoney(plan.ferryBilling.yourCostUsd)}
                     </>

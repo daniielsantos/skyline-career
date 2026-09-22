@@ -1452,7 +1452,7 @@ export function PortsPanel(props: {
   async function onClaimConcession(portIdToClaim: string) {
     if (props.busy || loading) return;
     if (!canPortCapex) {
-      props.onToast?.('fail', 'Only the VA owner can claim a Port FBO');
+      props.onToast?.('fail', 'Only the company owner can claim a Port FBO');
       return;
     }
     setLoading(true);
@@ -1485,7 +1485,7 @@ export function PortsPanel(props: {
   async function onRenewConcession(portIdToRenew: string, leaseUsd: number) {
     if (props.busy || loading) return;
     if (!canPortCapex) {
-      props.onToast?.('fail', 'Only the VA owner can renew a Port FBO lease');
+      props.onToast?.('fail', 'Only the company owner can renew a Port FBO lease');
       return;
     }
     const ok = await confirm({
@@ -1530,7 +1530,7 @@ export function PortsPanel(props: {
   ) {
     if (props.busy || loading) return;
     if (!canPortCapex) {
-      props.onToast?.('fail', 'Only the VA owner can upgrade a Port FBO');
+      props.onToast?.('fail', 'Only the company owner can upgrade a Port FBO');
       return;
     }
     const p3 = toLevel >= 3;
@@ -1857,7 +1857,7 @@ export function PortsPanel(props: {
   async function onBuyWarehouse(icao: string) {
     if (props.busy || loading) return;
     if (!canPortCapex) {
-      props.onToast?.('fail', 'Only the VA owner can buy a warehouse');
+      props.onToast?.('fail', 'Only the company owner can buy a warehouse');
       return;
     }
     setLoading(true);
@@ -1956,7 +1956,7 @@ export function PortsPanel(props: {
   async function onUpgradeWarehouse(warehouseId: string, icao: string) {
     if (props.busy || loading) return;
     if (!canPortCapex) {
-      props.onToast?.('fail', 'Only the VA owner can upgrade a warehouse');
+      props.onToast?.('fail', 'Only the company owner can upgrade a warehouse');
       return;
     }
     const wh = (warehouses?.warehouses ?? []).find((w) => w.id === warehouseId);
@@ -6111,7 +6111,7 @@ export function PortsPanel(props: {
                         : ''}
                   </button>
                   ) : (
-                    <p className="muted">Only the VA owner can renew or upgrade.</p>
+                    <p className="muted">Only the company owner can renew or upgrade.</p>
                   )}
                 </div>
               </>
@@ -6184,7 +6184,7 @@ export function PortsPanel(props: {
                       : ''}
                   </button>
                   ) : (
-                    <p className="muted">Only the VA owner can claim Port FBO.</p>
+                    <p className="muted">Only the company owner can claim Port FBO.</p>
                   )}
                 </div>
               </>
@@ -7062,7 +7062,7 @@ function DemandAcceptDialog(props: {
                 {props.aircraftOptions.map((a) => {
                   const active = a.id === props.aircraftId;
                   const prefix = props.vaAircraftIds?.has(a.id)
-                    ? 'VA · '
+                    ? 'Airline · '
                     : 'Yours · ';
                   return (
                     <button

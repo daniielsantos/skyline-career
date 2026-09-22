@@ -467,8 +467,8 @@ export function VaPage(props: Props) {
 
   const leaveVa = useCallback(async () => {
     const ok = await confirm({
-      title: 'Leave this VA?',
-      body: 'You leave the roster and switch back to your own company. Your personal wallet and fleet stay with you — VA money and hangar stay with the VA.',
+      title: 'Leave this airline?',
+      body: 'You leave the roster and switch back to your own company. Your personal wallet and fleet stay with you — company money and hangar stay with the airline.',
       confirmLabel: 'Leave',
       tone: 'warn',
     });
@@ -491,12 +491,12 @@ export function VaPage(props: Props) {
   const unlistVa = useCallback(async () => {
     const others = members.filter((m) => m.role !== 'owner').length;
     const ok = await confirm({
-      title: 'Unlist this VA?',
+      title: 'Unlist this airline?',
       body:
         others > 0
-          ? `Removes the listing from the VAs directory and drops ${others} other pilot${others === 1 ? '' : 's'} from the roster. Your company, wallet, and fleet stay.`
-          : 'Removes the listing from the VAs directory. Your company, wallet, and fleet stay — you can publish again later.',
-      confirmLabel: 'Unlist VA',
+          ? `Removes the listing from Airlines and drops ${others} other pilot${others === 1 ? '' : 's'} from the roster. Your company, wallet, and fleet stay.`
+          : 'Removes the listing from Airlines. Your company, wallet, and fleet stay — you can publish again later.',
+      confirmLabel: 'Unlist',
       tone: 'danger',
     });
     if (!ok) return;
@@ -562,7 +562,7 @@ export function VaPage(props: Props) {
   if (!canShow) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">Sign in to manage your VA.</p>
+        <p className="settings-help">Sign in to manage Crew.</p>
       </section>
     );
   }
@@ -572,7 +572,7 @@ export function VaPage(props: Props) {
   if (!loaded) {
     return (
       <section className="panel va-panel va-panel-loading">
-        <BusyBlock label="Loading VA…" />
+        <BusyBlock label="Loading Crew…" />
       </section>
     );
   }
@@ -581,7 +581,7 @@ export function VaPage(props: Props) {
     return (
       <section className="panel va-panel">
         <p className="settings-help">
-          Select a company first, then publish it as a VA from Company.
+          Select a company first, then publish it from Company → Open for pilots.
         </p>
         {props.onGoCompany ? (
           <button type="button" className="action" onClick={props.onGoCompany}>
@@ -597,7 +597,7 @@ export function VaPage(props: Props) {
       <section className="panel va-panel">
         <h3>Not published yet</h3>
         <p className="settings-help">
-          Your company exists, but it is not in the VAs directory. Publish from
+          Your company exists, but it is not in Airlines. Publish from
           Company (public name + home hub) — still the same wallet and fleet.
         </p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -612,7 +612,7 @@ export function VaPage(props: Props) {
               className="action ghost"
               onClick={props.onGoDirectory}
             >
-              Browse VAs
+              Browse Airlines
             </button>
           ) : null}
         </div>
@@ -649,7 +649,7 @@ export function VaPage(props: Props) {
             ) : null}
           </p>
         </div>
-        <div className="hangar-pane-toggle" role="tablist" aria-label="My VA views">
+        <div className="hangar-pane-toggle" role="tablist" aria-label="Crew views">
           <button
             type="button"
             role="tab"
@@ -907,19 +907,19 @@ export function VaPage(props: Props) {
       {pane === 'hangar' ? (
         <div className="va-pane-card">
           {tenantSwitching && hangarFleet.length === 0 ? (
-            <BusyStatus label="Opening VA hangar…" />
+            <BusyStatus label="Opening company hangar…" />
           ) : (
             <>
           {hangarReadOnly ? (
             <p className="settings-help">
-              Company hangar (shared VA fleet). Sidebar Hangar is your home
+              Company hangar (shared airline fleet). Sidebar Hangar is your home
               fleet. View-only for members — ferry still works. Reserve a parked
               tail for your session (4h). Sell, lease, inspect, repair, and
-              overhaul are owner-only (MX from the VA wallet).
+              overhaul are owner-only (MX from the company wallet).
             </p>
           ) : (
             <p className="settings-help">
-              Company hangar (shared VA fleet). Sidebar Hangar stays on your
+              Company hangar (shared airline fleet). Sidebar Hangar stays on your
               home company — chrome Wallet never switches here.
             </p>
           )}
@@ -1071,13 +1071,13 @@ export function VaPage(props: Props) {
       {pane === 'ledger' ? (
         <div className="va-pane-card">
           {tenantSwitching ? (
-            <BusyStatus label="Opening VA ledger…" />
+            <BusyStatus label="Opening company ledger…" />
           ) : (
             <>
           <div className="va-ledger-hero">
             <div className="va-ledger-wallet">
               <p className="aircraft-card-section-label" style={{ margin: 0 }}>
-                VA wallet
+                Company wallet
               </p>
               <p className="va-ledger-wallet-value">
                 {resolvedWalletUsd != null
@@ -1212,7 +1212,7 @@ export function VaPage(props: Props) {
         <div className="settings-card va-pane-card">
           {tenantSwitching ? (
             <div className="va-pane-loading">
-              <BusyBlock label="Opening VA logbook…" />
+              <BusyBlock label="Opening company logbook…" />
             </div>
           ) : (
             <>
@@ -1289,7 +1289,7 @@ export function VaPage(props: Props) {
                     })}
                     {logbookRows.length === 0 ? (
                       <li className="empty">
-                        No VA flights yet — accept Freights, Charter, or Internal
+                        No airline flights yet — accept Freights, Charter, or Internal
                         Haul on a company aircraft.
                       </li>
                     ) : null}
@@ -1310,7 +1310,7 @@ export function VaPage(props: Props) {
                 ? 'Hiring, ferry desk, invites, and listing. Name and hub live on Company.'
                 : canManage
                   ? 'Invites. Recruiting, cut, and listing are owner-only.'
-                  : 'Your seat on this VA. Most controls are owner-only.'}
+                  : 'Your seat on this airline. Most controls are owner-only.'}
             </p>
           </header>
 
@@ -1320,7 +1320,7 @@ export function VaPage(props: Props) {
               {isOwner ? (
                 <>
                   <li className="is-done">
-                    VA listed · {displayName || 'company'}
+                    Listed in Airlines · {displayName || 'company'}
                     {homeHubIcao ? ` · ${homeHubIcao}` : ''}
                   </li>
                   <li className={inviteCode ? 'is-done' : undefined}>
@@ -1346,7 +1346,7 @@ export function VaPage(props: Props) {
                   >
                     {lineCrew?.hired
                       ? `Line crew · ${lineCrew.tierName ?? 'Desk'} (${lineCrew.remaining}/${lineCrew.allowance} ferry/wk)`
-                      : 'Hire Line crew so empty ferry does not drain the VA wallet'}
+                      : 'Hire Line crew so empty ferry does not drain the company wallet'}
                   </li>
                   <li className={portFbo ? 'is-done' : undefined}>
                     {portFbo
@@ -1367,14 +1367,14 @@ export function VaPage(props: Props) {
                     {memberAirlineCutPct}% → your home Wallet
                   </li>
                   <li>
-                    My VA Hangar · Reserve a parked tail (4h) before Prepare
+                    Crew Hangar · Reserve a parked tail (4h) before Prepare
                   </li>
                   <li>
                     Hauls · Accept desk work (bridges / Demand / Wide haul) when
                     the company has stock
                   </li>
                   <li>
-                    Freights · pick an aircraft labeled VA · settle pays market
+                    Freights · pick an aircraft labeled Airline · settle pays market
                     hire cut home
                   </li>
                 </>
@@ -1422,7 +1422,7 @@ export function VaPage(props: Props) {
                   Open recruiting
                   <span className="muted">
                     {' '}
-                    · listed in VAs when on; invite still works when off
+                    · listed in Airlines when on; invite still works when off
                   </span>
                 </span>
               </label>
@@ -1476,7 +1476,7 @@ export function VaPage(props: Props) {
                   />
                   <span className="va-config-field-suffix">%</span>
                   <span className="muted va-config-field-hint">
-                    Freights / Charter on a VA tail (10–50)
+                    Freights / Charter on an airline tail (10–50)
                   </span>
                 </div>
               </div>
@@ -1589,7 +1589,7 @@ export function VaPage(props: Props) {
                             const upgradeUsd = lineCrew.upgradeUsd!;
                             const ok = await confirm({
                               title: `Upgrade to ${nextName}?`,
-                              body: `Pays $${upgradeUsd.toLocaleString()} from the VA wallet. Weekly salary becomes higher; allowance scales up. Used hops this week stay counted.`,
+                              body: `Pays $${upgradeUsd.toLocaleString()} from the company wallet. Weekly salary becomes higher; allowance scales up. Used hops this week stay counted.`,
                               confirmLabel: `Upgrade · $${upgradeUsd.toLocaleString()}`,
                             });
                             if (!ok) return;
@@ -1867,7 +1867,7 @@ export function VaPage(props: Props) {
               </p>
             ) : (
               <p className="settings-help">
-                One invite code per VA. Stays valid until you renew or unlist.
+                One invite code per airline. Stays valid until you renew or unlist.
               </p>
             )}
           </section>
@@ -1883,7 +1883,7 @@ export function VaPage(props: Props) {
                   void unlistVa();
                 }}
               >
-                Unlist VA
+                Unlist from Airlines
               </button>
             ) : (
               <button
@@ -1894,7 +1894,7 @@ export function VaPage(props: Props) {
                   void leaveVa();
                 }}
               >
-                Leave VA
+                Leave airline
               </button>
             )}
           </div>

@@ -1,5 +1,6 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-09-22. **UI copy:** directory = **Airlines**, desk = **Crew**, personal = **Company** (rotas/API `/api/va*` e códigos `VA-` intactos).
 Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
@@ -71,6 +72,12 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 **VA directory BusyBlock (2026-09-22):** sintoma = abrir VAs mostrava toolbar vazia / “No VAs…” sem animação. Causa = fetch sem `loaded` gate. Fix = `BusyBlock` “Loading VAs…” (mesmo padrão My VA) até `fetchVaDirectory` resolver.
 
 **Scout Hold amount picker (2026-09-22):** ver `24-port-fbo.md` — Hold no Scout abre slider + 25/50/75/Max em vez de reservar o suggestion kg inteiro.
+
+**Airlines / Crew / Company copy (2026-09-22):** sintoma = “VA/VAs/My VA” soava estranho para crews pequenas. Causa = label legado Virtual Airline. Fix = UI only: sidebar/directory **Airlines**, desk **Crew** (h1 = nome da airline), **Company** inalterado; pickers **Airline** / **Yours**; ledger/wallet “company”; invites ainda `VA-XXXXXXXX`. Sem rename de rotas/API/`va_listed`.
+
+**Hangar AOG note / overhaul ETA (2026-09-22):** sintoma = Duke em engine OH (1d light GA) parecia “maintenance” sem countdown. Causa = badge só pintava `status`; nota OH sumia atrás do ferry UI; AOG Inspect confundido com timer. Fix = badge `engine OH · 18h left`; Where “Shop at” + nota `Overhaul · Engine · … left · ready Day N`; ferry só parked; Inspect AOG = “not timed”.
+
+**Board picker parked-only (2026-09-22):** sintoma = Duke da airline em maintenance aparecia no picker de Freights/Contracts (`… · maintenance`) mas sumia em Charter/Hauls/Manifest. Causa = `boardEstimateFleet` aceitava `parked|assigned|maintenance`; Charter/Hauls filtravam só `parked`. Fix = `isOpsAircraftBoardSelectable` = parked only; Freights/Contracts alinhados. MX fica no Hangar até repair.
 
 **VA directory toolbar (2026-09-22):** sintoma = paragraph longo (“joining keeps… Port FBO…”) enchendo a toolbar. Fix = remover meta; Search à esquerda, Join code à direita.
 

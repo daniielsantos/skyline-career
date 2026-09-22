@@ -19,6 +19,7 @@ import {
   formatBoardDistanceNm,
 } from './board-money';
 import { IcaoLink } from './IcaoLink';
+import { isOpsAircraftBoardSelectable } from './ops-fleet';
 
 export const CHARTER_PAGE_SIZE = 12;
 
@@ -101,7 +102,7 @@ const SORT_TITLE =
   'Sort by this column. Click another column to add a sort level; click again to reverse or clear.';
 
 export function CharterBoard(props: CharterBoardProps) {
-  const parked = props.fleet.filter((aircraft) => aircraft.status === 'parked');
+  const parked = props.fleet.filter(isOpsAircraftBoardSelectable);
   const originLocked = props.origin !== undefined;
   const destLocked = props.dest !== undefined;
   const controlled =
@@ -313,7 +314,7 @@ export function CharterBoard(props: CharterBoardProps) {
               </option>
               {parked.map((aircraft) => {
                 const isVa = props.vaAircraftIds?.has(aircraft.id);
-                const prefix = isVa ? 'VA' : 'Yours';
+                const prefix = isVa ? 'Airline' : 'Yours';
                 return (
                   <option key={aircraft.id} value={aircraft.id}>
                     {prefix} · {aircraft.label} · {aircraft.locationIcao}

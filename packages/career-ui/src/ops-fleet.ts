@@ -115,7 +115,9 @@ export function pickOpsAircraftForOrigin(
   preferId?: string | null,
 ): OpsFleetEntry | null {
   const origin = originIcao.trim().toUpperCase();
-  const parked = entries.filter((e) => e.aircraft.status === 'parked');
+  const parked = entries.filter((e) =>
+    isOpsAircraftBoardSelectable(e.aircraft),
+  );
   if (preferId) {
     const named = parked.find((e) => e.aircraft.id === preferId.trim());
     if (named) return named;
@@ -127,12 +129,20 @@ export function pickOpsAircraftForOrigin(
   return parked[0] ?? null;
 }
 
+/**
+ * Freights / Charter / Contracts / Hauls pickers: only parked tails.
+ * Maintenance / assigned / ferry stay in Hangar — Prepare requires parked.
+ */
+export function isOpsAircraftBoardSelectable(aircraft: PlayerAircraft): boolean {
+  return aircraft.status === 'parked';
+}
+
 export function opsAircraftSelectLabel(
   entry: OpsFleetEntry,
   originIcao: string,
 ): string {
   const { aircraft, owner } = entry;
-  const prefix = owner === 'va' ? 'VA' : 'Yours';
+  const prefix = owner === 'va' ? 'Airline' : 'Yours';
   const atOrigin =
     aircraft.status === 'parked' &&
     aircraft.locationIcao.trim().toUpperCase() ===

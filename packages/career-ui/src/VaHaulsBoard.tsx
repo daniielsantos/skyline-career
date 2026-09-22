@@ -22,6 +22,7 @@ import {
 } from './company-network';
 import { VaCompanyNetwork } from './VaCompanyNetwork';
 import { VaPortPathCard } from './VaPortPathCard';
+import { isOpsAircraftBoardSelectable } from './ops-fleet';
 import { formatMass, type WeightSystem } from './weight-units';
 
 function commodityLabel(id: string): string {
@@ -186,7 +187,7 @@ export function VaHaulsBoard(props: Props) {
 
   /** All parked VA tails — Prepare/Accept like Freights (ferry off-origin in Manifest). */
   const parkedFleet = useMemo(
-    () => props.fleet.filter((acf) => acf.status === 'parked'),
+    () => props.fleet.filter(isOpsAircraftBoardSelectable),
     [props.fleet],
   );
 
@@ -362,8 +363,8 @@ export function VaHaulsBoard(props: Props) {
             {!loaded
               ? 'Airline desk — bridges, Demand, and Wide hauls.'
               : hasPortFbo
-                ? 'Airline desk · pick a parked VA tail: Accept if it fits at origin, else Prepare (ferry / partial load in Manifest).'
-                : 'Until Port FBO + stock, fly Freights with a VA tail (market hire).'}
+                ? 'Airline desk · pick a parked company tail: Accept if it fits at origin, else Prepare (ferry / partial load in Manifest).'
+                : 'Until Port FBO + stock, fly Freights with an airline tail (market hire).'}
           </p>
         </div>
         {props.onGoPorts ? (
@@ -436,11 +437,11 @@ export function VaHaulsBoard(props: Props) {
                   ? focusNode
                     ? `No open holds from ${focusNode.title} — try All, or post Scout Hold from Ports.`
                     : 'No desk holds open. Post from Ports (Scout / Hold) — needs company stock.'
-                  : 'No desk work yet. Fly Freights with a VA tail, or finish the Port FBO path above.'}
+                  : 'No desk work yet. Fly Freights with an airline tail, or finish the Port FBO path above.'}
               </p>
             ) : parkedFleet.length === 0 ? (
               <p className="empty">
-                No parked VA aircraft — park a company tail, then Prepare.
+                No parked company aircraft — park a company tail, then Prepare.
               </p>
             ) : (
               <ul className="va-hauls-list">

@@ -23,7 +23,7 @@ export const PAGE_HELP = {
     title: 'How Freights works',
     kicker: 'Page guide',
     bullets: [
-      'Cargo board. Pick Yours or VA in the aircraft list — VA tails pay Jet-A from the VA and send your cut % home.',
+      'Cargo board. Pick Yours or an airline tail in the aircraft list — airline tails pay Jet-A from that company and send your cut % home.',
       'Pick a lot (or several on the same route), then Dispatch to build the flight.',
       'Urgent and idle chips are economy pressure — same commodity, different pay and clock.',
       'A lock means Hangar → Cargo Ops has not unlocked that commodity yet (your home ladder).',
@@ -46,7 +46,7 @@ export const PAGE_HELP = {
     title: 'How Ports works',
     kicker: 'Page guide',
     bullets: [
-      'This sidebar Ports is your personal company — warehouses, Demand, and Port FBO you claim solo. Company (VA) desk is under My VA → Ports.',
+      'This sidebar Ports is your personal company — warehouses, Demand, and Port FBO you claim solo. Shared airline desk is under Crew → Ports.',
       'Seaport listings sell at factory price into a warehouse at a pickup hub. Overflow sits in the yard — listings do not spawn just because you opened this page.',
       'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent throughput.',
       'Buy warehouse space (T1–T3), then Store yard lots into it. Fees apply when you move cargo into the warehouse.',
@@ -56,27 +56,27 @@ export const PAGE_HELP = {
   },
   va: {
     id: 'va',
-    title: 'How My VA works',
+    title: 'How Crew works',
     kicker: 'Page guide',
     bullets: [
-      'My VA is the crew desk for one company — yours when published, or the airline you joined. It is not a second company.',
-      'Fresh VA = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls / Ports.',
-      'Hauls = Open desk holds: pick a VA tail, Accept if it fits at origin, or Prepare (ferry / partial load). Ports (this page) = company desk: claim FBO, buy WH, Scout, Demand. Sidebar Ports stays your personal company.',
+      'Crew is the desk for one company — yours when published, or the airline you joined. It is not a second company.',
+      'Fresh listing = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls / Ports.',
+      'Hauls = Open desk holds: pick a company tail, Accept if it fits at origin, or Prepare (ferry / partial load). Ports here = company desk: claim FBO, buy WH, Scout, Demand. Sidebar Ports stays your personal company.',
       'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Money map shows who pays Jet-A, cut, ferry, and MX.',
       'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
-      'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',
+      'Freights with an airline-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',
     ],
   },
   vaDirectory: {
     id: 'va-directory',
-    title: 'How VAs directory works',
+    title: 'How Airlines works',
     kicker: 'Page guide',
     bullets: [
       'Lists only companies that published — not every company in the world.',
-      'Joining keeps your personal company, wallet, and fleet. Early value is VA aircraft + cut; Port FBO desk/Hauls come after the company builds WH T3 and claims a port.',
+      'Joining keeps your personal company, wallet, and fleet. Early value is company aircraft + cut; Port FBO desk/Hauls come after the company builds WH T3 and claims a port.',
       'Quality chip is settle flight score + on-time over ~7 days (needs a few flights).',
       'Request to join when hiring is open, or use a private invite code anytime.',
-      'Owners publish from Company; manage seats under My VA (same company, crew desk).',
+      'Owners publish from Company; manage seats under Crew (same company, crew desk).',
     ],
   },
   vaRanking: {
@@ -84,8 +84,8 @@ export const PAGE_HELP = {
     title: 'How Ranking works',
     kicker: 'Page guide',
     bullets: [
-      'Seven-day Internal Haul stats across VAs — distance and haul count.',
-      'Flight quality rides along when the VA has enough scored settles.',
+      'Seven-day Internal Haul stats across listed airlines — distance and haul count.',
+      'Flight quality rides along when the airline has enough scored settles.',
       'Pilot strip shows members of your active company when you have one.',
       'Settle hauls from Dispatch after flying WH→WH bridges from Ports.',
     ],
@@ -118,8 +118,8 @@ export const PAGE_HELP = {
     title: 'How Company works',
     kicker: 'Page guide',
     bullets: [
-      'This is your airline — home hub, name, wallet snapshot. Publishing puts the same company in the VAs directory; it does not create a second company.',
-      'Open for pilots / In the directory controls the public listing. My VA is the crew desk (roster, ledger, hangar) for that listing.',
+      'This is your airline — home hub, name, wallet snapshot. Publishing puts the same company in Airlines; it does not create a second company.',
+      'Open for pilots / In the directory controls the public listing. Crew is the desk (roster, ledger, hangar) for that listing.',
       'You need a Base and cash to grow; the Hangar cashflow tab is the detailed ledger.',
     ],
   },
@@ -147,8 +147,8 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Settled flights — aircraft, cargo, distance, payout. It does not change the live board.',
-      'VA tag marks flights flown for a listed Virtual Airline (VA aircraft / Internal Haul).',
-      'Pay is what your home wallet received: solo/owner = full route; member Freights show your cut (not VA gross).',
+      'Airline tag marks flights flown for a listed company (shared aircraft / Internal Haul).',
+      'Pay is what your home wallet received: solo/owner = full route; member Freights show your cut (not company gross).',
     ],
   },
   settings: {

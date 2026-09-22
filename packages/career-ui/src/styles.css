@@ -6903,6 +6903,10 @@ tr.lot-locked {
   line-height: 1.35;
 }
 
+.hangar-where-note {
+  margin-top: 0.35rem;
+}
+
 .aircraft-market-toolbar {
   display: flex;
   flex-wrap: wrap;

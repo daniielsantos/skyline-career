@@ -42,7 +42,7 @@ export function VaRankingPage(props: Props) {
   if (!canShow) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">Sign in to see VA Internal Haul rankings.</p>
+        <p className="settings-help">Sign in to see airline Internal Haul rankings.</p>
       </section>
     );
   }
@@ -51,7 +51,7 @@ export function VaRankingPage(props: Props) {
     <section className="panel va-panel">
       <div className="settings-grid">
         <div className="settings-card">
-          <h3>VA ranking · {windowDays} days</h3>
+          <h3>Airline ranking · {windowDays} days</h3>
           <p className="settings-help">
             Internal Haul distance and count. Flight quality is settle score +
             on-time over the same window (shown when enough flights).
@@ -99,7 +99,7 @@ export function VaRankingPage(props: Props) {
 
         {pilots.length > 0 ? (
           <div className="settings-card">
-            <h3>Pilots · this VA</h3>
+            <h3>Pilots · this airline</h3>
             <p className="settings-help">
               Ranking for your active company over the same window.
             </p>

@@ -67,7 +67,7 @@ export function VaDirectoryPage(props: Props) {
   if (!canShow) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">Sign in to browse virtual airlines.</p>
+        <p className="settings-help">Sign in to browse airlines.</p>
       </section>
     );
   }
@@ -75,7 +75,7 @@ export function VaDirectoryPage(props: Props) {
   if (!loaded) {
     return (
       <section className="panel va-panel va-panel-loading">
-        <BusyBlock label="Loading VAs…" />
+        <BusyBlock label="Loading airlines…" />
       </section>
     );
   }
@@ -89,7 +89,7 @@ export function VaDirectoryPage(props: Props) {
           value={query}
           placeholder="Search name or home ICAO…"
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search VAs"
+          aria-label="Search airlines"
         />
         <div className="va-directory-invite">
           <input
@@ -106,7 +106,7 @@ export function VaDirectoryPage(props: Props) {
             disabled={busy || alreadyInVa || !joinCode.trim()}
             title={
               alreadyInVa
-                ? 'Leave your current VA before joining another'
+                ? 'Leave your current airline before joining another'
                 : undefined
             }
             onClick={() => {
@@ -146,7 +146,7 @@ export function VaDirectoryPage(props: Props) {
       {filtered.length === 0 ? (
         <p className="settings-help" style={{ marginTop: '1rem' }}>
           {directory.length === 0
-            ? 'No VAs published yet. Owners list theirs from Company → Become a VA.'
+            ? 'No airlines published yet. Owners list theirs from Company → Open for pilots.'
             : 'No matches.'}
         </p>
       ) : (

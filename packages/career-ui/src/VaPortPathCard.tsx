@@ -118,7 +118,7 @@ export function VaPortPathCard(props: Props) {
           done: canAfford,
           label: canAfford
             ? `Ledger covers claim + lease (${formatBoardMoney(dueUsd)})`
-            : `Need ~${formatBoardMoney(dueUsd)} on the VA Ledger (claim + first lease)`,
+            : `Need ~${formatBoardMoney(dueUsd)} on the company Ledger (claim + first lease)`,
         },
         {
           id: 'claim',
@@ -138,8 +138,8 @@ export function VaPortPathCard(props: Props) {
         );
         setDetail(
           props.isOwner
-            ? 'Claim on Ports. Freights with VA tails still work until then.'
-            : 'Owner claims when gates pass — fly Freights VA meanwhile.',
+            ? 'Claim on Ports. Freights with airline tails still work until then.'
+            : 'Owner claims when gates pass — fly Freights on an airline tail meanwhile.',
         );
       } else {
         const blocker =
@@ -151,15 +151,15 @@ export function VaPortPathCard(props: Props) {
               : shipped < shippedNeed
                 ? `Need more throughput through ${hub}`
                 : !canAfford
-                  ? 'VA Ledger needs more cash for claim + lease'
+                  ? 'Company Ledger needs more cash for claim + lease'
                   : 'Finish the steps below');
         setHeadline(
           `Path to Port FBO${port ? ` · ${port.name}` : ''} — ${blocker}.`,
         );
         setDetail(
           props.isOwner
-            ? 'Company CAPEX on the VA Ledger — not your home wallet.'
-            : 'Shared company goal. Fly VA freights while the owner builds WH/Port FBO.',
+            ? 'Company CAPEX on the company Ledger — not your home wallet.'
+            : 'Shared company goal. Fly airline freights while the owner builds WH/Port FBO.',
         );
       }
     } catch {

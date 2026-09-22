@@ -17,11 +17,11 @@ type Props = {
     displayName: string;
     homeHubIcao: string;
   }) => void;
-  /** Notify Company Identity when this company is in the VAs directory. */
+  /** Notify Company Identity when this company is in the Airlines directory. */
   onListingState?: (state: { listed: boolean }) => void;
 };
 
-/** Company panel: publish the active company to the VAs directory (or update listing). */
+/** Company panel: publish the active company to Airlines (or update listing). */
 export function CompanyVaPublishCard(props: Props) {
   const token = getAuthToken();
   const companyId = props.activeCompanyId || getStoredCompanyId();
@@ -89,7 +89,7 @@ export function CompanyVaPublishCard(props: Props) {
         </p>
         {listed && props.onGoVa ? (
           <button type="button" className="action ghost" onClick={props.onGoVa}>
-            My VA · roster and ledger
+            Crew · roster and ledger
           </button>
         ) : null}
       </div>
@@ -100,7 +100,7 @@ export function CompanyVaPublishCard(props: Props) {
       <div className="pilot-card company-va-card">
         <h3>Directory listing</h3>
         <p className="settings-help">
-          Sign in as owner of this company to publish it in the VAs directory.
+          Sign in as owner of this company to publish it in Airlines.
         </p>
       </div>
     );
@@ -111,7 +111,7 @@ export function CompanyVaPublishCard(props: Props) {
       <h3>{listed ? 'In the directory' : 'Open for pilots'}</h3>
       <p className="settings-help">
         Still this company — same wallet and fleet. Publishing lists it under
-        VAs so pilots can join.
+        Airlines so pilots can join.
       </p>
       {error ? (
         <p className="error" role="alert">
@@ -177,7 +177,7 @@ export function CompanyVaPublishCard(props: Props) {
         </button>
         {listed && props.onGoVa ? (
           <button type="button" className="action ghost" onClick={props.onGoVa}>
-            My VA · roster and ledger
+            Crew · roster and ledger
           </button>
         ) : null}
       </div>

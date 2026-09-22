@@ -707,7 +707,7 @@ function hangarWhereLabel(
         ? `${missionRoute.originIcao} → ${missionRoute.destIcao} ·`
         : 'On mission ·';
     case 'maintenance':
-      return 'AOG at';
+      return acf.overhaulKind ? 'Shop at' : 'AOG at';
     case 'listed':
       return 'Listed · based';
     case 'leased_out':
@@ -719,9 +719,55 @@ function hangarWhereLabel(
   }
 }
 
+function hangarStatusBadgeLabel(acf: PlayerAircraft): string {
+  if (acf.status === 'maintenance' && acf.overhaulKind) {
+    return acf.overhaulKind === 'engine' ? 'engine OH' : 'airframe OH';
+  }
+  return acf.status;
+}
+
+/** Mirror shared CRITICAL_CONDITION_PCT — hangar copy only. */
+const HANGAR_CRITICAL_CONDITION_PCT = 40;
+const HANGAR_HOURS_PER_TICK = 0.25;
+const HANGAR_HOURS_PER_DAY = 24;
+
+function formatHangarDurationHours(hours: number): string {
+  if (!(hours > 0)) return '0h';
+  if (hours < 1) {
+    const m = Math.max(1, Math.round(hours * 60));
+    return `${m}m`;
+  }
+  const totalHours = Math.round(hours);
+  if (totalHours < HANGAR_HOURS_PER_DAY) return `${totalHours}h`;
+  const days = Math.floor(totalHours / HANGAR_HOURS_PER_DAY);
+  const rem = totalHours % HANGAR_HOURS_PER_DAY;
+  return rem === 0 ? `${days}d` : `${days}d ${rem}h`;
+}
+
+function hangarOverhaulRemainingLabel(
+  acf: PlayerAircraft,
+  opts?: { economyTick?: number; economyClock?: number },
+): string | null {
+  if (!acf.overhaulKind) return null;
+  const ready =
+    typeof acf.overhaulReadyAtTick === 'number'
+      ? acf.overhaulReadyAtTick
+      : null;
+  if (ready == null) return null;
+  const now = opts?.economyClock ?? opts?.economyTick ?? 0;
+  const ticksLeft = Math.max(0, ready - Math.max(0, now));
+  if (ticksLeft <= 0) return 'ready soon';
+  return `${formatHangarDurationHours(ticksLeft * HANGAR_HOURS_PER_TICK)} left`;
+}
+
 function hangarStatusNote(
   acf: PlayerAircraft,
-  opts?: { economyTick?: number; formatClock?: (tick: number) => string },
+  opts?: {
+    economyTick?: number;
+    economyClock?: number;
+    formatClock?: (tick: number) => string;
+    mutationsLocked?: boolean;
+  },
 ): string | null {
   switch (acf.status) {
     case 'assigned':
@@ -734,15 +780,35 @@ function hangarStatusNote(
           typeof acf.overhaulReadyAtTick === 'number'
             ? acf.overhaulReadyAtTick
             : null;
+        const leftLabel = hangarOverhaulRemainingLabel(acf, opts);
         const readyLabel =
           ready != null && opts?.formatClock
             ? opts.formatClock(ready)
             : ready != null
               ? `tick ${ready}`
-              : 'soon';
-        return `Overhaul · ${kindLabel} · ready ${readyLabel}. Resets ${acf.overhaulKind === 'engine' ? 'engine' : 'airframe'} hours when the shop finishes.`;
+              : null;
+        if (leftLabel === 'ready soon') {
+          return `Overhaul · ${kindLabel} · shop done — parks on next Hangar refresh / world pulse.`;
+        }
+        if (leftLabel && readyLabel) {
+          return `Overhaul · ${kindLabel} · ${leftLabel} · ready ${readyLabel}.`;
+        }
+        if (leftLabel) {
+          return `Overhaul · ${kindLabel} · ${leftLabel}. Resets ${acf.overhaulKind === 'engine' ? 'engine' : 'airframe'} hours when the shop finishes.`;
+        }
+        return `Overhaul · ${kindLabel} · in progress. Resets ${acf.overhaulKind === 'engine' ? 'engine' : 'airframe'} hours when the shop finishes.`;
       }
-      return 'Pay inspection and/or repair before dispatch.';
+      if (opts?.mutationsLocked) {
+        return 'AOG — not timed. Owner must Inspect / Repair on this Hangar before anyone can fly it.';
+      }
+      {
+        const critical =
+          (acf.airframeConditionPct ?? 100) < HANGAR_CRITICAL_CONDITION_PCT ||
+          (acf.engineConditionPct ?? 100) < HANGAR_CRITICAL_CONDITION_PCT;
+        return critical
+          ? 'AOG — not timed. Pay Inspect, then Repair until airframe/engine are above 40%.'
+          : 'AOG — not timed. Pay Inspect to clear and fly again.';
+      }
     case 'listed':
       return 'Listed on Airframes — unlist to fly again.';
     case 'leased_out':
@@ -863,6 +929,8 @@ export function HangarAircraftCard(props: {
   formatMass: (kg: number) => string;
   /** Economy tick for lease due / overdue copy. */
   economyTick?: number;
+  /** Fractional economy clock for live overhaul remaining (optional). */
+  economyClock?: number;
   /** Optional clock formatter for next-due ticks. */
   formatClock?: (tick: number) => string;
   weightSystem?: WeightSystem;
@@ -950,9 +1018,15 @@ export function HangarAircraftCard(props: {
           Math.round((acf.maintenanceDueAtHours ?? 0) - (acf.hoursAirframe ?? 0)),
         )
       : null;
+  const ohLeft = hangarOverhaulRemainingLabel(acf, {
+    economyTick: props.economyTick,
+    economyClock: props.economyClock,
+  });
   const note = hangarStatusNote(acf, {
     economyTick: props.economyTick,
+    economyClock: props.economyClock,
     formatClock: props.formatClock,
+    mutationsLocked,
   });
   const registration = formatAircraftRegistration(acf.registration);
   const hoursMxMult = estimateHoursMxCostMult(acf);
@@ -1017,7 +1091,7 @@ export function HangarAircraftCard(props: {
     null,
   );
   const journeyOriginRef = useRef<string | null>(null);
-  const showMove = acf.status === 'parked' || acf.status === 'maintenance';
+  const showMove = acf.status === 'parked';
   const hasManageActions =
     !mutationsLocked &&
     (canRepair ||
@@ -1160,7 +1234,19 @@ export function HangarAircraftCard(props: {
         imageAlt={acf.label}
         badges={
           <>
-            <span className={`status status-${acf.status}`}>{acf.status}</span>
+            <span
+              className={`status status-${acf.status}`}
+              title={
+                acf.overhaulKind
+                  ? ohLeft
+                    ? `Overhaul · ${ohLeft}`
+                    : 'Overhaul in progress'
+                  : undefined
+              }
+            >
+              {hangarStatusBadgeLabel(acf)}
+              {ohLeft ? ` · ${ohLeft}` : ''}
+            </span>
             <span className="badge badge-ownership">
               {(acf.ownership ?? 'owned') === 'leased' ? 'leased' : 'owned'}
             </span>
@@ -1229,6 +1315,7 @@ export function HangarAircraftCard(props: {
               disabled={props.busy}
             />
           </div>
+          {note ? <p className="hangar-card-note hangar-where-note">{note}</p> : null}
         </div>
 
         <div className="hangar-section hangar-section-health">
@@ -1539,7 +1626,7 @@ export function HangarAircraftCard(props: {
                           : ferryPlan.ferryBilling?.mode === 'overflow'
                             ? ` · your wallet ${props.formatMoney(ferryPlan.ferryBilling.yourCostUsd)}`
                             : ferryPlan.ferryBilling?.mode === 'company'
-                              ? ' · VA wallet'
+                              ? ' · company wallet'
                               : ''}
                       </p>
                     </>
@@ -1547,8 +1634,6 @@ export function HangarAircraftCard(props: {
                 </div>
               ) : null}
             </div>
-          ) : note ? (
-            <p className="hangar-card-note">{note}</p>
           ) : (
             <div className="hangar-move-spacer" aria-hidden="true" />
           )}

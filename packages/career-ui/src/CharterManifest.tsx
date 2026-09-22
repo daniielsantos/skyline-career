@@ -145,7 +145,7 @@ export function CharterManifest(props: CharterManifestProps) {
                 )
                 .map((item) => {
                   const isVa = props.vaAircraftIds?.has(item.id);
-                  const prefix = isVa ? 'VA' : 'Yours';
+                  const prefix = isVa ? 'Airline' : 'Yours';
                   const enRoute =
                     item.status === 'ferry' && item.npcFerry
                       ? `Line crew → ${item.npcFerry.destIcao}`

@@ -969,7 +969,7 @@ export function VaPage(props: Props) {
             <p className="empty">No members.</p>
           ) : (
             <ul
-              className={`va-roster-list${isOwner ? ' is-manage' : ''} is-live-actions`}
+              className={`va-roster-list${isOwner ? ' is-manage' : ''}`}
             >
               {members.map((m) => {
                 const at = formatRosterAt(m);
@@ -986,7 +986,6 @@ export function VaPage(props: Props) {
                   : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`;
                 const liveOpen = livePilot?.accountId === m.accountId;
                 const canManageMember = isOwner && m.role !== 'owner';
-                const actionsEmpty = !hasLive && !canManageMember;
                 return (
                 <li key={m.accountId} className="va-roster-row">
                   <div className="va-roster-id">
@@ -1004,33 +1003,19 @@ export function VaPage(props: Props) {
                   </div>
                   <div className="va-roster-stat">
                     <span className="va-stat-label">At</span>
-                    <span
-                      className={`va-stat-value${flying ? ' is-flying' : ''}`}
-                      title={
-                        m.live
-                          ? formatLivePhase(m.live.phase) || 'Live'
-                          : flying
-                            ? 'In flight'
-                            : undefined
-                      }
-                    >
-                      {at}
-                    </span>
-                  </div>
-                  <div className="va-roster-stat va-roster-stat-role">
-                    <span className="va-stat-label">Role</span>
-                    <span
-                      className={`va-roster-role va-roster-role-${m.role}`}
-                    >
-                      {m.role}
-                    </span>
-                  </div>
-                  <div
-                    className={`va-roster-actions${
-                      actionsEmpty ? ' va-roster-actions-spacer' : ''
-                    }`}
-                    aria-hidden={actionsEmpty}
-                  >
+                    <div className="va-roster-at-row">
+                      <span
+                        className={`va-stat-value${flying ? ' is-flying' : ''}`}
+                        title={
+                          m.live
+                            ? formatLivePhase(m.live.phase) || 'Live'
+                            : flying
+                              ? 'In flight'
+                              : undefined
+                        }
+                      >
+                        {at}
+                      </span>
                       {hasLive ? (
                         <button
                           type="button"
@@ -1045,67 +1030,81 @@ export function VaPage(props: Props) {
                           {liveOpen ? 'Close' : 'Live'}
                         </button>
                       ) : null}
-                      {canManageMember ? (
-                        <>
-                          <button
-                            type="button"
-                            className="action ghost"
-                            disabled={pageBusy}
-                            onClick={() => {
-                              void (async () => {
-                                setBusy(true);
-                                try {
-                                  await postVaRole({
-                                    accountId: m.accountId,
-                                    role:
-                                      m.role === 'dispatcher'
-                                        ? 'pilot'
-                                        : 'dispatcher',
-                                  });
-                                  await refresh();
-                                } catch (err) {
-                                  setError(
-                                    err instanceof Error
-                                      ? err.message
-                                      : String(err),
-                                  );
-                                } finally {
-                                  setBusy(false);
-                                }
-                              })();
-                            }}
-                          >
-                            {m.role === 'dispatcher'
-                              ? 'Make pilot'
-                              : 'Make dispatcher'}
-                          </button>
-                          <button
-                            type="button"
-                            className="action ghost va-roster-kick"
-                            disabled={pageBusy}
-                            onClick={() => {
-                              void (async () => {
-                                setBusy(true);
-                                try {
-                                  await postVaKick(m.accountId);
-                                  await refresh();
-                                } catch (err) {
-                                  setError(
-                                    err instanceof Error
-                                      ? err.message
-                                      : String(err),
-                                  );
-                                } finally {
-                                  setBusy(false);
-                                }
-                              })();
-                            }}
-                          >
-                            Kick
-                          </button>
-                        </>
-                      ) : null}
+                    </div>
                   </div>
+                  <div className="va-roster-stat va-roster-stat-role">
+                    <span className="va-stat-label">Role</span>
+                    <span
+                      className={`va-roster-role va-roster-role-${m.role}`}
+                    >
+                      {m.role}
+                    </span>
+                  </div>
+                  {canManageMember ? (
+                    <div className="va-roster-actions">
+                      <button
+                        type="button"
+                        className="action ghost"
+                        disabled={pageBusy}
+                        onClick={() => {
+                          void (async () => {
+                            setBusy(true);
+                            try {
+                              await postVaRole({
+                                accountId: m.accountId,
+                                role:
+                                  m.role === 'dispatcher'
+                                    ? 'pilot'
+                                    : 'dispatcher',
+                              });
+                              await refresh();
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        {m.role === 'dispatcher'
+                          ? 'Make pilot'
+                          : 'Make dispatcher'}
+                      </button>
+                      <button
+                        type="button"
+                        className="action ghost va-roster-kick"
+                        disabled={pageBusy}
+                        onClick={() => {
+                          void (async () => {
+                            setBusy(true);
+                            try {
+                              await postVaKick(m.accountId);
+                              await refresh();
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        Kick
+                      </button>
+                    </div>
+                  ) : isOwner ? (
+                    <div
+                      className="va-roster-actions va-roster-actions-spacer"
+                      aria-hidden
+                    />
+                  ) : null}
                 </li>
                 );
               })}
@@ -1188,6 +1187,8 @@ export function VaPage(props: Props) {
                           : 'Stale'}
                       </span>
                     </>
+                  ) : liveOrigin && liveDest ? (
+                    <span>Waiting for position…</span>
                   ) : (
                     <span>Waiting for Watch…</span>
                   )}

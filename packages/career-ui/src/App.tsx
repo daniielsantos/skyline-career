@@ -6323,63 +6323,46 @@ export function App() {
             return next;
           });
         }
-        // VA Crew Live: same Watch sample Preflight uses for "Engines running".
-        // Stream while Watch owns an active airline mission — do not require
-        // enginesRunning alone (parking-brake spool override can false-off), but
-        // always include engines-on / phase as confirmation when present.
-        const mission = activeMissionRef.current;
+        // VA Crew Live: post Watch lat/lon to the listed airline whenever Watch
+        // is running. Do not gate on activeMission / resolveOpsCompanyId /
+        // chrome pin — dual-tenant sticky-home + stale watch-effect closures
+        // were dropping every sample while Preflight still showed engines on.
+        // World validates membership + mission on the VA company file (404/409 soft).
         const vaCompanyId = memberVaCompanyIdRef.current?.trim();
-        const activeCompany =
-          activeCompanyIdRef.current?.trim() || getStoredCompanyId();
         const pos = status.position;
-        const missionActive =
-          mission &&
-          ['accepted', 'dispatched', 'in_flight'].includes(mission.status);
         if (
           status.running &&
           status.missionId &&
-          mission &&
-          mission.id === status.missionId &&
-          missionActive &&
           vaCompanyId &&
           pos &&
           Number.isFinite(pos.lat) &&
           Number.isFinite(pos.lon) &&
           !(pos.lat === 0 && pos.lon === 0)
         ) {
-          const opsCompanyId = resolveOpsCompanyId(mission.aircraftId);
-          // Prefer ops tail → VA; also accept chrome already pinned to the airline
-          // (vaSessionFleet can lag and make resolveOpsCompanyId return home).
-          const trackCompanyId =
-            opsCompanyId === vaCompanyId || activeCompany === vaCompanyId
-              ? vaCompanyId
-              : null;
-          if (trackCompanyId) {
-            const now = Date.now();
-            if (now - flightTrackLastPostRef.current >= 15_000) {
-              flightTrackLastPostRef.current = now;
-              void postVaFlightTrack({
-                companyId: trackCompanyId,
-                missionId: mission.id,
-                lat: pos.lat,
-                lon: pos.lon,
-                gsKt:
-                  typeof status.groundSpeedKt === 'number'
-                    ? status.groundSpeedKt
-                    : undefined,
-                altFt:
-                  typeof status.altitudeFt === 'number'
-                    ? status.altitudeFt
-                    : undefined,
-                phase: status.phase?.trim() || undefined,
-                onGround:
-                  typeof status.onGround === 'boolean'
-                    ? status.onGround
-                    : undefined,
-              }).catch(() => {
-                /* soft — Live is best-effort */
-              });
-            }
+          const now = Date.now();
+          if (now - flightTrackLastPostRef.current >= 15_000) {
+            flightTrackLastPostRef.current = now;
+            void postVaFlightTrack({
+              companyId: vaCompanyId,
+              missionId: status.missionId,
+              lat: pos.lat,
+              lon: pos.lon,
+              gsKt:
+                typeof status.groundSpeedKt === 'number'
+                  ? status.groundSpeedKt
+                  : undefined,
+              altFt:
+                typeof status.altitudeFt === 'number'
+                  ? status.altitudeFt
+                  : undefined,
+              phase: status.phase?.trim() || undefined,
+              onGround:
+                typeof status.onGround === 'boolean'
+                  ? status.onGround
+                  : undefined,
+            }).catch(() => {
+              /* soft — Live is best-effort (solo home legs 404 on VA) */
+            });
           }
         }
       } catch {

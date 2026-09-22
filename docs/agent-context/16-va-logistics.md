@@ -7,7 +7,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
 **Doc 2026-09-22:** parking **$0** em `homeHubIcao` (Crew/Company HQ) para parked/MX; off-hub inalterado. Org perk de parking = backlog.
 **Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
-**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads position (~15s) to in-memory `/api/va/flight-track`; members GET hint `live`; map OD dashed + flown trail + progress. **(e)** sample + chip: phase / onGround / altFt / gsKt. **(f→i)** upload com Watch + missão VA (não só engines). **(g)** Live pane OD sem flicker. **(h)** botão Live na actions. **(j)** pin VA conta como ops company p/ telemetria.
+**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads; OD + trail. **(e–k)** phase/alt/GS; OD; Live inline At. **(l)** upload sem gate ops/chrome (Watch+VA+pos); companyId explícito no API. **(m)** mapa Live mais alto (`min(56vh, 32rem)`).
 **Doc 2026-09-22 (c):** sidebar tab highlight adiado por `await switchCompanyForVa` antes de `goToTab` (Crew→Airlines) — **fix** pinta tab no click; restore/refresh em background.
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
@@ -737,8 +737,10 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **2026-09-22 (e):** sample também leva `phase` / `onGround` / `altFt` / `gsKt` do Watch (`altitudeFt` no `/api/watch/status`); snapshot refresha telemetria mesmo sem crescer a trilha (taxi/hold); Live meta = chip de fase + alt + GS; members `live` inclui os mesmos campos.
 **2026-09-22 (f):** upload arma no **engines on** (missão accepted/dispatched/in_flight + Watch); latch até trocar missão / Watch parar; members `live` para qualquer missão ativa com track fresh; Roster **Live** já na missão assigned (mapa OD; telemetria após motores); soft-poll Roster 15s.
 **2026-09-22 (g):** Live pane — sem busy-flicker no poll; OD do flight enquanto espera motores; copy “Waiting for engines…”.
-**2026-09-22 (h):** botão **Live** na coluna de actions (direita), não empilhado sob At — altura da row estável.
+**2026-09-22 (h):** ~~botão Live na coluna de actions~~ → **(k)** Live **inline** ao lado da rota At (mesma linha; sem esticar altura).
 **2026-09-22 (i):** upload **não** depende só de `enginesRunning` — no ramp o spool override pode false-off; posta com Watch + missão VA. **(j)** também aceita chrome já pinado na airline (`activeCompany === va`) quando `resolveOpsCompanyId` ainda devolve home (vaSessionFleet lag) — era o caso típico no Preflight com “Engines running” e Live sem trilha.
+**2026-09-22 (l):** sintoma = Live OD ok + “Waiting for Watch/position” sem trilha. Causa = upload ainda exigia `activeMission.id === status.missionId` + `resolveOpsCompanyId`/`activeCompany === va` — sticky-home + closure stale do poll Watch (vaSessionFleet) → `trackCompanyId` null; POST soft-fail. Fix = postar sempre que Watch running + `memberVa` + lat/lon (servidor valida missão na VA); POST/GET `flight-track` usam `companyId` explícito do body/query (não remap `companyIdFromRequest` → home).
+**2026-09-22 (m):** mapa Live `.va-live-map` de `min(42vh, 22rem)` → `min(56vh, 32rem)` (min-height 16→22rem).
 
 ### Roster presence (online / flight / last seen) (2026-09-20)
 

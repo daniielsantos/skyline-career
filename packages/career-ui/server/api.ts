@@ -4373,7 +4373,19 @@ export function createCareerApiServer(port = 8787) {
           phase?: string;
           onGround?: boolean;
         };
-        const companyId = companyIdFromRequest(req, body.companyId);
+        // Prefer explicit body/header target — do not remap via session home.
+        // companyIdFromRequest can drop VA→home when PG vaGetMembership is async.
+        const headerRaw = req.headers['x-skyline-company-id'];
+        const headerCompany =
+          typeof headerRaw === 'string'
+            ? headerRaw.trim()
+            : Array.isArray(headerRaw)
+              ? String(headerRaw[0] ?? '').trim()
+              : '';
+        const companyId =
+          body.companyId?.trim() ||
+          headerCompany ||
+          companyIdFromRequest(req, body.companyId);
         if (!companyId || !body.missionId?.trim()) {
           send(res, 400, { error: 'companyId and missionId required' });
           return;
@@ -4465,10 +4477,17 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const companyId = companyIdFromRequest(
-          req,
-          url.searchParams.get('companyId'),
-        );
+        const headerRaw = req.headers['x-skyline-company-id'];
+        const headerCompany =
+          typeof headerRaw === 'string'
+            ? headerRaw.trim()
+            : Array.isArray(headerRaw)
+              ? String(headerRaw[0] ?? '').trim()
+              : '';
+        const companyId =
+          (url.searchParams.get('companyId') ?? '').trim() ||
+          headerCompany ||
+          companyIdFromRequest(req, url.searchParams.get('companyId'));
         const accountId = (url.searchParams.get('accountId') ?? '').trim();
         if (!companyId || !accountId) {
           send(res, 400, { error: 'companyId and accountId required' });

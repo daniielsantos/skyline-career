@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **ea249720** / desktop **0.3.222** shipped: Keep member pilot travel on the home company. Release: [v0.3.222](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.222).
+
+
 `main` **602b4d26** / desktop **0.3.221** shipped: Waive hangar parking fees at company HQ. Release: [v0.3.221](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.221).
 
 

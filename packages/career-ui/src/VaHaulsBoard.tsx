@@ -78,8 +78,10 @@ type Props = {
   onFleet?: (fleet: PlayerAircraft[]) => void;
   onMissions?: (missions: Mission[]) => void;
   onStaged?: (mission: Mission) => void;
-  /** Off-origin (or Prepare path): open Dispatch Manifest + ferry there. */
+  /** Off-origin or oversize hold: open Dispatch Manifest (ferry / partial load). */
   onPrepareHold?: (hold: VaHaulHold, aircraftId: string) => void;
+  /** Ops payload estimate for the selected tail (fallback if unknown). */
+  resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   onGoPorts?: () => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
 };
@@ -204,6 +206,34 @@ export function VaHaulsBoard(props: Props) {
     return parkedFleet.find((a) => a.id === id) ?? null;
   }
 
+  /** True when the hold won't fit this airframe's ops cap — Manifest slider. */
+  function holdNeedsPartialLoad(
+    hold: VaHaulHold,
+    acf: PlayerAircraft | null,
+  ): boolean {
+    if (!acf || !props.onPrepareHold) return false;
+    const holdKg = Math.max(0, Math.floor(hold.kg));
+    if (holdKg <= 0) return false;
+    const cap = Math.max(
+      0,
+      Math.floor(props.resolveMaxCargoKg?.(acf) ?? 0),
+    );
+    // Unknown cap: still allow Accept (server enforces). Known small cap → Prepare.
+    if (cap <= 0) return false;
+    return holdKg > cap;
+  }
+
+  function shouldPrepareHold(
+    hold: VaHaulHold,
+    acf: PlayerAircraft | null,
+  ): boolean {
+    if (!props.onPrepareHold || !acf) return false;
+    const origin = hold.originIcao.trim().toUpperCase();
+    const atOrigin =
+      (acf.locationIcao ?? '').trim().toUpperCase() === origin;
+    return !atOrigin || holdNeedsPartialLoad(hold, acf);
+  }
+
   async function acceptHold(hold: VaHaulHold) {
     const origin = hold.originIcao.trim().toUpperCase();
     const acf = selectedAircraftForHold(hold);
@@ -212,11 +242,11 @@ export function VaHaulsBoard(props: Props) {
       setError('No parked company aircraft available');
       return;
     }
+    if (shouldPrepareHold(hold, acf)) {
+      props.onPrepareHold?.(hold, aircraftId);
+      return;
+    }
     if ((acf.locationIcao ?? '').trim().toUpperCase() !== origin) {
-      if (props.onPrepareHold) {
-        props.onPrepareHold(hold, aircraftId);
-        return;
-      }
       setError(`Aircraft is at ${acf.locationIcao}, not ${origin} — Prepare to ferry`);
       return;
     }
@@ -258,7 +288,9 @@ export function VaHaulsBoard(props: Props) {
       props.onStaged?.(result.mission);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      props.onToast?.('fail', message);
     } finally {
       setBusyHoldId(null);
     }
@@ -330,7 +362,7 @@ export function VaHaulsBoard(props: Props) {
             {!loaded
               ? 'Airline desk — bridges, Demand, and Wide hauls.'
               : hasPortFbo
-                ? 'Airline desk · Prepare a parked VA tail (ferry in Dispatch if off-hub), then Accept.'
+                ? 'Airline desk · pick a parked VA tail: Accept if it fits at origin, else Prepare (ferry / partial load in Manifest).'
                 : 'Until Port FBO + stock, fly Freights with a VA tail (market hire).'}
           </p>
         </div>
@@ -393,9 +425,10 @@ export function VaHaulsBoard(props: Props) {
                 : ''}
             </h4>
             <p className="va-hauls-section-help muted">
-              Reserved cargo until Accept (Dispatch) or Cancel. Off-hub tails
-              Prepare → ferry in Manifest. Click a hold to plot the route on the
-              map.
+              Reserved cargo until Accept or Cancel. Pick the tail that will fly
+              it. Off-hub or hold larger than ops cap → Prepare opens Manifest
+              (ferry + load slider); leftover stays on Open desk. Click a hold
+              to plot the route on the map.
             </p>
             {filteredHolds.length === 0 ? (
               <p className="empty">
@@ -418,16 +451,14 @@ export function VaHaulsBoard(props: Props) {
                     aircraftByHold[hold.id] ||
                     pickDefaultAircraftId(hold.originIcao);
                   const selected = parkedFleet.find((a) => a.id === selectedId);
-                  const atOrigin = Boolean(
-                    selected &&
-                      (selected.locationIcao ?? '')
-                        .trim()
-                        .toUpperCase() === origin,
-                  );
                   const kind = hold.kind ?? 'demand';
                   const pay = holdPayParts(hold);
                   const busyThis = busyHoldId === hold.id;
-                  const usePrepare = Boolean(props.onPrepareHold) && !atOrigin;
+                  const usePrepare = shouldPrepareHold(hold, selected ?? null);
+                  const needsPartial = holdNeedsPartialLoad(
+                    hold,
+                    selected ?? null,
+                  );
                   const isSelected = selectedHoldId === hold.id;
                   return (
                     <li
@@ -502,8 +533,10 @@ export function VaHaulsBoard(props: Props) {
                           disabled={pageBusy || !selectedId}
                           title={
                             usePrepare
-                              ? `Open Dispatch — ferry to ${origin} before Accept`
-                              : undefined
+                              ? needsPartial
+                                ? `Hold ${mass(hold.kg)} exceeds this airframe — open Manifest to load a slice`
+                                : `Open Dispatch — ferry to ${origin} before Accept`
+                              : 'Dispatch the full hold on this aircraft'
                           }
                           onClick={() =>
                             usePrepare

@@ -3612,6 +3612,8 @@ export function App() {
   const [vaSessionWallet, setVaSessionWallet] = useState<number | null>(null);
   /** Bump so My VA Ledger refetches after external wallet credits. */
   const [vaLedgerRefreshEpoch, setVaLedgerRefreshEpoch] = useState(0);
+  /** Chrome h1 while My VA is open — public VA name (sidebar stays My VA). */
+  const [vaChromeTitle, setVaChromeTitle] = useState<string | null>(null);
   const [vaSessionFleet, setVaSessionFleet] = useState<PlayerAircraft[]>([]);
   /** Listed VA company id when this account is a member (chrome stays home). */
   const [memberVaCompanyId, setMemberVaCompanyId] = useState<string | null>(
@@ -12852,7 +12854,7 @@ export function App() {
                 : tab === 'ports'
                   ? 'Ports'
                   : tab === 'va'
-                    ? 'My VA'
+                    ? vaChromeTitle?.trim() || 'My VA'
                     : tab === 'vaDirectory'
                       ? 'VAs'
                     : tab === 'vaRanking'
@@ -20116,15 +20118,20 @@ export function App() {
             }
             setVaSessionWallet(null);
             setVaSessionFleet([]);
+            setVaChromeTitle(null);
             selectTab('vaDirectory');
           }}
           onUnpublished={() => {
             setVaSessionWallet(null);
             setVaSessionFleet([]);
+            setVaChromeTitle(null);
             selectTab('pilot');
           }}
           ledgerRefreshEpoch={vaLedgerRefreshEpoch}
           onMemberRouteCutPct={setVaMemberRouteCutPct}
+          onVaIdentity={({ displayName }) => {
+            setVaChromeTitle(displayName);
+          }}
           renderHangarCard={(acf, hangarOpts) => (
             <HangarAircraftCard
               key={acf.id}

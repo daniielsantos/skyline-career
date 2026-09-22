@@ -50,7 +50,11 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.
 
+**Hauls Accept flick oversize (2026-09-22):** sintoma = Accept “flick” + erro ops cap (Citation vs ~53 klb) e botão continuava Accept. Causa = board não recebia `resolveMaxCargoKg` → `holdNeedsPartialLoad` nunca virava Prepare; Accept full-hold batia no server. Fix = passar cap do VaPage; CTA **Prepare** quando hold > ops cap (mesmo at-origin) → Manifest slider; picker = qual cauda VA voa / ferries.
+
 **VA parallel cargo per pilot (2026-09-22):** sintoma = amigo não Accept enquanto outro membro tem missão na VA (fatiar hold / voar junto). Causa = gate `listActivePlayerMissions` company-wide em haul/bridge/demand + staging/commit + Charter. Fix = `listActivePlayerMissionsForPilot(pilotAccountId)` (legado sem stamp ainda bloqueia todos); Dispatch/Watch/Prepare usam só a missão do account logado.
+
+**My VA chrome title = airline name (2026-09-22):** sintoma = “MY VA” no h1 + “LAMUSINE” no head do pane (herói duplicado). Causa = chrome `pageTitle` fixo + `va-my-title` com displayName. Fix = h1 = nome da VA (`onVaIdentity`); sidebar continua My VA; head do pane só meta (hub/seats/role/org).
 
 **VA Ledger Credit beside wallet (2026-09-22):** hero em 3 colunas Wallet | Credit | Flight quality (empilha em viewport estreita).
 

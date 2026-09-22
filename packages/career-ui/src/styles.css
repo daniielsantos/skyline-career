@@ -14126,12 +14126,10 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   justify-content: space-between;
   margin-bottom: 0.85rem;
 }
-.va-my-title {
-  margin: 0 0 0.25rem;
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.va-my-meta {
+  margin: 0;
+  max-width: 42rem;
+  line-height: 1.4;
 }
 .va-pane-card {
   margin-top: 0.25rem;

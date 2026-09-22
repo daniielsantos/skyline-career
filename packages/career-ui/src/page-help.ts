@@ -61,7 +61,7 @@ export const PAGE_HELP = {
     bullets: [
       'My VA is the crew desk for one company — yours when published, or the airline you joined. It is not a second company.',
       'Fresh VA = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls / Ports.',
-      'Hauls = Accept paid Internal Haul bridges. Ports (this page) = company desk: claim FBO, buy WH, Scout, Demand. Sidebar Ports stays your personal company.',
+      'Hauls = Open desk holds: pick a VA tail, Accept if it fits at origin, or Prepare (ferry / partial load). Ports (this page) = company desk: claim FBO, buy WH, Scout, Demand. Sidebar Ports stays your personal company.',
       'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Money map shows who pays Jet-A, cut, ferry, and MX.',
       'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
       'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',

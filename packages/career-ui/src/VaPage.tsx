@@ -170,6 +170,8 @@ type Props = {
   onUnpublished?: () => void | Promise<void>;
   /** Keep Freights Prepare chip in sync with Config cut %. */
   onMemberRouteCutPct?: (pct: number) => void;
+  /** Chrome h1 — VA public name while this page is open. */
+  onVaIdentity?: (opts: { displayName: string | null }) => void;
   /**
    * Bump after VA wallet mutations outside this page (e.g. debug +$5K) so the
    * Ledger pane refetches instead of keeping a stale cashflow snapshot.
@@ -254,6 +256,8 @@ export function VaPage(props: Props) {
   onAirframePerfRef.current = props.onAirframePerf;
   const onMemberRouteCutPctRef = useRef(props.onMemberRouteCutPct);
   onMemberRouteCutPctRef.current = props.onMemberRouteCutPct;
+  const onVaIdentityRef = useRef(props.onVaIdentity);
+  onVaIdentityRef.current = props.onVaIdentity;
   const hasVaShellRef = useRef(false);
   const ledgerFetchGenRef = useRef(0);
   const logbookFetchGenRef = useRef(0);
@@ -263,6 +267,17 @@ export function VaPage(props: Props) {
     // Sync from parent unless a newer local reserve/release already painted.
     setHangarFleet(props.fleet);
   }, [props.fleet]);
+
+  useEffect(() => {
+    const name = listed && displayName.trim() ? displayName.trim() : null;
+    onVaIdentityRef.current?.({ displayName: name });
+  }, [listed, displayName]);
+
+  useEffect(() => {
+    return () => {
+      onVaIdentityRef.current?.({ displayName: null });
+    };
+  }, []);
 
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';
@@ -612,8 +627,7 @@ export function VaPage(props: Props) {
     <section className="panel va-panel va-panel-shell">
       <div className="panel-head va-my-head">
         <div>
-          <h3 className="va-my-title">{displayName || 'My VA'}</h3>
-          <p className="settings-sample">
+          <p className="va-my-meta settings-sample">
             {homeHubIcao || '—'} · {members.length}/{memberCap} seats · recruiting{' '}
             <strong>{recruiting ? 'on' : 'off'}</strong> · role{' '}
             <strong>{role}</strong>
@@ -1006,6 +1020,7 @@ export function VaPage(props: Props) {
           onMissions={props.onMissions}
           onStaged={props.onHaulStaged}
           onPrepareHold={props.onPrepareHaulHold}
+          resolveMaxCargoKg={props.resolveMaxCargoKg}
           onGoPorts={() => setPane('ports')}
           onToast={props.onToast}
         />

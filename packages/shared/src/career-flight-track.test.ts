@@ -116,4 +116,34 @@ describe('career flight track', () => {
     assert.equal(row?.altFt, 2200);
     assert.equal(row?.points[0]?.phase, 'takeoff');
   });
+
+  it('resets trail on teleport jump instead of drawing a spike', () => {
+    recordFlightTrackSample({
+      companyId: 'co_va',
+      accountId: 'acc_1',
+      missionId: 'm1',
+      originIcao: 'SBGR',
+      destIcao: 'SBCA',
+      lat: -23.43,
+      lon: -46.47,
+      atMs: 1_000,
+    });
+    // ~900 nm west — bogus SimConnect crumb.
+    recordFlightTrackSample({
+      companyId: 'co_va',
+      accountId: 'acc_1',
+      missionId: 'm1',
+      originIcao: 'SBGR',
+      destIcao: 'SBCA',
+      lat: -23.0,
+      lon: -60.0,
+      atMs: 20_000,
+      phase: 'climb',
+      altFt: 9000,
+    });
+    const row = getFlightTrack('co_va', 'acc_1');
+    assert.equal(row?.points.length, 1);
+    assert.equal(row?.points[0]?.lon, -60.0);
+    assert.equal(row?.phase, 'climb');
+  });
 });

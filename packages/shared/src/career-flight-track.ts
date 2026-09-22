@@ -33,6 +33,12 @@ export const FLIGHT_TRACK_FRESH_MS = 90_000;
 export const FLIGHT_TRACK_POST_MIN_MS = 15_000;
 /** Ignore samples closer than this to the previous point (noise). */
 export const FLIGHT_TRACK_MIN_MOVE_NM = 0.35;
+/**
+ * Max great-circle jump between consecutive crumbs (~300 kt × 15s ≈ 75 nm).
+ * Larger gaps are treated as teleports (bad SimConnect / stale probe) — reset
+ * the trail so Live does not draw a continent-spanning spike.
+ */
+export const FLIGHT_TRACK_MAX_JUMP_NM = 75;
 export const FLIGHT_TRACK_MAX_POINTS = 180;
 
 type StoreEntry = FlightTrackSnapshot;
@@ -212,6 +218,13 @@ export function recordFlightTrackSample(opts: {
       lat: opts.lat,
       lon: opts.lon,
     });
+    if (moved > FLIGHT_TRACK_MAX_JUMP_NM) {
+      // Teleport — drop the polluted breadcrumb and restart from this fix.
+      row.points = [pointFromSample({ ...opts, atMs })];
+      row.updatedAtMs = atMs;
+      store.set(key, row);
+      return { ...row, points: [...row.points] };
+    }
     if (moved < FLIGHT_TRACK_MIN_MOVE_NM && atMs - last.atMs < FLIGHT_TRACK_POST_MIN_MS) {
       // Refresh last crumb telemetry without growing the trail (taxi / hold).
       const refreshed = pointFromSample({

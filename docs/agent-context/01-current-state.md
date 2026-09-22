@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **b22f87bc** / desktop **0.3.237** shipped: Prioritize Watch pipe over Live and anchor Live dashed leg to AC. Release: [v0.3.237](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.237).
+
+
 `main` **5cf30015** / desktop **0.3.236** shipped: Keep SimBridge probe alive on Ready so Crew Live does not go Stale. Release: [v0.3.236](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.236).
 
 

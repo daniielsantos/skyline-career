@@ -143,7 +143,8 @@ export function CompanyNetworkMap(props: Props) {
     const plotNodes = props.nodes.filter((n) => hasCoords(n.lat, n.lon));
     if (plotNodes.length === 0) return;
 
-    const fboByPort = new Map<string, CompanyNetworkNode>();
+    // Must be the JS Map — never shadow with maplibre's `Map` import.
+    const fboByPort = new globalThis.Map<string, CompanyNetworkNode>();
     for (const n of plotNodes) {
       if (n.kind === 'fbo' && n.portId) {
         fboByPort.set(n.portId.toUpperCase(), n);

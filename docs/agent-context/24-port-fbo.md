@@ -56,7 +56,7 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Hauls CompanyNetworkMap crash (2026-09-21):** sintoma = UI error `canvasContextAttributes` ao abrir Hauls. Causa = MapLibre init/resize no embed antes do container ter tamanho ou após unmount (Strict Mode). Fix = defer init até `clientWidth/Height`, `aliveRef` + try/catch em resize/camera; My VA shell load = `BusyBlock` como Ports.
 
-**CompanyNetworkMap typecheck (2026-09-21):** CI `tsc` falhou — `Map` do maplibre sombreava `Map` nativo (`new Map<string, …>` → TS2558/TS2339). Fix = import `Map as MapLibreMap`.
+**CompanyNetworkMap typecheck + Hauls crash (2026-09-21):** CI `tsc` falhou e Hauls UI crashava `canvasContextAttributes`. Causa = `import { Map } from 'maplibre-gl'` sombreava `Map` nativo; `new Map()` no efeito dos feeders virava `new MapLibre()` sem options → lê `e.canvasContextAttributes` de `undefined`. Fix = `Map as MapLibreMap` + `new globalThis.Map` para o índice FBO. 0.3.203 ainda tinha o bug; ship em release seguinte.
 
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 

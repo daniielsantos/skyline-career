@@ -89,7 +89,7 @@ function isLiveTrackFresh(updatedAtMs: number, nowMs = Date.now()): boolean {
   return nowMs - updatedAtMs <= 90_000;
 }
 
-/** Browser-safe mirror of CAREER_FLIGHT_PHASE_LABEL. */
+/** Same labels as WatchStatusFooter PHASE chip. */
 const LIVE_PHASE_LABEL: Record<string, string> = {
   ground: 'On ground',
   taxi_out: 'Taxi out',
@@ -100,10 +100,22 @@ const LIVE_PHASE_LABEL: Record<string, string> = {
   approach: 'Approach',
   landing: 'Landing',
   taxi_in: 'Taxi in',
+  taxi: 'Taxi',
+  airborne: 'Airborne',
+  'ground+engines': 'On ground · engines',
 };
 
-function formatLivePhase(phase: string | null | undefined): string | null {
-  const key = phase?.trim();
+function formatLivePhase(
+  phase: string | null | undefined,
+  onGround?: boolean | null,
+): string | null {
+  let key = phase?.trim() || '';
+  // Coerce bad/stale OFP-compliance "airborne" while still on the ramp.
+  if (onGround === true && (key === 'airborne' || !key)) {
+    key = 'ground+engines';
+  } else if (onGround === false && !key) {
+    key = 'airborne';
+  }
   if (!key) return null;
   return LIVE_PHASE_LABEL[key] ?? key.replace(/_/g, ' ');
 }
@@ -1008,7 +1020,8 @@ export function VaPage(props: Props) {
                         className={`va-stat-value${flying ? ' is-flying' : ''}`}
                         title={
                           m.live
-                            ? formatLivePhase(m.live.phase) || 'Live'
+                            ? formatLivePhase(m.live.phase, m.live.onGround) ||
+                              'Live'
                             : flying
                               ? 'In flight'
                               : undefined
@@ -1131,26 +1144,30 @@ export function VaPage(props: Props) {
                   ) : liveTrack && liveOrigin && liveDest ? (
                     <>
                       {(() => {
+                        const last =
+                          liveTrack.points[liveTrack.points.length - 1];
+                        const onGround =
+                          typeof liveTrack.onGround === 'boolean'
+                            ? liveTrack.onGround
+                            : typeof last?.onGround === 'boolean'
+                              ? last.onGround
+                              : livePilot.live?.onGround;
                         const phaseLabel = formatLivePhase(
                           liveTrack.phase ??
-                            liveTrack.points[liveTrack.points.length - 1]
-                              ?.phase ??
+                            last?.phase ??
                             livePilot.live?.phase,
+                          onGround,
                         );
                         const alt = formatLiveAltFt(
                           liveTrack.altFt ??
-                            liveTrack.points[liveTrack.points.length - 1]
-                              ?.altFt ??
+                            last?.altFt ??
                             livePilot.live?.altFt,
                         );
                         const gs = formatLiveGsKt(
                           liveTrack.gsKt ??
-                            liveTrack.points[liveTrack.points.length - 1]
-                              ?.gsKt ??
+                            last?.gsKt ??
                             livePilot.live?.gsKt,
                         );
-                        const last =
-                          liveTrack.points[liveTrack.points.length - 1];
                         const pct = last
                           ? liveRouteProgressPct({
                               origin: liveOrigin,
@@ -1192,13 +1209,6 @@ export function VaPage(props: Props) {
                   ) : (
                     <span>Waiting for flyer Watch / Preflight…</span>
                   )}
-                  <button
-                    type="button"
-                    className="action ghost"
-                    onClick={() => setLivePilot(null)}
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
               {liveOrigin && liveDest ? (
@@ -1233,11 +1243,20 @@ export function VaPage(props: Props) {
                           : null
                     }
                     aircraftLabel={(() => {
+                      const last =
+                        liveTrack?.points[liveTrack.points.length - 1];
+                      const onGround =
+                        typeof liveTrack?.onGround === 'boolean'
+                          ? liveTrack.onGround
+                          : typeof last?.onGround === 'boolean'
+                            ? last.onGround
+                            : livePilot.live?.onGround;
                       const phase = formatLivePhase(
-                        liveTrack?.phase ?? livePilot.live?.phase,
+                        liveTrack?.phase ?? last?.phase ?? livePilot.live?.phase,
+                        onGround,
                       );
                       const alt = formatLiveAltFt(
-                        liveTrack?.altFt ?? livePilot.live?.altFt,
+                        liveTrack?.altFt ?? last?.altFt ?? livePilot.live?.altFt,
                       );
                       const bits = [livePilot.displayName, phase, alt].filter(
                         Boolean,

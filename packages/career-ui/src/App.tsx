@@ -7358,10 +7358,14 @@ export function App() {
                 typeof result.live.onGround === 'boolean'
                   ? result.live.onGround
                   : undefined,
+              // Watch-style phase — never OFP compliance "airborne" (that means
+              // engines/unlocked on the ground, not wheels-up).
               phase:
-                result.live.phase?.trim() ||
-                result.check.phase?.trim() ||
-                undefined,
+                result.live.onGround === false
+                  ? 'airborne'
+                  : result.live.enginesRunning
+                    ? 'ground+engines'
+                    : 'ground',
             }).catch(() => {
               /* soft */
             });

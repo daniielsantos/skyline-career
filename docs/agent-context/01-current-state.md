@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **7c31a83** / desktop **0.3.206** shipped: Polish Ports/Hauls UX: warehouse shed icon, drop All ports table, BusyBlock loads. Release: [v0.3.206](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.206).
+
+
 `main` **28a1b65** / desktop **0.3.205** shipped: Fix Hauls network map camera and pin drift; drop network chips from Ports. Release: [v0.3.205](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.205).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **5cf30015** / desktop **0.3.236** shipped: Keep SimBridge probe alive on Ready so Crew Live does not go Stale. Release: [v0.3.236](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.236).
+
+
 `main` **07102392** / desktop **0.3.235** shipped: Poll Crew Live every 5s instead of 15s. Release: [v0.3.235](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.235).
 
 

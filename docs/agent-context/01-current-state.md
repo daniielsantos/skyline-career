@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **602b4d26** / desktop **0.3.221** shipped: Waive hangar parking fees at company HQ. Release: [v0.3.221](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.221).
+
+
 `main` **b65a5e79** / desktop **0.3.220** shipped: Show Open desk hold expiry in aligned columns. Release: [v0.3.220](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.220).
 
 

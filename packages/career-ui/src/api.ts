@@ -3619,11 +3619,16 @@ export function postPortPickupAbandon(opts: { pickupId: string }) {
   });
 }
 
-export function fetchWarehouses() {
-  return api<PlayerWarehouseSnapshot>('/api/warehouses');
+export function fetchWarehouses(opts?: { companyId?: string }) {
+  const companyId = opts?.companyId?.trim();
+  return api<PlayerWarehouseSnapshot>('/api/warehouses', {
+    headers: companyId
+      ? { 'X-Skyline-Company-Id': companyId }
+      : undefined,
+  });
 }
 
-export function postWarehouseBuy(opts: { icao: string }) {
+export function postWarehouseBuy(opts: { icao: string; companyId?: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;

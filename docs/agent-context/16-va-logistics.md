@@ -5,7 +5,9 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA/yours UI; desk mutations ainda owner/exact operator).
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
-**Doc 2026-09-21 (d):** **Ports pin VA for members** — abrir Ports troca tenant para a VA listada (Scout/WH/desk); sair restaura home. Allied benefits sozinhos não bastam (`isPortOperator` exact).
+**Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
+**Doc 2026-09-21 (e):** ~~Available personal WH under VA pin~~ — **superseded (f)**; no mix on one shelf.
+**Doc 2026-09-21 (f):** **Ports split** — sidebar Ports = always home; **My VA → Ports** = company desk (`PortsPanel` embedded). Hauls CTA opens pane Ports. Sem pin ao entrar na sidebar.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)
@@ -788,6 +790,17 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** fleet so tinha assign de missao; sem soft-hold por conta.
 **Fix:** SQLite **v16** / PG **v27** `reserved_by_account_id` + `reserved_at_ms`; hard lock 4h TTL; 1 reserva/membro; reserve/release API; gate em assign/ferry; badge + Reserve/Release no Hangar VA.
 
+### Member Available hid personal WH at VA hubs (2026-09-21)
+
+**Sintoma:** Available só oferecia hubs sem WH da VA (ex. SBKP); SBGR sumia se a VA já tinha WH — membro não comprava WH pessoal no mesmo hub.
+**Causa:** filtro Available = `!ownedHubSet` do tenant pinado (VA). WH pessoal é company home independente.
+**Fix (e → f):** misturar Buy personal no shelf da VA não escala. **Ports split:** sidebar Ports = home only; My VA → Ports = company desk. Dual-buy Available revertido.
+
+### My VA Ports pane (2026-09-21)
+
+**Sintoma / gap:** pin VA na sidebar Ports + Available híbrido = inventário mental (FBO/WH pessoal vs company na mesma página).
+**Fix:** aba **Ports** em My VA (Roster/Hangar/Hauls/**Ports**/…); `PortsPanel` embedded + `logisticsCompanyId` VA; CTAs Hauls/Path → `setPane('ports')`. Sidebar Ports sem pin; sempre home.
+
 ### VA publish missing home_country_id (2026-09-20)
 
 **Sintoma:** companies.home_country_id vazio na Lamusine (SBKP) enquanto hub estava setado; local stub tambem vazio.
@@ -842,3 +855,4 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Path to Port FBO** — VaPortPathCard Hauls/Config + empty/join pitch (2026-09-21)
 - [x] **Hauls quiet após FBO** — Path some pós-claim; copy curta (2026-09-21)
 - [x] **IH-3 Auto-haul desk** — tick Scout bridges; Config opt-in; ≥2 members (2026-09-21)
+- [x] **Ports dual-tenant WH UX** — ~~Available personal under VA pin~~ → **My VA Ports pane** + sidebar home-only (2026-09-21)

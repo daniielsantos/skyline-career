@@ -4354,34 +4354,6 @@ export function App() {
     homeCompanyId,
   ]);
 
-  // Member on Ports: pin VA tenant so Scout/WH see company logistics (not home).
-  useEffect(() => {
-    if (tab !== 'ports') return;
-    const va = memberVaCompanyId?.trim();
-    if (!va) return;
-    if (va === activeCompanyIdRef.current?.trim()) return;
-    let cancelled = false;
-    void (async () => {
-      if (!homeCompanyIdRef.current) {
-        const prev =
-          activeCompanyIdRef.current?.trim() || getStoredCompanyId();
-        if (prev && prev !== va) {
-          homeCompanyIdRef.current = prev;
-          setHomeCompanyId(prev);
-        }
-      }
-      try {
-        await switchCompanyForVa(va);
-      } catch {
-        /* soft */
-      }
-      if (cancelled) return;
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [tab, memberVaCompanyId]);
-
   useEffect(() => {
     if (!selectedFboHoldId) return;
     const stillThere = (playerFbos?.holds ?? []).some(
@@ -7603,43 +7575,23 @@ export function App() {
     // Soft refresh in background — don't flash disabled on every nav button.
     void (async () => {
       const home = homeCompanyIdRef.current?.trim();
-      const va = memberVaCompanyIdRef.current?.trim();
       // Keep VA tenant while an active Dispatch mission needs that company
-      // (member accepted Freights/Charter/Ports on a VA tail).
+      // (member accepted Freights/Charter on a VA tail).
+      // Company port desk lives under My VA → Ports (session already VA there).
+      // Sidebar Ports is always home logistics.
       const activeVaDispatch = missions.some(
         (m) =>
           isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
       );
-      // Ports desk (Scout / WH / FBO) is company logistics — members must use
-      // the VA tenant or they see empty WH + "Claim Port FBO first" while the
-      // chip still says yours via allied benefits.
-      if (next === 'ports' && va) {
-        if (!homeCompanyIdRef.current) {
-          const prev =
-            activeCompanyIdRef.current?.trim() || getStoredCompanyId();
-          if (prev && prev !== va) {
-            homeCompanyIdRef.current = prev;
-            setHomeCompanyId(prev);
-          }
-        }
-        if (va !== activeCompanyIdRef.current?.trim()) {
-          try {
-            await switchCompanyForVa(va);
-          } catch {
-            /* soft — Ports may still fail closed */
-          }
-        }
-      } else {
-        const onVaTenant =
-          Boolean(home) && home !== activeCompanyIdRef.current;
-        const mustRestoreHome =
-          onVaTenant && next !== 'va' && !activeVaDispatch;
-        if (mustRestoreHome && home) {
-          try {
-            await switchCompanyForVa(home);
-          } catch {
-            /* soft — refresh below may still heal */
-          }
+      const onVaTenant =
+        Boolean(home) && home !== activeCompanyIdRef.current;
+      const mustRestoreHome =
+        onVaTenant && next !== 'va' && !activeVaDispatch;
+      if (mustRestoreHome && home) {
+        try {
+          await switchCompanyForVa(home);
+        } catch {
+          /* soft — refresh below may still heal */
         }
       }
       goToTab(next);
@@ -19434,7 +19386,8 @@ export function App() {
           formatTonnes={formatTonnes}
           fleet={prepareOpsFleet}
           vaAircraftIds={vaAircraftIdSet}
-          logisticsCompanyId={activeCompanyId}
+          logisticsCompanyId={homeCompanyId ?? activeCompanyId}
+          ownedShelfLabel="Yours"
           resolveOpsCompanyId={(aircraftId) =>
             resolveOpsCompanyId(aircraftId)
           }
@@ -19547,7 +19500,38 @@ export function App() {
           }}
           onGoCompany={() => selectTab('pilot')}
           onGoDirectory={() => selectTab('vaDirectory')}
-          onGoPorts={() => selectTab('ports')}
+          weightSystem={weightSystem}
+          formatMoney={formatMoney}
+          formatTonnes={formatTonnes}
+          vaAircraftIds={vaAircraftIdSet}
+          resolveOpsCompanyId={(aircraftId) =>
+            resolveOpsCompanyId(aircraftId)
+          }
+          ensureOpsCompany={async (aircraftId) => {
+            const companyId = resolveOpsCompanyId(aircraftId);
+            if (
+              memberVaCompanyIdRef.current &&
+              companyId === memberVaCompanyIdRef.current
+            ) {
+              await switchCompanyForVa(companyId);
+            }
+          }}
+          resolveMaxCargoKg={(acf) =>
+            hangarCatalogEntry(acf)?.maxCargoKg ?? 0
+          }
+          economyTick={tick}
+          cargoOps={cargoOps}
+          onOpenCargoOps={() => {
+            setHangarPane('cargo');
+            goToTab('hangar');
+          }}
+          onOpenAirport={(icao) => {
+            void openAirport(icao);
+          }}
+          clientUpdateRequiredMin={
+            clientUpdateBlock?.minClientVersion ?? null
+          }
+          onOpenUpdates={() => selectTab('settings')}
           onHaulStaged={() => {
             goToTab('staging');
           }}

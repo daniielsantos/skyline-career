@@ -46,6 +46,7 @@ export const PAGE_HELP = {
     title: 'How Ports works',
     kicker: 'Page guide',
     bullets: [
+      'This sidebar Ports is your personal company — warehouses, Demand, and Port FBO you claim solo. Company (VA) desk is under My VA → Ports.',
       'Seaport listings sell at factory price into a warehouse at a pickup hub. Overflow sits in the yard — listings do not spawn just because you opened this page.',
       'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent throughput.',
       'Buy warehouse space (T1–T3), then Store yard lots into it. Fees apply when you move cargo into the warehouse.',
@@ -59,8 +60,8 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'My VA is the crew desk for one company — yours when published, or the airline you joined. It is not a second company.',
-      'Fresh VA = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls.',
-      'Hauls lists paid Internal Haul bridges after desk stock; Accept with a parked VA tail, then Dispatch. Ports keeps buy/Scout.',
+      'Fresh VA = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls / Ports.',
+      'Hauls = Accept paid Internal Haul bridges. Ports (this page) = company desk: claim FBO, buy WH, Scout, Demand. Sidebar Ports stays your personal company.',
       'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Money map shows who pays Jet-A, cut, ferry, and MX.',
       'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
       'Freights with a VA-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',

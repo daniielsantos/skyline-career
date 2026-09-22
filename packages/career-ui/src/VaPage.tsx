@@ -28,13 +28,16 @@ import {
   type VaFlightQualitySnapshot,
   type VaOrgPerks,
   type Mission,
+  type CareerCargoOps,
 } from './api';
 import { BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
 import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
+import { PortsPanel } from './PortsPanel';
 import { formatBoardMoney } from './board-money';
+import type { WeightSystem } from './weight-units';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
 import { useConfirm } from './ConfirmDialog';
@@ -50,7 +53,7 @@ import {
   vaLogbookPilotLabel,
 } from './logbook';
 
-type VaPane = 'roster' | 'hangar' | 'hauls' | 'ledger' | 'logbook' | 'config';
+type VaPane = 'roster' | 'hangar' | 'hauls' | 'ports' | 'ledger' | 'logbook' | 'config';
 
 function formatRosterLastSeen(
   lastSeenAtMs: number | null | undefined,
@@ -136,7 +139,19 @@ type Props = {
   ) => void;
   onGoCompany?: () => void;
   onGoDirectory?: () => void;
-  onGoPorts?: () => void;
+  weightSystem: WeightSystem;
+  formatMoney: (n: number) => string;
+  formatTonnes: (kg: number) => string;
+  vaAircraftIds?: ReadonlySet<string>;
+  resolveOpsCompanyId?: (aircraftId: string) => string | undefined;
+  ensureOpsCompany?: (aircraftId: string) => Promise<void>;
+  resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
+  economyTick?: number;
+  cargoOps?: CareerCargoOps | null;
+  onOpenCargoOps?: () => void;
+  onOpenAirport?: (icao: string) => void;
+  clientUpdateRequiredMin?: string | null;
+  onOpenUpdates?: () => void;
   /** After Accept Internal Haul — open Dispatch / staging. */
   onHaulStaged?: (mission: Mission) => void;
   onMissions?: (missions: Mission[]) => void;
@@ -636,6 +651,15 @@ export function VaPage(props: Props) {
           <button
             type="button"
             role="tab"
+            aria-selected={pane === 'ports'}
+            className={pane === 'ports' ? 'tab active' : 'tab'}
+            onClick={() => setPane('ports')}
+          >
+            Ports
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={pane === 'ledger'}
             className={pane === 'ledger' ? 'tab active' : 'tab'}
             onClick={() => setPane('ledger')}
@@ -960,9 +984,46 @@ export function VaPage(props: Props) {
           }}
           onMissions={props.onMissions}
           onStaged={props.onHaulStaged}
-          onGoPorts={props.onGoPorts}
+          onGoPorts={() => setPane('ports')}
           onToast={props.onToast}
         />
+      ) : null}
+
+      {pane === 'ports' ? (
+        <div className="va-ports-pane">
+          {tenantSwitching ? (
+            <BusyStatus label="Opening company ports…" />
+          ) : (
+            <PortsPanel
+              embedded
+              busy={pageBusy || props.busy}
+              weightSystem={props.weightSystem}
+              formatMoney={props.formatMoney}
+              formatTonnes={props.formatTonnes}
+              fleet={hangarFleet}
+              vaAircraftIds={props.vaAircraftIds}
+              logisticsCompanyId={companyId}
+              ownedShelfLabel="Company"
+              resolveOpsCompanyId={props.resolveOpsCompanyId}
+              ensureOpsCompany={props.ensureOpsCompany}
+              resolveMaxCargoKg={props.resolveMaxCargoKg}
+              economyTick={props.economyTick}
+              cargoOps={props.cargoOps}
+              onOpenCargoOps={props.onOpenCargoOps}
+              onWallet={props.onWallet}
+              onFleet={(next) => {
+                setHangarFleet(next);
+                props.onFleet?.(next);
+              }}
+              onMissions={props.onMissions}
+              onOpenAirport={props.onOpenAirport}
+              onStaged={props.onHaulStaged}
+              onToast={props.onToast}
+              clientUpdateRequiredMin={props.clientUpdateRequiredMin}
+              onOpenUpdates={props.onOpenUpdates}
+            />
+          )}
+        </div>
       ) : null}
 
       {pane === 'ledger' ? (
@@ -1261,7 +1322,7 @@ export function VaPage(props: Props) {
             walletUsd={resolvedWalletUsd ?? 0}
             isOwner={isOwner}
             busy={pageBusy}
-            onGoPorts={props.onGoPorts}
+            onGoPorts={() => setPane('ports')}
           />
 
           <section className="va-config-section">

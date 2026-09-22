@@ -38,6 +38,10 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Member Ports empty Scout/WH (2026-09-21):** sintoma = membro vê Port FBO P1 / “Claim Port FBO first” e Warehouse “No warehouses”. Causa = chrome sticky-home: `GET /api/ports` herda `yours` via `alliedCompanyIds`, mas Scout/WH usam tenant **home** (`isPortOperator` exact + missions WH da home vazia). Fix = `selectTab('ports')` pinna VA (`switchCompanyForVa`) antes de montar Ports; sair de Ports restaura home (igual My VA), salvo Dispatch VA ativo.
 
+**Member Available hid personal WH at VA hubs (2026-09-21):** sintoma = Available só listava SBKP (VA ainda sem WH); SBGR sumia porque a VA já tinha WH lá. Causa = filtro `!ownedHubSet` do tenant pinado. **Superseded:** misturar personal+VA no mesmo Ports não escala.
+
+**Ports home vs My VA Ports (2026-09-21):** sidebar Ports = sempre **home** (sem pin VA). Company desk = **My VA → Ports** (`PortsPanel` embedded, shelf “Company”). Hauls “Open Ports desk” / Path CTA abrem o pane, não a sidebar. Dual-buy Available revertido.
+
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
 **Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.

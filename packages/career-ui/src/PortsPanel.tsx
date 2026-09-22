@@ -415,11 +415,18 @@ export function PortsPanel(props: {
   /** Ids belonging to the member VA — for picker labels. */
   vaAircraftIds?: ReadonlySet<string>;
   /**
-   * Dual-tenant: company whose Port FBO / WH / Scout to load.
-   * Members should pass the VA id (App pins it on Ports); falls back to
-   * request header company when omitted.
+   * Company whose Port FBO / WH / Scout to load.
+   * Sidebar Ports = home (omit or home id). My VA Ports = VA company id.
+   * Falls back to request header company when omitted.
    */
   logisticsCompanyId?: string | null;
+  /**
+   * Shelf label for owned warehouses / catalog concession chip.
+   * Home Ports: "Yours". My VA Ports: "Company".
+   */
+  ownedShelfLabel?: string;
+  /** Nested under My VA — drop outer panel chrome. */
+  embedded?: boolean;
   /** Dual-tenant: company for Accept/Fly when the tail is VA-owned. */
   resolveOpsCompanyId?: (aircraftId: string) => string | undefined;
   /** Pin VA tenant before Accept so Dispatch loads the right missions. */
@@ -442,6 +449,7 @@ export function PortsPanel(props: {
   clientUpdateRequiredMin?: string | null;
   onOpenUpdates?: () => void;
 }) {
+  const ownedShelfLabel = props.ownedShelfLabel?.trim() || 'Yours';
   const [snap, setSnap] = useState<PortsSnapshot | null>(null);
   const [demand, setDemand] = useState<DemandOrderView[]>([]);
   const [warehouses, setWarehouses] = useState<PlayerWarehouseSnapshot | null>(
@@ -1646,7 +1654,10 @@ export function PortsPanel(props: {
     if (props.busy || loading) return;
     setLoading(true);
     try {
-      const result = await postWarehouseBuy({ icao });
+      const result = await postWarehouseBuy({
+        icao,
+        companyId: props.logisticsCompanyId?.trim() || undefined,
+      });
       props.onWallet?.(result.walletUsd);
       setWarehouses(result.warehouses);
       setSnap(result.ports);
@@ -2294,6 +2305,7 @@ export function PortsPanel(props: {
       ),
     [warehouses?.warehouses],
   );
+
   const allBuyableHubs = useMemo(() => {
     const hubs = new Set<string>();
     for (const p of snap?.ports ?? []) {
@@ -3184,7 +3196,14 @@ export function PortsPanel(props: {
   }
 
   return (
-    <section className="panel ports-panel">
+    <section
+      className={
+        props.embedded
+          ? 'ports-panel ports-panel-embed'
+          : 'panel ports-panel'
+      }
+    >
+      {props.embedded ? null : (
       <div className="panel-head">
         <div>
           <h2>Ports & Demand</h2>
@@ -3199,6 +3218,7 @@ export function PortsPanel(props: {
           Refresh
         </button>
       </div>
+      )}
 
       {!snap ? (
         loadError ? (
@@ -3208,6 +3228,21 @@ export function PortsPanel(props: {
         )
       ) : (
         <div className="ports-panel-body">
+          {props.embedded ? (
+            <div className="ports-embed-toolbar">
+              <p className="ports-embed-toolbar-copy">
+                Company port desk · FBO, warehouses, Scout, Demand
+              </p>
+              <button
+                type="button"
+                className="action ghost"
+                disabled={props.busy || loading}
+                onClick={() => void refresh().catch(() => undefined)}
+              >
+                Refresh
+              </button>
+            </div>
+          ) : null}
           <div
             className="fbo-mode-switcher"
             role="tablist"
@@ -3557,7 +3592,7 @@ export function PortsPanel(props: {
                             p.id.toUpperCase();
                           const conc =
                             p.concession?.status === 'yours'
-                              ? `Yours · P${p.concession.level ?? 1}`
+                              ? `${ownedShelfLabel} · P${p.concession.level ?? 1}`
                               : p.concession?.status === 'held'
                                 ? 'Held'
                                 : 'Vacant';
@@ -4178,7 +4213,7 @@ export function PortsPanel(props: {
                             setSelectedBuyHubIcao(null);
                           }}
                         >
-                          Yours
+                          {ownedShelfLabel}
                           {allOwnedWarehouses.length > 0
                             ? ` (${allOwnedWarehouses.length})`
                             : ''}

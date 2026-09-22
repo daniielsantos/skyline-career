@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **daa00c1a** / desktop **0.3.228** shipped: Fix Crew Live telemetry arming and roster Live placement. Release: [v0.3.228](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.228).
+
+
 `main` **07211f4b** / desktop **0.3.227** shipped: Show Crew Live planned OD while waiting for engines. Release: [v0.3.227](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.227).
 
 

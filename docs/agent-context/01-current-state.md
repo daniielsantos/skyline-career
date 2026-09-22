@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **5bb0c34b** / desktop **0.3.215** shipped: Fix PortsMap MapLibre Map shadow so typecheck passes. Release: [v0.3.215](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.215).
+
+
 `main` **c7cc9f99** / desktop **0.3.214** shipped: Label plotted Hauls/Ports routes with ICAO ends and stop My VA title flicker. Release: [v0.3.214](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.214).
 
 

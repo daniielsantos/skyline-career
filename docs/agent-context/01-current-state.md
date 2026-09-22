@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **080a1679** / desktop **0.3.231** shipped: Align Crew Live phase with Watch footer and drop pane Close. Release: [v0.3.231](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.231).
+
+
 `main` **5abb2595** / desktop **0.3.230** shipped: Stream Crew Live from Preflight and expire abandoned active missions. Release: [v0.3.230](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.230).
 
 

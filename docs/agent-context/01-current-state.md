@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **36a24cd** / desktop **0.3.207** shipped: Gate VA Port desk ops to owner/dispatcher; keep Scout Hold for pilots. Release: [v0.3.207](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.207).
+
+
 `main` **7c31a83** / desktop **0.3.206** shipped: Polish Ports/Hauls UX: warehouse shed icon, drop All ports table, BusyBlock loads. Release: [v0.3.206](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.206).
 
 

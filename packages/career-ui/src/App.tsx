@@ -6469,100 +6469,6 @@ export function App() {
       setTab('staging');
     }
   }, [settleOverlaySticky, watch?.settling, tab, airportIcao]);
-  // Independent SimBridge probe — does not require Watch to be running.
-  // When Watch is already sampling, skip probing entirely (server would only
-  // mirror Watch anyway, and the extra poll re-rendered the status bar).
-  useEffect(() => {
-    if (watch?.running) return;
-    // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
-    // fight with Watch resume left settle dead after landing.
-    if (activeMissionRef.current?.status === 'in_flight') return;
-    // Ready / Loaded vs Due: yield the pipe so Watch auto-start can bind.
-    // Probe + Preflight contention left Dispatch on SIMBRIDGE/AIRBORNE for
-    // minutes with no takeoff/climb and no auto-depart → En route.
-    const msn = activeMissionRef.current;
-    if (
-      msn?.status === 'dispatched' &&
-      msn.lastPreflightCheck?.loadVerification &&
-      !holdWatchOffForPreflightRef.current
-    ) {
-      return;
-    }
-    let cancelled = false;
-    let consecutiveFailures = 0;
-    async function pollBridge() {
-      try {
-        const status = await fetchSimBridgeStatus();
-        if (cancelled) return;
-        consecutiveFailures = 0;
-        setSimBridge((prev) => {
-          if (
-            prev &&
-            prev.connected === status.connected &&
-            prev.phase === status.phase &&
-            prev.onGround === status.onGround &&
-            prev.enginesRunning === status.enginesRunning &&
-            prev.error === status.error &&
-            prev.aircraftTitle === status.aircraftTitle
-          ) {
-            return prev;
-          }
-          return status;
-        });
-        // Same uplink as Watch — probe already carries footer phase (+ taxi).
-        const pos = status.position;
-        if (
-          status.connected &&
-          pos &&
-          Number.isFinite(pos.lat) &&
-          Number.isFinite(pos.lon) &&
-          !(pos.lat === 0 && pos.lon === 0)
-        ) {
-          reportVaCrewLive({
-            lat: pos.lat,
-            lon: pos.lon,
-            gsKt: status.groundSpeedKt,
-            phase: status.phase,
-            onGround: status.onGround,
-          });
-        }
-      } catch {
-        if (cancelled) return;
-        consecutiveFailures += 1;
-        // Only flip to disconnected after repeated failures — single blips
-        // from pipe contention were flashing the status bar.
-        if (consecutiveFailures >= 3) {
-          setSimBridge((prev) => ({
-            connected: false,
-            mode: prev?.mode ?? null,
-            aircraftTitle: prev?.aircraftTitle ?? null,
-            onGround: prev?.onGround ?? null,
-            enginesRunning: prev?.enginesRunning ?? null,
-            parkingBrake: prev?.parkingBrake ?? null,
-            phase: prev?.phase ?? null,
-            groundSpeedKt: prev?.groundSpeedKt ?? null,
-            position: prev?.position ?? null,
-            source: 'probe',
-            error: 'SimBridge status unavailable',
-            checkedAtIso: new Date().toISOString(),
-          }));
-        }
-      }
-    }
-    void pollBridge();
-    const id = window.setInterval(() => {
-      void pollBridge();
-    }, 8_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [
-    watch?.running,
-    holdWatchOffForPreflight,
-    activeMission?.status,
-    Boolean(activeMission?.lastPreflightCheck?.loadVerification),
-  ]);
 
   const continuousHours = useMemo(() => {
     const frac = Math.max(0, displayNowMs - lastBatchAtMs) / msPerTick;
@@ -6661,6 +6567,100 @@ export function App() {
     [missions, authAccountId],
   );
   activeMissionRef.current = activeMission;
+
+  // Independent SimBridge probe — does not require Watch to be running.
+  // When Watch is already sampling, skip probing entirely (server would only
+  // mirror Watch anyway, and the extra poll re-rendered the status bar).
+  useEffect(() => {
+    if (watch?.running) return;
+    // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
+    // fight with Watch resume left settle dead after landing.
+    if (activeMission?.status === 'in_flight') return;
+    // Ready / Loaded vs Due: yield the pipe so Watch auto-start can bind.
+    // Probe + Preflight contention left Dispatch on SIMBRIDGE/AIRBORNE for
+    // minutes with no takeoff/climb and no auto-depart → En route.
+    if (
+      activeMission?.status === 'dispatched' &&
+      activeMission.lastPreflightCheck?.loadVerification &&
+      !holdWatchOffForPreflight
+    ) {
+      return;
+    }
+    let cancelled = false;
+    let consecutiveFailures = 0;
+    async function pollBridge() {
+      try {
+        const status = await fetchSimBridgeStatus();
+        if (cancelled) return;
+        consecutiveFailures = 0;
+        setSimBridge((prev) => {
+          if (
+            prev &&
+            prev.connected === status.connected &&
+            prev.phase === status.phase &&
+            prev.onGround === status.onGround &&
+            prev.enginesRunning === status.enginesRunning &&
+            prev.error === status.error &&
+            prev.aircraftTitle === status.aircraftTitle
+          ) {
+            return prev;
+          }
+          return status;
+        });
+        // Same uplink as Watch — probe already carries footer phase (+ taxi).
+        const pos = status.position;
+        if (
+          status.connected &&
+          pos &&
+          Number.isFinite(pos.lat) &&
+          Number.isFinite(pos.lon) &&
+          !(pos.lat === 0 && pos.lon === 0)
+        ) {
+          reportVaCrewLive({
+            lat: pos.lat,
+            lon: pos.lon,
+            gsKt: status.groundSpeedKt,
+            phase: status.phase,
+            onGround: status.onGround,
+          });
+        }
+      } catch {
+        if (cancelled) return;
+        consecutiveFailures += 1;
+        // Only flip to disconnected after repeated failures — single blips
+        // from pipe contention were flashing the status bar.
+        if (consecutiveFailures >= 3) {
+          setSimBridge((prev) => ({
+            connected: false,
+            mode: prev?.mode ?? null,
+            aircraftTitle: prev?.aircraftTitle ?? null,
+            onGround: prev?.onGround ?? null,
+            enginesRunning: prev?.enginesRunning ?? null,
+            parkingBrake: prev?.parkingBrake ?? null,
+            phase: prev?.phase ?? null,
+            groundSpeedKt: prev?.groundSpeedKt ?? null,
+            position: prev?.position ?? null,
+            source: 'probe',
+            error: 'SimBridge status unavailable',
+            checkedAtIso: new Date().toISOString(),
+          }));
+        }
+      }
+    }
+    void pollBridge();
+    const id = window.setInterval(() => {
+      void pollBridge();
+    }, 8_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    watch?.running,
+    holdWatchOffForPreflight,
+    activeMission?.status,
+    Boolean(activeMission?.lastPreflightCheck?.loadVerification),
+  ]);
 
   useEffect(() => {
     if (

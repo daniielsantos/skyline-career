@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **83215ee1** / desktop **0.3.216** shipped: Let Scout Hold pick a kg slice and show BusyBlock on the VAs directory. Release: [v0.3.216](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.216).
+
+
 `main` **5bb0c34b** / desktop **0.3.215** shipped: Fix PortsMap MapLibre Map shadow so typecheck passes. Release: [v0.3.215](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.215).
 
 

@@ -14390,8 +14390,8 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .va-company-network-map {
   margin-top: 0.65rem;
-  height: 20rem;
-  min-height: 18rem;
+  height: 26rem;
+  min-height: 22rem;
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -14404,11 +14404,19 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   background: transparent;
   cursor: pointer;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
-  transition: transform 0.12s ease;
+  /* Never set `transform` on the marker root — MapLibre owns it for lat/lon. */
+}
+
+.va-company-network-map-marker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transition: filter 0.12s ease;
 }
 
 .va-company-network-map-marker.is-selected {
-  transform: scale(1.08);
+  z-index: 2;
   filter: drop-shadow(0 0 6px rgba(240, 163, 90, 0.65));
 }
 

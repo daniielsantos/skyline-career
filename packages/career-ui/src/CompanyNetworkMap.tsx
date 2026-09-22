@@ -51,6 +51,7 @@ export function CompanyNetworkMap(props: Props) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const aliveRef = useRef(true);
   const markersRef = useRef<Marker[]>([]);
+  const fittedForRef = useRef('');
   const onSelectRef = useRef(props.onSelectNode);
   onSelectRef.current = props.onSelectNode;
   const [mapGeneration, setMapGeneration] = useState(0);
@@ -212,14 +213,8 @@ export function CompanyNetworkMap(props: Props) {
       }
     }
 
-    const bounds = new LngLatBounds();
-    let boundCount = 0;
-    const extend = (lon: number, lat: number) => {
-      bounds.extend([lon, lat]);
-      boundCount += 1;
-    };
-
     const selectedId = props.selectedId;
+    const nodeKey = plotNodes.map((n) => n.id).join('|');
 
     for (const node of plotNodes) {
       const selected = selectedId === node.id;
@@ -255,27 +250,64 @@ export function CompanyNetworkMap(props: Props) {
       } catch {
         continue;
       }
-      extend(node.lon, node.lat);
     }
 
+    // Focus camera on the selected node (zoom in). All / no selection → whole network.
+    let focusNodes: CompanyNetworkNode[] = plotNodes;
+    if (selectedId) {
+      const selected = plotNodes.find((n) => n.id === selectedId);
+      if (selected) {
+        if (selected.kind === 'fbo' && selected.portId) {
+          const port = selected.portId.toUpperCase();
+          focusNodes = plotNodes.filter(
+            (n) =>
+              n.id === selected.id ||
+              (n.kind === 'wh' && n.portId?.toUpperCase() === port),
+          );
+        } else if (selected.kind === 'wh' && selected.portId) {
+          const fbo = fboByPort.get(selected.portId.toUpperCase());
+          focusNodes =
+            fbo && hasCoords(fbo.lat, fbo.lon) ? [selected, fbo] : [selected];
+        } else {
+          focusNodes = [selected];
+        }
+      }
+    }
+
+    const focusBounds = new LngLatBounds();
+    let focusCount = 0;
+    for (const n of focusNodes) {
+      focusBounds.extend([n.lon, n.lat]);
+      focusCount += 1;
+    }
+
+    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}`;
+    if (cameraKey === fittedForRef.current || focusCount === 0) return;
+    fittedForRef.current = cameraKey;
+
+    const focused = Boolean(selectedId);
     try {
-      if (boundCount === 1) {
+      if (focusCount === 1) {
         map.easeTo({
-          center: [plotNodes[0]!.lon, plotNodes[0]!.lat],
-          zoom: 7.5,
+          center: [focusNodes[0]!.lon, focusNodes[0]!.lat],
+          zoom: focused ? 8.5 : 7.5,
           duration: 400,
         });
-      } else if (boundCount > 1) {
-        const ne = bounds.getNorthEast();
-        const sw = bounds.getSouthWest();
+      } else {
+        const ne = focusBounds.getNorthEast();
+        const sw = focusBounds.getSouthWest();
         if (ne.lng === sw.lng && ne.lat === sw.lat) {
           map.easeTo({
             center: [ne.lng, ne.lat],
-            zoom: 7.5,
+            zoom: focused ? 8.5 : 7.5,
             duration: 400,
           });
         } else {
-          map.fitBounds(bounds, { padding: 48, maxZoom: 9, duration: 450 });
+          map.fitBounds(focusBounds, {
+            padding: focused ? 56 : 48,
+            maxZoom: focused ? 11 : 9,
+            duration: 450,
+          });
         }
       }
     } catch {

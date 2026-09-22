@@ -58,6 +58,12 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **CompanyNetworkMap typecheck + Hauls crash (2026-09-21):** CI `tsc` falhou e Hauls UI crashava `canvasContextAttributes`. Causa = `import { Map } from 'maplibre-gl'` sombreava `Map` nativo; `new Map()` no efeito dos feeders virava `new MapLibre()` sem options → lê `e.canvasContextAttributes` de `undefined`. Fix = `Map as MapLibreMap` + `new globalThis.Map` para o índice FBO. 0.3.203 ainda tinha o bug; ship em release seguinte.
 
+**Company network map pin drift (2026-09-21):** sintoma = ícones escorregam ao pan e “voltam”. Causa = CSS `transform: scale()` no root do Marker (MapLibre usa `transform` para lat/lon). Fix = sem transform no root; highlight via filter/z-index.
+
+**Hauls network camera (2026-09-21):** sintoma = selecionar chip fazia zoom out (fitBounds de toda a rede). Fix = câmera foca o nó selecionado (+ FBO/WH ligado); All = rede inteira.
+
+**Company network fora do Port FBO (2026-09-21):** sintoma = chip SBRF no Ports esvazia Scout (filtro origem). Decisão = network chips + filtro ficam em **My VA → Hauls**; Port FBO é desk do porto (mapa Ports já mostra FBO/WH). Removido `VaCompanyNetwork` de `PortsPanel`.
+
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
 **Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.

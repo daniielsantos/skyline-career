@@ -407,6 +407,8 @@ export function dispatchWarehouseHaulHold(
   opts: {
     holdId: string;
     aircraftId: string;
+    /** Partial load; omit = full hold. Remainder stays reserved on Open desk. */
+    kg?: number;
     pilotAccountId?: string;
     actorIsVaOwner?: boolean;
   },
@@ -419,27 +421,42 @@ export function dispatchWarehouseHaulHold(
   if (hold.kind !== 'haul') {
     throw new Error('Not a warehouse haul hold');
   }
+  const takeKg = Math.max(
+    0,
+    Math.floor(
+      opts.kg != null && Number.isFinite(opts.kg) ? Number(opts.kg) : hold.kg,
+    ),
+  );
+  const kg = Math.min(hold.kg, takeKg);
+  if (kg <= 0) {
+    throw new Error('Dispatch amount must be positive');
+  }
   const aircraft = parkedAircraftAt(
     state,
     world,
     opts.aircraftId,
     hold.originIcao,
     hold.destIcao,
-    hold.kg,
+    kg,
   );
-  const payUsd = money(hold.unitPriceUsd * hold.kg);
+  const payUsd = money(hold.unitPriceUsd * kg);
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,
     commodityId: hold.commodityId,
-    kg: hold.kg,
+    kg,
   });
-  holds.splice(idx, 1);
+  const remainKg = hold.kg - kg;
+  if (remainKg <= 0) {
+    holds.splice(idx, 1);
+  } else {
+    holds[idx] = { ...hold, kg: remainKg };
+  }
   state.playerWarehouses!.demandHolds = holds;
   const mission = createHaulMission(state, world, {
     origin: hold.originIcao,
     dest: hold.destIcao,
     commodityId: hold.commodityId,
-    kg: hold.kg,
+    kg,
     payUsd,
     aircraft,
     warehouseId: withdrawn.warehouseId,
@@ -447,5 +464,5 @@ export function dispatchWarehouseHaulHold(
     pilotAccountId: opts.pilotAccountId,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
-  return { mission, kg: hold.kg, payUsd };
+  return { mission, kg, payUsd };
 }

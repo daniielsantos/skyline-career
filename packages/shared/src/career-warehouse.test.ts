@@ -42,6 +42,7 @@ import {
 import {
   acceptWarehouseBridge,
   clampInternalHaulPayUsd,
+  dispatchWarehouseBridgeHold,
   holdWarehouseBridge,
   INTERNAL_HAUL_PAY_BAND_MAX,
   INTERNAL_HAUL_PAY_BAND_MIN,
@@ -52,6 +53,7 @@ import { applySettleWalletDeltas } from './career-persist-commands.js';
 import {
   acceptWarehouseHaul,
   cancelWarehouseHaulHold,
+  dispatchWarehouseHaulHold,
   holdWarehouseHaul,
 } from './career-warehouse-haul.js';
 import {
@@ -1491,5 +1493,117 @@ describe('career warehouse + demand', () => {
     assert.equal(trimmed.releasedKg, 50);
     assert.equal(trimmed.mission.cargoKg, 150);
     assert.equal(warehouseFreeCommodityKg(state, 'SBGR', 'general'), 250);
+  });
+
+  it('partial haul/bridge/demand dispatch leaves remainder hold + pro-rata pay', () => {
+    const world = createSeedEconomyWorld({ seed: 'desk-hold-partial' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'PartialDesk',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 900_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    buyWarehouseAtPickupHub(state, world, 'SBCT');
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    wh.tier = 4;
+    wh.capacityKg = WAREHOUSE_T4_CAPACITY_KG;
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 1_200,
+      avgCostUsdPerKg: 1.5,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    const haulHeld = holdWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      kg: 200,
+    });
+    const haulUnit = haulHeld.hold.unitPriceUsd;
+    const haulPart = dispatchWarehouseHaulHold(state, world, {
+      holdId: haulHeld.hold.id,
+      aircraftId: aircraft.id,
+      kg: 80,
+    });
+    assert.equal(haulPart.kg, 80);
+    assert.equal(haulPart.payUsd, Math.round(haulUnit * 80 * 100) / 100);
+    const haulRemain = state.playerWarehouses!.demandHolds!.find(
+      (h) => h.id === haulHeld.hold.id,
+    );
+    assert.ok(haulRemain);
+    assert.equal(haulRemain!.kg, 120);
+    assert.equal(haulRemain!.kind, 'haul');
+    cancelMission(world, haulPart.mission, { fleet: state });
+    state.missions = [];
+    aircraft.status = 'parked';
+    aircraft.locationIcao = 'SBGR';
+    aircraft.assignedMissionId = undefined;
+
+    const bridgeHeld = holdWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      kg: 200,
+      pilotPayUsd: 1_000,
+    });
+    const bridgeFullPay = bridgeHeld.hold.pilotPayUsd ?? 0;
+    assert.ok(bridgeFullPay > 0);
+    const bridgePart = dispatchWarehouseBridgeHold(state, world, {
+      holdId: bridgeHeld.hold.id,
+      aircraftId: aircraft.id,
+      kg: 50,
+    });
+    assert.equal(bridgePart.kg, 50);
+    const bridgeRemain = state.playerWarehouses!.demandHolds!.find(
+      (h) => h.id === bridgeHeld.hold.id,
+    );
+    assert.ok(bridgeRemain);
+    assert.equal(bridgeRemain!.kg, 150);
+    assert.equal(
+      Math.round((bridgeRemain!.pilotPayUsd ?? 0) * 100) / 100,
+      Math.round(bridgeFullPay * 0.75 * 100) / 100,
+    );
+    assert.ok(bridgePart.pilotPayUsd > 0);
+    cancelMission(world, bridgePart.mission, { fleet: state });
+    state.missions = [];
+    aircraft.status = 'parked';
+    aircraft.locationIcao = 'SBGR';
+    aircraft.assignedMissionId = undefined;
+
+    world.demandOrders = [
+      {
+        id: 'demand_partial_sbkp',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 1_000,
+        remainingKg: 1_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+        portId: 'BRSSZ',
+      },
+    ];
+    const demandHeld = holdDemandOrder(state, world, {
+      orderId: 'demand_partial_sbkp',
+      originIcao: 'SBGR',
+      kg: 200,
+    });
+    const demandPart = dispatchDemandHold(state, world, {
+      holdId: demandHeld.hold.id,
+      aircraftId: aircraft.id,
+      kg: 80,
+    });
+    assert.equal(demandPart.kg, 80);
+    assert.equal(demandPart.payUsd, Math.round(4 * 80 * 100) / 100);
+    const demandRemain = state.playerWarehouses!.demandHolds!.find(
+      (h) => h.id === demandHeld.hold.id,
+    );
+    assert.ok(demandRemain);
+    assert.equal(demandRemain!.kg, 120);
   });
 });

@@ -16,6 +16,8 @@ export type PersistedStagingDraft = {
     kind: 'demand' | 'bridge' | 'haul';
     commodityId: string;
     kg: number;
+    /** This flight's load; omit on legacy drafts → treat as full hold.kg. */
+    loadKg?: number;
     unitPriceUsd?: number;
     pilotPayUsd?: number;
   };

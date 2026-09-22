@@ -584,7 +584,18 @@ export function PortsPanel(props: {
       setGroundStaff(
         nextPorts.groundStaff ?? nextPorts.warehouses?.groundStaff ?? null,
       );
-      if (!portId && nextPorts.ports[0]) setPortId(nextPorts.ports[0].id);
+      // Functional update — soft-poll / pulse effects call a stale `refresh`
+      // that closed over portId=null and kept snapping back to ports[0].
+      setPortId((cur) => {
+        if (cur) {
+          const still = nextPorts.ports.find(
+            (p) =>
+              p.id === cur || p.id.toUpperCase() === cur.toUpperCase(),
+          );
+          if (still) return still.id;
+        }
+        return cur ?? nextPorts.ports[0]?.id ?? null;
+      });
       if (!includeScout) return;
       try {
         await reloadScoutDesk(logisticsId);
@@ -661,7 +672,11 @@ export function PortsPanel(props: {
           (result.hold?.pilotPayUsd ?? 0) > 0
             ? ` · pilot ${props.formatMoney(result.hold!.pilotPayUsd!)}`
             : ' · unpaid'
-        } — Dispatch when ready`,
+        }${
+          props.embedded
+            ? ' — open Hauls to Prepare / Accept'
+            : ' — Dispatch when ready'
+        }`,
       );
     } catch (err) {
       props.onToast?.(
@@ -700,7 +715,11 @@ export function PortsPanel(props: {
       }
       props.onToast?.(
         'ok',
-        `Scout Demand hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(s.payUsd)} — Dispatch when ready`,
+        `Scout Demand hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(s.payUsd)}${
+          props.embedded
+            ? ' — open Hauls to Prepare / Accept'
+            : ' — Dispatch when ready'
+        }`,
       );
     } catch (err) {
       props.onToast?.(
@@ -739,7 +758,11 @@ export function PortsPanel(props: {
       }
       props.onToast?.(
         'ok',
-        `Scout Haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)} — Dispatch when ready`,
+        `Scout Haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)}${
+          props.embedded
+            ? ' — open Hauls to Prepare / Accept'
+            : ' — Dispatch when ready'
+        }`,
       );
     } catch (err) {
       props.onToast?.(
@@ -941,7 +964,12 @@ export function PortsPanel(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- interval per tenant
   }, [props.logisticsCompanyId]);
 
-  const port = snap?.ports.find((p) => p.id === portId) ?? snap?.ports[0];
+  const port =
+    snap?.ports.find(
+      (p) =>
+        portId != null &&
+        (p.id === portId || p.id.toUpperCase() === portId.toUpperCase()),
+    ) ?? (portId ? undefined : snap?.ports[0]);
   const amountDisplay = Math.max(0, Math.floor(Number(amountText) || 0));
   const kg =
     buyListing != null
@@ -3078,11 +3106,13 @@ export function PortsPanel(props: {
         focusPortId: portId ?? undefined,
         inboundTransfers: warehouses?.inboundTransfers,
         economyTick: props.economyTick,
+        demandHolds: warehouses?.demandHolds,
       }),
     [
       warehouses?.warehouses?.length,
       warehouses?.stock,
       warehouses?.inboundTransfers,
+      warehouses?.demandHolds,
       snap?.pickups,
       demand,
       portId,
@@ -3569,7 +3599,7 @@ export function PortsPanel(props: {
                 <PortsMap
                   ports={mapPorts}
                   ownedFbos={mapWarehouses}
-                  selectedPortId={port?.id ?? portId}
+                  selectedPortId={portId ?? port?.id}
                   focusToken={mapFocusToken}
                   onSelectPort={selectCatalogPort}
                   onSelectHub={(icao) => props.onOpenAirport?.(icao)}
@@ -3850,6 +3880,14 @@ export function PortsPanel(props: {
                                 ? [
                                     `No ${scoutFilter} ideas right now — try All.`,
                                   ]
+                                : holdsAtSelectedPort.length > 0
+                                  ? [
+                                      `${holdsAtSelectedPort.length} desk hold${
+                                        holdsAtSelectedPort.length === 1
+                                          ? ''
+                                          : 's'
+                                      } reserve free stock — open Hauls to fly, or Cancel a hold to reopen Scout.`,
+                                    ]
                                 : scoutEmptyHint && scoutEmptyHint.length > 0
                                   ? scoutEmptyHint
                                   : [
@@ -4251,9 +4289,9 @@ export function PortsPanel(props: {
                       ? highlightPortId
                       : whShelf === 'buy' && selectedBuyHubIcao
                         ? (portForHub.get(selectedBuyHubIcao)?.id ??
-                          port?.id ??
-                          portId)
-                        : (port?.id ?? portId)
+                          portId ??
+                          port?.id)
+                        : (portId ?? port?.id)
                   }
                   highlightedHubIcao={
                     whShelf === 'owned' || whShelf === 'staff'

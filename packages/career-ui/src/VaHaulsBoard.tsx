@@ -461,6 +461,11 @@ export function VaHaulsBoard(props: Props) {
                         <ul className="va-hauls-meta">
                           <li>{commodityLabel(hold.commodityId)}</li>
                           <li>{mass(hold.kg)}</li>
+                          {typeof hold.distanceNm === 'number' &&
+                          Number.isFinite(hold.distanceNm) &&
+                          hold.distanceNm > 0 ? (
+                            <li>{Math.round(hold.distanceNm).toLocaleString()} nm</li>
+                          ) : null}
                           {pay ? <li>{pay}</li> : null}
                           {hold.heldByName ? (
                             <li title="Posted by">{hold.heldByName}</li>

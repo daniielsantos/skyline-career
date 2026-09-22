@@ -10901,6 +10901,13 @@ span.dispatch-route-hub-dest {
   min-height: 0;
 }
 
+/* Roster/Ledger/Config: settings-card is display:grid — stretch tracks were
+   opening a huge gap under the pane title when the shell fills main-content. */
+.va-panel-shell > .va-pane-body > .va-pane-card {
+  align-content: start;
+  align-items: stretch;
+}
+
 .va-panel-shell > .va-pane-body > .va-ports-pane,
 .va-panel-shell > .va-pane-body > .va-hauls-pane {
   display: flex;

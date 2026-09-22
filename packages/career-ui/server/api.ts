@@ -1597,9 +1597,26 @@ function companyIdFromRequest(
       }
     }
     const owned = new Set(session.companies.map((c) => c.id));
-    const pick = owned.has(requestedRaw)
-      ? requestedRaw
-      : session.companies[0]!.id;
+    let pick: string | null = owned.has(requestedRaw) ? requestedRaw : null;
+    // VA members: body/header may target the listed company they don't own.
+    if (!pick && store?.supportsAuth && requestedRaw !== LOCAL_COMPANY_ID) {
+      try {
+        const membership = store.vaGetMembership(
+          session.account.id,
+          requestedRaw,
+        );
+        if (
+          membership &&
+          typeof (membership as Promise<unknown>).then !== 'function' &&
+          (membership as { companyId?: string }).companyId
+        ) {
+          pick = requestedRaw;
+        }
+      } catch {
+        /* fall through to home */
+      }
+    }
+    if (!pick) pick = session.companies[0]!.id;
     try {
       return resolveCompanyId({
         requested: pick,
@@ -4769,6 +4786,15 @@ export function createCareerApiServer(port = 8787) {
               ? resolveAirportCoords(dest, airportByIcao(world, dest) ?? null)
               : undefined;
             const heldByAccountId = h.heldByAccountId?.trim() || undefined;
+            const distanceRaw = world
+              ? routeDistanceNm(world, origin, dest)
+              : undefined;
+            const distanceNm =
+              typeof distanceRaw === 'number' &&
+              Number.isFinite(distanceRaw) &&
+              distanceRaw > 0
+                ? Math.round(distanceRaw)
+                : undefined;
             return {
               id: h.id,
               kind: h.kind ?? 'demand',
@@ -4778,6 +4804,7 @@ export function createCareerApiServer(port = 8787) {
               commodityId: h.commodityId,
               pilotPayUsd: h.pilotPayUsd,
               unitPriceUsd: h.unitPriceUsd,
+              distanceNm,
               heldByAccountId,
               heldByAuto: h.heldByAuto === true ? true : undefined,
               heldByName: heldByAccountId
@@ -10620,6 +10647,7 @@ export function createCareerApiServer(port = 8787) {
           holdId?: string;
           aircraftId?: string;
           pilotPayUsd?: number | null;
+          kg?: number;
           companyId?: string;
         };
         const warehouses_bridge_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
@@ -10654,6 +10682,10 @@ export function createCareerApiServer(port = 8787) {
               const dispatched = dispatchWarehouseBridgeHold(missions, world, {
                 holdId: body.holdId!,
                 aircraftId: body.aircraftId!,
+                kg:
+                  body.kg != null && Number.isFinite(Number(body.kg))
+                    ? Number(body.kg)
+                    : undefined,
                 pilotPayUsd:
                   body.pilotPayUsd === null
                     ? 0
@@ -10911,6 +10943,7 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           holdId?: string;
           aircraftId?: string;
+          kg?: number;
           companyId?: string;
         };
         const warehouses_haul_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
@@ -10941,6 +10974,10 @@ export function createCareerApiServer(port = 8787) {
               const dispatched = dispatchWarehouseHaulHold(missions, world, {
                 holdId: body.holdId!,
                 aircraftId: body.aircraftId!,
+                kg:
+                  body.kg != null && Number.isFinite(Number(body.kg))
+                    ? Number(body.kg)
+                    : undefined,
                 pilotAccountId: haulHoldActor.accountId ?? undefined,
                 actorIsVaOwner: haulHoldActor.isOwner,
               });
@@ -11172,6 +11209,7 @@ export function createCareerApiServer(port = 8787) {
         const body = (await readBody(req)) as {
           holdId?: string;
           aircraftId?: string;
+          kg?: number;
           companyId?: string;
         };
         const demand_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
@@ -11202,6 +11240,10 @@ export function createCareerApiServer(port = 8787) {
               const dispatched = dispatchDemandHold(missions, world, {
                 holdId: body.holdId!,
                 aircraftId: body.aircraftId!,
+                kg:
+                  body.kg != null && Number.isFinite(Number(body.kg))
+                    ? Number(body.kg)
+                    : undefined,
                 pilotAccountId: demandHoldActor.accountId ?? undefined,
                 actorIsVaOwner: demandHoldActor.isOwner,
               });

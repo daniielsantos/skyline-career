@@ -127,6 +127,22 @@ describe('derivePortsLoopStep', () => {
     });
   });
 
+  it('fulfill_demand ignores stock reserved by desk holds', () => {
+    const step = derivePortsLoopStep({
+      warehouseCount: 1,
+      stock: [
+        { commodityId: 'steel', kg: 2_000, warehouseId: 'wh1' },
+      ],
+      pickups: [],
+      demand: [{ commodityId: 'steel', remainingKg: 1_000, portId: 'BR-SANTOS' }],
+      focusPortId: 'BR-SANTOS',
+      demandHolds: [
+        { commodityId: 'steel', kg: 2_000, warehouseId: 'wh1' },
+      ],
+    });
+    assert.equal(step.kind, 'buy_port');
+  });
+
   it('store_yard beats inbound while yard still holds cargo', () => {
     const step = derivePortsLoopStep({
       warehouseCount: 1,

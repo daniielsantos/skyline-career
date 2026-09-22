@@ -512,6 +512,8 @@ export function dispatchDemandHold(
   opts: {
     holdId: string;
     aircraftId: string;
+    /** Partial load; omit = full hold. Remainder stays reserved on Open desk. */
+    kg?: number;
     pilotAccountId?: string;
     actorIsVaOwner?: boolean;
   },
@@ -525,6 +527,9 @@ export function dispatchDemandHold(
   if ((hold.kind ?? 'demand') === 'bridge') {
     throw new Error('Use warehouse bridge dispatch for this hold');
   }
+  if (hold.kind === 'haul') {
+    throw new Error('Use warehouse haul dispatch for this hold');
+  }
   const orderId = hold.orderId?.trim();
   if (!orderId) throw new Error('Demand hold is missing an order');
 
@@ -533,6 +538,17 @@ export function dispatchDemandHold(
     throw new Error(
       `Finish or cancel ${open[0]!.id} before dispatching a demand hold`,
     );
+  }
+
+  const takeKg = Math.max(
+    0,
+    Math.floor(
+      opts.kg != null && Number.isFinite(opts.kg) ? Number(opts.kg) : hold.kg,
+    ),
+  );
+  const kg = Math.min(hold.kg, takeKg);
+  if (kg <= 0) {
+    throw new Error('Dispatch amount must be positive');
   }
 
   const aircraft = findPlayerAircraft(state, opts.aircraftId);
@@ -561,9 +577,9 @@ export function dispatchDemandHold(
     hold.originIcao,
     hold.destIcao,
   );
-  if (hold.kg > maxCargoKg) {
+  if (kg > maxCargoKg) {
     throw new Error(
-      `Held ${hold.kg} kg exceeds this airframe's ${maxCargoKg} kg ops cap for ${hold.originIcao}→${hold.destIcao} — release the hold or use a larger aircraft`,
+      `Load ${kg} kg exceeds this airframe's ${maxCargoKg} kg ops cap for ${hold.originIcao}→${hold.destIcao} — lower the load or use a larger aircraft`,
     );
   }
 
@@ -571,13 +587,17 @@ export function dispatchDemandHold(
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,
     commodityId: hold.commodityId,
-    kg: hold.kg,
+    kg,
   });
 
-  holds.splice(idx, 1);
+  const remainKg = hold.kg - kg;
+  if (remainKg <= 0) {
+    holds.splice(idx, 1);
+  } else {
+    holds[idx] = { ...hold, kg: remainKg };
+  }
   state.playerWarehouses!.demandHolds = holds;
 
-  const kg = hold.kg;
   const payUsd = money(hold.unitPriceUsd * kg);
   const deadlineTick = Math.min(
     order?.expiresAtTick ?? world.tick + TICKS_PER_HOUR * 72,

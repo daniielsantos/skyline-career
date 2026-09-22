@@ -45,7 +45,7 @@ export function portsLoopTargetSection(step: PortsLoopStep): PortsLoopSection {
 
 export function derivePortsLoopStep(input: {
   warehouseCount: number;
-  stock: Array<{ commodityId: string; kg: number }>;
+  stock: Array<{ commodityId: string; kg: number; warehouseId?: string }>;
   pickups: Array<{
     id: string;
     hubIcao: string;
@@ -72,6 +72,12 @@ export function derivePortsLoopStep(input: {
     readyAtTick: number;
   }>;
   economyTick?: number;
+  /** Desk holds reserve free kg — match banner should ignore reserved stock. */
+  demandHolds?: Array<{
+    commodityId: string;
+    kg: number;
+    warehouseId?: string;
+  }>;
 }): PortsLoopStep {
   if (input.warehouseCount <= 0) {
     return { kind: 'buy_warehouse' };
@@ -96,7 +102,25 @@ export function derivePortsLoopStep(input: {
   }
 
   const stockLots = input.stock.filter((s) => s.kg > 0);
-  const stockKg = stockLots.reduce((sum, s) => sum + s.kg, 0);
+  const freeByKey = new Map<string, { commodityId: string; kg: number }>();
+  for (const s of stockLots) {
+    const commodityId = s.commodityId.trim();
+    const key = `${s.warehouseId?.trim() ?? '*'}|${commodityId.toLowerCase()}`;
+    const cur = freeByKey.get(key);
+    if (cur) cur.kg += Math.max(0, Math.floor(s.kg));
+    else freeByKey.set(key, { commodityId, kg: Math.max(0, Math.floor(s.kg)) });
+  }
+  for (const hold of input.demandHolds ?? []) {
+    const kg = Math.max(0, Math.floor(hold.kg));
+    if (kg <= 0) continue;
+    const commodityId = hold.commodityId.trim();
+    const key = `${hold.warehouseId?.trim() ?? '*'}|${commodityId.toLowerCase()}`;
+    const cur = freeByKey.get(key);
+    if (!cur) continue;
+    cur.kg = Math.max(0, cur.kg - kg);
+  }
+  const freeLots = [...freeByKey.values()].filter((s) => s.kg > 0);
+  const stockKg = freeLots.reduce((sum, s) => sum + s.kg, 0);
 
   const inbound = (input.inboundTransfers ?? []).filter((t) => t.kg > 0);
   if (stockKg <= 0 && inbound.length > 0) {
@@ -128,7 +152,7 @@ export function derivePortsLoopStep(input: {
   }
 
   const stockCommodities = new Set(
-    stockLots.map((s) => s.commodityId.trim().toLowerCase()),
+    freeLots.map((s) => s.commodityId.trim().toLowerCase()),
   );
   const focusPort = input.focusPortId?.trim().toUpperCase() ?? '';
   let matchCount = 0;

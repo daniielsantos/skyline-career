@@ -717,6 +717,32 @@ export function diagnosePortScoutEmpty(
   }
 
   const open = listOpenDemandOrders(world);
+  const deskHolds = listDemandHolds(state).filter((h) => {
+    const kind = h.kind ?? 'demand';
+    if (kind === 'bridge') {
+      return (h.pilotPayUsd ?? 0) > 0 && Boolean(h.destWarehouseId);
+    }
+    return kind === 'demand' || kind === 'haul';
+  });
+
+  let freeKgAtOwnedHubs = 0;
+  for (const origin of ownedOrigins) {
+    const seen = new Set<string>();
+    for (const pile of ensurePlayerWarehouses(state).stock) {
+      const wh = warehouses.find((w) => w.id === pile.warehouseId);
+      if (!wh || wh.icao.trim().toUpperCase() !== origin) continue;
+      if (!isWarehouseCommodityAllowed(pile.commodityId)) continue;
+      const key = `${origin}|${pile.commodityId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      freeKgAtOwnedHubs += warehouseFreeCommodityKg(
+        state,
+        origin,
+        pile.commodityId,
+      );
+    }
+  }
+
   let demandReachableMatches = 0;
   for (const origin of ownedOrigins) {
     for (const order of open) {
@@ -768,6 +794,13 @@ export function diagnosePortScoutEmpty(
   const lines: string[] = [];
   if (ownedOrigins.length === 0) {
     lines.push('Claim Port FBO first — Scout only runs from hubs you operate.');
+  } else if (
+    deskHolds.length > 0 &&
+    freeKgAtOwnedHubs < PORT_SCOUT_MIN_KG
+  ) {
+    lines.push(
+      `${deskHolds.length} desk hold${deskHolds.length === 1 ? '' : 's'} reserve your free stock — fly from Hauls or Cancel a hold to reopen Scout.`,
+    );
   } else if (stockKgAtOwnedHubs < PORT_SCOUT_MIN_KG) {
     lines.push(
       'No usable stock at your Port FBO hubs yet — buy from Catalog or wait for inbound.',
@@ -782,7 +815,9 @@ export function diagnosePortScoutEmpty(
       lines.push('Demand board is empty — wait for a tick or check another desk.');
     } else if (demandReachableMatches === 0) {
       lines.push(
-        'No open Demand matches your stock + corridor from this hub.',
+        deskHolds.length > 0
+          ? `No free Demand matches left (holds reserve stock) — open Hauls or Cancel a hold.`
+          : 'No open Demand matches your stock + corridor from this hub.',
       );
     }
     if (haulRoomDests === 0) {

@@ -42,11 +42,15 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Company Network map per-node (2026-09-21):** sintoma = WH em pickup hub (ex. SBGR p/ Santos) sumia do mapa/chips; plot usava anchor/container do PortsMap. Causa = `hubsCoveredByFbo` omitia WH no nó; `pickupHubDetails` copiava coords do porto. Fix = um nó WH por ICAO; `CompanyNetworkMap` com mesmos glyphs dos chips; FBO no porto, WH no hub; feeder tracejado porto→WH.
 
+**Scout empty after Hold (2026-09-22 b):** sintoma = Hold no Scout → “No open Demand matches…” + banner ainda “N Demand matches”. Causa = hold reserva free kg (Scout some) mas loop banner usava stock bruto; empty hint não mencionava holds. Fix = banner com free kg (−demandHolds); empty hint / UI citam desk holds → Hauls; toast VA aponta Hauls.
+
 **Scout board gone after Hold (2026-09-22):** sintoma = Hold no Scout → tabela some (“No open Demand matches…”). Causa = confirm **não** mandava `companyId` (list sim) → re-list no tenant errado / `?? []` limpava arrays. Fix = `companyId` em bridge/demand/haul confirm + `applyScoutDesk` só troca arrays presentes + fallback `list`.
 
 **Ports Demand tab chrome jump (2026-09-22):** sintoma = ao abrir Demand Board a shelf (tabs) sobe. Causa = CSS `:has(.ports-demand-board)` apertava `gap` / `panel-head` / `fbo-mode-switcher` margin. Fix = manter overflow hidden na board; spacing do chrome igual às outras abas.
 
 **Desk / inbound UI stale until navigate (2026-09-22):** sintoma = desk `today 0` / In transit vazio até trocar de página, embora pulse já tivesse comprado. Causa = Ports só refetchava em `economyTick` (congelado no MP sem clock poll) + sem soft-poll. Fix = poll `/api/world/clock` + Ports refresh em `economyLastBatchAtMs` / tick (sem Scout) + soft-poll 20s enquanto Ports aberto.
+
+**Map port selection snaps back (2026-09-22):** sintoma = clicar outro porto no mapa; após poucos segundos volta ao anterior (ex. Suape). Causa = soft-poll/pulse `refresh()` fechava `portId` stale (`null`) e fazia `setPortId(ports[0])`; fallback `port = find ?? ports[0]` também pintava o mapa errado. Fix = `setPortId` funcional (preserva seleção se ainda existir) + não fallback para `ports[0]` quando `portId` está set.
 
 **Desk Warehouse “Pickup WH…” + sole WH (2026-09-22):** sintoma = dropdown Desk auto-buy mostra “Pickup WH…” e o único WH (ex. SBGR · T4) — opções redundantes. Causa = `<option value="">` placeholder sempre presente + lista filtrada por `port.pickupHubs` (só desk hub). Fix = `deskPickupWarehouses` + auto-select quando `length === 1`; omitir placeholder nesse caso.
 

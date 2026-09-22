@@ -487,6 +487,8 @@ export function dispatchWarehouseBridgeHold(
     aircraftId: string;
     /** Override hold pay; omit keeps hold; 0 forces unpaid. */
     pilotPayUsd?: number | null;
+    /** Partial load; omit = full hold. Remainder stays reserved on Open desk. */
+    kg?: number;
     pilotAccountId?: string;
     pilotHomeCompanyId?: string;
     actorIsVaOwner?: boolean;
@@ -500,34 +502,61 @@ export function dispatchWarehouseBridgeHold(
   if ((hold.kind ?? 'demand') !== 'bridge' || !hold.destWarehouseId) {
     throw new Error('Not a warehouse bridge hold');
   }
+  const takeKg = Math.max(
+    0,
+    Math.floor(
+      opts.kg != null && Number.isFinite(opts.kg) ? Number(opts.kg) : hold.kg,
+    ),
+  );
+  const kg = Math.min(hold.kg, takeKg);
+  if (kg <= 0) {
+    throw new Error('Dispatch amount must be positive');
+  }
   const aircraft = parkedAircraftAt(
     state,
     world,
     opts.aircraftId,
     hold.originIcao,
     hold.destIcao,
-    hold.kg,
+    kg,
   );
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,
     commodityId: hold.commodityId,
-    kg: hold.kg,
+    kg,
   });
-  holds.splice(idx, 1);
-  state.playerWarehouses!.demandHolds = holds;
-  const destPortId = careerPortIdForPickupHub(hold.destIcao) ?? hold.destIcao;
-  const holdPay =
+  const holdPayTotal =
     hold.pilotPayUsd != null
       ? hold.pilotPayUsd
       : hold.unitPriceUsd > 0
         ? money(hold.unitPriceUsd * hold.kg)
         : undefined;
+  const holdPayForSlice =
+    holdPayTotal != null && hold.kg > 0
+      ? money((holdPayTotal * kg) / hold.kg)
+      : undefined;
+  const remainKg = hold.kg - kg;
+  if (remainKg <= 0) {
+    holds.splice(idx, 1);
+  } else {
+    const remainPay =
+      hold.pilotPayUsd != null && hold.kg > 0
+        ? money((hold.pilotPayUsd * remainKg) / hold.kg)
+        : hold.pilotPayUsd;
+    holds[idx] = {
+      ...hold,
+      kg: remainKg,
+      ...(remainPay != null ? { pilotPayUsd: remainPay } : {}),
+    };
+  }
+  state.playerWarehouses!.demandHolds = holds;
+  const destPortId = careerPortIdForPickupHub(hold.destIcao) ?? hold.destIcao;
   const pay = resolveBridgePilotPayUsd(world, {
     originIcao: hold.originIcao,
     destIcao: hold.destIcao,
-    kg: hold.kg,
+    kg,
     pilotPayUsd:
-      opts.pilotPayUsd !== undefined ? opts.pilotPayUsd : holdPay ?? 0,
+      opts.pilotPayUsd !== undefined ? opts.pilotPayUsd : holdPayForSlice ?? 0,
   });
   // Legacy holds without pilotPayUsd/unitPrice: unpaid bridge (preserve tests).
   const legacyUnpaid =
@@ -540,7 +569,7 @@ export function dispatchWarehouseBridgeHold(
     origin: hold.originIcao,
     dest: hold.destIcao,
     commodityId: hold.commodityId,
-    kg: hold.kg,
+    kg,
     pilotPayUsd,
     internalHaul,
     aircraft,
@@ -552,5 +581,5 @@ export function dispatchWarehouseBridgeHold(
     pilotHomeCompanyId: opts.pilotHomeCompanyId,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
-  return { mission, kg: hold.kg, pilotPayUsd };
+  return { mission, kg, pilotPayUsd };
 }

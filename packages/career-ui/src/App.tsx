@@ -563,11 +563,40 @@ type StagingDraft = {
     id: string;
     kind: 'demand' | 'bridge' | 'haul';
     commodityId: string;
+    /** Full reserved hold kg (Open desk remainder after partial Accept). */
     kg: number;
+    /** This flight's load ≤ kg and aircraft ops cap. */
+    loadKg: number;
     unitPriceUsd?: number;
     pilotPayUsd?: number;
   };
 };
+
+function deskHoldEffectiveLoadKg(
+  desk: NonNullable<StagingDraft['deskHold']>,
+): number {
+  const holdKg = Math.max(0, Math.floor(desk.kg));
+  const raw =
+    desk.loadKg != null && Number.isFinite(desk.loadKg)
+      ? Math.floor(desk.loadKg)
+      : holdKg;
+  return Math.max(0, Math.min(holdKg, raw));
+}
+
+function deskHoldPayUsd(desk: NonNullable<StagingDraft['deskHold']>): number {
+  const loadKg = deskHoldEffectiveLoadKg(desk);
+  if (loadKg <= 0) return 0;
+  if (desk.kind === 'bridge') {
+    const fullPay = Math.max(0, Math.round(desk.pilotPayUsd ?? 0));
+    const holdKg = Math.max(0, Math.floor(desk.kg));
+    if (holdKg <= 0) return 0;
+    return Math.max(0, Math.round((fullPay * loadKg) / holdKg));
+  }
+  if (desk.unitPriceUsd != null) {
+    return Math.max(0, Math.round(desk.unitPriceUsd * loadKg));
+  }
+  return 0;
+}
 
 function lotQuantityKg(lot: MarketLot): number {
   const qty = Number(lot.quantityKg);
@@ -5514,9 +5543,11 @@ export function App() {
         }),
       };
       next = clampDraftToCapacity(next);
-      const changed = next.lines.some(
-        (line, index) => line.cargoKg !== current.lines[index]?.cargoKg,
-      );
+      const changed =
+        next.lines.some(
+          (line, index) => line.cargoKg !== current.lines[index]?.cargoKg,
+        ) ||
+        next.deskHold?.loadKg !== current.deskHold?.loadKg;
       return changed ? next : current;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reclamp when capacity payload changes
@@ -6414,10 +6445,10 @@ export function App() {
     saveDevMode(devMode);
   }, [devMode]);
 
-  // Lab / Economy pulse are dev-only — leave those tabs if Dev Mode is off.
+  // Lab / Pulse / Rivals are dev-only — leave those tabs if Dev Mode is off.
   useEffect(() => {
     if (devMode) return;
-    if (tab !== 'lab' && tab !== 'pulse') return;
+    if (tab !== 'lab' && tab !== 'pulse' && tab !== 'fleet') return;
     setTab('market');
     writeCareerLocation({ tab: 'market', airportIcao: null }, { replace: true });
   }, [devMode, tab]);
@@ -6459,6 +6490,25 @@ export function App() {
     }
     setStaging(persisted as StagingDraft);
     setPreferredAircraft(persisted.aircraft as AircraftClass);
+    if (persisted.deskHold) {
+      setStaging((current) => {
+        if (!current?.deskHold) return current;
+        const holdKg = Math.max(0, Math.floor(current.deskHold.kg));
+        const loadKg =
+          current.deskHold.loadKg != null &&
+          Number.isFinite(current.deskHold.loadKg)
+            ? Math.max(
+                0,
+                Math.min(holdKg, Math.floor(current.deskHold.loadKg)),
+              )
+            : holdKg;
+        if (loadKg === current.deskHold.loadKg) return current;
+        return {
+          ...current,
+          deskHold: { ...current.deskHold, loadKg },
+        };
+      });
+    }
   }, [
     showProfileGate,
     activeCareerProfile?.id,
@@ -10254,7 +10304,19 @@ export function App() {
       remaining = Math.max(0, remaining - cargoKg);
       return { ...line, cargoKg };
     });
-    return { ...draft, lines };
+    if (!draft.deskHold) return { ...draft, lines };
+    const holdKg = Math.max(0, Math.floor(draft.deskHold.kg));
+    const maxLoad = Math.max(0, Math.floor(Math.min(holdKg, remaining)));
+    const raw = deskHoldEffectiveLoadKg(draft.deskHold);
+    const loadKg =
+      maxLoad <= 0
+        ? 0
+        : Math.max(1, Math.min(maxLoad, raw > 0 ? raw : maxLoad));
+    return {
+      ...draft,
+      lines,
+      deskHold: { ...draft.deskHold, loadKg },
+    };
   }
 
   function fleetTailAtOrigin(icao: string, preferId?: string) {
@@ -10413,6 +10475,18 @@ export function App() {
     const atOrigin =
       selectedAircraft.locationIcao.trim().toUpperCase() === origin;
     const kind = hold.kind ?? 'demand';
+    const holdKg = Math.max(0, Math.floor(hold.kg));
+    const fallbackCap = Math.max(
+      0,
+      Math.floor(fallbackMaxCargoKg(selectedAircraft.aircraftClassId)),
+    );
+    const loadKg =
+      holdKg <= 0
+        ? 0
+        : Math.max(
+            1,
+            Math.min(holdKg, fallbackCap > 0 ? fallbackCap : holdKg),
+          );
     const draft: StagingDraft = {
       originIcao: origin,
       destIcao: dest,
@@ -10425,7 +10499,8 @@ export function App() {
         id: hold.id,
         kind,
         commodityId: hold.commodityId,
-        kg: hold.kg,
+        kg: holdKg,
+        loadKg,
         unitPriceUsd: hold.unitPriceUsd,
         pilotPayUsd: hold.pilotPayUsd,
       },
@@ -10819,15 +10894,71 @@ export function App() {
       remaining = Math.max(0, remaining - cargoKg);
       return { ...line, cargoKg };
     });
+    let deskHold = staging.deskHold;
+    if (deskHold) {
+      const holdKg = Math.max(0, Math.floor(deskHold.kg));
+      const maxLoad = Math.max(0, Math.floor(Math.min(holdKg, remaining)));
+      const raw = deskHoldEffectiveLoadKg(deskHold);
+      const loadKg =
+        maxLoad <= 0
+          ? 0
+          : Math.max(1, Math.min(maxLoad, raw > 0 ? raw : maxLoad));
+      deskHold = { ...deskHold, loadKg };
+    }
     setStaging({
       ...staging,
       aircraft: next,
       aircraftId: selected.id,
       intoMissionId: openFlight?.id,
       lines,
+      deskHold,
     });
     setPreferredAircraft(next);
     setStagingFerryOpen(false);
+  }
+
+  function updateStagingDeskHoldKg(rawKg: number) {
+    setStaging((current) => {
+      if (!current?.deskHold) return current;
+      const holdKg = Math.max(0, Math.floor(current.deskHold.kg));
+      const maxLoad = Math.max(
+        0,
+        Math.floor(Math.min(holdKg, aircraftCapKg(current.aircraft))),
+      );
+      const loadKg =
+        maxLoad <= 0
+          ? 0
+          : Math.max(1, Math.min(maxLoad, Math.floor(rawKg) || 0));
+      return {
+        ...current,
+        deskHold: { ...current.deskHold, loadKg },
+      };
+    });
+  }
+
+  function setStagingDeskHoldFraction(fraction: number) {
+    setStaging((current) => {
+      if (!current?.deskHold) return current;
+      const holdKg = Math.max(0, Math.floor(current.deskHold.kg));
+      const maxLoad = Math.max(
+        0,
+        Math.floor(Math.min(holdKg, aircraftCapKg(current.aircraft))),
+      );
+      if (maxLoad <= 0) {
+        return {
+          ...current,
+          deskHold: { ...current.deskHold, loadKg: 0 },
+        };
+      }
+      const loadKg =
+        fraction >= 1
+          ? maxLoad
+          : Math.max(1, Math.min(maxLoad, Math.round(maxLoad * fraction)));
+      return {
+        ...current,
+        deskHold: { ...current.deskHold, loadKg },
+      };
+    });
   }
 
   function updateStagingLineKg(lotId: string, rawKg: number) {
@@ -10929,22 +11060,26 @@ export function App() {
         const vaOps =
           Boolean(memberVaCompanyIdRef.current) &&
           opsCompanyId === memberVaCompanyIdRef.current;
+        const loadKg = deskHoldEffectiveLoadKg(hold);
         const result =
           hold.kind === 'bridge'
             ? await postWarehouseBridgeDispatchHold({
                 holdId: hold.id,
                 aircraftId,
+                kg: loadKg,
                 companyId: opsCompanyId,
               })
             : hold.kind === 'haul'
               ? await postWarehouseHaulDispatchHold({
                   holdId: hold.id,
                   aircraftId,
+                  kg: loadKg,
                   companyId: opsCompanyId,
                 })
               : await postDemandDispatchHold({
                   holdId: hold.id,
                   aircraftId,
+                  kg: loadKg,
                   companyId: opsCompanyId,
                 });
         if (result.fleet) {
@@ -12306,16 +12441,7 @@ export function App() {
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
   const stagingPayUsd = staging
     ? staging.deskHold
-      ? staging.deskHold.kind === 'bridge'
-        ? Math.max(0, Math.round(staging.deskHold.pilotPayUsd ?? 0))
-        : staging.deskHold.unitPriceUsd != null && staging.deskHold.kg > 0
-          ? Math.max(
-              0,
-              Math.round(
-                staging.deskHold.unitPriceUsd * staging.deskHold.kg,
-              ),
-            )
-          : 0
+      ? deskHoldPayUsd(staging.deskHold)
       : staging.lines.reduce(
           (sum, line) => sum + proRataPayUsd(line.lot, line.cargoKg),
           0,
@@ -12329,8 +12455,19 @@ export function App() {
       : null;
   const stagingTotalKg = staging
     ? staging.deskHold
-      ? Math.max(0, Math.floor(staging.deskHold.kg))
+      ? deskHoldEffectiveLoadKg(staging.deskHold)
       : stagingUsedKg(staging)
+    : 0;
+  const stagingDeskHoldMaxKg = staging?.deskHold
+    ? Math.max(
+        0,
+        Math.floor(
+          Math.min(
+            Math.floor(staging.deskHold.kg),
+            aircraftCapKg(staging.aircraft),
+          ),
+        ),
+      )
     : 0;
   const stagingFreeKg = staging
     ? Math.max(0, aircraftCapKg(staging.aircraft) - stagingTotalKg)
@@ -12351,7 +12488,9 @@ export function App() {
     ? Boolean(staging.aircraftId) &&
       stagingAircraftAtOrigin &&
       stagingRangeOk(staging) &&
-      routeFuelFeasible !== false
+      routeFuelFeasible !== false &&
+      deskHoldEffectiveLoadKg(staging.deskHold) > 0 &&
+      deskHoldEffectiveLoadKg(staging.deskHold) <= stagingDeskHoldMaxKg
     : Boolean(staging) &&
       staging!.lines.length > 0 &&
       stagingAircraftAtOrigin &&
@@ -13091,15 +13230,17 @@ export function App() {
           >
             Base
           </button>
-          <button
-            type="button"
-            className={!showAirport && tab === 'fleet' ? 'tab active' : 'tab'}
-            onClick={() => selectTab('fleet')}
-            disabled={busy}
-            title={`${npcBusy} busy · ${npcSummary.airborne} airborne`}
-          >
-            Rivals
-          </button>
+          {devMode ? (
+            <button
+              type="button"
+              className={!showAirport && tab === 'fleet' ? 'tab active' : 'tab'}
+              onClick={() => selectTab('fleet')}
+              disabled={busy}
+              title={`${npcBusy} busy · ${npcSummary.airborne} airborne · Dev Mode`}
+            >
+              Rivals
+            </button>
+          ) : null}
           <button
             type="button"
             className={!showAirport && tab === 'pilot' ? 'tab active' : 'tab'}
@@ -13291,7 +13432,12 @@ export function App() {
             destIcao={staging.destIcao}
             detail={
               staging.deskHold
-                ? `Desk ${staging.deskHold.kind ?? 'hold'} · ${formatTonnes(staging.deskHold.kg)}`
+                ? `Desk ${staging.deskHold.kind ?? 'hold'} · ${formatTonnes(deskHoldEffectiveLoadKg(staging.deskHold))}${
+                    deskHoldEffectiveLoadKg(staging.deskHold) <
+                    Math.floor(staging.deskHold.kg)
+                      ? ` of ${formatTonnes(staging.deskHold.kg)}`
+                      : ''
+                  }`
                 : `${staging.lines.length} lot(s) staged`
             }
             busy={busy}
@@ -18804,14 +18950,99 @@ export function App() {
                         </div>
                       </div>
                       <p className="staging-line-meta">
-                        {staging.originIcao}→{staging.destIcao} ·{' '}
-                        {formatTonnes(staging.deskHold.kg)} · pay{' '}
+                        {staging.originIcao}→{staging.destIcao} · hold{' '}
+                        {formatTonnes(staging.deskHold.kg)} · load{' '}
+                        {formatTonnes(stagingTotalKg)} · pay{' '}
                         {formatMoney(stagingContractPayUsd)}
+                        {stagingTotalKg < Math.floor(staging.deskHold.kg) ? (
+                          <>
+                            {' '}
+                            · remainder{' '}
+                            {formatTonnes(
+                              Math.floor(staging.deskHold.kg) - stagingTotalKg,
+                            )}{' '}
+                            stays on Open desk
+                          </>
+                        ) : null}
                       </p>
+                      {(() => {
+                        const maxKg = stagingDeskHoldMaxKg;
+                        const displayMax = Math.max(
+                          0,
+                          Math.floor(kgToDisplay(maxKg, weightSystem)),
+                        );
+                        const displayValue = Math.round(
+                          kgToDisplay(stagingTotalKg, weightSystem),
+                        );
+                        const unit = massUnitLabel(weightSystem);
+                        return (
+                          <div className="staging-line-controls">
+                            <label className="cargo-amount staging-cargo-amount">
+                              Load
+                              <div>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={Math.max(1, displayMax)}
+                                  step={weightSystem === 'imperial' ? 10 : 100}
+                                  value={displayValue}
+                                  onChange={(e) =>
+                                    updateStagingDeskHoldKg(
+                                      displayToKg(
+                                        Number(e.target.value),
+                                        weightSystem,
+                                      ),
+                                    )
+                                  }
+                                  disabled={busy || maxKg <= 0}
+                                />
+                                <span>{unit}</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={1}
+                                max={Math.max(1, displayMax)}
+                                step={1}
+                                value={Math.min(
+                                  displayValue,
+                                  Math.max(1, displayMax),
+                                )}
+                                onChange={(e) =>
+                                  updateStagingDeskHoldKg(
+                                    displayToKg(
+                                      Number(e.target.value),
+                                      weightSystem,
+                                    ),
+                                  )
+                                }
+                                disabled={busy || maxKg <= 0}
+                              />
+                            </label>
+                            <div className="cargo-presets staging-cargo-presets">
+                              {[0.25, 0.5, 0.75, 1].map((fraction) => (
+                                <button
+                                  key={fraction}
+                                  type="button"
+                                  className="staging-preset-chip"
+                                  disabled={busy || maxKg <= 0}
+                                  onClick={() =>
+                                    setStagingDeskHoldFraction(fraction)
+                                  }
+                                >
+                                  {fraction === 1
+                                    ? 'Max'
+                                    : `${fraction * 100}%`}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <p className="muted">
-                        Reserved on Hauls. Ferry the tail to {staging.originIcao}{' '}
-                        if needed, then Accept &amp; Dispatch. Discarding Manifest
-                        keeps the hold open.
+                        Reserved on Hauls. Cap is min(hold, aircraft ops). Ferry
+                        the tail to {staging.originIcao} if needed, then Accept
+                        &amp; Dispatch — leftover kg stays held. Discarding
+                        Manifest keeps the full hold open.
                       </p>
                     </li>
                   </ul>
@@ -19054,7 +19285,10 @@ export function App() {
                         : !stagingFuelOk
                           ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
                           : staging.deskHold
-                            ? 'Finish the desk hold before Accept & Dispatch.'
+                            ? stagingTotalKg <= 0 ||
+                              stagingTotalKg > stagingDeskHoldMaxKg
+                              ? 'Lower the load to the aircraft ops cap (or pick a larger tail) before Accept & Dispatch.'
+                              : 'Finish the desk hold before Accept & Dispatch.'
                           : staging.lines.some((line) => {
                                 const maxKg = lineMaxKg(staging, line.lot);
                                 return line.cargoKg <= 0 || line.cargoKg > maxKg;
@@ -19544,9 +19778,10 @@ export function App() {
             <div className="settings-card">
               <h3>Developer</h3>
               <p className="settings-help">
-                Shows time-skip, wallet credit, reset world, and Dispatch Advanced
-                cheats (depart / settle without MSFS). Unlocks Cargo Ops, Class Ops,
-                and aircraft lease while on. Leave off for normal play.
+                Shows Rivals, Lab, Pulse, time-skip, wallet credit, reset world, and
+                Dispatch Advanced cheats (depart / settle without MSFS). Unlocks
+                Cargo Ops, Class Ops, and aircraft lease while on. Leave off for
+                normal play.
               </p>
               <div className="settings-choice" role="radiogroup" aria-label="Dev mode">
                 <button
@@ -20436,7 +20671,7 @@ export function App() {
             </>
           )}
         </section>
-      ) : hubSelected && tab === 'fleet' ? (
+      ) : hubSelected && tab === 'fleet' && devMode ? (
         <section className="panel">
           <div className="panel-head">
             <div>

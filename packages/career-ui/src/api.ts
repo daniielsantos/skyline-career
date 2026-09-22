@@ -3768,6 +3768,7 @@ export function postWarehouseBridgeDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
   pilotPayUsd?: number | null;
+  kg?: number;
   companyId?: string;
 }) {
   return api<{
@@ -3859,6 +3860,7 @@ export function postWarehouseHaulAccept(opts: {
 export function postWarehouseHaulDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
+  kg?: number;
   companyId?: string;
 }) {
   return api<{
@@ -3937,6 +3939,7 @@ export function postDemandHoldCancel(opts: {
 export function postDemandDispatchHold(opts: {
   holdId: string;
   aircraftId: string;
+  kg?: number;
   companyId?: string;
 }) {
   return api<{
@@ -5208,6 +5211,7 @@ export type VaHaulHold = {
   commodityId: string;
   pilotPayUsd?: number;
   unitPriceUsd?: number;
+  distanceNm?: number;
   heldByAccountId?: string;
   heldByAuto?: boolean;
   /** Resolved member display name, or "Auto-haul". */

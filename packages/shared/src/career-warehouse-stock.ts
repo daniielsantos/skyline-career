@@ -297,6 +297,15 @@ export function normalizePlayerWarehouseState(
         typeof h.unitPriceUsd === 'number' && Number.isFinite(h.unitPriceUsd)
           ? Math.max(0, money(h.unitPriceUsd))
           : 0;
+      const pilotPayUsd =
+        typeof h.pilotPayUsd === 'number' && Number.isFinite(h.pilotPayUsd)
+          ? Math.max(0, money(h.pilotPayUsd))
+          : undefined;
+      const heldByAccountId =
+        typeof h.heldByAccountId === 'string'
+          ? h.heldByAccountId.trim()
+          : '';
+      const heldByAuto = h.heldByAuto === true;
       const heldAtTick =
         typeof h.heldAtTick === 'number' && Number.isFinite(h.heldAtTick)
           ? Math.max(0, Math.floor(h.heldAtTick))
@@ -329,6 +338,9 @@ export function normalizePlayerWarehouseState(
         commodityId,
         kg,
         unitPriceUsd,
+        ...(pilotPayUsd != null ? { pilotPayUsd } : {}),
+        ...(heldByAccountId ? { heldByAccountId } : {}),
+        ...(heldByAuto ? { heldByAuto: true } : {}),
         heldAtTick,
         expiresAtTick: Math.max(expiresAtTick, heldAtTick),
       });

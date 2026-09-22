@@ -84,6 +84,7 @@ describe('canRestoreStagingDraft', () => {
         kind: 'bridge',
         commodityId: 'dry',
         kg: 2500,
+        loadKg: 1200,
         pilotPayUsd: 1200,
       },
     };

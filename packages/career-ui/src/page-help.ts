@@ -137,7 +137,7 @@ export const PAGE_HELP = {
     title: 'How Rivals works',
     kicker: 'Page guide',
     bullets: [
-      'NPC operators bid the same lots, fly, shop MX, and rest. You do not dispatch them.',
+      'Dev Mode only — NPC operators bid the same lots, fly, shop MX, and rest. You do not dispatch them.',
       'Thin fleet or busy lanes show up as Market pressure — they are why some lots pay more or fill faster.',
     ],
   },

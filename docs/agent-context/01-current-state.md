@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **bea67fb2** / desktop **0.3.229** shipped: Fix Crew Live position upload and enlarge the map. Release: [v0.3.229](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.229).
+
+
 `main` **daa00c1a** / desktop **0.3.228** shipped: Fix Crew Live telemetry arming and roster Live placement. Release: [v0.3.228](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.228).
 
 

@@ -294,6 +294,46 @@ function ensureFerryLayer(map: Map): void {
   }
 }
 
+function setTrailAndPlannedOd(
+  map: Map,
+  origin: DispatchRouteEndpoint,
+  dest: DispatchRouteEndpoint | null | undefined,
+  trail: Array<{ lat: number; lon: number }> | undefined,
+  plannedOd: boolean,
+): void {
+  ensureRouteLayer(map);
+  ensureFerryLayer(map);
+  const cargoSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
+  const ferrySource = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
+  if (trail && trail.length >= 2) {
+    const coords: [number, number][] = trail.map((p) => [p.lon, p.lat]);
+    cargoSource?.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: coords },
+    });
+  } else {
+    cargoSource?.setData(emptyLineFeature());
+  }
+  if (plannedOd && dest) {
+    ferrySource?.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { kind: 'ferry' },
+          geometry: {
+            type: 'LineString',
+            coordinates: greatCircleLine(origin, dest, 48),
+          },
+        },
+      ],
+    });
+  } else {
+    ferrySource?.setData({ type: 'FeatureCollection', features: [] });
+  }
+}
+
 function emptyLineFeature() {
   return {
     type: 'Feature' as const,
@@ -387,6 +427,8 @@ function routeCameraKey(
   waypoints: DispatchRouteWaypoint[] | undefined,
   originRole: string | undefined,
   segments?: DispatchRouteSegment[],
+  trail?: Array<{ lat: number; lon: number }> | null,
+  plannedOd?: boolean,
 ): string {
   if (segments?.length) {
     return `${originRole ?? 'dep'}|seg:${segments
@@ -402,7 +444,8 @@ function routeCameraKey(
   const d = dest
     ? `${dest.icao}:${dest.lat.toFixed(4)},${dest.lon.toFixed(4)}`
     : '';
-  return `${originRole ?? 'dep'}|${origin.icao}:${origin.lat.toFixed(4)},${origin.lon.toFixed(4)}|${d}|${w}`;
+  const trailKey = trail?.length ? 'trail' : '';
+  return `${originRole ?? 'dep'}|${origin.icao}:${origin.lat.toFixed(4)},${origin.lon.toFixed(4)}|${d}|${w}|od:${plannedOd ? 1 : 0}|${trailKey}`;
 }
 
 export function DispatchRouteMap(props: {
@@ -415,6 +458,13 @@ export function DispatchRouteMap(props: {
    * instead of a single OD/waypoints line.
    */
   segments?: DispatchRouteSegment[];
+  /**
+   * Flown breadcrumb (Watch samples). Solid line; pair with `plannedOd` for
+   * dashed OD (Crew Live / Pilops-style).
+   */
+  trail?: Array<{ lat: number; lon: number }> | null;
+  /** Draw dashed great-circle origin→dest under the trail. */
+  plannedOd?: boolean;
   /** Live aircraft position from Watch — updated without re-fitting the route. */
   aircraft?: DispatchAircraftPosition | null;
   /** Popup title for the aircraft marker. */
@@ -490,14 +540,23 @@ export function DispatchRouteMap(props: {
 
         const dest = props.dest ?? null;
         const segments = props.segments?.length ? props.segments : null;
-        if (segments) {
+        const trail = props.trail?.length ? props.trail : null;
+        if (trail || props.plannedOd) {
+          setTrailAndPlannedOd(
+            map,
+            props.origin,
+            dest,
+            trail ?? undefined,
+            Boolean(props.plannedOd),
+          );
+        } else if (segments) {
           setRouteSegments(map, segments);
         } else {
           setRouteLine(map, props.origin, dest, props.waypoints);
         }
 
         // Route gone → drop aircraft; live effect will recreate if needed.
-        if (!dest && !segments) {
+        if (!dest && !segments && !trail) {
           aircraftMarkerRef.current?.remove();
           aircraftMarkerRef.current = null;
         }
@@ -632,6 +691,8 @@ export function DispatchRouteMap(props: {
           props.waypoints,
           props.originRole,
           segments ?? undefined,
+          trail,
+          Boolean(props.plannedOd),
         );
         if (fittedRouteKeyRef.current !== cameraKey) {
           fittedRouteKeyRef.current = cameraKey;
@@ -642,14 +703,21 @@ export function DispatchRouteMap(props: {
               bounds.extend([seg.to.lon, seg.to.lat]);
             }
             map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
-          } else if (dest) {
+          } else if (dest || trail?.length) {
             const bounds = new LngLatBounds();
-            for (const p of buildRouteTrack(
-              props.origin,
-              dest,
-              props.waypoints,
-            )) {
+            bounds.extend([props.origin.lon, props.origin.lat]);
+            if (dest) bounds.extend([dest.lon, dest.lat]);
+            for (const p of trail ?? []) {
               bounds.extend([p.lon, p.lat]);
+            }
+            if (dest && !trail?.length) {
+              for (const p of buildRouteTrack(
+                props.origin,
+                dest,
+                props.waypoints,
+              )) {
+                bounds.extend([p.lon, p.lat]);
+              }
             }
             map.fitBounds(bounds, { padding: 48, maxZoom: 7, duration: 500 });
           } else {
@@ -681,6 +749,8 @@ export function DispatchRouteMap(props: {
     props.dest,
     props.waypoints,
     props.segments,
+    props.trail,
+    props.plannedOd,
     props.originRole,
   ]);
 

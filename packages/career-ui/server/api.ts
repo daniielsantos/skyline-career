@@ -345,6 +345,11 @@ import {
   resolveAirportCoords,
   pushPresenceEvent,
   listPresenceEvents,
+  recordFlightTrackSample,
+  getFlightTrack,
+  clearFlightTrack,
+  isFlightTrackFresh,
+  FLIGHT_TRACK_FRESH_MS,
   getCareerPort,
   type CareerEconomyWorld,
   type CareerMissionsState,
@@ -4216,12 +4221,39 @@ export function createCareerApiServer(port = 8787) {
           const online =
             lastSeenAtMs != null &&
             lastSeenAtMs >= nowMs - AUTH_ONLINE_WINDOW_MS;
+          const track = getFlightTrack(companyId, m.accountId);
+          const lastPt = track?.points[track.points.length - 1];
+          const live =
+            track &&
+            lastPt &&
+            isFlightTrackFresh(track.updatedAtMs, nowMs) &&
+            flightByAccount.get(m.accountId)?.status === 'in_flight'
+              ? {
+                  atMs: track.updatedAtMs,
+                  lat: lastPt.lat,
+                  lon: lastPt.lon,
+                  missionId: track.missionId,
+                  originIcao: track.originIcao,
+                  destIcao: track.destIcao,
+                  ...(track.phase ? { phase: track.phase } : {}),
+                  ...(typeof track.onGround === 'boolean'
+                    ? { onGround: track.onGround }
+                    : {}),
+                  ...(typeof track.altFt === 'number'
+                    ? { altFt: track.altFt }
+                    : {}),
+                  ...(typeof track.gsKt === 'number'
+                    ? { gsKt: track.gsKt }
+                    : {}),
+                }
+              : null;
           return {
             ...m,
             online,
             lastSeenAtMs,
             flight: flightByAccount.get(m.accountId) ?? null,
             pilotIcao: pilotIcaoByAccount.get(m.accountId) ?? null,
+            live,
           };
         });
         // Line crew snapshot for all members (read-only Config). Missions already
@@ -4305,11 +4337,188 @@ export function createCareerApiServer(port = 8787) {
           walletUsd,
           viewerAccountId: session.account.id,
           onlineWindowMs: AUTH_ONLINE_WINDOW_MS,
+          liveFreshMs: FLIGHT_TRACK_FRESH_MS,
           nowMs,
           ...(switchedFromCompanyId
             ? { switchToCompanyId: companyId }
             : {}),
         });
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/va/flight-track') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          companyId?: string;
+          missionId?: string;
+          lat?: number;
+          lon?: number;
+          altFt?: number;
+          gsKt?: number;
+          phase?: string;
+          onGround?: boolean;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!companyId || !body.missionId?.trim()) {
+          send(res, 400, { error: 'companyId and missionId required' });
+          return;
+        }
+        if (
+          typeof body.lat !== 'number' ||
+          typeof body.lon !== 'number' ||
+          !Number.isFinite(body.lat) ||
+          !Number.isFinite(body.lon)
+        ) {
+          send(res, 400, { error: 'lat and lon required' });
+          return;
+        }
+        try {
+          const listed = await Promise.resolve(store.vaIsListed(companyId));
+          if (!listed) {
+            send(res, 400, { error: 'Flight track is only for listed airlines' });
+            return;
+          }
+          const membership = await Promise.resolve(
+            store.vaGetMembership(session.account.id, companyId),
+          );
+          if (!membership) {
+            send(res, 403, { error: 'Not a member of this airline' });
+            return;
+          }
+          const missions = await loadMissions({ companyId });
+          const mission = missions.missions.find(
+            (m) => m.id === body.missionId!.trim(),
+          );
+          if (!mission) {
+            send(res, 404, { error: 'Mission not found' });
+            return;
+          }
+          const pilotId = mission.pilotAccountId?.trim() || '';
+          if (pilotId && pilotId !== session.account.id) {
+            send(res, 403, { error: 'Not your mission' });
+            return;
+          }
+          const status = String(mission.status ?? '');
+          if (!['accepted', 'dispatched', 'in_flight'].includes(status)) {
+            clearFlightTrack(companyId, session.account.id);
+            send(res, 409, {
+              error: 'Mission is not active',
+              code: 'not_active',
+            });
+            return;
+          }
+          const track = recordFlightTrackSample({
+            companyId,
+            accountId: session.account.id,
+            missionId: mission.id,
+            originIcao: mission.originIcao,
+            destIcao: mission.destIcao,
+            lat: body.lat,
+            lon: body.lon,
+            altFt: body.altFt,
+            gsKt: body.gsKt,
+            phase: body.phase,
+            onGround: body.onGround,
+          });
+          send(res, 200, {
+            ok: true,
+            updatedAtMs: track.updatedAtMs,
+            pointCount: track.points.length,
+            phase: track.phase ?? null,
+            onGround: track.onGround ?? null,
+            altFt: track.altFt ?? null,
+            gsKt: track.gsKt ?? null,
+          });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'GET' && path === '/api/va/flight-track') {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const companyId = companyIdFromRequest(
+          req,
+          url.searchParams.get('companyId'),
+        );
+        const accountId = (url.searchParams.get('accountId') ?? '').trim();
+        if (!companyId || !accountId) {
+          send(res, 400, { error: 'companyId and accountId required' });
+          return;
+        }
+        try {
+          const listed = await Promise.resolve(store.vaIsListed(companyId));
+          if (!listed) {
+            send(res, 400, { error: 'Flight track is only for listed airlines' });
+            return;
+          }
+          const membership = await Promise.resolve(
+            store.vaGetMembership(session.account.id, companyId),
+          );
+          if (!membership) {
+            send(res, 403, { error: 'Not a member of this airline' });
+            return;
+          }
+          const track = getFlightTrack(companyId, accountId);
+          if (!track) {
+            send(res, 200, { track: null, nowMs: Date.now() });
+            return;
+          }
+          const world =
+            typeof store.peekEconomyWorld === 'function'
+              ? store.peekEconomyWorld()
+              : null;
+          const originCoords = resolveAirportCoords(
+            track.originIcao,
+            world
+              ? airportByIcao(world, track.originIcao) ?? null
+              : null,
+          );
+          const destCoords = resolveAirportCoords(
+            track.destIcao,
+            world ? airportByIcao(world, track.destIcao) ?? null : null,
+          );
+          send(res, 200, {
+            track,
+            fresh: isFlightTrackFresh(track.updatedAtMs),
+            nowMs: Date.now(),
+            freshMs: FLIGHT_TRACK_FRESH_MS,
+            origin: originCoords
+              ? { icao: track.originIcao, ...originCoords }
+              : null,
+            dest: destCoords
+              ? { icao: track.destIcao, ...destCoords }
+              : null,
+          });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         return;
       }
 

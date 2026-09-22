@@ -260,6 +260,7 @@ export * from './career-ports.js';
 export * from './career-company-network.js';
 export * from './career-port-concessions.js';
 export * from './career-presence.js';
+export * from './career-flight-track.js';
 export * from './career-port-auto-buy.js';
 export * from './career-port-stevedore.js';
 export * from './career-port-scout.js';

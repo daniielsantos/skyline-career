@@ -140,6 +140,7 @@ import {
   postAuthRegister,
   postAuthLogout,
   fetchVaMembers,
+  postVaFlightTrack,
   fetchCareerHealth,
   resolveClientUpdateBlock,
   formatClientUpdateRequiredLabel,
@@ -3877,6 +3878,7 @@ export function App() {
   const [maxCargoSource, setMaxCargoSource] = useState<string | null>(null);
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
+  const flightTrackLastPostRef = useRef(0);
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const simBridgeRef = useRef(simBridge);
   simBridgeRef.current = simBridge;
@@ -6320,6 +6322,51 @@ export function App() {
             }
             return next;
           });
+        }
+        // VA Crew Live: throttle position to world while airborne on airline ops.
+        const mission = activeMissionRef.current;
+        const vaCompanyId = memberVaCompanyIdRef.current?.trim();
+        const pos = status.position;
+        if (
+          status.running &&
+          status.missionId &&
+          mission &&
+          mission.id === status.missionId &&
+          mission.status === 'in_flight' &&
+          vaCompanyId &&
+          pos &&
+          Number.isFinite(pos.lat) &&
+          Number.isFinite(pos.lon) &&
+          !(pos.lat === 0 && pos.lon === 0)
+        ) {
+          const opsCompanyId = resolveOpsCompanyId(mission.aircraftId);
+          if (opsCompanyId === vaCompanyId) {
+            const now = Date.now();
+            if (now - flightTrackLastPostRef.current >= 15_000) {
+              flightTrackLastPostRef.current = now;
+              void postVaFlightTrack({
+                companyId: vaCompanyId,
+                missionId: mission.id,
+                lat: pos.lat,
+                lon: pos.lon,
+                gsKt:
+                  typeof status.groundSpeedKt === 'number'
+                    ? status.groundSpeedKt
+                    : undefined,
+                altFt:
+                  typeof status.altitudeFt === 'number'
+                    ? status.altitudeFt
+                    : undefined,
+                phase: status.phase?.trim() || undefined,
+                onGround:
+                  typeof status.onGround === 'boolean'
+                    ? status.onGround
+                    : undefined,
+              }).catch(() => {
+                /* soft — Live is best-effort */
+              });
+            }
+          }
         }
       } catch {
         /* ignore watch poll errors */

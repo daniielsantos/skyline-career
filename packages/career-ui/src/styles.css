@@ -14839,6 +14839,74 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   color: #d4a574;
   font-weight: 600;
 }
+.va-roster-live {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  padding: 0.22rem 0.5rem;
+  justify-self: start;
+}
+.va-roster-live.is-active {
+  border-color: color-mix(in srgb, #d4a574 55%, transparent);
+  color: #d4a574;
+}
+.va-live-pane {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  padding: 0.85rem 1rem 1rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--bg-deep));
+}
+.va-live-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.55rem 1rem;
+}
+.va-live-title {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.va-live-title strong {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.va-live-title span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.va-live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.va-live-fresh {
+  color: #7cb87c;
+  font-weight: 600;
+}
+.va-live-stale {
+  color: color-mix(in srgb, #e07070 85%, white);
+}
+.va-live-phase {
+  font-weight: 600;
+  color: #d4a574;
+  letter-spacing: 0.02em;
+}
+.va-live-map {
+  min-height: 16rem;
+  height: min(42vh, 22rem);
+}
+.va-live-map-canvas,
+.va-live-map .dispatch-route-map,
+.va-live-map .dispatch-route-map-canvas {
+  height: 100%;
+  min-height: 16rem;
+}
 @media (max-width: 860px) {
   .va-roster-row,
   .va-roster-list.is-manage .va-roster-row,

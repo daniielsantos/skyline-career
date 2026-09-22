@@ -7,6 +7,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
 **Doc 2026-09-22:** parking **$0** em `homeHubIcao` (Crew/Company HQ) para parked/MX; off-hub inalterado. Org perk de parking = backlog.
 **Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
+**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads position (~15s) to in-memory `/api/va/flight-track`; members GET hint `live`; map OD dashed + flown trail + progress. **(e)** sample + chip: phase / onGround / altFt / gsKt (Watch; refresh even sem mover trilha).
 **Doc 2026-09-22 (c):** sidebar tab highlight adiado por `await switchCompanyForVa` antes de `goToTab` (Crew→Airlines) — **fix** pinta tab no click; restore/refresh em background.
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
@@ -728,6 +729,13 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 
 
+### Roster Live track (OD + breadcrumb) (2026-09-22)
+
+**Sintoma / gap:** Roster mostrava OD em voo mas sem mapa / breadcrumb (estilo Pilops).
+**Causa:** Watch/SimBridge é local; world-api não tinha posição dos membros.
+**Fix:** store in-memory `career-flight-track` (process-local, max ~180 pts); `POST/GET /api/va/flight-track` (listed VA + membership); App Watch poll (~15s) posta lat/lon enquanto `in_flight` em ops da airline; members enrich `live` (fresh ≤90s); Roster **Live** → `DispatchRouteMap` OD dashed + trail sólida + % progress. Soft-fail; reinício VPS zera tracks (OK para live-only).
+**2026-09-22 (e):** sample também leva `phase` / `onGround` / `altFt` / `gsKt` do Watch (`altitudeFt` no `/api/watch/status`); snapshot refresha telemetria mesmo sem crescer a trilha (taxi/hold); Live meta = chip de fase + alt + GS; members `live` inclui os mesmos campos.
+
 ### Roster presence (online / flight / last seen) (2026-09-20)
 
 **Sintoma:** Roster só mostrava nome + role — sem sinal de quem está online ou voando.
@@ -951,6 +959,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Watch world settle debrief payout** — ler payout/penalty da missão settled (não hardcode 0)
 - [x] **Chrome wallet ref lag** — sync activeCompanyIdRef + getStoredCompanyId no sticky; fleet/wallet após pin
 - [x] **Roster presence** — online / last seen / flight na row
+- [x] **Roster Live track** — Watch → VPS in-memory; OD + trail no Crew Roster (+ phase/alt/GS)
 - [x] **Roster member hub** — pilotIcao da home company (`At ICAO`)
 - [x] **VA aircraft reserve** — hard lock 4h TTL; 1/membro; Hangar badge
 - [x] **Prepare filter reserved + Accept auto-reserve** — picker esconde hold alheio; assign grava reserve

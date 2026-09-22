@@ -6,6 +6,7 @@ import {
   fetchCashflow,
   fetchMissions,
   fetchPorts,
+  fetchVaFlightTrack,
   postVaInvite,
   postVaAcceptJoinRequest,
   postVaRejectJoinRequest,
@@ -30,6 +31,7 @@ import {
   type Mission,
   type CareerCargoOps,
   type VaHaulHold,
+  type VaFlightTrack,
 } from './api';
 import { BusyBlock, BusyStatus } from './Busy';
 import { CompanyCreditBlock, CashflowSummaryGrid, HangarCashflowPanel } from './CashflowPanel';
@@ -37,6 +39,7 @@ import { VaMoneyMap } from './VaMoneyMap';
 import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
 import { PortsPanel } from './PortsPanel';
+import { DispatchRouteMap } from './DispatchRouteMap';
 import { formatBoardMoney } from './board-money';
 import type { WeightSystem } from './weight-units';
 import { getAuthToken } from './career-auth-client';
@@ -53,6 +56,70 @@ import {
   logbookStatusLabel,
   vaLogbookPilotLabel,
 } from './logbook';
+
+/** Browser-safe OD progress (mirrors shared flightTrackProgressPct). */
+function liveRouteProgressPct(opts: {
+  origin: { lat: number; lon: number };
+  dest: { lat: number; lon: number };
+  aircraft: { lat: number; lon: number };
+}): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const nm = (
+    a: { lat: number; lon: number },
+    b: { lat: number; lon: number },
+  ) => {
+    const R = 3440.065;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  };
+  const total = nm(opts.origin, opts.dest);
+  if (!(total > 0.05)) return 0;
+  const flown = nm(opts.origin, opts.aircraft);
+  return Math.max(0, Math.min(100, Math.round((flown / total) * 100)));
+}
+
+function isLiveTrackFresh(updatedAtMs: number, nowMs = Date.now()): boolean {
+  return nowMs - updatedAtMs <= 90_000;
+}
+
+/** Browser-safe mirror of CAREER_FLIGHT_PHASE_LABEL. */
+const LIVE_PHASE_LABEL: Record<string, string> = {
+  ground: 'On ground',
+  taxi_out: 'Taxi out',
+  takeoff: 'Takeoff',
+  climb: 'Climb',
+  cruise: 'Cruise',
+  descent: 'Descent',
+  approach: 'Approach',
+  landing: 'Landing',
+  taxi_in: 'Taxi in',
+};
+
+function formatLivePhase(phase: string | null | undefined): string | null {
+  const key = phase?.trim();
+  if (!key) return null;
+  return LIVE_PHASE_LABEL[key] ?? key.replace(/_/g, ' ');
+}
+
+function formatLiveAltFt(altFt: number | null | undefined): string | null {
+  if (typeof altFt !== 'number' || !Number.isFinite(altFt)) return null;
+  const rounded = Math.round(altFt);
+  if (rounded >= 10_000) {
+    return `FL${String(Math.round(rounded / 100)).padStart(3, '0')}`;
+  }
+  return `${rounded.toLocaleString()} ft`;
+}
+
+function formatLiveGsKt(gsKt: number | null | undefined): string | null {
+  if (typeof gsKt !== 'number' || !Number.isFinite(gsKt)) return null;
+  return `${Math.round(gsKt)} kt`;
+}
 
 type VaPane = 'roster' | 'hangar' | 'hauls' | 'ports' | 'ledger' | 'logbook' | 'config';
 
@@ -236,6 +303,22 @@ export function VaPage(props: Props) {
   );
   /** True while My VA pins the listed company session (avoid empty-state flash). */
   const [tenantSwitching, setTenantSwitching] = useState(false);
+  const [listedCompanyId, setListedCompanyId] = useState<string | null>(null);
+  const [livePilot, setLivePilot] = useState<VaMember | null>(null);
+  const [liveTrack, setLiveTrack] = useState<VaFlightTrack | null>(null);
+  const [liveOrigin, setLiveOrigin] = useState<{
+    icao: string;
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [liveDest, setLiveDest] = useState<{
+    icao: string;
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [liveFresh, setLiveFresh] = useState(false);
+  const [liveBusy, setLiveBusy] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
   const onSwitchCompanyRef = useRef(props.onSwitchCompany);
   onSwitchCompanyRef.current = props.onSwitchCompany;
@@ -362,6 +445,7 @@ export function VaPage(props: Props) {
       setViewerAccountId(m.viewerAccountId ?? null);
       setMemberCap(m.memberCap);
       setListed(m.listed);
+      setListedCompanyId(m.companyId?.trim() || null);
       setRecruiting(m.recruiting);
       setMemberRouteCutPct(m.memberRouteCutPct ?? 30);
       setCutDraft(String(m.memberRouteCutPct ?? 30));
@@ -545,6 +629,51 @@ export function VaPage(props: Props) {
     }, 30_000);
     return () => window.clearInterval(id);
   }, [pane, loaded, listed, refresh]);
+
+  // Crew Live map — poll track while a roster Live target is open.
+  useEffect(() => {
+    if (pane !== 'roster' || !livePilot || !listedCompanyId) {
+      setLiveTrack(null);
+      setLiveOrigin(null);
+      setLiveDest(null);
+      setLiveFresh(false);
+      setLiveError(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadLive() {
+      setLiveBusy(true);
+      setLiveError(null);
+      try {
+        const snap = await fetchVaFlightTrack({
+          companyId: listedCompanyId!,
+          accountId: livePilot!.accountId,
+        });
+        if (cancelled) return;
+        setLiveTrack(snap.track);
+        setLiveOrigin(snap.origin ?? null);
+        setLiveDest(snap.dest ?? null);
+        setLiveFresh(Boolean(snap.fresh));
+      } catch (err) {
+        if (cancelled) return;
+        setLiveError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLiveBusy(false);
+      }
+    }
+    void loadLive();
+    const id = window.setInterval(() => {
+      void loadLive();
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [pane, livePilot, listedCompanyId]);
+
+  useEffect(() => {
+    if (pane !== 'roster') setLivePilot(null);
+  }, [pane]);
 
   useEffect(() => {
     // Wait until the VA tenant is pinned — a home-tenant cashflow looks like
@@ -820,9 +949,11 @@ export function VaPage(props: Props) {
               {members.map((m) => {
                 const at = formatRosterAt(m);
                 const flying = m.flight?.status === 'in_flight';
+                const hasLive = Boolean(m.live) || flying;
                 const lastSeen = m.online
                   ? 'Active now'
                   : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`;
+                const liveOpen = livePilot?.accountId === m.accountId;
                 return (
                 <li key={m.accountId} className="va-roster-row">
                   <div className="va-roster-id">
@@ -846,6 +977,20 @@ export function VaPage(props: Props) {
                     >
                       {at}
                     </span>
+                    {hasLive ? (
+                      <button
+                        type="button"
+                        className={`action ghost va-roster-live${liveOpen ? ' is-active' : ''}`}
+                        disabled={pageBusy}
+                        onClick={() => {
+                          setLivePilot((prev) =>
+                            prev?.accountId === m.accountId ? null : m,
+                          );
+                        }}
+                      >
+                        {liveOpen ? 'Close' : 'Live'}
+                      </button>
+                    ) : null}
                   </div>
                   <div className="va-roster-stat va-roster-stat-role">
                     <span className="va-stat-label">Role</span>
@@ -925,6 +1070,149 @@ export function VaPage(props: Props) {
               })}
             </ul>
           )}
+          {livePilot ? (
+            <div className="va-live-pane">
+              <div className="va-live-head">
+                <div className="va-live-title">
+                  <strong>{livePilot.displayName}</strong>
+                  <span>
+                    {liveTrack
+                      ? `${liveTrack.originIcao} → ${liveTrack.destIcao}`
+                      : livePilot.flight
+                        ? `${livePilot.flight.originIcao} → ${livePilot.flight.destIcao}`
+                        : 'Live'}
+                  </span>
+                </div>
+                <div className="va-live-meta">
+                  {liveBusy && !liveTrack ? (
+                    <span>Loading…</span>
+                  ) : liveError ? (
+                    <span className="va-live-stale">{liveError}</span>
+                  ) : liveTrack && liveOrigin && liveDest ? (
+                    <>
+                      {(() => {
+                        const phaseLabel = formatLivePhase(
+                          liveTrack.phase ??
+                            liveTrack.points[liveTrack.points.length - 1]
+                              ?.phase ??
+                            livePilot.live?.phase,
+                        );
+                        const alt = formatLiveAltFt(
+                          liveTrack.altFt ??
+                            liveTrack.points[liveTrack.points.length - 1]
+                              ?.altFt ??
+                            livePilot.live?.altFt,
+                        );
+                        const gs = formatLiveGsKt(
+                          liveTrack.gsKt ??
+                            liveTrack.points[liveTrack.points.length - 1]
+                              ?.gsKt ??
+                            livePilot.live?.gsKt,
+                        );
+                        const last =
+                          liveTrack.points[liveTrack.points.length - 1];
+                        const pct = last
+                          ? liveRouteProgressPct({
+                              origin: liveOrigin,
+                              dest: liveDest,
+                              aircraft: last,
+                            })
+                          : null;
+                        return (
+                          <>
+                            {phaseLabel ? (
+                              <span className="va-live-phase">{phaseLabel}</span>
+                            ) : null}
+                            {alt ? <span>{alt}</span> : null}
+                            {gs ? <span>{gs}</span> : null}
+                            {pct != null ? (
+                              <span>{pct}% along route</span>
+                            ) : (
+                              <span>Waiting for position</span>
+                            )}
+                          </>
+                        );
+                      })()}
+                      <span
+                        className={
+                          liveFresh ||
+                          isLiveTrackFresh(liveTrack.updatedAtMs)
+                            ? 'va-live-fresh'
+                            : 'va-live-stale'
+                        }
+                      >
+                        {liveFresh ||
+                        isLiveTrackFresh(liveTrack.updatedAtMs)
+                          ? 'Live'
+                          : 'Stale'}
+                      </span>
+                    </>
+                  ) : (
+                    <span>Waiting for track…</span>
+                  )}
+                  <button
+                    type="button"
+                    className="action ghost"
+                    onClick={() => setLivePilot(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+              {liveOrigin && liveDest ? (
+                <div className="va-live-map">
+                  <DispatchRouteMap
+                    origin={liveOrigin}
+                    dest={liveDest}
+                    plannedOd
+                    trail={
+                      liveTrack && liveTrack.points.length >= 2
+                        ? liveTrack.points.map((p) => ({
+                            lat: p.lat,
+                            lon: p.lon,
+                          }))
+                        : null
+                    }
+                    aircraft={
+                      liveTrack?.points[liveTrack.points.length - 1]
+                        ? {
+                            lat: liveTrack.points[
+                              liveTrack.points.length - 1
+                            ]!.lat,
+                            lon: liveTrack.points[
+                              liveTrack.points.length - 1
+                            ]!.lon,
+                          }
+                        : livePilot.live
+                          ? {
+                              lat: livePilot.live.lat,
+                              lon: livePilot.live.lon,
+                            }
+                          : null
+                    }
+                    aircraftLabel={(() => {
+                      const phase = formatLivePhase(
+                        liveTrack?.phase ?? livePilot.live?.phase,
+                      );
+                      const alt = formatLiveAltFt(
+                        liveTrack?.altFt ?? livePilot.live?.altFt,
+                      );
+                      const bits = [livePilot.displayName, phase, alt].filter(
+                        Boolean,
+                      );
+                      return bits.join(' · ') || livePilot.displayName;
+                    })()}
+                  />
+                </div>
+              ) : liveBusy ? (
+                <BusyBlock label="Loading live map…" />
+              ) : (
+                <p className="settings-help">
+                  No position yet — pilot needs Watch running in flight.
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

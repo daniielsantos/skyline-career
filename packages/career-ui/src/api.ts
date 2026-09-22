@@ -4807,6 +4807,8 @@ export type WatchStatus = {
   onGround: boolean | null;
   enginesRunning: boolean | null;
   groundSpeedKt?: number | null;
+  /** MSL altitude (ft) from Watch sample. */
+  altitudeFt?: number | null;
   position: { lat: number; lon: number } | null;
   liveFuelLb?: number | null;
   livePayloadLb?: number | null;
@@ -5175,6 +5177,19 @@ export type VaMemberFlight = {
   destIcao: string;
 };
 
+export type VaMemberLive = {
+  atMs: number;
+  lat: number;
+  lon: number;
+  missionId: string;
+  originIcao: string;
+  destIcao: string;
+  phase?: string;
+  onGround?: boolean;
+  altFt?: number;
+  gsKt?: number;
+};
+
 export type VaMember = {
   companyId: string;
   accountId: string;
@@ -5187,6 +5202,8 @@ export type VaMember = {
   lastSeenAtMs?: number | null;
   /** Active mission on this VA company stamped to the pilot. */
   flight?: VaMemberFlight | null;
+  /** Fresh Watch breadcrumb when airborne (in-memory on world). */
+  live?: VaMemberLive | null;
   /** Current hub on the pilot's home company (chrome sticky location). */
   pilotIcao?: string | null;
 };
@@ -5302,6 +5319,7 @@ export function fetchVaMembers() {
     viewerAccountId?: string;
     nowMs?: number;
     onlineWindowMs?: number;
+    liveFreshMs?: number;
     /** VA hangar + wallet from the same missions load (no /api/state). */
     fleet?: PlayerAircraft[];
     airframePerf?: Record<
@@ -5333,6 +5351,71 @@ export function fetchVaMembers() {
     /** Active company was home/solo — switch UI tenant to this listed VA. */
     switchToCompanyId?: string;
   }>('/api/va/members');
+}
+
+export type VaFlightTrackPoint = {
+  lat: number;
+  lon: number;
+  atMs: number;
+  altFt?: number;
+  gsKt?: number;
+  phase?: string;
+  onGround?: boolean;
+};
+
+export type VaFlightTrack = {
+  companyId: string;
+  accountId: string;
+  missionId: string;
+  originIcao: string;
+  destIcao: string;
+  updatedAtMs: number;
+  phase?: string;
+  onGround?: boolean;
+  altFt?: number;
+  gsKt?: number;
+  points: VaFlightTrackPoint[];
+};
+
+export function postVaFlightTrack(body: {
+  companyId: string;
+  missionId: string;
+  lat: number;
+  lon: number;
+  altFt?: number;
+  gsKt?: number;
+  phase?: string;
+  onGround?: boolean;
+}) {
+  return api<{
+    ok: boolean;
+    updatedAtMs: number;
+    pointCount: number;
+  }>('/api/va/flight-track', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'X-Skyline-Company-Id': body.companyId },
+  });
+}
+
+export function fetchVaFlightTrack(opts: {
+  companyId: string;
+  accountId: string;
+}) {
+  const qs = new URLSearchParams({
+    companyId: opts.companyId,
+    accountId: opts.accountId,
+  });
+  return api<{
+    track: VaFlightTrack | null;
+    fresh?: boolean;
+    nowMs: number;
+    freshMs?: number;
+    origin?: { icao: string; lat: number; lon: number } | null;
+    dest?: { icao: string; lat: number; lon: number } | null;
+  }>(`/api/va/flight-track?${qs}`, {
+    headers: { 'X-Skyline-Company-Id': opts.companyId },
+  });
 }
 
 export function postVaFleetReserve(aircraftId: string) {

@@ -7,6 +7,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
 **Doc 2026-09-22:** parking **$0** em `homeHubIcao` (Crew/Company HQ) para parked/MX; off-hub inalterado. Org perk de parking = backlog.
 **Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
+**Doc 2026-09-22 (c):** sidebar tab highlight adiado por `await switchCompanyForVa` antes de `goToTab` (Crew→Airlines) — **fix** pinta tab no click; restore/refresh em background.
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
 **Doc 2026-09-21 (e):** ~~Available personal WH under VA pin~~ — **superseded (f)**; no mix on one shelf.
@@ -802,6 +803,13 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** Line crew era hire flat (Desk only); VAs grandes esgotavam allowance cedo sem path de escala.
 **Causa:** um único salary/allowance; sem upgrade.
 **Fix:** `vaLineCrew.tier` 1|2|3 no JSON (sem migrate); hire→Desk; `upgradeVaLineCrew` Ops/Network; fire→none com severance = salary do tier; allowance/salary por tabela; API `action=upgrade`; Config Upgrade/Fire; ledger `va_line_crew_upgrade`. Legacy hired sem tier = Desk.
+
+### Sidebar selection lag leaving Crew (2026-09-22)
+
+**Sintoma:** click Airlines (ou outra tab) com Crew/VA pinado — highlight demora / “trava” antes de mudar.
+**Causa:** `selectTab` fazia `await switchCompanyForVa(home)` (session open de rede) **antes** de `goToTab`. O load do directory (`BusyBlock`) é depois e não explica o atraso do botão.
+**Fix:** `goToTab(next)` síncrono no click; restore home + soft refresh em background (mesmo espírito do Crew que não bloqueia no App refresh).
+**Audit outros botões:** Freights…Settings / Ranking / Logbook / Lab / Pulse / strips → todos `selectTab` (coberto). **Base** já pintava via `openAirport` optimistic; agora também restaura home em background ao sair do Crew. **Back** → Terminal: era `await fetchAirportView` antes de setar ICAO — alinhado a `openAirport` optimistic.
 
 ### Pilot Move chip reverts while on Crew (2026-09-22)
 

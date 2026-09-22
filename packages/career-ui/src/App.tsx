@@ -7711,6 +7711,25 @@ export function App() {
     // Client FBO list can be empty before first airport hydrate — open home,
     // then redirect to the owned Base once /api/airport returns the fleet.
     fboBoardRedirectOwnedRef.current = owned.length === 0;
+    // Base is home logistics — restore VA pin in background (do not block highlight).
+    const homeCo = homeCompanyIdRef.current?.trim();
+    const onVaTenant =
+      Boolean(homeCo) && homeCo !== activeCompanyIdRef.current;
+    if (onVaTenant && homeCo) {
+      const me = authAccountIdRef.current?.trim() || '';
+      const activeVaDispatch = missions.some((m) => {
+        if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
+          return false;
+        }
+        if (!me) return true;
+        const owner = m.pilotAccountId?.trim() || '';
+        if (!owner) return true;
+        return owner === me;
+      });
+      if (!activeVaDispatch) {
+        void switchCompanyForVa(homeCo).catch(() => undefined);
+      }
+    }
     void openAirport(target, { section: 'fbo' });
   }
 
@@ -7777,27 +7796,29 @@ export function App() {
   function selectTab(next: Tab) {
     setAirportReturn(null);
     setSidebarOpen(false);
-    // Soft refresh in background — don't flash disabled on every nav button.
+    const home = homeCompanyIdRef.current?.trim();
+    // Keep VA tenant while an active Dispatch mission needs that company
+    // (member accepted Freights/Charter on a VA tail).
+    // Company port desk lives under My VA → Ports (session already VA there).
+    // Sidebar Ports is always home logistics.
+    const me = authAccountIdRef.current?.trim() || '';
+    const activeVaDispatch = missions.some((m) => {
+      if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
+        return false;
+      }
+      if (!me) return true;
+      const owner = m.pilotAccountId?.trim() || '';
+      if (!owner) return true;
+      return owner === me;
+    });
+    const onVaTenant =
+      Boolean(home) && home !== activeCompanyIdRef.current;
+    const mustRestoreHome =
+      onVaTenant && next !== 'va' && !activeVaDispatch;
+    // Paint the sidebar highlight in this click — never await session/network
+    // first (Crew→Airlines felt stuck until postCompanySessionOpen returned).
+    goToTab(next);
     void (async () => {
-      const home = homeCompanyIdRef.current?.trim();
-      // Keep VA tenant while an active Dispatch mission needs that company
-      // (member accepted Freights/Charter on a VA tail).
-      // Company port desk lives under My VA → Ports (session already VA there).
-      // Sidebar Ports is always home logistics.
-      const me = authAccountIdRef.current?.trim() || '';
-      const activeVaDispatch = missions.some((m) => {
-        if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
-          return false;
-        }
-        if (!me) return true;
-        const owner = m.pilotAccountId?.trim() || '';
-        if (!owner) return true;
-        return owner === me;
-      });
-      const onVaTenant =
-        Boolean(home) && home !== activeCompanyIdRef.current;
-      const mustRestoreHome =
-        onVaTenant && next !== 'va' && !activeVaDispatch;
       if (mustRestoreHome && home) {
         try {
           await switchCompanyForVa(home);
@@ -7805,7 +7826,7 @@ export function App() {
           /* soft — refresh below may still heal */
         }
       }
-      goToTab(next);
+      // Soft refresh in background — don't flash disabled on every nav button.
       // My VA loads its own /api/va/members — don't block tab paint on App refresh.
       if (next === 'va') {
         void run(() => refresh(liveRefreshScope(next, false)), {
@@ -7819,19 +7840,14 @@ export function App() {
     })();
   }
 
-  async function returnToAirport() {
+  function returnToAirport() {
     if (!airportReturn) return;
     const { icao, section } = airportReturn;
     setAirportReturn(null);
     setSidebarOpen(false);
-    await run(async () => {
-      const view = await fetchAirportView(icao);
-      setAirportView(view);
-      if (view.playerFbos) setPlayerFbos(view.playerFbos);
-      setAirportIcao(icao);
-      setTerminalSection(section);
-      writeCareerLocation({ tab, airportIcao: icao });
-    }, { lockUi: false });
+    // Same optimistic paint as openAirport — do not await /api/airport before
+    // the Terminal/Base sidebar highlight flips.
+    void openAirport(icao, { section });
   }
 
   async function onDebugCreditWallet(amountUsd = 5_000) {

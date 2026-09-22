@@ -42,6 +42,12 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Company Network map per-node (2026-09-21):** sintoma = WH em pickup hub (ex. SBGR p/ Santos) sumia do mapa/chips; plot usava anchor/container do PortsMap. Causa = `hubsCoveredByFbo` omitia WH no nó; `pickupHubDetails` copiava coords do porto. Fix = um nó WH por ICAO; `CompanyNetworkMap` com mesmos glyphs dos chips; FBO no porto, WH no hub; feeder tracejado porto→WH.
 
+**Ports Demand tab chrome jump (2026-09-22):** sintoma = ao abrir Demand Board a shelf (tabs) sobe. Causa = CSS `:has(.ports-demand-board)` apertava `gap` / `panel-head` / `fbo-mode-switcher` margin. Fix = manter overflow hidden na board; spacing do chrome igual às outras abas.
+
+**Desk / inbound UI stale until navigate (2026-09-22):** sintoma = desk `today 0` / In transit vazio até trocar de página, embora pulse já tivesse comprado. Causa = Ports só refetchava em `economyTick` (congelado no MP sem clock poll) + sem soft-poll. Fix = poll `/api/world/clock` + Ports refresh em `economyLastBatchAtMs` / tick (sem Scout) + soft-poll 20s enquanto Ports aberto.
+
+**Desk Warehouse “Pickup WH…” + sole WH (2026-09-22):** sintoma = dropdown Desk auto-buy mostra “Pickup WH…” e o único WH (ex. SBGR · T4) — opções redundantes. Causa = `<option value="">` placeholder sempre presente + lista filtrada por `port.pickupHubs` (só desk hub). Fix = `deskPickupWarehouses` + auto-select quando `length === 1`; omitir placeholder nesse caso.
+
 **Member Ports empty Scout/WH (2026-09-21):** sintoma = membro vê Port FBO P1 / “Claim Port FBO first” e Warehouse “No warehouses”. Causa = chrome sticky-home: `GET /api/ports` herda `yours` via `alliedCompanyIds`, mas Scout/WH usam tenant **home** (`isPortOperator` exact + missions WH da home vazia). Fix = `selectTab('ports')` pinna VA (`switchCompanyForVa`) antes de montar Ports; sair de Ports restaura home (igual My VA), salvo Dispatch VA ativo.
 
 **Member Available hid personal WH at VA hubs (2026-09-21):** sintoma = Available só listava SBKP (VA ainda sem WH); SBGR sumia porque a VA já tinha WH lá. Causa = filtro `!ownedHubSet` do tenant pinado. **Superseded:** misturar personal+VA no mesmo Ports não escala.
@@ -72,7 +78,7 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Desk auto-buy inputs empty by default (2026-09-21):** Max $/kg, Max kg/day e Wallet floor abrem vazios (placeholders só); submit valida preço/massa; floor vazio = $0; limpa após save.
 
-**Desk auto-buy weightSystem (2026-09-22):** labels Max $/lb|kg e mass/day seguem Settings; submit converte para $/kg + kg (economia). Summary da order também.
+**Desk auto-buy weightSystem (2026-09-22):** labels Max $/lb|kg e mass/day seguem Settings; submit converte para $/kg + kg (economia). Summary da order também. **24 998 vs 25 000 lb:** esperado — `floor(lb→kg)` + `round(kg→lb)`; ~2 lb dust (sem snap de maxKg de WH).
 
 **Desk auto-buy same-day skip (2026-09-22):** sintoma = order ativa `today 0 kg` com listing Supplies barata no Catalog por >15 min. Causa = `settleCompanyPassiveFeesForTickRange` early-out `daysCrossed<=0` (anti double-bill +Nd) **pulava** `tickPortAutoBuyOrders`; pulse só auto-buyava a company **active** no catch-up. VA/tenant não-active ficava até cruzar o dia. Fix = desk hygiene (auto-buy + auto-haul + inbound) também no path same-day. Precisa **redeploy world-api**.
 

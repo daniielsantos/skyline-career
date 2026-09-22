@@ -148,7 +148,7 @@ function amountCell(entry: CareerLedgerEntry, formatMoney: (n: number) => string
   );
 }
 
-function CompanyCreditBlock(props: {
+export function CompanyCreditBlock(props: {
   credit: CompanyCreditSnapshot | null;
   walletUsd: number;
   busy: boolean;
@@ -350,6 +350,8 @@ export function HangarCashflowPanel(props: {
   busy: boolean;
   /** When true, show credit status but no draw/repay controls. */
   creditActionsLocked?: boolean;
+  /** VA Ledger hero owns Credit — omit the inline block here. */
+  hideCredit?: boolean;
   /** VA listed: label credit Cargo Ops as owner ladder (formula unchanged). */
   vaOwnerOpsLabels?: boolean;
   /**
@@ -395,17 +397,18 @@ export function HangarCashflowPanel(props: {
 
   return (
     <div className="cashflow-panel">
-      <CompanyCreditBlock
-        credit={props.companyCredit}
-        walletUsd={props.walletUsd}
-        busy={props.busy}
-        actionsLocked={props.creditActionsLocked}
-        vaOwnerOpsLabels={props.vaOwnerOpsLabels}
-        formatMoney={props.formatMoney}
-        onUpdated={props.onCreditUpdated}
-        onError={props.onCreditError}
-      />
-
+      {!props.hideCredit ? (
+        <CompanyCreditBlock
+          credit={props.companyCredit}
+          walletUsd={props.walletUsd}
+          busy={props.busy}
+          actionsLocked={props.creditActionsLocked}
+          vaOwnerOpsLabels={props.vaOwnerOpsLabels}
+          formatMoney={props.formatMoney}
+          onUpdated={props.onCreditUpdated}
+          onError={props.onCreditError}
+        />
+      ) : null}
       {emptyLedger ? (
         <p className="empty">
           No ledger yet — freights, fuel, hangar parking, credit, leases, and shop

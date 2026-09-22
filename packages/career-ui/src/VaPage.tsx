@@ -31,7 +31,7 @@ import {
   type CareerCargoOps,
 } from './api';
 import { BusyBlock, BusyStatus } from './Busy';
-import { HangarCashflowPanel } from './CashflowPanel';
+import { CompanyCreditBlock, HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
 import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
@@ -147,6 +147,8 @@ type Props = {
   ensureOpsCompany?: (aircraftId: string) => Promise<void>;
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   economyTick?: number;
+  /** Advances with world pulse — Ports desk / inbound soft-refresh. */
+  economyLastBatchAtMs?: number;
   cargoOps?: CareerCargoOps | null;
   onOpenCargoOps?: () => void;
   onOpenAirport?: (icao: string) => void;
@@ -1030,6 +1032,7 @@ export function VaPage(props: Props) {
               ensureOpsCompany={props.ensureOpsCompany}
               resolveMaxCargoKg={props.resolveMaxCargoKg}
               economyTick={props.economyTick}
+              economyLastBatchAtMs={props.economyLastBatchAtMs}
               cargoOps={props.cargoOps}
               onOpenCargoOps={props.onOpenCargoOps}
               onWallet={props.onWallet}
@@ -1055,22 +1058,45 @@ export function VaPage(props: Props) {
           ) : (
             <>
           <div className="va-ledger-hero">
-            <div className="va-ledger-wallet">
-              <p className="aircraft-card-section-label" style={{ margin: 0 }}>
-                VA wallet
-              </p>
-              <p className="va-ledger-wallet-value">
-                {resolvedWalletUsd != null
-                  ? formatBoardMoney(resolvedWalletUsd)
-                  : ledgerBusy || tenantSwitching
-                    ? '…'
-                    : '—'}
-              </p>
-              <p className="va-ledger-wallet-hint">
-                Shared company cash (owner wallet).
-              </p>
+            <div className="va-ledger-hero-main">
+              <div className="va-ledger-wallet">
+                <p className="aircraft-card-section-label" style={{ margin: 0 }}>
+                  VA wallet
+                </p>
+                <p className="va-ledger-wallet-value">
+                  {resolvedWalletUsd != null
+                    ? formatBoardMoney(resolvedWalletUsd)
+                    : ledgerBusy || tenantSwitching
+                      ? '…'
+                      : '—'}
+                </p>
+                <p className="va-ledger-wallet-hint">
+                  Shared company cash (owner wallet).
+                </p>
+              </div>
+              <div className="va-ledger-credit">
+                <CompanyCreditBlock
+                  credit={companyCredit}
+                  walletUsd={resolvedWalletUsd ?? 0}
+                  busy={pageBusy || ledgerBusy}
+                  actionsLocked={!isOwner}
+                  vaOwnerOpsLabels
+                  formatMoney={formatBoardMoney}
+                  onUpdated={({ walletUsd, companyCredit: next }) => {
+                    props.onWallet?.(walletUsd);
+                    setCompanyCredit(next);
+                    void loadLedger();
+                  }}
+                  onError={(message) => {
+                    setLedgerError(message);
+                  }}
+                />
+              </div>
             </div>
-            <div className="va-ledger-quality">
+            <div
+              className="va-ledger-quality"
+              title="Rolling 7 days · settle score + on-time"
+            >
               <p className="aircraft-card-section-label" style={{ margin: 0 }}>
                 Flight quality
               </p>
@@ -1087,19 +1113,18 @@ export function VaPage(props: Props) {
                   <span className="muted"> · building</span>
                 )}
               </p>
-              <p className="va-ledger-quality-window muted">
-                Rolling 7 days · settle score + on-time
-              </p>
               {orgPerks ? (
                 <div className="va-org-perks">
                   <p className="va-org-perks-tier">
                     <strong>{orgPerks.tierName}</strong>
-                    {orgPerks.tier > 0 ? ` · T${orgPerks.tier}` : ''}
                     {orgPerks.labels.length > 0
                       ? ` · ${orgPerks.labels.join(' · ')}`
-                      : ''}
+                      : null}
                   </p>
-                  <ol className="va-org-perks-ladder" aria-label="Org perk tiers">
+                  <ol
+                    className="va-org-perks-ladder"
+                    aria-label="Org perk tiers"
+                  >
                     {(orgPerks.ladder ?? []).map((step) => {
                       const state =
                         orgPerks.tier === step.tier
@@ -1108,25 +1133,24 @@ export function VaPage(props: Props) {
                             ? 'is-done'
                             : 'is-ahead';
                       return (
-                        <li key={step.tier} className={state}>
+                        <li
+                          key={step.tier}
+                          className={state}
+                          title={`≥${step.minQuality} quality · ${step.minFlights}+ flights`}
+                        >
                           <span className="va-org-perks-ladder-name">
                             {step.tierName}
-                          </span>
-                          <span className="va-org-perks-ladder-gate muted">
-                            ≥{step.minQuality} · {step.minFlights}+
                           </span>
                         </li>
                       );
                     })}
                   </ol>
                   {orgPerks.nextTierHint ? (
-                    <p className="va-org-perks-next">
+                    <p className="va-org-perks-next muted">
                       Next · {orgPerks.nextTierHint}
                     </p>
                   ) : orgPerks.tier >= 3 ? (
-                    <p className="va-org-perks-next muted">
-                      Top tier — keep quality in the 7-day window
-                    </p>
+                    <p className="va-org-perks-next muted">Top tier</p>
                   ) : null}
                 </div>
               ) : null}
@@ -1150,6 +1174,7 @@ export function VaPage(props: Props) {
               walletUsd={resolvedWalletUsd ?? 0}
               busy={pageBusy || ledgerBusy}
               creditActionsLocked={!isOwner}
+              hideCredit
               vaOwnerOpsLabels
               memberNamesByAccountId={ledgerMemberNames}
               formatMoney={formatBoardMoney}

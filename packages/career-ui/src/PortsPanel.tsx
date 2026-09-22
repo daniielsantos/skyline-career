@@ -436,6 +436,8 @@ export function PortsPanel(props: {
   /** Aircraft cargo ceiling (kg); 0 = treat as unlimited for preview. */
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   economyTick?: number;
+  /** Wall anchor of last economy pulse — refresh desk/inbound when it advances. */
+  economyLastBatchAtMs?: number;
   cargoOps?: CareerCargoOps | null;
   onOpenCargoOps?: () => void;
   onWallet?: (usd: number) => void;
@@ -568,7 +570,8 @@ export function PortsPanel(props: {
     return Boolean(row && !row.unlocked);
   }
 
-  async function refresh() {
+  async function refresh(opts?: { includeScout?: boolean }) {
+    const includeScout = opts?.includeScout !== false;
     setLoadError(null);
     try {
       const logisticsId = props.logisticsCompanyId?.trim() || undefined;
@@ -582,6 +585,7 @@ export function PortsPanel(props: {
         nextPorts.groundStaff ?? nextPorts.warehouses?.groundStaff ?? null,
       );
       if (!portId && nextPorts.ports[0]) setPortId(nextPorts.ports[0].id);
+      if (!includeScout) return;
       try {
         const scout = await postPortScout({
           action: 'list',
@@ -863,10 +867,35 @@ export function PortsPanel(props: {
     props.resolveMaxCargoKg,
   ]);
 
+  // Soft-refresh desk/inbound on pulse without re-running the tenant bootstrap.
+  const skipPulsePortsRefresh = useRef(true);
+
   useEffect(() => {
-    void refresh().catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load + refresh when clock / tenant advances
-  }, [props.economyTick, props.logisticsCompanyId]);
+    void refresh({ includeScout: true }).catch(() => undefined);
+    skipPulsePortsRefresh.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tenant / first paint
+  }, [props.logisticsCompanyId]);
+
+  // After each economy pulse (tick / lastBatchAtMs): desk today + inbound ETA.
+  // Skip scout list — pulse soft-refresh should stay cheap.
+  useEffect(() => {
+    if (skipPulsePortsRefresh.current) {
+      skipPulsePortsRefresh.current = false;
+      return;
+    }
+    void refresh({ includeScout: false }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clock pulse only
+  }, [props.economyTick, props.economyLastBatchAtMs]);
+
+  // Soft poll while Ports is open so desk / In transit update without navigating.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void refresh({ includeScout: false }).catch(() => undefined);
+    }, 20_000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- interval per tenant
+  }, [props.logisticsCompanyId]);
 
   const port = snap?.ports.find((p) => p.id === portId) ?? snap?.ports[0];
   const amountDisplay = Math.max(0, Math.floor(Number(amountText) || 0));
@@ -2383,6 +2412,30 @@ export function PortsPanel(props: {
       'MMUN',
     ];
   }, [port?.pickupHubs, warehouses?.pickupHubs]);
+
+  /** Warehouses eligible for this port's desk auto-buy (desk pickup hub only). */
+  const deskPickupWarehouses = useMemo(() => {
+    const desk = resolvePortDeskPickupHub(port?.pickupHubs);
+    if (!desk) return [];
+    return (warehouses?.warehouses ?? []).filter(
+      (w) => w.icao.trim().toUpperCase() === desk,
+    );
+  }, [port?.pickupHubs, warehouses?.warehouses]);
+
+  useEffect(() => {
+    if (deskPickupWarehouses.length === 1) {
+      const only = deskPickupWarehouses[0]!.id;
+      if (deskWarehouseId !== only) setDeskWarehouseId(only);
+      return;
+    }
+    if (
+      deskWarehouseId &&
+      !deskPickupWarehouses.some((w) => w.id === deskWarehouseId)
+    ) {
+      setDeskWarehouseId('');
+    }
+  }, [deskPickupWarehouses, deskWarehouseId]);
+
   const allOwnedWarehouses = useMemo(() => {
     return [...(warehouses?.warehouses ?? [])].sort((a, b) =>
       a.icao.localeCompare(b.icao),
@@ -4034,20 +4087,24 @@ export function PortsPanel(props: {
                                       onChange={(e) =>
                                         setDeskWarehouseId(e.target.value)
                                       }
-                                      disabled={props.busy || loading}
+                                      disabled={
+                                        props.busy ||
+                                        loading ||
+                                        deskPickupWarehouses.length === 0
+                                      }
                                     >
-                                      <option value="">Pickup WH…</option>
-                                      {(warehouses?.warehouses ?? [])
-                                        .filter((w) =>
-                                          (port.pickupHubs ?? [])
-                                            .map((h) => h.toUpperCase())
-                                            .includes(w.icao.toUpperCase()),
-                                        )
-                                        .map((w) => (
-                                          <option key={w.id} value={w.id}>
-                                            {w.icao} · T{w.tier}
-                                          </option>
-                                        ))}
+                                      {deskPickupWarehouses.length !== 1 ? (
+                                        <option value="">
+                                          {deskPickupWarehouses.length === 0
+                                            ? 'No pickup WH'
+                                            : 'Pickup WH…'}
+                                        </option>
+                                      ) : null}
+                                      {deskPickupWarehouses.map((w) => (
+                                        <option key={w.id} value={w.id}>
+                                          {w.icao} · T{w.tier}
+                                        </option>
+                                      ))}
                                     </select>
                                   </label>
                                   <button

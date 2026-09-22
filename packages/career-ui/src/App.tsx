@@ -8,6 +8,7 @@ import {
   fetchNpcFleet,
   fetchRouteLots,
   fetchState,
+  fetchWorldClock,
   fetchCompanies,
   fetchWorldPresence,
   postCompany,
@@ -5582,7 +5583,7 @@ export function App() {
     });
   }, [staging?.replaceManifest, staging?.lines]);
 
-  // While economy catch-up is draining, refresh the banner often (timer is ~60s/batch).
+  // While SP catch-up banner is up, refresh catchUp progress (MP omits catchUp).
   const economySyncing = catchUpBanner != null;
   useEffect(() => {
     if (!economySyncing) return;
@@ -5596,19 +5597,51 @@ export function App() {
           } else {
             setCatchUpBanner(null);
           }
-          if (typeof state.tick === 'number') setTick(state.tick);
-          if (typeof state.lastBatchAtMs === 'number') {
-            setLastBatchAtMs(state.lastBatchAtMs);
-          }
-          if (typeof state.serverNowMs === 'number') {
-            setServerOffsetMs(state.serverNowMs - Date.now());
-            setDisplayNowMs(state.serverNowMs);
-          }
         })
         .catch(() => undefined);
     }, 15_000);
     return () => window.clearInterval(id);
-  }, [economySyncing, showProfileGate, activeCareerProfile?.id]);
+  }, [economySyncing, showProfileGate, showAuthGate, activeCareerProfile?.id]);
+
+  // World chip clock: always poll lightweight /api/world/clock (peek, no write
+  // lock). MP never sends catchUp on /api/state, so the old catchUp-gated
+  // fetchState poll never ran — lastBatchAtMs froze → stuck "pulse due".
+  useEffect(() => {
+    if (showProfileGate || showAuthGate || !activeCareerProfile) return;
+    if (!hubSelected) return;
+    let cancelled = false;
+    const pullClock = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      void fetchWorldClock()
+        .then((clock) => {
+          if (cancelled) return;
+          if (typeof clock.tick === 'number') setTick(clock.tick);
+          if (typeof clock.lastBatchAtMs === 'number') {
+            setLastBatchAtMs(clock.lastBatchAtMs);
+          }
+          if (typeof clock.msPerTick === 'number' && clock.msPerTick > 0) {
+            setMsPerTick(clock.msPerTick);
+          }
+          if (typeof clock.serverNowMs === 'number') {
+            const clientNow = Date.now();
+            setServerOffsetMs(clock.serverNowMs - clientNow);
+            setDisplayNowMs(clock.serverNowMs);
+          }
+        })
+        .catch(() => undefined);
+    };
+    pullClock();
+    const id = window.setInterval(pullClock, 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    showProfileGate,
+    showAuthGate,
+    activeCareerProfile?.id,
+    hubSelected,
+  ]);
 
   // Smooth local clock / ETA / progress between authoritative polls.
   useEffect(() => {
@@ -19411,6 +19444,7 @@ export function App() {
             hangarCatalogEntry(acf)?.maxCargoKg ?? 0
           }
           economyTick={tick}
+          economyLastBatchAtMs={lastBatchAtMs}
           cargoOps={cargoOps}
           onOpenCargoOps={() => {
             setHangarPane('cargo');
@@ -19527,6 +19561,7 @@ export function App() {
             hangarCatalogEntry(acf)?.maxCargoKg ?? 0
           }
           economyTick={tick}
+          economyLastBatchAtMs={lastBatchAtMs}
           cargoOps={cargoOps}
           onOpenCargoOps={() => {
             setHangarPane('cargo');

@@ -1367,6 +1367,17 @@ export function fetchState() {
   >('/api/state');
 }
 
+/** Lightweight economy clock (peek — does not take the career write lock). */
+export function fetchWorldClock(nowMs = Date.now()) {
+  const qs = new URLSearchParams({ nowMs: String(nowMs) });
+  return api<
+    ClockSync & {
+      worldId?: string;
+      nextPulseAtMs?: number;
+    }
+  >(`/api/world/clock?${qs.toString()}`);
+}
+
 export type CareerCompanyView = {
   id: string;
   displayName: string;

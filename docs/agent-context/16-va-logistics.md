@@ -454,6 +454,11 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** My VA lia só company ativa (home solo); badge usava `memberOfVaCompanyId`; `assembleMissions` backfillava `pilotName` de `companies.display_name` inclusive `va_listed`.
 **Fix:** `/api/va/members` resolve listed membership + `switchToCompanyId`; join code troca tenant; badge Yours=owner / Joined=member; backfill pilotName só se company não listada.
 
+### My VA Ledger hero: Credit under wallet + quieter Flight quality (2026-09-22)
+
+**Sintoma:** Credit lonjão sob Money map; Flight quality com prosa/ladder densa (T#, gates, window copy).
+**Fix:** Credit sobe para o hero sob VA wallet (`hideCredit` no cashflow); quality = score + tier/perks + chips de nome + Next (gates no tooltip).
+
 ### My VA Ledger for members (2026-09-20)
 
 **Sintoma / gap:** membros não viam wallet/ledger da VA (só o chrome do owner quando tenant ativo; sem aba dedicada).

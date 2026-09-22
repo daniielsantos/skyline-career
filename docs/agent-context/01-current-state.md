@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **bfd1bd02** / desktop **0.3.233** shipped: Reset Crew Live trail on teleport jumps and reclaim Watch after Ready. Release: [v0.3.233](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.233).
+
+
 `main` **2c768eff** / desktop **0.3.232** shipped: Show Dispatch OFP ops metrics always-on and uplink Crew Live from SimBridge status. Release: [v0.3.232](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.232).
 
 

@@ -472,6 +472,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** publish card brandava “Become a VA” / “VA name” como produto paralelo; dual-tenant real (home vs membership) misturava com o framing.
 **Fix:** UX only — card = **Open for pilots** / **In the directory** (Public name); Identity **Directory: Published**; My VA empty → Publish from Company; page-help/nav tooltips. Sem merge de tenant nem fold My VA→Company.
 
+### Port FBO desk auto-buy idle same day (2026-09-22)
+
+**Sintoma:** desk order ativa, listing no preço, `today 0 kg` por muitos minutos.
+**Causa:** settle `daysCrossed<=0` skipava auto-buy (só midnight); catch-up só active company.
+**Fix:** `runDeskHygiene` no early path same-day. **Redeploy world-api.**
+
 ### Port FBO desk role gates (2026-09-21)
 
 **Sintoma / gap:** qualquer membro em My VA → Ports podia auto-buy / stevedore / shuttle / claim (wallet VA).

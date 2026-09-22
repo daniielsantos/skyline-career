@@ -89,10 +89,35 @@ export function settleCompanyPassiveFeesForTickRange(
   const to = Math.max(from, Math.floor(toTick));
   if (to <= from) return null;
 
+  const deskCompanyId = deskOpts?.companyId ?? LOCAL_COMPANY_ID;
+  const runDeskHygiene = () => {
+    // Must not block the watermark — a throw used to re-bill the same day.
+    try {
+      settleWarehouseInboundTransfers(missions, world);
+      tickPortConcessions(missions, world);
+      // Desk auto-buy / VA auto-haul run on every settle window (incl. same
+      // economy day). Skipping them on daysCrossed==0 left VA / non-active
+      // tenants idle until midnight — pulse only auto-bought the ambient
+      // active company on catch-up.
+      tickPortAutoBuyOrders(missions, world, deskCompanyId);
+      tickVaAutoHaul(missions, world, {
+        companyId: deskOpts?.companyId,
+        vaListed: deskOpts?.vaListed,
+        memberCount: deskOpts?.memberCount,
+      });
+    } catch (error) {
+      console.error(
+        '[career] company passive hygiene skipped:',
+        error instanceof Error ? error.message : error,
+      );
+    }
+  };
+
   const feeRange = effectiveFeeTickRange(from, to);
-  // Same economy day: no hangar/salary/credit window. Still keep ferries/crew
-  // wall-clock healthy without running port auto-buy for every +Nd chunk.
+  // Same economy day: no hangar/salary/credit window. Still run desk hygiene
+  // + ferries/crew so Port FBO auto-buy fires on each pulse tick.
   if (feeRange.daysCrossed <= 0) {
+    runDeskHygiene();
     settleCrewOpsDue(missions, world, nowMs);
     listAircraftMarket(missions, world);
     finalizeStuckNpcFerries(missions, to);
@@ -132,27 +157,7 @@ export function settleCompanyPassiveFeesForTickRange(
     fromTick: feeRange.fromTick,
     toTick: feeRange.toTick,
   });
-  // Hygiene must not block the watermark — a throw here used to re-bill the
-  // same day on the next +Nd chunk.
-  try {
-    settleWarehouseInboundTransfers(missions, world);
-    tickPortConcessions(missions, world);
-    tickPortAutoBuyOrders(
-      missions,
-      world,
-      deskOpts?.companyId ?? LOCAL_COMPANY_ID,
-    );
-    tickVaAutoHaul(missions, world, {
-      companyId: deskOpts?.companyId,
-      vaListed: deskOpts?.vaListed,
-      memberCount: deskOpts?.memberCount,
-    });
-  } catch (error) {
-    console.error(
-      '[career] company passive hygiene skipped:',
-      error instanceof Error ? error.message : error,
-    );
-  }
+  runDeskHygiene();
   settleCrewOpsDue(missions, world, nowMs);
   listAircraftMarket(missions, world);
   finalizeStuckNpcFerries(missions, to);

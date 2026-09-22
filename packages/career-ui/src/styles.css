@@ -12128,6 +12128,24 @@ span.dispatch-route-hub-dest {
   font-size: 0.8rem;
 }
 
+.ports-desk-order-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 0;
+  min-width: 0;
+}
+
+.ports-desk-order-commodity {
+  gap: 0.4rem;
+  margin-right: 0.15rem;
+}
+
+.ports-desk-order-commodity strong {
+  display: inline;
+  font-weight: 650;
+}
+
 .ports-desk-order-actions {
   display: inline-flex;
   gap: 0.25rem;

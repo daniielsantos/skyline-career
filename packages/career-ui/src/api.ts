@@ -3140,6 +3140,7 @@ export function postPortAutoBuy(opts: {
   warehouseId?: string;
   walletFloorUsd?: number;
   paused?: boolean;
+  companyId?: string;
 }) {
   return api<{
     walletUsd: number;

@@ -72,6 +72,10 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Desk auto-buy inputs empty by default (2026-09-21):** Max $/kg, Max kg/day e Wallet floor abrem vazios (placeholders só); submit valida preço/massa; floor vazio = $0; limpa após save.
 
+**Desk auto-buy weightSystem (2026-09-22):** labels Max $/lb|kg e mass/day seguem Settings; submit converte para $/kg + kg (economia). Summary da order também.
+
+**Desk auto-buy same-day skip (2026-09-22):** sintoma = order ativa `today 0 kg` com listing Supplies barata no Catalog por >15 min. Causa = `settleCompanyPassiveFeesForTickRange` early-out `daysCrossed<=0` (anti double-bill +Nd) **pulava** `tickPortAutoBuyOrders`; pulse só auto-buyava a company **active** no catch-up. VA/tenant não-active ficava até cruzar o dia. Fix = desk hygiene (auto-buy + auto-haul + inbound) também no path same-day. Precisa **redeploy world-api**.
+
 **Desk auto-buy ≠ owner-only (2026-09-21):** ~~gate = `isPortOperator` only~~ → **DECIDIDO**: VA-listed → desk ops (auto-buy / stevedore / shuttle / abandon) = **owner|dispatcher**; Scout Hold + Catalog buy = qualquer membro; CAPEX (claim/renew/upgrade FBO, buy/upgrade WH) = **owner**. Solo/home sem gate. Helper `canMutateVaPortDeskOps`.
 
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).

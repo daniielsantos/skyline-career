@@ -77,6 +77,7 @@ import {
 } from './demand-accept-preview';
 import {
   displayAmountToStoredKg,
+  displayToKg,
   KG_TO_LB,
   kgToDisplay,
   massUnitLabel,
@@ -1447,11 +1448,23 @@ export function PortsPanel(props: {
       );
       return;
     }
-    const maxPriceUsdPerKg = Number(deskMaxPrice);
-    const maxKgPerDay = Number(deskMaxKgDay);
+    const priceDisplay = Number(deskMaxPrice);
+    const massDisplay = Number(deskMaxKgDay);
     const walletFloorUsd =
       deskWalletFloor.trim() === '' ? 0 : Number(deskWalletFloor);
+    // Inputs follow Settings weight system; economy always stores $/kg + kg.
+    const maxPriceUsdPerKg =
+      props.weightSystem === 'imperial'
+        ? priceDisplay * KG_TO_LB
+        : priceDisplay;
+    const maxKgPerDay = Math.floor(
+      displayToKg(massDisplay, props.weightSystem),
+    );
     if (
+      !Number.isFinite(priceDisplay) ||
+      priceDisplay < 0.01 ||
+      !Number.isFinite(massDisplay) ||
+      massDisplay < 1 ||
       !Number.isFinite(maxPriceUsdPerKg) ||
       maxPriceUsdPerKg < 0.01 ||
       !Number.isFinite(maxKgPerDay) ||
@@ -1497,6 +1510,7 @@ export function PortsPanel(props: {
         warehouseId,
         walletFloorUsd,
         paused: false,
+        companyId: props.logisticsCompanyId?.trim() || undefined,
       });
       props.onWallet?.(result.walletUsd);
       setSnap(result.ports);
@@ -1531,6 +1545,7 @@ export function PortsPanel(props: {
         action: 'pause',
         id: orderId,
         paused,
+        companyId: props.logisticsCompanyId?.trim() || undefined,
       });
       props.onWallet?.(result.walletUsd);
       setSnap(result.ports);
@@ -1556,7 +1571,11 @@ export function PortsPanel(props: {
     }
     setLoading(true);
     try {
-      const result = await postPortAutoBuy({ action: 'remove', id: orderId });
+      const result = await postPortAutoBuy({
+        action: 'remove',
+        id: orderId,
+        companyId: props.logisticsCompanyId?.trim() || undefined,
+      });
       props.onWallet?.(result.walletUsd);
       setSnap(result.ports);
       props.onToast?.('ok', 'Desk order removed');
@@ -3874,12 +3893,37 @@ export function PortsPanel(props: {
                                       key={o.id}
                                       className="ports-desk-order"
                                     >
-                                      <span>
-                                        {o.commodityId}
-                                        {o.paused ? ' · paused' : ''} · max $
-                                        {o.maxPriceUsdPerKg}/kg ·{' '}
-                                        {o.maxKgPerDay} kg/day · today{' '}
-                                        {o.boughtKgToday} kg
+                                      <span className="ports-desk-order-meta">
+                                        <span className="commodity-cell ports-desk-order-commodity">
+                                          <CommodityIcon
+                                            commodityId={o.commodityId}
+                                            size={28}
+                                            title={commodityLabel({
+                                              commodityId: o.commodityId,
+                                            })}
+                                          />
+                                          <strong>
+                                            {commodityLabel({
+                                              commodityId: o.commodityId,
+                                            })}
+                                          </strong>
+                                        </span>
+                                        {o.paused ? ' · paused' : ''} · max{' '}
+                                        {formatUnitPrice(o.maxPriceUsdPerKg)} ·{' '}
+                                        {Math.round(
+                                          kgToDisplay(
+                                            o.maxKgPerDay,
+                                            props.weightSystem,
+                                          ),
+                                        ).toLocaleString('en-US')}{' '}
+                                        {unit}/day · today{' '}
+                                        {Math.round(
+                                          kgToDisplay(
+                                            o.boughtKgToday,
+                                            props.weightSystem,
+                                          ),
+                                        ).toLocaleString('en-US')}{' '}
+                                        {unit}
                                       </span>
                                       {canPortDeskOps ? (
                                         <span className="ports-desk-order-actions">
@@ -3930,12 +3974,16 @@ export function PortsPanel(props: {
                                     </select>
                                   </label>
                                   <label>
-                                    Max $/kg
+                                    Max $/{unit}
                                     <input
                                       type="number"
                                       min={0.01}
                                       step={0.01}
-                                      placeholder="e.g. 2"
+                                      placeholder={
+                                        props.weightSystem === 'imperial'
+                                          ? 'e.g. 0.90'
+                                          : 'e.g. 2'
+                                      }
                                       value={deskMaxPrice}
                                       onChange={(e) =>
                                         setDeskMaxPrice(e.target.value)
@@ -3944,12 +3992,20 @@ export function PortsPanel(props: {
                                     />
                                   </label>
                                   <label>
-                                    Max kg/day
+                                    Max {unit}/day
                                     <input
                                       type="number"
                                       min={1}
-                                      step={100}
-                                      placeholder="e.g. 5000"
+                                      step={
+                                        props.weightSystem === 'imperial'
+                                          ? 200
+                                          : 100
+                                      }
+                                      placeholder={
+                                        props.weightSystem === 'imperial'
+                                          ? 'e.g. 11000'
+                                          : 'e.g. 5000'
+                                      }
                                       value={deskMaxKgDay}
                                       onChange={(e) =>
                                         setDeskMaxKgDay(e.target.value)

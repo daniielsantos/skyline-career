@@ -112,4 +112,40 @@ describe('settleCompanyPassiveFees watermark', () => {
       0,
     );
   });
+
+  it('still runs port auto-buy on same-day settle windows', () => {
+    // Regression: daysCrossed==0 used to skip desk hygiene, so VA tenants
+    // only auto-bought on midnight day-cross.
+    const world = createSeedEconomyWorld({ seed: 'fee-same-day-autobuy' });
+    const missions = emptyMissionsStateV2();
+    missions.walletUsd = 500_000;
+    missions.homeHubIcao = 'SBGR';
+    missions.portAutoBuyOrders = [
+      {
+        id: 'pabo_test_same_day',
+        portId: 'BRSSZ',
+        commodityId: 'supplies',
+        maxPriceUsdPerKg: 50,
+        maxKgPerDay: 5_000,
+        warehouseId: 'wh_missing',
+        walletFloorUsd: 0,
+        paused: false,
+        boughtKgToday: 0,
+        boughtDayIndex: 0,
+        createdAtTick: world.tick,
+      },
+    ];
+    const dayStart = Math.floor(world.tick / TICKS_PER_DAY) * TICKS_PER_DAY;
+    world.tick = dayStart + 30;
+    // No Port FBO / WH → tickPortAutoBuyOrders pauses the order (hygiene ran).
+    settleCompanyPassiveFeesForTickRange(
+      missions,
+      world,
+      dayStart + 10,
+      dayStart + 30,
+      Date.now(),
+      { companyId: 'co_test' },
+    );
+    assert.equal(missions.portAutoBuyOrders?.[0]?.paused, true);
+  });
 });

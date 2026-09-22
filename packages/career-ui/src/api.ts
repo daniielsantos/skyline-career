@@ -4809,8 +4809,6 @@ export type WatchStatus = {
   onGround: boolean | null;
   enginesRunning: boolean | null;
   groundSpeedKt?: number | null;
-  /** MSL altitude (ft) from Watch sample. */
-  altitudeFt?: number | null;
   position: { lat: number; lon: number } | null;
   liveFuelLb?: number | null;
   livePayloadLb?: number | null;

@@ -750,6 +750,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **2026-09-22 (u):** ~~probe leve continua no Ready até Watch~~ → **(v)**. Sintoma da (u) = Live Stale com SIMBRIDGE+DISPATCHED; causa real = Watch não subia (não o probe “faltando”).
 **2026-09-22 (v):** sintoma = decolado ~2 min, stepper READY, footer **SIMBRIDGE** / **AIRBORNE** / **DISPATCHED**, copy “Take off when Watch is connected”. Causa = (u) devolveu o probe após LV → exclusive gate impede `POST /api/watch/start` → sem Watch = sem auto-depart = sem En route. Fix = probe yield de novo no Ready após 1º LV (Preflight já parava); Live volta pelo Watch assim que o footer virar MSFS. Trade-off: Ready pode Stale ~segundos até Watch bind — melhor que En route travado.
 **2026-09-22 (w):** Live mapa — AC “parado” e ponta da tracejada “andando”. Causa = `plannedOd` desenhava OD fixa origem→dest (ferry layer); AC era só marker solto. Fix = tracejada **AC→dest** (remaining leg), atualizada no tick do marker; trilha sólida continua o breadcrumb.
+**2026-09-22 (x):** **revert** de tudo que o Live tinha enxertado em Watch/SimBridge/Preflight/probe (uplink `reportVaCrewLive`, lat/lon extra no probe, `altitudeFt` no Watch status, Preflight yield pós-LV, probe yield pós-LV, Watch retry 2s com LV). Watch/pipe voltam ao comportamento pré–Crew Live (`d081d2f9^` / 0.3.224 era). Live UI/API/mapa podem ficar; **sem** telemetria do desktop até redesign explícito.
 
 ### Roster presence (online / flight / last seen) (2026-09-20)
 

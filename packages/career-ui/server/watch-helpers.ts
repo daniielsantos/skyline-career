@@ -181,8 +181,6 @@ export type WatchStatusPayload = {
   /** Live parking-brake latch (settle trigger). */
   parkingBrake?: boolean | null;
   groundSpeedKt: number | null;
-  /** MSL altitude (ft) from the Watch pipe sample. */
-  altitudeFt?: number | null;
   position: { lat: number; lon: number } | null;
   /** Live fuel total (lb) sampled on the Watch pipe. */
   liveFuelLb: number | null;
@@ -1636,10 +1634,6 @@ export class CareerWatchSession {
       groundSpeedKt:
         typeof this.lastSample?.groundSpeedKt === 'number'
           ? this.lastSample.groundSpeedKt
-          : null,
-      altitudeFt:
-        typeof this.lastSample?.altitudeFt === 'number'
-          ? this.lastSample.altitudeFt
           : null,
       position: this.lastSample?.position ?? null,
       liveFuelLb: this.lastLiveFuelLb,

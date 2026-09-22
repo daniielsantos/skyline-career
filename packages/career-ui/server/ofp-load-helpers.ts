@@ -177,8 +177,6 @@ export type SimBridgeStatusPayload = {
   parkingBrake: boolean | null;
   phase: string | null;
   groundSpeedKt: number | null;
-  /** Soft plane lat/lon when the probe/Watch sample has a usable fix. */
-  position?: { lat: number; lon: number } | null;
   source: 'watch' | 'probe';
   error: string | null;
   checkedAtIso: string;
@@ -751,7 +749,6 @@ async function probeSimBridgeStatusUnlocked(opts: {
       parkingBrake: null,
       phase: watch.phase,
       groundSpeedKt: watch.groundSpeedKt,
-      position: watch.position ?? null,
       source: 'watch',
       error: watch.lastError,
       checkedAtIso,
@@ -792,24 +789,14 @@ async function probeSimBridgeStatusUnlocked(opts: {
     }
     const snap = await bridge.snapshot();
     let groundSpeedKt: number | null = null;
-    let position: { lat: number; lon: number } | null = null;
     try {
-      const [gs, latRaw, lonRaw] = await Promise.all([
-        bridge.readSimVar({ name: 'GROUND VELOCITY', unit: 'knots' }),
-        bridge.readSimVar({ name: 'PLANE LATITUDE', unit: 'degrees' }),
-        bridge.readSimVar({ name: 'PLANE LONGITUDE', unit: 'degrees' }),
-      ]);
+      const gs = await bridge.readSimVar({
+        name: 'GROUND VELOCITY',
+        unit: 'knots',
+      });
       if (Number.isFinite(gs) && gs >= 0) groundSpeedKt = gs;
-      if (
-        Number.isFinite(latRaw) &&
-        Number.isFinite(lonRaw) &&
-        !(latRaw === 0 && lonRaw === 0)
-      ) {
-        position = { lat: latRaw, lon: lonRaw };
-      }
     } catch {
       groundSpeedKt = null;
-      position = null;
     }
     const enginesRunning = await inferProbeEnginesRunning(
       bridge,
@@ -834,7 +821,6 @@ async function probeSimBridgeStatusUnlocked(opts: {
         lastProbeSnapshot?.phase,
       ),
       groundSpeedKt,
-      position,
       source: 'probe',
       error: null,
       checkedAtIso,

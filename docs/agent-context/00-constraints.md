@@ -38,10 +38,8 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 
 ## Watch / SimBridge / Crew Live
 
-- **Watch e o pipe SimBridge têm prioridade** sobre Crew Live. Não “consertar” Live reabrindo Preflight/probe no Ready após Loaded vs Due — isso atrasa/impede Watch start, auto-depart e En route.
-- Depois do 1º Loaded vs Due: **Preflight para**; **probe para** até `watch.running` (ou missão `in_flight`). Watch auto-start ~2s com LV.
-- Crew Live **só espelha** o sample que já alimenta o footer (Watch poll; probe só antes do Watch). Sem pipeline/fase inventada, sem segundo dono do pipe.
-- Live Stale curto no Ready enquanto Watch sobe é aceitável; En route travado **não** é.
+- **Watch/SimBridge são sagrados.** Não alterar probe/Preflight/Watch auto-start/pipe ownership “por causa do Live”. Live não pode virar segundo dono do SimBridge.
+- Uplink Crew Live a partir de Watch/probe/Preflight foi **removido** (2026-09-22) depois de regressões Ready→En route / Stale / pipe contention. API/mapa Live podem existir; telemetria desktop **não** se reacopla sem desenho novo e confirmação explícita.
 - Detail: `docs/agent-context/16-va-logistics.md` (Crew Live notes).
 
 ## Git / release

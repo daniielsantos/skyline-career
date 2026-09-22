@@ -140,7 +140,6 @@ import {
   postAuthRegister,
   postAuthLogout,
   fetchVaMembers,
-  postVaFlightTrack,
   fetchCareerHealth,
   resolveClientUpdateBlock,
   formatClientUpdateRequiredLabel,
@@ -3878,50 +3877,6 @@ export function App() {
   const [maxCargoSource, setMaxCargoSource] = useState<string | null>(null);
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
-  const flightTrackLastPostRef = useRef(0);
-  /**
-   * Single VA Crew Live uplink — same phase/GS the SimBridge footer shows.
-   * Called when Watch or the SimBridge probe refreshes status.
-   */
-  const reportVaCrewLive = (sample: {
-    missionId?: string | null;
-    lat: number;
-    lon: number;
-    phase?: string | null;
-    onGround?: boolean | null;
-    gsKt?: number | null;
-    altFt?: number | null;
-  }) => {
-    const vaCompanyId = memberVaCompanyIdRef.current?.trim();
-    const missionId =
-      sample.missionId?.trim() || activeMissionRef.current?.id || null;
-    if (!vaCompanyId || !missionId) return;
-    if (
-      !Number.isFinite(sample.lat) ||
-      !Number.isFinite(sample.lon) ||
-      (sample.lat === 0 && sample.lon === 0)
-    ) {
-      return;
-    }
-    const now = Date.now();
-    // Keep in sync with FLIGHT_TRACK_POST_MIN_MS (5s) in career-flight-track.
-    if (now - flightTrackLastPostRef.current < 5_000) return;
-    flightTrackLastPostRef.current = now;
-    void postVaFlightTrack({
-      companyId: vaCompanyId,
-      missionId,
-      lat: sample.lat,
-      lon: sample.lon,
-      ...(typeof sample.gsKt === 'number' ? { gsKt: sample.gsKt } : {}),
-      ...(typeof sample.altFt === 'number' ? { altFt: sample.altFt } : {}),
-      ...(sample.phase?.trim() ? { phase: sample.phase.trim() } : {}),
-      ...(typeof sample.onGround === 'boolean'
-        ? { onGround: sample.onGround }
-        : {}),
-    }).catch(() => {
-      /* soft — Live is best-effort */
-    });
-  };
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const simBridgeRef = useRef(simBridge);
   simBridgeRef.current = simBridge;
@@ -6348,7 +6303,6 @@ export function App() {
               parkingBrake: prev?.parkingBrake ?? null,
               phase: status.phase,
               groundSpeedKt: status.groundSpeedKt,
-              position: status.position ?? prev?.position ?? null,
               source: 'watch' as const,
               error: status.lastError,
               checkedAtIso: new Date().toISOString(),
@@ -6365,26 +6319,6 @@ export function App() {
               return prev;
             }
             return next;
-          });
-        }
-        // VA Crew Live: mirror the same SimBridge/Watch sample the footer uses.
-        const pos = status.position;
-        if (
-          status.running &&
-          status.missionId &&
-          pos &&
-          Number.isFinite(pos.lat) &&
-          Number.isFinite(pos.lon) &&
-          !(pos.lat === 0 && pos.lon === 0)
-        ) {
-          reportVaCrewLive({
-            missionId: status.missionId,
-            lat: pos.lat,
-            lon: pos.lon,
-            gsKt: status.groundSpeedKt,
-            altFt: status.altitudeFt,
-            phase: status.phase,
-            onGround: status.onGround,
           });
         }
       } catch {
@@ -6572,23 +6506,11 @@ export function App() {
   // Independent SimBridge probe — does not require Watch to be running.
   // When Watch is already sampling, skip probing entirely (server would only
   // mirror Watch anyway, and the extra poll re-rendered the status bar).
-  // After Loaded vs Due on Ready: yield the pipe so Watch can bind (auto-depart
-  // → En route). Probe + Preflight hogging left SIMBRIDGE/AIRBORNE + DISPATCHED
-  // for minutes airborne. Crew Live follows Watch once it owns the pipe; a brief
-  // Ready gap beats a stuck En route.
   useEffect(() => {
     if (watch?.running) return;
     // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
     // fight with Watch resume left settle dead after landing.
-    if (activeMission?.status === 'in_flight') return;
-    // Ready + first LV: Preflight already stopped; probe must too.
-    if (
-      activeMission?.status === 'dispatched' &&
-      activeMission.lastPreflightCheck?.loadVerification &&
-      !holdWatchOffForPreflight
-    ) {
-      return;
-    }
+    if (activeMissionRef.current?.status === 'in_flight') return;
     let cancelled = false;
     let consecutiveFailures = 0;
     async function pollBridge() {
@@ -6610,23 +6532,6 @@ export function App() {
           }
           return status;
         });
-        // Same uplink as Watch — probe already carries footer phase (+ taxi).
-        const pos = status.position;
-        if (
-          status.connected &&
-          pos &&
-          Number.isFinite(pos.lat) &&
-          Number.isFinite(pos.lon) &&
-          !(pos.lat === 0 && pos.lon === 0)
-        ) {
-          reportVaCrewLive({
-            lat: pos.lat,
-            lon: pos.lon,
-            gsKt: status.groundSpeedKt,
-            phase: status.phase,
-            onGround: status.onGround,
-          });
-        }
       } catch {
         if (cancelled) return;
         consecutiveFailures += 1;
@@ -6642,7 +6547,6 @@ export function App() {
             parkingBrake: prev?.parkingBrake ?? null,
             phase: prev?.phase ?? null,
             groundSpeedKt: prev?.groundSpeedKt ?? null,
-            position: prev?.position ?? null,
             source: 'probe',
             error: 'SimBridge status unavailable',
             checkedAtIso: new Date().toISOString(),
@@ -6658,12 +6562,7 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [
-    watch?.running,
-    holdWatchOffForPreflight,
-    activeMission?.status,
-    Boolean(activeMission?.lastPreflightCheck?.loadVerification),
-  ]);
+  }, [watch?.running]);
 
   useEffect(() => {
     if (
@@ -7353,9 +7252,6 @@ export function App() {
     // Match deriveDispatchStep: contract-pilot skips fuel purchase, so do not
     // require fuelAuthorizedOfpId (Accept OFP clears it; step can still be load).
     const fuelOk = activeMission ? fuelAuthorizedForOfp(activeMission) : false;
-    const hasLoadVerification = Boolean(
-      activeMission?.lastPreflightCheck?.loadVerification,
-    );
     // Do not gate on simBridge.connected — the probe can lag/false-negative while
     // /api/preflight still opens a pipe. Call the API and surface failures on the
     // Load card instead of spinning "Waiting for live preflight…" forever.
@@ -7371,9 +7267,6 @@ export function App() {
       // Hold-off means we already dropped UI Watch; do not wait for a hung
       // server tick to finish before the first Preflight sample.
       (!watch?.running || holdWatchOffForPreflight) &&
-      // Bootstrap Loaded vs Due only — once LV exists, stop hogging SimBridge
-      // so Watch can auto-start (takeoff/climb + auto-depart → En route).
-      (!hasLoadVerification || holdWatchOffForPreflight) &&
       loadOfpAutoStatus !== 'loading' &&
       loadOfpAutoStatus !== 'waiting' &&
       !ofpInjectInFlightRef.current &&
@@ -7574,16 +7467,11 @@ export function App() {
     }
 
     void tryStartWatch();
-    const hasLoadVerification = Boolean(
-      activeMission.lastPreflightCheck?.loadVerification,
-    );
     const id = window.setInterval(() => {
       void tryStartWatch();
     }, isAirborneResume
       ? 5_000
-      : loadOfpAutoStatus === 'done' ||
-          loadOfpAutoStatus === 'failed' ||
-          hasLoadVerification
+      : loadOfpAutoStatus === 'done' || loadOfpAutoStatus === 'failed'
         ? 2_000
         : 15_000);
     return () => {

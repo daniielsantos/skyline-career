@@ -169,8 +169,6 @@ export type MissionPreflightResult = {
     weightSource?: string;
     onGround: boolean;
     enginesRunning: boolean;
-    /** Soft lat/lon when SimConnect returns a usable plane position. */
-    position?: { lat: number; lon: number };
   };
 };
 
@@ -725,7 +723,6 @@ export async function runMissionPreflight(
         weightSource: live.weights?.source,
         onGround: live.onGround,
         enginesRunning: live.enginesRunning,
-        ...(planePosition ? { position: planePosition } : {}),
       },
     };
   } finally {

@@ -1390,10 +1390,14 @@ export function HangarAircraftCard(props: {
         <div className="hangar-section hangar-section-money">
           <p className="aircraft-card-section-label">Money</p>
           <div className="aircraft-card-money">
-            {acf.parkingUsdPerDay != null ? (
+            {acf.parkingUsdPerDay != null && acf.parkingUsdPerDay > 0 ? (
               <span>
                 Parking {props.formatMoney(acf.parkingUsdPerDay)}/day at{' '}
                 {acf.locationIcao}
+              </span>
+            ) : acf.parkingUsdPerDay === 0 ? (
+              <span>
+                Parking free at HQ ({acf.locationIcao})
               </span>
             ) : acf.status === 'assigned' ? (
               <span>Parking waived while assigned</span>

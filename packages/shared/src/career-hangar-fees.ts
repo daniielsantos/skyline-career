@@ -66,10 +66,13 @@ export function quoteHangarParkingUsdPerDay(
 export function resolveHangarParkingUsdPerDay(
   aircraft: PlayerAircraft,
   world: Pick<CareerEconomyWorld, 'airports'>,
-  state?: Pick<CareerMissionsState, 'playerFbos'>,
+  state?: Pick<CareerMissionsState, 'playerFbos' | 'homeHubIcao'>,
 ): number | null {
   if (!isHangarParkingBillable(aircraft)) return null;
   const icao = aircraft.locationIcao.toUpperCase();
+  const home = state?.homeHubIcao?.trim().toUpperCase() || '';
+  // Company / Crew HQ ramp is free (parked or in shop). Off-hub keeps tier + Base FBO.
+  if (home && icao === home) return 0;
   const airport = world.airports.find((a) => a.icao.toUpperCase() === icao);
   const base = quoteHangarParkingUsdPerDay(
     aircraft.aircraftClassId,

@@ -4,6 +4,7 @@ import { createSeedEconomyWorld, hubTierOf } from './career-economy.js';
 import {
   isHangarParkingBillable,
   quoteHangarParkingUsdPerDay,
+  resolveHangarParkingUsdPerDay,
   settleHangarParkingFees,
 } from './career-hangar-fees.js';
 import { emptyMissionsStateV2, PLAYER_FUEL_CAPACITY_KG } from './career-fleet.js';
@@ -142,5 +143,54 @@ describe('hangar parking fees', () => {
     assert.equal(result.daysCharged, 0);
     assert.equal(result.debitUsd, 0);
     assert.equal(state.walletUsd, 1_000);
+  });
+
+  it('waives parking at company HQ for parked and maintenance', () => {
+    const world = createSeedEconomyWorld({ seed: 'hangar-hq-free' });
+    const majorIcao =
+      world.airports.find((a) => hubTierOf(a) === 'major')?.icao ?? 'SBGR';
+    const spokeIcao =
+      world.airports.find((a) => hubTierOf(a) === 'spoke')?.icao ?? 'SBCT';
+    const state = emptyMissionsStateV2();
+    state.walletUsd = 50_000;
+    state.homeHubIcao = majorIcao;
+    state.fleet = [
+      makeAircraft({
+        id: 'at-hq',
+        aircraftClassId: 'narrow_freighter',
+        locationIcao: majorIcao,
+        status: 'parked',
+      }),
+      makeAircraft({
+        id: 'mx-hq',
+        aircraftClassId: 'light_jet',
+        locationIcao: majorIcao,
+        status: 'maintenance',
+      }),
+      makeAircraft({
+        id: 'away',
+        aircraftClassId: 'light_turboprop',
+        locationIcao: spokeIcao,
+        status: 'parked',
+      }),
+    ];
+
+    const result = settleHangarParkingFees(state, world, {
+      fromTick: 0,
+      toTick: 96,
+    });
+
+    assert.equal(result.daysCharged, 1);
+    assert.equal(result.lines.length, 1);
+    assert.equal(result.lines[0]?.aircraftId, 'away');
+    assert.ok(result.requestedUsd > 0);
+    assert.equal(
+      resolveHangarParkingUsdPerDay(state.fleet[0]!, world, state),
+      0,
+    );
+    assert.equal(
+      resolveHangarParkingUsdPerDay(state.fleet[1]!, world, state),
+      0,
+    );
   });
 });

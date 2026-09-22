@@ -1007,7 +1007,7 @@ function withCharterClassOpsGate(
 function withParkingRates(
   fleet: PlayerAircraft[],
   world?: Pick<CareerEconomyWorld, 'airports'>,
-  missions?: Pick<CareerMissionsState, 'playerFbos'>,
+  missions?: Pick<CareerMissionsState, 'playerFbos' | 'homeHubIcao'>,
 ): Array<PlayerAircraft & { parkingUsdPerDay: number | null }> {
   const airports = world ?? { airports: [] };
   return fleet.map((aircraft) => ({

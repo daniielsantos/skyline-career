@@ -300,6 +300,8 @@ function setTrailAndPlannedOd(
   dest: DispatchRouteEndpoint | null | undefined,
   trail: Array<{ lat: number; lon: number }> | undefined,
   plannedOd: boolean,
+  /** When set, dashed remaining leg starts at the live AC (not origin). */
+  aircraft?: DispatchAircraftPosition | null,
 ): void {
   ensureRouteLayer(map);
   ensureFerryLayer(map);
@@ -316,6 +318,15 @@ function setTrailAndPlannedOd(
     cargoSource?.setData(emptyLineFeature());
   }
   if (plannedOd && dest) {
+    const lastTrail = trail && trail.length > 0 ? trail[trail.length - 1] : null;
+    const from: LatLon = usableAircraftPosition(aircraft)
+      ? aircraft
+      : lastTrail &&
+          Number.isFinite(lastTrail.lat) &&
+          Number.isFinite(lastTrail.lon) &&
+          !(lastTrail.lat === 0 && lastTrail.lon === 0)
+        ? lastTrail
+        : origin;
     ferrySource?.setData({
       type: 'FeatureCollection',
       features: [
@@ -324,7 +335,7 @@ function setTrailAndPlannedOd(
           properties: { kind: 'ferry' },
           geometry: {
             type: 'LineString',
-            coordinates: greatCircleLine(origin, dest, 48),
+            coordinates: greatCircleLine(from, dest, 48),
           },
         },
       ],
@@ -460,10 +471,10 @@ export function DispatchRouteMap(props: {
   segments?: DispatchRouteSegment[];
   /**
    * Flown breadcrumb (Watch samples). Solid line; pair with `plannedOd` for
-   * dashed OD (Crew Live / Pilops-style).
+   * dashed remaining leg AC→dest (Crew Live / Pilops-style).
    */
   trail?: Array<{ lat: number; lon: number }> | null;
-  /** Draw dashed great-circle origin→dest under the trail. */
+  /** Draw dashed great-circle remaining leg (aircraft→dest, else origin→dest). */
   plannedOd?: boolean;
   /** Live aircraft position from Watch — updated without re-fitting the route. */
   aircraft?: DispatchAircraftPosition | null;
@@ -548,6 +559,7 @@ export function DispatchRouteMap(props: {
             dest,
             trail ?? undefined,
             Boolean(props.plannedOd),
+            props.aircraft,
           );
         } else if (segments) {
           setRouteSegments(map, segments);
@@ -751,10 +763,11 @@ export function DispatchRouteMap(props: {
     props.segments,
     props.trail,
     props.plannedOd,
+    props.aircraft,
     props.originRole,
   ]);
 
-  // Live aircraft — move marker only; do not refit route bounds each tick.
+  // Live aircraft — move marker + remaining dashed leg; do not refit bounds.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -768,32 +781,50 @@ export function DispatchRouteMap(props: {
       const lngLat: [number, number] = [props.aircraft.lon, props.aircraft.lat];
       if (aircraftMarkerRef.current) {
         aircraftMarkerRef.current.setLngLat(lngLat);
-        return;
+      } else {
+        const title = props.aircraftLabel?.trim() || 'Aircraft';
+        const marker = new Marker({
+          element: aircraftMarkerEl(),
+          anchor: 'center',
+        })
+          .setLngLat(lngLat)
+          .setPopup(
+            new Popup({
+              offset: 12,
+              closeButton: false,
+              className: 'dispatch-route-popup',
+            }).setHTML(
+              `<strong>${title}</strong><br/>${
+                props.aircraftLabel?.trim() ? 'En route' : 'Live position'
+              }`,
+            ),
+          )
+          .addTo(map);
+        aircraftMarkerRef.current = marker;
       }
-      const title = props.aircraftLabel?.trim() || 'Aircraft';
-      const marker = new Marker({
-        element: aircraftMarkerEl(),
-        anchor: 'center',
-      })
-        .setLngLat(lngLat)
-        .setPopup(
-          new Popup({
-            offset: 12,
-            closeButton: false,
-            className: 'dispatch-route-popup',
-          }).setHTML(
-            `<strong>${title}</strong><br/>${
-              props.aircraftLabel?.trim() ? 'En route' : 'Live position'
-            }`,
-          ),
-        )
-        .addTo(map);
-      aircraftMarkerRef.current = marker;
+      // Keep dashed remaining leg glued to AC while it moves.
+      if (props.plannedOd && props.dest) {
+        setTrailAndPlannedOd(
+          map,
+          props.origin,
+          props.dest,
+          props.trail ?? undefined,
+          true,
+          props.aircraft,
+        );
+      }
     };
 
     if (map.isStyleLoaded()) sync();
     else map.once('load', sync);
-  }, [props.aircraft, props.aircraftLabel]);
+  }, [
+    props.aircraft,
+    props.aircraftLabel,
+    props.plannedOd,
+    props.dest,
+    props.origin,
+    props.trail,
+  ]);
 
   // Hub rail / marker focus — fly without rebuilding the route.
   useEffect(() => {

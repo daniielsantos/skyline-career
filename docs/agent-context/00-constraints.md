@@ -36,6 +36,14 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - Jets `pax_and_cargo`: **não** empilhar todo mismatch em `efbPaxWeightLb`. Causas distintas (pax lb EFB, slots SimConnect, hold &lt; bag, OEW Default≠glass, ghosts) — playbook: `docs/agent-context/12-pax-efb-due.md`. Ao fechar um diagnóstico, **atualizar esse `.md` no mesmo turno**.
 - Homologação colaborativa: **não** implementar sem pedido. Esboço: `docs/agent-context/13-collaborative-homologation.md`. Formulário ≠ compra Hangar; captura ≠ listar Market.
 
+## Watch / SimBridge / Crew Live
+
+- **Watch e o pipe SimBridge têm prioridade** sobre Crew Live. Não “consertar” Live reabrindo Preflight/probe no Ready após Loaded vs Due — isso atrasa/impede Watch start, auto-depart e En route.
+- Depois do 1º Loaded vs Due: **Preflight para**; **probe para** até `watch.running` (ou missão `in_flight`). Watch auto-start ~2s com LV.
+- Crew Live **só espelha** o sample que já alimenta o footer (Watch poll; probe só antes do Watch). Sem pipeline/fase inventada, sem segundo dono do pipe.
+- Live Stale curto no Ready enquanto Watch sobe é aceitável; En route travado **não** é.
+- Detail: `docs/agent-context/16-va-logistics.md` (Crew Live notes).
+
 ## Git / release
 
 - Commit só quando o usuário pedir.

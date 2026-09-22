@@ -85,6 +85,9 @@ import {
   type WeightSystem,
 } from './weight-units';
 
+/** Mirror of shared PORT_SCOUT_MIN_KG — Scout Hold slider floor. */
+const SCOUT_HOLD_MIN_KG = 200;
+
 /** Mirror of shared groundStaffSlotsForWarehouse (client must not import shared). */
 function warehouseStaffSlotsUnlocked(tier: number): number {
   if (tier >= 3) return 3;
@@ -517,6 +520,12 @@ export function PortsPanel(props: {
   const [scoutFilter, setScoutFilter] = useState<
     'all' | 'haul' | 'demand' | 'bridge'
   >('all');
+  const [scoutHoldDraft, setScoutHoldDraft] = useState<
+    | { kind: 'haul'; suggestion: PortScoutHaulSuggestion }
+    | { kind: 'demand'; suggestion: PortScoutDemandSuggestion }
+    | { kind: 'bridge'; suggestion: PortScoutBridgeSuggestion }
+    | null
+  >(null);
   const [deskOpen, setDeskOpen] = useState(false);
   const [haulDraft, setHaulDraft] = useState<{
     originIcao: string;
@@ -641,10 +650,17 @@ export function PortsPanel(props: {
     applyScoutDesk(scout);
   }
 
-  async function onScoutConfirm(s: PortScoutBridgeSuggestion) {
+  async function onScoutConfirm(
+    s: PortScoutBridgeSuggestion,
+    kg?: number,
+  ) {
     if (props.busy || loading) return;
     setLoading(true);
     const logisticsId = props.logisticsCompanyId?.trim() || undefined;
+    const holdKg = Math.max(
+      SCOUT_HOLD_MIN_KG,
+      Math.min(s.kg, Math.floor(kg ?? s.kg)),
+    );
     try {
       const result = await postPortScout({
         action: 'confirm',
@@ -652,7 +668,7 @@ export function PortsPanel(props: {
         originIcao: s.originIcao,
         destIcao: s.destIcao,
         commodityId: s.commodityId,
-        kg: s.kg,
+        kg: holdKg,
         companyId: logisticsId,
       });
       if (result.ports) setSnap(result.ports);
@@ -666,9 +682,10 @@ export function PortsPanel(props: {
       } else {
         await reloadScoutDesk(logisticsId).catch(() => undefined);
       }
+      setScoutHoldDraft(null);
       props.onToast?.(
         'ok',
-        `Scout Internal haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao}${
+        `Scout Internal haul hold ${props.formatTonnes(result.kg ?? holdKg)} ${s.originIcao}→${s.destIcao}${
           (result.hold?.pilotPayUsd ?? 0) > 0
             ? ` · pilot ${props.formatMoney(result.hold!.pilotPayUsd!)}`
             : ' · unpaid'
@@ -688,17 +705,24 @@ export function PortsPanel(props: {
     }
   }
 
-  async function onScoutDemandConfirm(s: PortScoutDemandSuggestion) {
+  async function onScoutDemandConfirm(
+    s: PortScoutDemandSuggestion,
+    kg?: number,
+  ) {
     if (props.busy || loading) return;
     setLoading(true);
     const logisticsId = props.logisticsCompanyId?.trim() || undefined;
+    const holdKg = Math.max(
+      SCOUT_HOLD_MIN_KG,
+      Math.min(s.kg, Math.floor(kg ?? s.kg)),
+    );
     try {
       const result = await postPortScout({
         action: 'confirm',
         kind: 'demand',
         orderId: s.orderId,
         originIcao: s.originIcao,
-        kg: s.kg,
+        kg: holdKg,
         companyId: logisticsId,
       });
       if (result.ports) setSnap(result.ports);
@@ -713,9 +737,14 @@ export function PortsPanel(props: {
       } else {
         await reloadScoutDesk(logisticsId).catch(() => undefined);
       }
+      setScoutHoldDraft(null);
+      const payUsd =
+        s.kg > 0
+          ? Math.round((s.payUsd * (result.kg ?? holdKg)) / s.kg)
+          : s.payUsd;
       props.onToast?.(
         'ok',
-        `Scout Demand hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(s.payUsd)}${
+        `Scout Demand hold ${props.formatTonnes(result.kg ?? holdKg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(payUsd)}${
           props.embedded
             ? ' — open Hauls to Prepare / Accept'
             : ' — Dispatch when ready'
@@ -731,10 +760,17 @@ export function PortsPanel(props: {
     }
   }
 
-  async function onScoutHaulConfirm(s: PortScoutHaulSuggestion) {
+  async function onScoutHaulConfirm(
+    s: PortScoutHaulSuggestion,
+    kg?: number,
+  ) {
     if (props.busy || loading) return;
     setLoading(true);
     const logisticsId = props.logisticsCompanyId?.trim() || undefined;
+    const holdKg = Math.max(
+      SCOUT_HOLD_MIN_KG,
+      Math.min(s.kg, Math.floor(kg ?? s.kg)),
+    );
     try {
       const result = await postPortScout({
         action: 'confirm',
@@ -742,7 +778,7 @@ export function PortsPanel(props: {
         originIcao: s.originIcao,
         destIcao: s.destIcao,
         commodityId: s.commodityId,
-        kg: s.kg,
+        kg: holdKg,
         companyId: logisticsId,
       });
       if (result.ports) setSnap(result.ports);
@@ -756,9 +792,10 @@ export function PortsPanel(props: {
       } else {
         await reloadScoutDesk(logisticsId).catch(() => undefined);
       }
+      setScoutHoldDraft(null);
       props.onToast?.(
         'ok',
-        `Scout Haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)}${
+        `Scout Haul hold ${props.formatTonnes(result.kg ?? holdKg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)}${
           props.embedded
             ? ' — open Hauls to Prepare / Accept'
             : ' — Dispatch when ready'
@@ -3969,21 +4006,33 @@ export function PortsPanel(props: {
                                         <button
                                           type="button"
                                           className="accept"
-                                          disabled={props.busy || loading}
+                                          disabled={
+                                            props.busy ||
+                                            loading ||
+                                            row.kg < SCOUT_HOLD_MIN_KG
+                                          }
+                                          title={
+                                            row.kg < SCOUT_HOLD_MIN_KG
+                                              ? `Need at least ${props.formatTonnes(SCOUT_HOLD_MIN_KG)} free`
+                                              : 'Choose how much to reserve'
+                                          }
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             if (row.kind === 'haul') {
-                                              void onScoutHaulConfirm(
-                                                row.raw,
-                                              );
-                                            } else if (
-                                              row.kind === 'demand'
-                                            ) {
-                                              void onScoutDemandConfirm(
-                                                row.raw,
-                                              );
+                                              setScoutHoldDraft({
+                                                kind: 'haul',
+                                                suggestion: row.raw,
+                                              });
+                                            } else if (row.kind === 'demand') {
+                                              setScoutHoldDraft({
+                                                kind: 'demand',
+                                                suggestion: row.raw,
+                                              });
                                             } else {
-                                              void onScoutConfirm(row.raw);
+                                              setScoutHoldDraft({
+                                                kind: 'bridge',
+                                                suggestion: row.raw,
+                                              });
                                             }
                                           }}
                                         >
@@ -6289,6 +6338,28 @@ export function PortsPanel(props: {
         />
       ) : null}
 
+      {scoutHoldDraft ? (
+        <ScoutHoldDialog
+          kind={scoutHoldDraft.kind}
+          suggestion={scoutHoldDraft.suggestion}
+          weightSystem={props.weightSystem}
+          busy={Boolean(props.busy || loading)}
+          formatTonnes={props.formatTonnes}
+          formatMoney={props.formatMoney}
+          onCancel={() => setScoutHoldDraft(null)}
+          onConfirm={(kg) => {
+            const draft = scoutHoldDraft;
+            if (draft.kind === 'haul') {
+              void onScoutHaulConfirm(draft.suggestion, kg);
+            } else if (draft.kind === 'demand') {
+              void onScoutDemandConfirm(draft.suggestion, kg);
+            } else {
+              void onScoutConfirm(draft.suggestion, kg);
+            }
+          }}
+        />
+      ) : null}
+
       {confirmDialog}
     </section>
   );
@@ -6540,6 +6611,194 @@ function PortBuyDialog(props: {
             onClick={props.onConfirm}
           >
             Confirm buy
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScoutHoldDialog(props: {
+  kind: 'haul' | 'demand' | 'bridge';
+  suggestion:
+    | PortScoutHaulSuggestion
+    | PortScoutDemandSuggestion
+    | PortScoutBridgeSuggestion;
+  weightSystem: WeightSystem;
+  busy: boolean;
+  formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
+  onCancel: () => void;
+  onConfirm: (kg: number) => void;
+}) {
+  const titleId = useId();
+  const bodyId = useId();
+  const onCancelRef = useRef(props.onCancel);
+  onCancelRef.current = props.onCancel;
+  const maxKg = Math.max(0, Math.floor(props.suggestion.kg));
+  const minKg = Math.min(maxKg, SCOUT_HOLD_MIN_KG);
+  const [kg, setKg] = useState(() => maxKg);
+  const unit = massUnitLabel(props.weightSystem);
+  const displayMax = Math.max(
+    1,
+    Math.floor(kgToDisplay(maxKg, props.weightSystem)),
+  );
+  const displayMin = Math.max(
+    1,
+    Math.min(displayMax, Math.floor(kgToDisplay(minKg, props.weightSystem))),
+  );
+  const displayValue = Math.max(
+    displayMin,
+    Math.min(displayMax, Math.floor(kgToDisplay(kg, props.weightSystem))),
+  );
+
+  useEffect(() => {
+    setKg(maxKg);
+  }, [maxKg, props.suggestion.id]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCancelRef.current();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  function clampKg(next: number): number {
+    if (maxKg < minKg) return 0;
+    return Math.max(minKg, Math.min(maxKg, Math.floor(next) || minKg));
+  }
+
+  function setFraction(fraction: number) {
+    const next =
+      fraction >= 1
+        ? maxKg
+        : Math.max(minKg, Math.min(maxKg, Math.round(maxKg * fraction)));
+    setKg(clampKg(next));
+  }
+
+  const kindLabel =
+    props.kind === 'haul'
+      ? 'Haul'
+      : props.kind === 'demand'
+        ? 'Demand'
+        : 'Bridge';
+  const payUsd =
+    'payUsd' in props.suggestion &&
+    typeof props.suggestion.payUsd === 'number' &&
+    props.suggestion.kg > 0
+      ? Math.round((props.suggestion.payUsd * kg) / props.suggestion.kg)
+      : null;
+  const canConfirm = !props.busy && kg >= minKg && kg <= maxKg && maxKg > 0;
+
+  return (
+    <div
+      className="confirm-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancelRef.current();
+      }}
+    >
+      <div
+        className="confirm-dialog demand-accept-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={bodyId}
+      >
+        <p className="confirm-kicker">Scout · {kindLabel}</p>
+        <h2 id={titleId} className="confirm-title">
+          Hold {props.suggestion.originIcao}→{props.suggestion.destIcao}?
+        </h2>
+        <div id={bodyId} className="confirm-body">
+          <p>
+            {commodityLabel({ commodityId: props.suggestion.commodityId })} ·
+            suggestion {props.formatTonnes(maxKg)}
+            {props.suggestion.distanceNm > 0
+              ? ` · ${props.suggestion.distanceNm} nm`
+              : ''}
+          </p>
+          <p className="muted">
+            Reserve only what you want to fly — leftover stock stays free for
+            other Scout ideas.
+          </p>
+          <label className="cargo-amount">
+            Quantity to hold
+            <div>
+              <input
+                type="number"
+                min={displayMin}
+                max={displayMax}
+                step={props.weightSystem === 'imperial' ? 10 : 100}
+                value={displayValue}
+                disabled={props.busy || maxKg <= 0}
+                aria-label={`Amount (${unit})`}
+                onChange={(e) => {
+                  const next = displayToKg(
+                    Number(e.target.value),
+                    props.weightSystem,
+                  );
+                  setKg(clampKg(next));
+                }}
+              />
+              <span>{unit}</span>
+            </div>
+            <input
+              type="range"
+              min={displayMin}
+              max={displayMax}
+              step={props.weightSystem === 'imperial' ? 10 : 100}
+              value={displayValue}
+              disabled={props.busy || maxKg <= 0}
+              aria-label="Hold amount slider"
+              onChange={(e) => {
+                const next = displayToKg(
+                  Number(e.target.value),
+                  props.weightSystem,
+                );
+                setKg(clampKg(next));
+              }}
+            />
+          </label>
+          <div className="cargo-presets">
+            {[0.25, 0.5, 0.75, 1].map((fraction) => (
+              <button
+                key={fraction}
+                type="button"
+                disabled={props.busy || maxKg <= 0}
+                onClick={() => setFraction(fraction)}
+              >
+                {fraction === 1 ? 'Max' : `${fraction * 100}%`}
+              </button>
+            ))}
+          </div>
+          {payUsd != null ? (
+            <p className="demand-accept-hint">
+              Est. pay {props.formatMoney(payUsd)} · {props.formatTonnes(kg)}
+            </p>
+          ) : (
+            <p className="demand-accept-hint">{props.formatTonnes(kg)}</p>
+          )}
+        </div>
+        <div className="confirm-actions">
+          <button
+            type="button"
+            className="action ghost"
+            disabled={props.busy}
+            onClick={props.onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="action"
+            disabled={!canConfirm}
+            onClick={() => props.onConfirm(kg)}
+          >
+            Hold {props.formatTonnes(kg)}
           </button>
         </div>
       </div>

@@ -26,6 +26,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Port FBO quiet by state (2026-09-21):** Yours → Scout first (one ranked table + All/Haul/Demand/Bridge filter); Desk auto-buy in `<details>`; Port stock collapsed. Vacant/Held → one-line hint (Claim CTA stays in title). Less desk prose.
 
+**Scout Hold amount picker (2026-09-22):** sintoma = Scout Hold reservava o kg inteiro da sugestão (esgotava WH → Demand sumia). Causa = confirm mandava `s.kg` sem UI. Fix = diálogo Hold com slider + presets 25/50/75/Max (floor 200 kg); API `kg` já existia.
+
 **Scout empty + Haul fill (2026-09-21):** sintoma = Scout “No ideas” com stock no WH. Causas = (1) API list/confirm **não** passava `companyId` → gate Port FBO usava `local` e zerava desks auth; (2) Bridge precisa ≥2 WH; (3) Haul tinha hard-gate fill ≤40%. Fix principal = `companyId`. Desktop 0.3.197 chegou a usar só room ≥200 kg (erro de realismo: WH grande quase cheio ainda “cabe” 50 klb). **Revertido** para short-fill: dest fill ≤**40%** hard + `kg = min(free, room, need→55% fill)`.
 
 **Scout Fill column (2026-09-21):** tabela unificada All/Haul/Demand/Bridge carregava `destFillPct` no merge mas não renderizava — coluna **Fill** de volta (Haul só; Demand/Bridge = —).

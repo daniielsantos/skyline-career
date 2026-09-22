@@ -5,6 +5,7 @@ import {
   postVaJoinRequest,
   type VaDirectoryEntry,
 } from './api';
+import { BusyBlock } from './Busy';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
 
@@ -29,9 +30,13 @@ export function VaDirectoryPage(props: Props) {
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!canShow) return;
+    if (!canShow) {
+      setLoaded(true);
+      return;
+    }
     setError(null);
     try {
       const d = await fetchVaDirectory({ includeClosed: true });
@@ -39,6 +44,8 @@ export function VaDirectoryPage(props: Props) {
       setMemberOfVaCompanyId(d.memberOfVaCompanyId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoaded(true);
     }
   }, [canShow]);
 
@@ -61,6 +68,14 @@ export function VaDirectoryPage(props: Props) {
     return (
       <section className="panel va-panel">
         <p className="settings-help">Sign in to browse virtual airlines.</p>
+      </section>
+    );
+  }
+
+  if (!loaded) {
+    return (
+      <section className="panel va-panel va-panel-loading">
+        <BusyBlock label="Loading VAs…" />
       </section>
     );
   }

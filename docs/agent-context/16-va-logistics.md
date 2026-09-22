@@ -68,6 +68,10 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Roster list stuck at bottom (2026-09-22):** sintoma = título Roster no topo, lista no terço inferior (gap enorme). Causa = `va-pane-card` com `flex:1` + `.settings-card` `display:grid` → `align-content:stretch` inflava as tracks. Fix = `align-content: start` no card do shell (conteúdo cola no topo; shell ainda preenche altura).
 
+**VA directory BusyBlock (2026-09-22):** sintoma = abrir VAs mostrava toolbar vazia / “No VAs…” sem animação. Causa = fetch sem `loaded` gate. Fix = `BusyBlock` “Loading VAs…” (mesmo padrão My VA) até `fetchVaDirectory` resolver.
+
+**Scout Hold amount picker (2026-09-22):** ver `24-port-fbo.md` — Hold no Scout abre slider + 25/50/75/Max em vez de reservar o suggestion kg inteiro.
+
 **VA directory toolbar (2026-09-22):** sintoma = paragraph longo (“joining keeps… Port FBO…”) enchendo a toolbar. Fix = remover meta; Search à esquerda, Join code à direita.
 
 **UX:** directory + Leave copy dizem que join mantém company/wallet/frota pessoais. **Uma VA por conta** — join/request bloqueados se já for membro (ou owner) de qualquer company `va_listed`; Leave (membro) ou Unlist (owner) libera.

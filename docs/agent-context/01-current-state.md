@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **d4918d2** / desktop **0.3.204** shipped: Fix Hauls MapLibre crash from shadowed native Map. Release: [v0.3.204](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.204).
+
+
 `main` **7348953** / desktop **0.3.203** shipped: One desk pickup hub per port, fix Hauls map crash, and match VA loading to Ports. Release: [v0.3.203](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.203).
 
 

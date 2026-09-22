@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **2c768eff** / desktop **0.3.232** shipped: Show Dispatch OFP ops metrics always-on and uplink Crew Live from SimBridge status. Release: [v0.3.232](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.232).
+
+
 `main` **080a1679** / desktop **0.3.231** shipped: Align Crew Live phase with Watch footer and drop pane Close. Release: [v0.3.231](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.231).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **28a1b65** / desktop **0.3.205** shipped: Fix Hauls network map camera and pin drift; drop network chips from Ports. Release: [v0.3.205](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.205).
+
+
 `main` **d4918d2** / desktop **0.3.204** shipped: Fix Hauls MapLibre crash from shadowed native Map. Release: [v0.3.204](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.204).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **3be79c1** / desktop **0.3.200** shipped: Fix My VA Ports blank pane, false home FBO, and slow Roster open. Release: [v0.3.200](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.200).
+
+
 `main` **c30219a** / desktop **0.3.199** shipped: Split VA port desk into My VA Ports and keep sidebar Ports on home. Release: [v0.3.199](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.199).
 
 

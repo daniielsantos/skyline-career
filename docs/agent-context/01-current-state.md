@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **334df5b** / desktop **0.3.210** shipped: Let VA Hauls Prepare off-origin and show hold author on the desk map. Release: [v0.3.210](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.210).
+
+
 `main` **e840b58** / desktop **0.3.209** shipped: Fix MP World chip stuck on pulse due and keep Ports desk live. Release: [v0.3.209](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.209).
 
 

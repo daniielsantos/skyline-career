@@ -1,4 +1,7 @@
-# Current state (2026-09-21)
+# Current state (2026-09-22)
+
+`main` **c30219a** / desktop **0.3.199** shipped: Split VA port desk into My VA Ports and keep sidebar Ports on home. Release: [v0.3.199](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.199).
+
 
 `main` **9cc01a3** / desktop **0.3.198** shipped: Fix VA member Ports tenant and company logistics chrome. Release: [v0.3.198](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.198).
 

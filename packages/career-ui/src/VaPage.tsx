@@ -100,22 +100,13 @@ const LIVE_PHASE_LABEL: Record<string, string> = {
   approach: 'Approach',
   landing: 'Landing',
   taxi_in: 'Taxi in',
-  taxi: 'Taxi',
+  taxi: 'Taxiing',
   airborne: 'Airborne',
   'ground+engines': 'On ground · engines',
 };
 
-function formatLivePhase(
-  phase: string | null | undefined,
-  onGround?: boolean | null,
-): string | null {
-  let key = phase?.trim() || '';
-  // Coerce bad/stale OFP-compliance "airborne" while still on the ramp.
-  if (onGround === true && (key === 'airborne' || !key)) {
-    key = 'ground+engines';
-  } else if (onGround === false && !key) {
-    key = 'airborne';
-  }
+function formatLivePhase(phase: string | null | undefined): string | null {
+  const key = phase?.trim() || '';
   if (!key) return null;
   return LIVE_PHASE_LABEL[key] ?? key.replace(/_/g, ' ');
 }
@@ -1020,8 +1011,7 @@ export function VaPage(props: Props) {
                         className={`va-stat-value${flying ? ' is-flying' : ''}`}
                         title={
                           m.live
-                            ? formatLivePhase(m.live.phase, m.live.onGround) ||
-                              'Live'
+                            ? formatLivePhase(m.live.phase) || 'Live'
                             : flying
                               ? 'In flight'
                               : undefined
@@ -1146,17 +1136,10 @@ export function VaPage(props: Props) {
                       {(() => {
                         const last =
                           liveTrack.points[liveTrack.points.length - 1];
-                        const onGround =
-                          typeof liveTrack.onGround === 'boolean'
-                            ? liveTrack.onGround
-                            : typeof last?.onGround === 'boolean'
-                              ? last.onGround
-                              : livePilot.live?.onGround;
                         const phaseLabel = formatLivePhase(
                           liveTrack.phase ??
                             last?.phase ??
                             livePilot.live?.phase,
-                          onGround,
                         );
                         const alt = formatLiveAltFt(
                           liveTrack.altFt ??
@@ -1245,15 +1228,8 @@ export function VaPage(props: Props) {
                     aircraftLabel={(() => {
                       const last =
                         liveTrack?.points[liveTrack.points.length - 1];
-                      const onGround =
-                        typeof liveTrack?.onGround === 'boolean'
-                          ? liveTrack.onGround
-                          : typeof last?.onGround === 'boolean'
-                            ? last.onGround
-                            : livePilot.live?.onGround;
                       const phase = formatLivePhase(
                         liveTrack?.phase ?? last?.phase ?? livePilot.live?.phase,
-                        onGround,
                       );
                       const alt = formatLiveAltFt(
                         liveTrack?.altFt ?? last?.altFt ?? livePilot.live?.altFt,

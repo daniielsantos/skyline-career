@@ -171,7 +171,6 @@ export type MissionPreflightResult = {
     enginesRunning: boolean;
     /** Soft lat/lon when SimConnect returns a usable plane position. */
     position?: { lat: number; lon: number };
-    phase?: string;
   };
 };
 
@@ -727,7 +726,6 @@ export async function runMissionPreflight(
         onGround: live.onGround,
         enginesRunning: live.enginesRunning,
         ...(planePosition ? { position: planePosition } : {}),
-        ...(check.phase ? { phase: check.phase } : {}),
       },
     };
   } finally {

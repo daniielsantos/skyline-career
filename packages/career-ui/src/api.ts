@@ -622,6 +622,8 @@ export type Mission = {
     ofpId?: string;
     staticId?: string;
     briefing?: OfpBriefing;
+    /** SimBrief cabin seats on the OFP (0 = freighter-style sheet). */
+    passengerCount?: number;
     plannedBlockFuelKg?: number;
     findings: OfpCheckFinding[];
   };
@@ -4972,7 +4974,6 @@ export function postPreflight(opts: {
       onGround: boolean;
       enginesRunning: boolean;
       position?: { lat: number; lon: number };
-      phase?: string;
     };
   }>('/api/preflight', {
     method: 'POST',
@@ -5031,6 +5032,7 @@ export type SimBridgeStatus = {
   parkingBrake: boolean | null;
   phase: string | null;
   groundSpeedKt?: number | null;
+  position?: { lat: number; lon: number } | null;
   source: 'watch' | 'probe';
   error: string | null;
   checkedAtIso: string;

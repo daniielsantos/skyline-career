@@ -240,11 +240,6 @@ export function DispatchActivePanel(props: {
         ? mission.lastOfpCheck.briefing.distanceNm
         : undefined;
   const showOfpCard = Boolean(mission.lastOfpCheck);
-  /** Collapse passed OFP after flight_plan so load/ready/en_route stay short. */
-  const collapseOfpCard =
-    showOfpCard &&
-    step !== 'flight_plan' &&
-    mission.lastOfpCheck?.verdict === 'pass';
   const showFuelCard =
     step === 'fuel' ||
     (mission.fuelUplift &&
@@ -688,23 +683,62 @@ export function DispatchActivePanel(props: {
                     ).padStart(3, '0')}`
                   : `${Math.round(briefing.cruiseAltitudeFt).toLocaleString('en-US')} FT`
                 : undefined;
+            const ofpPax =
+              typeof check.passengerCount === 'number' &&
+              Number.isFinite(check.passengerCount)
+                ? Math.max(0, Math.floor(check.passengerCount))
+                : typeof mission.pax === 'number' &&
+                    Number.isFinite(mission.pax) &&
+                    mission.pax > 0
+                  ? Math.floor(mission.pax)
+                  : undefined;
+            const plannedPayloadLb =
+              mission.lastPreflightCheck?.loadVerification?.payload?.plannedLb;
+            const payloadKg =
+              typeof plannedPayloadLb === 'number' &&
+              Number.isFinite(plannedPayloadLb) &&
+              plannedPayloadLb > 0
+                ? plannedPayloadLb / KG_TO_LB
+                : mission.cargoKg > 0
+                  ? mission.cargoKg +
+                    (typeof mission.baggageKg === 'number' &&
+                    Number.isFinite(mission.baggageKg)
+                      ? mission.baggageKg
+                      : 0)
+                  : typeof mission.baggageKg === 'number' &&
+                      Number.isFinite(mission.baggageKg) &&
+                      mission.baggageKg > 0
+                    ? mission.baggageKg
+                    : undefined;
+            // Ops-first grid — hangar/type/tail live under “Aircraft details”.
             const briefingItems = [
-              assignedAircraft ? ['Hangar', assignedAircraft] : null,
-              briefing?.aircraftIcao ? ['OFP type', briefing.aircraftIcao] : null,
-              briefing?.tailNumber ? ['Tail number', briefing.tailNumber] : null,
               briefing?.distanceNm !== undefined
                 ? ['Distance', `${Math.round(briefing.distanceNm)} NM`]
                 : null,
-              briefing?.blockTime ? ['Block time', briefing.blockTime] : null,
-              briefing?.airTime ? ['Air time', briefing.airTime] : null,
               cruise ? ['Cruise', cruise] : null,
+              briefing?.blockTime ? ['Block', briefing.blockTime] : null,
+              briefing?.airTime ? ['Air', briefing.airTime] : null,
               briefing?.alternateIcao
                 ? ['Alternate', briefing.alternateIcao]
                 : null,
+              ofpPax !== undefined ? ['Pax', String(ofpPax)] : null,
+              payloadKg !== undefined
+                ? ['Payload', formatMassExact(payloadKg, weightSystem)]
+                : null,
+            ].filter((item): item is [string, string] => item !== null);
+            const aircraftDetailItems = [
+              assignedAircraft ? ['Hangar', assignedAircraft] : null,
+              briefing?.aircraftIcao
+                ? ['OFP type', briefing.aircraftIcao]
+                : null,
+              briefing?.tailNumber ? ['Tail', briefing.tailNumber] : null,
+              [
+                'Checked',
+                new Date(check.checkedAtIso).toLocaleTimeString(),
+              ] as [string, string],
             ].filter((item): item is [string, string] => item !== null);
 
-            const foldOfp = collapseOfpCard;
-            const ofpCard = (
+            return (
               <section
                 className={`ofp-result-card ofp-briefing-card ofp-result-${check.verdict}`}
                 aria-live="polite"
@@ -717,9 +751,6 @@ export function DispatchActivePanel(props: {
                         ? 'OFP NEEDS REVIEW'
                         : 'OFP FAILED'}
                   </strong>
-                  <span>
-                    Checked {new Date(check.checkedAtIso).toLocaleTimeString()}
-                  </span>
                 </div>
                 {check.verdict === 'fail' &&
                 isOfpCargoUnderOnlyFailureUi(check) &&
@@ -756,6 +787,19 @@ export function DispatchActivePanel(props: {
                 ) : (
                   <p>Re-check SimBrief to load the operational route.</p>
                 )}
+                {aircraftDetailItems.length > 0 ? (
+                  <details className="ofp-aircraft-details">
+                    <summary>Aircraft details</summary>
+                    <dl className="ofp-briefing-grid ofp-aircraft-details-grid">
+                      {aircraftDetailItems.map(([label, value]) => (
+                        <div key={label}>
+                          <dt>{label}</dt>
+                          <dd>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </details>
+                ) : null}
                 {actionableFindings.length > 0 ? (
                   <details className="preflight-technical" open={ofpCargoUnderOnly}>
                     <summary>
@@ -781,34 +825,6 @@ export function DispatchActivePanel(props: {
                   </div>
                 ) : null}
               </section>
-            );
-
-            if (!foldOfp) return ofpCard;
-
-            const foldLabel =
-              check.verdict === 'pass'
-                ? 'OFP passed'
-                : check.verdict === 'warn'
-                  ? 'OFP needs review'
-                  : 'OFP failed';
-            const foldMeta = [
-              briefing?.distanceNm !== undefined
-                ? `${Math.round(briefing.distanceNm)} NM`
-                : null,
-              cruise ?? null,
-              briefing?.blockTime ?? null,
-            ]
-              .filter(Boolean)
-              .join(' · ');
-
-            return (
-              <details className="dispatch-fold dispatch-fold-ofp">
-                <summary>
-                  {foldLabel}
-                  {foldMeta ? ` · ${foldMeta}` : ''}
-                </summary>
-                {ofpCard}
-              </details>
             );
           })()
         : null}
@@ -1408,24 +1424,39 @@ export function DispatchActivePanel(props: {
                 : undefined;
             const enRouteBriefItems = (
               [
-                assignedAircraft ? ['Aircraft', assignedAircraft] : null,
-                ofpBriefing?.aircraftIcao
-                  ? ['OFP type', ofpBriefing.aircraftIcao]
-                  : null,
                 ofpBriefing?.distanceNm !== undefined
                   ? [
                       'Distance',
                       `${Math.round(ofpBriefing.distanceNm)} NM`,
                     ]
                   : null,
+                enRouteCruise
+                  ? ['Cruise', enRouteCruise]
+                  : null,
                 ofpBriefing?.blockTime
-                  ? ['Block time', ofpBriefing.blockTime]
+                  ? ['Block', ofpBriefing.blockTime]
                   : null,
                 ofpBriefing?.airTime
-                  ? ['Air time', ofpBriefing.airTime]
+                  ? ['Air', ofpBriefing.airTime]
                   : null,
-                enRouteCruise
-                  ? ['Initial altitude', enRouteCruise]
+                ofpBriefing?.alternateIcao
+                  ? ['Alternate', ofpBriefing.alternateIcao]
+                  : null,
+                typeof mission.lastOfpCheck?.passengerCount === 'number'
+                  ? [
+                      'Pax',
+                      String(
+                        Math.max(
+                          0,
+                          Math.floor(mission.lastOfpCheck.passengerCount),
+                        ),
+                      ),
+                    ]
+                  : typeof mission.pax === 'number' && mission.pax > 0
+                    ? ['Pax', String(Math.floor(mission.pax))]
+                    : null,
+                mission.cargoKg > 0
+                  ? ['Payload', props.formatTonnes(mission.cargoKg)]
                   : null,
               ] as Array<[string, string] | null>
             ).filter((item): item is [string, string] => item !== null);

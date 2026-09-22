@@ -3879,6 +3879,48 @@ export function App() {
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
   const flightTrackLastPostRef = useRef(0);
+  /**
+   * Single VA Crew Live uplink — same phase/GS the SimBridge footer shows.
+   * Called when Watch or the SimBridge probe refreshes status.
+   */
+  const reportVaCrewLive = (sample: {
+    missionId?: string | null;
+    lat: number;
+    lon: number;
+    phase?: string | null;
+    onGround?: boolean | null;
+    gsKt?: number | null;
+    altFt?: number | null;
+  }) => {
+    const vaCompanyId = memberVaCompanyIdRef.current?.trim();
+    const missionId =
+      sample.missionId?.trim() || activeMissionRef.current?.id || null;
+    if (!vaCompanyId || !missionId) return;
+    if (
+      !Number.isFinite(sample.lat) ||
+      !Number.isFinite(sample.lon) ||
+      (sample.lat === 0 && sample.lon === 0)
+    ) {
+      return;
+    }
+    const now = Date.now();
+    if (now - flightTrackLastPostRef.current < 15_000) return;
+    flightTrackLastPostRef.current = now;
+    void postVaFlightTrack({
+      companyId: vaCompanyId,
+      missionId,
+      lat: sample.lat,
+      lon: sample.lon,
+      ...(typeof sample.gsKt === 'number' ? { gsKt: sample.gsKt } : {}),
+      ...(typeof sample.altFt === 'number' ? { altFt: sample.altFt } : {}),
+      ...(sample.phase?.trim() ? { phase: sample.phase.trim() } : {}),
+      ...(typeof sample.onGround === 'boolean'
+        ? { onGround: sample.onGround }
+        : {}),
+    }).catch(() => {
+      /* soft — Live is best-effort */
+    });
+  };
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const simBridgeRef = useRef(simBridge);
   simBridgeRef.current = simBridge;
@@ -6305,6 +6347,7 @@ export function App() {
               parkingBrake: prev?.parkingBrake ?? null,
               phase: status.phase,
               groundSpeedKt: status.groundSpeedKt,
+              position: status.position ?? prev?.position ?? null,
               source: 'watch' as const,
               error: status.lastError,
               checkedAtIso: new Date().toISOString(),
@@ -6323,47 +6366,25 @@ export function App() {
             return next;
           });
         }
-        // VA Crew Live: post Watch lat/lon to the listed airline whenever Watch
-        // is running. Do not gate on activeMission / resolveOpsCompanyId /
-        // chrome pin — dual-tenant sticky-home + stale watch-effect closures
-        // were dropping every sample while Preflight still showed engines on.
-        // World validates membership + mission on the VA company file (404/409 soft).
-        const vaCompanyId = memberVaCompanyIdRef.current?.trim();
+        // VA Crew Live: mirror the same SimBridge/Watch sample the footer uses.
         const pos = status.position;
         if (
           status.running &&
           status.missionId &&
-          vaCompanyId &&
           pos &&
           Number.isFinite(pos.lat) &&
           Number.isFinite(pos.lon) &&
           !(pos.lat === 0 && pos.lon === 0)
         ) {
-          const now = Date.now();
-          if (now - flightTrackLastPostRef.current >= 15_000) {
-            flightTrackLastPostRef.current = now;
-            void postVaFlightTrack({
-              companyId: vaCompanyId,
-              missionId: status.missionId,
-              lat: pos.lat,
-              lon: pos.lon,
-              gsKt:
-                typeof status.groundSpeedKt === 'number'
-                  ? status.groundSpeedKt
-                  : undefined,
-              altFt:
-                typeof status.altitudeFt === 'number'
-                  ? status.altitudeFt
-                  : undefined,
-              phase: status.phase?.trim() || undefined,
-              onGround:
-                typeof status.onGround === 'boolean'
-                  ? status.onGround
-                  : undefined,
-            }).catch(() => {
-              /* soft — Live is best-effort (solo home legs 404 on VA) */
-            });
-          }
+          reportVaCrewLive({
+            missionId: status.missionId,
+            lat: pos.lat,
+            lon: pos.lon,
+            gsKt: status.groundSpeedKt,
+            altFt: status.altitudeFt,
+            phase: status.phase,
+            onGround: status.onGround,
+          });
         }
       } catch {
         /* ignore watch poll errors */
@@ -6477,6 +6498,23 @@ export function App() {
           }
           return status;
         });
+        // Same uplink as Watch — probe already carries footer phase (+ taxi).
+        const pos = status.position;
+        if (
+          status.connected &&
+          pos &&
+          Number.isFinite(pos.lat) &&
+          Number.isFinite(pos.lon) &&
+          !(pos.lat === 0 && pos.lon === 0)
+        ) {
+          reportVaCrewLive({
+            lat: pos.lat,
+            lon: pos.lon,
+            gsKt: status.groundSpeedKt,
+            phase: status.phase,
+            onGround: status.onGround,
+          });
+        }
       } catch {
         if (cancelled) return;
         consecutiveFailures += 1;
@@ -7335,42 +7373,6 @@ export function App() {
             mission.id === result.mission.id ? result.mission : mission,
           ),
         );
-        // Crew Live: Preflight owns SimBridge before Watch starts — still stream
-        // lat/lon so Roster Live is not empty on the ramp with engines on.
-        const vaCompanyId = memberVaCompanyIdRef.current?.trim();
-        const pos = result.live?.position;
-        if (
-          vaCompanyId &&
-          pos &&
-          Number.isFinite(pos.lat) &&
-          Number.isFinite(pos.lon) &&
-          !(pos.lat === 0 && pos.lon === 0)
-        ) {
-          const now = Date.now();
-          if (now - flightTrackLastPostRef.current >= 15_000) {
-            flightTrackLastPostRef.current = now;
-            void postVaFlightTrack({
-              companyId: vaCompanyId,
-              missionId: activeMission.id,
-              lat: pos.lat,
-              lon: pos.lon,
-              onGround:
-                typeof result.live.onGround === 'boolean'
-                  ? result.live.onGround
-                  : undefined,
-              // Watch-style phase — never OFP compliance "airborne" (that means
-              // engines/unlocked on the ground, not wheels-up).
-              phase:
-                result.live.onGround === false
-                  ? 'airborne'
-                  : result.live.enginesRunning
-                    ? 'ground+engines'
-                    : 'ground',
-            }).catch(() => {
-              /* soft */
-            });
-          }
-        }
       } catch (err) {
         // Soft background refresh — but surface the first failure so Load
         // isn't a blank wait when SimBridge is up and the sample still fails.

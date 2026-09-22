@@ -8427,6 +8427,38 @@ table.contracts-table .col-access .action {
   white-space: normal;
 }
 
+.ofp-aircraft-details {
+  margin-top: 0.55rem;
+}
+
+.ofp-aircraft-details > summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  list-style: none;
+}
+
+.ofp-aircraft-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ofp-aircraft-details > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 0.35rem;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+.ofp-aircraft-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.ofp-aircraft-details-grid {
+  margin-top: 0.45rem;
+}
+
 .fuel-purchase-card .mx-fuel-burn-alert,
 .dispatch-step-card .mx-fuel-burn-alert,
 .preflight-summary-card .mx-fuel-burn-alert {

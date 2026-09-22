@@ -370,6 +370,8 @@ export function AircraftClassStripe(props: {
   imageSrc?: string;
   imageAlt?: string;
   badges?: ReactNode;
+  /** Corner mark on the art (e.g. hangar maintenance wrench). */
+  mark?: ReactNode;
 }) {
   const hasArt = Boolean(props.imageSrc);
   return (
@@ -391,7 +393,35 @@ export function AircraftClassStripe(props: {
       ) : (
         <div className="aircraft-silhouette" />
       )}
+      {props.mark ? (
+        <div className="aircraft-card-stripe-mark">{props.mark}</div>
+      ) : null}
     </div>
+  );
+}
+
+/** Compact wrench mark — hangar card art when status is maintenance. */
+function HangarMaintenanceMark(props: { title: string }) {
+  return (
+    <span className="hangar-mx-mark" title={props.title} aria-label={props.title}>
+      <svg
+        className="hangar-mx-mark-icon"
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+        />
+      </svg>
+    </span>
   );
 }
 
@@ -773,31 +803,9 @@ function hangarStatusNote(
     case 'assigned':
       return 'Finish or cancel the flight in Dispatch before moving this airframe.';
     case 'maintenance':
-      if (acf.overhaulKind) {
-        const kindLabel =
-          acf.overhaulKind === 'engine' ? 'Engine' : 'Airframe';
-        const ready =
-          typeof acf.overhaulReadyAtTick === 'number'
-            ? acf.overhaulReadyAtTick
-            : null;
-        const leftLabel = hangarOverhaulRemainingLabel(acf, opts);
-        const readyLabel =
-          ready != null && opts?.formatClock
-            ? opts.formatClock(ready)
-            : ready != null
-              ? `tick ${ready}`
-              : null;
-        if (leftLabel === 'ready soon') {
-          return `Overhaul · ${kindLabel} · shop done — parks on next Hangar refresh / world pulse.`;
-        }
-        if (leftLabel && readyLabel) {
-          return `Overhaul · ${kindLabel} · ${leftLabel} · ready ${readyLabel}.`;
-        }
-        if (leftLabel) {
-          return `Overhaul · ${kindLabel} · ${leftLabel}. Resets ${acf.overhaulKind === 'engine' ? 'engine' : 'airframe'} hours when the shop finishes.`;
-        }
-        return `Overhaul · ${kindLabel} · in progress. Resets ${acf.overhaulKind === 'engine' ? 'engine' : 'airframe'} hours when the shop finishes.`;
-      }
+      // Overhaul ETA lives on the status badge (`engine OH · Nh left`) — skip
+      // the Where prose so the card stays as tight as a parked airframe.
+      if (acf.overhaulKind) return null;
       if (opts?.mutationsLocked) {
         return 'AOG — not timed. Owner must Inspect / Repair on this Hangar before anyone can fly it.';
       }
@@ -1232,6 +1240,19 @@ export function HangarAircraftCard(props: {
         aircraftClassId={acf.aircraftClassId}
         imageSrc={airframeCardArtUrl(acf.airframeTypeId)}
         imageAlt={acf.label}
+        mark={
+          acf.status === 'maintenance' ? (
+            <HangarMaintenanceMark
+              title={
+                acf.overhaulKind
+                  ? ohLeft
+                    ? `Overhaul · ${ohLeft}`
+                    : 'Overhaul in progress'
+                  : 'In maintenance'
+              }
+            />
+          ) : null
+        }
         badges={
           <>
             <span

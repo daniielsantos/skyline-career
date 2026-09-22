@@ -7153,6 +7153,29 @@ tr.lot-locked {
   justify-content: space-between;
 }
 
+.aircraft-card-stripe-mark {
+  position: absolute;
+  z-index: 2;
+  right: 0.55rem;
+  bottom: 0.55rem;
+  pointer-events: none;
+}
+
+.hangar-mx-mark {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.35rem;
+  color: var(--warn, #c9a227);
+  background: rgba(11, 14, 19, 0.78);
+  border: 1px solid color-mix(in srgb, var(--warn, #c9a227) 45%, transparent);
+}
+
+.hangar-mx-mark-icon {
+  display: block;
+}
+
 .aircraft-card-stripe-badges .badge,
 .aircraft-card-stripe-badges .status {
   background: rgba(11, 14, 19, 0.82);

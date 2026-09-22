@@ -84,7 +84,7 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Crew clean layout (2026-09-22):** sintoma = Crew (Roster/abas) mais verbosa que Airlines directory. Causa = meta em prosa, `settings-card` + h3, presence “Last seen / On the ground”, help walls em Hangar/Config/Logbook. Fix = shell stats strip (HQ/Pilots/Role/Org/Hiring); roster rows estilo directory (Status/At/Role); cortar blurbs de abertura; subtitle App curto.
 
-**Hangar AOG note / overhaul ETA (2026-09-22):** sintoma = Duke em engine OH (1d light GA) parecia “maintenance” sem countdown. Causa = badge só pintava `status`; nota OH sumia atrás do ferry UI; AOG Inspect confundido com timer. Fix = badge `engine OH · 18h left`; Where “Shop at” + nota `Overhaul · Engine · … left · ready Day N`; ferry só parked; Inspect AOG = “not timed”.
+**Hangar AOG note / overhaul ETA (2026-09-22):** sintoma = Duke em engine OH (1d light GA) parecia “maintenance” sem countdown. Causa = badge só pintava `status`; nota OH sumia atrás do ferry UI; AOG Inspect confundido com timer. Fix = badge `engine OH · 18h left`; Where “Shop at”; AOG Inspect = “not timed”. **2026-09-22 (b):** nota prosa `Overhaul · Engine · … ready Day N` removida — badge basta. **2026-09-22 (c):** glyph chave no art do card quando `maintenance`.
 
 **Ferry tanks untouched (2026-09-22):** sintoma = Hangar/Line-crew ferry top-up + burn → tanques chegavam vazios mesmo com Jet-A no preço. Causa = `executeFerry` enchia shortfall e queimava `fuelNeededKg`. Fix = não mutar `fuelKg`; hop Jet-A continua em `totalCostUsd` (serviço incluso); copy Journey/toast.
 

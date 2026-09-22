@@ -348,19 +348,34 @@ export async function runMissionPreflight(
       onGround: live.onGround,
       originCoords: originCoords ?? null,
     });
+    // Airborne near origin is not "too far" — they already cleared the ramp.
+    // Stamping ORIGIN_NOT_ON_GROUND as location.ok=false poisons Ready/auto-depart
+    // when Watch is not yet running (UI reads lastPreflightCheck.location).
+    const locationProx =
+      originProx.code === 'ORIGIN_NOT_ON_GROUND' &&
+      typeof originProx.distanceNm === 'number' &&
+      originProx.distanceNm <= originProx.radiusNm
+        ? {
+            ...originProx,
+            ok: true,
+            code: 'ORIGIN_OK' as const,
+            severity: 'info' as const,
+            message: `Airborne near ${originProx.originIcao} · ${originProx.distanceNm.toFixed(1)} nm (≤${originProx.radiusNm} nm)`,
+          }
+        : originProx;
     findings.push({
-      code: originProx.code,
-      severity: originProx.severity,
-      message: originProx.message,
+      code: locationProx.code,
+      severity: locationProx.severity,
+      message: locationProx.message,
     });
     const location = {
-      ok: originProx.ok,
-      originIcao: originProx.originIcao,
-      ...(originProx.distanceNm !== undefined
-        ? { distanceNm: originProx.distanceNm }
+      ok: locationProx.ok,
+      originIcao: locationProx.originIcao,
+      ...(locationProx.distanceNm !== undefined
+        ? { distanceNm: locationProx.distanceNm }
         : {}),
-      radiusNm: originProx.radiusNm,
-      code: originProx.code,
+      radiusNm: locationProx.radiusNm,
+      code: locationProx.code,
     };
 
     // Ready = fuel + payload OK. CG / empty-weight notes never block Depart alone.

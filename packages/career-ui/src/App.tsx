@@ -6511,6 +6511,16 @@ export function App() {
     // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
     // fight with Watch resume left settle dead after landing.
     if (activeMissionRef.current?.status === 'in_flight') return;
+    // Ready + first LV: Preflight already stopped; probe must too so Watch
+    // can claim the exclusive gate (auto-depart → En route).
+    const mission = activeMissionRef.current;
+    if (
+      mission?.status === 'dispatched' &&
+      mission.lastPreflightCheck?.loadVerification &&
+      !holdWatchOffForPreflightRef.current
+    ) {
+      return;
+    }
     let cancelled = false;
     let consecutiveFailures = 0;
     async function pollBridge() {
@@ -6562,7 +6572,12 @@ export function App() {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [watch?.running]);
+  }, [
+    watch?.running,
+    activeMission?.status,
+    Boolean(activeMission?.lastPreflightCheck?.loadVerification),
+    holdWatchOffForPreflight,
+  ]);
 
   useEffect(() => {
     if (
@@ -7252,6 +7267,9 @@ export function App() {
     // Match deriveDispatchStep: contract-pilot skips fuel purchase, so do not
     // require fuelAuthorizedOfpId (Accept OFP clears it; step can still be load).
     const fuelOk = activeMission ? fuelAuthorizedForOfp(activeMission) : false;
+    const hasLoadVerification = Boolean(
+      activeMission?.lastPreflightCheck?.loadVerification,
+    );
     // Do not gate on simBridge.connected — the probe can lag/false-negative while
     // /api/preflight still opens a pipe. Call the API and surface failures on the
     // Load card instead of spinning "Waiting for live preflight…" forever.
@@ -7267,6 +7285,9 @@ export function App() {
       // Hold-off means we already dropped UI Watch; do not wait for a hung
       // server tick to finish before the first Preflight sample.
       (!watch?.running || holdWatchOffForPreflight) &&
+      // After first Loaded vs Due, stop hogging SimBridge so Watch can bind
+      // (takeoff/climb + auto-depart). Not a Live feature — Watch pipe hygiene.
+      (!hasLoadVerification || holdWatchOffForPreflight) &&
       loadOfpAutoStatus !== 'loading' &&
       loadOfpAutoStatus !== 'waiting' &&
       !ofpInjectInFlightRef.current &&
@@ -7467,11 +7488,16 @@ export function App() {
     }
 
     void tryStartWatch();
+    const hasLoadVerification = Boolean(
+      activeMission.lastPreflightCheck?.loadVerification,
+    );
     const id = window.setInterval(() => {
       void tryStartWatch();
     }, isAirborneResume
       ? 5_000
-      : loadOfpAutoStatus === 'done' || loadOfpAutoStatus === 'failed'
+      : loadOfpAutoStatus === 'done' ||
+          loadOfpAutoStatus === 'failed' ||
+          hasLoadVerification
         ? 2_000
         : 15_000);
     return () => {

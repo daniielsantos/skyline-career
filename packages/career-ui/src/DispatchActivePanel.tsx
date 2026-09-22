@@ -1593,7 +1593,9 @@ export function DispatchActivePanel(props: {
                                 ? `${loc.distanceNm.toFixed(1)} nm · ≤${loc.radiusNm} nm`
                                 : `≤${loc.radiusNm} nm`
                               : loc.distanceNm !== undefined
-                                ? `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
+                                ? loc.code === 'ORIGIN_NOT_ON_GROUND'
+                                  ? `airborne near ${loc.originIcao}`
+                                  : `from ${loc.originIcao} · need ≤${loc.radiusNm} nm`
                                 : (check.findings.find(
                                     (f) => f.code === loc.code,
                                   )?.message ??
@@ -1751,7 +1753,13 @@ export function DispatchActivePanel(props: {
                             ? 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
                             : loadReady && !locationOk
                               ? liveLocation
-                                ? liveLocation.distanceNm !== undefined
+                                ? liveLocation.code === 'ORIGIN_NOT_ON_GROUND'
+                                  ? `Aircraft is airborne near ${liveLocation.originIcao}${
+                                      liveLocation.distanceNm !== undefined
+                                        ? ` (${liveLocation.distanceNm.toFixed(1)} nm)`
+                                        : ''
+                                    }. Origin was cleared on the ramp — connect Watch to auto-depart.`
+                                  : liveLocation.distanceNm !== undefined
                                   ? `Aircraft is ${liveLocation.distanceNm.toFixed(1)} nm from ${liveLocation.originIcao} (need ≤${liveLocation.radiusNm} nm). Relocate before takeoff — Watch will not auto-depart.`
                                   : `Not verified at ${liveLocation.originIcao}. Relocate before takeoff — Watch will not auto-depart.`
                                 : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'

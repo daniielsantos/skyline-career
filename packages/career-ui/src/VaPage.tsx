@@ -30,7 +30,7 @@ import {
   type Mission,
   type CareerCargoOps,
 } from './api';
-import { BusyStatus } from './Busy';
+import { BusyBlock, BusyStatus } from './Busy';
 import { HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
 import { VaHaulsBoard } from './VaHaulsBoard';
@@ -554,8 +554,8 @@ export function VaPage(props: Props) {
   // VA tenant pin (fetchState) — do not block the whole My VA shell on that.
   if (!loaded) {
     return (
-      <section className="panel va-panel">
-        <BusyStatus label="Loading VA…" />
+      <section className="panel va-panel va-panel-loading">
+        <BusyBlock label="Loading VA…" />
       </section>
     );
   }

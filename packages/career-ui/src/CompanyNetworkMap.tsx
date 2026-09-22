@@ -26,6 +26,15 @@ function hasCoords(lat: unknown, lon: unknown): lat is number {
   );
 }
 
+function safeResize(map: Map | null) {
+  if (!map) return;
+  try {
+    map.resize();
+  } catch {
+    /* map torn down mid-resize */
+  }
+}
+
 type Props = {
   nodes: CompanyNetworkNode[];
   selectedId: string | null;
@@ -40,57 +49,93 @@ type Props = {
 export function CompanyNetworkMap(props: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
+  const aliveRef = useRef(true);
   const markersRef = useRef<Marker[]>([]);
   const onSelectRef = useRef(props.onSelectNode);
   onSelectRef.current = props.onSelectNode;
   const [mapGeneration, setMapGeneration] = useState(0);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    aliveRef.current = true;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const map = new Map({
-      container: containerRef.current,
-      style: OPENFREEMAP_DARK,
-      center: [-46.5, -24.5],
-      zoom: 5.2,
-      attributionControl: false,
-    });
-    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-    mapRef.current = map;
+    let map: Map | null = null;
+    let ro: ResizeObserver | null = null;
+    let onReady: (() => void) | null = null;
 
-    const onReady = () => {
-      setMapGeneration((n) => n + 1);
-      map.resize();
+    const attachMap = () => {
+      if (!aliveRef.current || mapRef.current || !container.isConnected) return;
+      if (container.clientWidth < 2 || container.clientHeight < 2) {
+        requestAnimationFrame(attachMap);
+        return;
+      }
+      try {
+        map = new Map({
+          container,
+          style: OPENFREEMAP_DARK,
+          center: [-46.5, -24.5],
+          zoom: 5.2,
+          attributionControl: false,
+        });
+      } catch {
+        return;
+      }
+      map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+      mapRef.current = map;
+
+      onReady = () => {
+        if (!aliveRef.current || mapRef.current !== map) return;
+        setMapGeneration((n) => n + 1);
+        safeResize(map);
+      };
+      if (map.isStyleLoaded()) onReady();
+      else map.once('load', onReady);
+
+      ro = new ResizeObserver(() => safeResize(mapRef.current));
+      ro.observe(container);
     };
-    if (map.isStyleLoaded()) onReady();
-    else map.once('load', onReady);
 
-    const ro = new ResizeObserver(() => map.resize());
-    ro.observe(containerRef.current);
+    requestAnimationFrame(attachMap);
 
     return () => {
-      ro.disconnect();
-      map.off('load', onReady);
+      aliveRef.current = false;
+      ro?.disconnect();
+      if (map && onReady) {
+        try {
+          map.off('load', onReady);
+        } catch {
+          /* ignore */
+        }
+      }
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
-      try {
-        if (map.getLayer('company-network-feeders')) {
-          map.removeLayer('company-network-feeders');
-        }
-        if (map.getSource('company-network-feeders')) {
-          map.removeSource('company-network-feeders');
-        }
-      } catch {
-        /* torn down */
-      }
-      map.remove();
+      const active = mapRef.current;
       mapRef.current = null;
+      if (active) {
+        try {
+          if (active.getLayer('company-network-feeders')) {
+            active.removeLayer('company-network-feeders');
+          }
+          if (active.getSource('company-network-feeders')) {
+            active.removeSource('company-network-feeders');
+          }
+        } catch {
+          /* torn down */
+        }
+        try {
+          active.remove();
+        } catch {
+          /* ignore */
+        }
+      }
     };
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || mapGeneration < 1 || !map.isStyleLoaded()) return;
+    if (!map || mapGeneration < 1 || !aliveRef.current) return;
+    if (!map.isStyleLoaded()) return;
 
     for (const marker of markersRef.current) marker.remove();
     markersRef.current = [];
@@ -145,31 +190,25 @@ export function CompanyNetworkMap(props: Props) {
     }
 
     if (feederFeatures.length > 0) {
-      map.addSource('company-network-feeders', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: feederFeatures },
-      });
-      map.addLayer({
-        id: 'company-network-feeders',
-        type: 'line',
-        source: 'company-network-feeders',
-        paint: {
-          'line-color': FEEDER_ACCENT,
-          'line-width': [
-            'case',
-            ['get', 'highlighted'],
-            2.5,
-            1.2,
-          ],
-          'line-opacity': [
-            'case',
-            ['get', 'highlighted'],
-            0.85,
-            0.45,
-          ],
-          'line-dasharray': [2, 2],
-        },
-      });
+      try {
+        map.addSource('company-network-feeders', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: feederFeatures },
+        });
+        map.addLayer({
+          id: 'company-network-feeders',
+          type: 'line',
+          source: 'company-network-feeders',
+          paint: {
+            'line-color': FEEDER_ACCENT,
+            'line-width': ['case', ['get', 'highlighted'], 2.5, 1.2],
+            'line-opacity': ['case', ['get', 'highlighted'], 0.85, 0.45],
+            'line-dasharray': [2, 2],
+          },
+        });
+      } catch {
+        /* style not ready / map removed */
+      }
     }
 
     const bounds = new LngLatBounds();
@@ -195,33 +234,51 @@ export function CompanyNetworkMap(props: Props) {
         onSelectRef.current(node.id);
       });
 
-      markersRef.current.push(
-        new Marker({ element: el, anchor: 'center' })
-          .setLngLat([node.lon, node.lat])
-          .setPopup(
-            new Popup({
-              offset: 14,
-              closeButton: false,
-              className: 'hub-map-popup',
-            }).setHTML(
-              `<strong>${label}</strong><br/>${
-                node.kind === 'fbo' ? 'Port FBO' : 'Company warehouse'
-              }`,
-            ),
-          )
-          .addTo(map),
-      );
+      try {
+        markersRef.current.push(
+          new Marker({ element: el, anchor: 'center' })
+            .setLngLat([node.lon, node.lat])
+            .setPopup(
+              new Popup({
+                offset: 14,
+                closeButton: false,
+                className: 'hub-map-popup',
+              }).setHTML(
+                `<strong>${label}</strong><br/>${
+                  node.kind === 'fbo' ? 'Port FBO' : 'Company warehouse'
+                }`,
+              ),
+            )
+            .addTo(map),
+        );
+      } catch {
+        continue;
+      }
       extend(node.lon, node.lat);
     }
 
-    if (boundCount === 1) {
-      map.easeTo({
-        center: [plotNodes[0]!.lon, plotNodes[0]!.lat],
-        zoom: 7.5,
-        duration: 400,
-      });
-    } else if (boundCount > 1) {
-      map.fitBounds(bounds, { padding: 48, maxZoom: 9, duration: 450 });
+    try {
+      if (boundCount === 1) {
+        map.easeTo({
+          center: [plotNodes[0]!.lon, plotNodes[0]!.lat],
+          zoom: 7.5,
+          duration: 400,
+        });
+      } else if (boundCount > 1) {
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        if (ne.lng === sw.lng && ne.lat === sw.lat) {
+          map.easeTo({
+            center: [ne.lng, ne.lat],
+            zoom: 7.5,
+            duration: 400,
+          });
+        } else {
+          map.fitBounds(bounds, { padding: 48, maxZoom: 9, duration: 450 });
+        }
+      }
+    } catch {
+      /* map removed mid-camera */
     }
   }, [props.nodes, props.selectedId, mapGeneration]);
 

@@ -99,7 +99,7 @@ describe('countPortCorridorDemandMatches', () => {
       ],
       portPickupOrigins: [{ icao: 'SBGR', countryId: 'BR' }],
       portCommodityIds: ['general'],
-      pickupHubs: ['SBGR', 'SBKP'],
+      pickupHubs: ['SBGR'],
       hubCoords: [sbgr],
       maxNm: corridorNmForLevel(1),
     });

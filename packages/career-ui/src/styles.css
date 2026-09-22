@@ -10901,6 +10901,18 @@ span.dispatch-route-hub-dest {
   min-height: 0;
 }
 
+.va-panel-loading {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-height: 14rem;
+}
+
+.va-panel-loading > .busy-block {
+  flex: 1 1 auto;
+  min-height: 14rem;
+}
+
 .ports-panel-body:has(> .ports-demand-board) > .fbo-mode-switcher {
   margin-bottom: 0;
 }

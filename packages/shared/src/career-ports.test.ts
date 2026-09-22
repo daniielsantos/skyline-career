@@ -99,6 +99,27 @@ describe('career ports', () => {
     assert.ok(snap.pickups[0]!.heldDays >= PORT_YARD_HOLD_WARN_DAYS);
   });
 
+  it('heals open listings onto desk pickup hub', () => {
+    const world = createSeedEconomyWorld({ seed: 'desk-heal' });
+    world.portListings = [
+      {
+        id: 'portlot_sbkp',
+        portId: 'BRSSZ',
+        commodityId: 'general',
+        availableKg: 5_000,
+        unitPriceUsd: 1.2,
+        allocatedHubIcao: 'SBKP',
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+      },
+    ];
+    ensurePortListings(world);
+    const lot = world.portListings!.find((l) => l.id === 'portlot_sbkp');
+    assert.ok(lot);
+    assert.equal(lot!.allocatedHubIcao, 'SBGR');
+  });
+
   it('rejects port buy when Cargo Ops commodity is locked', () => {
     const world = createSeedEconomyWorld({ seed: 'ports-lock' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
@@ -355,7 +376,7 @@ describe('career ports', () => {
       assert.equal(resolvePortPickupHub(port!), row.hub);
       assert.ok(port!.pickupHubs.includes(row.hub));
     }
-    assert.ok(getCareerPort('BRSSZ')!.pickupHubs.includes('SBKP'));
+    assert.deepEqual([...getCareerPort('BRSSZ')!.pickupHubs], ['SBGR']);
     assert.deepEqual([...getCareerPort('BRRIG')!.pickupHubs], ['SBPA']);
     assert.deepEqual([...getCareerPort('BRVDC')!.pickupHubs], ['SBBE']);
     assert.ok(getCareerPort('BRRIG')!.lat < -32 && getCareerPort('BRRIG')!.lat > -33);

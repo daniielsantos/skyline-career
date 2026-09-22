@@ -7,6 +7,7 @@ import {
   buyPortListing,
   effectivePortBuyUnitPriceUsd,
   getCareerPort,
+  resolvePortPickupHub,
 } from './career-ports.js';
 import { isPortOperator } from './career-port-concessions.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
@@ -64,9 +65,10 @@ function assertWarehouseForPort(
   );
   if (!wh) throw new Error('Warehouse not found');
   const hub = wh.icao.trim().toUpperCase();
-  if (!port.pickupHubs.map((h) => h.toUpperCase()).includes(hub)) {
+  const desk = resolvePortPickupHub(port);
+  if (hub !== desk) {
     throw new Error(
-      `Warehouse at ${hub} is not a pickup hub for ${port.name}`,
+      `Desk auto-buy for ${port.name} delivers to ${desk} only. Use Truck from yard or move stock via stevedore.`,
     );
   }
   return { warehouseId: wh.id, hubIcao: hub };

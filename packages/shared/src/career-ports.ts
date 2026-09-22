@@ -73,6 +73,7 @@ export type CareerPortDef = {
   lat: number;
   lon: number;
   /** Preferred collection hubs, first = default. Must be career hubs. */
+  /** Single air pickup hub per port (buy, listings, WH gate). */
   pickupHubs: readonly string[];
 };
 
@@ -104,7 +105,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'BR',
     lat: -23.952,
     lon: -46.308,
-    pickupHubs: ['SBGR', 'SBKP'],
+    pickupHubs: ['SBGR'],
   },
   {
     id: 'BRPNG',
@@ -337,7 +338,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'CO',
     lat: 10.4,
     lon: -75.53,
-    pickupHubs: ['SKCG', 'SKBQ'],
+    pickupHubs: ['SKCG'],
   },
   {
     id: 'COBUN',
@@ -345,7 +346,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'CO',
     lat: 3.89,
     lon: -77.08,
-    pickupHubs: ['SKCL', 'SKBU'],
+    pickupHubs: ['SKCL'],
   },
   {
     id: 'VELAG',
@@ -361,7 +362,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'GY',
     lat: 6.8,
     lon: -58.17,
-    pickupHubs: ['SYCJ', 'SYEC'],
+    pickupHubs: ['SYCJ'],
   },
   {
     id: 'SRPBM',
@@ -369,7 +370,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'SR',
     lat: 5.82,
     lon: -55.17,
-    pickupHubs: ['SMJP', 'SMZO'],
+    pickupHubs: ['SMJP'],
   },
   {
     id: 'GFCAY',
@@ -385,7 +386,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'PA',
     lat: 8.95,
     lon: -79.56,
-    pickupHubs: ['MPTO', 'MPMG'],
+    pickupHubs: ['MPTO'],
   },
   {
     id: 'CRLIM',
@@ -393,7 +394,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'CR',
     lat: 10.0,
     lon: -83.03,
-    pickupHubs: ['MRLM', 'MROC'],
+    pickupHubs: ['MRLM'],
   },
   {
     id: 'NICOR',
@@ -425,7 +426,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'GT',
     lat: 13.92,
     lon: -90.79,
-    pickupHubs: ['MGGT', 'MGSJ'],
+    pickupHubs: ['MGGT'],
   },
   {
     id: 'BZBLZ',
@@ -497,7 +498,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'LC',
     lat: 14.01,
     lon: -61.0,
-    pickupHubs: ['TLPL', 'TLPC'],
+    pickupHubs: ['TLPL'],
   },
   {
     id: 'GDSTG',
@@ -769,7 +770,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'IS',
     lat: 64.15,
     lon: -21.94,
-    pickupHubs: ['BIRK', 'BIKF'],
+    pickupHubs: ['BIRK'],
   },
   {
     id: 'MEDUR',
@@ -777,7 +778,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'ME',
     lat: 42.09,
     lon: 19.09,
-    pickupHubs: ['LYPG', 'LYTV'],
+    pickupHubs: ['LYPG'],
   },
   {
     id: 'ALDUR',
@@ -793,7 +794,7 @@ export const CAREER_PORTS: readonly CareerPortDef[] = [
     countryId: 'TR',
     lat: 41.0,
     lon: 28.95,
-    pickupHubs: ['LTFM', 'LTFJ'],
+    pickupHubs: ['LTFM'],
   },
   {
     id: 'TRIZM',
@@ -2029,6 +2030,19 @@ export function resolvePortPickupHub(
   return port.pickupHubs[0]!;
 }
 
+/** Rewire open listings onto the desk pickup hub (legacy multi-hub spawns). */
+function healPortListingsDeskHub(world: CareerEconomyWorld): void {
+  for (const l of world.portListings ?? []) {
+    if (l.status !== 'open' || l.availableKg <= 0) continue;
+    const port = getCareerPort(l.portId);
+    if (!port) continue;
+    const desk = resolvePortPickupHub(port);
+    if (l.allocatedHubIcao.trim().toUpperCase() !== desk) {
+      l.allocatedHubIcao = desk;
+    }
+  }
+}
+
 /** Static factory floor (no hub context) — used as fallback / tests. */
 export function portFactoryUnitPriceUsd(commodityId: CommodityId): number {
   return money(getCommodity(commodityId).basePricePerKg * PORT_FACTORY_PRICE_FRAC);
@@ -2098,6 +2112,7 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
     world.portListings = [];
   }
   const listings = world.portListings;
+  healPortListingsDeskHub(world);
   const rng = mulberry32(hashSeed(`${world.seed}:ports:${world.tick}`));
 
   // Return unused kg from expired open listings to inventory.
@@ -2124,15 +2139,9 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
     );
     let need = slotCap - open.length;
     let guard = 0;
-    let slot = 0;
     while (need > 0 && guard++ < 16) {
       const commodityId = PORT_CARGO[Math.floor(rng() * PORT_CARGO.length)]!;
-      const hub =
-        slot === 0
-          ? port.pickupHubs[0]!
-          : (port.pickupHubs[Math.floor(rng() * port.pickupHubs.length)] ??
-            port.pickupHubs[0]!);
-      slot += 1;
+      const hub = resolvePortPickupHub(port);
       if (!airportByIcao(world, hub)) {
         need -= 1;
         continue;
@@ -2849,16 +2858,22 @@ export function portSnapshot(
       return {
         ...port,
         pickupHubs: [...port.pickupHubs],
-        pickupHubDetails: port.pickupHubs.map((icao) => {
-          const coords = CAREER_HUB_COORDS[icao];
-          const ap = airportByIcao(world, icao);
-          return {
-            icao,
-            lat: coords?.lat ?? ap?.lat ?? port.lat,
-            lon: coords?.lon ?? ap?.lon ?? port.lon,
-            name: coords?.name ?? ap?.name,
-          };
-        }),
+        deskPickupHub: resolvePortPickupHub(port),
+        stevedorePickupHubs: [],
+        pickupHubDetails: (() => {
+          const desk = resolvePortPickupHub(port);
+          const coords = CAREER_HUB_COORDS[desk];
+          const ap = airportByIcao(world, desk);
+          return [
+            {
+              icao: desk,
+              lat: coords?.lat ?? ap?.lat ?? port.lat,
+              lon: coords?.lon ?? ap?.lon ?? port.lon,
+              name: coords?.name ?? ap?.name,
+              desk: true,
+            },
+          ];
+        })(),
         listings: listPortListings(world, port.id).map((l) => ({
           ...l,
           commodityName: getCommodity(l.commodityId).name,
@@ -2872,7 +2887,9 @@ export function portSnapshot(
           ...row,
           commodityName: getCommodity(row.commodityId).name,
         })),
-        marketSignals: portPickupMarketSignals(world, port.pickupHubs),
+        marketSignals: portPickupMarketSignals(world, [
+          resolvePortPickupHub(port),
+        ]),
         inbound: {
           arrivesAtTick,
           ticksLeft: Math.max(0, arrivesAtTick - world.tick),

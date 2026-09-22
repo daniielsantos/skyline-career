@@ -84,7 +84,7 @@ describe('per-port Demand desk', () => {
       assert.ok(o.portId, `order ${o.id} missing portId`);
       const pickups =
         o.portId === 'BRSSZ'
-          ? ['SBGR', 'SBKP']
+          ? ['SBGR']
           : o.portId === 'BRPNG'
             ? ['SBCT']
             : [];

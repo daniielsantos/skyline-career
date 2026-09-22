@@ -2890,11 +2890,16 @@ export type PortsSnapshot = {
     lat: number;
     lon: number;
     pickupHubs: string[];
+    /** Desk hub for buy/listings (pickupHubs[0]). */
+    deskPickupHub?: string;
+    /** Extra hubs reachable via Port FBO truck only. */
+    stevedorePickupHubs?: string[];
     pickupHubDetails?: Array<{
       icao: string;
       lat: number;
       lon: number;
       name?: string;
+      desk?: boolean;
     }>;
     listings: PortListingView[];
     inventory?: Array<{

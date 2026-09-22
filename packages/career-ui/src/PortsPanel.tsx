@@ -68,6 +68,11 @@ import {
   type PortsLoopStep,
 } from './ports-loop-guidance';
 import {
+  formatPortDeskPickupLabel,
+  portDeskPickupHubList,
+  resolvePortDeskPickupHub,
+} from './port-desk-pickup';
+import {
   demandOrderReachableFromOrigins,
   previewDemandAcceptPull,
   previewDemandInternationalRoute,
@@ -894,19 +899,28 @@ export function PortsPanel(props: {
 
   const mapPorts = useMemo(
     () =>
-      (snap?.ports ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        lat: p.lat,
-        lon: p.lon,
-        pickupHubDetails:
-          p.pickupHubDetails ??
-          p.pickupHubs.map((icao) => ({
-            icao,
-            lat: p.lat,
-            lon: p.lon,
-          })),
-      })),
+      (snap?.ports ?? []).map((p) => {
+        const deskHubs = portDeskPickupHubList(p.pickupHubs);
+        const details = p.pickupHubDetails ?? [];
+        return {
+          id: p.id,
+          name: p.name,
+          lat: p.lat,
+          lon: p.lon,
+          pickupHubDetails: deskHubs.map((icao) => {
+            const hit = details.find(
+              (d) => d.icao.trim().toUpperCase() === icao,
+            );
+            return (
+              hit ?? {
+                icao,
+                lat: p.lat,
+                lon: p.lon,
+              }
+            );
+          }),
+        };
+      }),
     [snap?.ports],
   );
 
@@ -951,9 +965,7 @@ export function PortsPanel(props: {
     const deskPort = deskPortId
       ? snap?.ports.find((p) => p.id.trim().toUpperCase() === deskPortId)
       : undefined;
-    const deskPickups = new Set(
-      (deskPort?.pickupHubs ?? []).map((h) => h.trim().toUpperCase()),
-    );
+    const deskPickups = new Set(portDeskPickupHubList(deskPort?.pickupHubs));
     const rows = (warehouses?.warehouses ?? [])
       .filter((w) => {
         const icao = w.icao.trim().toUpperCase();
@@ -1467,13 +1479,21 @@ export function PortsPanel(props: {
     if (props.busy || loading) return;
     const warehouseId =
       deskWarehouseId ||
-      (warehouses?.warehouses ?? []).find((w) =>
-        (port?.pickupHubs ?? [])
-          .map((h) => h.toUpperCase())
-          .includes(w.icao.toUpperCase()),
-      )?.id;
+      (warehouses?.warehouses ?? []).find((w) => {
+        const desk = resolvePortDeskPickupHub(port?.pickupHubs);
+        return (
+          desk != null &&
+          w.icao.trim().toUpperCase() === desk
+        );
+      })?.id;
     if (!warehouseId) {
-      props.onToast?.('fail', 'Need a warehouse at a pickup hub for this port');
+      const desk = resolvePortDeskPickupHub(port?.pickupHubs);
+      props.onToast?.(
+        'fail',
+        desk
+          ? `Need a warehouse at ${desk} (desk pickup for this port)`
+          : 'Need a warehouse at the desk pickup hub for this port',
+      );
       return;
     }
     setLoading(true);
@@ -2272,6 +2292,7 @@ export function PortsPanel(props: {
     return free >= needKg;
   }
 
+  /** All pickup hubs for this port (yard + stevedore). */
   const portPickupHubs = useMemo(() => {
     const hubs = port?.pickupHubs ?? [];
     if (hubs.length > 0) return hubs.map((h) => h.toUpperCase());
@@ -2347,11 +2368,7 @@ export function PortsPanel(props: {
     return map;
   }, [snap?.ports]);
   const selectedPortPickupSet = useMemo(() => {
-    return new Set(
-      (port?.pickupHubs ?? [])
-        .map((h) => h.trim().toUpperCase())
-        .filter(Boolean),
-    );
+    return new Set(portDeskPickupHubList(port?.pickupHubs));
   }, [port?.pickupHubs]);
 
   const filteredBuyableHubs = useMemo(() => {
@@ -3646,7 +3663,7 @@ export function PortsPanel(props: {
                                 <strong>{p.name}</strong>
                               </td>
                               <td className="muted">
-                                {p.pickupHubs.join(', ') || '—'}
+                                {formatPortDeskPickupLabel(p.pickupHubs)}
                               </td>
                               <td className="muted">{p.listings.length}</td>
                               <td className="muted">{conc}</td>

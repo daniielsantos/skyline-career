@@ -251,8 +251,8 @@ export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
           ) : null}
 
           <p className="ferry-journey-fuel-note">
-            Instant relocation. Each leg tops up for the hop, then burns trip
-            fuel — tanks usually arrive empty. Keep clicking{' '}
+            Instant relocation. Hop Jet-A is included in the ferry price —
+            hangar tanks stay as they are. Keep clicking{' '}
             <strong>Fly next leg</strong> until you reach {finalDest}.
           </p>
         </div>

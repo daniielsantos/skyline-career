@@ -8,7 +8,7 @@ import type {
 import { postCreditDraw, postCreditRepay } from './api';
 import { boardMoneyLabel, isFiniteMoney } from './board-money';
 
-const CASHFLOW_PAGE_SIZE = 15;
+const CASHFLOW_PAGE_SIZE = 10;
 
 /** Mirror of shared LEDGER_SYSTEM_KINDS — keep in sync for Member column. */
 const LEDGER_SYSTEM_KINDS = new Set([
@@ -134,6 +134,32 @@ function SummaryCard(props: {
           </dd>
         </div>
       </dl>
+    </div>
+  );
+}
+
+/** Week / month / all-time P&L cards (VA Ledger can place these above the hero). */
+export function CashflowSummaryGrid(props: {
+  cashflow: CareerCashflowSnapshot;
+  formatMoney: (n: number) => string;
+}) {
+  return (
+    <div className="cashflow-summary-grid">
+      <SummaryCard
+        title="This week"
+        summary={props.cashflow.week}
+        formatMoney={props.formatMoney}
+      />
+      <SummaryCard
+        title="This month"
+        summary={props.cashflow.month}
+        formatMoney={props.formatMoney}
+      />
+      <SummaryCard
+        title="All time"
+        summary={props.cashflow.allTime}
+        formatMoney={props.formatMoney}
+      />
     </div>
   );
 }
@@ -352,6 +378,8 @@ export function HangarCashflowPanel(props: {
   creditActionsLocked?: boolean;
   /** VA Ledger hero owns Credit — omit the inline block here. */
   hideCredit?: boolean;
+  /** When true, omit week/month/all-time (rendered above by CashflowSummaryGrid). */
+  hideSummaries?: boolean;
   /** VA listed: label credit Cargo Ops as owner ladder (formula unchanged). */
   vaOwnerOpsLabels?: boolean;
   /**
@@ -416,23 +444,12 @@ export function HangarCashflowPanel(props: {
         </p>
       ) : (
         <>
-          <div className="cashflow-summary-grid">
-            <SummaryCard
-              title="This week"
-              summary={snap!.week}
+          {!props.hideSummaries ? (
+            <CashflowSummaryGrid
+              cashflow={snap!}
               formatMoney={props.formatMoney}
             />
-            <SummaryCard
-              title="This month"
-              summary={snap!.month}
-              formatMoney={props.formatMoney}
-            />
-            <SummaryCard
-              title="All time"
-              summary={snap!.allTime}
-              formatMoney={props.formatMoney}
-            />
-          </div>
+          ) : null}
 
           <div className="cashflow-history">
             <p className="aircraft-card-section-label">Recent activity</p>

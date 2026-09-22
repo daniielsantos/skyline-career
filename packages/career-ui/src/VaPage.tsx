@@ -32,7 +32,7 @@ import {
   type VaHaulHold,
 } from './api';
 import { BusyBlock, BusyStatus } from './Busy';
-import { CompanyCreditBlock, HangarCashflowPanel } from './CashflowPanel';
+import { CompanyCreditBlock, CashflowSummaryGrid, HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
 import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
@@ -305,7 +305,7 @@ export function VaPage(props: Props) {
     setLedgerBusy(true);
     setLedgerError(null);
     try {
-      const snap = await fetchCashflow();
+      const snap = await fetchCashflow({ companyId });
       // Drop stale responses from a pre-switch (home) fetch.
       if (gen !== ledgerFetchGenRef.current) return;
       setCashflow(snap);
@@ -1074,6 +1074,24 @@ export function VaPage(props: Props) {
             <BusyStatus label="Opening company ledger…" />
           ) : (
             <>
+          <VaMoneyMap
+            marketHireCutPct={memberRouteCutPct}
+            airlineLaborCutPct={memberAirlineCutPct}
+          />
+          {ledgerError ? (
+            <p className="error" role="alert">
+              {ledgerError}
+            </p>
+          ) : null}
+          {ledgerBusy && !cashflow ? (
+            <BusyStatus label="Loading ledger…" />
+          ) : cashflow &&
+            (cashflow.recent.length > 0 || cashflow.allTime.entryCount > 0) ? (
+            <CashflowSummaryGrid
+              cashflow={cashflow}
+              formatMoney={formatBoardMoney}
+            />
+          ) : null}
           <div className="va-ledger-hero">
             <div className="va-ledger-wallet">
               <p className="aircraft-card-section-label" style={{ margin: 0 }}>
@@ -1171,18 +1189,7 @@ export function VaPage(props: Props) {
               ) : null}
             </div>
           </div>
-          <VaMoneyMap
-            marketHireCutPct={memberRouteCutPct}
-            airlineLaborCutPct={memberAirlineCutPct}
-          />
-          {ledgerError ? (
-            <p className="error" role="alert">
-              {ledgerError}
-            </p>
-          ) : null}
-          {ledgerBusy && !cashflow ? (
-            <BusyStatus label="Loading ledger…" />
-          ) : (
+          {!ledgerBusy || cashflow ? (
             <HangarCashflowPanel
               cashflow={cashflow}
               companyCredit={companyCredit}
@@ -1190,6 +1197,7 @@ export function VaPage(props: Props) {
               busy={pageBusy || ledgerBusy}
               creditActionsLocked={!isOwner}
               hideCredit
+              hideSummaries
               vaOwnerOpsLabels
               memberNamesByAccountId={ledgerMemberNames}
               formatMoney={formatBoardMoney}
@@ -1202,7 +1210,7 @@ export function VaPage(props: Props) {
                 setLedgerError(message);
               }}
             />
-          )}
+          ) : null}
             </>
           )}
         </div>

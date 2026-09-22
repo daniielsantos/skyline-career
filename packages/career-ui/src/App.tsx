@@ -10135,7 +10135,7 @@ export function App() {
       const arrivedAt =
         result.aircraft?.locationIcao?.trim().toUpperCase() ?? dest;
       setToastKind(result.quote.fuelScarcity === 'ok' ? 'ok' : 'warn');
-      const fuelNote = ' · tanks usually empty after hop';
+      const fuelNote = ' · tanks unchanged';
       const payLabel =
         result.ferryMode === 'allowance'
           ? 'Line crew · $0'

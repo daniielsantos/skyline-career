@@ -1589,6 +1589,7 @@ export interface FerryQuote {
   /** Full-rate fee without soft discount (for UI comparison). */
   fullRateFeeUsd: number;
   fuelNeededKg: number;
+  /** Shortfall vs hangar tanks — billed as hop Jet-A in totalCostUsd (tanks untouched). */
   fuelUpliftKg: number;
   fuelCostUsd: number;
   fuelScarcity: 'ok' | 'partial' | 'dry';
@@ -1749,8 +1750,9 @@ export function executeFerry(
     /** Skip VA/ops wallet debit (Line-crew allowance or cross-company overflow). */
     skipWalletDebit?: boolean;
     /**
-     * NPC Line-crew reposition: burn fuel now, arrive at tick (status `ferry`).
+     * NPC Line-crew reposition: arrive at tick (status `ferry`).
      * When omitted, ferry completes instantly (paid Hangar ferry).
+     * Hop fuel is billed in the quote; hangar tanks are not topped or burned.
      */
     npcArriveAtTick?: number;
     actorAccountId?: string | null;
@@ -1771,37 +1773,8 @@ export function executeFerry(
   }
   const aircraft = findPlayerAircraft(state, opts.aircraftId)!;
 
-  if (quote.fuelUpliftKg > 0) {
-    if (
-      isFerryRouteWaypoint(aircraft.locationIcao) ||
-      !world.airports.some((a) => a.icao === aircraft.locationIcao)
-    ) {
-      // Stepping-stone: wallet already includes flat fuel in quote; top up tanks.
-      aircraft.fuelKg = Math.min(
-        aircraft.fuelCapacityKg,
-        aircraft.fuelKg + quote.fuelUpliftKg,
-      );
-    } else {
-      const fuelQuote = quoteFuelUplift(world, {
-        originIcao: aircraft.locationIcao,
-        destIcao: quote.destIcao,
-        aircraftClassId: aircraft.aircraftClassId,
-        requestedKg: quote.fuelUpliftKg,
-        distanceNm: quote.distanceNm,
-        costMult: fboServiceCostMult(state, aircraft.locationIcao),
-      });
-      const uplift = deliverFuelUplift(world, fuelQuote);
-      aircraft.fuelKg = Math.min(
-        aircraft.fuelCapacityKg,
-        aircraft.fuelKg + uplift.deliveredKg,
-      );
-    }
-  }
-
-  aircraft.fuelKg = Math.max(
-    0,
-    Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg - quote.fuelNeededKg),
-  );
+  // Paid reposition: hop Jet-A stays in totalCostUsd (service fuel). Do not
+  // top up or burn hangar tanks — tanks arrive as they left.
   aircraft.assignedMissionId = undefined;
 
   const npcArrive =

@@ -77,6 +77,10 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hangar AOG note / overhaul ETA (2026-09-22):** sintoma = Duke em engine OH (1d light GA) parecia “maintenance” sem countdown. Causa = badge só pintava `status`; nota OH sumia atrás do ferry UI; AOG Inspect confundido com timer. Fix = badge `engine OH · 18h left`; Where “Shop at” + nota `Overhaul · Engine · … left · ready Day N`; ferry só parked; Inspect AOG = “not timed”.
 
+**Ferry tanks untouched (2026-09-22):** sintoma = Hangar/Line-crew ferry top-up + burn → tanques chegavam vazios mesmo com Jet-A no preço. Causa = `executeFerry` enchia shortfall e queimava `fuelNeededKg`. Fix = não mutar `fuelKg`; hop Jet-A continua em `totalCostUsd` (serviço incluso); copy Journey/toast.
+
+**Crew Ledger layout + tenant cashflow (2026-09-22):** sintoma = Money map / week·month·all time abaixo do hero; Recent 15/página. Validação = `/api/cashflow` já resume ledger da company do header (`loadMissions({ companyId })`); wallet da tela bate com all-time ± credit drawn. Fix = Money map + `CashflowSummaryGrid` acima do hero; `fetchCashflow({ companyId })` explícito no VaPage; Recent **10**/página.
+
 **Board picker parked-only (2026-09-22):** sintoma = Duke da airline em maintenance aparecia no picker de Freights/Contracts (`… · maintenance`) mas sumia em Charter/Hauls/Manifest. Causa = `boardEstimateFleet` aceitava `parked|assigned|maintenance`; Charter/Hauls filtravam só `parked`. Fix = `isOpsAircraftBoardSelectable` = parked only; Freights/Contracts alinhados. MX fica no Hangar até repair.
 
 **VA directory toolbar (2026-09-22):** sintoma = paragraph longo (“joining keeps… Port FBO…”) enchendo a toolbar. Fix = remover meta; Search à esquerda, Join code à direita.

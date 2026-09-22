@@ -369,8 +369,28 @@ describe('career fleet hangar', () => {
     assert.equal(listParkedAt(state, 'SBKP').length, 1);
     assert.equal(listParkedAt(state, 'SBGR').length, 0);
     assert.ok(state.walletUsd < 50_000);
-    assert.ok(result.aircraft.fuelKg < beforeFuel + quote.fuelUpliftKg);
+    // Hop Jet-A is billed in totalCostUsd; hangar tanks stay untouched.
+    assert.equal(result.aircraft.fuelKg, beforeFuel);
     assert.ok((state.ferrySoftNmUsed ?? 0) > 0);
+  });
+
+  it('ferry preserves hangar fuel when tanks already cover the hop', () => {
+    const world = createSeedEconomyWorld({ seed: 'ferry-keep-fuel' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    state.walletUsd = 50_000;
+    const aircraft = state.fleet[0]!;
+    aircraft.fuelKg = aircraft.fuelCapacityKg;
+    const quote = quoteFerry(world, state, {
+      aircraftId: aircraft.id,
+      destIcao: 'SBKP',
+    });
+    assert.equal(quote.fuelUpliftKg, 0);
+    assert.equal(quote.fuelCostUsd, 0);
+    const result = executeFerry(world, state, {
+      aircraftId: aircraft.id,
+      destIcao: 'SBKP',
+    });
+    assert.equal(result.aircraft.fuelKg, aircraft.fuelCapacityKg);
   });
 
   it('ferry soft budget expires into full-rate fees', () => {

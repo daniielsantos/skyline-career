@@ -1656,7 +1656,8 @@ export function deleteCareerProfile(id: string) {
   });
 }
 
-export function fetchCashflow() {
+export function fetchCashflow(opts?: { companyId?: string }) {
+  const companyId = opts?.companyId?.trim();
   return api<
     CareerCashflowSnapshot & {
       walletUsd: number;
@@ -1667,7 +1668,11 @@ export function fetchCashflow() {
       flightQuality?: VaFlightQualitySnapshot | null;
       orgPerks?: VaOrgPerks | null;
     }
-  >('/api/cashflow');
+  >('/api/cashflow', {
+    headers: companyId
+      ? { 'X-Skyline-Company-Id': companyId }
+      : undefined,
+  });
 }
 
 export function postCreditDraw(amountUsd: number) {

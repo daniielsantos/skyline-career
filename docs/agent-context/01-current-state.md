@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **ec19890** / desktop **0.3.201** shipped: Speed up Hauls company network and fix map stack, imperial mass, and chip glyphs. Release: [v0.3.201](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.201).
+
+
 `main` **3be79c1** / desktop **0.3.200** shipped: Fix My VA Ports blank pane, false home FBO, and slow Roster open. Release: [v0.3.200](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.200).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **dd2eaca** / desktop **0.3.211** shipped: Allow partial desk-hold loads and keep Ports map selection sticky. Release: [v0.3.211](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.211).
+
+
 `main` **334df5b** / desktop **0.3.210** shipped: Let VA Hauls Prepare off-origin and show hold author on the desk map. Release: [v0.3.210](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.210).
 
 

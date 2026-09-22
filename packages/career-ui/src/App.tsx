@@ -2150,16 +2150,29 @@ function isFboSplitSisterMission(mission: Mission): boolean {
 /**
  * Mission shown on the Dispatch board / Watch automation.
  * Excludes crew airborne and Split sisters waiting for Crew fly.
+ * When `pilotAccountId` is set (VA), prefer that pilot's mission so a friend's
+ * flight does not take over Dispatch / Watch.
  */
-function findDispatchBoardMission(missions: Mission[]): Mission | undefined {
-  const player = findPlayerDispatchMission(missions);
+function findDispatchBoardMission(
+  missions: Mission[],
+  pilotAccountId?: string | null,
+): Mission | undefined {
+  const player = findPlayerDispatchMission(missions, pilotAccountId);
   if (player) return player;
-  const candidates = missions.filter(
-    (m) =>
-      isActiveMissionStatus(m.status) &&
-      !m.crewOperated &&
-      !isFboSplitSisterMission(m),
-  );
+  const actor = pilotAccountId?.trim() || '';
+  const candidates = missions.filter((m) => {
+    if (
+      !isActiveMissionStatus(m.status) ||
+      m.crewOperated ||
+      isFboSplitSisterMission(m)
+    ) {
+      return false;
+    }
+    if (!actor) return true;
+    const owner = m.pilotAccountId?.trim() || '';
+    if (!owner) return true;
+    return owner === actor;
+  });
   if (candidates.length === 0) return undefined;
   return candidates.reduce((best, mission) =>
     (mission.acceptedAtTick ?? 0) >= (best.acceptedAtTick ?? 0) ? mission : best,
@@ -2167,10 +2180,20 @@ function findDispatchBoardMission(missions: Mission[]): Mission | undefined {
 }
 
 /** Personal Dispatch / Watch only — never crew airborne. */
-function findPlayerDispatchMission(missions: Mission[]): Mission | undefined {
-  const active = missions.filter(
-    (m) => isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
-  );
+function findPlayerDispatchMission(
+  missions: Mission[],
+  pilotAccountId?: string | null,
+): Mission | undefined {
+  const actor = pilotAccountId?.trim() || '';
+  const active = missions.filter((m) => {
+    if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
+      return false;
+    }
+    if (!actor) return true;
+    const owner = m.pilotAccountId?.trim() || '';
+    if (!owner) return true;
+    return owner === actor;
+  });
   if (active.length === 0) return undefined;
   return active.reduce((best, mission) =>
     (mission.acceptedAtTick ?? 0) >= (best.acceptedAtTick ?? 0) ? mission : best,
@@ -6458,8 +6481,8 @@ export function App() {
     [missions],
   );
   const activeMission = useMemo(
-    () => findDispatchBoardMission(missions),
-    [missions],
+    () => findDispatchBoardMission(missions, authAccountId),
+    [missions, authAccountId],
   );
   activeMissionRef.current = activeMission;
 
@@ -6527,7 +6550,7 @@ export function App() {
   // Do not mark the one-shot until we actually see in_flight — a first
   // missions payload of accepted/dispatched used to skip cruise resume.
   useEffect(() => {
-    const airborne = findPlayerDispatchMission(missions);
+    const airborne = findPlayerDispatchMission(missions, authAccountId);
     const action = airborneResumeShouldOpenDispatch({
       alreadyDone: airborneResumeNavDoneRef.current,
       hubSelected,
@@ -6543,7 +6566,7 @@ export function App() {
     setAirportHydrating(false);
     setTab('staging');
     writeCareerLocation({ tab: 'staging', airportIcao: null }, { replace: true });
-  }, [hubSelected, missions, tab, airportIcao]);
+  }, [hubSelected, missions, tab, airportIcao, authAccountId]);
 
   // Route ops cargo ceiling for Active Dispatch "Capacity left" (and staging).
   useEffect(() => {
@@ -6695,8 +6718,8 @@ export function App() {
   ]);
 
   const playerDispatchMission = useMemo(
-    () => findPlayerDispatchMission(missions),
-    [missions],
+    () => findPlayerDispatchMission(missions, authAccountId),
+    [missions, authAccountId],
   );
   const crewAirborneMission = useMemo(
     () => findCrewAirborneMission(missions),
@@ -7654,10 +7677,16 @@ export function App() {
     // — unless a VA Dispatch mission is active (ops tenant must stay).
     if (next === 'hangar') {
       const home = homeCompanyIdRef.current?.trim();
-      const activeVaDispatch = missions.some(
-        (m) =>
-          isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
-      );
+      const me = authAccountIdRef.current?.trim() || '';
+      const activeVaDispatch = missions.some((m) => {
+        if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
+          return false;
+        }
+        if (!me) return true;
+        const owner = m.pilotAccountId?.trim() || '';
+        if (!owner) return true;
+        return owner === me;
+      });
       if (
         home &&
         home !== activeCompanyIdRef.current &&
@@ -7678,10 +7707,16 @@ export function App() {
       // (member accepted Freights/Charter on a VA tail).
       // Company port desk lives under My VA → Ports (session already VA there).
       // Sidebar Ports is always home logistics.
-      const activeVaDispatch = missions.some(
-        (m) =>
-          isActiveMissionStatus(m.status) && isPlayerDispatchMission(m),
-      );
+      const me = authAccountIdRef.current?.trim() || '';
+      const activeVaDispatch = missions.some((m) => {
+        if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
+          return false;
+        }
+        if (!me) return true;
+        const owner = m.pilotAccountId?.trim() || '';
+        if (!owner) return true;
+        return owner === me;
+      });
       const onVaTenant =
         Boolean(home) && home !== activeCompanyIdRef.current;
       const mustRestoreHome =

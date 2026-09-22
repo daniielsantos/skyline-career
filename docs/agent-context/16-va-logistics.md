@@ -50,6 +50,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.
 
+**VA parallel cargo per pilot (2026-09-22):** sintoma = amigo não Accept enquanto outro membro tem missão na VA (fatiar hold / voar junto). Causa = gate `listActivePlayerMissions` company-wide em haul/bridge/demand + staging/commit + Charter. Fix = `listActivePlayerMissionsForPilot(pilotAccountId)` (legado sem stamp ainda bloqueia todos); Dispatch/Watch/Prepare usam só a missão do account logado.
+
 **VA Ledger Credit beside wallet (2026-09-22):** hero em 3 colunas Wallet | Credit | Flight quality (empilha em viewport estreita).
 
 **Hauls Open desk Cancel + layout (2026-09-22):** Hold = reserva de stock/Demand até Accept ou TTL. UI Hauls tinha Accept mas sem Cancel. Fix = Cancel (bridge/haul/demand cancel APIs + `companyId`); row em grid (rota+kind+meta | actions).
@@ -921,6 +923,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **My VA Hauls board** — Internal Haul open/active + Accept + Port strip + Ports CTA (2026-09-21)
 - [x] **Hauls Prepare + ferry Manifest** — off-origin Prepare → deskHold draft; Accept at-origin dispatch-hold (2026-09-22)
 - [x] **Desk hold partial load** — Manifest loadKg ≤ ops cap; *DispatchHold kg + remainder hold (2026-09-22)
+- [x] **VA parallel cargo per pilot** — friends Accept together; gate by pilotAccountId (2026-09-22)
 - [x] **Hauls hold author + map route** — heldByName on Open desk; click plots OD on Company Network map (2026-09-22)
 - [x] **Path to Port FBO** — VaPortPathCard Hauls/Config + empty/join pitch (2026-09-21)
 - [x] **Hauls quiet após FBO** — Path some pós-claim; copy curta (2026-09-21)

@@ -26,7 +26,7 @@ import { assignAircraftToMission, findPlayerAircraft } from './career-fleet.js';
 import { isBushHub, isBushTripOnlyHub } from './career-bush.js';
 import {
   getAircraftClass,
-  listActivePlayerMissions,
+  listActivePlayerMissionsForPilot,
   recomputeMissionTotals,
   syncPlayerInbound,
 } from './career-mission.js';
@@ -194,6 +194,9 @@ function createHaulMission(
     warehouseId: opts.warehouseId,
     warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
+    ...(opts.pilotAccountId?.trim()
+      ? { pilotAccountId: opts.pilotAccountId.trim() }
+      : {}),
   });
   assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
     actorAccountId: opts.pilotAccountId,
@@ -211,8 +214,12 @@ function parkedAircraftAt(
   origin: string,
   dest: string,
   kg: number,
+  pilotAccountId?: string | null,
 ) {
-  const open = listActivePlayerMissions(state.missions ?? []);
+  const open = listActivePlayerMissionsForPilot(
+    state.missions ?? [],
+    pilotAccountId,
+  );
   if (open.length > 0) {
     throw new Error(
       `Finish or cancel ${open[0]!.id} before starting a warehouse haul`,
@@ -374,6 +381,7 @@ export function acceptWarehouseHaul(
     origin,
     dest,
     kg,
+    opts.pilotAccountId,
   );
   const payUsd = quoteWarehouseHaulPayUsd(world, {
     originIcao: origin,
@@ -438,6 +446,7 @@ export function dispatchWarehouseHaulHold(
     hold.originIcao,
     hold.destIcao,
     kg,
+    opts.pilotAccountId,
   );
   const payUsd = money(hold.unitPriceUsd * kg);
   const withdrawn = withdrawCargoFromWarehouse(state, {

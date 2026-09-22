@@ -1108,6 +1108,30 @@ export function listActivePlayerMissions(
     .filter((m) => isActiveMissionStatus(m.status));
 }
 
+/**
+ * Active player cargo missions that block a new Accept for this pilot.
+ *
+ * VA parallel: when `pilotAccountId` is set, only that pilot's stamped missions
+ * (plus unstamped legacy missions) block — friends can fly together.
+ * Without an account id, behaves company-wide (solo / legacy).
+ */
+export function listActivePlayerMissionsForPilot(
+  missions: readonly MissionIntent[],
+  pilotAccountId?: string | null,
+): MissionIntent[] {
+  const active = listActivePlayerMissions(missions).filter(
+    (m) => m.crewOperated !== true,
+  );
+  const actor = pilotAccountId?.trim() || '';
+  if (!actor) return active;
+  return active.filter((m) => {
+    const owner = m.pilotAccountId?.trim() || '';
+    // Unstamped legacy missions still block everyone.
+    if (!owner) return true;
+    return owner === actor;
+  });
+}
+
 function activeNpcCargoKgForLot(world: CareerEconomyWorld, lotId: string): number {
   let total = 0;
   for (const flight of world.npcFlights ?? []) {
@@ -1197,7 +1221,10 @@ export function acceptEmptyFlight(
   if (bush && (bush.status === 'accepted' || bush.status === 'in_progress')) {
     throw new Error('Finish or abandon the active bush trip first');
   }
-  const open = listActivePlayerMissions(state.missions ?? []);
+  const open = listActivePlayerMissionsForPilot(
+    state.missions ?? [],
+    opts.actorAccountId,
+  );
   if (open.length > 0) {
     throw new Error(
       `Finish or cancel ${open[0]!.id} before planning an empty flight`,

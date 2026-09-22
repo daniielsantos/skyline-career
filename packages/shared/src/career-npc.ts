@@ -41,7 +41,7 @@ import {
 import {
   estimateRouteCargoLimit,
   getAircraftClass,
-  listActivePlayerMissions,
+  listActivePlayerMissionsForPilot,
   recomputeMissionTotals,
   reserveShipmentLot,
   syncPlayerInbound,
@@ -2887,6 +2887,8 @@ export function acceptContractPilotOffer(
     airframeTypeId: string;
     nowMs?: number;
     missionId?: string;
+    /** VA parallel — only this pilot's active missions block Accept. */
+    pilotAccountId?: string;
   },
 ): {
   mission: MissionIntent;
@@ -2954,9 +2956,10 @@ export function acceptContractPilotOffer(
     );
   }
 
-  const blocking = listActivePlayerMissions(state.missions).find(
-    (m) => m.crewOperated !== true,
-  );
+  const blocking = listActivePlayerMissionsForPilot(
+    state.missions,
+    opts.pilotAccountId,
+  )[0];
   if (blocking) {
     throw new Error(
       `Finish or cancel ${blocking.id} in Dispatch before accepting another flight`,
@@ -3076,6 +3079,9 @@ export function acceptContractPilotOffer(
     operatorNpcId: npc.id,
     operatorNpcName: npc.name,
     npcFlightId: flight.id,
+    ...(opts.pilotAccountId?.trim()
+      ? { pilotAccountId: opts.pilotAccountId.trim() }
+      : {}),
   });
 
   let remainderOpenOnBoard = false;

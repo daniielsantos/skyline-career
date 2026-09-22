@@ -26,6 +26,7 @@ import {
   missionOfpCheckSeq,
   KG_TO_LB,
   listActivePlayerMissions,
+  listActivePlayerMissionsForPilot,
   listMarketLots,
   listViableMarketLots,
   MAX_MANIFEST_LOTS,
@@ -964,6 +965,71 @@ describe('acceptMission', () => {
     });
     assert.equal(findActivePlayerMission([older, newer, settled])?.id, 'msn_new');
     assert.equal(listActivePlayerMissions([older, newer, settled]).length, 2);
+  });
+
+  it('listActivePlayerMissionsForPilot scopes VA parallel by pilotAccountId', () => {
+    const mine = baseMission({
+      id: 'msn_me',
+      status: 'accepted',
+      acceptedAtTick: 1,
+      pilotAccountId: 'acc_me',
+      lots: [
+        {
+          shipmentLotId: 'l1',
+          commodityId: 'general',
+          cargoKg: 100,
+          payUsd: 50,
+          urgency: 'normal',
+          reason: 'me',
+          deadlineTick: 99,
+        },
+      ],
+    });
+    const friend = baseMission({
+      id: 'msn_friend',
+      status: 'accepted',
+      acceptedAtTick: 2,
+      pilotAccountId: 'acc_friend',
+      lots: [
+        {
+          shipmentLotId: 'l2',
+          commodityId: 'general',
+          cargoKg: 100,
+          payUsd: 50,
+          urgency: 'normal',
+          reason: 'friend',
+          deadlineTick: 99,
+        },
+      ],
+    });
+    const legacy = baseMission({
+      id: 'msn_legacy',
+      status: 'accepted',
+      acceptedAtTick: 3,
+      lots: [
+        {
+          shipmentLotId: 'l3',
+          commodityId: 'general',
+          cargoKg: 100,
+          payUsd: 50,
+          urgency: 'normal',
+          reason: 'legacy',
+          deadlineTick: 99,
+        },
+      ],
+    });
+    const all = [mine, friend, legacy];
+    assert.equal(listActivePlayerMissionsForPilot(all).length, 3);
+    assert.deepEqual(
+      listActivePlayerMissionsForPilot(all, 'acc_me').map((m) => m.id).sort(),
+      ['msn_legacy', 'msn_me'],
+    );
+    assert.deepEqual(
+      listActivePlayerMissionsForPilot(all, 'acc_friend')
+        .map((m) => m.id)
+        .sort(),
+      ['msn_friend', 'msn_legacy'],
+    );
   });
 });
 

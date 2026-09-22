@@ -63,6 +63,7 @@ import {
   findPlayerAircraft,
   findNpcAirframe,
   listActivePlayerMissions,
+  listActivePlayerMissionsForPilot,
   listAircraftClassCatalog,
   buildAirframePerfMapForUi,
   listAircraftMarket,
@@ -8016,7 +8017,10 @@ export function createCareerApiServer(port = 8787) {
                   `Aircraft ${aircraft.label} must be parked at ${offer.originIcao}`,
                 );
               }
-              const active = listActivePlayerMissions(missions.missions);
+              const active = listActivePlayerMissionsForPilot(
+                missions.missions,
+                pilotStamp.pilotAccountId,
+              );
               if (active.length > 0) {
                 throw new Error(blockReasonAnotherActiveFlight(missions, active[0]!));
               }
@@ -12139,6 +12143,7 @@ export function createCareerApiServer(port = 8787) {
         }
         const cpAcceptCompanyId = companyIdFromRequest(req, body.companyId);
         try {
+          const cpPilotStamp = await vaPilotMissionStamp(req, cpAcceptCompanyId);
           const accepted = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const result = acceptContractPilotOffer(world, missions, {
@@ -12146,7 +12151,24 @@ export function createCareerApiServer(port = 8787) {
               npcFlightId: body.npcFlightId,
               airframeTypeId: body.airframeTypeId!,
               nowMs: Date.now(),
+              pilotAccountId: cpPilotStamp.pilotAccountId,
             });
+            if (cpPilotStamp.pilotAccountId || cpPilotStamp.pilotHomeCompanyId) {
+              const idx = missions.missions.findIndex(
+                (m) => m.id === result.mission.id,
+              );
+              if (idx >= 0) {
+                missions.missions[idx] = {
+                  ...missions.missions[idx]!,
+                  ...cpPilotStamp,
+                };
+                return {
+                  ...result,
+                  mission: missions.missions[idx]!,
+                  walletUsd: missions.walletUsd,
+                };
+              }
+            }
             return {
               ...result,
               walletUsd: missions.walletUsd,
@@ -12578,7 +12600,10 @@ export function createCareerApiServer(port = 8787) {
                 );
               }
             }
-            const activeMissions = listActivePlayerMissions(missions.missions);
+            const activeMissions = listActivePlayerMissionsForPilot(
+              missions.missions,
+              stagingPilotStamp.pilotAccountId,
+            );
             if (!intoMission && activeMissions.length > 0) {
               throw new Error(
                 blockReasonAnotherActiveFlight(missions, activeMissions[0]!),

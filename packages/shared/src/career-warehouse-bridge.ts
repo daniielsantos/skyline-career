@@ -17,7 +17,7 @@ import { assignAircraftToMission, findPlayerAircraft } from './career-fleet.js';
 import { isBushHub, isBushTripOnlyHub } from './career-bush.js';
 import {
   getAircraftClass,
-  listActivePlayerMissions,
+  listActivePlayerMissionsForPilot,
   recomputeMissionTotals,
   syncPlayerInbound,
 } from './career-mission.js';
@@ -374,8 +374,12 @@ function parkedAircraftAt(
   origin: string,
   dest: string,
   kg: number,
+  pilotAccountId?: string | null,
 ) {
-  const open = listActivePlayerMissions(state.missions ?? []);
+  const open = listActivePlayerMissionsForPilot(
+    state.missions ?? [],
+    pilotAccountId,
+  );
   if (open.length > 0) {
     throw new Error(
       `Finish or cancel ${open[0]!.id} before starting a warehouse bridge`,
@@ -453,6 +457,7 @@ export function acceptWarehouseBridge(
     origin,
     dest,
     kg,
+    opts.pilotAccountId,
   );
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: origin,
@@ -519,6 +524,7 @@ export function dispatchWarehouseBridgeHold(
     hold.originIcao,
     hold.destIcao,
     kg,
+    opts.pilotAccountId,
   );
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,

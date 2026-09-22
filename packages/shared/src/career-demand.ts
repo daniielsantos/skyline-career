@@ -38,7 +38,7 @@ import { isBushHub, isBushTripOnlyHub } from './career-bush.js';
 import {
   estimateRouteCargoLimit,
   getAircraftClass,
-  listActivePlayerMissions,
+  listActivePlayerMissionsForPilot,
   normalizeMissionIntent,
   recomputeMissionTotals,
   resolveConservativeOpsWeights,
@@ -533,7 +533,10 @@ export function dispatchDemandHold(
   const orderId = hold.orderId?.trim();
   if (!orderId) throw new Error('Demand hold is missing an order');
 
-  const open = listActivePlayerMissions(state.missions ?? []);
+  const open = listActivePlayerMissionsForPilot(
+    state.missions ?? [],
+    opts.pilotAccountId,
+  );
   if (open.length > 0) {
     throw new Error(
       `Finish or cancel ${open[0]!.id} before dispatching a demand hold`,
@@ -773,6 +776,9 @@ function createDemandMission(
     warehouseId: opts.warehouseId,
     warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
+    ...(opts.pilotAccountId?.trim()
+      ? { pilotAccountId: opts.pilotAccountId.trim() }
+      : {}),
   });
   assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
     actorAccountId: opts.pilotAccountId,
@@ -1154,7 +1160,10 @@ export function acceptDemandOrder(
     throw new Error('Dispatch the warehouse hold for this order instead of Fly now');
   }
 
-  const open = listActivePlayerMissions(state.missions ?? []);
+  const open = listActivePlayerMissionsForPilot(
+    state.missions ?? [],
+    opts.pilotAccountId,
+  );
   if (open.length > 0) {
     throw new Error(
       `Finish or cancel ${open[0]!.id} before accepting a demand order`,

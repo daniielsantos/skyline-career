@@ -62,7 +62,13 @@ import {
   ensurePortListings,
   listPortListings,
 } from './career-ports.js';
-import { cancelMission, departMission, settleMission, trimMissionCargoToKg } from './career-mission.js';
+import {
+  cancelMission,
+  departMission,
+  listActivePlayerMissions,
+  settleMission,
+  trimMissionCargoToKg,
+} from './career-mission.js';
 import { createSeedEconomyWorld, migrateEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { applyWalletDelta } from './career-ledger.js';
@@ -1605,5 +1611,82 @@ describe('career warehouse + demand', () => {
     );
     assert.ok(demandRemain);
     assert.equal(demandRemain!.kg, 120);
+  });
+
+  it('two pilots can partial-dispatch the same haul hold in parallel', () => {
+    const world = createSeedEconomyWorld({ seed: 'desk-hold-parallel' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'ParallelDesk',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 900_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    wh.tier = 4;
+    wh.capacityKg = WAREHOUSE_T4_CAPACITY_KG;
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 1_000,
+      avgCostUsdPerKg: 1.5,
+      tick: world.tick,
+    });
+    const aircraftA = state.fleet.find((a) => a.status === 'parked')!;
+    aircraftA.locationIcao = 'SBGR';
+    const aircraftB = {
+      ...aircraftA,
+      id: `${aircraftA.id}_b`,
+      label: `${aircraftA.label} B`,
+    };
+    state.fleet.push(aircraftB);
+
+    const held = holdWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      kg: 200,
+    });
+    const partA = dispatchWarehouseHaulHold(state, world, {
+      holdId: held.hold.id,
+      aircraftId: aircraftA.id,
+      kg: 80,
+      pilotAccountId: 'acc_pilot_a',
+    });
+    assert.equal(partA.kg, 80);
+    assert.equal(partA.mission.pilotAccountId, 'acc_pilot_a');
+    assert.equal(
+      state.playerWarehouses!.demandHolds!.find((h) => h.id === held.hold.id)!
+        .kg,
+      120,
+    );
+
+    const partB = dispatchWarehouseHaulHold(state, world, {
+      holdId: held.hold.id,
+      aircraftId: aircraftB.id,
+      kg: 50,
+      pilotAccountId: 'acc_pilot_b',
+    });
+    assert.equal(partB.kg, 50);
+    assert.equal(partB.mission.pilotAccountId, 'acc_pilot_b');
+    assert.equal(
+      state.playerWarehouses!.demandHolds!.find((h) => h.id === held.hold.id)!
+        .kg,
+      70,
+    );
+    assert.equal(
+      listActivePlayerMissions(state.missions ?? []).length,
+      2,
+    );
+
+    assert.throws(
+      () =>
+        dispatchWarehouseHaulHold(state, world, {
+          holdId: held.hold.id,
+          aircraftId: aircraftA.id,
+          kg: 40,
+          pilotAccountId: 'acc_pilot_a',
+        }),
+      /before starting a warehouse haul/i,
+    );
   });
 });

@@ -76,7 +76,6 @@ export function buildCompanyNetworkNodesFromState(
       c.leasePaidThroughTick > tick,
   );
 
-  const hubsCoveredByFbo = new Set<string>();
   const nodes: CompanyNetworkNode[] = [];
 
   for (const conc of activeConcs) {
@@ -90,8 +89,6 @@ export function buildCompanyNetworkNodesFromState(
     const hubs = (port.pickupHubs ?? [])
       .map((h) => h.trim().toUpperCase())
       .filter(Boolean);
-    for (const h of hubs) hubsCoveredByFbo.add(h);
-
     const primary =
       hubs.find((h) => whByIcao.has(h)) ?? hubs[0] ?? port.id.toUpperCase();
     // Map pin = geographic port; hold filter still uses hubIcaos / primaryHubIcao.
@@ -134,11 +131,13 @@ export function buildCompanyNetworkNodesFromState(
     });
   }
 
+  const whIcaosAdded = new Set<string>();
   for (const wh of warehouses) {
     const icao = wh.icao.trim().toUpperCase();
-    if (!icao || hubsCoveredByFbo.has(icao)) continue;
+    if (!icao || whIcaosAdded.has(icao)) continue;
     const coords = hubCoords(icao, world);
     if (!coords) continue;
+    whIcaosAdded.add(icao);
 
     const linked = listCareerPorts().find((p) =>
       (p.pickupHubs ?? []).some((h) => h.trim().toUpperCase() === icao),

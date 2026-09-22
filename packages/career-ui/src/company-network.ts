@@ -58,14 +58,12 @@ export function buildCompanyNetworkNodes(
     return Boolean(op && cid && op === cid);
   });
 
-  const hubsCoveredByFbo = new Set<string>();
   const nodes: CompanyNetworkNode[] = [];
 
   for (const port of fboPorts) {
     const hubs = (port.pickupHubs ?? [])
       .map((h) => h.trim().toUpperCase())
       .filter(Boolean);
-    for (const h of hubs) hubsCoveredByFbo.add(h);
 
     const details = port.pickupHubDetails ?? [];
     let primary =
@@ -117,9 +115,10 @@ export function buildCompanyNetworkNodes(
     });
   }
 
+  const whIcaosAdded = new Set<string>();
   for (const wh of warehouses) {
     const icao = wh.icao.trim().toUpperCase();
-    if (!icao || hubsCoveredByFbo.has(icao)) continue;
+    if (!icao || whIcaosAdded.has(icao)) continue;
 
     const linked = (snap.ports ?? []).find((p) =>
       (p.pickupHubs ?? []).some((h) => h.trim().toUpperCase() === icao),
@@ -127,11 +126,12 @@ export function buildCompanyNetworkNodes(
     const detail = linked?.pickupHubDetails?.find(
       (d) => d.icao.trim().toUpperCase() === icao,
     );
-    const coords = asCoordPair(
-      detail?.lat ?? linked?.lat,
-      detail?.lon ?? linked?.lon,
-    );
+    const coords =
+      asCoordPair(wh.lat, wh.lon) ??
+      asCoordPair(detail?.lat, detail?.lon) ??
+      asCoordPair(linked?.lat, linked?.lon);
     if (!coords) continue;
+    whIcaosAdded.add(icao);
 
     nodes.push({
       id: `wh:${icao}`,

@@ -40,6 +40,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Company Network map stack + mass + glyphs (2026-09-21):** sintoma = porto e WH no mesmo pin; mass em t/kg com UI imperial; chips só texto. Causa = `ownedFbos` incluía nós FBO (já em `ports`); subtitle/`formatMassKg` metric hardcoded. Fix = mapa só WH remotos; FBO pin em lat/lon do porto; `weightSystem` + `formatMass` no detail/holds; ícones SVG FBO/WH (não foto).
 
+**Company Network map per-node (2026-09-21):** sintoma = WH em pickup hub (ex. SBGR p/ Santos) sumia do mapa/chips; plot usava anchor/container do PortsMap. Causa = `hubsCoveredByFbo` omitia WH no nó; `pickupHubDetails` copiava coords do porto. Fix = um nó WH por ICAO; `CompanyNetworkMap` com mesmos glyphs dos chips; FBO no porto, WH no hub; feeder tracejado porto→WH.
+
 **Member Ports empty Scout/WH (2026-09-21):** sintoma = membro vê Port FBO P1 / “Claim Port FBO first” e Warehouse “No warehouses”. Causa = chrome sticky-home: `GET /api/ports` herda `yours` via `alliedCompanyIds`, mas Scout/WH usam tenant **home** (`isPortOperator` exact + missions WH da home vazia). Fix = `selectTab('ports')` pinna VA (`switchCompanyForVa`) antes de montar Ports; sair de Ports restaura home (igual My VA), salvo Dispatch VA ativo.
 
 **Member Available hid personal WH at VA hubs (2026-09-21):** sintoma = Available só listava SBKP (VA ainda sem WH); SBGR sumia porque a VA já tinha WH lá. Causa = filtro `!ownedHubSet` do tenant pinado. **Superseded:** misturar personal+VA no mesmo Ports não escala.

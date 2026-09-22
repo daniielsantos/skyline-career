@@ -14385,6 +14385,29 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   border: 1px solid var(--line);
 }
 
+.va-company-network-map-marker {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+  transition: transform 0.12s ease;
+}
+
+.va-company-network-map-marker.is-selected {
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px rgba(240, 163, 90, 0.65));
+}
+
+.va-company-network-map-marker.is-wh.is-selected {
+  filter: drop-shadow(0 0 6px rgba(94, 200, 192, 0.65));
+}
+
+.va-company-network-chip-icon-wh {
+  color: #5ec8c0;
+}
+
 .ports-fbo-network {
   margin: 0 0 0.75rem;
 }

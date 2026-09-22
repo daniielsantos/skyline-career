@@ -54,7 +54,11 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **VA parallel cargo per pilot (2026-09-22):** sintoma = amigo não Accept enquanto outro membro tem missão na VA (fatiar hold / voar junto). Causa = gate `listActivePlayerMissions` company-wide em haul/bridge/demand + staging/commit + Charter. Fix = `listActivePlayerMissionsForPilot(pilotAccountId)` (legado sem stamp ainda bloqueia todos); Dispatch/Watch/Prepare usam só a missão do account logado.
 
+**Hauls / Ports route dest markers (2026-09-22):** sintoma = plotar hold/transfer só desenhava a linha — destino fácil de perder no zoom. Causa = `CompanyNetworkMap` / `PortsMap` tinham line layer sem endpoint labels. Fix = markers DEP/ARR com ICAO (estilo Dispatch) nos ends da desk route / bridgeLegs.
+
 **My VA chrome title = airline name (2026-09-22):** sintoma = “MY VA” no h1 + “LAMUSINE” no head do pane (herói duplicado). Causa = chrome `pageTitle` fixo + `va-my-title` com displayName. Fix = h1 = nome da VA (`onVaIdentity`); sidebar continua My VA; head do pane só meta (hub/seats/role/org).
+
+**My VA chrome title flicker (2026-09-22):** sintoma = ao abrir My VA o h1 mostra “My VA” e depois troca pro nome. Causa = (1) unmount limpava `vaChromeTitle`; (2) `onVaIdentity(null)` antes do fetch (`listed` false). Fix = prefetch `/api/va/members` já grava o displayName; VaPage só notifica após `loaded`; null no chrome só leave/unlist / listed false pós-load.
 
 **VA Ledger Credit beside wallet (2026-09-22):** hero em 3 colunas Wallet | Credit | Flight quality (empilha em viewport estreita).
 

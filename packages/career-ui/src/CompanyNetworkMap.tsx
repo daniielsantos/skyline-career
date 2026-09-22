@@ -11,6 +11,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import type { CompanyNetworkNode } from './company-network';
 import { companyNetworkMarkerElement } from './company-network-icons';
+import { routeEndpointMarkerEl } from './route-map-endpoint-marker';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -324,6 +325,43 @@ export function CompanyNetworkMap(props: Props) {
         );
       } catch {
         continue;
+      }
+    }
+
+    // After network pins so ICAO labels sit on top of WH/FBO glyphs.
+    if (deskRouteOk) {
+      const endpoints: Array<{
+        icao: string;
+        lat: number;
+        lon: number;
+        kind: 'dep' | 'arr';
+      }> = [
+        {
+          icao: deskRoute.originIcao,
+          lat: deskRoute.originLat,
+          lon: deskRoute.originLon,
+          kind: 'dep',
+        },
+        {
+          icao: deskRoute.destIcao,
+          lat: deskRoute.destLat,
+          lon: deskRoute.destLon,
+          kind: 'arr',
+        },
+      ];
+      for (const ep of endpoints) {
+        try {
+          markersRef.current.push(
+            new Marker({
+              element: routeEndpointMarkerEl(ep.icao, ep.kind),
+              anchor: 'bottom',
+            })
+              .setLngLat([ep.lon, ep.lat])
+              .addTo(map),
+          );
+        } catch {
+          /* map removed */
+        }
       }
     }
 

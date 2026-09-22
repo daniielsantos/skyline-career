@@ -10,6 +10,7 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { companyNetworkIconSvg } from './company-network-icons';
+import { routeEndpointMarkerEl } from './route-map-endpoint-marker';
 
 setWorkerUrl(maplibreWorkerUrl);
 
@@ -454,6 +455,52 @@ export function PortsMap(props: {
       }
     } catch {
       /* feeders still show if transfer lines fail */
+    }
+
+    const bridgeEndpoints = new Map<
+      string,
+      { icao: string; lat: number; lon: number; kind: 'dep' | 'arr' }
+    >();
+    for (const leg of props.bridgeLegs ?? []) {
+      if (
+        !hasCoords(leg.origin.lat, leg.origin.lon) ||
+        !hasCoords(leg.dest.lat, leg.dest.lon)
+      ) {
+        continue;
+      }
+      const originIcao = leg.originIcao.trim().toUpperCase();
+      const destIcao = leg.destIcao.trim().toUpperCase();
+      if (originIcao) {
+        bridgeEndpoints.set(`dep:${originIcao}`, {
+          icao: originIcao,
+          lat: leg.origin.lat,
+          lon: leg.origin.lon,
+          kind: 'dep',
+        });
+      }
+      if (destIcao) {
+        // Dest wins if the same ICAO appears as both ends of different legs.
+        bridgeEndpoints.set(`arr:${destIcao}`, {
+          icao: destIcao,
+          lat: leg.dest.lat,
+          lon: leg.dest.lon,
+          kind: 'arr',
+        });
+      }
+    }
+    for (const ep of bridgeEndpoints.values()) {
+      try {
+        markersRef.current.push(
+          new Marker({
+            element: routeEndpointMarkerEl(ep.icao, ep.kind),
+            anchor: 'bottom',
+          })
+            .setLngLat([ep.lon, ep.lat])
+            .addTo(map),
+        );
+      } catch {
+        /* map removed */
+      }
     }
 
     if (boundCount === 0 && (props.bridgeLegs ?? []).length === 0) return;

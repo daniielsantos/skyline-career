@@ -269,15 +269,12 @@ export function VaPage(props: Props) {
   }, [props.fleet]);
 
   useEffect(() => {
+    // Wait for members fetch — do not clear chrome title to null while loading
+    // (that caused My VA → airline-name flicker on every open).
+    if (!loaded) return;
     const name = listed && displayName.trim() ? displayName.trim() : null;
     onVaIdentityRef.current?.({ displayName: name });
-  }, [listed, displayName]);
-
-  useEffect(() => {
-    return () => {
-      onVaIdentityRef.current?.({ displayName: null });
-    };
-  }, []);
+  }, [loaded, listed, displayName]);
 
   const canShow = Boolean(token) || props.authRequired;
   const canManage = role === 'owner' || role === 'dispatcher';

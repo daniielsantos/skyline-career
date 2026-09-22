@@ -4385,6 +4385,8 @@ export function App() {
         if (snap.listed && snap.companyId) {
           setMemberVaCompanyId(snap.companyId);
           setMemberVaIsOwner(snap.role === 'owner');
+          const vaName = snap.displayName?.trim();
+          if (vaName) setVaChromeTitle(vaName);
           if (typeof snap.memberRouteCutPct === 'number') {
             setVaMemberRouteCutPct(snap.memberRouteCutPct);
           }
@@ -4402,6 +4404,7 @@ export function App() {
           setMemberVaIsOwner(false);
           setVaMemberRouteCutPct(null);
           setVaSessionFleet([]);
+          setVaChromeTitle(null);
         }
       } catch {
         if (!cancelled) {
@@ -20130,7 +20133,10 @@ export function App() {
           ledgerRefreshEpoch={vaLedgerRefreshEpoch}
           onMemberRouteCutPct={setVaMemberRouteCutPct}
           onVaIdentity={({ displayName }) => {
-            setVaChromeTitle(displayName);
+            // Keep last known name while VaPage loads — avoid My VA → name flicker.
+            const next = displayName?.trim() || null;
+            if (next) setVaChromeTitle(next);
+            else if (displayName === null) setVaChromeTitle(null);
           }}
           renderHangarCard={(acf, hangarOpts) => (
             <HangarAircraftCard

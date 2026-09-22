@@ -3879,6 +3879,11 @@ export function App() {
   const [airframeLabel, setAirframeLabel] = useState<string | null>(null);
   const [watch, setWatch] = useState<WatchStatus | null>(null);
   const flightTrackLastPostRef = useRef(0);
+  /** Once engines light on a Watch mission, keep streaming until mission changes. */
+  const flightTrackArmedRef = useRef<{ missionId: string; armed: boolean }>({
+    missionId: '',
+    armed: false,
+  });
   const [simBridge, setSimBridge] = useState<SimBridgeStatus | null>(null);
   const simBridgeRef = useRef(simBridge);
   simBridgeRef.current = simBridge;
@@ -6323,16 +6328,19 @@ export function App() {
             return next;
           });
         }
-        // VA Crew Live: throttle position to world while airborne on airline ops.
+        // VA Crew Live: stream once engines light (taxi→cruise), not only airborne.
         const mission = activeMissionRef.current;
         const vaCompanyId = memberVaCompanyIdRef.current?.trim();
         const pos = status.position;
+        const missionActive =
+          mission &&
+          ['accepted', 'dispatched', 'in_flight'].includes(mission.status);
         if (
           status.running &&
           status.missionId &&
           mission &&
           mission.id === status.missionId &&
-          mission.status === 'in_flight' &&
+          missionActive &&
           vaCompanyId &&
           pos &&
           Number.isFinite(pos.lat) &&
@@ -6341,32 +6349,51 @@ export function App() {
         ) {
           const opsCompanyId = resolveOpsCompanyId(mission.aircraftId);
           if (opsCompanyId === vaCompanyId) {
-            const now = Date.now();
-            if (now - flightTrackLastPostRef.current >= 15_000) {
-              flightTrackLastPostRef.current = now;
-              void postVaFlightTrack({
-                companyId: vaCompanyId,
+            const arm = flightTrackArmedRef.current;
+            if (arm.missionId !== mission.id) {
+              flightTrackArmedRef.current = {
                 missionId: mission.id,
-                lat: pos.lat,
-                lon: pos.lon,
-                gsKt:
-                  typeof status.groundSpeedKt === 'number'
-                    ? status.groundSpeedKt
-                    : undefined,
-                altFt:
-                  typeof status.altitudeFt === 'number'
-                    ? status.altitudeFt
-                    : undefined,
-                phase: status.phase?.trim() || undefined,
-                onGround:
-                  typeof status.onGround === 'boolean'
-                    ? status.onGround
-                    : undefined,
-              }).catch(() => {
-                /* soft — Live is best-effort */
-              });
+                armed: false,
+              };
+            }
+            if (status.enginesRunning === true) {
+              flightTrackArmedRef.current.armed = true;
+            }
+            // Stay armed through airborne even if engines blip; clear only on
+            // mission change (above) or when Watch stops (poll idle).
+            const armed =
+              flightTrackArmedRef.current.armed ||
+              mission.status === 'in_flight';
+            if (armed) {
+              const now = Date.now();
+              if (now - flightTrackLastPostRef.current >= 15_000) {
+                flightTrackLastPostRef.current = now;
+                void postVaFlightTrack({
+                  companyId: vaCompanyId,
+                  missionId: mission.id,
+                  lat: pos.lat,
+                  lon: pos.lon,
+                  gsKt:
+                    typeof status.groundSpeedKt === 'number'
+                      ? status.groundSpeedKt
+                      : undefined,
+                  altFt:
+                    typeof status.altitudeFt === 'number'
+                      ? status.altitudeFt
+                      : undefined,
+                  phase: status.phase?.trim() || undefined,
+                  onGround:
+                    typeof status.onGround === 'boolean'
+                      ? status.onGround
+                      : undefined,
+                }).catch(() => {
+                  /* soft — Live is best-effort */
+                });
+              }
             }
           }
+        } else if (!status.running) {
+          flightTrackArmedRef.current = { missionId: '', armed: false };
         }
       } catch {
         /* ignore watch poll errors */

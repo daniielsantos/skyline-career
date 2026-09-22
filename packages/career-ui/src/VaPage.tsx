@@ -621,12 +621,12 @@ export function VaPage(props: Props) {
     void loadPortFbo();
   }, [pane, loaded, listed, tenantSwitching, loadPortFbo]);
 
-  // Soft-poll roster presence while the pane is open (online / flight).
+  // Soft-poll roster presence while the pane is open (online / flight / Live).
   useEffect(() => {
     if (pane !== 'roster' || !loaded || !listed) return;
     const id = window.setInterval(() => {
       void refresh();
-    }, 30_000);
+    }, 15_000);
     return () => window.clearInterval(id);
   }, [pane, loaded, listed, refresh]);
 
@@ -948,8 +948,14 @@ export function VaPage(props: Props) {
             >
               {members.map((m) => {
                 const at = formatRosterAt(m);
-                const flying = m.flight?.status === 'in_flight';
-                const hasLive = Boolean(m.live) || flying;
+                const flightStatus = m.flight?.status ?? '';
+                const flying =
+                  flightStatus === 'in_flight' || Boolean(m.live);
+                const hasLive =
+                  Boolean(m.live) ||
+                  flightStatus === 'in_flight' ||
+                  flightStatus === 'dispatched' ||
+                  flightStatus === 'accepted';
                 const lastSeen = m.online
                   ? 'Active now'
                   : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`;
@@ -973,14 +979,20 @@ export function VaPage(props: Props) {
                     <span className="va-stat-label">At</span>
                     <span
                       className={`va-stat-value${flying ? ' is-flying' : ''}`}
-                      title={flying ? 'In flight' : undefined}
+                      title={
+                        m.live
+                          ? formatLivePhase(m.live.phase) || 'Live'
+                          : flying
+                            ? 'In flight'
+                            : undefined
+                      }
                     >
                       {at}
                     </span>
                     {hasLive ? (
                       <button
                         type="button"
-                        className={`action ghost va-roster-live${liveOpen ? ' is-active' : ''}`}
+                        className={`action ghost va-roster-live${liveOpen ? ' is-active' : ''}${m.live ? ' is-hot' : ''}`}
                         disabled={pageBusy}
                         onClick={() => {
                           setLivePilot((prev) =>

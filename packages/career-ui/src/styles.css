@@ -14849,6 +14849,10 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   border-color: color-mix(in srgb, #d4a574 55%, transparent);
   color: #d4a574;
 }
+.va-roster-live.is-hot {
+  border-color: color-mix(in srgb, #7cb87c 50%, transparent);
+  color: #7cb87c;
+}
 .va-live-pane {
   display: grid;
   gap: 0.65rem;

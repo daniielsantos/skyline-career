@@ -4223,11 +4223,15 @@ export function createCareerApiServer(port = 8787) {
             lastSeenAtMs >= nowMs - AUTH_ONLINE_WINDOW_MS;
           const track = getFlightTrack(companyId, m.accountId);
           const lastPt = track?.points[track.points.length - 1];
+          const flight = flightByAccount.get(m.accountId) ?? null;
+          const flightActive =
+            flight != null &&
+            ['accepted', 'dispatched', 'in_flight'].includes(flight.status);
           const live =
             track &&
             lastPt &&
             isFlightTrackFresh(track.updatedAtMs, nowMs) &&
-            flightByAccount.get(m.accountId)?.status === 'in_flight'
+            flightActive
               ? {
                   atMs: track.updatedAtMs,
                   lat: lastPt.lat,
@@ -4251,7 +4255,7 @@ export function createCareerApiServer(port = 8787) {
             ...m,
             online,
             lastSeenAtMs,
-            flight: flightByAccount.get(m.accountId) ?? null,
+            flight,
             pilotIcao: pilotIcaoByAccount.get(m.accountId) ?? null,
             live,
           };

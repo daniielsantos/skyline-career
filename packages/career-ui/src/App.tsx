@@ -3641,47 +3641,71 @@ export function App() {
   const walletCommitHoldRef = useRef<{ usd: number; untilMs: number } | null>(
     null,
   );
-  const paintWallet = useCallback((next: number | null | undefined) => {
-    if (typeof next !== 'number' || !Number.isFinite(next)) return;
-    // Chrome sticky: never paint home wallet from a VA-tenant response.
-    const home = homeCompanyIdRef.current?.trim();
-    // Prefer live request tenant (URL/memory) — ref can lag one tick behind setState.
-    const active =
-      getStoredCompanyId()?.trim() ||
-      activeCompanyIdRef.current?.trim();
-    if (home && active && home !== active) {
-      setVaSessionWallet(next);
-      return;
-    }
-    if (next === 0 && walletRef.current > 0 && tickAdvanceRef.current) {
-      return;
-    }
-    const hold = walletCommitHoldRef.current;
-    if (hold && Date.now() < hold.untilMs) {
-      // Mutation response already painted the true balance; ignore in-flight
-      // /api/state or /api/missions that started before the write committed.
-      if (Math.abs(next - hold.usd) > 0.5) return;
-      walletCommitHoldRef.current = null;
-    }
-    setWalletState(next);
-  }, []);
+  /**
+   * Bumped on every refresh start + tenant switch. Late /api/state or missions
+   * from a prior tenant must not flash VA cash onto the chrome wallet.
+   */
+  const refreshGenRef = useRef(0);
+  const paintWallet = useCallback(
+    (
+      next: number | null | undefined,
+      opts?: { sourceCompanyId?: string | null },
+    ) => {
+      if (typeof next !== 'number' || !Number.isFinite(next)) return;
+      // Chrome sticky: never paint home wallet from a VA-tenant response.
+      const home = homeCompanyIdRef.current?.trim();
+      const source = opts?.sourceCompanyId?.trim();
+      if (home && source && source !== home) {
+        setVaSessionWallet(next);
+        return;
+      }
+      // Prefer live request tenant (URL/memory) — ref can lag one tick behind setState.
+      const active =
+        getStoredCompanyId()?.trim() ||
+        activeCompanyIdRef.current?.trim();
+      if (home && active && home !== active) {
+        setVaSessionWallet(next);
+        return;
+      }
+      if (next === 0 && walletRef.current > 0 && tickAdvanceRef.current) {
+        return;
+      }
+      const hold = walletCommitHoldRef.current;
+      if (hold && Date.now() < hold.untilMs) {
+        // Mutation response already painted the true balance; ignore in-flight
+        // /api/state or /api/missions that started before the write committed.
+        if (Math.abs(next - hold.usd) > 0.5) return;
+        walletCommitHoldRef.current = null;
+      }
+      setWalletState(next);
+    },
+    [],
+  );
   /** Authoritative wallet from a mutation — holds ambient refresh from regressing. */
-  const commitWallet = useCallback((next: number) => {
-    if (!Number.isFinite(next)) return;
-    const home = homeCompanyIdRef.current?.trim();
-    const active =
-      getStoredCompanyId()?.trim() ||
-      activeCompanyIdRef.current?.trim();
-    if (home && active && home !== active) {
-      setVaSessionWallet(next);
-      return;
-    }
-    walletCommitHoldRef.current = {
-      usd: next,
-      untilMs: Date.now() + 12_000,
-    };
-    setWalletState(next);
-  }, []);
+  const commitWallet = useCallback(
+    (next: number, opts?: { sourceCompanyId?: string | null }) => {
+      if (!Number.isFinite(next)) return;
+      const home = homeCompanyIdRef.current?.trim();
+      const source = opts?.sourceCompanyId?.trim();
+      if (home && source && source !== home) {
+        setVaSessionWallet(next);
+        return;
+      }
+      const active =
+        getStoredCompanyId()?.trim() ||
+        activeCompanyIdRef.current?.trim();
+      if (home && active && home !== active) {
+        setVaSessionWallet(next);
+        return;
+      }
+      walletCommitHoldRef.current = {
+        usd: next,
+        untilMs: Date.now() + 12_000,
+      };
+      setWalletState(next);
+    },
+    [],
+  );
   /** Local lock for Crew fly — avoids app-wide busy flash on every button. */
   const [crewDispatchBusy, setCrewDispatchBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -4022,11 +4046,15 @@ export function App() {
   /** Keep My VA Ledger wallet card in sync when ops debit/credit the VA. */
   function paintOpsMutationWallet(opsCompanyId: string, nextUsd: number) {
     const vaId = memberVaCompanyIdRef.current?.trim();
+    const home = homeCompanyIdRef.current?.trim();
     if (vaId && opsCompanyId === vaId) {
       setVaSessionWallet(nextUsd);
       setVaLedgerRefreshEpoch((n) => n + 1);
+      // Dual-tenant: VA ops must not paint chrome even if selectTab already
+      // restored home (active === home) before this mutation response lands.
+      if (home && home !== vaId) return;
     }
-    commitWallet(nextUsd);
+    commitWallet(nextUsd, { sourceCompanyId: opsCompanyId });
   }
 
   const [hangarPane, setHangarPane] = useState<
@@ -4667,7 +4695,20 @@ export function App() {
 
   const refresh = useCallback(async (scope?: CareerRefreshScope) => {
     setError(null);
+    const gen = ++refreshGenRef.current;
+    const requestTenant =
+      getStoredCompanyId()?.trim() ||
+      activeCompanyIdRef.current?.trim() ||
+      '';
     const state = await fetchState();
+    if (gen !== refreshGenRef.current) return;
+    const liveTenant =
+      getStoredCompanyId()?.trim() ||
+      activeCompanyIdRef.current?.trim() ||
+      '';
+    // Tenant switched mid-flight (leave My VA / pin VA) — drop this paint so
+    // VA walletUsd cannot flash onto chrome before the next home refresh.
+    if (requestTenant && liveTenant && requestTenant !== liveTenant) return;
     if (state.needsProfile) {
       setShowProfileGate(true);
       setCareerReady(false);
@@ -4728,7 +4769,7 @@ export function App() {
     const isHomeState =
       !homeId || !stateCompanyId || stateCompanyId === homeId;
     if (tenantMatches && isHomeState) {
-      paintWallet(state.walletUsd);
+      paintWallet(state.walletUsd, { sourceCompanyId: stateCompanyId });
     } else if (tenantMatches && !isHomeState) {
       if (typeof state.walletUsd === 'number' && Number.isFinite(state.walletUsd)) {
         setVaSessionWallet(state.walletUsd);
@@ -4878,10 +4919,24 @@ export function App() {
           ).catch(() => null)
         : Promise.resolve(null),
     ]);
+    if (gen !== refreshGenRef.current) return;
+    const liveTenantAfterBoard =
+      getStoredCompanyId()?.trim() ||
+      activeCompanyIdRef.current?.trim() ||
+      '';
+    if (
+      requestTenant &&
+      liveTenantAfterBoard &&
+      requestTenant !== liveTenantAfterBoard
+    ) {
+      return;
+    }
     if (wantBush) void refreshBushTrips();
     if (missionState && typeof missionState.walletUsd === 'number') {
       if (isHomeState) {
-        paintWallet(missionState.walletUsd);
+        paintWallet(missionState.walletUsd, {
+          sourceCompanyId: stateCompanyId || requestTenant,
+        });
       } else {
         setVaSessionWallet(missionState.walletUsd);
       }
@@ -4942,7 +4997,9 @@ export function App() {
         ...(acMarket.airframePerf ?? {}),
       }));
       if (isHomeState) {
-        paintWallet(acMarket.walletUsd);
+        paintWallet(acMarket.walletUsd, {
+          sourceCompanyId: stateCompanyId || requestTenant,
+        });
         if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
       } else if (Array.isArray(acMarket.fleet)) {
         setVaSessionFleet(acMarket.fleet);
@@ -5769,7 +5826,9 @@ export function App() {
           const home = homeCompanyIdRef.current?.trim();
           const active = activeCompanyIdRef.current?.trim();
           if (!home || !active || home === active) {
-            paintWallet(missionState.walletUsd);
+            paintWallet(missionState.walletUsd, {
+              sourceCompanyId: active || home,
+            });
           } else {
             setVaSessionWallet(missionState.walletUsd);
           }
@@ -8058,6 +8117,8 @@ export function App() {
   async function switchCompanyForVa(nextId: string): Promise<void> {
     const id = nextId.trim() || LOCAL_COMPANY_ID;
     if (!id || id === activeCompanyIdRef.current) return;
+    // Invalidate in-flight refresh paints from the previous tenant.
+    refreshGenRef.current += 1;
     const homeId = homeCompanyIdRef.current?.trim() || '';
     const switchingToHome = Boolean(homeId && id === homeId);
     // Remember home before pinning the VA so leaving My VA can restore it.
@@ -12903,7 +12964,7 @@ export function App() {
                 : tab === 'ports'
                   ? 'Factory-priced seaport cargo — buy into a warehouse, fulfill Demand Board orders.'
                   : tab === 'va'
-                    ? 'Roster, hangar, and hiring for your company crew desk.'
+                    ? 'Company crew desk — roster, hangar, and hiring.'
                     : tab === 'vaDirectory'
                       ? 'Published airlines — request to join or use an invite code.'
                     : tab === 'vaRanking'
@@ -20022,12 +20083,12 @@ export function App() {
             // Always cache VA wallet for My VA panes.
             setVaSessionWallet(usd);
             const home = homeCompanyIdRef.current?.trim();
-            const active =
-              getStoredCompanyId()?.trim() ||
-              activeCompanyIdRef.current?.trim();
-            // Member dual-tenant pin: never overwrite chrome home wallet.
-            if (home && active && home !== active) return;
-            commitWallet(usd);
+            const va = memberVaCompanyIdRef.current?.trim();
+            // Dual-tenant: never paint VA cash onto chrome — even after
+            // selectTab restored home (late cashflow / members responses).
+            // Checking active≠home races; home≠va is stable for members.
+            if (home && va && home !== va) return;
+            commitWallet(usd, { sourceCompanyId: va || home });
           }}
           onFleet={(nextFleet) => {
             setVaSessionFleet(nextFleet);

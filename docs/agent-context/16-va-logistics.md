@@ -75,6 +75,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Airlines / Crew / Company copy (2026-09-22):** sintoma = “VA/VAs/My VA” soava estranho para crews pequenas. Causa = label legado Virtual Airline. Fix = UI only: sidebar/directory **Airlines**, desk **Crew** (h1 = nome da airline), **Company** inalterado; pickers **Airline** / **Yours**; ledger/wallet “company”; invites ainda `VA-XXXXXXXX`. Sem rename de rotas/API/`va_listed`.
 
+**Crew clean layout (2026-09-22):** sintoma = Crew (Roster/abas) mais verbosa que Airlines directory. Causa = meta em prosa, `settings-card` + h3, presence “Last seen / On the ground”, help walls em Hangar/Config/Logbook. Fix = shell stats strip (HQ/Pilots/Role/Org/Hiring); roster rows estilo directory (Status/At/Role); cortar blurbs de abertura; subtitle App curto.
+
 **Hangar AOG note / overhaul ETA (2026-09-22):** sintoma = Duke em engine OH (1d light GA) parecia “maintenance” sem countdown. Causa = badge só pintava `status`; nota OH sumia atrás do ferry UI; AOG Inspect confundido com timer. Fix = badge `engine OH · 18h left`; Where “Shop at” + nota `Overhaul · Engine · … left · ready Day N`; ferry só parked; Inspect AOG = “not timed”.
 
 **Ferry tanks untouched (2026-09-22):** sintoma = Hangar/Line-crew ferry top-up + burn → tanques chegavam vazios mesmo com Jet-A no preço. Causa = `executeFerry` enchia shortfall e queimava `fuelNeededKg`. Fix = não mutar `fuelKg`; hop Jet-A continua em `totalCostUsd` (serviço incluso); copy Journey/toast.
@@ -648,6 +650,13 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** entrar Ledger/Hangar My VA (membro) substituía wallet/frota do chrome pelo da VA; Hangar da sidebar misturava frota.
 **Causa:** um único `wallet`/`fleet` + `switchCompanyForVa` pintava state da VA no shell.
 **Fix:** caches `vaSessionWallet`/`vaSessionFleet`; paint de chrome só quando `state.companyId === home`; Hangar sidebar / leave My VA restaura home; My VA Hangar/Ledger usam caches VA.
+
+### Sidebar wallet flicker on tab switch (2026-09-22)
+
+**Sintoma:** ao alternar botões da sidebar, o card Wallet ($1,498) piscava para outro valor e voltava.
+**Causa:** sticky `paintWallet`/`commitWallet` usava `active ≠ home`, mas `selectTab` restaura home *antes* de respostas late do My VA (`fetchCashflow` / `fetchVaMembers` / ops). Com `active === home` de novo, `onWallet(VA)` e `paintOpsMutationWallet` pintavam cash da VA no chrome; o soft `refresh` seguinte corrigia → flicker. Refresh overposto sem generation guard agravava.
+**Fix:** (1) My VA `onWallet` e ops VA: dual-tenant (`home ≠ memberVa`) nunca `commitWallet` no chrome — gate estável, não `active`. (2) `paintWallet`/`commitWallet` aceitam `sourceCompanyId` e recusam source ≠ home. (3) `refreshGenRef` invalida paints in-flight no tenant switch + mid-refresh. (4) VaPage unmount bumpa gens de members/ledger.
+**Nota:** label "nullable" / NULLABLE no chrome é o `displayName` da company (tenant de teste), não bug de null rendering.
 
 ### Chrome flicker on VAs directory (2026-09-20)
 

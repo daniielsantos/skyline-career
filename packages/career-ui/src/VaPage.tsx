@@ -77,29 +77,18 @@ function formatRosterLastSeen(
   }
 }
 
-function formatRosterFlight(
-  flight: VaMember['flight'],
-): string {
-  if (!flight) return 'On the ground';
+/** Compact At cell: ICAO on ground, short route when airborne/assigned. */
+function formatRosterAt(m: Pick<VaMember, 'pilotIcao' | 'flight'>): string {
+  const flight = m.flight;
   const od =
-    flight.originIcao && flight.destIcao
+    flight?.originIcao && flight?.destIcao
       ? `${flight.originIcao}→${flight.destIcao}`
       : '';
-  if (flight.status === 'in_flight') {
-    return od ? `In flight ${od}` : 'In flight';
-  }
-  if (flight.status === 'dispatched') {
-    return od ? `Dispatched ${od}` : 'Dispatched';
-  }
-  if (flight.status === 'accepted') {
-    return od ? `Assigned ${od}` : 'Assigned';
-  }
-  return od || flight.status;
-}
-
-function formatRosterHub(pilotIcao: string | null | undefined): string {
-  const icao = (pilotIcao ?? '').trim().toUpperCase();
-  return icao ? `At ${icao}` : 'Hub —';
+  if (flight?.status === 'in_flight') return od || 'Airborne';
+  if (flight?.status === 'dispatched') return od || 'Dispatched';
+  if (flight?.status === 'accepted') return od || 'Assigned';
+  const icao = (m.pilotIcao ?? '').trim().toUpperCase();
+  return icao || '—';
 }
 
 type Props = {
@@ -262,6 +251,18 @@ export function VaPage(props: Props) {
   const ledgerFetchGenRef = useRef(0);
   const logbookFetchGenRef = useRef(0);
   const hangarFleetGenRef = useRef(0);
+  const membersFetchGenRef = useRef(0);
+
+  // Leaving My VA mid-fetch: drop late cashflow/members so App onWallet cannot
+  // paint VA cash onto chrome after selectTab already restored home.
+  useEffect(() => {
+    return () => {
+      ledgerFetchGenRef.current += 1;
+      logbookFetchGenRef.current += 1;
+      hangarFleetGenRef.current += 1;
+      membersFetchGenRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     // Sync from parent unless a newer local reserve/release already painted.
@@ -349,9 +350,11 @@ export function VaPage(props: Props) {
       setLoaded(true);
       return;
     }
+    const gen = ++membersFetchGenRef.current;
     setError(null);
     try {
       const m = await fetchVaMembers();
+      if (gen !== membersFetchGenRef.current) return;
       setMembers(m.members);
       setRole(m.role);
       setViewerAccountId(m.viewerAccountId ?? null);
@@ -394,6 +397,7 @@ export function VaPage(props: Props) {
           setTenantSwitching(false);
         }
       }
+      if (gen !== membersFetchGenRef.current) return;
       // Fleet + wallet after pin so chrome sticky home already sees active ≠ home.
       if (Array.isArray(m.fleet)) {
         onFleetRef.current?.(m.fleet);
@@ -413,12 +417,14 @@ export function VaPage(props: Props) {
       if (m.listed && (m.role === 'owner' || m.role === 'dispatcher')) {
         try {
           const reqs = await fetchVaJoinRequests();
+          if (gen !== membersFetchGenRef.current) return;
           setPendingRequests(reqs.requests);
         } catch {
           setPendingRequests([]);
         }
         try {
           const inv = await fetchVaInvites();
+          if (gen !== membersFetchGenRef.current) return;
           setInviteCode(inv.invites[0]?.code ?? null);
         } catch {
           setInviteCode(null);
@@ -428,6 +434,7 @@ export function VaPage(props: Props) {
         setInviteCode(null);
       }
     } catch (err) {
+      if (gen !== membersFetchGenRef.current) return;
       setError(err instanceof Error ? err.message : String(err));
       // Soft-fail: keep the last good VA shell so a blip mid-switch does not
       // flash "Select a company first" for ~10s.
@@ -623,31 +630,37 @@ export function VaPage(props: Props) {
   return (
     <section className="panel va-panel va-panel-shell">
       <div className="panel-head va-my-head">
-        <div>
-          <p className="va-my-meta settings-sample">
-            {homeHubIcao || '—'} · {members.length}/{memberCap} seats · recruiting{' '}
-            <strong>{recruiting ? 'on' : 'off'}</strong> · role{' '}
-            <strong>{role}</strong>
-            {orgPerks ? (
-              <>
-                {' '}
-                · org{' '}
-                <strong>
-                  {orgPerks.tierName}
-                  {orgPerks.tier > 0 ? ` T${orgPerks.tier}` : ''}
-                </strong>
-                {orgPerks.nextTierHint ? (
-                  <span className="muted">
-                    {' '}
-                    · next{' '}
-                    {(orgPerks.ladder ?? []).find(
-                      (step) => step.tier === orgPerks.tier + 1,
-                    )?.tierName ?? 'tier'}
-                  </span>
-                ) : null}
-              </>
-            ) : null}
-          </p>
+        <div className="va-my-stats" aria-label="Company summary">
+          <div>
+            <span className="va-stat-label">HQ</span>
+            <span className="va-stat-value">{homeHubIcao || '—'}</span>
+          </div>
+          <div>
+            <span className="va-stat-label">Pilots</span>
+            <span className="va-stat-value">
+              {members.length}/{memberCap}
+            </span>
+          </div>
+          <div>
+            <span className="va-stat-label">Role</span>
+            <span className="va-stat-value">{role || '—'}</span>
+          </div>
+          <div>
+            <span className="va-stat-label">Org</span>
+            <span className="va-stat-value">
+              {orgPerks && orgPerks.tier > 0
+                ? `${orgPerks.tierName} T${orgPerks.tier}`
+                : orgPerks?.tierName || '—'}
+            </span>
+          </div>
+          <div>
+            <span className="va-stat-label">Hiring</span>
+            <span
+              className={`va-stat-value${recruiting ? ' is-open' : ' is-closed'}`}
+            >
+              {recruiting ? 'Open' : 'Closed'}
+            </span>
+          </div>
         </div>
         <div className="hangar-pane-toggle" role="tablist" aria-label="Crew views">
           <button
@@ -726,17 +739,20 @@ export function VaPage(props: Props) {
 
       <div className="va-pane-body">
       {pane === 'roster' ? (
-        <div className="settings-card va-pane-card">
-          <h3>Roster</h3>
+        <div className="va-roster-pane">
           {canManage && pendingRequests.length > 0 ? (
             <div className="va-roster-section">
-              <h4 className="va-roster-section-title">Join requests</h4>
+              <p className="va-roster-section-title">Join requests</p>
               <ul className="va-roster-list">
                 {pendingRequests.map((req) => (
                   <li key={req.id} className="va-roster-row va-roster-row-request">
                     <div className="va-roster-id">
                       <span className="va-roster-name">{req.displayName}</span>
                       <span className="va-roster-login">@{req.loginName}</span>
+                    </div>
+                    <div className="va-roster-stat">
+                      <span className="va-stat-label">Status</span>
+                      <span className="va-stat-value">Pending</span>
                     </div>
                     <div className="va-roster-actions">
                       <button
@@ -794,44 +810,49 @@ export function VaPage(props: Props) {
             </div>
           ) : null}
           {members.length === 0 ? (
-            <p className="settings-sample">No members.</p>
+            <p className="empty">No members.</p>
           ) : (
             <ul
               className={`va-roster-list${isOwner ? ' is-manage' : ''}`}
             >
-              {members.map((m) => (
+              {members.map((m) => {
+                const at = formatRosterAt(m);
+                const flying = m.flight?.status === 'in_flight';
+                const lastSeen = m.online
+                  ? 'Active now'
+                  : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`;
+                return (
                 <li key={m.accountId} className="va-roster-row">
                   <div className="va-roster-id">
                     <span className="va-roster-name">{m.displayName}</span>
                     <span className="va-roster-login">@{m.loginName}</span>
                   </div>
-                  <div className="va-roster-presence">
+                  <div className="va-roster-stat">
+                    <span className="va-stat-label">Status</span>
                     <span
-                      className={`va-roster-online${m.online ? ' is-online' : ''}`}
+                      className={`va-stat-value${m.online ? ' is-open' : ''}`}
+                      title={lastSeen}
                     >
                       {m.online ? 'Online' : 'Offline'}
                     </span>
-                    <span className="va-roster-seen">
-                      {m.online
-                        ? 'Active now'
-                        : `Last seen ${formatRosterLastSeen(m.lastSeenAtMs, Date.now())}`}
-                    </span>
                   </div>
-                  <div className="va-roster-place">
-                    <span className="va-roster-hub">{formatRosterHub(m.pilotIcao)}</span>
+                  <div className="va-roster-stat">
+                    <span className="va-stat-label">At</span>
                     <span
-                      className={`va-roster-flight${
-                        m.flight?.status === 'in_flight' ? ' is-flying' : ''
-                      }`}
+                      className={`va-stat-value${flying ? ' is-flying' : ''}`}
+                      title={flying ? 'In flight' : undefined}
                     >
-                      {formatRosterFlight(m.flight)}
+                      {at}
                     </span>
                   </div>
-                  <span
-                    className={`va-roster-role va-roster-role-${m.role}`}
-                  >
-                    {m.role}
-                  </span>
+                  <div className="va-roster-stat va-roster-stat-role">
+                    <span className="va-stat-label">Role</span>
+                    <span
+                      className={`va-roster-role va-roster-role-${m.role}`}
+                    >
+                      {m.role}
+                    </span>
+                  </div>
                   {isOwner && m.role !== 'owner' ? (
                     <div className="va-roster-actions">
                       <button
@@ -898,7 +919,8 @@ export function VaPage(props: Props) {
                     />
                   ) : null}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </div>
@@ -910,19 +932,6 @@ export function VaPage(props: Props) {
             <BusyStatus label="Opening company hangar…" />
           ) : (
             <>
-          {hangarReadOnly ? (
-            <p className="settings-help">
-              Company hangar (shared airline fleet). Sidebar Hangar is your home
-              fleet. View-only for members — ferry still works. Reserve a parked
-              tail for your session (4h). Sell, lease, inspect, repair, and
-              overhaul are owner-only (MX from the company wallet).
-            </p>
-          ) : (
-            <p className="settings-help">
-              Company hangar (shared airline fleet). Sidebar Hangar stays on your
-              home company — chrome Wallet never switches here.
-            </p>
-          )}
           {hangarFleet.length === 0 ? (
             <p className="empty">
               No aircraft yet — buy or lease on Airframes for this company.
@@ -1217,18 +1226,13 @@ export function VaPage(props: Props) {
       ) : null}
 
       {pane === 'logbook' ? (
-        <div className="settings-card va-pane-card">
+        <div className="va-pane-card">
           {tenantSwitching ? (
             <div className="va-pane-loading">
               <BusyBlock label="Opening company logbook…" />
             </div>
           ) : (
             <>
-              <h3>Logbook</h3>
-              <p className="settings-help">
-                Flights flown on this airline — every member. Personal Logbook
-                only shows your own legs.
-              </p>
               {logbookError ? (
                 <p className="error" role="alert">
                   {logbookError}
@@ -1241,7 +1245,7 @@ export function VaPage(props: Props) {
               ) : (
                 <>
                   <p className="panel-stats">
-                    {logbookRows.length} flights recorded · company history.
+                    {logbookRows.length} flights
                   </p>
                   <ul className="mission-list logbook-list va-logbook-list">
                     {logbookRows.map((m) => {
@@ -1310,18 +1314,7 @@ export function VaPage(props: Props) {
       ) : null}
 
       {pane === 'config' ? (
-        <div className="settings-card va-pane-card va-config-card">
-          <header className="va-config-head">
-            <h3>Config</h3>
-            <p className="settings-help">
-              {isOwner
-                ? 'Hiring, ferry desk, invites, and listing. Name and hub live on Company.'
-                : canManage
-                  ? 'Invites. Recruiting, cut, and listing are owner-only.'
-                  : 'Your seat on this airline. Most controls are owner-only.'}
-            </p>
-          </header>
-
+        <div className="va-pane-card va-config-card">
           <section className="va-config-section va-config-checklist">
             <h4 className="va-config-section-title">Next steps</h4>
             <ul className="va-checklist">
@@ -1853,9 +1846,7 @@ export function VaPage(props: Props) {
                   {inviteCode ? 'Renew invite' : 'Create invite'}
                 </button>
               ) : (
-                <span className="settings-help">
-                  Owner or dispatcher can mint invites.
-                </span>
+                <span className="muted">Owner/dispatcher only</span>
               )}
               {isOwner && props.onGoCompany ? (
                 <button
@@ -1874,9 +1865,7 @@ export function VaPage(props: Props) {
                 <span className="muted"> · does not expire · renew replaces it</span>
               </p>
             ) : (
-              <p className="settings-help">
-                One invite code per airline. Stays valid until you renew or unlist.
-              </p>
+              <p className="empty">No invite code yet.</p>
             )}
           </section>
 

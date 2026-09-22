@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **f643b70** / desktop **0.3.208** shipped: Fix Port desk auto-buy skipping same-day settles; show mass units and commodity icons. Release: [v0.3.208](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.208).
+
+
 `main` **36a24cd** / desktop **0.3.207** shipped: Gate VA Port desk ops to owner/dispatcher; keep Scout Hold for pilots. Release: [v0.3.207](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.207).
 
 

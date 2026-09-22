@@ -2772,7 +2772,8 @@ export function portSnapshot(
   const companyDisplayNames = opts?.companyDisplayNames;
   const viewerCompanyId =
     opts?.viewerCompanyId?.trim() || LOCAL_COMPANY_ID;
-  const alliedCompanyIds = opts?.alliedCompanyIds;
+  // opts.alliedCompanyIds still accepted for callers; buy/ETA inheritance is
+  // applied in buyPortListing / effectivePortBuyUnitPriceUsd — not status "yours".
   ensurePortListings(world);
   ensureDemandOrders(world, {
     operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
@@ -2834,16 +2835,6 @@ export function portSnapshot(
       const operatorExact = Boolean(
         op && op.companyId === viewerCompanyId,
       );
-      const yours = Boolean(
-        state &&
-          op &&
-          hasPortOperatorBenefits(
-            world,
-            port.id,
-            viewerCompanyId,
-            alliedCompanyIds,
-          ),
-      );
       const yoursConc = state?.playerPortConcessions?.find(
         (c) =>
           c.portId === port.id &&
@@ -2892,17 +2883,16 @@ export function portSnapshot(
           })),
         },
         concession: {
-          status: yours ? 'yours' : op ? 'held' : 'vacant',
+          // Desk ownership only — allied VA members inherit buy/ETA via
+          // hasPortOperatorBenefits, but must not paint status "yours" on home
+          // Ports (Lease/Upgrade/Scout desks are exact operator).
+          status: operatorExact ? 'yours' : op ? 'held' : 'vacant',
           companyId: op?.companyId ?? null,
           companyDisplayName: op?.companyId
             ? (companyDisplayNames?.get(op.companyId) ??
               op.companyId)
             : null,
-          level: yours
-            ? portOperatorLevel(world, port.id)
-            : op
-              ? portOperatorLevel(world, port.id)
-              : null,
+          level: op ? portOperatorLevel(world, port.id) : null,
           leasePaidThroughTick: op?.leasePaidThroughTick ?? null,
           lifetimeThroughputKg: yoursConc?.lifetimeThroughputKg ?? null,
           recentThroughputKg: yoursConc

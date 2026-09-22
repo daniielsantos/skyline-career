@@ -7595,9 +7595,16 @@ export function App() {
         }
       }
       goToTab(next);
-      await run(() => refresh(liveRefreshScope(next, false)), {
-        lockUi: false,
-      });
+      // My VA loads its own /api/va/members — don't block tab paint on App refresh.
+      if (next === 'va') {
+        void run(() => refresh(liveRefreshScope(next, false)), {
+          lockUi: false,
+        });
+      } else {
+        await run(() => refresh(liveRefreshScope(next, false)), {
+          lockUi: false,
+        });
+      }
     })();
   }
 

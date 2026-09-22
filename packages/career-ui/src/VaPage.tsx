@@ -354,31 +354,12 @@ export function VaPage(props: Props) {
       setFlightQuality(m.flightQuality ?? null);
       setOrgPerks(m.orgPerks ?? null);
       hasVaShellRef.current = Boolean(m.role && m.listed);
-      try {
-        const portsSnap = await fetchPorts();
-        const owned = portsSnap.ports.find(
-          (p) =>
-            p.concession?.status === 'yours' ||
-            (p.concession?.companyId &&
-              p.concession.companyId === m.companyId),
-        );
-        setPortFbo(
-          owned
-            ? {
-                name: owned.name,
-                level: owned.concession?.level ?? 1,
-              }
-            : null,
-        );
-      } catch {
-        setPortFbo(null);
-      }
       // Hangar local first — do not push fleet to App until after tenant pin,
       // or chrome home fleet gets overwritten while active is still home.
       if (Array.isArray(m.fleet)) {
         setHangarFleet(m.fleet);
       }
-      // Paint roster first — tenant switch used to block behind a full refresh (~20s).
+      // Paint roster first — do not await /api/ports (withCareerWrite) here.
       setLoaded(true);
       if (
         m.switchToCompanyId &&
@@ -441,6 +422,32 @@ export function VaPage(props: Props) {
     }
   }, [canShow, companyId]);
 
+  const loadPortFbo = useCallback(async () => {
+    if (!canShow || !companyId) {
+      setPortFbo(null);
+      return;
+    }
+    try {
+      const portsSnap = await fetchPorts({ companyId });
+      const owned = portsSnap.ports.find(
+        (p) =>
+          p.concession?.status === 'yours' ||
+          (p.concession?.companyId &&
+            p.concession.companyId === companyId),
+      );
+      setPortFbo(
+        owned
+          ? {
+              name: owned.name,
+              level: owned.concession?.level ?? 1,
+            }
+          : null,
+      );
+    } catch {
+      setPortFbo(null);
+    }
+  }, [canShow, companyId]);
+
   const leaveVa = useCallback(async () => {
     const ok = await confirm({
       title: 'Leave this VA?',
@@ -496,6 +503,13 @@ export function VaPage(props: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Port FBO chip (Path / Config) — defer /api/ports so Roster paints first.
+  useEffect(() => {
+    if (!loaded || !listed || tenantSwitching) return;
+    if (pane !== 'hauls' && pane !== 'config') return;
+    void loadPortFbo();
+  }, [pane, loaded, listed, tenantSwitching, loadPortFbo]);
 
   // Soft-poll roster presence while the pane is open (online / flight).
   useEffect(() => {

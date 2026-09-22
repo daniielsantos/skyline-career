@@ -566,7 +566,10 @@ export function PortsPanel(props: {
   async function refresh() {
     setLoadError(null);
     try {
-      const nextPorts = await fetchPorts();
+      const logisticsId = props.logisticsCompanyId?.trim() || undefined;
+      const nextPorts = await fetchPorts(
+        logisticsId ? { companyId: logisticsId } : undefined,
+      );
       setSnap(nextPorts);
       setDemand(nextPorts.demand?.orders ?? []);
       setWarehouses(nextPorts.warehouses ?? null);
@@ -575,7 +578,10 @@ export function PortsPanel(props: {
       );
       if (!portId && nextPorts.ports[0]) setPortId(nextPorts.ports[0].id);
       try {
-        const scout = await postPortScout({ action: 'list' });
+        const scout = await postPortScout({
+          action: 'list',
+          companyId: logisticsId,
+        });
         setScoutSuggestions(scout.suggestions ?? []);
         setScoutDemandSuggestions(scout.demandSuggestions ?? []);
         setScoutHaulSuggestions(scout.haulSuggestions ?? []);
@@ -2915,6 +2921,19 @@ export function PortsPanel(props: {
   /** Show when the player is on the wrong tab for the next loop step. */
   const showPortsLoopBanner = section !== loopTargetSection;
 
+  /** Exact-operator Port FBO — hide the desk tab until this company claims one. */
+  const hasOwnedPortFbo = useMemo(
+    () =>
+      (snap?.ports ?? []).some((p) => p.concession?.status === 'yours'),
+    [snap?.ports],
+  );
+
+  useEffect(() => {
+    if (section === 'portFbo' && snap && !hasOwnedPortFbo) {
+      setSection('catalog');
+    }
+  }, [section, snap, hasOwnedPortFbo]);
+
   function goToLoopStep() {
     setSection(loopTargetSection);
     if (loopStep.kind === 'buy_warehouse') {
@@ -3260,21 +3279,25 @@ export function PortsPanel(props: {
             >
               Port catalog
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={section === 'portFbo'}
-              className={
-                section === 'portFbo' ? 'fbo-icao-chip active' : 'fbo-icao-chip'
-              }
-              disabled={props.busy || loading}
-              onClick={() => setSection('portFbo')}
-            >
-              Port FBO
-              {port?.concession?.status === 'yours'
-                ? ` · P${port.concession.level ?? 1}`
-                : ''}
-            </button>
+            {hasOwnedPortFbo ? (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={section === 'portFbo'}
+                className={
+                  section === 'portFbo'
+                    ? 'fbo-icao-chip active'
+                    : 'fbo-icao-chip'
+                }
+                disabled={props.busy || loading}
+                onClick={() => setSection('portFbo')}
+              >
+                Port FBO
+                {port?.concession?.status === 'yours'
+                  ? ` · P${port.concession.level ?? 1}`
+                  : ''}
+              </button>
+            ) : null}
             <button
               type="button"
               role="tab"
@@ -3374,9 +3397,16 @@ export function PortsPanel(props: {
                     type="button"
                     className="action ghost ports-concession-open"
                     disabled={props.busy}
-                    onClick={() => setSection('portFbo')}
+                    onClick={() => {
+                      if (hasOwnedPortFbo) setSection('portFbo');
+                      else setConcessionOpen(true);
+                    }}
                   >
-                    Port FBO
+                    {port.concession?.status === 'yours'
+                      ? 'Open desk'
+                      : port.concession?.status === 'held'
+                        ? 'Details'
+                        : 'Claim'}
                   </button>
                 </h3>
               ) : (

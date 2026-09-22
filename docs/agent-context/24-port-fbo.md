@@ -42,6 +42,10 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Ports home vs My VA Ports (2026-09-21):** sidebar Ports = sempre **home** (sem pin VA). Company desk = **My VA → Ports** (`PortsPanel` embedded, shelf “Company”). Hauls “Open Ports desk” / Path CTA abrem o pane, não a sidebar. Dual-buy Available revertido.
 
+**Home Ports false FBO + My VA Ports blank (2026-09-21):** sintoma = sidebar pintava Port FBO · P1 da VA (Lease) enquanto Scout pedia Claim; My VA → Ports preto. Causa = snapshot `yours` via allied benefits + CSS flex collapse no embed. Fix = `yours` exact operator; CSS `> .ports-panel` + embed min-height.
+
+**Port FBO tab only when yours (2026-09-21):** aba Port FBO escondida sem concession exact; Claim/Details no Catalog. My VA Roster sem await `/api/ports`.
+
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
 **Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.

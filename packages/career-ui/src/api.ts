@@ -3094,8 +3094,13 @@ export type DemandSnapshot = {
   warehouses?: PlayerWarehouseSnapshot;
 };
 
-export function fetchPorts() {
-  return api<PortsSnapshot>('/api/ports');
+export function fetchPorts(opts?: { companyId?: string }) {
+  const companyId = opts?.companyId?.trim();
+  return api<PortsSnapshot>('/api/ports', {
+    headers: companyId
+      ? { 'X-Skyline-Company-Id': companyId }
+      : undefined,
+  });
 }
 
 export function postPortBuy(opts: { listingId: string; kg: number }) {
@@ -3243,6 +3248,7 @@ export function postPortScout(opts: {
   destIcao?: string;
   commodityId?: string;
   kg?: number;
+  companyId?: string;
 }) {
   return api<{
     suggestions?: PortScoutBridgeSuggestion[];

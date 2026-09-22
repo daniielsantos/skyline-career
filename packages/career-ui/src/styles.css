@@ -10800,13 +10800,13 @@ span.dispatch-route-hub-dest {
   overflow: hidden;
 }
 
-.main-content:has(.ports-panel) {
+.main-content:has(> .ports-panel) {
   overflow: hidden;
   padding-top: 0.65rem;
   padding-bottom: 0.5rem;
 }
 
-.main-content:has(.ports-panel) > .ports-panel {
+.main-content:has(> .ports-panel) > .ports-panel {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -10865,17 +10865,40 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-panel-embed {
+  /* Nested under My VA — avoid sidebar Ports flex/overflow collapse (blank pane). */
   display: flex;
   flex-direction: column;
-  min-height: 0;
   flex: 1 1 auto;
+  min-height: min(68vh, 44rem);
+  height: auto;
+  overflow: auto;
 }
 
 .va-ports-pane {
   display: flex;
   flex-direction: column;
-  min-height: 0;
   flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.main-content:has(.va-ports-pane) {
+  overflow: hidden;
+  padding-top: 0.65rem;
+  padding-bottom: 0.5rem;
+}
+
+.main-content:has(.va-ports-pane) > .va-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-content:has(.va-ports-pane) > .va-panel > .va-ports-pane {
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .ports-panel-body:has(> .ports-demand-board) > .fbo-mode-switcher {

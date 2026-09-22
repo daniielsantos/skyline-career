@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   LngLatBounds,
-  Map,
+  Map as MapLibreMap,
   Marker,
   NavigationControl,
   Popup,
@@ -26,7 +26,7 @@ function hasCoords(lat: unknown, lon: unknown): lat is number {
   );
 }
 
-function safeResize(map: Map | null) {
+function safeResize(map: MapLibreMap | null) {
   if (!map) return;
   try {
     map.resize();
@@ -48,7 +48,7 @@ type Props = {
  */
 export function CompanyNetworkMap(props: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<Map | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
   const aliveRef = useRef(true);
   const markersRef = useRef<Marker[]>([]);
   const onSelectRef = useRef(props.onSelectNode);
@@ -60,7 +60,7 @@ export function CompanyNetworkMap(props: Props) {
     const container = containerRef.current;
     if (!container) return;
 
-    let map: Map | null = null;
+    let map: MapLibreMap | null = null;
     let ro: ResizeObserver | null = null;
     let onReady: (() => void) | null = null;
 
@@ -71,7 +71,7 @@ export function CompanyNetworkMap(props: Props) {
         return;
       }
       try {
-        map = new Map({
+        map = new MapLibreMap({
           container,
           style: OPENFREEMAP_DARK,
           center: [-46.5, -24.5],

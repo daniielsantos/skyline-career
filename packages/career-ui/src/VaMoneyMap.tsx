@@ -34,6 +34,11 @@ export function VaMoneyMap(props: {
       earns: '—',
     },
     {
+      job: 'Pilot travel (Move chip)',
+      pays: 'Your home wallet',
+      earns: '—',
+    },
+    {
       job: 'Inspect / repair / overhaul',
       pays: 'Company wallet (owner only)',
       earns: '—',

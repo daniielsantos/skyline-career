@@ -6,6 +6,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
 **Doc 2026-09-22:** parking **$0** em `homeHubIcao` (Crew/Company HQ) para parked/MX; off-hub inalterado. Org perk de parking = backlog.
+**Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
 **Doc 2026-09-21 (e):** ~~Available personal WH under VA pin~~ — **superseded (f)**; no mix on one shelf.
@@ -801,6 +802,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** Line crew era hire flat (Desk only); VAs grandes esgotavam allowance cedo sem path de escala.
 **Causa:** um único salary/allowance; sem upgrade.
 **Fix:** `vaLineCrew.tier` 1|2|3 no JSON (sem migrate); hire→Desk; `upgradeVaLineCrew` Ops/Network; fire→none com severance = salary do tier; allowance/salary por tabela; API `action=upgrade`; Config Upgrade/Fire; ledger `va_line_crew_upgrade`. Legacy hired sem tier = Desk.
+
+### Pilot Move chip reverts while on Crew (2026-09-22)
+
+**Sintoma:** membro em Crew/Roster (ex. noname, home SBCT, At SBGL) Move chip → SBKP (HQ da VA); toast OK; depois chip + “At” + sidebar voltam a **SBGL**. Ledger da **company** mostrava `Pilot travel` (bug — VA debitada).
+**Causa:** `pilotIcao` canônico fica na company **home** (chrome sticky; `GET /api/va/members` At = home). Abrir Crew faz `switchCompanyForVa` → header/`companyId` = VA. `POST /api/pilot/travel` usava esse tenant → gravava (e debitava) na **VA**. UI pintava SBKP; home ficava SBGL → soft-poll / paint home revertiam. `mirrorHomePilotIcaoOntoOps` apagava o SBKP fantasma na VA.
+**Fix:** `resolvePilotTravelCompanyId` força `vaHomeCompanyId(actor)` no quote/write; client manda `companyId: home` + `commitWallet(..., { sourceCompanyId: home })` mesmo com VA pinada; Money map: Pilot travel → home wallet. Owner (home === VA) inalterado. Debits errados já no Ledger VA não são auto-estornados.
 
 ### VA Accept ignores home pilot after Travel (2026-09-20)
 

@@ -3693,6 +3693,16 @@ export function App() {
         setVaSessionWallet(next);
         return;
       }
+      // Explicit home-source writes (pilot travel) paint chrome even while Crew
+      // has the VA tenant pinned — otherwise cash lands in vaSessionWallet.
+      if (home && source && source === home) {
+        walletCommitHoldRef.current = {
+          usd: next,
+          untilMs: Date.now() + 12_000,
+        };
+        setWalletState(next);
+        return;
+      }
       const active =
         getStoredCompanyId()?.trim() ||
         activeCompanyIdRef.current?.trim();
@@ -10280,9 +10290,31 @@ export function App() {
     let moved = false;
     await run(async () => {
       setError(null);
-      const result = await postPilotTravel({ destIcao: dest });
-      if (result.fleet) setFleet(result.fleet);
-      commitWallet(result.walletUsd);
+      // Hub + debit always on home — Crew may have the VA tenant pinned.
+      const home =
+        homeCompanyIdRef.current?.trim() ||
+        homeCompanyId?.trim() ||
+        undefined;
+      const result = await postPilotTravel({
+        destIcao: dest,
+        companyId: home,
+      });
+      const homeId =
+        result.companyId?.trim() ||
+        home ||
+        homeCompanyIdRef.current?.trim() ||
+        undefined;
+      // Travel mutates home missions only — never replace chrome fleet with a
+      // VA/home mismatch payload while Crew is pinned.
+      if (result.fleet && homeId) {
+        const active =
+          getStoredCompanyId()?.trim() ||
+          activeCompanyIdRef.current?.trim();
+        if (!active || active === homeId) {
+          setFleet(result.fleet);
+        }
+      }
+      commitWallet(result.walletUsd, { sourceCompanyId: homeId });
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
       else setPilotIcao(dest);
       setToastKind('ok');
@@ -20969,6 +21001,7 @@ export function App() {
         <PilotTravelDialog
           key={pilotTravelInitialDest ?? 'picker'}
           pilotIcao={pilotIcao}
+          homeCompanyId={homeCompanyId ?? homeCompanyIdRef.current}
           initialDestIcao={pilotTravelInitialDest}
           hubs={ferryDestinationHubs(hubOptions).map((hub) => ({
             icao: hub.icao,

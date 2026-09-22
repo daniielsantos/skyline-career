@@ -4303,12 +4303,15 @@ export function fetchFerryPlan(opts: {
 export function postPilotTravel(opts: {
   destIcao: string;
   quoteOnly?: boolean;
+  /** Always the pilot home company — never a pinned VA tenant. */
+  companyId?: string;
 }) {
   return api<{
     quote: PilotTravelQuote;
     walletDebitUsd?: number;
     walletUsd: number;
     pilotIcao?: string;
+    companyId?: string;
     hubSelected?: boolean;
     fleet?: PlayerAircraft[];
     hubs?: StarterHubOption[];

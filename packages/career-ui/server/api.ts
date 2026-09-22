@@ -2099,6 +2099,30 @@ async function mirrorHomePilotIcaoOntoOps(
 }
 
 /**
+ * Pilot hub + travel cash live on the account home company (chrome sticky).
+ * Crew may pin a VA tenant in the header — never debit that for member travel.
+ */
+async function resolvePilotTravelCompanyId(
+  req: import('node:http').IncomingMessage,
+  requestedCompanyId: string,
+): Promise<{ companyId: string; actorAccountId?: string }> {
+  const requested = requestedCompanyId.trim();
+  const session = authSessionFromRequest(req);
+  const actorAccountId = session?.account?.id?.trim() || undefined;
+  if (!actorAccountId || !store?.supportsAuth) {
+    return { companyId: requested, actorAccountId };
+  }
+  try {
+    const home = await Promise.resolve(store.vaHomeCompanyId(actorAccountId));
+    const id = home?.trim();
+    if (id) return { companyId: id, actorAccountId };
+  } catch {
+    /* fall through */
+  }
+  return { companyId: requested, actorAccountId };
+}
+
+/**
  * Load, mutate, and persist. Default: no hourly tick, full economy save.
  * `persist: 'company'` writes missions only (plus optional demand/listing/concession
  * upserts). `persist: 'blob'` writes economy stub + dealer pool table (not live cargo).
@@ -7470,7 +7494,14 @@ export function createCareerApiServer(port = 8787) {
           quoteOnly?: boolean;
           companyId?: string;
         };
-        const pilot_travelCompanyId = companyIdFromRequest(req, body.companyId);
+        const requestedTravelCompanyId = companyIdFromRequest(
+          req,
+          body.companyId,
+        );
+        const {
+          companyId: pilot_travelCompanyId,
+          actorAccountId: pilot_travelActorId,
+        } = await resolvePilotTravelCompanyId(req, requestedTravelCompanyId);
         if (!body.destIcao) {
           send(res, 400, { error: 'destIcao required' });
           return;
@@ -7483,6 +7514,7 @@ export function createCareerApiServer(port = 8787) {
                 quote,
                 walletUsd: missions.walletUsd,
                 pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
+                companyId: pilot_travelCompanyId,
               };
             }, { companyId: pilot_travelCompanyId });
             send(res, 200, quoted);
@@ -7499,9 +7531,14 @@ export function createCareerApiServer(port = 8787) {
               quote: traveled.quote,
               walletDebitUsd: traveled.walletDebitUsd,
               walletUsd: missions.walletUsd,
+              companyId: pilot_travelCompanyId,
               ...fleetPayload(missions, world),
             };
-          }, { persist: 'company', companyId: pilot_travelCompanyId });
+          }, {
+            persist: 'company',
+            companyId: pilot_travelCompanyId,
+            actorAccountId: pilot_travelActorId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, 400, {

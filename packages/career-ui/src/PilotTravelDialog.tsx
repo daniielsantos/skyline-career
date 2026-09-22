@@ -25,6 +25,8 @@ type Mode = 'pilot' | 'ferry';
  */
 export function PilotTravelDialog(props: {
   pilotIcao: string;
+  /** Pilot home company — quotes/writes never use a pinned VA tenant. */
+  homeCompanyId?: string | null;
   hubs: FerryHubOption[];
   /** Prefill destination (e.g. Hangar “Travel here”). */
   initialDestIcao?: string | null;
@@ -137,8 +139,13 @@ export function PilotTravelDialog(props: {
     let cancelled = false;
     setQuoting(true);
     setQuoteError(null);
+    const homeId = props.homeCompanyId?.trim() || undefined;
     const timer = window.setTimeout(() => {
-      void postPilotTravel({ destIcao: dest, quoteOnly: true })
+      void postPilotTravel({
+        destIcao: dest,
+        quoteOnly: true,
+        companyId: homeId,
+      })
         .then((res) => {
           if (cancelled) return;
           setQuote(res.quote);
@@ -157,7 +164,7 @@ export function PilotTravelDialog(props: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [dest, origin, mode]);
+  }, [dest, origin, mode, props.homeCompanyId]);
 
   const canTravel =
     mode === 'pilot' &&

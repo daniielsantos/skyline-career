@@ -14802,6 +14802,15 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
     minmax(5.5rem, 0.65fr)
     13.5rem;
 }
+/* Pilots: slim trailing Live column (same row height as At). */
+.va-roster-list.is-live-actions:not(.is-manage) .va-roster-row {
+  grid-template-columns:
+    minmax(8rem, 1.2fr)
+    minmax(4.5rem, 0.55fr)
+    minmax(5.5rem, 0.7fr)
+    minmax(5.5rem, 0.65fr)
+    4.25rem;
+}
 .va-roster-row-request {
   grid-template-columns: minmax(8rem, 1.2fr) minmax(4.5rem, 0.55fr) auto;
 }
@@ -14840,10 +14849,10 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font-weight: 600;
 }
 .va-roster-live {
-  margin-top: 0.35rem;
   font-size: 0.72rem;
-  padding: 0.22rem 0.5rem;
-  justify-self: start;
+  padding: 0.28rem 0.55rem;
+  justify-self: stretch;
+  width: 100%;
 }
 .va-roster-live.is-active {
   border-color: color-mix(in srgb, #d4a574 55%, transparent);
@@ -14914,6 +14923,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 @media (max-width: 860px) {
   .va-roster-row,
   .va-roster-list.is-manage .va-roster-row,
+  .va-roster-list.is-live-actions .va-roster-row,
   .va-roster-row-request {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;

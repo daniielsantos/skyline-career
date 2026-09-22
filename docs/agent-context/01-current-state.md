@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **8d9dc5e2** / desktop **0.3.223** shipped: Paint sidebar tab selection before session restore. Release: [v0.3.223](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.223).
+
+
 `main` **ea249720** / desktop **0.3.222** shipped: Keep member pilot travel on the home company. Release: [v0.3.222](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.222).
 
 

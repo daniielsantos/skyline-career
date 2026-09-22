@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **bb58387a** / desktop **0.3.224** shipped: Clarify hangar maintenance with a wrench mark. Release: [v0.3.224](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.224).
+
+
 `main` **8d9dc5e2** / desktop **0.3.223** shipped: Paint sidebar tab selection before session restore. Release: [v0.3.223](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.223).
 
 

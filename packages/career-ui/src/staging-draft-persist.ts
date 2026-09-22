@@ -10,6 +10,15 @@ export type PersistedStagingDraft = {
   intoMissionId?: string;
   replaceManifest?: boolean;
   lines: Array<{ lot: MarketLot; cargoKg: number }>;
+  /** VA Hauls desk hold — no Market lots; Accept → *DispatchHold. */
+  deskHold?: {
+    id: string;
+    kind: 'demand' | 'bridge' | 'haul';
+    commodityId: string;
+    kg: number;
+    unitPriceUsd?: number;
+    pilotPayUsd?: number;
+  };
 };
 
 type MissionRef = {
@@ -80,6 +89,13 @@ export function canRestoreStagingDraft(
   missions: MissionRef[],
   activeMissionId?: string,
 ): boolean {
+  const deskHoldId = draft.deskHold?.id?.trim();
+  if (deskHoldId) {
+    if (draft.replaceManifest || draft.intoMissionId) return false;
+    if (activeMissionId) return false;
+    return Boolean(draft.aircraftId?.trim());
+  }
+
   if (draft.lines.length === 0) return false;
 
   if (draft.replaceManifest) {

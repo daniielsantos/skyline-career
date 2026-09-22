@@ -259,6 +259,7 @@ export function holdWarehouseHaul(
     destIcao: string;
     commodityId: CommodityId;
     kg?: number;
+    heldByAccountId?: string;
   },
 ): { hold: PlayerDemandHold; kg: number; payUsd: number } {
   expireDemandHolds(state, world);
@@ -309,6 +310,7 @@ export function holdWarehouseHaul(
     commodityId: opts.commodityId,
     kg,
     unitPriceUsd,
+    heldByAccountId: opts.heldByAccountId?.trim() || undefined,
     heldAtTick: world.tick,
     expiresAtTick: world.tick + ttl,
   };

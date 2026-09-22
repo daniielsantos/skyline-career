@@ -204,6 +204,8 @@ export function holdWarehouseBridge(
     kg?: number;
     /** Omit = suggest Internal Haul pay; 0 = unpaid bridge. */
     pilotPayUsd?: number | null;
+    heldByAccountId?: string;
+    heldByAuto?: boolean;
   },
 ): { hold: PlayerDemandHold; kg: number; pilotPayUsd: number } {
   expireDemandHolds(state, world);
@@ -254,6 +256,8 @@ export function holdWarehouseBridge(
     kg,
     unitPriceUsd: pay.unitPriceUsd,
     pilotPayUsd: pay.pilotPayUsd,
+    heldByAccountId: opts.heldByAccountId?.trim() || undefined,
+    heldByAuto: opts.heldByAuto === true ? true : undefined,
     heldAtTick: world.tick,
     expiresAtTick: world.tick + ttl,
   };

@@ -42,6 +42,18 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Non-goal (agora):** contractor com casco pessoal em missão da VA (ownership/MX/seguro) — outro desenho.
 
+**Hauls hold author + map route (2026-09-22):** sintoma = Open desk sem quem postou; mapa só rede FBO/WH. Causa = hold não gravava account; CompanyNetworkMap sem OD. Fix = `heldByAccountId` / `heldByAuto` no hold (Scout/Ports/manual + Auto-haul); `/api/va/hauls` resolve `heldByName` + coords; click na row seleciona e plota rota no mapa.
+
+**Hauls Prepare + ferry Manifest (2026-09-22):** sintoma = Open desk só Accept com cauda parked no origin (“Need parked tail at …”). Causa = `*DispatchHold` exige `locationIcao === origin` (carga no WH) e a board filtrava só at-origin. Fix = espelhar Freights: picker = todas parked VA; off-origin → **Prepare** → `StagingDraft.deskHold` + Manifest (ferry Line crew CTA); **Accept & Dispatch** só at-origin chama o mesmo trio dispatch-hold. API gate intacto; Discard Manifest não cancela o hold.
+
+**VA Ledger Credit beside wallet (2026-09-22):** hero em 3 colunas Wallet | Credit | Flight quality (empilha em viewport estreita).
+
+**Hauls Open desk Cancel + layout (2026-09-22):** Hold = reserva de stock/Demand até Accept ou TTL. UI Hauls tinha Accept mas sem Cancel. Fix = Cancel (bridge/haul/demand cancel APIs + `companyId`); row em grid (rota+kind+meta | actions).
+
+**My VA pane height jump (2026-09-22):** sintoma = alternar Roster/Hangar/Hauls/Ports/… mudava a altura da página. Causa = só Ports forçava fill (`:has(.va-ports-pane)`); panes curtas shrink-wrap. Fix = `va-panel-shell` + `va-pane-body` preenchem `main-content` em todas as abas.
+
+**VA directory toolbar (2026-09-22):** sintoma = paragraph longo (“joining keeps… Port FBO…”) enchendo a toolbar. Fix = remover meta; Search à esquerda, Join code à direita.
+
 **UX:** directory + Leave copy dizem que join mantém company/wallet/frota pessoais. **Uma VA por conta** — join/request bloqueados se já for membro (ou owner) de qualquer company `va_listed`; Leave (membro) ou Unlist (owner) libera.
 
 ---
@@ -901,6 +913,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Company ≈ VA vocabulary** — publish card as directory status; Identity Published; no tenant merge (2026-09-21)
 - [x] **Buff concessão herdado** — hasPortOperatorBenefits buy/ETA; status yours exact only (2026-09-21 g)
 - [x] **My VA Hauls board** — Internal Haul open/active + Accept + Port strip + Ports CTA (2026-09-21)
+- [x] **Hauls Prepare + ferry Manifest** — off-origin Prepare → deskHold draft; Accept at-origin dispatch-hold (2026-09-22)
+- [x] **Hauls hold author + map route** — heldByName on Open desk; click plots OD on Company Network map (2026-09-22)
 - [x] **Path to Port FBO** — VaPortPathCard Hauls/Config + empty/join pitch (2026-09-21)
 - [x] **Hauls quiet após FBO** — Path some pós-claim; copy curta (2026-09-21)
 - [x] **IH-3 Auto-haul desk** — tick Scout bridges; Config opt-in; ≥2 members (2026-09-21)

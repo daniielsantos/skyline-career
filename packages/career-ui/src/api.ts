@@ -3728,7 +3728,10 @@ export function postWarehouseBridgeHold(opts: {
   });
 }
 
-export function postWarehouseBridgeHoldCancel(opts: { holdId: string }) {
+export function postWarehouseBridgeHoldCancel(opts: {
+  holdId: string;
+  companyId?: string;
+}) {
   return api<{ kg: number; warehouses: PlayerWarehouseSnapshot }>(
     '/api/warehouses/bridge/hold/cancel',
     {
@@ -3818,7 +3821,10 @@ export function postWarehouseHaulHold(opts: {
   });
 }
 
-export function postWarehouseHaulHoldCancel(opts: { holdId: string }) {
+export function postWarehouseHaulHoldCancel(opts: {
+  holdId: string;
+  companyId?: string;
+}) {
   return api<{ kg: number; warehouses: PlayerWarehouseSnapshot }>(
     '/api/warehouses/haul/hold/cancel',
     {
@@ -3913,7 +3919,10 @@ export function postDemandHold(opts: {
   });
 }
 
-export function postDemandHoldCancel(opts: { holdId: string }) {
+export function postDemandHoldCancel(opts: {
+  holdId: string;
+  companyId?: string;
+}) {
   return api<{
     kg: number;
     orderId: string;
@@ -5199,6 +5208,14 @@ export type VaHaulHold = {
   commodityId: string;
   pilotPayUsd?: number;
   unitPriceUsd?: number;
+  heldByAccountId?: string;
+  heldByAuto?: boolean;
+  /** Resolved member display name, or "Auto-haul". */
+  heldByName?: string | null;
+  originLat?: number;
+  originLon?: number;
+  destLat?: number;
+  destLon?: number;
 };
 
 export type VaHaulMission = {

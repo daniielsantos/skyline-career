@@ -29,6 +29,7 @@ import {
   type VaOrgPerks,
   type Mission,
   type CareerCargoOps,
+  type VaHaulHold,
 } from './api';
 import { BusyBlock, BusyStatus } from './Busy';
 import { CompanyCreditBlock, HangarCashflowPanel } from './CashflowPanel';
@@ -156,6 +157,8 @@ type Props = {
   onOpenUpdates?: () => void;
   /** After Accept Internal Haul — open Dispatch / staging. */
   onHaulStaged?: (mission: Mission) => void;
+  /** Open Dispatch Manifest for a desk hold (ferry off-origin there). */
+  onPrepareHaulHold?: (hold: VaHaulHold, aircraftId: string) => void;
   onMissions?: (missions: Mission[]) => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
   /** Switch active tenant to the listed VA (member dual-tenant). */
@@ -606,7 +609,7 @@ export function VaPage(props: Props) {
   }
 
   return (
-    <section className="panel va-panel">
+    <section className="panel va-panel va-panel-shell">
       <div className="panel-head va-my-head">
         <div>
           <h3 className="va-my-title">{displayName || 'My VA'}</h3>
@@ -710,6 +713,7 @@ export function VaPage(props: Props) {
         </p>
       ) : null}
 
+      <div className="va-pane-body">
       {pane === 'roster' ? (
         <div className="settings-card va-pane-card">
           <h3>Roster</h3>
@@ -1001,6 +1005,7 @@ export function VaPage(props: Props) {
           }}
           onMissions={props.onMissions}
           onStaged={props.onHaulStaged}
+          onPrepareHold={props.onPrepareHaulHold}
           onGoPorts={() => setPane('ports')}
           onToast={props.onToast}
         />
@@ -1058,40 +1063,38 @@ export function VaPage(props: Props) {
           ) : (
             <>
           <div className="va-ledger-hero">
-            <div className="va-ledger-hero-main">
-              <div className="va-ledger-wallet">
-                <p className="aircraft-card-section-label" style={{ margin: 0 }}>
-                  VA wallet
-                </p>
-                <p className="va-ledger-wallet-value">
-                  {resolvedWalletUsd != null
-                    ? formatBoardMoney(resolvedWalletUsd)
-                    : ledgerBusy || tenantSwitching
-                      ? '…'
-                      : '—'}
-                </p>
-                <p className="va-ledger-wallet-hint">
-                  Shared company cash (owner wallet).
-                </p>
-              </div>
-              <div className="va-ledger-credit">
-                <CompanyCreditBlock
-                  credit={companyCredit}
-                  walletUsd={resolvedWalletUsd ?? 0}
-                  busy={pageBusy || ledgerBusy}
-                  actionsLocked={!isOwner}
-                  vaOwnerOpsLabels
-                  formatMoney={formatBoardMoney}
-                  onUpdated={({ walletUsd, companyCredit: next }) => {
-                    props.onWallet?.(walletUsd);
-                    setCompanyCredit(next);
-                    void loadLedger();
-                  }}
-                  onError={(message) => {
-                    setLedgerError(message);
-                  }}
-                />
-              </div>
+            <div className="va-ledger-wallet">
+              <p className="aircraft-card-section-label" style={{ margin: 0 }}>
+                VA wallet
+              </p>
+              <p className="va-ledger-wallet-value">
+                {resolvedWalletUsd != null
+                  ? formatBoardMoney(resolvedWalletUsd)
+                  : ledgerBusy || tenantSwitching
+                    ? '…'
+                    : '—'}
+              </p>
+              <p className="va-ledger-wallet-hint">
+                Shared company cash (owner wallet).
+              </p>
+            </div>
+            <div className="va-ledger-credit">
+              <CompanyCreditBlock
+                credit={companyCredit}
+                walletUsd={resolvedWalletUsd ?? 0}
+                busy={pageBusy || ledgerBusy}
+                actionsLocked={!isOwner}
+                vaOwnerOpsLabels
+                formatMoney={formatBoardMoney}
+                onUpdated={({ walletUsd, companyCredit: next }) => {
+                  props.onWallet?.(walletUsd);
+                  setCompanyCredit(next);
+                  void loadLedger();
+                }}
+                onError={(message) => {
+                  setLedgerError(message);
+                }}
+              />
             </div>
             <div
               className="va-ledger-quality"
@@ -1885,6 +1888,7 @@ export function VaPage(props: Props) {
           </div>
         </div>
       ) : null}
+      </div>
       {confirmDialog}
     </section>
   );

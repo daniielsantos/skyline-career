@@ -4746,19 +4746,51 @@ export function createCareerApiServer(port = 8787) {
         const companyNetwork = world
           ? buildCompanyNetworkNodesFromState(world, missions, companyId)
           : [];
+        const members =
+          store.supportsAuth
+            ? await Promise.resolve(store.vaListMembers(companyId))
+            : [];
+        const memberNameById = new Map(
+          members.map((m) => [
+            m.accountId,
+            (m.displayName || m.loginName || '').trim() || m.accountId,
+          ]),
+        );
         send(res, 200, {
           companyId,
           companyNetwork,
-          openHolds: openHolds.map((h) => ({
-            id: h.id,
-            kind: h.kind ?? 'demand',
-            originIcao: h.originIcao,
-            destIcao: h.destIcao,
-            kg: h.kg,
-            commodityId: h.commodityId,
-            pilotPayUsd: h.pilotPayUsd,
-            unitPriceUsd: h.unitPriceUsd,
-          })),
+          openHolds: openHolds.map((h) => {
+            const origin = h.originIcao.trim().toUpperCase();
+            const dest = h.destIcao.trim().toUpperCase();
+            const originCoords = world
+              ? resolveAirportCoords(origin, airportByIcao(world, origin) ?? null)
+              : undefined;
+            const destCoords = world
+              ? resolveAirportCoords(dest, airportByIcao(world, dest) ?? null)
+              : undefined;
+            const heldByAccountId = h.heldByAccountId?.trim() || undefined;
+            return {
+              id: h.id,
+              kind: h.kind ?? 'demand',
+              originIcao: h.originIcao,
+              destIcao: h.destIcao,
+              kg: h.kg,
+              commodityId: h.commodityId,
+              pilotPayUsd: h.pilotPayUsd,
+              unitPriceUsd: h.unitPriceUsd,
+              heldByAccountId,
+              heldByAuto: h.heldByAuto === true ? true : undefined,
+              heldByName: heldByAccountId
+                ? memberNameById.get(heldByAccountId) ?? null
+                : h.heldByAuto
+                  ? 'Auto-haul'
+                  : null,
+              originLat: originCoords?.lat,
+              originLon: originCoords?.lon,
+              destLat: destCoords?.lat,
+              destLon: destCoords?.lon,
+            };
+          }),
           activeMissions: active.map((m) => ({
             id: m.id,
             kind:
@@ -9866,6 +9898,8 @@ export function createCareerApiServer(port = 8787) {
         const kind =
           body.kind ??
           (body.orderId ? 'demand' : 'bridge');
+        const scoutActorAccountId =
+          authSessionFromRequest(req)?.account.id?.trim() || undefined;
         try {
           if (action === 'list') {
             const missions = await loadMissions({ companyId: ports_scoutCompanyId });
@@ -9897,6 +9931,7 @@ export function createCareerApiServer(port = 8787) {
                 originIcao: body.originIcao!,
                 kg: body.kg != null ? Number(body.kg) : undefined,
                 companyId: ports_scoutCompanyId,
+                heldByAccountId: scoutActorAccountId,
               });
               return {
                 hold: confirmed.hold,
@@ -9938,6 +9973,7 @@ export function createCareerApiServer(port = 8787) {
                 >[2]['commodityId'],
                 kg: body.kg != null ? Number(body.kg) : undefined,
                 companyId: ports_scoutCompanyId,
+                heldByAccountId: scoutActorAccountId,
               });
               return {
                 hold: confirmed.hold,
@@ -9973,6 +10009,7 @@ export function createCareerApiServer(port = 8787) {
               >[2]['commodityId'],
               kg: body.kg != null ? Number(body.kg) : undefined,
               companyId: ports_scoutCompanyId,
+              heldByAccountId: scoutActorAccountId,
             });
             return {
               hold: confirmed.hold,
@@ -10423,6 +10460,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const actorAccountId =
+            authSessionFromRequest(req)?.account.id?.trim() || undefined;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
@@ -10437,6 +10476,7 @@ export function createCareerApiServer(port = 8787) {
                     : body.pilotPayUsd != null
                       ? Number(body.pilotPayUsd)
                       : undefined,
+                heldByAccountId: actorAccountId,
               });
               return {
                 hold: held.hold,
@@ -10720,6 +10760,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const actorAccountId =
+            authSessionFromRequest(req)?.account.id?.trim() || undefined;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
@@ -10728,6 +10770,7 @@ export function createCareerApiServer(port = 8787) {
                 destIcao: body.destIcao!,
                 commodityId: body.commodityId as CommodityId,
                 kg: body.kg != null ? Number(body.kg) : undefined,
+                heldByAccountId: actorAccountId,
               });
               return {
                 hold: held.hold,
@@ -11054,6 +11097,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const actorAccountId =
+            authSessionFromRequest(req)?.account.id?.trim() || undefined;
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () => {
@@ -11061,6 +11106,7 @@ export function createCareerApiServer(port = 8787) {
                 orderId: body.orderId!,
                 originIcao: body.originIcao!,
                 kg: body.kg != null ? Number(body.kg) : undefined,
+                heldByAccountId: actorAccountId,
               });
               const warehouses = playerWarehouseSnapshot(missions, world);
               return {

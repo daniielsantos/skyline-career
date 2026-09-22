@@ -336,6 +336,7 @@ export function confirmPortScoutBridge(
     commodityId: CommodityId;
     kg?: number;
     companyId?: string;
+    heldByAccountId?: string;
   },
 ): {
   hold: PlayerDemandHold;
@@ -369,6 +370,7 @@ export function confirmPortScoutBridge(
     destIcao: dest,
     commodityId: opts.commodityId,
     kg: opts.kg ?? match?.kg,
+    heldByAccountId: opts.heldByAccountId,
   });
   return { hold: held.hold, kg: held.kg, suggestion: match ?? null };
 }
@@ -465,6 +467,7 @@ export function confirmPortScoutDemand(
     originIcao: string;
     kg?: number;
     companyId?: string;
+    heldByAccountId?: string;
   },
 ): {
   hold: PlayerDemandHold;
@@ -494,6 +497,7 @@ export function confirmPortScoutDemand(
     orderId: opts.orderId,
     originIcao: origin,
     kg: opts.kg ?? match?.kg,
+    heldByAccountId: opts.heldByAccountId,
   });
   return { hold: held.hold, kg: held.kg, suggestion: match ?? null };
 }
@@ -630,6 +634,7 @@ export function confirmPortScoutHaul(
     commodityId: CommodityId;
     kg?: number;
     companyId?: string;
+    heldByAccountId?: string;
   },
 ): {
   hold: PlayerDemandHold;
@@ -668,6 +673,7 @@ export function confirmPortScoutHaul(
     destIcao: dest,
     commodityId: opts.commodityId,
     kg: opts.kg ?? match?.kg,
+    heldByAccountId: opts.heldByAccountId,
   });
   return {
     hold: held.hold,

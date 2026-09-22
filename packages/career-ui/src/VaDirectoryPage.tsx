@@ -55,7 +55,6 @@ export function VaDirectoryPage(props: Props) {
     });
   }, [directory, query]);
 
-  const hiringCount = directory.filter((r) => r.recruiting).length;
   const alreadyInVa = Boolean(memberOfVaCompanyId);
 
   if (!canShow) {
@@ -69,14 +68,6 @@ export function VaDirectoryPage(props: Props) {
   return (
     <section className="panel va-panel va-directory-panel">
       <div className="va-directory-toolbar">
-        <p className="va-directory-meta">
-          {directory.length} airline{directory.length === 1 ? '' : 's'}
-          {hiringCount > 0 ? ` · ${hiringCount} hiring` : ''}
-          {' · '}
-          joining keeps your personal company, wallet, and fleet. Early
-          value is VA aircraft and pilot cut — Port FBO desk and Internal
-          Hauls come after the company builds warehouse T3 and claims a port
-        </p>
         <input
           type="search"
           className="va-directory-search"

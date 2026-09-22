@@ -1674,6 +1674,10 @@ export interface PlayerDemandHold {
    * Omit / 0 = unpaid WH→WH bridge (Port shuttle OK).
    */
   pilotPayUsd?: number;
+  /** Auth account that posted the hold (Scout / Ports Hold). */
+  heldByAccountId?: string;
+  /** True when Auto-haul desk posted the hold (no member). */
+  heldByAuto?: boolean;
   heldAtTick: number;
   expiresAtTick: number;
 }

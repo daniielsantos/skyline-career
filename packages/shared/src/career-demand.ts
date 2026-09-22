@@ -390,6 +390,7 @@ export function holdDemandOrder(
     orderId: string;
     originIcao: string;
     kg?: number;
+    heldByAccountId?: string;
   },
 ): { hold: PlayerDemandHold; order: DemandOrder; kg: number } {
   ensureDemandOrders(world);
@@ -468,6 +469,7 @@ export function holdDemandOrder(
     commodityId: order.commodityId,
     kg,
     unitPriceUsd,
+    heldByAccountId: opts.heldByAccountId?.trim() || undefined,
     heldAtTick: world.tick,
     expiresAtTick: Math.min(world.tick + ttl, order.expiresAtTick),
   };

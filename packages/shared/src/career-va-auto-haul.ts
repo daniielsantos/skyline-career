@@ -242,6 +242,7 @@ export function tickVaAutoHaul(
         commodityId: s.commodityId,
         kg: s.kg,
         pilotPayUsd,
+        heldByAuto: true,
       });
       cfg.postedToday += 1;
       remaining -= 1;

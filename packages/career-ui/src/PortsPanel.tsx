@@ -587,19 +587,9 @@ export function PortsPanel(props: {
       if (!portId && nextPorts.ports[0]) setPortId(nextPorts.ports[0].id);
       if (!includeScout) return;
       try {
-        const scout = await postPortScout({
-          action: 'list',
-          companyId: logisticsId,
-        });
-        setScoutSuggestions(scout.suggestions ?? []);
-        setScoutDemandSuggestions(scout.demandSuggestions ?? []);
-        setScoutHaulSuggestions(scout.haulSuggestions ?? []);
-        setScoutEmptyHint(scout.emptyHint?.lines ?? null);
+        await reloadScoutDesk(logisticsId);
       } catch {
-        setScoutSuggestions([]);
-        setScoutDemandSuggestions([]);
-        setScoutHaulSuggestions([]);
-        setScoutEmptyHint(null);
+        /* keep current scout desk on list fail */
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -608,9 +598,42 @@ export function PortsPanel(props: {
     }
   }
 
+  function applyScoutDesk(desk: {
+    suggestions?: PortScoutBridgeSuggestion[];
+    demandSuggestions?: PortScoutDemandSuggestion[];
+    haulSuggestions?: PortScoutHaulSuggestion[];
+    emptyHint?: { lines: string[] } | null;
+  }) {
+    // Only replace when arrays are present — confirm used to wipe the board
+    // with `?? []` when a field was missing.
+    if (Array.isArray(desk.suggestions)) {
+      setScoutSuggestions(desk.suggestions);
+    }
+    if (Array.isArray(desk.demandSuggestions)) {
+      setScoutDemandSuggestions(desk.demandSuggestions);
+    }
+    if (Array.isArray(desk.haulSuggestions)) {
+      setScoutHaulSuggestions(desk.haulSuggestions);
+    }
+    if ('emptyHint' in desk) {
+      setScoutEmptyHint(desk.emptyHint?.lines ?? null);
+    }
+  }
+
+  async function reloadScoutDesk(companyId?: string) {
+    const logisticsId =
+      companyId?.trim() || props.logisticsCompanyId?.trim() || undefined;
+    const scout = await postPortScout({
+      action: 'list',
+      companyId: logisticsId,
+    });
+    applyScoutDesk(scout);
+  }
+
   async function onScoutConfirm(s: PortScoutBridgeSuggestion) {
     if (props.busy || loading) return;
     setLoading(true);
+    const logisticsId = props.logisticsCompanyId?.trim() || undefined;
     try {
       const result = await postPortScout({
         action: 'confirm',
@@ -619,18 +642,25 @@ export function PortsPanel(props: {
         destIcao: s.destIcao,
         commodityId: s.commodityId,
         kg: s.kg,
+        companyId: logisticsId,
       });
       if (result.ports) setSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
-      setScoutSuggestions(result.suggestions ?? []);
-      setScoutDemandSuggestions(result.demandSuggestions ?? []);
-      setScoutHaulSuggestions(result.haulSuggestions ?? []);
-      setScoutEmptyHint(result.emptyHint?.lines ?? null);
-      const pilotPay = result.hold?.pilotPayUsd ?? 0;
+      if (
+        Array.isArray(result.suggestions) &&
+        Array.isArray(result.demandSuggestions) &&
+        Array.isArray(result.haulSuggestions)
+      ) {
+        applyScoutDesk(result);
+      } else {
+        await reloadScoutDesk(logisticsId).catch(() => undefined);
+      }
       props.onToast?.(
         'ok',
         `Scout Internal haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao}${
-          pilotPay > 0 ? ` · pilot ${props.formatMoney(pilotPay)}` : ' · unpaid'
+          (result.hold?.pilotPayUsd ?? 0) > 0
+            ? ` · pilot ${props.formatMoney(result.hold!.pilotPayUsd!)}`
+            : ' · unpaid'
         } — Dispatch when ready`,
       );
     } catch (err) {
@@ -646,6 +676,7 @@ export function PortsPanel(props: {
   async function onScoutDemandConfirm(s: PortScoutDemandSuggestion) {
     if (props.busy || loading) return;
     setLoading(true);
+    const logisticsId = props.logisticsCompanyId?.trim() || undefined;
     try {
       const result = await postPortScout({
         action: 'confirm',
@@ -653,14 +684,20 @@ export function PortsPanel(props: {
         orderId: s.orderId,
         originIcao: s.originIcao,
         kg: s.kg,
+        companyId: logisticsId,
       });
       if (result.ports) setSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
       if (result.demand?.orders) setDemand(result.demand.orders);
-      setScoutSuggestions(result.suggestions ?? []);
-      setScoutDemandSuggestions(result.demandSuggestions ?? []);
-      setScoutHaulSuggestions(result.haulSuggestions ?? []);
-      setScoutEmptyHint(result.emptyHint?.lines ?? null);
+      if (
+        Array.isArray(result.suggestions) &&
+        Array.isArray(result.demandSuggestions) &&
+        Array.isArray(result.haulSuggestions)
+      ) {
+        applyScoutDesk(result);
+      } else {
+        await reloadScoutDesk(logisticsId).catch(() => undefined);
+      }
       props.onToast?.(
         'ok',
         `Scout Demand hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(s.payUsd)} — Dispatch when ready`,
@@ -678,6 +715,7 @@ export function PortsPanel(props: {
   async function onScoutHaulConfirm(s: PortScoutHaulSuggestion) {
     if (props.busy || loading) return;
     setLoading(true);
+    const logisticsId = props.logisticsCompanyId?.trim() || undefined;
     try {
       const result = await postPortScout({
         action: 'confirm',
@@ -686,13 +724,19 @@ export function PortsPanel(props: {
         destIcao: s.destIcao,
         commodityId: s.commodityId,
         kg: s.kg,
+        companyId: logisticsId,
       });
       if (result.ports) setSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
-      setScoutSuggestions(result.suggestions ?? []);
-      setScoutDemandSuggestions(result.demandSuggestions ?? []);
-      setScoutHaulSuggestions(result.haulSuggestions ?? []);
-      setScoutEmptyHint(result.emptyHint?.lines ?? null);
+      if (
+        Array.isArray(result.suggestions) &&
+        Array.isArray(result.demandSuggestions) &&
+        Array.isArray(result.haulSuggestions)
+      ) {
+        applyScoutDesk(result);
+      } else {
+        await reloadScoutDesk(logisticsId).catch(() => undefined);
+      }
       props.onToast?.(
         'ok',
         `Scout Haul hold ${props.formatTonnes(result.kg ?? s.kg)} ${s.originIcao}→${s.destIcao} · ${props.formatMoney(result.payUsd ?? s.payUsd)} — Dispatch when ready`,

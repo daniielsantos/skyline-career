@@ -78,6 +78,9 @@ import {
   postPilotTravel,
   postContractPilotAccept,
   postStagingCommit,
+  postDemandDispatchHold,
+  postWarehouseBridgeDispatchHold,
+  postWarehouseHaulDispatchHold,
   postTick,
   postDebugCreditWallet,
   postDebugClaimPort,
@@ -112,6 +115,7 @@ import {
   type NpcClaim,
   type NpcFleetMember,
   type PlayerAircraft,
+  type VaHaulHold,
   type PlayerFboSnapshot,
   type BaseDispatchScoutPolicy,
   type BaseDispatchTour,
@@ -551,6 +555,18 @@ type StagingDraft = {
   /** When true, commit replaces the full manifest instead of appending. */
   replaceManifest?: boolean;
   lines: StagingLine[];
+  /**
+   * VA desk hold prepared from My VA → Hauls (no Market lots).
+   * Accept & Dispatch calls *DispatchHold once the tail is at origin.
+   */
+  deskHold?: {
+    id: string;
+    kind: 'demand' | 'bridge' | 'haul';
+    commodityId: string;
+    kg: number;
+    unitPriceUsd?: number;
+    pilotPayUsd?: number;
+  };
 };
 
 function lotQuantityKg(lot: MarketLot): number {
@@ -10370,6 +10386,69 @@ export function App() {
     }
   }
 
+  function enterStagingForVaHaulHold(hold: VaHaulHold, aircraftId: string) {
+    if (!hubSelected) {
+      setError('Create your pilot profile first (name + home hub)');
+      goToTab('pilot');
+      return;
+    }
+    if (playerDispatchMission) {
+      setError(
+        `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch before preparing another flight`,
+      );
+      goToTab('staging');
+      return;
+    }
+    const id = aircraftId.trim();
+    const selectedAircraft =
+      findOpsEntry(opsFleetEntries, id)?.aircraft ??
+      vaSessionFleet.find((a) => a.id === id) ??
+      fleet.find((a) => a.id === id);
+    if (!selectedAircraft || selectedAircraft.status !== 'parked') {
+      setError('Pick a parked company aircraft for this desk hold');
+      return;
+    }
+    const origin = hold.originIcao.trim().toUpperCase();
+    const dest = hold.destIcao.trim().toUpperCase();
+    const atOrigin =
+      selectedAircraft.locationIcao.trim().toUpperCase() === origin;
+    const kind = hold.kind ?? 'demand';
+    const draft: StagingDraft = {
+      originIcao: origin,
+      destIcao: dest,
+      originName: origin,
+      destName: dest,
+      aircraft: selectedAircraft.aircraftClassId,
+      aircraftId: selectedAircraft.id,
+      lines: [],
+      deskHold: {
+        id: hold.id,
+        kind,
+        commodityId: hold.commodityId,
+        kg: hold.kg,
+        unitPriceUsd: hold.unitPriceUsd,
+        pilotPayUsd: hold.pilotPayUsd,
+      },
+    };
+    setFlightDebrief(null);
+    setStagingFerryOpen(false);
+    setCharterManifest(null);
+    setStaging(draft);
+    setPreferredAircraft(selectedAircraft.aircraftClassId);
+    setError(null);
+    goToTab('staging');
+    const vaId = memberVaCompanyIdRef.current?.trim();
+    if (vaId) {
+      void switchCompanyForVa(vaId).catch(() => undefined);
+    }
+    if (!atOrigin) {
+      setToastKind('warn');
+      setToast(
+        `Manifest · ${selectedAircraft.label} is at ${selectedAircraft.locationIcao} — ferry to ${origin} before Accept & Dispatch`,
+      );
+    }
+  }
+
   function enterCharterManifest(
     offer: CharterOfferView,
     aircraftId: string,
@@ -10539,7 +10618,9 @@ export function App() {
           <p>
             {staging.replaceManifest
               ? 'Staged changes will be cleared. The accepted flight stays open until you cancel it from Dispatch.'
-              : 'Your staged cargo lines will be cleared. No flight has been accepted yet.'}
+              : staging.deskHold
+                ? 'This desk hold stays reserved on Hauls until you Accept here, Cancel on Hauls, or the hold expires. Discarding only leaves Manifest.'
+                : 'Your staged cargo lines will be cleared. No flight has been accepted yet.'}
           </p>
         </>
       ),
@@ -10683,6 +10764,7 @@ export function App() {
     if (staging.replaceManifest || staging.intoMissionId) return;
     const selected =
       findOpsEntry(opsFleetEntries, nextAircraftId)?.aircraft ??
+      vaSessionFleet.find((aircraft) => aircraft.id === nextAircraftId) ??
       fleet.find((aircraft) => aircraft.id === nextAircraftId);
     if (!selected) return;
     // Allow off-origin parked airframes — Ferry CTA on Manifest brings them in.
@@ -10827,7 +10909,90 @@ export function App() {
   }
 
   async function onCommitStaging() {
-    if (!staging || staging.lines.length === 0) return;
+    if (!staging) return;
+    if (staging.deskHold) {
+      const hold = staging.deskHold;
+      const aircraftId = staging.aircraftId?.trim();
+      if (!aircraftId) return;
+      const assigned =
+        findOpsEntry(opsFleetEntries, aircraftId)?.aircraft ??
+        vaSessionFleet.find((a) => a.id === aircraftId) ??
+        fleet.find((a) => a.id === aircraftId);
+      const atOrigin =
+        Boolean(assigned) &&
+        assigned!.status === 'parked' &&
+        assigned!.locationIcao.trim().toUpperCase() ===
+          staging.originIcao.trim().toUpperCase();
+      if (!atOrigin) return;
+      await run(async () => {
+        const opsCompanyId = resolveOpsCompanyId(aircraftId);
+        const vaOps =
+          Boolean(memberVaCompanyIdRef.current) &&
+          opsCompanyId === memberVaCompanyIdRef.current;
+        const result =
+          hold.kind === 'bridge'
+            ? await postWarehouseBridgeDispatchHold({
+                holdId: hold.id,
+                aircraftId,
+                companyId: opsCompanyId,
+              })
+            : hold.kind === 'haul'
+              ? await postWarehouseHaulDispatchHold({
+                  holdId: hold.id,
+                  aircraftId,
+                  companyId: opsCompanyId,
+                })
+              : await postDemandDispatchHold({
+                  holdId: hold.id,
+                  aircraftId,
+                  companyId: opsCompanyId,
+                });
+        if (result.fleet) {
+          paintOpsMutationFleet(result.fleet, opsCompanyId);
+        }
+        if (result.missions?.length) {
+          setMissions(result.missions.slice().reverse());
+        } else if (result.mission) {
+          setMissions((prev) => {
+            const idx = prev.findIndex((m) => m.id === result.mission.id);
+            if (idx >= 0) {
+              const next = prev.slice();
+              next[idx] = result.mission;
+              return next;
+            }
+            return [result.mission, ...prev];
+          });
+        }
+        if (typeof result.walletUsd === 'number') {
+          if (vaOps) setVaSessionWallet(result.walletUsd);
+          else commitWallet(result.walletUsd);
+        }
+        if (vaOps && memberVaCompanyIdRef.current) {
+          await switchCompanyForVa(memberVaCompanyIdRef.current);
+        }
+        if (activeCareerProfile?.id) {
+          clearPersistedStagingDraft(activeCareerProfile.id);
+        }
+        setStaging(null);
+        setWatchAutoPaused(false);
+        setSimbriefLaunchUrl(null);
+        goToTab('staging');
+        const payNote =
+          hold.kind === 'bridge' &&
+          'pilotPayUsd' in result &&
+          typeof result.pilotPayUsd === 'number'
+            ? ` · pilot ${formatMoney(result.pilotPayUsd)}`
+            : 'payUsd' in result && typeof result.payUsd === 'number'
+              ? ` · ${formatMoney(result.payUsd)}`
+              : '';
+        setToastKind('ok');
+        setToast(
+          `Desk hold ${result.mission.originIcao}→${result.mission.destIcao} · ${formatTonnes(result.kg)}${payNote} · open Dispatch`,
+        );
+      });
+      return;
+    }
+    if (staging.lines.length === 0) return;
     // Refresh free kg from the board, then clamp sliders (never send quantityKg as avail).
     let refreshed: StagingDraft = {
       ...staging,
@@ -12140,10 +12305,21 @@ export function App() {
     : undefined;
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
   const stagingPayUsd = staging
-    ? staging.lines.reduce(
-        (sum, line) => sum + proRataPayUsd(line.lot, line.cargoKg),
-        0,
-      )
+    ? staging.deskHold
+      ? staging.deskHold.kind === 'bridge'
+        ? Math.max(0, Math.round(staging.deskHold.pilotPayUsd ?? 0))
+        : staging.deskHold.unitPriceUsd != null && staging.deskHold.kg > 0
+          ? Math.max(
+              0,
+              Math.round(
+                staging.deskHold.unitPriceUsd * staging.deskHold.kg,
+              ),
+            )
+          : 0
+      : staging.lines.reduce(
+          (sum, line) => sum + proRataPayUsd(line.lot, line.cargoKg),
+          0,
+        )
     : 0;
   const stagingContractPayUsd =
     stagingPayUsd + (stagingExisting?.payUsd ?? 0);
@@ -12151,13 +12327,18 @@ export function App() {
     estimatedFuelCostUsd !== null
       ? stagingContractPayUsd - estimatedFuelCostUsd
       : null;
-  const stagingTotalKg = staging ? stagingUsedKg(staging) : 0;
+  const stagingTotalKg = staging
+    ? staging.deskHold
+      ? Math.max(0, Math.floor(staging.deskHold.kg))
+      : stagingUsedKg(staging)
+    : 0;
   const stagingFreeKg = staging
     ? Math.max(0, aircraftCapKg(staging.aircraft) - stagingTotalKg)
     : 0;
   const stagingAssignedAircraft = staging?.aircraftId
     ? findOpsEntry(opsFleetEntries, staging.aircraftId)?.aircraft ??
-      fleet.find((a) => a.id === staging.aircraftId)
+      fleet.find((a) => a.id === staging.aircraftId) ??
+      vaSessionFleet.find((a) => a.id === staging.aircraftId)
     : undefined;
   const stagingAircraftAtOrigin = Boolean(
     staging &&
@@ -12166,17 +12347,21 @@ export function App() {
       stagingAssignedAircraft.locationIcao.trim().toUpperCase() ===
         staging.originIcao.trim().toUpperCase(),
   );
-  const stagingValid =
-    Boolean(staging) &&
-    staging!.lines.length > 0 &&
-    stagingAircraftAtOrigin &&
-    stagingRangeOk(staging!) &&
-    routeFuelFeasible !== false &&
-    staging!.lines.every((line) => {
-      const maxKg = lineMaxKg(staging!, line.lot);
-      return line.cargoKg > 0 && line.cargoKg <= maxKg;
-    }) &&
-    stagingExistingLots + staging!.lines.length <= MAX_STAGING_LOTS;
+  const stagingValid = staging?.deskHold
+    ? Boolean(staging.aircraftId) &&
+      stagingAircraftAtOrigin &&
+      stagingRangeOk(staging) &&
+      routeFuelFeasible !== false
+    : Boolean(staging) &&
+      staging!.lines.length > 0 &&
+      stagingAircraftAtOrigin &&
+      stagingRangeOk(staging!) &&
+      routeFuelFeasible !== false &&
+      staging!.lines.every((line) => {
+        const maxKg = lineMaxKg(staging!, line.lot);
+        return line.cargoKg > 0 && line.cargoKg <= maxKg;
+      }) &&
+      stagingExistingLots + staging!.lines.length <= MAX_STAGING_LOTS;
   const stagingDistanceNm = staging ? stagingRouteDistanceNm(staging) : undefined;
   const stagingInRange = staging ? stagingRangeOk(staging) : true;
   const stagingFuelOk = routeFuelFeasible !== false;
@@ -12192,6 +12377,8 @@ export function App() {
     : [];
   const stagingAssignedLabel = staging
     ? findOpsEntry(opsFleetEntries, staging.aircraftId)?.aircraft.label ??
+      vaSessionFleet.find((aircraft) => aircraft.id === staging.aircraftId)
+        ?.label ??
       fleet.find((aircraft) => aircraft.id === staging.aircraftId)?.label ??
       aircraftClassLabel(staging.aircraft)
     : '';
@@ -13102,7 +13289,11 @@ export function App() {
             label="Dispatch draft"
             originIcao={staging.originIcao}
             destIcao={staging.destIcao}
-            detail={`${staging.lines.length} lot(s) staged`}
+            detail={
+              staging.deskHold
+                ? `Desk ${staging.deskHold.kind ?? 'hold'} · ${formatTonnes(staging.deskHold.kg)}`
+                : `${staging.lines.length} lot(s) staged`
+            }
             busy={busy}
             onOpen={() => selectTab('staging')}
           />
@@ -18590,6 +18781,43 @@ export function App() {
                 </p>
               ) : null}
 
+              {staging.deskHold ? (
+                <div className="staging-section">
+                  <h3>VA desk hold</h3>
+                  <ul className="staging-lines">
+                    <li className="staging-line staging-line-compact">
+                      <div className="staging-line-head">
+                        <div className="staging-line-title">
+                          <strong>
+                            {staging.deskHold.commodityId
+                              ? staging.deskHold.commodityId.charAt(0).toUpperCase() +
+                                staging.deskHold.commodityId.slice(1)
+                              : 'Cargo'}
+                          </strong>
+                          <span className="tag">
+                            {staging.deskHold.kind === 'bridge'
+                              ? 'Bridge'
+                              : staging.deskHold.kind === 'haul'
+                                ? 'Wide haul'
+                                : 'Demand'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="staging-line-meta">
+                        {staging.originIcao}→{staging.destIcao} ·{' '}
+                        {formatTonnes(staging.deskHold.kg)} · pay{' '}
+                        {formatMoney(stagingContractPayUsd)}
+                      </p>
+                      <p className="muted">
+                        Reserved on Hauls. Ferry the tail to {staging.originIcao}{' '}
+                        if needed, then Accept &amp; Dispatch. Discarding Manifest
+                        keeps the hold open.
+                      </p>
+                    </li>
+                  </ul>
+                </div>
+              ) : (
+                <>
               {stagingExisting && (stagingExisting.lots?.length ?? 0) > 0 ? (
                 <div className="staging-section">
                   <h3>Already on this flight</h3>
@@ -18807,12 +19035,15 @@ export function App() {
                   </ul>
                 )}
               </div>
+                </>
+              )}
 
               <div className="staging-footer staging-footer-sticky">
                 <div>
                   <p>
-                    {staging.lines.length} staged · {formatTonnes(stagingTotalKg)} ·{' '}
-                    {formatMoney(stagingContractPayUsd)} total
+                    {staging.deskHold
+                      ? `Desk hold · ${formatTonnes(stagingTotalKg)} · ${formatMoney(stagingContractPayUsd)}`
+                      : `${staging.lines.length} staged · ${formatTonnes(stagingTotalKg)} · ${formatMoney(stagingContractPayUsd)} total`}
                   </p>
                   {!stagingValid ? (
                     <p className="cargo-dialog-error">
@@ -18822,6 +19053,8 @@ export function App() {
                         ? 'Route exceeds aircraft range — pick another airframe or shorter hop.'
                         : !stagingFuelOk
                           ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
+                          : staging.deskHold
+                            ? 'Finish the desk hold before Accept & Dispatch.'
                           : staging.lines.some((line) => {
                                 const maxKg = lineMaxKg(staging, line.lot);
                                 return line.cargoKg <= 0 || line.cargoKg > maxKg;
@@ -19576,6 +19809,9 @@ export function App() {
           onOpenUpdates={() => selectTab('settings')}
           onHaulStaged={() => {
             goToTab('staging');
+          }}
+          onPrepareHaulHold={(hold, aircraftId) => {
+            enterStagingForVaHaulHold(hold, aircraftId);
           }}
           onMissions={setMissions}
           onToast={(kind, message) => {

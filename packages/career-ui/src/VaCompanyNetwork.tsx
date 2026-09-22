@@ -6,11 +6,22 @@ import { CompanyNetworkMap } from './CompanyNetworkMap';
 import { NetworkChipIcon } from './company-network-icons';
 import { formatMass, type WeightSystem } from './weight-units';
 
+export type CompanyNetworkHighlightRoute = {
+  originIcao: string;
+  destIcao: string;
+  originLat: number;
+  originLon: number;
+  destLat: number;
+  destLon: number;
+};
+
 type Props = {
   nodes: CompanyNetworkNode[];
   /** null = All network */
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Desk-hold OD to draw on the map (Hauls Open desk selection). */
+  highlightRoute?: CompanyNetworkHighlightRoute | null;
   /** Compact map of company assets (Hauls). Ports already has a full map. */
   showMap?: boolean;
   className?: string;
@@ -137,6 +148,7 @@ export function VaCompanyNetwork(props: Props) {
           className="va-company-network-map"
           nodes={nodes}
           selectedId={selectedId}
+          highlightRoute={props.highlightRoute ?? null}
           onSelectNode={(id) => onSelect(id)}
         />
       ) : null}

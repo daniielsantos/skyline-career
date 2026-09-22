@@ -16,6 +16,7 @@ setWorkerUrl(maplibreWorkerUrl);
 
 const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const FEEDER_ACCENT = '#f0a35a';
+const DESK_ROUTE_ACCENT = '#7ec8e3';
 
 function hasCoords(lat: unknown, lon: unknown): lat is number {
   return (
@@ -35,10 +36,21 @@ function safeResize(map: MapLibreMap | null) {
   }
 }
 
+export type CompanyNetworkMapRoute = {
+  originIcao: string;
+  destIcao: string;
+  originLat: number;
+  originLon: number;
+  destLat: number;
+  destLon: number;
+};
+
 type Props = {
   nodes: CompanyNetworkNode[];
   selectedId: string | null;
   onSelectNode: (id: string) => void;
+  /** Selected Open desk hold OD — solid line + camera focus. */
+  highlightRoute?: CompanyNetworkMapRoute | null;
   className?: string;
 };
 
@@ -120,6 +132,12 @@ export function CompanyNetworkMap(props: Props) {
           }
           if (active.getSource('company-network-feeders')) {
             active.removeSource('company-network-feeders');
+          }
+          if (active.getLayer('company-network-desk-route')) {
+            active.removeLayer('company-network-desk-route');
+          }
+          if (active.getSource('company-network-desk-route')) {
+            active.removeSource('company-network-desk-route');
           }
         } catch {
           /* torn down */
@@ -213,8 +231,65 @@ export function CompanyNetworkMap(props: Props) {
       }
     }
 
+    try {
+      if (map.getLayer('company-network-desk-route')) {
+        map.removeLayer('company-network-desk-route');
+      }
+      if (map.getSource('company-network-desk-route')) {
+        map.removeSource('company-network-desk-route');
+      }
+    } catch {
+      /* ok */
+    }
+
+    const deskRoute = props.highlightRoute;
+    const deskRouteOk =
+      deskRoute &&
+      hasCoords(deskRoute.originLat, deskRoute.originLon) &&
+      hasCoords(deskRoute.destLat, deskRoute.destLon);
+    if (deskRouteOk) {
+      try {
+        map.addSource('company-network-desk-route', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {
+                  label: `${deskRoute.originIcao}→${deskRoute.destIcao}`,
+                },
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [deskRoute.originLon, deskRoute.originLat],
+                    [deskRoute.destLon, deskRoute.destLat],
+                  ],
+                },
+              },
+            ],
+          },
+        });
+        map.addLayer({
+          id: 'company-network-desk-route',
+          type: 'line',
+          source: 'company-network-desk-route',
+          paint: {
+            'line-color': DESK_ROUTE_ACCENT,
+            'line-width': 3.2,
+            'line-opacity': 0.92,
+          },
+        });
+      } catch {
+        /* style not ready / map removed */
+      }
+    }
+
     const selectedId = props.selectedId;
     const nodeKey = plotNodes.map((n) => n.id).join('|');
+    const routeKey = deskRouteOk
+      ? `${deskRoute.originIcao}-${deskRoute.destIcao}-${deskRoute.originLat.toFixed(3)}-${deskRoute.destLat.toFixed(3)}`
+      : 'none';
 
     for (const node of plotNodes) {
       const selected = selectedId === node.id;
@@ -252,44 +327,53 @@ export function CompanyNetworkMap(props: Props) {
       }
     }
 
-    // Focus camera on the selected node (zoom in). All / no selection → whole network.
-    let focusNodes: CompanyNetworkNode[] = plotNodes;
-    if (selectedId) {
-      const selected = plotNodes.find((n) => n.id === selectedId);
-      if (selected) {
-        if (selected.kind === 'fbo' && selected.portId) {
-          const port = selected.portId.toUpperCase();
-          focusNodes = plotNodes.filter(
-            (n) =>
-              n.id === selected.id ||
-              (n.kind === 'wh' && n.portId?.toUpperCase() === port),
-          );
-        } else if (selected.kind === 'wh' && selected.portId) {
-          const fbo = fboByPort.get(selected.portId.toUpperCase());
-          focusNodes =
-            fbo && hasCoords(fbo.lat, fbo.lon) ? [selected, fbo] : [selected];
-        } else {
-          focusNodes = [selected];
-        }
-      }
-    }
-
     const focusBounds = new LngLatBounds();
     let focusCount = 0;
-    for (const n of focusNodes) {
-      focusBounds.extend([n.lon, n.lat]);
-      focusCount += 1;
+    let focused = false;
+
+    if (deskRouteOk) {
+      focusBounds.extend([deskRoute.originLon, deskRoute.originLat]);
+      focusBounds.extend([deskRoute.destLon, deskRoute.destLat]);
+      focusCount = 2;
+      focused = true;
+    } else {
+      // Focus camera on the selected node (zoom in). All / no selection → whole network.
+      let focusNodes: CompanyNetworkNode[] = plotNodes;
+      if (selectedId) {
+        const selected = plotNodes.find((n) => n.id === selectedId);
+        if (selected) {
+          if (selected.kind === 'fbo' && selected.portId) {
+            const port = selected.portId.toUpperCase();
+            focusNodes = plotNodes.filter(
+              (n) =>
+                n.id === selected.id ||
+                (n.kind === 'wh' && n.portId?.toUpperCase() === port),
+            );
+          } else if (selected.kind === 'wh' && selected.portId) {
+            const fbo = fboByPort.get(selected.portId.toUpperCase());
+            focusNodes =
+              fbo && hasCoords(fbo.lat, fbo.lon) ? [selected, fbo] : [selected];
+          } else {
+            focusNodes = [selected];
+          }
+        }
+      }
+      for (const n of focusNodes) {
+        focusBounds.extend([n.lon, n.lat]);
+        focusCount += 1;
+      }
+      focused = Boolean(selectedId);
     }
 
-    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}`;
+    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}|${routeKey}`;
     if (cameraKey === fittedForRef.current || focusCount === 0) return;
     fittedForRef.current = cameraKey;
 
-    const focused = Boolean(selectedId);
     try {
       if (focusCount === 1) {
+        const ne = focusBounds.getNorthEast();
         map.easeTo({
-          center: [focusNodes[0]!.lon, focusNodes[0]!.lat],
+          center: [ne.lng, ne.lat],
           zoom: focused ? 8.5 : 7.5,
           duration: 400,
         });
@@ -313,7 +397,7 @@ export function CompanyNetworkMap(props: Props) {
     } catch {
       /* map removed mid-camera */
     }
-  }, [props.nodes, props.selectedId, mapGeneration]);
+  }, [props.nodes, props.selectedId, props.highlightRoute, mapGeneration]);
 
   return (
     <div

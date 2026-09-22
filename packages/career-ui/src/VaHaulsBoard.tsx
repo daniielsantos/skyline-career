@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   fetchVaHauls,
   postDemandDispatchHold,
+  postDemandHoldCancel,
   postWarehouseBridgeDispatchHold,
+  postWarehouseBridgeHoldCancel,
   postWarehouseHaulDispatchHold,
+  postWarehouseHaulHoldCancel,
   type Mission,
   type PlayerAircraft,
   type VaCompanyNetworkNode,
@@ -33,17 +36,28 @@ function holdKindLabel(kind: VaHaulHold['kind']): string {
   return 'Demand';
 }
 
-function holdPayLabel(hold: VaHaulHold): string {
+function holdPayParts(hold: VaHaulHold): string | null {
   const kind = hold.kind ?? 'demand';
   if (kind === 'bridge') {
     const pay = hold.pilotPayUsd ?? 0;
-    return pay > 0 ? ` · pilot ${formatBoardMoney(pay)}` : '';
+    return pay > 0 ? `pilot ${formatBoardMoney(pay)}` : null;
   }
   const unit = hold.unitPriceUsd ?? 0;
   if (unit > 0 && hold.kg > 0) {
-    return ` · ~${formatBoardMoney(Math.round(unit * hold.kg))}`;
+    return `~${formatBoardMoney(Math.round(unit * hold.kg))}`;
   }
-  return '';
+  return null;
+}
+
+function aircraftOptionLabel(
+  acf: PlayerAircraft,
+  originIcao: string,
+): string {
+  const origin = originIcao.trim().toUpperCase();
+  const loc = (acf.locationIcao ?? '').trim().toUpperCase();
+  const atOrigin = loc === origin;
+  const where = atOrigin ? `@ ${loc}` : `ferry from ${loc || '—'}`;
+  return `${acf.label || acf.id} · ${where}`;
 }
 
 function asNetworkNodes(
@@ -64,6 +78,8 @@ type Props = {
   onFleet?: (fleet: PlayerAircraft[]) => void;
   onMissions?: (missions: Mission[]) => void;
   onStaged?: (mission: Mission) => void;
+  /** Off-origin (or Prepare path): open Dispatch Manifest + ferry there. */
+  onPrepareHold?: (hold: VaHaulHold, aircraftId: string) => void;
   onGoPorts?: () => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
 };
@@ -79,6 +95,7 @@ export function VaHaulsBoard(props: Props) {
     {},
   );
   const [networkFocusId, setNetworkFocusId] = useState<string | null>(null);
+  const [selectedHoldId, setSelectedHoldId] = useState<string | null>(null);
   const mass = (kg: number) => formatMass(kg, props.weightSystem);
 
   const refresh = useCallback(async () => {
@@ -123,6 +140,40 @@ export function VaHaulsBoard(props: Props) {
     [holds, focusNode],
   );
 
+  useEffect(() => {
+    if (
+      selectedHoldId &&
+      !filteredHolds.some((h) => h.id === selectedHoldId)
+    ) {
+      setSelectedHoldId(null);
+    }
+  }, [selectedHoldId, filteredHolds]);
+
+  const selectedHoldRoute = useMemo(() => {
+    const hold = filteredHolds.find((h) => h.id === selectedHoldId);
+    if (!hold) return null;
+    if (
+      typeof hold.originLat !== 'number' ||
+      typeof hold.originLon !== 'number' ||
+      typeof hold.destLat !== 'number' ||
+      typeof hold.destLon !== 'number' ||
+      !Number.isFinite(hold.originLat) ||
+      !Number.isFinite(hold.originLon) ||
+      !Number.isFinite(hold.destLat) ||
+      !Number.isFinite(hold.destLon)
+    ) {
+      return null;
+    }
+    return {
+      originIcao: hold.originIcao.trim().toUpperCase(),
+      destIcao: hold.destIcao.trim().toUpperCase(),
+      originLat: hold.originLat,
+      originLon: hold.originLon,
+      destLat: hold.destLat,
+      destLon: hold.destLon,
+    };
+  }, [filteredHolds, selectedHoldId]);
+
   const filteredActive = useMemo(
     () =>
       active.filter((m) =>
@@ -131,26 +182,42 @@ export function VaHaulsBoard(props: Props) {
     [active, focusNode],
   );
 
-  const parkedByOrigin = useMemo(() => {
-    const map = new Map<string, PlayerAircraft[]>();
-    for (const acf of props.fleet) {
-      if (acf.status !== 'parked') continue;
-      const icao = (acf.locationIcao ?? '').trim().toUpperCase();
-      if (!icao) continue;
-      const list = map.get(icao) ?? [];
-      list.push(acf);
-      map.set(icao, list);
-    }
-    return map;
-  }, [props.fleet]);
+  /** All parked VA tails — Prepare/Accept like Freights (ferry off-origin in Manifest). */
+  const parkedFleet = useMemo(
+    () => props.fleet.filter((acf) => acf.status === 'parked'),
+    [props.fleet],
+  );
+
+  function pickDefaultAircraftId(originIcao: string): string {
+    const origin = originIcao.trim().toUpperCase();
+    const atOrigin = parkedFleet.find(
+      (acf) =>
+        (acf.locationIcao ?? '').trim().toUpperCase() === origin,
+    );
+    return (atOrigin ?? parkedFleet[0])?.id ?? '';
+  }
+
+  function selectedAircraftForHold(hold: VaHaulHold): PlayerAircraft | null {
+    const id =
+      (aircraftByHold[hold.id] || pickDefaultAircraftId(hold.originIcao)).trim();
+    if (!id) return null;
+    return parkedFleet.find((a) => a.id === id) ?? null;
+  }
 
   async function acceptHold(hold: VaHaulHold) {
     const origin = hold.originIcao.trim().toUpperCase();
-    const candidates = parkedByOrigin.get(origin) ?? [];
-    const aircraftId =
-      (aircraftByHold[hold.id] || candidates[0]?.id || '').trim();
-    if (!aircraftId) {
-      setError(`No parked company aircraft at ${origin}`);
+    const acf = selectedAircraftForHold(hold);
+    const aircraftId = acf?.id?.trim() ?? '';
+    if (!aircraftId || !acf) {
+      setError('No parked company aircraft available');
+      return;
+    }
+    if ((acf.locationIcao ?? '').trim().toUpperCase() !== origin) {
+      if (props.onPrepareHold) {
+        props.onPrepareHold(hold, aircraftId);
+        return;
+      }
+      setError(`Aircraft is at ${acf.locationIcao}, not ${origin} — Prepare to ferry`);
       return;
     }
     setBusyHoldId(hold.id);
@@ -197,6 +264,61 @@ export function VaHaulsBoard(props: Props) {
     }
   }
 
+  function prepareHold(hold: VaHaulHold) {
+    const acf = selectedAircraftForHold(hold);
+    const aircraftId = acf?.id?.trim() ?? '';
+    if (!aircraftId) {
+      setError('No parked company aircraft available');
+      return;
+    }
+    if (!props.onPrepareHold) {
+      void acceptHold(hold);
+      return;
+    }
+    props.onPrepareHold(hold, aircraftId);
+  }
+
+  async function cancelHold(hold: VaHaulHold) {
+    setBusyHoldId(hold.id);
+    setError(null);
+    const kind = hold.kind ?? 'demand';
+    try {
+      if (kind === 'bridge') {
+        const result = await postWarehouseBridgeHoldCancel({
+          holdId: hold.id,
+          companyId: props.companyId,
+        });
+        props.onToast?.(
+          'ok',
+          `Released ${mass(result.kg)} bridge hold`,
+        );
+      } else if (kind === 'haul') {
+        const result = await postWarehouseHaulHoldCancel({
+          holdId: hold.id,
+          companyId: props.companyId,
+        });
+        props.onToast?.(
+          'ok',
+          `Released ${mass(result.kg)} wide haul hold`,
+        );
+      } else {
+        const result = await postDemandHoldCancel({
+          holdId: hold.id,
+          companyId: props.companyId,
+        });
+        props.onToast?.(
+          'ok',
+          `Released ${mass(result.kg)} Demand hold`,
+        );
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyHoldId(null);
+    }
+  }
+
   const pageBusy = Boolean(props.busy) || busyHoldId != null;
 
   return (
@@ -208,7 +330,7 @@ export function VaHaulsBoard(props: Props) {
             {!loaded
               ? 'Airline desk — bridges, Demand, and Wide hauls.'
               : hasPortFbo
-                ? 'Airline desk · Pick a network node, Accept with a parked VA tail at origin, then Dispatch.'
+                ? 'Airline desk · Prepare a parked VA tail (ferry in Dispatch if off-hub), then Accept.'
                 : 'Until Port FBO + stock, fly Freights with a VA tail (market hire).'}
           </p>
         </div>
@@ -240,6 +362,7 @@ export function VaHaulsBoard(props: Props) {
           nodes={networkNodes}
           selectedId={networkFocusId}
           onSelect={setNetworkFocusId}
+          highlightRoute={selectedHoldRoute}
           showMap={networkNodes.length > 1 || hasPortFbo}
           disabled={pageBusy}
           weightSystem={props.weightSystem}
@@ -269,6 +392,11 @@ export function VaHaulsBoard(props: Props) {
                   })`
                 : ''}
             </h4>
+            <p className="va-hauls-section-help muted">
+              Reserved cargo until Accept (Dispatch) or Cancel. Off-hub tails
+              Prepare → ferry in Manifest. Click a hold to plot the route on the
+              map.
+            </p>
             {filteredHolds.length === 0 ? (
               <p className="empty">
                 {hasPortFbo
@@ -277,64 +405,124 @@ export function VaHaulsBoard(props: Props) {
                     : 'No desk holds open. Post from Ports (Scout / Hold) — needs company stock.'
                   : 'No desk work yet. Fly Freights with a VA tail, or finish the Port FBO path above.'}
               </p>
+            ) : parkedFleet.length === 0 ? (
+              <p className="empty">
+                No parked VA aircraft — park a company tail, then Prepare.
+              </p>
             ) : (
               <ul className="va-hauls-list">
                 {filteredHolds.map((hold) => {
                   const origin = hold.originIcao.trim().toUpperCase();
-                  const candidates = parkedByOrigin.get(origin) ?? [];
-                  const selected =
-                    aircraftByHold[hold.id] || candidates[0]?.id || '';
+                  const dest = hold.destIcao.trim().toUpperCase();
+                  const selectedId =
+                    aircraftByHold[hold.id] ||
+                    pickDefaultAircraftId(hold.originIcao);
+                  const selected = parkedFleet.find((a) => a.id === selectedId);
+                  const atOrigin = Boolean(
+                    selected &&
+                      (selected.locationIcao ?? '')
+                        .trim()
+                        .toUpperCase() === origin,
+                  );
                   const kind = hold.kind ?? 'demand';
+                  const pay = holdPayParts(hold);
+                  const busyThis = busyHoldId === hold.id;
+                  const usePrepare = Boolean(props.onPrepareHold) && !atOrigin;
+                  const isSelected = selectedHoldId === hold.id;
                   return (
-                    <li key={hold.id} className="va-hauls-row">
-                      <div className="va-hauls-route">
-                        <strong>
-                          {origin}→{hold.destIcao.trim().toUpperCase()}
-                        </strong>
-                        <span className="muted">
-                          {holdKindLabel(kind)} ·{' '}
-                          {commodityLabel(hold.commodityId)} ·{' '}
-                          {mass(hold.kg)}
-                          {holdPayLabel(hold)}
-                        </span>
-                      </div>
-                      <div className="va-hauls-actions">
-                        {candidates.length === 0 ? (
-                          <span className="muted">
-                            Need parked tail at {origin}
+                    <li
+                      key={hold.id}
+                      className={
+                        isSelected
+                          ? 'va-hauls-row is-selected'
+                          : 'va-hauls-row'
+                      }
+                      onClick={() =>
+                        setSelectedHoldId((prev) =>
+                          prev === hold.id ? null : hold.id,
+                        )
+                      }
+                    >
+                      <div className="va-hauls-row-main">
+                        <div className="va-hauls-route">
+                          <strong>
+                            {origin}
+                            <span className="va-hauls-route-arrow" aria-hidden>
+                              →
+                            </span>
+                            {dest}
+                          </strong>
+                          <span
+                            className={`va-hauls-kind va-hauls-kind-${kind}`}
+                          >
+                            {holdKindLabel(kind)}
                           </span>
-                        ) : (
-                          <>
-                            <label className="simbrief-field va-hauls-aircraft">
-                              <span>Aircraft</span>
-                              <select
-                                value={selected}
-                                disabled={pageBusy}
-                                aria-label="Aircraft for haul"
-                                onChange={(e) =>
-                                  setAircraftByHold((prev) => ({
-                                    ...prev,
-                                    [hold.id]: e.target.value,
-                                  }))
-                                }
-                              >
-                                {candidates.map((acf) => (
-                                  <option key={acf.id} value={acf.id}>
-                                    {acf.label || acf.id}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <button
-                              type="button"
-                              className="action"
-                              disabled={pageBusy || !selected}
-                              onClick={() => void acceptHold(hold)}
-                            >
-                              {busyHoldId === hold.id ? 'Accepting…' : 'Accept'}
-                            </button>
-                          </>
-                        )}
+                        </div>
+                        <ul className="va-hauls-meta">
+                          <li>{commodityLabel(hold.commodityId)}</li>
+                          <li>{mass(hold.kg)}</li>
+                          {pay ? <li>{pay}</li> : null}
+                          {hold.heldByName ? (
+                            <li title="Posted by">{hold.heldByName}</li>
+                          ) : null}
+                        </ul>
+                      </div>
+                      <div
+                        className="va-hauls-actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <label className="simbrief-field va-hauls-aircraft">
+                          <span>Aircraft</span>
+                          <select
+                            value={selectedId}
+                            disabled={pageBusy}
+                            aria-label="Aircraft for haul"
+                            onChange={(e) =>
+                              setAircraftByHold((prev) => ({
+                                ...prev,
+                                [hold.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            {parkedFleet.map((acf) => (
+                              <option key={acf.id} value={acf.id}>
+                                {aircraftOptionLabel(acf, origin)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          className="action"
+                          disabled={pageBusy || !selectedId}
+                          title={
+                            usePrepare
+                              ? `Open Dispatch — ferry to ${origin} before Accept`
+                              : undefined
+                          }
+                          onClick={() =>
+                            usePrepare
+                              ? prepareHold(hold)
+                              : void acceptHold(hold)
+                          }
+                        >
+                          {busyThis
+                            ? usePrepare
+                              ? '…'
+                              : 'Accepting…'
+                            : usePrepare
+                              ? 'Prepare'
+                              : 'Accept'}
+                        </button>
+                        <button
+                          type="button"
+                          className="action ghost"
+                          disabled={pageBusy}
+                          title="Release reserved cargo back to the desk"
+                          onClick={() => void cancelHold(hold)}
+                        >
+                          {busyThis ? '…' : 'Cancel'}
+                        </button>
                       </div>
                     </li>
                   );

@@ -42,6 +42,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Company Network map per-node (2026-09-21):** sintoma = WH em pickup hub (ex. SBGR p/ Santos) sumia do mapa/chips; plot usava anchor/container do PortsMap. Causa = `hubsCoveredByFbo` omitia WH no nó; `pickupHubDetails` copiava coords do porto. Fix = um nó WH por ICAO; `CompanyNetworkMap` com mesmos glyphs dos chips; FBO no porto, WH no hub; feeder tracejado porto→WH.
 
+**Scout board gone after Hold (2026-09-22):** sintoma = Hold no Scout → tabela some (“No open Demand matches…”). Causa = confirm **não** mandava `companyId` (list sim) → re-list no tenant errado / `?? []` limpava arrays. Fix = `companyId` em bridge/demand/haul confirm + `applyScoutDesk` só troca arrays presentes + fallback `list`.
+
 **Ports Demand tab chrome jump (2026-09-22):** sintoma = ao abrir Demand Board a shelf (tabs) sobe. Causa = CSS `:has(.ports-demand-board)` apertava `gap` / `panel-head` / `fbo-mode-switcher` margin. Fix = manter overflow hidden na board; spacing do chrome igual às outras abas.
 
 **Desk / inbound UI stale until navigate (2026-09-22):** sintoma = desk `today 0` / In transit vazio até trocar de página, embora pulse já tivesse comprado. Causa = Ports só refetchava em `economyTick` (congelado no MP sem clock poll) + sem soft-poll. Fix = poll `/api/world/clock` + Ports refresh em `economyLastBatchAtMs` / tick (sem Scout) + soft-poll 20s enquanto Ports aberto.

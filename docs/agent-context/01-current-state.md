@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **e840b58** / desktop **0.3.209** shipped: Fix MP World chip stuck on pulse due and keep Ports desk live. Release: [v0.3.209](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.209).
+
+
 `main` **f643b70** / desktop **0.3.208** shipped: Fix Port desk auto-buy skipping same-day settles; show mass units and commodity icons. Release: [v0.3.208](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.208).
 
 

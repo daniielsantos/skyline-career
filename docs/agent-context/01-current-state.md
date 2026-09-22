@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **7348953** / desktop **0.3.203** shipped: One desk pickup hub per port, fix Hauls map crash, and match VA loading to Ports. Release: [v0.3.203](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.203).
+
+
 `main` **30f0ce6** / desktop **0.3.202** shipped: Plot Company Network with per-hub WH pins and chip-matched map glyphs. Release: [v0.3.202](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.202).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **61922c66** / desktop **0.3.239** shipped: Restore Watch pipe reclaim after Ready and stop false NOT AT ORIGIN airborne fails. Release: [v0.3.239](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.239).
+
+
 `main` **72bf1613** / desktop **0.3.238** shipped: Detach Crew Live from Watch and SimBridge to restore pre-Live pipe behavior. Release: [v0.3.238](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.238).
 
 

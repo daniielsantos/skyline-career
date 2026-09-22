@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **fccc324c** / desktop **0.3.217** shipped: Rename VA chrome to Airlines/Crew and show hangar overhaul ETA. Release: [v0.3.217](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.217).
+
+
 `main` **83215ee1** / desktop **0.3.216** shipped: Let Scout Hold pick a kg slice and show BusyBlock on the VAs directory. Release: [v0.3.216](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.216).
 
 

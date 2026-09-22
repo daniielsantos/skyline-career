@@ -7,7 +7,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
 **Doc 2026-09-22:** parking **$0** em `homeHubIcao` (Crew/Company HQ) para parked/MX; off-hub inalterado. Org perk de parking = backlog.
 **Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
-**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads; OD + trail. **(e–o)** … **(p)** fase Live = mesma do footer SimBridge (não OFP compliance).
+**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads; OD + trail. **(e–o)** … **(p)** fase Live = mesma do footer SimBridge (não OFP compliance). **(x–y)** detach + pipe hygiene sem uplink. **Sketch soft uplink Watch→VPS** (não implementado) — ver secção abaixo.
 **Doc 2026-09-22 (c):** sidebar tab highlight adiado por `await switchCompanyForVa` antes de `goToTab` (Crew→Airlines) — **fix** pinta tab no click; restore/refresh em background.
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
@@ -752,6 +752,52 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **2026-09-22 (w):** Live mapa — AC “parado” e ponta da tracejada “andando”. Causa = `plannedOd` desenhava OD fixa origem→dest (ferry layer); AC era só marker solto. Fix = tracejada **AC→dest** (remaining leg), atualizada no tick do marker; trilha sólida continua o breadcrumb.
 **2026-09-22 (x):** **revert** de tudo que o Live tinha enxertado em Watch/SimBridge/Preflight/probe (uplink `reportVaCrewLive`, lat/lon extra no probe, `altitudeFt` no Watch status, Preflight yield pós-LV, probe yield pós-LV, Watch retry 2s com LV). Watch/pipe voltam ao comportamento pré–Crew Live (`d081d2f9^` / 0.3.224 era). Live UI/API/mapa podem ficar; **sem** telemetria do desktop até redesign explícito.
 **2026-09-22 (y):** sintoma pós-(x) = decolado, footer **SIMBRIDGE**/AIRBORNE/DISPATCHED + banner **NOT AT ORIGIN** com “0.3 nm (need ≤12 nm)” (contraditório). Causa = (1) revert tirou yield Preflight/probe → Watch não sobe; (2) Preflight/CHECK airborne gravou `ORIGIN_NOT_ON_GROUND` como `location.ok=false`; UI usava texto de distância. Fix = restaurar yield pós-LV + Watch 2s (**sem** Live uplink); Preflight airborne-near → location OK; copy específica para `ORIGIN_NOT_ON_GROUND`.
+
+### Sketch: soft Live uplink from Watch only (2026-09-22) — **não implementado**
+
+**Problema que o redesign resolve:** as iterações (n–w) fizeram Live competir pelo pipe (probe/Preflight/yield/reclaim) e quebraram Ready→En route. (x) detachou telemetria; (y) restaurou higiene de pipe **sem** uplink. Queremos Crew Live de novo **sem** segundo dono do SimBridge.
+
+**Princípio (hard):** Live **nunca** abre pipe, **nunca** faz probe, **nunca** mexe em Preflight/Watch auto-start/yield. Só **reenvia** o sample que o Watch já leu. Se o POST falhar → Live Stale; o voo segue.
+
+**Cobertura esperada (aceitar gaps):**
+
+| Momento | Watch pipe | Live uplink |
+|--|--|--|
+| Inject / reinject | `stop()` — inject owns pipe | **sem sample** (Stale OK) |
+| Preflight até 1º Loaded vs Due | Watch hold off | **sem sample** |
+| Pós-LV, footer MSFS (solo + ar) | tick ~5s, `sampleLiveFlight` | soft POST |
+| Pipe drop / inject active mid-tick | tick skip / reopen | sem POST até sample ok |
+
+**API já existe (não redesenhar):** `POST/GET /api/va/flight-track` + store in-memory `career-flight-track` na VPS; gateway já proxya `/api/va/*` via `isGatewayProxiedPath`. UI Roster Live (GET-only) fica.
+
+**Uplink preferido — server, após sample no tick**
+
+1. Em `WatchSession.tick` (`watch-helpers.ts`), **depois** de `sampleLiveFlight` ok (lat/lon finitos), fire-and-forget soft POST — **fora** do `withSimBridgeExclusive`, **sem** `await` no caminho crítico (ou `void` + timeout curto ≤1–2s).
+2. Body: `companyId` (ops VA da missão), `missionId`, `lat`, `lon`, `altFt`, `gsKt`, `phase`, `onGround` — mesmos campos que o endpoint já aceita.
+3. Destino do POST: em `gateway` → `CAREER_WORLD_API_URL` (não gravar track na memória do desktop); em `full` lab → handler local ok.
+4. Auth: token/session que o gateway já usa para proxy world (espelhar settle enrich / outros POSTs server→world). Sem sessão / sem VA listed / missão não-VA → no-op silencioso.
+5. Soft-fail total: catch + log debug; **nunca** `throw` no tick; **nunca** `stop()` / reopen por falha de Live.
+6. Throttle opcional: no máximo 1 POST / ~5s (alinhar tick); não enfileirar backlog se a rede atrasar.
+
+**Não fazer (lições (n)–(w)):**
+
+- Uplink a partir de Preflight ou probe SimBridge
+- Segundo client NDJSON / yield pipe “pro Live”
+- Mudar auto-start Watch, hold pós-LV, ou retry 2s “por causa do Live”
+- Exigir `enginesRunning` pra armar upload (ramp false-off) — bastam Watch running + lat/lon + missão ativa VA
+- Remap `companyId` via home sticky — sempre `companyId` explícito da missão/ops VA (lição **l**)
+
+**Alternativa B (mais fina na UI, se A atrasar):** App soft-POST no poll de `/api/watch/status` quando `running` + `position` + `memberVa` — status **já** expõe `position` / `phase` / `onGround` / `groundSpeedKt`. Mesmas regras soft-fail. Desvantagem: depende do poll do App aberto; A sobe track mesmo com UI noutro tab se o processo Watch estiver vivo.
+
+**Definição de pronto (quando implementar):**
+
+1. Solo: após Loaded vs Due + Watch MSFS → Roster Live mostra posição (sem AC durante inject).
+2. Ar: En route / auto-depart intactos; Live trail atualiza ~5s.
+3. Rede VPS down → Live Stale; Watch/footer/inject OK.
+4. **Zero** mudanças em probe/Preflight ownership além do que (y) já shipou.
+5. Smoke: Ready→takeoff sem delay SIMBRIDGE; membro remoto vê track fresh ≤90s.
+
+**Fora de escopo deste sketch:** persistir tracks além do process VPS; Live em solo pré-Watch; browser sem desktop Watch.
 
 ### Roster presence (online / flight / last seen) (2026-09-20)
 

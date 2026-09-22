@@ -6369,10 +6369,15 @@ export function App() {
     const mission = activeMissionRef.current;
     const settleBlocked = watch?.lastEvent?.type === 'settle_blocked';
     const liveInFlight = mission?.status === 'in_flight';
+    // MSFS flight restart teleports to origin — do not treat ground+sawAirborne
+    // as a destination landing unless Watch says we are near dest (or settle
+    // already started / completed on the server).
+    const nearDestForSettle = Boolean(watch?.destProximity?.ok);
     const optimisticLandedSettle =
       liveInFlight &&
       !flightDebrief &&
       !settleBlocked &&
+      nearDestForSettle &&
       Boolean(watch?.sawAirborne) &&
       watch?.onGround === true &&
       (watch?.enginesRunning === false ||
@@ -6391,6 +6396,7 @@ export function App() {
     watch?.enginesRunning,
     watch?.parkingBrake,
     watch?.sawAirborne,
+    watch?.destProximity?.ok,
     watch?.lastEvent?.type,
     flightDebrief,
     missions,
@@ -12806,7 +12812,8 @@ export function App() {
     (Boolean(watch?.settling) ||
       settleOverlaySticky ||
       watch?.lastEvent?.type === 'settle' ||
-      (Boolean(watch?.sawAirborne) &&
+      (Boolean(watch?.destProximity?.ok) &&
+        Boolean(watch?.sawAirborne) &&
         watch?.onGround === true &&
         (watch?.enginesRunning === false || watch?.parkingBrake === true) &&
         watch?.lastEvent?.type !== 'settle_blocked'));
@@ -12854,6 +12861,7 @@ export function App() {
         : (simBridge?.enginesRunning ?? null),
     watchSawAirborne: Boolean(watch?.sawAirborne),
     watchSettling: Boolean(watch?.settling) || settleOverlaySticky,
+    watchNearDest: Boolean(watch?.destProximity?.ok),
     watchSettleBlockedReason:
       watch?.lastEvent?.type === 'settle_blocked'
         ? watch.lastEvent.reason

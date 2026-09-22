@@ -444,6 +444,8 @@ export function dispatchStepStatusLine(input: {
   watchSawAirborne?: boolean;
   watchSettling?: boolean;
   watchSettleBlockedReason?: string | null;
+  /** Watch dest proximity — land/settle copy only when near arrival. */
+  watchNearDest?: boolean;
 }): string {
   const { step, mission } = input;
   switch (step) {
@@ -552,13 +554,19 @@ export function dispatchStepStatusLine(input: {
       ) {
         return 'Still on the ground — take off in MSFS. Menu / variant swaps are not a departure.';
       }
+      const nearDest = input.watchNearDest === true;
       if (input.watchSettleBlockedReason) {
-        return `Landed — settle blocked: ${input.watchSettleBlockedReason}`;
+        return nearDest
+          ? `Landed — settle blocked: ${input.watchSettleBlockedReason}`
+          : `Settle blocked: ${input.watchSettleBlockedReason}`;
       }
       if (input.watchSettling) {
         return 'Settling flight — saving payout and flight log…';
       }
       if (input.watchOnGround === true) {
+        if (!nearDest && input.watchSawAirborne) {
+          return 'On the ground away from the destination — take off again to continue, or abandon. Settle only at arrival.';
+        }
         if (!input.watchRunning) {
           return input.watchEnginesRunning
             ? 'Landed — Watch is reconnecting. Shut down engines (or set parking brake) to settle.'

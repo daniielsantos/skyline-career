@@ -235,6 +235,7 @@ describe('dispatchStepStatusLine en_route', () => {
         watchOnGround: true,
         watchEnginesRunning: true,
         watchSawAirborne: true,
+        watchNearDest: true,
       }),
       /shut down engines/i,
     );
@@ -262,6 +263,7 @@ describe('dispatchStepStatusLine en_route', () => {
         watchRunning: false,
         watchOnGround: true,
         watchEnginesRunning: false,
+        watchNearDest: true,
       }),
       /reconnecting to settle/i,
     );
@@ -277,6 +279,31 @@ describe('dispatchStepStatusLine en_route', () => {
         watchSawAirborne: false,
       }),
       /still on the ground/i,
+    );
+  });
+
+  it('does not treat MSFS restart at departure as a landing', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchEnginesRunning: false,
+        watchSawAirborne: true,
+        watchNearDest: false,
+      }),
+      /away from the destination/i,
+    );
+    assert.doesNotMatch(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchEnginesRunning: false,
+        watchSawAirborne: true,
+        watchNearDest: false,
+      }),
+      /^Landed/i,
     );
   });
 });

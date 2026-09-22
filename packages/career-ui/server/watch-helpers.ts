@@ -251,6 +251,18 @@ export type WatchStatusPayload = {
     radiusNm: number;
     code: string;
   } | null;
+  /**
+   * Live distance to mission dest (Watch tick). En route “LANDED / Settling”
+   * UI must require this — MSFS flight restart teleports to origin and must
+   * not look like a destination landing.
+   */
+  destProximity: {
+    ok: boolean;
+    destIcao: string;
+    distanceNm?: number;
+    radiusNm: number;
+    code: string;
+  } | null;
 };
 
 /**
@@ -1393,6 +1405,8 @@ export class CareerWatchSession {
   private lastLoadVerification: WatchLoadVerification | null = null;
   /** Live origin proximity for Origin card (see WatchStatusPayload.originProximity). */
   private lastOriginProximity: WatchStatusPayload['originProximity'] = null;
+  /** Live dest proximity for En route land/settle UI (see WatchStatusPayload.destProximity). */
+  private lastDestProximity: WatchStatusPayload['destProximity'] = null;
   /**
    * Envelope painted at Validate/inject (profile calibrated-live). Soft Watch
    * CG reads refresh liveMac only — never overwrite with SimVar FWD/AFT.
@@ -1640,6 +1654,7 @@ export class CareerWatchSession {
       livePayloadLb: this.lastLivePayloadLb,
       loadVerification: this.lastLoadVerification,
       originProximity: this.lastOriginProximity,
+      destProximity: this.lastDestProximity,
       sawAirborne: this.watchState.sawAirborne,
       lastEvent: this.lastEvent,
       lastEventAtIso: this.lastEventAtIso,
@@ -1721,6 +1736,7 @@ export class CareerWatchSession {
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
     this.lastOriginProximity = null;
+    this.lastDestProximity = null;
     this.pinnedCgEnvelope = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
@@ -1979,6 +1995,7 @@ export class CareerWatchSession {
     this.lastLivePayloadLb = null;
     this.lastLoadVerification = null;
     this.lastOriginProximity = null;
+    this.lastDestProximity = null;
     this.pinnedCgEnvelope = null;
     this.lastEvent = null;
     this.lastEventAtIso = null;
@@ -3023,6 +3040,23 @@ export class CareerWatchSession {
         };
       } else {
         this.lastOriginProximity = null;
+      }
+      if (
+        typeof liveDistToDestNm === 'number' &&
+        destCoords &&
+        sample.position &&
+        current.destIcao
+      ) {
+        const nearDest = liveDistToDestNm <= settleRadiusNm;
+        this.lastDestProximity = {
+          ok: nearDest,
+          destIcao: current.destIcao,
+          distanceNm: liveDistToDestNm,
+          radiusNm: settleRadiusNm,
+          code: nearDest ? 'DEST_OK' : 'DEST_FAR',
+        };
+      } else {
+        this.lastDestProximity = null;
       }
       // On the ramp: re-check origin so relocating hubs clears the gate without
       // a fresh Validate. Latch sticks through wheels-up for auto-depart.

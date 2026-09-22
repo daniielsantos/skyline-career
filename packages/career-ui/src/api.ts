@@ -4915,6 +4915,14 @@ export type WatchStatus = {
     radiusNm: number;
     code: string;
   } | null;
+  /** Live MSFS vs mission dest — En route land/settle UI requires ok. */
+  destProximity?: {
+    ok: boolean;
+    destIcao: string;
+    distanceNm?: number;
+    radiusNm: number;
+    code: string;
+  } | null;
 };
 
 export function postDepart(opts: {

@@ -1348,24 +1348,38 @@ export function DispatchActivePanel(props: {
                   ? props.simBridge.enginesRunning
                   : false;
             const sawAirborneNow = Boolean(props.watch?.sawAirborne);
+            const nearDestNow = Boolean(props.watch?.destProximity?.ok);
+            const nearOriginNow = Boolean(
+              props.watch?.originProximity?.ok,
+            );
+            // Ground after airborne is only a "landing" for settle UX when near
+            // dest. MSFS restart dumps the AC at origin and must not look settled.
             const enRouteHeadline = !liveOnGroundNow
               ? 'EN ROUTE · LIVE LOAD'
               : !sawAirborneNow
                 ? 'ON GROUND · WAITING FOR DEPARTURE'
-                : !watchLive
-                  ? 'LANDED · WATCH RECONNECTING'
-                  : liveEnginesNow
-                    ? 'LANDED · AWAITING SHUTDOWN'
-                    : 'LANDED · READY TO SETTLE';
+                : !nearDestNow
+                  ? nearOriginNow
+                    ? 'ON GROUND · BACK AT DEPARTURE'
+                    : 'ON GROUND · NOT AT DESTINATION'
+                  : !watchLive
+                    ? 'LANDED · WATCH RECONNECTING'
+                    : liveEnginesNow
+                      ? 'LANDED · AWAITING SHUTDOWN'
+                      : 'LANDED · READY TO SETTLE';
             const enRouteSub = !liveOnGroundNow
               ? 'Live load only — fuel burn below OFP departure is normal. Settle after landing + engines off.'
               : !sawAirborneNow
                 ? 'Still on the ramp — Watch ignores the MSFS menu and aircraft reloads. Take off to depart.'
-                : !watchLive
-                  ? 'Watch dropped mid-flight — reconnecting so shutdown at the destination can settle.'
-                  : liveEnginesNow
-                    ? 'Shut down engines (or set parking brake) in MSFS — Watch settles after engines off at the destination.'
-                    : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.';
+                : !nearDestNow
+                  ? nearOriginNow
+                    ? 'Back at departure (MSFS reload or return) — take off again to continue, or abandon the mission. Settle only at the destination.'
+                    : 'On the ground away from the destination — relocate to the arrival airport (or abandon). Settle only near dest.'
+                  : !watchLive
+                    ? 'Watch dropped mid-flight — reconnecting so shutdown at the destination can settle.'
+                    : liveEnginesNow
+                      ? 'Shut down engines (or set parking brake) in MSFS — Watch settles after engines off at the destination.'
+                      : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.';
             const loadTileClass = (ok: boolean) =>
               enRoute
                 ? ok
@@ -1561,9 +1575,13 @@ export function DispatchActivePanel(props: {
                           ? liveOnGround
                             ? !props.watch?.sawAirborne
                               ? 'RAMP'
-                              : liveEngines
-                                ? 'TAXI'
-                                : 'LANDED'
+                              : props.watch?.destProximity?.ok
+                                ? liveEngines
+                                  ? 'TAXI'
+                                  : 'LANDED'
+                                : props.watch?.originProximity?.ok
+                                  ? 'DEP'
+                                  : 'GROUND'
                             : 'AIR'
                           : liveOnGround && !liveEngines
                             ? 'READY'

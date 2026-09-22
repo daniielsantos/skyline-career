@@ -1,5 +1,21 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-22: **MSFS flight restart @ origin → false “Settle” UX** — **fix applied**: Watch `destProximity` + overlay/headline LANDED só com nearDest (ou `settling`); restart no DEP → “ON GROUND · BACK AT DEPARTURE”, sem animação Settling. Diag abaixo.
+
+### MSFS restart mid-flight @ origin (2026-09-22) — diag
+
+**Sintoma:** restart no MSFS em cruzeiro → avião no origin; En route mostra animação Settling + “LANDED · READY TO SETTLE · At SBGR”; Logbook VA lento → `World API unreachable: fetch failed`; reopen app → logbook OK, missão IN FLIGHT, footer frozen 10% need 70%.
+
+**Causa:**
+1. UI (`App` `optimisticLandedSettle` + `DispatchActivePanel` `enRouteHeadline`): trata qualquer ground+sawAirborne+shutdown como “landed settle” — não checa proximidade do **dest**.
+2. Watch (`gateSettleByDestination`): tenta settle → `settle_blocked` (airborne time primeiro; depois também bloquearia wrong airport). **Não** completa payout — correto.
+3. `revertFalseDepart` só com elapsed &lt; ~8 min — voo já tinha ~14 min → fica `in_flight` no ramp do origin.
+4. Logbook erro = `gateway-proxy` 502 `world_unreachable` (fetch à VPS falhou naquele momento) — não apaga missão.
+
+**Fix:** `WatchStatusPayload.destProximity` no tick; `optimisticLandedSettle` exige `destProximity.ok`; En route headline/badge LANDED só near dest — senão “BACK AT DEPARTURE” / “NOT AT DESTINATION”.
+
+**Estado agora:** missão válida IN FLIGHT; pode decolar de novo do origin e completar, ou abandonar/cancelar. Não esperar settle em SBGR.
+
 Atualizado 2026-09-22: **Dispatch OFP card (Ready/Load)** — sintoma: OFP passed ficava em `<details>` e escondia Route + metrics. Causa: fold pós–flight_plan. Fix: card sempre aberto com Distance/Cruise/Block/Air/Pax/Payload + Route (sem Alternate); Hangar/OFP type/Tail sob “Aircraft details”. En route metrics alinhados (sem hangar/type/alternate).
 
 Atualizado 2026-09-20: **Rebrand Fase 3 userData migrator** — AppData → `%APPDATA%\Airframe Career` (cópia one-shot de Skyline; `appId` fica). Smoke no próximo desktop release. Spec: [`26-rebrand-airframe.md`](./26-rebrand-airframe.md).

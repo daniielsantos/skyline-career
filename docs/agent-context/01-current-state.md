@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **d8875594** / desktop **0.3.219** shipped: Fix chrome wallet flicker and align Crew with Airlines layout. Release: [v0.3.219](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.219).
+
+
 `main` **3e5164e5** / desktop **0.3.218** shipped: Keep hangar fuel on ferry and lift Crew Ledger P&L. Release: [v0.3.218](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.218).
 
 

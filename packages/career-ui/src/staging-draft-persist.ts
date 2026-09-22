@@ -20,6 +20,7 @@ export type PersistedStagingDraft = {
     loadKg?: number;
     unitPriceUsd?: number;
     pilotPayUsd?: number;
+    expiresAtTick?: number;
   };
 };
 

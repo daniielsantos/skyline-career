@@ -61,6 +61,48 @@ function aircraftOptionLabel(
   return `${acf.label || acf.id} · ${where}`;
 }
 
+const HOURS_PER_TICK = 0.25;
+const HOURS_PER_DAY = 24;
+
+function formatHoldDuration(hours: number): string {
+  const totalMinutes = Math.max(0, Math.round(Math.abs(hours) * 60));
+  if (totalMinutes < 120) {
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h <= 0) return `${m}m`;
+    return m === 0 ? `${h}h` : `${h}h ${m}m`;
+  }
+  const totalHours = Math.round(totalMinutes / 60);
+  if (totalHours < HOURS_PER_DAY) {
+    return `${totalHours}h`;
+  }
+  const days = Math.floor(totalHours / HOURS_PER_DAY);
+  const rem = totalHours % HOURS_PER_DAY;
+  return rem === 0 ? `${days}d` : `${days}d ${rem}h`;
+}
+
+/** Desk-hold TTL countdown (economy clock). Always returns a cell for column align. */
+function formatHoldExpiresIn(
+  expiresAtTick: number | undefined,
+  clock: number | undefined,
+): { label: string; urgent: boolean } {
+  if (expiresAtTick == null || !Number.isFinite(expiresAtTick)) {
+    return { label: '—', urgent: false };
+  }
+  if (clock == null || !Number.isFinite(clock)) {
+    return { label: '…', urgent: false };
+  }
+  const remainingTicks = expiresAtTick - clock;
+  if (remainingTicks <= 0) {
+    return { label: 'Expired', urgent: true };
+  }
+  const hoursLeft = remainingTicks * HOURS_PER_TICK;
+  return {
+    label: `${formatHoldDuration(hoursLeft)} left`,
+    urgent: hoursLeft <= 2,
+  };
+}
+
 function asNetworkNodes(
   nodes: VaCompanyNetworkNode[] | undefined,
 ): CompanyNetworkNode[] {
@@ -75,6 +117,10 @@ type Props = {
   isOwner: boolean;
   weightSystem: WeightSystem;
   busy?: boolean;
+  /** Integer economy tick (fallback for hold TTL). */
+  economyTick?: number;
+  /** Soft continuous clock for smoother countdown. */
+  economyClock?: number;
   onWallet?: (walletUsd: number) => void;
   onFleet?: (fleet: PlayerAircraft[]) => void;
   onMissions?: (missions: Mission[]) => void;
@@ -426,10 +472,9 @@ export function VaHaulsBoard(props: Props) {
                 : ''}
             </h4>
             <p className="va-hauls-section-help muted">
-              Reserved cargo until Accept or Cancel. Pick the tail that will fly
-              it. Off-hub or hold larger than ops cap → Prepare opens Manifest
-              (ferry + load slider); leftover stays on Open desk. Click a hold
-              to plot the route on the map.
+              Reserved until Accept, Cancel, or hold TTL (WH tier; Demand also
+              ends with the order). Off-hub or oversize → Prepare opens Manifest;
+              leftover stays here. Click a hold to plot the route.
             </p>
             {filteredHolds.length === 0 ? (
               <p className="empty">
@@ -461,6 +506,19 @@ export function VaHaulsBoard(props: Props) {
                     selected ?? null,
                   );
                   const isSelected = selectedHoldId === hold.id;
+                  const clock =
+                    typeof props.economyClock === 'number' &&
+                    Number.isFinite(props.economyClock)
+                      ? props.economyClock
+                      : props.economyTick;
+                  const expiry = formatHoldExpiresIn(hold.expiresAtTick, clock);
+                  const distNm =
+                    typeof hold.distanceNm === 'number' &&
+                    Number.isFinite(hold.distanceNm) &&
+                    hold.distanceNm > 0
+                      ? Math.round(hold.distanceNm).toLocaleString()
+                      : '—';
+                  const byName = hold.heldByName?.trim() || null;
                   return (
                     <li
                       key={hold.id}
@@ -475,34 +533,65 @@ export function VaHaulsBoard(props: Props) {
                         )
                       }
                     >
-                      <div className="va-hauls-row-main">
-                        <div className="va-hauls-route">
-                          <strong>
-                            {origin}
-                            <span className="va-hauls-route-arrow" aria-hidden>
-                              →
-                            </span>
-                            {dest}
-                          </strong>
-                          <span
-                            className={`va-hauls-kind va-hauls-kind-${kind}`}
-                          >
-                            {holdKindLabel(kind)}
+                      <div className="va-hauls-row-id">
+                        <strong className="va-hauls-route-od">
+                          {origin}
+                          <span className="va-hauls-route-arrow" aria-hidden>
+                            →
+                          </span>
+                          {dest}
+                        </strong>
+                        <span
+                          className={`va-hauls-kind va-hauls-kind-${kind}`}
+                        >
+                          {holdKindLabel(kind)}
+                        </span>
+                      </div>
+                      <div className="va-hauls-stats" aria-label="Hold details">
+                        <div>
+                          <span className="va-stat-label">Cargo</span>
+                          <span className="va-stat-value">
+                            {commodityLabel(hold.commodityId)}
                           </span>
                         </div>
-                        <ul className="va-hauls-meta">
-                          <li>{commodityLabel(hold.commodityId)}</li>
-                          <li>{mass(hold.kg)}</li>
-                          {typeof hold.distanceNm === 'number' &&
-                          Number.isFinite(hold.distanceNm) &&
-                          hold.distanceNm > 0 ? (
-                            <li>{Math.round(hold.distanceNm).toLocaleString()} nm</li>
-                          ) : null}
-                          {pay ? <li>{pay}</li> : null}
-                          {hold.heldByName ? (
-                            <li title="Posted by">{hold.heldByName}</li>
-                          ) : null}
-                        </ul>
+                        <div>
+                          <span className="va-stat-label">Mass</span>
+                          <span className="va-stat-value">{mass(hold.kg)}</span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Dist</span>
+                          <span className="va-stat-value">
+                            {distNm === '—' ? '—' : `${distNm} nm`}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Pay</span>
+                          <span className="va-stat-value">{pay ?? '—'}</span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Expires</span>
+                          <span
+                            className={`va-stat-value va-hauls-expiry${
+                              expiry.urgent ? ' is-urgent' : ''
+                            }`}
+                            title={
+                              kind === 'demand'
+                                ? 'Hold TTL, capped by Demand order expiry'
+                                : 'Hold TTL by warehouse tier'
+                            }
+                          >
+                            {expiry.label}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">By</span>
+                          <span
+                            className="va-stat-value"
+                            title={byName ? 'Posted by' : undefined}
+                          >
+                            {byName || '—'}
+                          </span>
+                        </div>
                       </div>
                       <div
                         className="va-hauls-actions"

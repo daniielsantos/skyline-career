@@ -4806,6 +4806,8 @@ export function createCareerApiServer(port = 8787) {
               pilotPayUsd: h.pilotPayUsd,
               unitPriceUsd: h.unitPriceUsd,
               distanceNm,
+              heldAtTick: h.heldAtTick,
+              expiresAtTick: h.expiresAtTick,
               heldByAccountId,
               heldByAuto: h.heldByAuto === true ? true : undefined,
               heldByName: heldByAccountId

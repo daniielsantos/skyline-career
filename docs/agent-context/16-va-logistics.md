@@ -65,6 +65,10 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hauls Open desk Cancel + layout (2026-09-22):** Hold = reserva de stock/Demand até Accept ou TTL. UI Hauls tinha Accept mas sem Cancel. Fix = Cancel (bridge/haul/demand cancel APIs + `companyId`); row em grid (rota+kind+meta | actions).
 
+**Desk hold TTL visible (2026-09-22):** sintoma = Open desk / WH holds sem countdown; só Demand no board mostrava expiry. Causa = `GET /api/va/hauls` omitia `expiresAtTick`; help dizia só Accept/Cancel. Fix = API + meta “Nh left” (urgente ≤2h); Manifest herda; Ports “left”; help cita TTL (Demand capped pelo order).
+
+**Open desk column align (2026-09-22):** sintoma = meta em flex (`·`) desalinhava Mass/Dist/Pay entre rows; Expires sumia no print antigo. Fix = stats grid rotulado (Cargo/Mass/Dist/Pay/Expires/By) como Airlines; Expires sempre (Demand = hold capped pelo order).
+
 **My VA pane height jump (2026-09-22):** sintoma = alternar Roster/Hangar/Hauls/Ports/… mudava a altura da página. Causa = só Ports forçava fill (`:has(.va-ports-pane)`); panes curtas shrink-wrap. Fix = `va-panel-shell` + `va-pane-body` preenchem `main-content` em todas as abas.
 
 **Roster list stuck at bottom (2026-09-22):** sintoma = título Roster no topo, lista no terço inferior (gap enorme). Causa = `va-pane-card` com `flex:1` + `.settings-card` `display:grid` → `align-content:stretch` inflava as tracks. Fix = `align-content: start` no card do shell (conteúdo cola no topo; shell ainda preenche altura).

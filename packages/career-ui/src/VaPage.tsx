@@ -137,6 +137,8 @@ type Props = {
   ensureOpsCompany?: (aircraftId: string) => Promise<void>;
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   economyTick?: number;
+  /** Soft continuous clock for Hauls hold TTL countdown. */
+  economyClock?: number;
   /** Advances with world pulse — Ports desk / inbound soft-refresh. */
   economyLastBatchAtMs?: number;
   cargoOps?: CareerCargoOps | null;
@@ -1027,6 +1029,8 @@ export function VaPage(props: Props) {
           onStaged={props.onHaulStaged}
           onPrepareHold={props.onPrepareHaulHold}
           resolveMaxCargoKg={props.resolveMaxCargoKg}
+          economyTick={props.economyTick}
+          economyClock={props.economyClock}
           onGoPorts={() => setPane('ports')}
           onToast={props.onToast}
         />

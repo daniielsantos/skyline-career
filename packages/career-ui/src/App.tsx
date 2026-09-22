@@ -570,6 +570,8 @@ type StagingDraft = {
     loadKg: number;
     unitPriceUsd?: number;
     pilotPayUsd?: number;
+    /** Desk hold TTL — same clock as Open desk. */
+    expiresAtTick?: number;
   };
 };
 
@@ -10605,6 +10607,7 @@ export function App() {
         loadKg,
         unitPriceUsd: hold.unitPriceUsd,
         pilotPayUsd: hold.pilotPayUsd,
+        expiresAtTick: hold.expiresAtTick,
       },
     };
     setFlightDebrief(null);
@@ -19050,6 +19053,17 @@ export function App() {
                         {formatTonnes(staging.deskHold.kg)} · load{' '}
                         {formatTonnes(stagingTotalKg)} · pay{' '}
                         {formatMoney(stagingContractPayUsd)}
+                        {staging.deskHold.expiresAtTick != null ? (
+                          <>
+                            {' '}
+                            ·{' '}
+                            {formatExpiry({
+                              expiresAtTick: staging.deskHold.expiresAtTick,
+                              currentTick: tick,
+                              continuousHours,
+                            })}
+                          </>
+                        ) : null}
                         {stagingTotalKg < Math.floor(staging.deskHold.kg) ? (
                           <>
                             {' '}
@@ -20125,6 +20139,7 @@ export function App() {
             hangarCatalogEntry(acf)?.maxCargoKg ?? 0
           }
           economyTick={tick}
+          economyClock={continuousHours}
           economyLastBatchAtMs={lastBatchAtMs}
           cargoOps={cargoOps}
           onOpenCargoOps={() => {

@@ -5217,6 +5217,9 @@ export type VaHaulHold = {
   pilotPayUsd?: number;
   unitPriceUsd?: number;
   distanceNm?: number;
+  heldAtTick?: number;
+  /** Economy tick when the desk hold releases (WH TTL; Demand also capped by order). */
+  expiresAtTick?: number;
   heldByAccountId?: string;
   heldByAuto?: boolean;
   /** Resolved member display name, or "Auto-haul". */

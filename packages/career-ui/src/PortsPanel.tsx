@@ -267,7 +267,7 @@ function formatExpiresIn(
   }
   const remainingTicks = expiresAtTick - currentTick;
   if (remainingTicks <= 0) return 'Expired';
-  return formatDuration(remainingTicks * HOURS_PER_TICK);
+  return `${formatDuration(remainingTicks * HOURS_PER_TICK)} left`;
 }
 
 function demandSortValue(order: DemandOrderView, key: DemandSortKey): string | number {
@@ -4877,7 +4877,10 @@ export function PortsPanel(props: {
                                                   <span className="ports-wh-hold-dest">
                                                     → {h.destIcao}
                                                   </span>
-                                                  <span className="muted">
+                                                  <span
+                                                    className="muted"
+                                                    title="Hold TTL — releases if not Accepted"
+                                                  >
                                                     {formatExpiresIn(
                                                       h.expiresAtTick,
                                                       props.economyTick,

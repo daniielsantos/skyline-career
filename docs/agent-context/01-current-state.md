@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **07211f4b** / desktop **0.3.227** shipped: Show Crew Live planned OD while waiting for engines. Release: [v0.3.227](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.227).
+
+
 `main` **a659cea3** / desktop **0.3.226** shipped: Start Crew Live telemetry when engines light on the ramp. Release: [v0.3.226](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.226).
 
 

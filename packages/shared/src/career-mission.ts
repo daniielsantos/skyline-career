@@ -1028,6 +1028,67 @@ export function cancelOrphanPlayerMissions(
   return cancelled;
 }
 
+/**
+ * Wall-clock grace after {@link MissionIntent.deadlineTick} before the server
+ * auto-cancels an active player mission (accepted / dispatched / in_flight).
+ * 24h = 96 ticks. Same clock for ramp and abandoned airborne legs.
+ */
+export const STALE_ACTIVE_MISSION_GRACE_TICKS = TICKS_PER_HOUR * 24;
+
+/** @deprecated Use {@link STALE_ACTIVE_MISSION_GRACE_TICKS}. */
+export const STALE_RAMP_MISSION_GRACE_TICKS = STALE_ACTIVE_MISSION_GRACE_TICKS;
+
+/**
+ * Server hygiene: cancel player missions past delivery deadline + grace.
+ * Covers freight, charter, empty, Demand/Haul/Bridge, Payload Lab, etc. —
+ * including abandoned `in_flight` (app closed mid-leg). Skips crew-operated
+ * NPC legs. Uses {@link cancelMission} (no payout — abort, not settle).
+ */
+export function expireStaleActiveMissions(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  opts?: { nowMs?: number; nowTick?: number },
+): MissionIntent[] {
+  const nowTick = opts?.nowTick ?? world.tick;
+  const nowMs = opts?.nowMs ?? Date.now();
+  const cancelled: MissionIntent[] = [];
+  for (const raw of [...state.missions]) {
+    const mission = normalizeMissionIntent(raw);
+    if (mission.crewOperated) continue;
+    if (
+      mission.status !== 'accepted' &&
+      mission.status !== 'dispatched' &&
+      mission.status !== 'in_flight'
+    ) {
+      continue;
+    }
+    const deadline = Math.floor(Number(mission.deadlineTick) || 0);
+    if (deadline <= 0) continue;
+    if (nowTick <= deadline + STALE_ACTIVE_MISSION_GRACE_TICKS) continue;
+    try {
+      const next = cancelMission(world, mission, {
+        fleet: state,
+        nowMs,
+      });
+      const idx = state.missions.findIndex((row) => row.id === mission.id);
+      if (idx >= 0) state.missions[idx] = next;
+      cancelled.push(next);
+    } catch {
+      /* soft — one bad row must not block company settle */
+    }
+  }
+  return cancelled;
+}
+
+/** @deprecated Use {@link expireStaleActiveMissions}. */
+export function expireStaleRampMissions(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  opts?: { nowMs?: number; nowTick?: number },
+): MissionIntent[] {
+  return expireStaleActiveMissions(world, state, opts);
+}
+
 const ACTIVE_MISSION_STATUSES = new Set(['accepted', 'dispatched', 'in_flight']);
 
 export function isActiveMissionStatus(status: string): boolean {

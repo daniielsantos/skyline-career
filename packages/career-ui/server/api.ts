@@ -20,6 +20,7 @@ import {
   payAircraftLeaseOverdue,
   CAREER_COMMODITIES,
   cancelOrphanPlayerMissions,
+  expireStaleActiveMissions,
   cargoOpsIsUnlocked,
   unlockAllCareerCargoOps,
   unlockAllCareerClassOps,
@@ -2379,6 +2380,7 @@ async function withCareerWrite<T>(
       settleCrewOpsDue(missions, world, Date.now());
       reconcileLotReservations(world, missions);
       cancelOrphanPlayerMissions(world, missions);
+      expireStaleActiveMissions(world, missions);
     }
     const result = await fn(world, missions);
     if (!sliceMissionId && sliceLotIds.length > 0) {

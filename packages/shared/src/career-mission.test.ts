@@ -6,6 +6,8 @@ import {
   assertRolesPackAllowsDirectInjection,
   cancelMission,
   cancelOrphanPlayerMissions,
+  expireStaleActiveMissions,
+  STALE_ACTIVE_MISSION_GRACE_TICKS,
   careerAllowsDirectInject,
   careerLoadWeightMatchOk,
   careerFuelMatchOk,
@@ -850,6 +852,84 @@ describe('acceptMission', () => {
     const cancelled = cancelOrphanPlayerMissions(world, state);
     assert.equal(cancelled.length, 0);
     assert.equal(state.missions[0]!.status, 'accepted');
+  });
+
+  it('expireStaleActiveMissions cancels accepted past deadline + grace', () => {
+    const world = createSeedEconomyWorld({ seed: 'stale-ramp' });
+    world.tick = STALE_ACTIVE_MISSION_GRACE_TICKS + 200;
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SAEZ', {
+      pilotName: 'Stale Ramp',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const acf = state.fleet[0]!;
+    acf.status = 'assigned';
+    acf.assignedMissionId = 'msn_stale_ramp';
+    const deadline = world.tick - STALE_ACTIVE_MISSION_GRACE_TICKS - 1;
+    state.missions = [
+      baseMission({
+        id: 'msn_stale_ramp',
+        status: 'dispatched',
+        originIcao: 'SAEZ',
+        destIcao: 'SGAS',
+        aircraftId: acf.id,
+        aircraftClassId: acf.aircraftClassId,
+        deadlineTick: deadline,
+        lots: [],
+        cargoKg: 0,
+      }),
+    ];
+    const cancelled = expireStaleActiveMissions(world, state);
+    assert.equal(cancelled.length, 1);
+    assert.equal(state.missions[0]!.status, 'cancelled');
+    assert.equal(acf.status, 'parked');
+  });
+
+  it('expireStaleActiveMissions keeps missions inside grace', () => {
+    const world = createSeedEconomyWorld({ seed: 'stale-grace' });
+    const state = emptyMissionsStateV2();
+    state.missions = [
+      baseMission({
+        id: 'msn_in_grace',
+        status: 'accepted',
+        originIcao: 'SAEZ',
+        destIcao: 'SGAS',
+        deadlineTick: world.tick - 1,
+        lots: [],
+        cargoKg: 0,
+      }),
+    ];
+    const cancelled = expireStaleActiveMissions(world, state);
+    assert.equal(cancelled.length, 0);
+    assert.equal(state.missions[0]!.status, 'accepted');
+  });
+
+  it('expireStaleActiveMissions cancels abandoned in_flight past deadline + grace', () => {
+    const world = createSeedEconomyWorld({ seed: 'stale-airborne' });
+    world.tick = STALE_ACTIVE_MISSION_GRACE_TICKS + 200;
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SAEZ', {
+      pilotName: 'Stale Air',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    const acf = state.fleet[0]!;
+    acf.status = 'assigned';
+    acf.assignedMissionId = 'msn_airborne';
+    state.missions = [
+      baseMission({
+        id: 'msn_airborne',
+        status: 'in_flight',
+        originIcao: 'SAEZ',
+        destIcao: 'SGAS',
+        aircraftId: acf.id,
+        aircraftClassId: acf.aircraftClassId,
+        deadlineTick: world.tick - STALE_ACTIVE_MISSION_GRACE_TICKS - 10,
+        lots: [],
+        cargoKg: 0,
+      }),
+    ];
+    const cancelled = expireStaleActiveMissions(world, state);
+    assert.equal(cancelled.length, 1);
+    assert.equal(state.missions[0]!.status, 'cancelled');
+    assert.equal(acf.status, 'parked');
   });
 
   it('reconcileLotReservations releases orphan reserved kg', () => {

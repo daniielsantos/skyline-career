@@ -7335,6 +7335,38 @@ export function App() {
             mission.id === result.mission.id ? result.mission : mission,
           ),
         );
+        // Crew Live: Preflight owns SimBridge before Watch starts — still stream
+        // lat/lon so Roster Live is not empty on the ramp with engines on.
+        const vaCompanyId = memberVaCompanyIdRef.current?.trim();
+        const pos = result.live?.position;
+        if (
+          vaCompanyId &&
+          pos &&
+          Number.isFinite(pos.lat) &&
+          Number.isFinite(pos.lon) &&
+          !(pos.lat === 0 && pos.lon === 0)
+        ) {
+          const now = Date.now();
+          if (now - flightTrackLastPostRef.current >= 15_000) {
+            flightTrackLastPostRef.current = now;
+            void postVaFlightTrack({
+              companyId: vaCompanyId,
+              missionId: activeMission.id,
+              lat: pos.lat,
+              lon: pos.lon,
+              onGround:
+                typeof result.live.onGround === 'boolean'
+                  ? result.live.onGround
+                  : undefined,
+              phase:
+                result.live.phase?.trim() ||
+                result.check.phase?.trim() ||
+                undefined,
+            }).catch(() => {
+              /* soft */
+            });
+          }
+        }
       } catch (err) {
         // Soft background refresh — but surface the first failure so Load
         // isn't a blank wait when SimBridge is up and the sample still fails.

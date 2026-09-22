@@ -4971,6 +4971,8 @@ export function postPreflight(opts: {
       weightSource?: string;
       onGround: boolean;
       enginesRunning: boolean;
+      position?: { lat: number; lon: number };
+      phase?: string;
     };
   }>('/api/preflight', {
     method: 'POST',

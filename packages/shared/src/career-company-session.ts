@@ -27,6 +27,9 @@ import { emptyMissionsStateV2 } from './career-fleet.js';
 import { finalizeStuckNpcFerries } from './career-va-line-crew.js';
 import { finalizeAircraftOverhaulsDue } from './career-aircraft-overhaul.js';
 import {
+  expireStaleActiveMissions,
+} from './career-mission.js';
+import {
   assembleMissionsFromTables,
   LOCAL_COMPANY_ID,
   persistCompanyTables,
@@ -122,6 +125,7 @@ export function settleCompanyPassiveFeesForTickRange(
     listAircraftMarket(missions, world);
     finalizeStuckNpcFerries(missions, to);
     finalizeAircraftOverhaulsDue(missions, to);
+    expireStaleActiveMissions(world, missions, { nowMs, nowTick: to });
     return null;
   }
 
@@ -162,6 +166,7 @@ export function settleCompanyPassiveFeesForTickRange(
   listAircraftMarket(missions, world);
   finalizeStuckNpcFerries(missions, to);
   finalizeAircraftOverhaulsDue(missions, to);
+  expireStaleActiveMissions(world, missions, { nowMs, nowTick: to });
 
   const passiveDebitUsd =
     hangarOps.debitUsd +

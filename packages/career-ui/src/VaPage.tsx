@@ -1190,7 +1190,7 @@ export function VaPage(props: Props) {
                   ) : liveOrigin && liveDest ? (
                     <span>Waiting for position…</span>
                   ) : (
-                    <span>Waiting for Watch…</span>
+                    <span>Waiting for flyer Watch / Preflight…</span>
                   )}
                   <button
                     type="button"

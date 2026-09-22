@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **cfd05b63** / desktop **0.3.213** shipped: Route oversize Hauls holds to Prepare and title My VA with the airline name. Release: [v0.3.213](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.213).
+
+
 `main` **1a99dc40** / desktop **0.3.212** shipped: Allow VA members to fly cargo missions in parallel. Release: [v0.3.212](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.212).
 
 

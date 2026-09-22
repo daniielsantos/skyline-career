@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **5abb2595** / desktop **0.3.230** shipped: Stream Crew Live from Preflight and expire abandoned active missions. Release: [v0.3.230](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.230).
+
+
 `main` **bea67fb2** / desktop **0.3.229** shipped: Fix Crew Live position upload and enlarge the map. Release: [v0.3.229](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.229).
 
 

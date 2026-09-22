@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **21b5cd0b** / desktop **0.3.225** shipped: Add Crew Roster Live flight track from Watch telemetry. Release: [v0.3.225](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.225).
+
+
 `main` **bb58387a** / desktop **0.3.224** shipped: Clarify hangar maintenance with a wrench mark. Release: [v0.3.224](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.224).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **f0213396** / desktop **0.3.234** shipped: Fix SimBridge probe effect reading activeMission before declaration. Release: [v0.3.234](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.234).
+
+
 `main` **bfd1bd02** / desktop **0.3.233** shipped: Reset Crew Live trail on teleport jumps and reclaim Watch after Ready. Release: [v0.3.233](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.233).
 
 

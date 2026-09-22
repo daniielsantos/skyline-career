@@ -1164,7 +1164,9 @@ export function VaPage(props: Props) {
       {pane === 'logbook' ? (
         <div className="settings-card va-pane-card">
           {tenantSwitching ? (
-            <BusyStatus label="Opening VA logbook…" />
+            <div className="va-pane-loading">
+              <BusyBlock label="Opening VA logbook…" />
+            </div>
           ) : (
             <>
               <h3>Logbook</h3>
@@ -1178,7 +1180,9 @@ export function VaPage(props: Props) {
                 </p>
               ) : null}
               {logbookBusy && logbookMissions.length === 0 ? (
-                <BusyStatus label="Loading flights…" />
+                <div className="va-pane-loading">
+                  <BusyBlock label="Loading flights…" />
+                </div>
               ) : (
                 <>
                   <p className="panel-stats">

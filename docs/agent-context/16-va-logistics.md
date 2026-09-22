@@ -9,6 +9,8 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-21 (e):** ~~Available personal WH under VA pin~~ — **superseded (f)**; no mix on one shelf.
 **Doc 2026-09-21 (h):** My VA open — não await `/api/ports` no Roster (defer Hauls/Config); selectTab(`va`) não espera App refresh. Ports — aba Port FBO só com concession `yours`.
 **Doc 2026-09-21 (i):** Hauls Company Network — intencional; payload leve em `GET /api/va/hauls` (sem `fetchPorts`/write); mapa ~20rem.
+**Doc 2026-09-21 (j):** My VA Logbook load — `BusyBlock` (igual Ports/Roster), não `BusyStatus` inline.
+**Doc 2026-09-21 (k):** My VA Hauls load — `BusyBlock` no lugar do texto “Loading hauls…”.
 Relacionado: [15-business-model.md](./15-business-model.md), [14-mp-world-clock.md](./14-mp-world-clock.md), Ports/WH em `08-economy.md` + roadmap.
 
 ## Fantasia (uma frase)

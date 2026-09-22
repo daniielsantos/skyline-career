@@ -10913,6 +10913,17 @@ span.dispatch-route-hub-dest {
   min-height: 14rem;
 }
 
+.va-pane-loading {
+  display: flex;
+  align-items: stretch;
+  min-height: 14rem;
+}
+
+.va-pane-loading > .busy-block {
+  flex: 1 1 auto;
+  min-height: 14rem;
+}
+
 .ports-panel-body:has(> .ports-demand-board) > .fbo-mode-switcher {
   margin-bottom: 0;
 }
@@ -12903,57 +12914,6 @@ span.dispatch-route-hub-dest {
   white-space: normal;
 }
 
-.ports-world-catalog {
-  margin-top: 0.85rem;
-}
-
-.ports-world-catalog-title {
-  margin: 0 0 0.55rem;
-  font-size: 0.92rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-}
-
-.ports-world-list-wrap {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  background: rgba(12, 12, 14, 0.45);
-  overflow: auto;
-}
-
-.ports-world-list {
-  font-size: 0.86rem;
-  margin: 0;
-}
-
-.ports-world-list th,
-.ports-world-list td {
-  padding: 0.4rem 0.65rem;
-  white-space: nowrap;
-}
-
-.ports-world-row {
-  cursor: pointer;
-}
-
-.ports-world-row:hover {
-  background: rgba(240, 163, 90, 0.08);
-}
-
-.ports-world-row.is-selected {
-  background: rgba(240, 163, 90, 0.16);
-}
-
-.ports-world-row.is-selected td {
-  border-color: rgba(240, 163, 90, 0.2);
-}
-
-.ports-world-row-country {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: rgba(240, 163, 90, 0.95);
-}
-
 .ports-map {
   position: relative;
   min-width: 0;
@@ -13167,6 +13127,11 @@ span.dispatch-route-hub-dest {
 
 .ports-map-fbo-marker.is-selected {
   z-index: 3;
+}
+
+.ports-map-fbo-marker.is-selected img,
+.ports-map-fbo-marker.is-selected svg {
+  filter: drop-shadow(0 0 6px rgba(94, 200, 192, 0.7));
 }
 
 .fbo-route-map .dispatch-route-map-canvas {

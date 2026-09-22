@@ -197,7 +197,6 @@ function commodityLabel(
 }
 
 const DEMAND_PAGE_SIZE = 11;
-const WORLD_PORTS_PAGE_SIZE = 5;
 /** 1 economy tick = 15 wall-clock minutes. */
 const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
@@ -543,7 +542,6 @@ export function PortsPanel(props: {
   });
   const [demandPage, setDemandPage] = useState(1);
   const [demandCountryFilter, setDemandCountryFilter] = useState('');
-  const [worldPortsPage, setWorldPortsPage] = useState(1);
 
   const unit = massUnitLabel(props.weightSystem);
 
@@ -3122,32 +3120,6 @@ export function PortsPanel(props: {
     }
   }, [demandCountryFilter, demandCountryOptions]);
 
-  const sortedWorldPorts = useMemo(() => {
-    return [...(snap?.ports ?? [])].sort((a, b) => {
-      const c = a.countryId.localeCompare(b.countryId);
-      if (c !== 0) return c;
-      return a.name.localeCompare(b.name);
-    });
-  }, [snap?.ports]);
-  const worldPortsPageCount = Math.max(
-    1,
-    Math.ceil(sortedWorldPorts.length / WORLD_PORTS_PAGE_SIZE) || 1,
-  );
-  const safeWorldPortsPage = Math.min(
-    Math.max(1, worldPortsPage),
-    worldPortsPageCount,
-  );
-  const pagedWorldPorts = useMemo(() => {
-    const start = (safeWorldPortsPage - 1) * WORLD_PORTS_PAGE_SIZE;
-    return sortedWorldPorts.slice(start, start + WORLD_PORTS_PAGE_SIZE);
-  }, [sortedWorldPorts, safeWorldPortsPage]);
-
-  useEffect(() => {
-    if (worldPortsPage > worldPortsPageCount) {
-      setWorldPortsPage(worldPortsPageCount);
-    }
-  }, [worldPortsPage, worldPortsPageCount]);
-
   function toggleDemandSort(key: DemandSortKey) {
     setDemandSort((current) => {
       if (current.key !== key) return { key, direction: 'asc' };
@@ -3548,114 +3520,6 @@ export function PortsPanel(props: {
                   )}
                 </div>
               </div>
-
-              <section
-                className="ports-world-catalog"
-                aria-label="World port catalog"
-              >
-                <h4 className="ports-world-catalog-title">All ports</h4>
-                <div className="table-wrap ports-world-list-wrap">
-                  <table className="data-table ports-world-list">
-                    <thead>
-                      <tr>
-                        <th>Country</th>
-                        <th>Port</th>
-                        <th>Pickup</th>
-                        <th>Open</th>
-                        <th>Port FBO</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagedWorldPorts.length === 0 ? (
-                        <tr>
-                          <td colSpan={5}>
-                            <p className="empty">No ports yet.</p>
-                          </td>
-                        </tr>
-                      ) : (
-                        pagedWorldPorts.map((p) => {
-                          const selected =
-                            (port?.id ?? portId)?.toUpperCase() ===
-                            p.id.toUpperCase();
-                          const conc =
-                            p.concession?.status === 'yours'
-                              ? `${ownedShelfLabel} · P${p.concession.level ?? 1}`
-                              : p.concession?.status === 'held'
-                                ? 'Held'
-                                : 'Vacant';
-                          return (
-                            <tr
-                              key={p.id}
-                              className={
-                                selected
-                                  ? 'ports-world-row is-selected'
-                                  : 'ports-world-row'
-                              }
-                              aria-selected={selected}
-                              onClick={() => {
-                                if (!props.busy) selectCatalogPort(p.id);
-                              }}
-                            >
-                              <td className="ports-world-row-country">
-                                {p.countryId}
-                              </td>
-                              <td>
-                                <strong>{p.name}</strong>
-                              </td>
-                              <td className="muted">
-                                {formatPortDeskPickupLabel(p.pickupHubs)}
-                              </td>
-                              <td className="muted">{p.listings.length}</td>
-                              <td className="muted">{conc}</td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {sortedWorldPorts.length > 0 ? (
-                  <nav className="pagination" aria-label="Port catalog pages">
-                    <p>
-                      {`${(safeWorldPortsPage - 1) * WORLD_PORTS_PAGE_SIZE + 1}–${Math.min(
-                        safeWorldPortsPage * WORLD_PORTS_PAGE_SIZE,
-                        sortedWorldPorts.length,
-                      )} of ${sortedWorldPorts.length}`}
-                    </p>
-                    <div>
-                      <button
-                        type="button"
-                        disabled={safeWorldPortsPage <= 1 || props.busy}
-                        onClick={() =>
-                          setWorldPortsPage(Math.max(1, safeWorldPortsPage - 1))
-                        }
-                      >
-                        Previous
-                      </button>
-                      <span>
-                        Page {safeWorldPortsPage} of {worldPortsPageCount}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={
-                          safeWorldPortsPage >= worldPortsPageCount ||
-                          props.busy
-                        }
-                        onClick={() =>
-                          setWorldPortsPage(
-                            Math.min(
-                              worldPortsPageCount,
-                              safeWorldPortsPage + 1,
-                            ),
-                          )
-                        }
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </nav>
-                ) : null}
-              </section>
             </>
           ) : null}
 

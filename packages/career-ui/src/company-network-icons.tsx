@@ -9,10 +9,13 @@ export function companyNetworkIconSvg(kind: 'fbo' | 'wh'): string {
   <circle cx="12" cy="8" r="1.2" fill="#f0a35a"/>
 </svg>`;
   }
+  // Warehouse: industrial shed + bay door (no rib/grid lines).
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <rect x="3.5" y="6" width="17" height="13" rx="1.5" fill="#5ec8c0" opacity="0.28"/>
-  <path d="M3.5 10.5h17M12 6v13M7.5 6v13M16.5 6v13" fill="none" stroke="#5ec8c0" stroke-width="1.5"/>
-  <path d="M5 19.5h14" fill="none" stroke="#5ec8c0" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M3 10.5 12 4.5 21 10.5" fill="#5ec8c0" fill-opacity="0.22" stroke="#5ec8c0" stroke-width="1.6" stroke-linejoin="round"/>
+  <rect x="4" y="10" width="16" height="10.5" rx="1.2" fill="#5ec8c0" fill-opacity="0.28" stroke="#5ec8c0" stroke-width="1.55"/>
+  <rect x="8.25" y="13.25" width="7.5" height="7.25" rx="0.6" fill="none" stroke="#5ec8c0" stroke-width="1.45"/>
+  <path d="M8.25 16.25h7.5" stroke="#5ec8c0" stroke-width="1.35" stroke-linecap="round"/>
+  <path d="M3.5 20.75h17" stroke="#5ec8c0" stroke-width="1.55" stroke-linecap="round"/>
 </svg>`;
 }
 
@@ -58,26 +61,45 @@ export function NetworkChipIcon(props: { kind: 'fbo' | 'wh' }) {
       aria-hidden="true"
       focusable="false"
     >
-      <rect
-        x="3.5"
-        y="6"
-        width="17"
-        height="13"
-        rx="1.5"
+      <path
+        d="M3 10.5 12 4.5 21 10.5"
         fill="currentColor"
-        opacity="0.2"
-      />
-      <path
-        d="M3.5 10.5h17M12 6v13M7.5 6v13M16.5 6v13"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M5 19.5h14"
-        fill="none"
+        fillOpacity="0.18"
         stroke="currentColor"
         strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <rect
+        x="4"
+        y="10"
+        width="16"
+        height="10.5"
+        rx="1.2"
+        fill="currentColor"
+        fillOpacity="0.2"
+        stroke="currentColor"
+        strokeWidth="1.55"
+      />
+      <rect
+        x="8.25"
+        y="13.25"
+        width="7.5"
+        height="7.25"
+        rx="0.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.45"
+      />
+      <path
+        d="M8.25 16.25h7.5"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3.5 20.75h17"
+        stroke="currentColor"
+        strokeWidth="1.55"
         strokeLinecap="round"
       />
     </svg>

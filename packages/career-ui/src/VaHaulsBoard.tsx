@@ -11,6 +11,7 @@ import {
   type VaHaulMission,
 } from './api';
 import { formatBoardMoney } from './board-money';
+import { BusyBlock } from './Busy';
 import {
   findNetworkNode,
   hubInNetworkFocus,
@@ -252,7 +253,9 @@ export function VaHaulsBoard(props: Props) {
       ) : null}
 
       {!loaded ? (
-        <p className="settings-help">Loading hauls…</p>
+        <div className="va-pane-loading">
+          <BusyBlock label="Loading hauls…" />
+        </div>
       ) : (
         <>
           <section className="va-hauls-section">

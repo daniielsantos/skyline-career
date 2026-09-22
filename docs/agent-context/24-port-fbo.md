@@ -64,6 +64,10 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Company network fora do Port FBO (2026-09-21):** sintoma = chip SBRF no Ports esvazia Scout (filtro origem). Decisão = network chips + filtro ficam em **My VA → Hauls**; Port FBO é desk do porto (mapa Ports já mostra FBO/WH). Removido `VaCompanyNetwork` de `PortsPanel`.
 
+**Ports WH map glyph = Hauls (2026-09-21):** pin WH no `PortsMap` e chips usam `companyNetworkIconSvg('wh')`. Redesign = galpão + porta de doca (sem grades/ribs); chips + Hauls + Ports compartilham o mesmo SVG.
+
+**All ports table removed (2026-09-21):** tabela “All ports” no Catalog (sidebar + My VA Ports) removida — seleção fica no mapa / porto focado.
+
 **Port FBO map + Scout route (2026-09-12):** Port FBO = `ports-main` (map left + panel right). Scout rows are tables; click selects haul/demand/bridge → `bridgeLegs` draws the route and `fitBounds`. Coords from scout payload (`originLat/Lon`, `destLat/Lon`) with hub fallback. Stage FBO taller (`~74vh` / 50rem) + Scout wraps sem `max-height` para reduzir scroll interno. Discharge ETA/kg moved to **Port catalog** strip (not FBO).
 
 **Ports tab chrome (2026-09-13):** loop guidance always in fixed `ports-loop-slot` (banner off-target / hint on-target) so Catalog/FBO/Warehouse/Demand don’t jump vertically; Demand gets `ports-stage-title` like the other shelves.

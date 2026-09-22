@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **07102392** / desktop **0.3.235** shipped: Poll Crew Live every 5s instead of 15s. Release: [v0.3.235](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.235).
+
+
 `main` **f0213396** / desktop **0.3.234** shipped: Fix SimBridge probe effect reading activeMission before declaration. Release: [v0.3.234](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.234).
 
 

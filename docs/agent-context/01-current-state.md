@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **30f0ce6** / desktop **0.3.202** shipped: Plot Company Network with per-hub WH pins and chip-matched map glyphs. Release: [v0.3.202](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.202).
+
+
 `main` **ec19890** / desktop **0.3.201** shipped: Speed up Hauls company network and fix map stack, imperial mass, and chip glyphs. Release: [v0.3.201](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.201).
 
 

@@ -19223,12 +19223,6 @@ export function App() {
                           </div>
                         );
                       })()}
-                      <p className="muted">
-                        Reserved on Hauls. Cap is min(hold, aircraft ops). Ferry
-                        the tail to {staging.originIcao} if needed, then Accept
-                        &amp; Dispatch — leftover kg stays held. Discarding
-                        Manifest keeps the full hold open.
-                      </p>
                     </li>
                   </ul>
                 </div>

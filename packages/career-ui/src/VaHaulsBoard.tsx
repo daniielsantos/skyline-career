@@ -670,25 +670,96 @@ export function VaHaulsBoard(props: Props) {
               <p className="empty">None in progress.</p>
             ) : (
               <ul className="va-hauls-list">
-                {filteredActive.map((m) => (
-                  <li key={m.id} className="va-hauls-row">
-                    <div className="va-hauls-route">
-                      <strong>
-                        {m.originIcao}→{m.destIcao}
-                      </strong>
-                      <span className="muted">
-                        {commodityLabel(m.commodityId)} ·{' '}
-                        {mass(m.cargoKg)} · {m.status}
-                        {m.payUsd > 0
-                          ? ` · ${formatBoardMoney(m.payUsd)}`
-                          : ''}
-                        {m.distanceNm != null
-                          ? ` · ${Math.round(m.distanceNm)} nm`
-                          : ''}
-                      </span>
-                    </div>
-                  </li>
-                ))}
+                {filteredActive.map((m) => {
+                  const origin = m.originIcao.trim().toUpperCase();
+                  const dest = m.destIcao.trim().toUpperCase();
+                  const kind = m.kind ?? 'other';
+                  const kindLabel =
+                    kind === 'other' ? 'Flight' : holdKindLabel(kind);
+                  const acf = m.aircraftId
+                    ? props.fleet.find((a) => a.id === m.aircraftId)
+                    : undefined;
+                  const tail =
+                    acf?.label?.trim() ||
+                    acf?.registration?.trim() ||
+                    null;
+                  const distNm =
+                    typeof m.distanceNm === 'number' &&
+                    Number.isFinite(m.distanceNm) &&
+                    m.distanceNm > 0
+                      ? Math.round(m.distanceNm).toLocaleString()
+                      : null;
+                  const statusLabel = m.status.replace(/_/g, ' ');
+                  return (
+                    <li
+                      key={m.id}
+                      className="va-hauls-row va-hauls-row-active"
+                    >
+                      <div className="va-hauls-row-id">
+                        <strong className="va-hauls-route-od">
+                          {origin}
+                          <span className="va-hauls-route-arrow" aria-hidden>
+                            →
+                          </span>
+                          {dest}
+                        </strong>
+                        <span
+                          className={`va-hauls-kind va-hauls-kind-${
+                            kind === 'other' ? 'demand' : kind
+                          }`}
+                        >
+                          {kindLabel}
+                        </span>
+                      </div>
+                      <div
+                        className="va-hauls-stats va-hauls-stats-active"
+                        aria-label="Active flight details"
+                      >
+                        <div>
+                          <span className="va-stat-label">Cargo</span>
+                          <span className="va-stat-value">
+                            {commodityLabel(m.commodityId)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Mass</span>
+                          <span className="va-stat-value">
+                            {mass(m.cargoKg)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Dist</span>
+                          <span className="va-stat-value">
+                            {distNm ? `${distNm} nm` : '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Pay</span>
+                          <span className="va-stat-value">
+                            {m.payUsd > 0
+                              ? formatBoardMoney(m.payUsd)
+                              : '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Status</span>
+                          <span className="va-stat-value va-hauls-status">
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="va-stat-label">Aircraft</span>
+                          <span
+                            className="va-stat-value"
+                            title={tail ?? undefined}
+                          >
+                            {tail || '—'}
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>

@@ -1,5 +1,8 @@
 # Current state (2026-09-22)
 
+`main` **b65a5e79** / desktop **0.3.220** shipped: Show Open desk hold expiry in aligned columns. Release: [v0.3.220](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.220).
+
+
 `main` **d8875594** / desktop **0.3.219** shipped: Fix chrome wallet flicker and align Crew with Airlines layout. Release: [v0.3.219](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.219).
 
 

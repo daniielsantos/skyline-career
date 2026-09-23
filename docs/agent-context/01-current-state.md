@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **fa45c95d** / desktop **0.3.255** shipped: Count airline desk labor on Ranking and declutter Hangar Cargo Ops. Release: [v0.3.255](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.255).
+
+
 `main` **731b2700** / desktop **0.3.254** shipped: Add pilot career hours, settle For-you debrief, and VA member brief. Release: [v0.3.254](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.254).
 
 

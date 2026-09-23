@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **27bd8a64** / desktop **0.3.252** shipped: Stamp pilotHome on Hauls/Ports desk dispatch so members get their airline cut. Release: [v0.3.252](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.252).
+
+
 `main` **b40f55fc** / desktop **0.3.251** shipped: Shorten MX burn Dispatch banners to one line. Release: [v0.3.251](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.251).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **731b2700** / desktop **0.3.254** shipped: Add pilot career hours, settle For-you debrief, and VA member brief. Release: [v0.3.254](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.254).
+
+
 `main` **c3439f15** / desktop **0.3.253** shipped: Clarify VA Cuts as market hire vs airline desk with tooltips. Release: [v0.3.253](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.253).
 
 

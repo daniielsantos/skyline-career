@@ -227,10 +227,11 @@ export function recordFlightTrackSample(opts: {
       return { ...row, points: [...row.points] };
     }
     if (moved < FLIGHT_TRACK_MIN_MOVE_NM && atMs - last.atMs < FLIGHT_TRACK_POST_MIN_MS) {
-      // Refresh last crumb telemetry without growing the trail (taxi / hold).
+      // Refresh last crumb in place (taxi / hold) — move the tip to the new
+      // fix so Crew Live AC tracks without growing a crumb every tick.
       const refreshed = pointFromSample({
-        lat: last.lat,
-        lon: last.lon,
+        lat: opts.lat,
+        lon: opts.lon,
         atMs,
         altFt: opts.altFt ?? last.altFt,
         gsKt: opts.gsKt ?? last.gsKt,

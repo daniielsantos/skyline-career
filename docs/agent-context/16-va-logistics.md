@@ -763,6 +763,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **Implementado (2026-09-22):** `createVaLiveUplink` + `WatchSession.softReportVaLiveTrack` após `advanceFlightPhase` no tick; gateway → `POST /api/va/flight-track` via `WorldApiClient` (auth background + `companyId` explícito no `POST /api/watch/start`); throttle 5s; timeout 2s; soft-fail. App passa `resolveOpsCompanyId` no Watch start. Sem probe/Preflight uplink.
 
+**2026-09-22 (z):** Live meta ok mas AC sumia / ficava atrás do trail. Causa = (1) HTML marker sob DEP; (2) refresh de taxi gravava telemetria mas **mantinha lat/lon do crumb antigo** (`FLIGHT_TRACK_MIN_MOVE`) → linha crescia e AC ficava fixo. Fix = GeoJSON AC na ponta do trail; refresh in-place atualiza lat/lon; tip = sempre `trail[last]`.
+
 **Cobertura esperada (aceitar gaps):**
 
 | Momento | Watch pipe | Live uplink |

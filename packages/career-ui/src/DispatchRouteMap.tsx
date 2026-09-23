@@ -22,6 +22,12 @@ const FERRY_SOURCE_ID = 'dispatch-route-ferry';
 const FERRY_LAYER_ID = 'dispatch-route-ferry-line';
 /** Match `.base-dispatch-ferry-tag` accent (`--accent`). */
 const FERRY_LINE_COLOR = '#f0a35a';
+/** Live AC tip — canvas layer so it stays visible over DEP/ARR chips. */
+const AC_SOURCE_ID = 'dispatch-route-ac';
+const AC_LAYER_DOT_ID = 'dispatch-route-ac-dot';
+const AC_LAYER_HALO_ID = 'dispatch-route-ac-halo';
+const AC_LAYER_LABEL_ID = 'dispatch-route-ac-label';
+const AC_DOT_COLOR = '#7dd3fc';
 
 export type DispatchRouteEndpoint = {
   icao: string;
@@ -294,6 +300,101 @@ function ensureFerryLayer(map: Map): void {
   }
 }
 
+function ensureAcLayer(map: Map): void {
+  if (map.getSource(AC_SOURCE_ID)) return;
+  map.addSource(AC_SOURCE_ID, {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+  map.addLayer({
+    id: AC_LAYER_HALO_ID,
+    type: 'circle',
+    source: AC_SOURCE_ID,
+    paint: {
+      'circle-radius': 11,
+      'circle-color': AC_DOT_COLOR,
+      'circle-opacity': 0.28,
+      'circle-stroke-width': 0,
+    },
+  });
+  map.addLayer({
+    id: AC_LAYER_DOT_ID,
+    type: 'circle',
+    source: AC_SOURCE_ID,
+    paint: {
+      'circle-radius': 6,
+      'circle-color': AC_DOT_COLOR,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#0b0b0c',
+    },
+  });
+  map.addLayer({
+    id: AC_LAYER_LABEL_ID,
+    type: 'symbol',
+    source: AC_SOURCE_ID,
+    layout: {
+      'text-field': 'AC',
+      'text-size': 11,
+      'text-offset': [0, 1.15],
+      'text-anchor': 'top',
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: {
+      'text-color': '#e8f7ff',
+      'text-halo-color': '#0b0b0c',
+      'text-halo-width': 1.5,
+    },
+  });
+}
+
+function setAircraftOnMap(
+  map: Map,
+  aircraft?: DispatchAircraftPosition | null,
+): void {
+  ensureAcLayer(map);
+  const source = map.getSource(AC_SOURCE_ID) as GeoJSONSource | undefined;
+  if (!source) return;
+  if (!usableAircraftPosition(aircraft)) {
+    source.setData({ type: 'FeatureCollection', features: [] });
+    return;
+  }
+  source.setData({
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Point',
+          coordinates: [aircraft.lon, aircraft.lat],
+        },
+      },
+    ],
+  });
+}
+
+/**
+ * Tip of the live drawing: always the last trail crumb when present.
+ * Prefer trail over a separate aircraft prop so AC cannot lag behind the line.
+ */
+function resolveLiveTip(
+  trail: Array<{ lat: number; lon: number }> | null | undefined,
+  aircraft?: DispatchAircraftPosition | null,
+): DispatchAircraftPosition | null {
+  if (trail && trail.length > 0) {
+    const last = trail[trail.length - 1]!;
+    if (
+      Number.isFinite(last.lat) &&
+      Number.isFinite(last.lon) &&
+      !(last.lat === 0 && last.lon === 0)
+    ) {
+      return { lat: last.lat, lon: last.lon };
+    }
+  }
+  return usableAircraftPosition(aircraft) ? aircraft : null;
+}
+
 function setTrailAndPlannedOd(
   map: Map,
   origin: DispatchRouteEndpoint,
@@ -317,16 +418,9 @@ function setTrailAndPlannedOd(
   } else {
     cargoSource?.setData(emptyLineFeature());
   }
+  const tip = resolveLiveTip(trail, aircraft);
   if (plannedOd && dest) {
-    const lastTrail = trail && trail.length > 0 ? trail[trail.length - 1] : null;
-    const from: LatLon = usableAircraftPosition(aircraft)
-      ? aircraft
-      : lastTrail &&
-          Number.isFinite(lastTrail.lat) &&
-          Number.isFinite(lastTrail.lon) &&
-          !(lastTrail.lat === 0 && lastTrail.lon === 0)
-        ? lastTrail
-        : origin;
+    const from: LatLon = tip ?? origin;
     ferrySource?.setData({
       type: 'FeatureCollection',
       features: [
@@ -343,6 +437,7 @@ function setTrailAndPlannedOd(
   } else {
     ferrySource?.setData({ type: 'FeatureCollection', features: [] });
   }
+  setAircraftOnMap(map, tip);
 }
 
 function emptyLineFeature() {
@@ -361,6 +456,7 @@ function setRouteLine(
 ): void {
   ensureRouteLayer(map);
   ensureFerryLayer(map);
+  setAircraftOnMap(map, null);
   const source = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   const ferry = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
   ferry?.setData({ type: 'FeatureCollection', features: [] });
@@ -382,6 +478,7 @@ function setRouteLine(
 function setRouteSegments(map: Map, segments: DispatchRouteSegment[]): void {
   ensureRouteLayer(map);
   ensureFerryLayer(map);
+  setAircraftOnMap(map, null);
   const cargoSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   const ferrySource = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
   const cargoFeatures: Array<{
@@ -767,25 +864,33 @@ export function DispatchRouteMap(props: {
     props.originRole,
   ]);
 
-  // Live aircraft — move marker + remaining dashed leg; do not refit bounds.
+  // Live aircraft — glued to trail tip; do not refit bounds.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const sync = () => {
-      if (!usableAircraftPosition(props.aircraft)) {
+      const tip = resolveLiveTip(props.trail, props.aircraft);
+      if (!tip) {
         aircraftMarkerRef.current?.remove();
         aircraftMarkerRef.current = null;
+        setAircraftOnMap(map, null);
         return;
       }
-      const lngLat: [number, number] = [props.aircraft.lon, props.aircraft.lat];
+      setAircraftOnMap(map, tip);
+      const lngLat: [number, number] = [tip.lon, tip.lat];
+      // No pixel offset — canvas AC layer is the source of truth; HTML marker
+      // only carries the popup and must sit on the same tip.
       if (aircraftMarkerRef.current) {
         aircraftMarkerRef.current.setLngLat(lngLat);
+        aircraftMarkerRef.current.setOffset([0, 0]);
+        aircraftMarkerRef.current.getElement().style.zIndex = '4';
       } else {
         const title = props.aircraftLabel?.trim() || 'Aircraft';
         const marker = new Marker({
           element: aircraftMarkerEl(),
           anchor: 'center',
+          offset: [0, 0],
         })
           .setLngLat(lngLat)
           .setPopup(
@@ -800,9 +905,9 @@ export function DispatchRouteMap(props: {
             ),
           )
           .addTo(map);
+        marker.getElement().style.zIndex = '4';
         aircraftMarkerRef.current = marker;
       }
-      // Keep dashed remaining leg glued to AC while it moves.
       if (props.plannedOd && props.dest) {
         setTrailAndPlannedOd(
           map,
@@ -810,7 +915,7 @@ export function DispatchRouteMap(props: {
           props.dest,
           props.trail ?? undefined,
           true,
-          props.aircraft,
+          tip,
         );
       }
     };

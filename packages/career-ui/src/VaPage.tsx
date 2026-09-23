@@ -1202,7 +1202,7 @@ export function VaPage(props: Props) {
                     dest={liveDest}
                     plannedOd
                     trail={
-                      liveTrack && liveTrack.points.length >= 2
+                      liveTrack && liveTrack.points.length >= 1
                         ? liveTrack.points.map((p) => ({
                             lat: p.lat,
                             lon: p.lon,

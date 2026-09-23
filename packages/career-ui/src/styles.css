@@ -10683,6 +10683,9 @@ span.dispatch-route-hub-dest {
   gap: 0.12rem;
   pointer-events: auto;
   cursor: default;
+  /* Above DEP/ARR when AC sits on the same coordinates (ramp Live). */
+  z-index: 4;
+  position: relative;
 }
 
 .dispatch-route-ac-dot {
@@ -10703,6 +10706,11 @@ span.dispatch-route-hub-dest {
   letter-spacing: 0.08em;
   color: #e8f7ff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* MapLibre wraps the element — keep AC above airport chips. */
+.maplibregl-marker:has(.dispatch-route-ac) {
+  z-index: 4 !important;
 }
 
 .dispatch-route-popup .maplibregl-popup-content {

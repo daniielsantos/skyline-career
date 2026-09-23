@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **c3439f15** / desktop **0.3.253** shipped: Clarify VA Cuts as market hire vs airline desk with tooltips. Release: [v0.3.253](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.253).
+
+
 `main` **27bd8a64** / desktop **0.3.252** shipped: Stamp pilotHome on Hauls/Ports desk dispatch so members get their airline cut. Release: [v0.3.252](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.252).
 
 

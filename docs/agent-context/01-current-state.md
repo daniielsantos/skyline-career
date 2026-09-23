@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **dc9fcfa7** / desktop **0.3.266** shipped: Densify early Crew Live breadcrumb crumbs without shortening cruise trail. Release: [v0.3.266](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.266).
+
+
 `main` **eb059c87** / desktop **0.3.265** shipped: Revert "Add Payload Load vs Stations schematic toggle without touching inject." Release: [v0.3.265](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.265).
 
 

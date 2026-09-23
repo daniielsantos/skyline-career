@@ -4,6 +4,7 @@
  */
 
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
+import { assertClassOpsUnlocked } from './career-class-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
 import {
   airportByIcao,
@@ -391,6 +392,7 @@ export function acceptWarehouseHaul(
     kg,
     opts.pilotAccountId,
   );
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
   const payUsd = quoteWarehouseHaulPayUsd(world, {
     originIcao: origin,
     destIcao: dest,
@@ -441,6 +443,12 @@ export function dispatchWarehouseHaulHold(
   if (hold.kind !== 'haul') {
     throw new Error('Not a warehouse haul hold');
   }
+  if (!cargoOpsIsUnlocked(state.cargoOps, hold.commodityId)) {
+    const name = getCommodity(hold.commodityId).name;
+    throw new Error(
+      `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+    );
+  }
   const takeKg = Math.max(
     0,
     Math.floor(
@@ -460,6 +468,7 @@ export function dispatchWarehouseHaulHold(
     kg,
     opts.pilotAccountId,
   );
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
   const payUsd = money(hold.unitPriceUsd * kg);
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,

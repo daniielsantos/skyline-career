@@ -55,6 +55,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hauls desk Accept skipped member cut (2026-09-23):** sintoma = Demand/Haul via Hauls Accept settled OK (VA ledger + logbook bruto) mas home cashflow sem `va_member_cut`; Logbook pessoal sem sufixo `cut`. Causa = `/api/demand/dispatch-hold` e `/api/warehouses/haul/dispatch-hold` só passavam `pilotAccountId` (bridge já usava `vaPilotMissionStamp`); sem `pilotHomeCompanyId` o settle trata como owner/ops e **não** fatia. Fix = stamp completo (`pilotHome` + `vaFlight`) no trio; `createDemandMission` / `createHaulMission` gravam os campos. Mesmo bug no **Ports → WH → DISPATCH** (e Hauls Accept): ambos chamam esses endpoints. **Mesmo stamp** também alimenta `settleMission({ progression })` write-back na home — sem `pilotHome`, Cargo Ops / Class Ops / lease Dry cleans iam pra company VA (membro via Hangar home = 0 cleans). Voo já settled **não** backfill automático — fatia + XP perdidos nessa perna.
 
+**Hauls/Demand desk skipped Class Ops gate (2026-09-23):** sintoma = membro Accept/Prepare C680 Light jet no Hauls com Class Ops home ainda locked (0.8/20 h). Causa = `*/dispatch-hold` (haul/demand/bridge) **não** usavam `withProgressionGates` nem `assertClassOpsUnlocked` (Charter já tinha; accept* tinha gates mas shared não assertava class). Fix = assert class (+ cargo re-check) em accept/dispatch haul/bridge/demand; dispatch-hold APIs wrap home ladder via `resolvePilotProgressionOps` + `withProgressionGates`. Voo já ACCEPTED pode completar — gate só em novos accepts.
+
 **Pilot career hours + settle “for you” (2026-09-23):** sintoma = membro não via cut/clean/hours no debrief; Hangar `0/8` sem explicar última perna; sem contador de horas de piloto (só hours no airframe / Class Ops). Fix = `pilotFlightHours` + `lastSettleOutcome` na home; settle aplica hours + hangar note; debrief bloco **For you** (pay line, note, +Xh); Class Ops no debrief só se ladder ainda aberta; card dismissível `VaMemberBriefCard` no My VA. Sem fórmula de reputação por hours.
 
 **Cuts chip unlabeled (2026-09-23):** sintoma = Airlines directory `Cuts 50% / 50%` e Config readonly sem dizer o quê é cada %. Causa = pair compacto sem labels. Fix = `Mkt N% · Desk N%` + `title` tooltip (`va-cuts-copy.ts`: market hire = Freights/Charter; desk = Demand/Haul; % do net → home).
@@ -1082,6 +1084,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **My VA Hauls board** — Internal Haul open/active + Accept + Port strip + Ports CTA (2026-09-21)
 - [x] **Hauls Prepare + ferry Manifest** — off-origin Prepare → deskHold draft; Accept at-origin dispatch-hold (2026-09-22)
 - [x] **Hauls desk Accept member cut stamp** — demand/haul dispatch-hold `vaPilotMissionStamp` (2026-09-23)
+- [x] **Hauls/Demand Class Ops gate** — dispatch-hold + accept assert home ladder (2026-09-23)
 - [x] **Desk hold partial load** — Manifest loadKg ≤ ops cap; *DispatchHold kg + remainder hold (2026-09-22)
 - [x] **VA parallel cargo per pilot** — friends Accept together; gate by pilotAccountId (2026-09-22)
 - [x] **Hauls hold author + map route** — heldByName on Open desk; click plots OD on Company Network map (2026-09-22)

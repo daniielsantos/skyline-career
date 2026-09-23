@@ -4,6 +4,7 @@
  */
 
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
+import { assertClassOpsUnlocked } from './career-class-ops.js';
 import { TICKS_PER_HOUR } from './career-clock.js';
 import { getCommodity, routeDistanceNm } from './career-economy.js';
 import {
@@ -459,6 +460,7 @@ export function acceptWarehouseBridge(
     kg,
     opts.pilotAccountId,
   );
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: origin,
     commodityId: opts.commodityId,
@@ -507,6 +509,12 @@ export function dispatchWarehouseBridgeHold(
   if ((hold.kind ?? 'demand') !== 'bridge' || !hold.destWarehouseId) {
     throw new Error('Not a warehouse bridge hold');
   }
+  if (!cargoOpsIsUnlocked(state.cargoOps, hold.commodityId)) {
+    const name = getCommodity(hold.commodityId).name;
+    throw new Error(
+      `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+    );
+  }
   const takeKg = Math.max(
     0,
     Math.floor(
@@ -526,6 +534,7 @@ export function dispatchWarehouseBridgeHold(
     kg,
     opts.pilotAccountId,
   );
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: hold.originIcao,
     commodityId: hold.commodityId,

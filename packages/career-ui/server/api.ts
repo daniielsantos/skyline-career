@@ -11044,41 +11044,52 @@ export function createCareerApiServer(port = 8787) {
             req,
             warehouses_bridge_dispatch_holdCompanyId,
           );
+          const bridgeHoldProgPeek = await withCareerRead((_w, missions) => ({
+            cargoOps: missions.cargoOps,
+            classOps: missions.classOps,
+          }), { companyId: warehouses_bridge_dispatch_holdCompanyId });
+          const bridgeHoldProgression = await resolvePilotProgressionOps(
+            req,
+            warehouses_bridge_dispatch_holdCompanyId,
+            bridgeHoldProgPeek,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            return withDevCargoOpsUnlock(req, missions, () => {
-              const dispatched = dispatchWarehouseBridgeHold(missions, world, {
-                holdId: body.holdId!,
-                aircraftId: body.aircraftId!,
-                kg:
-                  body.kg != null && Number.isFinite(Number(body.kg))
-                    ? Number(body.kg)
-                    : undefined,
-                pilotPayUsd:
-                  body.pilotPayUsd === null
-                    ? 0
-                    : body.pilotPayUsd != null
-                      ? Number(body.pilotPayUsd)
+            return withDevCargoOpsUnlock(req, missions, () =>
+              withProgressionGates(missions, bridgeHoldProgression, () => {
+                const dispatched = dispatchWarehouseBridgeHold(missions, world, {
+                  holdId: body.holdId!,
+                  aircraftId: body.aircraftId!,
+                  kg:
+                    body.kg != null && Number.isFinite(Number(body.kg))
+                      ? Number(body.kg)
                       : undefined,
-                ...pilotStamp,
-                actorIsVaOwner: bridgeHoldActor.isOwner,
-              });
-              return {
-                walletUsd: missions.walletUsd,
-                mission: withMissionClientView(
-                  world,
-                  missions,
-                  dispatched.mission,
-                ),
-                kg: dispatched.kg,
-                pilotPayUsd: dispatched.pilotPayUsd,
-                warehouses: playerWarehouseSnapshot(missions, world),
-                fleet: missions.fleet,
-                missions: missions.missions.map((m) =>
-                  withMissionClientView(world, missions, m),
-                ),
-              };
-            });
+                  pilotPayUsd:
+                    body.pilotPayUsd === null
+                      ? 0
+                      : body.pilotPayUsd != null
+                        ? Number(body.pilotPayUsd)
+                        : undefined,
+                  ...pilotStamp,
+                  actorIsVaOwner: bridgeHoldActor.isOwner,
+                });
+                return {
+                  walletUsd: missions.walletUsd,
+                  mission: withMissionClientView(
+                    world,
+                    missions,
+                    dispatched.mission,
+                  ),
+                  kg: dispatched.kg,
+                  pilotPayUsd: dispatched.pilotPayUsd,
+                  warehouses: playerWarehouseSnapshot(missions, world),
+                  fleet: missions.fleet,
+                  missions: missions.missions.map((m) =>
+                    withMissionClientView(world, missions, m),
+                  ),
+                };
+              }),
+            );
           }, { persist: 'company', companyId: warehouses_bridge_dispatch_holdCompanyId });
           send(res, 200, result);
         } catch (error) {
@@ -11340,35 +11351,46 @@ export function createCareerApiServer(port = 8787) {
             req,
             warehouses_haul_dispatch_holdCompanyId,
           );
+          const haulHoldProgPeek = await withCareerRead((_w, missions) => ({
+            cargoOps: missions.cargoOps,
+            classOps: missions.classOps,
+          }), { companyId: warehouses_haul_dispatch_holdCompanyId });
+          const haulHoldProgression = await resolvePilotProgressionOps(
+            req,
+            warehouses_haul_dispatch_holdCompanyId,
+            haulHoldProgPeek,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            return withDevCargoOpsUnlock(req, missions, () => {
-              const dispatched = dispatchWarehouseHaulHold(missions, world, {
-                holdId: body.holdId!,
-                aircraftId: body.aircraftId!,
-                kg:
-                  body.kg != null && Number.isFinite(Number(body.kg))
-                    ? Number(body.kg)
-                    : undefined,
-                ...haulPilotStamp,
-                actorIsVaOwner: haulHoldActor.isOwner,
-              });
-              return {
-                walletUsd: missions.walletUsd,
-                mission: withMissionClientView(
-                  world,
-                  missions,
-                  dispatched.mission,
-                ),
-                kg: dispatched.kg,
-                payUsd: dispatched.payUsd,
-                warehouses: playerWarehouseSnapshot(missions, world),
-                fleet: missions.fleet,
-                missions: missions.missions.map((m) =>
-                  withMissionClientView(world, missions, m),
-                ),
-              };
-            });
+            return withDevCargoOpsUnlock(req, missions, () =>
+              withProgressionGates(missions, haulHoldProgression, () => {
+                const dispatched = dispatchWarehouseHaulHold(missions, world, {
+                  holdId: body.holdId!,
+                  aircraftId: body.aircraftId!,
+                  kg:
+                    body.kg != null && Number.isFinite(Number(body.kg))
+                      ? Number(body.kg)
+                      : undefined,
+                  ...haulPilotStamp,
+                  actorIsVaOwner: haulHoldActor.isOwner,
+                });
+                return {
+                  walletUsd: missions.walletUsd,
+                  mission: withMissionClientView(
+                    world,
+                    missions,
+                    dispatched.mission,
+                  ),
+                  kg: dispatched.kg,
+                  payUsd: dispatched.payUsd,
+                  warehouses: playerWarehouseSnapshot(missions, world),
+                  fleet: missions.fleet,
+                  missions: missions.missions.map((m) =>
+                    withMissionClientView(world, missions, m),
+                  ),
+                };
+              }),
+            );
           }, { persist: 'company', companyId: warehouses_haul_dispatch_holdCompanyId });
           send(res, 200, result);
         } catch (error) {
@@ -11610,36 +11632,47 @@ export function createCareerApiServer(port = 8787) {
             req,
             demand_dispatch_holdCompanyId,
           );
+          const demandHoldProgPeek = await withCareerRead((_w, missions) => ({
+            cargoOps: missions.cargoOps,
+            classOps: missions.classOps,
+          }), { companyId: demand_dispatch_holdCompanyId });
+          const demandHoldProgression = await resolvePilotProgressionOps(
+            req,
+            demand_dispatch_holdCompanyId,
+            demandHoldProgPeek,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            return withDevCargoOpsUnlock(req, missions, () => {
-              const dispatched = dispatchDemandHold(missions, world, {
-                holdId: body.holdId!,
-                aircraftId: body.aircraftId!,
-                kg:
-                  body.kg != null && Number.isFinite(Number(body.kg))
-                    ? Number(body.kg)
-                    : undefined,
-                ...demandHoldStamp,
-                actorIsVaOwner: demandHoldActor.isOwner,
-              });
-              const warehouses = playerWarehouseSnapshot(missions, world);
-              return {
-                walletUsd: missions.walletUsd,
-                mission: withMissionClientView(world, missions, dispatched.mission),
-                order: dispatched.order,
-                kg: dispatched.kg,
-                payUsd: dispatched.payUsd,
-                warehouses,
-                demand: demandSnapshot(world, {
-                  warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
-                }),
-                fleet: missions.fleet,
-                missions: missions.missions.map((m) =>
-                  withMissionClientView(world, missions, m),
-                ),
-              };
-            });
+            return withDevCargoOpsUnlock(req, missions, () =>
+              withProgressionGates(missions, demandHoldProgression, () => {
+                const dispatched = dispatchDemandHold(missions, world, {
+                  holdId: body.holdId!,
+                  aircraftId: body.aircraftId!,
+                  kg:
+                    body.kg != null && Number.isFinite(Number(body.kg))
+                      ? Number(body.kg)
+                      : undefined,
+                  ...demandHoldStamp,
+                  actorIsVaOwner: demandHoldActor.isOwner,
+                });
+                const warehouses = playerWarehouseSnapshot(missions, world);
+                return {
+                  walletUsd: missions.walletUsd,
+                  mission: withMissionClientView(world, missions, dispatched.mission),
+                  order: dispatched.order,
+                  kg: dispatched.kg,
+                  payUsd: dispatched.payUsd,
+                  warehouses,
+                  demand: demandSnapshot(world, {
+                    warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
+                  }),
+                  fleet: missions.fleet,
+                  missions: missions.missions.map((m) =>
+                    withMissionClientView(world, missions, m),
+                  ),
+                };
+              }),
+            );
           }, {
             persist: 'company',
             persistDemandOrderId: undefined,

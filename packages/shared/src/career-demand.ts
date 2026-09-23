@@ -13,6 +13,7 @@ import {
   type CareerEconomyWorld,
 } from './career-economy.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
+import { assertClassOpsUnlocked } from './career-class-ops.js';
 import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { countryIdFromRegion } from './career-partition.js';
@@ -532,6 +533,12 @@ export function dispatchDemandHold(
   if (hold.kind === 'haul') {
     throw new Error('Use warehouse haul dispatch for this hold');
   }
+  if (!cargoOpsIsUnlocked(state.cargoOps, hold.commodityId)) {
+    const name = getCommodity(hold.commodityId).name;
+    throw new Error(
+      `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+    );
+  }
   const orderId = hold.orderId?.trim();
   if (!orderId) throw new Error('Demand hold is missing an order');
 
@@ -570,6 +577,7 @@ export function dispatchDemandHold(
       `Aircraft is at ${aircraft.locationIcao}, not warehouse hub ${hold.originIcao}`,
     );
   }
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
 
   const dispatchAircraft = {
     id: aircraft.id,
@@ -1189,6 +1197,7 @@ export function acceptDemandOrder(
       `Aircraft is at ${aircraft.locationIcao}, not warehouse hub ${origin}`,
     );
   }
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
 
   if (!CAREER_HUB_COORDS[origin] || !CAREER_HUB_COORDS[dest]) {
     throw new Error(`Unknown hub route ${origin}→${dest}`);

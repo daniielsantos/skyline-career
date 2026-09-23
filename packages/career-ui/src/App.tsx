@@ -12610,28 +12610,6 @@ export function App() {
   }
 
   /** Open Hangar ferry with dest = current terminal (parked board aircraft, else any parked). */
-  function ferryAircraftToCurrentTerminal() {
-    if (!airportView) return;
-    const dest = airportView.airport.icao.trim().toUpperCase();
-    const acf =
-      boardAircraft?.status === 'parked'
-        ? boardAircraft
-        : boardEstimateFleet.find((a) => a.status === 'parked');
-    if (!acf) {
-      setError('No parked aircraft available to ferry');
-      return;
-    }
-    const from = acf.locationIcao.trim().toUpperCase();
-    if (from === dest) return;
-    setAirportReturn({
-      icao: dest,
-      section: terminalSection,
-    });
-    setFerrySeed({ dest, token: Date.now() });
-    setHangarPane('aircraft');
-    goToTab('hangar');
-  }
-
   function toggleMarketSort(key: MarketSortKey) {
     setMarketSorts((current) => {
       if (key === 'access') {
@@ -16756,36 +16734,6 @@ export function App() {
                                 : ' · Jet-A from company · cut → your home Wallet'}
                             </p>
                           ) : null}
-                          {(() => {
-                            const dest =
-                              airportView.airport.icao.trim().toUpperCase();
-                            const ferryAcf =
-                              boardAircraft?.status === 'parked'
-                                ? boardAircraft
-                                : boardEstimateFleet.find(
-                                    (a) => a.status === 'parked',
-                                  );
-                            if (!ferryAcf) return null;
-                            if (
-                              ferryAcf.locationIcao.trim().toUpperCase() ===
-                              dest
-                            ) {
-                              return null;
-                            }
-                            return (
-                              <button
-                                type="button"
-                                className="linkish board-aircraft-ferry"
-                                disabled={busy}
-                                title={`Open Hangar ferry ${ferryAcf.locationIcao} → ${dest}`}
-                                onClick={() =>
-                                  ferryAircraftToCurrentTerminal()
-                                }
-                              >
-                                Ferry to {dest}
-                              </button>
-                            );
-                          })()}
                         </div>
                         ) : null}
                       </div>
@@ -18474,13 +18422,13 @@ export function App() {
             </table>
           </div>
           <nav className="pagination" aria-label="Freight pages">
-            <p>
+            <p title="Count after Freights filters — board shelf also breathes as lots form and expire each tick">
               {marketTotalLots === 0
-                ? '0 records'
+                ? '0 matching'
                 : `${(safeMarketPage - 1) * MARKET_PAGE_SIZE + 1}–${Math.min(
                     safeMarketPage * MARKET_PAGE_SIZE,
                     marketTotalLots,
-                  )} of ${marketTotalLots}`}
+                  )} of ${marketTotalLots.toLocaleString('en-US')} matching`}
             </p>
             <div>
               <button

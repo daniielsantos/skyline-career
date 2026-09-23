@@ -1364,26 +1364,6 @@ body {
   cursor: help;
 }
 
-.panel-head .board-aircraft-ferry {
-  font-size: inherit;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 0.12em;
-  cursor: pointer;
-}
-
-.panel-head .board-aircraft-ferry:hover:not(:disabled) {
-  color: var(--ink);
-}
-
-.panel-head .board-aircraft-ferry:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .panel-head .near-aircraft-btn {
   display: inline-flex;
   align-items: center;

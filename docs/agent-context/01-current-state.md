@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **618386b0** / desktop **0.3.262** shipped: Solidify airline network icons and raise profile map height. Release: [v0.3.262](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.262).
+
+
 `main` **fa48b88a** / desktop **0.3.261** shipped: Add Logbook Settled/Cancelled filter and job-kind chips. Release: [v0.3.261](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.261).
 
 

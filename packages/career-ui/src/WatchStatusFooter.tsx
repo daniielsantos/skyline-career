@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { SimBridgeStatus, WatchStatus } from './api';
 import { formatFuelFlow, type WeightSystem } from './weight-units';
 
@@ -55,6 +56,24 @@ export function WatchStatusFooter(props: Props) {
       (!props.activeMissionId ||
         props.watch.missionId === props.activeMissionId),
   );
+  // Hold last airborne clock / cruise chip across brief Watch flaps on
+  // mid-cruise app reopen (running false → SIMBRIDGE used to wipe the burn).
+  const stickyInFlightRef = useRef<{
+    flightTime: NonNullable<WatchStatus['flightTime']> | null;
+    cruiseSample: WatchStatus['cruiseSample'];
+    phase: string | null;
+  } | null>(null);
+  if (props.missionStatus !== 'in_flight') {
+    stickyInFlightRef.current = null;
+  } else if (watchRunning && props.watch) {
+    stickyInFlightRef.current = {
+      flightTime: props.watch.flightTime ?? stickyInFlightRef.current?.flightTime ?? null,
+      cruiseSample:
+        props.watch.cruiseSample ?? stickyInFlightRef.current?.cruiseSample ?? null,
+      phase: props.watch.phase ?? stickyInFlightRef.current?.phase ?? null,
+    };
+  }
+  const stickyInFlight = stickyInFlightRef.current;
   const bridgeConnected = Boolean(
     props.loadOfpAutoStatus === 'loading' ||
       watchRunning ||
@@ -74,6 +93,7 @@ export function WatchStatusFooter(props: Props) {
       : (props.simBridge?.enginesRunning ?? null);
   const bridgePhase =
     (watchRunning ? props.watch?.phase : null) ??
+    stickyInFlight?.phase ??
     props.simBridge?.phase ??
     null;
   const bridgeGs =
@@ -86,7 +106,7 @@ export function WatchStatusFooter(props: Props) {
       bridgeOnGround === true &&
       typeof bridgeGs === 'number' &&
       bridgeGs >= 5;
-    if (watchRunning) {
+    if (watchRunning || stickyInFlight) {
       if (props.watch?.settling) return 'Settling flight';
       if (props.watch?.lastEvent?.type === 'settle') return 'Settling flight';
       if (bridgePhase === 'taxi_in') return 'Taxi in';
@@ -109,6 +129,8 @@ export function WatchStatusFooter(props: Props) {
     return bridgeConnected ? 'Sampling…' : '—';
   })();
   // Server already sticky-holds pipeConnected across single blips; trust it.
+  // While En route with a sticky sample, prefer RECONNECTING over SIMBRIDGE so
+  // a brief Watch flap does not look like we lost the flight to the probe.
   const watchPipeLive =
     watchRunning && props.watch?.pipeConnected !== false;
   const statusLabel =
@@ -118,7 +140,7 @@ export function WatchStatusFooter(props: Props) {
         ? 'SETTLING…'
         : watchPipeLive
         ? 'MSFS'
-        : watchRunning
+        : watchRunning || stickyInFlight
           ? 'RECONNECTING…'
           : bridgeConnected
             ? 'SIMBRIDGE'
@@ -128,8 +150,12 @@ export function WatchStatusFooter(props: Props) {
                 ? 'PAUSED'
                 : 'WAITING…';
 
-  const flightTime = watchRunning ? props.watch?.flightTime : null;
-  const cruise = watchRunning ? props.watch?.cruiseSample : null;
+  const flightTime = watchRunning
+    ? props.watch?.flightTime
+    : stickyInFlight?.flightTime ?? null;
+  const cruise = watchRunning
+    ? props.watch?.cruiseSample
+    : stickyInFlight?.cruiseSample ?? null;
   const needPct =
     flightTime && !flightTime.met
       ? Math.round(
@@ -144,7 +170,7 @@ export function WatchStatusFooter(props: Props) {
       className={`watch-status-footer ${
         props.loadOfpAutoStatus === 'loading'
           ? 'watch-connected'
-          : watchPipeLive || bridgeConnected
+          : watchPipeLive || stickyInFlight || bridgeConnected
             ? 'watch-connected'
             : 'watch-waiting'
       }`}
@@ -156,11 +182,11 @@ export function WatchStatusFooter(props: Props) {
               ? 'checking'
               : props.watch?.settling
                 ? 'checking'
-                : watchRunning && !watchPipeLive
+                : (watchRunning || stickyInFlight) && !watchPipeLive
                 ? 'checking'
                 : !bridgeConnected && props.watchAutoStatus === 'connecting'
                   ? 'checking'
-                  : watchPipeLive || bridgeConnected
+                  : watchPipeLive || stickyInFlight || bridgeConnected
                     ? 'on'
                     : 'off'
           }`}
@@ -198,7 +224,7 @@ export function WatchStatusFooter(props: Props) {
           const cruiseChip =
             cruise && cruise.phase !== 'idle'
               ? cruise
-              : watchRunning &&
+              : (watchRunning || stickyInFlight) &&
                   props.missionStatus === 'in_flight' &&
                   bridgePhase === 'cruise'
                 ? cruise ?? {

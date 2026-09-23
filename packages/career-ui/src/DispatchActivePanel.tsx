@@ -204,11 +204,14 @@ export function DispatchActivePanel(props: {
   ) {
     lastAircraftRef.current = watchPos;
   }
-  if (!watchRunning) {
+  // Keep last plot across brief Watch flaps while still En route (app reopen
+  // mid-cruise used to null the tip every time running went false).
+  const holdAircraftForMission = watchRunning || mission.status === 'in_flight';
+  if (!holdAircraftForMission) {
     lastAircraftRef.current = null;
   }
   const stickyAircraft =
-    watchRunning && (watchPos ?? lastAircraftRef.current)
+    holdAircraftForMission && (watchPos ?? lastAircraftRef.current)
       ? (watchPos ?? lastAircraftRef.current)
       : null;
   const flightKind = logbookFlightKind(mission);

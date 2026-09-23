@@ -6515,8 +6515,15 @@ export function App() {
   useEffect(() => {
     if (watch?.running) return;
     // Don't open a competing probe pipe on an in-flight leg — that 0xC00000B0
-    // fight with Watch resume left settle dead after landing.
-    if (activeMissionRef.current?.status === 'in_flight') return;
+    // fight with Watch resume left settle dead after landing. Also gate on the
+    // missions list: before activeMission hydrates, a boot probe was claiming
+    // exclusive and thrashing mid-cruise app reopen.
+    if (
+      activeMissionRef.current?.status === 'in_flight' ||
+      missions.some((m) => m.status === 'in_flight')
+    ) {
+      return;
+    }
     // Ready + first LV: Preflight already stopped; probe must too so Watch
     // can claim the exclusive gate (auto-depart → En route).
     const mission = activeMissionRef.current;
@@ -6583,6 +6590,7 @@ export function App() {
     activeMission?.status,
     Boolean(activeMission?.lastPreflightCheck?.loadVerification),
     holdWatchOffForPreflight,
+    missions.some((m) => m.status === 'in_flight'),
   ]);
 
   useEffect(() => {
@@ -7466,13 +7474,17 @@ export function App() {
           companyId:
             resolveOpsCompanyId(activeMission.aircraftId) || undefined,
         });
-        // Late responses must not resurrect Watch while Preflight owns the pipe
-        // (or after this effect was cancelled / remounted).
+        // Late responses must not resurrect Watch while Preflight owns the pipe.
+        // Mid-flight resume is different: effect remounts (watch.running / LV
+        // hydrate / poll) used to cancel mid-await and postWatchStop the session
+        // that just started → footer MSFS↔SIMBRIDGE + map AC / burn flicker.
         const stillNeedsHold =
           holdWatchOffForPreflightRef.current ||
           (!isAirborneResume &&
             !activeMissionRef.current?.lastPreflightCheck?.loadVerification);
-        if (cancelled || stillNeedsHold) {
+        const yieldPipeForPreflight =
+          stillNeedsHold || (cancelled && !isAirborneResume);
+        if (yieldPipeForPreflight) {
           if (status.running) {
             void postWatchStop({ reset: true }).catch(() => {
               /* soft */
@@ -7481,6 +7493,7 @@ export function App() {
           if (!cancelled) setWatchAutoStatus('waiting');
           return;
         }
+        // cancelled + airborne: keep server Watch; attach UI so poll/footer stick.
         setWatch(status);
         stopped = true;
         if (!cancelled) {

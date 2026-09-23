@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **3e06a238** / desktop **0.3.241** shipped: Keep Crew Live AC marker glued to the trail tip. Release: [v0.3.241](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.241).
+
+
 `main` **b49ad4f4** / desktop **0.3.240** shipped: Restore Crew Live via soft Watch sample uplink to the VPS. Release: [v0.3.240](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.240).
 
 

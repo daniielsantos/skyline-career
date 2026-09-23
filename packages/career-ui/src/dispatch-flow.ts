@@ -553,7 +553,7 @@ export function buildLogbookDebriefFromMission(mission: Mission): FlightDebrief 
       impactEnded,
       payLine: impactEnded
         ? 'Flight ended — impact away from destination.'
-        : null,
+        : undefined,
     },
   });
 }

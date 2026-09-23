@@ -2225,6 +2225,80 @@ export function cancelMission(
 }
 
 /**
+ * End a flight as an in-flight impact: status `failed`, no payout, cargo lost
+ * (not restored to warehouse / demand / market as available).
+ */
+export function failMissionImpact(
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: {
+    fleet?: CareerMissionsState;
+    nowMs?: number;
+    message?: string;
+  } = {},
+): MissionIntent {
+  const normalized = normalizeMissionIntent(mission);
+  if (
+    normalized.status !== 'accepted' &&
+    normalized.status !== 'dispatched' &&
+    normalized.status !== 'in_flight'
+  ) {
+    throw new Error(`Cannot fail mission in status=${normalized.status}`);
+  }
+  const note =
+    opts.message?.trim() ||
+    'Flight ended — impact away from destination. Cargo lost; no payout.';
+
+  if (normalized.missionType === 'charter') {
+    const cancelled = cancelCharterMission(
+      world,
+      normalized as import('./types/career-economy.js').CharterMissionIntent,
+      { cancelledAtTick: world.tick, cancelOffer: true },
+    ).mission;
+    if (opts.fleet) releaseAircraftOnCancel(opts.fleet, cancelled);
+    clearPlayerInbound(world, cancelled.id);
+    return {
+      ...cancelled,
+      status: 'failed',
+      failReason: 'impact',
+      payoutUsd: 0,
+      reason: note,
+    };
+  }
+
+  for (const line of normalized.lots) {
+    const id = line.shipmentLotId;
+    if (
+      id.startsWith('deadhead_') ||
+      id.startsWith('empty_') ||
+      id.startsWith('portpk_') ||
+      id.startsWith('demand_') ||
+      id.startsWith('whbridge_') ||
+      id.startsWith('whhaul_') ||
+      id.startsWith('charter_')
+    ) {
+      continue;
+    }
+    const lot = world.lots.find((l) => l.id === id);
+    if (lot) {
+      shrinkLotAfterDelivery(lot, line.cargoKg, world);
+    }
+  }
+
+  if (opts.fleet) {
+    releaseAircraftOnCancel(opts.fleet, normalized);
+  }
+  clearPlayerInbound(world, normalized.id);
+  return {
+    ...normalized,
+    status: 'failed',
+    failReason: 'impact',
+    payoutUsd: 0,
+    reason: note,
+  };
+}
+
+/**
  * If a Contract offer is still awaiting_pilot on this lot, fold the cancelled
  * slice back into that pool. Returns true when handled (skip market release).
  */

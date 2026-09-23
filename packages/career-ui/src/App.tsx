@@ -377,6 +377,7 @@ import {
 } from './ui-sounds';
 import {
   buildFlightDebrief,
+  buildDebriefPillars,
   deriveDispatchStep,
   dispatchStepStatusLine,
   formatCargoOpsDebriefLine,
@@ -5943,7 +5944,15 @@ export function App() {
               setMissions((current) =>
                 current.map((m) =>
                   m.id === settledId && isActiveMissionStatus(m.status)
-                    ? { ...m, status: 'completed' }
+                    ? {
+                        ...m,
+                        status: status.settlement!.impactEnded
+                          ? 'failed'
+                          : 'completed',
+                        ...(status.settlement!.impactEnded
+                          ? { failReason: 'impact', payoutUsd: 0 }
+                          : {}),
+                      }
                     : m,
                 ),
               );
@@ -5953,7 +5962,19 @@ export function App() {
               }
               // Debrief sheet carries P&L — only toast when we could not build it.
               if (!debrief) {
-                setToastKind(status.settlement!.onTime ? 'ok' : 'warn');
+                setToastKind(
+                  status.settlement!.impactEnded
+                    ? 'fail'
+                    : status.settlement!.onTime
+                      ? 'ok'
+                      : 'warn',
+                );
+                if (status.settlement!.impactEnded) {
+                  setToast(
+                    status.settlement!.payLine?.trim() ||
+                      'Flight ended — impact away from destination.',
+                  );
+                } else {
                 const cargoLine = formatCargoOpsDebriefLine(
                   status.settlement!.cargoOpsDeltas,
                 );
@@ -5968,6 +5989,7 @@ export function App() {
                     status.settlement!.payoutUsd,
                   )}${opsLine ? ` · ${opsLine}` : ''}`,
                 );
+                }
               }
               goToTab('staging');
               void (async () => {
@@ -18573,7 +18595,11 @@ export function App() {
                 aria-live="polite"
               >
                 <header className="debrief-hero">
-                  <p className="debrief-kicker">Flight complete</p>
+                  <p className="debrief-kicker">
+                    {flightDebrief.impactEnded
+                      ? 'Flight ended'
+                      : 'Flight debrief'}
+                  </p>
                   <h2>
                     {flightDebrief.originIcao}
                     <span className="debrief-hero-arrow" aria-hidden="true">
@@ -18582,15 +18608,19 @@ export function App() {
                     {flightDebrief.destIcao}
                   </h2>
                   <p className="debrief-hero-meta">
-                    <span
-                      className={
-                        flightDebrief.onTime ? 'debrief-ok' : 'debrief-late'
-                      }
-                    >
-                      {flightDebrief.onTime
-                        ? 'On time'
-                        : `Late ${(flightDebrief.lateTicks / 4).toFixed(1)}h`}
-                    </span>
+                    {flightDebrief.impactEnded ? (
+                      <span className="debrief-late">Impact</span>
+                    ) : (
+                      <span
+                        className={
+                          flightDebrief.onTime ? 'debrief-ok' : 'debrief-late'
+                        }
+                      >
+                        {flightDebrief.onTime
+                          ? 'On time'
+                          : `Late ${(flightDebrief.lateTicks / 4).toFixed(1)}h`}
+                      </span>
+                    )}
                     {flightDebrief.flightDurationMs != null ? (
                       <>
                         {' · '}
@@ -18600,6 +18630,31 @@ export function App() {
                     ) : null}
                   </p>
                 </header>
+
+                <ul className="debrief-pillars" aria-label="Flight glance">
+                  {buildDebriefPillars(flightDebrief).map((pillar) => (
+                    <li
+                      key={pillar.id}
+                      className={`debrief-pillar debrief-pillar-${pillar.tone}`}
+                    >
+                      <span className="debrief-pillar-label">
+                        {pillar.label}
+                      </span>
+                      <span className="debrief-pillar-badge">
+                        {pillar.badge}
+                      </span>
+                      <span className="debrief-pillar-detail">
+                        {pillar.detail}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {flightDebrief.impactEnded && flightDebrief.payLine ? (
+                  <p className="debrief-impact-note" role="status">
+                    {flightDebrief.payLine}
+                  </p>
+                ) : null}
 
                 <div className="debrief-layout">
                   <div className="debrief-col-touch">
@@ -18624,6 +18679,10 @@ export function App() {
                           </p>
                         ) : null}
                       </div>
+                    ) : flightDebrief.impactEnded ? (
+                      <p className="muted debrief-no-touch">
+                        No destination touchdown — cargo written off.
+                      </p>
                     ) : (
                       <p className="muted debrief-no-touch">
                         No runway sample this leg — landing still scored from
@@ -18640,7 +18699,8 @@ export function App() {
                           {boardMoneyLabel(flightDebrief.netUsd, formatMoney)}
                         </strong>
                       </div>
-                      {flightDebrief.flightScore ? (
+                      {flightDebrief.flightScore &&
+                      !flightDebrief.impactEnded ? (
                         <div className="debrief-hero-score">
                           <span className="debrief-hero-money-label">Score</span>
                           <strong
@@ -18658,36 +18718,41 @@ export function App() {
                       ) : null}
                     </div>
 
-                    <dl className="debrief-metrics">
-                      <div>
-                        <dt>Payout</dt>
-                        <dd>{formatMoney(flightDebrief.payoutUsd)}</dd>
-                      </div>
-                      {flightDebrief.penaltyUsd > 0 ? (
+                    {!flightDebrief.impactEnded ? (
+                      <dl className="debrief-metrics">
                         <div>
-                          <dt>Late</dt>
-                          <dd>−{formatMoney(flightDebrief.penaltyUsd)}</dd>
+                          <dt>Payout</dt>
+                          <dd>{formatMoney(flightDebrief.payoutUsd)}</dd>
                         </div>
-                      ) : null}
-                      {flightDebrief.fuelCostUsd > 0 ? (
+                        {flightDebrief.penaltyUsd > 0 ? (
+                          <div>
+                            <dt>Late</dt>
+                            <dd>−{formatMoney(flightDebrief.penaltyUsd)}</dd>
+                          </div>
+                        ) : null}
+                        {flightDebrief.fuelCostUsd > 0 ? (
+                          <div>
+                            <dt>Fuel</dt>
+                            <dd>−{formatMoney(flightDebrief.fuelCostUsd)}</dd>
+                          </div>
+                        ) : null}
                         <div>
-                          <dt>Fuel</dt>
-                          <dd>−{formatMoney(flightDebrief.fuelCostUsd)}</dd>
+                          <dt>Landing</dt>
+                          <dd>{formatLandingFpm(flightDebrief.landingFpm)}</dd>
                         </div>
-                      ) : null}
-                      <div>
-                        <dt>Landing</dt>
-                        <dd>{formatLandingFpm(flightDebrief.landingFpm)}</dd>
-                      </div>
-                      {flightDebrief.weatherBonusUsd > 0 ? (
-                        <div>
-                          <dt>Weather</dt>
-                          <dd>+{formatMoney(flightDebrief.weatherBonusUsd)}</dd>
-                        </div>
-                      ) : null}
-                    </dl>
+                        {flightDebrief.weatherBonusUsd > 0 ? (
+                          <div>
+                            <dt>Weather</dt>
+                            <dd>
+                              +{formatMoney(flightDebrief.weatherBonusUsd)}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    ) : null}
 
-                    {flightDebrief.flightScore ? (
+                    {flightDebrief.flightScore &&
+                    !flightDebrief.impactEnded ? (
                       <div
                         className="flight-score flight-score-compact"
                         aria-label="Flight score"
@@ -18724,9 +18789,10 @@ export function App() {
                       </div>
                     ) : null}
 
-                    {flightDebrief.payLine ||
-                    flightDebrief.forYouNote ||
-                    flightDebrief.pilotHoursDelta != null ? (
+                    {!flightDebrief.impactEnded &&
+                    (flightDebrief.payLine ||
+                      flightDebrief.forYouNote ||
+                      flightDebrief.pilotHoursDelta != null) ? (
                       <div className="cargo-ops-debrief" aria-label="For you">
                         <strong>For you</strong>
                         {flightDebrief.payLine ? (

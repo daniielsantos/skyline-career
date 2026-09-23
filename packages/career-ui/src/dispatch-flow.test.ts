@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { Mission, MissionSettlement } from './api.ts';
 import {
   buildFlightDebrief,
+  buildDebriefPillars,
   deriveDispatchStep,
   dispatchStepStatusLine,
   formatCargoOpsDebriefLine,
@@ -370,8 +371,38 @@ describe('buildFlightDebrief', () => {
     assert.equal(formatFlightDurationMs(debrief.flightDurationMs), '1h 9m');
     assert.equal(debrief.flightScore?.pct, 86);
     assert.equal(debrief.flightScore?.earned, 44);
+    assert.equal(debrief.takeoffFuelKg, 200);
+    assert.equal(debrief.impactEnded, false);
     assert.deepEqual(debrief.cargoOpsDeltas, []);
     assert.deepEqual(debrief.classOpsDeltas, []);
+    const pillars = buildDebriefPillars(debrief);
+    assert.equal(pillars[0]?.badge, 'Butter');
+    assert.equal(pillars[0]?.tone, 'good');
+    assert.equal(pillars[1]?.badge, 'Late');
+    assert.equal(pillars[2]?.badge, 'Normal');
+    assert.match(pillars[2]?.detail ?? '', /of uplift/);
+  });
+
+  it('marks impact fail pillars without inventing payout', () => {
+    const debrief = buildFlightDebrief({
+      mission: mission({ payUsd: 2000 }),
+      settlement: {
+        payoutUsd: 0,
+        penaltyUsd: 0,
+        lateTicks: 0,
+        onTime: false,
+        deliveredKg: 0,
+        residualFuelKg: null,
+        impactEnded: true,
+        payLine: 'High-G impact mid-route — cargo lost.',
+      },
+    });
+    assert.equal(debrief.impactEnded, true);
+    assert.equal(debrief.netUsd, 0);
+    const pillars = buildDebriefPillars(debrief);
+    assert.equal(pillars[0]?.badge, 'Impact');
+    assert.equal(pillars[1]?.badge, 'Aborted');
+    assert.equal(pillars[2]?.badge, '—');
   });
 
   it('includes cargo ops deltas when settlement provides them', () => {

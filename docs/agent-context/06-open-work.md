@@ -1,5 +1,11 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-23: **VA member brief stepper** — My VA card em 4 slides (Wallets/Cuts/Progression/Jobs). Spec note em [`16-va-logistics.md`](./16-va-logistics.md).
+
+Atualizado 2026-09-23: **Debrief 3 pilares** — Landing/Time/Fuel badges no sheet (`buildDebriefPillars`); impact fail factual. Spec: [`29-flight-debrief.md`](./29-flight-debrief.md).
+
+Atualizado 2026-09-23: **Crash detection fase 1** — `career-flight-crash` + Watch auto-fail confiança alta (sem MSFS events, sem Confirm). Spec: [`28-crash-detection.md`](./28-crash-detection.md). Soak / write-off = fase 2.
+
 Atualizado 2026-09-22: **MSFS flight restart @ origin → false “Settle” UX** — **fix applied**: Watch `destProximity` + overlay/headline LANDED só com nearDest (ou `settling`); restart no DEP → “ON GROUND · BACK AT DEPARTURE”, sem animação Settling. Diag abaixo.
 
 ### MSFS restart mid-flight @ origin (2026-09-22) — diag

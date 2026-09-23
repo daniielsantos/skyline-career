@@ -289,6 +289,7 @@ export * from './career-live-load.js';
 export * from './career-flight-watch.js';
 export * from './career-flight-phase.js';
 export * from './career-flight-score.js';
+export * from './career-flight-crash.js';
 export * from './cruise-sample.js';
 export * from './fingerprint.js';
 export * from './profile-structure.js';

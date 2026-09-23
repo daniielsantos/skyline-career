@@ -65,6 +65,11 @@ import {
   routeDistanceNm,
   executeSettleFlight,
   executeDepartFlight,
+  executeFailMissionImpact,
+  emptyCrashDetectState,
+  stepCrashDetect,
+  type CrashDetectState,
+  type CrashVerdict,
   syncActiveTour,
   watchIntervalMsForPhase,
   weatherOpsStatus,
@@ -232,6 +237,8 @@ export type WatchStatusPayload = {
     lastSettleOutcome?: import('@msfs-compat/shared').LastSettleOutcome | null;
     payLine?: string;
     showClassOpsDebrief?: boolean;
+    /** Watch impact auto-fail (not a normal settle). */
+    impactEnded?: boolean;
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -1551,6 +1558,8 @@ export class CareerWatchSession {
   private lastMxFuelDrainSkipLogAtMs = 0;
   /** Accumulated MX excess kg accrued this flight (settle-only debit). */
   private mxFuelDrainAccruedKg = 0;
+  private crashDetect: CrashDetectState = emptyCrashDetectState();
+  private crashBoostPoll = false;
 
   constructor(private readonly cb: WatchCallbacks) {}
 
@@ -1871,6 +1880,8 @@ export class CareerWatchSession {
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
     this.mxFuelDrainAccruedKg = 0;
+    this.crashDetect = emptyCrashDetectState();
+    this.crashBoostPoll = false;
     this.paxAndCargoCrewCache = null;
     this.freighterRolesCache = null;
     this.stationMaxCache = null;
@@ -2159,6 +2170,8 @@ export class CareerWatchSession {
     this.lastMxFuelDrainAtMs = 0;
     this.lastMxFuelDrainSkipLogAtMs = 0;
     this.mxFuelDrainAccruedKg = 0;
+    this.crashDetect = emptyCrashDetectState();
+    this.crashBoostPoll = false;
     this.paxAndCargoCrewCache = null;
     this.freighterRolesCache = null;
     this.stationMaxCache = null;
@@ -3705,6 +3718,47 @@ export class CareerWatchSession {
         landingVsFpm: nextState.landingFpm,
       });
 
+      // Conservative mid-route impact → auto-fail (never near dest).
+      if (
+        !this.settling &&
+        !this.settlement &&
+        nextState.sawAirborne &&
+        (current.status === 'in_flight' ||
+          current.status === 'dispatched' ||
+          current.status === 'accepted')
+      ) {
+        const crashStep = stepCrashDetect(
+          this.crashDetect,
+          {
+            atMs: nowMs,
+            onGround: sample.onGround === true,
+            sawAirborne: nextState.sawAirborne === true,
+            groundSpeedKt: sample.groundSpeedKt,
+            verticalSpeedFpm: sample.verticalSpeedFpm,
+            aglFt: sample.aglFt,
+            gForce: sample.gForce,
+            enginesRunning: sample.enginesRunning,
+            frozen: isSimPlaybackFrozen(sample),
+            lat: sample.position?.lat,
+            lon: sample.position?.lon,
+          },
+          {
+            nearDest: this.lastDestProximity?.ok === true,
+            simAlive:
+              !this.pendingSimConnectReset &&
+              this.bridge?.isPipeConnected !== false,
+          },
+        );
+        this.crashDetect = crashStep.state;
+        this.crashBoostPoll = crashStep.boostPoll;
+        if (crashStep.verdict) {
+          await this.applyImpactFail(crashStep.verdict, nowMs);
+          return;
+        }
+      } else {
+        this.crashBoostPoll = false;
+      }
+
       // Accrue MX excess burn for settle (no in-flight sim writes).
       if (
         current.status === 'in_flight' &&
@@ -4445,10 +4499,92 @@ export class CareerWatchSession {
             this.intervalMs,
             watchIntervalMsForPhase('landing'),
           );
+        } else if (this.crashBoostPoll) {
+          this.intervalMs = Math.min(
+            this.intervalMs,
+            watchIntervalMsForPhase('approach'),
+          );
         }
         this.scheduleNextTick(this.intervalMs);
       }
     }
+  }
+
+  /**
+   * High-confidence mid-route impact: fail mission (cargo lost), stop Watch,
+   * surface a factual debrief via settlement payload (payout 0).
+   */
+  private async applyImpactFail(
+    verdict: CrashVerdict,
+    nowMs: number,
+  ): Promise<void> {
+    if (!this.missionId) return;
+    watchDebugLog('watch', 'impact fail', {
+      missionId: this.missionId,
+      reasonBits: verdict.reasonBits,
+      peakG: verdict.peakG,
+      peakAbsVs: verdict.peakAbsVs,
+    });
+    try {
+      const result = await this.cb.withCareerWrite(
+        (world, missions) => {
+          const executed = executeFailMissionImpact(world, missions, {
+            missionId: this.missionId!,
+            nowMs,
+            message: verdict.message,
+          });
+          return {
+            kind: executed.kind,
+            walletUsd: missions.walletUsd,
+            mission:
+              executed.kind === 'applied' || executed.kind === 'replay'
+                ? executed.mission
+                : null,
+          };
+        },
+        {
+          persist: 'company',
+          housekeeping: false,
+          catchUp: false,
+          commandSliceMissionId: this.missionId,
+        },
+      );
+      if (result.kind === 'applied' || result.kind === 'replay') {
+        this.missionStatus = 'failed';
+        this.walletUsd =
+          typeof result.walletUsd === 'number' ? result.walletUsd : null;
+        this.settlement = {
+          payoutUsd: 0,
+          penaltyUsd: 0,
+          lateTicks: 0,
+          onTime: false,
+          deliveredKg: 0,
+          residualFuelKg: null,
+          landingFpm: null,
+          flightDurationMs: null,
+          flightScore: this.lastFlightScore,
+          weatherBonusUsd: 0,
+          weatherOps: this.weatherStatus,
+          runwayTouch: null,
+          cargoOpsDeltas: [],
+          classOpsDeltas: [],
+          pilotPayUsd: null,
+          lastSettleOutcome: null,
+          payLine: verdict.message,
+          showClassOpsDebrief: false,
+          impactEnded: true,
+        };
+      } else {
+        this.lastError = `Impact detected but mission close failed (${result.kind})`;
+      }
+    } catch (err) {
+      this.lastError = formatIpcError(err);
+      watchDebugLog('watch', 'impact fail write error', {
+        error: this.lastError,
+      });
+    }
+    this.settling = false;
+    await this.stop({ fromOwnTick: true });
   }
 
   /**

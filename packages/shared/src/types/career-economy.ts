@@ -915,6 +915,11 @@ export interface MissionIntent {
   charterDemandId?: string;
   charterTier?: CharterTier;
   status: MissionStatus;
+  /**
+   * When status is `failed` — e.g. `impact` from Watch crash detection.
+   * Cargo is lost (not restored to WH / board).
+   */
+  failReason?: string;
   acceptedAtTick: number;
   /** Set when career dispatch opens SimBrief. */
   staticId?: string;

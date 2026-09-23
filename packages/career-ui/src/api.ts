@@ -4791,6 +4791,8 @@ export type MissionSettlement = {
   payLine?: string;
   /** Hide Class Ops block when ladder is complete. */
   showClassOpsDebrief?: boolean;
+  /** Watch mid-route impact auto-fail (not a normal settle). */
+  impactEnded?: boolean;
 };
 
 export type CharterMissionSettlement = {
@@ -4821,6 +4823,8 @@ export type CharterMissionSettlement = {
   lastSettleOutcome?: LastSettleOutcome | null;
   payLine?: string;
   showClassOpsDebrief?: boolean;
+  /** Mid-route impact auto-fail (freight path; rare on charter). */
+  impactEnded?: boolean;
 };
 
 export type WatchEvent =

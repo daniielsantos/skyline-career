@@ -47,6 +47,8 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 | [25-runway-touchdown.md](./25-runway-touchdown.md) | Debrief runway: Null Island; magnetic ident×10 stubs → false OFF runway; `repair:runways:magnetic` |
 | [26-rebrand-airframe.md](./26-rebrand-airframe.md) | Marca Airframe / `playairframe.com`; fases domínio → UI → AppData |
 | [27-mp-presence.md](./27-mp-presence.md) | MP presence board + Port/lot names + F7 claim-before-debit |
+| [28-crash-detection.md](./28-crash-detection.md) | Watch: esboço detector de acidente (G + multi-sinal, anti FP) |
+| [29-flight-debrief.md](./29-flight-debrief.md) | Debrief sheet: 3 pilares Landing/Time/Fuel + impact |
 
 ## Manutenção
 

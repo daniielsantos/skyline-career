@@ -2435,6 +2435,88 @@ th {
   font-size: 0.92rem;
 }
 
+.debrief-pillars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.debrief-pillar {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  text-align: center;
+  padding: 0.75rem 0.55rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.debrief-pillar-label {
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.debrief-pillar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.55rem;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pillar-tone, var(--muted)) 45%, var(--line));
+  background: color-mix(in srgb, var(--pillar-tone, var(--muted)) 14%, var(--surface));
+  color: color-mix(in srgb, var(--pillar-tone, var(--muted)) 88%, var(--ink));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.debrief-pillar-detail {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.debrief-pillar-good {
+  --pillar-tone: var(--ok);
+}
+
+.debrief-pillar-ok {
+  --pillar-tone: color-mix(in srgb, var(--ok) 55%, var(--muted));
+}
+
+.debrief-pillar-warn {
+  --pillar-tone: var(--accent);
+}
+
+.debrief-pillar-bad {
+  --pillar-tone: var(--danger);
+}
+
+.debrief-pillar-muted {
+  --pillar-tone: var(--muted);
+}
+
+.debrief-impact-note {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: color-mix(in srgb, var(--danger) 75%, var(--ink));
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .debrief-layout {
   display: grid;
   grid-template-columns: minmax(18rem, 1.2fr) minmax(20rem, 1fr);
@@ -2540,6 +2622,10 @@ th {
 
 @media (max-width: 52rem) {
   .debrief-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .debrief-pillars {
     grid-template-columns: 1fr;
   }
 }
@@ -14175,32 +14261,84 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .va-member-brief {
   margin: 0 0 0.85rem;
-  padding: 0.75rem 0.9rem;
+  padding: 0.9rem 1rem 1rem;
   border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--panel) 92%, var(--accent, #c45c26) 8%);
+  display: grid;
+  gap: 0.55rem;
 }
 .va-member-brief-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.45rem;
+}
+.va-member-brief-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .va-member-brief-dismiss {
   flex: 0 0 auto;
+  min-width: 2rem;
+  padding-inline: 0.45rem;
+  font-size: 1.15rem;
+  line-height: 1;
 }
-.va-member-brief-list {
+.va-member-brief-title {
   margin: 0;
-  padding-left: 1.1rem;
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.88rem;
-  color: var(--muted);
-  line-height: 1.35;
-}
-.va-member-brief-list strong {
-  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 1.8vw, 1.25rem);
   font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.va-member-brief-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  max-width: 42rem;
+}
+.va-member-brief-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin-top: 0.25rem;
+}
+.va-member-brief-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.va-member-brief-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--muted) 55%, var(--line));
+  background: transparent;
+  cursor: pointer;
+}
+.va-member-brief-dot.is-active {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  background: var(--ok);
+}
+.va-member-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+.va-member-brief-actions .accept {
+  min-width: 6.5rem;
 }
 
 .va-stat-label {

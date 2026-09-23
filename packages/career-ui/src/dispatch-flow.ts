@@ -52,6 +52,8 @@ export type FlightDebrief = {
   penaltyUsd: number;
   fuelCostUsd: number;
   residualFuelKg: number | null;
+  /** Uplift delivered at origin (kg) — proxy for takeoff fuel when present. */
+  takeoffFuelKg: number | null;
   /** Touchdown vertical speed (fpm), typically negative. */
   landingFpm: number | null;
   /** Airborne duration (wheels-up → touchdown/settle), ms. */
@@ -70,6 +72,22 @@ export type FlightDebrief = {
   pilotHoursDelta: number | null;
   pilotHoursAfter: number | null;
   showClassOpsDebrief: boolean;
+  /** Mid-route impact auto-fail (not a normal dest settle). */
+  impactEnded: boolean;
+};
+
+/** Glance badges for the debrief sheet (Landing / Time / Fuel). */
+export type DebriefPillarId = 'landing' | 'time' | 'fuel';
+
+export type DebriefPillarTone = 'good' | 'ok' | 'warn' | 'bad' | 'muted';
+
+export type DebriefPillar = {
+  id: DebriefPillarId;
+  label: string;
+  badge: string;
+  tone: DebriefPillarTone;
+  /** Primary number / short fact under the badge. */
+  detail: string;
 };
 
 const CARGO_OPS_LABELS: Record<string, string> = {
@@ -140,6 +158,191 @@ export function formatFlightDurationMs(ms: number | null | undefined): string {
   const minutes = totalMinutes % 60;
   if (hours <= 0) return `${minutes}m`;
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+/**
+ * Landing / Time / Fuel glance pillars for the debrief sheet.
+ * Badges are labels only — no invented XP multipliers or pay bonuses.
+ * VS thresholds mirror `scoreLandingVsPoints` bands in shared.
+ */
+export function buildDebriefPillars(
+  debrief: Pick<
+    FlightDebrief,
+    | 'landingFpm'
+    | 'flightDurationMs'
+    | 'onTime'
+    | 'lateTicks'
+    | 'residualFuelKg'
+    | 'takeoffFuelKg'
+    | 'runwayTouch'
+    | 'impactEnded'
+  >,
+): DebriefPillar[] {
+  return [
+    buildLandingPillar(debrief),
+    buildTimePillar(debrief),
+    buildFuelPillar(debrief),
+  ];
+}
+
+function buildLandingPillar(
+  debrief: Pick<
+    FlightDebrief,
+    'landingFpm' | 'runwayTouch' | 'impactEnded'
+  >,
+): DebriefPillar {
+  if (debrief.impactEnded) {
+    return {
+      id: 'landing',
+      label: 'Landing',
+      badge: 'Impact',
+      tone: 'bad',
+      detail: 'Away from destination',
+    };
+  }
+  const offPavement = debrief.runwayTouch?.onPavement === false;
+  const fpm = debrief.landingFpm;
+  if (typeof fpm !== 'number' || !Number.isFinite(fpm)) {
+    return {
+      id: 'landing',
+      label: 'Landing',
+      badge: offPavement ? 'Off rwy' : 'No sample',
+      tone: offPavement ? 'bad' : 'muted',
+      detail: offPavement
+        ? formatRunwayTouchdownDebriefLine(debrief.runwayTouch) || 'Off pavement'
+        : 'Watch had no touchdown VS',
+    };
+  }
+  const abs = Math.abs(fpm);
+  let badge = 'Heavy';
+  let tone: DebriefPillarTone = 'bad';
+  if (abs <= 200) {
+    badge = 'Butter';
+    tone = 'good';
+  } else if (abs <= 250) {
+    badge = 'Soft';
+    tone = 'good';
+  } else if (abs <= 350) {
+    badge = 'Firm';
+    tone = 'ok';
+  } else if (abs <= 450) {
+    badge = 'Hard';
+    tone = 'warn';
+  } else if (abs <= 600) {
+    badge = 'Rough';
+    tone = 'warn';
+  }
+  if (offPavement) {
+    badge = 'Off rwy';
+    tone = 'bad';
+  }
+  return {
+    id: 'landing',
+    label: 'Landing',
+    badge,
+    tone,
+    detail: formatLandingFpm(fpm),
+  };
+}
+
+function buildTimePillar(
+  debrief: Pick<
+    FlightDebrief,
+    'flightDurationMs' | 'onTime' | 'lateTicks' | 'impactEnded'
+  >,
+): DebriefPillar {
+  if (debrief.impactEnded) {
+    return {
+      id: 'time',
+      label: 'Time',
+      badge: 'Aborted',
+      tone: 'bad',
+      detail:
+        debrief.flightDurationMs != null
+          ? formatFlightDurationMs(debrief.flightDurationMs)
+          : '—',
+    };
+  }
+  const duration = formatFlightDurationMs(debrief.flightDurationMs);
+  if (debrief.onTime) {
+    return {
+      id: 'time',
+      label: 'Time',
+      badge: 'On time',
+      tone: 'good',
+      detail: duration === '—' ? 'On schedule' : `${duration} airborne`,
+    };
+  }
+  const lateH = (debrief.lateTicks / 4).toFixed(1);
+  return {
+    id: 'time',
+    label: 'Time',
+    badge: 'Late',
+    tone: debrief.lateTicks >= 8 ? 'bad' : 'warn',
+    detail:
+      duration === '—'
+        ? `${lateH}h late`
+        : `${duration} · ${lateH}h late`,
+  };
+}
+
+function buildFuelPillar(
+  debrief: Pick<
+    FlightDebrief,
+    'residualFuelKg' | 'takeoffFuelKg' | 'impactEnded'
+  >,
+): DebriefPillar {
+  if (debrief.impactEnded) {
+    return {
+      id: 'fuel',
+      label: 'Fuel',
+      badge: '—',
+      tone: 'muted',
+      detail: 'Not settled',
+    };
+  }
+  const residual = debrief.residualFuelKg;
+  const takeoff = debrief.takeoffFuelKg;
+  if (typeof residual !== 'number' || !Number.isFinite(residual)) {
+    return {
+      id: 'fuel',
+      label: 'Fuel',
+      badge: 'No sample',
+      tone: 'muted',
+      detail: 'Residual not read',
+    };
+  }
+  const residualKg = Math.max(0, Math.round(residual));
+  if (
+    typeof takeoff === 'number' &&
+    Number.isFinite(takeoff) &&
+    takeoff > 0
+  ) {
+    const pct = Math.round((100 * residualKg) / takeoff);
+    let badge = 'Normal';
+    let tone: DebriefPillarTone = 'ok';
+    if (pct < 12) {
+      badge = 'Low';
+      tone = 'warn';
+    } else if (pct > 80) {
+      badge = 'Heavy';
+      tone = 'muted';
+    }
+    return {
+      id: 'fuel',
+      label: 'Fuel',
+      badge,
+      tone,
+      detail: `${pct}% of uplift · ${residualKg} kg left`,
+    };
+  }
+  return {
+    id: 'fuel',
+    label: 'Fuel',
+    badge: 'Residual',
+    tone: 'ok',
+    detail: `${residualKg} kg left`,
+  };
 }
 
 /** Compact debrief line for live weather-ops bonus. */
@@ -255,6 +458,16 @@ export function buildFlightDebrief(opts: {
         : 0;
   const runwayTouch =
     opts.settlement.runwayTouch ?? opts.mission.settledRunwayTouch ?? null;
+  const takeoffFuelKg =
+    typeof opts.mission.fuelUplift?.deliveredKg === 'number' &&
+    Number.isFinite(opts.mission.fuelUplift.deliveredKg) &&
+    opts.mission.fuelUplift.deliveredKg > 0
+      ? Math.round(opts.mission.fuelUplift.deliveredKg)
+      : typeof opts.mission.fuelUplift?.requestedKg === 'number' &&
+          Number.isFinite(opts.mission.fuelUplift.requestedKg) &&
+          opts.mission.fuelUplift.requestedKg > 0
+        ? Math.round(opts.mission.fuelUplift.requestedKg)
+        : null;
   return {
     missionId: opts.mission.id,
     originIcao: opts.mission.originIcao,
@@ -266,6 +479,7 @@ export function buildFlightDebrief(opts: {
     penaltyUsd: opts.settlement.penaltyUsd,
     fuelCostUsd,
     residualFuelKg: opts.settlement.residualFuelKg,
+    takeoffFuelKg,
     landingFpm,
     flightDurationMs,
     flightScore,
@@ -289,6 +503,7 @@ export function buildFlightDebrief(opts: {
       typeof opts.settlement.showClassOpsDebrief === 'boolean'
         ? opts.settlement.showClassOpsDebrief
         : (opts.settlement.classOpsDeltas?.length ?? 0) > 0,
+    impactEnded: opts.settlement.impactEnded === true,
   };
 }
 

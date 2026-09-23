@@ -15,6 +15,7 @@ import {
   cancelMission,
   commitStagedManifest,
   departMission,
+  failMissionImpact,
   LotClaimConflictError,
   normalizeMissionIntent,
   settleMission,
@@ -755,4 +756,45 @@ export function executeCancelMission(
   }
   missions.missions[idx] = cancelled;
   return { kind: 'applied', mission: cancelled };
+}
+
+export type ExecuteFailMissionImpactOpts = {
+  missionId: string;
+  nowMs?: number;
+  message?: string;
+};
+
+export type ExecuteFailMissionImpactResult =
+  | { kind: 'missing' }
+  | { kind: 'closed' }
+  | { kind: 'replay'; mission: MissionIntent }
+  | { kind: 'applied'; mission: MissionIntent };
+
+export function executeFailMissionImpact(
+  world: CareerEconomyWorld,
+  missions: CareerMissionsState,
+  opts: ExecuteFailMissionImpactOpts,
+): ExecuteFailMissionImpactResult {
+  const idx = missions.missions.findIndex((row) => row.id === opts.missionId);
+  if (idx < 0) return { kind: 'missing' };
+  const open = missions.missions[idx]!;
+  if (open.status === 'settled' || open.status === 'cancelled') {
+    return { kind: 'closed' };
+  }
+  if (open.status === 'failed' && open.failReason === 'impact') {
+    return { kind: 'replay', mission: open };
+  }
+  if (open.status === 'failed') {
+    return { kind: 'closed' };
+  }
+  const failed = failMissionImpact(world, open, {
+    fleet: missions,
+    nowMs: opts.nowMs,
+    message: opts.message,
+  });
+  if (open.crewOperated || open.crewMemberId) {
+    releaseCompanyCrewFromMission(missions, failed.id);
+  }
+  missions.missions[idx] = failed;
+  return { kind: 'applied', mission: failed };
 }

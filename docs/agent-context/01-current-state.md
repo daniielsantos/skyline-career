@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **26f2ef05** / desktop **0.3.258** shipped: Fix Ranking va_listed PG query, declutter the page, and simplify Cuts chips. Release: [v0.3.258](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.258).
+
+
 `main` **dd27f26c** / desktop **0.3.257** shipped: Add mid-route crash auto-fail, debrief glance pillars, and VA member brief slides. Release: [v0.3.257](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.257).
 
 

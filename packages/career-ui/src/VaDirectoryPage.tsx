@@ -8,6 +8,7 @@ import {
 import { BusyBlock } from './Busy';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
+import { formatVaCutsPair, VA_CUTS_TOOLTIP } from './va-cuts-copy';
 
 type Props = {
   authRequired: boolean;
@@ -225,15 +226,13 @@ export function VaDirectoryPage(props: Props) {
                         {row.recruiting ? 'Open' : 'Closed'}
                       </span>
                     </div>
-                    <div>
+                    <div className="va-stat-cuts" title={VA_CUTS_TOOLTIP}>
                       <span className="va-stat-label">Cuts</span>
                       <span className="va-stat-value">
-                        {row.memberRouteCutPct != null
-                          ? `${row.memberRouteCutPct}%`
-                          : '—'}
-                        {row.memberAirlineCutPct != null
-                          ? ` / ${row.memberAirlineCutPct}%`
-                          : ''}
+                        {formatVaCutsPair(
+                          row.memberRouteCutPct,
+                          row.memberAirlineCutPct,
+                        )}
                       </span>
                     </div>
                   </div>

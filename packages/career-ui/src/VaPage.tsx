@@ -45,6 +45,7 @@ import { formatBoardMoney } from './board-money';
 import type { WeightSystem } from './weight-units';
 import { getAuthToken } from './career-auth-client';
 import { getStoredCompanyId } from './career-company-client';
+import { VA_CUTS_TOOLTIP } from './va-cuts-copy';
 import { useConfirm } from './ConfirmDialog';
 import {
   logbookAircraftLabel,
@@ -1832,9 +1833,13 @@ export function VaPage(props: Props) {
                 </div>
               </div>
             ) : (
-              <p className="settings-sample va-config-readonly">
+              <p
+                className="settings-sample va-config-readonly"
+                title={VA_CUTS_TOOLTIP}
+              >
                 Market hire <strong>{memberRouteCutPct}%</strong> · airline desk{' '}
                 <strong>{memberAirlineCutPct}%</strong>
+                <span className="muted"> → your home Wallet</span>
               </p>
             )}
             {isOwner ? (

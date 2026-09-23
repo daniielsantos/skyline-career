@@ -14122,6 +14122,10 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   gap: 0.1rem;
   min-width: 3.2rem;
 }
+.va-directory-card-stats > div.va-stat-cuts {
+  min-width: 7.5rem;
+  cursor: help;
+}
 .va-stat-label {
   font-size: 0.65rem;
   letter-spacing: 0.08em;

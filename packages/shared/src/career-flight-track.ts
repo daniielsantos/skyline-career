@@ -39,8 +39,18 @@ export type FlightTrackSnapshot = {
 export const FLIGHT_TRACK_FRESH_MS = 90_000;
 /** Min interval between posted crumbs (matches Watch tick / Live poll). */
 export const FLIGHT_TRACK_POST_MIN_MS = 5_000;
-/** Ignore samples closer than this to the previous point (noise). */
+/**
+ * Cruise crumb spacing (nm). Samples closer only refresh the tip in place.
+ * Kept relatively coarse so MAX_POINTS still covers a long flight.
+ */
 export const FLIGHT_TRACK_MIN_MOVE_NM = 0.35;
+/**
+ * Denser spacing while the trail is still short — taxi / early climb used to
+ * look like a single origin→AC chord until ~0.35 nm accumulated.
+ */
+export const FLIGHT_TRACK_EARLY_MIN_MOVE_NM = 0.12;
+/** Use EARLY_MIN_MOVE while `points.length` is below this (after append count). */
+export const FLIGHT_TRACK_EARLY_POINTS = 15;
 /**
  * Max great-circle jump between consecutive crumbs (~300 kt × 5s ≈ 25 nm;
  * 75 nm still catches teleports without clipping fast jets).
@@ -48,6 +58,13 @@ export const FLIGHT_TRACK_MIN_MOVE_NM = 0.35;
  */
 export const FLIGHT_TRACK_MAX_JUMP_NM = 75;
 export const FLIGHT_TRACK_MAX_POINTS = 180;
+
+/** Crumb threshold for the next append given current trail length. */
+export function flightTrackMinMoveNm(pointCount: number): number {
+  return pointCount < FLIGHT_TRACK_EARLY_POINTS
+    ? FLIGHT_TRACK_EARLY_MIN_MOVE_NM
+    : FLIGHT_TRACK_MIN_MOVE_NM;
+}
 
 type StoreEntry = FlightTrackSnapshot;
 
@@ -243,7 +260,7 @@ export function recordFlightTrackSample(opts: {
       store.set(key, row);
       return { ...row, points: [...row.points] };
     }
-    if (moved < FLIGHT_TRACK_MIN_MOVE_NM) {
+    if (moved < flightTrackMinMoveNm(row.points.length)) {
       // Below crumb threshold: always move the tip in place (do not require
       // POST_MIN). Skipping lat/lon here left Crew Live AC glued while alt/GS
       // still refreshed on the snapshot.

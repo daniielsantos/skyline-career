@@ -765,6 +765,10 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **2026-09-22 (z):** Live meta ok mas AC sumia / ficava atrás do trail. Causa = (1) HTML marker sob DEP; (2) refresh de taxi gravava telemetria mas **mantinha lat/lon do crumb antigo** (`FLIGHT_TRACK_MIN_MOVE`) → linha crescia e AC ficava fixo. Fix = GeoJSON AC na ponta do trail; refresh in-place atualiza lat/lon; tip = sempre `trail[last]`.
 
+**2026-09-22 (aa):** sintoma = En route Dispatch AC colado no origin (SBGR) com voo AIR / fuel live ok; Live map também parado. Causa = (z) passou a limpar AC em `setRouteLine`/`setRouteSegments`, e o paint re-roda a cada tick de `props.aircraft` → wipe vs live effect. En route **não** usa trail VPS — só `watch.position` local; deploy VPS sozinho não move esse AC. Fix = paint OFP/segments não zera mais o AC.
+
+**2026-09-22 (ab):** sintoma = Live com **dois** AC (GeoJSON num crumb, HTML noutro); En route AC sumiu. Causa = (z) deixou HTML marker visual + layer canvas; paint (trail/aircraft) e live effect divergiam no tip. Fix = HTML só hit invisível pro popup; AC visível = só GeoJSON; paint não seta AC nem depende de `props.aircraft` — live effect é dono exclusivo.
+
 **Cobertura esperada (aceitar gaps):**
 
 | Momento | Watch pipe | Live uplink |

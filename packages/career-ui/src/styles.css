@@ -10688,6 +10688,13 @@ span.dispatch-route-hub-dest {
   position: relative;
 }
 
+/* Popup hit only — visible AC is the GeoJSON circle/label layer. */
+.dispatch-route-ac-hit {
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+}
+
 .dispatch-route-ac-dot {
   display: block;
   width: 14px;

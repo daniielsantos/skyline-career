@@ -234,11 +234,12 @@ function isAirportWaypoint(waypoint: DispatchRouteWaypoint): boolean {
 
 function aircraftMarkerEl(): HTMLDivElement {
   const el = document.createElement('div');
-  el.className = 'dispatch-route-ac';
+  // Invisible hit target for the popup only — visible AC is the GeoJSON layer.
+  // Showing both drew two "AC" icons whenever paint and the live effect briefly
+  // disagreed on the tip (common while the trail grows).
+  el.className = 'dispatch-route-ac dispatch-route-ac-hit';
   el.title = 'Aircraft';
   el.setAttribute('aria-label', 'Aircraft position');
-  el.innerHTML =
-    '<span class="dispatch-route-ac-dot" aria-hidden="true"></span><span class="dispatch-route-ac-label">AC</span>';
   return el;
 }
 
@@ -437,7 +438,7 @@ function setTrailAndPlannedOd(
   } else {
     ferrySource?.setData({ type: 'FeatureCollection', features: [] });
   }
-  setAircraftOnMap(map, tip);
+  // AC is owned exclusively by the live-aircraft effect — do not set it here.
 }
 
 function emptyLineFeature() {
@@ -456,7 +457,9 @@ function setRouteLine(
 ): void {
   ensureRouteLayer(map);
   ensureFerryLayer(map);
-  setAircraftOnMap(map, null);
+  // Do not clear or set AC here — En route paint re-runs on route/trail changes
+  // and must not fight the live-aircraft effect (that race left En route blank
+  // or Live with two ACs). Live trail tip path updates ferry via setTrailAndPlannedOd.
   const source = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   const ferry = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
   ferry?.setData({ type: 'FeatureCollection', features: [] });
@@ -478,7 +481,6 @@ function setRouteLine(
 function setRouteSegments(map: Map, segments: DispatchRouteSegment[]): void {
   ensureRouteLayer(map);
   ensureFerryLayer(map);
-  setAircraftOnMap(map, null);
   const cargoSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   const ferrySource = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
   const cargoFeatures: Array<{
@@ -665,9 +667,10 @@ export function DispatchRouteMap(props: {
         }
 
         // Route gone → drop aircraft; live effect will recreate if needed.
-        if (!dest && !segments && !trail) {
+        if (!dest && !segments && !trail && !props.aircraft) {
           aircraftMarkerRef.current?.remove();
           aircraftMarkerRef.current = null;
+          setAircraftOnMap(map, null);
         }
 
         const originKind = props.originRole ?? 'dep';
@@ -860,7 +863,8 @@ export function DispatchRouteMap(props: {
     props.segments,
     props.trail,
     props.plannedOd,
-    props.aircraft,
+    // Intentionally omit props.aircraft — position ticks belong to the live
+    // effect. Re-painting the OFP route on every Watch sample fought the AC layer.
     props.originRole,
   ]);
 

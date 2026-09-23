@@ -298,7 +298,9 @@ export function CompanyNetworkMap(props: Props) {
       const label =
         node.kind === 'fbo'
           ? node.title
-          : `${node.primaryHubIcao} · Warehouse`;
+          : node.kind === 'hq'
+            ? `${node.primaryHubIcao} · HQ`
+            : `${node.primaryHubIcao} · Warehouse`;
       el.title = label;
       el.setAttribute('aria-label', label);
       el.addEventListener('click', (event) => {
@@ -317,7 +319,11 @@ export function CompanyNetworkMap(props: Props) {
                 className: 'hub-map-popup',
               }).setHTML(
                 `<strong>${label}</strong><br/>${
-                  node.kind === 'fbo' ? 'Port FBO' : 'Company warehouse'
+                  node.kind === 'fbo'
+                    ? 'Port FBO'
+                    : node.kind === 'hq'
+                      ? 'Headquarters'
+                      : 'Company warehouse'
                 }`,
               ),
             )

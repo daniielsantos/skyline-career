@@ -2,7 +2,7 @@ import type { PortsSnapshot } from './api';
 
 export type CompanyNetworkNode = {
   id: string;
-  kind: 'fbo' | 'wh';
+  kind: 'fbo' | 'wh' | 'hq';
   title: string;
   subtitle: string;
   portId: string | null;

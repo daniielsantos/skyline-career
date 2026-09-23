@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-23: **Airlines profile map** — directory → perfil (HQ + ports/WH no mapa). Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
 Atualizado 2026-09-23: **Ranking PG COALESCE + declutter** — `va_listed IS TRUE`; UI sem Refresh/essays. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 Atualizado 2026-09-23: **VA member brief stepper** — My VA card em 4 slides (Wallets/Cuts/Progression/Jobs). Spec note em [`16-va-logistics.md`](./16-va-logistics.md).

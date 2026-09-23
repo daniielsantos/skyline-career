@@ -1,6 +1,14 @@
-/** Shared FBO / WH glyphs for Company network chips and map markers. */
+/** Shared FBO / WH / HQ glyphs for Company network chips and map markers. */
 
-export function companyNetworkIconSvg(kind: 'fbo' | 'wh'): string {
+export type CompanyNetworkIconKind = 'fbo' | 'wh' | 'hq';
+
+export function companyNetworkIconSvg(kind: CompanyNetworkIconKind): string {
+  if (kind === 'hq') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <circle cx="12" cy="12" r="9" fill="#6aa8d8" fill-opacity="0.22" stroke="#6aa8d8" stroke-width="1.6"/>
+  <path d="M12 6.5 13.8 11.2 18.8 11.5 14.9 14.7 16.2 19.5 12 16.8 7.8 19.5 9.1 14.7 5.2 11.5 10.2 11.2Z" fill="#6aa8d8"/>
+</svg>`;
+  }
   if (kind === 'fbo') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
   <rect x="3" y="10" width="18" height="10" rx="1.5" fill="#f0a35a" opacity="0.35"/>
@@ -19,7 +27,31 @@ export function companyNetworkIconSvg(kind: 'fbo' | 'wh'): string {
 </svg>`;
 }
 
-export function NetworkChipIcon(props: { kind: 'fbo' | 'wh' }) {
+export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
+  if (props.kind === 'hq') {
+    return (
+      <svg
+        className="va-company-network-chip-icon va-company-network-chip-icon-hq"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          fill="currentColor"
+          fillOpacity="0.18"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+        <path
+          d="M12 6.5 13.8 11.2 18.8 11.5 14.9 14.7 16.2 19.5 12 16.8 7.8 19.5 9.1 14.7 5.2 11.5 10.2 11.2Z"
+          fill="currentColor"
+        />
+      </svg>
+    );
+  }
   if (props.kind === 'fbo') {
     return (
       <svg
@@ -107,7 +139,7 @@ export function NetworkChipIcon(props: { kind: 'fbo' | 'wh' }) {
 }
 
 export function companyNetworkMarkerElement(
-  kind: 'fbo' | 'wh',
+  kind: CompanyNetworkIconKind,
   selected: boolean,
 ): HTMLButtonElement {
   const el = document.createElement('button');
@@ -115,7 +147,14 @@ export function companyNetworkMarkerElement(
   el.className = `va-company-network-map-marker is-${kind}${
     selected ? ' is-selected' : ''
   }`;
-  const size = kind === 'fbo' ? (selected ? 40 : 36) : selected ? 36 : 32;
+  const size =
+    kind === 'fbo' || kind === 'hq'
+      ? selected
+        ? 40
+        : 36
+      : selected
+        ? 36
+        : 32;
   el.style.width = `${size}px`;
   el.style.height = `${size}px`;
   const img = document.createElement('img');

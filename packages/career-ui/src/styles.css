@@ -14230,6 +14230,23 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   align-items: center;
   flex: 1 1 18rem;
 }
+.va-directory-card-open {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.va-directory-card-open:hover .va-directory-card-name {
+  color: var(--accent);
+}
+.va-directory-card-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, var(--ink));
+  outline-offset: 3px;
+}
 .va-directory-card-id {
   display: grid;
   gap: 0.15rem;
@@ -14770,8 +14787,48 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   filter: drop-shadow(0 0 6px rgba(94, 200, 192, 0.65));
 }
 
+.va-company-network-map-marker.is-hq.is-selected {
+  filter: drop-shadow(0 0 6px rgba(106, 168, 216, 0.7));
+}
+
 .va-company-network-chip-icon-wh {
   color: #5ec8c0;
+}
+
+.va-company-network-chip-icon-hq {
+  color: #6aa8d8;
+}
+
+.va-airline-profile {
+  display: grid;
+  gap: 0.85rem;
+}
+.va-airline-profile-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+.va-airline-profile-head {
+  display: grid;
+  gap: 0.65rem;
+}
+.va-airline-profile-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.va-airline-profile-stats {
+  margin: 0;
+}
+.va-airline-profile-empty {
+  margin: 0;
+}
+.va-airline-profile-network .va-company-network-map {
+  min-height: 26rem;
 }
 
 .ports-fbo-network {

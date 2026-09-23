@@ -8,7 +8,7 @@ import {
 
 export type CompanyNetworkNode = {
   id: string;
-  kind: 'fbo' | 'wh';
+  kind: 'fbo' | 'wh' | 'hq';
   title: string;
   subtitle: string;
   portId: string | null;
@@ -164,8 +164,64 @@ export function buildCompanyNetworkNodesFromState(
   }
 
   nodes.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind === 'fbo' ? -1 : 1;
+    if (a.kind !== b.kind) {
+      const order = { hq: 0, fbo: 1, wh: 2 } as const;
+      return order[a.kind] - order[b.kind];
+    }
     return a.title.localeCompare(b.title);
   });
   return nodes;
+}
+
+/**
+ * Public Airlines profile footprint: HQ pin + Port FBOs + WHs.
+ * Stock free/capacity redacted (locations only).
+ */
+export function buildPublicAirlineNetworkNodes(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState,
+  opts: { companyId: string; homeHubIcao?: string | null },
+): CompanyNetworkNode[] {
+  const base = buildCompanyNetworkNodesFromState(
+    world,
+    state,
+    opts.companyId,
+  ).map((n) => ({
+    ...n,
+    freeKg: null,
+    capacityKg: null,
+    subtitle:
+      n.kind === 'fbo'
+        ? `Port FBO P${n.level ?? 1}`
+        : n.kind === 'wh'
+          ? 'Warehouse'
+          : n.subtitle,
+  }));
+
+  const hq = opts.homeHubIcao?.trim().toUpperCase();
+  if (!hq) return base;
+  const coords = hubCoords(hq, world);
+  if (!coords) return base;
+  const covered = base.some(
+    (n) =>
+      n.primaryHubIcao === hq ||
+      n.hubIcaos.some((h) => h === hq),
+  );
+  if (covered) return base;
+
+  const hqNode: CompanyNetworkNode = {
+    id: `hq:${hq}`,
+    kind: 'hq',
+    title: hq,
+    subtitle: 'Headquarters',
+    portId: null,
+    hubIcaos: [hq],
+    primaryHubIcao: hq,
+    lat: coords.lat,
+    lon: coords.lon,
+    level: null,
+    freeKg: null,
+    capacityKg: null,
+  };
+  return [hqNode, ...base];
 }

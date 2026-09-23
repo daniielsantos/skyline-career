@@ -73,6 +73,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Lists only companies that published — not every company in the world.',
+      'Open a card for the airline profile: HQ, Port FBOs, and warehouses on the map.',
       'Joining keeps your personal company, wallet, and fleet. Early value is company aircraft + cut; Port FBO desk/Hauls come after the company builds WH T3 and claims a port.',
       'Quality chip is settle flight score + on-time over ~7 days (needs a few flights).',
       'Request to join when hiring is open, or use a private invite code anytime.',

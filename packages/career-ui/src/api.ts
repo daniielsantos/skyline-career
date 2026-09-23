@@ -5317,7 +5317,7 @@ export type VaHaulMission = {
 /** Light company footprint from GET /api/va/hauls (no /api/ports write). */
 export type VaCompanyNetworkNode = {
   id: string;
-  kind: 'fbo' | 'wh';
+  kind: 'fbo' | 'wh' | 'hq';
   title: string;
   subtitle: string;
   portId: string | null;
@@ -5673,6 +5673,15 @@ export function fetchVaDirectory(opts?: { includeClosed?: boolean }) {
     directory: VaDirectoryEntry[];
     memberOfVaCompanyId: string | null;
   }>(`/api/va/directory${q}`);
+}
+
+export function fetchVaAirlineProfile(companyId: string) {
+  const id = encodeURIComponent(companyId.trim());
+  return api<{
+    airline: VaDirectoryEntry;
+    network: VaCompanyNetworkNode[];
+    memberOfVaCompanyId: string | null;
+  }>(`/api/va/profile/${id}`);
 }
 
 export function postVaJoinRequest(companyId: string) {

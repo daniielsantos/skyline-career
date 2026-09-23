@@ -33,6 +33,7 @@ function nodeRoomLine(
   n: CompanyNetworkNode,
   weightSystem: WeightSystem,
 ): string {
+  if (n.kind === 'hq') return 'Headquarters';
   if (n.freeKg != null && n.capacityKg != null) {
     const room = `${formatMass(n.freeKg, weightSystem)} free / ${formatMass(
       n.capacityKg,
@@ -65,12 +66,17 @@ export function VaCompanyNetwork(props: Props) {
   const multi = nodes.length > 1;
   const whCount = nodes.filter((n) => n.kind === 'wh').length;
   const fboCount = nodes.filter((n) => n.kind === 'fbo').length;
+  const hqCount = nodes.filter((n) => n.kind === 'hq').length;
   const detail = selected
     ? nodeRoomLine(selected, weightSystem)
     : multi
-      ? `${fboCount} Port FBO${fboCount === 1 ? '' : 's'} · ${whCount} WH${
-          whCount === 1 ? '' : 's'
-        } · select a node to filter desk work`
+      ? [
+          hqCount > 0 ? `${hqCount} HQ` : null,
+          `${fboCount} Port FBO${fboCount === 1 ? '' : 's'}`,
+          `${whCount} WH${whCount === 1 ? '' : 's'}`,
+        ]
+          .filter(Boolean)
+          .join(' · ') + ' · select a node to filter desk work'
       : nodes[0]
         ? nodeRoomLine(nodes[0], weightSystem)
         : '';
@@ -123,7 +129,7 @@ export function VaCompanyNetwork(props: Props) {
               <NetworkChipIcon kind={n.kind} />
               <span className="va-company-network-chip-text">
                 <span className="va-company-network-chip-kind">
-                  {n.kind === 'fbo' ? 'FBO' : 'WH'}
+                  {n.kind === 'fbo' ? 'FBO' : n.kind === 'hq' ? 'HQ' : 'WH'}
                 </span>
                 <span className="va-company-network-chip-title">{n.title}</span>
                 <span className="va-company-network-chip-sub muted">
@@ -131,7 +137,9 @@ export function VaCompanyNetwork(props: Props) {
                     ? `P${n.level ?? 1}${
                         n.primaryHubIcao ? ` · ${n.primaryHubIcao}` : ''
                       }`
-                    : n.primaryHubIcao}
+                    : n.kind === 'hq'
+                      ? 'Home'
+                      : n.primaryHubIcao}
                 </span>
               </span>
             </button>

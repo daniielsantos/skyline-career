@@ -194,6 +194,7 @@ import {
   listAirlineDeskMissions,
   isVaAirlineLaborMission,
   buildCompanyNetworkNodesFromState,
+  buildPublicAirlineNetworkNodes,
   vaDayKeyFromTick,
   VA_RANKING_WINDOW_DAYS,
   VA_FLIGHT_QUALITY_WINDOW_DAYS,
@@ -5213,6 +5214,81 @@ export function createCareerApiServer(port = 8787) {
           directory,
           memberOfVaCompanyId: listedMembership?.companyId ?? null,
         });
+        return;
+      }
+
+      const vaProfileMatch = path.match(/^\/api\/va\/profile\/([^/]+)$/i);
+      if (req.method === 'GET' && vaProfileMatch) {
+        if (!store?.supportsAuth) {
+          send(res, 501, { error: 'VA requires auth store' });
+          return;
+        }
+        const session = authSessionFromRequest(req);
+        if (!session) {
+          send(res, 401, {
+            error: 'Authentication required',
+            code: 'auth_required',
+          });
+          return;
+        }
+        const profileCompanyId = decodeURIComponent(
+          vaProfileMatch[1] ?? '',
+        ).trim();
+        if (!profileCompanyId) {
+          send(res, 400, { error: 'companyId required' });
+          return;
+        }
+        try {
+          const listed = await Promise.resolve(
+            store.vaIsListed(profileCompanyId),
+          );
+          if (!listed) {
+            send(res, 404, { error: 'Airline not listed' });
+            return;
+          }
+          const world = store.peekEconomyWorld();
+          const worldId = world?.worldId || undefined;
+          const directoryRaw = await Promise.resolve(
+            store.vaDirectory({
+              worldId,
+              accountId: session.account.id,
+              includeClosed: true,
+              limit: 100,
+            }),
+          );
+          const entry = directoryRaw.find(
+            (row) => row.companyId === profileCompanyId,
+          );
+          if (!entry) {
+            send(res, 404, { error: 'Airline not found' });
+            return;
+          }
+          const missions = await store.loadMissions({
+            companyId: profileCompanyId,
+          });
+          const network =
+            world != null
+              ? buildPublicAirlineNetworkNodes(world, missions, {
+                  companyId: profileCompanyId,
+                  homeHubIcao: entry.homeHubIcao,
+                })
+              : [];
+          const listedMembership = await Promise.resolve(
+            store.vaListedMembership(session.account.id),
+          );
+          send(res, 200, {
+            airline: {
+              ...entry,
+              orgPerks: resolveVaOrgPerks(entry.flightQuality ?? null),
+            },
+            network,
+            memberOfVaCompanyId: listedMembership?.companyId ?? null,
+          });
+        } catch (err) {
+          send(res, 400, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
         return;
       }
 

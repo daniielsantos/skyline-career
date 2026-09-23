@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  fetchVaAirlineProfile,
   fetchVaDirectory,
   postVaJoin,
   postVaJoinRequest,
+  type VaCompanyNetworkNode,
   type VaDirectoryEntry,
 } from './api';
 import { BusyBlock } from './Busy';
 import { getAuthToken } from './career-auth-client';
-import { getStoredCompanyId } from './career-company-client';
 import { formatVaCutsPair, VA_CUTS_TOOLTIP } from './va-cuts-copy';
+import { VaAirlineProfilePanel } from './VaAirlineProfilePanel';
 
 type Props = {
   authRequired: boolean;
@@ -21,7 +23,6 @@ type Props = {
 
 export function VaDirectoryPage(props: Props) {
   const token = getAuthToken();
-  const companyId = props.activeCompanyId || getStoredCompanyId();
   const canShow = Boolean(token) || props.authRequired;
   const [directory, setDirectory] = useState<VaDirectoryEntry[]>([]);
   const [memberOfVaCompanyId, setMemberOfVaCompanyId] = useState<string | null>(
@@ -32,6 +33,14 @@ export function VaDirectoryPage(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileAirline, setProfileAirline] = useState<VaDirectoryEntry | null>(
+    null,
+  );
+  const [profileNetwork, setProfileNetwork] = useState<VaCompanyNetworkNode[]>(
+    [],
+  );
+  const [profileBusy, setProfileBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!canShow) {
@@ -53,6 +62,25 @@ export function VaDirectoryPage(props: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const openProfile = useCallback(async (companyIdToOpen: string) => {
+    setProfileBusy(true);
+    setError(null);
+    setProfileId(companyIdToOpen);
+    try {
+      const r = await fetchVaAirlineProfile(companyIdToOpen);
+      setProfileAirline(r.airline);
+      setProfileNetwork(r.network);
+      setMemberOfVaCompanyId(r.memberOfVaCompanyId ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setProfileId(null);
+      setProfileAirline(null);
+      setProfileNetwork([]);
+    } finally {
+      setProfileBusy(false);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -77,6 +105,53 @@ export function VaDirectoryPage(props: Props) {
     return (
       <section className="panel va-panel va-panel-loading">
         <BusyBlock label="Loading airlines…" />
+      </section>
+    );
+  }
+
+  if (profileId && profileBusy && !profileAirline) {
+    return (
+      <section className="panel va-panel va-panel-loading">
+        <BusyBlock label="Loading airline…" />
+      </section>
+    );
+  }
+
+  if (profileId && profileAirline) {
+    return (
+      <section className="panel va-panel va-directory-panel">
+        {error ? (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <VaAirlineProfilePanel
+          airline={profileAirline}
+          network={profileNetwork}
+          alreadyInVa={alreadyInVa}
+          busy={busy || profileBusy}
+          onBack={() => {
+            setProfileId(null);
+            setProfileAirline(null);
+            setProfileNetwork([]);
+            setError(null);
+          }}
+          onRequestJoin={() => {
+            void (async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                await postVaJoinRequest(profileAirline.companyId);
+                await openProfile(profileAirline.companyId);
+                await refresh();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err));
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+        />
       </section>
     );
   }
@@ -166,7 +241,11 @@ export function VaDirectoryPage(props: Props) {
               row.myRequestStatus !== 'accepted';
             return (
               <li key={row.companyId} className="va-directory-card">
-                <div className="va-directory-card-main">
+                <button
+                  type="button"
+                  className="va-directory-card-main va-directory-card-open"
+                  onClick={() => void openProfile(row.companyId)}
+                >
                   <div className="va-directory-card-id">
                     <div className="va-directory-card-title-row">
                       <strong className="va-directory-card-name">
@@ -236,7 +315,7 @@ export function VaDirectoryPage(props: Props) {
                       </span>
                     </div>
                   </div>
-                </div>
+                </button>
                 <div className="va-directory-card-actions">
                   {row.myRequestStatus === 'pending' ? (
                     <span className="va-directory-pending">Request pending</span>
@@ -246,7 +325,8 @@ export function VaDirectoryPage(props: Props) {
                       type="button"
                       className="action"
                       disabled={busy}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         void (async () => {
                           setBusy(true);
                           setError(null);
@@ -267,7 +347,15 @@ export function VaDirectoryPage(props: Props) {
                     >
                       Request join
                     </button>
-                  ) : null}
+                  ) : (
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void openProfile(row.companyId)}
+                    >
+                      View
+                    </button>
+                  )}
                 </div>
               </li>
             );

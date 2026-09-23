@@ -1,4 +1,7 @@
-# Current state (2026-09-22)
+# Current state (2026-09-23)
+
+`main` **b49ad4f4** / desktop **0.3.240** shipped: Restore Crew Live via soft Watch sample uplink to the VPS. Release: [v0.3.240](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.240).
+
 
 `main` **61922c66** / desktop **0.3.239** shipped: Restore Watch pipe reclaim after Ready and stop false NOT AT ORIGIN airborne fails. Release: [v0.3.239](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.239).
 

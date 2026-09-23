@@ -77,6 +77,7 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hauls Active align + pilot (2026-09-22):** sintoma = Active desalinhado do Open desk (2 cols vs 3); sem piloto; colado no rodapé. Causa = `va-hauls-row-active` grid curto + Aircraft dentro dos stats; pane sem padding. Fix = mesmo grid 3 cols (route | stats | aircraft RO); stats = Cargo/Mass/Dist/Pay/Status/Pilot (`pilotName` no `/api/va/hauls`); padding-bottom no pane.
 **Hauls Open↔Active column align (2026-09-22):** sintoma = Cargo/Mass/Dist/Pay/Expires|Status/By|Pilot ainda desalinhados entre as duas listas. Causa = 3ª track `auto` (Prepare+select largo no Open, só tail no Active) → `1fr` do meio diferente por row → 6 stats não batem. Fix = tracks fixas `10.75rem | 1fr | 20rem` + stats `repeat(6, minmax(0,1fr))`.
+**Hauls actions fit (2026-09-22):** sintoma = select do avião truncava contra Prepare/Cancel. Causa = gaps largos (row 1.1rem / stats 0.75rem) + actions `20rem` + wrap. Fix = gaps menores; actions `24rem`; flex nowrap (select `1 1 auto`, botões `0 0 auto`).
 
 **My VA pane height jump (2026-09-22):** sintoma = alternar Roster/Hangar/Hauls/Ports/… mudava a altura da página. Causa = só Ports forçava fill (`:has(.va-ports-pane)`); panes curtas shrink-wrap. Fix = `va-panel-shell` + `va-pane-body` preenchem `main-content` em todas as abas.
 

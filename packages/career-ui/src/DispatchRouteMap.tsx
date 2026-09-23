@@ -26,6 +26,7 @@ const FERRY_LINE_COLOR = '#f0a35a';
 const AC_SOURCE_ID = 'dispatch-route-ac';
 const AC_LAYER_DOT_ID = 'dispatch-route-ac-dot';
 const AC_LAYER_HALO_ID = 'dispatch-route-ac-halo';
+/** Legacy symbol layer from 0.3.241–242 — strip if a long-lived map still has it. */
 const AC_LAYER_LABEL_ID = 'dispatch-route-ac-label';
 const AC_DOT_COLOR = '#7dd3fc';
 
@@ -232,17 +233,6 @@ function isAirportWaypoint(waypoint: DispatchRouteWaypoint): boolean {
   return String(waypoint.type ?? '').toLowerCase() === 'airport';
 }
 
-function aircraftMarkerEl(): HTMLDivElement {
-  const el = document.createElement('div');
-  // Invisible hit target for the popup only — visible AC is the GeoJSON layer.
-  // Showing both drew two "AC" icons whenever paint and the live effect briefly
-  // disagreed on the tip (common while the trail grows).
-  el.className = 'dispatch-route-ac dispatch-route-ac-hit';
-  el.title = 'Aircraft';
-  el.setAttribute('aria-label', 'Aircraft position');
-  return el;
-}
-
 function ensureRouteLayer(map: Map): void {
   if (map.getSource(ROUTE_SOURCE_ID)) return;
   map.addSource(ROUTE_SOURCE_ID, {
@@ -302,51 +292,38 @@ function ensureFerryLayer(map: Map): void {
 }
 
 function ensureAcLayer(map: Map): void {
-  if (map.getSource(AC_SOURCE_ID)) return;
-  map.addSource(AC_SOURCE_ID, {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-  });
-  map.addLayer({
-    id: AC_LAYER_HALO_ID,
-    type: 'circle',
-    source: AC_SOURCE_ID,
-    paint: {
-      'circle-radius': 11,
-      'circle-color': AC_DOT_COLOR,
-      'circle-opacity': 0.28,
-      'circle-stroke-width': 0,
-    },
-  });
-  map.addLayer({
-    id: AC_LAYER_DOT_ID,
-    type: 'circle',
-    source: AC_SOURCE_ID,
-    paint: {
-      'circle-radius': 6,
-      'circle-color': AC_DOT_COLOR,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#0b0b0c',
-    },
-  });
-  map.addLayer({
-    id: AC_LAYER_LABEL_ID,
-    type: 'symbol',
-    source: AC_SOURCE_ID,
-    layout: {
-      'text-field': 'AC',
-      'text-size': 11,
-      'text-offset': [0, 1.15],
-      'text-anchor': 'top',
-      'text-allow-overlap': true,
-      'text-ignore-placement': true,
-    },
-    paint: {
-      'text-color': '#e8f7ff',
-      'text-halo-color': '#0b0b0c',
-      'text-halo-width': 1.5,
-    },
-  });
+  if (!map.getSource(AC_SOURCE_ID)) {
+    map.addSource(AC_SOURCE_ID, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+    map.addLayer({
+      id: AC_LAYER_HALO_ID,
+      type: 'circle',
+      source: AC_SOURCE_ID,
+      paint: {
+        'circle-radius': 11,
+        'circle-color': AC_DOT_COLOR,
+        'circle-opacity': 0.28,
+        'circle-stroke-width': 0,
+      },
+    });
+    map.addLayer({
+      id: AC_LAYER_DOT_ID,
+      type: 'circle',
+      source: AC_SOURCE_ID,
+      paint: {
+        'circle-radius': 6,
+        'circle-color': AC_DOT_COLOR,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#0b0b0c',
+      },
+    });
+  }
+  // Drop the old "AC" text layer (caused double labels with the HTML marker).
+  if (map.getLayer(AC_LAYER_LABEL_ID)) {
+    map.removeLayer(AC_LAYER_LABEL_ID);
+  }
 }
 
 function setAircraftOnMap(
@@ -577,7 +554,7 @@ export function DispatchRouteMap(props: {
   plannedOd?: boolean;
   /** Live aircraft position from Watch — updated without re-fitting the route. */
   aircraft?: DispatchAircraftPosition | null;
-  /** Popup title for the aircraft marker. */
+  /** Unused — kept for callers; AC is a GeoJSON dot only (no popup label). */
   aircraftLabel?: string | null;
   /** Origin marker role — FBO base vs departure. */
   originRole?: 'dep' | 'fbo';
@@ -597,7 +574,6 @@ export function DispatchRouteMap(props: {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Marker[]>([]);
-  const aircraftMarkerRef = useRef<Marker | null>(null);
   const fittedRouteKeyRef = useRef<string | null>(null);
   const onSelectRef = useRef(props.onSelectAirport);
   onSelectRef.current = props.onSelectAirport;
@@ -627,8 +603,6 @@ export function DispatchRouteMap(props: {
       resizeObserver?.disconnect();
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
-      aircraftMarkerRef.current?.remove();
-      aircraftMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
       fittedRouteKeyRef.current = null;
@@ -668,8 +642,6 @@ export function DispatchRouteMap(props: {
 
         // Route gone → drop aircraft; live effect will recreate if needed.
         if (!dest && !segments && !trail && !props.aircraft) {
-          aircraftMarkerRef.current?.remove();
-          aircraftMarkerRef.current = null;
           setAircraftOnMap(map, null);
         }
 
@@ -868,51 +840,15 @@ export function DispatchRouteMap(props: {
     props.originRole,
   ]);
 
-  // Live aircraft — glued to trail tip; do not refit bounds.
+  // Live aircraft — GeoJSON tip only (no HTML marker / "AC" label).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const sync = () => {
       const tip = resolveLiveTip(props.trail, props.aircraft);
-      if (!tip) {
-        aircraftMarkerRef.current?.remove();
-        aircraftMarkerRef.current = null;
-        setAircraftOnMap(map, null);
-        return;
-      }
       setAircraftOnMap(map, tip);
-      const lngLat: [number, number] = [tip.lon, tip.lat];
-      // No pixel offset — canvas AC layer is the source of truth; HTML marker
-      // only carries the popup and must sit on the same tip.
-      if (aircraftMarkerRef.current) {
-        aircraftMarkerRef.current.setLngLat(lngLat);
-        aircraftMarkerRef.current.setOffset([0, 0]);
-        aircraftMarkerRef.current.getElement().style.zIndex = '4';
-      } else {
-        const title = props.aircraftLabel?.trim() || 'Aircraft';
-        const marker = new Marker({
-          element: aircraftMarkerEl(),
-          anchor: 'center',
-          offset: [0, 0],
-        })
-          .setLngLat(lngLat)
-          .setPopup(
-            new Popup({
-              offset: 12,
-              closeButton: false,
-              className: 'dispatch-route-popup',
-            }).setHTML(
-              `<strong>${title}</strong><br/>${
-                props.aircraftLabel?.trim() ? 'En route' : 'Live position'
-              }`,
-            ),
-          )
-          .addTo(map);
-        marker.getElement().style.zIndex = '4';
-        aircraftMarkerRef.current = marker;
-      }
-      if (props.plannedOd && props.dest) {
+      if (tip && props.plannedOd && props.dest) {
         setTrailAndPlannedOd(
           map,
           props.origin,
@@ -928,7 +864,6 @@ export function DispatchRouteMap(props: {
     else map.once('load', sync);
   }, [
     props.aircraft,
-    props.aircraftLabel,
     props.plannedOd,
     props.dest,
     props.origin,

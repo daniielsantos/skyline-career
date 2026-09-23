@@ -769,6 +769,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **2026-09-22 (ab):** sintoma = Live com **dois** AC (GeoJSON num crumb, HTML noutro); En route AC sumiu. Causa = (z) deixou HTML marker visual + layer canvas; paint (trail/aircraft) e live effect divergiam no tip. Fix = HTML só hit invisível pro popup; AC visível = só GeoJSON; paint não seta AC nem depende de `props.aircraft` — live effect é dono exclusivo.
 
+**2026-09-22 (ac):** sintoma = Live ainda com label **AC** duplicado sob a bolinha. Causa = layer symbol `text-field: AC` + residual do HTML. Fix = só halo+dot GeoJSON; remove HTML marker e layer de label (strip legado se o mapa ainda tiver).
+
 **Cobertura esperada (aceitar gaps):**
 
 | Momento | Watch pipe | Live uplink |

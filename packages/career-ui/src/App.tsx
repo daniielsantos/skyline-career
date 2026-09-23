@@ -11793,14 +11793,18 @@ export function App() {
         setToast(
           result.returnedToMarket
             ? `Cancelled · ${formatTonnes(result.releasedKg)} released · ${tourHint}`
-            : `Cancelled · ${tourHint}`,
+            : result.returnedToWarehouse
+              ? `Cancelled · cargo returned to warehouse · ${tourHint}`
+              : `Cancelled · ${tourHint}`,
         );
       } else {
         setToastKind(result.warning ? 'warn' : 'ok');
         setToast(
           result.returnedToMarket
             ? `Cancelled · ${formatTonnes(result.releasedKg)} released to market`
-            : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
+            : result.returnedToWarehouse
+              ? 'Cancelled · cargo returned to warehouse at origin'
+              : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
         );
       }
       goToTab('staging');

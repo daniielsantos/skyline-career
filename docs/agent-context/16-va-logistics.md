@@ -69,6 +69,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hauls Open desk Cancel + layout (2026-09-22):** Hold = reserva de stock/Demand até Accept ou TTL. UI Hauls tinha Accept mas sem Cancel. Fix = Cancel (bridge/haul/demand cancel APIs + `companyId`); row em grid (rota+kind+meta | actions).
 
+**Cancel Haul false “lot pruned” toast (2026-09-22):** sintoma = cancel missão Haul (via hold) → warn “shipment lot had already been pruned or reset”. Causa = `/api/cancel` só olha `world.lots`; Haul usa id sintético `whhaul_*` e no cancel `depositCargoToWarehouse` (hold já foi consumido no Accept — **não** recria Open desk). Fix = `returnedToWarehouse` + warning null pra Haul/Bridge/Demand; toast “cargo returned to warehouse at origin”.
+
 **Desk hold TTL visible (2026-09-22):** sintoma = Open desk / WH holds sem countdown; só Demand no board mostrava expiry. Causa = `GET /api/va/hauls` omitia `expiresAtTick`; help dizia só Accept/Cancel. Fix = API + meta “Nh left” (urgente ≤2h); Manifest herda; Ports “left”; help cita TTL (Demand capped pelo order).
 
 **Open desk column align (2026-09-22):** sintoma = meta em flex (`·`) desalinhava Mass/Dist/Pay entre rows; Expires sumia no print antigo. Fix = stats grid rotulado (Cargo/Mass/Dist/Pay/Expires/By) como Airlines; Expires sempre (Demand = hold capped pelo order).

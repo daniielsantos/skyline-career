@@ -4329,6 +4329,8 @@ export function postCancel(opts: { missionId: string; companyId?: string }) {
     walletUsd: number;
     releasedKg: number;
     returnedToMarket: boolean;
+    /** Haul/Bridge/Demand cancel deposited cargo back to origin WH (not Open desk). */
+    returnedToWarehouse?: boolean;
     warning?: string | null;
     activeTour?: ActiveTourView | null;
   }>('/api/cancel', {

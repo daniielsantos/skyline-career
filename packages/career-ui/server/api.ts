@@ -13219,6 +13219,21 @@ export function createCareerApiServer(port = 8787) {
             const returnedToMarket = charter
               ? charterOffer?.status === 'available'
               : releasedKg > 0 && anyReturned;
+            // Haul/Bridge/Demand never touch world.lots — cancel deposits kg
+            // back to the origin warehouse (hold was already consumed on Accept).
+            const returnedToWarehouse = Boolean(
+              !charter &&
+                (existing.warehouseHaul ||
+                  existing.warehouseBridge ||
+                  existing.demandOrderId) &&
+                (existing.cargoKg ?? 0) > 0,
+            );
+            const noBoardLot =
+              charter ||
+              returnedToWarehouse ||
+              Boolean(existing.portPickupId) ||
+              Boolean(existing.emptyFlight) ||
+              Boolean(existing.crewDeadhead);
             syncActiveTour(missions, world);
             syncCharterActiveTour(missions, world);
             return {
@@ -13227,7 +13242,9 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               releasedKg,
               returnedToMarket,
+              returnedToWarehouse,
               foundBefore: charter ? 1 : foundBefore,
+              noBoardLot,
               charter,
               activeTour: activeTourView(missions, world),
               charterActiveTour: charterActiveTourView(missions, world),
@@ -13250,10 +13267,11 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: result.walletUsd,
             releasedKg: result.releasedKg,
             returnedToMarket: result.returnedToMarket,
+            returnedToWarehouse: result.returnedToWarehouse ?? false,
             activeTour: result.activeTour ?? null,
             charterActiveTour: result.charterActiveTour ?? null,
             warning:
-              result.charter
+              result.charter || result.noBoardLot
                 ? null
                 : result.foundBefore > 0
                 ? result.returnedToMarket

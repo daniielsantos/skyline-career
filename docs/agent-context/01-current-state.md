@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **b40f55fc** / desktop **0.3.251** shipped: Shorten MX burn Dispatch banners to one line. Release: [v0.3.251](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.251).
+
+
 `main` **7348c436** / desktop **0.3.250** shipped: Stop Live map pan stutter from trail poll fighting MapLibre. Release: [v0.3.250](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.250).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **e8729a24** / desktop **0.3.267** shipped: Replace hangar assigned prose with an in-flight corner mark. Release: [v0.3.267](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.267).
+
+
 `main` **dc9fcfa7** / desktop **0.3.266** shipped: Densify early Crew Live breadcrumb crumbs without shortening cruise trail. Release: [v0.3.266](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.266).
 
 

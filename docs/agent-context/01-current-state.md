@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **60b40c96** / desktop **0.3.248** shipped: Align Hauls Open desk and Active cargo columns on fixed grid tracks. Release: [v0.3.248](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.248).
+
+
 `main` **a33fb260** / desktop **0.3.247** shipped: Stop mid-cruise Watch stop/start thrash after app reopen. Release: [v0.3.247](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.247).
 
 

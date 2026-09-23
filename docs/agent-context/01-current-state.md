@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **02205403** / desktop **0.3.256** shipped: Gate Hauls and Demand desk accepts on home Class Ops. Release: [v0.3.256](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.256).
+
+
 `main` **fa45c95d** / desktop **0.3.255** shipped: Count airline desk labor on Ranking and declutter Hangar Cargo Ops. Release: [v0.3.255](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.255).
 
 

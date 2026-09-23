@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { formatMassExact, KG_TO_LB, type WeightSystem } from './weight-units';
 
 type FuelTanks = {
@@ -10,6 +10,123 @@ type FuelTanks = {
   leftTip?: number;
   rightTip?: number;
 };
+
+export type PayloadSchematicMode = 'load' | 'stations';
+
+export type PayloadStationRoles = {
+  crewStations?: number[];
+  passengerStations?: number[];
+  baggageStations?: number[];
+  serviceStations?: number[];
+  averagePassengerWeight?: number;
+};
+
+export type PayloadNarrativeBucket = {
+  id: 'crew' | 'pax' | 'cargo' | 'other';
+  label: string;
+  lb: number;
+  maxLb?: number;
+};
+
+const PAYLOAD_SCHEMATIC_MODE_KEY = 'airframe.payloadSchematicMode';
+
+export function readPayloadSchematicMode(): PayloadSchematicMode {
+  try {
+    const raw = localStorage.getItem(PAYLOAD_SCHEMATIC_MODE_KEY);
+    if (raw === 'stations' || raw === 'load') return raw;
+  } catch {
+    /* private mode / SSR */
+  }
+  return 'load';
+}
+
+export function writePayloadSchematicMode(mode: PayloadSchematicMode): void {
+  try {
+    localStorage.setItem(PAYLOAD_SCHEMATIC_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
+
+function sumStationsForIndexes(
+  indexes: number[],
+  stations: Record<number, number>,
+  stationMax?: Record<number, number>,
+): { lb: number; maxLb?: number } {
+  let lb = 0;
+  let maxSum = 0;
+  let hasMax = false;
+  for (const index of indexes) {
+    lb += stations[index] ?? 0;
+    const max = stationMax?.[index];
+    if (max !== undefined && max > 0) {
+      maxSum += max;
+      hasMax = true;
+    }
+  }
+  return { lb, maxLb: hasMax ? maxSum : undefined };
+}
+
+/**
+ * Aggregate live station weights into Crew / Pax / Cargo (baggage) narrative
+ * buckets for the Preflight Payload schematic. Does not change Due/inject.
+ */
+export function aggregatePayloadNarrative(
+  stations: Record<number, number>,
+  stationMax?: Record<number, number>,
+  stationRoles?: PayloadStationRoles | null,
+): PayloadNarrativeBucket[] {
+  const allIndexes = [
+    ...new Set([
+      ...Object.keys(stations).map(Number),
+      ...Object.keys(stationMax ?? {}).map(Number),
+    ]),
+  ].filter((index) => Number.isFinite(index));
+
+  if (!stationRoles) {
+    const { lb, maxLb } = sumStationsForIndexes(allIndexes, stations, stationMax);
+    return lb > 0.5 || (maxLb !== undefined && maxLb > 0)
+      ? [{ id: 'cargo', label: 'Cargo', lb, maxLb }]
+      : [];
+  }
+
+  const crewIdx = stationRoles.crewStations ?? [];
+  const paxIdx = stationRoles.passengerStations ?? [];
+  const cargoIdx = stationRoles.baggageStations ?? [];
+  const serviceIdx = stationRoles.serviceStations ?? [];
+  const assigned = new Set([...crewIdx, ...paxIdx, ...cargoIdx, ...serviceIdx]);
+
+  const buckets: PayloadNarrativeBucket[] = [];
+  const push = (
+    id: PayloadNarrativeBucket['id'],
+    label: string,
+    indexes: number[],
+    opts?: { requireWeight?: boolean },
+  ) => {
+    if (indexes.length === 0) return;
+    const { lb, maxLb } = sumStationsForIndexes(indexes, stations, stationMax);
+    const show =
+      lb > 0.5 ||
+      (!opts?.requireWeight && maxLb !== undefined && maxLb > 0);
+    if (show) {
+      buckets.push({ id, label, lb, maxLb });
+    }
+  };
+
+  // Crew/Pax only when live mass — freighter must not paint empty crew caps.
+  push('crew', 'Crew', crewIdx, { requireWeight: true });
+  push('pax', 'Pax', paxIdx, { requireWeight: true });
+  push('cargo', 'Cargo', cargoIdx);
+
+  const otherIdx = allIndexes.filter(
+    (index) =>
+      !assigned.has(index) &&
+      ((stations[index] ?? 0) > 0.5 || (stationMax?.[index] ?? 0) > 0),
+  );
+  push('other', 'Other', otherIdx);
+
+  return buckets;
+}
 
 function massFromLb(lb: number | undefined, weightSystem: WeightSystem): string {
   if (lb === undefined || !Number.isFinite(lb)) return '—';
@@ -336,11 +453,40 @@ export function CgEnvelopeSchematic(props: {
 export function PayloadStationSchematic(props: {
   stations?: Record<number, number>;
   stationMax?: Record<number, number>;
+  stationRoles?: PayloadStationRoles | null;
   weightSystem: WeightSystem;
+  mode: PayloadSchematicMode;
 }) {
   const stations = props.stations;
   if (!stations) return null;
   const maxMap = props.stationMax;
+
+  if (props.mode === 'load') {
+    const buckets = aggregatePayloadNarrative(
+      stations,
+      maxMap,
+      props.stationRoles,
+    );
+    if (buckets.length === 0) return null;
+    return (
+      <div
+        className="load-schematic load-schematic-stations"
+        aria-label="Payload load"
+      >
+        {buckets.map((bucket) => (
+          <SchematicCell
+            key={bucket.id}
+            className="load-schematic-station"
+            label={bucket.label}
+            valueLb={bucket.lb}
+            maxLb={bucket.maxLb}
+            weightSystem={props.weightSystem}
+          />
+        ))}
+      </div>
+    );
+  }
+
   const maxKeys = maxMap
     ? Object.keys(maxMap)
         .map(Number)
@@ -391,4 +537,49 @@ export function PayloadStationSchematic(props: {
       ))}
     </div>
   );
+}
+
+/** Compact Load | Stations toggle (localStorage preference). */
+export function PayloadSchematicModeToggle(props: {
+  mode: PayloadSchematicMode;
+  onChange: (mode: PayloadSchematicMode) => void;
+}) {
+  return (
+    <div
+      className="payload-schematic-mode logbook-list-filter"
+      role="group"
+      aria-label="Payload schematic view"
+    >
+      <button
+        type="button"
+        className={props.mode === 'load' ? 'is-active' : undefined}
+        aria-pressed={props.mode === 'load'}
+        onClick={() => props.onChange('load')}
+      >
+        Load
+      </button>
+      <button
+        type="button"
+        className={props.mode === 'stations' ? 'is-active' : undefined}
+        aria-pressed={props.mode === 'stations'}
+        onClick={() => props.onChange('stations')}
+      >
+        Stations
+      </button>
+    </div>
+  );
+}
+
+/** Hook: Payload schematic mode with localStorage default Load. */
+export function usePayloadSchematicMode(): [
+  PayloadSchematicMode,
+  (mode: PayloadSchematicMode) => void,
+] {
+  const [mode, setMode] = useState<PayloadSchematicMode>(() =>
+    readPayloadSchematicMode(),
+  );
+  useEffect(() => {
+    writePayloadSchematicMode(mode);
+  }, [mode]);
+  return [mode, setMode];
 }

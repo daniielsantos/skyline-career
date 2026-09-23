@@ -676,6 +676,14 @@ export type Mission = {
         ok: boolean;
         stations?: Record<number, number>;
         stationMax?: Record<number, number>;
+        /** Pack/OFP roles for Payload Load narrative schematic. */
+        stationRoles?: {
+          crewStations?: number[];
+          passengerStations?: number[];
+          baggageStations?: number[];
+          serviceStations?: number[];
+          averagePassengerWeight?: number;
+        };
       };
       aircraft: {
         onGround: boolean;
@@ -4884,6 +4892,13 @@ export type WatchStatus = {
       ok: boolean;
       stations?: Record<number, number>;
       stationMax?: Record<number, number>;
+      stationRoles?: {
+        crewStations?: number[];
+        passengerStations?: number[];
+        baggageStations?: number[];
+        serviceStations?: number[];
+        averagePassengerWeight?: number;
+      };
     };
     cg?: {
       liveMac?: number;
@@ -5174,6 +5189,14 @@ export type OfpLoadProgress = {
   };
   liveStations?: Record<number, number>;
   stationMax?: Record<number, number>;
+  /** Pack/OFP roles for Payload Load narrative while inject runs. */
+  stationRoles?: {
+    crewStations?: number[];
+    passengerStations?: number[];
+    baggageStations?: number[];
+    serviceStations?: number[];
+    averagePassengerWeight?: number;
+  };
   plannedFuelLb?: number;
   plannedPayloadLb?: number;
   updatedAtIso: string;

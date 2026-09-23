@@ -9098,6 +9098,28 @@ table.contracts-table .col-access .action {
   font-size: 0.76rem;
 }
 
+.preflight-payload-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.preflight-payload-tile-head > span {
+  min-width: 0;
+}
+
+.payload-schematic-mode {
+  flex: 0 0 auto;
+  grid-template-columns: auto auto;
+}
+
+.payload-schematic-mode button {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.62rem;
+}
+
 .preflight-load-grid strong,
 .preflight-aircraft-stack strong {
   font-size: 1rem;

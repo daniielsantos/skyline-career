@@ -250,6 +250,14 @@ export type OfpLoadProgress = {
   liveStations?: Record<number, number>;
   /** Profile maxLoad (lb) keyed by station index. */
   stationMax?: Record<number, number>;
+  /** Pack/OFP roles for Payload Load narrative while inject runs. */
+  stationRoles?: {
+    crewStations?: number[];
+    passengerStations?: number[];
+    baggageStations?: number[];
+    serviceStations?: number[];
+    averagePassengerWeight?: number;
+  };
   plannedFuelLb?: number;
   plannedPayloadLb?: number;
   updatedAtIso: string;
@@ -1557,6 +1565,7 @@ async function applyMissionOfpLoadExclusive(
           : {}),
         liveStations: stationsForUi,
         ...(schematicStationMax ? { stationMax: schematicStationMax } : {}),
+        ...(stationRoles ? { stationRoles } : {}),
         plannedFuelLb,
         plannedPayloadLb,
       });
@@ -3661,6 +3670,8 @@ async function applyMissionOfpLoadExclusive(
           ? { liveTanks: lastGoodSchematicTanks }
           : {}),
         liveStations: afterLive.stations,
+        ...(schematicStationMax ? { stationMax: schematicStationMax } : {}),
+        ...(stationRoles ? { stationRoles } : {}),
         plannedFuelLb,
         plannedPayloadLb,
       });

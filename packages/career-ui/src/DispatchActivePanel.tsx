@@ -13,8 +13,10 @@ import { formatMassExact, formatWeightText, KG_TO_LB, type WeightSystem } from '
 import {
   CgEnvelopeSchematic,
   FuelTankSchematic,
+  PayloadSchematicModeToggle,
   PayloadStationSchematic,
   formatMacPct,
+  usePayloadSchematicMode,
 } from './LoadSchematic';
 import { DispatchRouteCard } from './DispatchRouteCard';
 import { DispatchFlightSummary } from './DispatchFlightSummary';
@@ -114,6 +116,13 @@ export function DispatchActivePanel(props: {
   };
     liveStations?: Record<number, number>;
     stationMax?: Record<number, number>;
+    stationRoles?: {
+      crewStations?: number[];
+      passengerStations?: number[];
+      baggageStations?: number[];
+      serviceStations?: number[];
+      averagePassengerWeight?: number;
+    };
     plannedFuelLb?: number;
     plannedPayloadLb?: number;
   } | null;
@@ -181,6 +190,8 @@ export function DispatchActivePanel(props: {
     stickyFuelRef.current = {};
   }
   const stickyInjectStatusRef = useRef(props.loadOfpAutoStatus);
+  const [payloadSchematicMode, setPayloadSchematicMode] =
+    usePayloadSchematicMode();
   if (
     stickyInjectStatusRef.current !== 'loading' &&
     props.loadOfpAutoStatus === 'loading'
@@ -1232,6 +1243,9 @@ export function DispatchActivePanel(props: {
                         ...(injectProgress.stationMax
                           ? { stationMax: injectProgress.stationMax }
                           : {}),
+                        ...(injectProgress.stationRoles
+                          ? { stationRoles: injectProgress.stationRoles }
+                          : {}),
                       },
                       cg:
                         injectProgress.liveMac !== undefined ||
@@ -1512,7 +1526,13 @@ export function DispatchActivePanel(props: {
                       />
                     </div>
                     <div className={loadTileClass(payloadOk)}>
-                      <span>Payload (stations)</span>
+                      <div className="preflight-payload-tile-head">
+                        <span>Payload</span>
+                        <PayloadSchematicModeToggle
+                          mode={payloadSchematicMode}
+                          onChange={setPayloadSchematicMode}
+                        />
+                      </div>
                       <strong>Sim {massFromLb(view.payload.liveLb)}</strong>
                       <small>
                         {formatPayloadDueLine(view.payload, massFromLb)}
@@ -1521,6 +1541,8 @@ export function DispatchActivePanel(props: {
                       <PayloadStationSchematic
                         stations={view.payload.stations}
                         stationMax={view.payload.stationMax}
+                        stationRoles={view.payload.stationRoles}
+                        mode={payloadSchematicMode}
                         weightSystem={weightSystem}
                       />
                     </div>

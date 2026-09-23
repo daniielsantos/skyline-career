@@ -163,6 +163,14 @@ export type WatchLoadVerification = {
     stations?: Record<number, number>;
     /** Profile maxLoad (lb) keyed by station index. */
     stationMax?: Record<number, number>;
+    /** Pack/OFP roles for Payload Load narrative schematic. */
+    stationRoles?: {
+      crewStations?: number[];
+      passengerStations?: number[];
+      baggageStations?: number[];
+      serviceStations?: number[];
+      averagePassengerWeight?: number;
+    };
   };
   cg?: {
     liveMac?: number;
@@ -2896,6 +2904,13 @@ export class CareerWatchSession {
             freshStationMax,
             prevWatchPayload.stationMax,
           );
+          const stationRoles =
+            prevWatchPayload.stationRoles ??
+            (current.lastOfpCheck?.payload?.stationRoles as
+              | WatchLoadVerification['payload']['stationRoles']
+              | undefined) ??
+            freighterStationRoles ??
+            undefined;
           const stationSumNow = load.stations
             ? Object.values(load.stations).reduce(
                 (sum, lb) => sum + (Number.isFinite(lb) ? lb : 0),
@@ -2975,6 +2990,7 @@ export class CareerWatchSession {
                 : {}),
               ...(stations ? { stations } : {}),
               ...(stationMax ? { stationMax } : {}),
+              ...(stationRoles ? { stationRoles } : {}),
             },
             ...(prevCg ? { cg: prevCg } : {}),
           };
@@ -3123,6 +3139,7 @@ export class CareerWatchSession {
                       ...(mergedStationMax
                         ? { stationMax: mergedStationMax }
                         : {}),
+                      ...(stationRoles ? { stationRoles } : {}),
                     },
                     aircraft: {
                       onGround: sample.onGround,

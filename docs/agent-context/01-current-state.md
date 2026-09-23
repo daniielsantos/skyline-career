@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **a33fb260** / desktop **0.3.247** shipped: Stop mid-cruise Watch stop/start thrash after app reopen. Release: [v0.3.247](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.247).
+
+
 `main` **1c48652e** / desktop **0.3.246** shipped: Align Hauls Active rows with Open desk and show the flyer. Release: [v0.3.246](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.246).
 
 

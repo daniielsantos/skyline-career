@@ -63,6 +63,13 @@ export type FlightDebrief = {
   cargoOpsDeltas: CargoOpsDelta[];
   classOpsDeltas: ClassOpsDelta[];
   netUsd: number;
+  /** Member cut / home pay one-liner. */
+  payLine: string | null;
+  /** Hangar-style progression note. */
+  forYouNote: string | null;
+  pilotHoursDelta: number | null;
+  pilotHoursAfter: number | null;
+  showClassOpsDebrief: boolean;
 };
 
 const CARGO_OPS_LABELS: Record<string, string> = {
@@ -268,6 +275,20 @@ export function buildFlightDebrief(opts: {
     cargoOpsDeltas: opts.settlement.cargoOpsDeltas ?? [],
     classOpsDeltas: opts.settlement.classOpsDeltas ?? [],
     netUsd: opts.settlement.payoutUsd - fuelCostUsd,
+    payLine: opts.settlement.payLine?.trim() || null,
+    forYouNote: opts.settlement.lastSettleOutcome?.hangarNote?.trim() || null,
+    pilotHoursDelta:
+      typeof opts.settlement.lastSettleOutcome?.pilotHoursDelta === 'number'
+        ? opts.settlement.lastSettleOutcome.pilotHoursDelta
+        : null,
+    pilotHoursAfter:
+      typeof opts.settlement.lastSettleOutcome?.pilotHoursAfter === 'number'
+        ? opts.settlement.lastSettleOutcome.pilotHoursAfter
+        : null,
+    showClassOpsDebrief:
+      typeof opts.settlement.showClassOpsDebrief === 'boolean'
+        ? opts.settlement.showClassOpsDebrief
+        : (opts.settlement.classOpsDeltas?.length ?? 0) > 0,
   };
 }
 

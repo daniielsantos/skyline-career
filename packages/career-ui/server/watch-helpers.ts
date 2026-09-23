@@ -94,6 +94,12 @@ import {
   type RunwayTouchdownSnapshot,
   type WeatherOpsAccumulator,
   type WeatherOpsSnapshot,
+  applyPilotCareerSettle,
+  classOpsLadderComplete,
+  dryCleanSettlesOk,
+  estimateMissionBlockHours,
+  LEASE_UNLOCK_CLEAN_DRY_SETTLES,
+  formatPilotPayDebriefLine,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-pipe-sim-bridge.ts';
 import {
@@ -222,6 +228,10 @@ export type WatchStatusPayload = {
     cargoOpsDeltas?: CargoOpsDelta[];
     /** Class Ops ladder deltas from this settle. */
     classOpsDeltas?: ClassOpsDelta[];
+    pilotPayUsd?: number | null;
+    lastSettleOutcome?: import('@msfs-compat/shared').LastSettleOutcome | null;
+    payLine?: string;
+    showClassOpsDebrief?: boolean;
   } | null;
   walletUsd: number | null;
   autoDepart: boolean;
@@ -4285,6 +4295,30 @@ export class CareerWatchSession {
             );
             this.missionStatus = result.mission.status;
             this.walletUsd = freshMissions.walletUsd;
+            const leaseCleanAfter = dryCleanSettlesOk(freshMissions.cargoOps);
+            const outcome = applyPilotCareerSettle(freshMissions, {
+              atTick: worldFresh.tick,
+              mission: result.mission,
+              flightDurationMs: result.mission.settledFlightDurationMs,
+              blockHoursFallback: estimateMissionBlockHours(
+                worldFresh,
+                openMission.originIcao,
+                openMission.destIcao,
+                openMission.aircraftClassId,
+              ),
+              cargoOpsDeltas: result.cargoOpsDeltas,
+              classOpsDeltas: result.classOpsDeltas,
+              flightScorePct: result.mission.settledFlightScore?.pct ?? null,
+              onTime: result.settlement.onTime,
+              pilotPayUsd: null,
+              leaseCleanAfter,
+              leaseCleanRequired: LEASE_UNLOCK_CLEAN_DRY_SETTLES,
+            });
+            const classDeltas = result.classOpsDeltas ?? [];
+            const showClassOpsDebrief =
+              classDeltas.length > 0 &&
+              (!classOpsLadderComplete(freshMissions.classOps) ||
+                classDeltas.some((d) => d.unlockedNow));
             this.settlement = {
               payoutUsd: result.settlement.payoutUsd,
               penaltyUsd: result.settlement.penaltyUsd,
@@ -4300,6 +4334,17 @@ export class CareerWatchSession {
               runwayTouch: result.mission.settledRunwayTouch ?? null,
               cargoOpsDeltas: result.cargoOpsDeltas ?? [],
               classOpsDeltas: result.classOpsDeltas ?? [],
+              pilotPayUsd: null,
+              lastSettleOutcome: outcome,
+              payLine: formatPilotPayDebriefLine({
+                pilotPayUsd: null,
+                companyPayoutUsd: result.settlement.payoutUsd,
+                isVaFlight: result.mission.vaFlight === true,
+                internalHaul:
+                  result.mission.warehouseBridge === true &&
+                  result.mission.internalHaul === true,
+              }),
+              showClassOpsDebrief,
             };
             return true;
           },

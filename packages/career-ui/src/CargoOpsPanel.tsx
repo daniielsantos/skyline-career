@@ -21,13 +21,34 @@ export function CargoOpsPanel(props: {
   cargoOps: CareerCargoOps | null | undefined;
   /** Optional lease-unlock progress line while still locked. */
   leaseUnlockHint?: string | null;
+  /** Last settle one-liner (why clean / lease did or did not move). */
+  lastSettleNote?: string | null;
+  /** Lifetime pilot hours on this company (home). */
+  pilotFlightHours?: number | null;
 }) {
   const ops = props.cargoOps;
+  const hours =
+    typeof props.pilotFlightHours === 'number' &&
+    Number.isFinite(props.pilotFlightHours)
+      ? props.pilotFlightHours
+      : null;
   if (!ops?.commodities) {
     return (
       <section className="cargo-ops-panel" aria-label="Cargo Ops">
         <h3>Cargo Ops</h3>
         <p className="muted">Progression unlocks after your first freight settle.</p>
+        {hours != null && hours > 0 ? (
+          <p className="cargo-ops-side-note">
+            <span className="cargo-ops-side-note-label">Pilot</span>
+            {hours}h career
+          </p>
+        ) : null}
+        {props.lastSettleNote ? (
+          <p className="cargo-ops-side-note">
+            <span className="cargo-ops-side-note-label">Last flight</span>
+            {props.lastSettleNote}
+          </p>
+        ) : null}
         {props.leaseUnlockHint ? (
           <p className="cargo-ops-side-note">{props.leaseUnlockHint}</p>
         ) : null}
@@ -45,6 +66,20 @@ export function CargoOpsPanel(props: {
         you; Value is high $/kg; Time is deadline-sensitive; Heavy is bulk weight.
         Pay rises with each commodity&apos;s own rep after unlock.
       </p>
+
+      {hours != null ? (
+        <p className="cargo-ops-side-note">
+          <span className="cargo-ops-side-note-label">Pilot</span>
+          {hours}h career
+        </p>
+      ) : null}
+
+      {props.lastSettleNote ? (
+        <p className="cargo-ops-side-note">
+          <span className="cargo-ops-side-note-label">Last flight</span>
+          {props.lastSettleNote}
+        </p>
+      ) : null}
 
       {nextUnlock ? (
         <div className="cargo-ops-next" aria-label="Next unlock">

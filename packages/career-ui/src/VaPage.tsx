@@ -36,6 +36,7 @@ import {
 import { BusyBlock, BusyStatus } from './Busy';
 import { CompanyCreditBlock, CashflowSummaryGrid, HangarCashflowPanel } from './CashflowPanel';
 import { VaMoneyMap } from './VaMoneyMap';
+import { VaMemberBriefCard } from './VaMemberBriefCard';
 import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
 import { PortsPanel } from './PortsPanel';
@@ -849,6 +850,9 @@ export function VaPage(props: Props) {
             </span>
           </div>
         </div>
+        <VaMemberBriefCard
+          visible={Boolean(role && role !== 'owner')}
+        />
         <div className="hangar-pane-toggle" role="tablist" aria-label="Crew views">
           <button
             type="button"

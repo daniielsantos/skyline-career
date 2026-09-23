@@ -284,6 +284,7 @@ export * from './career-mission.js';
 export * from './career-persist-commands.js';
 export * from './career-cargo-ops.js';
 export * from './career-class-ops.js';
+export * from './career-pilot-career.js';
 export * from './career-live-load.js';
 export * from './career-flight-watch.js';
 export * from './career-flight-phase.js';

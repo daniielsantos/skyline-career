@@ -1225,6 +1225,19 @@ export type CareerCargoOps = {
   commodities: Record<CargoOpsCommodityId, CargoOpsCommodityState>;
 };
 
+/** Hangar “last flight” note + career hours snapshot from settle. */
+export type LastSettleOutcome = {
+  missionId: string;
+  originIcao: string;
+  destIcao: string;
+  atTick: number;
+  hangarNote: string;
+  pilotHoursDelta: number;
+  pilotHoursAfter: number;
+  dryClean: boolean | null;
+  pilotPayUsd: number | null;
+};
+
 export type ClassOpsClassState = {
   unlocked: boolean;
   hours: number;
@@ -1352,6 +1365,8 @@ export function fetchState() {
       companyCredit?: CompanyCreditSnapshot;
       cargoOps?: CareerCargoOps | null;
       classOps?: CareerClassOps | null;
+      pilotFlightHours?: number | null;
+      lastSettleOutcome?: LastSettleOutcome | null;
       playerFbos?: PlayerFboSnapshot | null;
       companyCrew?: CompanyCrewSnapshot | null;
       groundStaff?: GroundStaffSnapshot | null;
@@ -4769,6 +4784,13 @@ export type MissionSettlement = {
   cargoOpsDeltas?: CargoOpsDelta[];
   /** Class Ops ladder deltas from this settle. */
   classOpsDeltas?: ClassOpsDelta[];
+  /** Member cut / IH fee to home Wallet. */
+  pilotPayUsd?: number | null;
+  lastSettleOutcome?: LastSettleOutcome | null;
+  /** “For you” pay one-liner. */
+  payLine?: string;
+  /** Hide Class Ops block when ladder is complete. */
+  showClassOpsDebrief?: boolean;
 };
 
 export type CharterMissionSettlement = {
@@ -4795,6 +4817,10 @@ export type CharterMissionSettlement = {
   runwayTouch?: RunwayTouchdownSnapshot | null;
   cargoOpsDeltas?: CargoOpsDelta[];
   classOpsDeltas?: ClassOpsDelta[];
+  pilotPayUsd?: number | null;
+  lastSettleOutcome?: LastSettleOutcome | null;
+  payLine?: string;
+  showClassOpsDebrief?: boolean;
 };
 
 export type WatchEvent =

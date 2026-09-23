@@ -26,6 +26,10 @@ import {
 } from './career-aircraft-maintenance.js';
 import { applyWalletDelta, normalizeCareerLedger } from './career-ledger.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
+import {
+  normalizeLastSettleOutcome,
+  normalizePilotFlightHours,
+} from './career-pilot-career.js';
 import { normalizeGroundStaffState } from './career-ground-staff.js';
 import { normalizePlayerWarehouseState } from './career-warehouse-stock.js';
 import {
@@ -403,6 +407,15 @@ export function normalizeMissionsState(
     ledger,
     cargoOps,
     classOps,
+    pilotFlightHours: normalizePilotFlightHours(
+      (raw as CareerMissionsState).pilotFlightHours,
+    ),
+    ...(() => {
+      const last = normalizeLastSettleOutcome(
+        (raw as CareerMissionsState).lastSettleOutcome,
+      );
+      return last ? { lastSettleOutcome: last } : {};
+    })(),
     companyCredit,
     playerFbos,
     companyCrew,

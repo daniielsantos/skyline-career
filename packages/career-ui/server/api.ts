@@ -32,6 +32,9 @@ import {
   CLASS_OPS_STARTER_IDS,
   LEASE_UNLOCK_CLEAN_DRY_SETTLES,
   dryCleanSettlesOk,
+  applyPilotCareerSettle,
+  formatPilotPayDebriefLine,
+  classOpsLadderComplete,
   aircraftLeaseUnlockProgress,
   aircraftLeaseUnlockProgressDevOpen,
   BOARD_NEAR_MAX_NM,
@@ -2597,10 +2600,15 @@ async function vaPilotMissionStamp(
 async function resolvePilotProgressionOps(
   req: import('node:http').IncomingMessage,
   opsCompanyId: string,
-  opsMissions: Pick<CareerMissionsState, 'cargoOps' | 'classOps'>,
+  opsMissions: Pick<CareerMissionsState, 'cargoOps' | 'classOps'> & {
+    pilotFlightHours?: number;
+    lastSettleOutcome?: CareerMissionsState['lastSettleOutcome'];
+  },
 ): Promise<{
   cargoOps: CareerMissionsState['cargoOps'];
   classOps: CareerMissionsState['classOps'];
+  pilotFlightHours: number;
+  lastSettleOutcome: CareerMissionsState['lastSettleOutcome'];
   homeCompanyId: string | null;
   crossCompany: boolean;
 }> {
@@ -2609,6 +2617,8 @@ async function resolvePilotProgressionOps(
     return {
       cargoOps: cargoOpsForRequest(req, opsMissions.cargoOps),
       classOps: classOpsForRequest(req, opsMissions.classOps),
+      pilotFlightHours: opsMissions.pilotFlightHours ?? 0,
+      lastSettleOutcome: opsMissions.lastSettleOutcome,
       homeCompanyId: null,
       crossCompany: false,
     };
@@ -2620,6 +2630,8 @@ async function resolvePilotProgressionOps(
     return {
       cargoOps: cargoOpsForRequest(req, opsMissions.cargoOps),
       classOps: classOpsForRequest(req, opsMissions.classOps),
+      pilotFlightHours: opsMissions.pilotFlightHours ?? 0,
+      lastSettleOutcome: opsMissions.lastSettleOutcome,
       homeCompanyId: homeId,
       crossCompany: false,
     };
@@ -2628,12 +2640,16 @@ async function resolvePilotProgressionOps(
     (_world, missions) => ({
       cargoOps: missions.cargoOps,
       classOps: missions.classOps,
+      pilotFlightHours: missions.pilotFlightHours ?? 0,
+      lastSettleOutcome: missions.lastSettleOutcome,
     }),
     { companyId: homeId },
   );
   return {
     cargoOps: cargoOpsForRequest(req, home.cargoOps),
     classOps: classOpsForRequest(req, home.classOps),
+    pilotFlightHours: home.pilotFlightHours,
+    lastSettleOutcome: home.lastSettleOutcome,
     homeCompanyId: homeId,
     crossCompany: true,
   };
@@ -6295,6 +6311,8 @@ export function createCareerApiServer(port = 8787) {
             opsPeek: {
               cargoOps: missions.cargoOps,
               classOps: missions.classOps,
+              pilotFlightHours: missions.pilotFlightHours ?? 0,
+              lastSettleOutcome: missions.lastSettleOutcome,
             },
             payload: {
               needsProfile: false,
@@ -6336,6 +6354,8 @@ export function createCareerApiServer(port = 8787) {
           ...payload,
           cargoOps: progression.cargoOps ?? null,
           classOps: progression.classOps ?? payload.classOps ?? null,
+          pilotFlightHours: progression.pilotFlightHours,
+          lastSettleOutcome: progression.lastSettleOutcome ?? null,
         });
         return;
       }
@@ -14397,13 +14417,25 @@ export function createCareerApiServer(port = 8787) {
               settled.classOpsDeltas.length > 0)
               ? settled.progressionHomeCompanyId
               : '';
-          const homeWriteId = homePilotSyncId || homeProgWrite;
+          const careerCompanyId =
+            pilotHomeForXp &&
+            settleCompanyId &&
+            pilotHomeForXp !== settleCompanyId
+              ? pilotHomeForXp
+              : settleCompanyId ?? '';
+          const homeWriteId = homePilotSyncId || homeProgWrite || careerCompanyId;
+          let lastSettleOutcome:
+            | ReturnType<typeof applyPilotCareerSettle>
+            | undefined;
+          let showClassOpsDebrief = false;
           if (homeWriteId) {
             const destIcao = (settled.mission.destIcao ?? '').trim().toUpperCase();
             const nextCargo = progressionBag?.cargoOps;
             const nextClass = progressionBag?.classOps;
-            await withCareerWrite(
-              (_world, missions) => {
+            const pilotPayUsd = settled.pilotPayCredit?.amountUsd ?? null;
+            const scorePct = settled.mission.settledFlightScore?.pct;
+            const careerWrite = await withCareerWrite(
+              (world, missions) => {
                 if (homePilotSyncId && destIcao) {
                   syncPilotIcaoTo(missions, destIcao);
                 }
@@ -14411,9 +14443,36 @@ export function createCareerApiServer(port = 8787) {
                   missions.cargoOps = nextCargo;
                   missions.classOps = nextClass;
                 }
+                const leaseCleanAfter = dryCleanSettlesOk(missions.cargoOps);
+                const outcome = applyPilotCareerSettle(missions, {
+                  atTick: settled.settleTick,
+                  mission: settled.mission,
+                  flightDurationMs: settled.mission.settledFlightDurationMs,
+                  blockHoursFallback: estimateMissionBlockHours(
+                    world,
+                    settled.mission.originIcao,
+                    settled.mission.destIcao,
+                    settled.mission.aircraftClassId,
+                  ),
+                  cargoOpsDeltas: settled.cargoOpsDeltas,
+                  classOpsDeltas: settled.classOpsDeltas,
+                  flightScorePct:
+                    typeof scorePct === 'number' ? scorePct : null,
+                  onTime: settled.settlement.onTime,
+                  pilotPayUsd,
+                  leaseCleanAfter,
+                  leaseCleanRequired: LEASE_UNLOCK_CLEAN_DRY_SETTLES,
+                });
+                const classDeltas = settled.classOpsDeltas ?? [];
+                const showClass =
+                  classDeltas.length > 0 &&
+                  (!classOpsLadderComplete(missions.classOps) ||
+                    classDeltas.some((d) => d.unlockedNow));
                 return {
                   ok: true as const,
                   pilotIcao: missions.pilotIcao ?? missions.homeHubIcao ?? '',
+                  outcome,
+                  showClassOpsDebrief: showClass,
                 };
               },
               {
@@ -14423,6 +14482,8 @@ export function createCareerApiServer(port = 8787) {
                 catchUp: false,
               },
             );
+            lastSettleOutcome = careerWrite.outcome;
+            showClassOpsDebrief = careerWrite.showClassOpsDebrief;
             if (homePilotSyncId && destIcao) {
               settled.pilotIcao = destIcao;
             }
@@ -14498,6 +14559,14 @@ export function createCareerApiServer(port = 8787) {
               );
             }
           }
+          const payLine = formatPilotPayDebriefLine({
+            pilotPayUsd: settled.pilotPayCredit?.amountUsd ?? null,
+            companyPayoutUsd: settled.settlement.payoutUsd,
+            isVaFlight: settled.mission.vaFlight === true,
+            internalHaul:
+              settled.mission.warehouseBridge === true &&
+              settled.mission.internalHaul === true,
+          });
           send(res, 200, {
             mission: await toClientMission(settled.mission),
             walletUsd: settled.walletUsd,
@@ -14506,6 +14575,7 @@ export function createCareerApiServer(port = 8787) {
             pilotIcao: settled.pilotIcao,
             activeTour: settled.activeTour ?? null,
             charterActiveTour: settled.charterActiveTour ?? null,
+            lastSettleOutcome: lastSettleOutcome ?? null,
             settlement: settled.settlement.settlementType === 'charter'
               ? {
                   ...settled.settlement,
@@ -14516,6 +14586,10 @@ export function createCareerApiServer(port = 8787) {
                   flightScore: settled.mission.settledFlightScore ?? null,
                   weatherOps: settled.mission.settledWeatherOps ?? null,
                   runwayTouch: settled.mission.settledRunwayTouch ?? null,
+                  pilotPayUsd: settled.pilotPayCredit?.amountUsd ?? null,
+                  lastSettleOutcome: lastSettleOutcome ?? null,
+                  payLine,
+                  showClassOpsDebrief,
                 }
               : {
               payoutUsd: settled.settlement.payoutUsd,
@@ -14532,6 +14606,10 @@ export function createCareerApiServer(port = 8787) {
               runwayTouch: settled.mission.settledRunwayTouch ?? null,
               cargoOpsDeltas: settled.cargoOpsDeltas,
               classOpsDeltas: settled.classOpsDeltas,
+              pilotPayUsd: settled.pilotPayCredit?.amountUsd ?? null,
+              lastSettleOutcome: lastSettleOutcome ?? null,
+              payLine,
+              showClassOpsDebrief,
             },
           });
         } catch (error) {

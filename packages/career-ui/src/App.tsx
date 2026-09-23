@@ -270,7 +270,7 @@ import { classOpsUnlockProgress } from './class-ops-unlock';
 import { CrewPanel, CrewPortrait } from './CrewPanel';
 import { crewPortraitUrl } from './crewPortraits';
 import { CommodityIcon } from './CommodityIcon';
-import type { CareerCargoOps, CareerClassOps } from './api';
+import type { CareerCargoOps, CareerClassOps, LastSettleOutcome } from './api';
 import { HubNetworkMap } from './HubNetworkMap';
 import {
   logbookAircraftLabel,
@@ -4082,6 +4082,9 @@ export function App() {
   >('aircraft');
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
+  const [pilotFlightHours, setPilotFlightHours] = useState(0);
+  const [lastSettleOutcome, setLastSettleOutcome] =
+    useState<LastSettleOutcome | null>(null);
   const [playerFbos, setPlayerFbos] = useState<PlayerFboSnapshot | null>(null);
   const [dispatchScoutPolicy, setDispatchScoutPolicy] =
     useState<BaseDispatchScoutPolicy | null>(null);
@@ -4797,6 +4800,13 @@ export function App() {
     }
     setCargoOps(state.cargoOps ?? null);
     setClassOps(state.classOps ?? null);
+    setPilotFlightHours(
+      typeof state.pilotFlightHours === 'number' &&
+        Number.isFinite(state.pilotFlightHours)
+        ? state.pilotFlightHours
+        : 0,
+    );
+    setLastSettleOutcome(state.lastSettleOutcome ?? null);
     if (stateCompanyId && tenantMatches) {
       activeCompanyIdRef.current = stateCompanyId;
       setActiveCompanyId(stateCompanyId);
@@ -18714,6 +18724,29 @@ export function App() {
                       </div>
                     ) : null}
 
+                    {flightDebrief.payLine ||
+                    flightDebrief.forYouNote ||
+                    flightDebrief.pilotHoursDelta != null ? (
+                      <div className="cargo-ops-debrief" aria-label="For you">
+                        <strong>For you</strong>
+                        {flightDebrief.payLine ? (
+                          <p>{flightDebrief.payLine}</p>
+                        ) : null}
+                        {flightDebrief.forYouNote ? (
+                          <p>{flightDebrief.forYouNote}</p>
+                        ) : null}
+                        {flightDebrief.pilotHoursDelta != null &&
+                        flightDebrief.pilotHoursDelta > 0 ? (
+                          <p className="muted">
+                            +{flightDebrief.pilotHoursDelta}h pilot
+                            {flightDebrief.pilotHoursAfter != null
+                              ? ` · ${flightDebrief.pilotHoursAfter}h career`
+                              : ''}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     {flightDebrief.cargoOpsDeltas.length > 0 ? (
                       <div className="cargo-ops-debrief" aria-label="Cargo Ops">
                         <strong>Cargo Ops</strong>
@@ -18725,7 +18758,8 @@ export function App() {
                       </div>
                     ) : null}
 
-                    {flightDebrief.classOpsDeltas.length > 0 ? (
+                    {flightDebrief.showClassOpsDebrief &&
+                    flightDebrief.classOpsDeltas.length > 0 ? (
                       <div className="cargo-ops-debrief" aria-label="Class Ops">
                         <strong>Class Ops</strong>
                         <p>
@@ -20779,6 +20813,8 @@ export function App() {
             <>
               <CargoOpsPanel
                 cargoOps={cargoOps}
+                pilotFlightHours={pilotFlightHours}
+                lastSettleNote={lastSettleOutcome?.hangarNote ?? null}
                 leaseUnlockHint={
                   !devMode && leaseUnlock && !leaseUnlock.unlocked
                     ? `Lease unlock: ${leaseUnlock.current}/${leaseUnlock.required} clean Dry freights (on-time).`

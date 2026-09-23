@@ -1370,6 +1370,25 @@ export interface CareerMissionsState {
    * Gates buy/lease, accept, contract-pilot, and Freights board size.
    */
   classOps?: CareerClassOps;
+  /**
+   * Lifetime pilot flight hours (career identity on this company — home for
+   * VA members). Incremented on settle from airborne duration. Not a rep formula.
+   */
+  pilotFlightHours?: number;
+  /**
+   * Last settle outcome for Hangar “why didn’t this count?” copy.
+   */
+  lastSettleOutcome?: {
+    missionId: string;
+    originIcao: string;
+    destIcao: string;
+    atTick: number;
+    hangarNote: string;
+    pilotHoursDelta: number;
+    pilotHoursAfter: number;
+    dryClean: boolean | null;
+    pilotPayUsd: number | null;
+  };
   /** Revolving company credit line (Hangar cashflow). */
   companyCredit?: CompanyCreditState;
   /** Player-owned FBOs + bonded contract holds (spot inventory removed). */

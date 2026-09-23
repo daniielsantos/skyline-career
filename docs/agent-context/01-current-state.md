@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **459fcc0b** / desktop **0.3.260** shipped: Add Logbook list cards and archived flight debrief for home and Crew. Release: [v0.3.260](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.260).
+
+
 `main` **ea2ac946** / desktop **0.3.259** shipped: Add public Airlines profile with HQ and Port FBO network map. Release: [v0.3.259](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.259).
 
 

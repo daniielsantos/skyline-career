@@ -5279,6 +5279,8 @@ export type VaHaulMission = {
   status: string;
   distanceNm?: number;
   pilotAccountId?: string;
+  /** Roster display name for the flyer (VA member). */
+  pilotName?: string | null;
   aircraftId?: string;
 };
 

@@ -690,6 +690,7 @@ export function VaHaulsBoard(props: Props) {
                       ? Math.round(m.distanceNm).toLocaleString()
                       : null;
                   const statusLabel = m.status.replace(/_/g, ' ');
+                  const pilotName = m.pilotName?.trim() || null;
                   return (
                     <li
                       key={m.id}
@@ -712,7 +713,7 @@ export function VaHaulsBoard(props: Props) {
                         </span>
                       </div>
                       <div
-                        className="va-hauls-stats va-hauls-stats-active"
+                        className="va-hauls-stats"
                         aria-label="Active flight details"
                       >
                         <div>
@@ -748,6 +749,17 @@ export function VaHaulsBoard(props: Props) {
                           </span>
                         </div>
                         <div>
+                          <span className="va-stat-label">Pilot</span>
+                          <span
+                            className="va-stat-value"
+                            title={pilotName ?? undefined}
+                          >
+                            {pilotName || '—'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="va-hauls-actions va-hauls-actions-readonly">
+                        <div className="va-hauls-aircraft-ro">
                           <span className="va-stat-label">Aircraft</span>
                           <span
                             className="va-stat-value"

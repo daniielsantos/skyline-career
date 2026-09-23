@@ -14176,6 +14176,8 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Clear Watch footer + last Active row breathing room */
+  padding-bottom: 1.75rem;
 }
 .va-rep-strip {
   display: grid;
@@ -14496,6 +14498,10 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   margin-top: 1rem;
 }
 
+.va-hauls-section:last-child {
+  margin-bottom: 0.75rem;
+}
+
 .va-hauls-section-help {
   margin: 0.2rem 0 0;
   font-size: 0.8rem;
@@ -14536,7 +14542,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 
 .va-hauls-row-active {
-  grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+  /* Same 3-column grid as Open desk (route | stats | aircraft). */
   cursor: default;
 }
 
@@ -14544,8 +14550,23 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   border-color: var(--line);
 }
 
-.va-hauls-stats-active {
-  grid-template-columns: repeat(6, minmax(3.4rem, 1fr));
+.va-hauls-actions-readonly {
+  justify-content: flex-end;
+  min-width: 9.5rem;
+}
+
+.va-hauls-aircraft-ro {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  text-align: right;
+}
+
+.va-hauls-aircraft-ro .va-stat-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
 }
 
 .va-hauls-status {
@@ -14640,12 +14661,16 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   .va-hauls-row {
     grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
   }
-  .va-hauls-row-active {
-    grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
-  }
   .va-hauls-actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
+  }
+  .va-hauls-actions-readonly {
+    justify-content: flex-start;
+    text-align: left;
+  }
+  .va-hauls-aircraft-ro {
+    text-align: left;
   }
 }
 
@@ -14653,13 +14678,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   .va-hauls-row {
     grid-template-columns: 1fr;
   }
-  .va-hauls-row-active {
-    grid-template-columns: 1fr;
-  }
   .va-hauls-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .va-hauls-stats-active {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .va-hauls-gate {

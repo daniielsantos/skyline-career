@@ -5128,26 +5128,32 @@ export function createCareerApiServer(port = 8787) {
               destLon: destCoords?.lon,
             };
           }),
-          activeMissions: active.map((m) => ({
-            id: m.id,
-            kind:
-              m.warehouseBridge && m.internalHaul
-                ? 'bridge'
-                : m.warehouseHaul
-                  ? 'haul'
-                  : m.demandOrderId
-                    ? 'demand'
-                    : 'other',
-            originIcao: m.originIcao,
-            destIcao: m.destIcao,
-            commodityId: m.commodityId,
-            cargoKg: m.cargoKg,
-            payUsd: m.payUsd,
-            status: m.status,
-            distanceNm: m.distanceNm,
-            pilotAccountId: m.pilotAccountId,
-            aircraftId: m.aircraftId,
-          })),
+          activeMissions: active.map((m) => {
+            const pilotAccountId = m.pilotAccountId?.trim() || undefined;
+            return {
+              id: m.id,
+              kind:
+                m.warehouseBridge && m.internalHaul
+                  ? 'bridge'
+                  : m.warehouseHaul
+                    ? 'haul'
+                    : m.demandOrderId
+                      ? 'demand'
+                      : 'other',
+              originIcao: m.originIcao,
+              destIcao: m.destIcao,
+              commodityId: m.commodityId,
+              cargoKg: m.cargoKg,
+              payUsd: m.payUsd,
+              status: m.status,
+              distanceNm: m.distanceNm,
+              pilotAccountId,
+              pilotName: pilotAccountId
+                ? memberNameById.get(pilotAccountId) ?? null
+                : null,
+              aircraftId: m.aircraftId,
+            };
+          }),
         });
         return;
       }

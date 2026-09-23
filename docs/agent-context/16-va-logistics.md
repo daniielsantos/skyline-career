@@ -75,6 +75,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Open desk column align (2026-09-22):** sintoma = meta em flex (`·`) desalinhava Mass/Dist/Pay entre rows; Expires sumia no print antigo. Fix = stats grid rotulado (Cargo/Mass/Dist/Pay/Expires/By) como Airlines; Expires sempre (Demand = hold capped pelo order).
 
+**Hauls Active align + pilot (2026-09-22):** sintoma = Active desalinhado do Open desk (2 cols vs 3); sem piloto; colado no rodapé. Causa = `va-hauls-row-active` grid curto + Aircraft dentro dos stats; pane sem padding. Fix = mesmo grid 3 cols (route | stats | aircraft RO); stats = Cargo/Mass/Dist/Pay/Status/Pilot (`pilotName` no `/api/va/hauls`); padding-bottom no pane.
+
 **My VA pane height jump (2026-09-22):** sintoma = alternar Roster/Hangar/Hauls/Ports/… mudava a altura da página. Causa = só Ports forçava fill (`:has(.va-ports-pane)`); panes curtas shrink-wrap. Fix = `va-panel-shell` + `va-pane-body` preenchem `main-content` em todas as abas.
 
 **Roster list stuck at bottom (2026-09-22):** sintoma = título Roster no topo, lista no terço inferior (gap enorme). Causa = `va-pane-card` com `flex:1` + `.settings-card` `display:grid` → `align-content:stretch` inflava as tracks. Fix = `align-content: start` no card do shell (conteúdo cola no topo; shell ainda preenche altura).

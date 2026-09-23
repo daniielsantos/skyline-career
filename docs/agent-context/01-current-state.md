@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **347e248f** / desktop **0.3.245** shipped: Move Live AC, trail, and dashed remaining leg as one tip. Release: [v0.3.245](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.245).
+
+
 `main` **09152c72** / desktop **0.3.244** shipped: Keep Crew Live AC on the latest sample, not a stale trail tip. Release: [v0.3.244](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.244).
 
 

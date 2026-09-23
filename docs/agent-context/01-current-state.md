@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **8074bcac** / desktop **0.3.243** shipped: Show Live aircraft as a blue dot only. Release: [v0.3.243](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.243).
+
+
 `main` **cc30f789** / desktop **0.3.242** shipped: Show a single map AC and keep En route glued to Watch. Release: [v0.3.242](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.242).
 
 

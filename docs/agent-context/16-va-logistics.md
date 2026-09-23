@@ -53,6 +53,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hauls Prepare + ferry Manifest (2026-09-22):** sintoma = Open desk só Accept com cauda parked no origin (“Need parked tail at …”). Causa = `*DispatchHold` exige `locationIcao === origin` (carga no WH) e a board filtrava só at-origin. Fix = espelhar Freights: picker = todas parked VA; off-origin → **Prepare** → `StagingDraft.deskHold` + Manifest (ferry Line crew CTA); **Accept & Dispatch** só at-origin chama o mesmo trio dispatch-hold. API gate intacto; Discard Manifest não cancela o hold.
 
+**Hauls desk Accept skipped member cut (2026-09-23):** sintoma = Demand/Haul via Hauls Accept settled OK (VA ledger + logbook bruto) mas home cashflow sem `va_member_cut`; Logbook pessoal sem sufixo `cut`. Causa = `/api/demand/dispatch-hold` e `/api/warehouses/haul/dispatch-hold` só passavam `pilotAccountId` (bridge já usava `vaPilotMissionStamp`); sem `pilotHomeCompanyId` o settle trata como owner/ops e **não** fatia. Fix = stamp completo (`pilotHome` + `vaFlight`) no trio; `createDemandMission` / `createHaulMission` gravam os campos. Mesmo bug no **Ports → WH → DISPATCH** (e Hauls Accept): ambos chamam esses endpoints. Voo já settled **não** backfill automático — fatia perdida nessa perna.
+
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.
 
 **Hauls Accept flick oversize (2026-09-22):** sintoma = Accept “flick” + erro ops cap (Citation vs ~53 klb) e botão continuava Accept. Causa = board não recebia `resolveMaxCargoKg` → `holdNeedsPartialLoad` nunca virava Prepare; Accept full-hold batia no server. Fix = passar cap do VaPage; CTA **Prepare** quando hold > ops cap (mesmo at-origin) → Manifest slider; picker = qual cauda VA voa / ferries.
@@ -218,7 +220,7 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 5. Faixa **10–50%**; default publish **30%**.
 6. Owner voando o próprio VA: **sem cut** (`pilotHomeCompanyId` = ops).
 7. IH **não** recebe esse % em cima do pay stamp.
-8. Accept Freights/Demand/Charter **stamp** `pilotHomeCompanyId` / `pilotAccountId`.
+8. Accept Freights/Demand/Charter **e** Hauls desk `*dispatch-hold` **stamp** `pilotHomeCompanyId` / `pilotAccountId` / `vaFlight`.
 
 **Airline desk (`memberAirlineCutPct`) — shipped 2026-09-21:**
 
@@ -1072,6 +1074,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Buff concessão herdado** — hasPortOperatorBenefits buy/ETA; status yours exact only (2026-09-21 g)
 - [x] **My VA Hauls board** — Internal Haul open/active + Accept + Port strip + Ports CTA (2026-09-21)
 - [x] **Hauls Prepare + ferry Manifest** — off-origin Prepare → deskHold draft; Accept at-origin dispatch-hold (2026-09-22)
+- [x] **Hauls desk Accept member cut stamp** — demand/haul dispatch-hold `vaPilotMissionStamp` (2026-09-23)
 - [x] **Desk hold partial load** — Manifest loadKg ≤ ops cap; *DispatchHold kg + remainder hold (2026-09-22)
 - [x] **VA parallel cargo per pilot** — friends Accept together; gate by pilotAccountId (2026-09-22)
 - [x] **Hauls hold author + map route** — heldByName on Open desk; click plots OD on Company Network map (2026-09-22)

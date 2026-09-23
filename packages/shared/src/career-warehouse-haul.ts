@@ -148,6 +148,8 @@ function createHaulMission(
     warehouseId: string;
     avgCostUsdPerKg: number;
     pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
     actorIsVaOwner?: boolean;
   },
 ): MissionIntent {
@@ -197,6 +199,10 @@ function createHaulMission(
     ...(opts.pilotAccountId?.trim()
       ? { pilotAccountId: opts.pilotAccountId.trim() }
       : {}),
+    ...(opts.pilotHomeCompanyId?.trim()
+      ? { pilotHomeCompanyId: opts.pilotHomeCompanyId.trim() }
+      : {}),
+    ...(opts.vaFlight === true ? { vaFlight: true as const } : {}),
   });
   assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
     actorAccountId: opts.pilotAccountId,
@@ -354,6 +360,8 @@ export function acceptWarehouseHaul(
     aircraftId: string;
     kg?: number;
     pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
     actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; payUsd: number } {
@@ -404,6 +412,8 @@ export function acceptWarehouseHaul(
     warehouseId: withdrawn.warehouseId,
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
     pilotAccountId: opts.pilotAccountId,
+    pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    vaFlight: opts.vaFlight,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg, payUsd };
@@ -418,6 +428,8 @@ export function dispatchWarehouseHaulHold(
     /** Partial load; omit = full hold. Remainder stays reserved on Open desk. */
     kg?: number;
     pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
     actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; payUsd: number } {
@@ -471,6 +483,8 @@ export function dispatchWarehouseHaulHold(
     warehouseId: withdrawn.warehouseId,
     avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
     pilotAccountId: opts.pilotAccountId,
+    pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    vaFlight: opts.vaFlight,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg, payUsd };

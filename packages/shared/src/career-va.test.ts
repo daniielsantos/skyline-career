@@ -26,6 +26,10 @@ import {
   buyWarehouseAtPickupHub,
   depositCargoToWarehouse,
 } from './career-warehouse.js';
+import {
+  dispatchDemandHold,
+  holdDemandOrder,
+} from './career-demand.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { departMission, settleMission } from './career-mission.js';
@@ -983,6 +987,87 @@ describe('VA IH-2', () => {
       },
     );
     assert.ok(wallet.pilotPayCredit);
+    assert.equal(wallet.pilotPayCredit!.amountUsd, 400);
+    assert.equal(va.walletUsd, before + 1000 - 200 - 400);
+  });
+
+  it('demand dispatch-hold stamps pilotHome so airline cut applies', () => {
+    const world = createSeedEconomyWorld({ seed: 'va-demand-hold-cut' });
+    const va = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'VA',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    va.walletUsd = 500_000;
+    buyWarehouseAtPickupHub(va, world, 'SBGR');
+    const wh = va.playerWarehouses!.warehouses[0]!;
+    wh.tier = 4;
+    depositCargoToWarehouse(va, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 500,
+      avgCostUsdPerKg: 1,
+      tick: world.tick,
+    });
+    world.demandOrders = [
+      {
+        id: 'ord_hold_cut',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 200,
+        remainingKg: 200,
+        maxUnitPriceUsd: 5,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 500,
+        status: 'open',
+        portId: 'BRSSZ',
+      },
+    ];
+    const held = holdDemandOrder(va, world, {
+      orderId: 'ord_hold_cut',
+      originIcao: 'SBGR',
+      kg: 100,
+    });
+    const aircraft = va.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const dispatched = dispatchDemandHold(va, world, {
+      holdId: held.hold.id,
+      aircraftId: aircraft.id,
+      pilotAccountId: 'acc_pilot',
+      pilotHomeCompanyId: 'co_pilot_home',
+      vaFlight: true,
+    });
+    assert.equal(dispatched.mission.pilotHomeCompanyId, 'co_pilot_home');
+    assert.equal(dispatched.mission.pilotAccountId, 'acc_pilot');
+    assert.equal(dispatched.mission.vaFlight, true);
+    assert.ok(dispatched.mission.demandOrderId);
+
+    const before = va.walletUsd;
+    const wallet = applySettleWalletDeltas(
+      va,
+      world.tick,
+      {
+        mission: dispatched.mission,
+        settlement: {
+          missionId: dispatched.mission.id,
+          payoutUsd: 1000,
+          penaltyUsd: 0,
+          lateTicks: 0,
+          deliveredKg: 100,
+          onTime: true,
+          originStockAfterKg: 0,
+          destStockAfterKg: 100,
+        },
+        walletCreditUsd: 1000,
+        fuelDebitUsd: 200,
+      },
+      {
+        companyId: 'co_va_ops',
+        memberRouteCutPct: 30,
+        memberAirlineCutPct: 50,
+      },
+    );
+    assert.ok(wallet.pilotPayCredit);
+    assert.equal(wallet.pilotPayCredit!.companyId, 'co_pilot_home');
     assert.equal(wallet.pilotPayCredit!.amountUsd, 400);
     assert.equal(va.walletUsd, before + 1000 - 200 - 400);
   });

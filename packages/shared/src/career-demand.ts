@@ -515,6 +515,8 @@ export function dispatchDemandHold(
     /** Partial load; omit = full hold. Remainder stays reserved on Open desk. */
     kg?: number;
     pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
     actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
@@ -623,6 +625,8 @@ export function dispatchDemandHold(
     destCountryId: demandHubCountryId(world, hold.destIcao) ?? '',
     deadlineTick,
     pilotAccountId: opts.pilotAccountId,
+    pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    vaFlight: opts.vaFlight,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
 
@@ -726,6 +730,8 @@ function createDemandMission(
     destCountryId: string;
     deadlineTick: number;
     pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
     actorIsVaOwner?: boolean;
   },
 ): MissionIntent {
@@ -740,6 +746,7 @@ function createDemandMission(
   const laneLabel = opts.international
     ? `Intl demand · ${opts.originCountryId}→${opts.destCountryId}`
     : `Demand delivery · ${opts.origin}→${opts.dest}`;
+  const home = opts.pilotHomeCompanyId?.trim() || undefined;
   const mission = recomputeMissionTotals({
     id: missionId,
     lots: [
@@ -779,6 +786,8 @@ function createDemandMission(
     ...(opts.pilotAccountId?.trim()
       ? { pilotAccountId: opts.pilotAccountId.trim() }
       : {}),
+    ...(home ? { pilotHomeCompanyId: home } : {}),
+    ...(opts.vaFlight === true ? { vaFlight: true as const } : {}),
   });
   assignAircraftToMission(state, opts.aircraft.id, mission.id, opts.origin, {
     actorAccountId: opts.pilotAccountId,

@@ -11292,6 +11292,10 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const haulPilotStamp = await vaPilotMissionStamp(
+            req,
+            warehouses_haul_dispatch_holdCompanyId,
+          );
           const haulHoldActor = await resolveVaFleetActor(
             req,
             warehouses_haul_dispatch_holdCompanyId,
@@ -11306,7 +11310,7 @@ export function createCareerApiServer(port = 8787) {
                   body.kg != null && Number.isFinite(Number(body.kg))
                     ? Number(body.kg)
                     : undefined,
-                pilotAccountId: haulHoldActor.accountId ?? undefined,
+                ...haulPilotStamp,
                 actorIsVaOwner: haulHoldActor.isOwner,
               });
               return {
@@ -11558,6 +11562,10 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const demandHoldStamp = await vaPilotMissionStamp(
+            req,
+            demand_dispatch_holdCompanyId,
+          );
           const demandHoldActor = await resolveVaFleetActor(
             req,
             demand_dispatch_holdCompanyId,
@@ -11572,7 +11580,7 @@ export function createCareerApiServer(port = 8787) {
                   body.kg != null && Number.isFinite(Number(body.kg))
                     ? Number(body.kg)
                     : undefined,
-                pilotAccountId: demandHoldActor.accountId ?? undefined,
+                ...demandHoldStamp,
                 actorIsVaOwner: demandHoldActor.isOwner,
               });
               const warehouses = playerWarehouseSnapshot(missions, world);

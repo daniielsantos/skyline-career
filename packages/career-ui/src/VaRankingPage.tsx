@@ -44,84 +44,71 @@ export function VaRankingPage(props: Props) {
   if (!canShow) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">
-          Sign in to see airline desk rankings.
-        </p>
+        <p className="settings-help">Sign in to see rankings.</p>
       </section>
     );
   }
 
   return (
-    <section className="panel va-panel">
+    <section className="panel va-panel va-ranking">
       <div className="settings-grid">
         <div className="settings-card">
-          <h3>Airlines · {windowDays} days</h3>
-          <p className="settings-help">
-            Airline desk labor (Demand, Wide haul, Internal Haul) — distance and
-            count on listed VAs. Flight quality is settle score + on-time over
-            the same window (shown when enough flights).
-          </p>
+          <div className="va-ranking-head">
+            <h3>Airlines · {windowDays}d</h3>
+            {busy ? <span className="muted va-ranking-busy">Updating…</span> : null}
+          </div>
           {error ? (
             <p className="error" role="alert">
-              {error}
+              {error}{' '}
+              <button
+                type="button"
+                className="linkish"
+                disabled={busy}
+                onClick={() => void refresh()}
+              >
+                Retry
+              </button>
             </p>
           ) : null}
-          <button
-            type="button"
-            className="action ghost"
-            disabled={busy}
-            onClick={() => void refresh()}
-          >
-            Refresh
-          </button>
-          {companies.length === 0 ? (
-            <p className="settings-sample" style={{ marginTop: '0.75rem' }}>
-              No airline desk stats yet. Settle Demand, Wide haul, or Internal
-              Haul on a listed VA to appear.
-            </p>
-          ) : (
-            <ol
-              className="settings-sample"
-              style={{ marginTop: '0.75rem', paddingLeft: '1.1rem' }}
-            >
-              {companies.map((row) => (
-                <li key={row.companyId} style={{ marginBottom: '0.35rem' }}>
-                  <strong>{row.displayName}</strong> · {row.nm} nm · {row.hauls}{' '}
-                  hauls
-                  {row.payUsd > 0
-                    ? ` · $${Math.round(row.payUsd).toLocaleString()}`
-                    : ''}
-                  {row.flightQuality?.qualityScore != null
-                    ? ` · quality ${Math.round(row.flightQuality.qualityScore)}`
-                    : ''}
-                  {row.orgPerks && row.orgPerks.tier > 0
-                    ? ` · ${row.orgPerks.tierName}`
-                    : ''}
+          {companies.length === 0 && !error ? (
+            <p className="muted va-ranking-empty">No desk flights in this window.</p>
+          ) : companies.length > 0 ? (
+            <ol className="va-ranking-list">
+              {companies.map((row, i) => (
+                <li key={row.companyId}>
+                  <span className="va-ranking-place">{i + 1}</span>
+                  <span className="va-ranking-name">{row.displayName}</span>
+                  <span className="va-ranking-meta">
+                    {row.nm.toLocaleString()} nm · {row.hauls}{' '}
+                    {row.hauls === 1 ? 'haul' : 'hauls'}
+                    {row.flightQuality?.qualityScore != null
+                      ? ` · Q${Math.round(row.flightQuality.qualityScore)}`
+                      : ''}
+                  </span>
                 </li>
               ))}
             </ol>
-          )}
+          ) : null}
         </div>
 
         <div className="settings-card">
-          <h3>Pilots · this airline</h3>
-          <p className="settings-help">
-            Same window, members of your listed VA. Freights / Charter market
-            hire do not count here.
-          </p>
+          <div className="va-ranking-head">
+            <h3>Pilots · this airline</h3>
+          </div>
           {!pilotsCompanyId ? (
-            <p className="settings-sample">
-              Join or publish a listed airline to see crew ranking.
-            </p>
+            <p className="muted va-ranking-empty">Join a listed airline first.</p>
           ) : pilots.length === 0 ? (
-            <p className="settings-sample">
-              No airline desk flights for this crew in the window yet.
-            </p>
+            <p className="muted va-ranking-empty">No crew desk flights yet.</p>
           ) : (
-            <ol className="settings-sample" style={{ paddingLeft: '1.1rem' }}>
-              {pilots.map((p) => (
-                <li key={p.accountId} style={{ marginBottom: '0.35rem' }}>
-                  <strong>{p.displayName}</strong> · {p.nm} nm · {p.hauls} hauls
+            <ol className="va-ranking-list">
+              {pilots.map((p, i) => (
+                <li key={p.accountId}>
+                  <span className="va-ranking-place">{i + 1}</span>
+                  <span className="va-ranking-name">{p.displayName}</span>
+                  <span className="va-ranking-meta">
+                    {p.nm.toLocaleString()} nm · {p.hauls}{' '}
+                    {p.hauls === 1 ? 'haul' : 'hauls'}
+                  </span>
                 </li>
               ))}
             </ol>

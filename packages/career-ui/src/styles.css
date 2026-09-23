@@ -14341,6 +14341,71 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   min-width: 6.5rem;
 }
 
+.va-ranking .va-ranking-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+.va-ranking .va-ranking-head h3 {
+  margin: 0;
+}
+.va-ranking-busy {
+  font-size: 0.78rem;
+}
+.va-ranking-empty {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.va-ranking-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+.va-ranking-list li {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+  gap: 0.45rem 0.65rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.va-ranking-list li:last-child {
+  border-bottom: none;
+}
+.va-ranking-place {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+}
+.va-ranking-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.va-ranking-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 40rem) {
+  .va-ranking-list li {
+    grid-template-columns: 1.4rem minmax(0, 1fr);
+  }
+  .va-ranking-meta {
+    grid-column: 2;
+    text-align: left;
+    white-space: normal;
+  }
+}
+
 .va-stat-label {
   font-size: 0.65rem;
   letter-spacing: 0.08em;

@@ -63,7 +63,11 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Cuts chip unlabeled (2026-09-23):** sintoma = Airlines directory `Cuts 50% / 50%` e Config readonly sem dizer o quê é cada %. Causa = pair compacto sem labels. Fix = `Mkt N% · Desk N%` + `title` tooltip (`va-cuts-copy.ts`: market hire = Freights/Charter; desk = Demand/Haul; % do net → home).
 
+**Cuts chip range (2026-09-23):** sintoma = `Mkt 50% · Desk 50%` confunde no directory. Fix = iguais → `50%`; diferentes → `10%–50%` (low–high); tooltip ainda explica Mkt vs Desk.
+
 **Ranking empty / IH-only (2026-09-23):** sintoma = página Ranking “No Internal Haul stats yet” apesar de Demand/Wide haul settled. Causa = `vaRecordHaulStats` só em `internalHaul===true`; board Airlines/Pilots copy IH; Pilots card escondido quando vazio; company ranking sem filtro `va_listed`. Fix = gravar desk labor (`isVaAirlineLaborMission`) em company **listed**; ranking companies só `va_listed`; API resolve `pilotsCompanyId` (active listed ou membership); UI sempre mostra Airlines + Pilots com empty states; copy airline desk. Sem backfill de settles antigos. Fora desta fatia: world pilots, Freights market-hire board.
+
+**Ranking COALESCE boolean/int + UI declutter (2026-09-23):** sintoma = Airlines card “COALESCE types boolean and integer cannot be matched” + Refresh enorme + essays. Causa = `vaCompanyRanking` PG usava `COALESCE(va_listed, 0)` mas coluna é `BOOLEAN`. Fix = `c.va_listed IS TRUE`; UI sem help walls / botão Refresh (retry só no erro; detalhe no `?`).
 
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.
 

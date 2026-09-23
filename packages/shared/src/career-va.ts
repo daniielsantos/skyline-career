@@ -784,6 +784,7 @@ export function listCompanyHaulRanking(
        FROM company_haul_stats s
        JOIN companies c ON c.id = s.company_id
        WHERE s.day_key >= ? AND s.day_key <= ?
+         AND IFNULL(c.va_listed, 0) != 0
        GROUP BY s.company_id
        ORDER BY nm DESC, hauls DESC
        LIMIT ?`,

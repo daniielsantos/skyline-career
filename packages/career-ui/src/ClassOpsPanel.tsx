@@ -13,10 +13,11 @@ export function ClassOpsPanel(props: {
   if (!ops?.classes) {
     return (
       <section className="cargo-ops-panel class-ops-panel" aria-label="Class Ops">
-        <h3>Class Ops</h3>
-        <p className="muted">
-          Unlock freighter classes with flight hours and clean settles. Light GA
-          and turboprop start open; Medium is optional beside Light jet.
+        <div className="cargo-ops-head">
+          <h3>Class Ops</h3>
+        </div>
+        <p className="muted cargo-ops-empty">
+          Unlocks with hours and clean settles on freights.
         </p>
       </section>
     );
@@ -29,32 +30,26 @@ export function ClassOpsPanel(props: {
 
   return (
     <section className="cargo-ops-panel class-ops-panel" aria-label="Class Ops">
-      <h3>Class Ops</h3>
-      <p className="muted cargo-ops-lede">
-        Starters (Light GA / turboprop) are always open. Jet or Medium unlocks
-        Narrow; Narrow unlocks Wide. Contract crew flights count — empty ferry /
-        reposition legs do not.
-      </p>
-
-      <p className="class-ops-status-line" role="status">
-        <strong>
-          {unlockedCount}/{CLASS_OPS_PROGRESS_IDS.length}
-        </strong>{' '}
-        ladder classes unlocked
-        <span className="muted">
-          {' '}
-          · starters always open
-        </span>
-      </p>
+      <div className="cargo-ops-head">
+        <h3>Class Ops</h3>
+        <div className="cargo-ops-meta">
+          <span
+            className="cargo-ops-chip"
+            title="Ladder classes (Light GA / turboprop start open)"
+          >
+            {unlockedCount}/{CLASS_OPS_PROGRESS_IDS.length}
+          </span>
+        </div>
+      </div>
 
       {next ? (
         <div className="cargo-ops-next" aria-label="Next class unlock">
-          <p className="cargo-ops-next-label">Next unlock</p>
+          <p className="cargo-ops-next-label">Next</p>
           <p className="cargo-ops-next-title">{next.label}</p>
-          <p className="muted cargo-ops-next-lede">{next.summary}</p>
+          <p className="cargo-ops-next-progress">{next.summary}</p>
         </div>
       ) : (
-        <p className="cargo-ops-all-open muted">All freighter classes unlocked.</p>
+        <p className="cargo-ops-all-open muted">All classes open.</p>
       )}
 
       <ul className="cargo-ops-tiers">
@@ -77,22 +72,16 @@ export function ClassOpsPanel(props: {
                 <div className="cargo-ops-tier-title">
                   <strong>{progress.label}</strong>
                   {progress.unlocked ? (
-                    <span className="class-ops-badge open">Unlocked</span>
+                    <span className="class-ops-badge open">Open</span>
                   ) : isNext ? (
-                    <span className="cargo-ops-next-tag">Working toward</span>
+                    <span className="cargo-ops-next-tag">Next</span>
                   ) : (
                     <span className="class-ops-badge locked">Locked</span>
                   )}
                 </div>
               </div>
-              {progress.summary ? (
-                <p
-                  className={
-                    progress.unlocked
-                      ? 'cargo-ops-progress class-ops-stats'
-                      : 'cargo-ops-progress muted'
-                  }
-                >
+              {progress.unlocked && progress.summary ? (
+                <p className="cargo-ops-progress class-ops-stats">
                   {progress.summary}
                 </p>
               ) : null}

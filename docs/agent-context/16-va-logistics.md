@@ -1,7 +1,7 @@
 # VA logistics — air bridge + desk automation
 
 Atualizado 2026-09-22. **UI copy:** directory = **Airlines**, desk = **Crew**, personal = **Company** (rotas/API `/api/va*` e códigos `VA-` intactos).
-Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d. Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
+Atualizado 2026-09-23. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d (airline desk labor). Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.
 **Doc 2026-09-19:** dual-tenant membro; **member route cut shipped**; **ferry ops shipped** (Line crew + allowance NPC + overflow home); MX owner-only; **member progression home ladder shipped** (gates + settle XP).
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
@@ -58,6 +58,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 **Pilot career hours + settle “for you” (2026-09-23):** sintoma = membro não via cut/clean/hours no debrief; Hangar `0/8` sem explicar última perna; sem contador de horas de piloto (só hours no airframe / Class Ops). Fix = `pilotFlightHours` + `lastSettleOutcome` na home; settle aplica hours + hangar note; debrief bloco **For you** (pay line, note, +Xh); Class Ops no debrief só se ladder ainda aberta; card dismissível `VaMemberBriefCard` no My VA. Sem fórmula de reputação por hours.
 
 **Cuts chip unlabeled (2026-09-23):** sintoma = Airlines directory `Cuts 50% / 50%` e Config readonly sem dizer o quê é cada %. Causa = pair compacto sem labels. Fix = `Mkt N% · Desk N%` + `title` tooltip (`va-cuts-copy.ts`: market hire = Freights/Charter; desk = Demand/Haul; % do net → home).
+
+**Ranking empty / IH-only (2026-09-23):** sintoma = página Ranking “No Internal Haul stats yet” apesar de Demand/Wide haul settled. Causa = `vaRecordHaulStats` só em `internalHaul===true`; board Airlines/Pilots copy IH; Pilots card escondido quando vazio; company ranking sem filtro `va_listed`. Fix = gravar desk labor (`isVaAirlineLaborMission`) em company **listed**; ranking companies só `va_listed`; API resolve `pilotsCompanyId` (active listed ou membership); UI sempre mostra Airlines + Pilots com empty states; copy airline desk. Sem backfill de settles antigos. Fora desta fatia: world pilots, Freights market-hire board.
 
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.
 
@@ -194,7 +196,7 @@ Hard rule: airline cut **max 60** — nunca ≥ solo. Listar VA vazia **não** d
 
 1. **Board Internal Haul** — voar pontes WH→WH que a VA montou; pay interno → wallet home.
 2. **Roster / roles** — pilot ou dispatcher; invite / request.
-3. **Ranking 7d** — company + strip de pilots.
+3. **Ranking 7d** — Airlines (desk labor nm/hauls on listed VAs) + Pilots strip for your listed VA.
 4. **Hangar da VA** — ver/usar cascos da company listada (mesmo wallet/frota do owner).
 5. **Airline labor cut** — Demand/Haul pagam melhor que Freights no mesmo casco VA.
 
@@ -1037,6 +1039,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] Fase 1 auto-buy
 - [x] Fase 2 scout
 - [x] IH-2 members + board interno + ranking 7d
+- [x] **Ranking airline desk** — Demand/Wide/IH → haul_stats (listed); pilots board always on; listed-only companies (2026-09-23)
 - [x] Fase 3 / IH-3: VA auto-haul desk (Scout bridges, caps, ≥2 members) (2026-09-21)
 - [ ] UI surplus/tight por commodity no Ports / região
 - [ ] IH-3 extras: OD allowlist / pay fine-tune UI / Demand auto

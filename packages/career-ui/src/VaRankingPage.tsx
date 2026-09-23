@@ -16,6 +16,7 @@ export function VaRankingPage(props: Props) {
   const [windowDays, setWindowDays] = useState(7);
   const [companies, setCompanies] = useState<VaCompanyRank[]>([]);
   const [pilots, setPilots] = useState<VaPilotRank[]>([]);
+  const [pilotsCompanyId, setPilotsCompanyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,6 +29,7 @@ export function VaRankingPage(props: Props) {
       setWindowDays(r.windowDays);
       setCompanies(r.companies);
       setPilots(r.pilots);
+      setPilotsCompanyId(r.pilotsCompanyId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -42,7 +44,9 @@ export function VaRankingPage(props: Props) {
   if (!canShow) {
     return (
       <section className="panel va-panel">
-        <p className="settings-help">Sign in to see airline Internal Haul rankings.</p>
+        <p className="settings-help">
+          Sign in to see airline desk rankings.
+        </p>
       </section>
     );
   }
@@ -51,10 +55,11 @@ export function VaRankingPage(props: Props) {
     <section className="panel va-panel">
       <div className="settings-grid">
         <div className="settings-card">
-          <h3>Airline ranking · {windowDays} days</h3>
+          <h3>Airlines · {windowDays} days</h3>
           <p className="settings-help">
-            Internal Haul distance and count. Flight quality is settle score +
-            on-time over the same window (shown when enough flights).
+            Airline desk labor (Demand, Wide haul, Internal Haul) — distance and
+            count on listed VAs. Flight quality is settle score + on-time over
+            the same window (shown when enough flights).
           </p>
           {error ? (
             <p className="error" role="alert">
@@ -71,7 +76,8 @@ export function VaRankingPage(props: Props) {
           </button>
           {companies.length === 0 ? (
             <p className="settings-sample" style={{ marginTop: '0.75rem' }}>
-              No Internal Haul stats yet.
+              No airline desk stats yet. Settle Demand, Wide haul, or Internal
+              Haul on a listed VA to appear.
             </p>
           ) : (
             <ol
@@ -97,12 +103,21 @@ export function VaRankingPage(props: Props) {
           )}
         </div>
 
-        {pilots.length > 0 ? (
-          <div className="settings-card">
-            <h3>Pilots · this airline</h3>
-            <p className="settings-help">
-              Ranking for your active company over the same window.
+        <div className="settings-card">
+          <h3>Pilots · this airline</h3>
+          <p className="settings-help">
+            Same window, members of your listed VA. Freights / Charter market
+            hire do not count here.
+          </p>
+          {!pilotsCompanyId ? (
+            <p className="settings-sample">
+              Join or publish a listed airline to see crew ranking.
             </p>
+          ) : pilots.length === 0 ? (
+            <p className="settings-sample">
+              No airline desk flights for this crew in the window yet.
+            </p>
+          ) : (
             <ol className="settings-sample" style={{ paddingLeft: '1.1rem' }}>
               {pilots.map((p) => (
                 <li key={p.accountId} style={{ marginBottom: '0.35rem' }}>
@@ -110,8 +125,8 @@ export function VaRankingPage(props: Props) {
                 </li>
               ))}
             </ol>
-          </div>
-        ) : null}
+          )}
+        </div>
       </div>
     </section>
   );

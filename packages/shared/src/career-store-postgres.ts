@@ -1430,6 +1430,7 @@ export class PostgresCareerStore implements CareerStore {
        FROM company_haul_stats s
        JOIN companies c ON c.id = s.company_id
        WHERE s.day_key >= $1 AND s.day_key <= $2
+         AND COALESCE(c.va_listed, 0) != 0
        GROUP BY s.company_id, c.display_name
        ORDER BY nm DESC, hauls DESC
        LIMIT $3`,

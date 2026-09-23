@@ -84,10 +84,10 @@ export const PAGE_HELP = {
     title: 'How Ranking works',
     kicker: 'Page guide',
     bullets: [
-      'Seven-day Internal Haul stats across listed airlines — distance and haul count.',
+      'Seven-day airline desk labor across listed VAs — Demand, Wide haul, and Internal Haul (nm + haul count).',
       'Flight quality rides along when the airline has enough scored settles.',
-      'Pilot strip shows members of your active company when you have one.',
-      'Settle hauls from Dispatch after flying WH→WH bridges from Ports.',
+      'Pilots board ranks members of your listed VA over the same window.',
+      'Freights / Charter market hire do not count on this board — settle desk work from Hauls / Ports.',
     ],
   },
   hangar: {
@@ -98,7 +98,7 @@ export const PAGE_HELP = {
       'Aircraft must be at the mission origin with you. Travel moves the pilot; ferry moves the airframe (often empty).',
       'Inspect, then repair. Hours raise MX cost and cut resale. Parked frames pay daily parking (assigned and leased-out do not).',
       'Pax shows Charter seats. “dual” / “needs pax” means cargo glass + passenger glass on the same SKU — not the Cargo kg payload line.',
-      'Cargo Ops (sub-tab here) unlocks Market commodities and freighter classes. Dry/Light starters are open; Medium and Jet climb the ladder.',
+      'Cargo Ops / Class Ops: next checklist + tier list — no essay. Pilot hours and lease chips in the header.',
       'Company home (Base) unlocks parking and Jet-A/MRO perks. Cashflow is the ledger — freights, fuel, leases, shop, parking.',
     ],
   },

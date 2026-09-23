@@ -4,8 +4,6 @@ import {
   CARGO_OPS_COMMODITY_LABELS,
   CARGO_OPS_TIERS,
   cargoOpsNextUnlockChecks,
-  cargoOpsUnlockProgress,
-  type CargoOpsTierId,
 } from './cargo-ops-unlock';
 
 function payMultHint(rep: number): string {
@@ -14,6 +12,11 @@ function payMultHint(rep: number): string {
   if (rep < 70) return 'pay ×1.00';
   if (rep < 85) return 'pay ×1.08';
   return 'pay ×1.15';
+}
+
+function formatHours(hours: number): string {
+  const n = Math.round(hours * 10) / 10;
+  return `${n}h`;
 }
 
 /** Compact Cargo Ops ladder for Hangar / Career. */
@@ -32,25 +35,43 @@ export function CargoOpsPanel(props: {
     Number.isFinite(props.pilotFlightHours)
       ? props.pilotFlightHours
       : null;
+  const leaseShort = props.leaseUnlockHint
+    ? props.leaseUnlockHint
+        .replace(/^Lease unlock:\s*/i, '')
+        .replace(/\s*clean Dry freights \(on-time\)\.?/i, '')
+        .trim()
+    : null;
+
+  const meta = (
+    <div className="cargo-ops-meta">
+      {hours != null ? (
+        <span className="cargo-ops-chip" title="Career flight hours on this company">
+          Pilot {formatHours(hours)}
+        </span>
+      ) : null}
+      {leaseShort ? (
+        <span
+          className="cargo-ops-chip"
+          title="Clean on-time Dry freights to unlock aircraft lease"
+        >
+          Lease {leaseShort}
+        </span>
+      ) : null}
+    </div>
+  );
+
   if (!ops?.commodities) {
     return (
       <section className="cargo-ops-panel" aria-label="Cargo Ops">
-        <h3>Cargo Ops</h3>
-        <p className="muted">Progression unlocks after your first freight settle.</p>
-        {hours != null && hours > 0 ? (
-          <p className="cargo-ops-side-note">
-            <span className="cargo-ops-side-note-label">Pilot</span>
-            {hours}h career
-          </p>
-        ) : null}
+        <div className="cargo-ops-head">
+          <h3>Cargo Ops</h3>
+          {meta}
+        </div>
+        <p className="muted cargo-ops-empty">Unlocks after your first freight settle.</p>
         {props.lastSettleNote ? (
-          <p className="cargo-ops-side-note">
-            <span className="cargo-ops-side-note-label">Last flight</span>
+          <p className="cargo-ops-last" title={props.lastSettleNote}>
             {props.lastSettleNote}
           </p>
-        ) : null}
-        {props.leaseUnlockHint ? (
-          <p className="cargo-ops-side-note">{props.leaseUnlockHint}</p>
         ) : null}
       </section>
     );
@@ -60,32 +81,21 @@ export function CargoOpsPanel(props: {
 
   return (
     <section className="cargo-ops-panel" aria-label="Cargo Ops">
-      <h3>Cargo Ops</h3>
-      <p className="muted cargo-ops-lede">
-        Tiers are an <strong>unlock path</strong>, not ranked by price. Dry trains
-        you; Value is high $/kg; Time is deadline-sensitive; Heavy is bulk weight.
-        Pay rises with each commodity&apos;s own rep after unlock.
-      </p>
-
-      {hours != null ? (
-        <p className="cargo-ops-side-note">
-          <span className="cargo-ops-side-note-label">Pilot</span>
-          {hours}h career
-        </p>
-      ) : null}
+      <div className="cargo-ops-head">
+        <h3>Cargo Ops</h3>
+        {meta}
+      </div>
 
       {props.lastSettleNote ? (
-        <p className="cargo-ops-side-note">
-          <span className="cargo-ops-side-note-label">Last flight</span>
+        <p className="cargo-ops-last" title={props.lastSettleNote}>
           {props.lastSettleNote}
         </p>
       ) : null}
 
       {nextUnlock ? (
         <div className="cargo-ops-next" aria-label="Next unlock">
-          <p className="cargo-ops-next-label">Next unlock</p>
+          <p className="cargo-ops-next-label">Next</p>
           <p className="cargo-ops-next-title">{nextUnlock.tierLabel}</p>
-          <p className="muted cargo-ops-next-lede">{nextUnlock.lede}</p>
           <ul className="cargo-ops-checklist">
             {nextUnlock.checks.map((check) => (
               <li
@@ -101,15 +111,8 @@ export function CargoOpsPanel(props: {
           </ul>
         </div>
       ) : (
-        <p className="cargo-ops-all-open muted">All freight commodities unlocked.</p>
+        <p className="cargo-ops-all-open muted">All commodities open.</p>
       )}
-
-      {props.leaseUnlockHint ? (
-        <p className="cargo-ops-side-note">
-          <span className="cargo-ops-side-note-label">Lease</span>
-          {props.leaseUnlockHint.replace(/^Lease unlock:\s*/i, '')}
-        </p>
-      ) : null}
 
       <ul className="cargo-ops-tiers">
         {CARGO_OPS_TIERS.map((tier) => {
@@ -123,10 +126,6 @@ export function CargoOpsPanel(props: {
               nextUnlock.tierLabel.startsWith('Value')) ||
               (tier.id === 'time' && nextUnlock.tierLabel.startsWith('Time')) ||
               (tier.id === 'heavy' && nextUnlock.tierLabel.startsWith('Heavy')));
-          const progress = cargoOpsUnlockProgress(
-            ops,
-            tier.id as CargoOpsTierId,
-          );
           return (
             <li
               key={tier.id}
@@ -140,21 +139,16 @@ export function CargoOpsPanel(props: {
             >
               <div className="cargo-ops-tier-head">
                 <div className="cargo-ops-tier-title">
-                  <strong>
-                    {unlocked ? '●' : '○'} {tier.label}
-                  </strong>
-                  {isNext ? (
-                    <span className="cargo-ops-next-tag">working toward</span>
-                  ) : null}
-                  {!unlocked && !isNext ? (
-                    <span className="cargo-ops-lock">Locked</span>
-                  ) : null}
+                  <strong>{tier.label}</strong>
+                  {unlocked ? (
+                    <span className="class-ops-badge open">Open</span>
+                  ) : isNext ? (
+                    <span className="cargo-ops-next-tag">Next</span>
+                  ) : (
+                    <span className="class-ops-badge locked">Locked</span>
+                  )}
                 </div>
-                <p className="muted cargo-ops-tier-lede">{tier.lede}</p>
               </div>
-              {progress.summary && !isNext ? (
-                <p className="cargo-ops-progress muted">{progress.summary}</p>
-              ) : null}
               <ul className="cargo-ops-commodities">
                 {tier.commodityIds.map((id) => {
                   const row = ops.commodities[id];
@@ -171,12 +165,11 @@ export function CargoOpsPanel(props: {
                           {CARGO_OPS_COMMODITY_LABELS[id]}
                         </span>
                         {row.unlocked ? (
-                          <span>
-                            rep {row.rep} · {row.settlesOk} clean ·{' '}
-                            {payMultHint(row.rep)}
+                          <span title={payMultHint(row.rep)}>
+                            {row.rep} · {row.settlesOk} clean
                           </span>
                         ) : (
-                          <span className="muted">Locked — see checklist above</span>
+                          <span className="muted">—</span>
                         )}
                       </div>
                       {row.unlocked ? (

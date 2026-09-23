@@ -410,6 +410,14 @@ describe('VA IH-2', () => {
     );
     const companyId = reg.company!.id;
     await Promise.resolve(
+      store.vaPublish({
+        companyId,
+        actorAccountId: reg.account.id,
+        displayName: 'Ranker Air',
+        homeHubIcao: 'SBGR',
+      }),
+    );
+    await Promise.resolve(
       store.vaRecordHaulStats({
         companyId,
         accountId: reg.account.id,

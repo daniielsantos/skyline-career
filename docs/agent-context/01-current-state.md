@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **fa48b88a** / desktop **0.3.261** shipped: Add Logbook Settled/Cancelled filter and job-kind chips. Release: [v0.3.261](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.261).
+
+
 `main` **459fcc0b** / desktop **0.3.260** shipped: Add Logbook list cards and archived flight debrief for home and Crew. Release: [v0.3.260](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.260).
 
 

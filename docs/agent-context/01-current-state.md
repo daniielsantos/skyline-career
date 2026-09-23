@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **eb059c87** / desktop **0.3.265** shipped: Revert "Add Payload Load vs Stations schematic toggle without touching inject." Release: [v0.3.265](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.265).
+
+
 `main` **23f2a925** / desktop **0.3.264** shipped: Add Payload Load vs Stations schematic toggle without touching inject. Release: [v0.3.264](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.264).
 
 

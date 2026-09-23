@@ -584,14 +584,6 @@ export type LoadVerificationPayload = {
   ok: boolean;
   stations?: Record<number, number>;
   stationMax?: Record<number, number>;
-  /** Pack/OFP station roles for Load narrative schematic (Crew/Pax/Cargo). */
-  stationRoles?: {
-    crewStations?: number[];
-    passengerStations?: number[];
-    baggageStations?: number[];
-    serviceStations?: number[];
-    averagePassengerWeight?: number;
-  };
 };
 
 /**

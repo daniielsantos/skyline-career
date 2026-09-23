@@ -4,10 +4,6 @@ Jets de passageiro no Career: freight vai na **cabine + leftover cargo**, não `
 
 SimBrief Dispatch usa **175+55 lb/assento** (`paxwgt`/`bagwgt`). O Due do Preflight **não** é o klb do contrato no topo (isso é freight da missão). Due = payload OFP (pax+bags+cargo), depois os ajustes abaixo.
 
-## Payload schematic — Load vs Stations (UI only)
-
-Preflight tile **Payload** defaults to **Load**: Crew / Pax / Cargo buckets from `stationRoles` (`crewStations` / `passengerStations` / `baggageStations` → Cargo), same `--schematic-fill` cells. Toggle **Stations** shows `S1…Sn` for homologation. Preference: `localStorage` `airframe.payloadSchematicMode`. **Does not** change Loaded vs Due, inject, or Watch math.
-
 **Charter (2026-09-07; bag prefill 2026-09-12):** manifesto é indivisível:
 Dispatch manda `pax=N` exato e bagagem **só** via `acdata.bagwgt`
 (lb/pax = bagagem÷N). **Não** mandar `cargo=` junto — SimBrief soma

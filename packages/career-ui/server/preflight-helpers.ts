@@ -30,7 +30,6 @@ import {
   type FuelTankBreakdown,
   type MissionIntent,
   type OfpExpectation,
-  type OfpStationRoleMap,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
 import { applyOfpOverrides } from '../../agent/src/ofp-compliance/parse-ofp.ts';
@@ -126,8 +125,6 @@ export type PreflightCheckResult = {
         ok: boolean;
         stations?: Record<number, number>;
         stationMax?: Record<number, number>;
-        /** Pack/OFP roles for Payload Load narrative (not the Due-collapsed map). */
-        stationRoles?: OfpStationRoleMap;
       };
     aircraft: { onGround: boolean; enginesRunning: boolean };
     cg?: {
@@ -697,9 +694,6 @@ export async function runMissionPreflight(
             ? { stations: { ...live.payload.stations } }
             : {}),
           ...(stationMax ? { stationMax } : {}),
-          ...(ofp.payload?.stationRoles
-            ? { stationRoles: ofp.payload.stationRoles }
-            : {}),
         },
         aircraft: {
           onGround: live.onGround,
@@ -814,7 +808,6 @@ export function lastPreflightFromInjectLive(opts: {
           cargoLb?: number;
           crewLb?: number;
           stationMax?: unknown;
-          stationRoles?: unknown;
         };
         cg?: {
           liveMac?: number;
@@ -897,9 +890,6 @@ export function lastPreflightFromInjectLive(opts: {
         ...(crewLb > 0 ? { crewLb } : {}),
         ...(prevLv?.payload.stationMax
           ? { stationMax: prevLv.payload.stationMax }
-          : {}),
-        ...(prevLv?.payload.stationRoles
-          ? { stationRoles: prevLv.payload.stationRoles }
           : {}),
       },
       ...(liveMac !== undefined || minMac !== undefined || maxMac !== undefined

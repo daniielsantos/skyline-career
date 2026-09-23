@@ -19132,21 +19132,20 @@ export function App() {
               ) : null}
 
               {stagingMxFuelWarn ? (
-                <p className="banner warn">
-                  MX burn +{mxFuelBurn!.excessPct}% (condition{' '}
-                  {Math.round(mxFuelBurn!.conditionPct)}%) — this airframe may
-                  need more fuel than a healthy plan on this route
-                  {typeof mxFuelBurn!.baseBlockFuelKg === 'number'
-                    ? ` (healthy ~${formatMassExact(mxFuelBurn!.baseBlockFuelKg, weightSystem)}`
-                    : ''}
-                  {typeof mxFuelBurn!.blockFuelKg === 'number' &&
-                  typeof mxFuelBurn!.baseBlockFuelKg === 'number'
-                    ? ` → worn ~${formatMassExact(mxFuelBurn!.blockFuelKg, weightSystem)})`
-                    : typeof mxFuelBurn!.baseBlockFuelKg === 'number'
-                      ? ')'
-                      : ''}
-                  . Dispatch still uses SimBrief OFP for Due — repair before long
-                  legs; excess wear burn is debited on settle.
+                <p
+                  className="banner warn"
+                  title={
+                    typeof mxFuelBurn!.baseBlockFuelKg === 'number'
+                      ? `Healthy ~${formatMassExact(mxFuelBurn!.baseBlockFuelKg, weightSystem)}${
+                          typeof mxFuelBurn!.blockFuelKg === 'number'
+                            ? ` → worn ~${formatMassExact(mxFuelBurn!.blockFuelKg, weightSystem)}`
+                            : ''
+                        }. Due matches SimBrief — excess debited on settle.`
+                      : 'Due matches SimBrief — excess wear burn debited on settle.'
+                  }
+                >
+                  MX burn +{mxFuelBurn!.excessPct}% · cond{' '}
+                  {Math.round(mxFuelBurn!.conditionPct)}% — excess at settle
                 </p>
               ) : null}
 

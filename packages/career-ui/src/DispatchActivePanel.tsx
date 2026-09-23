@@ -31,7 +31,7 @@ import {
   stabilizeDisplayedFuel,
   matchFuelOk,
 } from './load-verification';
-import { mxFuelBurnAlertText } from './mx-fuel-burn';
+import { mxFuelBurnAlertText, mxFuelBurnAlertTitle } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
 import { CargoLotCards } from './CargoLotCards';
 import { playPreflightReadySound, notePreflightNotReady } from './ui-sounds';
@@ -872,7 +872,11 @@ export function DispatchActivePanel(props: {
               <span>{props.missionFuelQuote.quote.uplift.scarcity}</span>
             </div>
             {props.mxFuelBurnAlert ? (
-              <p className="banner warn mx-fuel-burn-alert" role="status">
+              <p
+                className="banner warn mx-fuel-burn-alert"
+                role="status"
+                title={mxFuelBurnAlertTitle(props.mxFuelBurnAlert)}
+              >
                 {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
               </p>
             ) : null}
@@ -928,7 +932,11 @@ export function DispatchActivePanel(props: {
             <strong>Could not calculate OFP fuel purchase</strong>
             <p>{props.missionFuelQuoteError}</p>
             {props.mxFuelBurnAlert ? (
-              <p className="banner warn mx-fuel-burn-alert" role="status">
+              <p
+                className="banner warn mx-fuel-burn-alert"
+                role="status"
+                title={mxFuelBurnAlertTitle(props.mxFuelBurnAlert)}
+              >
                 {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
               </p>
             ) : null}
@@ -940,7 +948,11 @@ export function DispatchActivePanel(props: {
               <strong>Checking persisted aircraft fuel…</strong>
               <p>Comparing the career tank with OFP block fuel.</p>
               {props.mxFuelBurnAlert ? (
-                <p className="banner warn mx-fuel-burn-alert" role="status">
+                <p
+                  className="banner warn mx-fuel-burn-alert"
+                  role="status"
+                  title={mxFuelBurnAlertTitle(props.mxFuelBurnAlert)}
+                >
                   {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
                 </p>
               ) : null}
@@ -1013,7 +1025,11 @@ export function DispatchActivePanel(props: {
           </dl>
           <p>{preflightWaitHint}</p>
           {props.mxFuelBurnAlert ? (
-            <p className="banner warn mx-fuel-burn-alert" role="status">
+            <p
+              className="banner warn mx-fuel-burn-alert"
+              role="status"
+              title={mxFuelBurnAlertTitle(props.mxFuelBurnAlert)}
+            >
               {mxFuelBurnAlertText(props.mxFuelBurnAlert)}
             </p>
           ) : null}
@@ -1903,7 +1919,15 @@ export function DispatchActivePanel(props: {
                 )}
                 {props.mxFuelBurnAlert ||
                 check.findings.some((f) => f.code === 'MX_FUEL_BURN') ? (
-                  <p className="banner warn mx-fuel-burn-alert" role="status">
+                  <p
+                    className="banner warn mx-fuel-burn-alert"
+                    role="status"
+                    title={
+                      props.mxFuelBurnAlert
+                        ? mxFuelBurnAlertTitle(props.mxFuelBurnAlert)
+                        : undefined
+                    }
+                  >
                     {props.mxFuelBurnAlert
                       ? mxFuelBurnAlertText(props.mxFuelBurnAlert)
                       : (check.findings.find((f) => f.code === 'MX_FUEL_BURN')

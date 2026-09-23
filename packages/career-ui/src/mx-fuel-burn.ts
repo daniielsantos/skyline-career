@@ -52,6 +52,11 @@ export function mxFuelBurnFromAircraft(
 
 /** Short pilot-facing copy for fuel load / preflight banners. */
 export function mxFuelBurnAlertText(alert: MxFuelBurnAlert): string {
+  return `MX burn +${alert.excessPct}% · cond ${Math.round(alert.conditionPct)}% — excess at settle`;
+}
+
+/** Longer explanation for title/tooltip (Due = SimBrief; debit on repair/settle). */
+export function mxFuelBurnAlertTitle(alert: MxFuelBurnAlert): string {
   return (
     `This airframe burns about +${alert.excessPct}% more fuel than healthy ` +
     `(condition ${Math.round(alert.conditionPct)}%). ` +

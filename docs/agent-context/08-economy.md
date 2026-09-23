@@ -23,6 +23,7 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 - **Economy events soft-cap (2026-09-20):** teto ativo escala com regioes (ceil(regions/10), min 4 / max 24); spawn base ~7%/h com catch-up leve se <50% cheio; prefere regiao sem evento; **multiplicadores inalterados** (sem Dry).
 - Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
 - **MX fuel settle-only (2026-09-01):** wear &lt;90% → Watch **accrue** excess burn in flight (no sim writes); settle debita do tank career (`settledMxFuelDrainKg`). Inject e clássico iguais. Offline: `estimateMxFuelDrainKgForSettle`.
+- **MX burn banner copy (2026-09-23):** Dispatch alert encurtado → `MX burn +N% · cond N% — excess at settle` (essay no `title` hover). Finding `MX_FUEL_BURN` alinhado.
 - **Fuel audit (2026-09-20):** pipeline Watch→settle→`fuel_kg` **ok**. Gaps restantes: ~airframes sem flow no catálogo (override ao voar); ferry sem MX excess; inject≠hangar (desenho).
 - **Fuel settle harden (2026-09-20):** `resolveSettledAircraftFuelKg` usa `max(Watch ledger, estimate)`; residual capped ao hangar (sem fuel grátis do sim); floor `hangar − tripBurn − mx` preserva surplus pré-OFP; Watch accrue dt cap **15 min** + backfill desde `airborneAtMs` no 1º step.
 - **MX fuel / hangar fuelKg audit (2026-09-20):**

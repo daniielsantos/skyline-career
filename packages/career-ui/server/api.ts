@@ -1110,11 +1110,7 @@ function mxFuelBurnFindingForAircraft(
   return {
     code: 'MX_FUEL_BURN',
     severity: 'warn',
-    message:
-      `This airframe burns about +${excessPct}% more fuel than healthy ` +
-      `(condition ${Math.round(mxBurn.conditionPct)}%). ` +
-      `Due still matches the SimBrief OFP — repair before long legs or settle ` +
-      `will debit the excess burn from your hangar tank.`,
+    message: `MX burn +${excessPct}% · cond ${Math.round(mxBurn.conditionPct)}% — excess at settle`,
   };
 }
 

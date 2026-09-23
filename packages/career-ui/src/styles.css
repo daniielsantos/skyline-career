@@ -4651,6 +4651,180 @@ tr.lot-locked {
   grid-template-columns: 1fr;
 }
 
+.logbook-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.logbook-card {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel, #12161c) 88%, transparent);
+  overflow: hidden;
+}
+
+.logbook-card.is-selected {
+  border-color: color-mix(in srgb, var(--accent, #6ea8d6) 55%, var(--line));
+}
+
+.logbook-card-hit {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 0.85rem 1.1rem;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.logbook-card-hit.is-static {
+  cursor: default;
+}
+
+button.logbook-card-hit:hover {
+  background: color-mix(in srgb, var(--accent, #6ea8d6) 6%, transparent);
+}
+
+button.logbook-card-hit:focus-visible {
+  outline: 2px solid var(--accent, #6ea8d6);
+  outline-offset: -2px;
+}
+
+.logbook-card-od {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+}
+
+.logbook-card-icao {
+  font-weight: 500;
+}
+
+.logbook-card-arrow {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.logbook-card-aircraft {
+  margin: 0.28rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.logbook-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.logbook-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem 0.65rem;
+}
+
+.logbook-card-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.logbook-card-metric-label {
+  color: var(--muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.logbook-card-metric-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logbook-card-pay {
+  color: var(--ok, #7dcea0);
+}
+
+.logbook-card-score.is-good {
+  color: var(--ok, #7dcea0);
+}
+
+.logbook-card-score.is-warn {
+  color: var(--danger, #e07a7a);
+}
+
+.logbook-card-score.is-ok {
+  color: var(--text);
+}
+
+.logbook-card-score.is-muted {
+  color: var(--muted);
+}
+
+.logbook-card-when {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+.logbook-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.logbook-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.logbook-detail-hero {
+  margin: 0;
+}
+
+@media (max-width: 860px) {
+  .logbook-card-hit {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+
+  .logbook-card-when {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .logbook-card-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .logbook-kind {
   display: inline-flex;
   align-items: center;

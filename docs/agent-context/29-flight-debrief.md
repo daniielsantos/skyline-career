@@ -28,3 +28,17 @@ Glance layout inspired by other career addons: **three pillars first**, money/sc
 - Não copiar radar/XP% do outro addon
 - Não retunar payout/score só por layout
 - Briefing onboarding global (origin/board/map) = fora de escopo; My VA member brief = stepper em `VaMemberBriefCard` (ver `16-va-logistics.md`)
+
+## Logbook list + detail (2026-09-23)
+
+**Sintoma:** Logbook home + Crew eram listas densas (route + prose) sem glance de score/tempo nem reabrir o debrief.
+
+**Causa:** UI monolítica em `App` / `VaPage`; dados settled já existiam na missão (`settledFlightScore`, runway, duration) mas só no sheet pós-settle.
+
+**Fix:**
+- Lista: `LogbookFlightCard` (OD + Time/Dist/Pay/Score) — home + My VA
+- Detalhe: `LogbookFlightDetail` + `buildLogbookDebriefFromMission` → mesmos 3 pilares / runway / score
+- Sem inventar trail/XP; active legs não abrem detail (só Dispatch)
+- Pay: home = cut (`pilotPayoutUsd`); VA company = bruto rota
+
+Ver também `16-va-logistics.md` (My VA Logbook).

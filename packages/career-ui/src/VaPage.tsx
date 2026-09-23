@@ -49,16 +49,11 @@ import { getStoredCompanyId } from './career-company-client';
 import { VA_CUTS_TOOLTIP } from './va-cuts-copy';
 import { useConfirm } from './ConfirmDialog';
 import {
-  logbookAircraftLabel,
-  logbookCargoLabel,
   logbookCompanyPayoutUsd,
-  logbookDistanceNm,
-  logbookFlightDurationLabel,
-  logbookFlightKind,
-  logbookFlightWhenLabel,
-  logbookStatusLabel,
   vaLogbookPilotLabel,
 } from './logbook';
+import { LogbookFlightCard } from './LogbookFlightCard';
+import { LogbookFlightDetail } from './LogbookFlightDetail';
 
 /** Browser-safe OD progress (mirrors shared flightTrackProgressPct). */
 function liveRouteProgressPct(opts: {
@@ -300,6 +295,10 @@ export function VaPage(props: Props) {
   const [logbookMissions, setLogbookMissions] = useState<Mission[]>([]);
   const [logbookBusy, setLogbookBusy] = useState(false);
   const [logbookError, setLogbookError] = useState<string | null>(null);
+  /** Company Logbook list → archived debrief. */
+  const [logbookDetailMissionId, setLogbookDetailMissionId] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -753,6 +752,15 @@ export function VaPage(props: Props) {
         b.id.localeCompare(a.id),
     );
   }, [logbookMissions]);
+
+  useEffect(() => {
+    if (pane !== 'logbook') setLogbookDetailMissionId(null);
+  }, [pane]);
+
+  const formatVaMass = useCallback(
+    (kg: number) => `${Math.round(kg).toLocaleString('en-US')} kg`,
+    [],
+  );
 
   if (!canShow) {
     return (
@@ -1598,70 +1606,70 @@ export function VaPage(props: Props) {
                   <BusyBlock label="Loading flights…" />
                 </div>
               ) : (
-                <>
-                  <p className="panel-stats">
-                    {logbookRows.length} flights
-                  </p>
-                  <ul className="mission-list logbook-list va-logbook-list">
-                    {logbookRows.map((m) => {
-                      const kind = logbookFlightKind(m);
-                      const distanceNm = logbookDistanceNm(m);
-                      const duration = logbookFlightDurationLabel(m);
-                      const when = logbookFlightWhenLabel(m);
-                      const payout = logbookCompanyPayoutUsd(m);
-                      const pilot = vaLogbookPilotLabel(m, ledgerMemberNames);
-                      const fleetLabel = m.aircraftId
-                        ? hangarFleet.find((a) => a.id === m.aircraftId)?.label
-                        : null;
-                      return (
-                        <li key={m.id} className="mission logbook-entry">
-                          <div className="mission-main">
-                            <div className="route">
-                              <span>{m.originIcao}</span>
-                              <span className="arrow">→</span>
-                              <span>{m.destIcao}</span>
-                              <span className={`status status-${m.status}`}>
-                                {logbookStatusLabel(m.status)}
-                              </span>
-                              <span className="logbook-kind">{kind}</span>
-                              <span
-                                className="logbook-kind logbook-pilot"
-                                title="Pilot who flew this leg"
-                              >
-                                {pilot}
-                              </span>
-                            </div>
-                            <p className="logbook-summary">
-                              {logbookAircraftLabel(m, { fleetLabel })}
-                              {' · '}
-                              {logbookCargoLabel(m, (kg) =>
-                                `${Math.round(kg).toLocaleString('en-US')} kg`,
+                (() => {
+                  const detailMission = logbookDetailMissionId
+                    ? logbookRows.find((m) => m.id === logbookDetailMissionId)
+                    : undefined;
+                  if (detailMission) {
+                    const fleetLabel = detailMission.aircraftId
+                      ? hangarFleet.find((a) => a.id === detailMission.aircraftId)
+                          ?.label
+                      : null;
+                    return (
+                      <LogbookFlightDetail
+                        mission={detailMission}
+                        formatMoney={formatBoardMoney}
+                        formatMass={formatVaMass}
+                        payoutMode="company"
+                        fleetLabel={fleetLabel}
+                        pilotLabel={vaLogbookPilotLabel(
+                          detailMission,
+                          ledgerMemberNames,
+                        )}
+                        onBack={() => setLogbookDetailMissionId(null)}
+                      />
+                    );
+                  }
+                  return (
+                    <>
+                      <p className="panel-stats">
+                        {logbookRows.length} flights
+                      </p>
+                      <ul className="mission-list logbook-list logbook-card-list va-logbook-list">
+                        {logbookRows.map((m) => {
+                          const fleetLabel = m.aircraftId
+                            ? hangarFleet.find((a) => a.id === m.aircraftId)
+                                ?.label
+                            : null;
+                          return (
+                            <LogbookFlightCard
+                              key={m.id}
+                              mission={m}
+                              formatMoney={formatBoardMoney}
+                              formatMass={formatVaMass}
+                              payoutUsd={logbookCompanyPayoutUsd(m)}
+                              fleetLabel={fleetLabel}
+                              pilotLabel={vaLogbookPilotLabel(
+                                m,
+                                ledgerMemberNames,
                               )}
-                              {' · '}
-                              {distanceNm != null
-                                ? `${distanceNm.toLocaleString('en-US')} nm`
-                                : 'Distance —'}
-                              {' · '}
-                              {duration ?? 'Time —'}
-                              {' · '}
-                              {when ?? 'When —'}
-                              {' · '}
-                              {payout != null
-                                ? formatBoardMoney(payout)
-                                : '—'}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                    {logbookRows.length === 0 ? (
-                      <li className="empty">
-                        No airline flights yet — accept Freights, Charter, or Internal
-                        Haul on a company aircraft.
-                      </li>
-                    ) : null}
-                  </ul>
-                </>
+                              selected={logbookDetailMissionId === m.id}
+                              onOpen={(mission) =>
+                                setLogbookDetailMissionId(mission.id)
+                              }
+                            />
+                          );
+                        })}
+                        {logbookRows.length === 0 ? (
+                          <li className="empty">
+                            No airline flights yet — accept Freights, Charter, or
+                            Internal Haul on a company aircraft.
+                          </li>
+                        ) : null}
+                      </ul>
+                    </>
+                  );
+                })()
               )}
             </>
           )}

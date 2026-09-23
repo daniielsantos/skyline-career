@@ -273,19 +273,13 @@ import { CommodityIcon } from './CommodityIcon';
 import type { CareerCargoOps, CareerClassOps, LastSettleOutcome } from './api';
 import { HubNetworkMap } from './HubNetworkMap';
 import {
-  logbookAircraftLabel,
-  logbookCargoLabel,
-  logbookDistanceNm,
-  logbookFlightDurationLabel,
-  logbookFlightKind,
-  logbookFlightWhenLabel,
-  logbookIsVaFlight,
   logbookPayoutIsPilotCut,
   logbookPayoutUsd,
-  logbookStatusLabel,
   mergeLogbookMissions,
   filterVaMissionsForPilot,
 } from './logbook';
+import { LogbookFlightCard } from './LogbookFlightCard';
+import { LogbookFlightDetail } from './LogbookFlightDetail';
 import {
   liveRefreshScope,
   type CareerRefreshScope,
@@ -3587,6 +3581,10 @@ export function App() {
   });
   const [regionPressure, setRegionPressure] = useState<RegionPressure[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
+  /** Home Logbook list → archived debrief (settled/failed). */
+  const [logbookDetailMissionId, setLogbookDetailMissionId] = useState<
+    string | null
+  >(null);
   const [busy, setBusy] = useState(false);
   /** Chunked time-advance progress (dev +1 / +3 / +7 / +14 / +30 day skips). */
   const [tickAdvance, setTickAdvance] = useState<{
@@ -7905,6 +7903,7 @@ export function App() {
   function selectTab(next: Tab) {
     setAirportReturn(null);
     setSidebarOpen(false);
+    if (next !== 'missions') setLogbookDetailMissionId(null);
     const home = homeCompanyIdRef.current?.trim();
     // Keep VA tenant while an active Dispatch mission needs that company
     // (member accepted Freights/Charter on a VA tail).
@@ -21062,103 +21061,81 @@ export function App() {
         </section>
       ) : !hubSelected ? null : (
         <section className="panel logbook-panel">
-          <div className="panel-head">
-            <p className="panel-stats">
-              {missions.length} flights recorded · read-only history.
-            </p>
-            {activeMission ? (
-              <button
-                type="button"
-                className="accept"
-                onClick={() => selectTab('staging')}
-                disabled={busy}
-              >
-                Open Dispatch
-              </button>
-            ) : null}
-          </div>
-          <ul className="mission-list logbook-list">
-            {[...missions]
-              .sort(
-                (a, b) =>
-                  (b.acceptedAtTick ?? 0) - (a.acceptedAtTick ?? 0) ||
-                  b.id.localeCompare(a.id),
-              )
-              .map((m) => {
-                const kind = logbookFlightKind(m);
-                const distanceNm = logbookDistanceNm(m);
-                const duration = logbookFlightDurationLabel(m);
-                const when = logbookFlightWhenLabel(m);
-                const payout = logbookPayoutUsd(m);
-                const payoutIsCut = logbookPayoutIsPilotCut(m);
-                const vaFlight = logbookIsVaFlight(m);
-                const fleetLabel = m.aircraftId
-                  ? fleet.find((a) => a.id === m.aircraftId)?.label
-                  : null;
-                return (
-                  <li key={m.id} className="mission logbook-entry">
-                    <div className="mission-main">
-                      <div className="route">
-                        <IcaoLink
-                          icao={m.originIcao}
-                          onOpen={openAirport}
-                          disabled={busy}
+          {(() => {
+            const detailMission = logbookDetailMissionId
+              ? missions.find((m) => m.id === logbookDetailMissionId)
+              : undefined;
+            if (detailMission) {
+              const fleetLabel = detailMission.aircraftId
+                ? fleet.find((a) => a.id === detailMission.aircraftId)?.label
+                : null;
+              return (
+                <LogbookFlightDetail
+                  mission={detailMission}
+                  formatMoney={formatMoney}
+                  formatMass={(kg) => formatTonnes(kg)}
+                  payoutMode="pilot"
+                  fleetLabel={fleetLabel}
+                  onBack={() => setLogbookDetailMissionId(null)}
+                />
+              );
+            }
+            return (
+              <>
+                <div className="panel-head">
+                  <p className="panel-stats">
+                    {missions.length} flights recorded · read-only history.
+                  </p>
+                  {activeMission ? (
+                    <button
+                      type="button"
+                      className="accept"
+                      onClick={() => selectTab('staging')}
+                      disabled={busy}
+                    >
+                      Open Dispatch
+                    </button>
+                  ) : null}
+                </div>
+                <ul className="mission-list logbook-list logbook-card-list">
+                  {[...missions]
+                    .sort(
+                      (a, b) =>
+                        (b.acceptedAtTick ?? 0) - (a.acceptedAtTick ?? 0) ||
+                        b.id.localeCompare(a.id),
+                    )
+                    .map((m) => {
+                      const payout = logbookPayoutUsd(m);
+                      const fleetLabel = m.aircraftId
+                        ? fleet.find((a) => a.id === m.aircraftId)?.label
+                        : null;
+                      return (
+                        <LogbookFlightCard
+                          key={m.id}
+                          mission={m}
+                          formatMoney={formatMoney}
+                          formatMass={(kg) => formatTonnes(kg)}
+                          payoutUsd={payout}
+                          payoutIsCut={logbookPayoutIsPilotCut(m)}
+                          fleetLabel={fleetLabel}
+                          selected={logbookDetailMissionId === m.id}
+                          onOpen={(mission) =>
+                            setLogbookDetailMissionId(mission.id)
+                          }
+                          onOperate={() => selectTab('staging')}
+                          operateDisabled={busy}
                         />
-                        <span className="arrow">→</span>
-                        <IcaoLink
-                          icao={m.destIcao}
-                          onOpen={openAirport}
-                          disabled={busy}
-                        />
-                        <span className={`status status-${m.status}`}>
-                          {logbookStatusLabel(m.status)}
-                        </span>
-                        <span className="logbook-kind">{kind}</span>
-                        {vaFlight ? (
-                          <span className="logbook-kind logbook-va" title="Flown for a listed airline">
-                            Airline
-                          </span>
-                        ) : null}
-                        {isActiveMissionStatus(m.status) ? (
-                          <button
-                            type="button"
-                            className="linkish"
-                            onClick={() => selectTab('staging')}
-                            disabled={busy}
-                          >
-                            Operate in Dispatch
-                          </button>
-                        ) : null}
-                      </div>
-                      <p className="logbook-summary">
-                        {logbookAircraftLabel(m, { fleetLabel })}
-                        {' · '}
-                        {logbookCargoLabel(m, formatTonnes)}
-                        {' · '}
-                        {distanceNm != null
-                          ? `${distanceNm.toLocaleString('en-US')} nm`
-                          : 'Distance —'}
-                        {' · '}
-                        {duration ?? 'Time —'}
-                        {' · '}
-                        {when ?? 'When —'}
-                        {' · '}
-                        {payout != null
-                          ? payoutIsCut
-                            ? `${formatMoney(payout)} cut`
-                            : formatMoney(payout)
-                          : '—'}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            {missions.length === 0 ? (
-              <li className="empty">
-                No flights logged yet — prepare a freight from Freights.
-              </li>
-            ) : null}
-          </ul>
+                      );
+                    })}
+                  {missions.length === 0 ? (
+                    <li className="empty">
+                      No flights logged yet — prepare a freight from Freights.
+                    </li>
+                  ) : null}
+                </ul>
+              </>
+            );
+          })()}
         </section>
       )}
 

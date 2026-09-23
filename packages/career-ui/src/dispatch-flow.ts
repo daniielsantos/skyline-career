@@ -507,6 +507,57 @@ export function buildFlightDebrief(opts: {
   };
 }
 
+/**
+ * Rebuild a FlightDebrief from a settled/failed mission for Logbook detail.
+ * Soft defaults when late/onTime weren't persisted on older saves.
+ */
+export function buildLogbookDebriefFromMission(mission: Mission): FlightDebrief {
+  const payoutUsd =
+    typeof mission.payoutUsd === 'number' && Number.isFinite(mission.payoutUsd)
+      ? mission.payoutUsd
+      : mission.status === 'failed'
+        ? 0
+        : mission.payUsd;
+  const penaltyUsd =
+    typeof mission.penaltyUsd === 'number' && Number.isFinite(mission.penaltyUsd)
+      ? mission.penaltyUsd
+      : 0;
+  const lateTicks =
+    typeof mission.lateTicks === 'number' && Number.isFinite(mission.lateTicks)
+      ? mission.lateTicks
+      : 0;
+  const impactEnded =
+    mission.status === 'failed' &&
+    (mission.failReason === 'impact' || mission.failReason === 'crash');
+  return buildFlightDebrief({
+    mission,
+    settlement: {
+      payoutUsd,
+      penaltyUsd,
+      lateTicks,
+      onTime: lateTicks <= 0 && !impactEnded,
+      deliveredKg: impactEnded ? 0 : mission.cargoKg,
+      residualFuelKg:
+        typeof mission.settledFuelKg === 'number' &&
+        Number.isFinite(mission.settledFuelKg)
+          ? mission.settledFuelKg
+          : null,
+      landingFpm: mission.settledLandingFpm ?? null,
+      flightDurationMs: mission.settledFlightDurationMs ?? null,
+      flightScore: mission.settledFlightScore ?? null,
+      weatherBonusUsd: mission.settledWeatherBonusUsd ?? 0,
+      weatherOps: mission.settledWeatherOps ?? null,
+      runwayTouch: mission.settledRunwayTouch ?? null,
+      cargoOpsDeltas: [],
+      classOpsDeltas: [],
+      impactEnded,
+      payLine: impactEnded
+        ? 'Flight ended — impact away from destination.'
+        : null,
+    },
+  });
+}
+
 export function resolveLoadPath(
   mission: Mission,
   preferManualLoad: boolean,

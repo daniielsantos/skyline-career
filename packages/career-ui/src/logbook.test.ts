@@ -16,6 +16,8 @@ import {
   filterVaMissionsForPilot,
   vaLogbookPilotLabel,
   logbookCompanyPayoutUsd,
+  logbookScorePct,
+  logbookHasDetail,
   formatEconomyClock,
 } from './logbook.js';
 
@@ -300,6 +302,28 @@ describe('logbookStatusLabel', () => {
   it('humanizes status chips', () => {
     assert.equal(logbookStatusLabel('in_flight'), 'In flight');
     assert.equal(logbookStatusLabel('settled'), 'Settled');
+  });
+});
+
+describe('logbookScorePct / logbookHasDetail', () => {
+  it('rounds settled score and gates detail to finished legs', () => {
+    assert.equal(
+      logbookScorePct(
+        mission({
+          settledFlightScore: {
+            earned: 44,
+            max: 51,
+            pct: 86.4,
+            categories: [],
+          },
+        }),
+      ),
+      86,
+    );
+    assert.equal(logbookScorePct(mission()), null);
+    assert.equal(logbookHasDetail(mission({ status: 'settled' })), true);
+    assert.equal(logbookHasDetail(mission({ status: 'failed' })), true);
+    assert.equal(logbookHasDetail(mission({ status: 'in_flight' })), false);
   });
 });
 

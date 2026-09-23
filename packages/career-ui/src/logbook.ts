@@ -248,6 +248,22 @@ export function logbookCompanyPayoutUsd(mission: Mission): number | null {
   return null;
 }
 
+/** Settled flight score % (0–100), when Watch captured a card. */
+export function logbookScorePct(mission: Mission): number | null {
+  const pct = mission.settledFlightScore?.pct;
+  if (typeof pct !== 'number' || !Number.isFinite(pct)) return null;
+  return Math.round(pct);
+}
+
+/** Completed/failed legs can open the archived debrief detail. */
+export function logbookHasDetail(mission: Mission): boolean {
+  return (
+    mission.status === 'completed' ||
+    mission.status === 'settled' ||
+    mission.status === 'failed'
+  );
+}
+
 const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 

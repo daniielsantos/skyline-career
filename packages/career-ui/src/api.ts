@@ -518,6 +518,11 @@ export type Mission = {
   charterTier?: string;
   payUsd: number;
   payoutUsd?: number;
+  /** Late delivery penalty deducted from payUsd. */
+  penaltyUsd?: number;
+  lateTicks?: number;
+  /** Set when status is failed — e.g. impact from Watch crash detection. */
+  failReason?: string;
   urgency: string;
   aircraftClassId: string;
   /** Concrete Market airframe assigned to this flight. */

@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-23: **Logbook list + detail** — cards Time/Dist/Pay/Score + archived debrief (home + Crew). Spec: [`29-flight-debrief.md`](./29-flight-debrief.md).
+
 Atualizado 2026-09-23: **Airlines profile map** — directory → perfil (HQ + ports/WH no mapa). Spec: [`16-va-logistics.md`](./16-va-logistics.md).
 
 Atualizado 2026-09-23: **Ranking PG COALESCE + declutter** — `va_listed IS TRUE`; UI sem Refresh/essays. Spec: [`16-va-logistics.md`](./16-va-logistics.md).

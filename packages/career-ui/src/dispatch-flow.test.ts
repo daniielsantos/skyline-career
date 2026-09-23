@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { Mission, MissionSettlement } from './api.ts';
 import {
   buildFlightDebrief,
+  buildLogbookDebriefFromMission,
   buildDebriefPillars,
   deriveDispatchStep,
   dispatchStepStatusLine,
@@ -433,6 +434,55 @@ describe('buildFlightDebrief', () => {
       formatCargoOpsDebriefLine(debrief.cargoOpsDeltas),
       /General \+4→59 · clean/,
     );
+  });
+});
+
+describe('buildLogbookDebriefFromMission', () => {
+  it('rebuilds pillars from settled mission fields', () => {
+    const debrief = buildLogbookDebriefFromMission(
+      mission({
+        status: 'settled',
+        payUsd: 5000,
+        payoutUsd: 4500,
+        penaltyUsd: 500,
+        lateTicks: 2,
+        settledLandingFpm: -185,
+        settledFlightDurationMs: 69 * 60_000,
+        settledFlightScore: {
+          earned: 44,
+          max: 51,
+          pct: 86,
+          categories: [],
+        },
+        fuelUplift: {
+          originIcao: 'SBSV',
+          requestedKg: 200,
+          deliveredKg: 200,
+          unitPriceUsd: 1,
+          costUsd: 800,
+          scarcity: 'ok',
+          upliftedAtTick: 10,
+        },
+      }),
+    );
+    assert.equal(debrief.payoutUsd, 4500);
+    assert.equal(debrief.penaltyUsd, 500);
+    assert.equal(debrief.onTime, false);
+    assert.equal(debrief.landingFpm, -185);
+    assert.equal(debrief.flightScore?.pct, 86);
+    assert.equal(buildDebriefPillars(debrief)[0]?.badge, 'Butter');
+  });
+
+  it('marks impact failed legs', () => {
+    const debrief = buildLogbookDebriefFromMission(
+      mission({
+        status: 'failed',
+        failReason: 'crash',
+        payoutUsd: 0,
+      }),
+    );
+    assert.equal(debrief.impactEnded, true);
+    assert.match(debrief.payLine ?? '', /impact/i);
   });
 });
 

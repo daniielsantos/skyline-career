@@ -704,6 +704,32 @@ export function VaPage(props: Props) {
     if (pane !== 'roster') setLivePilot(null);
   }, [pane]);
 
+  // Stable trail/aircraft props — avoid new array/object identity on every
+  // VaPage render (roster soft-poll) when the track snapshot did not change.
+  const liveMapTrail = useMemo(() => {
+    if (!liveTrack || liveTrack.points.length < 1) return null;
+    return liveTrack.points.map((p) => ({ lat: p.lat, lon: p.lon }));
+  }, [liveTrack]);
+  const liveMapAircraft = useMemo(() => {
+    const last = liveTrack?.points[liveTrack.points.length - 1];
+    if (last) return { lat: last.lat, lon: last.lon };
+    const trackLat = liveTrack?.lat;
+    const trackLon = liveTrack?.lon;
+    if (
+      typeof trackLat === 'number' &&
+      typeof trackLon === 'number' &&
+      Number.isFinite(trackLat) &&
+      Number.isFinite(trackLon) &&
+      !(trackLat === 0 && trackLon === 0)
+    ) {
+      return { lat: trackLat, lon: trackLon };
+    }
+    if (livePilot?.live) {
+      return { lat: livePilot.live.lat, lon: livePilot.live.lon };
+    }
+    return null;
+  }, [liveTrack, livePilot?.live]);
+
   useEffect(() => {
     // Wait until the VA tenant is pinned — a home-tenant cashflow looks like
     // "No ledger yet" while wallet/credit already show the VA from props.
@@ -1217,39 +1243,8 @@ export function VaPage(props: Props) {
                     origin={liveOrigin}
                     dest={liveDest}
                     plannedOd
-                    trail={
-                      liveTrack && liveTrack.points.length >= 1
-                        ? liveTrack.points.map((p) => ({
-                            lat: p.lat,
-                            lon: p.lon,
-                          }))
-                        : null
-                    }
-                    aircraft={(() => {
-                      // Same fix the trail tip uses — last crumb first (in-place
-                      // refresh). Snapshot lat/lon / members live are fallbacks.
-                      const last =
-                        liveTrack?.points[liveTrack.points.length - 1];
-                      if (last) return { lat: last.lat, lon: last.lon };
-                      const trackLat = liveTrack?.lat;
-                      const trackLon = liveTrack?.lon;
-                      if (
-                        typeof trackLat === 'number' &&
-                        typeof trackLon === 'number' &&
-                        Number.isFinite(trackLat) &&
-                        Number.isFinite(trackLon) &&
-                        !(trackLat === 0 && trackLon === 0)
-                      ) {
-                        return { lat: trackLat, lon: trackLon };
-                      }
-                      if (livePilot.live) {
-                        return {
-                          lat: livePilot.live.lat,
-                          lon: livePilot.live.lon,
-                        };
-                      }
-                      return null;
-                    })()}
+                    trail={liveMapTrail}
+                    aircraft={liveMapAircraft}
                     aircraftLabel={(() => {
                       const last =
                         liveTrack?.points[liveTrack.points.length - 1];

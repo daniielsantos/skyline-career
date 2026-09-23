@@ -560,8 +560,28 @@ function routeCameraKey(
   const d = dest
     ? `${dest.icao}:${dest.lat.toFixed(4)},${dest.lon.toFixed(4)}`
     : '';
-  const trailKey = trail?.length ? 'trail' : '';
+  const trailKey = plannedOd ? '' : trail?.length ? 'trail' : '';
   return `${originRole ?? 'dep'}|${origin.icao}:${origin.lat.toFixed(4)},${origin.lon.toFixed(4)}|${d}|${w}|od:${plannedOd ? 1 : 0}|${trailKey}`;
+}
+
+function liveLayersSyncKey(
+  origin: DispatchRouteEndpoint,
+  dest: DispatchRouteEndpoint | null | undefined,
+  trail: Array<{ lat: number; lon: number }> | null | undefined,
+  aircraft: DispatchAircraftPosition | null | undefined,
+): string {
+  const tip = resolveLiveTip(trail, aircraft);
+  const n = trail?.length ?? 0;
+  const last = n > 0 ? trail![n - 1]! : null;
+  const tipBit =
+    tip && usableAircraftPosition(tip)
+      ? `${tip.lat.toFixed(4)},${tip.lon.toFixed(4)}`
+      : '';
+  const lastBit =
+    last && Number.isFinite(last.lat) && Number.isFinite(last.lon)
+      ? `${last.lat.toFixed(4)},${last.lon.toFixed(4)}`
+      : '';
+  return `${origin.icao}|${dest?.icao ?? ''}|${n}|${lastBit}|${tipBit}`;
 }
 
 export function DispatchRouteMap(props: {
@@ -604,6 +624,10 @@ export function DispatchRouteMap(props: {
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const fittedRouteKeyRef = useRef<string | null>(null);
+  const lastLiveSyncKeyRef = useRef<string>('');
+  const pendingLiveSyncRef = useRef(false);
+  const liveSyncPropsRef = useRef(props);
+  liveSyncPropsRef.current = props;
   const onSelectRef = useRef(props.onSelectAirport);
   onSelectRef.current = props.onSelectAirport;
 
@@ -620,21 +644,61 @@ export function DispatchRouteMap(props: {
     mapRef.current = map;
     fittedRouteKeyRef.current = null;
 
+    const flushLiveSync = () => {
+      if (!pendingLiveSyncRef.current) return;
+      if (map.isMoving()) return;
+      pendingLiveSyncRef.current = false;
+      const p = liveSyncPropsRef.current;
+      if (p.plannedOd) {
+        const key = liveLayersSyncKey(
+          p.origin,
+          p.dest,
+          p.trail,
+          p.aircraft,
+        );
+        lastLiveSyncKeyRef.current = key;
+        syncLiveTrackLayers(
+          map,
+          p.origin,
+          p.dest ?? null,
+          p.trail,
+          true,
+          p.aircraft,
+        );
+        return;
+      }
+      setAircraftOnMap(map, resolveLiveTip(null, p.aircraft));
+    };
+
+    map.on('moveend', flushLiveSync);
+    map.on('zoomend', flushLiveSync);
+
+    let resizeRaf = 0;
     const resizeObserver =
       typeof ResizeObserver !== 'undefined'
         ? new ResizeObserver(() => {
-            map.resize();
+            if (map.isMoving()) return;
+            cancelAnimationFrame(resizeRaf);
+            resizeRaf = requestAnimationFrame(() => {
+              if (map.isMoving()) return;
+              map.resize();
+            });
           })
         : null;
     resizeObserver?.observe(containerRef.current);
 
     return () => {
       resizeObserver?.disconnect();
+      cancelAnimationFrame(resizeRaf);
+      map.off('moveend', flushLiveSync);
+      map.off('zoomend', flushLiveSync);
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
       map.remove();
       mapRef.current = null;
       fittedRouteKeyRef.current = null;
+      lastLiveSyncKeyRef.current = '';
+      pendingLiveSyncRef.current = false;
     };
     // Map is created once; route updates happen in the paint effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
@@ -836,7 +900,8 @@ export function DispatchRouteMap(props: {
             });
           }
         }
-        map.resize();
+        // Do not map.resize() here — ResizeObserver owns that. Polling trail /
+        // parent re-renders were resizing mid-pan and stuttering Crew Live.
       } catch {
         // Style/source not ready yet — load/idle below retries.
       }
@@ -857,19 +922,32 @@ export function DispatchRouteMap(props: {
     props.dest,
     props.waypoints,
     props.segments,
-    props.trail,
+    // Crew Live trail ticks belong to the live effect — including trail here
+    // rebuilt DEP/ARR markers on every poll and fought the user's pan.
     props.plannedOd,
-    // Intentionally omit props.aircraft — position ticks belong to the live
-    // effect. Re-painting the OFP route on every Watch sample fought the AC layer.
     props.originRole,
   ]);
 
   // Crew Live — one tip drives AC + solid trail end + dashed remaining leg.
+  // Defer setData while the user is panning/zooming; flush on moveend.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const sync = () => {
+      const key = liveLayersSyncKey(
+        props.origin,
+        props.dest,
+        props.trail,
+        props.aircraft,
+      );
+      if (key === lastLiveSyncKeyRef.current) return;
+      if (map.isMoving()) {
+        pendingLiveSyncRef.current = true;
+        return;
+      }
+      lastLiveSyncKeyRef.current = key;
+      pendingLiveSyncRef.current = false;
       if (props.plannedOd) {
         syncLiveTrackLayers(
           map,
@@ -887,6 +965,9 @@ export function DispatchRouteMap(props: {
 
     if (map.isStyleLoaded()) sync();
     else map.once('load', sync);
+    return () => {
+      map.off('load', sync);
+    };
   }, [
     props.aircraft,
     props.plannedOd,

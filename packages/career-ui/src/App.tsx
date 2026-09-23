@@ -7463,6 +7463,8 @@ export function App() {
         const status = await postWatchStart({
           missionId: activeMission.id,
           intervalSec: 5,
+          companyId:
+            resolveOpsCompanyId(activeMission.aircraftId) || undefined,
         });
         // Late responses must not resurrect Watch while Preflight owns the pipe
         // (or after this effect was cancelled / remounted).
@@ -12052,6 +12054,7 @@ export function App() {
       const status = await postWatchStart({
         missionId: mission.id,
         intervalSec: 5,
+        companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
       });
       setWatch(status);
     } catch {

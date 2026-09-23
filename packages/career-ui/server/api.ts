@@ -426,6 +426,7 @@ import {
   worldAuthFromIncoming,
   type WorldApiAuth,
 } from './world-api-client.ts';
+import { createVaLiveUplink } from './va-live-uplink.ts';
 
 import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import {
@@ -3534,6 +3535,8 @@ export function createCareerApiServer(port = 8787) {
   if (isCareerWorldFixed()) {
     console.log('[career] world-fixed (CAREER_WORLD_FIXED=1) — clients attach, no profile gate');
   }
+  /** Account id captured on Watch start for full-mode local flight-track. */
+  let watchLiveAccountId: string | null = null;
   const watchSession = new CareerWatchSession({
     withCareerRead,
     withCareerWrite,
@@ -3546,6 +3549,38 @@ export function createCareerApiServer(port = 8787) {
           ),
         }
       : {}),
+    liveUplink: createVaLiveUplink({
+      worldClient:
+        careerApiMode === 'gateway' ? gatewayWorldClient : null,
+      getAuth: () =>
+        careerApiMode === 'gateway' ? gatewayAuthScope.current() : {},
+      recordLocal:
+        careerApiMode === 'gateway'
+          ? undefined
+          : (sample) => {
+              try {
+                recordFlightTrackSample({
+                  companyId: sample.companyId,
+                  accountId: sample.accountId,
+                  missionId: sample.missionId,
+                  originIcao: '',
+                  destIcao: '',
+                  lat: sample.lat,
+                  lon: sample.lon,
+                  altFt: sample.altFt,
+                  gsKt: sample.gsKt,
+                  phase: sample.phase ?? undefined,
+                  onGround:
+                    typeof sample.onGround === 'boolean'
+                      ? sample.onGround
+                      : undefined,
+                });
+              } catch {
+                /* soft */
+              }
+            },
+      getAccountId: () => watchLiveAccountId,
+    }),
   });
   const handleRequest = async (
     req: import('node:http').IncomingMessage,
@@ -14774,6 +14809,8 @@ export function createCareerApiServer(port = 8787) {
           settleRadiusNm?: number;
           pipeName?: string;
           allowDepartOverride?: boolean;
+          /** Ops company for Crew Live soft uplink (explicit VA id). */
+          companyId?: string;
         };
         if (!body.missionId) {
           send(res, 400, { error: 'missionId required' });
@@ -14787,6 +14824,14 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const session = authSessionFromRequest(req);
+          watchLiveAccountId = session?.account.id?.trim() || null;
+          const headerCompany =
+            careerApiMode === 'gateway'
+              ? worldAuthFromIncoming(req).companyId?.trim()
+              : companyIdFromRequest(req, body.companyId)?.trim();
+          const liveTrackCompanyId =
+            body.companyId?.trim() || headerCompany || undefined;
           const status = await watchSession.start({
             missionId: body.missionId,
             intervalSec: body.intervalSec,
@@ -14797,6 +14842,7 @@ export function createCareerApiServer(port = 8787) {
             settleRadiusNm: body.settleRadiusNm,
             pipeName: body.pipeName,
             allowDepartOverride: body.allowDepartOverride,
+            liveTrackCompanyId,
           });
           send(res, 200, status);
         } catch (error) {

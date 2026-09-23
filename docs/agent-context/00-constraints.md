@@ -39,7 +39,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 ## Watch / SimBridge / Crew Live
 
 - **Watch/SimBridge são sagrados.** Não alterar probe/Preflight/Watch auto-start/pipe ownership “por causa do Live”. Live não pode virar segundo dono do SimBridge.
-- Uplink Crew Live a partir de Watch/probe/Preflight ficou **removido** (2026-09-22). API/mapa Live podem existir; telemetria desktop **não** se reacopla sem confirmação explícita. Esboço aprovado (soft POST só do sample do Watch, sem segundo pipe): `16-va-logistics.md` → “Sketch: soft Live uplink”.
+- Uplink Crew Live = **soft POST do sample do Watch** only (2026-09-22 shipped). Sem segundo pipe / probe / Preflight. Detail: `16-va-logistics.md` → “Sketch: soft Live uplink”.
 - **Pipe hygiene (Watch, não Live):** depois do 1º Loaded vs Due, Preflight e probe **param** até Watch `running` (ou `in_flight`); Watch auto-start ~2s com LV. Reverter isso “junto com Live” quebra Ready→En route de novo.
 - Preflight **não** deve gravar `ORIGIN_NOT_ON_GROUND` como `location.ok=false` quando airborne **dentro** do raio (parece “NOT AT ORIGIN” com 0.3 nm ≤ 12).
 - Detail: `docs/agent-context/16-va-logistics.md` (Crew Live notes).

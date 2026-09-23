@@ -5017,10 +5017,16 @@ export function postWatchStart(opts: {
   requireDestProximity?: boolean;
   settleRadiusNm?: number;
   allowDepartOverride?: boolean;
+  /** Ops company for Crew Live soft uplink (VA / listed airline). */
+  companyId?: string;
 }) {
+  const companyId = opts.companyId?.trim();
   return api<WatchStatus>('/api/watch/start', {
     method: 'POST',
     body: JSON.stringify(opts),
+    ...(companyId
+      ? { headers: { 'X-Skyline-Company-Id': companyId } }
+      : {}),
   });
 }
 

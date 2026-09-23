@@ -338,6 +338,20 @@ type WatchCallbacks = {
   ) => Promise<boolean>;
   /** Gateway → world host HTTP mutations (optional). */
   worldMutations?: WatchWorldMutations;
+  /**
+   * Soft Crew Live uplink (optional). Fire-and-forget after a successful
+   * sample — must never open SimBridge or throw into the tick.
+   */
+  liveUplink?: { softReport: (sample: {
+    companyId: string;
+    missionId: string;
+    lat: number;
+    lon: number;
+    altFt?: number;
+    gsKt?: number;
+    phase?: string | null;
+    onGround?: boolean | null;
+  }) => void };
 };
 
 type WatchOptions = {
@@ -351,6 +365,11 @@ type WatchOptions = {
   pipeName?: string;
   /** Allow auto-depart even when lastPreflightCheck verdict is fail. */
   allowDepartOverride?: boolean;
+  /**
+   * Ops company for Crew Live soft uplink (explicit VA / listed airline id).
+   * Do not remap via sticky home — lesson from flight-track (l).
+   */
+  liveTrackCompanyId?: string;
 };
 
 function finiteNum(value: number | undefined): number | undefined {
@@ -1473,6 +1492,8 @@ export class CareerWatchSession {
   private pipeBackoffMs = 0;
   /** Next tick: IPC disconnect+connect (station TIMEOUT was swallowed). */
   private pendingSimConnectReset = false;
+  /** Ops company for soft Crew Live uplink (explicit; never sticky-home remap). */
+  private liveTrackCompanyId: string | null = null;
   private preflightDepartBlockedLogged = false;
   /**
    * Set while on ground within settle radius of mission origin (or Validate ok).
@@ -1704,6 +1725,9 @@ export class CareerWatchSession {
     // Idempotent for same mission even when the pipe is down — reconnect belongs
     // to tick backoff. stop()/start() on every UI retry was thrashing the host.
     if (this.running && this.missionId === opts.missionId) {
+      if (opts.liveTrackCompanyId?.trim()) {
+        this.liveTrackCompanyId = opts.liveTrackCompanyId.trim();
+      }
       watchDebugLog('watch', 'start skipped — already running', {
         missionId: opts.missionId,
         pipeConnected: this.bridge?.isPipeConnected ?? false,
@@ -1727,6 +1751,7 @@ export class CareerWatchSession {
       pipeName: opts.pipeName,
     };
     this.missionId = opts.missionId;
+    this.liveTrackCompanyId = opts.liveTrackCompanyId?.trim() || null;
     this.lastSample = null;
     this.lastPhase = null;
     this.intervalMs = watchIntervalMsForPhase('ground', {
@@ -1791,11 +1816,13 @@ export class CareerWatchSession {
     });
     if (!loaded) {
       this.missionId = null;
+      this.liveTrackCompanyId = null;
       throw new Error(`Unknown mission ${opts.missionId}`);
     }
     const { mission } = loaded;
     if (!['accepted', 'dispatched', 'in_flight'].includes(mission.status)) {
       this.missionId = null;
+      this.liveTrackCompanyId = null;
       throw new Error(`Mission ${mission.id} is ${mission.status} — nothing to watch`);
     }
     this.missionStatus = mission.status;
@@ -1987,6 +2014,7 @@ export class CareerWatchSession {
    */
   resetSession(): void {
     this.missionId = null;
+    this.liveTrackCompanyId = null;
     this.missionStatus = null;
     this.watchState = createMissionFlightWatchState();
     this.lastSample = null;
@@ -2127,6 +2155,37 @@ export class CareerWatchSession {
         missionId: this.missionId,
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  /**
+   * Soft Crew Live — re-post lat/lon already read this tick. Never awaits;
+   * never opens SimBridge; never throws into the tick path.
+   */
+  private softReportVaLiveTrack(sample: {
+    position?: { lat: number; lon: number };
+    altitudeFt?: number;
+    groundSpeedKt?: number;
+    onGround?: boolean;
+  }): void {
+    const companyId = this.liveTrackCompanyId?.trim();
+    const missionId = this.missionId?.trim();
+    const pos = sample.position;
+    if (!companyId || !missionId || !pos) return;
+    if (isOfpLoadActive()) return;
+    try {
+      this.cb.liveUplink?.softReport({
+        companyId,
+        missionId,
+        lat: pos.lat,
+        lon: pos.lon,
+        altFt: sample.altitudeFt,
+        gsKt: sample.groundSpeedKt,
+        phase: this.lastPhase,
+        onGround: sample.onGround,
+      });
+    } catch {
+      /* soft */
     }
   }
 
@@ -3293,6 +3352,8 @@ export class CareerWatchSession {
           },
         );
       }
+
+      this.softReportVaLiveTrack(sample);
 
       // Stable-cruise burn/TAS — use fuel flow from the flight batch (same IPC).
       // A separate 29-var flow read often TIMEOUTed and left the footer at 0/180s.

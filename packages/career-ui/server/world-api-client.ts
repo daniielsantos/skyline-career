@@ -203,6 +203,26 @@ export class WorldApiClient {
     });
   }
 
+  /** Soft Crew Live breadcrumb — Watch sample only (no SimBridge on world). */
+  postVaFlightTrack(
+    opts: {
+      companyId: string;
+      missionId: string;
+      lat: number;
+      lon: number;
+      altFt?: number;
+      gsKt?: number;
+      phase?: string;
+      onGround?: boolean;
+    },
+    auth?: WorldApiAuth,
+  ): Promise<unknown> {
+    return this.request('POST', '/api/va/flight-track', {
+      auth: mergeAuth(auth, { companyId: opts.companyId }),
+      body: opts,
+    });
+  }
+
   getAirport(
     icao: string,
     auth?: WorldApiAuth,

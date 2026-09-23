@@ -771,6 +771,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 
 **2026-09-22 (ac):** sintoma = Live ainda com label **AC** duplicado sob a bolinha. Causa = layer symbol `text-field: AC` + residual do HTML. Fix = só halo+dot GeoJSON; remove HTML marker e layer de label (strip legado se o mapa ainda tiver).
 
+**2026-09-22 (ad):** sintoma = Live AC “fixado” (bolinha atrás do tip / tip não acompanha taxi). Causa = AC preferia `trail[last]`; crumb só refreshava lat/lon sob `MIN_MOVE && POST_MIN`; snapshot não tinha lat/lon próprio (só alt/GS). Origin/dest do mapa = OD do voo (já hub) — **AC não precisa de âncora fixa**. Fix = snapshot `lat`/`lon` a cada sample; in-place tip sempre que `moved < MIN_MOVE`; mapa prefere `aircraft` (sample) sobre crumb; linha cola no fix; members `live` lê snapshot.
+
 **Cobertura esperada (aceitar gaps):**
 
 | Momento | Watch pipe | Live uplink |

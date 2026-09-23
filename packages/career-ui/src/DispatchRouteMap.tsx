@@ -353,13 +353,14 @@ function setAircraftOnMap(
 }
 
 /**
- * Tip of the live drawing: always the last trail crumb when present.
- * Prefer trail over a separate aircraft prop so AC cannot lag behind the line.
+ * Live AC tip: prefer the explicit aircraft fix (latest sample) over the trail
+ * crumb. Trail can lag a poll behind; AC must not stay glued to an old tip.
  */
 function resolveLiveTip(
   trail: Array<{ lat: number; lon: number }> | null | undefined,
   aircraft?: DispatchAircraftPosition | null,
 ): DispatchAircraftPosition | null {
+  if (usableAircraftPosition(aircraft)) return aircraft;
   if (trail && trail.length > 0) {
     const last = trail[trail.length - 1]!;
     if (
@@ -370,7 +371,7 @@ function resolveLiveTip(
       return { lat: last.lat, lon: last.lon };
     }
   }
-  return usableAircraftPosition(aircraft) ? aircraft : null;
+  return null;
 }
 
 function setTrailAndPlannedOd(
@@ -386,17 +387,31 @@ function setTrailAndPlannedOd(
   ensureFerryLayer(map);
   const cargoSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   const ferrySource = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
-  if (trail && trail.length >= 2) {
+  const tip = resolveLiveTip(trail, aircraft);
+  if (trail && trail.length >= 1) {
     const coords: [number, number][] = trail.map((p) => [p.lon, p.lat]);
-    cargoSource?.setData({
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'LineString', coordinates: coords },
-    });
+    // Glue the drawn trail to the live fix so AC is never orphaned ahead of
+    // the last crumb when the sample moved but a new point was not appended.
+    if (
+      tip &&
+      (coords.length === 0 ||
+        coords[coords.length - 1]![0] !== tip.lon ||
+        coords[coords.length - 1]![1] !== tip.lat)
+    ) {
+      coords.push([tip.lon, tip.lat]);
+    }
+    if (coords.length >= 2) {
+      cargoSource?.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: coords },
+      });
+    } else {
+      cargoSource?.setData(emptyLineFeature());
+    }
   } else {
     cargoSource?.setData(emptyLineFeature());
   }
-  const tip = resolveLiveTip(trail, aircraft);
   if (plannedOd && dest) {
     const from: LatLon = tip ?? origin;
     ferrySource?.setData({

@@ -118,6 +118,8 @@ describe('career flight track', () => {
     // Tip moves with the aircraft even when the crumb count stays 1.
     assert.equal(row?.points[0]?.lat, -23.0001);
     assert.equal(row?.points[0]?.lon, -47.0001);
+    assert.equal(row?.lat, -23.0001);
+    assert.equal(row?.lon, -47.0001);
   });
 
   it('resets trail on teleport jump instead of drawing a spike', () => {

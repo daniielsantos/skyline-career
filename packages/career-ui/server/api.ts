@@ -4266,27 +4266,41 @@ export function createCareerApiServer(port = 8787) {
             ['accepted', 'dispatched', 'in_flight'].includes(flight.status);
           const live =
             track &&
-            lastPt &&
             isFlightTrackFresh(track.updatedAtMs, nowMs) &&
             flightActive
-              ? {
-                  atMs: track.updatedAtMs,
-                  lat: lastPt.lat,
-                  lon: lastPt.lon,
-                  missionId: track.missionId,
-                  originIcao: track.originIcao,
-                  destIcao: track.destIcao,
-                  ...(track.phase ? { phase: track.phase } : {}),
-                  ...(typeof track.onGround === 'boolean'
-                    ? { onGround: track.onGround }
-                    : {}),
-                  ...(typeof track.altFt === 'number'
-                    ? { altFt: track.altFt }
-                    : {}),
-                  ...(typeof track.gsKt === 'number'
-                    ? { gsKt: track.gsKt }
-                    : {}),
-                }
+              ? (() => {
+                  const lat =
+                    typeof track.lat === 'number' ? track.lat : lastPt?.lat;
+                  const lon =
+                    typeof track.lon === 'number' ? track.lon : lastPt?.lon;
+                  if (
+                    typeof lat !== 'number' ||
+                    typeof lon !== 'number' ||
+                    !Number.isFinite(lat) ||
+                    !Number.isFinite(lon) ||
+                    (lat === 0 && lon === 0)
+                  ) {
+                    return null;
+                  }
+                  return {
+                    atMs: track.updatedAtMs,
+                    lat,
+                    lon,
+                    missionId: track.missionId,
+                    originIcao: track.originIcao,
+                    destIcao: track.destIcao,
+                    ...(track.phase ? { phase: track.phase } : {}),
+                    ...(typeof track.onGround === 'boolean'
+                      ? { onGround: track.onGround }
+                      : {}),
+                    ...(typeof track.altFt === 'number'
+                      ? { altFt: track.altFt }
+                      : {}),
+                    ...(typeof track.gsKt === 'number'
+                      ? { gsKt: track.gsKt }
+                      : {}),
+                  };
+                })()
               : null;
           return {
             ...m,

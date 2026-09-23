@@ -5388,6 +5388,9 @@ export type VaFlightTrack = {
   originIcao: string;
   destIcao: string;
   updatedAtMs: number;
+  /** Latest fix — prefer over points[last] for the AC marker. */
+  lat?: number;
+  lon?: number;
   phase?: string;
   onGround?: boolean;
   altFt?: number;

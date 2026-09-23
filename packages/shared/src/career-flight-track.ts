@@ -21,6 +21,13 @@ export type FlightTrackSnapshot = {
   originIcao: string;
   destIcao: string;
   updatedAtMs: number;
+  /**
+   * Latest fix — always overwritten on every sample (like alt/GS).
+   * Crew Live AC must follow these, not only trail[last], so taxi/hold
+   * below MIN_MOVE still moves the tip.
+   */
+  lat?: number;
+  lon?: number;
   /** Latest Watch phase / speed / alt (refreshed even when trail does not grow). */
   phase?: string;
   onGround?: boolean;
@@ -107,12 +114,22 @@ export function flightTrackProgressPct(opts: {
 function applyLiveTelemetry(
   row: StoreEntry,
   opts: {
+    lat?: number;
+    lon?: number;
     altFt?: number;
     gsKt?: number;
     phase?: string;
     onGround?: boolean;
   },
 ): void {
+  if (
+    typeof opts.lat === 'number' &&
+    typeof opts.lon === 'number' &&
+    isUsableFlightTrackPosition(opts.lat, opts.lon)
+  ) {
+    row.lat = opts.lat;
+    row.lon = opts.lon;
+  }
   if (typeof opts.altFt === 'number' && Number.isFinite(opts.altFt)) {
     row.altFt = opts.altFt;
   }
@@ -226,9 +243,10 @@ export function recordFlightTrackSample(opts: {
       store.set(key, row);
       return { ...row, points: [...row.points] };
     }
-    if (moved < FLIGHT_TRACK_MIN_MOVE_NM && atMs - last.atMs < FLIGHT_TRACK_POST_MIN_MS) {
-      // Refresh last crumb in place (taxi / hold) — move the tip to the new
-      // fix so Crew Live AC tracks without growing a crumb every tick.
+    if (moved < FLIGHT_TRACK_MIN_MOVE_NM) {
+      // Below crumb threshold: always move the tip in place (do not require
+      // POST_MIN). Skipping lat/lon here left Crew Live AC glued while alt/GS
+      // still refreshed on the snapshot.
       const refreshed = pointFromSample({
         lat: opts.lat,
         lon: opts.lon,

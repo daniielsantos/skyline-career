@@ -1152,13 +1152,29 @@ export function VaPage(props: Props) {
                             last?.gsKt ??
                             livePilot.live?.gsKt,
                         );
-                        const pct = last
-                          ? liveRouteProgressPct({
-                              origin: liveOrigin,
-                              dest: liveDest,
-                              aircraft: last,
-                            })
-                          : null;
+                        const pct = (() => {
+                          const lat =
+                            typeof liveTrack.lat === 'number'
+                              ? liveTrack.lat
+                              : last?.lat;
+                          const lon =
+                            typeof liveTrack.lon === 'number'
+                              ? liveTrack.lon
+                              : last?.lon;
+                          if (
+                            typeof lat !== 'number' ||
+                            typeof lon !== 'number' ||
+                            !Number.isFinite(lat) ||
+                            !Number.isFinite(lon)
+                          ) {
+                            return null;
+                          }
+                          return liveRouteProgressPct({
+                            origin: liveOrigin,
+                            dest: liveDest,
+                            aircraft: { lat, lon },
+                          });
+                        })();
                         return (
                           <>
                             {phaseLabel ? (
@@ -1209,23 +1225,29 @@ export function VaPage(props: Props) {
                           }))
                         : null
                     }
-                    aircraft={
-                      liveTrack?.points[liveTrack.points.length - 1]
-                        ? {
-                            lat: liveTrack.points[
-                              liveTrack.points.length - 1
-                            ]!.lat,
-                            lon: liveTrack.points[
-                              liveTrack.points.length - 1
-                            ]!.lon,
-                          }
-                        : livePilot.live
-                          ? {
-                              lat: livePilot.live.lat,
-                              lon: livePilot.live.lon,
-                            }
-                          : null
-                    }
+                    aircraft={(() => {
+                      const trackLat = liveTrack?.lat;
+                      const trackLon = liveTrack?.lon;
+                      if (
+                        typeof trackLat === 'number' &&
+                        typeof trackLon === 'number' &&
+                        Number.isFinite(trackLat) &&
+                        Number.isFinite(trackLon) &&
+                        !(trackLat === 0 && trackLon === 0)
+                      ) {
+                        return { lat: trackLat, lon: trackLon };
+                      }
+                      const last =
+                        liveTrack?.points[liveTrack.points.length - 1];
+                      if (last) return { lat: last.lat, lon: last.lon };
+                      if (livePilot.live) {
+                        return {
+                          lat: livePilot.live.lat,
+                          lon: livePilot.live.lon,
+                        };
+                      }
+                      return null;
+                    })()}
                     aircraftLabel={(() => {
                       const last =
                         liveTrack?.points[liveTrack.points.length - 1];

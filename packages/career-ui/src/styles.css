@@ -4647,6 +4647,61 @@ tr.lot-locked {
   align-items: end;
 }
 
+.logbook-panel-head {
+  align-items: start;
+}
+
+.logbook-panel-head-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  min-width: 0;
+}
+
+.va-logbook-head {
+  margin-bottom: 0.35rem;
+}
+
+.logbook-list-filter {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel, #12161c) 70%, transparent);
+  overflow: hidden;
+}
+
+.logbook-list-filter button {
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.logbook-list-filter button + button {
+  border-left: 1px solid var(--line);
+}
+
+.logbook-list-filter button.is-active {
+  background: color-mix(in srgb, var(--accent, #6ea8d6) 18%, transparent);
+  color: var(--text);
+}
+
+.logbook-list-filter button:focus-visible {
+  outline: 2px solid var(--accent, #6ea8d6);
+  outline-offset: -2px;
+}
+
 .logbook-list .logbook-entry {
   grid-template-columns: 1fr;
 }
@@ -4836,6 +4891,27 @@ button.logbook-card-hit:focus-visible {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.logbook-kind[data-kind='Demand'],
+.logbook-kind[data-kind='Haul'] {
+  border-color: color-mix(in srgb, var(--accent, #6ea8d6) 45%, var(--line));
+  color: var(--accent, #6ea8d6);
+}
+
+.logbook-kind[data-kind='Internal Haul'],
+.logbook-kind[data-kind='Bridge'] {
+  border-color: color-mix(in srgb, #c4a35a 45%, var(--line));
+  color: #c4a35a;
+}
+
+.logbook-kind[data-kind='Charter'] {
+  border-color: color-mix(in srgb, var(--ok, #7dcea0) 40%, var(--line));
+  color: var(--ok, #7dcea0);
+}
+
+.logbook-kind[data-kind='Ferry'] {
+  border-color: color-mix(in srgb, var(--muted) 60%, var(--line));
 }
 
 .logbook-va {

@@ -250,7 +250,7 @@ Membro **pode** voar **Freights / Demand / Charter** (e empty ferry) com **tail 
 11. **Logbook merge still empty (2026-09-20):** `warmCareerBeforeEnter` não setava `homeCompanyId`; merge exigia `home && va` → nunca puxava VA. Fix: stamp home no warm; merge todo tenant extra ≠ active; `GET /api/missions?companyId=` como Charter.
 12. **Logbook leaked other members’ VA flights (2026-09-20):** merge puxava o arquivo inteiro da company VA. Fix: `filterVaMissionsForPilot` (`pilotAccountId` / `pilotHomeCompanyId`; legacy unstamped só pro owner).
 13. **My VA Logbook tab (2026-09-20):** histórico da company (todos os membros) em My VA → Logbook; chip com nome do piloto; pay = bruto da rota. Logbook sidebar continua pessoal.
-14. **Logbook list + detail (2026-09-23):** cards compartilhados (`LogbookFlightCard` / `LogbookFlightDetail`) em home + Crew; click em settled/failed reabre pilares do debrief (`buildLogbookDebriefFromMission`). Sem trail inventado. Spec: [`29-flight-debrief.md`](./29-flight-debrief.md).
+14. **Logbook list + detail (2026-09-23):** cards compartilhados (`LogbookFlightCard` / `LogbookFlightDetail`) em home + Crew; click em settled/failed reabre pilares do debrief (`buildLogbookDebriefFromMission`). Sem trail inventado. Filtro Settled|Cancelled (default esconde cancelados). Spec: [`29-flight-debrief.md`](./29-flight-debrief.md).
 
 ### Charter board infinite loading (VA tail) — **shipped (2026-09-20)**
 

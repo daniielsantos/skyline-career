@@ -277,9 +277,12 @@ import {
   logbookPayoutUsd,
   mergeLogbookMissions,
   filterVaMissionsForPilot,
+  filterLogbookMissions,
+  type LogbookListFilter,
 } from './logbook';
 import { LogbookFlightCard } from './LogbookFlightCard';
 import { LogbookFlightDetail } from './LogbookFlightDetail';
+import { LogbookListFilterToggle } from './LogbookListFilterToggle';
 import {
   liveRefreshScope,
   type CareerRefreshScope,
@@ -3585,6 +3588,9 @@ export function App() {
   const [logbookDetailMissionId, setLogbookDetailMissionId] = useState<
     string | null
   >(null);
+  /** Default: hide cancelled prepares. */
+  const [logbookListFilter, setLogbookListFilter] =
+    useState<LogbookListFilter>('settled');
   const [busy, setBusy] = useState(false);
   /** Chunked time-advance progress (dev +1 / +3 / +7 / +14 / +30 day skips). */
   const [tickAdvance, setTickAdvance] = useState<{
@@ -7903,7 +7909,10 @@ export function App() {
   function selectTab(next: Tab) {
     setAirportReturn(null);
     setSidebarOpen(false);
-    if (next !== 'missions') setLogbookDetailMissionId(null);
+    if (next !== 'missions') {
+      setLogbookDetailMissionId(null);
+      setLogbookListFilter('settled');
+    }
     const home = homeCompanyIdRef.current?.trim();
     // Keep VA tenant while an active Dispatch mission needs that company
     // (member accepted Freights/Charter on a VA tail).
@@ -21080,12 +21089,34 @@ export function App() {
                 />
               );
             }
+            const settledRows = filterLogbookMissions(missions, 'settled');
+            const cancelledRows = filterLogbookMissions(missions, 'cancelled');
+            const listRows = filterLogbookMissions(missions, logbookListFilter)
+              .slice()
+              .sort(
+                (a, b) =>
+                  (b.acceptedAtTick ?? 0) - (a.acceptedAtTick ?? 0) ||
+                  b.id.localeCompare(a.id),
+              );
             return (
               <>
-                <div className="panel-head">
-                  <p className="panel-stats">
-                    {missions.length} flights recorded · read-only history.
-                  </p>
+                <div className="panel-head logbook-panel-head">
+                  <div className="logbook-panel-head-main">
+                    <p className="panel-stats">
+                      {logbookListFilter === 'cancelled'
+                        ? `${listRows.length} cancelled · ${settledRows.length} settled total`
+                        : `${listRows.length} flights · ${cancelledRows.length} cancelled hidden`}
+                    </p>
+                    <LogbookListFilterToggle
+                      value={logbookListFilter}
+                      onChange={(next) => {
+                        setLogbookListFilter(next);
+                        setLogbookDetailMissionId(null);
+                      }}
+                      settledCount={settledRows.length}
+                      cancelledCount={cancelledRows.length}
+                    />
+                  </div>
                   {activeMission ? (
                     <button
                       type="button"
@@ -21098,38 +21129,36 @@ export function App() {
                   ) : null}
                 </div>
                 <ul className="mission-list logbook-list logbook-card-list">
-                  {[...missions]
-                    .sort(
-                      (a, b) =>
-                        (b.acceptedAtTick ?? 0) - (a.acceptedAtTick ?? 0) ||
-                        b.id.localeCompare(a.id),
-                    )
-                    .map((m) => {
-                      const payout = logbookPayoutUsd(m);
-                      const fleetLabel = m.aircraftId
-                        ? fleet.find((a) => a.id === m.aircraftId)?.label
-                        : null;
-                      return (
-                        <LogbookFlightCard
-                          key={m.id}
-                          mission={m}
-                          formatMoney={formatMoney}
-                          formatMass={(kg) => formatTonnes(kg)}
-                          payoutUsd={payout}
-                          payoutIsCut={logbookPayoutIsPilotCut(m)}
-                          fleetLabel={fleetLabel}
-                          selected={logbookDetailMissionId === m.id}
-                          onOpen={(mission) =>
-                            setLogbookDetailMissionId(mission.id)
-                          }
-                          onOperate={() => selectTab('staging')}
-                          operateDisabled={busy}
-                        />
-                      );
-                    })}
-                  {missions.length === 0 ? (
+                  {listRows.map((m) => {
+                    const payout = logbookPayoutUsd(m);
+                    const fleetLabel = m.aircraftId
+                      ? fleet.find((a) => a.id === m.aircraftId)?.label
+                      : null;
+                    return (
+                      <LogbookFlightCard
+                        key={m.id}
+                        mission={m}
+                        formatMoney={formatMoney}
+                        formatMass={(kg) => formatTonnes(kg)}
+                        payoutUsd={payout}
+                        payoutIsCut={logbookPayoutIsPilotCut(m)}
+                        fleetLabel={fleetLabel}
+                        selected={logbookDetailMissionId === m.id}
+                        onOpen={(mission) =>
+                          setLogbookDetailMissionId(mission.id)
+                        }
+                        onOperate={() => selectTab('staging')}
+                        operateDisabled={busy}
+                      />
+                    );
+                  })}
+                  {listRows.length === 0 ? (
                     <li className="empty">
-                      No flights logged yet — prepare a freight from Freights.
+                      {logbookListFilter === 'cancelled'
+                        ? 'No cancelled flights.'
+                        : missions.length === 0
+                          ? 'No flights logged yet — prepare a freight from Freights.'
+                          : 'No settled flights — check Cancelled or fly a leg.'}
                     </li>
                   ) : null}
                 </ul>

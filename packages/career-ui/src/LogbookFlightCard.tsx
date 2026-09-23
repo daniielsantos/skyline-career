@@ -82,7 +82,9 @@ export function LogbookFlightCard(props: Props) {
           <span className={`status status-${m.status}`}>
             {logbookStatusLabel(m.status)}
           </span>
-          <span className="logbook-kind">{kind}</span>
+          <span className="logbook-kind" data-kind={kind}>
+            {kind}
+          </span>
           {vaFlight ? (
             <span
               className="logbook-kind logbook-va"

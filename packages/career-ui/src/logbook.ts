@@ -1,9 +1,43 @@
 import type { Mission } from './api';
 import { aircraftClassLabel } from './AircraftCards';
 
-export type LogbookFlightKind = 'Contract' | 'Ferry' | 'Charter' | 'Normal';
+export type LogbookFlightKind =
+  | 'Freights'
+  | 'Demand'
+  | 'Haul'
+  | 'Internal Haul'
+  | 'Bridge'
+  | 'Ferry'
+  | 'Charter'
+  | 'Contract';
 
-/** Contract crew / empty reposition / player freight. */
+/** List filter — default hides cancelled clutter. */
+export type LogbookListFilter = 'settled' | 'cancelled';
+
+/**
+ * Settled view = flown / live legs (not cancelled).
+ * Cancelled view = cancelled prepares only.
+ */
+export function logbookMatchesListFilter(
+  mission: Mission,
+  filter: LogbookListFilter,
+): boolean {
+  if (filter === 'cancelled') return mission.status === 'cancelled';
+  return mission.status !== 'cancelled';
+}
+
+export function filterLogbookMissions(
+  missions: readonly Mission[],
+  filter: LogbookListFilter,
+): Mission[] {
+  return missions.filter((m) => logbookMatchesListFilter(m, filter));
+}
+
+/**
+ * Job kind for logbook / Dispatch chips.
+ * Order: charter → empty ferry → contract crew → desk Demand → WH haul →
+ * Internal Haul → WH bridge → market Freights.
+ */
 export function logbookFlightKind(mission: Mission): LogbookFlightKind {
   if (mission.missionType === 'charter') return 'Charter';
   if (
@@ -14,7 +48,12 @@ export function logbookFlightKind(mission: Mission): LogbookFlightKind {
     return 'Ferry';
   }
   if (mission.contractPilot) return 'Contract';
-  return 'Normal';
+  if (mission.demandOrderId?.trim()) return 'Demand';
+  if (mission.warehouseHaul === true) return 'Haul';
+  if (mission.warehouseBridge === true) {
+    return mission.internalHaul === true ? 'Internal Haul' : 'Bridge';
+  }
+  return 'Freights';
 }
 
 export function logbookStatusLabel(status: string): string {

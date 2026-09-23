@@ -88,7 +88,9 @@ export function LogbookFlightDetail(props: Props) {
             : ''}
           {when ? ` · ${when}` : ''}
           {' · '}
-          <span className="logbook-kind">{kind}</span>
+          <span className="logbook-kind" data-kind={kind}>
+            {kind}
+          </span>
           {props.pilotLabel ? (
             <>
               {' · '}

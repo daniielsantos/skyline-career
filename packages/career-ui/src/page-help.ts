@@ -149,6 +149,7 @@ export const PAGE_HELP = {
     bullets: [
       'Each card shows route, time, distance, pay, and score when Watch recorded one.',
       'Open a settled or failed flight for the same Landing / Time / Fuel glance as Dispatch debrief.',
+      'Filter defaults to Settled (hides cancelled prepares); switch to Cancelled to review those.',
       'Airline tag marks flights flown for a listed company. Pay here is your home cut when stamped; My VA Logbook shows company gross.',
     ],
   },

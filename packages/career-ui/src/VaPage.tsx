@@ -51,9 +51,12 @@ import { useConfirm } from './ConfirmDialog';
 import {
   logbookCompanyPayoutUsd,
   vaLogbookPilotLabel,
+  filterLogbookMissions,
+  type LogbookListFilter,
 } from './logbook';
 import { LogbookFlightCard } from './LogbookFlightCard';
 import { LogbookFlightDetail } from './LogbookFlightDetail';
+import { LogbookListFilterToggle } from './LogbookListFilterToggle';
 
 /** Browser-safe OD progress (mirrors shared flightTrackProgressPct). */
 function liveRouteProgressPct(opts: {
@@ -299,6 +302,8 @@ export function VaPage(props: Props) {
   const [logbookDetailMissionId, setLogbookDetailMissionId] = useState<
     string | null
   >(null);
+  const [logbookListFilter, setLogbookListFilter] =
+    useState<LogbookListFilter>('settled');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -754,7 +759,10 @@ export function VaPage(props: Props) {
   }, [logbookMissions]);
 
   useEffect(() => {
-    if (pane !== 'logbook') setLogbookDetailMissionId(null);
+    if (pane !== 'logbook') {
+      setLogbookDetailMissionId(null);
+      setLogbookListFilter('settled');
+    }
   }, [pane]);
 
   const formatVaMass = useCallback(
@@ -1630,13 +1638,38 @@ export function VaPage(props: Props) {
                       />
                     );
                   }
+                  const settledRows = filterLogbookMissions(
+                    logbookRows,
+                    'settled',
+                  );
+                  const cancelledRows = filterLogbookMissions(
+                    logbookRows,
+                    'cancelled',
+                  );
+                  const listRows = filterLogbookMissions(
+                    logbookRows,
+                    logbookListFilter,
+                  );
                   return (
                     <>
-                      <p className="panel-stats">
-                        {logbookRows.length} flights
-                      </p>
+                      <div className="logbook-panel-head-main va-logbook-head">
+                        <p className="panel-stats">
+                          {logbookListFilter === 'cancelled'
+                            ? `${listRows.length} cancelled · ${settledRows.length} settled total`
+                            : `${listRows.length} flights · ${cancelledRows.length} cancelled hidden`}
+                        </p>
+                        <LogbookListFilterToggle
+                          value={logbookListFilter}
+                          onChange={(next) => {
+                            setLogbookListFilter(next);
+                            setLogbookDetailMissionId(null);
+                          }}
+                          settledCount={settledRows.length}
+                          cancelledCount={cancelledRows.length}
+                        />
+                      </div>
                       <ul className="mission-list logbook-list logbook-card-list va-logbook-list">
-                        {logbookRows.map((m) => {
+                        {listRows.map((m) => {
                           const fleetLabel = m.aircraftId
                             ? hangarFleet.find((a) => a.id === m.aircraftId)
                                 ?.label
@@ -1660,10 +1693,13 @@ export function VaPage(props: Props) {
                             />
                           );
                         })}
-                        {logbookRows.length === 0 ? (
+                        {listRows.length === 0 ? (
                           <li className="empty">
-                            No airline flights yet — accept Freights, Charter, or
-                            Internal Haul on a company aircraft.
+                            {logbookListFilter === 'cancelled'
+                              ? 'No cancelled airline flights.'
+                              : logbookRows.length === 0
+                                ? 'No airline flights yet — accept Freights, Charter, or Internal Haul on a company aircraft.'
+                                : 'No settled flights — check Cancelled or fly a leg.'}
                           </li>
                         ) : null}
                       </ul>

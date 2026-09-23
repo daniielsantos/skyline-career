@@ -40,5 +40,8 @@ Glance layout inspired by other career addons: **three pillars first**, money/sc
 - Detalhe: `LogbookFlightDetail` + `buildLogbookDebriefFromMission` → mesmos 3 pilares / runway / score
 - Sem inventar trail/XP; active legs não abrem detail (só Dispatch)
 - Pay: home = cut (`pilotPayoutUsd`); VA company = bruto rota
+- Kind chip: Freights / Demand / Haul / Internal Haul / Bridge / Ferry / Charter / Contract (não mais “Normal”)
+
+**Filtro Settled / Cancelled (2026-09-23):** default lista não-cancelados; toggle mostra só `cancelled`. Home + Crew.
 
 Ver também `16-va-logistics.md` (My VA Logbook).

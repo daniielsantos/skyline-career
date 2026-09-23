@@ -18,6 +18,7 @@ import {
   logbookCompanyPayoutUsd,
   logbookScorePct,
   logbookHasDetail,
+  filterLogbookMissions,
   formatEconomyClock,
 } from './logbook.js';
 
@@ -40,23 +41,45 @@ function mission(overrides: Partial<Mission> = {}): Mission {
 }
 
 describe('logbookFlightKind', () => {
-  it('labels contract, ferry, and normal freight', () => {
-    assert.equal(logbookFlightKind(mission({ contractPilot: true })), 'Contract');
+  it('labels charter, ferry, contract, desk, and market jobs', () => {
+    assert.equal(
+      logbookFlightKind(mission({ missionType: 'charter', pax: 5, cargoKg: 0 })),
+      'Charter',
+    );
     assert.equal(
       logbookFlightKind(mission({ emptyFlight: true, cargoKg: 0 })),
       'Ferry',
     );
     assert.equal(
       logbookFlightKind(
-        mission({ contractPilot: true, contractPilotReposition: true, cargoKg: 0 }),
+        mission({
+          contractPilot: true,
+          contractPilotReposition: true,
+          cargoKg: 0,
+        }),
       ),
       'Ferry',
     );
-    assert.equal(logbookFlightKind(mission()), 'Normal');
+    assert.equal(logbookFlightKind(mission({ contractPilot: true })), 'Contract');
     assert.equal(
-      logbookFlightKind(mission({ missionType: 'charter', pax: 5, cargoKg: 0 })),
-      'Charter',
+      logbookFlightKind(mission({ demandOrderId: 'ord_1' })),
+      'Demand',
     );
+    assert.equal(
+      logbookFlightKind(mission({ warehouseHaul: true })),
+      'Haul',
+    );
+    assert.equal(
+      logbookFlightKind(
+        mission({ warehouseBridge: true, internalHaul: true }),
+      ),
+      'Internal Haul',
+    );
+    assert.equal(
+      logbookFlightKind(mission({ warehouseBridge: true })),
+      'Bridge',
+    );
+    assert.equal(logbookFlightKind(mission()), 'Freights');
   });
 });
 
@@ -302,6 +325,24 @@ describe('logbookStatusLabel', () => {
   it('humanizes status chips', () => {
     assert.equal(logbookStatusLabel('in_flight'), 'In flight');
     assert.equal(logbookStatusLabel('settled'), 'Settled');
+  });
+});
+
+describe('filterLogbookMissions', () => {
+  it('defaults to non-cancelled; cancelled view is cancelled-only', () => {
+    const settled = mission({ id: 'a', status: 'settled' });
+    const failed = mission({ id: 'b', status: 'failed' });
+    const cancelled = mission({ id: 'c', status: 'cancelled' });
+    const active = mission({ id: 'd', status: 'in_flight' });
+    const all = [settled, failed, cancelled, active];
+    assert.deepEqual(
+      filterLogbookMissions(all, 'settled').map((m) => m.id),
+      ['a', 'b', 'd'],
+    );
+    assert.deepEqual(
+      filterLogbookMissions(all, 'cancelled').map((m) => m.id),
+      ['c'],
+    );
   });
 });
 

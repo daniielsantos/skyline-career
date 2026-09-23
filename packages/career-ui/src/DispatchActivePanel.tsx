@@ -409,7 +409,9 @@ export function DispatchActivePanel(props: {
               ? ` · ${props.aircraftClassLabel(mission.aircraftClassId)}`
               : null}
             {' · '}
-            <span className="logbook-kind">{flightKind}</span>
+            <span className="logbook-kind" data-kind={flightKind}>
+              {flightKind}
+            </span>
             {' · '}
             <span className={`status status-${mission.status}`}>
               {mission.status.replace(/_/g, ' ')}

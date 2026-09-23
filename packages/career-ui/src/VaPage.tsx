@@ -1226,6 +1226,11 @@ export function VaPage(props: Props) {
                         : null
                     }
                     aircraft={(() => {
+                      // Same fix the trail tip uses — last crumb first (in-place
+                      // refresh). Snapshot lat/lon / members live are fallbacks.
+                      const last =
+                        liveTrack?.points[liveTrack.points.length - 1];
+                      if (last) return { lat: last.lat, lon: last.lon };
                       const trackLat = liveTrack?.lat;
                       const trackLon = liveTrack?.lon;
                       if (
@@ -1237,9 +1242,6 @@ export function VaPage(props: Props) {
                       ) {
                         return { lat: trackLat, lon: trackLon };
                       }
-                      const last =
-                        liveTrack?.points[liveTrack.points.length - 1];
-                      if (last) return { lat: last.lat, lon: last.lon };
                       if (livePilot.live) {
                         return {
                           lat: livePilot.live.lat,

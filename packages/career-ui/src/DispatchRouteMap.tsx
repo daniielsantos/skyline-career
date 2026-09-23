@@ -353,14 +353,14 @@ function setAircraftOnMap(
 }
 
 /**
- * Live AC tip: prefer the explicit aircraft fix (latest sample) over the trail
- * crumb. Trail can lag a poll behind; AC must not stay glued to an old tip.
+ * Live tip for AC + dashed remaining leg.
+ * Prefer the last trail crumb (server moves it in-place every sample).
+ * `aircraft` is fallback when the trail is empty (first fix / members live).
  */
 function resolveLiveTip(
   trail: Array<{ lat: number; lon: number }> | null | undefined,
   aircraft?: DispatchAircraftPosition | null,
 ): DispatchAircraftPosition | null {
-  if (usableAircraftPosition(aircraft)) return aircraft;
   if (trail && trail.length > 0) {
     const last = trail[trail.length - 1]!;
     if (
@@ -371,7 +371,28 @@ function resolveLiveTip(
       return { lat: last.lat, lon: last.lon };
     }
   }
-  return null;
+  return usableAircraftPosition(aircraft) ? aircraft : null;
+}
+
+/** Same tip for solid trail end, dashed start, and AC — never diverge. */
+function syncLiveTrackLayers(
+  map: Map,
+  origin: DispatchRouteEndpoint,
+  dest: DispatchRouteEndpoint | null | undefined,
+  trail: Array<{ lat: number; lon: number }> | null | undefined,
+  plannedOd: boolean,
+  aircraft?: DispatchAircraftPosition | null,
+): void {
+  const tip = resolveLiveTip(trail, aircraft);
+  setTrailAndPlannedOd(
+    map,
+    origin,
+    dest,
+    trail ?? undefined,
+    plannedOd,
+    tip,
+  );
+  setAircraftOnMap(map, tip);
 }
 
 function setTrailAndPlannedOd(
@@ -380,40 +401,34 @@ function setTrailAndPlannedOd(
   dest: DispatchRouteEndpoint | null | undefined,
   trail: Array<{ lat: number; lon: number }> | undefined,
   plannedOd: boolean,
-  /** When set, dashed remaining leg starts at the live AC (not origin). */
-  aircraft?: DispatchAircraftPosition | null,
+  /** Tip already resolved — dashed + trail glue use this exact fix. */
+  tip?: DispatchAircraftPosition | null,
 ): void {
   ensureRouteLayer(map);
   ensureFerryLayer(map);
   const cargoSource = map.getSource(ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
   const ferrySource = map.getSource(FERRY_SOURCE_ID) as GeoJSONSource | undefined;
-  const tip = resolveLiveTip(trail, aircraft);
-  if (trail && trail.length >= 1) {
-    const coords: [number, number][] = trail.map((p) => [p.lon, p.lat]);
-    // Glue the drawn trail to the live fix so AC is never orphaned ahead of
-    // the last crumb when the sample moved but a new point was not appended.
-    if (
-      tip &&
-      (coords.length === 0 ||
-        coords[coords.length - 1]![0] !== tip.lon ||
-        coords[coords.length - 1]![1] !== tip.lat)
-    ) {
-      coords.push([tip.lon, tip.lat]);
-    }
-    if (coords.length >= 2) {
-      cargoSource?.setData({
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'LineString', coordinates: coords },
-      });
-    } else {
-      cargoSource?.setData(emptyLineFeature());
-    }
+  const coords: [number, number][] = (trail ?? []).map((p) => [p.lon, p.lat]);
+  if (
+    tip &&
+    usableAircraftPosition(tip) &&
+    (coords.length === 0 ||
+      coords[coords.length - 1]![0] !== tip.lon ||
+      coords[coords.length - 1]![1] !== tip.lat)
+  ) {
+    coords.push([tip.lon, tip.lat]);
+  }
+  if (coords.length >= 2) {
+    cargoSource?.setData({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: coords },
+    });
   } else {
     cargoSource?.setData(emptyLineFeature());
   }
   if (plannedOd && dest) {
-    const from: LatLon = tip ?? origin;
+    const from: LatLon = tip && usableAircraftPosition(tip) ? tip : origin;
     ferrySource?.setData({
       type: 'FeatureCollection',
       features: [
@@ -430,7 +445,6 @@ function setTrailAndPlannedOd(
   } else {
     ferrySource?.setData({ type: 'FeatureCollection', features: [] });
   }
-  // AC is owned exclusively by the live-aircraft effect — do not set it here.
 }
 
 function emptyLineFeature() {
@@ -640,15 +654,10 @@ export function DispatchRouteMap(props: {
         const dest = props.dest ?? null;
         const segments = props.segments?.length ? props.segments : null;
         const trail = props.trail?.length ? props.trail : null;
-        if (trail || props.plannedOd) {
-          setTrailAndPlannedOd(
-            map,
-            props.origin,
-            dest,
-            trail ?? undefined,
-            Boolean(props.plannedOd),
-            props.aircraft,
-          );
+        if (props.plannedOd) {
+          // Crew Live: solid trail + dashed + AC are owned by syncLiveTrackLayers
+          // in the live effect. Paint must not touch them (omitting aircraft from
+          // deps left ferry tip and AC on different fixes).
         } else if (segments) {
           setRouteSegments(map, segments);
         } else {
@@ -855,24 +864,25 @@ export function DispatchRouteMap(props: {
     props.originRole,
   ]);
 
-  // Live aircraft — GeoJSON tip only (no HTML marker / "AC" label).
+  // Crew Live — one tip drives AC + solid trail end + dashed remaining leg.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
     const sync = () => {
-      const tip = resolveLiveTip(props.trail, props.aircraft);
-      setAircraftOnMap(map, tip);
-      if (tip && props.plannedOd && props.dest) {
-        setTrailAndPlannedOd(
+      if (props.plannedOd) {
+        syncLiveTrackLayers(
           map,
           props.origin,
-          props.dest,
-          props.trail ?? undefined,
+          props.dest ?? null,
+          props.trail,
           true,
-          tip,
+          props.aircraft,
         );
+        return;
       }
+      // En route Dispatch: OFP line from paint; only the AC dot follows Watch.
+      setAircraftOnMap(map, resolveLiveTip(null, props.aircraft));
     };
 
     if (map.isStyleLoaded()) sync();

@@ -14,6 +14,7 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 - **Freights paginator `of N` (2026-09-23):** `N` = lots **após filtros** da board (`queryMarketBoardPage` → `totalLots`), não inventário bruto do mundo. Swing ~17k↔20k (pós-densify) é equilíbrio vivo **formLots × expireLots** (+ troca Your/Operator/airframe/Near) — **não** retunar Dry/`CARGO_FLOW_BALANCE`. UI: `… of N matching`.
 
+- **Hangar assigned mark (2026-09-23):** card `assigned` deixa de mostrar a prosa “Finish or cancel…”. Badge ASSIGNED + ícone de avião no canto da arte (par do wrench de MX); hover explica o gate.
 - **Charter board Expires look synced (2026-09-20):** sintoma — página cheia de URGENT com **15 min** iguais. Causa — (1) TTL de board é tick discreto (1 tick = 15 min); (2) formação em lote no mesmo `world.tick` (quota 48) → coorte com o mesmo `expiresAtTick`; (3) label arredonda &lt;1 h. **Fix shipped:** form trickle **10**/catch-up **20**/warm **28**; TTL **12–26 h**; stagger `+formed` no expires. Deadline de voo = Expires no Accept (igual Freights).
 
 - **Stale active mission auto-cancel (2026-09-22):** sintoma — `accepted`/`dispatched`/`in_flight` podiam ficar eternas (ramp ou app fechado mid-leg) com cauda assigned + carga reservada; Deadline só multa no settle. Fix **server-side** = `expireStaleActiveMissions` no pulse/company settle + housekeeping: cancela quando `tick > deadlineTick + 24h` (mesma grace pra todos os status ativos); `cancelMission` = abort sem payout. Skip `crewOperated`.

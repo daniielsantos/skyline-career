@@ -7538,6 +7538,21 @@ button.logbook-card-hit:focus-visible {
   display: block;
 }
 
+.hangar-inflight-mark {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.35rem;
+  color: var(--accent, #6ea8d6);
+  background: rgba(11, 14, 19, 0.78);
+  border: 1px solid color-mix(in srgb, var(--accent, #6ea8d6) 45%, transparent);
+}
+
+.hangar-inflight-mark-icon {
+  display: block;
+}
+
 .aircraft-card-stripe-badges .badge,
 .aircraft-card-stripe-badges .status {
   background: rgba(11, 14, 19, 0.82);

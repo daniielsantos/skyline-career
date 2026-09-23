@@ -2,28 +2,26 @@
 
 export type CompanyNetworkIconKind = 'fbo' | 'wh' | 'hq';
 
+/** Solid map-marker SVGs (fixed brand colors). */
 export function companyNetworkIconSvg(kind: CompanyNetworkIconKind): string {
   if (kind === 'hq') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <circle cx="12" cy="12" r="9" fill="#6aa8d8" fill-opacity="0.22" stroke="#6aa8d8" stroke-width="1.6"/>
-  <path d="M12 6.5 13.8 11.2 18.8 11.5 14.9 14.7 16.2 19.5 12 16.8 7.8 19.5 9.1 14.7 5.2 11.5 10.2 11.2Z" fill="#6aa8d8"/>
+  <circle cx="12" cy="12" r="10" fill="#6aa8d8"/>
+  <path d="M12 5.8 13.95 11l5.55.35-4.25 3.55 1.35 5.35L12 17.35 7.4 20.25l1.35-5.35-4.25-3.55L10.05 11Z" fill="#0e141b"/>
 </svg>`;
   }
   if (kind === 'fbo') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <rect x="3" y="10" width="18" height="10" rx="1.5" fill="#f0a35a" opacity="0.35"/>
-  <path d="M4 10V7.5L12 3l8 4.5V10" fill="none" stroke="#f0a35a" stroke-width="1.6" stroke-linejoin="round"/>
-  <path d="M8 20v-5h3v5M13 20v-3.5h3V20" fill="none" stroke="#f0a35a" stroke-width="1.5"/>
-  <circle cx="12" cy="8" r="1.2" fill="#f0a35a"/>
+  <path d="M3.5 10.2 12 3.8l8.5 6.4V20.5H3.5V10.2Z" fill="#f0a35a"/>
+  <rect x="8" y="13.4" width="3.2" height="7.1" rx="0.4" fill="#1a1208"/>
+  <rect x="12.8" y="15.2" width="3.2" height="5.3" rx="0.4" fill="#1a1208"/>
+  <circle cx="12" cy="8.2" r="1.35" fill="#1a1208"/>
 </svg>`;
   }
-  // Warehouse: industrial shed + bay door (no rib/grid lines).
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <path d="M3 10.5 12 4.5 21 10.5" fill="#5ec8c0" fill-opacity="0.22" stroke="#5ec8c0" stroke-width="1.6" stroke-linejoin="round"/>
-  <rect x="4" y="10" width="16" height="10.5" rx="1.2" fill="#5ec8c0" fill-opacity="0.28" stroke="#5ec8c0" stroke-width="1.55"/>
-  <rect x="8.25" y="13.25" width="7.5" height="7.25" rx="0.6" fill="none" stroke="#5ec8c0" stroke-width="1.45"/>
-  <path d="M8.25 16.25h7.5" stroke="#5ec8c0" stroke-width="1.35" stroke-linecap="round"/>
-  <path d="M3.5 20.75h17" stroke="#5ec8c0" stroke-width="1.55" stroke-linecap="round"/>
+  <path d="M2.8 10.6 12 3.9l9.2 6.7V20.6H2.8V10.6Z" fill="#5ec8c0"/>
+  <rect x="8.1" y="13.1" width="7.8" height="7.5" rx="0.55" fill="#0e1a18"/>
+  <path d="M8.1 16.4h7.8" stroke="#5ec8c0" stroke-width="1.2" stroke-linecap="round"/>
 </svg>`;
 }
 
@@ -36,18 +34,10 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
         aria-hidden="true"
         focusable="false"
       >
-        <circle
-          cx="12"
-          cy="12"
-          r="9"
-          fill="currentColor"
-          fillOpacity="0.18"
-          stroke="currentColor"
-          strokeWidth="1.6"
-        />
+        <circle cx="12" cy="12" r="10" fill="currentColor" />
         <path
-          d="M12 6.5 13.8 11.2 18.8 11.5 14.9 14.7 16.2 19.5 12 16.8 7.8 19.5 9.1 14.7 5.2 11.5 10.2 11.2Z"
-          fill="currentColor"
+          d="M12 5.8 13.95 11l5.55.35-4.25 3.55 1.35 5.35L12 17.35 7.4 20.25l1.35-5.35-4.25-3.55L10.05 11Z"
+          fill="#0e141b"
         />
       </svg>
     );
@@ -60,29 +50,27 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
         aria-hidden="true"
         focusable="false"
       >
-        <rect
-          x="3"
-          y="10"
-          width="18"
-          height="10"
-          rx="1.5"
+        <path
+          d="M3.5 10.2 12 3.8l8.5 6.4V20.5H3.5V10.2Z"
           fill="currentColor"
-          opacity="0.22"
         />
-        <path
-          d="M4 10V7.5L12 3l8 4.5V10"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
+        <rect
+          x="8"
+          y="13.4"
+          width="3.2"
+          height="7.1"
+          rx="0.4"
+          fill="#1a1208"
         />
-        <path
-          d="M8 20v-5h3v5M13 20v-3.5h3V20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
+        <rect
+          x="12.8"
+          y="15.2"
+          width="3.2"
+          height="5.3"
+          rx="0.4"
+          fill="#1a1208"
         />
-        <circle cx="12" cy="8" r="1.2" fill="currentColor" />
+        <circle cx="12" cy="8.2" r="1.35" fill="#1a1208" />
       </svg>
     );
   }
@@ -94,44 +82,21 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
       focusable="false"
     >
       <path
-        d="M3 10.5 12 4.5 21 10.5"
+        d="M2.8 10.6 12 3.9l9.2 6.7V20.6H2.8V10.6Z"
         fill="currentColor"
-        fillOpacity="0.18"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
       />
       <rect
-        x="4"
-        y="10"
-        width="16"
-        height="10.5"
-        rx="1.2"
-        fill="currentColor"
-        fillOpacity="0.2"
-        stroke="currentColor"
-        strokeWidth="1.55"
-      />
-      <rect
-        x="8.25"
-        y="13.25"
-        width="7.5"
-        height="7.25"
-        rx="0.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.45"
+        x="8.1"
+        y="13.1"
+        width="7.8"
+        height="7.5"
+        rx="0.55"
+        fill="#0e1a18"
       />
       <path
-        d="M8.25 16.25h7.5"
+        d="M8.1 16.4h7.8"
         stroke="currentColor"
-        strokeWidth="1.35"
-        strokeLinecap="round"
-      />
-      <path
-        d="M3.5 20.75h17"
-        stroke="currentColor"
-        strokeWidth="1.55"
+        strokeWidth="1.2"
         strokeLinecap="round"
       />
     </svg>

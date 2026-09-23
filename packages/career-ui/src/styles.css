@@ -14952,7 +14952,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   width: 1.85rem;
   height: 1.85rem;
   color: var(--accent, #f0a35a);
-  opacity: 0.92;
+  opacity: 1;
 }
 
 .va-company-network-chip-text {
@@ -15078,7 +15078,8 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   margin: 0;
 }
 .va-airline-profile-network .va-company-network-map {
-  min-height: 26rem;
+  height: 38rem;
+  min-height: 32rem;
 }
 
 .ports-fbo-network {

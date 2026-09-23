@@ -1400,6 +1400,15 @@ export class CareerWatchSession {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private watchState: MissionFlightWatchState = createMissionFlightWatchState();
   private running = false;
+  /**
+   * Coalesce concurrent POST /api/watch/start (UI effect remount storms).
+   * Without this, a second start saw missionId set but running=false and
+   * stop()'d the pipe under the first tick — footer MSFS↔SIMBRIDGE thrash.
+   */
+  private startPromise: Promise<WatchStatusPayload> | null = null;
+  private startMissionId: string | null = null;
+  /** Bumped on stop() so a late start open cannot resurrect after abort. */
+  private startEpoch = 0;
   private missionId: string | null = null;
   private missionStatus: string | null = null;
   private lastSample: (FlightGroundSample & {
@@ -1735,9 +1744,66 @@ export class CareerWatchSession {
       });
       return this.getStatus();
     }
+
+    // Join an in-flight start for the same mission — do NOT stop()/reopen.
+    // Log evidence: pairs of start ~200ms apart with 0 "already running" skips
+    // because running=true is only set after pipe open.
+    if (this.startPromise && this.startMissionId === opts.missionId) {
+      watchDebugLog('watch', 'start joined — already starting', {
+        missionId: opts.missionId,
+      });
+      const status = await this.startPromise;
+      if (opts.liveTrackCompanyId?.trim()) {
+        this.liveTrackCompanyId = opts.liveTrackCompanyId.trim();
+      }
+      return this.running && this.missionId === opts.missionId
+        ? this.getStatus()
+        : status;
+    }
+    if (this.startPromise) {
+      try {
+        await this.startPromise;
+      } catch {
+        /* ignore — we'll start/replace below */
+      }
+      if (this.running && this.missionId === opts.missionId) {
+        if (opts.liveTrackCompanyId?.trim()) {
+          this.liveTrackCompanyId = opts.liveTrackCompanyId.trim();
+        }
+        watchDebugLog('watch', 'start skipped — already running', {
+          missionId: opts.missionId,
+          pipeConnected: this.bridge?.isPipeConnected ?? false,
+          lastError: this.lastError,
+        });
+        return this.getStatus();
+      }
+      if (this.startPromise && this.startMissionId === opts.missionId) {
+        return this.start(opts);
+      }
+    }
+
+    this.startMissionId = opts.missionId;
+    const epoch = this.startEpoch;
+    const work = this.startExclusive(opts, epoch).finally(() => {
+      if (this.startPromise === work) {
+        this.startPromise = null;
+        this.startMissionId = null;
+      }
+    });
+    this.startPromise = work;
+    return work;
+  }
+
+  private async startExclusive(
+    opts: WatchOptions,
+    epoch: number,
+  ): Promise<WatchStatusPayload> {
     if (this.running || this.missionId != null) {
       // Always wipe prior identity before binding a (possibly new) mission.
-      await this.stop({ reset: true });
+      await this.stop({ reset: true, fromStart: true });
+    }
+    if (epoch !== this.startEpoch) {
+      throw new Error('Watch start aborted');
     }
 
     this.opts = {
@@ -1934,12 +2000,29 @@ export class CareerWatchSession {
       watchDebugLog('watch', 'start failed', { error: this.lastError });
       throw error;
     }
+    if (epoch !== this.startEpoch) {
+      try {
+        await bridge.close({ disconnectHost: false });
+      } catch {
+        /* ignore */
+      }
+      this.missionId = null;
+      this.missionStatus = null;
+      watchDebugLog('watch', 'start aborted — stop won the race', {
+        missionId: opts.missionId,
+      });
+      throw new Error('Watch start aborted');
+    }
     this.bridge = bridge;
     this.running = true;
 
     // Brief settle after open — immediate sample right after a probe/preflight
     // close was returning 0xC00000B0 and kicking the reconnect storm.
     await new Promise((resolve) => setTimeout(resolve, 400));
+    if (epoch !== this.startEpoch) {
+      await this.stop({ reset: true });
+      throw new Error('Watch start aborted');
+    }
 
     // First sample immediately; each tick rearms setTimeout with phase interval.
     await this.tick();
@@ -1960,8 +2043,18 @@ export class CareerWatchSession {
   }
 
   async stop(
-    opts: { reset?: boolean; fromOwnTick?: boolean } = {},
+    opts: {
+      reset?: boolean;
+      fromOwnTick?: boolean;
+      /** Wipe from startExclusive — do not invalidate the start that called us. */
+      fromStart?: boolean;
+    } = {},
   ): Promise<WatchStatusPayload> {
+    // Invalidate any in-flight startExclusive so a late pipe-open cannot
+    // resurrect Watch after cancel / mission switch / start coalesce stop.
+    if (!opts.fromStart) {
+      this.startEpoch += 1;
+    }
     this.running = false;
     if (this.timer) {
       clearTimeout(this.timer);

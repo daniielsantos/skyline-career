@@ -3806,6 +3806,14 @@ export function App() {
     useState(false);
   const holdWatchOffForPreflightRef = useRef(false);
   holdWatchOffForPreflightRef.current = holdWatchOffForPreflight;
+  /**
+   * Survives Watch auto-start effect remounts so overlapping tryStartWatch
+   * calls await one POST (server also coalesces; this cuts duplicate storms).
+   */
+  const watchStartGateRef = useRef<{
+    missionId: string;
+    promise: Promise<WatchStatus | null>;
+  } | null>(null);
   /** Prevents a second /api/load-ofp while one is already in flight. */
   const ofpInjectInFlightRef = useRef(false);
   const loadOfpAutoStatusRef = useRef(loadOfpAutoStatus);
@@ -7467,13 +7475,34 @@ export function App() {
       if (cancelled || stopped || inFlight || !activeMission) return;
       inFlight = true;
       setWatchAutoStatus('connecting');
+      const missionId = activeMission.id;
       try {
-        const status = await postWatchStart({
-          missionId: activeMission.id,
-          intervalSec: 5,
-          companyId:
-            resolveOpsCompanyId(activeMission.aircraftId) || undefined,
-        });
+        let status: WatchStatus | null = null;
+        const existing = watchStartGateRef.current;
+        if (existing?.missionId === missionId) {
+          status = await existing.promise;
+        } else {
+          const promise = postWatchStart({
+            missionId,
+            intervalSec: 5,
+            companyId:
+              resolveOpsCompanyId(activeMission.aircraftId) || undefined,
+          })
+            .then((s) => s)
+            .catch(() => null);
+          watchStartGateRef.current = { missionId, promise };
+          try {
+            status = await promise;
+          } finally {
+            if (watchStartGateRef.current?.promise === promise) {
+              watchStartGateRef.current = null;
+            }
+          }
+        }
+        if (!status) {
+          if (!cancelled) setWatchAutoStatus('waiting');
+          return;
+        }
         // Late responses must not resurrect Watch while Preflight owns the pipe.
         // Mid-flight resume is different: effect remounts (watch.running / LV
         // hydrate / poll) used to cancel mid-await and postWatchStop the session

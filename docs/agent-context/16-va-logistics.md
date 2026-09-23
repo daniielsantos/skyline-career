@@ -7,7 +7,7 @@ Atualizado 2026-09-21. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-20:** **VA org perks shipped** — Flight quality → tiers Proven/Reliable/Elite (−MX / −overflow ferry); UI My VA + directory/ranking. **Buff concessão herdado shipped 2026-09-21** (buy/ETA; desk exact operator). **2026-09-21 (g):** snapshot `status: yours` = exact operator only (não pintar FBO da VA na sidebar home).
 **Doc 2026-09-22:** parking **$0** em `homeHubIcao` (Crew/Company HQ) para parked/MX; off-hub inalterado. Org perk de parking = backlog.
 **Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
-**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads; OD + trail. **(e–o)** … **(p)** fase Live = mesma do footer SimBridge (não OFP compliance). **(x–y)** detach + pipe hygiene sem uplink. **Soft uplink Watch→VPS shipped** (tick sample only). **(af)** mid-cruise app reopen footer/AC/burn flick — Watch cancel-stop + probe boot race.
+**Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads; OD + trail. **(e–o)** … **(p)** fase Live = mesma do footer SimBridge (não OFP compliance). **(x–y)** detach + pipe hygiene sem uplink. **Soft uplink Watch→VPS shipped** (tick sample only). **(af)** mid-cruise app reopen footer/AC/burn flick — Watch cancel-stop + probe boot race. **(ag)** concurrent `/watch/start` coalesce (log-confirmed).
 **Doc 2026-09-22 (c):** sidebar tab highlight adiado por `await switchCompanyForVa` antes de `goToTab` (Crew→Airlines) — **fix** pinta tab no click; restore/refresh em background.
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
@@ -76,6 +76,7 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 **Open desk column align (2026-09-22):** sintoma = meta em flex (`·`) desalinhava Mass/Dist/Pay entre rows; Expires sumia no print antigo. Fix = stats grid rotulado (Cargo/Mass/Dist/Pay/Expires/By) como Airlines; Expires sempre (Demand = hold capped pelo order).
 
 **Hauls Active align + pilot (2026-09-22):** sintoma = Active desalinhado do Open desk (2 cols vs 3); sem piloto; colado no rodapé. Causa = `va-hauls-row-active` grid curto + Aircraft dentro dos stats; pane sem padding. Fix = mesmo grid 3 cols (route | stats | aircraft RO); stats = Cargo/Mass/Dist/Pay/Status/Pilot (`pilotName` no `/api/va/hauls`); padding-bottom no pane.
+**Hauls Open↔Active column align (2026-09-22):** sintoma = Cargo/Mass/Dist/Pay/Expires|Status/By|Pilot ainda desalinhados entre as duas listas. Causa = 3ª track `auto` (Prepare+select largo no Open, só tail no Active) → `1fr` do meio diferente por row → 6 stats não batem. Fix = tracks fixas `10.75rem | 1fr | 20rem` + stats `repeat(6, minmax(0,1fr))`.
 
 **My VA pane height jump (2026-09-22):** sintoma = alternar Roster/Hangar/Hauls/Ports/… mudava a altura da página. Causa = só Ports forçava fill (`:has(.va-ports-pane)`); panes curtas shrink-wrap. Fix = `va-panel-shell` + `va-pane-body` preenchem `main-content` em todas as abas.
 
@@ -778,6 +779,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **2026-09-22 (ae):** sintoma = bolinha no chão, sem linha azul, tracejado “andando” noutro tip. Causa = paint do mapa (sem `aircraft` nas deps) redesenhava ferry/trail enquanto o live effect movia o AC → **dois tips**; preferir `track.lat` sobre crumb podia deixar AC velho. Fix = `syncLiveTrackLayers` (um tip → AC + sólida + tracejado); paint com `plannedOd` **não** toca essas layers; tip = crumb last (in-place) com fallback aircraft.
 
 **2026-09-22 (af):** sintoma = reopen app em cruzeiro → footer **MSFS↔SIMBRIDGE** flick, plot do avião aparece/some, burn `19m/137m · need 70%` some com o flick. Causa = (1) Watch auto-start effect remonta (deps `watch.running` / LV hydrate) no meio do `postWatchStart` → `cancelled` + `postWatchStop` matava a sessão que acabou de subir (stop/start storm no exclusive gate); (2) probe bootava **antes** de `activeMission` hidratar `in_flight` e competia pelo pipe; (3) UI zerava AC/`flightTime` no primeiro frame com `running=false`. Fix = em airborne resume **não** `postWatchStop` no cancel (só yield Preflight); probe também gateia em `missions.some(in_flight)`; sticky AC + burn/RECONNECTING no footer enquanto `in_flight`.
+
+**2026-09-22 (ag):** log `watch-debug` no mesmo voo: **85** `[watch] start` / **0** `start skipped` / `stop — closing pipe under in-flight tick`. Causa = POST `/api/watch/start` concorrente (~pares 200ms); `running=true` só pós-open → 2º call via `stop()` em vez de idempotent. Fix = coalesce `startPromise` (join same mission); `startEpoch` aborta open tardio após `stop()`; UI `watchStartGateRef` compartilha um POST entre remounts do effect.
 
 **Cobertura esperada (aceitar gaps):**
 

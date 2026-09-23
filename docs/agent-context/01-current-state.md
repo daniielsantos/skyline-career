@@ -1,5 +1,8 @@
 # Current state (2026-09-23)
 
+`main` **1c48652e** / desktop **0.3.246** shipped: Align Hauls Active rows with Open desk and show the flyer. Release: [v0.3.246](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.246).
+
+
 `main` **347e248f** / desktop **0.3.245** shipped: Move Live AC, trail, and dashed remaining leg as one tip. Release: [v0.3.245](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.245).
 
 

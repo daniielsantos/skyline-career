@@ -5636,8 +5636,6 @@ export function fetchVaRanking() {
     windowDays: number;
     companies: VaCompanyRank[];
     pilots: VaPilotRank[];
-    /** Listed VA used for the pilots board (active company or membership). */
-    pilotsCompanyId?: string | null;
   }>('/api/va/ranking');
 }
 

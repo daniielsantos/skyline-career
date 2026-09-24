@@ -67,6 +67,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Ranking empty / IH-only (2026-09-23):** sintoma = página Ranking “No Internal Haul stats yet” apesar de Demand/Wide haul settled. Causa = `vaRecordHaulStats` só em `internalHaul===true`; board Airlines/Pilots copy IH; Pilots card escondido quando vazio; company ranking sem filtro `va_listed`. Fix = gravar desk labor (`isVaAirlineLaborMission`) em company **listed**; ranking companies só `va_listed`; API resolve `pilotsCompanyId` (active listed ou membership); UI sempre mostra Airlines + Pilots com empty states; copy airline desk. Sem backfill de settles antigos. Fora desta fatia: world pilots, Freights market-hire board.
 
+**Ranking global all VA flights (2026-09-23):** sintoma = Freights na airline não apareciam; “Pilots · this airline” confundia. Causa = gate só desk labor + board interno. Fix = `isVaRankingMission` (desk **ou** `vaFlight`); Pilots = agregação global 7d; UI Airlines/Pilots global; sem backfill; ranking interno VA adiado.
+
 **Ranking COALESCE boolean/int + UI declutter (2026-09-23):** sintoma = Airlines card “COALESCE types boolean and integer cannot be matched” + Refresh enorme + essays. Causa = `vaCompanyRanking` PG usava `COALESCE(va_listed, 0)` mas coluna é `BOOLEAN`. Fix = `c.va_listed IS TRUE`; UI sem help walls / botão Refresh (retry só no erro; detalhe no `?`).
 
 **Airlines profile map slice (2026-09-23):** sintoma = directory só listava cards. Fix = click/View → `GET /api/va/profile/:id` + `VaAirlineProfilePanel` (stats + `CompanyNetworkMap`); `buildPublicAirlineNetworkNodes` = HQ pin + Port FBOs + WHs (stock redacted). Sem live flights / tiers Pilops. **Icons (2026-09-23):** HQ/FBO/WH glyphs sólidos (fill full, cutouts escuros) — não outline translúcido. Perfil: mapa `.va-airline-profile-network .va-company-network-map` ~38rem.
@@ -206,7 +208,7 @@ Hard rule: airline cut **max 60** — nunca ≥ solo. Listar VA vazia **não** d
 
 1. **Board Internal Haul** — voar pontes WH→WH que a VA montou; pay interno → wallet home.
 2. **Roster / roles** — pilot ou dispatcher; invite / request.
-3. **Ranking 7d** — Airlines (desk labor nm/hauls on listed VAs) + Pilots strip for your listed VA.
+3. **Ranking 7d** — Airlines + Pilots **global** (all Freights/Charter/Demand/Wide/IH on listed VAs).
 4. **Hangar da VA** — ver/usar cascos da company listada (mesmo wallet/frota do owner).
 5. **Airline labor cut** — Demand/Haul pagam melhor que Freights no mesmo casco VA.
 
@@ -1053,6 +1055,7 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] Fase 2 scout
 - [x] IH-2 members + board interno + ranking 7d
 - [x] **Ranking airline desk** — Demand/Wide/IH → haul_stats (listed); pilots board always on; listed-only companies (2026-09-23)
+- [x] **Ranking global** — Freights/Charter/`vaFlight` + desk; Airlines + Pilots global 7d (2026-09-23)
 - [x] Fase 3 / IH-3: VA auto-haul desk (Scout bridges, caps, ≥2 members) (2026-09-21)
 - [ ] UI surplus/tight por commodity no Ports / região
 - [ ] IH-3 extras: OD allowlist / pay fine-tune UI / Demand auto

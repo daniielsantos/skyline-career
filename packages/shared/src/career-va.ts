@@ -106,6 +106,22 @@ export function isVaAirlineLaborMission(mission: {
   return false;
 }
 
+/**
+ * Counts toward global Airlines / Pilots ranking (7d haul_stats).
+ * Desk labor + any Freights/Charter stamped `vaFlight` on a listed VA.
+ * Solo home flights do not set vaFlight — they stay out.
+ */
+export function isVaRankingMission(mission: {
+  warehouseBridge?: boolean;
+  internalHaul?: boolean;
+  warehouseHaul?: boolean;
+  demandOrderId?: string;
+  vaFlight?: boolean;
+}): boolean {
+  if (isVaAirlineLaborMission(mission)) return true;
+  return mission.vaFlight === true;
+}
+
 export function quoteMemberAirlineCutUsd(
   payoutUsd: number,
   fuelDebitUsd: number,
@@ -845,6 +861,48 @@ export function listPilotHaulRankingForCompany(
     accountId: row.account_id,
     loginName: row.login_name,
     displayName: row.display_name,
+    hauls: Number(row.hauls) || 0,
+    nm: Math.round(Number(row.nm) || 0),
+    payUsd: Math.round((Number(row.pay_usd) || 0) * 100) / 100,
+  }));
+}
+
+/** Global pilots board — sum nm/hauls across listed VAs in the window. */
+export function listPilotHaulRankingGlobal(
+  db: SqliteDb,
+  opts: {
+    fromDayKey: number;
+    toDayKey: number;
+    limit?: number;
+  },
+): VaPilotRankRow[] {
+  ensureV12Ddl(db);
+  const limit = Math.max(1, Math.min(50, opts.limit ?? 20));
+  const rows = db
+    .prepare(
+      `SELECT s.account_id, a.login_name, a.display_name,
+              SUM(s.hauls) AS hauls, SUM(s.nm) AS nm, SUM(s.pay_usd) AS pay_usd
+       FROM company_pilot_haul_stats s
+       JOIN accounts a ON a.id = s.account_id
+       JOIN companies c ON c.id = s.company_id
+       WHERE s.day_key >= ? AND s.day_key <= ?
+         AND IFNULL(c.va_listed, 0) != 0
+       GROUP BY s.account_id
+       ORDER BY nm DESC, hauls DESC
+       LIMIT ?`,
+    )
+    .all(opts.fromDayKey, opts.toDayKey, limit) as Array<{
+    account_id: string;
+    login_name: string;
+    display_name: string;
+    hauls: number;
+    nm: number;
+    pay_usd: number;
+  }>;
+  return rows.map((row) => ({
+    accountId: row.account_id,
+    loginName: row.login_name,
+    displayName: row.display_name || row.login_name || row.account_id,
     hauls: Number(row.hauls) || 0,
     nm: Math.round(Number(row.nm) || 0),
     payUsd: Math.round((Number(row.pay_usd) || 0) * 100) / 100,

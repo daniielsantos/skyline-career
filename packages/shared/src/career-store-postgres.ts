@@ -1452,28 +1452,55 @@ export class PostgresCareerStore implements CareerStore {
   }
 
   async vaPilotRanking(opts: {
-    companyId: string;
+    companyId?: string | null;
     fromDayKey: number;
     toDayKey: number;
     limit?: number;
   }): Promise<VaPilotRankRow[]> {
     await this.ready;
     const limit = Math.max(1, Math.min(50, opts.limit ?? 20));
+    const companyId = opts.companyId?.trim();
+    if (companyId) {
+      const { rows } = await this.pool.query(
+        `SELECT s.account_id, a.login_name, a.display_name,
+                SUM(s.hauls)::int AS hauls, SUM(s.nm) AS nm, SUM(s.pay_usd) AS pay_usd
+         FROM company_pilot_haul_stats s
+         JOIN accounts a ON a.id = s.account_id
+         WHERE s.company_id = $1 AND s.day_key >= $2 AND s.day_key <= $3
+         GROUP BY s.account_id, a.login_name, a.display_name
+         ORDER BY nm DESC, hauls DESC
+         LIMIT $4`,
+        [companyId, opts.fromDayKey, opts.toDayKey, limit],
+      );
+      return rows.map((r) => ({
+        accountId: r.account_id as string,
+        loginName: r.login_name as string,
+        displayName: r.display_name as string,
+        hauls: Number(r.hauls) || 0,
+        nm: Math.round(Number(r.nm) || 0),
+        payUsd: Math.round((Number(r.pay_usd) || 0) * 100) / 100,
+      }));
+    }
     const { rows } = await this.pool.query(
       `SELECT s.account_id, a.login_name, a.display_name,
               SUM(s.hauls)::int AS hauls, SUM(s.nm) AS nm, SUM(s.pay_usd) AS pay_usd
        FROM company_pilot_haul_stats s
        JOIN accounts a ON a.id = s.account_id
-       WHERE s.company_id = $1 AND s.day_key >= $2 AND s.day_key <= $3
+       JOIN companies c ON c.id = s.company_id
+       WHERE s.day_key >= $1 AND s.day_key <= $2
+         AND c.va_listed IS TRUE
        GROUP BY s.account_id, a.login_name, a.display_name
        ORDER BY nm DESC, hauls DESC
-       LIMIT $4`,
-      [opts.companyId, opts.fromDayKey, opts.toDayKey, limit],
+       LIMIT $3`,
+      [opts.fromDayKey, opts.toDayKey, limit],
     );
     return rows.map((r) => ({
       accountId: r.account_id as string,
       loginName: r.login_name as string,
-      displayName: r.display_name as string,
+      displayName:
+        (r.display_name as string) ||
+        (r.login_name as string) ||
+        (r.account_id as string),
       hauls: Number(r.hauls) || 0,
       nm: Math.round(Number(r.nm) || 0),
       payUsd: Math.round((Number(r.pay_usd) || 0) * 100) / 100,

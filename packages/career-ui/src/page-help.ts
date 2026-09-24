@@ -85,10 +85,10 @@ export const PAGE_HELP = {
     title: 'How Ranking works',
     kicker: 'Page guide',
     bullets: [
-      'Seven-day airline desk labor across listed VAs — Demand, Wide haul, and Internal Haul (nm + haul count).',
-      'Flight quality rides along when the airline has enough scored settles.',
-      'Pilots board ranks members of your listed VA over the same window.',
-      'Freights / Charter market hire do not count on this board — settle desk work from Hauls / Ports.',
+      'Global boards for the last 7 days across listed airlines.',
+      'Airlines and Pilots count every Freights, Charter, Demand, Wide haul, and Internal Haul settled on a listed VA.',
+      'Solo home company flights do not count. Older settles before this change are not backfilled.',
+      'Flight quality (perks) is separate — it still uses scored settles on the airline.',
     ],
   },
   hangar: {

@@ -81,6 +81,9 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 **Ports WH map glyph = Hauls (2026-09-21):** pin WH no `PortsMap` e chips usam `companyNetworkIconSvg('wh')`. Redesign = galpão + porta de doca (sem grades/ribs); chips + Hauls + Ports compartilham o mesmo SVG.
 
 **Company network glyphs outline (2026-09-23):** sintoma = chips FBO/WH “sólidos demais”. Fix = stroke + soft fill: FBO = pier + shed + yard crane; WH = hangar + dock bay; HQ = ring + star outline. Mesmo módulo chips/mapa.
+
+**Company network feeder flicker (2026-09-23):** sintoma = rota tracejada porto/FBO→WH (perfil Airlines / Hauls) piscava sem parar. Causa = `CompanyNetworkMap` recriava source/layer GeoJSON a cada re-render do App (`nodes` novo por referência via `asNetworkNodes`). Fix = signature estável + `setData` em vez de remove/add; `useMemo` no profile panel.
+
 **All ports table removed (2026-09-21):** tabela “All ports” no Catalog (sidebar + My VA Ports) removida — seleção fica no mapa / porto focado.
 
 **Ports loop copy trim (2026-09-21):** banner/hints enxutos (só massa/hub/ETA/fee/match count); on-target Demand/catalog sem tutorial óbvio; inbound/yard hints curtos.

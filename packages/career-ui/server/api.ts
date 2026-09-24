@@ -192,7 +192,7 @@ import {
   quoteInternalHaulForRoute,
   listOpenAirlineDeskHolds,
   listAirlineDeskMissions,
-  isVaAirlineLaborMission,
+  isVaRankingMission,
   buildCompanyNetworkNodesFromState,
   buildPublicAirlineNetworkNodes,
   vaDayKeyFromTick,
@@ -5693,18 +5693,10 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const url = new URL(
-          req.url ?? '/',
-          `http://${req.headers.host ?? 'localhost'}`,
-        );
         const world = store.peekEconomyWorld();
         const tick = world?.tick ?? 0;
         const toDay = vaDayKeyFromTick(tick);
         const fromDay = Math.max(0, toDay - (VA_RANKING_WINDOW_DAYS - 1));
-        const requestedCompanyId =
-          companyIdFromRequest(req) ??
-          url.searchParams.get('companyId') ??
-          undefined;
         const rankingRaw = await Promise.resolve(
           store.vaCompanyRanking({
             fromDayKey: fromDay,
@@ -5716,39 +5708,19 @@ export function createCareerApiServer(port = 8787) {
           ...row,
           orgPerks: resolveVaOrgPerks(row.flightQuality ?? null),
         }));
-        let pilotsCompanyId: string | null = null;
-        if (requestedCompanyId?.trim()) {
-          const listed = await Promise.resolve(
-            store.vaIsListed(requestedCompanyId.trim()),
-          );
-          if (listed) pilotsCompanyId = requestedCompanyId.trim();
-        }
-        if (!pilotsCompanyId && session) {
-          const membership = await Promise.resolve(
-            store.vaListedMembership(session.account.id),
-          );
-          if (membership?.companyId) {
-            pilotsCompanyId = membership.companyId;
-          }
-        }
-        let pilots: Awaited<ReturnType<typeof store.vaPilotRanking>> = [];
-        if (pilotsCompanyId) {
-          pilots = await Promise.resolve(
-            store.vaPilotRanking({
-              companyId: pilotsCompanyId,
-              fromDayKey: fromDay,
-              toDayKey: toDay,
-              limit: 12,
-            }),
-          );
-        }
+        const pilots = await Promise.resolve(
+          store.vaPilotRanking({
+            fromDayKey: fromDay,
+            toDayKey: toDay,
+            limit: 20,
+          }),
+        );
         send(res, 200, {
           windowDays: VA_RANKING_WINDOW_DAYS,
           fromDayKey: fromDay,
           toDayKey: toDay,
           companies: ranking,
           pilots,
-          pilotsCompanyId,
         });
         return;
       }
@@ -14648,7 +14620,7 @@ export function createCareerApiServer(port = 8787) {
             );
           }
           if (
-            isVaAirlineLaborMission(settled.mission) &&
+            isVaRankingMission(settled.mission) &&
             settleCompanyId &&
             store
           ) {

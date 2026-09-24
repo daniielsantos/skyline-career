@@ -13121,7 +13121,7 @@ export function App() {
                     : tab === 'vaDirectory'
                       ? 'Published airlines — request to join or use an invite code.'
                     : tab === 'vaRanking'
-                      ? 'Airline desk distance and count over the last week.'
+                      ? 'Global airline and pilot distance over the last week.'
                   : tab === 'missions'
                   ? 'Past flights — aircraft, cargo, distance, and payout.'
                   : tab === 'lab'

@@ -191,6 +191,7 @@ import {
   listOpenCompanyInvites,
   listPendingJoinRequests,
   listPilotHaulRankingForCompany,
+  listPilotHaulRankingGlobal,
   isCompanyVaListed,
   listVaDirectory,
   findAccountListedVaMembership,
@@ -496,7 +497,8 @@ export interface CareerStore {
     limit?: number;
   }): VaCompanyRankRow[] | Promise<VaCompanyRankRow[]>;
   vaPilotRanking(opts: {
-    companyId: string;
+    /** When set, rank within that VA; omit for global pilots board. */
+    companyId?: string | null;
     fromDayKey: number;
     toDayKey: number;
     limit?: number;
@@ -921,7 +923,7 @@ class JsonCareerStore implements CareerStore {
   }
 
   vaPilotRanking(_opts: {
-    companyId: string;
+    companyId?: string | null;
     fromDayKey: number;
     toDayKey: number;
     limit?: number;
@@ -1786,12 +1788,25 @@ class SqliteCareerStore implements CareerStore {
   }
 
   vaPilotRanking(opts: {
-    companyId: string;
+    companyId?: string | null;
     fromDayKey: number;
     toDayKey: number;
     limit?: number;
   }): VaPilotRankRow[] {
-    return listPilotHaulRankingForCompany(this.db, opts);
+    const companyId = opts.companyId?.trim();
+    if (companyId) {
+      return listPilotHaulRankingForCompany(this.db, {
+        companyId,
+        fromDayKey: opts.fromDayKey,
+        toDayKey: opts.toDayKey,
+        limit: opts.limit,
+      });
+    }
+    return listPilotHaulRankingGlobal(this.db, {
+      fromDayKey: opts.fromDayKey,
+      toDayKey: opts.toDayKey,
+      limit: opts.limit,
+    });
   }
 
   vaDirectory(opts?: {

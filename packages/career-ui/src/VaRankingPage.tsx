@@ -16,7 +16,6 @@ export function VaRankingPage(props: Props) {
   const [windowDays, setWindowDays] = useState(7);
   const [companies, setCompanies] = useState<VaCompanyRank[]>([]);
   const [pilots, setPilots] = useState<VaPilotRank[]>([]);
-  const [pilotsCompanyId, setPilotsCompanyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,7 +28,6 @@ export function VaRankingPage(props: Props) {
       setWindowDays(r.windowDays);
       setCompanies(r.companies);
       setPilots(r.pilots);
-      setPilotsCompanyId(r.pilotsCompanyId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -71,7 +69,9 @@ export function VaRankingPage(props: Props) {
             </p>
           ) : null}
           {companies.length === 0 && !error ? (
-            <p className="muted va-ranking-empty">No desk flights in this window.</p>
+            <p className="muted va-ranking-empty">
+              No listed-airline flights in this window yet.
+            </p>
           ) : companies.length > 0 ? (
             <ol className="va-ranking-list">
               {companies.map((row, i) => (
@@ -80,7 +80,7 @@ export function VaRankingPage(props: Props) {
                   <span className="va-ranking-name">{row.displayName}</span>
                   <span className="va-ranking-meta">
                     {row.nm.toLocaleString()} nm · {row.hauls}{' '}
-                    {row.hauls === 1 ? 'haul' : 'hauls'}
+                    {row.hauls === 1 ? 'flight' : 'flights'}
                     {row.flightQuality?.qualityScore != null
                       ? ` · Q${Math.round(row.flightQuality.qualityScore)}`
                       : ''}
@@ -93,13 +93,13 @@ export function VaRankingPage(props: Props) {
 
         <div className="settings-card">
           <div className="va-ranking-head">
-            <h3>Pilots · this airline</h3>
+            <h3>Pilots · {windowDays}d</h3>
           </div>
-          {!pilotsCompanyId ? (
-            <p className="muted va-ranking-empty">Join a listed airline first.</p>
-          ) : pilots.length === 0 ? (
-            <p className="muted va-ranking-empty">No crew desk flights yet.</p>
-          ) : (
+          {pilots.length === 0 && !error ? (
+            <p className="muted va-ranking-empty">
+              No listed-airline flights in this window yet.
+            </p>
+          ) : pilots.length > 0 ? (
             <ol className="va-ranking-list">
               {pilots.map((p, i) => (
                 <li key={p.accountId}>
@@ -107,12 +107,12 @@ export function VaRankingPage(props: Props) {
                   <span className="va-ranking-name">{p.displayName}</span>
                   <span className="va-ranking-meta">
                     {p.nm.toLocaleString()} nm · {p.hauls}{' '}
-                    {p.hauls === 1 ? 'haul' : 'hauls'}
+                    {p.hauls === 1 ? 'flight' : 'flights'}
                   </span>
                 </li>
               ))}
             </ol>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

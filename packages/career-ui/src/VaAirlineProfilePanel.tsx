@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { VaCompanyNetworkNode, VaDirectoryEntry } from './api';
 import { formatVaCutsPair, VA_CUTS_TOOLTIP } from './va-cuts-copy';
 import { VaCompanyNetwork } from './VaCompanyNetwork';
@@ -37,7 +37,10 @@ function asNetworkNodes(nodes: VaCompanyNetworkNode[]): CompanyNetworkNode[] {
 export function VaAirlineProfilePanel(props: Props) {
   const { airline } = props;
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const nodes = asNetworkNodes(props.network);
+  const nodes = useMemo(
+    () => asNetworkNodes(props.network),
+    [props.network],
+  );
 
   useEffect(() => {
     setSelectedId(null);

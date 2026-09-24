@@ -11,6 +11,8 @@ import {
 import {
   VA_MEMBER_CAP,
   canMutateVaPortDeskOps,
+  isVaAirlineLaborMission,
+  isVaRankingMission,
   listOpenAirlineDeskHolds,
   listOpenInternalHaulHolds,
   quoteMemberAirlineCutUsd,
@@ -38,6 +40,19 @@ import { DatabaseSync } from 'node:sqlite';
 describe('VA IH-2', () => {
   let dir: string;
   let store: CareerStore;
+
+  it('isVaRankingMission includes Freights vaFlight and desk labor', () => {
+    assert.equal(isVaRankingMission({ vaFlight: true }), true);
+    assert.equal(isVaRankingMission({ warehouseHaul: true }), true);
+    assert.equal(isVaRankingMission({ demandOrderId: 'dem_1' }), true);
+    assert.equal(
+      isVaRankingMission({ warehouseBridge: true, internalHaul: true }),
+      true,
+    );
+    assert.equal(isVaRankingMission({}), false);
+    assert.equal(isVaAirlineLaborMission({ warehouseHaul: false }), false);
+    assert.equal(isVaAirlineLaborMission({}), false);
+  });
 
   before(async () => {
     dir = mkdtempSync(join(tmpdir(), 'career-va-'));
@@ -433,14 +448,21 @@ describe('VA IH-2', () => {
       }),
     );
     assert.ok(ranking.some((r) => r.companyId === companyId && r.nm >= 400));
-    const pilots = await Promise.resolve(
+    const pilotsCompany = await Promise.resolve(
       store.vaPilotRanking({
         companyId,
         fromDayKey: day,
         toDayKey: day,
       }),
     );
-    assert.ok(pilots.some((p) => p.accountId === reg.account.id));
+    assert.ok(pilotsCompany.some((p) => p.accountId === reg.account.id));
+    const pilotsGlobal = await Promise.resolve(
+      store.vaPilotRanking({
+        fromDayKey: day,
+        toDayKey: day,
+      }),
+    );
+    assert.ok(pilotsGlobal.some((p) => p.accountId === reg.account.id && p.nm >= 400));
   });
 
   it('records flight quality and publishes composite after sample floor', async () => {

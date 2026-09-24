@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   LngLatBounds,
   Map as MapLibreMap,
@@ -6,6 +6,7 @@ import {
   NavigationControl,
   Popup,
   setWorkerUrl,
+  type GeoJSONSource,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
@@ -18,6 +19,23 @@ setWorkerUrl(maplibreWorkerUrl);
 const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const FEEDER_ACCENT = '#f0a35a';
 const DESK_ROUTE_ACCENT = '#7ec8e3';
+
+const FEEDERS_SOURCE = 'company-network-feeders';
+const FEEDERS_LAYER = 'company-network-feeders';
+const DESK_SOURCE = 'company-network-desk-route';
+const DESK_LAYER = 'company-network-desk-route';
+
+type LineFeatureCollection = {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    properties: Record<string, unknown>;
+    geometry: {
+      type: 'LineString';
+      coordinates: [number, number][];
+    };
+  }>;
+};
 
 function hasCoords(lat: unknown, lon: unknown): lat is number {
   return (
@@ -35,6 +53,84 @@ function safeResize(map: MapLibreMap | null) {
   } catch {
     /* map torn down mid-resize */
   }
+}
+
+function emptyLineCollection(): LineFeatureCollection {
+  return { type: 'FeatureCollection', features: [] };
+}
+
+function upsertLineLayer(
+  map: MapLibreMap,
+  sourceId: string,
+  layerId: string,
+  data: LineFeatureCollection,
+  paint: Record<string, unknown>,
+) {
+  const existing = map.getSource(sourceId) as GeoJSONSource | undefined;
+  if (existing && typeof existing.setData === 'function') {
+    existing.setData(data);
+    if (!map.getLayer(layerId)) {
+      map.addLayer({
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        paint: paint as never,
+      });
+    }
+    return;
+  }
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+  map.addSource(sourceId, { type: 'geojson', data });
+  map.addLayer({
+    id: layerId,
+    type: 'line',
+    source: sourceId,
+    paint: paint as never,
+  });
+}
+
+function clearLineLayer(map: MapLibreMap, sourceId: string, layerId: string) {
+  const existing = map.getSource(sourceId) as GeoJSONSource | undefined;
+  if (existing && typeof existing.setData === 'function') {
+    existing.setData(emptyLineCollection());
+    return;
+  }
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+}
+
+function nodesSignature(
+  nodes: CompanyNetworkNode[],
+  selectedId: string | null,
+): string {
+  return nodes
+    .filter((n) => hasCoords(n.lat, n.lon))
+    .map(
+      (n) =>
+        `${n.id}:${n.kind}:${n.lat.toFixed(5)}:${n.lon.toFixed(5)}:${n.portId ?? ''}:${selectedId === n.id ? 1 : 0}`,
+    )
+    .join('|');
+}
+
+function routeSignature(
+  route: CompanyNetworkMapRoute | null | undefined,
+): string {
+  if (!route) return '';
+  if (
+    !hasCoords(route.originLat, route.originLon) ||
+    !hasCoords(route.destLat, route.destLon)
+  ) {
+    return '';
+  }
+  return [
+    route.originIcao,
+    route.destIcao,
+    route.originLat.toFixed(5),
+    route.originLon.toFixed(5),
+    route.destLat.toFixed(5),
+    route.destLon.toFixed(5),
+  ].join('|');
 }
 
 export type CompanyNetworkMapRoute = {
@@ -65,9 +161,16 @@ export function CompanyNetworkMap(props: Props) {
   const aliveRef = useRef(true);
   const markersRef = useRef<Marker[]>([]);
   const fittedForRef = useRef('');
+  const plottedSigRef = useRef('');
   const onSelectRef = useRef(props.onSelectNode);
   onSelectRef.current = props.onSelectNode;
   const [mapGeneration, setMapGeneration] = useState(0);
+
+  const plotSig = useMemo(
+    () =>
+      `${nodesSignature(props.nodes, props.selectedId)}#${routeSignature(props.highlightRoute)}`,
+    [props.nodes, props.selectedId, props.highlightRoute],
+  );
 
   useEffect(() => {
     aliveRef.current = true;
@@ -124,21 +227,22 @@ export function CompanyNetworkMap(props: Props) {
       }
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
+      plottedSigRef.current = '';
       const active = mapRef.current;
       mapRef.current = null;
       if (active) {
         try {
-          if (active.getLayer('company-network-feeders')) {
-            active.removeLayer('company-network-feeders');
+          if (active.getLayer(FEEDERS_LAYER)) {
+            active.removeLayer(FEEDERS_LAYER);
           }
-          if (active.getSource('company-network-feeders')) {
-            active.removeSource('company-network-feeders');
+          if (active.getSource(FEEDERS_SOURCE)) {
+            active.removeSource(FEEDERS_SOURCE);
           }
-          if (active.getLayer('company-network-desk-route')) {
-            active.removeLayer('company-network-desk-route');
+          if (active.getLayer(DESK_LAYER)) {
+            active.removeLayer(DESK_LAYER);
           }
-          if (active.getSource('company-network-desk-route')) {
-            active.removeSource('company-network-desk-route');
+          if (active.getSource(DESK_SOURCE)) {
+            active.removeSource(DESK_SOURCE);
           }
         } catch {
           /* torn down */
@@ -157,11 +261,23 @@ export function CompanyNetworkMap(props: Props) {
     if (!map || mapGeneration < 1 || !aliveRef.current) return;
     if (!map.isStyleLoaded()) return;
 
+    const fullSig = `${mapGeneration}|${plotSig}`;
+    if (fullSig === plottedSigRef.current) return;
+    plottedSigRef.current = fullSig;
+
     for (const marker of markersRef.current) marker.remove();
     markersRef.current = [];
 
     const plotNodes = props.nodes.filter((n) => hasCoords(n.lat, n.lon));
-    if (plotNodes.length === 0) return;
+    if (plotNodes.length === 0) {
+      try {
+        clearLineLayer(map, FEEDERS_SOURCE, FEEDERS_LAYER);
+        clearLineLayer(map, DESK_SOURCE, DESK_LAYER);
+      } catch {
+        /* ok */
+      }
+      return;
+    }
 
     // Must be the JS Map — never shadow with maplibre's `Map` import.
     const fboByPort = new globalThis.Map<string, CompanyNetworkNode>();
@@ -171,15 +287,7 @@ export function CompanyNetworkMap(props: Props) {
       }
     }
 
-    const feederFeatures: Array<{
-      type: 'Feature';
-      properties: { highlighted: boolean };
-      geometry: {
-        type: 'LineString';
-        coordinates: [number, number][];
-      };
-    }> = [];
-
+    const feederFeatures: LineFeatureCollection['features'] = [];
     for (const wh of plotNodes) {
       if (wh.kind !== 'wh' || !wh.portId) continue;
       const fbo = fboByPort.get(wh.portId.toUpperCase());
@@ -200,47 +308,24 @@ export function CompanyNetworkMap(props: Props) {
     }
 
     try {
-      if (map.getLayer('company-network-feeders')) {
-        map.removeLayer('company-network-feeders');
-      }
-      if (map.getSource('company-network-feeders')) {
-        map.removeSource('company-network-feeders');
-      }
-    } catch {
-      /* ok */
-    }
-
-    if (feederFeatures.length > 0) {
-      try {
-        map.addSource('company-network-feeders', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: feederFeatures },
-        });
-        map.addLayer({
-          id: 'company-network-feeders',
-          type: 'line',
-          source: 'company-network-feeders',
-          paint: {
+      if (feederFeatures.length > 0) {
+        upsertLineLayer(
+          map,
+          FEEDERS_SOURCE,
+          FEEDERS_LAYER,
+          { type: 'FeatureCollection', features: feederFeatures },
+          {
             'line-color': FEEDER_ACCENT,
             'line-width': ['case', ['get', 'highlighted'], 2.5, 1.2],
             'line-opacity': ['case', ['get', 'highlighted'], 0.85, 0.45],
             'line-dasharray': [2, 2],
           },
-        });
-      } catch {
-        /* style not ready / map removed */
-      }
-    }
-
-    try {
-      if (map.getLayer('company-network-desk-route')) {
-        map.removeLayer('company-network-desk-route');
-      }
-      if (map.getSource('company-network-desk-route')) {
-        map.removeSource('company-network-desk-route');
+        );
+      } else {
+        clearLineLayer(map, FEEDERS_SOURCE, FEEDERS_LAYER);
       }
     } catch {
-      /* ok */
+      /* style not ready / map removed */
     }
 
     const deskRoute = props.highlightRoute;
@@ -248,11 +333,14 @@ export function CompanyNetworkMap(props: Props) {
       deskRoute &&
       hasCoords(deskRoute.originLat, deskRoute.originLon) &&
       hasCoords(deskRoute.destLat, deskRoute.destLon);
-    if (deskRouteOk) {
-      try {
-        map.addSource('company-network-desk-route', {
-          type: 'geojson',
-          data: {
+
+    try {
+      if (deskRouteOk) {
+        upsertLineLayer(
+          map,
+          DESK_SOURCE,
+          DESK_LAYER,
+          {
             type: 'FeatureCollection',
             features: [
               {
@@ -270,20 +358,17 @@ export function CompanyNetworkMap(props: Props) {
               },
             ],
           },
-        });
-        map.addLayer({
-          id: 'company-network-desk-route',
-          type: 'line',
-          source: 'company-network-desk-route',
-          paint: {
+          {
             'line-color': DESK_ROUTE_ACCENT,
             'line-width': 3.2,
             'line-opacity': 0.92,
           },
-        });
-      } catch {
-        /* style not ready / map removed */
+        );
+      } else {
+        clearLineLayer(map, DESK_SOURCE, DESK_LAYER);
       }
+    } catch {
+      /* style not ready / map removed */
     }
 
     const selectedId = props.selectedId;
@@ -441,7 +526,13 @@ export function CompanyNetworkMap(props: Props) {
     } catch {
       /* map removed mid-camera */
     }
-  }, [props.nodes, props.selectedId, props.highlightRoute, mapGeneration]);
+  }, [
+    plotSig,
+    mapGeneration,
+    props.nodes,
+    props.selectedId,
+    props.highlightRoute,
+  ]);
 
   return (
     <div

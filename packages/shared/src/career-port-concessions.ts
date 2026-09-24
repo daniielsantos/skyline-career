@@ -57,14 +57,14 @@ export const PORT_CONCESSION_SHIPPED_KG = 25_000;
 /** P2 yard: larger soft caps (restock % unchanged → more kg per ship). */
 export const PORT_P2_CAP_MULT = 1.35;
 export const PORT_P2_UPGRADE_USD = 220_000;
-/** Lifetime kg through this port (operator) to unlock P2. */
+/** Lifetime kg settled outbound through this port (operator) to unlock P2. */
 export const PORT_P2_THROUGHPUT_KG = 80_000;
 export const PORT_P2_LEASE_LEVEL_MULT = 1.2;
 
 /** P3: faster restock + listing slot + mild inbound ETA. Same buy discount as P1. */
 export const PORT_P3_RESTOCK_FRAC_PER_DAY = 0.11;
 export const PORT_P3_UPGRADE_USD = 280_000;
-/** Lifetime kg through this port (operator) to unlock P3. */
+/** Lifetime kg settled outbound through this port (operator) to unlock P3. */
 export const PORT_P3_THROUGHPUT_KG = 180_000;
 export const PORT_P3_LEASE_LEVEL_MULT = 1.4;
 export const PORT_P3_EXTRA_LISTINGS = 1;

@@ -6688,48 +6688,77 @@ button.logbook-card-hit:focus-visible {
 
 .cashflow-burn-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.85rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.cashflow-burn-title {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.cashflow-burn-title .aircraft-card-section-label {
+  margin: 0;
 }
 
 .cashflow-burn-total {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.35rem;
   font-weight: 650;
+  line-height: 1.15;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
 }
 
 .cashflow-burn-unit {
   margin-left: 0.15rem;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 500;
   color: var(--muted, #8b97a8);
 }
 
 .cashflow-burn-runway {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
 }
 
-.cashflow-burn-lines {
+.cashflow-burn-breakdown {
   list-style: none;
-  margin: 0.65rem 0 0;
-  padding: 0;
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--line);
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+  gap: 0.65rem 1rem;
 }
 
-.cashflow-burn-lines li {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  font-size: 0.88rem;
+.cashflow-burn-breakdown li {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
 }
 
-.cashflow-burn-note {
-  margin: 0.65rem 0 0;
-  font-size: 0.78rem;
-  line-height: 1.35;
+.cashflow-burn-line-label {
+  font-size: 0.7rem;
+  line-height: 1.25;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted, #8b97a8);
+}
+
+.cashflow-burn-line-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.cashflow-burn-line-value .cashflow-burn-unit {
+  font-weight: 500;
 }
 
 .cashflow-summary-dl {

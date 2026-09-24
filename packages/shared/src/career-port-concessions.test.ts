@@ -10,6 +10,9 @@ import {
   listPortListings,
   quotePortListingUnitPriceUsd,
 } from './career-ports.js';
+import { acceptDemandOrder } from './career-demand.js';
+import { departMission, settleMission } from './career-mission.js';
+import { depositCargoToWarehouse } from './career-warehouse-stock.js';
 import {
   PORT_CONCESSION_CLAIM_USD,
   PORT_CONCESSION_LEASE_DAYS,
@@ -202,8 +205,10 @@ describe('port concessions', () => {
       kg: 500,
     });
     assert.ok(bought.unitPriceUsd <= listing!.unitPriceUsd * 0.91);
-    assert.ok(
-      (state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0) >= 500,
+    assert.equal(
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0,
+      0,
+      'port buy must not credit FBO throughput (settle-only)',
     );
   });
 
@@ -403,5 +408,78 @@ describe('port concessions', () => {
       PORT_OPERATOR_ETA_MULT,
     );
     assert.equal(portOperatorEtaMult(world, 'BRSSZ', 'co_home'), 1);
+  });
+
+  it('Demand settle credits FBO throughput; port buy does not', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 500_000;
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0, 0);
+
+    ensurePortListings(world);
+    const listing = listPortListings(world, 'BRSSZ').find(
+      (l) =>
+        l.availableKg >= 400 &&
+        (l.commodityId === 'general' || l.commodityId === 'supplies'),
+    );
+    assert.ok(listing);
+    buyPortListing(state, world, { listingId: listing!.id, kg: 400 });
+    assert.equal(
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0,
+      0,
+    );
+
+    // Force WH stock ready (inbound may still be transferring).
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 300,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+
+    const dest = world.airports.find((a) => a.icao === 'SBKP');
+    assert.ok(dest);
+    dest!.inventory.general!.stockKg = Math.floor(
+      dest!.inventory.general!.capacityKg * 0.05,
+    );
+    world.demandOrders = [
+      {
+        id: 'demand_tp_settle',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 4_000,
+        remainingKg: 4_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+        portId: 'BRSSZ',
+      },
+    ];
+
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+
+    const accepted = acceptDemandOrder(state, world, {
+      orderId: 'demand_tp_settle',
+      originIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      kg: 250,
+    });
+    const departed = departMission(world, accepted.mission, { fleet: state });
+    settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0,
+      accepted.kg,
+    );
+    assert.ok(
+      (state.playerPortConcessions?.[0]?.throughputWindowKg?.[0] ?? 0) >=
+        accepted.kg,
+    );
   });
 });

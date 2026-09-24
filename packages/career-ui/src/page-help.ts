@@ -48,7 +48,7 @@ export const PAGE_HELP = {
     bullets: [
       'This sidebar Ports is your personal company — warehouses, Demand, and Port FBO you claim solo. Shared airline desk is under Crew → Ports.',
       'Seaport listings sell at factory price into a warehouse at a pickup hub. Overflow sits in the yard — listings do not spawn just because you opened this page.',
-      'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent throughput.',
+      'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent settled throughput (Demand / WH haul).',
       'Buy warehouse space (T1–T3), then Store yard lots into it. Fees apply when you move cargo into the warehouse.',
       'Demand Board is the sell tab: terminals pay when stock is low. Hold pledges warehouse kg; Fly now or Dispatch stages the flight.',
       'On Warehouse, pick a hub. Move sends company stock to another warehouse (no payout). Overflow lands in the dest hub yard, not the terminal.',

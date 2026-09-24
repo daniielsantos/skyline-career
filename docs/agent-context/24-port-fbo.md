@@ -92,6 +92,10 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Port FBO lease days in dialog (2026-09-24):** sintoma = “lease through tick N” ilegível; modal denso. Fix = dias restantes (`ceil((through−tick)/96)`); botão **Lease · Nd**; copy P-level enxuta + throughput separado.
 
+**Throughput 7d 0 após voo Demand (2026-09-24):** sintoma = member settle Demand e modal ainda `7d 0.0`. Causa = crédito só no port buy (não no settle). **Superseded** pelo fix settle-only abaixo — após ship, Demand settle no tenant operator credita lifetime + 7d.
+
+**Throughput farm buy→abandon (2026-09-24):** sintoma = jogador pergunta se abandonar stock e recomprar burla o gate P2/P3. Causa = crédito no buy; `abandonWarehouseStock` / `abandonPortPickup` **sem** clawback. **Fix shipped:** crédito só em settle Demand / WH haul (`creditPortOperatorThroughputOnOutboundSettle`); buy não credita. Bridge/portpk não. Lifetime histórico (pré-fix) permanece.
+
 **Network tab locked Buy WH (2026-09-24):** sintoma = Home Ports Network cinza; jogador achava que precisava Claim FBO antes de WH. Causa = `disabled={!hasNetworkAssets}` + Buy warehouse só dentro de Network → deadlock onboarding. Fix = Network sempre clicável (vazio abre Buy warehouse); CTA **Buy warehouse · ICAO** no catalog ao lado de Claim; FBO **não** é pré-requisito de WH.
 
 **Company network fora do Port FBO (2026-09-21):** sintoma = chip SBRF no Ports esvazia Scout (filtro origem). Decisão = network chips + filtro ficam em **My VA → Hauls**; Port FBO é desk do porto (mapa Ports já mostra FBO/WH). Removido `VaCompanyNetwork` de `PortsPanel`.

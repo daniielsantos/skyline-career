@@ -31,7 +31,6 @@ import {
 import {
   concessionLeaseUsdForDays,
   creditPortInventory,
-  creditPortOperatorThroughput,
   debitPortInventory,
   estimatePortInboundCargo,
   evaluatePortConcessionClaim,
@@ -2379,7 +2378,8 @@ export function buyPortListing(
     note: `${port.name} · ${listing.commodityId} · ${qty} kg @ $${unitPriceUsd}/kg → ${hub}`,
   });
 
-  creditPortOperatorThroughput(state, world, listing.portId, qty);
+  // Port FBO throughput credits on Demand / WH-haul settle, not buy
+  // (buy→abandon would otherwise farm P2/P3 gates).
 
   const wh = findPlayerWarehouseAtIcao(state, hub);
   const freeRaw = wh ? warehouseInboundFreeKg(state, wh.id) : 0;

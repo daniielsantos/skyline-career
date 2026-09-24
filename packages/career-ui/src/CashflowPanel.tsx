@@ -161,40 +161,33 @@ export function CashflowBurnEstimateCard(props: {
     burn.runwayDays == null
       ? null
       : burn.runwayDays >= 9999
-        ? '9999+ days runway'
-        : `~${burn.runwayDays.toLocaleString()} days runway`;
+        ? '9999+ days of cash'
+        : `~${burn.runwayDays.toLocaleString()} days of cash`;
   return (
-    <div
-      className="cashflow-burn-card"
-      title="Estimate if the current footprint stays as-is. Parking, storage, and Port FBO lease change with ops."
-    >
+    <div className="cashflow-burn-card">
       <div className="cashflow-burn-head">
-        <p className="aircraft-card-section-label" style={{ margin: 0 }}>
-          Est. burn
-        </p>
+        <div className="cashflow-burn-title">
+          <p className="aircraft-card-section-label">Forward burn</p>
+          {runway ? (
+            <p className="cashflow-burn-runway muted">{runway}</p>
+          ) : null}
+        </div>
         <p className="cashflow-burn-total cashflow-neg">
           {props.formatMoney(burn.totalUsdPerDay)}
           <span className="cashflow-burn-unit">/day</span>
         </p>
-        {runway ? (
-          <p className="cashflow-burn-runway muted">{runway}</p>
-        ) : null}
       </div>
-      <ul className="cashflow-burn-lines">
+      <ul className="cashflow-burn-breakdown">
         {burn.lines.map((line) => (
           <li key={line.id}>
-            <span>{line.label}</span>
-            <span className="cashflow-neg">
+            <span className="cashflow-burn-line-label">{line.label}</span>
+            <span className="cashflow-burn-line-value cashflow-neg">
               {props.formatMoney(line.usdPerDay)}
               <span className="cashflow-burn-unit">/d</span>
             </span>
           </li>
         ))}
       </ul>
-      <p className="cashflow-burn-note muted">
-        At current footprint — changes if you move aircraft, return a lease, or
-        empty stock.
-      </p>
     </div>
   );
 }

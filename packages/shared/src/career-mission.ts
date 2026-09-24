@@ -22,6 +22,7 @@ import {
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { depositCargoToWarehouse, depositCargoToWarehouseOrYard, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
+import { creditPortOperatorThroughputOnOutboundSettle } from './career-port-throughput.js';
 import { whOpsShippedMultForWarehouse } from './career-ground-staff.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
 import {
@@ -3032,6 +3033,11 @@ export function settleMission(
             icao: working.originIcao,
             kg: line.cargoKg,
             creditMult,
+          });
+          creditPortOperatorThroughputOnOutboundSettle(opts.fleet, world, {
+            originIcao: working.originIcao,
+            kg: line.cargoKg,
+            demandOrderId: working.demandOrderId,
           });
         }
         continue;

@@ -6180,13 +6180,15 @@ export function PortsPanel(props: {
                       : ' · cheaper buys, faster inbound'}
                 </p>
                 <p className="muted ports-warehouse-hint">
-                  Throughput{' '}
+                  Settled through this FBO{' '}
                   {props.formatTonnes(
                     port.concession.lifetimeThroughputKg ?? 0,
                   )}
                   {port.concession.recentThroughputKg != null
                     ? ` · 7d ${props.formatTonnes(port.concession.recentThroughputKg)}`
                     : ''}
+                  {' '}
+                  (Demand / WH haul settle — not buys)
                 </p>
                 <div className="confirm-actions">
                   <button

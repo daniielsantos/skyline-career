@@ -1802,7 +1802,7 @@ export interface PlayerPortConcession {
   level: PortConcessionLevel;
   claimedAtTick: number;
   leasePaidThroughTick: number;
-  /** Cumulative kg bought at this port by anyone while under this operator. */
+  /** Cumulative kg settled outbound (Demand / WH haul) while under this operator. */
   lifetimeThroughputKg: number;
   /** Economy-day index (`floor(tick/96)`) for `throughputWindowKg[0]`. */
   throughputWindowDay?: number;

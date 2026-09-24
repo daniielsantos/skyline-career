@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **c1e16268** / desktop **0.3.271** shipped: Promote iniBuilds A300-600, L1011-500, and Contrail Falcon 50 with Market card art. Release: [v0.3.271](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.271).
+
+
 `main` **3d5e8957** / desktop **0.3.270** shipped: Count all listed-VA settles on global Ranking boards and stop network feeder flicker. Release: [v0.3.270](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.270).
 
 

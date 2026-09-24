@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **1b348c3d** / desktop **0.3.277** shipped: Match My VA Ledger loading to Ports/Hauls BusyBlock. Release: [v0.3.277](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.277).
+
+
 `main` **ca2eb7c1** / desktop **0.3.276** shipped: Allow charter inject when SKU is injectCapable and trim EFB preflight copy. Release: [v0.3.276](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.276).
 
 

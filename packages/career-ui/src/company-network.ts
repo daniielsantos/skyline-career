@@ -13,6 +13,8 @@ export type CompanyNetworkNode = {
   level: number | null;
   freeKg: number | null;
   capacityKg: number | null;
+  /** Optional chip badge (e.g. open Demand holds at this hub). */
+  badge?: string | null;
 };
 
 function formatMassKg(kg: number): string {

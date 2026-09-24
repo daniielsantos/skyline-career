@@ -62,6 +62,12 @@ import {
   type PortsLoopStep,
 } from './ports-loop-guidance';
 import {
+  buildCompanyNetworkNodes,
+  findNetworkNode,
+  type CompanyNetworkNode,
+} from './company-network';
+import { VaCompanyNetwork } from './VaCompanyNetwork';
+import {
   formatPortDeskPickupLabel,
   portDeskPickupHubList,
   resolvePortDeskPickupHub,
@@ -350,15 +356,15 @@ function portsLoopMessage(
 function portsLoopCtaLabel(step: PortsLoopStep): string | null {
   switch (step.kind) {
     case 'buy_warehouse':
-      return 'Open warehouses';
+      return 'Buy warehouse';
     case 'store_yard':
       return 'Open yard';
     case 'wait_inbound':
       return 'Open warehouse';
     case 'fulfill_demand':
-      return 'Open Demand Board';
+      return 'Open Demand';
     case 'wait_demand':
-      return 'Open Demand Board';
+      return 'Open Demand';
     case 'buy_port':
       return 'Open catalog';
   }
@@ -374,7 +380,7 @@ function portsLoopSectionHint(
 ): string {
   switch (step.kind) {
     case 'buy_warehouse':
-      return 'Available · buy WH space';
+      return 'Network · Buy warehouse at a pickup hub';
     case 'store_yard': {
       const fee =
         yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
@@ -543,11 +549,16 @@ export function PortsPanel(props: {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
-  const [section, setSection] = useState<
-    'catalog' | 'portFbo' | 'warehouse' | 'demand'
-  >('catalog');
+  const [section, setSection] = useState<'catalog' | 'network'>('catalog');
+  /** What the Network tab shows after a node / action is chosen. */
+  const [networkSurface, setNetworkSurface] = useState<
+    'fbo' | 'wh' | 'demand' | 'buy' | 'staff'
+  >('wh');
+  const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(
+    null,
+  );
+  const [networkSearch, setNetworkSearch] = useState('');
   const [whShelf, setWhShelf] = useState<'owned' | 'staff' | 'buy'>('owned');
-  const [whHubScope, setWhHubScope] = useState<'port' | 'all'>('port');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
   const [selectedOwnedHubIcao, setSelectedOwnedHubIcao] = useState<string | null>(
     null,
@@ -1438,7 +1449,7 @@ export function PortsPanel(props: {
       }
       props.onToast?.('ok', `Bought ${props.formatTonnes(result.kg)} · ${where}`);
       closeBuyModal();
-      if (inbound > 0 || yard > 0) setSection('warehouse');
+      if (inbound > 0 || yard > 0) openNetworkSurface('wh');
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -1471,7 +1482,7 @@ export function PortsPanel(props: {
         `Claimed Port FBO · operator rates active`,
       );
       setConcessionOpen(false);
-      setSection('portFbo');
+      openNetworkSurface('fbo', { portId: portIdToClaim });
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -2640,10 +2651,7 @@ export function PortsPanel(props: {
       return portForHub.get(icao)?.id === portIdSel;
     });
   }, [port, allOwnedWarehouses, selectedPortPickupSet, portForHub]);
-  const ownedWarehousesInScope = useMemo(() => {
-    if (whHubScope === 'all' || !port) return allOwnedWarehouses;
-    return ownedWarehousesAtPort;
-  }, [whHubScope, port, allOwnedWarehouses, ownedWarehousesAtPort]);
+  const ownedWarehousesInScope = allOwnedWarehouses;
   const ownedStockAtSelectedPort = useMemo(() => {
     const allowed = new Set(ownedWarehousesInScope.map((w) => w.id));
     return allWarehouseStock.filter((s) => allowed.has(s.warehouseId));
@@ -2683,22 +2691,15 @@ export function PortsPanel(props: {
         if (match.length > 0) return match;
       }
     }
-    if (!port || whHubScope === 'all') {
-      const ids = new Set<string>();
-      for (const w of warehouses?.warehouses ?? []) {
-        const linked = portForHub.get(w.icao.trim().toUpperCase());
-        if (linked?.id) ids.add(linked.id);
-      }
-      if (ids.size === 0) return mapPorts;
-      return mapPorts.filter((p) => ids.has(p.id));
+    const ids = new Set<string>();
+    for (const w of warehouses?.warehouses ?? []) {
+      const linked = portForHub.get(w.icao.trim().toUpperCase());
+      if (linked?.id) ids.add(linked.id);
     }
-    return mapPorts.filter(
-      (p) => p.id.toUpperCase() === port.id.toUpperCase(),
-    );
+    if (ids.size === 0) return mapPorts;
+    return mapPorts.filter((p) => ids.has(p.id));
   }, [
     mapPorts,
-    port,
-    whHubScope,
     warehouses?.warehouses,
     portForHub,
     selectedOwnedHubIcao,
@@ -3161,31 +3162,202 @@ export function PortsPanel(props: {
   /** Show when the player is on the wrong tab for the next loop step. */
   const showPortsLoopBanner = section !== loopTargetSection;
 
-  /** Exact-operator Port FBO — hide the desk tab until this company claims one. */
+  /** Exact-operator Port FBO — hide Network desk until this company claims one or owns WH. */
   const hasOwnedPortFbo = useMemo(
     () =>
       (snap?.ports ?? []).some((p) => p.concession?.status === 'yours'),
     [snap?.ports],
   );
+  const hasNetworkAssets = hasOwnedPortFbo || allOwnedWarehouses.length > 0;
+
+  const demandHoldsByHub = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of warehouses?.demandHolds ?? []) {
+      if ((h.kind ?? 'demand') === 'bridge' || h.kind === 'haul') continue;
+      const icao = h.originIcao.trim().toUpperCase();
+      if (!icao) continue;
+      map.set(icao, (map.get(icao) ?? 0) + 1);
+    }
+    return map;
+  }, [warehouses?.demandHolds]);
+
+  const companyNetworkNodes = useMemo((): CompanyNetworkNode[] => {
+    if (!snap) return [];
+    const cid = props.logisticsCompanyId?.trim() || '';
+    const base = buildCompanyNetworkNodes(snap, cid);
+    return base.map((n) => {
+      if (n.kind !== 'wh') return n;
+      const holds = demandHoldsByHub.get(n.primaryHubIcao) ?? 0;
+      return holds > 0 ? { ...n, badge: String(holds) } : n;
+    });
+  }, [snap, props.logisticsCompanyId, demandHoldsByHub]);
+
+  const filteredNetworkNodes = useMemo(() => {
+    const q = networkSearch.trim().toLowerCase();
+    if (!q) return companyNetworkNodes;
+    return companyNetworkNodes.filter((n) => {
+      const hay = `${n.title} ${n.subtitle} ${n.primaryHubIcao} ${n.hubIcaos.join(' ')} ${n.portId ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [companyNetworkNodes, networkSearch]);
+
+  const selectedNetworkNode = useMemo(
+    () => findNetworkNode(companyNetworkNodes, selectedNetworkId),
+    [companyNetworkNodes, selectedNetworkId],
+  );
+
+  const scoutHighlightRoute = useMemo(() => {
+    if (!scoutRouteFocus) return null;
+    const o = scoutRouteFocus;
+    if (
+      !(
+        Number.isFinite(o.originLat) &&
+        Number.isFinite(o.originLon) &&
+        Number.isFinite(o.destLat) &&
+        Number.isFinite(o.destLon)
+      )
+    ) {
+      return null;
+    }
+    return {
+      originIcao: o.originIcao,
+      destIcao: o.destIcao,
+      originLat: o.originLat!,
+      originLon: o.originLon!,
+      destLat: o.destLat!,
+      destLon: o.destLon!,
+    };
+  }, [scoutRouteFocus]);
+
+  /** Buyable hubs: this port's pickups first; search unlocks the world list. */
+  const networkBuyableHubs = useMemo(() => {
+    const q = buyHubQuery.trim().toLowerCase();
+    if (!q) {
+      const atPort = allBuyableHubs.filter((icao) =>
+        selectedPortPickupSet.has(icao),
+      );
+      if (atPort.length > 0) return atPort;
+    }
+    return filteredBuyableHubs;
+  }, [
+    buyHubQuery,
+    allBuyableHubs,
+    selectedPortPickupSet,
+    filteredBuyableHubs,
+  ]);
 
   useEffect(() => {
-    if (section === 'portFbo' && snap && !hasOwnedPortFbo) {
+    if (!hasNetworkAssets && section === 'network') {
       setSection('catalog');
     }
-  }, [section, snap, hasOwnedPortFbo]);
+  }, [hasNetworkAssets, section]);
+
+  const didAutoNetworkRef = useRef(false);
+  useEffect(() => {
+    if (didAutoNetworkRef.current || !snap || !hasNetworkAssets) return;
+    didAutoNetworkRef.current = true;
+    setSection('network');
+    if (filteredNetworkNodes.length === 1) {
+      onSelectNetworkNode(filteredNetworkNodes[0]!.id);
+    } else if (hasOwnedPortFbo) {
+      const fbo = companyNetworkNodes.find((n) => n.kind === 'fbo');
+      if (fbo) onSelectNetworkNode(fbo.id);
+      else setNetworkSurface('wh');
+    } else {
+      setNetworkSurface('wh');
+    }
+  }, [
+    snap,
+    hasNetworkAssets,
+    hasOwnedPortFbo,
+    filteredNetworkNodes,
+    companyNetworkNodes,
+  ]);
+
+  function openNetworkSurface(
+    surface: 'fbo' | 'wh' | 'demand' | 'buy' | 'staff',
+    opts?: { hubIcao?: string; networkId?: string | null; portId?: string },
+  ) {
+    setSection('network');
+    setNetworkSurface(surface);
+    if (surface === 'buy') {
+      setWhShelf('buy');
+      setSelectedStockId(null);
+      setSelectedOwnedHubIcao(null);
+    } else if (surface === 'staff') {
+      setWhShelf('staff');
+      setSelectedBuyHubIcao(null);
+      setSelectedStockId(null);
+    } else if (surface === 'wh') {
+      setWhShelf('owned');
+      setSelectedBuyHubIcao(null);
+    } else {
+      setWhShelf('owned');
+      setSelectedBuyHubIcao(null);
+    }
+    if (opts?.networkId !== undefined) {
+      setSelectedNetworkId(opts.networkId);
+    }
+    if (opts?.hubIcao) {
+      const code = opts.hubIcao.trim().toUpperCase();
+      setSelectedOwnedHubIcao(code);
+      const linked = portForHub.get(code);
+      if (linked) setPortId(linked.id);
+      if (!opts.networkId) {
+        const whNode = companyNetworkNodes.find(
+          (n) => n.kind === 'wh' && n.primaryHubIcao === code,
+        );
+        if (whNode) setSelectedNetworkId(whNode.id);
+      }
+    }
+    if (opts?.portId) setPortId(opts.portId);
+  }
+
+  function onSelectNetworkNode(id: string | null) {
+    setSelectedNetworkId(id);
+    if (!id) {
+      setNetworkSurface('wh');
+      return;
+    }
+    const node = findNetworkNode(companyNetworkNodes, id);
+    if (!node) return;
+    if (node.kind === 'fbo' && node.portId) {
+      setPortId(node.portId);
+      setNetworkSurface('fbo');
+      setWhShelf('owned');
+      const pickup = node.primaryHubIcao;
+      if (pickup && ownedHubSet.has(pickup)) {
+        setSelectedOwnedHubIcao(pickup);
+      }
+      return;
+    }
+    if (node.kind === 'wh') {
+      openNetworkSurface('wh', {
+        hubIcao: node.primaryHubIcao,
+        networkId: node.id,
+        portId: node.portId ?? undefined,
+      });
+    }
+  }
 
   function goToLoopStep() {
-    setSection(loopTargetSection);
+    if (loopTargetSection === 'catalog') {
+      setSection('catalog');
+      return;
+    }
     if (loopStep.kind === 'buy_warehouse') {
-      setWhShelf('buy');
+      openNetworkSurface('buy');
     } else if (loopStep.kind === 'store_yard') {
-      setWhShelf('owned');
-      setSelectedOwnedHubIcao(loopStep.hubIcao);
-      setSelectedStockId(null);
+      openNetworkSurface('wh', { hubIcao: loopStep.hubIcao });
     } else if (loopStep.kind === 'wait_inbound') {
-      setWhShelf('owned');
-      setSelectedOwnedHubIcao(loopStep.hubIcao);
-      setSelectedStockId(null);
+      openNetworkSurface('wh', { hubIcao: loopStep.hubIcao });
+    } else if (
+      loopStep.kind === 'fulfill_demand' ||
+      loopStep.kind === 'wait_demand'
+    ) {
+      openNetworkSurface('demand');
+    } else {
+      setSection('network');
     }
   }
 
@@ -3215,11 +3387,11 @@ export function PortsPanel(props: {
   useEffect(() => {
     if (
       selectedBuyHubIcao &&
-      !filteredBuyableHubs.includes(selectedBuyHubIcao.trim().toUpperCase())
+      !networkBuyableHubs.includes(selectedBuyHubIcao.trim().toUpperCase())
     ) {
       setSelectedBuyHubIcao(null);
     }
-  }, [filteredBuyableHubs, selectedBuyHubIcao]);
+  }, [networkBuyableHubs, selectedBuyHubIcao]);
 
   function selectStockLot(stockId: string, hubIcao: string) {
     const next = selectedStockId === stockId ? null : stockId;
@@ -3238,6 +3410,10 @@ export function PortsPanel(props: {
     setSelectedStockId(null);
     const linkedPort = portForHub.get(code);
     if (linkedPort) setPortId(linkedPort.id);
+    const whNode = companyNetworkNodes.find(
+      (n) => n.kind === 'wh' && n.primaryHubIcao === code,
+    );
+    if (whNode) setSelectedNetworkId(whNode.id);
   }
 
   function openBridgeFromLot(originIcao: string, commodityId: string) {
@@ -3464,7 +3640,7 @@ export function PortsPanel(props: {
           {props.embedded ? (
             <div className="ports-embed-toolbar">
               <p className="ports-embed-toolbar-copy">
-                Company port desk · FBO, warehouses, Scout, Demand
+                Company network · FBO desk, warehouses, Scout, Demand
               </p>
               <button
                 type="button"
@@ -3493,54 +3669,44 @@ export function PortsPanel(props: {
             >
               Port catalog
             </button>
-            {hasOwnedPortFbo ? (
+            {hasNetworkAssets ? (
               <button
                 type="button"
                 role="tab"
-                aria-selected={section === 'portFbo'}
+                aria-selected={section === 'network'}
                 className={
-                  section === 'portFbo'
+                  section === 'network'
                     ? 'fbo-icao-chip active'
                     : 'fbo-icao-chip'
                 }
                 disabled={props.busy || loading}
-                onClick={() => setSection('portFbo')}
+                onClick={() => {
+                  setSection('network');
+                  if (
+                    selectedNetworkId == null &&
+                    filteredNetworkNodes.length === 1
+                  ) {
+                    onSelectNetworkNode(filteredNetworkNodes[0]!.id);
+                  } else if (
+                    networkSurface === 'buy' ||
+                    networkSurface === 'demand' ||
+                    networkSurface === 'staff'
+                  ) {
+                    /* keep surface */
+                  } else if (selectedNetworkNode?.kind === 'fbo') {
+                    setNetworkSurface('fbo');
+                  } else {
+                    setNetworkSurface('wh');
+                    setWhShelf('owned');
+                  }
+                }}
               >
-                Port FBO
-                {port?.concession?.status === 'yours'
-                  ? ` · P${port.concession.level ?? 1}`
+                Network
+                {companyNetworkNodes.length > 0
+                  ? ` (${companyNetworkNodes.length})`
                   : ''}
               </button>
             ) : null}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={section === 'warehouse'}
-              className={
-                section === 'warehouse'
-                  ? 'fbo-icao-chip active'
-                  : 'fbo-icao-chip'
-              }
-              disabled={props.busy || loading}
-              onClick={() => setSection('warehouse')}
-            >
-              Warehouse
-              {(snap.pickups?.length ?? 0) > 0
-                ? ` (${snap.pickups.length})`
-                : ''}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={section === 'demand'}
-              className={
-                section === 'demand' ? 'fbo-icao-chip active' : 'fbo-icao-chip'
-              }
-              disabled={props.busy || loading}
-              onClick={() => setSection('demand')}
-            >
-              Demand Board ({sortedDemand.length})
-            </button>
           </div>
 
           <div
@@ -3615,8 +3781,11 @@ export function PortsPanel(props: {
                     className="action ghost ports-concession-open"
                     disabled={props.busy}
                     onClick={() => {
-                      if (hasOwnedPortFbo) setSection('portFbo');
-                      else setConcessionOpen(true);
+                      if (hasOwnedPortFbo) {
+                        openNetworkSurface('fbo', {
+                          portId: port.id,
+                        });
+                      } else setConcessionOpen(true);
                     }}
                   >
                     {port.concession?.status === 'yours'
@@ -3811,7 +3980,108 @@ export function PortsPanel(props: {
             </>
           ) : null}
 
-          {section === 'portFbo' ? (
+          {section === 'network' ? (
+            <div className="ports-network-chrome">
+              <div className="ports-network-toolbar">
+                <label className="ports-network-search">
+                  <span className="ports-network-search-label">Find</span>
+                  <input
+                    type="search"
+                    value={networkSearch}
+                    placeholder="ICAO or port"
+                    aria-label="Search company network by ICAO or port"
+                    disabled={props.busy || loading}
+                    onChange={(e) => setNetworkSearch(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={
+                    networkSurface === 'demand'
+                      ? 'fbo-icao-chip active'
+                      : 'fbo-icao-chip'
+                  }
+                  disabled={props.busy || loading}
+                  onClick={() => openNetworkSurface('demand')}
+                >
+                  Demand ({sortedDemand.length})
+                </button>
+                <button
+                  type="button"
+                  className={
+                    networkSurface === 'buy'
+                      ? 'fbo-icao-chip active'
+                      : 'fbo-icao-chip'
+                  }
+                  disabled={props.busy || loading}
+                  onClick={() => openNetworkSurface('buy')}
+                >
+                  Buy warehouse
+                  {networkBuyableHubs.length > 0
+                    ? ` (${networkBuyableHubs.length}${
+                        buyHubQuery.trim() ? '' : '+'
+                      })`
+                    : ''}
+                </button>
+                <button
+                  type="button"
+                  className={
+                    networkSurface === 'staff'
+                      ? 'fbo-icao-chip active'
+                      : 'fbo-icao-chip'
+                  }
+                  disabled={props.busy || loading}
+                  onClick={() => openNetworkSurface('staff')}
+                >
+                  Ground staff
+                  {(groundStaff?.members.length ?? 0) > 0
+                    ? ` (${groundStaff!.members.length})`
+                    : ''}
+                </button>
+              </div>
+              {filteredNetworkNodes.length > 0 ? (
+                <VaCompanyNetwork
+                  className="ports-network-assets"
+                  nodes={filteredNetworkNodes}
+                  selectedId={
+                    networkSurface === 'demand' ||
+                    networkSurface === 'buy' ||
+                    networkSurface === 'staff'
+                      ? null
+                      : selectedNetworkId
+                  }
+                  onSelect={onSelectNetworkNode}
+                  showMap={
+                    networkSurface === 'fbo' || networkSurface === 'wh'
+                  }
+                  hideAllChip
+                  highlightRoute={
+                    networkSurface === 'fbo' ? scoutHighlightRoute : null
+                  }
+                  weightSystem={props.weightSystem}
+                  disabled={props.busy || loading}
+                />
+              ) : companyNetworkNodes.length === 0 ? (
+                <p className="empty">
+                  No Port FBO or warehouse yet — claim on Port catalog or Buy
+                  warehouse.
+                </p>
+              ) : (
+                <p className="empty">
+                  No network match for “{networkSearch.trim()}”.
+                </p>
+              )}
+              {networkSurface === 'wh' &&
+              companyNetworkNodes.length > 0 &&
+              !selectedNetworkId ? (
+                <p className="empty ports-network-pick-hint">
+                  Select a Port FBO or warehouse above.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {section === 'network' && networkSurface === 'fbo' ? (
             <>
               {port ? (
                 <h3 className="ports-selected-name ports-stage-title">
@@ -3851,29 +4121,14 @@ export function PortsPanel(props: {
                 </h3>
               ) : (
                 <p className="ports-stage-title is-muted">
-                  Select a port on Port catalog first.
+                  Select a Port FBO on the network map.
                 </p>
               )}
 
-              {port ? (
-                <div className="ports-main ports-fbo-main">
-                  <PortsMap
-                    ports={mapPorts}
-                    ownedFbos={mapWarehouses}
-                    selectedPortId={port.id}
-                    highlightedHubIcao={
-                      scoutRouteFocus?.originIcao ??
-                      port.pickupHubs?.[0] ??
-                      null
-                    }
-                    bridgeLegs={scoutRouteLegs}
-                    focusToken={scoutFocusToken}
-                    onSelectPort={selectCatalogPort}
-                    onSelectHub={(icao) => props.onOpenAirport?.(icao)}
-                  />
+              {port && port.concession?.status === 'yours' ? (
+                <div className="ports-main ports-fbo-main ports-network-detail">
                   <div className="ports-listings ports-fbo-panel">
-                    {port.concession?.status === 'yours' ? (
-                      <>
+                    <>
                         <div
                           className="ports-scout-desk"
                           aria-label="Port FBO scout suggestions"
@@ -4294,56 +4549,55 @@ export function PortsPanel(props: {
                           </details>
                         ) : null}
                       </>
-                    ) : port.concession?.status === 'held' ? (
-                      <p className="muted ports-warehouse-hint">
-                        Held by another company — Catalog buy still works.
-                      </p>
-                    ) : (
-                      <p className="muted ports-warehouse-hint">
-                        Vacant — Claim needs WH T3 + 25 t shipped + CAPEX.
-                        Catalog buy works either way.
-                      </p>
-                    )}
                   </div>
                 </div>
+              ) : port ? (
+                <p className="muted ports-warehouse-hint">
+                  {port.concession?.status === 'held'
+                    ? 'Held by another company — Catalog buy still works.'
+                    : 'Vacant — Claim on Port catalog. Catalog buy works either way.'}
+                </p>
               ) : null}
             </>
           ) : null}
 
-          {section === 'warehouse' ? (
+          {section === 'network' &&
+          (networkSurface === 'wh' ||
+            networkSurface === 'buy' ||
+            networkSurface === 'staff') ? (
             <>
               <h3 className="ports-stage-title">
                 {whShelf === 'staff'
                   ? 'Ground staff'
                   : whShelf === 'buy'
-                    ? 'Available warehouses'
+                    ? 'Buy warehouse'
                     : highlightedHubIcao
                       ? `Warehouse · ${highlightedHubIcao}`
                       : 'Your warehouses'}
               </h3>
-              <div className="ports-main">
+              <div
+                className={
+                  whShelf === 'owned'
+                    ? 'ports-main ports-network-detail'
+                    : 'ports-main'
+                }
+              >
+                {whShelf !== 'owned' ? (
                 <PortsMap
-                  ports={
-                    whShelf === 'owned' ? warehouseFocusPorts : mapPorts
-                  }
-                  ownedFbos={
-                    whShelf === 'owned' ? warehouseFocusFbos : mapWarehouses
-                  }
-                  bridgeLegs={
-                    whShelf === 'owned' ? warehouseBridgeLegs : undefined
-                  }
+                  ports={mapPorts}
+                  ownedFbos={mapWarehouses}
+                  bridgeLegs={undefined}
                   selectedPortId={
-                    (whShelf === 'owned' || whShelf === 'staff') &&
-                    highlightPortId
-                      ? highlightPortId
-                      : whShelf === 'buy' && selectedBuyHubIcao
-                        ? (portForHub.get(selectedBuyHubIcao)?.id ??
-                          portId ??
-                          port?.id)
+                    whShelf === 'buy' && selectedBuyHubIcao
+                      ? (portForHub.get(selectedBuyHubIcao)?.id ??
+                        portId ??
+                        port?.id)
+                      : highlightPortId
+                        ? highlightPortId
                         : (portId ?? port?.id)
                   }
                   highlightedHubIcao={
-                    whShelf === 'owned' || whShelf === 'staff'
+                    whShelf === 'staff'
                       ? highlightedHubIcao
                       : whShelf === 'buy'
                         ? selectedBuyHubIcao
@@ -4351,7 +4605,7 @@ export function PortsPanel(props: {
                   }
                   onSelectPort={(id) => {
                     setPortId(id);
-                    if (whShelf === 'owned' || whShelf === 'staff') {
+                    if (whShelf === 'staff') {
                       setSelectedStockId(null);
                       const picked = (snap.ports ?? []).find(
                         (p) => p.id.toUpperCase() === id.toUpperCase(),
@@ -4377,129 +4631,38 @@ export function PortsPanel(props: {
                     const owned = allOwnedWarehouses.some(
                       (w) => w.icao.trim().toUpperCase() === code,
                     );
-                    if (
-                      (whShelf === 'owned' || whShelf === 'staff') &&
-                      owned
-                    ) {
+                    if (whShelf === 'staff' && owned) {
                       selectOwnedHub(code);
+                      return;
+                    }
+                    if (whShelf === 'buy') {
+                      setSelectedBuyHubIcao(code);
                       return;
                     }
                     props.onOpenAirport?.(icao);
                   }}
                 />
+                ) : null}
 
                 <div className="ports-warehouse-side">
                   <div className="ports-warehouse-strip">
                     <div className="ports-wh-head">
-                      <h3>Warehouses</h3>
+                      <h3>
+                        {whShelf === 'buy'
+                          ? 'Buy at pickup'
+                          : whShelf === 'staff'
+                            ? 'Ground staff'
+                            : 'Warehouse'}
+                      </h3>
                       <p className="muted ports-warehouse-hint">
                         {whShelf === 'owned'
-                          ? 'Pick a hub. Stock lives here. Move it to another warehouse or Dispatch a hold.'
+                          ? 'Stock lives here. Move to another warehouse or Dispatch a hold. Demand holds show below.'
                           : whShelf === 'staff'
                             ? 'Hire per warehouse · Ace→Green grades · salary by grade.'
-                            : 'Buyable hubs — select on the map, then buy.'}
+                            : port
+                              ? `Pickup hubs for ${port.name} — search to browse other ports.`
+                              : 'Search a pickup ICAO, then buy.'}
                       </p>
-                      <div
-                        className="ports-wh-shelf"
-                        role="tablist"
-                        aria-label="Warehouse shelf"
-                      >
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={whShelf === 'owned'}
-                          className={
-                            whShelf === 'owned'
-                              ? 'ports-wh-shelf-tab active'
-                              : 'ports-wh-shelf-tab'
-                          }
-                          disabled={props.busy || loading}
-                          onClick={() => {
-                            setWhShelf('owned');
-                            setSelectedBuyHubIcao(null);
-                          }}
-                        >
-                          {ownedShelfLabel}
-                          {allOwnedWarehouses.length > 0
-                            ? ` (${allOwnedWarehouses.length})`
-                            : ''}
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={whShelf === 'staff'}
-                          className={
-                            whShelf === 'staff'
-                              ? 'ports-wh-shelf-tab active'
-                              : 'ports-wh-shelf-tab'
-                          }
-                          disabled={props.busy || loading}
-                          onClick={() => {
-                            setWhShelf('staff');
-                            setSelectedBuyHubIcao(null);
-                            setSelectedStockId(null);
-                          }}
-                        >
-                          Ground staff
-                          {(groundStaff?.members.length ?? 0) > 0
-                            ? ` (${groundStaff!.members.length})`
-                            : ''}
-                        </button>
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={whShelf === 'buy'}
-                          className={
-                            whShelf === 'buy'
-                              ? 'ports-wh-shelf-tab active'
-                              : 'ports-wh-shelf-tab'
-                          }
-                          disabled={props.busy || loading}
-                          onClick={() => {
-                            setWhShelf('buy');
-                            setSelectedStockId(null);
-                            setSelectedOwnedHubIcao(null);
-                          }}
-                        >
-                          Available
-                          {allBuyableHubs.length > 0
-                            ? ` (${allBuyableHubs.length})`
-                            : ''}
-                        </button>
-                      </div>
-                      {whShelf === 'owned' && allOwnedWarehouses.length > 0 ? (
-                        <div
-                          className="ports-wh-scope"
-                          role="group"
-                          aria-label="Warehouse hub scope"
-                        >
-                          <button
-                            type="button"
-                            className={
-                              whHubScope === 'port'
-                                ? 'ports-wh-scope-btn active'
-                                : 'ports-wh-scope-btn'
-                            }
-                            disabled={props.busy || loading || !port}
-                            onClick={() => setWhHubScope('port')}
-                          >
-                            This port
-                            {port ? ` (${ownedWarehousesAtPort.length})` : ''}
-                          </button>
-                          <button
-                            type="button"
-                            className={
-                              whHubScope === 'all'
-                                ? 'ports-wh-scope-btn active'
-                                : 'ports-wh-scope-btn'
-                            }
-                            disabled={props.busy || loading}
-                            onClick={() => setWhHubScope('all')}
-                          >
-                            All hubs ({allOwnedWarehouses.length})
-                          </button>
-                        </div>
-                      ) : null}
                     </div>
 
                     <div className="ports-wh-body">
@@ -4507,13 +4670,12 @@ export function PortsPanel(props: {
                       <>
                         {allOwnedWarehouses.length === 0 ? (
                           <p className="empty">
-                            No warehouses yet — open Available to buy one at a
+                            No warehouses yet — use Buy warehouse above at a
                             pickup hub.
                           </p>
-                        ) : ownedWarehousesInScope.length === 0 ? (
+                        ) : !selectedNetworkId && !focusedOwnedWarehouse ? (
                           <p className="empty">
-                            No warehouse at this port — open All hubs, or buy
-                            one on Available.
+                            Select a warehouse on the network map.
                           </p>
                         ) : (
                           <div className="ports-wh-hub-focus">
@@ -4534,6 +4696,7 @@ export function PortsPanel(props: {
                                       100,
                                   ),
                                 );
+                                const demandN = demandHoldsByHub.get(code) ?? 0;
                                 return (
                                   <button
                                     key={row.id}
@@ -4546,10 +4709,19 @@ export function PortsPanel(props: {
                                         : 'ports-wh-hub-chip'
                                     }
                                     disabled={props.busy || loading}
-                                    onClick={() => selectOwnedHub(code)}
+                                    onClick={() =>
+                                      openNetworkSurface('wh', {
+                                        hubIcao: code,
+                                      })
+                                    }
                                   >
                                     <strong>{code}</strong>
                                     <span>{fillPct}%</span>
+                                    {demandN > 0 ? (
+                                      <span className="ports-wh-hub-chip-badge">
+                                        {demandN}
+                                      </span>
+                                    ) : null}
                                   </button>
                                 );
                               })}
@@ -4957,8 +5129,7 @@ export function PortsPanel(props: {
                     ) : whShelf === 'staff' ? (
                       allOwnedWarehouses.length === 0 ? (
                         <p className="empty">
-                          Buy a warehouse on Available before hiring ground
-                          staff.
+                          Buy a warehouse before hiring ground staff.
                         </p>
                       ) : (
                         <div className="ports-ground-staff">
@@ -5228,20 +5399,24 @@ export function PortsPanel(props: {
                           />
                         </label>
                         {port &&
-                        allBuyableHubs.some((icao) =>
+                        networkBuyableHubs.some((icao) =>
                           selectedPortPickupSet.has(icao),
-                        ) ? (
+                        ) &&
+                        !buyHubQuery.trim() ? (
                           <p className="muted ports-wh-buy-port-hint">
-                            Pickup hubs for {port.name} are listed first.
+                            Showing pickups for {port.name}. Type to search
+                            other ports ({allBuyableHubs.length} hubs).
                           </p>
                         ) : null}
-                        {filteredBuyableHubs.length === 0 ? (
+                        {networkBuyableHubs.length === 0 ? (
                           <p className="empty">
-                            No hubs match “{buyHubQuery.trim()}”.
+                            {buyHubQuery.trim()
+                              ? `No hubs match “${buyHubQuery.trim()}”.`
+                              : 'No buyable pickup hubs — claim a port or wait for catalog.'}
                           </p>
                         ) : (
                       <div className="ports-wh-buy-list">
-                        {filteredBuyableHubs.map((icao) => {
+                        {networkBuyableHubs.map((icao) => {
                           const buyUsd = buyUsdByIcao[icao];
                           const linked = portForHub.get(icao);
                           const selected =
@@ -5639,7 +5814,7 @@ export function PortsPanel(props: {
             </>
           ) : null}
 
-          {section === 'demand' ? (
+          {section === 'network' && networkSurface === 'demand' ? (
             <div className="ports-demand-board">
               <h3 className="ports-stage-title">
                 {port ? `Demand · ${port.name}` : 'Demand Board'}

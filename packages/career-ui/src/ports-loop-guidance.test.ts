@@ -24,7 +24,7 @@ describe('derivePortsLoopStep', () => {
       hubIcao: 'SBRJ',
       ticksLeft: 5,
     });
-    assert.equal(portsLoopTargetSection(step), 'warehouse');
+    assert.equal(portsLoopTargetSection(step), 'network');
   });
 
   it('uses buy_port when empty stock and no inbound', () => {
@@ -49,7 +49,7 @@ describe('derivePortsLoopStep', () => {
       ],
     });
     assert.deepEqual(step, { kind: 'fulfill_demand', matchCount: 1 });
-    assert.equal(portsLoopTargetSection(step), 'demand');
+    assert.equal(portsLoopTargetSection(step), 'network');
   });
 
   it('fulfill_demand counts only the focused port desk', () => {

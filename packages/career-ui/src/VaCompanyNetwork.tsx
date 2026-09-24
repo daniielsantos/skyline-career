@@ -24,6 +24,8 @@ type Props = {
   highlightRoute?: CompanyNetworkHighlightRoute | null;
   /** Compact map of company assets (Hauls). Ports already has a full map. */
   showMap?: boolean;
+  /** Hide the All chip (Ports uses explicit Demand / Buy actions). */
+  hideAllChip?: boolean;
   className?: string;
   disabled?: boolean;
   weightSystem?: WeightSystem;
@@ -56,6 +58,7 @@ export function VaCompanyNetwork(props: Props) {
     selectedId,
     onSelect,
     showMap = false,
+    hideAllChip = false,
     disabled,
     weightSystem = 'metric',
   } = props;
@@ -76,7 +79,7 @@ export function VaCompanyNetwork(props: Props) {
           `${whCount} WH${whCount === 1 ? '' : 's'}`,
         ]
           .filter(Boolean)
-          .join(' · ') + ' · select a node to filter desk work'
+          .join(' · ') + ' · select a node to open the desk'
       : nodes[0]
         ? nodeRoomLine(nodes[0], weightSystem)
         : '';
@@ -87,7 +90,7 @@ export function VaCompanyNetwork(props: Props) {
     >
       <div className="va-company-network-head">
         <p className="va-company-network-label">Company network</p>
-        {multi ? (
+        {multi && !hideAllChip ? (
           <button
             type="button"
             className={
@@ -142,6 +145,11 @@ export function VaCompanyNetwork(props: Props) {
                       : n.primaryHubIcao}
                 </span>
               </span>
+              {n.badge ? (
+                <span className="va-company-network-chip-badge" aria-label={n.badge}>
+                  {n.badge}
+                </span>
+              ) : null}
             </button>
           );
         })}

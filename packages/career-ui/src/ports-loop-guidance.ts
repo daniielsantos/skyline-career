@@ -27,17 +27,17 @@ export type PortsLoopStep =
     }
   | { kind: 'buy_port' };
 
-export type PortsLoopSection = 'catalog' | 'warehouse' | 'demand';
+/** Top-level Ports tabs after network IA — warehouse/demand live under Network. */
+export type PortsLoopSection = 'catalog' | 'network';
 
 export function portsLoopTargetSection(step: PortsLoopStep): PortsLoopSection {
   switch (step.kind) {
     case 'buy_warehouse':
     case 'store_yard':
     case 'wait_inbound':
-      return 'warehouse';
     case 'fulfill_demand':
     case 'wait_demand':
-      return 'demand';
+      return 'network';
     case 'buy_port':
       return 'catalog';
   }

@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-24: **Ports Network IA** — Catalog + Network (chips/mapa); Available/Demand contextual. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
 Atualizado 2026-09-24: **Charter → Class Ops** — settle Charter credita horas/cleans Class Ops (sem Cargo Ops). Spec: [`08-economy.md`](./08-economy.md) + [`29-flight-debrief.md`](./29-flight-debrief.md).
 
 Atualizado 2026-09-24: **EN ROUTE live load polish** — tanks `--live-fuel-*` + Aircraft|Origin 50/50 (preflight intact). Shipping w/ desktop release.

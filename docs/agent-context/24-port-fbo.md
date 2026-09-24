@@ -76,6 +76,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Hauls network camera (2026-09-21):** sintoma = selecionar chip fazia zoom out (fitBounds de toda a rede). Fix = câmera foca o nó selecionado (+ FBO/WH ligado); All = rede inteira.
 
+**Ports network IA (2026-09-24):** sintoma = Catalog / Port FBO / Warehouse / Demand + Available 239 não escala com N FBO/WH. Causa = abas planas + browse mundial no WH. Fix = tabs **Port catalog** + **Network**; Network = chips/`CompanyNetworkMap` + search ICAO; seleção FBO→Scout desk, WH→stock/Demand holds; Buy warehouse / Demand / Ground staff = CTAs (Available contextual no porto); sem This port/All hubs. Hauls continua board de holds. Spec UX em plano Ports layout scale.
+
 **Company network fora do Port FBO (2026-09-21):** sintoma = chip SBRF no Ports esvazia Scout (filtro origem). Decisão = network chips + filtro ficam em **My VA → Hauls**; Port FBO é desk do porto (mapa Ports já mostra FBO/WH). Removido `VaCompanyNetwork` de `PortsPanel`.
 
 **Ports WH map glyph = Hauls (2026-09-21):** pin WH no `PortsMap` e chips usam `companyNetworkIconSvg('wh')`. Redesign = galpão + porta de doca (sem grades/ribs); chips + Hauls + Ports compartilham o mesmo SVG.

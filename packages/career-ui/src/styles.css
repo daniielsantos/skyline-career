@@ -15070,6 +15070,89 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   background: color-mix(in srgb, var(--accent, #f0a35a) 14%, transparent);
 }
 
+.va-company-network-chip-badge {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 1.25rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent, #f0a35a) 28%, transparent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.ports-network-chrome {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 0 0 0.85rem;
+}
+
+.ports-network-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+}
+
+.ports-network-search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  flex: 1 1 10rem;
+  min-width: 8rem;
+  max-width: 16rem;
+}
+
+.ports-network-search-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #9a9a9a);
+}
+
+.ports-network-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.ports-network-assets {
+  margin-bottom: 0;
+}
+
+.ports-network-assets .va-company-network-map {
+  min-height: 18rem;
+  height: 22rem;
+}
+
+.ports-network-detail {
+  grid-template-columns: 1fr;
+}
+
+.ports-network-pick-hint {
+  margin: 0;
+}
+
+.ports-wh-hub-chip-badge {
+  margin-left: 0.25rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent, #f0a35a) 28%, transparent);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
 .va-company-network-chip:disabled {
   opacity: 0.55;
   cursor: not-allowed;

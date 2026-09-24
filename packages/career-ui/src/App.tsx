@@ -5869,10 +5869,9 @@ export function App() {
           }
           if (typeof clock.serverNowMs === 'number') {
             const clientNow = Date.now();
-            setServerOffsetMs(clock.serverNowMs - clientNow);
-            setDisplayNowMs((prev) =>
-              coalesceDisplayNowMs(prev, clock.serverNowMs),
-            );
+            const serverNow = clock.serverNowMs;
+            setServerOffsetMs(serverNow - clientNow);
+            setDisplayNowMs((prev) => coalesceDisplayNowMs(prev, serverNow));
           }
         })
         .catch(() => undefined);
@@ -8141,10 +8140,9 @@ export function App() {
           }
           if (typeof result.serverNowMs === 'number') {
             const clientNow = Date.now();
-            setServerOffsetMs(result.serverNowMs - clientNow);
-            setDisplayNowMs((prev) =>
-              coalesceDisplayNowMs(prev, result.serverNowMs),
-            );
+            const serverNow = result.serverNowMs;
+            setServerOffsetMs(serverNow - clientNow);
+            setDisplayNowMs((prev) => coalesceDisplayNowMs(prev, serverNow));
           }
           leasePaidUsd += result.leasePaidUsd ?? 0;
           leaseRepossessed += result.leaseRepossessed?.length ?? 0;

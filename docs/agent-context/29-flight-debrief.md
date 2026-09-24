@@ -21,7 +21,15 @@ Glance layout inspired by other career addons: **three pillars first**, money/sc
 |--------|--------|
 | Landing | Butter ≤200 · Soft ≤250 · Firm ≤350 · Hard ≤450 · Rough ≤600 · Heavy; Off rwy; Impact |
 | Time | On time · Late; Aborted on impact |
-| Fuel | Low &lt;12% uplift · Normal · Heavy &gt;80%; Residual kg-only; — on impact |
+| Fuel | Low &lt;12% of bought · Normal · Heavy &gt;80% of bought; detail = `left · bought N kg` (uplift = Jet-A purchased at origin, often a top-up); Residual kg-only; — on impact |
+
+## Fuel pillar copy (2026-09-23)
+
+**Sintoma:** debrief `352% of uplift · 1957 kg left` — jargão “uplift” + % sobre compra pequena (tanque já cheio) parecia absurdo.
+
+**Causa:** % = residual ÷ `fuelUplift.deliveredKg` (kg **comprados**), não ÷ combustível total na decolagem.
+
+**Fix:** detail `1957 kg left · bought 556 kg`; badges Low/Normal/Heavy inalterados (ainda vs kg comprados).
 
 ## Não fazer
 

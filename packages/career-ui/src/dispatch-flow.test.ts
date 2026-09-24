@@ -381,7 +381,7 @@ describe('buildFlightDebrief', () => {
     assert.equal(pillars[0]?.tone, 'good');
     assert.equal(pillars[1]?.badge, 'Late');
     assert.equal(pillars[2]?.badge, 'Normal');
-    assert.match(pillars[2]?.detail ?? '', /of uplift/);
+    assert.match(pillars[2]?.detail ?? '', /120 kg left · bought 200 kg/);
   });
 
   it('marks impact fail pillars without inventing payout', () => {

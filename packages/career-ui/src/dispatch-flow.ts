@@ -318,7 +318,8 @@ function buildFuelPillar(
     Number.isFinite(takeoff) &&
     takeoff > 0
   ) {
-    const pct = Math.round((100 * residualKg) / takeoff);
+    const boughtKg = Math.round(takeoff);
+    const pct = Math.round((100 * residualKg) / boughtKg);
     let badge = 'Normal';
     let tone: DebriefPillarTone = 'ok';
     if (pct < 12) {
@@ -333,7 +334,8 @@ function buildFuelPillar(
       label: 'Fuel',
       badge,
       tone,
-      detail: `${pct}% of uplift · ${residualKg} kg left`,
+      // "Uplift" = Jet-A purchased at origin (may be a small top-up).
+      detail: `${residualKg} kg left · bought ${boughtKg} kg`,
     };
   }
   return {

@@ -1,5 +1,19 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-24: **EN ROUTE live load polish** — tanks `--live-fuel-*` + Aircraft|Origin 50/50 (preflight intact). Shipping w/ desktop release.
+
+### EN ROUTE tanks + Aircraft|Origin (2026-09-24) — diag
+
+**Sintoma:** após widen EN ROUTE, tanks L/R ficavam miúdos no card Fuel; Aircraft e Origin em full-width stacked. Preflight já estava bom — não mexer nele.
+
+**Causa:**
+1. Tanks compartilhavam `--live-cell-h` / `--live-fuel-max` com stations; `max-width` + min-height baixo + regra genérica `.dispatch-active-enroute .load-schematic-* { min-height: 1.35rem }` esmagava as asas.
+2. Aircraft stack no EN ROUTE usava `grid-template-columns: 1fr` (legado do side-panel).
+
+**Fix (só `.dispatch-enroute-live-tiles` / `.dispatch-enroute-live-load`):**
+- `--live-fuel-h` / `--live-fuel-fs` separados das stations; tanks sem `max-width`, stretch na coluna Fuel.
+- Aircraft|Origin `repeat(2, 1fr)` sob `.dispatch-enroute-live-load` (mobile 1-col). Preflight `.preflight-load-grid` intacto.
+
 Atualizado 2026-09-23: **Logbook list + detail** — cards Time/Dist/Pay/Score + archived debrief (home + Crew). Spec: [`29-flight-debrief.md`](./29-flight-debrief.md).
 
 Atualizado 2026-09-23: **Airlines profile map** — directory → perfil (HQ + ports/WH no mapa). Spec: [`16-va-logistics.md`](./16-va-logistics.md).

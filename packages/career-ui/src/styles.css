@@ -3798,7 +3798,7 @@ tr.lot-locked {
   --live-cell-h: clamp(2.35rem, 3.2vw, 3.1rem);
   --live-cell-fs: clamp(0.58rem, 0.72vw, 0.72rem);
   --live-fuel-max: clamp(2.6rem, 8vw, 4.75rem);
-  --live-center-w: clamp(1.35rem, 3.5vw, 2.2rem);
+  --live-center-w: clamp(2.6rem, 5.5vw, 3.6rem);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
@@ -3812,7 +3812,7 @@ tr.lot-locked {
     --live-cell-h: 2.2rem;
     --live-cell-fs: 0.58rem;
     --live-fuel-max: 2.85rem;
-    --live-center-w: 1.55rem;
+    --live-center-w: 2.75rem;
   }
 
   .dispatch-enroute-live-tiles > div {
@@ -3932,7 +3932,7 @@ tr.lot-locked {
   width: var(--live-center-w);
   min-height: var(--live-cell-h);
   height: var(--live-cell-h);
-  padding: 0.2rem 0.12rem;
+  padding: 0.2rem 0.28rem;
   box-sizing: border-box;
   align-self: center;
 }
@@ -8828,10 +8828,6 @@ table.contracts-table .col-access .action {
   background: rgba(20, 32, 48, 0.035);
 }
 
-.ofp-route-strip > span {
-  color: #8a5a12;
-}
-
 .ofp-route-strip code {
   color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -9271,7 +9267,9 @@ table.contracts-table .col-access .action {
 }
 
 .load-schematic-center {
-  flex: 0 0 2.4rem;
+  flex: 1.15 1 3.6rem;
+  min-width: 3.5rem;
+  padding-inline: 0.45rem;
   border-radius: 0.2rem;
 }
 

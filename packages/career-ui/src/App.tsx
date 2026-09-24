@@ -2410,12 +2410,12 @@ function formatExpiry(opts: {
 function formatDeadline(deadlineTick: number, continuousHours: number): string {
   const deltaTicks = deadlineTick - continuousHours;
   if (deltaTicks < 0) {
-    return `Overdue by ${formatDuration(Math.abs(deltaTicks) * HOURS_PER_TICK)} · was ${formatClock(deadlineTick)}`;
+    return `Overdue by ${formatDuration(Math.abs(deltaTicks) * HOURS_PER_TICK)}`;
   }
   if (deltaTicks * HOURS_PER_TICK < 1 / 60) {
-    return `Due now (${formatClock(deadlineTick)})`;
+    return 'Due now';
   }
-  return `Due in ${formatDuration(deltaTicks * HOURS_PER_TICK)} · ${formatClock(deadlineTick)}`;
+  return `Due in ${formatDuration(deltaTicks * HOURS_PER_TICK)}`;
 }
 
 function stationMapDrifted(

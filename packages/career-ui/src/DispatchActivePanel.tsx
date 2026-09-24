@@ -16,7 +16,10 @@ import {
   PayloadStationSchematic,
   formatMacPct,
 } from './LoadSchematic';
-import { DispatchRouteCard } from './DispatchRouteCard';
+import {
+  DispatchRouteCard,
+  highlightOfpRoute,
+} from './DispatchRouteCard';
 import { DispatchFlightSummary } from './DispatchFlightSummary';
 import { IcaoLink } from './IcaoLink';
 import { CrewFlyControls } from './CrewFlyControls';
@@ -767,7 +770,13 @@ export function DispatchActivePanel(props: {
                 {briefing?.route ? (
                   <div className="ofp-route-strip">
                     <span>Route</span>
-                    <code>{briefing.route}</code>
+                    <code title={briefing.route}>
+                      {highlightOfpRoute(
+                        briefing.route,
+                        mission.originIcao,
+                        mission.destIcao,
+                      )}
+                    </code>
                   </div>
                 ) : (
                   <p>Re-check SimBrief to load the operational route.</p>

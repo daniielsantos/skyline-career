@@ -9,7 +9,7 @@ import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 import { BusyBlock, BusySpinner } from './Busy';
 
 /** Highlight origin/dest ICAO tokens (incl. runway suffix like SAVN/12) in the OFP route. */
-function highlightOfpRoute(
+export function highlightOfpRoute(
   route: string,
   originIcao: string,
   destIcao: string,

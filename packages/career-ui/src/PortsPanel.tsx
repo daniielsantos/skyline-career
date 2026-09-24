@@ -3140,6 +3140,16 @@ export function PortsPanel(props: {
     companyNetworkNodes,
   ]);
 
+  /** First buyable pickup on the catalog-selected port (onboarding path). */
+  const catalogBuyWarehouseHub = useMemo(() => {
+    if (!port) return null;
+    for (const h of port.pickupHubs ?? []) {
+      const code = h.trim().toUpperCase();
+      if (code && !ownedHubSet.has(code)) return code;
+    }
+    return null;
+  }, [port, ownedHubSet]);
+
   /** Buyable hubs: this port's pickups first; search unlocks the world list. */
   const networkBuyableHubs = useMemo(() => {
     const q = buyHubQuery.trim().toLowerCase();
@@ -3156,12 +3166,6 @@ export function PortsPanel(props: {
     selectedPortPickupSet,
     filteredBuyableHubs,
   ]);
-
-  useEffect(() => {
-    if (!hasNetworkAssets && section === 'network') {
-      setSection('catalog');
-    }
-  }, [hasNetworkAssets, section]);
 
   const didAutoNetworkRef = useRef(false);
   useEffect(() => {
@@ -3195,6 +3199,9 @@ export function PortsPanel(props: {
       setWhShelf('buy');
       setSelectedStockId(null);
       setSelectedOwnedHubIcao(null);
+      if (opts?.hubIcao) {
+        setSelectedBuyHubIcao(opts.hubIcao.trim().toUpperCase());
+      }
     } else if (surface === 'staff') {
       setWhShelf('staff');
       setSelectedBuyHubIcao(null);
@@ -3209,7 +3216,7 @@ export function PortsPanel(props: {
     if (opts?.networkId !== undefined) {
       setSelectedNetworkId(opts.networkId);
     }
-    if (opts?.hubIcao) {
+    if (opts?.hubIcao && surface !== 'buy') {
       const code = opts.hubIcao.trim().toUpperCase();
       setSelectedOwnedHubIcao(code);
       const linked = portForHub.get(code);
@@ -3220,6 +3227,9 @@ export function PortsPanel(props: {
         );
         if (whNode) setSelectedNetworkId(whNode.id);
       }
+    } else if (opts?.hubIcao && surface === 'buy') {
+      const linked = portForHub.get(opts.hubIcao.trim().toUpperCase());
+      if (linked) setPortId(linked.id);
     }
     if (opts?.portId) setPortId(opts.portId);
   }
@@ -3565,14 +3575,20 @@ export function PortsPanel(props: {
                   ? 'fbo-icao-chip active'
                   : 'fbo-icao-chip'
               }
-              disabled={props.busy || loading || !hasNetworkAssets}
+              disabled={props.busy || loading}
               title={
                 hasNetworkAssets
                   ? undefined
-                  : 'Claim a Port FBO or buy a warehouse first'
+                  : 'Opens Buy warehouse — Port FBO is optional'
               }
               onClick={() => {
-                if (!hasNetworkAssets) return;
+                if (!hasNetworkAssets) {
+                  openNetworkSurface('buy', {
+                    portId: port?.id,
+                    hubIcao: catalogBuyWarehouseHub ?? undefined,
+                  });
+                  return;
+                }
                 setSection('network');
                 if (
                   selectedNetworkId == null &&
@@ -3639,6 +3655,22 @@ export function PortsPanel(props: {
                         ? 'Details'
                         : 'Claim'}
                   </button>
+                  {catalogBuyWarehouseHub ? (
+                    <button
+                      type="button"
+                      className="action ghost"
+                      disabled={props.busy || loading}
+                      title={`Buy a company warehouse at ${catalogBuyWarehouseHub} (no Port FBO required)`}
+                      onClick={() =>
+                        openNetworkSurface('buy', {
+                          portId: port.id,
+                          hubIcao: catalogBuyWarehouseHub,
+                        })
+                      }
+                    >
+                      Buy warehouse · {catalogBuyWarehouseHub}
+                    </button>
+                  ) : null}
                 </h3>
               ) : (
                 <p className="ports-stage-title is-muted">
@@ -3911,8 +3943,12 @@ export function PortsPanel(props: {
                 />
               ) : companyNetworkNodes.length === 0 ? (
                 <p className="empty">
-                  No Port FBO or warehouse yet — claim on Port catalog or Buy
-                  warehouse.
+                  No Port FBO or warehouse yet — use{' '}
+                  <strong>Buy warehouse</strong> above
+                  {catalogBuyWarehouseHub
+                    ? ` (start at ${catalogBuyWarehouseHub})`
+                    : ''}
+                  , or Claim on Port catalog.
                 </p>
               ) : (
                 <p className="empty">

@@ -84,6 +84,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Ports network IA (2026-09-24):** sintoma = Catalog / Port FBO / Warehouse / Demand + Available 239 não escala com N FBO/WH. Causa = abas planas + browse mundial no WH. Fix = tabs **Port catalog** + **Network**; Network = chips/`CompanyNetworkMap` + search ICAO; seleção FBO→Scout desk, WH→stock/Demand holds; Buy warehouse / Demand / Ground staff = CTAs (Available contextual no porto); sem This port/All hubs. Hauls continua board de holds. Spec UX em plano Ports layout scale.
 
+**Network tab locked Buy WH (2026-09-24):** sintoma = Home Ports Network cinza; jogador achava que precisava Claim FBO antes de WH. Causa = `disabled={!hasNetworkAssets}` + Buy warehouse só dentro de Network → deadlock onboarding. Fix = Network sempre clicável (vazio abre Buy warehouse); CTA **Buy warehouse · ICAO** no catalog ao lado de Claim; FBO **não** é pré-requisito de WH.
+
 **Company network fora do Port FBO (2026-09-21):** sintoma = chip SBRF no Ports esvazia Scout (filtro origem). Decisão = network chips + filtro ficam em **My VA → Hauls**; Port FBO é desk do porto (mapa Ports já mostra FBO/WH). Removido `VaCompanyNetwork` de `PortsPanel`.
 
 **Ports WH map glyph = Hauls (2026-09-21):** pin WH no `PortsMap` e chips usam `companyNetworkIconSvg('wh')`. Redesign = galpão + porta de doca (sem grades/ribs); chips + Hauls + Ports compartilham o mesmo SVG.

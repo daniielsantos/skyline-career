@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **bbdabb33** / desktop **0.3.296** shipped: Unlock Buy warehouse without owning a Port FBO first. Release: [v0.3.296](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.296).
+
+
 `main` **cbf744a7** / desktop **0.3.295** shipped: Show Demand corridor radius on the Ports Network map. Release: [v0.3.295](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.295).
 
 

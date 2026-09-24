@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **f0ee4d8f** / desktop **0.3.291** shipped: Raise Live trail cap and drop duplicate settle spinner. Release: [v0.3.291](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.291).
+
+
 `main` **bf69d172** / desktop **0.3.290** shipped: Enlarge EN ROUTE fuel tanks and place Aircraft beside Origin. Release: [v0.3.290](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.290).
 
 

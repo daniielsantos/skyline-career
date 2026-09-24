@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **fc540f2c** / desktop **0.3.279** shipped: Title-case account, company, and pilot display names on write. Release: [v0.3.279](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.279).
+
+
 `main` **bf198d08** / desktop **0.3.278** shipped: Stop Arrivals NPC progress bars from rewinding on clock polls. Release: [v0.3.278](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.278).
 
 

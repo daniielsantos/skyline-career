@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **dd87da18** / desktop **0.3.294** shipped: Scale Ports navigation with a Network map and catalog split. Release: [v0.3.294](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.294).
+
+
 `main` **80109566** / desktop **0.3.293** shipped: Credit Class Ops hours and cleans on Charter settle. Release: [v0.3.293](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.293).
 
 

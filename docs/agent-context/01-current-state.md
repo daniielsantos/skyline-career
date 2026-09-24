@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **95992263** / desktop **0.3.284** shipped: Polish OFP route highlighting, center-tank width, and deadline countdown. Release: [v0.3.284](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.284).
+
+
 `main` **46417b6f** / desktop **0.3.283** shipped: Prioritize Import and Preflight on dispatched flights and hide freight OFP Pax. Release: [v0.3.283](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.283).
 
 

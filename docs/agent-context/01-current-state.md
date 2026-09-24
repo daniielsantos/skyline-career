@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **47c55fd1** / desktop **0.3.273** shipped: Keep Payload Lab on Dispatch without polluting career economy or logbook. Release: [v0.3.273](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.273).
+
+
 `main` **e49bf4ef** / desktop **0.3.272** shipped: Show Contrail Falcon 50 add-on info on Market cards. Release: [v0.3.272](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.272).
 
 

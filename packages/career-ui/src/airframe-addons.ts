@@ -27,6 +27,7 @@ const PUBLISHER_BY_PREFIX: Array<{ prefix: string; publisher: string }> = [
   { prefix: 'toliss', publisher: 'ToLiss' },
   { prefix: 'tfdi', publisher: 'TFDi Design' },
   { prefix: 'skyward', publisher: 'Skyward' },
+  { prefix: 'contrail', publisher: 'Contrail' },
   { prefix: 'a2a', publisher: 'A2A Simulations' },
   { prefix: 'asobo', publisher: 'Asobo' },
   { prefix: 'microsoft', publisher: 'Microsoft' },
@@ -75,6 +76,9 @@ const ADDONS_BY_TYPE_ID: Record<string, AirframeAddon[]> = {
   ],
   'justflight-146-300': [
     { publisher: 'Just Flight', product: 'BAe 146 Professional (300 / QT)' },
+  ],
+  'contrail-contrail-falcon-50': [
+    { publisher: 'Contrail', product: 'Falcon 50' },
   ],
 };
 

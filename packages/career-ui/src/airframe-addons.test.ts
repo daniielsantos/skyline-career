@@ -15,6 +15,12 @@ describe('airframe addons', () => {
     ]);
   });
 
+  it('lists Contrail Falcon 50 with product name', () => {
+    assert.deepEqual(listAirframeAddons('contrail-contrail-falcon-50'), [
+      { publisher: 'Contrail', product: 'Falcon 50' },
+    ]);
+  });
+
   it('lists both Caravan vendors on the shared SKU', () => {
     const rows = listAirframeAddons('c208-caravan-cargo');
     assert.equal(rows.length, 2);

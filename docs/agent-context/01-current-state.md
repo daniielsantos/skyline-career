@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **cbf744a7** / desktop **0.3.295** shipped: Show Demand corridor radius on the Ports Network map. Release: [v0.3.295](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.295).
+
+
 `main` **dd87da18** / desktop **0.3.294** shipped: Scale Ports navigation with a Network map and catalog split. Release: [v0.3.294](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.294).
 
 

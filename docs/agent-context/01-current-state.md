@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **3d5e8957** / desktop **0.3.270** shipped: Count all listed-VA settles on global Ranking boards and stop network feeder flicker. Release: [v0.3.270](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.270).
+
+
 `main` **e366525c** / desktop **0.3.269** shipped: Redraw company network FBO/WH/HQ glyphs as outline ops icons. Release: [v0.3.269](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.269).
 
 

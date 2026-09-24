@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **4a8021d1** / desktop **0.3.297** shipped: Zoom Network map into the selected FBO pin. Release: [v0.3.297](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.297).
+
+
 `main` **bbdabb33** / desktop **0.3.296** shipped: Unlock Buy warehouse without owning a Port FBO first. Release: [v0.3.296](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.296).
 
 

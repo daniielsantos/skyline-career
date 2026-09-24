@@ -1,4 +1,7 @@
-# Current state (2026-09-23)
+# Current state (2026-09-24)
+
+`main` **737f28fc** / desktop **0.3.268** shipped: Clarify debrief fuel pillar as residual vs fuel bought at origin. Release: [v0.3.268](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.268).
+
 
 `main` **e8729a24** / desktop **0.3.267** shipped: Replace hangar assigned prose with an in-flight corner mark. Release: [v0.3.267](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.267).
 

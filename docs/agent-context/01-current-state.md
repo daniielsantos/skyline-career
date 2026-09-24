@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **4e6606c2** / desktop **0.3.292** shipped: Fix ledger Day labels and move Money map behind help. Release: [v0.3.292](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.292).
+
+
 `main` **f0ee4d8f** / desktop **0.3.291** shipped: Raise Live trail cap and drop duplicate settle spinner. Release: [v0.3.291](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.291).
 
 

@@ -172,7 +172,7 @@ export function CashflowBurnEstimateCard(props: {
             <p className="cashflow-burn-runway muted">{runway}</p>
           ) : null}
         </div>
-        <p className="cashflow-burn-total cashflow-neg">
+        <p className="cashflow-burn-total">
           {props.formatMoney(burn.totalUsdPerDay)}
           <span className="cashflow-burn-unit">/day</span>
         </p>
@@ -181,7 +181,7 @@ export function CashflowBurnEstimateCard(props: {
         {burn.lines.map((line) => (
           <li key={line.id}>
             <span className="cashflow-burn-line-label">{line.label}</span>
-            <span className="cashflow-burn-line-value cashflow-neg">
+            <span className="cashflow-burn-line-value">
               {props.formatMoney(line.usdPerDay)}
               <span className="cashflow-burn-unit">/d</span>
             </span>

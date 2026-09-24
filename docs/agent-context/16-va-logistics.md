@@ -72,6 +72,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Ranking COALESCE boolean/int + UI declutter (2026-09-23):** sintoma = Airlines card “COALESCE types boolean and integer cannot be matched” + Refresh enorme + essays. Causa = `vaCompanyRanking` PG usava `COALESCE(va_listed, 0)` mas coluna é `BOOLEAN`. Fix = `c.va_listed IS TRUE`; UI sem help walls / botão Refresh (retry só no erro; detalhe no `?`).
 
+**Ranking tabs + Airlines cards (2026-09-24):** sintoma = Airlines/Pilots empilhados em listas magras. Fix = tabs Airlines | Pilots; rows no chrome `va-directory-card` (place + name + Distance/Flights/Quality/Perks).
+
 **Airlines profile map slice (2026-09-23):** sintoma = directory só listava cards. Fix = click/View → `GET /api/va/profile/:id` + `VaAirlineProfilePanel` (stats + `CompanyNetworkMap`); `buildPublicAirlineNetworkNodes` = HQ pin + Port FBOs + WHs (stock redacted). Sem live flights / tiers Pilops. **Icons (2026-09-23):** HQ/FBO/WH glyphs sólidos (fill full, cutouts escuros) — não outline translúcido. Perfil: mapa `.va-airline-profile-network .va-company-network-map` ~38rem.
 
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.

@@ -1479,6 +1479,24 @@ export function VaPage(props: Props) {
             />
           ) : null}
           <div className="va-ledger-hero">
+            <div className="va-ledger-credit">
+              <CompanyCreditBlock
+                credit={companyCredit}
+                walletUsd={resolvedWalletUsd ?? 0}
+                busy={pageBusy || ledgerBusy}
+                actionsLocked={!isOwner}
+                vaOwnerOpsLabels
+                formatMoney={formatBoardMoney}
+                onUpdated={({ walletUsd, companyCredit: next }) => {
+                  props.onWallet?.(walletUsd);
+                  setCompanyCredit(next);
+                  void loadLedger();
+                }}
+                onError={(message) => {
+                  setLedgerError(message);
+                }}
+              />
+            </div>
             <div className="va-ledger-wallet">
               <div className="va-ledger-wallet-head">
                 <p className="aircraft-card-section-label" style={{ margin: 0 }}>
@@ -1502,24 +1520,6 @@ export function VaPage(props: Props) {
               <p className="va-ledger-wallet-hint">
                 Shared company cash (owner wallet).
               </p>
-            </div>
-            <div className="va-ledger-credit">
-              <CompanyCreditBlock
-                credit={companyCredit}
-                walletUsd={resolvedWalletUsd ?? 0}
-                busy={pageBusy || ledgerBusy}
-                actionsLocked={!isOwner}
-                vaOwnerOpsLabels
-                formatMoney={formatBoardMoney}
-                onUpdated={({ walletUsd, companyCredit: next }) => {
-                  props.onWallet?.(walletUsd);
-                  setCompanyCredit(next);
-                  void loadLedger();
-                }}
-                onError={(message) => {
-                  setLedgerError(message);
-                }}
-              />
             </div>
             <div
               className="va-ledger-quality"

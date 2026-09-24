@@ -6711,6 +6711,7 @@ button.logbook-card-hit:focus-visible {
   text-align: right;
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
+  color: var(--ink);
 }
 
 .cashflow-burn-unit {
@@ -6755,6 +6756,7 @@ button.logbook-card-hit:focus-visible {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
+  color: var(--ink);
 }
 
 .cashflow-burn-line-value .cashflow-burn-unit {
@@ -14803,69 +14805,34 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   min-width: 6.5rem;
 }
 
-.va-ranking .va-ranking-head {
+.va-ranking-toolbar {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.55rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  margin: 0 0 1rem;
 }
-.va-ranking .va-ranking-head h3 {
-  margin: 0;
+.va-ranking-window {
+  margin-left: auto;
+  font-size: 0.82rem;
 }
-.va-ranking-busy {
-  font-size: 0.78rem;
+.va-ranking-pane {
+  min-width: 0;
 }
 .va-ranking-empty {
   margin: 0;
   font-size: 0.9rem;
 }
-.va-ranking-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 0.45rem;
-}
-.va-ranking-list li {
-  display: grid;
-  grid-template-columns: 1.6rem minmax(0, 1fr) auto;
-  gap: 0.45rem 0.65rem;
+.va-ranking-card .va-directory-card-title-row {
   align-items: baseline;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
-}
-.va-ranking-list li:last-child {
-  border-bottom: none;
+  gap: 0.45rem;
 }
 .va-ranking-place {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   font-size: 0.85rem;
-}
-.va-ranking-name {
   font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.va-ranking-meta {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-@media (max-width: 40rem) {
-  .va-ranking-list li {
-    grid-template-columns: 1.4rem minmax(0, 1fr);
-  }
-  .va-ranking-meta {
-    grid-column: 2;
-    text-align: left;
-    white-space: normal;
-  }
+  min-width: 1.6rem;
 }
 
 .va-stat-label {
@@ -14942,7 +14909,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 .va-ledger-hero {
   display: grid;
   grid-template-columns:
-    minmax(9.5rem, 0.8fr) minmax(16rem, 1.4fr) minmax(11rem, 0.9fr);
+    minmax(16rem, 1.4fr) minmax(9.5rem, 0.8fr) minmax(11rem, 0.9fr);
   gap: 0.85rem 1.25rem;
   align-items: start;
   margin: 0 0 1.1rem;
@@ -14953,7 +14920,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 @media (max-width: 1100px) {
   .va-ledger-hero {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   }
   .va-ledger-quality {
     grid-column: 1 / -1;

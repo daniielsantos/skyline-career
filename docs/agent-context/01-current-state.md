@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **ff397cb9** / desktop **0.3.286** shipped: Prefill SimBrief Dispatch with the fleet aircraft registration. Release: [v0.3.286](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.286).
+
+
 `main` **a8c66bde** / desktop **0.3.285** shipped: Hide OFP and preflight technical details behind Dev Mode. Release: [v0.3.285](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.285).
 
 

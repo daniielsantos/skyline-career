@@ -224,16 +224,24 @@ Notas por airframe: `profiles/notes/*.md` — criar ao promover (`09-homologate.
 
 Settings → **Developer → On** → sidebar **Lab** (`/lab`).
 
-Cria missão sintética (`payloadLab` + `contractPilot`) **sem** comprar / ferry / settle:
+Harness **só** para OFP → inject → Due vs Sim. Reusa a UI do Dispatch/Preflight.
+
+- **Não** compra / ferry / settle / payout / Ranking / haul_stats
+- **Não** publica inbound no mundo (soft-fill)
+- **Não** aparece no Logbook
+- **Não** marca `vaFlight`
+- Grava só uma missão sintética `payloadLab` no ficheiro de missions da **company do request** (para a UI), com stamp de piloto mínimo para o refresh VA não apagar o lab
 
 1. Escolhe SKU + payload kg + OD  
 2. **Start lab → Dispatch**  
-3. No Dispatch: Open SimBrief → Accept OFP → inject → Due vs Sim (UI real)  
+3. Open SimBrief → Accept OFP → inject → Due vs Sim  
 4. **Cancel flight** quando terminar  
 
 API: `GET|POST|DELETE /api/dev/payload-lab`. Requer nenhum outro Dispatch player ativo.
 
-**Não** aplica o clamp de route ops (fuel+MTOW Career) no Open SimBrief — o Lab mantém o payload escolhido (economia corta; Lab testa inject).
+**Não** aplica o clamp de route ops (fuel+MTOW Career) no Open SimBrief — o Lab mantém o payload escolhido.
+
+**Diag bounce Preflight→empty (2026-09-24):** write sem companyId + bare Accepted fora do board + refresh VA. Fix = companyId + stamp piloto (sem vaFlight) + `payloadLab` no Dispatch + sem inbound/logbook.
 
 ---
 

@@ -344,6 +344,23 @@ describe('filterLogbookMissions', () => {
       ['c'],
     );
   });
+
+  it('hides Payload Lab harness flights', () => {
+    const real = mission({ id: 'real', status: 'settled' });
+    const lab = mission({
+      id: 'lab',
+      status: 'cancelled',
+      payloadLab: true,
+    });
+    assert.deepEqual(
+      filterLogbookMissions([real, lab], 'settled').map((m) => m.id),
+      ['real'],
+    );
+    assert.deepEqual(
+      filterLogbookMissions([real, lab], 'cancelled').map((m) => m.id),
+      [],
+    );
+  });
 });
 
 describe('logbookScorePct / logbookHasDetail', () => {

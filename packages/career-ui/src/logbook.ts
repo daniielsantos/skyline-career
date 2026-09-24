@@ -30,7 +30,9 @@ export function filterLogbookMissions(
   missions: readonly Mission[],
   filter: LogbookListFilter,
 ): Mission[] {
-  return missions.filter((m) => logbookMatchesListFilter(m, filter));
+  return missions.filter(
+    (m) => !m.payloadLab && logbookMatchesListFilter(m, filter),
+  );
 }
 
 /**

@@ -1383,6 +1383,10 @@ export function startPayloadLabMission(
     destIcao: string;
     missionId?: string;
     nowMs?: number;
+    /** Stamp so VA mission merge keeps the lab after refresh. */
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
   },
 ): { mission: MissionIntent; airframeLabel: string; replacedLabIds: string[] } {
   const typeId = opts.airframeTypeId?.trim();
@@ -1479,10 +1483,20 @@ export function startPayloadLabMission(
     payloadLab: true,
     contractPilotFeeUsd: 0,
     ...(typeof distanceNm === 'number' ? { distanceNm } : {}),
+    ...(opts.pilotAccountId?.trim()
+      ? { pilotAccountId: opts.pilotAccountId.trim() }
+      : {}),
+    ...(opts.pilotHomeCompanyId?.trim()
+      ? { pilotHomeCompanyId: opts.pilotHomeCompanyId.trim() }
+      : {}),
+    ...(opts.vaFlight === true ? { vaFlight: true as const } : {}),
   });
 
   state.missions = [...(state.missions ?? []), mission];
-  syncPlayerInbound(world, mission);
+  // Lab must not publish inbound / soft-fill / economy world rows — Dispatch UI only.
+  if (!mission.payloadLab) {
+    syncPlayerInbound(world, mission);
+  }
 
   return {
     mission,

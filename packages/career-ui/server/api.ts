@@ -7744,8 +7744,9 @@ export function createCareerApiServer(port = 8787) {
             injectCapable: row.injectCapable !== false,
           }))
           .sort((a, b) => a.label.localeCompare(b.label));
-        const lab = await withCareerRead((_world, missions) =>
-          findPayloadLabMission(missions.missions ?? []),
+        const lab = await withCareerRead(
+          (_world, missions) => findPayloadLabMission(missions.missions ?? []),
+          { companyId: companyIdFromRequest(req) },
         );
         send(res, 200, {
           options,
@@ -7770,6 +7771,7 @@ export function createCareerApiServer(port = 8787) {
           cargoKg?: number;
           originIcao?: string;
           destIcao?: string;
+          companyId?: string;
         };
         if (!body.airframeTypeId?.trim()) {
           send(res, 400, { error: 'airframeTypeId required' });
@@ -7782,6 +7784,17 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'cargoKg required' });
           return;
         }
+        const labCompanyId = companyIdFromRequest(req, body.companyId);
+        // Stamp pilot only — never vaFlight. Lab is a local Dispatch harness, not a VA leg.
+        const labPilotFull = await vaPilotMissionStamp(req, labCompanyId);
+        const labPilotStamp = {
+          ...(labPilotFull.pilotAccountId
+            ? { pilotAccountId: labPilotFull.pilotAccountId }
+            : {}),
+          ...(labPilotFull.pilotHomeCompanyId
+            ? { pilotHomeCompanyId: labPilotFull.pilotHomeCompanyId }
+            : {}),
+        };
         const originIcao = (body.originIcao ?? 'SBGR').trim().toUpperCase();
         const destIcao = (body.destIcao ?? 'SBSP').trim().toUpperCase();
         try {
@@ -7791,6 +7804,7 @@ export function createCareerApiServer(port = 8787) {
               cargoKg: body.cargoKg!,
               originIcao,
               destIcao,
+              ...labPilotStamp,
             });
             return {
               mission: withMissionClientView(world, missions, started.mission),
@@ -7800,7 +7814,7 @@ export function createCareerApiServer(port = 8787) {
                 withMissionClientView(world, missions, m),
               ),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: labCompanyId });
           const watch = watchSession.getStatus();
           if (watch.missionId && watch.missionId !== result.mission.id) {
             if (watch.running) await watchSession.stop({ reset: true });
@@ -7816,6 +7830,7 @@ export function createCareerApiServer(port = 8787) {
       }
 
       if (req.method === 'DELETE' && path === '/api/dev/payload-lab') {
+        const labCancelCompanyId = companyIdFromRequest(req);
         try {
           const result = await withCareerWrite((world, missions) => {
             const lab = findPayloadLabMission(missions.missions ?? []);
@@ -7843,7 +7858,7 @@ export function createCareerApiServer(port = 8787) {
                 withMissionClientView(world, missions, m),
               ),
             };
-          }, { persist: 'company' });
+          }, { persist: 'company', companyId: labCancelCompanyId });
           const watch = watchSession.getStatus();
           if (
             result.cancelled &&

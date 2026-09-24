@@ -35,6 +35,24 @@ describe('payload lab mission', () => {
     assert.equal(findPayloadLabMission(state.missions)?.id, second.mission.id);
   });
 
+  it('stamps pilot account for VA merge survival', () => {
+    const world = createSeedEconomyWorld({ seed: 'lab3' });
+    world.tick = 30;
+    const state = emptyMissionsStateV2();
+    const { mission } = startPayloadLabMission(world, state, {
+      airframeTypeId: 'asobo-c172sp-cargo',
+      cargoKg: 100,
+      originIcao: 'SBSP',
+      destIcao: 'SBRJ',
+      pilotAccountId: 'acc_lab',
+      pilotHomeCompanyId: 'co_home',
+    });
+    assert.equal(mission.pilotAccountId, 'acc_lab');
+    assert.equal(mission.pilotHomeCompanyId, 'co_home');
+    assert.equal(mission.vaFlight, undefined);
+    assert.equal((world.inboundPending ?? []).length, 0);
+  });
+
   it('refuses settle and allows cancel', () => {
     const world = createSeedEconomyWorld({ seed: 'lab2' });
     world.tick = 20;

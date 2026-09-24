@@ -2128,9 +2128,11 @@ function shouldSurfaceApiError(message: string): boolean {
  * True when the player has started (or is flying) the Dispatch / Watch pipeline.
  * Bare Accepted / crew-operated legs do not count — Freights stays open and the
  * Active-flight banners stay off.
+ * Payload Lab is an exception: bare Accepted must stay on the Dispatch board.
  */
 function isPlayerDispatchMission(mission: Mission): boolean {
   if (mission.crewOperated) return false;
+  if (mission.payloadLab) return isActiveMissionStatus(mission.status);
   if (mission.status === 'dispatched' || mission.status === 'in_flight') {
     return true;
   }

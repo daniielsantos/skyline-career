@@ -463,6 +463,21 @@ export function DispatchActivePanel(props: {
         </div>
       </div>
 
+      {showRouteMap && isEnRoute ? (
+        <DispatchRouteCard
+          fill
+          originIcao={mission.originIcao}
+          destIcao={mission.destIcao}
+          waypoints={mission.lastOfpCheck?.briefing?.waypoints}
+          ofpRoute={mission.lastOfpCheck?.briefing?.route}
+          aircraft={stickyAircraft}
+          busy={busy}
+          canRefreshNavlog={Boolean(simbriefUser.trim())}
+          onOpenAirport={props.onOpenAirport}
+          onRefreshNavlog={() => props.onRefreshOfpBriefing(mission)}
+        />
+      ) : null}
+
       <div
         className={
           opsFirst
@@ -1944,21 +1959,6 @@ export function DispatchActivePanel(props: {
         : null}
       </div>
       </div>
-
-      {showRouteMap && isEnRoute ? (
-        <DispatchRouteCard
-          fill
-          originIcao={mission.originIcao}
-          destIcao={mission.destIcao}
-          waypoints={mission.lastOfpCheck?.briefing?.waypoints}
-          ofpRoute={mission.lastOfpCheck?.briefing?.route}
-          aircraft={stickyAircraft}
-          busy={busy}
-          canRefreshNavlog={Boolean(simbriefUser.trim())}
-          onOpenAirport={props.onOpenAirport}
-          onRefreshNavlog={() => props.onRefreshOfpBriefing(mission)}
-        />
-      ) : null}
 
       {showRouteMap && !isEnRoute ? (
         <DispatchRouteCard

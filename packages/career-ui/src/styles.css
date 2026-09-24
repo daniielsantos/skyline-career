@@ -946,20 +946,18 @@ body {
   flex-direction: column;
 }
 
-/* EN ROUTE cockpit: fill main-content → staging-panel → panel (no outer scroll) */
+/* EN ROUTE: centered stacked column — page scrolls in main-content */
 .main-content:has(.dispatch-active-enroute) {
-  overflow: hidden;
+  overflow: auto;
   padding-top: 0.55rem;
   padding-bottom: 0.55rem;
 }
 
 .main-content:has(.dispatch-active-enroute) > .staging-panel {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  overflow: hidden;
+  display: block;
+  overflow: visible;
   padding: 0.45rem 0.65rem;
 }
 
@@ -4166,7 +4164,29 @@ tr.lot-locked {
   display: contents;
 }
 
+/* Dissolve stack wrappers so EN ROUTE grid / normal flow see the cards.
+   Ops-first re-materializes them below so `order` can rearrange sections. */
+.dispatch-body-stack > .dispatch-stack-summary,
+.dispatch-body-stack > .dispatch-stack-manifest,
+.dispatch-body-stack > .dispatch-stack-ofp,
+.dispatch-body-stack > .dispatch-stack-fuel,
+.dispatch-body-stack > .dispatch-stack-load,
+.dispatch-body-stack > .dispatch-stack-preflight {
+  display: contents;
+}
+
 .dispatch-ops-first {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dispatch-ops-first > .dispatch-stack-summary,
+.dispatch-ops-first > .dispatch-stack-manifest,
+.dispatch-ops-first > .dispatch-stack-ofp,
+.dispatch-ops-first > .dispatch-stack-fuel,
+.dispatch-ops-first > .dispatch-stack-load,
+.dispatch-ops-first > .dispatch-stack-preflight {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -4257,27 +4277,26 @@ tr.lot-locked {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dispatch-accent) 14%, transparent);
 }
 
-/* EN ROUTE: map dominant + status/load side, single viewport on desktop */
+/* EN ROUTE: stacked map → OFP/cargo/live in a centered column (scrolls). */
 .dispatch-active-enroute {
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(17.5rem, 0.9fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  align-content: stretch;
-  gap: 0.35rem 0.65rem;
-  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1 1 auto;
   min-height: 0;
-  height: 0; /* flex child of .staging-panel — grows to fill */
+  height: auto;
   max-height: none;
-  overflow: hidden;
-  margin: 0;
-  padding-bottom: 0;
-  width: 100%;
+  overflow: visible;
+  margin: 0 auto;
+  padding-bottom: 0.35rem;
+  width: min(100%, 58rem);
+  max-width: 58rem;
+  box-sizing: border-box;
 }
 
 .dispatch-active-enroute > .dispatch-stepper {
-  grid-column: 1 / -1;
-  grid-row: 1;
   padding: 0;
+  flex: 0 0 auto;
 }
 
 .dispatch-active-enroute .dispatch-step {
@@ -4292,9 +4311,8 @@ tr.lot-locked {
 }
 
 .dispatch-active-enroute > .missions-head {
-  grid-column: 1 / -1;
-  grid-row: 2;
   margin: 0;
+  flex: 0 0 auto;
 }
 
 .dispatch-active-enroute > .missions-head h2 {
@@ -4308,27 +4326,20 @@ tr.lot-locked {
 }
 
 .dispatch-active-enroute > .dispatch-route-map-card {
-  grid-column: 1;
-  grid-row: 3;
-  align-self: stretch;
-  min-height: 0;
+  flex: 0 0 auto;
   margin: 0;
-  height: 100%;
+  height: clamp(14rem, 36vh, 22rem);
+  min-height: 14rem;
 }
 
 .dispatch-active-enroute > .preflight-summary-card {
-  grid-column: 2;
-  grid-row: 3;
-  align-self: stretch;
-  min-height: 0;
+  flex: 0 0 auto;
   margin: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.55rem 0.65rem;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
   box-sizing: border-box;
 }
 
@@ -4359,7 +4370,6 @@ tr.lot-locked {
 
 .dispatch-active-enroute .dispatch-enroute-block-title {
   font-size: 1rem;
-  /* Bebas side-bearing can hang past the metric box edge */
   padding-inline-start: 0.04em;
 }
 
@@ -4368,7 +4378,7 @@ tr.lot-locked {
   padding: 0;
   width: 100%;
   max-width: 100%;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
 }
 
 .dispatch-active-enroute .dispatch-enroute-metrics > div {
@@ -4394,10 +4404,10 @@ tr.lot-locked {
 .dispatch-active-enroute .dispatch-enroute-live .preflight-load-grid {
   margin: 0;
   padding: 0;
-  gap: 0.35rem;
-  flex: 1 1 auto;
+  gap: 0.45rem;
+  flex: 0 0 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
   align-content: start;
   width: 100%;
   max-width: 100%;
@@ -4463,7 +4473,6 @@ tr.lot-locked {
   min-height: 1.35rem;
 }
 
-/* Don't crush EN ROUTE live-tile stations — they match fuel via --live-cell-h. */
 .dispatch-active-enroute
   .dispatch-enroute-live-tiles
   .load-schematic-station {
@@ -4489,8 +4498,7 @@ tr.lot-locked {
 .dispatch-active-enroute > .dispatch-advanced-actions,
 .dispatch-active-enroute > .dispatch-advanced,
 .dispatch-active-enroute > .settings-chip {
-  grid-column: 1 / -1;
-  grid-row: 4;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 900px) {
@@ -4507,29 +4515,14 @@ tr.lot-locked {
   }
 
   .dispatch-active-enroute {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-    flex: none;
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .dispatch-active-enroute > .dispatch-stepper,
-  .dispatch-active-enroute > .missions-head,
-  .dispatch-active-enroute > .dispatch-route-map-card,
-  .dispatch-active-enroute > .preflight-summary-card,
-  .dispatch-active-enroute > .dispatch-primary-actions,
-  .dispatch-active-enroute > .dispatch-advanced-actions,
-  .dispatch-active-enroute > .dispatch-advanced,
-  .dispatch-active-enroute > .settings-chip {
-    grid-column: 1;
-    grid-row: auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
   }
 
   .dispatch-active-enroute > .dispatch-route-map-card {
-    min-height: 40vh;
     height: 40vh;
+    min-height: 40vh;
   }
 }
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **22c86fb4** / desktop **0.3.298** shipped: Clarify Ports cashflow burn and warehouse stock vs holds. Release: [v0.3.298](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.298).
+
+
 `main` **4a8021d1** / desktop **0.3.297** shipped: Zoom Network map into the selected FBO pin. Release: [v0.3.297](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.297).
 
 

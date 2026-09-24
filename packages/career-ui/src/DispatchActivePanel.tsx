@@ -386,13 +386,6 @@ export function DispatchActivePanel(props: {
         isEnRoute ? 'dispatch-active dispatch-active-enroute' : 'dispatch-active'
       }
     >
-      {props.watch?.settling ? (
-        <div className="dispatch-settle-busy" role="status" aria-live="polite">
-          <span className="busy-spinner busy-spinner-lg" aria-hidden="true" />
-          <strong>Settling flight…</strong>
-          <span>Saving payout and flight log</span>
-        </div>
-      ) : null}
       <DispatchStepper current={step} />
 
       {mission.payloadLab ? (

@@ -41,7 +41,7 @@ export const FLIGHT_TRACK_FRESH_MS = 90_000;
 export const FLIGHT_TRACK_POST_MIN_MS = 5_000;
 /**
  * Cruise crumb spacing (nm). Samples closer only refresh the tip in place.
- * Kept relatively coarse so MAX_POINTS still covers a long flight.
+ * Coarse enough for long flights under MAX_POINTS without sparse taxi/climb.
  */
 export const FLIGHT_TRACK_MIN_MOVE_NM = 0.35;
 /**
@@ -57,7 +57,13 @@ export const FLIGHT_TRACK_EARLY_POINTS = 15;
  * Larger gaps reset the trail so Live does not draw a continent-spanning spike.
  */
 export const FLIGHT_TRACK_MAX_JUMP_NM = 75;
-export const FLIGHT_TRACK_MAX_POINTS = 180;
+/**
+ * Cap crumbs per active flyer. ~5s uplink → ~8k ≈ 11h of continuous appends;
+ * at cruise MIN_MOVE (0.35 nm) ≈ 2800 nm of path. Prune used to drop early
+ * approach history near dest holds — keep this high; tracks clear when the
+ * mission leaves accepted/dispatched/in_flight (or process restart).
+ */
+export const FLIGHT_TRACK_MAX_POINTS = 8_000;
 
 /** Crumb threshold for the next append given current trail length. */
 export function flightTrackMinMoveNm(pointCount: number): number {

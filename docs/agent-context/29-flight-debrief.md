@@ -2,6 +2,14 @@
 
 Glance layout inspired by other career addons: **three pillars first**, money/score second. No invented XP multipliers.
 
+## Settle double spinner (2026-09-24)
+
+**Sintoma:** no settle Watch apareciam **duas** animações “Settling flight…” (card principal + outra atrás no painel Dispatch).
+
+**Causa:** overlay global `settle-busy-overlay` em `App.tsx` **e** inline `dispatch-settle-busy` em `DispatchActivePanel` quando `watch.settling`.
+
+**Fix:** remover o inline + CSS `.dispatch-settle-busy`; fica só o overlay global (debrief opens next).
+
 ## Shipped (2026-09-23)
 
 **Sintoma:** debrief espalhava runway + net + metrics + score bars sem um “hero glance” legível.

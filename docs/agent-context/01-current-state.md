@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **2aecd9cc** / desktop **0.3.287** shipped: Polish VA Crew role/org labels and align airline profile stats. Release: [v0.3.287](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.287).
+
+
 `main` **ff397cb9** / desktop **0.3.286** shipped: Prefill SimBrief Dispatch with the fleet aircraft registration. Release: [v0.3.286](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.286).
 
 

@@ -3921,7 +3921,14 @@ export function compareMissionIntentToOfp(
   } else {
     const delta = ofpCargo - expectedCargoKg;
     const direction = delta < 0 ? 'under' : 'over';
-    const tol = charter ? 1 : cargoToleranceKg(expectedCargoKg, tolerances, direction);
+    // Charter Open SimBrief sends integer bagwgt lb/pax; OFP bags = bagwgt×pax
+    // can drift ≤0.5 lb × seats vs mission kg (Falcon 9×18 kg → 357 vs 360 lb).
+    const tol = charter
+      ? Math.max(
+          1,
+          Math.ceil((Math.max(1, mission.pax) * 0.5) / KG_TO_LB),
+        )
+      : cargoToleranceKg(expectedCargoKg, tolerances, direction);
     if (Math.abs(delta) > tol) {
       findings.push({
         code: 'INTENT_CARGO_MISMATCH',

@@ -254,6 +254,8 @@ API: `GET|POST|DELETE /api/dev/payload-lab`. Body POST: `missionKind?: 'freight'
 
 **Charter Lab (2026-09-24):** modo Charter no Lab; cancel/fail charter lab sem offer no mundo.
 
+**Charter OFP bags FAIL 357 vs 360 lb (2026-09-24):** sintoma = Intent→OFP FAIL após Open SimBrief charter. Causa = `bagwgt` inteiro lb/pax (`round(missionBagsLb/pax)`) × pax drift ≤0.5 lb×N vs missão em kg; tol fixa 1 kg curta (9×18 kg → 357 vs 360). Fix = tol charter `max(1, ceil(0.5×pax/KG_TO_LB))`.
+
 ---
 
 ## freighter vs `pax_and_cargo` — quando usar

@@ -1790,6 +1790,59 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
   });
 
+  it('tolerates charter OFP bags from integer bagwgt lb round-trip', () => {
+    // 9 pax × 18 kg = 162 kg (~357 lb). Open SimBrief bagwgt=round(357/9)=40 → 360 lb.
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        missionType: 'charter',
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'contrail-contrail-falcon-50',
+        cargoKg: 0,
+        pax: 9,
+        baggageKg: 162,
+        rolesPackRelPath: 'profiles/ofp/contrail-contrail-falcon-50.json',
+      }),
+      matchingOfp({
+        icao: 'FA50',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 4_072,
+          passengerCount: 9,
+          baggage: 360,
+          payload: 1_935,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
+  });
+
+  it('still fails charter bags when far beyond bagwgt round error', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        missionType: 'charter',
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'contrail-contrail-falcon-50',
+        cargoKg: 0,
+        pax: 9,
+        baggageKg: 162,
+        rolesPackRelPath: 'profiles/ofp/contrail-contrail-falcon-50.json',
+      }),
+      matchingOfp({
+        icao: 'FA50',
+        loadSheet: {
+          unit: 'lb',
+          blockFuel: 4_072,
+          passengerCount: 9,
+          baggage: 500,
+          payload: 2_075,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'fail');
+    assert.ok(check.findings.some((f) => f.code === 'INTENT_CARGO_MISMATCH'));
+  });
+
   it('detects cargo-under as the only fail', () => {
     const check = compareMissionIntentToOfp(
       baseMission({ cargoKg: 1_800 }),

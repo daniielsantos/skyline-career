@@ -1450,8 +1450,16 @@ export function VaPage(props: Props) {
 
       {pane === 'ledger' ? (
         <div className="va-pane-card">
-          {tenantSwitching ? (
-            <BusyStatus label="Opening company ledger…" />
+          {tenantSwitching || (ledgerBusy && !cashflow) ? (
+            <div className="va-pane-loading">
+              <BusyBlock
+                label={
+                  tenantSwitching
+                    ? 'Opening company ledger…'
+                    : 'Loading ledger…'
+                }
+              />
+            </div>
           ) : (
             <>
           <VaMoneyMap
@@ -1463,10 +1471,8 @@ export function VaPage(props: Props) {
               {ledgerError}
             </p>
           ) : null}
-          {ledgerBusy && !cashflow ? (
-            <BusyStatus label="Loading ledger…" />
-          ) : cashflow &&
-            (cashflow.recent.length > 0 || cashflow.allTime.entryCount > 0) ? (
+          {cashflow &&
+          (cashflow.recent.length > 0 || cashflow.allTime.entryCount > 0) ? (
             <CashflowSummaryGrid
               cashflow={cashflow}
               formatMoney={formatBoardMoney}
@@ -1480,9 +1486,7 @@ export function VaPage(props: Props) {
               <p className="va-ledger-wallet-value">
                 {resolvedWalletUsd != null
                   ? formatBoardMoney(resolvedWalletUsd)
-                  : ledgerBusy || tenantSwitching
-                    ? '…'
-                    : '—'}
+                  : '—'}
               </p>
               <p className="va-ledger-wallet-hint">
                 Shared company cash (owner wallet).
@@ -1569,28 +1573,26 @@ export function VaPage(props: Props) {
               ) : null}
             </div>
           </div>
-          {!ledgerBusy || cashflow ? (
-            <HangarCashflowPanel
-              cashflow={cashflow}
-              companyCredit={companyCredit}
-              walletUsd={resolvedWalletUsd ?? 0}
-              busy={pageBusy || ledgerBusy}
-              creditActionsLocked={!isOwner}
-              hideCredit
-              hideSummaries
-              vaOwnerOpsLabels
-              memberNamesByAccountId={ledgerMemberNames}
-              formatMoney={formatBoardMoney}
-              onCreditUpdated={({ walletUsd, companyCredit: next }) => {
-                props.onWallet?.(walletUsd);
-                setCompanyCredit(next);
-                void loadLedger();
-              }}
-              onCreditError={(message) => {
-                setLedgerError(message);
-              }}
-            />
-          ) : null}
+          <HangarCashflowPanel
+            cashflow={cashflow}
+            companyCredit={companyCredit}
+            walletUsd={resolvedWalletUsd ?? 0}
+            busy={pageBusy || ledgerBusy}
+            creditActionsLocked={!isOwner}
+            hideCredit
+            hideSummaries
+            vaOwnerOpsLabels
+            memberNamesByAccountId={ledgerMemberNames}
+            formatMoney={formatBoardMoney}
+            onCreditUpdated={({ walletUsd, companyCredit: next }) => {
+              props.onWallet?.(walletUsd);
+              setCompanyCredit(next);
+              void loadLedger();
+            }}
+            onCreditError={(message) => {
+              setLedgerError(message);
+            }}
+          />
             </>
           )}
         </div>

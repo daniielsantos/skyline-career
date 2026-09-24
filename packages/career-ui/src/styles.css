@@ -4287,10 +4287,10 @@ tr.lot-locked {
   height: auto;
   max-height: none;
   overflow: visible;
-  margin: 0 auto;
+  margin: 0;
   padding-bottom: 0.35rem;
-  width: min(100%, 58rem);
-  max-width: 58rem;
+  width: 100%;
+  max-width: none;
   box-sizing: border-box;
 }
 
@@ -4328,8 +4328,8 @@ tr.lot-locked {
 .dispatch-active-enroute > .dispatch-route-map-card {
   flex: 0 0 auto;
   margin: 0;
-  height: clamp(14rem, 36vh, 22rem);
-  min-height: 14rem;
+  height: clamp(16rem, 42vh, 28rem);
+  min-height: 16rem;
 }
 
 .dispatch-active-enroute > .preflight-summary-card {
@@ -4516,8 +4516,6 @@ tr.lot-locked {
 
   .dispatch-active-enroute {
     width: 100%;
-    max-width: none;
-    margin: 0;
   }
 
   .dispatch-active-enroute > .dispatch-route-map-card {

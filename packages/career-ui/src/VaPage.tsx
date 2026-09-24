@@ -35,7 +35,7 @@ import {
 } from './api';
 import { BusyBlock, BusyStatus } from './Busy';
 import { CompanyCreditBlock, CashflowSummaryGrid, HangarCashflowPanel } from './CashflowPanel';
-import { VaMoneyMap } from './VaMoneyMap';
+import { VaMoneyMapDialog } from './VaMoneyMap';
 import { VaMemberBriefCard } from './VaMemberBriefCard';
 import { VaHaulsBoard } from './VaHaulsBoard';
 import { VaPortPathCard } from './VaPortPathCard';
@@ -329,6 +329,7 @@ export function VaPage(props: Props) {
   const [liveFresh, setLiveFresh] = useState(false);
   const [liveBusy, setLiveBusy] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const [moneyMapOpen, setMoneyMapOpen] = useState(false);
   const { confirm, confirmDialog } = useConfirm();
   const onSwitchCompanyRef = useRef(props.onSwitchCompany);
   onSwitchCompanyRef.current = props.onSwitchCompany;
@@ -743,6 +744,10 @@ export function VaPage(props: Props) {
       void loadLedger();
     }
   }, [pane, listed, role, tenantSwitching, loadLedger, props.ledgerRefreshEpoch]);
+
+  useEffect(() => {
+    if (pane !== 'ledger') setMoneyMapOpen(false);
+  }, [pane]);
 
   useEffect(() => {
     if (pane === 'logbook' && listed && role && !tenantSwitching) {
@@ -1462,10 +1467,6 @@ export function VaPage(props: Props) {
             </div>
           ) : (
             <>
-          <VaMoneyMap
-            marketHireCutPct={memberRouteCutPct}
-            airlineLaborCutPct={memberAirlineCutPct}
-          />
           {ledgerError ? (
             <p className="error" role="alert">
               {ledgerError}
@@ -1480,9 +1481,20 @@ export function VaPage(props: Props) {
           ) : null}
           <div className="va-ledger-hero">
             <div className="va-ledger-wallet">
-              <p className="aircraft-card-section-label" style={{ margin: 0 }}>
-                Company wallet
-              </p>
+              <div className="va-ledger-wallet-head">
+                <p className="aircraft-card-section-label" style={{ margin: 0 }}>
+                  Company wallet
+                </p>
+                <button
+                  type="button"
+                  className="action ghost compact va-ledger-money-help"
+                  title="How money works"
+                  aria-label="How money works"
+                  onClick={() => setMoneyMapOpen(true)}
+                >
+                  ?
+                </button>
+              </div>
               <p className="va-ledger-wallet-value">
                 {resolvedWalletUsd != null
                   ? formatBoardMoney(resolvedWalletUsd)
@@ -2304,6 +2316,13 @@ export function VaPage(props: Props) {
       ) : null}
       </div>
       {confirmDialog}
+      {moneyMapOpen ? (
+        <VaMoneyMapDialog
+          marketHireCutPct={memberRouteCutPct}
+          airlineLaborCutPct={memberAirlineCutPct}
+          onClose={() => setMoneyMapOpen(false)}
+        />
+      ) : null}
     </section>
   );
 }

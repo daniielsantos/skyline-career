@@ -1,3 +1,5 @@
+import { useEffect, useId, useRef } from 'react';
+
 /** Compact airline money map — who pays / who receives. */
 
 export function VaMoneyMap(props: {
@@ -51,9 +53,6 @@ export function VaMoneyMap(props: {
   ];
   return (
     <div className="va-money-map">
-      <p className="aircraft-card-section-label" style={{ margin: 0 }}>
-        Money map
-      </p>
       <p className="va-money-map-blurb">
         Topbar Wallet is always your <strong>home</strong> company. This Ledger
         is the shared <strong>company</strong> wallet. Solo keeps 100% after CAPEX;
@@ -78,6 +77,73 @@ export function VaMoneyMap(props: {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Reference dialog — Ledger keeps the map off the main flow. */
+export function VaMoneyMapDialog(props: {
+  marketHireCutPct: number;
+  airlineLaborCutPct: number;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const bodyId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(props.onClose);
+  onCloseRef.current = props.onClose;
+
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  return (
+    <div
+      className="confirm-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) props.onClose();
+      }}
+    >
+      <div
+        className="confirm-dialog va-money-map-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={bodyId}
+      >
+        <p className="confirm-kicker">Reference</p>
+        <h2 id={titleId} className="confirm-title">
+          Money map
+        </h2>
+        <div id={bodyId} className="confirm-body va-money-map-dialog-body">
+          <VaMoneyMap
+            marketHireCutPct={props.marketHireCutPct}
+            airlineLaborCutPct={props.airlineLaborCutPct}
+          />
+        </div>
+        <div className="confirm-actions">
+          <button
+            ref={closeRef}
+            type="button"
+            className="action"
+            onClick={props.onClose}
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

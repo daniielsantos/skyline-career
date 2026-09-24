@@ -10,6 +10,15 @@ import { boardMoneyLabel, isFiniteMoney } from './board-money';
 
 const CASHFLOW_PAGE_SIZE = 10;
 
+/**
+ * Ledger `dayIndex` is 0-based (`floor(tick / 96)`). World topbar + logbook
+ * use Day N = that index + 1 — show the same number here.
+ */
+function ledgerDisplayDay(dayIndex: number): number {
+  return Math.max(0, Math.floor(Number(dayIndex) || 0)) + 1;
+}
+
+
 /** Mirror of shared LEDGER_SYSTEM_KINDS — keep in sync for Member column. */
 const LEDGER_SYSTEM_KINDS = new Set([
   'hangar_parking',
@@ -474,7 +483,7 @@ export function HangarCashflowPanel(props: {
                     <tbody>
                       {pageEntries.map((entry) => (
                         <tr key={entry.id}>
-                          <td>{entry.dayIndex}</td>
+                          <td>{ledgerDisplayDay(entry.dayIndex)}</td>
                           <td>{kindLabel(entry.kind, entry.note)}</td>
                           {showMember ? (
                             <td>{memberLabel(entry, props.memberNamesByAccountId)}</td>

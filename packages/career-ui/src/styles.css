@@ -14866,6 +14866,20 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
+.va-ledger-wallet-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.va-ledger-money-help {
+  min-width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  line-height: 1;
+}
 .va-ledger-wallet-hint {
   margin: 0;
   color: var(--muted);
@@ -14873,15 +14887,25 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   line-height: 1.35;
   max-width: 28rem;
 }
+.va-money-map-dialog {
+  width: min(100%, 40rem);
+}
+.va-money-map-dialog-body {
+  margin-top: 0.65rem;
+  margin-bottom: 1.1rem;
+}
+.va-money-map-dialog-body .va-money-map {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
 .va-money-map {
-  margin: 0 0 1rem;
-  padding: 0.75rem 1rem 0.85rem;
-  border: 1px solid color-mix(in srgb, var(--border, #444) 70%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-2, #121820) 88%, transparent);
+  margin: 0;
 }
 .va-money-map-blurb {
-  margin: 0.35rem 0 0.65rem;
+  margin: 0 0 0.65rem;
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.4;

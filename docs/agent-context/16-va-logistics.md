@@ -118,6 +118,10 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Crew Ledger layout + tenant cashflow (2026-09-22):** sintoma = Money map / week·month·all time abaixo do hero; Recent 15/página. Validação = `/api/cashflow` já resume ledger da company do header (`loadMissions({ companyId })`); wallet da tela bate com all-time ± credit drawn. Fix = Money map + `CashflowSummaryGrid` acima do hero; `fetchCashflow({ companyId })` explícito no VaPage; Recent **10**/página.
 
+**Ledger Day off-by-one (2026-09-24):** sintoma = settle no Day 83 (logbook/topbar) aparecia como Day **82** no Recent activity. Causa = `dayIndex = floor(tick/96)` 0-based na row; UI pintava o índice cru. Fix = `ledgerDisplayDay` = `dayIndex + 1` no `CashflowPanel` (Hangar + Crew Ledger). Storage/windows intactos.
+
+**Money map → dialog (2026-09-24):** sintoma = tabela de referência (Job/Pays/Pilot earns) ocupava o topo do Ledger e empurrava wallet/activity. Causa = referência sempre inline. Fix = `?` ao lado de Company wallet abre `VaMoneyMapDialog`; page guide aponta pro atalho.
+
 **Board picker parked-only (2026-09-22):** sintoma = Duke da airline em maintenance aparecia no picker de Freights/Contracts (`… · maintenance`) mas sumia em Charter/Hauls/Manifest. Causa = `boardEstimateFleet` aceitava `parked|assigned|maintenance`; Charter/Hauls filtravam só `parked`. Fix = `isOpsAircraftBoardSelectable` = parked only; Freights/Contracts alinhados. MX fica no Hangar até repair.
 
 **VA directory toolbar (2026-09-22):** sintoma = paragraph longo (“joining keeps… Port FBO…”) enchendo a toolbar. Fix = remover meta; Search à esquerda, Join code à direita.

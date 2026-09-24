@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **56b51212** / desktop **0.3.281** shipped: Merge iFly 737 MAX into the Asobo Max 8 Market family. Release: [v0.3.281](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.281).
+
+
 `main` **0385647d** / desktop **0.3.280** shipped: Promote iFly 737 MAX 8 and MAX 8200 to Market with SimBrief seat rows. Release: [v0.3.280](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.280).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **d20650f0** / desktop **0.3.274** shipped: Add Payload Lab charter mode for inject Due vs Sim. Release: [v0.3.274](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.274).
+
+
 `main` **47c55fd1** / desktop **0.3.273** shipped: Keep Payload Lab on Dispatch without polluting career economy or logbook. Release: [v0.3.273](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.273).
 
 

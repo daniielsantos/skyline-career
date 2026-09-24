@@ -15109,8 +15109,8 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 
 .ports-network-assets .va-company-network-map {
-  min-height: 18rem;
-  height: 22rem;
+  min-height: 24rem;
+  height: 30rem;
 }
 
 .ports-network-detail {
@@ -15161,8 +15161,8 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .va-company-network-map {
   margin-top: 0.65rem;
-  height: 26rem;
-  min-height: 22rem;
+  height: 30rem;
+  min-height: 24rem;
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid var(--line);

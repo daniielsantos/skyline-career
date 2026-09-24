@@ -679,24 +679,9 @@ export function CompanyNetworkMap(props: Props) {
       focusBounds.extend([deskRoute.destLon, deskRoute.destLat]);
       focusCount = 2;
       focused = true;
-    } else if (corridorOk) {
-      // Fit the Demand corridor disk so P1/P2 radius is readable.
-      focusBounds.extend([corridor.lon, corridor.lat]);
-      for (const bearing of [0, 90, 180, 270] as const) {
-        const [lng, lat] = destinationLngLat(
-          corridor.lat,
-          corridor.lon,
-          bearing,
-          corridor.radiusNm,
-        );
-        focusBounds.extend([lng, lat]);
-      }
-      focusCount = 5;
-      focused = true;
     } else {
-      // Focus camera on the selected pin only (zoom in). Pairing FBO+WH
-      // (port vs hub coords) was fitBounds → felt like zoom-out.
-      // No selection → whole network.
+      // Selected pin → zoom in. Corridor ring stays drawn but does not drive
+      // the camera (fitBounds on P1/P2 felt like a continent zoom-out).
       let focusNodes: CompanyNetworkNode[] = plotNodes;
       if (selectedId) {
         const selected = plotNodes.find((n) => n.id === selectedId);
@@ -718,7 +703,7 @@ export function CompanyNetworkMap(props: Props) {
         const ne = focusBounds.getNorthEast();
         map.easeTo({
           center: [ne.lng, ne.lat],
-          zoom: focused ? 9.25 : 7.5,
+          zoom: focused ? 9.75 : 7.5,
           duration: 400,
         });
       } else {
@@ -727,7 +712,7 @@ export function CompanyNetworkMap(props: Props) {
         if (ne.lng === sw.lng && ne.lat === sw.lat) {
           map.easeTo({
             center: [ne.lng, ne.lat],
-            zoom: focused ? 9.25 : 7.5,
+            zoom: focused ? 9.75 : 7.5,
             duration: 400,
           });
         } else {
@@ -747,6 +732,7 @@ export function CompanyNetworkMap(props: Props) {
     props.nodes,
     props.selectedId,
     props.highlightRoute,
+    props.corridorRing,
   ]);
 
   return (

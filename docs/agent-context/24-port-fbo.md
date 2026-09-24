@@ -76,9 +76,9 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Hauls network camera (2026-09-21):** sintoma = selecionar chip fazia zoom out (fitBounds de toda a rede). Fix = câmera foca o nó selecionado (+ FBO/WH ligado); All = rede inteira.
 
-**CompanyNetworkMap FBO focus zoom-out (2026-09-24):** sintoma = clicar chip/card FBO fazia zoom out. Causa = `fitBounds` no FBO + todos WH do porto (coords porto oceânico ≠ hub). Fix = câmera só no pin selecionado (`easeTo` ~9.25); rede inteira só sem seleção. Label embed “Company network · …” removida. *Atualização:* com FBO selecionado e corridor P1/P2, câmera volta a `fitBounds` no disco Demand (não no par FBO+WH).
+**CompanyNetworkMap FBO focus zoom-out (2026-09-24):** sintoma = clicar chip/card FBO fazia zoom out. Causa = `fitBounds` no FBO + todos WH do porto (coords porto oceânico ≠ hub). Fix = câmera só no pin selecionado (`easeTo` ~9.75); rede inteira só sem seleção. Label embed “Company network · …” removida. Corridor ring **não** dirige câmera (só desenha).
 
-**Demand corridor ring on Network map (2026-09-24):** sintoma = jogador não via o alcance Demand do Port FBO (P1 500 / P2 1800 / P3 open). Causa = mapa só pins + feeder; Scout Haul 1800 é outro sistema. Fix = `corridorRing` em `CompanyNetworkMap` (disco GeoJSON no hub de pickup); Ports passa ring ao selecionar FBO via `resolveUiPortCorridorLevel` + `corridorNmForLevel`; P3 sem ring; câmera `fitBounds` no disco (desk route ainda tem prioridade).
+**Demand corridor ring on Network map (2026-09-24):** sintoma = jogador não via o alcance Demand do Port FBO (P1 500 / P2 1800 / P3 open). Causa = mapa só pins + feeder; Scout Haul 1800 é outro sistema. Fix = `corridorRing` em `CompanyNetworkMap` (disco GeoJSON no hub de pickup); Ports passa ring ao selecionar FBO; P3 sem ring; desk route ainda tem prioridade de câmera. Mapa Ports Network ~30rem.
 
 **Ports loop banner off (2026-09-24):** sintoma = card “Open Demand” + gap sob as tabs (Catalog/Network). Causa = `.ports-loop-slot` com min-height mesmo on-target. Fix = remover banner do chrome; tabs com altura fixa; conteúdo mais perto das tabs.
 

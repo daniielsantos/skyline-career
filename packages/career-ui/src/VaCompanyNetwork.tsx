@@ -2,7 +2,10 @@ import {
   type CompanyNetworkNode,
   findNetworkNode,
 } from './company-network';
-import { CompanyNetworkMap } from './CompanyNetworkMap';
+import {
+  CompanyNetworkMap,
+  type CompanyNetworkCorridorRing,
+} from './CompanyNetworkMap';
 import { NetworkChipIcon } from './company-network-icons';
 import { formatMass, type WeightSystem } from './weight-units';
 
@@ -22,6 +25,8 @@ type Props = {
   onSelect: (id: string | null) => void;
   /** Desk-hold OD to draw on the map (Hauls Open desk selection). */
   highlightRoute?: CompanyNetworkHighlightRoute | null;
+  /** Demand corridor reach disk (Ports FBO selection; P3 open = omit). */
+  corridorRing?: CompanyNetworkCorridorRing | null;
   /** Compact map of company assets (Hauls). Ports already has a full map. */
   showMap?: boolean;
   /** Hide the All chip (Ports uses explicit Demand / Buy actions). */
@@ -165,6 +170,7 @@ export function VaCompanyNetwork(props: Props) {
           nodes={nodes}
           selectedId={selectedId}
           highlightRoute={props.highlightRoute ?? null}
+          corridorRing={props.corridorRing ?? null}
           onSelectNode={(id) => onSelect(id)}
         />
       ) : null}

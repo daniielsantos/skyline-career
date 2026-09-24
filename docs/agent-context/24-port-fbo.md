@@ -76,6 +76,12 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Hauls network camera (2026-09-21):** sintoma = selecionar chip fazia zoom out (fitBounds de toda a rede). Fix = câmera foca o nó selecionado (+ FBO/WH ligado); All = rede inteira.
 
+**CompanyNetworkMap FBO focus zoom-out (2026-09-24):** sintoma = clicar chip/card FBO fazia zoom out. Causa = `fitBounds` no FBO + todos WH do porto (coords porto oceânico ≠ hub). Fix = câmera só no pin selecionado (`easeTo` ~9.25); rede inteira só sem seleção. Label embed “Company network · …” removida. *Atualização:* com FBO selecionado e corridor P1/P2, câmera volta a `fitBounds` no disco Demand (não no par FBO+WH).
+
+**Demand corridor ring on Network map (2026-09-24):** sintoma = jogador não via o alcance Demand do Port FBO (P1 500 / P2 1800 / P3 open). Causa = mapa só pins + feeder; Scout Haul 1800 é outro sistema. Fix = `corridorRing` em `CompanyNetworkMap` (disco GeoJSON no hub de pickup); Ports passa ring ao selecionar FBO via `resolveUiPortCorridorLevel` + `corridorNmForLevel`; P3 sem ring; câmera `fitBounds` no disco (desk route ainda tem prioridade).
+
+**Ports loop banner off (2026-09-24):** sintoma = card “Open Demand” + gap sob as tabs (Catalog/Network). Causa = `.ports-loop-slot` com min-height mesmo on-target. Fix = remover banner do chrome; tabs com altura fixa; conteúdo mais perto das tabs.
+
 **Ports network IA (2026-09-24):** sintoma = Catalog / Port FBO / Warehouse / Demand + Available 239 não escala com N FBO/WH. Causa = abas planas + browse mundial no WH. Fix = tabs **Port catalog** + **Network**; Network = chips/`CompanyNetworkMap` + search ICAO; seleção FBO→Scout desk, WH→stock/Demand holds; Buy warehouse / Demand / Ground staff = CTAs (Available contextual no porto); sem This port/All hubs. Hauls continua board de holds. Spec UX em plano Ports layout scale.
 
 **Company network fora do Port FBO (2026-09-21):** sintoma = chip SBRF no Ports esvazia Scout (filtro origem). Decisão = network chips + filtro ficam em **My VA → Hauls**; Port FBO é desk do porto (mapa Ports já mostra FBO/WH). Removido `VaCompanyNetwork` de `PortsPanel`.

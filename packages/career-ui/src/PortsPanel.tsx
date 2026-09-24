@@ -57,11 +57,6 @@ import { CrewPortrait } from './CrewPanel';
 import { crewPortraitUrl } from './crewPortraits';
 import { useConfirm } from './ConfirmDialog';
 import {
-  derivePortsLoopStep,
-  portsLoopTargetSection,
-  type PortsLoopStep,
-} from './ports-loop-guidance';
-import {
   buildCompanyNetworkNodes,
   findNetworkNode,
   type CompanyNetworkNode,
@@ -80,6 +75,7 @@ import {
   greatCircleDistanceNm,
   formatPortCorridorReachLabel,
   resolveUiPortCorridorLevel,
+  corridorNmForLevel,
 } from './demand-accept-preview';
 import {
   displayAmountToStoredKg,
@@ -311,105 +307,6 @@ function compareDemandOrders(
   }
   if (cmp === 0) return a.id.localeCompare(b.id);
   return sort.direction === 'asc' ? cmp : -cmp;
-}
-
-function portsLoopMessage(
-  step: PortsLoopStep,
-  formatTonnes: (kg: number) => string,
-  formatMoney: (n: number) => string,
-  yardHoldUsdPerDayTotal?: number,
-  ticksToHours?: (ticks: number) => string,
-): string {
-  switch (step.kind) {
-    case 'buy_warehouse':
-      return 'Need a warehouse at a pickup hub.';
-    case 'store_yard': {
-      const fee =
-        yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
-          ? yardHoldUsdPerDayTotal
-          : step.holdUsdPerDay;
-      const feeBit = fee > 0 ? ` · yard ${formatMoney(fee)}/day` : '';
-      return `Yard ${formatTonnes(step.kg)} ${commodityLabel(step)} @ ${step.hubIcao}${feeBit}`;
-    }
-    case 'wait_inbound': {
-      const eta =
-        step.ticksLeft <= 0
-          ? 'soon'
-          : ticksToHours
-            ? `~${ticksToHours(step.ticksLeft)}`
-            : `${step.ticksLeft} ticks`;
-      return `${formatTonnes(step.kg)} in transit → ${step.hubIcao} · ${eta}`;
-    }
-    case 'fulfill_demand':
-      return step.matchCount === 1
-        ? '1 Demand match on this desk'
-        : `${step.matchCount} Demand matches on this desk`;
-    case 'wait_demand':
-      return step.openDemandCount > 0
-        ? `${formatTonnes(step.stockKg)} in WH · no desk match`
-        : `${formatTonnes(step.stockKg)} in WH · waiting on Demand`;
-    case 'buy_port':
-      return 'Buy cargo at the seaport.';
-  }
-}
-
-function portsLoopCtaLabel(step: PortsLoopStep): string | null {
-  switch (step.kind) {
-    case 'buy_warehouse':
-      return 'Buy warehouse';
-    case 'store_yard':
-      return 'Open yard';
-    case 'wait_inbound':
-      return 'Open warehouse';
-    case 'fulfill_demand':
-      return 'Open Demand';
-    case 'wait_demand':
-      return 'Open Demand';
-    case 'buy_port':
-      return 'Open catalog';
-  }
-}
-
-/** On-section hint — skip tutoring; empty = hide the line. */
-function portsLoopSectionHint(
-  step: PortsLoopStep,
-  formatMoney?: (n: number) => string,
-  yardHoldUsdPerDayTotal?: number,
-  formatTonnes?: (kg: number) => string,
-  ticksToHours?: (ticks: number) => string,
-): string {
-  switch (step.kind) {
-    case 'buy_warehouse':
-      return 'Network · Buy warehouse at a pickup hub';
-    case 'store_yard': {
-      const fee =
-        yardHoldUsdPerDayTotal != null && yardHoldUsdPerDayTotal > 0
-          ? yardHoldUsdPerDayTotal
-          : step.holdUsdPerDay;
-      return fee > 0 && formatMoney
-        ? `Yard hold ${formatMoney(fee)}/day`
-        : '';
-    }
-    case 'wait_inbound': {
-      const eta =
-        step.ticksLeft <= 0
-          ? 'soon'
-          : ticksToHours
-            ? `~${ticksToHours(step.ticksLeft)}`
-            : `${step.ticksLeft} ticks`;
-      const mass =
-        formatTonnes != null ? formatTonnes(step.kg) : `${step.kg} kg`;
-      return `${mass} → ${step.hubIcao} · ${eta}`;
-    }
-    case 'fulfill_demand':
-      return '';
-    case 'wait_demand':
-      return step.openDemandCount > 0
-        ? 'No stock match on this desk'
-        : 'Waiting on catchment Demand';
-    case 'buy_port':
-      return '';
-  }
 }
 
 export function PortsPanel(props: {
@@ -3134,34 +3031,6 @@ export function PortsPanel(props: {
     };
   }, [whShelf, staffFocusWarehouse, staffSlotsFree, staffHirePool.length]);
 
-  const loopStep = useMemo(
-    () =>
-      derivePortsLoopStep({
-        warehouseCount: warehouses?.warehouses?.length ?? 0,
-        stock: warehouses?.stock ?? [],
-        pickups: snap?.pickups ?? [],
-        demand,
-        focusPortId: portId ?? undefined,
-        inboundTransfers: warehouses?.inboundTransfers,
-        economyTick: props.economyTick,
-        demandHolds: warehouses?.demandHolds,
-      }),
-    [
-      warehouses?.warehouses?.length,
-      warehouses?.stock,
-      warehouses?.inboundTransfers,
-      warehouses?.demandHolds,
-      snap?.pickups,
-      demand,
-      portId,
-      props.economyTick,
-    ],
-  );
-  const loopTargetSection = portsLoopTargetSection(loopStep);
-  const loopCtaLabel = portsLoopCtaLabel(loopStep);
-  /** Show when the player is on the wrong tab for the next loop step. */
-  const showPortsLoopBanner = section !== loopTargetSection;
-
   /** Exact-operator Port FBO — hide Network desk until this company claims one or owns WH. */
   const hasOwnedPortFbo = useMemo(
     () =>
@@ -3228,6 +3097,48 @@ export function PortsPanel(props: {
       destLon: o.destLon!,
     };
   }, [scoutRouteFocus]);
+
+  /** Soft Demand corridor disk on Network map when an FBO is selected (P1/P2). */
+  const networkCorridorRing = useMemo(() => {
+    if (networkSurface !== 'fbo') return null;
+    const fbo = selectedNetworkNode;
+    if (!fbo || fbo.kind !== 'fbo') return null;
+    const pid = (fbo.portId ?? '').trim().toUpperCase();
+    if (!pid) return null;
+    const portRow =
+      port?.id.trim().toUpperCase() === pid
+        ? port
+        : (snap?.ports ?? []).find((p) => p.id.trim().toUpperCase() === pid);
+    if (!portRow) return null;
+    const hubSet = new Set(
+      (portRow.pickupHubs ?? []).map((h) => h.trim().toUpperCase()),
+    );
+    const tiers = (warehouses?.warehouses ?? [])
+      .filter((w) => hubSet.has(w.icao.trim().toUpperCase()))
+      .map((w) => w.tier);
+    const { level } = resolveUiPortCorridorLevel({
+      concessionStatus: portRow.concession?.status,
+      concessionLevel: portRow.concession?.level,
+      warehouseTiersAtPort: tiers,
+    });
+    const nm = corridorNmForLevel(level);
+    if (nm == null) return null;
+    const hubIcao = fbo.primaryHubIcao.trim().toUpperCase();
+    const wh = companyNetworkNodes.find(
+      (n) => n.kind === 'wh' && n.primaryHubIcao === hubIcao,
+    );
+    const lat = wh?.lat ?? fbo.lat;
+    const lon = wh?.lon ?? fbo.lon;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon, radiusNm: nm };
+  }, [
+    networkSurface,
+    selectedNetworkNode,
+    port,
+    snap?.ports,
+    warehouses?.warehouses,
+    companyNetworkNodes,
+  ]);
 
   /** Buyable hubs: this port's pickups first; search unlocks the world list. */
   const networkBuyableHubs = useMemo(() => {
@@ -3337,27 +3248,6 @@ export function PortsPanel(props: {
         networkId: node.id,
         portId: node.portId ?? undefined,
       });
-    }
-  }
-
-  function goToLoopStep() {
-    if (loopTargetSection === 'catalog') {
-      setSection('catalog');
-      return;
-    }
-    if (loopStep.kind === 'buy_warehouse') {
-      openNetworkSurface('buy');
-    } else if (loopStep.kind === 'store_yard') {
-      openNetworkSurface('wh', { hubIcao: loopStep.hubIcao });
-    } else if (loopStep.kind === 'wait_inbound') {
-      openNetworkSurface('wh', { hubIcao: loopStep.hubIcao });
-    } else if (
-      loopStep.kind === 'fulfill_demand' ||
-      loopStep.kind === 'wait_demand'
-    ) {
-      openNetworkSurface('demand');
-    } else {
-      setSection('network');
     }
   }
 
@@ -3639,9 +3529,6 @@ export function PortsPanel(props: {
         <div className="ports-panel-body">
           {props.embedded ? (
             <div className="ports-embed-toolbar">
-              <p className="ports-embed-toolbar-copy">
-                Company network · FBO desk, warehouses, Scout, Demand
-              </p>
               <button
                 type="button"
                 className="action ghost"
@@ -3669,90 +3556,48 @@ export function PortsPanel(props: {
             >
               Port catalog
             </button>
-            {hasNetworkAssets ? (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={section === 'network'}
-                className={
-                  section === 'network'
-                    ? 'fbo-icao-chip active'
-                    : 'fbo-icao-chip'
+            <button
+              type="button"
+              role="tab"
+              aria-selected={section === 'network'}
+              className={
+                section === 'network'
+                  ? 'fbo-icao-chip active'
+                  : 'fbo-icao-chip'
+              }
+              disabled={props.busy || loading || !hasNetworkAssets}
+              title={
+                hasNetworkAssets
+                  ? undefined
+                  : 'Claim a Port FBO or buy a warehouse first'
+              }
+              onClick={() => {
+                if (!hasNetworkAssets) return;
+                setSection('network');
+                if (
+                  selectedNetworkId == null &&
+                  filteredNetworkNodes.length === 1
+                ) {
+                  onSelectNetworkNode(filteredNetworkNodes[0]!.id);
+                } else if (
+                  networkSurface === 'buy' ||
+                  networkSurface === 'demand' ||
+                  networkSurface === 'staff'
+                ) {
+                  /* keep surface */
+                } else if (selectedNetworkNode?.kind === 'fbo') {
+                  setNetworkSurface('fbo');
+                } else {
+                  setNetworkSurface('wh');
+                  setWhShelf('owned');
                 }
-                disabled={props.busy || loading}
-                onClick={() => {
-                  setSection('network');
-                  if (
-                    selectedNetworkId == null &&
-                    filteredNetworkNodes.length === 1
-                  ) {
-                    onSelectNetworkNode(filteredNetworkNodes[0]!.id);
-                  } else if (
-                    networkSurface === 'buy' ||
-                    networkSurface === 'demand' ||
-                    networkSurface === 'staff'
-                  ) {
-                    /* keep surface */
-                  } else if (selectedNetworkNode?.kind === 'fbo') {
-                    setNetworkSurface('fbo');
-                  } else {
-                    setNetworkSurface('wh');
-                    setWhShelf('owned');
-                  }
-                }}
-              >
-                Network
-                {companyNetworkNodes.length > 0
-                  ? ` (${companyNetworkNodes.length})`
-                  : ''}
-              </button>
-            ) : null}
-          </div>
-
-          <div
-            className={
-              showPortsLoopBanner
-                ? 'ports-loop-slot ports-loop-banner'
-                : 'ports-loop-slot ports-loop-banner is-on-target'
-            }
-            role="status"
-          >
-            {showPortsLoopBanner ? (
-              <>
-                <p className="ports-loop-banner-text">
-                  {portsLoopMessage(
-                    loopStep,
-                    props.formatTonnes,
-                    props.formatMoney,
-                    snap.yardHoldUsdPerDay,
-                    ticksToHoursLabel,
-                  )}
-                </p>
-                {loopCtaLabel ? (
-                  <button
-                    type="button"
-                    className="action ghost ports-loop-banner-cta"
-                    disabled={props.busy || loading}
-                    onClick={() => goToLoopStep()}
-                  >
-                    {loopCtaLabel}
-                  </button>
-                ) : null}
-              </>
-            ) : (
-              (() => {
-                const hint = portsLoopSectionHint(
-                  loopStep,
-                  props.formatMoney,
-                  snap.yardHoldUsdPerDay,
-                  props.formatTonnes,
-                  ticksToHoursLabel,
-                );
-                return hint ? (
-                  <p className="ports-loop-banner-text">{hint}</p>
-                ) : null;
-              })()
-            )}
+              }}
+            >
+              Network
+              {companyNetworkNodes.length > 0
+                ? ` (${companyNetworkNodes.length})`
+                : ''}
+            </button>
           </div>
 
           {section === 'catalog' ? (
@@ -4058,6 +3903,9 @@ export function PortsPanel(props: {
                   highlightRoute={
                     networkSurface === 'fbo' ? scoutHighlightRoute : null
                   }
+                  corridorRing={
+                    networkSurface === 'fbo' ? networkCorridorRing : null
+                  }
                   weightSystem={props.weightSystem}
                   disabled={props.busy || loading}
                 />
@@ -4071,13 +3919,6 @@ export function PortsPanel(props: {
                   No network match for “{networkSearch.trim()}”.
                 </p>
               )}
-              {networkSurface === 'wh' &&
-              companyNetworkNodes.length > 0 &&
-              !selectedNetworkId ? (
-                <p className="empty ports-network-pick-hint">
-                  Select a Port FBO or warehouse above.
-                </p>
-              ) : null}
             </div>
           ) : null}
 

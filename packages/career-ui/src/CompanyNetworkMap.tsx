@@ -19,11 +19,15 @@ setWorkerUrl(maplibreWorkerUrl);
 const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const FEEDER_ACCENT = '#f0a35a';
 const DESK_ROUTE_ACCENT = '#7ec8e3';
+const CORRIDOR_ACCENT = '#7ec8e3';
 
 const FEEDERS_SOURCE = 'company-network-feeders';
 const FEEDERS_LAYER = 'company-network-feeders';
 const DESK_SOURCE = 'company-network-desk-route';
 const DESK_LAYER = 'company-network-desk-route';
+const CORRIDOR_SOURCE = 'company-network-corridor';
+const CORRIDOR_FILL = 'company-network-corridor-fill';
+const CORRIDOR_LINE = 'company-network-corridor-line';
 
 type LineFeatureCollection = {
   type: 'FeatureCollection';
@@ -37,6 +41,18 @@ type LineFeatureCollection = {
   }>;
 };
 
+type PolygonFeatureCollection = {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    properties: Record<string, unknown>;
+    geometry: {
+      type: 'Polygon';
+      coordinates: [number, number][][];
+    };
+  }>;
+};
+
 function hasCoords(lat: unknown, lon: unknown): lat is number {
   return (
     typeof lat === 'number' &&
@@ -44,6 +60,60 @@ function hasCoords(lat: unknown, lon: unknown): lat is number {
     Number.isFinite(lat) &&
     Number.isFinite(lon)
   );
+}
+
+/** Destination [lon, lat] at bearing° / distance nm on a sphere (Earth ~3440 nm). */
+function destinationLngLat(
+  lat: number,
+  lon: number,
+  bearingDeg: number,
+  distanceNm: number,
+): [number, number] {
+  const R = 3440.065;
+  const δ = distanceNm / R;
+  const θ = (bearingDeg * Math.PI) / 180;
+  const φ1 = (lat * Math.PI) / 180;
+  const λ1 = (lon * Math.PI) / 180;
+  const sinφ1 = Math.sin(φ1);
+  const cosφ1 = Math.cos(φ1);
+  const sinδ = Math.sin(δ);
+  const cosδ = Math.cos(δ);
+  const sinφ2 = sinφ1 * cosδ + cosφ1 * sinδ * Math.cos(θ);
+  const φ2 = Math.asin(Math.max(-1, Math.min(1, sinφ2)));
+  const λ2 =
+    λ1 +
+    Math.atan2(
+      Math.sin(θ) * sinδ * cosφ1,
+      cosδ - sinφ1 * Math.sin(φ2),
+    );
+  return [((λ2 * 180) / Math.PI + 540) % 360 - 180, (φ2 * 180) / Math.PI];
+}
+
+function corridorCirclePolygon(
+  lat: number,
+  lon: number,
+  radiusNm: number,
+  steps = 72,
+): PolygonFeatureCollection {
+  const ring: [number, number][] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const bearing = (360 * i) / steps;
+    ring.push(destinationLngLat(lat, lon, bearing, radiusNm));
+  }
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: { radiusNm },
+        geometry: { type: 'Polygon', coordinates: [ring] },
+      },
+    ],
+  };
+}
+
+function emptyPolygonCollection(): PolygonFeatureCollection {
+  return { type: 'FeatureCollection', features: [] };
 }
 
 function safeResize(map: MapLibreMap | null) {
@@ -100,6 +170,101 @@ function clearLineLayer(map: MapLibreMap, sourceId: string, layerId: string) {
   if (map.getSource(sourceId)) map.removeSource(sourceId);
 }
 
+function upsertCorridorLayer(
+  map: MapLibreMap,
+  data: PolygonFeatureCollection,
+) {
+  const existing = map.getSource(CORRIDOR_SOURCE) as GeoJSONSource | undefined;
+  if (existing && typeof existing.setData === 'function') {
+    existing.setData(data);
+    if (!map.getLayer(CORRIDOR_FILL)) {
+      map.addLayer({
+        id: CORRIDOR_FILL,
+        type: 'fill',
+        source: CORRIDOR_SOURCE,
+        paint: {
+          'fill-color': CORRIDOR_ACCENT,
+          'fill-opacity': 0.08,
+        },
+      });
+    }
+    if (!map.getLayer(CORRIDOR_LINE)) {
+      map.addLayer({
+        id: CORRIDOR_LINE,
+        type: 'line',
+        source: CORRIDOR_SOURCE,
+        paint: {
+          'line-color': CORRIDOR_ACCENT,
+          'line-width': 1.4,
+          'line-opacity': 0.55,
+          'line-dasharray': [2, 2],
+        },
+      });
+    }
+    // Keep disk under feeder / desk lines.
+    const before =
+      (map.getLayer(FEEDERS_LAYER) && FEEDERS_LAYER) ||
+      (map.getLayer(DESK_LAYER) && DESK_LAYER) ||
+      undefined;
+    if (before) {
+      try {
+        map.moveLayer(CORRIDOR_FILL, before);
+        map.moveLayer(CORRIDOR_LINE, before);
+      } catch {
+        /* layer order optional */
+      }
+    }
+    return;
+  }
+  if (map.getLayer(CORRIDOR_LINE)) map.removeLayer(CORRIDOR_LINE);
+  if (map.getLayer(CORRIDOR_FILL)) map.removeLayer(CORRIDOR_FILL);
+  if (map.getSource(CORRIDOR_SOURCE)) map.removeSource(CORRIDOR_SOURCE);
+  map.addSource(CORRIDOR_SOURCE, { type: 'geojson', data });
+  map.addLayer({
+    id: CORRIDOR_FILL,
+    type: 'fill',
+    source: CORRIDOR_SOURCE,
+    paint: {
+      'fill-color': CORRIDOR_ACCENT,
+      'fill-opacity': 0.08,
+    },
+  });
+  map.addLayer({
+    id: CORRIDOR_LINE,
+    type: 'line',
+    source: CORRIDOR_SOURCE,
+    paint: {
+      'line-color': CORRIDOR_ACCENT,
+      'line-width': 1.4,
+      'line-opacity': 0.55,
+      'line-dasharray': [2, 2],
+    },
+  });
+  const before =
+    (map.getLayer(FEEDERS_LAYER) && FEEDERS_LAYER) ||
+    (map.getLayer(DESK_LAYER) && DESK_LAYER) ||
+    undefined;
+  if (before) {
+    try {
+      map.moveLayer(CORRIDOR_FILL, before);
+      map.moveLayer(CORRIDOR_LINE, before);
+    } catch {
+      /* layer order optional */
+    }
+  }
+}
+
+function clearCorridorLayer(map: MapLibreMap) {
+  const existing = map.getSource(CORRIDOR_SOURCE) as GeoJSONSource | undefined;
+  if (existing && typeof existing.setData === 'function') {
+    existing.setData(emptyPolygonCollection());
+    return;
+  }
+  if (map.getLayer(CORRIDOR_LINE)) map.removeLayer(CORRIDOR_LINE);
+  if (map.getLayer(CORRIDOR_FILL)) map.removeLayer(CORRIDOR_FILL);
+  if (map.getSource(CORRIDOR_SOURCE)) map.removeSource(CORRIDOR_SOURCE);
+}
+
 function nodesSignature(
   nodes: CompanyNetworkNode[],
   selectedId: string | null,
@@ -133,6 +298,14 @@ function routeSignature(
   ].join('|');
 }
 
+function corridorSignature(
+  ring: CompanyNetworkCorridorRing | null | undefined,
+): string {
+  if (!ring) return '';
+  if (!hasCoords(ring.lat, ring.lon) || !(ring.radiusNm > 0)) return '';
+  return `${ring.lat.toFixed(5)}:${ring.lon.toFixed(5)}:${Math.round(ring.radiusNm)}`;
+}
+
 export type CompanyNetworkMapRoute = {
   originIcao: string;
   destIcao: string;
@@ -142,12 +315,21 @@ export type CompanyNetworkMapRoute = {
   destLon: number;
 };
 
+/** Demand desk corridor reach (nm) — P1/P2; omit for P3 open. */
+export type CompanyNetworkCorridorRing = {
+  lat: number;
+  lon: number;
+  radiusNm: number;
+};
+
 type Props = {
   nodes: CompanyNetworkNode[];
   selectedId: string | null;
   onSelectNode: (id: string) => void;
   /** Selected Open desk hold OD — solid line + camera focus. */
   highlightRoute?: CompanyNetworkMapRoute | null;
+  /** Soft Demand corridor disk (centered on pickup hub). */
+  corridorRing?: CompanyNetworkCorridorRing | null;
   className?: string;
 };
 
@@ -168,8 +350,8 @@ export function CompanyNetworkMap(props: Props) {
 
   const plotSig = useMemo(
     () =>
-      `${nodesSignature(props.nodes, props.selectedId)}#${routeSignature(props.highlightRoute)}`,
-    [props.nodes, props.selectedId, props.highlightRoute],
+      `${nodesSignature(props.nodes, props.selectedId)}#${routeSignature(props.highlightRoute)}#${corridorSignature(props.corridorRing)}`,
+    [props.nodes, props.selectedId, props.highlightRoute, props.corridorRing],
   );
 
   useEffect(() => {
@@ -244,6 +426,15 @@ export function CompanyNetworkMap(props: Props) {
           if (active.getSource(DESK_SOURCE)) {
             active.removeSource(DESK_SOURCE);
           }
+          if (active.getLayer(CORRIDOR_LINE)) {
+            active.removeLayer(CORRIDOR_LINE);
+          }
+          if (active.getLayer(CORRIDOR_FILL)) {
+            active.removeLayer(CORRIDOR_FILL);
+          }
+          if (active.getSource(CORRIDOR_SOURCE)) {
+            active.removeSource(CORRIDOR_SOURCE);
+          }
         } catch {
           /* torn down */
         }
@@ -273,6 +464,7 @@ export function CompanyNetworkMap(props: Props) {
       try {
         clearLineLayer(map, FEEDERS_SOURCE, FEEDERS_LAYER);
         clearLineLayer(map, DESK_SOURCE, DESK_LAYER);
+        clearCorridorLayer(map);
       } catch {
         /* ok */
       }
@@ -371,10 +563,32 @@ export function CompanyNetworkMap(props: Props) {
       /* style not ready / map removed */
     }
 
+    const corridor = props.corridorRing;
+    const corridorOk =
+      corridor &&
+      hasCoords(corridor.lat, corridor.lon) &&
+      corridor.radiusNm > 0;
+
+    try {
+      if (corridorOk) {
+        upsertCorridorLayer(
+          map,
+          corridorCirclePolygon(corridor.lat, corridor.lon, corridor.radiusNm),
+        );
+      } else {
+        clearCorridorLayer(map);
+      }
+    } catch {
+      /* style not ready / map removed */
+    }
+
     const selectedId = props.selectedId;
     const nodeKey = plotNodes.map((n) => n.id).join('|');
     const routeKey = deskRouteOk
       ? `${deskRoute.originIcao}-${deskRoute.destIcao}-${deskRoute.originLat.toFixed(3)}-${deskRoute.destLat.toFixed(3)}`
+      : 'none';
+    const corridorKey = corridorOk
+      ? `${corridor.lat.toFixed(3)}-${corridor.lon.toFixed(3)}-${Math.round(corridor.radiusNm)}`
       : 'none';
 
     for (const node of plotNodes) {
@@ -465,27 +679,28 @@ export function CompanyNetworkMap(props: Props) {
       focusBounds.extend([deskRoute.destLon, deskRoute.destLat]);
       focusCount = 2;
       focused = true;
+    } else if (corridorOk) {
+      // Fit the Demand corridor disk so P1/P2 radius is readable.
+      focusBounds.extend([corridor.lon, corridor.lat]);
+      for (const bearing of [0, 90, 180, 270] as const) {
+        const [lng, lat] = destinationLngLat(
+          corridor.lat,
+          corridor.lon,
+          bearing,
+          corridor.radiusNm,
+        );
+        focusBounds.extend([lng, lat]);
+      }
+      focusCount = 5;
+      focused = true;
     } else {
-      // Focus camera on the selected node (zoom in). All / no selection → whole network.
+      // Focus camera on the selected pin only (zoom in). Pairing FBO+WH
+      // (port vs hub coords) was fitBounds → felt like zoom-out.
+      // No selection → whole network.
       let focusNodes: CompanyNetworkNode[] = plotNodes;
       if (selectedId) {
         const selected = plotNodes.find((n) => n.id === selectedId);
-        if (selected) {
-          if (selected.kind === 'fbo' && selected.portId) {
-            const port = selected.portId.toUpperCase();
-            focusNodes = plotNodes.filter(
-              (n) =>
-                n.id === selected.id ||
-                (n.kind === 'wh' && n.portId?.toUpperCase() === port),
-            );
-          } else if (selected.kind === 'wh' && selected.portId) {
-            const fbo = fboByPort.get(selected.portId.toUpperCase());
-            focusNodes =
-              fbo && hasCoords(fbo.lat, fbo.lon) ? [selected, fbo] : [selected];
-          } else {
-            focusNodes = [selected];
-          }
-        }
+        focusNodes = selected ? [selected] : plotNodes;
       }
       for (const n of focusNodes) {
         focusBounds.extend([n.lon, n.lat]);
@@ -494,7 +709,7 @@ export function CompanyNetworkMap(props: Props) {
       focused = Boolean(selectedId);
     }
 
-    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}|${routeKey}`;
+    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}|${routeKey}|${corridorKey}`;
     if (cameraKey === fittedForRef.current || focusCount === 0) return;
     fittedForRef.current = cameraKey;
 
@@ -503,7 +718,7 @@ export function CompanyNetworkMap(props: Props) {
         const ne = focusBounds.getNorthEast();
         map.easeTo({
           center: [ne.lng, ne.lat],
-          zoom: focused ? 8.5 : 7.5,
+          zoom: focused ? 9.25 : 7.5,
           duration: 400,
         });
       } else {
@@ -512,7 +727,7 @@ export function CompanyNetworkMap(props: Props) {
         if (ne.lng === sw.lng && ne.lat === sw.lat) {
           map.easeTo({
             center: [ne.lng, ne.lat],
-            zoom: focused ? 8.5 : 7.5,
+            zoom: focused ? 9.25 : 7.5,
             duration: 400,
           });
         } else {

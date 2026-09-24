@@ -1,0 +1,63 @@
+{
+  "source": "simbrief",
+  "icao": "L101",
+  "ofpId": "inibuilds-l1011-500-pod",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "L1011-500 Standard Cabin & Engine Pod",
+    "L-1011-500 Cabin w/ Lounge & Engine Pod",
+    "L1011-500 Cabin w/ Lounge & Engine Pod"
+  ],
+  "matchTitlePattern": "L-?1011-500.*Engine\\s*Pod",
+  "notes": [
+    "iniBuilds L1011-500 Engine Pod ferry glasses — native-simbrief",
+    "Market SKU: inibuilds-l1011-500 (family pack)",
+    "SimBrief: iniBuilds (MSFS) - L1011-500 Pod Ferry (not Default — higher OEW)",
+    "Pack match left Default so live title inference picks Pod Ferry",
+    "Homologated: inibuilds/l1011-500-standard-cabin-engine-pod@1.0.0, inibuilds/l-1011-500-cabin-w-lounge-engine-pod@1.0.0",
+    "Fuel: FUELSYSTEM tanks 1–8; 10 payload stations; write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "L101",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 400,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 600,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

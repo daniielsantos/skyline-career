@@ -1,0 +1,484 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "contrail-contrail-falcon-50",
+  "profileKey": "contrail/contrail-falcon-50",
+  "semver": "1.1.1",
+  "displayName": "Contrail Falcon 50 (MSFS 2024)",
+  "match": {
+    "fingerprint": "cec92865f859732c2181072228d53d00fcb1e3520b5f25453e4b12aea9fd2698",
+    "title": "Contrail Falcon 50",
+    "publisher": "contrail",
+    "icao": "FA50",
+    "liveTitles": [
+      "Contrail Falcon 50"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": true,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_AUX",
+        "name": "Left Wing",
+        "capacity": 559,
+        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:1",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "CENTER",
+        "name": "Center Wing",
+        "capacity": 410,
+        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:2",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_AUX",
+        "name": "Right Wing",
+        "capacity": 559,
+        "readVar": "FUELSYSTEM TANK QUANTITY:3",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:3",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Feeder",
+        "capacity": 210,
+        "readVar": "FUELSYSTEM TANK QUANTITY:4",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:4",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "CENTER2",
+        "name": "Center Feeder",
+        "capacity": 367,
+        "readVar": "FUELSYSTEM TANK QUANTITY:5",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:5",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Feeder",
+        "capacity": 210,
+        "readVar": "FUELSYSTEM TANK QUANTITY:6",
+        "readUnit": "gallons",
+        "writeVar": "FUELSYSTEM TANK QUANTITY:6",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_LH_WING_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_RH_WING_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_CENTER_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_REAR_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "delay",
+        "ms": 500
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "unit": "gallons",
+        "valueExpr": "{CENTER}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:3",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:4",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:5",
+        "unit": "gallons",
+        "valueExpr": "{CENTER2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:6",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:1",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:2",
+        "unit": "gallons",
+        "valueExpr": "{CENTER}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:3",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_AUX}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:4",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:5",
+        "unit": "gallons",
+        "valueExpr": "{CENTER2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUELSYSTEM TANK QUANTITY:6",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN}"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_LH_WING_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_RH_WING_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_CENTER_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "lvar_set",
+        "name": "CTL_FA50_FUEL_PANEL_REAR_SW",
+        "valueExpr": "0"
+      },
+      {
+        "op": "delay",
+        "ms": 2000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 12000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:1",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_AUX}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:2",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{CENTER}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:3",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_AUX}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:4",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:5",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{CENTER2}"
+        },
+        {
+          "var": "FUELSYSTEM TANK QUANTITY:6",
+          "unit": "gallons",
+          "tolerancePct": 8,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 750
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 750
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      },
+      {
+        "index": 9,
+        "name": "Station 9",
+        "maxLoad": 500
+      },
+      {
+        "index": 10,
+        "name": "Station 10",
+        "maxLoad": 500
+      },
+      {
+        "index": 11,
+        "name": "Station 11",
+        "maxLoad": 500
+      },
+      {
+        "index": 12,
+        "name": "Station 12",
+        "maxLoad": 500
+      },
+      {
+        "index": 13,
+        "name": "Station 13",
+        "maxLoad": 500
+      },
+      {
+        "index": 14,
+        "name": "Station 14",
+        "maxLoad": 500
+      },
+      {
+        "index": 15,
+        "name": "Station 15",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:8",
+        "unit": "pounds",
+        "valueExpr": "{station_8}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:9",
+        "unit": "pounds",
+        "valueExpr": "{station_9}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:10",
+        "unit": "pounds",
+        "valueExpr": "{station_10}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:11",
+        "unit": "pounds",
+        "valueExpr": "{station_11}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:12",
+        "unit": "pounds",
+        "valueExpr": "{station_12}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:13",
+        "unit": "pounds",
+        "valueExpr": "{station_13}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:14",
+        "unit": "pounds",
+        "valueExpr": "{station_14}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:15",
+        "unit": "pounds",
+        "valueExpr": "{station_15}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 14.000000000000002,
+      "maxMac": 32.5
+    },
+    "calibration": {
+      "observedMac": 25.811731815338135,
+      "calibratedAtIso": "2026-09-24T02:17:45.277Z",
+      "sweep": {
+        "minObservedMac": 23.03764373064041,
+        "maxObservedMac": 25.857117772102356,
+        "payloadLb": 200,
+        "forwardStation": 1,
+        "aftStation": 15,
+        "usedStationArms": false,
+        "restored": true,
+        "sampledAtIso": "2026-09-24T02:17:54.545Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Contrail Falcon 50.",
+    "ICAO type designator (catalog/SimBrief): FA50.",
+    "Fuel: FUELSYSTEM 1–6 (EFB path) — Left/Right Wing, Center Wing, Left/Right/Center Feeder.",
+    "Engines must be off (gating); vendor rebalances with combustion on.",
+    "WritePlan: panel SW off → delay → dual FUELSYSTEM write → SW off → settle 2s; verify tol 8% (readback ~20 gal under).",
+    "Not Accu-Sim LVar qty (unlike A2A Aerostar).",
+    "SimBrief: Contrail (MSFS) - Falcon 50B (not Default).",
+    "Payload stations from writetest: 1–15.",
+    "Station maxLoad: cargo-split S1=750,S2=750,S3–15=500 (ceiling 3708 lb) (simbrief mzfw-oew)",
+    "See profiles/notes/contrail-contrail-falcon-50.md"
+  ]
+}

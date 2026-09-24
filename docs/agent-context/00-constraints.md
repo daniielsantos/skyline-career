@@ -33,6 +33,9 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - PMDG **738 BBJ2** fica **fora do Market** (`enabled: false`) até OEW bater com SimBrief Dual Class (empty live ~102.2 klb vs OEW ~93k).
 - Arte dos cards: `docs/market-airframe-card-prompts.md` + `AIRFRAME_CARD_ART` em `AircraftCards.tsx`. Um PNG por SKU de Market, não por vidro.
 - A340-300 iniBuilds: um SKU `inibuilds-a340-300`; SimBrief **Passenger / Preighter / VIP** (não Default). Freighter glass → Preighter. Fingerprint: freighter exige token cargo no título (mesmo `structuralHash` pax/VIP/EIS).
+- A300-600 iniBuilds: um SKU `inibuilds-a300-600`; SimBrief **A300-600R GE / PW** (não Default). Freighter glass usa a mesma row do motor (SimBrief sem Preighter). Live title inference escolhe GE vs PW.
+- L1011-500 iniBuilds: um SKU `inibuilds-l1011-500`; SimBrief **Regular / Pod Ferry** (não Default). Engine Pod glass → Pod Ferry. Lounge ≠ Standard via tokens `lounge`/`pod`.
+- Contrail Falcon 50: `light_jet` inject via **FUELSYSTEM 1–6** + panel switch LVars off (EFB path); **engines off**. Não Accu-Sim qty LVars.
 - Jets `pax_and_cargo`: **não** empilhar todo mismatch em `efbPaxWeightLb`. Causas distintas (pax lb EFB, slots SimConnect, hold &lt; bag, OEW Default≠glass, ghosts) — playbook: `docs/agent-context/12-pax-efb-due.md`. Ao fechar um diagnóstico, **atualizar esse `.md` no mesmo turno**.
 - Homologação colaborativa: **não** implementar sem pedido. Esboço: `docs/agent-context/13-collaborative-homologation.md`. Formulário ≠ compra Hangar; captura ≠ listar Market.
 

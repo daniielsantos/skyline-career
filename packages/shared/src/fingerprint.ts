@@ -33,6 +33,8 @@ export function normalizeAircraftTitle(title: string): string {
   t = t.replace(/\s+(?:livery|paint|repaint)$/i, '');
   // Payload / config state suffixes (Carenado Saab "340 Cargo - Loaded", etc.)
   t = t.replace(/\s*-?\s*(?:loaded|unloaded|empty)\s*$/i, '');
+  // Lockheed TriStar — MSFS/iniBuilds mix "L-1011-500" and "L1011-500".
+  t = t.replace(/\bL-1011\b/gi, 'L1011');
   // Leftover punctuation after registration strip ("Cessna C680:")
   t = t.replace(/[:\-–—|/]+$/g, '');
   return t.trim();
@@ -342,6 +344,9 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     // "Commuter, Tundra" must not alias onto "Commuter, Cargopod, Tundra".
     'cargopod',
     'nocp',
+    // iniBuilds L1011-500 — Lounge cabin ≠ Standard; Engine Pod ≠ Regular.
+    'lounge',
+    'pod',
     // Turbocharged / pressurized cabin markers (Bonanza A36TC ≠ A36).
     'tc',
     'turbo',

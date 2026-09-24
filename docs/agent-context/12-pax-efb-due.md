@@ -109,6 +109,8 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 | `microsoft-a321lr` | 220 | `efbPaxWeightLb: 188` (153 pax: Sim 37127 vs OFP 35164). **Fuel:** EFB APPLY **não** grava FOB (bug iniBuilds A321LR); usar EFB/slider **padrão do MSFS**. Watch C = CENTER+CENTER2; TOTAL pode ser > L+R+C |
 | `inibuilds-a330-200` | 257 | SimBrief **iniBuilds GE/RR** (OEW 116t = EFB Dry). Default OEW ~270k → APPLY ZFW inflates stations by ~14.5k vs OFP Payload |
 | `inibuilds-a330-300` | 291 | Same: iniBuilds GE/RR (P2F → P2F rows); not A333 Default |
+| `inibuilds-a300-600` | 256 (GE/PW) | **A306** `iniBuilds (MSFS) - A300-600R GE/PW` — not Default. Freighter glass uses same engine row (no Preighter). Family packs pax/freighter |
+| `inibuilds-l1011-500` | 243 (Regular) | **L101** Regular / Pod Ferry — not Default. Engine Pod glass → Pod Ferry. Family packs Regular/Pod |
 | `inibuilds-a340-300` | 279 (Passenger) | **A343** Passenger / Preighter / VIP — not Default. Freighter glass → Preighter (0 pax). Family packs pax/freighter/VIP |
 | `fenix-a320` | 180 | `simconnectEmptyPayloadBiasLb: 2591` — sem `efbPaxWeightLb` |
 | `fenix-a319` | 145 | SimBrief Default A319 Full=(145); was catalog 150 (2026-09-19 SB sync). `simconnectEmptyPayloadBiasLb: 2642` |

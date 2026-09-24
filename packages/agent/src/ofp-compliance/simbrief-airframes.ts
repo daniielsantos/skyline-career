@@ -185,6 +185,13 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (/A320neo\s*V2\b/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A320neo V2';
   }
+  if (/\bContrail Falcon 50\b/i.test(t)) {
+    return 'Contrail \\(MSFS\\) - Falcon 50B';
+  }
+  const inibuildsL1011 = inferIniBuildsL1011SimBriefMatch(t);
+  if (inibuildsL1011) return inibuildsL1011;
+  const inibuildsA300 = inferIniBuildsA300SimBriefMatch(t);
+  if (inibuildsA300) return inibuildsA300;
   const inibuildsA340 = inferIniBuildsA340SimBriefMatch(t);
   if (inibuildsA340) return inibuildsA340;
   const inibuildsA330 = inferIniBuildsA330SimBriefMatch(t);
@@ -339,6 +346,15 @@ export function liveTitleMatchesMarketSku(
   if (id === 'leonardo-fly-the-maddog-x-md-88-20th') {
     return /Fly The Maddog X MD-88 20th/i.test(t);
   }
+  if (id === 'contrail-contrail-falcon-50') {
+    return /\bContrail Falcon 50\b/i.test(t) || /\bFalcon 50\b/i.test(t);
+  }
+  if (id === 'inibuilds-l1011-500') {
+    return /\bL-?1011-?500\b/i.test(t);
+  }
+  if (id === 'inibuilds-a300-600') {
+    return /\bA300\b/i.test(t);
+  }
   if (id === 'inibuilds-a340-300') {
     return /\bA340-300\b/i.test(t);
   }
@@ -405,6 +421,28 @@ function inferPmdg777200erSimBriefMatch(title: string): string | undefined {
     return 'PMDG \\(MSFS\\) - Trent 892 - Default MTOW';
   }
   return undefined;
+}
+
+/**
+ * iniBuilds L1011-500 — Regular vs Pod Ferry (engine-pod ferry tank).
+ * Live titles: "L1011-500 Standard Cabin" / "… Engine Pod" / "L-1011-500 …".
+ */
+function inferIniBuildsL1011SimBriefMatch(title: string): string | undefined {
+  if (!/\bL-?1011-?500\b/i.test(title)) return undefined;
+  if (/Engine\s*Pod|Pod\s*Ferry/i.test(title)) {
+    return 'iniBuilds \\(MSFS\\) - L1011-500 Pod Ferry';
+  }
+  return 'iniBuilds \\(MSFS\\) - L1011-500 Regular';
+}
+
+/**
+ * iniBuilds A300-600R — SimBrief only ships GE/PW rows (no freighter/Default OEW).
+ * Live titles: "A300 Passenger (GE)" / "A300 Freighter (PW)".
+ */
+function inferIniBuildsA300SimBriefMatch(title: string): string | undefined {
+  if (!/\bA300\b/i.test(title)) return undefined;
+  const eng = /\bPW\b/i.test(title) ? 'PW' : 'GE';
+  return `iniBuilds \\(MSFS\\) - A300-600R ${eng}`;
 }
 
 /** iniBuilds A340-300 — Passenger / Preighter (freighter) / VIP; not Default OEW. */

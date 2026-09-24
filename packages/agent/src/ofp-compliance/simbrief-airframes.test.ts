@@ -467,6 +467,65 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       true,
     );
     assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A300 Passenger (GE)'),
+      'iniBuilds \\(MSFS\\) - A300-600R GE',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A300 Freighter (PW)'),
+      'iniBuilds \\(MSFS\\) - A300-600R PW',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('A300 Passenger (PW)'),
+      'iniBuilds \\(MSFS\\) - A300-600R PW',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('A300 Passenger (GE)', 'inibuilds-a300-600'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('A300 Freighter (PW)', 'inibuilds-a300-600'),
+      true,
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('L1011-500 Standard Cabin'),
+      'iniBuilds \\(MSFS\\) - L1011-500 Regular',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('Contrail Falcon 50'),
+      'Contrail \\(MSFS\\) - Falcon 50B',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('Contrail Falcon 50', 'contrail-contrail-falcon-50'),
+      true,
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('L1011-500 Cabin w/ Lounge'),
+      'iniBuilds \\(MSFS\\) - L1011-500 Regular',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'L1011-500 Standard Cabin & Engine Pod',
+      ),
+      'iniBuilds \\(MSFS\\) - L1011-500 Pod Ferry',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle(
+        'L-1011-500 Cabin w/ Lounge & Engine Pod',
+      ),
+      'iniBuilds \\(MSFS\\) - L1011-500 Pod Ferry',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('L1011-500 Standard Cabin', 'inibuilds-l1011-500'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku(
+        'L-1011-500 Cabin w/ Lounge & Engine Pod',
+        'inibuilds-l1011-500',
+      ),
+      true,
+    );
+    assert.equal(
       inferSimBriefAirframeMatchFromTitle('A330-200 (GE)'),
       'iniBuilds \\(MSFS\\) - A330-200 GE',
     );

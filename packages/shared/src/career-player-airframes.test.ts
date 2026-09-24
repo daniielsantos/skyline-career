@@ -165,6 +165,64 @@ describe('career player airframes', () => {
     );
   });
 
+  it('stages iniBuilds A300-600 family with GE/PW SimBrief rows', () => {
+    const a300 = findCareerPlayerAirframe('inibuilds-a300-600');
+    assert.equal(a300?.simbriefIcao, 'A306');
+    assert.equal(
+      a300?.simbriefAirframeMatch,
+      'iniBuilds \\(MSFS\\) - A300-600R GE',
+    );
+    assert.equal(a300?.injectCapable, false);
+    assert.equal(a300?.loadLayout, 'pax_and_cargo');
+    assert.equal(a300?.maxPaxSeats, 256);
+    assert.equal(a300?.rolesPackRelPath, 'profiles/ofp/inibuilds-a300-600.json');
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(a300!)].sort(),
+      [
+        'profiles/ofp/inibuilds-a300-600-freighter.json',
+        'profiles/ofp/inibuilds-a300-600.json',
+      ].sort(),
+    );
+  });
+
+  it('stages iniBuilds L1011-500 family with Regular / Pod Ferry SimBrief rows', () => {
+    const l1011 = findCareerPlayerAirframe('inibuilds-l1011-500');
+    assert.equal(l1011?.simbriefIcao, 'L101');
+    assert.equal(
+      l1011?.simbriefAirframeMatch,
+      'iniBuilds \\(MSFS\\) - L1011-500 Regular',
+    );
+    assert.equal(l1011?.injectCapable, false);
+    assert.equal(l1011?.loadLayout, 'pax_and_cargo');
+    assert.equal(l1011?.maxPaxSeats, 243);
+    assert.equal(l1011?.rolesPackRelPath, 'profiles/ofp/inibuilds-l1011-500.json');
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(l1011!)].sort(),
+      [
+        'profiles/ofp/inibuilds-l1011-500-pod.json',
+        'profiles/ofp/inibuilds-l1011-500.json',
+      ].sort(),
+    );
+  });
+
+  it('stages Contrail Falcon 50 as light_jet with FUELSYSTEM inject + Contrail SimBrief row', () => {
+    const fa50 = findCareerPlayerAirframe('contrail-contrail-falcon-50');
+    assert.equal(fa50?.aircraftClassId, 'light_jet');
+    assert.equal(fa50?.simbriefIcao, 'FA50');
+    assert.equal(
+      fa50?.simbriefAirframeMatch,
+      'Contrail \\(MSFS\\) - Falcon 50B',
+    );
+    assert.equal(fa50?.injectCapable, true);
+    assert.equal(fa50?.loadLayout, 'pax_and_cargo');
+    assert.equal(fa50?.maxPaxSeats, 9);
+    assert.equal(fa50?.fuelCapacityKg, 7037);
+    assert.equal(
+      fa50?.rolesPackRelPath,
+      'profiles/ofp/contrail-contrail-falcon-50.json',
+    );
+  });
+
   it('stages Skyward C680 on the Skyward SimBrief airframe row', () => {
     const c680 = findCareerPlayerAirframe('skyward-cessna-c680');
     assert.equal(c680?.simbriefIcao, 'C680');
@@ -213,11 +271,12 @@ describe('career player airframes', () => {
     );
   });
 
-  it('certifies passenger configurations for all nine light-jet Market SKUs', () => {
+  it('certifies passenger configurations for all light-jet Market SKUs', () => {
     const expected = new Map<string, [number, string]>([
       ['workingtitle-cessna-citation-cj4', [10, 'dispatch_ready']],
       ['workingtitle-cessna-citation-longitude-passengers', [10, 'dispatch_ready']],
       ['skyward-cessna-c680', [10, 'inject_verified']],
+      ['contrail-contrail-falcon-50', [9, 'dispatch_ready']],
       ['flightfx-citation-x', [12, 'dispatch_ready']],
       ['flightfx-mg-hjet-ha420', [6, 'dispatch_ready']],
       ['flysimware-learjet-35a-cargo', [8, 'dispatch_ready']],

@@ -229,6 +229,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'microsoft-pc-24-vip': '/airframes/pc-24.png',
   'flightfx-mg-hjet-ha420': '/airframes/hondajet-ha420.png',
   'fsreborn-phenom-300e': '/airframes/phenom-300e.png',
+  'contrail-contrail-falcon-50': '/airframes/falcon-50.png',
 
   // --- light_turboprop ---
   'asobo-beechcraft-king-air-350i': '/airframes/king-air-350i.png',
@@ -315,6 +316,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'inibuilds-a330-200': '/airframes/a330-200.png',
   'inibuilds-a330-300': '/airframes/a330-300.png',
   'inibuilds-a340-300': '/airframes/a340-300.png',
+  'inibuilds-a300-600': '/airframes/a300-600.png',
+  'inibuilds-l1011-500': '/airframes/l1011-500.png',
   'toliss-toliss-a346-pro-preset-pax': '/airframes/a346.png',
 };
 

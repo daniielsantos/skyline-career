@@ -33,6 +33,8 @@ node packages/agent/dist/cli.js smoke --profile profiles/drafts\<arquivo>.json
 - Stations **>16** (EMB-110 pax / Saab): Watch overflow batch; wizard avisa no discovery. Discovery/fingerprint/probe CLI cap = **48** (`PAYLOAD_STATION_DISCOVERY_MAX`; Saab COUNT≈37). Saab **Passenger**: S1–2 crew, S3–36 as `baggageStations` maxLoad 500 (não soft-max 300), S37 excluded; **`cg.policy: none`** (braços ruins + ballast estourava Due). Vidro **Cargo** continua freighter 6-station.
 - Soft re-probe: holds que grudam e esvaziam (C408) saem do draft antes do promote.
 - Force-include AUX com write falho: **não** (Host risk); remap para MAIN sticky.
+- **Contrail Falcon 50 fuel (2026-09-23):** sintoma = classic MAIN ok, CENTER/AUX “partial write”. Causa = EFB escreve `FUELSYSTEM 1–6` e desliga `L:CTL_FA50_FUEL_PANEL_*_SW`; com switches on o sistema rebalanceia. Fix = profile@1.1.0 FUELSYSTEM + switches off no writePlan (não Accu-Sim LVar qty). Classe `light_jet`; SimBrief Falcon 50B.
+- **Contrail Falcon 50 smoke FUEL_VERIFY_FAILED (2026-09-23):** payload/CG ok; engines **on**; GW bateu ~alvo (~1907 gal) mas FS:1/2 readback ~20 gal abaixo (tol 3%). `FUEL TOTAL QUANTITY` sub-reporta. Fix @1.1.1 = `requireEnginesOff` + dual write + settle 2s + tol 8%. **Re-smoke engines off → success.**
 - `maxCargoKg` com stations ainda em placeholder 500: wizard prefere SimBrief. Catálogo antigo: `npm run airframes:backfill-simbrief-cargo` / `-- --apply`.
 - **Fingerprint structural igual ≠ mesmo vidro:** A340-300 pax/VIP/Freighter × EIS1/EIS2 partilham `structuralHash`. Resolve só com `liveTitles` / `titlesMatchForCatalog` — freighter não pode aceitar título sem `Freighter`/`Cargo` (bug: `A340-300 EIS1` → perfil Freighter EIS1).
 - **C152 Manifest max 0 lb (2026-09-17):** starter C152 em hop curto mostrou `max 0.0 klb` / `Choose between 1 and 0 lb`. Não é endpoint travado — `/api/cargo-limit` (`light_ga`) consulta SimBrief; C152 usa proxy **C172**. OEW SimBrief C172 (~740–767 kg) + `resolveConservativeOpsWeights` `max(OEW)+min(MTOW)` vs MTOW catálogo **760** → useful ~0/− → `operationalMaxCargoKg: 0`. Audit live SimBrief proxies: **colapsam** C152, Arrow III, DR400; Norden colapsa mesmo com catálogo (useful 210 kg < 2-crew~154 + margin 50); Warrior/Dakota finos mas >0; Corvalis SR2T / DA50→DA42 / Commander→C182 OK. Fix: se mixed headroom ≤ crew+100 kg, cargo-limit usa OEW/MTOW/fuel do catálogo (SimBrief ainda manda em `maxCargoKg` / BN2 soft). Pós-fix VPS: hop curto ~**28 kg / 62 lb** ops (reserva 2×170 + margin) — esperado, não bug de troca.
@@ -52,10 +54,13 @@ Não criar um `typeId` de catálogo por Highline/Passenger/Stol. Um SKU + um (ou
 | `microsoft-c400-corvalis` | `light_ga` | `profiles/ofp/microsoft-c400-corvalis.json` | **SR2T** (COL4 não existe no SimBrief) |
 | `inibuilds-a330-200` | `wide_freighter` | `profiles/ofp/inibuilds-a330-200.json` (GE/RR/VIP) | **A332** `iniBuilds (MSFS) - A330-200 GE/RR` (not Default) |
 | `inibuilds-a330-300` | `wide_freighter` | `profiles/ofp/inibuilds-a330-300.json` (GE/RR/VIP/P2F) | **A333** `iniBuilds (MSFS) - A330-300 GE/RR` (+ P2F rows) |
+| `inibuilds-a300-600` | `wide_freighter` | pax + freighter packs (`familyRolesPackRelPaths`) | **A306** `iniBuilds (MSFS) - A300-600R GE/PW` (not Default; freighter glass uses same engine row — no Preighter) |
+| `inibuilds-l1011-500` | `wide_freighter` | Regular + Engine Pod packs (`familyRolesPackRelPaths`) | **L101** `iniBuilds (MSFS) - L1011-500 Regular` / `Pod Ferry` (not Default; Engine Pod glass → Pod Ferry) |
 | `inibuilds-a340-300` | `wide_freighter` | pax + freighter + VIP packs (`familyRolesPackRelPaths`) | **A343** Passenger / Preighter / VIP (not Default; Freighter glass → Preighter) |
 | `asobo-737-max-8-passengers` | `narrow_freighter` | `profiles/ofp/asobo-737-max-8-passengers.json` | **B38M** Default |
 | `synaptic-a220-300` | `narrow_freighter` | `profiles/ofp/synaptic-a220-300.json` | **BCS3** `Synaptic / iniBuilds (MSFS) - A220-300` (not Default) |
 | `skyward-cessna-c680` | `light_jet` | `profiles/ofp/skyward-cessna-c680.json` | **C680** `Skyward Simulations (MSFS) - C680 Sovereign+` (not Default); passenger **`inject_verified`** + `efbPaxWeightLb: 210` / S14–S16 ghosts omitted |
+| `contrail-contrail-falcon-50` | `light_jet` | `profiles/ofp/contrail-contrail-falcon-50.json` | **FA50** `Contrail (MSFS) - Falcon 50B` (not Default); fuel = FUELSYSTEM 1–6 + panel SW off; engines off (@1.1.1) |
 | `justflight-146-100` | `narrow_freighter` | `justflight-146-100` + Statesman family | **B461** JF MSFS (Statesman → CC2) |
 | `justflight-146-200` | `narrow_freighter` | `justflight-146-200` + QC/QT freighter family | **B462** JF MSFS (QT → QC/QT) |
 | `justflight-146-300` | `narrow_freighter` | `justflight-146-300` + QT freighter family | **B463** JF MSFS (QT → QT) |
@@ -79,6 +84,10 @@ Homologação **não** é só cargo writetest. Se o SKU tem assentos (ou `loadLa
 Pure freighter SKUs (BCF, C-130, …): cargo-only — **não** inventar passenger stamp.
 
 Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço em [`13-collaborative-homologation.md`](./13-collaborative-homologation.md).
+
+- **A300-600 iniBuilds promote (2026-09-23):** sintoma = 4 glasses homologated (Passenger/Freighter × GE/PW) still fora do Market / OFP Default. Fix = SKU `inibuilds-a300-600` + family packs pax/freighter; SimBrief **A306** `iniBuilds (MSFS) - A300-600R GE/PW` via title inference (pack match Default so PW não fica preso em GE). Sem Preighter no SimBrief — freighter usa a row do motor. Arte de card: prompt em `docs/market-airframe-card-prompts.md` (PNG pendente).
+
+- **L1011-500 iniBuilds promote (2026-09-23):** sintoma = 4 glasses (Standard/Lounge × Regular/Engine Pod) fora do Market. Fix = SKU `inibuilds-l1011-500` + packs Regular/Pod; SimBrief **L101** Regular vs Pod Ferry via `Engine Pod` no título; normalize `L-1011`→`L1011`; variant tokens `lounge`/`pod`. Arte: prompt pendente PNG.
 
 ## Hubs (aeroportos career)
 

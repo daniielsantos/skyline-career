@@ -723,6 +723,38 @@
     "fuelBurnKgPerNm": 1.4
   },
   {
+    "typeId": "contrail-contrail-falcon-50",
+    "aircraftClassId": "light_jet",
+    "label": "Falcon 50",
+    "rolesPackRelPath": "profiles/ofp/contrail-contrail-falcon-50.json",
+    "defaultConfigurationId": "passenger",
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 9,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 495,
+        "rolesPackRelPath": "profiles/ofp/contrail-contrail-falcon-50.json"
+      }
+    ],
+    "simbriefIcao": "FA50",
+    "simbriefAirframeMatch": "Contrail \\(MSFS\\) - Falcon 50B",
+    "injectCapable": true,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 9,
+    "oewKg": 10315,
+    "mtowKg": 18497,
+    "maxCargoKg": 1682,
+    "fuelCapacityKg": 7037,
+    "maxRangeNm": 3000,
+    "cruiseSpeedKt": 430,
+    "fuelBurnKgPerNm": 1.6
+  },
+  {
     "typeId": "flightfx-citation-x",
     "aircraftClassId": "light_jet",
     "label": "Citation X",
@@ -1670,6 +1702,70 @@
     "maxPaxSeats": 68
   },
   {
+    "typeId": "asobo-737-max-8-passengers",
+    "aircraftClassId": "narrow_freighter",
+    "label": "737 Max 8",
+    "rolesPackRelPath": "profiles/ofp/asobo-737-max-8-passengers.json",
+    "simbriefIcao": "B38M",
+    "simbriefAirframeMatch": "Default",
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 189,
+    "oewKg": 45065,
+    "mtowKg": 82191,
+    "maxCargoKg": 18000,
+    "fuelCapacityKg": 20725,
+    "maxRangeNm": 3550,
+    "cruiseSpeedKt": 453,
+    "fuelBurnKgPerNm": 5.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 189,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 10395,
+        "rolesPackRelPath": "profiles/ofp/asobo-737-max-8-passengers.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "synaptic-a220-300",
+    "aircraftClassId": "narrow_freighter",
+    "label": "A220-300",
+    "rolesPackRelPath": "profiles/ofp/synaptic-a220-300.json",
+    "simbriefIcao": "BCS3",
+    "simbriefAirframeMatch": "Synaptic / iniBuilds \\(MSFS\\) - A220-300",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 140,
+    "oewKg": 37081,
+    "mtowKg": 70900,
+    "mzfwKg": 55792,
+    "maxCargoKg": 18700,
+    "fuelCapacityKg": 17490,
+    "maxRangeNm": 3400,
+    "cruiseSpeedKt": 447,
+    "fuelBurnKgPerNm": 4.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 140,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 7700,
+        "rolesPackRelPath": "profiles/ofp/synaptic-a220-300.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
     "typeId": "microsoft-a320neo-v2",
     "aircraftClassId": "narrow_freighter",
     "label": "A320neo V2",
@@ -1729,39 +1825,6 @@
         "baggageAllowanceLbPerPassenger": 55,
         "baggageCapacityLb": 12100,
         "rolesPackRelPath": "profiles/ofp/microsoft-a321lr.json"
-      }
-    ],
-    "defaultConfigurationId": "passenger"
-  },
-  {
-    "typeId": "synaptic-a220-300",
-    "aircraftClassId": "narrow_freighter",
-    "label": "A220-300",
-    "rolesPackRelPath": "profiles/ofp/synaptic-a220-300.json",
-    "simbriefIcao": "BCS3",
-    "simbriefAirframeMatch": "Synaptic / iniBuilds \\(MSFS\\) - A220-300",
-    "injectCapable": false,
-    "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 140,
-    "oewKg": 37081,
-    "mtowKg": 70900,
-    "mzfwKg": 55792,
-    "maxCargoKg": 18700,
-    "fuelCapacityKg": 17490,
-    "maxRangeNm": 3400,
-    "cruiseSpeedKt": 447,
-    "fuelBurnKgPerNm": 4.2,
-    "configurations": [
-      {
-        "id": "passenger",
-        "label": "Passenger",
-        "role": "passenger",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 140,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 7700,
-        "rolesPackRelPath": "profiles/ofp/synaptic-a220-300.json"
       }
     ],
     "defaultConfigurationId": "passenger"
@@ -1863,6 +1926,142 @@
     "defaultConfigurationId": "passenger"
   },
   {
+    "typeId": "justflight-146-100",
+    "aircraftClassId": "narrow_freighter",
+    "label": "BAe 146-100",
+    "rolesPackRelPath": "profiles/ofp/justflight-146-100.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/justflight-146-100.json",
+      "profiles/ofp/justflight-146-100-statesman.json"
+    ],
+    "simbriefIcao": "B461",
+    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-100",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 80,
+    "oewKg": 24108,
+    "mtowKg": 38102,
+    "maxCargoKg": 6963,
+    "fuelCapacityKg": 10360,
+    "maxRangeNm": 1600,
+    "cruiseSpeedKt": 390,
+    "fuelBurnKgPerNm": 3.6,
+    "mzfwKg": 31071,
+    "efbPaxWeightLb": 170,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 80,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 4400,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-100.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "justflight-146-200",
+    "aircraftClassId": "narrow_freighter",
+    "label": "BAe 146-200",
+    "rolesPackRelPath": "profiles/ofp/justflight-146-200.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/justflight-146-200.json",
+      "profiles/ofp/justflight-146-200-freighter.json"
+    ],
+    "simbriefIcao": "B462",
+    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-200",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 112,
+    "oewKg": 24966,
+    "mtowKg": 42184,
+    "maxCargoKg": 9779,
+    "fuelCapacityKg": 10360,
+    "maxRangeNm": 1600,
+    "cruiseSpeedKt": 390,
+    "fuelBurnKgPerNm": 3.7,
+    "mzfwKg": 34745,
+    "efbPaxWeightLb": 170,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 112,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 6160,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-200.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-200-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "justflight-146-300",
+    "aircraftClassId": "narrow_freighter",
+    "label": "BAe 146-300",
+    "rolesPackRelPath": "profiles/ofp/justflight-146-300.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/justflight-146-300.json",
+      "profiles/ofp/justflight-146-300-freighter.json"
+    ],
+    "simbriefIcao": "B463",
+    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-300",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 128,
+    "oewKg": 26009,
+    "mtowKg": 45132,
+    "maxCargoKg": 10505,
+    "fuelCapacityKg": 10360,
+    "maxRangeNm": 1600,
+    "cruiseSpeedKt": 390,
+    "fuelBurnKgPerNm": 3.8,
+    "mzfwKg": 36514,
+    "efbPaxWeightLb": 170,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 128,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 7040,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-300.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/justflight-146-300-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
     "typeId": "pmdg-738-bbj2-family",
     "aircraftClassId": "narrow_freighter",
     "label": "Boeing 737-800 BBJ2",
@@ -1930,37 +2129,6 @@
         "baggageAllowanceLbPerPassenger": 55,
         "baggageCapacityLb": 8965,
         "rolesPackRelPath": "profiles/ofp/pmdg-738-pax.json"
-      }
-    ],
-    "defaultConfigurationId": "passenger"
-  },
-  {
-    "typeId": "asobo-737-max-8-passengers",
-    "aircraftClassId": "narrow_freighter",
-    "label": "737 Max 8",
-    "rolesPackRelPath": "profiles/ofp/asobo-737-max-8-passengers.json",
-    "simbriefIcao": "B38M",
-    "simbriefAirframeMatch": "Default",
-    "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 189,
-    "oewKg": 45065,
-    "mtowKg": 82191,
-    "maxCargoKg": 18000,
-    "fuelCapacityKg": 20725,
-    "maxRangeNm": 3550,
-    "cruiseSpeedKt": 453,
-    "fuelBurnKgPerNm": 5.2,
-    "configurations": [
-      {
-        "id": "passenger",
-        "label": "Passenger",
-        "role": "passenger",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 189,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 10395,
-        "rolesPackRelPath": "profiles/ofp/asobo-737-max-8-passengers.json"
       }
     ],
     "defaultConfigurationId": "passenger"
@@ -2104,142 +2272,6 @@
     "defaultConfigurationId": "passenger"
   },
   {
-    "typeId": "justflight-146-100",
-    "aircraftClassId": "narrow_freighter",
-    "label": "BAe 146-100",
-    "rolesPackRelPath": "profiles/ofp/justflight-146-100.json",
-    "familyRolesPackRelPaths": [
-      "profiles/ofp/justflight-146-100.json",
-      "profiles/ofp/justflight-146-100-statesman.json"
-    ],
-    "simbriefIcao": "B461",
-    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-100",
-    "injectCapable": false,
-    "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 80,
-    "oewKg": 24108,
-    "mtowKg": 38102,
-    "maxCargoKg": 6963,
-    "fuelCapacityKg": 10360,
-    "maxRangeNm": 1600,
-    "cruiseSpeedKt": 390,
-    "fuelBurnKgPerNm": 3.6,
-    "mzfwKg": 31071,
-    "efbPaxWeightLb": 170,
-    "configurations": [
-      {
-        "id": "passenger",
-        "label": "Passenger",
-        "role": "passenger",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 80,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 4400,
-        "rolesPackRelPath": "profiles/ofp/justflight-146-100.json"
-      }
-    ],
-    "defaultConfigurationId": "passenger"
-  },
-  {
-    "typeId": "justflight-146-200",
-    "aircraftClassId": "narrow_freighter",
-    "label": "BAe 146-200",
-    "rolesPackRelPath": "profiles/ofp/justflight-146-200.json",
-    "familyRolesPackRelPaths": [
-      "profiles/ofp/justflight-146-200.json",
-      "profiles/ofp/justflight-146-200-freighter.json"
-    ],
-    "simbriefIcao": "B462",
-    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-200",
-    "injectCapable": false,
-    "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 112,
-    "oewKg": 24966,
-    "mtowKg": 42184,
-    "maxCargoKg": 9779,
-    "fuelCapacityKg": 10360,
-    "maxRangeNm": 1600,
-    "cruiseSpeedKt": 390,
-    "fuelBurnKgPerNm": 3.7,
-    "mzfwKg": 34745,
-    "efbPaxWeightLb": 170,
-    "configurations": [
-      {
-        "id": "passenger",
-        "label": "Passenger",
-        "role": "passenger",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 112,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 6160,
-        "rolesPackRelPath": "profiles/ofp/justflight-146-200.json"
-      },
-      {
-        "id": "cargo",
-        "label": "Cargo",
-        "role": "cargo",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 0,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 0,
-        "rolesPackRelPath": "profiles/ofp/justflight-146-200-freighter.json"
-      }
-    ],
-    "defaultConfigurationId": "passenger"
-  },
-  {
-    "typeId": "justflight-146-300",
-    "aircraftClassId": "narrow_freighter",
-    "label": "BAe 146-300",
-    "rolesPackRelPath": "profiles/ofp/justflight-146-300.json",
-    "familyRolesPackRelPaths": [
-      "profiles/ofp/justflight-146-300.json",
-      "profiles/ofp/justflight-146-300-freighter.json"
-    ],
-    "simbriefIcao": "B463",
-    "simbriefAirframeMatch": "Just Flight \\(MSFS\\) - BAe 146-300",
-    "injectCapable": false,
-    "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 128,
-    "oewKg": 26009,
-    "mtowKg": 45132,
-    "maxCargoKg": 10505,
-    "fuelCapacityKg": 10360,
-    "maxRangeNm": 1600,
-    "cruiseSpeedKt": 390,
-    "fuelBurnKgPerNm": 3.8,
-    "mzfwKg": 36514,
-    "efbPaxWeightLb": 170,
-    "configurations": [
-      {
-        "id": "passenger",
-        "label": "Passenger",
-        "role": "passenger",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 128,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 7040,
-        "rolesPackRelPath": "profiles/ofp/justflight-146-300.json"
-      },
-      {
-        "id": "cargo",
-        "label": "Cargo",
-        "role": "cargo",
-        "certificationState": "dispatch_ready",
-        "passengerCapacity": 0,
-        "requiredCrew": 2,
-        "baggageAllowanceLbPerPassenger": 55,
-        "baggageCapacityLb": 0,
-        "rolesPackRelPath": "profiles/ofp/justflight-146-300-freighter.json"
-      }
-    ],
-    "defaultConfigurationId": "passenger"
-  },
-  {
     "typeId": "leonardo-fly-the-maddog-x-md-82-20th",
     "aircraftClassId": "narrow_freighter",
     "label": "MD-82 20th Anniversary",
@@ -2337,21 +2369,27 @@
     "defaultConfigurationId": "passenger"
   },
   {
-    "typeId": "toliss-toliss-a346-pro-preset-pax",
+    "typeId": "inibuilds-a300-600",
     "aircraftClassId": "wide_freighter",
-    "label": "A340-600 PRO Preset Pax",
-    "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
-    "simbriefIcao": "A346",
-    "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
+    "label": "A300-600",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-a300-600.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/inibuilds-a300-600.json",
+      "profiles/ofp/inibuilds-a300-600-freighter.json"
+    ],
+    "simbriefIcao": "A306",
+    "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - A300-600R GE",
+    "injectCapable": false,
     "loadLayout": "pax_and_cargo",
-    "maxPaxSeats": 440,
-    "oewKg": 185500,
-    "mtowKg": 368000,
-    "maxCargoKg": 56811,
-    "fuelCapacityKg": 152024,
-    "maxRangeNm": 6000,
-    "cruiseSpeedKt": 490,
-    "fuelBurnKgPerNm": 12
+    "maxPaxSeats": 256,
+    "oewKg": 88805,
+    "mtowKg": 170500,
+    "mzfwKg": 130000,
+    "maxCargoKg": 41195,
+    "fuelCapacityKg": 54530,
+    "maxRangeNm": 4000,
+    "cruiseSpeedKt": 460,
+    "fuelBurnKgPerNm": 9.5
   },
   {
     "typeId": "inibuilds-a330-200",
@@ -2412,6 +2450,23 @@
     "maxRangeNm": 7000,
     "cruiseSpeedKt": 470,
     "fuelBurnKgPerNm": 10
+  },
+  {
+    "typeId": "toliss-toliss-a346-pro-preset-pax",
+    "aircraftClassId": "wide_freighter",
+    "label": "A340-600 PRO Preset Pax",
+    "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
+    "simbriefIcao": "A346",
+    "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 440,
+    "oewKg": 185500,
+    "mtowKg": 368000,
+    "maxCargoKg": 56811,
+    "fuelCapacityKg": 152024,
+    "maxRangeNm": 6000,
+    "cruiseSpeedKt": 490,
+    "fuelBurnKgPerNm": 12
   },
   {
     "typeId": "inibuilds-a350-1000-default-cabin",
@@ -2530,6 +2585,29 @@
     "maxRangeNm": 8000,
     "cruiseSpeedKt": 490,
     "fuelBurnKgPerNm": 12
+  },
+  {
+    "typeId": "inibuilds-l1011-500",
+    "aircraftClassId": "wide_freighter",
+    "label": "L1011-500",
+    "rolesPackRelPath": "profiles/ofp/inibuilds-l1011-500.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/inibuilds-l1011-500.json",
+      "profiles/ofp/inibuilds-l1011-500-pod.json"
+    ],
+    "simbriefIcao": "L101",
+    "simbriefAirframeMatch": "iniBuilds \\(MSFS\\) - L1011-500 Regular",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 243,
+    "oewKg": 111312,
+    "mtowKg": 231332,
+    "mzfwKg": 147418,
+    "maxCargoKg": 26399,
+    "fuelCapacityKg": 96904,
+    "maxRangeNm": 5200,
+    "cruiseSpeedKt": 520,
+    "fuelBurnKgPerNm": 11
   },
   {
     "typeId": "tfdi-md11f-family",

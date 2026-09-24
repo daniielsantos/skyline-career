@@ -505,6 +505,22 @@ CLASS SCENE KIT — light_jet: Cool slate dusk sky (#6a8a9e / #2f4a5c), polished
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## Contrail Falcon 50
+- **typeId:** `contrail-contrail-falcon-50`
+- **file:** `falcon-50.png`
+
+```
+Stylized cartoon / clean vector illustration of a Dassault Falcon 50 (FA50), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: classic three-engine Falcon business jet — TWO engines on the rear fuselage (one each side) PLUS a THIRD center engine in the tail with S-duct intake at the base of the fin, low wing, T-tail, sleek Falcon pointed nose and greenhouse cockpit, retractable tricycle gear down, midsize bizjet proportions. Three engines are essential — must read as Falcon 50 at a glance, not a Falcon 900/7X lookalike with wrong count, not a Citation (two engines only), not a Learjet.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_jet: Cool slate dusk sky (#6a8a9e / #2f4a5c), polished concrete FBO apron, glass FBO silhouette, subtle city haze. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ---
 
 # light_turboprop
@@ -1313,6 +1329,38 @@ Composition: aircraft large and centered for a wide market card banner. No text,
 Stylized cartoon / clean vector illustration of an Airbus A340-300 widebody quadjet (A343), three-quarter side view parked facing left.
 
 Keep the aircraft highly recognizable: FOUR underwing engines (two per side), Airbus A340 nose and cockpit, dense passenger window row, tall tail with bullet fairing, gear down, shorter -300 fuselage vs A340-600. Four engines essential — distinguishes from A330/A350 twinjet. Not freighter (windows present).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## iniBuilds A300-600
+- **typeId:** `inibuilds-a300-600`
+- **file:** `a300-600.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A300-600R widebody twinjet (A306), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: twin underwing engines, classic A300 nose and cockpit (more angular than A330), dense passenger window row, tall conventional tail without A330 bullet fairing, gear down. Twin engines only — not A340 (four engines), not A330 (no bullet fairing), not freighter (windows present).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — wide_freighter: Copper / amber sunset-twilight sky echoing #b07a4a / #6a4224, large widebody cargo dock, oversized ramp. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
+## iniBuilds L1011-500
+- **typeId:** `inibuilds-l1011-500`
+- **file:** `l1011-500.png`
+
+```
+Stylized cartoon / clean vector illustration of a Lockheed L-1011-500 TriStar widebody trijet (L101), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: three engines (two underwing + one center S-duct into the tail), classic TriStar nose and cockpit, dense passenger window row, tall conventional fin with the center-engine intake at the base of the fin (not a T-tail), gear down. Three engines + S-duct intake essential — distinguishes from A300/A330 twinjet and from DC-10/MD-11 (DC-10 has a straight tail-engine, not TriStar S-duct). Not freighter (windows present).
 
 Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
 

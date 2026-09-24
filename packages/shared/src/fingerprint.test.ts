@@ -167,6 +167,52 @@ describe('titlesMatchForCatalog', () => {
     );
   });
 
+  it('keeps A300 Passenger/Freighter and GE/PW distinct', () => {
+    assert.equal(
+      titlesMatchForCatalog('A300 Passenger (GE)', 'A300 Freighter (GE)'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('A300 Passenger (GE)', 'A300 Passenger (PW)'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('A300 Freighter (PW)', 'A300 Freighter (PW)'),
+      true,
+    );
+  });
+
+  it('keeps L1011 lounge / standard / engine-pod glasses distinct', () => {
+    assert.equal(
+      titlesMatchForCatalog(
+        'L1011-500 Standard Cabin',
+        'L1011-500 Cabin w/ Lounge',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'L1011-500 Standard Cabin',
+        'L1011-500 Standard Cabin & Engine Pod',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'L1011-500 Cabin w/ Lounge',
+        'L-1011-500 Cabin w/ Lounge & Engine Pod',
+      ),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog(
+        'L-1011-500 Cabin w/ Lounge & Engine Pod',
+        'L1011-500 Cabin w/ Lounge & Engine Pod',
+      ),
+      true,
+    );
+  });
+
   it('does not alias BN2 Passenger Tip Tanks onto SpecialOps or Cargo', () => {
     assert.equal(
       titlesMatchForCatalog(

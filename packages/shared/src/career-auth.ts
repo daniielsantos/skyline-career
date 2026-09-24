@@ -15,6 +15,10 @@ import { ensureCompany, type CareerCompanyRow } from './career-companies.js';
 import { LOCAL_WORLD_ID } from './career-store-v4.js';
 import { ensureV10Ddl } from './career-store-v10.js';
 import { claimAccessKeySqlite } from './career-access-keys.js';
+import {
+  normalizeAccountDisplayName,
+  normalizeCompanyDisplayName,
+} from './career-display-name.js';
 
 export type CareerAccountRole = 'owner' | 'dispatcher' | 'pilot';
 
@@ -73,13 +77,6 @@ function normalizeLoginName(raw: string): string {
   return trimmed;
 }
 
-function normalizeDisplayName(raw: string): string {
-  const trimmed = raw.trim().replace(/\s+/g, ' ');
-  if (trimmed.length < 2 || trimmed.length > 48) {
-    throw new Error('display name must be 2–48 characters');
-  }
-  return trimmed;
-}
 
 function normalizePassword(raw: string): string {
   if (raw.length < 6 || raw.length > 128) {
@@ -235,7 +232,7 @@ export function registerAccount(
   const accessKey = opts.accessKeyCode?.trim();
   const run = (): RegisterAccountResult => {
     const loginName = normalizeLoginName(opts.loginName);
-    const displayName = normalizeDisplayName(opts.displayName);
+    const displayName = normalizeAccountDisplayName(opts.displayName);
     const password = normalizePassword(opts.password);
     const now = opts.nowMs ?? Date.now();
     const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
@@ -261,10 +258,13 @@ export function registerAccount(
     if (wantCreate) {
       const companyId =
         opts.companyId?.trim() || suggestCompanyIdFromLogin(loginName);
+      const companyLabel = opts.companyDisplayName?.trim()
+        ? normalizeCompanyDisplayName(opts.companyDisplayName)
+        : displayName;
       company = ensureCompany(db, {
         id: companyId,
         worldId,
-        displayName: opts.companyDisplayName?.trim() || displayName,
+        displayName: companyLabel,
         homeHubIcao: opts.homeHubIcao,
         homeCountryId: opts.homeCountryId,
       });

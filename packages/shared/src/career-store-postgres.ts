@@ -33,6 +33,11 @@ import {
   type RegisterAccountResult,
 } from './career-auth.js';
 import {
+  ensureDisplayNameTitleCasePg,
+  normalizeAccountDisplayName,
+  normalizeCompanyDisplayName,
+} from './career-display-name.js';
+import {
   claimAccessKeyPg,
   mintAccessKeysPg,
   revokeAccessKeyPg,
@@ -207,14 +212,6 @@ function normalizeLoginName(raw: string): string {
   const trimmed = raw.trim().toLowerCase();
   if (!/^[a-z0-9_]{3,32}$/.test(trimmed)) {
     throw new Error('login name must be 3–32 chars [a-z0-9_]');
-  }
-  return trimmed;
-}
-
-function normalizeDisplayName(raw: string): string {
-  const trimmed = raw.trim().replace(/\s+/g, ' ');
-  if (trimmed.length < 2 || trimmed.length > 48) {
-    throw new Error('display name must be 2–48 characters');
   }
   return trimmed;
 }
@@ -566,6 +563,7 @@ export class PostgresCareerStore implements CareerStore {
       [LOCAL_COMPANY_ID, LOCAL_WORLD_ID, Date.now()],
     );
     await backfillCompanyHomeCountryIdsInPg(this.pool);
+    await ensureDisplayNameTitleCasePg(this.pool);
     assertCareerWorldSeedAllowed(
       await postgresWorldHasEconomy(this.pool),
     );
@@ -626,6 +624,10 @@ export class PostgresCareerStore implements CareerStore {
     const id = normalizeCompanyId(opts.id);
     const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
     const now = Date.now();
+    const displayNameIn =
+      typeof opts.displayName === 'string' && opts.displayName.trim()
+        ? normalizeCompanyDisplayName(opts.displayName)
+        : (opts.displayName ?? '');
     const existing = await this.pool.query(
       `SELECT id, display_name, home_hub_icao, home_country_id, world_id, created_at_ms
        FROM companies WHERE id = $1`,
@@ -641,7 +643,7 @@ export class PostgresCareerStore implements CareerStore {
              world_id = COALESCE(NULLIF($4, ''), world_id)
            WHERE id = $5`,
           [
-            opts.displayName ?? '',
+            displayNameIn,
             opts.homeHubIcao ?? '',
             opts.homeCountryId ?? '',
             opts.worldId ?? '',
@@ -661,7 +663,7 @@ export class PostgresCareerStore implements CareerStore {
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         id,
-        opts.displayName ?? '',
+        displayNameIn,
         opts.homeHubIcao ?? '',
         opts.homeCountryId ?? '',
         now,
@@ -670,7 +672,7 @@ export class PostgresCareerStore implements CareerStore {
     );
     return {
       id,
-      displayName: opts.displayName ?? '',
+      displayName: displayNameIn,
       homeHubIcao: opts.homeHubIcao ?? '',
       homeCountryId: opts.homeCountryId ?? '',
       worldId,
@@ -681,7 +683,7 @@ export class PostgresCareerStore implements CareerStore {
   async authRegister(opts: RegisterAccountOpts): Promise<RegisterAccountResult> {
     await this.ready;
     const loginName = normalizeLoginName(opts.loginName);
-    const displayName = normalizeDisplayName(opts.displayName);
+    const displayName = normalizeAccountDisplayName(opts.displayName);
     const password = normalizePassword(opts.password);
     const now = opts.nowMs ?? Date.now();
     const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
@@ -742,7 +744,9 @@ export class PostgresCareerStore implements CareerStore {
       company = await this.ensureCompany({
         id: companyId,
         worldId,
-        displayName: opts.companyDisplayName?.trim() || displayName,
+        displayName: opts.companyDisplayName?.trim()
+          ? normalizeCompanyDisplayName(opts.companyDisplayName)
+          : displayName,
         homeHubIcao: opts.homeHubIcao,
         homeCountryId: opts.homeCountryId,
       });
@@ -1554,9 +1558,7 @@ export class PostgresCareerStore implements CareerStore {
       companyId,
     ]);
     if (!exists.rows[0]) throw new Error('Unknown company');
-    const displayName = opts.displayName.trim();
-    if (!displayName) throw new Error('displayName required');
-    if (displayName.length > 64) throw new Error('displayName too long');
+    const displayName = normalizeCompanyDisplayName(opts.displayName);
     const homeHubIcao = opts.homeHubIcao.trim().toUpperCase();
     if (!/^[A-Z0-9]{3,4}$/.test(homeHubIcao)) {
       throw new Error('homeHubIcao must be a 3–4 letter ICAO');

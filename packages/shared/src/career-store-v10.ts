@@ -1,6 +1,7 @@
 /** Career store schema v10 — local Auth (accounts / sessions / company members). */
 
 import type { DatabaseSync } from 'node:sqlite';
+import { ensureDisplayNameTitleCaseSqlite } from './career-display-name.js';
 
 export const CAREER_STORE_SCHEMA_V10 = '10';
 export type SqliteDb = DatabaseSync;
@@ -41,6 +42,7 @@ export function ensureV10Ddl(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS company_members_account_idx
       ON company_members(account_id);
   `);
+  ensureDisplayNameTitleCaseSqlite(db);
 }
 
 export function migrateV9toV10IfNeeded(

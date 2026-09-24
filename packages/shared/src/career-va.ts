@@ -13,6 +13,7 @@ import {
   type CareerAccountRole,
   type CareerCompanyMember,
 } from './career-auth.js';
+import { normalizeCompanyDisplayName } from './career-display-name.js';
 import { ensureV12Ddl } from './career-store-v12.js';
 import { ensureV13Ddl } from './career-store-v13.js';
 import { ensureV14Ddl } from './career-store-v14.js';
@@ -1106,9 +1107,7 @@ export function publishCompanyAsVa(
     .prepare(`SELECT id FROM companies WHERE id = ?`)
     .get(companyId) as { id: string } | undefined;
   if (!exists) throw new Error('Unknown company');
-  const displayName = opts.displayName.trim();
-  if (!displayName) throw new Error('displayName required');
-  if (displayName.length > 64) throw new Error('displayName too long');
+  const displayName = normalizeCompanyDisplayName(opts.displayName);
   const homeHubIcao = opts.homeHubIcao.trim().toUpperCase();
   if (!/^[A-Z0-9]{3,4}$/.test(homeHubIcao)) {
     throw new Error('homeHubIcao must be a 3–4 letter ICAO');

@@ -6,6 +6,7 @@ export * from './types/career-economy.js';
 export * from './ofp-compliance.js';
 export * from './career-company-session.js';
 export * from './career-companies.js';
+export * from './career-display-name.js';
 export * from './career-auth.js';
 export * from './career-access-keys.js';
 export * from './career-store-v10.js';

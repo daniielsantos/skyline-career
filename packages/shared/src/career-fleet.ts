@@ -19,6 +19,7 @@ import {
   isFerryRouteWaypoint,
 } from './career-ferry-route.js';
 import { fboServiceCostMult } from './career-fbo-perks.js';
+import { formatDisplayLabel } from './career-display-name.js';
 import {
   ensureAircraftConditionPcts,
   estimateMxFuelDrainKgForSettle,
@@ -168,7 +169,7 @@ export function emptyMissionsStateV2(): CareerMissionsState {
 
 export function normalizePilotName(raw: unknown): string {
   if (typeof raw !== 'string') return '';
-  return raw.trim().replace(/\s+/g, ' ').slice(0, PILOT_NAME_MAX_LEN);
+  return formatDisplayLabel(raw).slice(0, PILOT_NAME_MAX_LEN);
 }
 
 export function assertValidPilotName(name: string): string {

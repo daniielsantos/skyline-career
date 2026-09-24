@@ -9,6 +9,7 @@ import {
   type SqliteDb,
 } from './career-store-v3.js';
 import { LOCAL_WORLD_ID } from './career-store-v4.js';
+import { normalizeCompanyDisplayName } from './career-display-name.js';
 
 export type CareerCompanyRow = {
   id: string;
@@ -41,6 +42,10 @@ export function ensureCompany(db: SqliteDb, opts: EnsureCompanyOpts): CareerComp
   const id = normalizeCompanyId(opts.id);
   const worldId = (opts.worldId ?? LOCAL_WORLD_ID).trim() || LOCAL_WORLD_ID;
   const now = Date.now();
+  const displayNameIn =
+    typeof opts.displayName === 'string' && opts.displayName.trim()
+      ? normalizeCompanyDisplayName(opts.displayName)
+      : (opts.displayName ?? '');
   const existing = db
     .prepare(
       `SELECT id, display_name, home_hub_icao, home_country_id, world_id, created_at_ms
@@ -67,7 +72,7 @@ export function ensureCompany(db: SqliteDb, opts: EnsureCompanyOpts): CareerComp
            world_id = COALESCE(NULLIF(?, ''), world_id)
          WHERE id = ?`,
       ).run(
-        opts.displayName ?? '',
+        displayNameIn,
         opts.homeHubIcao ?? '',
         opts.homeCountryId ?? '',
         opts.worldId ?? '',
@@ -102,7 +107,7 @@ export function ensureCompany(db: SqliteDb, opts: EnsureCompanyOpts): CareerComp
      VALUES (?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
-    opts.displayName ?? '',
+    displayNameIn,
     opts.homeHubIcao ?? '',
     opts.homeCountryId ?? '',
     now,
@@ -110,7 +115,7 @@ export function ensureCompany(db: SqliteDb, opts: EnsureCompanyOpts): CareerComp
   );
   return {
     id,
-    displayName: opts.displayName ?? '',
+    displayName: displayNameIn,
     homeHubIcao: opts.homeHubIcao ?? '',
     homeCountryId: opts.homeCountryId ?? '',
     worldId,

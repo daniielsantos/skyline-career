@@ -9,6 +9,7 @@ Atualizado 2026-09-23. **IH-2 multi-piloto shipped** — invite/roster (cap 8), 
 **Doc 2026-09-22 (b):** Pilot Move no chip enquanto Crew pinado → grava VA; chrome/roster leem home → volta ao ICAO antigo — **fix shipped** (travel sempre home).
 **Doc 2026-09-22 (d):** Crew Roster **Live** — Watch uploads; OD + trail. **(e–o)** … **(p)** fase Live = mesma do footer SimBridge (não OFP compliance). **(x–y)** detach + pipe hygiene sem uplink. **Soft uplink Watch→VPS shipped** (tick sample only). **(af)** mid-cruise app reopen footer/AC/burn flick — Watch cancel-stop + probe boot race. **(ag)** concurrent `/watch/start` coalesce (log-confirmed). **(ah)** Live map pan jank — defer sync / no paint-on-trail.
 **Doc 2026-09-22 (c):** sidebar tab highlight adiado por `await switchCompanyForVa` antes de `goToTab` (Crew→Airlines) — **fix** pinta tab no click; restore/refresh em background.
+**Doc 2026-09-24:** Display names Title Case on write — account/company/pilot; rankings usam `display_name` (não login). Multi-palavra ok. Migrate one-shot SQLite/PG.
 **Doc 2026-09-20 (b):** Prepare/Accept dual-tenant — Freights/Charter/Ports list **Yours+VA** tails; ferry modal só sob CTA; Base Dispatcher permanece home-only. Operator aircraft ≠ VA.
 **Doc 2026-09-21 (d):** ~~Ports pin VA for members~~ — **superseded (f)**; sidebar Ports = home.
 **Doc 2026-09-21 (e):** ~~Available personal WH under VA pin~~ — **superseded (f)**; no mix on one shelf.
@@ -452,6 +453,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Leave / Unlist (2026-09-19):** membro já tinha `POST /api/va/leave` (Roster); owner não podia “desfazer VA”. Fix: `vaUnpublish` / `POST /api/va/unpublish` → `va_listed=0`, recruiting off, remove non-owners, reject pending, expire invites. Config: **Unlist VA** (owner) / **Leave VA** (membro) com confirm. Leave devolve `homeCompanyId` + companies pra trocar de tenant.
 
 **VA name reset to pilot (2026-09-19):** Save/select-hub escrevia `missions.pilotName` em `companies.display_name` (COALESCE), apagando Lamusine→Nothin. Fix: persist company state / select-hub só atualizam `home_hub_icao`; listing name só via `vaPublish`.
+
+**Display names Title Case (2026-09-24):** sintoma = ranking/Airlines misturavam `Nothin` / `noname` / `NoNaMe` conforme o form. Causa = account/company/pilot gravavam o texto cru (só trim/collapse). Fix = `formatDisplayLabel` Title Case por palavra no write (`career-display-name.ts`) em register, ensureCompany, VA publish, `normalizePilotName`; multi-palavra ok; login continua `[a-z0-9_]`. One-shot migrate SQLite/PG (`display_name_titlecase_v1`). Rankings já usam `display_name`, não login.
 
 **Pilot name sticky across register (2026-09-20):** Conta nova `nullable` mostrava Identity/who `Nothin`. Causa: `signupName` React não limpava no switch de sessão e `setSignupName(prev => prev || fromAuth)` preservava o draft; select-hub gravava isso em `pilotName` enquanto `companies.display_name` ficava correto. Fix: clear `signupName` no session paint; auth sempre sobrescreve draft; resolve do hub-picker prefer company; assemble alinha pilotName↔display_name em company pre-fleet não listada; seed register seta pilotName.
 

@@ -12,6 +12,8 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 **Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
+- **Est. burn on Ledger (2026-09-24):** Hangar Cashflow + My VA Ledger mostram burn recorrente forward (`estimateCareerBurnUsdPerDay` → `burnEstimate` em `/api/cashflow`): salários, leases (/7), parking, storage WH/yard/base, Port FBO lease; runway ≈ wallet/burn. Estimate no footprint atual — não fatura.
+
 - **Freights paginator `of N` (2026-09-23):** `N` = lots **após filtros** da board (`queryMarketBoardPage` → `totalLots`), não inventário bruto do mundo. Swing ~17k↔20k (pós-densify) é equilíbrio vivo **formLots × expireLots** (+ troca Your/Operator/airframe/Near) — **não** retunar Dry/`CARGO_FLOW_BALANCE`. UI: `… of N matching`.
 
 - **Hangar assigned mark (2026-09-23):** card `assigned` deixa de mostrar a prosa “Finish or cancel…”. Badge ASSIGNED + ícone de avião no canto da arte (par do wrench de MX); hover explica o gate.

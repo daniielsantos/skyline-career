@@ -120,6 +120,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Ledger Day off-by-one (2026-09-24):** sintoma = settle no Day 83 (logbook/topbar) aparecia como Day **82** no Recent activity. Causa = `dayIndex = floor(tick/96)` 0-based na row; UI pintava o índice cru. Fix = `ledgerDisplayDay` = `dayIndex + 1` no `CashflowPanel` (Hangar + Crew Ledger). Storage/windows intactos.
 
+**Est. burn on Ledger (2026-09-24):** sintoma = Cashflow/Ledger só mostra passado; jogador não via custo fixo futuro. Fix = `estimateCareerBurnUsdPerDay` (crew/ground/leases/parking/WH+yard storage/Port FBO lease/VA line) em `GET /api/cashflow`; card **Est. burn · $/day** + runway + breakdown no Hangar Cashflow e My VA Ledger. Estimate no footprint atual (não fatura).
+
 **Money map → dialog (2026-09-24):** sintoma = tabela de referência (Job/Pays/Pilot earns) ocupava o topo do Ledger e empurrava wallet/activity. Causa = referência sempre inline. Fix = `?` ao lado de Company wallet abre `VaMoneyMapDialog`; page guide aponta pro atalho.
 
 **Board picker parked-only (2026-09-22):** sintoma = Duke da airline em maintenance aparecia no picker de Freights/Contracts (`… · maintenance`) mas sumia em Charter/Hauls/Manifest. Causa = `boardEstimateFleet` aceitava `parked|assigned|maintenance`; Charter/Hauls filtravam só `parked`. Fix = `isOpsAircraftBoardSelectable` = parked only; Freights/Contracts alinhados. MX fica no Hangar até repair.

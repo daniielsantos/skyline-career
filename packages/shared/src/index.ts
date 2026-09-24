@@ -273,6 +273,7 @@ export * from './career-port-shuttle.js';
 export * from './career-crew.js';
 export * from './career-ground-staff.js';
 export * from './career-ledger.js';
+export * from './career-burn-estimate.js';
 export * from './career-json-io.js';
 export * from './career-partition.js';
 export * from './career-store.js';

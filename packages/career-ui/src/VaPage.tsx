@@ -1472,8 +1472,7 @@ export function VaPage(props: Props) {
               {ledgerError}
             </p>
           ) : null}
-          {cashflow &&
-          (cashflow.recent.length > 0 || cashflow.allTime.entryCount > 0) ? (
+          {cashflow ? (
             <CashflowSummaryGrid
               cashflow={cashflow}
               formatMoney={formatBoardMoney}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type {
+  CareerBurnEstimate,
   CareerCashflowSnapshot,
   CareerLedgerEntry,
   CareerLedgerSummary,
@@ -147,28 +148,85 @@ function SummaryCard(props: {
   );
 }
 
+/** Forward burn at current footprint — Hangar Cashflow + My VA Ledger. */
+export function CashflowBurnEstimateCard(props: {
+  burn: CareerBurnEstimate | null | undefined;
+  formatMoney: (n: number) => string;
+}) {
+  const burn = props.burn;
+  if (!burn || !(burn.totalUsdPerDay > 0) || burn.lines.length === 0) {
+    return null;
+  }
+  const runway =
+    burn.runwayDays == null
+      ? null
+      : burn.runwayDays >= 9999
+        ? '9999+ days runway'
+        : `~${burn.runwayDays.toLocaleString()} days runway`;
+  return (
+    <div
+      className="cashflow-burn-card"
+      title="Estimate if the current footprint stays as-is. Parking, storage, and Port FBO lease change with ops."
+    >
+      <div className="cashflow-burn-head">
+        <p className="aircraft-card-section-label" style={{ margin: 0 }}>
+          Est. burn
+        </p>
+        <p className="cashflow-burn-total cashflow-neg">
+          {props.formatMoney(burn.totalUsdPerDay)}
+          <span className="cashflow-burn-unit">/day</span>
+        </p>
+        {runway ? (
+          <p className="cashflow-burn-runway muted">{runway}</p>
+        ) : null}
+      </div>
+      <ul className="cashflow-burn-lines">
+        {burn.lines.map((line) => (
+          <li key={line.id}>
+            <span>{line.label}</span>
+            <span className="cashflow-neg">
+              {props.formatMoney(line.usdPerDay)}
+              <span className="cashflow-burn-unit">/d</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="cashflow-burn-note muted">
+        At current footprint — changes if you move aircraft, return a lease, or
+        empty stock.
+      </p>
+    </div>
+  );
+}
+
 /** Week / month / all-time P&L cards (VA Ledger can place these above the hero). */
 export function CashflowSummaryGrid(props: {
   cashflow: CareerCashflowSnapshot;
   formatMoney: (n: number) => string;
 }) {
   return (
-    <div className="cashflow-summary-grid">
-      <SummaryCard
-        title="This week"
-        summary={props.cashflow.week}
+    <div className="cashflow-summary-stack">
+      <CashflowBurnEstimateCard
+        burn={props.cashflow.burnEstimate}
         formatMoney={props.formatMoney}
       />
-      <SummaryCard
-        title="This month"
-        summary={props.cashflow.month}
-        formatMoney={props.formatMoney}
-      />
-      <SummaryCard
-        title="All time"
-        summary={props.cashflow.allTime}
-        formatMoney={props.formatMoney}
-      />
+      <div className="cashflow-summary-grid">
+        <SummaryCard
+          title="This week"
+          summary={props.cashflow.week}
+          formatMoney={props.formatMoney}
+        />
+        <SummaryCard
+          title="This month"
+          summary={props.cashflow.month}
+          formatMoney={props.formatMoney}
+        />
+        <SummaryCard
+          title="All time"
+          summary={props.cashflow.allTime}
+          formatMoney={props.formatMoney}
+        />
+      </div>
     </div>
   );
 }
@@ -447,10 +505,18 @@ export function HangarCashflowPanel(props: {
         />
       ) : null}
       {emptyLedger ? (
-        <p className="empty">
-          No ledger yet — freights, fuel, hangar parking, credit, leases, and shop
-          visits will show up here.
-        </p>
+        <>
+          {!props.hideSummaries ? (
+            <CashflowBurnEstimateCard
+              burn={snap?.burnEstimate}
+              formatMoney={props.formatMoney}
+            />
+          ) : null}
+          <p className="empty">
+            No ledger yet — freights, fuel, hangar parking, credit, leases, and shop
+            visits will show up here.
+          </p>
+        </>
       ) : (
         <>
           {!props.hideSummaries ? (

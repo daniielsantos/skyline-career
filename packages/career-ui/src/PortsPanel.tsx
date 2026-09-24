@@ -206,6 +206,26 @@ const DEMAND_PAGE_SIZE = 11;
 /** 1 economy tick = 15 wall-clock minutes. */
 const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
+/** Economy batches per career day (matches shared TICKS_PER_DAY). */
+const TICKS_PER_DAY = 96;
+
+function leaseDaysLeftFromTicks(
+  leasePaidThroughTick: number | null | undefined,
+  economyTick: number | null | undefined,
+): number | null {
+  if (
+    leasePaidThroughTick == null ||
+    economyTick == null ||
+    !Number.isFinite(leasePaidThroughTick) ||
+    !Number.isFinite(economyTick)
+  ) {
+    return null;
+  }
+  return Math.max(
+    0,
+    Math.ceil((leasePaidThroughTick - economyTick) / TICKS_PER_DAY),
+  );
+}
 
 type DemandSortKey =
   | 'country'
@@ -2850,13 +2870,9 @@ export function PortsPanel(props: {
     for (const s of scoutHaulSuggestions) ids.add(s.id);
     for (const s of scoutDemandSuggestions) ids.add(s.id);
     for (const s of scoutSuggestions) ids.add(s.id);
+    // Do not auto-pick the first Scout row — route only after a click.
     if (scoutFocusId && !ids.has(scoutFocusId)) {
       setScoutFocusId(null);
-      return;
-    }
-    if (!scoutFocusId && scoutMergedRows[0]) {
-      setScoutFocusId(scoutMergedRows[0].id);
-      setScoutFocusToken((n) => n + 1);
     }
   }, [
     scoutFocusId,
@@ -2867,7 +2883,7 @@ export function PortsPanel(props: {
   ]);
 
   function focusScoutRow(id: string) {
-    setScoutFocusId(id);
+    setScoutFocusId((prev) => (prev === id ? null : id));
     setScoutFocusToken((n) => n + 1);
   }
 
@@ -3414,6 +3430,19 @@ export function PortsPanel(props: {
     port?.concession?.companyDisplayName,
   ]);
 
+  const portLeaseDaysLeft = useMemo(
+    () =>
+      leaseDaysLeftFromTicks(
+        port?.concession?.leasePaidThroughTick,
+        props.economyTick,
+      ),
+    [port?.concession?.leasePaidThroughTick, props.economyTick],
+  );
+
+  useEffect(() => {
+    setScoutFocusId(null);
+  }, [port?.id]);
+
   const portDeskOrders = useMemo(() => {
     if (!port) return [] as DemandOrderView[];
     const pid = port.id.trim().toUpperCase();
@@ -3537,18 +3566,6 @@ export function PortsPanel(props: {
         )
       ) : (
         <div className="ports-panel-body">
-          {props.embedded ? (
-            <div className="ports-embed-toolbar">
-              <button
-                type="button"
-                className="action ghost"
-                disabled={props.busy || loading}
-                onClick={() => void refresh().catch(() => undefined)}
-              >
-                Refresh
-              </button>
-            </div>
-          ) : null}
           <div
             className="fbo-mode-switcher"
             role="tablist"
@@ -3614,6 +3631,16 @@ export function PortsPanel(props: {
                 ? ` (${companyNetworkNodes.length})`
                 : ''}
             </button>
+            {props.embedded ? (
+              <button
+                type="button"
+                className="action ghost ports-embed-refresh"
+                disabled={props.busy || loading}
+                onClick={() => void refresh().catch(() => undefined)}
+              >
+                Refresh
+              </button>
+            ) : null}
           </div>
 
           {section === 'catalog' ? (
@@ -3984,11 +4011,20 @@ export function PortsPanel(props: {
                     className="action ghost ports-concession-open"
                     disabled={props.busy}
                     onClick={() => setConcessionOpen(true)}
+                    title={
+                      portLeaseDaysLeft != null
+                        ? `Lease · ${portLeaseDaysLeft}d left`
+                        : undefined
+                    }
                   >
                     {port.concession?.status === 'yours'
                       ? canPortCapex
-                        ? 'Lease · Upgrade'
-                        : 'Details'
+                        ? portLeaseDaysLeft != null
+                          ? `Lease · ${portLeaseDaysLeft}d`
+                          : 'Lease · Upgrade'
+                        : portLeaseDaysLeft != null
+                          ? `Lease · ${portLeaseDaysLeft}d`
+                          : 'Details'
                       : port.concession?.status === 'held'
                         ? 'Details'
                         : canPortCapex
@@ -4531,15 +4567,15 @@ export function PortsPanel(props: {
                             ? 'Ground staff'
                             : 'Warehouse'}
                       </h3>
+                      {whShelf === 'owned' ? null : (
                       <p className="muted ports-warehouse-hint">
-                        {whShelf === 'owned'
-                          ? 'Stock lives here. Move to another warehouse or Dispatch a hold. Demand holds show below.'
-                          : whShelf === 'staff'
-                            ? 'Hire per warehouse · Ace→Green grades · salary by grade.'
-                            : port
-                              ? `Pickup hubs for ${port.name} — search to browse other ports.`
-                              : 'Search a pickup ICAO, then buy.'}
+                        {whShelf === 'staff'
+                          ? 'Hire per warehouse · Ace→Green grades · salary by grade.'
+                          : port
+                            ? `Pickup hubs for ${port.name} — search to browse other ports.`
+                            : 'Search a pickup ICAO, then buy.'}
                       </p>
+                      )}
                     </div>
 
                     <div className="ports-wh-body">
@@ -4776,226 +4812,268 @@ export function PortsPanel(props: {
                                     </p>
                                   )}
                                 </div>
-                                {hubStock.length === 0 ? (
-                                  <p className="empty ports-wh-hub-empty">
-                                    Empty — buy at the port or move stock here.
-                                  </p>
-                                ) : (
-                                  <ul className="ports-wh-lots">
-                                    {hubStock.map((s) => {
-                                      const selected = selectedStockId === s.id;
-                                      const lotLabel = `${props.formatTonnes(s.kg)} ${commodityLabel(
-                                        { commodityId: s.commodityId },
-                                      )}`;
-                                      return (
-                                        <li
-                                          key={s.id}
-                                          className={
-                                            selected
-                                              ? 'ports-wh-lot is-selected'
-                                              : 'ports-wh-lot'
-                                          }
-                                          tabIndex={0}
-                                          aria-selected={selected}
-                                          onClick={() =>
-                                            selectStockLot(s.id, icao)
-                                          }
-                                          onKeyDown={(event) => {
-                                            if (
-                                              event.key === 'Enter' ||
-                                              event.key === ' '
-                                            ) {
-                                              event.preventDefault();
-                                              selectStockLot(s.id, icao);
-                                            }
-                                          }}
-                                        >
-                                          <div className="ports-wh-lot-main">
-                                            <div className="commodity-cell">
-                                              <CommodityIcon
-                                                commodityId={s.commodityId}
-                                                size={28}
-                                              />
-                                              <div>
-                                                <strong>
-                                                  {commodityLabel({
-                                                    commodityId: s.commodityId,
-                                                  })}
-                                                </strong>
-                                                <p className="muted">
-                                                  {formatMassPreferExact(
-                                                    s.kg,
-                                                    props.weightSystem,
-                                                  )}{' '}
-                                                  ·{' '}
-                                                  {formatUnitPrice(
-                                                    s.avgCostUsdPerKg,
-                                                  )}
-                                                </p>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="ports-wh-lot-actions">
-                                            {allOwnedWarehouses.length > 1 ? (
-                                              <button
-                                                type="button"
-                                                className="accept"
-                                                disabled={
-                                                  props.busy || loading
-                                                }
-                                                onClick={(event) => {
-                                                  event.stopPropagation();
-                                                  openBridgeFromLot(
-                                                    icao,
-                                                    s.commodityId,
-                                                  );
-                                                }}
-                                              >
-                                                Move
-                                              </button>
-                                            ) : null}
-                                            <button
-                                              type="button"
-                                              className="accept"
-                                              disabled={props.busy || loading}
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                openHaulFromLot(
-                                                  icao,
-                                                  s.commodityId,
-                                                );
-                                              }}
-                                              title="Dispatch WH stock to a destination terminal (Wide when kg allows)"
-                                            >
-                                              Haul
-                                            </button>
-                                            {canPortDeskOps ? (
-                                            <button
-                                              type="button"
-                                              className="action ghost"
-                                              disabled={props.busy || loading}
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                void onAbandonWarehouseStock(
-                                                  s.id,
-                                                  lotLabel,
-                                                  icao || 'warehouse',
-                                                );
-                                              }}
-                                            >
-                                              Abandon
-                                            </button>
-                                            ) : null}
-                                          </div>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                )}
-                                {hubHolds.length > 0 ? (
-                                  <ul className="ports-wh-lots ports-wh-holds">
-                                    {hubHolds.map((h) => {
-                                      const isBridge =
-                                        (h.kind ?? 'demand') === 'bridge';
-                                      const isHaul = h.kind === 'haul';
-                                      return (
-                                        <li key={h.id} className="ports-wh-lot">
-                                          <div className="ports-wh-lot-main">
-                                            <div className="commodity-cell">
-                                              <CommodityIcon
-                                                commodityId={h.commodityId}
-                                                size={28}
-                                              />
-                                              <div>
-                                                <div className="ports-wh-hold-line">
-                                                  <span
-                                                    className={
-                                                      isBridge
-                                                        ? 'ports-wh-hold-kind is-transfer'
-                                                        : isHaul
-                                                          ? 'ports-wh-hold-kind is-transfer'
-                                                          : 'ports-wh-hold-kind is-demand'
-                                                    }
-                                                  >
-                                                    {isBridge
-                                                      ? 'Transfer'
-                                                      : isHaul
-                                                        ? 'Haul'
-                                                        : 'Demand'}
-                                                  </span>
-                                                  <span className="ports-wh-hold-dest">
-                                                    → {h.destIcao}
-                                                  </span>
-                                                  <span
-                                                    className="muted"
-                                                    title="Hold TTL — releases if not Accepted"
-                                                  >
-                                                    {formatExpiresIn(
-                                                      h.expiresAtTick,
-                                                      props.economyTick,
-                                                    )}
-                                                  </span>
-                                                </div>
-                                                <p className="muted ports-wh-hold-lot">
-                                                  {commodityLabel({
-                                                    commodityId: h.commodityId,
-                                                  })}{' '}
-                                                  · {props.formatTonnes(h.kg)}
-                                                  {(h.kind ?? 'demand') ===
-                                                    'bridge' &&
-                                                  (h.pilotPayUsd ?? 0) > 0
-                                                    ? ` · pilot ${props.formatMoney(h.pilotPayUsd ?? 0)}`
-                                                    : (h.kind ?? 'demand') ===
-                                                        'bridge'
-                                                      ? ' · unpaid'
-                                                      : ''}
-                                                </p>
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="ports-wh-lot-actions">
-                                            <button
-                                              type="button"
-                                              className="accept"
-                                              disabled={props.busy || loading}
-                                              onClick={() => {
-                                                setDispatchHold(h);
-                                                setDispatchMode('fly');
-                                                setShuttleQuote(null);
-                                                const aircraft =
-                                                  props.fleet.filter(
-                                                    (a) =>
-                                                      a.status === 'parked' &&
-                                                      a.locationIcao
-                                                        .trim()
-                                                        .toUpperCase() ===
-                                                        h.originIcao
-                                                          .trim()
-                                                          .toUpperCase(),
-                                                  );
-                                                setDispatchAircraftId(
-                                                  aircraft[0]?.id ?? '',
-                                                );
-                                              }}
-                                            >
-                                              Dispatch
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="action ghost"
-                                              disabled={props.busy || loading}
-                                              onClick={() =>
-                                                void onReleaseDemandHold(h)
+                                <div className="ports-wh-sections">
+                                  <section
+                                    className="ports-wh-section"
+                                    aria-label="In stock"
+                                  >
+                                    <h4 className="ports-wh-section-label">
+                                      In stock
+                                      {hubStock.length > 0
+                                        ? ` · ${hubStock.length}`
+                                        : ''}
+                                    </h4>
+                                    {hubStock.length === 0 ? (
+                                      <p className="empty ports-wh-hub-empty">
+                                        Empty — buy at the port or move stock
+                                        here.
+                                      </p>
+                                    ) : (
+                                      <ul className="ports-wh-lots is-stock">
+                                        {hubStock.map((s) => {
+                                          const selected =
+                                            selectedStockId === s.id;
+                                          const lotLabel = `${props.formatTonnes(s.kg)} ${commodityLabel(
+                                            { commodityId: s.commodityId },
+                                          )}`;
+                                          return (
+                                            <li
+                                              key={s.id}
+                                              className={
+                                                selected
+                                                  ? 'ports-wh-lot is-stock is-selected'
+                                                  : 'ports-wh-lot is-stock'
                                               }
+                                              tabIndex={0}
+                                              aria-selected={selected}
+                                              onClick={() =>
+                                                selectStockLot(s.id, icao)
+                                              }
+                                              onKeyDown={(event) => {
+                                                if (
+                                                  event.key === 'Enter' ||
+                                                  event.key === ' '
+                                                ) {
+                                                  event.preventDefault();
+                                                  selectStockLot(s.id, icao);
+                                                }
+                                              }}
                                             >
-                                              Release
-                                            </button>
-                                          </div>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                ) : null}
+                                              <div className="ports-wh-lot-main">
+                                                <div className="commodity-cell ports-wh-stock-cell">
+                                                  <CommodityIcon
+                                                    commodityId={s.commodityId}
+                                                    size={22}
+                                                  />
+                                                  <div className="ports-wh-stock-copy">
+                                                    <strong>
+                                                      {commodityLabel({
+                                                        commodityId:
+                                                          s.commodityId,
+                                                      })}
+                                                    </strong>
+                                                    <span className="muted">
+                                                      {formatMassPreferExact(
+                                                        s.kg,
+                                                        props.weightSystem,
+                                                      )}
+                                                      {' · '}
+                                                      {formatUnitPrice(
+                                                        s.avgCostUsdPerKg,
+                                                      )}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <div className="ports-wh-lot-actions">
+                                                {allOwnedWarehouses.length >
+                                                1 ? (
+                                                  <button
+                                                    type="button"
+                                                    className="action ghost"
+                                                    disabled={
+                                                      props.busy || loading
+                                                    }
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      openBridgeFromLot(
+                                                        icao,
+                                                        s.commodityId,
+                                                      );
+                                                    }}
+                                                  >
+                                                    Move
+                                                  </button>
+                                                ) : null}
+                                                <button
+                                                  type="button"
+                                                  className="action ghost"
+                                                  disabled={
+                                                    props.busy || loading
+                                                  }
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    openHaulFromLot(
+                                                      icao,
+                                                      s.commodityId,
+                                                    );
+                                                  }}
+                                                  title="Dispatch WH stock to a destination terminal (Wide when kg allows)"
+                                                >
+                                                  Haul
+                                                </button>
+                                                {canPortDeskOps ? (
+                                                  <button
+                                                    type="button"
+                                                    className="action ghost"
+                                                    disabled={
+                                                      props.busy || loading
+                                                    }
+                                                    onClick={(event) => {
+                                                      event.stopPropagation();
+                                                      void onAbandonWarehouseStock(
+                                                        s.id,
+                                                        lotLabel,
+                                                        icao || 'warehouse',
+                                                      );
+                                                    }}
+                                                  >
+                                                    Abandon
+                                                  </button>
+                                                ) : null}
+                                              </div>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                    )}
+                                  </section>
+
+                                  <section
+                                    className="ports-wh-section"
+                                    aria-label="Holds ready to fly"
+                                  >
+                                    <h4 className="ports-wh-section-label">
+                                      Holds
+                                      {hubHolds.length > 0
+                                        ? ` · ${hubHolds.length}`
+                                        : ''}
+                                    </h4>
+                                    {hubHolds.length === 0 ? (
+                                      <p className="empty ports-wh-hub-empty">
+                                        No holds — Scout or Demand Board.
+                                      </p>
+                                    ) : (
+                                      <ul className="ports-wh-lots is-holds">
+                                        {hubHolds.map((h) => {
+                                          const isBridge =
+                                            (h.kind ?? 'demand') === 'bridge';
+                                          const isHaul = h.kind === 'haul';
+                                          return (
+                                            <li
+                                              key={h.id}
+                                              className="ports-wh-lot is-hold"
+                                            >
+                                              <div className="ports-wh-lot-main">
+                                                <div className="ports-wh-hold-main">
+                                                  <div className="ports-wh-hold-line">
+                                                    <span
+                                                      className={
+                                                        isBridge
+                                                          ? 'ports-wh-hold-kind is-transfer'
+                                                          : isHaul
+                                                            ? 'ports-wh-hold-kind is-transfer'
+                                                            : 'ports-wh-hold-kind is-demand'
+                                                      }
+                                                    >
+                                                      {isBridge
+                                                        ? 'Transfer'
+                                                        : isHaul
+                                                          ? 'Haul'
+                                                          : 'Demand'}
+                                                    </span>
+                                                    <span className="ports-wh-hold-dest">
+                                                      → {h.destIcao}
+                                                    </span>
+                                                    <span
+                                                      className="ports-wh-hold-ttl muted"
+                                                      title="Hold TTL — releases if not Accepted"
+                                                    >
+                                                      {formatExpiresIn(
+                                                        h.expiresAtTick,
+                                                        props.economyTick,
+                                                      )}
+                                                    </span>
+                                                  </div>
+                                                  <p className="muted ports-wh-hold-lot">
+                                                    {commodityLabel({
+                                                      commodityId:
+                                                        h.commodityId,
+                                                    })}{' '}
+                                                    ·{' '}
+                                                    {props.formatTonnes(h.kg)}
+                                                    {(h.kind ?? 'demand') ===
+                                                      'bridge' &&
+                                                    (h.pilotPayUsd ?? 0) > 0
+                                                      ? ` · pilot ${props.formatMoney(h.pilotPayUsd ?? 0)}`
+                                                      : (h.kind ??
+                                                            'demand') ===
+                                                          'bridge'
+                                                        ? ' · unpaid'
+                                                        : ''}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                              <div className="ports-wh-lot-actions">
+                                                <button
+                                                  type="button"
+                                                  className="accept"
+                                                  disabled={
+                                                    props.busy || loading
+                                                  }
+                                                  onClick={() => {
+                                                    setDispatchHold(h);
+                                                    setDispatchMode('fly');
+                                                    setShuttleQuote(null);
+                                                    const aircraft =
+                                                      props.fleet.filter(
+                                                        (a) =>
+                                                          a.status ===
+                                                            'parked' &&
+                                                          a.locationIcao
+                                                            .trim()
+                                                            .toUpperCase() ===
+                                                            h.originIcao
+                                                              .trim()
+                                                              .toUpperCase(),
+                                                      );
+                                                    setDispatchAircraftId(
+                                                      aircraft[0]?.id ?? '',
+                                                    );
+                                                  }}
+                                                >
+                                                  Dispatch
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className="action ghost"
+                                                  disabled={
+                                                    props.busy || loading
+                                                  }
+                                                  onClick={() =>
+                                                    void onReleaseDemandHold(h)
+                                                  }
+                                                >
+                                                  Release
+                                                </button>
+                                              </div>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                    )}
+                                  </section>
+                                </div>
                                 </div>
                               );
                             })}
@@ -6078,28 +6156,37 @@ export function PortsPanel(props: {
             <h3 id="ports-concession-title">{port.name} · Port FBO</h3>
             {port.concession?.status === 'yours' ? (
               <>
+                <p className="ports-concession-lease">
+                  {portLeaseDaysLeft != null ? (
+                    <>
+                      Lease ·{' '}
+                      <strong>
+                        {portLeaseDaysLeft === 0
+                          ? 'due now'
+                          : `${portLeaseDaysLeft}d left`}
+                      </strong>
+                      {portLeaseDaysLeft <= 2 ? ' · renew soon' : null}
+                    </>
+                  ) : (
+                    'Lease active'
+                  )}
+                </p>
                 <p className="muted">
-                  Port FBO · P{port.concession.level ?? 1}: ~10% cheaper buys
+                  P{port.concession.level ?? 1}
                   {(port.concession.level ?? 1) >= 3
-                    ? ', ~22% faster inbound, +2 listings, faster restock'
-                    : ', ~15% faster inbound, +1 listing'}
-                  {(port.concession.level ?? 1) >= 2
-                    ? ', enlarged yard cap'
-                    : ''}
-                  . Throughput{' '}
+                    ? ' · cheaper buys, faster inbound & restock'
+                    : (port.concession.level ?? 1) >= 2
+                      ? ' · cheaper buys, faster inbound, larger yard'
+                      : ' · cheaper buys, faster inbound'}
+                </p>
+                <p className="muted ports-warehouse-hint">
+                  Throughput{' '}
                   {props.formatTonnes(
                     port.concession.lifetimeThroughputKg ?? 0,
                   )}
                   {port.concession.recentThroughputKg != null
                     ? ` · 7d ${props.formatTonnes(port.concession.recentThroughputKg)}`
                     : ''}
-                  {port.concession.leasePaidThroughTick != null &&
-                  props.economyTick != null
-                    ? ` · lease through tick ${port.concession.leasePaidThroughTick}`
-                    : null}
-                </p>
-                <p className="muted ports-warehouse-hint">
-                  Desk auto-buy and Scout live on the Port FBO tab.
                 </p>
                 <div className="confirm-actions">
                   <button

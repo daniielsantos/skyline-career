@@ -82,7 +82,15 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Ports loop banner off (2026-09-24):** sintoma = card “Open Demand” + gap sob as tabs (Catalog/Network). Causa = `.ports-loop-slot` com min-height mesmo on-target. Fix = remover banner do chrome; tabs com altura fixa; conteúdo mais perto das tabs.
 
+**Ports embed gap above tabs (2026-09-24):** sintoma = espaço morto entre HQ strip e Port catalog/Network no My VA. Causa = `ports-embed-toolbar` (só Refresh) em linha própria. Fix = Refresh na mesma row das tabs (`margin-left: auto`); `va-my-head` margin menor.
+
+**WH stock vs Holds sections (2026-09-24):** sintoma = piles e Demand holds na mesma lista visual. Fix = seções **In stock** / **Holds**; stock denser (mass·price inline, ações ghost); holds com tint outbound + Dispatch primary; sem prosa tutorial no head.
+
 **Ports network IA (2026-09-24):** sintoma = Catalog / Port FBO / Warehouse / Demand + Available 239 não escala com N FBO/WH. Causa = abas planas + browse mundial no WH. Fix = tabs **Port catalog** + **Network**; Network = chips/`CompanyNetworkMap` + search ICAO; seleção FBO→Scout desk, WH→stock/Demand holds; Buy warehouse / Demand / Ground staff = CTAs (Available contextual no porto); sem This port/All hubs. Hauls continua board de holds. Spec UX em plano Ports layout scale.
+
+**Scout auto-select first row (2026-09-24):** sintoma = abrir FBO já destacava 1ª linha Scout + traçava rota. Causa = `useEffect` setava `scoutFocusId` no primeiro merge. Fix = só foco em click (toggle clear); limpa ao trocar porto.
+
+**Port FBO lease days in dialog (2026-09-24):** sintoma = “lease through tick N” ilegível; modal denso. Fix = dias restantes (`ceil((through−tick)/96)`); botão **Lease · Nd**; copy P-level enxuta + throughput separado.
 
 **Network tab locked Buy WH (2026-09-24):** sintoma = Home Ports Network cinza; jogador achava que precisava Claim FBO antes de WH. Causa = `disabled={!hasNetworkAssets}` + Buy warehouse só dentro de Network → deadlock onboarding. Fix = Network sempre clicável (vazio abre Buy warehouse); CTA **Buy warehouse · ICAO** no catalog ao lado de Claim; FBO **não** é pré-requisito de WH.
 

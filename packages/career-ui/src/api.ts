@@ -160,11 +160,25 @@ export type CareerLedgerSummary = {
   byKind?: Partial<Record<CareerLedgerKind, number>>;
 };
 
+export type CareerBurnLine = {
+  id: string;
+  label: string;
+  usdPerDay: number;
+};
+
+export type CareerBurnEstimate = {
+  totalUsdPerDay: number;
+  runwayDays: number | null;
+  lines: CareerBurnLine[];
+};
+
 export type CareerCashflowSnapshot = {
   week: CareerLedgerSummary;
   month: CareerLedgerSummary;
   allTime: CareerLedgerSummary;
   recent: CareerLedgerEntry[];
+  /** Forward-looking recurring burn at current footprint ($/economy day). */
+  burnEstimate?: CareerBurnEstimate | null;
 };
 
 export type AircraftListing = {

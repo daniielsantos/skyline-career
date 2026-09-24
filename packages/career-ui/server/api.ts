@@ -301,6 +301,7 @@ import {
   resolveHangarParkingUsdPerDay,
   applyWalletDelta,
   summarizeCareerLedger,
+  estimateCareerBurnUsdPerDay,
   LEDGER_KIND_LABEL,
   enterLedgerActorAccountId,
   peekLedgerActorAccountId,
@@ -1032,6 +1033,16 @@ function withParkingRates(
       missions,
     ),
   }));
+}
+
+function careerCashflowSnapshot(
+  missions: MissionsFile,
+  world: Pick<CareerEconomyWorld, 'tick' | 'airports'>,
+) {
+  return {
+    ...summarizeCareerLedger(missions, world.tick),
+    burnEstimate: estimateCareerBurnUsdPerDay(missions, world),
+  };
 }
 
 function fleetPayload(
@@ -6401,7 +6412,7 @@ export function createCareerApiServer(port = 8787) {
                 world.npcFlights?.filter((f) => f.status === 'in_flight').length ??
                 0,
               ...fleetPayload(missions, world, req),
-              cashflow: summarizeCareerLedger(missions, world.tick),
+              cashflow: careerCashflowSnapshot(missions, world),
               cargoOps: null as CareerMissionsState['cargoOps'] | null,
               playerFbos: playerFboSnapshot(missions, world),
               companyCrew: companyCrewSnapshot(missions, world),
@@ -6461,7 +6472,7 @@ export function createCareerApiServer(port = 8787) {
         const payload = await withCareerRead((world, missions) => ({
           walletUsd: missions.walletUsd,
           ...fleetPayload(missions, world),
-          cashflow: summarizeCareerLedger(missions, world.tick),
+          cashflow: careerCashflowSnapshot(missions, world),
           homeCountryId: world.homeCountryId ?? null,
           store: requireStore().kind,
         }), { companyId: fleetCompanyId });
@@ -6485,7 +6496,7 @@ export function createCareerApiServer(port = 8787) {
         const missions = await loadMissions(
           cashflowCompanyId ? { companyId: cashflowCompanyId } : undefined,
         );
-        const cashflow = summarizeCareerLedger(missions, world.tick);
+        const cashflow = careerCashflowSnapshot(missions, world);
         let flightQuality = null;
         let orgPerks = resolveVaOrgPerks(null);
         if (cashflowCompanyId && store) {

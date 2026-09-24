@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **e366525c** / desktop **0.3.269** shipped: Redraw company network FBO/WH/HQ glyphs as outline ops icons. Release: [v0.3.269](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.269).
+
+
 `main` **737f28fc** / desktop **0.3.268** shipped: Clarify debrief fuel pillar as residual vs fuel bought at origin. Release: [v0.3.268](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.268).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **6fc17925** / desktop **0.3.289** shipped: Widen EN ROUTE content to full page width. Release: [v0.3.289](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.289).
+
+
 `main` **75e2f5cb** / desktop **0.3.288** shipped: Center the stacked EN ROUTE layout instead of the two-column cockpit. Release: [v0.3.288](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.288).
 
 

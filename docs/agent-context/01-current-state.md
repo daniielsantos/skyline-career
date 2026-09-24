@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **46417b6f** / desktop **0.3.283** shipped: Prioritize Import and Preflight on dispatched flights and hide freight OFP Pax. Release: [v0.3.283](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.283).
+
+
 `main` **d9c953ae** / desktop **0.3.282** shipped: Count iFly 737 MAX S1/S2 in Loaded vs Due after EFB SimBrief import. Release: [v0.3.282](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.282).
 
 

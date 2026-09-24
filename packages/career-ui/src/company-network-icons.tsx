@@ -2,26 +2,39 @@
 
 export type CompanyNetworkIconKind = 'fbo' | 'wh' | 'hq';
 
-/** Solid map-marker SVGs (fixed brand colors). */
+const STROKE = {
+  width: 1.45,
+  join: 'round' as const,
+  cap: 'round' as const,
+};
+
+/**
+ * Map-marker SVGs (fixed brand colors). Outline + soft fill — ops diagram,
+ * not solid app tiles. FBO = pier shed + yard crane; WH = hangar + dock bay.
+ */
 export function companyNetworkIconSvg(kind: CompanyNetworkIconKind): string {
   if (kind === 'hq') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <circle cx="12" cy="12" r="10" fill="#6aa8d8"/>
-  <path d="M12 5.8 13.95 11l5.55.35-4.25 3.55 1.35 5.35L12 17.35 7.4 20.25l1.35-5.35-4.25-3.55L10.05 11Z" fill="#0e141b"/>
+  <circle cx="12" cy="12" r="9.15" fill="#6aa8d8" fill-opacity="0.16" stroke="#6aa8d8" stroke-width="1.5"/>
+  <path d="M12 5.9 13.85 11l5.35.32-4.1 3.4 1.3 5.15L12 17.2 7.6 19.87l1.3-5.15-4.1-3.4L10.15 11Z" fill="none" stroke="#6aa8d8" stroke-width="1.35" stroke-linejoin="round"/>
 </svg>`;
   }
   if (kind === 'fbo') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <path d="M3.5 10.2 12 3.8l8.5 6.4V20.5H3.5V10.2Z" fill="#f0a35a"/>
-  <rect x="8" y="13.4" width="3.2" height="7.1" rx="0.4" fill="#1a1208"/>
-  <rect x="12.8" y="15.2" width="3.2" height="5.3" rx="0.4" fill="#1a1208"/>
-  <circle cx="12" cy="8.2" r="1.35" fill="#1a1208"/>
+  <path d="M3.6 20.6h16.8" stroke="#f0a35a" stroke-width="1.35" stroke-linecap="round" opacity="0.5"/>
+  <path d="M4.6 20.6V17.9h5.4V20.6" fill="none" stroke="#f0a35a" stroke-width="1.35" stroke-linejoin="round"/>
+  <path d="M9.4 17.9V11.1L14.6 7.5 19.8 11.1V17.9Z" fill="#f0a35a" fill-opacity="0.15" stroke="#f0a35a" stroke-width="1.45" stroke-linejoin="round"/>
+  <path d="M12.7 17.9v-3.9h3.1v3.9" fill="none" stroke="#f0a35a" stroke-width="1.3" stroke-linejoin="round"/>
+  <path d="M6.1 17.9V6.2" stroke="#f0a35a" stroke-width="1.45" stroke-linecap="round"/>
+  <path d="M6.1 6.55h7.4" stroke="#f0a35a" stroke-width="1.45" stroke-linecap="round"/>
+  <path d="M13.5 6.55v2.15" stroke="#f0a35a" stroke-width="1.2" stroke-linecap="round" opacity="0.85"/>
 </svg>`;
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <path d="M2.8 10.6 12 3.9l9.2 6.7V20.6H2.8V10.6Z" fill="#5ec8c0"/>
-  <rect x="8.1" y="13.1" width="7.8" height="7.5" rx="0.55" fill="#0e1a18"/>
-  <path d="M8.1 16.4h7.8" stroke="#5ec8c0" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M3.4 19.9V10.5L12 4.7l8.6 5.8v9.4Z" fill="#5ec8c0" fill-opacity="0.15" stroke="#5ec8c0" stroke-width="1.45" stroke-linejoin="round"/>
+  <path d="M8 19.9V13.2h8v6.7" fill="none" stroke="#5ec8c0" stroke-width="1.4" stroke-linejoin="round"/>
+  <path d="M8 16.55h8" stroke="#5ec8c0" stroke-width="1.2" stroke-linecap="round" opacity="0.75"/>
+  <path d="M12 4.7v2.9" stroke="#5ec8c0" stroke-width="1.2" stroke-linecap="round" opacity="0.55"/>
 </svg>`;
 }
 
@@ -33,11 +46,23 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
         viewBox="0 0 24 24"
         aria-hidden="true"
         focusable="false"
+        fill="none"
       >
-        <circle cx="12" cy="12" r="10" fill="currentColor" />
+        <circle
+          cx="12"
+          cy="12"
+          r="9.15"
+          fill="currentColor"
+          fillOpacity={0.16}
+          stroke="currentColor"
+          strokeWidth={1.5}
+        />
         <path
-          d="M12 5.8 13.95 11l5.55.35-4.25 3.55 1.35 5.35L12 17.35 7.4 20.25l1.35-5.35-4.25-3.55L10.05 11Z"
-          fill="#0e141b"
+          d="M12 5.9 13.85 11l5.35.32-4.1 3.4 1.3 5.15L12 17.2 7.6 19.87l1.3-5.15-4.1-3.4L10.15 11Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.35}
+          strokeLinejoin={STROKE.join}
         />
       </svg>
     );
@@ -49,28 +74,56 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
         viewBox="0 0 24 24"
         aria-hidden="true"
         focusable="false"
+        fill="none"
       >
         <path
-          d="M3.5 10.2 12 3.8l8.5 6.4V20.5H3.5V10.2Z"
+          d="M3.6 20.6h16.8"
+          stroke="currentColor"
+          strokeWidth={1.35}
+          strokeLinecap={STROKE.cap}
+          opacity={0.5}
+        />
+        <path
+          d="M4.6 20.6V17.9h5.4V20.6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.35}
+          strokeLinejoin={STROKE.join}
+        />
+        <path
+          d="M9.4 17.9V11.1L14.6 7.5 19.8 11.1V17.9Z"
           fill="currentColor"
+          fillOpacity={0.15}
+          stroke="currentColor"
+          strokeWidth={STROKE.width}
+          strokeLinejoin={STROKE.join}
         />
-        <rect
-          x="8"
-          y="13.4"
-          width="3.2"
-          height="7.1"
-          rx="0.4"
-          fill="#1a1208"
+        <path
+          d="M12.7 17.9v-3.9h3.1v3.9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.3}
+          strokeLinejoin={STROKE.join}
         />
-        <rect
-          x="12.8"
-          y="15.2"
-          width="3.2"
-          height="5.3"
-          rx="0.4"
-          fill="#1a1208"
+        <path
+          d="M6.1 17.9V6.2"
+          stroke="currentColor"
+          strokeWidth={STROKE.width}
+          strokeLinecap={STROKE.cap}
         />
-        <circle cx="12" cy="8.2" r="1.35" fill="#1a1208" />
+        <path
+          d="M6.1 6.55h7.4"
+          stroke="currentColor"
+          strokeWidth={STROKE.width}
+          strokeLinecap={STROKE.cap}
+        />
+        <path
+          d="M13.5 6.55v2.15"
+          stroke="currentColor"
+          strokeWidth={1.2}
+          strokeLinecap={STROKE.cap}
+          opacity={0.85}
+        />
       </svg>
     );
   }
@@ -80,24 +133,36 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
       viewBox="0 0 24 24"
       aria-hidden="true"
       focusable="false"
+      fill="none"
     >
       <path
-        d="M2.8 10.6 12 3.9l9.2 6.7V20.6H2.8V10.6Z"
+        d="M3.4 19.9V10.5L12 4.7l8.6 5.8v9.4Z"
         fill="currentColor"
-      />
-      <rect
-        x="8.1"
-        y="13.1"
-        width="7.8"
-        height="7.5"
-        rx="0.55"
-        fill="#0e1a18"
+        fillOpacity={0.15}
+        stroke="currentColor"
+        strokeWidth={STROKE.width}
+        strokeLinejoin={STROKE.join}
       />
       <path
-        d="M8.1 16.4h7.8"
+        d="M8 19.9V13.2h8v6.7"
+        fill="none"
         stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
+        strokeWidth={1.4}
+        strokeLinejoin={STROKE.join}
+      />
+      <path
+        d="M8 16.55h8"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap={STROKE.cap}
+        opacity={0.75}
+      />
+      <path
+        d="M12 4.7v2.9"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap={STROKE.cap}
+        opacity={0.55}
       />
     </svg>
   );

@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **a8c66bde** / desktop **0.3.285** shipped: Hide OFP and preflight technical details behind Dev Mode. Release: [v0.3.285](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.285).
+
+
 `main` **95992263** / desktop **0.3.284** shipped: Polish OFP route highlighting, center-tank width, and deadline countdown. Release: [v0.3.284](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.284).
 
 

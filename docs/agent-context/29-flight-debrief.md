@@ -10,6 +10,14 @@ Glance layout inspired by other career addons: **three pillars first**, money/sc
 
 **Fix:** remover o inline + CSS `.dispatch-settle-busy`; fica só o overlay global (debrief opens next).
 
+## Charter Class Ops on settle (2026-09-24)
+
+**Sintoma:** Class Ops no Hangar não mudava após Charter; debrief sem `classOpsDeltas` em perna pax.
+
+**Causa:** `settleMission` devolvia cedo no path `missionType === 'charter'` sem `applyClassOpsOnSettle`.
+
+**Fix:** Charter settle aplica Class Ops (horas + clean) na classe do avião; **não** Cargo Ops. Debrief / Hangar / home ladder (VA member bag) passam a receber deltas.
+
 ## Shipped (2026-09-23)
 
 **Sintoma:** debrief espalhava runway + net + metrics + score bars sem um “hero glance” legível.

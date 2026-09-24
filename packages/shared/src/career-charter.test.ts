@@ -549,6 +549,43 @@ describe('Charter economy', () => {
     );
   });
 
+  it('credits Class Ops on charter settle without Cargo Ops / Dry cleans', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-class-ops' });
+    generateDailyCharterOffers(world, 0);
+    const offer = world.charterOffers![0]!;
+    const state = emptyMissionsStateV2();
+    assert.ok(state.classOps);
+    const hoursBefore = state.classOps.classes.light_jet.hours;
+    const cleansBefore = state.classOps.classes.light_jet.cleans;
+    const cargoSnap = JSON.stringify(state.cargoOps);
+    const mission = reserveCharterOffer(world, {
+      offerId: offer.id,
+      missionId: 'msn_charter_class_ops',
+      aircraftClassId: 'light_jet',
+    });
+    state.missions.push(mission);
+    const result = executeSettleFlight(world, state, {
+      missionId: mission.id,
+      skipMinAirborneGate: true,
+      flightScore: { earned: 45, max: 51, pct: 90, categories: [] },
+    });
+    assert.equal(result.kind, 'applied');
+    if (result.kind !== 'applied') return;
+    assert.ok(
+      (result.result.classOpsDeltas?.length ?? 0) > 0,
+      'expected Class Ops deltas on charter settle',
+    );
+    assert.equal(result.result.cargoOpsDeltas, undefined);
+    assert.ok(state.classOps);
+    assert.ok(state.classOps.classes.light_jet.hours > hoursBefore);
+    assert.equal(state.classOps.classes.light_jet.cleans, cleansBefore + 1);
+    assert.equal(
+      JSON.stringify(state.cargoOps),
+      cargoSnap,
+      'Charter must not touch Cargo Ops / Dry cleans',
+    );
+  });
+
   it('applies late penalties to the whole charter without splitting passengers', () => {
     const world = createSeedEconomyWorld({ seed: 'charter-late-settle' });
     generateDailyCharterOffers(world, 0);

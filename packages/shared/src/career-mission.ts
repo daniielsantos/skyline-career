@@ -2699,6 +2699,7 @@ export interface SettleMissionOpts {
   /**
    * When set (VA member), Cargo/Class Ops XP applies here instead of `fleet`.
    * Fleet still relocates aircraft / fuel. Caller persists this bag to pilot home.
+   * Charter settle applies **Class Ops only** (no Cargo Ops / Dry cleans).
    */
   progression?: Pick<CareerMissionsState, 'cargoOps' | 'classOps'>;
 }
@@ -3191,22 +3192,57 @@ export function settleMission(
         weatherBonusUsd: pay.weatherBonusUsd,
       },
     );
+    const charterMission = {
+      ...charter.mission,
+      settledFuelKg: settled.settledFuelKg,
+      settledMxFuelDrainKg: settled.settledMxFuelDrainKg,
+      settledLandingFpm: settled.settledLandingFpm,
+      settledFlightDurationMs: settled.settledFlightDurationMs,
+      settledFlightScore: settled.settledFlightScore,
+      settledWeatherOps: settled.settledWeatherOps,
+      settledTouchdownLat: settled.settledTouchdownLat,
+      settledTouchdownLon: settled.settledTouchdownLon,
+      settledRunwayTouch: settled.settledRunwayTouch,
+    };
+    // Charter is passenger work: Class Ops hours/cleans yes, Cargo Ops / Dry no.
+    let classOpsDeltas: ClassOpsDelta[] | undefined;
+    if (
+      opts.fleet &&
+      !working.crewDeadhead &&
+      !working.contractPilotReposition &&
+      !working.emptyFlight
+    ) {
+      const progressionHost = opts.progression ?? opts.fleet;
+      const blockHours = estimateMissionBlockHours(
+        world,
+        working.originIcao,
+        working.destIcao,
+        working.aircraftClassId,
+      );
+      const hoursMult =
+        typeof opts.hoursMult === 'number' &&
+        Number.isFinite(opts.hoursMult) &&
+        opts.hoursMult > 0
+          ? opts.hoursMult
+          : 1;
+      const classApplied = applyClassOpsOnSettle(
+        progressionHost.classOps,
+        charterMission,
+        {
+          onTime: pay.onTime,
+          blockHours: blockHours * hoursMult,
+          flightScore: opts.flightScore ?? settled.settledFlightScore,
+        },
+      );
+      progressionHost.classOps = classApplied.classOps;
+      classOpsDeltas = classApplied.deltas;
+    }
     return {
-      mission: {
-        ...charter.mission,
-        settledFuelKg: settled.settledFuelKg,
-        settledMxFuelDrainKg: settled.settledMxFuelDrainKg,
-        settledLandingFpm: settled.settledLandingFpm,
-        settledFlightDurationMs: settled.settledFlightDurationMs,
-        settledFlightScore: settled.settledFlightScore,
-        settledWeatherOps: settled.settledWeatherOps,
-        settledTouchdownLat: settled.settledTouchdownLat,
-        settledTouchdownLon: settled.settledTouchdownLon,
-        settledRunwayTouch: settled.settledRunwayTouch,
-      },
+      mission: charterMission,
       settlement: charter.settlement,
       walletCreditUsd: charter.walletCreditUsd,
       fuelDebitUsd,
+      classOpsDeltas,
     };
   }
 

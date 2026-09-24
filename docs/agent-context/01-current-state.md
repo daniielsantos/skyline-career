@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **15f43d44** / desktop **0.3.299** shipped: Credit Port FBO throughput on Demand settle and polish Forward burn. Release: [v0.3.299](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.299).
+
+
 `main` **22c86fb4** / desktop **0.3.298** shipped: Clarify Ports cashflow burn and warehouse stock vs holds. Release: [v0.3.298](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.298).
 
 

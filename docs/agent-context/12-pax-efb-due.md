@@ -118,5 +118,14 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 | `leonardo-fly-the-maddog-x-md-82-20th` | 162 | **Verde:** LOAD OFP + trim MZFW + INSTANT LOAD. Sem `efbPaxWeightLb`. CG manual |
 | `leonardo-fly-the-maddog-x-md-83-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
 | `leonardo-fly-the-maddog-x-md-88-20th` | 162 | Mesmo EFB/Y162 que o 82; MZFW pode diferir. Mesmo ritual |
+| `asobo-737-max-8-passengers` (iFly packs) | 166–197 | **iFly:** S1–S11 `baggageStations` (EFB põe OFP payload em S1/S2). Wizard `crewStations:[1,2]` → Sim excluía ~S1+S2 (~7.3k lb) vs Due=OFP. Asobo glass mantém S1/S2 crew se o EFB não encher essas caixas. |
 
 **TFDi MD-11F:** pack `injectCapable: false` / native-simbrief. Homologation profiles still have discovery `maxLoad: 500` on every station → 10 holds × 500 = **5 000 lb**. Preflight used to clamp freighter Due to that sum while EFB Sim ≈ OFP Payload (~198 klb). Fix: `freighterBaggageCapacityFromStationMax` **ignores** uniform 500×N placeholders; also skip station-max Due clamp when `missionLoadPolicy` is native-simbrief; Watch heals sticky Due ≪ mission freight. Desktop instalado precisa **rebuild/restart Host** — fix não hot-swap.
+
+### iFly 737 MAX — Sim ≪ Due (~S1+S2) (2026-09-24)
+
+**Sintoma:** Import SimBrief no tablet iFly OK (EFB ZFW/fuel/cargo = OFP); Preflight Fuel verde (~1 lb); Payload Sim ~32.3k vs Due ~39.7k. Chips S1–S9 verdes somavam o Due.
+
+**Causa:** packs `ifly-737-max-8` / `ifly-737-max-8200` tinham `crewStations:[1,2]`. Watch/Preflight **Sim** = passenger+baggage (crew fora). EFB iFly carrega massa do OFP também em S1/S2 → exclusão cortava ~7 350 lb.
+
+**Fix:** `crewStations: []`; S1–S11 em `baggageStations` + `stationMap` role baggage. Asobo Max 8 pack **não** mudado (publisher/EFB diferente).

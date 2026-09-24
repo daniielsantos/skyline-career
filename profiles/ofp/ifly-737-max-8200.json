@@ -15,6 +15,7 @@
     "SimBrief type B38M — pack match Default; live title infers iFly (MSFS) - 737 MAX 8200 - 197 Seats (LBS)",
     "Homologated: ifly/ifly-737-max8200@1.0.0",
     "Fuel: L/R MAIN + CENTER classic qty; write plans empty",
+    "S1–S11 all baggageStations — iFly EFB loads OFP payload into S1/S2 (not crew-only); crew exclusion undercounted Sim by ~S1+S2",
     "loadMethod: native-simbrief; injectCapable: false"
   ],
   "fuel": {
@@ -26,8 +27,8 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [1, 2],
-      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11],
+      "crewStations": [],
+      "baggageStations": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       "passengerStations": []
     }
   },
@@ -39,8 +40,8 @@
   "simbriefIcao": "B38M",
   "simbriefAirframeMatch": "Default",
   "stationMap": [
-    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
-    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "baggage" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "baggage" },
     { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
     { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
     { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },

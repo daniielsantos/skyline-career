@@ -89,7 +89,7 @@ Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço 
 
 - **L1011-500 iniBuilds promote (2026-09-23):** sintoma = 4 glasses (Standard/Lounge × Regular/Engine Pod) fora do Market. Fix = SKU `inibuilds-l1011-500` + packs Regular/Pod; SimBrief **L101** Regular vs Pod Ferry via `Engine Pod` no título; normalize `L-1011`→`L1011`; variant tokens `lounge`/`pod`. Arte: prompt pendente PNG.
 
-- **iFly 737 MAX promote (2026-09-24):** sintoma = 4 glasses homologados (MAX8 166/178/189 + MAX8200) fora do Market / SimBrief Default. Fix = packs iFly + merge no SKU `asobo-737-max-8-passengers` (`familyRolesPackRelPaths`); aliases `ifly-737-max-8` / `ifly-737-max-8200`; live title → seat rows LBS; Market “i” lista Asobo + iFly. Arte: `737-max-8.png` (SKU) / `ifly-737-max-8.png` (legado).
+- **iFly 737 MAX promote (2026-09-24):** sintoma = 4 glasses homologados (MAX8 166/178/189 + MAX8200) fora do Market / SimBrief Default. Fix = packs iFly + merge no SKU `asobo-737-max-8-passengers` (`familyRolesPackRelPaths`); aliases `ifly-737-max-8` / `ifly-737-max-8200`; live title → seat rows LBS; Market “i” lista Asobo + iFly. Arte: `737-max-8.png` (SKU) / `ifly-737-max-8.png` (legado). Preflight Sim≪Due: S1–S11 baggage (não crew) — ver `12-pax-efb-due.md`.
 
 ## Hubs (aeroportos career)
 

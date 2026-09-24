@@ -266,6 +266,15 @@ export function missionLoadPolicy(mission: {
   const aircraft = getAircraftClass(mission.aircraftClassId as FreighterClassId);
   const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
   if (mission.missionType === 'charter') {
+    // Same SKU opt-in as freight: injectCapable unlocks Skyline inject so we can
+    // smoke cabin/pax write. inject_verified alone still unlocks (Phenom/Sovereign).
+    // Do not fall through to class defaults — charter without a flag stays EFB.
+    if (airframe?.injectCapable === false) {
+      return { loadMethod: 'native-simbrief', injectCapable: false };
+    }
+    if (airframe?.injectCapable === true) {
+      return { loadMethod: 'direct-injection', injectCapable: true };
+    }
     const configuration = findCareerAirframeConfiguration(
       airframe,
       mission.airframeConfigurationId,

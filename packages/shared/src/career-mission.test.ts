@@ -139,11 +139,21 @@ describe('mission load method policy', () => {
     );
   });
 
-  it('allows charter inject only for inject_verified passenger configs', () => {
+  it('allows charter inject when airframe.injectCapable or passenger inject_verified', () => {
     assert.deepEqual(
       missionLoadPolicy({
         aircraftClassId: 'light_jet',
         airframeTypeId: 'skyward-cessna-c680',
+        missionType: 'charter',
+      }),
+      { loadMethod: 'direct-injection', injectCapable: true },
+    );
+    // Falcon: freight inject flagged, passenger still dispatch_ready — must not
+    // require inject_verified before cabin smoke is possible.
+    assert.deepEqual(
+      missionLoadPolicy({
+        aircraftClassId: 'light_jet',
+        airframeTypeId: 'contrail-contrail-falcon-50',
         missionType: 'charter',
       }),
       { loadMethod: 'direct-injection', injectCapable: true },

@@ -970,18 +970,17 @@ export function DispatchActivePanel(props: {
               ? 'Import OFP in the aircraft EFB'
               : 'Load manually'}
           </strong>
-          <p>
+          <p
+            title={
+              loadPath === 'efb'
+                ? 'kg mode on the EFB often writes the wrong mass into the sim and Loaded vs Due fails'
+                : undefined
+            }
+          >
             {loadPath === 'efb'
-              ? `Use Import SimBrief / Load OFP on the ${assignedAircraft} EFB or FMC.`
+              ? `Import SimBrief on the ${assignedAircraft} EFB/FMC · weight units LB`
               : `Set fuel and payload on the ${assignedAircraft} in Mass & Balance / EFB.`}
           </p>
-          {loadPath === 'efb' ? (
-            <p className="dispatch-preflight-wait-hint">
-              Set the aircraft EFB weight units to <strong>LB</strong> before
-              Import / Apply — kg mode often writes the wrong mass into the
-              sim and Preflight will fail Loaded vs Due.
-            </p>
-          ) : null}
           {!mission.lastPreflightCheck ? (
             <p
               className={
@@ -994,12 +993,6 @@ export function DispatchActivePanel(props: {
                 <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
               ) : null}{' '}
               {preflightWaitHint}
-            </p>
-          ) : mission.lastPreflightCheck.verdict === 'fail' ||
-            mission.lastPreflightCheck.verdict === 'warn' ? (
-            <p className="dispatch-preflight-wait-hint">
-              Preflight already sampled — Loaded vs Due is below. Re-import
-              weights if the sim still does not match Due.
             </p>
           ) : null}
         </div>
@@ -1804,16 +1797,6 @@ export function DispatchActivePanel(props: {
                                 : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'
                             : 'Fix the mismatched aircraft load before departure.'}
                       </small>
-                      {!enRoute &&
-                      !ready &&
-                      !injecting &&
-                      !confirming &&
-                      loadPath === 'efb' ? (
-                        <p className="dispatch-preflight-wait-hint preflight-efb-units-hint">
-                          Reminder: aircraft EFB units should be <strong>LB</strong>{' '}
-                          (not kg) when Import / Apply-ing the OFP.
-                        </p>
-                      ) : null}
                     </div>
                     <div className="preflight-head-actions">
                       {loadPath === 'inject' ||

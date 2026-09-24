@@ -408,7 +408,7 @@ export function PayloadLabPanel(props: {
               <span>{loadLayoutLabel(selected.loadLayout)}</span>
               <span className="muted">
                 {labKind === 'charter'
-                  ? 'Charter Lab: exact pax + bags on OFP (no board offer). Inject still follows charter cert gate (inject_verified config).'
+                  ? 'Charter Lab: exact pax + bags on OFP (no board offer). Inject when SKU injectCapable or passenger inject_verified.'
                   : selected.loadLayout === 'pax_and_cargo'
                     ? 'SKU fills cabin seats then leftover freight (SimBrief pax+cargo). Same for all glass variants on this Market card.'
                     : 'SKU is career freighter (omit/default). Cargo + Passengers glass share this — seats map as baggage. Not per-variant.'}

@@ -239,7 +239,7 @@ Harness **só** para OFP → inject → Due vs Sim. Reusa a UI do Dispatch/Prefl
 | **Freight** (default) | `cargoKg`, `pax=0` | Payload lb |
 | **Charter** | `missionType: charter`, `pax` + `baggageKg` (18 kg/pax), sem `charterOfferId` | Passengers (1…max seats) |
 
-Charter Lab **não** cria offer/demand no mundo — cancel local; settle continua bloqueado. Inject segue o gate real de charter (`inject_verified` na config passenger). Lista filtra SKUs sem seats.
+Charter Lab **não** cria offer/demand no mundo — cancel local; settle continua bloqueado. Inject: `airframe.injectCapable === true` **ou** config `inject_verified` (mesmo gate do board charter). Lista filtra SKUs sem seats.
 
 1. Escolhe **Freight | Charter** + SKU + payload/pax + OD  
 2. **Start lab → Dispatch**  
@@ -255,6 +255,8 @@ API: `GET|POST|DELETE /api/dev/payload-lab`. Body POST: `missionKind?: 'freight'
 **Charter Lab (2026-09-24):** modo Charter no Lab; cancel/fail charter lab sem offer no mundo.
 
 **Charter OFP bags FAIL 357 vs 360 lb (2026-09-24):** sintoma = Intent→OFP FAIL após Open SimBrief charter. Causa = `bagwgt` inteiro lb/pax (`round(missionBagsLb/pax)`) × pax drift ≤0.5 lb×N vs missão em kg; tol fixa 1 kg curta (9×18 kg → 357 vs 360). Fix = tol charter `max(1, ceil(0.5×pax/KG_TO_LB))`.
+
+**Charter inject gate (2026-09-24):** sintoma = Falcon charter só EFB Import apesar de `injectCapable: true`. Causa = charter exigia só `inject_verified` (chicken-egg). Fix = charter libera inject se `injectCapable === true` **ou** config `inject_verified`; CJ4 sem flag continua EFB.
 
 ---
 

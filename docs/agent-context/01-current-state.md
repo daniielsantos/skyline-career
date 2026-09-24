@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **80109566** / desktop **0.3.293** shipped: Credit Class Ops hours and cleans on Charter settle. Release: [v0.3.293](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.293).
+
+
 `main` **4e6606c2** / desktop **0.3.292** shipped: Fix ledger Day labels and move Money map behind help. Release: [v0.3.292](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.292).
 
 

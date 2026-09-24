@@ -1093,9 +1093,9 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
-## Asobo 737 Max 8
-- **typeId:** `asobo-737-max-8-passengers`
-- **file:** `737-max-8.png`
+## Asobo / iFly 737 Max 8
+- **typeId:** `asobo-737-max-8-passengers` (aliases: `ifly-737-max-8`, `ifly-737-max-8200`)
+- **file:** `737-max-8.png` (Market SKU; legacy hangar art also `ifly-737-max-8.png`)
 
 ```
 Stylized cartoon / clean vector illustration of a Boeing 737 Max 8 passenger airliner (B38M), three-quarter side view parked facing left.
@@ -1107,24 +1107,6 @@ Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturate
 CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
 
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
-```
-
-## iFly 737 MAX 8 / MAX 8200
-- **typeId:** `ifly-737-max-8` (also `ifly-737-max-8200` — same card art)
-- **file:** `ifly-737-max-8.png`
-
-```
-Stylized cartoon / clean vector illustration of an iFly Boeing 737 MAX 8 passenger airliner (B38M), three-quarter side view parked facing left.
-
-Keep the aircraft highly recognizable as a modern 737 MAX narrowbody: sleek passenger fuselage with a full window row (not a freighter), characteristic MAX underwing LEAP-style high-bypass engines with chevron / serrated nozzle lips and larger nacelles than a 737 NG, Advanced Technology split-tip winglets (not classic blended NG winglets), pointed 737 nose and cockpit eyebrow windows, conventional 737 T-tail-less empennage with a tall single fin, retractable tricycle gear down. Slightly longer / denser “MAX 8 family” look is fine — do not invent a MAX 10 stretch or a freighter cargo door. Must read as 737 MAX at a glance, distinct from NG 737-800 and from Airbus A320neo.
-
-Paint: clean neutral airline-white fuselage with subtle dark grey belly and wing/engine accents (generic, no airline livery, no logos, no titles). Optional thin tasteful cheatline only — no readable text.
-
-Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
-
-CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), stacked cargo containers, apron floodlights casting soft pools of light. Soft ground shadow under the aircraft.
-
-Composition: aircraft large and centered for a wide market card banner (aspect ~16:9). No text, no logos, no watermarks, no people in focus, no cockpit interior, no UI overlay.
 ```
 
 ## Synaptic / iniBuilds A220-300

@@ -434,8 +434,8 @@ describe('resolveDispatchSimBriefParams', () => {
   it('iFly 737 MAX: live seat layout picks SimBrief LBS airframe row', async () => {
     const max8 = await resolveDispatchSimBriefParams({
       aircraftClassId: 'narrow_freighter',
-      airframeTypeId: 'ifly-737-max-8',
-      rolesPackRelPath: 'profiles/ofp/ifly-737-max-8.json',
+      airframeTypeId: 'asobo-737-max-8-passengers',
+      rolesPackRelPath: 'profiles/ofp/asobo-737-max-8-passengers.json',
       liveTitle: 'iFly 737-MAX8 (178Seats)',
     });
     assert.equal(max8.simbriefIcao, 'B38M');
@@ -446,8 +446,8 @@ describe('resolveDispatchSimBriefParams', () => {
 
     const max8200 = await resolveDispatchSimBriefParams({
       aircraftClassId: 'narrow_freighter',
-      airframeTypeId: 'ifly-737-max-8200',
-      rolesPackRelPath: 'profiles/ofp/ifly-737-max-8200.json',
+      airframeTypeId: 'asobo-737-max-8-passengers',
+      rolesPackRelPath: 'profiles/ofp/asobo-737-max-8-passengers.json',
       liveTitle: 'iFly 737-MAX8200',
     });
     assert.equal(max8200.simbriefIcao, 'B38M');

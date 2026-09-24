@@ -397,6 +397,12 @@ export function liveTitleMatchesMarketSku(
     // Seat-layout MAX8 only — exclude MAX8200 (prefix would otherwise match).
     return /iFly\s*737-MAX8\s*\(\d+\s*Seats?\)/i.test(t);
   }
+  if (id === 'asobo-737-max-8-passengers') {
+    // Family: Asobo Max 8 + iFly MAX 8 seats + iFly MAX 8200.
+    if (/iFly\s*737-MAX8200/i.test(t)) return true;
+    if (/iFly\s*737-MAX8\s*\(\d+\s*Seats?\)/i.test(t)) return true;
+    return /737\s*Max\s*8/i.test(t) && !/8200/i.test(t);
+  }
   return false;
 }
 

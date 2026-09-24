@@ -10,8 +10,8 @@
   "matchTitlePattern": "iFly\\s*737-MAX8200",
   "notes": [
     "iFly 737-MAX8200 — native-simbrief (EFB/tablet load)",
-    "Market SKU: ifly-737-max-8200 (narrow_freighter, pax_and_cargo)",
-    "Seat-layout MAX8 (166/178/189) is a separate SKU: ifly-737-max-8",
+    "Market SKU: asobo-737-max-8-passengers (Asobo + iFly MAX 8 / 8200 family)",
+    "iFly MAX 8 seat layouts use sibling pack: profiles/ofp/ifly-737-max-8.json",
     "SimBrief type B38M — pack match Default; live title infers iFly (MSFS) - 737 MAX 8200 - 197 Seats (LBS)",
     "Homologated: ifly/ifly-737-max8200@1.0.0",
     "Fuel: L/R MAIN + CENTER classic qty; write plans empty",

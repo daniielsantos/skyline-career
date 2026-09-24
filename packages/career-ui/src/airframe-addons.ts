@@ -28,6 +28,7 @@ const PUBLISHER_BY_PREFIX: Array<{ prefix: string; publisher: string }> = [
   { prefix: 'tfdi', publisher: 'TFDi Design' },
   { prefix: 'skyward', publisher: 'Skyward' },
   { prefix: 'contrail', publisher: 'Contrail' },
+  { prefix: 'ifly', publisher: 'iFly' },
   { prefix: 'a2a', publisher: 'A2A Simulations' },
   { prefix: 'asobo', publisher: 'Asobo' },
   { prefix: 'microsoft', publisher: 'Microsoft' },
@@ -80,6 +81,10 @@ const ADDONS_BY_TYPE_ID: Record<string, AirframeAddon[]> = {
   'contrail-contrail-falcon-50': [
     { publisher: 'Contrail', product: 'Falcon 50' },
   ],
+  'asobo-737-max-8-passengers': [
+    { publisher: 'Asobo', product: '737 Max 8 Passengers' },
+    { publisher: 'iFly', product: '737 MAX 8 / MAX 8200' },
+  ],
 };
 
 function publisherFromStem(stem: string): string | null {
@@ -99,7 +104,11 @@ export function listAirframeAddons(
 ): AirframeAddon[] {
   const id = airframeTypeId?.trim();
   if (!id) return [];
-  const override = ADDONS_BY_TYPE_ID[id];
+  const resolved =
+    id === 'ifly-737-max-8' || id === 'ifly-737-max-8200'
+      ? 'asobo-737-max-8-passengers'
+      : id;
+  const override = ADDONS_BY_TYPE_ID[resolved];
   if (override) return override;
   const publisher = publisherFromStem(id);
   if (publisher) return [{ publisher }];

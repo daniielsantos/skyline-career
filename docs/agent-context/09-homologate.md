@@ -57,9 +57,7 @@ Não criar um `typeId` de catálogo por Highline/Passenger/Stol. Um SKU + um (ou
 | `inibuilds-a300-600` | `wide_freighter` | pax + freighter packs (`familyRolesPackRelPaths`) | **A306** `iniBuilds (MSFS) - A300-600R GE/PW` (not Default; freighter glass uses same engine row — no Preighter) |
 | `inibuilds-l1011-500` | `wide_freighter` | Regular + Engine Pod packs (`familyRolesPackRelPaths`) | **L101** `iniBuilds (MSFS) - L1011-500 Regular` / `Pod Ferry` (not Default; Engine Pod glass → Pod Ferry) |
 | `inibuilds-a340-300` | `wide_freighter` | pax + freighter + VIP packs (`familyRolesPackRelPaths`) | **A343** Passenger / Preighter / VIP (not Default; Freighter glass → Preighter) |
-| `asobo-737-max-8-passengers` | `narrow_freighter` | `profiles/ofp/asobo-737-max-8-passengers.json` | **B38M** Default |
-| `ifly-737-max-8` | `narrow_freighter` | `profiles/ofp/ifly-737-max-8.json` (166/178/189 seats) | **B38M** `iFly (MSFS) - 737 MAX 8 - N Seats (LBS)` via live title (pack Default) |
-| `ifly-737-max-8200` | `narrow_freighter` | `profiles/ofp/ifly-737-max-8200.json` | **B38M** `iFly (MSFS) - 737 MAX 8200 - 197 Seats (LBS)` via live title (pack Default) |
+| `asobo-737-max-8-passengers` | `narrow_freighter` | Asobo + iFly MAX 8 / 8200 (`familyRolesPackRelPaths`) | **B38M** Default (Asobo); iFly live → `iFly (MSFS) - 737 MAX 8 - N Seats (LBS)` / `…8200 - 197 Seats (LBS)` |
 | `synaptic-a220-300` | `narrow_freighter` | `profiles/ofp/synaptic-a220-300.json` | **BCS3** `Synaptic / iniBuilds (MSFS) - A220-300` (not Default) |
 | `skyward-cessna-c680` | `light_jet` | `profiles/ofp/skyward-cessna-c680.json` | **C680** `Skyward Simulations (MSFS) - C680 Sovereign+` (not Default); passenger **`inject_verified`** + `efbPaxWeightLb: 210` / S14–S16 ghosts omitted |
 | `contrail-contrail-falcon-50` | `light_jet` | `profiles/ofp/contrail-contrail-falcon-50.json` | **FA50** `Contrail (MSFS) - Falcon 50B` (not Default); fuel = FUELSYSTEM 1–6 + panel SW off; engines off (@1.1.1) |
@@ -91,7 +89,7 @@ Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço 
 
 - **L1011-500 iniBuilds promote (2026-09-23):** sintoma = 4 glasses (Standard/Lounge × Regular/Engine Pod) fora do Market. Fix = SKU `inibuilds-l1011-500` + packs Regular/Pod; SimBrief **L101** Regular vs Pod Ferry via `Engine Pod` no título; normalize `L-1011`→`L1011`; variant tokens `lounge`/`pod`. Arte: prompt pendente PNG.
 
-- **iFly 737 MAX promote (2026-09-24):** sintoma = 4 glasses homologados (MAX8 166/178/189 + MAX8200) fora do Market / SimBrief Default. Fix = SKUs `ifly-737-max-8` + `ifly-737-max-8200` (native-simbrief, `injectCapable: false`); pack match Default; live title → `iFly (MSFS) - 737 MAX 8 - N Seats (LBS)` / `…8200 - 197 Seats (LBS)`. Arte: `ifly-737-max-8.png` (ambos SKUs).
+- **iFly 737 MAX promote (2026-09-24):** sintoma = 4 glasses homologados (MAX8 166/178/189 + MAX8200) fora do Market / SimBrief Default. Fix = packs iFly + merge no SKU `asobo-737-max-8-passengers` (`familyRolesPackRelPaths`); aliases `ifly-737-max-8` / `ifly-737-max-8200`; live title → seat rows LBS; Market “i” lista Asobo + iFly. Arte: `737-max-8.png` (SKU) / `ifly-737-max-8.png` (legado).
 
 ## Hubs (aeroportos career)
 

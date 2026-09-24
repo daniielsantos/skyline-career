@@ -24,4 +24,4 @@
 ## Homologated
 
 - `profiles/examples/ifly-ifly-737-max8200.json`
-- Market SKU: `ifly-737-max-8200` (OFP pack `profiles/ofp/ifly-737-max-8200.json`); SimBrief 197-seat LBS row via live title.
+- Market SKU: `asobo-737-max-8-passengers` (family pack `profiles/ofp/ifly-737-max-8200.json`); SimBrief 197-seat LBS row via live title.

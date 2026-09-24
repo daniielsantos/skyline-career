@@ -451,6 +451,9 @@ const LEGACY_AIRFRAME_ALIASES: Record<string, string> = {
   'flightfx-c750': 'flightfx-citation-x',
   'flightfx-c750-winglets': 'flightfx-citation-x',
   'flightfx-citation-x-winglets': 'flightfx-citation-x',
+  /** iFly MAX 8 / 8200 glasses — same Market family as Asobo 737 Max 8. */
+  'ifly-737-max-8': 'asobo-737-max-8-passengers',
+  'ifly-737-max-8200': 'asobo-737-max-8-passengers',
 };
 
 const BY_ID = new Map(CAREER_PLAYER_AIRFRAMES.map((airframe) => [airframe.typeId, airframe]));

@@ -499,6 +499,27 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       false,
     );
     assert.equal(
+      liveTitleMatchesMarketSku(
+        'iFly 737-MAX8 (178Seats)',
+        'asobo-737-max-8-passengers',
+      ),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku(
+        'iFly 737-MAX8200',
+        'asobo-737-max-8-passengers',
+      ),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku(
+        '737 Max 8 Passengers',
+        'asobo-737-max-8-passengers',
+      ),
+      true,
+    );
+    assert.equal(
       inferSimBriefAirframeMatchFromTitle('A300 Passenger (GE)'),
       'iniBuilds \\(MSFS\\) - A300-600R GE',
     );

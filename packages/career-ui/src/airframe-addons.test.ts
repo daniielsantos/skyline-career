@@ -21,6 +21,13 @@ describe('airframe addons', () => {
     ]);
   });
 
+  it('lists Asobo and iFly on the shared 737 Max 8 SKU', () => {
+    const rows = listAirframeAddons('asobo-737-max-8-passengers');
+    assert.equal(rows.length, 2);
+    assert.ok(rows.some((r) => r.publisher === 'Asobo'));
+    assert.ok(rows.some((r) => r.publisher === 'iFly'));
+  });
+
   it('lists both Caravan vendors on the shared SKU', () => {
     const rows = listAirframeAddons('c208-caravan-cargo');
     assert.equal(rows.length, 2);

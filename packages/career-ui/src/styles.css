@@ -4162,6 +4162,44 @@ tr.lot-locked {
   --accent-ink: var(--dispatch-accent-ink);
 }
 
+.dispatch-body-stack {
+  display: contents;
+}
+
+.dispatch-ops-first {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dispatch-ops-first > .dispatch-stack-fuel {
+  order: 1;
+}
+.dispatch-ops-first > .dispatch-stack-load {
+  order: 2;
+}
+.dispatch-ops-first > .dispatch-stack-preflight {
+  order: 3;
+}
+.dispatch-ops-first > .dispatch-stack-ofp {
+  order: 4;
+}
+.dispatch-ops-first > .dispatch-stack-summary {
+  order: 5;
+}
+.dispatch-ops-first > .dispatch-stack-manifest {
+  order: 6;
+}
+
+.dispatch-ops-first > .dispatch-stack-summary:empty,
+.dispatch-ops-first > .dispatch-stack-manifest:empty,
+.dispatch-ops-first > .dispatch-stack-ofp:empty,
+.dispatch-ops-first > .dispatch-stack-fuel:empty,
+.dispatch-ops-first > .dispatch-stack-load:empty,
+.dispatch-ops-first > .dispatch-stack-preflight:empty {
+  display: none;
+}
+
 .dispatch-settle-busy {
   position: absolute;
   inset: 0;
@@ -8834,6 +8872,15 @@ table.contracts-table .col-access .action {
 
 .ofp-aircraft-details-grid {
   margin-top: 0.45rem;
+}
+
+.ofp-aircraft-meta-grid {
+  margin-top: 0.55rem;
+  opacity: 0.92;
+}
+
+.ofp-aircraft-meta-grid dt {
+  font-size: 0.72rem;
 }
 
 .fuel-purchase-card .mx-fuel-burn-alert,

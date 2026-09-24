@@ -252,6 +252,21 @@ export function DispatchActivePanel(props: {
     Boolean(mission.lastPreflightCheck) &&
     (step === 'load' || step === 'ready' || step === 'en_route');
   const showRouteMap = showPreflight;
+  /** After OFP is locked: put Import + Preflight above contract/OFP chrome. */
+  const opsFirst =
+    !isEnRoute && (step === 'fuel' || step === 'load' || step === 'ready');
+  const canEditCargo =
+    ['accepted', 'dispatched'].includes(mission.status) &&
+    !mission.contractPilot &&
+    mission.missionType !== 'charter';
+  const showManifestSection =
+    !isEnRoute &&
+    (isFerryLeg
+      ? true
+      : opsFirst
+        ? canEditCargo
+        : (mission.lots?.length ?? 0) > 0 ||
+          ['accepted', 'dispatched'].includes(mission.status));
 
   const ofpCargoUnderOnly =
     isOfpCargoUnderOnlyFailureUi(mission.lastOfpCheck) &&
@@ -445,6 +460,14 @@ export function DispatchActivePanel(props: {
         </div>
       </div>
 
+      <div
+        className={
+          opsFirst
+            ? 'dispatch-body-stack dispatch-ops-first'
+            : 'dispatch-body-stack'
+        }
+      >
+      <div className="dispatch-stack-summary">
       {!isEnRoute ? (
         (() => {
           const structuralMaxKg = props.missionMaxCargoKg(mission);
@@ -477,6 +500,28 @@ export function DispatchActivePanel(props: {
           );
 
           if (isFerryLeg) {
+            const ferryHighlights = [
+              {
+                label: mission.contractPilot ? 'Pilot fee' : 'Payout',
+                value: props.formatMoney(mission.payUsd),
+              },
+              { label: 'Deadline', value: deadlineLabel },
+              { label: 'Route', value: routeLabel },
+              {
+                label: 'Mission',
+                value: flightKind,
+              },
+              ...(mission.fuelUplift &&
+              (mission.fuelUplift.costUsd > 0 ||
+                mission.fuelUplift.requestedKg > 0.5)
+                ? [
+                    {
+                      label: 'Fuel booked',
+                      value: `${props.formatMoney(mission.fuelUplift.costUsd)} · ${props.formatTonnes(mission.fuelUplift.requestedKg)}`,
+                    },
+                  ]
+                : []),
+            ];
             return (
               <DispatchFlightSummary
                 ariaLabel="Ferry summary"
@@ -486,43 +531,61 @@ export function DispatchActivePanel(props: {
                 capKg={0}
                 showCapacityBar={false}
                 capacityStaticLabel="Empty"
-                capacityNote="ferry / reposition"
-                highlights={[
-                  {
-                    label: mission.contractPilot ? 'Pilot fee' : 'Payout',
-                    value: props.formatMoney(mission.payUsd),
-                  },
-                  { label: 'Deadline', value: deadlineLabel },
-                  { label: 'Route', value: routeLabel },
-                ]}
-                planningDetails={
-                  mission.fuelUplift &&
-                  (mission.fuelUplift.costUsd > 0 ||
-                    mission.fuelUplift.requestedKg > 0.5) ? (
-                    <span>
-                      Fuel booked
-                      <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
-                      <em>
-                        {props.formatTonnes(mission.fuelUplift.requestedKg)}
-                        {mission.fuelUplift.scarcity !== 'ok'
-                          ? ` · ${mission.fuelUplift.scarcity}`
-                          : ''}
-                      </em>
-                    </span>
-                  ) : (
-                    <span>
-                      Mission
-                      <strong>{flightKind}</strong>
-                      <em>
-                        {mission.reason?.trim() ||
-                          'Empty reposition — no freight on board'}
-                      </em>
-                    </span>
-                  )
+                capacityNote={
+                  mission.reason?.trim() ||
+                  'ferry / reposition — no freight on board'
                 }
+                highlights={ferryHighlights}
               />
             );
           }
+
+          const lotCount = mission.lots?.length ?? 1;
+          const fuelBookedHighlight =
+            mission.fuelUplift &&
+            (mission.fuelUplift.costUsd > 0 ||
+              mission.fuelUplift.requestedKg > 0.5)
+              ? {
+                  label: 'Fuel booked',
+                  value: `${props.formatMoney(mission.fuelUplift.costUsd)} · ${props.formatTonnes(mission.fuelUplift.requestedKg)}${
+                    mission.fuelUplift.scarcity !== 'ok'
+                      ? ` · ${mission.fuelUplift.scarcity}`
+                      : ''
+                  }`,
+                }
+              : null;
+          const summaryHighlights = [
+            {
+              label: 'Contract',
+              value: props.formatMoney(mission.payUsd),
+            },
+            { label: 'Deadline', value: deadlineLabel },
+            { label: 'Route', value: routeLabel },
+            ...(mission.missionType === 'charter'
+              ? [
+                  {
+                    label: 'Passengers',
+                    value: String(mission.pax ?? 0),
+                  },
+                  {
+                    label: 'Baggage',
+                    value: formatMassExact(
+                      mission.baggageKg ?? 0,
+                      weightSystem,
+                    ),
+                  },
+                ]
+              : [
+                  {
+                    label: 'Capacity left',
+                    value: props.formatTonnes(capacityLeftKg),
+                  },
+                  ...(lotCount > 1
+                    ? [{ label: 'Lots', value: String(lotCount) }]
+                    : []),
+                ]),
+            ...(fuelBookedHighlight ? [fuelBookedHighlight] : []),
+          ];
 
           return (
             <DispatchFlightSummary
@@ -538,99 +601,19 @@ export function DispatchActivePanel(props: {
               }
               capKg={barCapKg}
               capacityNote={routeOpsNote}
-              highlights={[
-                {
-                  label: 'Contract',
-                  value: props.formatMoney(mission.payUsd),
-                },
-                { label: 'Deadline', value: deadlineLabel },
-                { label: 'Route', value: routeLabel },
-                ...(mission.missionType === 'charter'
-                  ? [
-                      {
-                        label: 'Passengers',
-                        value: String(mission.pax ?? 0),
-                      },
-                    ]
-                  : []),
-              ]}
-              planningDetails={
-                <>
-                  {mission.missionType === 'charter' ? (
-                    <>
-                      <span>
-                        Passengers
-                        <strong>{mission.pax ?? 0}</strong>
-                        <em>charter group</em>
-                      </span>
-                      <span>
-                        Baggage
-                        <strong>
-                          {formatMassExact(mission.baggageKg ?? 0, weightSystem)}
-                        </strong>
-                        <em>contracted</em>
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        Capacity left
-                        <strong>{props.formatTonnes(capacityLeftKg)}</strong>
-                        <em>
-                          {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg
-                            ? 'vs route ops cap'
-                            : 'structural'}
-                        </em>
-                      </span>
-                      {opsCapKg !== null && opsCapKg + 1 < structuralMaxKg ? (
-                        <span>
-                          Structural max
-                          <strong>{props.formatTonnes(structuralMaxKg)}</strong>
-                          <em>airframe · not the booking cap</em>
-                        </span>
-                      ) : null}
-                      <span>
-                        Cargo lots
-                        <strong>{mission.lots?.length ?? 1}</strong>
-                        <em>
-                          {(mission.lots?.length ?? 1) > 1
-                            ? 'multi-lot manifest'
-                            : 'single lot'}
-                        </em>
-                      </span>
-                    </>
-                  )}
-                  {mission.fuelUplift &&
-                  (mission.fuelUplift.costUsd > 0 ||
-                    mission.fuelUplift.requestedKg > 0.5) ? (
-                    <span>
-                      Fuel booked
-                      <strong>{props.formatMoney(mission.fuelUplift.costUsd)}</strong>
-                      <em>
-                        {props.formatTonnes(mission.fuelUplift.requestedKg)}
-                        {mission.fuelUplift.scarcity !== 'ok'
-                          ? ` · ${mission.fuelUplift.scarcity}`
-                          : ''}
-                      </em>
-                    </span>
-                  ) : null}
-                </>
-              }
+              highlights={summaryHighlights}
             />
           );
         })()
       ) : null}
+      </div>
 
-      {!isEnRoute &&
-      !isFerryLeg &&
-      ((mission.lots?.length ?? 0) > 0 ||
-        ['accepted', 'dispatched'].includes(mission.status)) ? (
+      <div className="dispatch-stack-manifest">
+      {showManifestSection && !isFerryLeg ? (
         <div className="staging-section">
           <div className="staging-section-head">
             <h3>{mission.missionType === 'charter' ? 'Passengers' : 'Cargo'}</h3>
-            {['accepted', 'dispatched'].includes(mission.status) &&
-            !mission.contractPilot &&
-            mission.missionType !== 'charter' ? (
+            {canEditCargo ? (
               <button
                 type="button"
                 className="action ghost info dispatch-edit-btn"
@@ -659,7 +642,7 @@ export function DispatchActivePanel(props: {
             <p className="empty">No cargo lots on this flight yet.</p>
           )}
         </div>
-      ) : !isEnRoute && isFerryLeg ? (
+      ) : showManifestSection && isFerryLeg ? (
         <div className="staging-section">
           <div className="staging-section-head">
             <h3>Ferry</h3>
@@ -672,7 +655,9 @@ export function DispatchActivePanel(props: {
           </p>
         </div>
       ) : null}
+      </div>
 
+      <div className="dispatch-stack-ofp">
       {(step === 'flight_plan' || showOfpCard) && showOfpCard && !isEnRoute
         ? (() => {
             const check = mission.lastOfpCheck!;
@@ -689,14 +674,16 @@ export function DispatchActivePanel(props: {
                   : `${Math.round(briefing.cruiseAltitudeFt).toLocaleString('en-US')} FT`
                 : undefined;
             const ofpPax =
-              typeof check.passengerCount === 'number' &&
-              Number.isFinite(check.passengerCount)
-                ? Math.max(0, Math.floor(check.passengerCount))
-                : typeof mission.pax === 'number' &&
-                    Number.isFinite(mission.pax) &&
-                    mission.pax > 0
-                  ? Math.floor(mission.pax)
-                  : undefined;
+              mission.missionType === 'charter'
+                ? typeof check.passengerCount === 'number' &&
+                  Number.isFinite(check.passengerCount)
+                  ? Math.max(0, Math.floor(check.passengerCount))
+                  : typeof mission.pax === 'number' &&
+                      Number.isFinite(mission.pax) &&
+                      mission.pax > 0
+                    ? Math.floor(mission.pax)
+                    : undefined
+                : undefined;
             const plannedPayloadLb =
               mission.lastPreflightCheck?.loadVerification?.payload?.plannedLb;
             const payloadKg =
@@ -715,7 +702,7 @@ export function DispatchActivePanel(props: {
                       mission.baggageKg > 0
                     ? mission.baggageKg
                     : undefined;
-            // Ops-first grid — hangar/type/tail live under “Aircraft details”.
+            // Ops-first grid — hangar/type/tail stay as a compact meta strip.
             const briefingItems = [
               briefing?.distanceNm !== undefined
                 ? ['Distance', `${Math.round(briefing.distanceNm)} NM`]
@@ -728,16 +715,12 @@ export function DispatchActivePanel(props: {
                 ? ['Payload', formatMassExact(payloadKg, weightSystem)]
                 : null,
             ].filter((item): item is [string, string] => item !== null);
-            const aircraftDetailItems = [
+            const aircraftMetaItems = [
               assignedAircraft ? ['Hangar', assignedAircraft] : null,
               briefing?.aircraftIcao
                 ? ['OFP type', briefing.aircraftIcao]
                 : null,
               briefing?.tailNumber ? ['Tail', briefing.tailNumber] : null,
-              [
-                'Checked',
-                new Date(check.checkedAtIso).toLocaleTimeString(),
-              ] as [string, string],
             ].filter((item): item is [string, string] => item !== null);
 
             return (
@@ -789,21 +772,21 @@ export function DispatchActivePanel(props: {
                 ) : (
                   <p>Re-check SimBrief to load the operational route.</p>
                 )}
-                {aircraftDetailItems.length > 0 ? (
-                  <details className="ofp-aircraft-details">
-                    <summary>Aircraft details</summary>
-                    <dl className="ofp-briefing-grid ofp-aircraft-details-grid">
-                      {aircraftDetailItems.map(([label, value]) => (
-                        <div key={label}>
-                          <dt>{label}</dt>
-                          <dd>{value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </details>
+                {aircraftMetaItems.length > 0 ? (
+                  <dl className="ofp-briefing-grid ofp-aircraft-meta-grid">
+                    {aircraftMetaItems.map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 ) : null}
                 {actionableFindings.length > 0 ? (
-                  <details className="preflight-technical" open={ofpCargoUnderOnly}>
+                  <details
+                    className="preflight-technical"
+                    open={ofpCargoUnderOnly || check.verdict === 'fail'}
+                  >
                     <summary>
                       {actionableFindings.length}{' '}
                       {actionableFindings.length === 1 ? 'OFP detail' : 'OFP details'}
@@ -860,7 +843,9 @@ export function DispatchActivePanel(props: {
           </div>
         </div>
       ) : null}
+      </div>
 
+      <div className="dispatch-stack-fuel">
       {step === 'fuel' ? (
         props.missionFuelQuote ? (
           <section className="fuel-purchase-card" aria-live="polite">
@@ -962,7 +947,9 @@ export function DispatchActivePanel(props: {
           </div>
         )
       ) : null}
+      </div>
 
+      <div className="dispatch-stack-load">
       {showLoadPanel && loadPath !== 'inject' ? (
         <div className="dispatch-step-card" aria-live="polite">
           <strong>
@@ -1030,22 +1017,9 @@ export function DispatchActivePanel(props: {
           ) : null}
         </div>
       ) : null}
+      </div>
 
-      {showRouteMap && isEnRoute ? (
-        <DispatchRouteCard
-          fill
-          originIcao={mission.originIcao}
-          destIcao={mission.destIcao}
-          waypoints={mission.lastOfpCheck?.briefing?.waypoints}
-          ofpRoute={mission.lastOfpCheck?.briefing?.route}
-          aircraft={stickyAircraft}
-          busy={busy}
-          canRefreshNavlog={Boolean(simbriefUser.trim())}
-          onOpenAirport={props.onOpenAirport}
-          onRefreshNavlog={() => props.onRefreshOfpBriefing(mission)}
-        />
-      ) : null}
-
+      <div className="dispatch-stack-preflight">
       {showPreflight && mission.lastPreflightCheck
         ? (() => {
             const check = mission.lastPreflightCheck;
@@ -1464,7 +1438,8 @@ export function DispatchActivePanel(props: {
                 ofpBriefing?.airTime
                   ? ['Air', ofpBriefing.airTime]
                   : null,
-                typeof mission.lastOfpCheck?.passengerCount === 'number'
+                typeof mission.lastOfpCheck?.passengerCount === 'number' &&
+                mission.missionType === 'charter'
                   ? [
                       'Pax',
                       String(
@@ -1474,7 +1449,9 @@ export function DispatchActivePanel(props: {
                         ),
                       ),
                     ]
-                  : typeof mission.pax === 'number' && mission.pax > 0
+                  : mission.missionType === 'charter' &&
+                      typeof mission.pax === 'number' &&
+                      mission.pax > 0
                     ? ['Pax', String(Math.floor(mission.pax))]
                     : null,
                 mission.cargoKg > 0
@@ -1940,7 +1917,10 @@ export function DispatchActivePanel(props: {
                   liveLoadGrid
                 )}
                 {check.findings.length > 0 ? (
-                  <details className="preflight-technical">
+                  <details
+                    className="preflight-technical"
+                    open={!ready}
+                  >
                     <summary>{noteLabel}</summary>
                     <ul className="ofp-findings">
                       {check.findings.map((finding) => (
@@ -1959,6 +1939,23 @@ export function DispatchActivePanel(props: {
             );
           })()
         : null}
+      </div>
+      </div>
+
+      {showRouteMap && isEnRoute ? (
+        <DispatchRouteCard
+          fill
+          originIcao={mission.originIcao}
+          destIcao={mission.destIcao}
+          waypoints={mission.lastOfpCheck?.briefing?.waypoints}
+          ofpRoute={mission.lastOfpCheck?.briefing?.route}
+          aircraft={stickyAircraft}
+          busy={busy}
+          canRefreshNavlog={Boolean(simbriefUser.trim())}
+          onOpenAirport={props.onOpenAirport}
+          onRefreshNavlog={() => props.onRefreshOfpBriefing(mission)}
+        />
+      ) : null}
 
       {showRouteMap && !isEnRoute ? (
         <DispatchRouteCard

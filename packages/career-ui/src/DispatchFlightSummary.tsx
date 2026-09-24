@@ -16,13 +16,15 @@ export function DispatchFlightSummary(props: {
   capacityStaticLabel?: string;
   capacityNote?: string;
   highlights: DispatchFlightSummaryHighlight[];
-  planningDetails: ReactNode;
+  /** When omitted/null, the Planning details disclosure is hidden. */
+  planningDetails?: ReactNode | null;
   planningSummaryLabel?: string;
 }) {
   const showBar = props.showCapacityBar !== false && props.capKg > 0;
   const fillPct = showBar
     ? Math.min(100, Math.round((props.totalKg / props.capKg) * 100))
     : 0;
+  const showPlanning = props.planningDetails != null && props.planningDetails !== false;
 
   return (
     <section
@@ -78,12 +80,14 @@ export function DispatchFlightSummary(props: {
         ))}
       </div>
 
-      <details className="staging-planning-details">
-        <summary>{props.planningSummaryLabel ?? 'Planning details'}</summary>
-        <div className="cargo-capacity staging-capacity staging-planning-grid">
-          {props.planningDetails}
-        </div>
-      </details>
+      {showPlanning ? (
+        <details className="staging-planning-details">
+          <summary>{props.planningSummaryLabel ?? 'Planning details'}</summary>
+          <div className="cargo-capacity staging-capacity staging-planning-grid">
+            {props.planningDetails}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

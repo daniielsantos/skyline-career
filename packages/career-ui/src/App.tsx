@@ -2453,6 +2453,36 @@ function liveProgress(opts: {
   return opts.fallbackPct ?? 0;
 }
 
+/**
+ * Progress bars must not shrink while a leg is airborne. Clock polls can nudge
+ * displayNowMs backward (RTT / offset correction); CSS width transitions make
+ * that look like the NPC is flying in reverse.
+ * Key includes wall stamps so a real retime (shiftEconomyWallClock) resets.
+ */
+function holdMonotonicPct(
+  store: Map<string, number>,
+  key: string,
+  raw: number,
+): number {
+  const clamped = Math.max(0, Math.min(100, raw));
+  const held = Math.max(store.get(key) ?? 0, clamped);
+  store.set(key, held);
+  return held;
+}
+
+/** Ignore sub-3s backward clock snaps from poll RTT / offset rewrite. */
+const DISPLAY_NOW_BACKWARD_SLACK_MS = 3_000;
+
+function coalesceDisplayNowMs(prev: number, next: number): number {
+  if (
+    next < prev &&
+    prev - next < DISPLAY_NOW_BACKWARD_SLACK_MS
+  ) {
+    return prev;
+  }
+  return next;
+}
+
 function liveEtaHours(opts: {
   arrivesAtMs?: number;
   nowMs: number;
@@ -2909,6 +2939,18 @@ function MovementBoard(props: {
   nowMs: number;
   weightSystem?: WeightSystem;
 }) {
+  const progressFloorRef = useRef(new Map<string, number>());
+  useEffect(() => {
+    const alive = new Set(
+      props.rows.map(
+        (r) =>
+          `${r.kind}-${r.id}:${r.departedAtMs ?? ''}:${r.arrivesAtMs ?? ''}`,
+      ),
+    );
+    for (const key of progressFloorRef.current.keys()) {
+      if (!alive.has(key)) progressFloorRef.current.delete(key);
+    }
+  }, [props.rows]);
   return (
     <div className="movement-board">
       <h3>{props.title}</h3>
@@ -2923,12 +2965,17 @@ function MovementBoard(props: {
               nowMs: props.nowMs,
               fallbackHours: row.etaHours,
             });
-            const pct = liveProgress({
-              departedAtMs: row.departedAtMs,
-              arrivesAtMs: row.arrivesAtMs,
-              nowMs: props.nowMs,
-              fallbackPct: row.progressPct,
-            });
+            const progressKey = `${row.kind}-${row.id}:${row.departedAtMs ?? ''}:${row.arrivesAtMs ?? ''}`;
+            const pct = holdMonotonicPct(
+              progressFloorRef.current,
+              progressKey,
+              liveProgress({
+                departedAtMs: row.departedAtMs,
+                arrivesAtMs: row.arrivesAtMs,
+                nowMs: props.nowMs,
+                fallbackPct: row.progressPct,
+              }),
+            );
             const phase =
               row.phase === 'boarding' || row.phase === 'turnaround'
                 ? row.phase
@@ -3053,6 +3100,7 @@ function FleetRoster(props: {
   );
   const [classFilter, setClassFilter] = useState<'' | AircraftClass>('');
   const [laneFilter, setLaneFilter] = useState<LaneFilter>('');
+  const progressFloorRef = useRef(new Map<string, number>());
   const countryFilter =
     countryOverride !== undefined
       ? countryOverride
@@ -3060,12 +3108,23 @@ function FleetRoster(props: {
 
   const enriched = useMemo(
     () =>
-      props.fleet.map((npc) => ({
-        npc,
-        ...resolveNpcLiveState(npc, props.nowMs),
-      })),
+      props.fleet.map((npc) => {
+        const live = resolveNpcLiveState(npc, props.nowMs);
+        const mission = live.mission;
+        const progressKey = mission
+          ? `${npc.id}:${mission.departedAtMs ?? ''}:${mission.arrivesAtMs ?? ''}`
+          : `${npc.id}:ground`;
+        return { npc, ...live, progressKey };
+      }),
     [props.fleet, props.nowMs],
   );
+
+  useEffect(() => {
+    const alive = new Set(enriched.map((row) => row.progressKey));
+    for (const key of progressFloorRef.current.keys()) {
+      if (!alive.has(key)) progressFloorRef.current.delete(key);
+    }
+  }, [enriched]);
 
   const countryOptions = useMemo(() => {
     const ids = new Set<string>();
@@ -3330,7 +3389,17 @@ function FleetRoster(props: {
           </thead>
           <tbody>
             {pageRows.map(
-              ({ npc, mission, eta, pct, turnaroundLeft, restLeft, mxLeft, phase }) => (
+              ({
+                npc,
+                mission,
+                eta,
+                pct,
+                progressKey,
+                turnaroundLeft,
+                restLeft,
+                mxLeft,
+                phase,
+              }) => (
                 <tr key={npc.id} className={`fleet-row phase-${phase}`}>
                   <td>
                     <strong>{npc.name}</strong>
@@ -3414,7 +3483,13 @@ function FleetRoster(props: {
                   </td>
                   <td>
                     {mission ? (
-                      <ProgressTrack pct={pct} />
+                      <ProgressTrack
+                        pct={holdMonotonicPct(
+                          progressFloorRef.current,
+                          progressKey,
+                          pct,
+                        )}
+                      />
                     ) : (
                       <span className="muted">—</span>
                     )}
@@ -4783,7 +4858,7 @@ export function App() {
     setTick(state.tick);
     setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
     setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
-    setDisplayNowMs(serverNow);
+    setDisplayNowMs((prev) => coalesceDisplayNowMs(prev, serverNow));
     const stateCompanyId =
       typeof state.companyId === 'string' ? state.companyId.trim() : '';
     const expectedTenant =
@@ -5795,7 +5870,9 @@ export function App() {
           if (typeof clock.serverNowMs === 'number') {
             const clientNow = Date.now();
             setServerOffsetMs(clock.serverNowMs - clientNow);
-            setDisplayNowMs(clock.serverNowMs);
+            setDisplayNowMs((prev) =>
+              coalesceDisplayNowMs(prev, clock.serverNowMs),
+            );
           }
         })
         .catch(() => undefined);
@@ -5816,7 +5893,9 @@ export function App() {
   // Smooth local clock / ETA / progress between authoritative polls.
   useEffect(() => {
     const id = window.setInterval(() => {
-      setDisplayNowMs(Date.now() + serverOffsetMs);
+      setDisplayNowMs((prev) =>
+        coalesceDisplayNowMs(prev, Date.now() + serverOffsetMs),
+      );
     }, 1_000);
     return () => window.clearInterval(id);
   }, [serverOffsetMs]);
@@ -8063,7 +8142,9 @@ export function App() {
           if (typeof result.serverNowMs === 'number') {
             const clientNow = Date.now();
             setServerOffsetMs(result.serverNowMs - clientNow);
-            setDisplayNowMs(result.serverNowMs);
+            setDisplayNowMs((prev) =>
+              coalesceDisplayNowMs(prev, result.serverNowMs),
+            );
           }
           leasePaidUsd += result.leasePaidUsd ?? 0;
           leaseRepossessed += result.leaseRepossessed?.length ?? 0;

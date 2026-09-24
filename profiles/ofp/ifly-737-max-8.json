@@ -1,0 +1,64 @@
+{
+  "source": "simbrief",
+  "icao": "B38M",
+  "ofpId": "ifly-737-max-8",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "iFly 737-MAX8 (166Seats)",
+    "iFly 737-MAX8 (178Seats)",
+    "iFly 737-MAX8 (189Seats)"
+  ],
+  "matchTitlePattern": "iFly\\s*737-MAX8\\s*\\(\\d+Seats\\)",
+  "notes": [
+    "iFly 737-MAX8 seat layouts (166/178/189) — native-simbrief (EFB/tablet load)",
+    "Market SKU: ifly-737-max-8 (narrow_freighter, pax_and_cargo)",
+    "MAX8200 is a separate SKU: ifly-737-max-8200",
+    "SimBrief type B38M — pack match Default; live title infers iFly (MSFS) - 737 MAX 8 - N Seats (LBS)",
+    "Homologated: ifly/ifly-737-max8-166seats@1.0.0, -178seats@1.0.0, -189seats@1.0.0",
+    "Fuel: L/R MAIN + CENTER classic qty; write plans empty",
+    "loadMethod: native-simbrief; injectCapable: false"
+  ],
+  "fuel": {
+    "unit": "lb"
+  },
+  "loadSheet": {
+    "unit": "lb"
+  },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11],
+      "passengerStations": []
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "B38M",
+  "simbriefAirframeMatch": "Default",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Station 7", "role": "baggage" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Station 8", "role": "baggage" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Station 9", "role": "baggage" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "Station 10", "role": "baggage" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "Station 11", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

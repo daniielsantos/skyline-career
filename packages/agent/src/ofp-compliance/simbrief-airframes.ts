@@ -190,6 +190,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   }
   const inibuildsL1011 = inferIniBuildsL1011SimBriefMatch(t);
   if (inibuildsL1011) return inibuildsL1011;
+  const ifly737Max = inferIfly737MaxSimBriefMatch(t);
+  if (ifly737Max) return ifly737Max;
   const inibuildsA300 = inferIniBuildsA300SimBriefMatch(t);
   if (inibuildsA300) return inibuildsA300;
   const inibuildsA340 = inferIniBuildsA340SimBriefMatch(t);
@@ -388,6 +390,13 @@ export function liveTitleMatchesMarketSku(
   if (id === 'tfdi-md11f-family') {
     return /TFDi Design MD-11F/i.test(t);
   }
+  if (id === 'ifly-737-max-8200') {
+    return /iFly\s*737-MAX8200/i.test(t);
+  }
+  if (id === 'ifly-737-max-8') {
+    // Seat-layout MAX8 only — exclude MAX8200 (prefix would otherwise match).
+    return /iFly\s*737-MAX8\s*\(\d+\s*Seats?\)/i.test(t);
+  }
   return false;
 }
 
@@ -433,6 +442,21 @@ function inferIniBuildsL1011SimBriefMatch(title: string): string | undefined {
     return 'iniBuilds \\(MSFS\\) - L1011-500 Pod Ferry';
   }
   return 'iniBuilds \\(MSFS\\) - L1011-500 Regular';
+}
+
+/**
+ * iFly 737 MAX — SimBrief B38M vendor rows by seat layout (LBS; career uses lb).
+ * Live: "iFly 737-MAX8 (178Seats)" / "iFly 737-MAX8200".
+ */
+function inferIfly737MaxSimBriefMatch(title: string): string | undefined {
+  if (/iFly\s*737-MAX8200/i.test(title)) {
+    return 'iFly \\(MSFS\\) - 737 MAX 8200 - 197 Seats \\(LBS\\)';
+  }
+  const max8 = title.match(/iFly\s*737-MAX8\s*\((\d+)\s*Seats?\)/i);
+  if (max8?.[1]) {
+    return `iFly \\(MSFS\\) - 737 MAX 8 - ${max8[1]} Seats \\(LBS\\)`;
+  }
+  return undefined;
 }
 
 /**

@@ -430,4 +430,30 @@ describe('resolveDispatchSimBriefParams', () => {
     });
     assert.equal(params.simbriefIcao, 'BE6G');
   });
+
+  it('iFly 737 MAX: live seat layout picks SimBrief LBS airframe row', async () => {
+    const max8 = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'narrow_freighter',
+      airframeTypeId: 'ifly-737-max-8',
+      rolesPackRelPath: 'profiles/ofp/ifly-737-max-8.json',
+      liveTitle: 'iFly 737-MAX8 (178Seats)',
+    });
+    assert.equal(max8.simbriefIcao, 'B38M');
+    assert.equal(
+      max8.simbriefAirframeMatch,
+      'iFly \\(MSFS\\) - 737 MAX 8 - 178 Seats \\(LBS\\)',
+    );
+
+    const max8200 = await resolveDispatchSimBriefParams({
+      aircraftClassId: 'narrow_freighter',
+      airframeTypeId: 'ifly-737-max-8200',
+      rolesPackRelPath: 'profiles/ofp/ifly-737-max-8200.json',
+      liveTitle: 'iFly 737-MAX8200',
+    });
+    assert.equal(max8200.simbriefIcao, 'B38M');
+    assert.equal(
+      max8200.simbriefAirframeMatch,
+      'iFly \\(MSFS\\) - 737 MAX 8200 - 197 Seats \\(LBS\\)',
+    );
+  });
 });

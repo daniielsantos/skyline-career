@@ -301,6 +301,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'pmdg-738-bcf-family': '/airframes/b738-bcf.png',
   'pmdg-738-pax-family': '/airframes/b738-pax.png',
   'asobo-737-max-8-passengers': '/airframes/737-max-8.png',
+  'ifly-737-max-8': '/airframes/ifly-737-max-8.png',
+  'ifly-737-max-8200': '/airframes/ifly-737-max-8.png',
   'inibuilds-boeing-b707-gns': '/airframes/b707-gns.png',
 
   // --- wide_freighter ---

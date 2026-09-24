@@ -165,6 +165,29 @@ describe('career player airframes', () => {
     );
   });
 
+  it('stages iFly 737 MAX 8 / 8200 as native-simbrief B38M families', () => {
+    const max8 = findCareerPlayerAirframe('ifly-737-max-8');
+    assert.equal(max8?.simbriefIcao, 'B38M');
+    assert.equal(max8?.simbriefAirframeMatch, 'Default');
+    assert.equal(max8?.injectCapable, false);
+    assert.equal(max8?.loadLayout, 'pax_and_cargo');
+    assert.equal(max8?.maxPaxSeats, 189);
+    assert.equal(max8?.rolesPackRelPath, 'profiles/ofp/ifly-737-max-8.json');
+    assert.equal(max8?.configurations?.[0]?.passengerCapacity, 189);
+
+    const max8200 = findCareerPlayerAirframe('ifly-737-max-8200');
+    assert.equal(max8200?.simbriefIcao, 'B38M');
+    assert.equal(max8200?.simbriefAirframeMatch, 'Default');
+    assert.equal(max8200?.injectCapable, false);
+    assert.equal(max8200?.loadLayout, 'pax_and_cargo');
+    assert.equal(max8200?.maxPaxSeats, 197);
+    assert.equal(
+      max8200?.rolesPackRelPath,
+      'profiles/ofp/ifly-737-max-8200.json',
+    );
+    assert.equal(max8200?.configurations?.[0]?.passengerCapacity, 197);
+  });
+
   it('stages iniBuilds A300-600 family with GE/PW SimBrief rows', () => {
     const a300 = findCareerPlayerAirframe('inibuilds-a300-600');
     assert.equal(a300?.simbriefIcao, 'A306');

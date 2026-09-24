@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **e49bf4ef** / desktop **0.3.272** shipped: Show Contrail Falcon 50 add-on info on Market cards. Release: [v0.3.272](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.272).
+
+
 `main` **c1e16268** / desktop **0.3.271** shipped: Promote iniBuilds A300-600, L1011-500, and Contrail Falcon 50 with Market card art. Release: [v0.3.271](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.271).
 
 

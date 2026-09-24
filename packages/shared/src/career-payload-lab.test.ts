@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2 } from './career-fleet.js';
+import { charterBaggageKg } from './career-charter.js';
 import {
   cancelMission,
   findPayloadLabMission,
+  resolvePayloadLabCharterMaxPax,
   settleMission,
   startPayloadLabMission,
 } from './career-mission.js';
+import { findCareerPlayerAirframe } from './career-player-airframes.js';
 
 describe('payload lab mission', () => {
   it('starts a hangar-free lab flight and replaces a prior lab', () => {
@@ -74,5 +77,62 @@ describe('payload lab mission', () => {
     );
     const cancelled = cancelMission(world, mission, { fleet: state });
     assert.equal(cancelled.status, 'cancelled');
+  });
+
+  it('starts charter lab with pax + bags and cancels without a world offer', () => {
+    const world = createSeedEconomyWorld({ seed: 'lab4' });
+    world.tick = 40;
+    const state = emptyMissionsStateV2();
+    const falcon = findCareerPlayerAirframe('contrail-contrail-falcon-50');
+    assert.ok(falcon);
+    const maxPax = resolvePayloadLabCharterMaxPax(falcon!);
+    assert.ok(maxPax >= 1);
+    const pax = Math.min(4, maxPax);
+    const { mission } = startPayloadLabMission(world, state, {
+      airframeTypeId: 'contrail-contrail-falcon-50',
+      missionKind: 'charter',
+      pax,
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+    });
+    assert.equal(mission.payloadLab, true);
+    assert.equal(mission.missionType, 'charter');
+    assert.equal(mission.pax, pax);
+    assert.equal(mission.cargoKg, 0);
+    assert.equal(mission.baggageKg, charterBaggageKg(pax));
+    assert.equal(mission.charterOfferId, undefined);
+    assert.equal((world.charterOffers ?? []).length, 0);
+    assert.throws(
+      () =>
+        settleMission(
+          world,
+          { ...mission, status: 'dispatched' },
+          { fleet: state },
+        ),
+      /cannot settle/i,
+    );
+    const cancelled = cancelMission(world, mission, { fleet: state });
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(cancelled.missionType, 'charter');
+  });
+
+  it('rejects charter lab when pax exceeds seats', () => {
+    const world = createSeedEconomyWorld({ seed: 'lab5' });
+    world.tick = 50;
+    const state = emptyMissionsStateV2();
+    const falcon = findCareerPlayerAirframe('contrail-contrail-falcon-50');
+    assert.ok(falcon);
+    const maxPax = resolvePayloadLabCharterMaxPax(falcon!);
+    assert.throws(
+      () =>
+        startPayloadLabMission(world, state, {
+          airframeTypeId: 'contrail-contrail-falcon-50',
+          missionKind: 'charter',
+          pax: maxPax + 1,
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+        }),
+      /exceeds/i,
+    );
   });
 });

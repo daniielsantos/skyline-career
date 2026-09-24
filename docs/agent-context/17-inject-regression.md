@@ -232,16 +232,27 @@ Harness **só** para OFP → inject → Due vs Sim. Reusa a UI do Dispatch/Prefl
 - **Não** marca `vaFlight`
 - Grava só uma missão sintética `payloadLab` no ficheiro de missions da **company do request** (para a UI), com stamp de piloto mínimo para o refresh VA não apagar o lab
 
-1. Escolhe SKU + payload kg + OD  
+**Modos**
+
+| Modo | Missão | Input |
+|------|--------|--------|
+| **Freight** (default) | `cargoKg`, `pax=0` | Payload lb |
+| **Charter** | `missionType: charter`, `pax` + `baggageKg` (18 kg/pax), sem `charterOfferId` | Passengers (1…max seats) |
+
+Charter Lab **não** cria offer/demand no mundo — cancel local; settle continua bloqueado. Inject segue o gate real de charter (`inject_verified` na config passenger). Lista filtra SKUs sem seats.
+
+1. Escolhe **Freight | Charter** + SKU + payload/pax + OD  
 2. **Start lab → Dispatch**  
 3. Open SimBrief → Accept OFP → inject → Due vs Sim  
 4. **Cancel flight** quando terminar  
 
-API: `GET|POST|DELETE /api/dev/payload-lab`. Requer nenhum outro Dispatch player ativo.
+API: `GET|POST|DELETE /api/dev/payload-lab`. Body POST: `missionKind?: 'freight'|'charter'`, `cargoKg` ou `pax`. Requer nenhum outro Dispatch player ativo.
 
 **Não** aplica o clamp de route ops (fuel+MTOW Career) no Open SimBrief — o Lab mantém o payload escolhido.
 
 **Diag bounce Preflight→empty (2026-09-24):** write sem companyId + bare Accepted fora do board + refresh VA. Fix = companyId + stamp piloto (sem vaFlight) + `payloadLab` no Dispatch + sem inbound/logbook.
+
+**Charter Lab (2026-09-24):** modo Charter no Lab; cancel/fail charter lab sem offer no mundo.
 
 ---
 

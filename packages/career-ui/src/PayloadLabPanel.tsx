@@ -8,6 +8,9 @@ import {
 } from './api';
 import { KG_TO_LB } from './weight-units';
 
+/** Matches shared `CHARTER_BAGGAGE_KG_PER_PAX` for Lab preview only. */
+const LAB_CHARTER_BAGGAGE_KG_PER_PAX = 18;
+
 function kgToLb(kg: number): number {
   return Math.round(kg * KG_TO_LB);
 }
@@ -23,6 +26,14 @@ function defaultCargoLb(option: PayloadLabAirframeOption | undefined): number {
     return Math.max(100, Math.min(maxLb, Math.round(maxLb * 0.6)));
   }
   return 880;
+}
+
+function defaultPax(option: PayloadLabAirframeOption | undefined): number {
+  const max = option?.maxPaxSeats;
+  if (typeof max === 'number' && max > 0) {
+    return Math.max(1, Math.min(max, Math.round(max * 0.5)));
+  }
+  return 4;
 }
 
 function formatLb(lb: number): string {
@@ -63,6 +74,8 @@ function airframeMatchesQuery(
   );
 }
 
+type LabKind = 'freight' | 'charter';
+
 export function PayloadLabPanel(props: {
   busy: boolean;
   homeHubIcao?: string | null;
@@ -72,7 +85,9 @@ export function PayloadLabPanel(props: {
 }) {
   const [options, setOptions] = useState<PayloadLabAirframeOption[]>([]);
   const [typeId, setTypeId] = useState('');
+  const [labKind, setLabKind] = useState<LabKind>('freight');
   const [cargoLb, setCargoLb] = useState(880);
+  const [pax, setPax] = useState(4);
   const [originIcao, setOriginIcao] = useState('SBGR');
   const [destIcao, setDestIcao] = useState('SBSP');
   const [textFilter, setTextFilter] = useState('');
@@ -91,9 +106,13 @@ export function PayloadLabPanel(props: {
   const filtered = useMemo(() => {
     return options.filter((row) => {
       if (classFilter && row.aircraftClassId !== classFilter) return false;
+      if (labKind === 'charter') {
+        const seats = row.maxPaxSeats;
+        if (!(typeof seats === 'number' && seats > 0)) return false;
+      }
       return airframeMatchesQuery(row, textFilter);
     });
-  }, [options, classFilter, textFilter]);
+  }, [options, classFilter, textFilter, labKind]);
 
   const selected = useMemo(
     () => options.find((row) => row.typeId === typeId),
@@ -104,6 +123,16 @@ export function PayloadLabPanel(props: {
     typeof selected?.maxCargoKg === 'number' && selected.maxCargoKg > 0
       ? kgToLb(selected.maxCargoKg)
       : undefined;
+
+  const selectedMaxPax =
+    typeof selected?.maxPaxSeats === 'number' && selected.maxPaxSeats > 0
+      ? selected.maxPaxSeats
+      : undefined;
+
+  const baggageLbPreview =
+    labKind === 'charter' && pax >= 1
+      ? kgToLb(pax * LAB_CHARTER_BAGGAGE_KG_PER_PAX)
+      : 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -125,11 +154,21 @@ export function PayloadLabPanel(props: {
         setTypeId(preferred);
         const opt = data.options.find((o) => o.typeId === preferred);
         if (opt) setClassFilter(opt.aircraftClassId);
-        setCargoLb(
-          data.mission?.cargoKg && data.mission.cargoKg > 0
-            ? kgToLb(data.mission.cargoKg)
-            : defaultCargoLb(opt),
-        );
+        if (data.mission?.missionType === 'charter') {
+          setLabKind('charter');
+          setPax(
+            data.mission.pax && data.mission.pax > 0
+              ? data.mission.pax
+              : defaultPax(opt),
+          );
+        } else {
+          setLabKind('freight');
+          setCargoLb(
+            data.mission?.cargoKg && data.mission.cargoKg > 0
+              ? kgToLb(data.mission.cargoKg)
+              : defaultCargoLb(opt),
+          );
+        }
         if (data.mission) {
           setOriginIcao(data.mission.originIcao);
           setDestIcao(data.mission.destIcao);
@@ -150,10 +189,14 @@ export function PayloadLabPanel(props: {
 
   useEffect(() => {
     if (!selected) return;
-    if (selectedMaxLb !== undefined && cargoLb > selectedMaxLb) {
-      setCargoLb(selectedMaxLb);
+    if (labKind === 'freight') {
+      if (selectedMaxLb !== undefined && cargoLb > selectedMaxLb) {
+        setCargoLb(selectedMaxLb);
+      }
+    } else if (selectedMaxPax !== undefined && pax > selectedMaxPax) {
+      setPax(selectedMaxPax);
     }
-  }, [selected?.typeId, selectedMaxLb]);
+  }, [selected?.typeId, selectedMaxLb, selectedMaxPax, labKind]);
 
   useEffect(() => {
     if (!typeId) return;
@@ -164,19 +207,31 @@ export function PayloadLabPanel(props: {
       return;
     }
     setTypeId(next.typeId);
-    setCargoLb(defaultCargoLb(next));
-  }, [filtered, typeId]);
+    if (labKind === 'charter') setPax(defaultPax(next));
+    else setCargoLb(defaultCargoLb(next));
+  }, [filtered, typeId, labKind]);
 
   async function onStart() {
     setError(null);
     setWorking(true);
     try {
-      const result = await postPayloadLab({
-        airframeTypeId: typeId,
-        cargoKg: lbToKg(cargoLb),
-        originIcao,
-        destIcao,
-      });
+      const result = await postPayloadLab(
+        labKind === 'charter'
+          ? {
+              airframeTypeId: typeId,
+              missionKind: 'charter',
+              pax,
+              originIcao,
+              destIcao,
+            }
+          : {
+              airframeTypeId: typeId,
+              missionKind: 'freight',
+              cargoKg: lbToKg(cargoLb),
+              originIcao,
+              destIcao,
+            },
+      );
       props.onMissionsUpdated(result.missions);
       props.onOpenDispatch();
     } catch (err) {
@@ -200,6 +255,11 @@ export function PayloadLabPanel(props: {
   }
 
   const disabled = props.busy || working || loading || !typeId;
+  const startDisabled =
+    disabled ||
+    (labKind === 'freight' ? cargoLb < 1 : pax < 1 || !selectedMaxPax);
+
+  const activeIsCharter = props.activeLabMission?.missionType === 'charter';
 
   return (
     <section className="panel payload-lab-panel">
@@ -222,7 +282,11 @@ export function PayloadLabPanel(props: {
             Active lab: <strong>{props.activeLabMission.reason}</strong> ·{' '}
             {props.activeLabMission.originIcao}→
             {props.activeLabMission.destIcao} ·{' '}
-            {formatLb(kgToLb(props.activeLabMission.cargoKg))}
+            {activeIsCharter
+              ? `${props.activeLabMission.pax ?? 0} pax · ${formatLb(
+                  kgToLb(props.activeLabMission.baggageKg ?? 0),
+                )} bags`
+              : formatLb(kgToLb(props.activeLabMission.cargoKg))}
           </p>
           <div className="row-actions">
             <button
@@ -245,6 +309,31 @@ export function PayloadLabPanel(props: {
       ) : null}
 
       <div className="card payload-lab-form">
+        <div className="payload-lab-kind" role="group" aria-label="Lab mode">
+          <button
+            type="button"
+            className={labKind === 'freight' ? 'is-active' : undefined}
+            disabled={props.busy || working || loading}
+            onClick={() => {
+              setLabKind('freight');
+              setCargoLb(defaultCargoLb(selected));
+            }}
+          >
+            Freight
+          </button>
+          <button
+            type="button"
+            className={labKind === 'charter' ? 'is-active' : undefined}
+            disabled={props.busy || working || loading}
+            onClick={() => {
+              setLabKind('charter');
+              setPax(defaultPax(selected));
+            }}
+          >
+            Charter
+          </button>
+        </div>
+
         <div className="payload-lab-filters">
           <label className="field">
             <span>Search</span>
@@ -287,7 +376,8 @@ export function PayloadLabPanel(props: {
               const next = e.target.value;
               setTypeId(next);
               const opt = options.find((o) => o.typeId === next);
-              setCargoLb(defaultCargoLb(opt));
+              if (labKind === 'charter') setPax(defaultPax(opt));
+              else setCargoLb(defaultCargoLb(opt));
             }}
           >
             {loading ? (
@@ -299,9 +389,13 @@ export function PayloadLabPanel(props: {
                 <option key={row.typeId} value={row.typeId}>
                   {row.label} · {classLabel(row.aircraftClassId)} ·{' '}
                   {loadLayoutLabel(row.loadLayout)}
-                  {row.maxCargoKg
-                    ? ` · max ${formatLb(kgToLb(row.maxCargoKg))}`
-                    : ''}
+                  {labKind === 'charter'
+                    ? row.maxPaxSeats
+                      ? ` · max ${row.maxPaxSeats} pax`
+                      : ''
+                    : row.maxCargoKg
+                      ? ` · max ${formatLb(kgToLb(row.maxCargoKg))}`
+                      : ''}
                 </option>
               ))
             )}
@@ -313,47 +407,86 @@ export function PayloadLabPanel(props: {
               <strong>loadLayout</strong>
               <span>{loadLayoutLabel(selected.loadLayout)}</span>
               <span className="muted">
-                {selected.loadLayout === 'pax_and_cargo'
-                  ? 'SKU fills cabin seats then leftover freight (SimBrief pax+cargo). Same for all glass variants on this Market card.'
-                  : 'SKU is career freighter (omit/default). Cargo + Passengers glass share this — seats map as baggage. Not per-variant.'}
+                {labKind === 'charter'
+                  ? 'Charter Lab: exact pax + bags on OFP (no board offer). Inject still follows charter cert gate (inject_verified config).'
+                  : selected.loadLayout === 'pax_and_cargo'
+                    ? 'SKU fills cabin seats then leftover freight (SimBrief pax+cargo). Same for all glass variants on this Market card.'
+                    : 'SKU is career freighter (omit/default). Cargo + Passengers glass share this — seats map as baggage. Not per-variant.'}
               </span>
             </p>
           ) : null}
         </label>
 
-        <label className="field">
-          <span>
-            Payload (lb)
-            {selectedMaxLb !== undefined
-              ? ` · max ${formatLb(selectedMaxLb)}`
-              : ''}
-          </span>
-          <div className="payload-lab-payload-row">
-            <input
-              type="number"
-              min={1}
-              step={10}
-              max={selectedMaxLb}
-              value={cargoLb}
-              disabled={disabled}
-              onChange={(e) => setCargoLb(Number(e.target.value) || 0)}
-            />
-            <button
-              type="button"
-              disabled={disabled || selectedMaxLb === undefined}
-              title={
-                selectedMaxLb !== undefined
-                  ? `Set payload to max (${formatLb(selectedMaxLb)})`
-                  : 'Select an airframe with a known max cargo'
-              }
-              onClick={() => {
-                if (selectedMaxLb !== undefined) setCargoLb(selectedMaxLb);
-              }}
-            >
-              100%
-            </button>
-          </div>
-        </label>
+        {labKind === 'freight' ? (
+          <label className="field">
+            <span>
+              Payload (lb)
+              {selectedMaxLb !== undefined
+                ? ` · max ${formatLb(selectedMaxLb)}`
+                : ''}
+            </span>
+            <div className="payload-lab-payload-row">
+              <input
+                type="number"
+                min={1}
+                step={10}
+                max={selectedMaxLb}
+                value={cargoLb}
+                disabled={disabled}
+                onChange={(e) => setCargoLb(Number(e.target.value) || 0)}
+              />
+              <button
+                type="button"
+                disabled={disabled || selectedMaxLb === undefined}
+                title={
+                  selectedMaxLb !== undefined
+                    ? `Set payload to max (${formatLb(selectedMaxLb)})`
+                    : 'Select an airframe with a known max cargo'
+                }
+                onClick={() => {
+                  if (selectedMaxLb !== undefined) setCargoLb(selectedMaxLb);
+                }}
+              >
+                100%
+              </button>
+            </div>
+          </label>
+        ) : (
+          <label className="field">
+            <span>
+              Passengers
+              {selectedMaxPax !== undefined ? ` · max ${selectedMaxPax}` : ''}
+              {baggageLbPreview > 0
+                ? ` · bags ~${formatLb(baggageLbPreview)}`
+                : ''}
+            </span>
+            <div className="payload-lab-payload-row">
+              <input
+                type="number"
+                min={1}
+                step={1}
+                max={selectedMaxPax}
+                value={pax}
+                disabled={disabled || !selectedMaxPax}
+                onChange={(e) => setPax(Math.max(1, Number(e.target.value) || 1))}
+              />
+              <button
+                type="button"
+                disabled={disabled || selectedMaxPax === undefined}
+                title={
+                  selectedMaxPax !== undefined
+                    ? `Fill cabin (${selectedMaxPax} pax)`
+                    : 'Select an airframe with passenger seats'
+                }
+                onClick={() => {
+                  if (selectedMaxPax !== undefined) setPax(selectedMaxPax);
+                }}
+              >
+                Full
+              </button>
+            </div>
+          </label>
+        )}
 
         <div className="payload-lab-od">
           <label className="field">
@@ -386,7 +519,7 @@ export function PayloadLabPanel(props: {
         <button
           type="button"
           className="primary"
-          disabled={disabled || cargoLb < 1}
+          disabled={startDisabled}
           onClick={() => void onStart()}
         >
           {working ? 'Starting…' : 'Start lab → Dispatch'}

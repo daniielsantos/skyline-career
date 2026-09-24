@@ -56,6 +56,7 @@ import {
   findCareerPlayerAirframe,
   findCareerAirframeConfiguration,
   isCareerPlayerAirframeEnabled,
+  isPassengerConfigurationEligible,
   listCareerPlayerAirframes,
   resolveAirframeFuelBurnKgPerNm,
   resolveAirframeMaxRangeNm,
@@ -1370,7 +1371,34 @@ export function acceptEmptyFlight(
 }
 
 /**
+ * Cabin seat ceiling for Payload Lab charter (catalog maxPaxSeats or passenger
+ * / VIP config). 0 = SKU cannot host a charter lab flight.
+ */
+export function resolvePayloadLabCharterMaxPax(
+  airframe: CareerPlayerAirframe,
+): number {
+  const fromCatalog =
+    typeof airframe.maxPaxSeats === 'number' && airframe.maxPaxSeats > 0
+      ? Math.floor(airframe.maxPaxSeats)
+      : 0;
+  const passengerCfgs = (airframe.configurations ?? []).filter((cfg) =>
+    isPassengerConfigurationEligible(cfg),
+  );
+  const fromConfig = passengerCfgs.length
+    ? Math.max(...passengerCfgs.map((cfg) => Math.floor(cfg.passengerCapacity)))
+    : 0;
+  return Math.min(CHARTER_GROUP_SIZE_MAX, Math.max(0, fromCatalog, fromConfig));
+}
+
+function pickPayloadLabPassengerConfiguration(airframe: CareerPlayerAirframe) {
+  return (airframe.configurations ?? []).find((cfg) =>
+    isPassengerConfigurationEligible(cfg),
+  );
+}
+
+/**
  * Dev Payload Lab: temporary Dispatch flight without hangar / Market lot.
+ * Freight (`cargoKg`) or charter (`pax` + bags) — no charter offer / demand.
  * Reuses Preflight + inject + Watch. Cancel when finished (no settle / payout).
  */
 export function startPayloadLabMission(
@@ -1378,7 +1406,11 @@ export function startPayloadLabMission(
   state: CareerMissionsState,
   opts: {
     airframeTypeId: string;
-    cargoKg: number;
+    /** Default freight. Charter skips world offers — synthetic pax + bags only. */
+    missionKind?: 'freight' | 'charter';
+    cargoKg?: number;
+    pax?: number;
+    baggageKg?: number;
     originIcao: string;
     destIcao: string;
     missionId?: string;
@@ -1408,18 +1440,45 @@ export function startPayloadLabMission(
     throw new Error('Origin and destination must differ');
   }
 
-  const cargoKg = Math.max(0, Math.floor(opts.cargoKg));
-  if (cargoKg < 1) {
-    throw new Error('cargoKg must be at least 1');
-  }
-  const structuralMax =
-    typeof airframe.maxCargoKg === 'number' && airframe.maxCargoKg > 0
-      ? Math.floor(airframe.maxCargoKg)
-      : getAircraftClass(airframe.aircraftClassId).maxCargoKg;
-  if (cargoKg > structuralMax) {
-    throw new Error(
-      `cargoKg ${cargoKg} exceeds ${airframe.label} max ${structuralMax} kg`,
-    );
+  const missionKind = opts.missionKind === 'charter' ? 'charter' : 'freight';
+  let cargoKg = 0;
+  let pax = 0;
+  let baggageKg = 0;
+  const passengerCfg =
+    missionKind === 'charter'
+      ? pickPayloadLabPassengerConfiguration(airframe)
+      : undefined;
+
+  if (missionKind === 'charter') {
+    const maxPax = resolvePayloadLabCharterMaxPax(airframe);
+    if (maxPax < 1) {
+      throw new Error(
+        `${airframe.label} has no passenger seats for charter Lab`,
+      );
+    }
+    pax = Math.max(1, Math.floor(Number(opts.pax) || 0));
+    if (pax < 1) throw new Error('pax must be at least 1 for charter Lab');
+    if (pax > maxPax) {
+      throw new Error(`pax ${pax} exceeds ${airframe.label} max ${maxPax}`);
+    }
+    baggageKg =
+      typeof opts.baggageKg === 'number' && Number.isFinite(opts.baggageKg)
+        ? Math.max(0, Math.round(opts.baggageKg))
+        : charterBaggageKg(pax);
+  } else {
+    cargoKg = Math.max(0, Math.floor(Number(opts.cargoKg) || 0));
+    if (cargoKg < 1) {
+      throw new Error('cargoKg must be at least 1');
+    }
+    const structuralMax =
+      typeof airframe.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+        ? Math.floor(airframe.maxCargoKg)
+        : getAircraftClass(airframe.aircraftClassId).maxCargoKg;
+    if (cargoKg > structuralMax) {
+      throw new Error(
+        `cargoKg ${cargoKg} exceeds ${airframe.label} max ${structuralMax} kg`,
+      );
+    }
   }
 
   const replacedLabIds: string[] = [];
@@ -1449,40 +1508,7 @@ export function startPayloadLabMission(
   const missionId =
     opts.missionId?.trim() ||
     `msn_lab_${world.tick}_${typeId}_${Math.floor(Math.random() * 1e6)}`;
-  const shipmentLotId = `lab_${missionId}`;
-
-  const mission = recomputeMissionTotals({
-    id: missionId,
-    lots: [
-      {
-        shipmentLotId,
-        commodityId: 'general',
-        cargoKg,
-        payUsd: 0,
-        urgency: 'normal',
-        reason: `Payload Lab · ${airframe.label}`,
-        deadlineTick: world.tick + TICKS_PER_HOUR * 72,
-      },
-    ],
-    shipmentLotId,
-    commodityId: 'general',
-    originIcao: origin,
-    destIcao: dest,
-    cargoKg,
-    pax: 0,
-    aircraftClassId: airframe.aircraftClassId,
-    airframeTypeId: airframe.typeId,
-    rolesPackRelPath: airframe.rolesPackRelPath ?? classDef.rolesPackRelPath,
-    deadlineTick: world.tick + TICKS_PER_HOUR * 72,
-    payUsd: 0,
-    urgency: 'normal',
-    reason: `Payload Lab · ${airframe.label}`,
-    status: 'accepted',
-    acceptedAtTick: world.tick,
-    contractPilot: true,
-    payloadLab: true,
-    contractPilotFeeUsd: 0,
-    ...(typeof distanceNm === 'number' ? { distanceNm } : {}),
+  const pilotStamp = {
     ...(opts.pilotAccountId?.trim()
       ? { pilotAccountId: opts.pilotAccountId.trim() }
       : {}),
@@ -1490,7 +1516,65 @@ export function startPayloadLabMission(
       ? { pilotHomeCompanyId: opts.pilotHomeCompanyId.trim() }
       : {}),
     ...(opts.vaFlight === true ? { vaFlight: true as const } : {}),
-  });
+  };
+  const shared = {
+    id: missionId,
+    commodityId: 'general' as const,
+    originIcao: origin,
+    destIcao: dest,
+    aircraftClassId: airframe.aircraftClassId,
+    airframeTypeId: airframe.typeId,
+    deadlineTick: world.tick + TICKS_PER_HOUR * 72,
+    payUsd: 0,
+    urgency: 'normal' as const,
+    status: 'accepted' as const,
+    acceptedAtTick: world.tick,
+    contractPilot: true,
+    payloadLab: true,
+    contractPilotFeeUsd: 0,
+    ...(typeof distanceNm === 'number' ? { distanceNm } : {}),
+    ...pilotStamp,
+  };
+
+  const mission =
+    missionKind === 'charter'
+      ? recomputeMissionTotals({
+          ...shared,
+          missionType: 'charter',
+          lots: [],
+          shipmentLotId: `lab_charter_${missionId}`,
+          cargoKg: 0,
+          pax,
+          baggageKg,
+          ...(passengerCfg
+            ? { airframeConfigurationId: passengerCfg.id }
+            : {}),
+          rolesPackRelPath:
+            passengerCfg?.rolesPackRelPath ??
+            airframe.rolesPackRelPath ??
+            classDef.rolesPackRelPath,
+          reason: `Payload Lab · Charter · ${pax} pax · ${airframe.label}`,
+        })
+      : recomputeMissionTotals({
+          ...shared,
+          lots: [
+            {
+              shipmentLotId: `lab_${missionId}`,
+              commodityId: 'general',
+              cargoKg,
+              payUsd: 0,
+              urgency: 'normal',
+              reason: `Payload Lab · ${airframe.label}`,
+              deadlineTick: world.tick + TICKS_PER_HOUR * 72,
+            },
+          ],
+          shipmentLotId: `lab_${missionId}`,
+          cargoKg,
+          pax: 0,
+          rolesPackRelPath:
+            airframe.rolesPackRelPath ?? classDef.rolesPackRelPath,
+          reason: `Payload Lab · ${airframe.label}`,
+        });
 
   state.missions = [...(state.missions ?? []), mission];
   // Lab must not publish inbound / soft-fill / economy world rows — Dispatch UI only.
@@ -2119,6 +2203,13 @@ export function cancelMission(
     throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
   if (normalized.missionType === 'charter') {
+    // Payload Lab charter has no world offer/demand — cancel locally only.
+    if (normalized.payloadLab) {
+      const cancelled = { ...normalized, status: 'cancelled' as const };
+      if (opts.fleet) releaseAircraftOnCancel(opts.fleet, cancelled);
+      clearPlayerInbound(world, cancelled.id);
+      return cancelled;
+    }
     const cancelled = cancelCharterMission(
       world,
       normalized as import('./types/career-economy.js').CharterMissionIntent,
@@ -2264,6 +2355,18 @@ export function failMissionImpact(
     'Flight ended — impact away from destination. Cargo lost; no payout.';
 
   if (normalized.missionType === 'charter') {
+    if (normalized.payloadLab) {
+      const failed = {
+        ...normalized,
+        status: 'failed' as const,
+        failReason: 'impact' as const,
+        payoutUsd: 0,
+        reason: note,
+      };
+      if (opts.fleet) releaseAircraftOnCancel(opts.fleet, failed);
+      clearPlayerInbound(world, failed.id);
+      return failed;
+    }
     const cancelled = cancelCharterMission(
       world,
       normalized as import('./types/career-economy.js').CharterMissionIntent,

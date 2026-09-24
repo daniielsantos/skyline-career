@@ -4219,6 +4219,7 @@ export type PayloadLabAirframeOption = {
   label: string;
   aircraftClassId: string;
   maxCargoKg: number | null;
+  maxPaxSeats: number | null;
   loadLayout: string;
   injectCapable: boolean;
 };
@@ -4233,6 +4234,9 @@ export function fetchPayloadLab() {
       originIcao: string;
       destIcao: string;
       cargoKg: number;
+      pax?: number;
+      baggageKg?: number;
+      missionType?: 'freight' | 'charter';
       reason: string;
     } | null;
   }>('/api/dev/payload-lab');
@@ -4240,7 +4244,10 @@ export function fetchPayloadLab() {
 
 export function postPayloadLab(opts: {
   airframeTypeId: string;
-  cargoKg: number;
+  missionKind?: 'freight' | 'charter';
+  cargoKg?: number;
+  pax?: number;
+  baggageKg?: number;
   originIcao?: string;
   destIcao?: string;
 }) {

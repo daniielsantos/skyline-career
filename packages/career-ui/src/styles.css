@@ -13841,6 +13841,21 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   gap: 0.75rem;
 }
 
+.payload-lab-kind {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.payload-lab-kind button {
+  flex: 1;
+  min-width: 0;
+}
+
+.payload-lab-kind button.is-active {
+  border-color: color-mix(in srgb, var(--accent, #6ea8fe) 55%, transparent);
+  background: color-mix(in srgb, var(--accent, #6ea8fe) 18%, transparent);
+}
+
 .payload-lab-payload-row {
   display: flex;
   gap: 0.5rem;

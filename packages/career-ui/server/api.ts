@@ -10,6 +10,7 @@ import {
   findPayloadLabMission,
   listCareerPlayerAirframes,
   isCareerPlayerAirframeEnabled,
+  resolvePayloadLabCharterMaxPax,
   assignAircraftToMission,
   reserveAircraftForMember,
   releaseAircraftReservation,
@@ -7735,14 +7736,18 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/dev/payload-lab') {
         const options = listCareerPlayerAirframes()
           .filter((row) => isCareerPlayerAirframeEnabled(row))
-          .map((row) => ({
-            typeId: row.typeId,
-            label: row.label,
-            aircraftClassId: row.aircraftClassId,
-            maxCargoKg: row.maxCargoKg ?? null,
-            loadLayout: row.loadLayout ?? 'freighter',
-            injectCapable: row.injectCapable !== false,
-          }))
+          .map((row) => {
+            const maxPaxSeats = resolvePayloadLabCharterMaxPax(row);
+            return {
+              typeId: row.typeId,
+              label: row.label,
+              aircraftClassId: row.aircraftClassId,
+              maxCargoKg: row.maxCargoKg ?? null,
+              maxPaxSeats: maxPaxSeats > 0 ? maxPaxSeats : null,
+              loadLayout: row.loadLayout ?? 'freighter',
+              injectCapable: row.injectCapable !== false,
+            };
+          })
           .sort((a, b) => a.label.localeCompare(b.label));
         const lab = await withCareerRead(
           (_world, missions) => findPayloadLabMission(missions.missions ?? []),
@@ -7758,6 +7763,9 @@ export function createCareerApiServer(port = 8787) {
                 originIcao: lab.originIcao,
                 destIcao: lab.destIcao,
                 cargoKg: lab.cargoKg,
+                pax: lab.pax ?? 0,
+                baggageKg: lab.baggageKg ?? 0,
+                missionType: lab.missionType === 'charter' ? 'charter' : 'freight',
                 reason: lab.reason,
               }
             : null,
@@ -7768,7 +7776,10 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'POST' && path === '/api/dev/payload-lab') {
         const body = (await readBody(req)) as {
           airframeTypeId?: string;
+          missionKind?: 'freight' | 'charter';
           cargoKg?: number;
+          pax?: number;
+          baggageKg?: number;
           originIcao?: string;
           destIcao?: string;
           companyId?: string;
@@ -7777,11 +7788,21 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'airframeTypeId required' });
           return;
         }
-        if (
-          typeof body.cargoKg !== 'number' ||
-          !Number.isFinite(body.cargoKg)
+        const missionKind =
+          body.missionKind === 'charter' ? 'charter' : 'freight';
+        if (missionKind === 'freight') {
+          if (
+            typeof body.cargoKg !== 'number' ||
+            !Number.isFinite(body.cargoKg)
+          ) {
+            send(res, 400, { error: 'cargoKg required' });
+            return;
+          }
+        } else if (
+          typeof body.pax !== 'number' ||
+          !Number.isFinite(body.pax)
         ) {
-          send(res, 400, { error: 'cargoKg required' });
+          send(res, 400, { error: 'pax required for charter Lab' });
           return;
         }
         const labCompanyId = companyIdFromRequest(req, body.companyId);
@@ -7801,7 +7822,15 @@ export function createCareerApiServer(port = 8787) {
           const result = await withCareerWrite((world, missions) => {
             const started = startPayloadLabMission(world, missions, {
               airframeTypeId: body.airframeTypeId!.trim(),
-              cargoKg: body.cargoKg!,
+              missionKind,
+              ...(missionKind === 'charter'
+                ? {
+                    pax: body.pax!,
+                    ...(typeof body.baggageKg === 'number'
+                      ? { baggageKg: body.baggageKg }
+                      : {}),
+                  }
+                : { cargoKg: body.cargoKg! }),
               originIcao,
               destIcao,
               ...labPilotStamp,

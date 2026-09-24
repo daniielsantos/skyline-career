@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **bf69d172** / desktop **0.3.290** shipped: Enlarge EN ROUTE fuel tanks and place Aircraft beside Origin. Release: [v0.3.290](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.290).
+
+
 `main` **6fc17925** / desktop **0.3.289** shipped: Widen EN ROUTE content to full page width. Release: [v0.3.289](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.289).
 
 

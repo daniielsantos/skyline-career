@@ -14745,6 +14745,10 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 .va-stat-value.is-closed {
   color: var(--muted);
 }
+.va-stat-role,
+.va-roster-role {
+  text-transform: capitalize;
+}
 .va-directory-card-actions {
   display: flex;
   gap: 0.5rem;
@@ -15127,7 +15131,22 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   letter-spacing: 0.02em;
 }
 .va-airline-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.75rem, max-content));
+  justify-content: start;
+  align-items: start;
+  gap: 0.75rem 1.35rem;
+  width: 100%;
   margin: 0;
+}
+.va-airline-profile-stats > div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  justify-items: start;
+}
+.va-airline-profile-stats > div.va-stat-cuts {
+  min-width: 0;
 }
 .va-airline-profile-empty {
   margin: 0;

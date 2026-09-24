@@ -847,14 +847,14 @@ export function VaPage(props: Props) {
           </div>
           <div>
             <span className="va-stat-label">Role</span>
-            <span className="va-stat-value">{role || '—'}</span>
+            <span className="va-stat-value va-stat-role">
+              {role || '—'}
+            </span>
           </div>
           <div>
             <span className="va-stat-label">Org</span>
             <span className="va-stat-value">
-              {orgPerks && orgPerks.tier > 0
-                ? `${orgPerks.tierName} T${orgPerks.tier}`
-                : orgPerks?.tierName || '—'}
+              {orgPerks?.tierName || '—'}
             </span>
           </div>
           <div>

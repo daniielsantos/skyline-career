@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **bf198d08** / desktop **0.3.278** shipped: Stop Arrivals NPC progress bars from rewinding on clock polls. Release: [v0.3.278](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.278).
+
+
 `main` **1b348c3d** / desktop **0.3.277** shipped: Match My VA Ledger loading to Ports/Hauls BusyBlock. Release: [v0.3.277](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.277).
 
 

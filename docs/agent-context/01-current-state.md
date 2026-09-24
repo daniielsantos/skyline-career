@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **ca2eb7c1** / desktop **0.3.276** shipped: Allow charter inject when SKU is injectCapable and trim EFB preflight copy. Release: [v0.3.276](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.276).
+
+
 `main` **53cb801d** / desktop **0.3.275** shipped: Widen charter OFP baggage tolerance for SimBrief bagwgt lb round-trip. Release: [v0.3.275](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.275).
 
 

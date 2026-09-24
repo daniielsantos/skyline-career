@@ -92,7 +92,7 @@ export function buildDispatchRedirectUrl(params: SimBriefDispatchParams): string
     qs.set('altn', params.altn.trim().toUpperCase());
   }
   if (params.reg) {
-    qs.set('reg', params.reg.trim());
+    qs.set('reg', params.reg.trim().toUpperCase());
   }
   if (params.callsign) {
     qs.set('callsign', params.callsign.trim());

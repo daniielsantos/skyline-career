@@ -15,6 +15,7 @@ import {
   getAircraftClass,
   isPaxAndCargoLoadLayout,
   KG_TO_LB,
+  normalizeAircraftRegistration,
   ofpCargoKg,
   ofpFreightTowardMissionKg,
   planPaxAndCargoSimBriefLoad,
@@ -493,6 +494,8 @@ export async function buildMissionDispatch(
      * so SimBrief is not asked for more freight than inject can load.
      */
     cargoKg?: number;
+    /** Fleet tail number — prefills SimBrief `reg=` when present. */
+    registration?: string | null;
     /** Test seam — defaults to global fetch. */
     fetchImpl?: typeof fetch;
   } = {},
@@ -612,6 +615,7 @@ export async function buildMissionDispatch(
   );
   // Charter: bags go only through bagwgt×pax. Passing cargo= as well double-counts
   // on SimBrief (bagwgt×N + freight ≈ 2× contracted baggage) and fails OFP check.
+  const fleetReg = normalizeAircraftRegistration(opts.registration) ?? undefined;
   const url = buildDispatchRedirectUrl({
     type,
     orig: canonicalCareerAirportIcao(mission.originIcao),
@@ -624,6 +628,7 @@ export async function buildMissionDispatch(
         : { cargo: freightThousands }),
     units,
     staticId,
+    ...(fleetReg ? { reg: fleetReg } : {}),
     // Dual Class airframes default ~190 lb paxwgt; force Skyline 175+55 so
     // Payload ≈ mission freight (same math as planPaxAndCargoSimBriefLoad).
     ...(charter
@@ -680,6 +685,8 @@ export async function buildFlyableMissionDispatch(
   opts: {
     units?: 'KGS' | 'LBS' | DispatchWeightSystem;
     liveTitle?: string | null;
+    /** Fleet tail number — prefills SimBrief `reg=` when present. */
+    registration?: string | null;
     /** Test seam — defaults to global fetch. */
     fetchImpl?: typeof fetch;
   } = {},
@@ -713,6 +720,7 @@ export async function buildFlyableMissionDispatch(
     units: opts.units,
     liveTitle: opts.liveTitle,
     cargoKg: flyable.cargoKg,
+    registration: opts.registration,
     ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
   });
   return { built, flyable, cargoLimit };

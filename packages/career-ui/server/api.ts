@@ -66,6 +66,7 @@ import {
   isCharterEligibleAircraftClass,
   findOpenManifestForRoute,
   findPlayerAircraft,
+  normalizeAircraftRegistration,
   findNpcAirframe,
   listActivePlayerMissions,
   listActivePlayerMissionsForPilot,
@@ -12699,7 +12700,18 @@ export function createCareerApiServer(port = 8787) {
               const { built, flyable } = await buildFlyableMissionDispatch(
                 mission,
                 distanceNm,
-                { liveTitle: getLastProbeAircraftTitle() },
+                {
+                  liveTitle: getLastProbeAircraftTitle(),
+                  registration: await withCareerPeekRead((_w, missions) => {
+                    if (!mission.aircraftId) return undefined;
+                    return (
+                      normalizeAircraftRegistration(
+                        findPlayerAircraft(missions, mission.aircraftId)
+                          ?.registration,
+                      ) ?? undefined
+                    );
+                  }, { companyId: cpAcceptCompanyId }),
+                },
               );
               mission = await withCareerWrite((world, missions) => {
                 const idx = missions.missions.findIndex((m) => m.id === mission.id);
@@ -13273,6 +13285,15 @@ export function createCareerApiServer(port = 8787) {
                 {
                   units: body.units ?? body.weightSystem,
                   liveTitle: getLastProbeAircraftTitle(),
+                  registration: await withCareerPeekRead((_w, missions) => {
+                    if (!mission.aircraftId) return undefined;
+                    return (
+                      normalizeAircraftRegistration(
+                        findPlayerAircraft(missions, mission.aircraftId)
+                          ?.registration,
+                      ) ?? undefined
+                    );
+                  }),
                 },
               );
               mission = await withCareerWrite((world, missions) => {
@@ -13539,11 +13560,18 @@ export function createCareerApiServer(port = 8787) {
           }
           const dispatchDistanceNm =
             routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
+          const registration =
+            mission.aircraftId != null
+              ? normalizeAircraftRegistration(
+                  findPlayerAircraft(missions, mission.aircraftId)?.registration,
+                ) ?? undefined
+              : undefined;
           return {
             kind: 'ok' as const,
             mission,
             dispatchDistanceNm,
             aircraftClassId: mission.aircraftClassId,
+            registration,
           };
         }, { companyId: dispatchCompanyId });
         if (prep.kind === 'missing') {
@@ -13566,6 +13594,7 @@ export function createCareerApiServer(port = 8787) {
             {
               units: body.units ?? body.weightSystem,
               liveTitle,
+              registration: prep.registration,
             },
           );
           const needsCargoTrim = flyable.cargoKg < prep.mission.cargoKg;

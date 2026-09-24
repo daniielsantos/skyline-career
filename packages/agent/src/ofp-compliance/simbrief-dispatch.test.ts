@@ -97,4 +97,15 @@ describe('buildDispatchRedirectUrl', () => {
     assert.equal(qs.get('units'), 'LBS');
     assert.equal(qs.get('acdata'), JSON.stringify({ paxwgt: 190, bagwgt: 30 }));
   });
+
+  it('prefills fleet registration via reg=', () => {
+    const url = buildDispatchRedirectUrl({
+      type: 'B38M',
+      orig: 'SBGR',
+      dest: 'SBSP',
+      reg: 'pt-wkj',
+    });
+    const qs = new URL(url).searchParams;
+    assert.equal(qs.get('reg'), 'PT-WKJ');
+  });
 });

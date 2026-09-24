@@ -791,11 +791,8 @@ export function DispatchActivePanel(props: {
                     ))}
                   </dl>
                 ) : null}
-                {actionableFindings.length > 0 ? (
-                  <details
-                    className="preflight-technical"
-                    open={ofpCargoUnderOnly || check.verdict === 'fail'}
-                  >
+                {devMode && actionableFindings.length > 0 ? (
+                  <details className="preflight-technical">
                     <summary>
                       {actionableFindings.length}{' '}
                       {actionableFindings.length === 1 ? 'OFP detail' : 'OFP details'}
@@ -1925,11 +1922,8 @@ export function DispatchActivePanel(props: {
                 ) : (
                   liveLoadGrid
                 )}
-                {check.findings.length > 0 ? (
-                  <details
-                    className="preflight-technical"
-                    open={!ready}
-                  >
+                {devMode && check.findings.length > 0 ? (
+                  <details className="preflight-technical">
                     <summary>{noteLabel}</summary>
                     <ul className="ofp-findings">
                       {check.findings.map((finding) => (

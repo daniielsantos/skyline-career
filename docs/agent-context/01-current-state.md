@@ -1,5 +1,8 @@
 # Current state (2026-09-24)
 
+`main` **53cb801d** / desktop **0.3.275** shipped: Widen charter OFP baggage tolerance for SimBrief bagwgt lb round-trip. Release: [v0.3.275](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.275).
+
+
 `main` **d20650f0** / desktop **0.3.274** shipped: Add Payload Lab charter mode for inject Due vs Sim. Release: [v0.3.274](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.274).
 
 

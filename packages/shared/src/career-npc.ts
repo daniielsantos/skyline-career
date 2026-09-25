@@ -2127,6 +2127,7 @@ function settleNpcFlight(world: CareerEconomyWorld, flight: NpcFlight, nowMs: nu
       originIcao: flight.originIcao,
       destIcao: flight.destIcao,
       kg: flight.cargoKg,
+      activitySource: 'npc',
     });
 
     if (lot) {

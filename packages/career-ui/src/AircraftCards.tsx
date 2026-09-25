@@ -1774,9 +1774,6 @@ export function HangarAircraftCard(props: {
                   </button>
                 </div>
               </div>
-              {moveLockReason ? (
-                <p className="ferry-plan-meta">{moveLockReason}</p>
-              ) : null}
             </div>
           )}
         </div>

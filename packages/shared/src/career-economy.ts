@@ -1119,14 +1119,23 @@ export {
   ensureAirportHubLevel,
   ensureWorldHubLevels,
   HUB_ACTIVITY,
+  HUB_ACTIVITY_SOURCE_MULT,
   HUB_LEVEL_CURVE_VERSION,
+  HUB_LEVEL_DEMOTE_SLACK_FRAC,
+  HUB_LEVEL_L5_MAX_IDLE_TICKS,
+  HUB_LEVEL_L5_MIN_ACTIVITY_SCORE,
   HUB_LEVEL_MAX,
   HUB_LEVEL_MIN,
   HUB_LEVEL_PROFILE,
+  HUB_LEVEL_XP_DECAY_PER_TICK,
   HUB_LEVEL_XP_PER_TICK_CAP,
   HUB_LEVEL_XP_TO_REACH,
+  HUB_QUIET_ACTIVITY_SCORE,
+  hubLevelDemoteBelowXp,
+  hubLevelEligibleForPromotionTo,
   hubLevelFromXp,
   hubLevelHealthMult,
+  hubLevelIsQuiet,
   hubLevelLaneBonus,
   hubLevelNpcBidMult,
   hubLevelOriginPayMult,
@@ -1140,6 +1149,7 @@ export {
   regionAverageHubLevel,
   tickHubLevels,
 } from './career-hub-level.js';
+export type { HubActivitySource } from './career-hub-level.js';
 import { maybeQueueHubEconomyDaySample } from './career-hub-economy-sample.js';
 
 export {
@@ -9385,6 +9395,8 @@ export function applyFreightDelivery(
     originIcao: string;
     destIcao: string;
     kg: number;
+    /** Player settle = full XP; NPC = discounted. Default player for back-compat. */
+    activitySource?: 'player' | 'npc';
   },
 ): { removedFromOriginKg: number; addedToDestKg: number; originStockKg: number; destStockKg: number } {
   const byIcao = airportMap(world);
@@ -9409,7 +9421,12 @@ export function applyFreightDelivery(
   dStock.stockKg = clamp(dStock.stockKg + addedToDestKg, 0, dStock.capacityKg);
   noteDeliveryStock(world, removedFromOriginKg, addedToDestKg);
   if (addedToDestKg > 0 || removedFromOriginKg > 0) {
-    recordFreightSettleActivity(world, opts.originIcao, opts.destIcao);
+    recordFreightSettleActivity(
+      world,
+      opts.originIcao,
+      opts.destIcao,
+      opts.activitySource ?? 'player',
+    );
   }
   return {
     removedFromOriginKg,

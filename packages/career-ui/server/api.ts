@@ -2984,6 +2984,8 @@ function mapAirportTerminalChrome(
       laneBonus: levelProfile.laneBonus,
       originPayMult: levelProfile.originPayMult,
       quiet: (airport.activityScore ?? 40) < 8,
+      atRisk: levelInfo.atRisk,
+      demoteBelowXp: levelInfo.demoteBelowXp,
     },
   };
 }

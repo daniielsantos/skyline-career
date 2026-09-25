@@ -3079,6 +3079,7 @@ export function settleMission(
         originIcao: working.originIcao,
         destIcao: working.destIcao,
         kg: line.cargoKg,
+        activitySource: 'player',
       });
       lastOriginStock = delivery.originStockKg;
       lastDestStock = delivery.destStockKg;

@@ -1,6 +1,9 @@
 /**
- * Hub development level (1→5): sticky progression driven by real traffic,
+ * Hub development level (1→5): progression driven by real traffic,
  * separate from static hubTier (major/regional/spoke).
+ *
+ * Quiet hubs slowly lose XP and can demote (hysteresis). L5 is a rare
+ * ceiling that needs recent activity to reach and traffic to hold.
  */
 
 import type {
@@ -44,7 +47,7 @@ export const HUB_LEVEL_XP_TO_REACH: Record<number, number> = {
 
 /**
  * Bonuses relative to level 1.
- * Capacity/flow are applied as one-shot rescale on level-up (ratio next/prev).
+ * Capacity/flow are applied as one-shot rescale on level-up/down (ratio next/prev).
  * Lane/pay/bid are read live each tick.
  */
 export const HUB_LEVEL_PROFILE: Record<
@@ -111,14 +114,39 @@ export const HUB_ACTIVITY = {
   fuelTruckDelivery: 3,
 } as const;
 
+/** Who caused the XP — NPC/market traffic is discounted so levels are not a timer. */
+export type HubActivitySource = 'player' | 'npc' | 'market';
+
+export const HUB_ACTIVITY_SOURCE_MULT: Record<HubActivitySource, number> = {
+  player: 1,
+  npc: 0.4,
+  market: 0.5,
+};
+
 /** Hard cap so a busy formation hour cannot dump a whole level alone (~6/hour ÷ 4). */
 export const HUB_LEVEL_XP_PER_TICK_CAP = 1.5;
 
-/** Recent-activity soft health (neglect does not drop level). */
+/**
+ * Quiet hubs lose XP each tick. ~0.45 × 96 ≈ 43 XP/day.
+ * L5 hysteresis slack (~675) drains in ~2 weeks of neglect.
+ */
+export const HUB_LEVEL_XP_DECAY_PER_TICK = 0.45;
+
+/**
+ * Demote only after XP falls this fraction of the span *into* the current level
+ * below the reach threshold (anti yo-yo right after promote).
+ */
+export const HUB_LEVEL_DEMOTE_SLACK_FRAC = 0.25;
+
+/** L5 promotion needs recent traffic, not XP + warehouse alone. */
+export const HUB_LEVEL_L5_MIN_ACTIVITY_SCORE = 35;
+/** Max idle ticks since last XP grant to allow L5 (~12 wall-hours). */
+export const HUB_LEVEL_L5_MAX_IDLE_TICKS = 48;
+
 /** Per 15-min tick; ≈ 0.985 per wall-hour (0.985^(1/4)). */
 const ACTIVITY_DECAY_PER_TICK = 0.99622;
 const ACTIVITY_SCORE_CAP = 100;
-const QUIET_ACTIVITY_SCORE = 8;
+export const HUB_QUIET_ACTIVITY_SCORE = 8;
 const QUIET_FLOW_MULT = 0.92;
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -145,22 +173,49 @@ export function hubLevelProfile(level: number) {
   return HUB_LEVEL_PROFILE[clampHubLevel(level)] ?? HUB_LEVEL_PROFILE[1]!;
 }
 
+/** XP must fall below this to demote from `level` (hysteresis under reach threshold). */
+export function hubLevelDemoteBelowXp(level: number): number {
+  const L = clampHubLevel(level);
+  if (L <= 1) return 0;
+  const at = HUB_LEVEL_XP_TO_REACH[L] ?? 0;
+  const prev = HUB_LEVEL_XP_TO_REACH[L - 1] ?? 0;
+  const span = Math.max(1, at - prev);
+  return Math.max(prev, at - span * HUB_LEVEL_DEMOTE_SLACK_FRAC);
+}
+
+export function hubLevelIsQuiet(ap: AirportTerminal): boolean {
+  return (ap.activityScore ?? ACTIVITY_SCORE_CAP * 0.4) < HUB_QUIET_ACTIVITY_SCORE;
+}
+
 export function hubLevelXpProgress(ap: AirportTerminal): {
   level: number;
   xp: number;
   xpIntoLevel: number;
   xpForNext: number | null;
   progressPct: number;
+  atRisk: boolean;
+  demoteBelowXp: number | null;
 } {
   const level = clampHubLevel(ap.level ?? 1);
   const xp = Math.max(0, ap.levelXp ?? HUB_LEVEL_XP_TO_REACH[level] ?? 0);
+  const quiet = hubLevelIsQuiet(ap);
+  const demoteBelow = level > 1 ? hubLevelDemoteBelowXp(level) : null;
+  const atRisk = level >= 2 && (quiet || (demoteBelow != null && xp < demoteBelow + (HUB_LEVEL_XP_TO_REACH[level]! - demoteBelow) * 0.35));
+
   if (level >= HUB_LEVEL_MAX) {
+    // Bar = maintenance band from demote floor → reach threshold.
+    const floor = demoteBelow ?? HUB_LEVEL_XP_TO_REACH[level]!;
+    const at = HUB_LEVEL_XP_TO_REACH[level] ?? floor;
+    const span = Math.max(1, at - floor);
+    const into = clamp(xp - floor, 0, span);
     return {
       level,
       xp,
-      xpIntoLevel: 0,
+      xpIntoLevel: into,
       xpForNext: null,
-      progressPct: 100,
+      progressPct: Math.round((into / span) * 100),
+      atRisk: quiet || xp < at,
+      demoteBelowXp: floor,
     };
   }
   const at = HUB_LEVEL_XP_TO_REACH[level] ?? 0;
@@ -173,6 +228,8 @@ export function hubLevelXpProgress(ap: AirportTerminal): {
     xpIntoLevel: into,
     xpForNext: next - at,
     progressPct: Math.round((into / span) * 100),
+    atRisk,
+    demoteBelowXp: demoteBelow,
   };
 }
 
@@ -192,13 +249,13 @@ export function hubLevelNpcBidMult(level: number): number {
 }
 
 /**
- * Soft neglect: quiet hubs keep their level number but lose a bit of throughput.
+ * Soft neglect: quiet hubs also lose a bit of throughput (on top of XP decay).
  * Returns 1 when healthy.
  */
 export function hubLevelHealthMult(ap: AirportTerminal): number {
   const score = ap.activityScore ?? ACTIVITY_SCORE_CAP * 0.4;
-  if (score >= QUIET_ACTIVITY_SCORE) return 1;
-  const t = score / QUIET_ACTIVITY_SCORE;
+  if (score >= HUB_QUIET_ACTIVITY_SCORE) return 1;
+  const t = score / HUB_QUIET_ACTIVITY_SCORE;
   return QUIET_FLOW_MULT + (1 - QUIET_FLOW_MULT) * t;
 }
 
@@ -219,6 +276,19 @@ export function hubLevelHealthyForPromotion(ap: AirportTerminal): boolean {
     if (f >= 0.22 && f <= 0.92) ok += 1;
   }
   return n > 0 && ok / n >= 0.55;
+}
+
+/** Extra gate for L5 — recent traffic, not just cumulative XP. */
+export function hubLevelEligibleForPromotionTo(
+  world: CareerEconomyWorld,
+  ap: AirportTerminal,
+  toLevel: number,
+): boolean {
+  if (!hubLevelHealthyForPromotion(ap)) return false;
+  if (toLevel < HUB_LEVEL_MAX) return true;
+  if ((ap.activityScore ?? 0) < HUB_LEVEL_L5_MIN_ACTIVITY_SCORE) return false;
+  const idle = world.tick - (ap.lastActivityTick ?? 0);
+  return idle <= HUB_LEVEL_L5_MAX_IDLE_TICKS;
 }
 
 function findAirport(
@@ -300,8 +370,12 @@ export function recordHubActivity(
   world: CareerEconomyWorld,
   icao: string,
   points: number,
+  source: HubActivitySource = 'player',
 ): void {
   if (!(points > 0)) return;
+  const mult = HUB_ACTIVITY_SOURCE_MULT[source] ?? 1;
+  const scaled = points * mult;
+  if (!(scaled > 0)) return;
   const ap = findAirport(world, icao);
   if (!ap) return;
   ensureAirportHubLevel(ap);
@@ -312,7 +386,7 @@ export function recordHubActivity(
   }
   const already = ap.levelXpTick ?? 0;
   const room = Math.max(0, HUB_LEVEL_XP_PER_TICK_CAP - already);
-  const grant = Math.min(points, room);
+  const grant = Math.min(scaled, room);
   if (!(grant > 0)) return;
 
   ap.levelXpTick = already + grant;
@@ -329,17 +403,18 @@ export function recordLotFormationActivity(
   originIcao: string,
   destIcao: string,
 ): void {
-  recordHubActivity(world, originIcao, HUB_ACTIVITY.lotOrigin);
-  recordHubActivity(world, destIcao, HUB_ACTIVITY.lotDest);
+  recordHubActivity(world, originIcao, HUB_ACTIVITY.lotOrigin, 'market');
+  recordHubActivity(world, destIcao, HUB_ACTIVITY.lotDest, 'market');
 }
 
 export function recordFreightSettleActivity(
   world: CareerEconomyWorld,
   originIcao: string,
   destIcao: string,
+  source: HubActivitySource = 'player',
 ): void {
-  recordHubActivity(world, originIcao, HUB_ACTIVITY.freightSettleOrigin);
-  recordHubActivity(world, destIcao, HUB_ACTIVITY.freightSettleDest);
+  recordHubActivity(world, originIcao, HUB_ACTIVITY.freightSettleOrigin, source);
+  recordHubActivity(world, destIcao, HUB_ACTIVITY.freightSettleDest, source);
 }
 
 export function recordFuelUpliftActivity(
@@ -352,25 +427,26 @@ export function recordFuelUpliftActivity(
     HUB_ACTIVITY.fuelUpliftCap,
     deliveredKg * HUB_ACTIVITY.fuelUpliftPerKg,
   );
-  recordHubActivity(world, originIcao, pts);
+  recordHubActivity(world, originIcao, pts, 'player');
 }
 
 export function recordFuelTruckDeliveryActivity(
   world: CareerEconomyWorld,
   destIcao: string,
 ): void {
-  recordHubActivity(world, destIcao, HUB_ACTIVITY.fuelTruckDelivery);
+  recordHubActivity(world, destIcao, HUB_ACTIVITY.fuelTruckDelivery, 'npc');
 }
 
 /**
- * Decay activity scores, then promote hubs that crossed XP + health gates.
- * Level never decreases.
+ * Decay activity + quiet XP, demote when below hysteresis floor, then promote.
  */
 export function tickHubLevels(world: CareerEconomyWorld): {
   promoted: Array<{ icao: string; from: number; to: number }>;
+  demoted: Array<{ icao: string; from: number; to: number }>;
 } {
   ensureWorldHubLevels(world);
   const promoted: Array<{ icao: string; from: number; to: number }> = [];
+  const demoted: Array<{ icao: string; from: number; to: number }> = [];
 
   for (const ap of world.airports) {
     ap.activityScore = Math.max(
@@ -378,17 +454,29 @@ export function tickHubLevels(world: CareerEconomyWorld): {
       (ap.activityScore ?? 0) * ACTIVITY_DECAY_PER_TICK,
     );
 
-    if (ap.level >= HUB_LEVEL_MAX) continue;
-    // Evaluate at most once every 6 ticks to avoid +1 day blasting many levels.
+    if (hubLevelIsQuiet(ap) && clampHubLevel(ap.level) >= 2) {
+      ap.levelXp = Math.max(0, (ap.levelXp ?? 0) - HUB_LEVEL_XP_DECAY_PER_TICK);
+    }
+
+    let from = clampHubLevel(ap.level);
+    while (from > 1 && (ap.levelXp ?? 0) < hubLevelDemoteBelowXp(from)) {
+      const to = from - 1;
+      applyLevelRescale(ap, from, to);
+      ap.level = to;
+      demoted.push({ icao: ap.icao, from, to });
+      from = to;
+    }
+
+    if (from >= HUB_LEVEL_MAX) continue;
+    // Evaluate promotion at most once every 6 ticks to avoid +1 day blasting many levels.
     if (world.tick % 6 !== 0) continue;
     if (!hubLevelHealthyForPromotion(ap)) continue;
 
-    let from = clampHubLevel(ap.level);
     while (from < HUB_LEVEL_MAX) {
       const need = HUB_LEVEL_XP_TO_REACH[from + 1] ?? Infinity;
       if ((ap.levelXp ?? 0) < need) break;
-      if (!hubLevelHealthyForPromotion(ap)) break;
       const to = from + 1;
+      if (!hubLevelEligibleForPromotionTo(world, ap, to)) break;
       applyLevelRescale(ap, from, to);
       ap.level = to;
       promoted.push({ icao: ap.icao, from, to });
@@ -396,7 +484,7 @@ export function tickHubLevels(world: CareerEconomyWorld): {
     }
   }
 
-  return { promoted };
+  return { promoted, demoted };
 }
 
 /** Average clamped level of airports in a region (for NPC bid mult). */

@@ -13909,7 +13909,9 @@ export function App() {
                         ? [
                             airportView.hubLevel.xpForNext != null
                               ? `${airportView.hubLevel.progressPct}% to terminal level ${airportView.hubLevel.level + 1}`
-                              : 'Max terminal level',
+                              : airportView.hubLevel.atRisk
+                                ? 'Max level — XP draining; may drop if quiet'
+                                : 'Max terminal level — keep traffic to hold',
                             `Cap ×${airportView.hubLevel.capacityMult.toFixed(2)} · Flow ×${airportView.hubLevel.flowMult.toFixed(2)}`,
                             airportView.hubLevel.laneBonus > 0
                               ? `+${airportView.hubLevel.laneBonus} lane lots`
@@ -13917,7 +13919,11 @@ export function App() {
                             airportView.hubLevel.originPayMult > 1
                               ? `origin pay ×${airportView.hubLevel.originPayMult.toFixed(2)}`
                               : null,
-                            airportView.hubLevel.quiet ? 'quiet terminal' : null,
+                            airportView.hubLevel.atRisk
+                              ? 'at risk — quiet drains XP'
+                              : airportView.hubLevel.quiet
+                                ? 'quiet terminal'
+                                : null,
                           ]
                             .filter(Boolean)
                             .join(' · ')

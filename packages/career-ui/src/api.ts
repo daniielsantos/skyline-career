@@ -1125,6 +1125,8 @@ export type AirportView = ClockSync & {
     laneBonus: number;
     originPayMult: number;
     quiet: boolean;
+    atRisk?: boolean;
+    demoteBelowXp?: number | null;
   };
   events?: EconomyEvent[];
   totalStockKg: number;

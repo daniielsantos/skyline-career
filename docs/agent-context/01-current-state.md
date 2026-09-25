@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **3f9b2401** / desktop **0.3.326** shipped: Allow inject when MSFS leaves IS PAUSED sticky. Release: [v0.3.326](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.326).
+
+
 `main` **ec8878f0** / desktop **0.3.325** shipped: Restore Manifest draft after account switch without wiping storage. Release: [v0.3.325](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.325).
 
 

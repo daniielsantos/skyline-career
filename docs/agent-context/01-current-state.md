@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **02450cea** / desktop **0.3.306** shipped: Stop false slew from freezing Watch while airborne. Release: [v0.3.306](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.306).
+
+
 `main` **ac0c3ad7** / desktop **0.3.305** shipped: Unfreeze Watch via sim Absolute Time and log playback freeze. Release: [v0.3.305](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.305).
 
 

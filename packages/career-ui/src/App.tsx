@@ -7687,16 +7687,17 @@ export function App() {
           return;
         }
         // Late responses must not resurrect Watch while Preflight owns the pipe.
-        // Mid-flight resume is different: effect remounts (watch.running / LV
-        // hydrate / poll) used to cancel mid-await and postWatchStop the session
-        // that just started → footer MSFS↔SIMBRIDGE + map AC / burn flicker.
+        // Effect remounts (watch.running / LV hydrate / poll) used to cancel
+        // mid-await and postWatchStop the session that just started → footer
+        // MSFS↔SIMBRIDGE flicker on app open with Ready + DISPATCHED (same as
+        // the old mid-cruise reopen bug). Keep server Watch whenever Loaded vs
+        // Due already exists (or in_flight); only yield when Preflight still
+        // needs the pipe.
         const stillNeedsHold =
           holdWatchOffForPreflightRef.current ||
           (!isAirborneResume &&
             !activeMissionRef.current?.lastPreflightCheck?.loadVerification);
-        const yieldPipeForPreflight =
-          stillNeedsHold || (cancelled && !isAirborneResume);
-        if (yieldPipeForPreflight) {
+        if (stillNeedsHold) {
           if (status.running) {
             void postWatchStop({ reset: true }).catch(() => {
               /* soft */
@@ -7705,7 +7706,7 @@ export function App() {
           if (!cancelled) setWatchAutoStatus('waiting');
           return;
         }
-        // cancelled + airborne: keep server Watch; attach UI so poll/footer stick.
+        // cancelled + Ready/in_flight: keep server Watch; attach UI so poll/footer stick.
         setWatch(status);
         stopped = true;
         if (!cancelled) {

@@ -2096,6 +2096,14 @@ export class CareerWatchSession {
       this.startEpoch += 1;
     }
     this.running = false;
+    if (opts.reset) {
+      watchDebugLog('watch', 'stop', {
+        reset: true,
+        fromStart: Boolean(opts.fromStart),
+        fromOwnTick: Boolean(opts.fromOwnTick),
+        missionId: this.missionId,
+      });
+    }
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = undefined;

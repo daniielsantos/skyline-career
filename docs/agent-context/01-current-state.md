@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **07428f87** / desktop **0.3.340** shipped: Mix Demand desk and Scout Haul boards by distance bands so long-haul pay no longer monopolizes the shelf. Release: [v0.3.340](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.340).
+
+
 `main` **fa98851b** / desktop **0.3.339** shipped: Trust Watch residual fuel on settle instead of the tripBurn hangar floor. Release: [v0.3.339](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.339).
 
 

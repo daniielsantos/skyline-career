@@ -7606,12 +7606,15 @@ export function App() {
   ]);
 
   // Keep Watch running after the first Preflight exists; Preflight gates auto-depart.
-  // Mid-flight reopen: resume without requiring Dispatch tab or a Preflight card
-  // (depart already happened; airborne % was persisted separately).
+  // Once Ready (Loaded vs Due) or already in_flight, do NOT require the Dispatch
+  // tab — leaving for Crew/Hangar used to skip Watch → no takeoff / stuck DISPATCHED.
   useEffect(() => {
     const alreadyWatching =
       Boolean(watch?.running) && watch?.missionId === activeMission?.id;
     const isAirborneResume = activeMission?.status === 'in_flight';
+    const hasLoadVerification = Boolean(
+      activeMission?.lastPreflightCheck?.loadVerification,
+    );
     // Settlement / cruise from a *previous* mission must not block Watch on the
     // next flight — that left PC24 stuck on DISPATCHED while probe showed AIRBORNE.
     const staleWatchOtherMission =
@@ -7621,15 +7624,10 @@ export function App() {
     const settlementBlocks =
       Boolean(watch?.settlement) && watch?.missionId === activeMission?.id;
     const eligible =
-      (tab === 'staging' || isAirborneResume) &&
-      // Airport panel can stay selected while Dispatch is open — do not block
-      // Watch for an active staged flight (only block when not on staging).
-      (tab === 'staging' || !airportIcao || isAirborneResume) &&
       Boolean(activeMission) &&
       ['dispatched', 'in_flight'].includes(activeMission?.status ?? '') &&
-      // Ground Dispatch needs Loaded vs Due before Watch owns the pipe.
-      (isAirborneResume ||
-        Boolean(activeMission?.lastPreflightCheck?.loadVerification)) &&
+      // Ground: need Loaded vs Due before Watch owns the pipe. Mid-flight: always.
+      (isAirborneResume || hasLoadVerification) &&
       !alreadyWatching &&
       !watchAutoPaused &&
       !holdWatchOffForPreflight &&
@@ -7723,9 +7721,6 @@ export function App() {
     }
 
     void tryStartWatch();
-    const hasLoadVerification = Boolean(
-      activeMission.lastPreflightCheck?.loadVerification,
-    );
     const id = window.setInterval(() => {
       void tryStartWatch();
     }, isAirborneResume
@@ -7746,10 +7741,8 @@ export function App() {
     // Presence of first Preflight only — do NOT depend on ready/checkedAtIso
     // (those flip every sample and remounted this effect → Watch start storms).
     Boolean(activeMission?.lastPreflightCheck?.loadVerification),
-    airportIcao,
     holdWatchOffForPreflight,
     loadOfpAutoStatus,
-    tab,
     watch?.running,
     watch?.missionId,
     watch?.settlement,

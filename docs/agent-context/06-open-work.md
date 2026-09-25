@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-25: **Sidebar order** — `Freights → Charter → Ports → Hangar → Airframes → Base → Company → Network → Airlines → Crew → Ranking → Logbook` (Ports sobe pro bloco de trabalho; Hangar antes de Airframes).
+
 Atualizado 2026-09-25: **Settle = parking brake** — iFly idle lia engines-off e auto-settle + overlay sticky. Spec note em [`11-persist-commands.md`](./11-persist-commands.md).
 
 Atualizado 2026-09-25: **IH pay market-anchored** — suggest = max(floor, legacy, Market×0.45); Auto-haul Config Pay %. Spec: [`16-va-logistics.md`](./16-va-logistics.md).

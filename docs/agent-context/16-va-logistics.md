@@ -200,6 +200,7 @@ My VA tem **pelo menos duas leituras** do mesmo shell (Roster / Hangar / Ledger 
 
 - Abrir My VA faz `switchCompanyForVa` e grava `?company=` da VA — necessário para hangar/ledger/mutações.
 - **Chrome sticky = home:** topbar Company + Wallet + Hangar da sidebar leem sempre a **home**. Label do chip é sempre **Wallet** (nunca “VA wallet”). Sessão API pode estar na VA só dentro de My VA; `paintWallet`/`commitWallet` recusam pintar chrome se `active ≠ home` (mandam para `vaSessionWallet`).
+- **Crew onWallet painted VA cash as home (2026-09-25):** sintoma = membro vê chrome Wallet = saldo da airline; Hangar corrige pro home. Causa = `onWallet` usava `sourceCompanyId: va||home` com `memberVaCompanyId` ainda null → $ da VA rotulado como home. Fix = members só `setVaSessionWallet`; chrome só se `home === va` (owner). Company identity = Home company. Restore home limpa commit-hold.
 - Qualquer tab **≠ My VA** (incl. VAs directory) restaura session home antes do refresh.
 - Join por código **não** troca tenant — My VA é que abre a VA.
 

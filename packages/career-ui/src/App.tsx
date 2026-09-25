@@ -8443,6 +8443,9 @@ export function App() {
       // Keep vaSessionFleet / wallet — Prepare opsFleet needs VA tails while
       // chrome Hangar stays on home `fleet`. Clearing here left members with
       // only "Yours" after visiting My VA.
+      // Drop commit hold so the following home refresh can repaint Wallet
+      // after a Crew race that labeled VA cash as home.
+      walletCommitHoldRef.current = null;
       return;
     }
     // Hangar/wallet for VA pin already painted from /api/va/members.
@@ -13644,19 +13647,12 @@ export function App() {
           </button>
           <button
             type="button"
-            className={!showAirport && tab === 'aircraft' ? 'tab active' : 'tab'}
-            onClick={() => {
-              selectTab('aircraft');
-              void refreshAircraftMarket().catch(() => undefined);
-            }}
+            className={!showAirport && tab === 'ports' ? 'tab active' : 'tab'}
+            onClick={() => selectTab('ports')}
             disabled={busy}
-            title={
-              aircraftListings.length
-                ? `${aircraftListings.length} airframe listings today`
-                : 'Buy, used, and lease airframes'
-            }
+            title="Seaport factory cargo"
           >
-            Airframes
+            Ports
           </button>
           <button
             type="button"
@@ -13670,6 +13666,22 @@ export function App() {
             }
           >
             Hangar
+          </button>
+          <button
+            type="button"
+            className={!showAirport && tab === 'aircraft' ? 'tab active' : 'tab'}
+            onClick={() => {
+              selectTab('aircraft');
+              void refreshAircraftMarket().catch(() => undefined);
+            }}
+            disabled={busy}
+            title={
+              aircraftListings.length
+                ? `${aircraftListings.length} airframe listings today`
+                : 'Buy, used, and lease airframes'
+            }
+          >
+            Airframes
           </button>
           <button
             type="button"
@@ -13724,15 +13736,6 @@ export function App() {
             }
           >
             Network
-          </button>
-          <button
-            type="button"
-            className={!showAirport && tab === 'ports' ? 'tab active' : 'tab'}
-            onClick={() => selectTab('ports')}
-            disabled={busy}
-            title="Seaport factory cargo"
-          >
-            Ports
           </button>
           <button
             type="button"
@@ -20611,12 +20614,20 @@ export function App() {
             // Always cache VA wallet for My VA panes.
             setVaSessionWallet(usd);
             const home = homeCompanyIdRef.current?.trim();
-            const va = memberVaCompanyIdRef.current?.trim();
-            // Dual-tenant: never paint VA cash onto chrome — even after
-            // selectTab restored home (late cashflow / members responses).
-            // Checking active≠home races; home≠va is stable for members.
-            if (home && va && home !== va) return;
-            commitWallet(usd, { sourceCompanyId: va || home });
+            const active =
+              getStoredCompanyId()?.trim() ||
+              activeCompanyIdRef.current?.trim();
+            const va =
+              memberVaCompanyIdRef.current?.trim() ||
+              (home && active && home !== active ? active : '');
+            // Owner: home company IS the listed VA — same wallet as chrome.
+            if (home && va && home === va) {
+              commitWallet(usd, { sourceCompanyId: home });
+              return;
+            }
+            // Member / VA pin: never paint airline cash onto chrome Wallet —
+            // even if memberVaCompanyId is not ready yet (old path used
+            // sourceCompanyId: va||home → labeled VA $ as home).
           }}
           onFleet={(nextFleet) => {
             setVaSessionFleet(nextFleet);
@@ -20795,10 +20806,12 @@ export function App() {
                 </div>
                 {authRequired ? (
                   <div>
-                    <dt>Active company</dt>
+                    <dt>Home company</dt>
                     <dd>
-                      {companies.find((c) => c.id === activeCompanyId)
-                        ?.displayName ||
+                      {companies.find(
+                        (c) => c.id === (homeCompanyId || activeCompanyId),
+                      )?.displayName ||
+                        homeCompanyId ||
                         activeCompanyId ||
                         '—'}
                     </dd>
@@ -20874,8 +20887,9 @@ export function App() {
               activeCompanyId={activeCompanyId}
               defaultHomeHubIcao={homeHubIcao}
               defaultDisplayName={
-                companies.find((c) => c.id === activeCompanyId)?.displayName ||
-                ''
+                companies.find(
+                  (c) => c.id === (homeCompanyId || activeCompanyId),
+                )?.displayName || ''
               }
               onGoVa={() => selectTab('va')}
               onListingState={({ listed }) => setCompanyDirectoryListed(listed)}

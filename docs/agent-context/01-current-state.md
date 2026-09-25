@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **208db5ba** / desktop **0.3.320** shipped: Show Demand total pay if you fill remaining Wanted. Release: [v0.3.320](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.320).
+
+
 `main` **d3a6a8d1** / desktop **0.3.319** shipped: Widen warehouse T2/T3 so mid upgrades change staging room. Release: [v0.3.319](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.319).
 
 

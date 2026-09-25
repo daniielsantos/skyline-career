@@ -4569,7 +4569,7 @@ tr.lot-locked {
 .settings-panel .settings-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
 }
 
 .settings-card {
@@ -4579,6 +4579,7 @@ tr.lot-locked {
   display: grid;
   gap: 0.75rem;
   color: var(--ink);
+  min-width: 0;
 }
 
 .settings-card h3 {
@@ -4622,15 +4623,19 @@ tr.lot-locked {
 
 .settings-dev-tools {
   display: grid;
-  gap: 0.85rem;
-  margin-top: 0.25rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid var(--line);
+  gap: 0.85rem 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  margin-top: 0.15rem;
+}
+
+.settings-dev-panel {
+  margin-top: 1rem;
 }
 
 .settings-dev-group {
   display: grid;
   gap: 0.4rem;
+  align-content: start;
 }
 
 .settings-dev-group .aircraft-card-section-label {
@@ -6417,7 +6422,42 @@ button.logbook-card-hit:focus-visible {
 }
 
 .pilot-travel-dialog .fbo-icao-switcher {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.65rem;
+  flex-wrap: wrap;
+}
+
+.pilot-travel-shortcuts {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0 0 0.35rem;
+}
+
+.pilot-travel-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
+  line-height: 1.15;
+  padding: 0.35rem 0.55rem;
+  height: auto;
+  min-height: 2rem;
+}
+
+.pilot-travel-chip-icao {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.pilot-travel-chip-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--muted, #9aa0a6);
+}
+
+.fbo-icao-chip.active .pilot-travel-chip-label {
+  color: color-mix(in srgb, var(--accent, #c4a574) 70%, var(--ink));
 }
 
 .pilot-travel-dialog .pilot-travel-quote {
@@ -12854,6 +12894,13 @@ span.dispatch-route-hub-dest {
   border: 1px solid color-mix(in srgb, var(--line, #3a4450) 80%, transparent);
   border-radius: 6px;
   background: color-mix(in srgb, var(--panel, #1a222c) 92%, #2a4a3a 8%);
+}
+
+.ports-scout-loading {
+  min-height: 7rem;
+  display: grid;
+  place-items: center;
+  padding: 0.75rem 0;
 }
 
 .ports-scout-title {

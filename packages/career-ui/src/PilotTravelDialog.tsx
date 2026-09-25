@@ -10,6 +10,12 @@ export type PilotTravelFleetShortcut = {
   label: string;
 };
 
+export type PilotTravelContextShortcut = {
+  icao: string;
+  /** Short reason — e.g. Dispatch origin, Mission origin. */
+  label: string;
+};
+
 export type PilotTravelFerryAircraft = {
   id: string;
   label: string;
@@ -30,6 +36,8 @@ export function PilotTravelDialog(props: {
   hubs: FerryHubOption[];
   /** Prefill destination (e.g. Hangar “Travel here”). */
   initialDestIcao?: string | null;
+  /** Current Dispatch / accepted mission origins — one-click dest (pilot mode). */
+  contextShortcuts?: PilotTravelContextShortcut[];
   /** Parked fleet ICAOs where the pilot is away — one-click dest (pilot mode). */
   fleetShortcuts?: PilotTravelFleetShortcut[];
   /** Parked fleet for ferry mode. */
@@ -84,8 +92,20 @@ export function PilotTravelDialog(props: {
     );
   }, [props.hubs, origin, ferryOrigin, mode]);
 
-  const shortcuts = useMemo(() => {
+  const contextShortcuts = useMemo(() => {
     const seen = new Set<string>();
+    const out: PilotTravelContextShortcut[] = [];
+    for (const row of props.contextShortcuts ?? []) {
+      const icao = row.icao.trim().toUpperCase();
+      if (!icao || icao === origin || seen.has(icao)) continue;
+      seen.add(icao);
+      out.push({ icao, label: row.label.trim() || icao });
+    }
+    return out;
+  }, [props.contextShortcuts, origin]);
+
+  const shortcuts = useMemo(() => {
+    const seen = new Set(contextShortcuts.map((r) => r.icao));
     const out: PilotTravelFleetShortcut[] = [];
     for (const row of props.fleetShortcuts ?? []) {
       const icao = row.icao.trim().toUpperCase();
@@ -94,7 +114,7 @@ export function PilotTravelDialog(props: {
       out.push({ icao, label: row.label });
     }
     return out;
-  }, [props.fleetShortcuts, origin]);
+  }, [props.fleetShortcuts, origin, contextShortcuts]);
 
   useEffect(() => {
     if (!aircraftId && ferryOptions[0]) {
@@ -298,26 +318,58 @@ export function PilotTravelDialog(props: {
             )
           ) : null}
 
-          {mode === 'pilot' && shortcuts.length > 0 ? (
-            <div
-              className="fbo-icao-switcher"
-              role="group"
-              aria-label="Fleet locations"
-            >
-              {shortcuts.map((row) => (
-                <button
-                  key={row.icao}
-                  type="button"
-                  className={
-                    dest === row.icao ? 'fbo-icao-chip active' : 'fbo-icao-chip'
-                  }
-                  disabled={props.busy || submitting}
-                  title={`${row.label} at ${row.icao}`}
-                  onClick={() => setDestIcao(row.icao)}
+          {mode === 'pilot' &&
+          (contextShortcuts.length > 0 || shortcuts.length > 0) ? (
+            <div className="pilot-travel-shortcuts">
+              {contextShortcuts.length > 0 ? (
+                <div
+                  className="fbo-icao-switcher"
+                  role="group"
+                  aria-label="Flight destinations"
                 >
-                  {row.icao}
-                </button>
-              ))}
+                  {contextShortcuts.map((row) => (
+                    <button
+                      key={`ctx-${row.icao}`}
+                      type="button"
+                      className={
+                        dest === row.icao
+                          ? 'fbo-icao-chip active pilot-travel-chip'
+                          : 'fbo-icao-chip pilot-travel-chip'
+                      }
+                      disabled={props.busy || submitting}
+                      title={`Travel to ${row.icao} · ${row.label}`}
+                      onClick={() => setDestIcao(row.icao)}
+                    >
+                      <span className="pilot-travel-chip-icao">{row.icao}</span>
+                      <span className="pilot-travel-chip-label">{row.label}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {shortcuts.length > 0 ? (
+                <div
+                  className="fbo-icao-switcher"
+                  role="group"
+                  aria-label="Fleet locations"
+                >
+                  {shortcuts.map((row) => (
+                    <button
+                      key={row.icao}
+                      type="button"
+                      className={
+                        dest === row.icao
+                          ? 'fbo-icao-chip active'
+                          : 'fbo-icao-chip'
+                      }
+                      disabled={props.busy || submitting}
+                      title={`${row.label} at ${row.icao}`}
+                      onClick={() => setDestIcao(row.icao)}
+                    >
+                      {row.icao}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
 

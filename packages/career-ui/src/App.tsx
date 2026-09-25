@@ -20120,117 +20120,120 @@ export function App() {
                   <small>Cheats &amp; debug</small>
                 </button>
               </div>
-              {devMode ? (
-                <div className="settings-dev-tools">
-                  <div className="settings-dev-group">
-                    <p className="aircraft-card-section-label">Time</p>
-                    <div className="settings-dev-actions">
-                      <button
-                        type="button"
-                        className="action"
-                        onClick={() => void onTick(96)}
-                        disabled={busy}
-                        title="Advance economy + crew wall-clock by 1 day (96 ticks)"
-                      >
-                        {formatTickAdvanceButton(96, '+1 day')}
-                      </button>
-                      <button
-                        type="button"
-                        className="action"
-                        onClick={() => void onTick(96 * 3)}
-                        disabled={busy}
-                        title="Advance economy + crew wall-clock by 3 days (288 ticks)"
-                      >
-                        {formatTickAdvanceButton(96 * 3, '+3 day')}
-                      </button>
-                      <button
-                        type="button"
-                        className="action"
-                        onClick={() => void onTick(96 * 7)}
-                        disabled={busy}
-                        title="Advance economy + crew wall-clock by 7 days (672 ticks)"
-                      >
-                        {formatTickAdvanceButton(96 * 7, '+7 day')}
-                      </button>
-                      <button
-                        type="button"
-                        className="action"
-                        onClick={() => void onTick(96 * 14)}
-                        disabled={busy}
-                        title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
-                      >
-                        {formatTickAdvanceButton(96 * 14, '+14 day')}
-                      </button>
-                      <button
-                        type="button"
-                        className="action"
-                        onClick={() => void onTick(96 * 30)}
-                        disabled={busy}
-                        title="Advance economy + crew wall-clock by 30 days (2880 ticks)"
-                      >
-                        {formatTickAdvanceButton(96 * 30, '+30 day')}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="settings-dev-group">
-                    <p className="aircraft-card-section-label">Wallet</p>
-                    <div className="settings-dev-actions">
-                      <button
-                        type="button"
-                        className="action ghost"
-                        onClick={() => void onDebugCreditWallet(5_000)}
-                        disabled={busy}
-                        title="Add $5,000 to the active company wallet"
-                      >
-                        +$5K
-                      </button>
-                      <button
-                        type="button"
-                        className="action ghost"
-                        onClick={() => void onDebugCreditWallet(100_000)}
-                        disabled={busy}
-                        title="Add $100,000 to the active company wallet"
-                      >
-                        +$100K
-                      </button>
-                    </div>
-                  </div>
-                  <div className="settings-dev-group">
-                    <p className="aircraft-card-section-label">Ports</p>
-                    <div className="settings-dev-actions">
-                      <button
-                        type="button"
-                        className="action ghost"
-                        onClick={() => void onDebugClaimSantos()}
-                        disabled={busy}
-                        title="Force Port FBO at Port of Santos (BRSSZ) for the active company"
-                      >
-                        Claim Santos
-                      </button>
-                    </div>
-                  </div>
-                  <div className="settings-dev-group">
-                    <p className="aircraft-card-section-label">Progression</p>
-                    <p className="settings-help">
-                      Writes unlocks into the company save (unlike the session
-                      gates above).
-                    </p>
-                    <div className="settings-dev-actions">
-                      <button
-                        type="button"
-                        className="action ghost"
-                        onClick={() => void onDebugUnlockClassOps()}
-                        disabled={busy}
-                        title="Persist unlock of every freighter Class Ops rung"
-                      >
-                        Unlock Class Ops
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
+          {devMode ? (
+            <div className="settings-card settings-dev-panel">
+              <h3>Dev tools</h3>
+              <p className="settings-help">
+                Active company only. Progression unlocks write into the save;
+                time / wallet / ports are one-shot cheats.
+              </p>
+              <div className="settings-dev-tools">
+                <div className="settings-dev-group">
+                  <p className="aircraft-card-section-label">Time</p>
+                  <div className="settings-dev-actions">
+                    <button
+                      type="button"
+                      className="action"
+                      onClick={() => void onTick(96)}
+                      disabled={busy}
+                      title="Advance economy + crew wall-clock by 1 day (96 ticks)"
+                    >
+                      {formatTickAdvanceButton(96, '+1 day')}
+                    </button>
+                    <button
+                      type="button"
+                      className="action"
+                      onClick={() => void onTick(96 * 3)}
+                      disabled={busy}
+                      title="Advance economy + crew wall-clock by 3 days (288 ticks)"
+                    >
+                      {formatTickAdvanceButton(96 * 3, '+3 day')}
+                    </button>
+                    <button
+                      type="button"
+                      className="action"
+                      onClick={() => void onTick(96 * 7)}
+                      disabled={busy}
+                      title="Advance economy + crew wall-clock by 7 days (672 ticks)"
+                    >
+                      {formatTickAdvanceButton(96 * 7, '+7 day')}
+                    </button>
+                    <button
+                      type="button"
+                      className="action"
+                      onClick={() => void onTick(96 * 14)}
+                      disabled={busy}
+                      title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
+                    >
+                      {formatTickAdvanceButton(96 * 14, '+14 day')}
+                    </button>
+                    <button
+                      type="button"
+                      className="action"
+                      onClick={() => void onTick(96 * 30)}
+                      disabled={busy}
+                      title="Advance economy + crew wall-clock by 30 days (2880 ticks)"
+                    >
+                      {formatTickAdvanceButton(96 * 30, '+30 day')}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-dev-group">
+                  <p className="aircraft-card-section-label">Wallet</p>
+                  <div className="settings-dev-actions">
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void onDebugCreditWallet(5_000)}
+                      disabled={busy}
+                      title="Add $5,000 to the active company wallet"
+                    >
+                      +$5K
+                    </button>
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void onDebugCreditWallet(100_000)}
+                      disabled={busy}
+                      title="Add $100,000 to the active company wallet"
+                    >
+                      +$100K
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-dev-group">
+                  <p className="aircraft-card-section-label">Ports</p>
+                  <div className="settings-dev-actions">
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void onDebugClaimSantos()}
+                      disabled={busy}
+                      title="Force Port FBO at Port of Santos (BRSSZ) for the active company"
+                    >
+                      Claim Santos
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-dev-group">
+                  <p className="aircraft-card-section-label">Progression</p>
+                  <div className="settings-dev-actions">
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void onDebugUnlockClassOps()}
+                      disabled={busy}
+                      title="Persist unlock of every freighter Class Ops rung"
+                    >
+                      Unlock Class Ops
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       ) : hubSelected && tab === 'map' ? (
         <section className="panel network-map-panel">
@@ -21279,6 +21282,26 @@ export function App() {
             icao: hub.icao,
             name: hub.name,
           }))}
+          contextShortcuts={[
+            ...(staging?.originIcao?.trim()
+              ? [
+                  {
+                    icao: staging.originIcao,
+                    label: 'Dispatch origin',
+                  },
+                ]
+              : []),
+            ...(activeMission?.originIcao?.trim() &&
+            activeMission.originIcao.trim().toUpperCase() !==
+              staging?.originIcao?.trim().toUpperCase()
+              ? [
+                  {
+                    icao: activeMission.originIcao,
+                    label: 'Mission origin',
+                  },
+                ]
+              : []),
+          ]}
           fleetShortcuts={fleet
             .filter(
               (acf) =>

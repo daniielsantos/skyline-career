@@ -443,6 +443,8 @@ export function PortsPanel(props: {
   const [scoutFilter, setScoutFilter] = useState<
     'all' | 'haul' | 'demand' | 'bridge'
   >('all');
+  const [scoutBusy, setScoutBusy] = useState(false);
+  const [scoutLoaded, setScoutLoaded] = useState(false);
   const [scoutHoldDraft, setScoutHoldDraft] = useState<
     | { kind: 'haul'; suggestion: PortScoutHaulSuggestion }
     | { kind: 'demand'; suggestion: PortScoutDemandSuggestion }
@@ -571,11 +573,17 @@ export function PortsPanel(props: {
   async function reloadScoutDesk(companyId?: string) {
     const logisticsId =
       companyId?.trim() || props.logisticsCompanyId?.trim() || undefined;
-    const scout = await postPortScout({
-      action: 'list',
-      companyId: logisticsId,
-    });
-    applyScoutDesk(scout);
+    setScoutBusy(true);
+    try {
+      const scout = await postPortScout({
+        action: 'list',
+        companyId: logisticsId,
+      });
+      applyScoutDesk(scout);
+    } finally {
+      setScoutLoaded(true);
+      setScoutBusy(false);
+    }
   }
 
   async function onScoutConfirm(
@@ -903,6 +911,11 @@ export function PortsPanel(props: {
   const skipPulsePortsRefresh = useRef(true);
 
   useEffect(() => {
+    setScoutLoaded(false);
+    setScoutSuggestions([]);
+    setScoutDemandSuggestions([]);
+    setScoutHaulSuggestions([]);
+    setScoutEmptyHint(null);
     void refresh({ includeScout: true }).catch(() => undefined);
     skipPulsePortsRefresh.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tenant / first paint
@@ -4079,7 +4092,11 @@ export function PortsPanel(props: {
                               ))}
                             </div>
                           </div>
-                          {scoutMergedRows.length === 0 ? (
+                          {scoutBusy && !scoutLoaded ? (
+                            <div className="ports-scout-loading">
+                              <BusyBlock label="Loading Scout…" />
+                            </div>
+                          ) : scoutMergedRows.length === 0 ? (
                             <div className="ports-scout-empty">
                               {(scoutFilter !== 'all'
                                 ? [

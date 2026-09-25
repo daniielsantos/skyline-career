@@ -90,6 +90,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Scout auto-select first row (2026-09-24):** sintoma = abrir FBO já destacava 1ª linha Scout + traçava rota. Causa = `useEffect` setava `scoutFocusId` no primeiro merge. Fix = só foco em click (toggle clear); limpa ao trocar porto.
 
+**Scout board BusyBlock (2026-09-24):** sintoma = Scout vazio/estático até a API voltar. Fix = `scoutBusy`/`scoutLoaded` em `reloadScoutDesk`; `BusyBlock` “Loading Scout…” até o 1º list.
+
 **Port FBO lease days in dialog (2026-09-24):** sintoma = “lease through tick N” ilegível; modal denso. Fix = dias restantes (`ceil((through−tick)/96)`); botão **Lease · Nd**; copy P-level enxuta + throughput separado.
 
 **Throughput 7d 0 após voo Demand (2026-09-24):** sintoma = member settle Demand e modal ainda `7d 0.0`. Causa = crédito só no port buy (não no settle). **Superseded** pelo fix settle-only abaixo — após ship, Demand settle no tenant operator credita lifetime + 7d.

@@ -925,6 +925,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Causa:** `GET ferry-plan`, ferry `quoteOnly`, peek pré-write e pilot `quoteOnly` usavam `withCareerRead` → world lock atrás do pulse (~20s+).
 **Fix:** `withCareerPeekRead` (peek economy + `loadMissions`, sem world lock / crew settle) nesses caminhos; write real continua em `withCareerWrite`.
 
+### Pilot travel Dispatch origin chip (2026-09-24)
+
+**Sintoma:** modal Travel só digitava ICAO; chips de frota só apareciam se aircraft parked longe do piloto.
+**Causa:** `PilotTravelDialog` recebia só `fleetShortcuts` — sem origem do voo em planejamento.
+**Fix:** `contextShortcuts` com origem do Staging / missão ativa (labels Dispatch origin / Mission origin); clique preenche dest + quote; frota continua abaixo sem duplicar ICAO.
+
 ### Line crew allowance ferry left Duke stuck / missing from Manifest (2026-09-20)
 
 **Sintoma:** toast de sucesso (−$0), Duke não mudou de ICAO no Hangar VA; sumiu do picker Manifest.

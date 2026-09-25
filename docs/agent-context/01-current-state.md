@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **0b2e0520** / desktop **0.3.328** shipped: Start Watch after Ready even when leaving the Dispatch tab. Release: [v0.3.328](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.328).
+
+
 `main` **407db5ba** / desktop **0.3.327** shipped: Stop gating inject on unused sim rate and slew flags. Release: [v0.3.327](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.327).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **68bd0632** / desktop **0.3.334** shipped: Fix Resume prep layout and frozen load cards; paint live fuel burn in En route. Release: [v0.3.334](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.334).
+
+
 `main` **476e6c98** / desktop **0.3.333** shipped: Allow Resume prep reinject after MSFS restart at departure without reverting in_flight. Release: [v0.3.333](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.333).
 
 

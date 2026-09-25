@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **a5902c01** / desktop **0.3.338** shipped: Freeze the airborne clock on ESC pause even when Absolute Time keeps ticking. Release: [v0.3.338](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.338).
+
+
 `main` **113aa0f1** / desktop **0.3.337** shipped: Park Resume prep inject status left of the switch without shifting layout. Release: [v0.3.337](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.337).
 
 

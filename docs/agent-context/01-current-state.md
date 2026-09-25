@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **891a8d62** / desktop **0.3.313** shipped: Keep Hangar OH cards aligned and show Demand route distance. Release: [v0.3.313](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.313).
+
+
 `main` **6c2b5201** / desktop **0.3.312** shipped: Include credit interest in forward burn and tidy Ledger recent activity. Release: [v0.3.312](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.312).
 
 

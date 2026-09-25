@@ -685,6 +685,26 @@ export function originLocationAllowsDepart(mission: Mission): boolean {
   return loc.ok !== false;
 }
 
+/**
+ * Mid-flight MSFS crash/reload dumped the AC back at the departure ramp while
+ * the mission is still `in_flight`. Unlock reinject / Loaded vs Due without
+ * reverting status (lots stay in transit; airborne clock kept).
+ */
+export function isResumePrepAtOrigin(opts: {
+  missionStatus?: string | null;
+  onGround?: boolean | null;
+  sawAirborne?: boolean;
+  nearOrigin?: boolean;
+  nearDest?: boolean;
+}): boolean {
+  if (opts.missionStatus !== 'in_flight') return false;
+  if (opts.onGround !== true) return false;
+  if (!opts.sawAirborne) return false;
+  if (opts.nearOrigin !== true) return false;
+  if (opts.nearDest === true) return false;
+  return true;
+}
+
 export function deriveDispatchStep(input: {
   hasDraft: boolean;
   hasDebrief: boolean;
@@ -735,6 +755,8 @@ export function dispatchStepStatusLine(input: {
   watchSettleBlockedReason?: string | null;
   /** Watch dest proximity — land/settle copy only when near arrival. */
   watchNearDest?: boolean;
+  /** Watch origin proximity — resume-prep / reinject when back at DEP. */
+  watchNearOrigin?: boolean;
 }): string {
   const { step, mission } = input;
   switch (step) {
@@ -844,6 +866,36 @@ export function dispatchStepStatusLine(input: {
         return 'Still on the ground — take off in MSFS. Menu / variant swaps are not a departure.';
       }
       const nearDest = input.watchNearDest === true;
+      const resumePrep = isResumePrepAtOrigin({
+        missionStatus: mission?.status,
+        onGround: input.watchOnGround,
+        sawAirborne: input.watchSawAirborne,
+        nearOrigin: input.watchNearOrigin === true,
+        nearDest,
+      });
+      if (resumePrep) {
+        if (input.loadPath === 'inject') {
+          if (input.loadOfpAutoStatus === 'loading') {
+            return input.loadOfpProgress?.message
+              ? `${input.loadOfpProgress.message} · Resume prep — turn inject off to stop.`
+              : 'Resume prep — writing fuel/payload. Turn Airframe inject off to stop.';
+          }
+          if (input.loadOfpAutoStatus === 'failed') {
+            return (
+              input.loadOfpAutoError ??
+              'Resume prep — inject failed. Turn Airframe inject on to reload the aircraft.'
+            );
+          }
+        }
+        if (
+          input.mission &&
+          loadVerificationReady(input.mission) &&
+          originLocationAllowsDepart(input.mission)
+        ) {
+          return 'Resume prep ready — take off again to continue the mission. Settle only at the destination.';
+        }
+        return 'Back at departure — enable Airframe inject to reload fuel/payload (MSFS restart), then take off again.';
+      }
       if (input.watchSettleBlockedReason) {
         return nearDest
           ? `Landed — settle blocked: ${input.watchSettleBlockedReason}`

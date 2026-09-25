@@ -48,6 +48,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - **Watch após Ready:** auto-start **não** exige aba Dispatch — sair pra Crew/Hangar com LV e decolar sem Watch deixava DISPATCHED (2026-09-25).
 - **Watch depart + sticky pause:** `evaluateMissionFlightTransition` **deve** receber `prevSample` — sem isso, sticky `IS PAUSED` bloqueia En route enquanto o footer ainda mostra PHASE CLIMB (2026-09-25).
 - **Watch auto-start + effect cancel:** com Loaded vs Due (ou `in_flight`), **não** `postWatchStop` só porque o effect remount cancelou o await — isso piscava MSFS↔SIMBRIDGE no open (2026-09-25).
+- **Resume prep (MSFS restart @ origin):** manter `in_flight`; **não** reverter status. Unlock reinject + Loaded vs Due no En route quando `isResumePrepAtOrigin` (chão + sawAirborne + nearOrigin + !nearDest). `/api/load-ofp` aceita `in_flight`. Detail: `16-va-logistics.md`.
 - Preflight **não** deve gravar `ORIGIN_NOT_ON_GROUND` como `location.ok=false` quando airborne **dentro** do raio (parece “NOT AT ORIGIN” com 0.3 nm ≤ 12).
 - Detail: `docs/agent-context/16-va-logistics.md` (Crew Live notes).
 

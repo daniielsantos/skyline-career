@@ -900,7 +900,14 @@ async function applyMissionOfpLoadExclusive(
   if (!mission.staticId) {
     throw new Error('Mission has no static_id — Dispatch first');
   }
-  if (mission.status !== 'dispatched' && mission.status !== 'accepted') {
+  // `in_flight` = resume prep at origin (MSFS restart / return) — reinject
+  // without reverting status. Cruise mid-air inject stays blocked by on-ground
+  // checks in the Host / UI toggle.
+  if (
+    mission.status !== 'dispatched' &&
+    mission.status !== 'accepted' &&
+    mission.status !== 'in_flight'
+  ) {
     throw new Error(
       `Mission ${mission.id} cannot load OFP (status=${mission.status})`,
     );

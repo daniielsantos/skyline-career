@@ -13102,6 +13102,7 @@ export function App() {
     watchSawAirborne: Boolean(watch?.sawAirborne),
     watchSettling: Boolean(watch?.settling) || settleOverlaySticky,
     watchNearDest: Boolean(watch?.destProximity?.ok),
+    watchNearOrigin: Boolean(watch?.originProximity?.ok),
     watchSettleBlockedReason:
       watch?.lastEvent?.type === 'settle_blocked'
         ? watch.lastEvent.reason

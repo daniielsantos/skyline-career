@@ -13,6 +13,7 @@ import {
   formatRunwayTouchdownDebriefLine,
   airborneResumeShouldOpenDispatch,
   isOfpCargoUnderOnlyFailureUi,
+  isResumePrepAtOrigin,
   livePreflightWaitHint,
   ofpCargoKgFromUnderFinding,
   resolveLoadPath,
@@ -306,6 +307,113 @@ describe('dispatchStepStatusLine en_route', () => {
         watchNearDest: false,
       }),
       /^Landed/i,
+    );
+  });
+
+  it('offers resume prep reinject when back at departure', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchEnginesRunning: false,
+        watchSawAirborne: true,
+        watchNearDest: false,
+        watchNearOrigin: true,
+      }),
+      /Back at departure.*Airframe inject/i,
+    );
+    assert.doesNotMatch(
+      dispatchStepStatusLine({
+        ...base,
+        step: 'en_route',
+        watchOnGround: true,
+        watchSawAirborne: true,
+        watchNearDest: false,
+        watchNearOrigin: true,
+      }),
+      /^Landed/i,
+    );
+  });
+
+  it('says resume prep ready when Loaded vs Due passes at origin', () => {
+    assert.match(
+      dispatchStepStatusLine({
+        ...base,
+        mission: mission({
+          status: 'in_flight',
+          lastPreflightCheck: {
+            verdict: 'pass',
+            summary: 'ok',
+            checkedAtIso: new Date().toISOString(),
+            phase: 'preflight',
+            loadVerification: {
+              ready: true,
+              fuel: { ok: true, liveLb: 1000, plannedLb: 1000 },
+              payload: { ok: true, liveLb: 500, plannedLb: 500 },
+            },
+            location: {
+              ok: true,
+              originIcao: 'SBSV',
+              radiusNm: 12,
+              distanceNm: 0.2,
+              code: 'ORIGIN_OK',
+            },
+            findings: [],
+          },
+        }),
+        step: 'en_route',
+        watchOnGround: true,
+        watchSawAirborne: true,
+        watchNearDest: false,
+        watchNearOrigin: true,
+      }),
+      /Resume prep ready/i,
+    );
+  });
+});
+
+describe('isResumePrepAtOrigin', () => {
+  it('requires in_flight, on ground, saw airborne, near origin, not near dest', () => {
+    assert.equal(
+      isResumePrepAtOrigin({
+        missionStatus: 'in_flight',
+        onGround: true,
+        sawAirborne: true,
+        nearOrigin: true,
+        nearDest: false,
+      }),
+      true,
+    );
+    assert.equal(
+      isResumePrepAtOrigin({
+        missionStatus: 'dispatched',
+        onGround: true,
+        sawAirborne: true,
+        nearOrigin: true,
+        nearDest: false,
+      }),
+      false,
+    );
+    assert.equal(
+      isResumePrepAtOrigin({
+        missionStatus: 'in_flight',
+        onGround: true,
+        sawAirborne: true,
+        nearOrigin: true,
+        nearDest: true,
+      }),
+      false,
+    );
+    assert.equal(
+      isResumePrepAtOrigin({
+        missionStatus: 'in_flight',
+        onGround: false,
+        sawAirborne: true,
+        nearOrigin: true,
+        nearDest: false,
+      }),
+      false,
     );
   });
 });

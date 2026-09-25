@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **476e6c98** / desktop **0.3.333** shipped: Allow Resume prep reinject after MSFS restart at departure without reverting in_flight. Release: [v0.3.333](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.333).
+
+
 `main` **37795d6c** / desktop **0.3.332** shipped: Raise Live trail cap to 15k crumbs for ~6000 nm long hauls. Release: [v0.3.332](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.332).
 
 

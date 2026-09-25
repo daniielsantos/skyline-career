@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **ec8878f0** / desktop **0.3.325** shipped: Restore Manifest draft after account switch without wiping storage. Release: [v0.3.325](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.325).
+
+
 `main` **5aa25084** / desktop **0.3.324** shipped: Add Airframes live-aircraft identify and trim Crew Hauls copy. Release: [v0.3.324](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.324).
 
 

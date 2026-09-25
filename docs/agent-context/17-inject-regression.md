@@ -18,7 +18,7 @@ Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./1
 
 ---
 
-## Leitura de payload (Sim) — como funciona
+**Inject `SIM_PAUSED` com cockpit “unpaused” (2026-09-25):** sintoma = Aerostar (e outros) Airframe inject → `fuel SIM_PAUSED, payload SIM_PAUSED` / ROLLBACK INCOMPLETE; MSFS não mostra pause. Causa = gating `blockWhenPaused` lê `IS PAUSED` sticky (MSFS 2024); Watch já override via Absolute Time, inject não. Fix = `clearStickyPausedForGating` no `DefaultProfileEngine.applyLoadPlan` (probe Absolute Time ~450ms; dt≥0.2s → trata como live).
 
 **Não existe um SimVar único confiável de “payload total”** no fluxo clássico. O Watch lê:
 

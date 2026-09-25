@@ -3588,7 +3588,10 @@ async function applyMissionOfpLoadExclusive(
       error = formatPipeError(
         `Apply failed (${parts.join(', ') || 'unknown'})`,
       );
-      if (skipPayloadRollback && !restoreFuelOnRollback) {
+      if (parts.some((p) => p.includes('SIM_PAUSED'))) {
+        error +=
+          ' — MSFS reports paused (ESC/menu or sticky IS PAUSED); unpause and retry';
+      } else if (skipPayloadRollback && !restoreFuelOnRollback) {
         error += ' — check CDU/EFB load manually (no classic station rollback)';
       } else if (rollbackOk === false) {
         error += ' — ROLLBACK INCOMPLETE, check aircraft load manually';

@@ -2,6 +2,7 @@ import type { AircraftProfile, LoadPlanRequest } from '@msfs-compat/shared';
 import { normalizeMacPercent } from '@msfs-compat/shared';
 import { DefaultCapabilityDetector } from './capability/default-capability-detector.js';
 import { DefaultGatingEvaluator } from './gating/default-gating-evaluator.js';
+import { clearStickyPausedForGating } from './gating/sticky-pause.js';
 import { StrategyRegistry } from './registry/strategy-registry.js';
 import { HybridSyncFuelStrategy, LvarBridgeFuelStrategy, SimConnectDirectFuelStrategy } from './strategies/fuel/simconnect-fuel-strategy.js';
 import { StationWritebackPayloadStrategy } from './strategies/payload/station-payload-strategy.js';
@@ -35,7 +36,12 @@ export class DefaultProfileEngine implements ProfileEngine {
     // Fast path (skipVerify): one snapshot for gating, no capability re-probe.
     // Capability detect() itself calls snapshot() again and was doubling pipe
     // traffic on every CG rebalance round.
-    const snapshot = await this.bridge.snapshot();
+    let snapshot = await this.bridge.snapshot();
+    if (this.profile.gating.blockWhenPaused && snapshot.paused) {
+      // MSFS 2024 sticky IS PAUSED after Resume — same signal Watch uses.
+      const cleared = await clearStickyPausedForGating(this.bridge, snapshot);
+      snapshot = cleared.snapshot;
+    }
     const gate = this.gating.evaluate(this.profile.gating, snapshot);
 
     if (!gate.allowed) {

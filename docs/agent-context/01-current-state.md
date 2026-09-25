@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **85263eb1** / desktop **0.3.331** shipped: Densify Crew Live trail crumbs so turns stop looking impossible. Release: [v0.3.331](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.331).
+
+
 `main` **65fbe9d2** / desktop **0.3.330** shipped: Stop MSFS/SIMBRIDGE footer flicker on app open with Ready. Release: [v0.3.330](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.330).
 
 

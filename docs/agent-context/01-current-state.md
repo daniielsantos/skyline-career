@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **0f9284ea** / desktop **0.3.301** shipped: Move Dev Mode cheats into Settings and add Class Ops unlock. Release: [v0.3.301](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.301).
+
+
 `main` **3a42de1c** / desktop **0.3.300** shipped: Polish Ledger and Ranking chrome. Release: [v0.3.300](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.300).
 
 

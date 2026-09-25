@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **db5f76e2** / desktop **0.3.323** shipped: Fix desk auto-buy lb round-trip and put Crew Hauls first. Release: [v0.3.323](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.323).
+
+
 `main` **80563f6c** / desktop **0.3.322** shipped: Stop Airframes sidebar click from double-fetching the market board. Release: [v0.3.322](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.322).
 
 

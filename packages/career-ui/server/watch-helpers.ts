@@ -1603,8 +1603,8 @@ export class CareerWatchSession {
     stallWarning?: boolean;
   }) | null = null;
   /**
-   * Effective pause freeze for the latest Watch tick (sticky IS PAUSED after
-   * ESC Resume is cleared when sim absolute time / position advances).
+   * Effective pause freeze for the latest Watch tick. Sticky IS PAUSED after
+   * ESC Resume clears only when position advances (not Absolute Time alone).
    */
   private playbackFrozen = false;
   private playbackFreezeReason: string | null = null;
@@ -2565,18 +2565,22 @@ export class CareerWatchSession {
       }
       const prevSample = this.lastSample;
       this.lastSample = sample;
-      const freeze = inspectSimPlaybackFreeze(sample, prevSample);
+      const nowTickMs = Date.now();
+      const wallDtMs =
+        this.lastSuccessfulTickAtMs > 0
+          ? nowTickMs - this.lastSuccessfulTickAtMs
+          : undefined;
+      const freeze = inspectSimPlaybackFreeze(sample, prevSample, {
+        wallDtMs,
+      });
       const wasFrozen = this.playbackFrozen;
       this.playbackFrozen = freeze.frozen;
       this.playbackFreezeReason = freeze.reason;
-      const nowTickMs = Date.now();
       if (
         wasFrozen !== freeze.frozen ||
         (freeze.frozen &&
           nowTickMs - this.lastPlaybackFreezeLogAtMs >= 10_000) ||
-        (!freeze.frozen &&
-          (freeze.reason === 'paused_but_time_live' ||
-            freeze.reason === 'paused_but_moved'))
+        (!freeze.frozen && freeze.reason === 'paused_but_moved')
       ) {
         this.lastPlaybackFreezeLogAtMs = nowTickMs;
         watchDebugLog('watch', 'playback freeze', {
@@ -2585,6 +2589,7 @@ export class CareerWatchSession {
           reason: freeze.reason,
           paused: sample.paused === true,
           slew: sample.slewActive === true,
+          wallDtMs: wallDtMs ?? null,
           simAbsSec:
             typeof sample.simAbsoluteTimeSec === 'number'
               ? Math.round(sample.simAbsoluteTimeSec * 10) / 10

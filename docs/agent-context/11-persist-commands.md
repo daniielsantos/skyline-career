@@ -58,7 +58,11 @@ Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 
 **Pause ESC does not freeze footer clock (2026-09-24):** sintoma = ESC pause no MSFS; chip `12m/59m` e % continuam subindo. Causa = Watch já tinha `isSimPlaybackFrozen(paused|slew)`, mas o Host live **hardcodava** `Paused = false` e **não** lia `IS PAUSED` no `SnapshotData`. Fix = double `IS PAUSED` no snapshot + DTO; Host rebuild no pack/release.
 
-**Sticky IS PAUSED after Resume (2026-09-24, rev):** sintoma = chip preso (`22m/55m · 39%`) com Cruise sample ainda andando; logs `paused:true` + GS ~450. Premissa errada do cleanup 0.3.307 = “sticky pause era só desalinhamento Absolute Time no SnapshotData”. Absolute Time **no snapshot** realmente desalinha FLOAT64 (slew falso); mas `IS PAUSED` sticky **também é real** no MSFS 2024. Fix = Host snapshot só `IS PAUSED` (sem SLEW/ABSOLUTE); Watch lê `ABSOLUTE TIME` no **flight-sample batch** (IPC separado) + override por movimento ≥~0.015 nm → `paused_but_time_live` / `paused_but_moved`; soft-hold lat/lon não conta como parado; fase fina atualiza mesmo com clock frozen.
+**Sticky IS PAUSED after Resume (2026-09-24, rev):** sintoma = chip preso (`22m/55m · 39%`) com Cruise sample ainda andando; logs `paused:true` + GS ~450. Premissa errada do cleanup 0.3.307 = “sticky pause era só desalinhamento Absolute Time no SnapshotData”. Absolute Time **no snapshot** realmente desalinha FLOAT64 (slew falso); mas `IS PAUSED` sticky **também é real** no MSFS 2024. Fix = Host snapshot só `IS PAUSED` (sem SLEW/ABSOLUTE); Watch lê `ABSOLUTE TIME` no flight-sample; **unfreeze sticky só por movimento ≥~0.015 nm** (não Absolute Time sozinho).
+
+**ESC pause clock still runs (2026-09-25):** sintoma = ESC aberto, chip `Nm/Mm · %` sobe. Causa = override `paused_but_time_live` (Absolute Time ≥0.2s) — no MSFS 2024 Absolute Time **continua** no menu pause com avião parado. Fix = remover unfreeze por Absolute Time; sticky só limpa com motion; se Absolute Time **trava** no gap wall do Watch (≥0.4s) sem motion → `sim_time_stopped` mesmo com `IS PAUSED` false.
+
+**PHASE Approach (2026-09-25):** `advanceFlightPhase` entra em `approach` com dest ≤ **~15 nm** (+ descent/level; sticky até ~18 nm). Rota curta perto do ARR = Approach esperado — não é settle.
 - Crew ops due / orphan cancel: **não** no settle; próximo write de company que já abra missões, ou o timer de 60s.
 - Tick NPC, port discharge, dealer pool, `persistWorldAirports` full rewrite.
 

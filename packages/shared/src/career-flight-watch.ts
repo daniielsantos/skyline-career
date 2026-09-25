@@ -57,21 +57,28 @@ function finitePositive(n: number | undefined, min: number): boolean {
 /**
  * Pause / slew diagnostics — shared by freeze gate + Watch debug log.
  *
- * MSFS 2024 can leave `IS PAUSED` sticky after ESC → Resume while the aircraft
- * is already flying. Prefer ABSOLUTE TIME advancing (flight-sample read, not
- * Host SnapshotData) or fresh position motion over the sticky flag.
- * Soft-held lat/lon must not count as "no motion".
+ * MSFS 2024 can leave `IS PAUSED` sticky after ESC → Resume while flying.
+ * Clear that only when **position** advances (≥~0.015 nm). Soft-held lat/lon
+ * must not count as motion.
+ *
+ * Do **not** clear on Absolute Time alone: ESC pause often keeps Absolute Time
+ * ticking while the aircraft is still — that used to let the footer clock run
+ * during a real menu pause (`paused_but_time_live`).
+ *
+ * When Absolute Time stalls across a Watch wall gap (≥~0.4s) with no motion,
+ * freeze even if `IS PAUSED` is false (Host/menu reporting gaps).
  */
 export function inspectSimPlaybackFreeze(
   sample: FlightGroundSample,
   prev?: FlightGroundSample | null,
+  opts?: { wallDtMs?: number },
 ): {
   frozen: boolean;
   reason:
     | 'live'
     | 'slew'
     | 'paused'
-    | 'paused_but_time_live'
+    | 'sim_time_stopped'
     | 'paused_but_moved';
   simAbsDtSec: number | null;
   movedNm: number | null;
@@ -99,12 +106,17 @@ export function inspectSimPlaybackFreeze(
   ) {
     movedNm = distanceNm(prev.position, sample.position);
   }
+  const clearlyMoved = movedNm != null && movedNm >= 0.015;
+  const wallDtMs =
+    typeof opts?.wallDtMs === 'number' && Number.isFinite(opts.wallDtMs)
+      ? Math.max(0, opts.wallDtMs)
+      : null;
+  const wallDtSec = wallDtMs != null ? wallDtMs / 1000 : null;
 
   if (sample.slewActive === true) {
     // Misaligned Host snapshots / mock slew while clearly flying.
     const flying =
-      finitePositive(sample.groundSpeedKt, 30) ||
-      (movedNm != null && movedNm >= 0.015);
+      finitePositive(sample.groundSpeedKt, 30) || clearlyMoved;
     if (!flying) {
       return {
         frozen: true,
@@ -115,6 +127,25 @@ export function inspectSimPlaybackFreeze(
       };
     }
   }
+
+  // Sim clock stalled while wall advanced — treat as paused even if IS PAUSED
+  // is false (ESC/menu reporting gaps). Motion still wins (live flight).
+  if (
+    !clearlyMoved &&
+    wallDtSec != null &&
+    wallDtSec >= 0.4 &&
+    simAbsDtSec != null &&
+    simAbsDtSec < 0.05
+  ) {
+    return {
+      frozen: true,
+      reason: 'sim_time_stopped',
+      simAbsDtSec,
+      movedNm,
+      positionHeld,
+    };
+  }
+
   if (sample.paused !== true) {
     return {
       frozen: false,
@@ -124,18 +155,9 @@ export function inspectSimPlaybackFreeze(
       positionHeld,
     };
   }
-  // One Watch poll is typically 0.5–5s of sim time while live.
-  if (simAbsDtSec != null && simAbsDtSec >= 0.2) {
-    return {
-      frozen: false,
-      reason: 'paused_but_time_live',
-      simAbsDtSec,
-      movedNm,
-      positionHeld,
-    };
-  }
-  // ~0.015 nm ≈ 90 ft
-  if (movedNm != null && movedNm >= 0.015) {
+  // Sticky IS PAUSED while flying: only real position motion clears it.
+  // Absolute Time alone must not — ESC pause often keeps Absolute Time live.
+  if (clearlyMoved) {
     return {
       frozen: false,
       reason: 'paused_but_moved',
@@ -157,8 +179,9 @@ export function inspectSimPlaybackFreeze(
 export function isSimPlaybackFrozen(
   sample: FlightGroundSample,
   prev?: FlightGroundSample | null,
+  opts?: { wallDtMs?: number },
 ): boolean {
-  return inspectSimPlaybackFreeze(sample, prev).frozen;
+  return inspectSimPlaybackFreeze(sample, prev, opts).frozen;
 }
 
 /**
@@ -224,7 +247,8 @@ export interface FlightGroundSample {
   /**
    * SimConnect ABSOLUTE TIME (seconds) from the Watch flight-sample batch
    * (not Host SnapshotData — packing it there mis-aligned FLOAT64s).
-   * Stalls while truly paused; keeps advancing under sticky IS PAUSED.
+   * Used to detect sim-clock stall (`sim_time_stopped`). Does **not** alone
+   * clear sticky `IS PAUSED` — ESC pause often keeps Absolute Time ticking.
    */
   simAbsoluteTimeSec?: number;
   /**
@@ -520,8 +544,9 @@ export interface EvaluateMissionFlightOpts {
   /** Fallback block hours when OFP + distance unavailable. */
   fallbackHours?: number;
   /**
-   * Prior Watch tick — required to clear sticky `IS PAUSED` when Absolute Time
-   * or position advances (same policy as {@link inspectSimPlaybackFreeze}).
+   * Prior Watch tick — required to clear sticky `IS PAUSED` when position
+   * advances (same policy as {@link inspectSimPlaybackFreeze}). Absolute Time
+   * alone does not clear (ESC pause often keeps Absolute Time ticking).
    * Without this, MSFS 2024 sticky pause blocks depart forever while the
    * display-only phase still advances to climb/cruise.
    */
@@ -1135,8 +1160,8 @@ export function evaluateMissionFlightTransition(
   // and unpause on the ramp does not look like a touchdown.
   // Exception: already on the ground after airborne — still allow settle when
   // parking brake is set (sticky IS PAUSED must not trap Settling forever).
-  // Pass prevSample so sticky IS PAUSED + advancing Absolute Time / motion is
-  // treated as live (matches Watch playbackFrozen + inject gating).
+  // Pass prevSample so sticky IS PAUSED + position motion is treated as live
+  // (matches Watch playbackFrozen). Absolute Time alone does not clear pause.
   if (isSimPlaybackFrozen(sample, prevSample)) {
     const canSettleWhileFrozen =
       sample.onGround === true &&

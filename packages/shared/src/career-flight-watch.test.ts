@@ -1050,7 +1050,7 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(gate.elapsedMs, 20 * 60_000);
   });
 
-  it('unfreezes sticky IS PAUSED when time or position advances', () => {
+  it('unfreezes sticky IS PAUSED on position motion, not Absolute Time alone', () => {
     const prev = {
       onGround: false,
       enginesRunning: true,
@@ -1068,17 +1068,40 @@ describe('evaluateMissionFlightTransition', () => {
       position: { lat: -25.52, lon: -49.18 },
       simAbsoluteTimeSec: 1000,
     };
-    const timeLive = {
+    // ESC pause often keeps Absolute Time ticking while the aircraft is still —
+    // that must stay frozen (old paused_but_time_live wrongly unfroze the clock).
+    const timeLiveStill = {
       ...prev,
       position: { lat: -25.5, lon: -49.2 },
       simAbsoluteTimeSec: 1005,
     };
     assert.equal(isSimPlaybackFrozen(stuck, prev), true);
     assert.equal(isSimPlaybackFrozen(moved, prev), false);
-    assert.equal(isSimPlaybackFrozen(timeLive, prev), false);
+    assert.equal(isSimPlaybackFrozen(timeLiveStill, prev), true);
     assert.equal(isSimPlaybackFrozen(moved), true);
     assert.equal(
       isSimPlaybackFrozen({ ...moved, positionHeld: true }, prev),
+      true,
+    );
+    // Absolute Time stalled across a Watch wall gap → freeze even if IS PAUSED lies.
+    assert.equal(
+      isSimPlaybackFrozen(
+        {
+          onGround: false,
+          enginesRunning: true,
+          paused: false,
+          position: { lat: -25.5, lon: -49.2 },
+          simAbsoluteTimeSec: 1000.01,
+        },
+        {
+          onGround: false,
+          enginesRunning: true,
+          paused: false,
+          position: { lat: -25.5, lon: -49.2 },
+          simAbsoluteTimeSec: 1000,
+        },
+        { wallDtMs: 500 },
+      ),
       true,
     );
   });

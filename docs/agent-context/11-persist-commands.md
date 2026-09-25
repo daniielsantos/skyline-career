@@ -55,6 +55,8 @@ Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 - Cruise EMA / `airframePerfOverrides`: no mesmo `saveMissions` do settle (um objeto pequeno). Sem job.
 - Relógio airborne após settle: **não** persistir de novo (Watch `228d6c1`).
 - **Pause/menu:** `airborneElapsedMs` só avança com sim “vivo” (`IS PAUSED` / slew congelam o chip + gate); wall `airborneAtMs` continua âncora de ETA/resume.
+
+**Pause ESC does not freeze footer clock (2026-09-24):** sintoma = ESC pause no MSFS; chip `12m/59m` e % continuam subindo; Mission ainda IN FLIGHT. Causa = Watch **tem** `tickAirbornePlaybackClock` + `isSimPlaybackFrozen(paused|slew)` (shipped 0.3.50), mas `SimConnectClient` live **hardcodava** `Paused = false` / `SlewActive = false` e **não** pedia `IS PAUSED` / `IS SLEW ACTIVE` no `SnapshotData` (só o mock host lia). Fix = esses dois doubles no snapshot + DTO; Host rebuild no pack/release.
 - Crew ops due / orphan cancel: **não** no settle; próximo write de company que já abra missões, ou o timer de 60s.
 - Tick NPC, port discharge, dealer pool, `persistWorldAirports` full rewrite.
 

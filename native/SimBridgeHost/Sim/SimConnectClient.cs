@@ -145,7 +145,7 @@ public sealed class SimConnectClient : ISimClient
 
     /// <summary>
     /// Fixed snapshot layout — field order must match AddToDataDefinition order below.
-    /// Paused/Slew are best-effort (0 when unavailable).
+    /// IS PAUSED / IS SLEW ACTIVE freeze Watch airborne elapsed (escape menu, active pause, slew).
     /// </summary>
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     private struct SnapshotData
@@ -153,6 +153,8 @@ public sealed class SimConnectClient : ISimClient
         public double OnGround;
         public double EnginesRunning;
         public double ParkingBrake;
+        public double Paused;
+        public double SlewActive;
         public double SimRate;
         public double CgPercent;
         public double GrossWeightLb;
@@ -664,6 +666,8 @@ public sealed class SimConnectClient : ISimClient
             ["SIM ON GROUND"] = data.OnGround,
             ["ENG COMBUSTION:1"] = data.EnginesRunning,
             ["BRAKE PARKING POSITION"] = data.ParkingBrake,
+            ["IS PAUSED"] = data.Paused,
+            ["IS SLEW ACTIVE"] = data.SlewActive,
             ["SIMULATION RATE"] = data.SimRate,
             ["CG PERCENT"] = cgMacPercent,
             ["CG PERCENT RAW"] = data.CgPercent,
@@ -691,8 +695,8 @@ public sealed class SimConnectClient : ISimClient
             OnGround = data.OnGround > 0.5,
             EnginesRunning = data.EnginesRunning > 0.5,
             ParkingBrake = data.ParkingBrake > 0.5,
-            Paused = false,
-            SlewActive = false,
+            Paused = data.Paused > 0.5,
+            SlewActive = data.SlewActive > 0.5,
             SimRate = data.SimRate,
             CgPercent = cgMacPercent,
             GrossWeightLb = data.GrossWeightLb,
@@ -1178,6 +1182,8 @@ public sealed class SimConnectClient : ISimClient
         AddFloat(sim, Definitions.Snapshot, "SIM ON GROUND", "Bool");
         AddFloat(sim, Definitions.Snapshot, "ENG COMBUSTION:1", "Bool");
         AddFloat(sim, Definitions.Snapshot, "BRAKE PARKING POSITION", "Bool");
+        AddFloat(sim, Definitions.Snapshot, "IS PAUSED", "Bool");
+        AddFloat(sim, Definitions.Snapshot, "IS SLEW ACTIVE", "Bool");
         AddFloat(sim, Definitions.Snapshot, "SIMULATION RATE", "Number");
         AddFloat(sim, Definitions.Snapshot, "CG PERCENT", "Percent over 100");
         AddFloat(sim, Definitions.Snapshot, "TOTAL WEIGHT", "pounds");

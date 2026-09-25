@@ -78,6 +78,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Desk hold partial load (2026-09-22):** sintoma = hold wide (ex. 53 klb) > Citation ops cap → Accept all-or-nothing falhava. Causa = `*DispatchHold` só tirava o hold inteiro. Fix (opção 1) = `kg` opcional no trio haul/bridge/demand dispatch-hold; withdraw + pay pro-rata; remainder fica no Open desk. Manifest: slider `loadKg` ≤ min(hold, ops cap); commit manda `kg`; Discard ainda preserva hold completo.
 
+**Manifest Load Max 4996 vs “5.0 klb” (2026-09-24):** sintoma = slider/input imperial para em ~4996 lb com label hold/load **5.0 klb**. Causa = economia em **kg**; `formatMass` arredonda 1 decimal (`2266 kg × 2.2046… ≈ 4996 lb` → `5.0 klb`); Max = `floor(kg)` do hold (não 5000 lb “redondo”). Não é cap cortando carga — Max já é 100% do hold. Mesma família do dust WH/`displayAmountToStoredKg` (24-port-fbo).
+
 **Hauls Accept flick oversize (2026-09-22):** sintoma = Accept “flick” + erro ops cap (Citation vs ~53 klb) e botão continuava Accept. Causa = board não recebia `resolveMaxCargoKg` → `holdNeedsPartialLoad` nunca virava Prepare; Accept full-hold batia no server. Fix = passar cap do VaPage; CTA **Prepare** quando hold > ops cap (mesmo at-origin) → Manifest slider; picker = qual cauda VA voa / ferries.
 
 **VA parallel cargo per pilot (2026-09-22):** sintoma = amigo não Accept enquanto outro membro tem missão na VA (fatiar hold / voar junto). Causa = gate `listActivePlayerMissions` company-wide em haul/bridge/demand + staging/commit + Charter. Fix = `listActivePlayerMissionsForPilot(pilotAccountId)` (legado sem stamp ainda bloqueia todos); Dispatch/Watch/Prepare usam só a missão do account logado.

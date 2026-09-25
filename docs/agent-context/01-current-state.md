@@ -1,4 +1,7 @@
-# Current state (2026-09-24)
+# Current state (2026-09-25)
+
+`main` **3a42de1c** / desktop **0.3.300** shipped: Polish Ledger and Ranking chrome. Release: [v0.3.300](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.300).
+
 
 `main` **15f43d44** / desktop **0.3.299** shipped: Credit Port FBO throughput on Demand settle and polish Forward burn. Release: [v0.3.299](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.299).
 

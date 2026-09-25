@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **abffba76** / desktop **0.3.308** shipped: Scale down EN ROUTE live load tiles to match OFP density. Release: [v0.3.308](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.308).
+
+
 `main` **fbdcb854** / desktop **0.3.307** shipped: Remove wrong-premise pause workarounds from Watch freeze. Release: [v0.3.307](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.307).
 
 

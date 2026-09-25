@@ -468,9 +468,11 @@ Atualizado 2026-09-03: **Value/Heavy slice esboçado** — Phase A idle/recycle 
 
 Atualizado 2026-09-14: **Desktop boot timeout :8788** — `/api/health` esperava `loadEconomy()` sob career lock; headless login catch-up no save SP antigo (~94s) > waitForApi 90s → “did not become ready”. Fix: health usa `peekEconomyWorld` (sem lock). Antes do PlayModeGate (`!mode`): `CAREER_HEADLESS_PULSE=0`.
 
-Atualizado 2026-09-14: **AppData bush cleanup** — não seed/pack `bush_PLN`; ao abrir career root apaga `bush_PLN` legado. Overrides MSFS renomeados `msfs-hub-overrides.json` (migra `msfs-bush-hub-overrides.json` uma vez). Ainda úteis no SP (coords/runways). Homologate `/api/bush-hubs/*` paths API keep name for now.
+Atualizado 2026-09-25: **Bush hub homologate HTTP removed** — `/api/bush-hubs/homologate*` + `bush-hub-homologate.ts` gone. Overrides still load/persist via `msfs-hub-overrides-io.ts` + `npm run career-hubs` (agent wizard).
 
-Atualizado 2026-09-03: **Bush trips product removed** — catalog/mission/pln/GFP/watch APIs gone (`410`); `career-bush.ts` stubs; soft hubs = normal spokes; `activeBushTrip` cleared on load/normalize; `/api/bush-hubs/homologate*` kept for MSFS overrides. File: `msfs-hub-overrides.json` (ex-`msfs-bush-hub-overrides.json`).
+Atualizado 2026-09-14: **AppData bush cleanup** — não seed/pack `bush_PLN`; ao abrir career root apaga `bush_PLN` legado. Overrides MSFS renomeados `msfs-hub-overrides.json` (migra `msfs-bush-hub-overrides.json` uma vez). Ainda úteis no SP (coords/runways).
+
+Atualizado 2026-09-03: **Bush trips product removed** — catalog/mission/pln/GFP/watch APIs gone (`410`); `career-bush.ts` stubs; soft hubs = normal spokes; `activeBushTrip` cleared on load/normalize. Overrides file: `msfs-hub-overrides.json` (ex-`msfs-bush-hub-overrides.json`). Homologate HTTP removed later (2026-09-25).
 
 Atualizado 2026-09-03: **Pay transparency UI** — Terminal + Freights: idle `↑N%` no Pay + tooltip formação/nm/urgent; airport lots passam `basePayUsd`+`pressure`. Sem Dry.
 

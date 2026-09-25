@@ -1,5 +1,7 @@
 # Hub Stats + histórico econômico
 
+Atualizado 2026-09-25: **Hub-picker map incomplete + auto zoom-out** — sintoma: All countries com poucos pins; segundos depois `fitBounds` mundial. Causa: pins = interseção `hubOptions`×`/api/hubs` (lista crescia em 2 etapas) + camera re-fit em todo update de `hubs`. Fix: mapa lê só `networkHubs` (All = major/regional); `cameraKey` faz overview fit uma vez por filtro.
+
 Atualizado 2026-09-25: **Choose home hub — sidebar locked** — `app-shell--hub-picker`: sidebar blur + `inert`/`pointer-events:none`; Menu toggle oculto; fecha drawer mobile. Sintoma: nav clicável durante claim.
 
 Atualizado 2026-09-25: **Choose home hub map** — busca/país + `HubNetworkMap` (click → seleciona; “All” só major/regional no mapa). `/api/hubs` carrega antes de `hubSelected`.

@@ -56,7 +56,7 @@ On `migrateEconomyWorld` / load, these run — **after** the seed constants are 
 
 ## MSFS hub overrides (network homolog)
 
-Network hubs are stamped via SimConnect Facilities (`POST /api/bush-hubs/homologate` / `homologate-batch` / `npm run career-hubs`) while MSFS is running — writes [`msfs-bush-hub-overrides.json`](packages/shared/src/data/msfs-bush-hub-overrides.json) / `profiles/career/msfs-bush-hub-overrides.json` with `source: "msfs_facility"`. Explicit panel coords still allowed.
+Network hubs are stamped via SimConnect Facilities while MSFS is running: **`npm run career-hubs`** (agent wizard). Writes [`msfs-hub-overrides.json`](packages/shared/src/data/msfs-hub-overrides.json) / AppData `msfs-hub-overrides.json` with `source: "msfs_facility"`. Explicit panel coords still allowed. HTTP `/api/bush-hubs/homologate*` removed 2026-09-25.
 
 ~~BushTripOnly FAA locals~~ removed 2026-09-03 with bush trips. Do not reintroduce trip-only catalogs.
 

@@ -439,12 +439,9 @@ import { createVaLiveUplink } from './va-live-uplink.ts';
 
 import { WATCH_DEBUG_LOG_PATH } from './debug-log.ts';
 import {
-  homologateBushHub,
-  homologateBushHubBatch,
   loadProfileMsfsBushHubOverrides,
   persistProfileMsfsBushHubOverrides,
-  resolveHomologateCoords,
-} from './bush-hub-homologate.ts';
+} from './msfs-hub-overrides-io.ts';
 import {
   clearActiveCareerProfile,
   createCareerProfile,
@@ -15211,75 +15208,6 @@ export function createCareerApiServer(port = 8787) {
           reset: body.reset === true,
         });
         send(res, 200, status);
-        return;
-      }
-
-
-      if (req.method === 'POST' && path === '/api/bush-hubs/homologate') {
-        const body = (await readBody(req)) as {
-          icao?: string;
-          name?: string;
-          lat?: number;
-          lon?: number;
-          source?: 'msfs_panel' | 'parked_sample' | 'msfs_facility';
-          pipeName?: string;
-        };
-        if (!body.icao?.trim()) {
-          send(res, 400, { error: 'icao required' });
-          return;
-        }
-        try {
-          const resolved = await resolveHomologateCoords({
-            icao: body.icao,
-            name: body.name,
-            lat: body.lat,
-            lon: body.lon,
-            source: body.source,
-            pipeName: body.pipeName,
-          });
-          const result = await withCareerWrite(
-            async (world) => homologateBushHub(careerRoot, world, resolved),
-            {
-              housekeeping: false,
-              commandSliceIcaos: [resolved.icao.trim().toUpperCase()],
-            },
-          );
-          send(res, 200, result);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          send(res, 400, { error: message });
-        }
-        return;
-      }
-
-      if (req.method === 'POST' && path === '/api/bush-hubs/homologate-batch') {
-        const body = (await readBody(req)) as {
-          icaos?: string[];
-          all?: boolean;
-          bushOnly?: boolean;
-          pipeName?: string;
-        };
-        try {
-          const hasList = Array.isArray(body.icaos) && body.icaos.length > 0;
-          const result = await homologateBushHubBatch(
-            careerRoot,
-            {
-              icaos: body.icaos,
-              all: hasList ? false : body.all !== false,
-              bushOnly: body.bushOnly === true,
-              pipeName: body.pipeName,
-            },
-            (fn, icao) =>
-              withCareerWrite(fn, {
-                housekeeping: false,
-                commandSliceIcaos: [icao],
-              }),
-          );
-          send(res, 200, result);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          send(res, 400, { error: message });
-        }
         return;
       }
 

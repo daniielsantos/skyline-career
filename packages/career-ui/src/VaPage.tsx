@@ -223,6 +223,15 @@ type Props = {
   onPrepareHaulHold?: (hold: VaHaulHold, aircraftId: string) => void;
   onMissions?: (missions: Mission[]) => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
+  /**
+   * Pilot home focus for nested Ports catalog default (nearest seaport).
+   * Falls back to VA HQ ICAO coords when omitted.
+   */
+  homeFocus?: {
+    lat?: number | null;
+    lon?: number | null;
+    countryId?: string | null;
+  } | null;
   /** Switch active tenant to the listed VA (member dual-tenant). */
   onSwitchCompany?: (companyId: string) => void | Promise<void>;
   onLeftVa?: (opts: {
@@ -1443,6 +1452,7 @@ export function VaPage(props: Props) {
               fleet={hangarFleet}
               vaAircraftIds={props.vaAircraftIds}
               logisticsCompanyId={companyId}
+              homeFocus={props.homeFocus}
               vaMemberRole={
                 role === 'owner' ||
                 role === 'dispatcher' ||

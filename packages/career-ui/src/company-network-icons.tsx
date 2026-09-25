@@ -1,6 +1,6 @@
-/** Shared FBO / WH / HQ glyphs for Company network chips and map markers. */
+/** Shared FBO / WH / HQ / seaport glyphs for Company network chips and map markers. */
 
-export type CompanyNetworkIconKind = 'fbo' | 'wh' | 'hq';
+export type CompanyNetworkIconKind = 'fbo' | 'wh' | 'hq' | 'port';
 
 const STROKE = {
   width: 1.45,
@@ -10,13 +10,23 @@ const STROKE = {
 
 /**
  * Map-marker SVGs (fixed brand colors). Outline + soft fill — ops diagram,
- * not solid app tiles. FBO = pier shed + yard crane; WH = hangar + dock bay.
+ * not solid app tiles. FBO = pier shed + yard crane; WH = hangar + dock bay;
+ * port = seaport anchor.
  */
 export function companyNetworkIconSvg(kind: CompanyNetworkIconKind): string {
   if (kind === 'hq') {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
   <circle cx="12" cy="12" r="9.15" fill="#6aa8d8" fill-opacity="0.16" stroke="#6aa8d8" stroke-width="1.5"/>
   <path d="M12 5.9 13.85 11l5.35.32-4.1 3.4 1.3 5.15L12 17.2 7.6 19.87l1.3-5.15-4.1-3.4L10.15 11Z" fill="none" stroke="#6aa8d8" stroke-width="1.35" stroke-linejoin="round"/>
+</svg>`;
+  }
+  if (kind === 'port') {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <circle cx="12" cy="4.35" r="2.05" fill="#f0a35a" fill-opacity="0.18" stroke="#f0a35a" stroke-width="1.45"/>
+  <path d="M12 6.4v11.35" stroke="#f0a35a" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M6.9 9.55h10.2" stroke="#f0a35a" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M5.15 14.35c1.2 4.35 3.85 6.45 6.85 6.45s5.65-2.1 6.85-6.45" fill="none" stroke="#f0a35a" stroke-width="1.55" stroke-linecap="round"/>
+  <path d="M5.15 14.35 3.45 15.4M18.85 14.35l1.7 1.05" stroke="#f0a35a" stroke-width="1.45" stroke-linecap="round"/>
 </svg>`;
   }
   if (kind === 'fbo') {
@@ -63,6 +73,52 @@ export function NetworkChipIcon(props: { kind: CompanyNetworkIconKind }) {
           stroke="currentColor"
           strokeWidth={1.35}
           strokeLinejoin={STROKE.join}
+        />
+      </svg>
+    );
+  }
+  if (props.kind === 'port') {
+    return (
+      <svg
+        className="va-company-network-chip-icon"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        focusable="false"
+        fill="none"
+      >
+        <circle
+          cx="12"
+          cy="4.35"
+          r="2.05"
+          fill="currentColor"
+          fillOpacity={0.18}
+          stroke="currentColor"
+          strokeWidth={1.45}
+        />
+        <path
+          d="M12 6.4v11.35"
+          stroke="currentColor"
+          strokeWidth={1.6}
+          strokeLinecap={STROKE.cap}
+        />
+        <path
+          d="M6.9 9.55h10.2"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap={STROKE.cap}
+        />
+        <path
+          d="M5.15 14.35c1.2 4.35 3.85 6.45 6.85 6.45s5.65-2.1 6.85-6.45"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.55}
+          strokeLinecap={STROKE.cap}
+        />
+        <path
+          d="M5.15 14.35 3.45 15.4M18.85 14.35l1.7 1.05"
+          stroke="currentColor"
+          strokeWidth={1.45}
+          strokeLinecap={STROKE.cap}
         />
       </svg>
     );

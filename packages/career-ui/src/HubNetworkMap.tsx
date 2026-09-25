@@ -77,14 +77,23 @@ export function HubNetworkMap(props: {
   focusIcao?: string | null;
   /** Bump to re-run camera even when focusIcao is unchanged. */
   focusToken?: number;
+  /**
+   * Overview fitBounds key (e.g. country filter). Auto-fit runs once per key
+   * when hubs first become available — not again when the pin list grows.
+   */
+  cameraKey?: string;
   onSelectHub?: (icao: string) => void;
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  const hubsRef = useRef(props.hubs);
+  hubsRef.current = props.hubs;
+  const overviewFittedKeysRef = useRef(new Set<string>());
   const onSelectRef = useRef(props.onSelectHub);
   onSelectRef.current = props.onSelectHub;
+  const hubsReady = props.hubs.length > 0;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -108,8 +117,10 @@ export function HubNetworkMap(props: {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    let cancelled = false;
 
     const paint = () => {
+      if (cancelled) return;
       for (const marker of markersRef.current) marker.remove();
       markersRef.current = [];
 
@@ -149,16 +160,24 @@ export function HubNetworkMap(props: {
 
     if (map.isStyleLoaded()) paint();
     else map.once('load', paint);
+    return () => {
+      cancelled = true;
+    };
   }, [props.hubs, props.highlightIcao, props.focusIcao]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || props.hubs.length === 0) return;
+    if (!map || !hubsReady) return;
+    let cancelled = false;
 
     const focusCamera = () => {
+      if (cancelled) return;
+      const hubs = hubsRef.current;
+      if (hubs.length === 0) return;
+
       const focus = props.focusIcao?.trim().toUpperCase() ?? '';
       if (focus) {
-        const hub = props.hubs.find((h) => h.icao.toUpperCase() === focus);
+        const hub = hubs.find((h) => h.icao.toUpperCase() === focus);
         if (hub) {
           try {
             map.easeTo({
@@ -173,20 +192,24 @@ export function HubNetworkMap(props: {
         }
       }
 
+      const overviewKey = props.cameraKey?.trim() || 'default';
+      if (overviewFittedKeysRef.current.has(overviewKey)) return;
+
       try {
-        if (props.hubs.length === 1) {
+        if (hubs.length === 1) {
           map.easeTo({
-            center: [props.hubs[0]!.lon, props.hubs[0]!.lat],
+            center: [hubs[0]!.lon, hubs[0]!.lat],
             zoom: 5,
             duration: 600,
           });
-          return;
+        } else {
+          const bounds = new LngLatBounds();
+          for (const hub of hubs) {
+            bounds.extend([hub.lon, hub.lat]);
+          }
+          map.fitBounds(bounds, { padding: 56, maxZoom: 5, duration: 600 });
         }
-        const bounds = new LngLatBounds();
-        for (const hub of props.hubs) {
-          bounds.extend([hub.lon, hub.lat]);
-        }
-        map.fitBounds(bounds, { padding: 56, maxZoom: 5, duration: 600 });
+        overviewFittedKeysRef.current.add(overviewKey);
       } catch {
         /* ignore camera errors */
       }
@@ -194,7 +217,10 @@ export function HubNetworkMap(props: {
 
     if (map.isStyleLoaded()) focusCamera();
     else map.once('load', focusCamera);
-  }, [props.hubs, props.focusIcao, props.focusToken]);
+    return () => {
+      cancelled = true;
+    };
+  }, [hubsReady, props.focusIcao, props.focusToken, props.cameraKey]);
 
   return (
     <div className={props.className ?? 'hub-network-map'}>

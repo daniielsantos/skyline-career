@@ -4560,60 +4560,6 @@ export async function downloadBushTripGfp(tripId: string): Promise<{
   };
 }
 
-export type HomologateBushHubResult = {
-  icao: string;
-  override: {
-    name: string;
-    lat: number;
-    lon: number;
-    source: 'msfs_panel' | 'parked_sample' | 'msfs_facility';
-    validatedAt: string;
-  };
-  path: string;
-  airport: {
-    icao: string;
-    name: string;
-    lat: number;
-    lon: number;
-  } | null;
-};
-
-/** Stamp MSFS lat/lon/name for a bushTripOnly hub via Facilities (or explicit coords). */
-export function postBushHubHomologate(body: {
-  icao: string;
-  name?: string;
-  lat?: number;
-  lon?: number;
-  source?: 'msfs_panel' | 'parked_sample' | 'msfs_facility';
-  pipeName?: string;
-}) {
-  return api<HomologateBushHubResult>('/api/bush-hubs/homologate', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
-export type HomologateBushHubBatchResult = {
-  results: Array<
-    | { icao: string; ok: true; result: HomologateBushHubResult }
-    | { icao: string; ok: false; error: string }
-  >;
-  okCount: number;
-  failCount: number;
-};
-
-/** Homologate all bushTripOnly hubs (or a list) via SimConnect Facilities. */
-export function postBushHubHomologateBatch(body?: {
-  icaos?: string[];
-  all?: boolean;
-  pipeName?: string;
-}) {
-  return api<HomologateBushHubBatchResult>('/api/bush-hubs/homologate-batch', {
-    method: 'POST',
-    body: JSON.stringify(body ?? { all: true }),
-  });
-}
-
 export async function fetchBushTrips(): Promise<{
   trips: BushTripBoardRow[];
   active: ActiveBushTripView | null;

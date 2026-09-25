@@ -13356,42 +13356,49 @@ export function App() {
     );
   }, [signupCargoHubs, signupCountry]);
 
-  /** Map pins: country filter when set; majors+regionals only on “All” (search still full). */
+  /** Map pins from live `/api/hubs`. All = majors+regionals worldwide; country = all tiers. */
   const signupMapHubs = useMemo(() => {
-    const byIcao = new Map(
-      networkHubs.map((hub) => [hub.icao.toUpperCase(), hub] as const),
-    );
-    let list = signupHubsForCountry;
-    if (!signupCountry) {
-      list = list.filter(
-        (hub) => hub.hubTier === 'major' || hub.hubTier === 'regional',
-      );
+    return networkHubs
+      .filter((hub) => {
+        if (hub.bushTripOnly === true) return false;
+        if (!Number.isFinite(hub.lat) || !Number.isFinite(hub.lon)) return false;
+        if (signupCountry) {
+          return countryIdFromRegion(hub.region) === signupCountry;
+        }
+        return hub.hubTier === 'major' || hub.hubTier === 'regional';
+      })
+      .map((hub) => ({
+        icao: hub.icao,
+        name: hub.name,
+        region: hub.region,
+        hubTier: hub.hubTier,
+        lat: hub.lat,
+        lon: hub.lon,
+        level: hub.level,
+      }));
+  }, [networkHubs, signupCountry]);
+
+  const portsHomeFocus = useMemo(() => {
+    const icao = homeHubIcao.trim().toUpperCase();
+    const hub = icao
+      ? networkHubs.find((h) => h.icao.toUpperCase() === icao)
+      : undefined;
+    const countryId =
+      (hub ? countryIdFromRegion(hub.region) : '') ||
+      aircraftHomeCountryId ||
+      null;
+    if (
+      hub &&
+      Number.isFinite(hub.lat) &&
+      Number.isFinite(hub.lon)
+    ) {
+      return { lat: hub.lat, lon: hub.lon, countryId };
     }
-    const out: Array<{
-      icao: string;
-      name: string;
-      region: string;
-      hubTier: 'major' | 'regional' | 'spoke';
-      lat: number;
-      lon: number;
-      level?: number;
-    }> = [];
-    for (const hub of list) {
-      const live = byIcao.get(hub.icao.toUpperCase());
-      if (!live) continue;
-      if (!Number.isFinite(live.lat) || !Number.isFinite(live.lon)) continue;
-      out.push({
-        icao: live.icao,
-        name: live.name,
-        region: live.region,
-        hubTier: live.hubTier,
-        lat: live.lat,
-        lon: live.lon,
-        level: live.level,
-      });
+    if (countryId) {
+      return { countryId };
     }
-    return out;
-  }, [networkHubs, signupHubsForCountry, signupCountry]);
+    return null;
+  }, [homeHubIcao, networkHubs, aircraftHomeCountryId]);
 
   const signupPilotResolved = resolvedSignupPilotName();
   const signupPilotLocked = authRequired && signupPilotResolved.length >= 2;
@@ -14302,7 +14309,7 @@ export function App() {
               <p className="hub-picker-map-hint">
                 {signupCountry
                   ? 'Click a hub on the map, or search above.'
-                  : 'Pick a country to see spokes, or click a major/regional on the map.'}
+                  : 'All countries shows majors and regionals worldwide — pick a country for spokes.'}
               </p>
               {networkHubsLoading && signupMapHubs.length === 0 ? (
                 <div className="hub-network-map" aria-busy="true">
@@ -14312,6 +14319,7 @@ export function App() {
                 <HubNetworkMap
                   className="hub-network-map"
                   hubs={signupMapHubs}
+                  cameraKey={signupCountry || 'all'}
                   highlightIcao={signupHub || null}
                   focusIcao={signupHub || null}
                   focusToken={signupMapFocusToken}
@@ -14321,7 +14329,11 @@ export function App() {
                     );
                     const country = hub
                       ? countryIdFromRegion(hub.region)
-                      : '';
+                      : countryIdFromRegion(
+                          signupMapHubs.find(
+                            (h) => h.icao.toUpperCase() === icao.toUpperCase(),
+                          )?.region ?? '',
+                        );
                     if (country) setSignupCountry(country);
                     setSignupHub(icao.toUpperCase());
                     setSignupMapFocusToken((token) => token + 1);
@@ -20486,6 +20498,7 @@ export function App() {
           ) : (
             <HubNetworkMap
               hubs={networkHubs}
+              cameraKey="network"
               highlightIcao={homeHubIcao}
               focusIcao={networkMapFocusIcao || null}
               focusToken={networkMapFocusToken}
@@ -20504,6 +20517,7 @@ export function App() {
           fleet={prepareOpsFleet}
           vaAircraftIds={vaAircraftIdSet}
           logisticsCompanyId={homeCompanyId ?? activeCompanyId}
+          homeFocus={portsHomeFocus}
           ownedShelfLabel="Yours"
           resolveOpsCompanyId={(aircraftId) =>
             resolveOpsCompanyId(aircraftId)
@@ -20575,6 +20589,7 @@ export function App() {
         <VaPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
+          homeFocus={portsHomeFocus}
           fleet={
             viewingVaTenant || vaSessionFleet.length > 0
               ? vaSessionFleet

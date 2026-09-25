@@ -77,6 +77,7 @@ import {
   resolveUiPortCorridorLevel,
   corridorNmForLevel,
 } from './demand-accept-preview';
+import { pickDefaultPortId } from './ports-default-pick';
 import {
   displayAmountToStoredKg,
   displayToKg,
@@ -365,6 +366,15 @@ export function PortsPanel(props: {
   vaMemberRole?: 'owner' | 'dispatcher' | 'pilot' | null;
   /** Nested under My VA — drop outer panel chrome. */
   embedded?: boolean;
+  /**
+   * Pilot / company home for initial catalog focus.
+   * Nearest seaport wins when no owned FBO/WH yet (avoids always landing on Santos).
+   */
+  homeFocus?: {
+    lat?: number | null;
+    lon?: number | null;
+    countryId?: string | null;
+  } | null;
   /** Dual-tenant: company for Accept/Fly when the tail is VA-owned. */
   resolveOpsCompanyId?: (aircraftId: string) => string | undefined;
   /** Pin VA tenant before Accept so Dispatch loads the right missions. */
@@ -543,7 +553,18 @@ export function PortsPanel(props: {
           );
           if (still) return still.id;
         }
-        return cur ?? nextPorts.ports[0]?.id ?? null;
+        return (
+          cur ??
+          pickDefaultPortId({
+            ports: nextPorts.ports,
+            homeLat: props.homeFocus?.lat,
+            homeLon: props.homeFocus?.lon,
+            homeCountryId: props.homeFocus?.countryId,
+            ownedWarehouseHubs: (nextPorts.warehouses?.warehouses ?? []).map(
+              (w) => w.icao,
+            ),
+          })
+        );
       });
       if (!includeScout) return;
       try {
@@ -958,7 +979,24 @@ export function PortsPanel(props: {
       (p) =>
         portId != null &&
         (p.id === portId || p.id.toUpperCase() === portId.toUpperCase()),
-    ) ?? (portId ? undefined : snap?.ports[0]);
+    ) ??
+    (portId
+      ? undefined
+      : snap
+        ? snap.ports.find(
+            (p) =>
+              p.id ===
+              pickDefaultPortId({
+                ports: snap.ports,
+                homeLat: props.homeFocus?.lat,
+                homeLon: props.homeFocus?.lon,
+                homeCountryId: props.homeFocus?.countryId,
+                ownedWarehouseHubs: (warehouses?.warehouses ?? []).map(
+                  (w) => w.icao,
+                ),
+              }),
+          ) ?? snap.ports[0]
+        : undefined);
   const amountDisplay = Math.max(0, Math.floor(Number(amountText) || 0));
   const kg =
     buyListing != null

@@ -1,5 +1,11 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-25: **Port map pin SVG** — `anchor.png` pixelado trocado por glyph SVG (`companyNetworkIconSvg('port')`), mesmo traço dos ícones FBO/WH.
+
+Atualizado 2026-09-25: **Ports map snap-back** — sintoma = pan/navega noutro porto e a câmera volta (ex. Santos) a cada soft-poll. Causa = efeito de markers re-`easeTo` no `selectedPortId` sempre que `ports` mudava. Fix = `lastCameraKeyRef` só re-foca em seleção/highlight/scout/route; center inicial deixa de ser Santos.
+
+Atualizado 2026-09-25: **Ports open → Santos** — sintoma = home KPBI ainda abria Catalog em BRSSZ. Causa = `portId` null → `ports[0]` (Santos first in `CAREER_PORTS`). Fix = `pickDefaultPortId`: owned FBO → WH-linked → nearest to home hub → home country → catalog[0].
+
 Atualizado 2026-09-20. **Phase 0–10 shipped** (lease-out/crew off; Port FBO desk+stevedore; Base perks; Scout bridge+Demand+Haul; Port shuttle). **IH-1 Internal Haul pay shipped**. **1ª Base free** + **Base Dispatcher seat** (hire) + unified **Search** (1 freight ou tour 2–4 legs) + **Active Tour** (Accept L2+, no multi-reserve).
 **Doc 2026-09-20:** Base `playerFbos` sticky-home (VA tenant não pinta sidebar Base) + preserve `canBuyAtIcao` no poll `/api/state`.
 Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md), [`10-aircraft-pool.md`](./10-aircraft-pool.md) (lease-out).

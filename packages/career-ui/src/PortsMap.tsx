@@ -20,8 +20,10 @@ const OPENFREEMAP_DARK = 'https://tiles.openfreemap.org/styles/dark';
 const PORT_ACCENT = '#f0a35a';
 const BRIDGE_ACCENT = '#5ec8c0';
 
-/** Generated map pins. Anchor PNG in `public/ports`; WH glyph shared with Hauls network map. */
-const PORT_ANCHOR_SRC = '/ports/anchor.png';
+/** Generated map pins — SVG glyphs shared with Company network map. */
+const PORT_ANCHOR_SRC = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  companyNetworkIconSvg('port'),
+)}`;
 const WAREHOUSE_SRC = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
   companyNetworkIconSvg('wh'),
 )}`;
@@ -132,6 +134,11 @@ export function PortsMap(props: {
   onSelectHubRef.current = props.onSelectHub;
   /** Bumps when the MapLibre style is ready so markers always (re)paint. */
   const [mapGeneration, setMapGeneration] = useState(0);
+  /**
+   * Soft-poll rebuilds `ports` every ~20s — do not re-ease the camera unless
+   * selection / highlight / scout route actually changed (felt like snap-back to Santos).
+   */
+  const lastCameraKeyRef = useRef<string>('');
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -140,8 +147,9 @@ export function PortsMap(props: {
     const map = new Map({
       container: containerRef.current,
       style: OPENFREEMAP_DARK,
-      center: [-46.5, -24.5],
-      zoom: 5.2,
+      // Neutral Atlantic start — selection / focusToken drives the first camera.
+      center: [-40, 10],
+      zoom: 2.6,
       attributionControl: false,
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
@@ -505,6 +513,20 @@ export function PortsMap(props: {
     }
 
     if (boundCount === 0 && (props.bridgeLegs ?? []).length === 0) return;
+
+    const bridgeKey = (props.bridgeLegs ?? [])
+      .map((l) => `${l.originIcao}-${l.destIcao}`)
+      .join(',');
+    const cameraKey = [
+      selectedId,
+      props.focusToken ?? 0,
+      highlightHub,
+      bridgeKey,
+      mapGeneration,
+    ].join('|');
+    if (cameraKey === lastCameraKeyRef.current) return;
+    lastCameraKeyRef.current = cameraKey;
+
     try {
       const routeBounds = new LngLatBounds();
       let routePoints = 0;

@@ -4286,6 +4286,7 @@ export function App() {
   const [signupName, setSignupName] = useState('');
   const [signupHub, setSignupHub] = useState('');
   const [signupCountry, setSignupCountry] = useState('');
+  const [signupMapFocusToken, setSignupMapFocusToken] = useState(0);
   const [aircraftListings, setAircraftListings] = useState<AircraftListing[]>([]);
   const [aircraftDeliveryQuotes, setAircraftDeliveryQuotes] = useState<
     Record<string, AircraftDeliveryQuoteView>
@@ -4348,6 +4349,12 @@ export function App() {
   const [networkHubsLoading, setNetworkHubsLoading] = useState(false);
   const [networkMapFocusIcao, setNetworkMapFocusIcao] = useState('');
   const [networkMapFocusToken, setNetworkMapFocusToken] = useState(0);
+
+  useEffect(() => {
+    if (careerStateReady && !hubSelected) {
+      setSidebarOpen(false);
+    }
+  }, [careerStateReady, hubSelected]);
 
   useEffect(() => {
     setSelectedFboHoldId(null);
@@ -5934,8 +5941,9 @@ export function App() {
 
   useEffect(() => {
     if (showProfileGate || showAuthGate || !activeCareerProfile) return;
-    if (!hubSelected) return;
+    // Need coords for Choose home hub map before hubSelected, and Network after.
     void refreshNetworkHubs().catch((err) => {
+      if (!hubSelected) return;
       const message = err instanceof Error ? err.message : String(err);
       if (isNeedsProfileMessage(message)) return;
       setToastKind('fail');
@@ -13348,6 +13356,43 @@ export function App() {
     );
   }, [signupCargoHubs, signupCountry]);
 
+  /** Map pins: country filter when set; majors+regionals only on “All” (search still full). */
+  const signupMapHubs = useMemo(() => {
+    const byIcao = new Map(
+      networkHubs.map((hub) => [hub.icao.toUpperCase(), hub] as const),
+    );
+    let list = signupHubsForCountry;
+    if (!signupCountry) {
+      list = list.filter(
+        (hub) => hub.hubTier === 'major' || hub.hubTier === 'regional',
+      );
+    }
+    const out: Array<{
+      icao: string;
+      name: string;
+      region: string;
+      hubTier: 'major' | 'regional' | 'spoke';
+      lat: number;
+      lon: number;
+      level?: number;
+    }> = [];
+    for (const hub of list) {
+      const live = byIcao.get(hub.icao.toUpperCase());
+      if (!live) continue;
+      if (!Number.isFinite(live.lat) || !Number.isFinite(live.lon)) continue;
+      out.push({
+        icao: live.icao,
+        name: live.name,
+        region: live.region,
+        hubTier: live.hubTier,
+        lat: live.lat,
+        lon: live.lon,
+        level: live.level,
+      });
+    }
+    return out;
+  }, [networkHubs, signupHubsForCountry, signupCountry]);
+
   const signupPilotResolved = resolvedSignupPilotName();
   const signupPilotLocked = authRequired && signupPilotResolved.length >= 2;
 
@@ -13522,8 +13567,16 @@ export function App() {
 
   return (
     <AirportNamesProvider names={airportNames}>
-    <div className={`app-shell${sidebarOpen ? ' sidebar-open' : ''}`}>
-      {sidebarOpen ? (
+    <div
+      className={[
+        'app-shell',
+        sidebarOpen ? 'sidebar-open' : '',
+        careerStateReady && !hubSelected ? 'app-shell--hub-picker' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {sidebarOpen && hubSelected ? (
         <button
           type="button"
           className="sidebar-backdrop"
@@ -13531,7 +13584,12 @@ export function App() {
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}
-      <aside className="sidebar" aria-label="Primary">
+      <aside
+        className="sidebar"
+        aria-label="Primary"
+        aria-hidden={careerStateReady && !hubSelected ? true : undefined}
+        inert={careerStateReady && !hubSelected ? true : undefined}
+      >
         <div className="sidebar-brand">
           <BrandMark />
         </div>
@@ -13941,14 +13999,16 @@ export function App() {
         ) : null}
         <header className="topbar">
           <div className="topbar-title">
-            <button
-              type="button"
-              className="sidebar-toggle"
-              aria-label="Open navigation"
-              onClick={() => setSidebarOpen(true)}
-            >
-              Menu
-            </button>
+            {hubSelected ? (
+              <button
+                type="button"
+                className="sidebar-toggle"
+                aria-label="Open navigation"
+                onClick={() => setSidebarOpen(true)}
+              >
+                Menu
+              </button>
+            ) : null}
             <h1>
               {pageTitle}
               {pageHelp ? <PageHelpButton help={pageHelp} /> : null}
@@ -14227,13 +14287,47 @@ export function App() {
                       .join(' · '),
                   }))}
                   value={signupHub}
-                  onChange={setSignupHub}
+                  onChange={(icao) => {
+                    setSignupHub(icao);
+                    setSignupMapFocusToken((token) => token + 1);
+                  }}
                   disabled={busy}
                   plainText
                   maxResults={signupCountry ? 40 : 16}
                   placeholder="Type ICAO, city, or country…"
                 />
               </label>
+            </div>
+            <div className="hub-picker-map">
+              <p className="hub-picker-map-hint">
+                {signupCountry
+                  ? 'Click a hub on the map, or search above.'
+                  : 'Pick a country to see spokes, or click a major/regional on the map.'}
+              </p>
+              {networkHubsLoading && signupMapHubs.length === 0 ? (
+                <div className="hub-network-map" aria-busy="true">
+                  <BusyBlock label="Loading hubs" />
+                </div>
+              ) : (
+                <HubNetworkMap
+                  className="hub-network-map"
+                  hubs={signupMapHubs}
+                  highlightIcao={signupHub || null}
+                  focusIcao={signupHub || null}
+                  focusToken={signupMapFocusToken}
+                  onSelectHub={(icao) => {
+                    const hub = signupCargoHubs.find(
+                      (h) => h.icao.toUpperCase() === icao.toUpperCase(),
+                    );
+                    const country = hub
+                      ? countryIdFromRegion(hub.region)
+                      : '';
+                    if (country) setSignupCountry(country);
+                    setSignupHub(icao.toUpperCase());
+                    setSignupMapFocusToken((token) => token + 1);
+                  }}
+                />
+              )}
             </div>
             <button
               type="submit"

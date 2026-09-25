@@ -51,6 +51,18 @@ body {
     var(--bg);
 }
 
+/* Choose home hub: keep chrome for context, but lock nav until a hub is claimed. */
+.app-shell--hub-picker .sidebar {
+  filter: blur(4px) saturate(0.65);
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
+}
+
+.app-shell--hub-picker.sidebar-open .sidebar {
+  transform: none;
+}
+
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -5771,7 +5783,7 @@ button.logbook-card-hit:focus-visible {
 .pilot-signup {
   display: grid;
   gap: 1rem;
-  max-width: 36rem;
+  max-width: min(52rem, 100%);
 }
 
 .pilot-signup-hubs {
@@ -5784,6 +5796,25 @@ button.logbook-card-hit:focus-visible {
     grid-template-columns: minmax(10rem, 0.9fr) minmax(14rem, 1.2fr);
     align-items: end;
   }
+}
+
+.hub-picker-map {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.hub-picker-map-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.hub-picker-map .hub-network-map {
+  min-height: 0;
+}
+
+.hub-picker-map .hub-network-map-canvas {
+  height: min(42vh, 22rem);
 }
 
 .profile-gate-shell {

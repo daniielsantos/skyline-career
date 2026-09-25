@@ -1,5 +1,9 @@
 # Hub Stats + histórico econômico
 
+Atualizado 2026-09-25: **Choose home hub — sidebar locked** — `app-shell--hub-picker`: sidebar blur + `inert`/`pointer-events:none`; Menu toggle oculto; fecha drawer mobile. Sintoma: nav clicável durante claim.
+
+Atualizado 2026-09-25: **Choose home hub map** — busca/país + `HubNetworkMap` (click → seleciona; “All” só major/regional no mapa). `/api/hubs` carrega antes de `hubSelected`.
+
 Atualizado 2026-09-25: **Hub level maintenance** — quiet decai XP → demote (histerese); NPC settle 0.4×; L5 gate de tráfego recente. Detail: [`08-economy.md`](./08-economy.md) (Hub level maintenance). UI terminal: `atRisk` no tooltip.
 
 Atualizado 2026-09-20: **History Jet-A chip dead** — chips vinham de `now.commodities` (inclui fuel); samples diários só gravam `CAREER_CARGO_COMMODITIES` (fuel fica em `jetAFill`, sem `spotUsd`). Sintoma: “No spot samples for Jet-A fuel…”. Fix: History chips excluem `kind === 'fuel'`; Terminal inventory continua mostrando Jet-A live.

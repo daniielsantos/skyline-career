@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **fbdcb854** / desktop **0.3.307** shipped: Remove wrong-premise pause workarounds from Watch freeze. Release: [v0.3.307](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.307).
+
+
 `main` **02450cea** / desktop **0.3.306** shipped: Stop false slew from freezing Watch while airborne. Release: [v0.3.306](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.306).
 
 

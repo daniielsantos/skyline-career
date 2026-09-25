@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **5bbaa799** / desktop **0.3.309** shipped: Unfreeze sticky IS PAUSED via flight-sample Absolute Time and motion. Release: [v0.3.309](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.309).
+
+
 `main` **abffba76** / desktop **0.3.308** shipped: Scale down EN ROUTE live load tiles to match OFP density. Release: [v0.3.308](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.308).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **113aa0f1** / desktop **0.3.337** shipped: Park Resume prep inject status left of the switch without shifting layout. Release: [v0.3.337](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.337).
+
+
 `main` **b6ff0e2c** / desktop **0.3.336** shipped: Stabilize Resume prep inject chrome so the toggle stops blinking and shoving layout. Release: [v0.3.336](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.336).
 
 

@@ -122,8 +122,8 @@ describe('career flight track', () => {
     assert.equal(row?.lon, -47.0001);
   });
 
-  it('uses denser early crumbs then cruise MIN_MOVE', () => {
-    // ~0.18 nm east of origin — above EARLY (0.12), below cruise (0.35).
+  it('appends a crumb once past the noise floor (per-uplink fix)', () => {
+    // ~0.18 nm east of origin — above MIN_MOVE (0.05) → new vertex.
     recordFlightTrackSample({
       companyId: 'co_va',
       accountId: 'acc_1',
@@ -146,26 +146,8 @@ describe('career flight track', () => {
     });
     assert.equal(getFlightTrack('co_va', 'acc_1')?.points.length, 2);
 
-    // Pad to EARLY_POINTS with larger steps so cruise threshold applies next.
-    let lon = -47.917;
-    for (let i = 0; i < 13; i++) {
-      lon -= 0.01; // ~0.58 nm at this lat
-      recordFlightTrackSample({
-        companyId: 'co_va',
-        accountId: 'acc_1',
-        missionId: 'm1',
-        originIcao: 'SBBR',
-        destIcao: 'SBSP',
-        lat: -15.87,
-        lon,
-        atMs: 10_000 + i * 5_000,
-      });
-    }
-    const padded = getFlightTrack('co_va', 'acc_1');
-    assert.equal(padded?.points.length, 15);
-
-    const tip = padded!.points[14]!;
-    // ~0.18 nm again — must stay tip-only under cruise MIN_MOVE.
+    const tip = getFlightTrack('co_va', 'acc_1')!.points[1]!;
+    // ~0.02 nm — below noise floor: tip slides, no new vertex.
     recordFlightTrackSample({
       companyId: 'co_va',
       accountId: 'acc_1',
@@ -173,10 +155,10 @@ describe('career flight track', () => {
       originIcao: 'SBBR',
       destIcao: 'SBSP',
       lat: tip.lat,
-      lon: tip.lon + 0.003,
-      atMs: 100_000,
+      lon: tip.lon + 0.0003,
+      atMs: 11_000,
     });
-    assert.equal(getFlightTrack('co_va', 'acc_1')?.points.length, 15);
+    assert.equal(getFlightTrack('co_va', 'acc_1')?.points.length, 2);
   });
 
   it('resets trail on teleport jump instead of drawing a spike', () => {

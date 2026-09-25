@@ -40,16 +40,18 @@ export const FLIGHT_TRACK_FRESH_MS = 90_000;
 /** Min interval between posted crumbs (matches Watch tick / Live poll). */
 export const FLIGHT_TRACK_POST_MIN_MS = 5_000;
 /**
- * Cruise crumb spacing (nm). Samples closer only refresh the tip in place.
- * Coarse enough for long flights under MAX_POINTS without sparse taxi/climb.
+ * Min move to append a new breadcrumb vertex (nm).
+ * Uplink is already ~5s — below this we only slide the tip in place (hold /
+ * GPS jitter). Higher values (0.35) left big chords through turns so Live
+ * looked like impossible 90°+ corners. With MAX_POINTS=8k, denser crumbs are fine.
  */
-export const FLIGHT_TRACK_MIN_MOVE_NM = 0.35;
+export const FLIGHT_TRACK_MIN_MOVE_NM = 0.05;
 /**
- * Denser spacing while the trail is still short — taxi / early climb used to
- * look like a single origin→AC chord until ~0.35 nm accumulated.
+ * Same as cruise — kept as a named alias so early-climb callers/tests stay clear.
+ * (Was 0.12 while cruise was 0.35; both are now the per-uplink noise floor.)
  */
-export const FLIGHT_TRACK_EARLY_MIN_MOVE_NM = 0.12;
-/** Use EARLY_MIN_MOVE while `points.length` is below this (after append count). */
+export const FLIGHT_TRACK_EARLY_MIN_MOVE_NM = FLIGHT_TRACK_MIN_MOVE_NM;
+/** @deprecated Adaptive early window unused — threshold is uniform. Kept for API. */
 export const FLIGHT_TRACK_EARLY_POINTS = 15;
 /**
  * Max great-circle jump between consecutive crumbs (~300 kt × 5s ≈ 25 nm;
@@ -59,17 +61,14 @@ export const FLIGHT_TRACK_EARLY_POINTS = 15;
 export const FLIGHT_TRACK_MAX_JUMP_NM = 75;
 /**
  * Cap crumbs per active flyer. ~5s uplink → ~8k ≈ 11h of continuous appends;
- * at cruise MIN_MOVE (0.35 nm) ≈ 2800 nm of path. Prune used to drop early
- * approach history near dest holds — keep this high; tracks clear when the
- * mission leaves accepted/dispatched/in_flight (or process restart).
+ * at 0.05 nm ≈ dense path for long hauls. Tracks clear when the mission leaves
+ * accepted/dispatched/in_flight (or process restart).
  */
 export const FLIGHT_TRACK_MAX_POINTS = 8_000;
 
-/** Crumb threshold for the next append given current trail length. */
-export function flightTrackMinMoveNm(pointCount: number): number {
-  return pointCount < FLIGHT_TRACK_EARLY_POINTS
-    ? FLIGHT_TRACK_EARLY_MIN_MOVE_NM
-    : FLIGHT_TRACK_MIN_MOVE_NM;
+/** Crumb threshold for the next append (uniform — uplink already throttles rate). */
+export function flightTrackMinMoveNm(_pointCount?: number): number {
+  return FLIGHT_TRACK_MIN_MOVE_NM;
 }
 
 type StoreEntry = FlightTrackSnapshot;

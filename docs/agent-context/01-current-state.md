@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **37795d6c** / desktop **0.3.332** shipped: Raise Live trail cap to 15k crumbs for ~6000 nm long hauls. Release: [v0.3.332](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.332).
+
+
 `main` **85263eb1** / desktop **0.3.331** shipped: Densify Crew Live trail crumbs so turns stop looking impossible. Release: [v0.3.331](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.331).
 
 

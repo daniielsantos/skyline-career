@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **54e42f6e** / desktop **0.3.315** shipped: Replace Claim Santos with a Dev Mode port picker. Release: [v0.3.315](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.315).
+
+
 `main` **5d6acc70** / desktop **0.3.314** shipped: Add hub level maintenance so terminals do not stay maxed forever. Release: [v0.3.314](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.314).
 
 

@@ -3506,27 +3506,27 @@ export class CareerWatchSession {
         (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null) ||
         Boolean(this.scoreAcc.landing);
 
-      if (!this.playbackFrozen) {
-        this.lastPhase = advanceFlightPhase(
-          this.lastPhase,
-          {
-            onGround: sample.onGround,
-            enginesRunning: sample.enginesRunning,
-            groundSpeedKt: sample.groundSpeedKt,
-            verticalSpeedFpm: sample.verticalSpeedFpm,
-            altitudeFt: sample.altitudeFt,
-            aglFt: sample.aglFt,
-            distanceToDestNm: liveDistToDestNm,
-            sawAirborne: nextState.sawAirborne,
-            postTouchdown,
-          },
-          {
-            airborneAtMs: nextState.airborneAtMs,
-            touchdownAtMs: nextState.airborneEndedAtMs,
-            nowMs,
-          },
-        );
-      }
+      // Phase is display-only — keep updating even while the airborne clock is
+      // frozen (pause), otherwise the footer sticks on coarse "Airborne".
+      this.lastPhase = advanceFlightPhase(
+        this.lastPhase,
+        {
+          onGround: sample.onGround,
+          enginesRunning: sample.enginesRunning,
+          groundSpeedKt: sample.groundSpeedKt,
+          verticalSpeedFpm: sample.verticalSpeedFpm,
+          altitudeFt: sample.altitudeFt,
+          aglFt: sample.aglFt,
+          distanceToDestNm: liveDistToDestNm,
+          sawAirborne: nextState.sawAirborne,
+          postTouchdown,
+        },
+        {
+          airborneAtMs: nextState.airborneAtMs,
+          touchdownAtMs: nextState.airborneEndedAtMs,
+          nowMs,
+        },
+      );
 
       this.softReportVaLiveTrack(sample);
 

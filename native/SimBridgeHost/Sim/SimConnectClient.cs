@@ -145,7 +145,10 @@ public sealed class SimConnectClient : ISimClient
 
     /// <summary>
     /// Fixed snapshot layout — field order must match AddToDataDefinition order below.
-    /// IS PAUSED / IS SLEW ACTIVE freeze Watch airborne elapsed (escape menu, active pause, slew).
+    /// IS PAUSED freezes Watch airborne elapsed. Do NOT pack ABSOLUTE TIME / IS SLEW
+    /// ACTIVE here — those SimVars mis-align the FLOAT64 block on MSFS 2024 (Watch
+    /// saw simAbsSec=1 + sticky slew while GS 400kt). Slew is inferred in Watch from
+    /// kinematics when needed.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     private struct SnapshotData
@@ -154,8 +157,6 @@ public sealed class SimConnectClient : ISimClient
         public double EnginesRunning;
         public double ParkingBrake;
         public double Paused;
-        public double SlewActive;
-        public double AbsoluteTimeSec;
         public double SimRate;
         public double CgPercent;
         public double GrossWeightLb;
@@ -668,8 +669,6 @@ public sealed class SimConnectClient : ISimClient
             ["ENG COMBUSTION:1"] = data.EnginesRunning,
             ["BRAKE PARKING POSITION"] = data.ParkingBrake,
             ["IS PAUSED"] = data.Paused,
-            ["IS SLEW ACTIVE"] = data.SlewActive,
-            ["ABSOLUTE TIME"] = data.AbsoluteTimeSec,
             ["SIMULATION RATE"] = data.SimRate,
             ["CG PERCENT"] = cgMacPercent,
             ["CG PERCENT RAW"] = data.CgPercent,
@@ -698,8 +697,10 @@ public sealed class SimConnectClient : ISimClient
             EnginesRunning = data.EnginesRunning > 0.5,
             ParkingBrake = data.ParkingBrake > 0.5,
             Paused = data.Paused > 0.5,
-            SlewActive = data.SlewActive > 0.5,
-            AbsoluteTimeSec = data.AbsoluteTimeSec,
+            // Soft-false: packing IS SLEW ACTIVE / ABSOLUTE TIME broke snapshot
+            // alignment on MSFS 2024. Watch treats high-GS "slew" as live.
+            SlewActive = false,
+            AbsoluteTimeSec = 0,
             SimRate = data.SimRate,
             CgPercent = cgMacPercent,
             GrossWeightLb = data.GrossWeightLb,
@@ -1186,8 +1187,6 @@ public sealed class SimConnectClient : ISimClient
         AddFloat(sim, Definitions.Snapshot, "ENG COMBUSTION:1", "Bool");
         AddFloat(sim, Definitions.Snapshot, "BRAKE PARKING POSITION", "Bool");
         AddFloat(sim, Definitions.Snapshot, "IS PAUSED", "Bool");
-        AddFloat(sim, Definitions.Snapshot, "IS SLEW ACTIVE", "Bool");
-        AddFloat(sim, Definitions.Snapshot, "ABSOLUTE TIME", "Seconds");
         AddFloat(sim, Definitions.Snapshot, "SIMULATION RATE", "Number");
         AddFloat(sim, Definitions.Snapshot, "CG PERCENT", "Percent over 100");
         AddFloat(sim, Definitions.Snapshot, "TOTAL WEIGHT", "pounds");

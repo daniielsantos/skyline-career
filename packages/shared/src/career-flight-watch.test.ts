@@ -960,25 +960,27 @@ describe('evaluateMissionFlightTransition', () => {
     );
   });
 
-  it('treats sticky IS PAUSED as live when absolute time advances', () => {
+  it('ignores false slew while the aircraft is clearly flying', () => {
     const prev = {
       onGround: false,
       enginesRunning: true,
-      paused: true,
-      simAbsoluteTimeSec: 1000,
+      slewActive: true,
       position: { lat: -25.5, lon: -49.2 },
-      positionHeld: true,
     };
-    const stuckTime = {
+    const flying = {
       ...prev,
-      simAbsoluteTimeSec: 1000.05,
+      groundSpeedKt: 400,
+      position: { lat: -25.52, lon: -49.18 },
     };
-    const liveTime = {
-      ...prev,
-      simAbsoluteTimeSec: 1001.5,
+    const parkedSlew = {
+      onGround: true,
+      enginesRunning: false,
+      slewActive: true,
+      groundSpeedKt: 0,
+      position: { lat: -25.5, lon: -49.2 },
     };
-    assert.equal(isSimPlaybackFrozen(stuckTime, prev), true);
-    assert.equal(isSimPlaybackFrozen(liveTime, prev), false);
+    assert.equal(isSimPlaybackFrozen(flying, prev), false);
+    assert.equal(isSimPlaybackFrozen(parkedSlew, prev), true);
   });
 
   it('uses 50% airborne gate for routes under 100 nm', () => {

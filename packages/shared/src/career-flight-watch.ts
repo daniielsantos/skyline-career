@@ -100,13 +100,21 @@ export function inspectSimPlaybackFreeze(
   }
 
   if (sample.slewActive === true) {
-    return {
-      frozen: true,
-      reason: 'slew',
-      simAbsDtSec,
-      movedNm,
-      positionHeld,
-    };
+    // MSFS 2024 / misaligned Host snapshots can stick IS SLEW ACTIVE while the
+    // aircraft is clearly flying (GS 400kt + position advancing). Only trust
+    // slew when there is no real motion.
+    const flying =
+      finitePositive(sample.groundSpeedKt, 30) ||
+      (movedNm != null && movedNm >= 0.015);
+    if (!flying) {
+      return {
+        frozen: true,
+        reason: 'slew',
+        simAbsDtSec,
+        movedNm,
+        positionHeld,
+      };
+    }
   }
   if (sample.paused !== true) {
     return {

@@ -235,6 +235,7 @@ type DemandSortKey =
   | 'commodity'
   | 'wanted'
   | 'price'
+  | 'pay'
   | 'expires';
 
 type DemandSort = { key: DemandSortKey; direction: 'asc' | 'desc' };
@@ -314,6 +315,8 @@ function demandSortValue(
       return order.remainingKg;
     case 'price':
       return order.maxUnitPriceUsd;
+    case 'pay':
+      return order.remainingKg * order.maxUnitPriceUsd;
     case 'expires':
       return order.expiresAtTick;
   }
@@ -6022,6 +6025,16 @@ export function PortsPanel(props: {
                           <span>{demandSortIndicator('price')}</span>
                         </button>
                       </th>
+                      <th aria-sort={demandAriaSort('pay')}>
+                        <button
+                          type="button"
+                          className={`sort-header${demandSort.key === 'pay' ? ' is-sorted' : ''}`}
+                          title="Sort by total pay if you fill the remaining Wanted"
+                          onClick={() => toggleDemandSort('pay')}
+                        >
+                          Total pay <span>{demandSortIndicator('pay')}</span>
+                        </button>
+                      </th>
                       <th aria-sort={demandAriaSort('expires')}>
                         <button
                           type="button"
@@ -6038,7 +6051,7 @@ export function PortsPanel(props: {
                   <tbody key={demandTableKey}>
                     {sortedDemand.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>
+                        <td colSpan={9}>
                           <p className="empty">
                             {!port
                               ? 'Select a port.'
@@ -6124,6 +6137,13 @@ export function PortsPanel(props: {
                           </td>
                           <td>{props.formatTonnes(o.remainingKg)}</td>
                           <td>{formatUnitPrice(o.maxUnitPriceUsd)}</td>
+                          <td
+                            title={`Remaining ${props.formatTonnes(o.remainingKg)} × ${formatUnitPrice(o.maxUnitPriceUsd)}`}
+                          >
+                            {props.formatMoney(
+                              o.remainingKg * o.maxUnitPriceUsd,
+                            )}
+                          </td>
                           <td
                             className="muted"
                             title={

@@ -10916,6 +10916,7 @@ export function createCareerApiServer(port = 8787) {
           originIcao?: string;
           destIcao?: string;
           kg?: number;
+          commodityId?: string;
         };
         if (!body.originIcao || !body.destIcao) {
           send(res, 400, { error: 'originIcao and destIcao required' });
@@ -10932,6 +10933,7 @@ export function createCareerApiServer(port = 8787) {
               originIcao: body.originIcao,
               destIcao: body.destIcao,
               kg: body.kg != null ? Number(body.kg) : 0,
+              commodityId: body.commodityId as CommodityId | undefined,
             }),
           });
         } catch (error) {

@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-25: **Settle = parking brake** — iFly idle lia engines-off e auto-settle + overlay sticky. Spec note em [`11-persist-commands.md`](./11-persist-commands.md).
+
+Atualizado 2026-09-25: **IH pay market-anchored** — suggest = max(floor, legacy, Market×0.45); Auto-haul Config Pay %. Spec: [`16-va-logistics.md`](./16-va-logistics.md).
+
 Atualizado 2026-09-24: **Ports Network IA** — Catalog + Network (chips/mapa); Available/Demand contextual. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 Atualizado 2026-09-24: **Charter → Class Ops** — settle Charter credita horas/cleans Class Ops (sem Cargo Ops). Spec: [`08-economy.md`](./08-economy.md) + [`29-flight-debrief.md`](./29-flight-debrief.md).

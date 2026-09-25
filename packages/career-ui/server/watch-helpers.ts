@@ -4215,8 +4215,18 @@ export class CareerWatchSession {
         }
       }
 
-      if (event.type === 'settle' && this.opts.autoSettle) {
+        if (event.type === 'settle' && this.opts.autoSettle) {
         this.settling = true;
+        watchDebugLog('watch', 'settle begin', {
+          missionId: this.missionId,
+          paused: sample.paused === true,
+          parkingBrake: sample.parkingBrake === true,
+          enginesRunning: sample.enginesRunning,
+          gsKt:
+            typeof sample.groundSpeedKt === 'number'
+              ? Math.round(sample.groundSpeedKt)
+              : null,
+        });
         // Give the UI at least one /api/watch/status poll with settling=true
         // before SimVar reads + withCareerWrite block the event loop (~10s).
         await new Promise<void>((resolve) => setTimeout(resolve, 250));
@@ -4471,9 +4481,18 @@ export class CareerWatchSession {
         );
         if (!saved) {
           this.settling = false;
+          this.lastError =
+            'Settle failed to save — check world connection, then set parking brake again.';
+          watchDebugLog('watch', 'settle save failed', {
+            missionId: this.missionId,
+          });
           await this.stop({ fromOwnTick: true });
           return;
         }
+        watchDebugLog('watch', 'settle saved', {
+          missionId: this.missionId,
+          status: this.missionStatus,
+        });
         await this.stop({ fromOwnTick: true });
       }
     } catch (error) {
@@ -4484,6 +4503,7 @@ export class CareerWatchSession {
         error: this.lastError,
         pipeConnected: this.bridge?.isPipeConnected ?? false,
         consecutivePipeErrors: this.consecutivePipeErrors,
+        settlingCleared: true,
         ms: Date.now() - tickStarted,
       });
       // First TIMEOUT/NOT_CONNECTED: reset SimConnect next tick (same as stations).

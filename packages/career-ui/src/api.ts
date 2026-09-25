@@ -3746,12 +3746,15 @@ export type InternalHaulPayQuote = {
   suggestedPayUsd: number;
   minPayUsd: number;
   maxPayUsd: number;
+  marketPayUsd?: number;
+  marketFrac?: number;
 };
 
 export function postWarehouseBridgeQuote(opts: {
   originIcao: string;
   destIcao: string;
   kg?: number;
+  commodityId?: string;
 }) {
   return api<{ quote: InternalHaulPayQuote }>('/api/warehouses/bridge/quote', {
     method: 'POST',

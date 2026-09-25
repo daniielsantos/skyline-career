@@ -401,18 +401,18 @@ export function inferEnginesRunning(input: {
 }
 
 /**
- * Ready to settle after landing: nearly stopped, and either engines off or
- * parking brake set.
+ * Ready to settle after landing: nearly stopped, and parking brake set.
  *
- * Always require low ground speed when GS is known — a false “engines off”
- * reading on touchdown must not settle mid-rollout.
+ * Do **not** settle on `enginesRunning === false` alone — payware jets (iFly
+ * 737) often report idle as “engines off” (combustion/N1/flow quiet until
+ * thrust), which auto-settled mid-rollout / before parking.
+ * Shutdown without brake: set the parking brake (or Advanced settle).
  */
 export function isShutdownOrParked(sample: FlightGroundSample): boolean {
   const gs = sample.groundSpeedKt;
   if (typeof gs === 'number' && Number.isFinite(gs) && gs >= PARKED_GROUND_SPEED_KT) {
     return false;
   }
-  if (!sample.enginesRunning) return true;
   return sample.parkingBrake === true;
 }
 
@@ -1119,8 +1119,17 @@ export function evaluateMissionFlightTransition(
 
   // Menu / slew: ignore the sample entirely so lastOnGround does not flip
   // and unpause on the ramp does not look like a touchdown.
+  // Exception: already on the ground after airborne — still allow settle when
+  // parking brake is set (sticky IS PAUSED must not trap Settling forever).
   if (isSimPlaybackFrozen(sample)) {
-    return { event: { type: 'none' }, nextState: state };
+    const canSettleWhileFrozen =
+      sample.onGround === true &&
+      state.sawAirborne === true &&
+      mission.status === 'in_flight' &&
+      isShutdownOrParked(sample);
+    if (!canSettleWhileFrozen) {
+      return { event: { type: 'none' }, nextState: state };
+    }
   }
 
   const confirmTicks = sample.onGround
@@ -1239,16 +1248,14 @@ export function evaluateMissionFlightTransition(
         nextState,
         opts,
         requireEnginesOff
-          ? shutdownOrParked && sample.enginesRunning
-            ? 'touchdown + parked'
-            : 'touchdown + engines off'
+          ? 'touchdown + parking brake'
           : 'touchdown (SIM ON GROUND true)',
       ),
       nextState,
     };
   }
 
-  // Touchdown with engines still running: wait (taxi-in) unless parked.
+  // Touchdown without parking brake: wait (taxi-in).
   if (
     touchedDown &&
     mission.status === 'in_flight' &&
@@ -1271,7 +1278,7 @@ export function evaluateMissionFlightTransition(
         sample,
         nextState,
         opts,
-        sample.enginesRunning ? 'parked after landing' : 'engines off after landing',
+        'parking brake after landing',
       ),
       nextState,
     };

@@ -340,9 +340,9 @@ Ainda OPEN (não bloqueia cut nem ferry desk): rake no IH; salary dispatcher hum
 
 Reusa missões / Watch / settle / WH. **Não** exige vender no porto. Solo pode ser Owner+Pilot no mesmo haul.
 
-**Pay do haul — DECIDIDO (híbrido) · shipped IH-1:**
-- Sistema **sugere** pay (`quoteInternalHaulPayUsd`: floor + $/kg + $/nm)
-- Dispatcher ajusta **dentro de banda** 80–150% (`clampInternalHaulPayUsd`)
+**Pay do haul — DECIDIDO (híbrido) · shipped IH-1 · market-anchored 2026-09-25:**
+- Sistema **sugere** pay = `max(floor, legacy kg+nm, Market freight quote × 0.45)` via `quoteInternalHaulPayUsd` (sample = `quoteWarehouseHaulPayUsd` / `quoteFreightLotPay` — **só leitura**, sem retune de formação)
+- Dispatcher / Auto-haul `payMult` ajusta **dentro de banda** 80–150% (`clampInternalHaulPayUsd`)
 - Debita **company** / credita **pilot** no settle (kind `internal_haul_pay`)
 - Solo Owner+Pilot: mesmo `walletUsd`, duas linhas ledger (net 0 além de fuel/ops)
 - Port shuttle **recusa** hold/missão com pay &gt; 0
@@ -417,7 +417,7 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 |--|--|
 | **O que** | Desk cria Internal Hauls automaticamente a partir de `listPortScoutBridgeSuggestions` |
 | **Quem voa** | Pilots humanos (board Hauls); AI **não** voa |
-| **Caps** | max 1–3/dia (default 2); max 3 open bridge holds; pay = suggest × mult (0.8–1.5); wallet floor |
+| **Caps** | max 1–3/dia (default 2); max 3 open bridge holds; pay = market×0.45 suggest × mult (0.8–1.5, Config); wallet floor |
 | **Gates** | `va_listed` + **≥2 members** + Port FBO (Scout) + enabled |
 | **UI** | My VA Config → Auto-haul desk; Hauls board unchanged |
 | **Não faz (v1)** | OD allowlist; Demand/Haul auto; IAP desk seat; snipar board global |

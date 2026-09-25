@@ -2113,9 +2113,10 @@ export function VaPage(props: Props) {
             <h4 className="va-config-section-title">Auto-haul desk</h4>
             <p className="va-config-section-blurb">
               Posts Internal Hauls from Scout on the day tick (max{' '}
-              {autoHaul?.maxHaulsPerDay ?? 2}/day). Needs ≥{autoHaulMinMembers}{' '}
-              members + Port FBO stock. Manual Scout Confirm has no AI daily
-              cap.
+              {autoHaul?.maxHaulsPerDay ?? 2}/day). Pilot suggest ≈ 45% of
+              Market freight for the OD, then your Pay %. Needs ≥
+              {autoHaulMinMembers} members + Port FBO stock. Manual Scout
+              Confirm has no AI daily cap.
             </p>
             {autoHaul == null ? (
               <p className="settings-sample va-config-readonly">
@@ -2205,6 +2206,41 @@ export function VaPage(props: Props) {
                         <option value={1}>1</option>
                         <option value={2}>2</option>
                         <option value={3}>3</option>
+                      </select>
+                    </label>
+                    <label className="va-config-field">
+                      <span>Pay % of suggest</span>
+                      <select
+                        value={Math.round(autoHaul.payMult * 100)}
+                        disabled={pageBusy}
+                        onChange={(e) => {
+                          const pct = Number(e.target.value);
+                          void (async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              const res = await postVaAutoHaul({
+                                payMult: pct / 100,
+                              });
+                              setAutoHaul(res.autoHaul);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        <option value={80}>80%</option>
+                        <option value={90}>90%</option>
+                        <option value={100}>100%</option>
+                        <option value={110}>110%</option>
+                        <option value={125}>125%</option>
+                        <option value={150}>150%</option>
                       </select>
                     </label>
                   </div>

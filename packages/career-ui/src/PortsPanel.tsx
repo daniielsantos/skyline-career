@@ -770,6 +770,7 @@ export function PortsPanel(props: {
       originIcao: bridgeDraft.originIcao,
       destIcao: bridgeDest,
       kg: Math.max(200, freeKg),
+      commodityId: bridgeDraft.commodityId,
     })
       .then((res) => {
         if (cancelled) return;

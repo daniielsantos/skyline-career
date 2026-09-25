@@ -47,6 +47,8 @@ import {
   INTERNAL_HAUL_PAY_BAND_MAX,
   INTERNAL_HAUL_PAY_BAND_MIN,
   INTERNAL_HAUL_PAY_MIN_USD,
+  quoteInternalHaulForRoute,
+  quoteInternalHaulLegacyPayUsd,
   quoteInternalHaulPayUsd,
 } from './career-warehouse-bridge.js';
 import { applySettleWalletDeltas } from './career-persist-commands.js';
@@ -1184,13 +1186,25 @@ describe('career warehouse + demand', () => {
     assert.equal(shipped, 0);
   });
 
-  it('quotes Internal Haul pay with floor and clamps band', () => {
+  it('quotes Internal Haul pay from market sample with legacy floor', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-ih-quote' });
     assert.equal(
-      quoteInternalHaulPayUsd({ kg: 0, distanceNm: 0 }),
+      quoteInternalHaulLegacyPayUsd({ kg: 0, distanceNm: 0 }),
       INTERNAL_HAUL_PAY_MIN_USD,
     );
-    const suggested = quoteInternalHaulPayUsd({ kg: 1_000, distanceNm: 400 });
-    assert.equal(suggested, 80 + 180);
+    const legacy = quoteInternalHaulLegacyPayUsd({
+      kg: 1_000,
+      distanceNm: 400,
+    });
+    assert.equal(legacy, 80 + 180);
+    const suggested = quoteInternalHaulPayUsd(world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBCT',
+      commodityId: 'general',
+      kg: 1_000,
+      distanceNm: 400,
+    });
+    assert.ok(suggested >= legacy);
     assert.equal(
       clampInternalHaulPayUsd(suggested, suggested * 0.5),
       Math.round(suggested * INTERNAL_HAUL_PAY_BAND_MIN * 100) / 100,
@@ -1200,6 +1214,25 @@ describe('career warehouse + demand', () => {
       Math.round(suggested * INTERNAL_HAUL_PAY_BAND_MAX * 100) / 100,
     );
     assert.equal(clampInternalHaulPayUsd(suggested, null), suggested);
+
+    const longHaul = quoteInternalHaulForRoute(world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBRF',
+      commodityId: 'general',
+      kg: 2_268,
+    });
+    assert.ok(longHaul.marketPayUsd > 0);
+    assert.ok(
+      longHaul.suggestedPayUsd >=
+        Math.round(longHaul.marketPayUsd * 0.45 * 100) / 100 - 0.01 ||
+        longHaul.suggestedPayUsd >=
+          quoteInternalHaulLegacyPayUsd({
+            kg: 2_268,
+            distanceNm: longHaul.distanceNm,
+          }),
+    );
+    // Long domestic hop should clear the old flat kg+nm suggest (~$692).
+    assert.ok(longHaul.suggestedPayUsd > 900);
   });
 
   it('Internal Haul settle deposits dest WH and ledger ±pilot pay (solo net 0)', () => {

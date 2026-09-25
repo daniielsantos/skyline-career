@@ -220,7 +220,10 @@ export function tickVaAutoHaul(
     if (remaining <= 0) break;
     if (openBridgeHoldCount(state) >= VA_AUTO_HAUL_MAX_OPEN_HOLDS) break;
 
-    const suggested = quoteInternalHaulPayUsd({
+    const suggested = quoteInternalHaulPayUsd(world, {
+      originIcao: s.originIcao,
+      destIcao: s.destIcao,
+      commodityId: s.commodityId,
       kg: s.kg,
       distanceNm: s.distanceNm,
     });

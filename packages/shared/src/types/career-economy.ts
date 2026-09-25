@@ -1446,7 +1446,7 @@ export interface VaAutoHaulState {
   enabled: boolean;
   /** Hard cap posts per economy day (AI desk — keep low). */
   maxHaulsPerDay: number;
-  /** Multiplier on suggested Internal Haul pay (clamped 0.8–1.5). */
+  /** Multiplier on market-anchored Internal Haul suggest (clamped 0.8–1.5). */
   payMult: number;
   /** Skip posting when wallet − pay would fall below this. */
   walletFloorUsd: number;

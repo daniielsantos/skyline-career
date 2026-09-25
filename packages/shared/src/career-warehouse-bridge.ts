@@ -24,6 +24,7 @@ import {
 } from './career-mission.js';
 import { findCareerPlayerAirframe } from './career-player-airframes.js';
 import { careerPortIdForPickupHub } from './career-ports.js';
+import { quoteWarehouseHaulPayUsd } from './career-warehouse-haul.js';
 import {
   findPlayerWarehouseAtIcao,
   warehouseBridgeDestRoomKg,
@@ -41,10 +42,17 @@ import type {
 /** Floor pilot fee for Internal Haul. */
 export const INTERNAL_HAUL_PAY_MIN_USD = 75;
 
-/** $/kg component of suggested Internal Haul pay. */
+/**
+ * Share of Market-style freight quote (`quoteWarehouseHaulPayUsd` /
+ * `quoteFreightLotPay`) used as Internal Haul suggest. Not 100% — company
+ * still keeps margin; high enough that members prefer Hauls over empty legs.
+ */
+export const INTERNAL_HAUL_MARKET_FRAC = 0.45;
+
+/** Soft floor when market sample is thin (short / low-arb hops). */
 export const INTERNAL_HAUL_PAY_USD_PER_KG = 0.08;
 
-/** $/nm component of suggested Internal Haul pay. */
+/** Soft floor $/nm when market sample is thin. */
 export const INTERNAL_HAUL_PAY_USD_PER_NM = 0.45;
 
 /** Dispatcher may set pay within this band of the suggest. */
@@ -67,7 +75,8 @@ function bridgeDistanceNm(
   return hubDistanceNm(from, to) ?? routeDistanceNm(world, from, to) ?? 0;
 }
 
-export function quoteInternalHaulPayUsd(opts: {
+/** Legacy kg+nm floor — used when market sample is missing or below this. */
+export function quoteInternalHaulLegacyPayUsd(opts: {
   kg: number;
   distanceNm: number;
 }): number {
@@ -78,6 +87,49 @@ export function quoteInternalHaulPayUsd(opts: {
       INTERNAL_HAUL_PAY_MIN_USD,
       kg * INTERNAL_HAUL_PAY_USD_PER_KG + nm * INTERNAL_HAUL_PAY_USD_PER_NM,
     ),
+  );
+}
+
+/**
+ * Suggested Internal Haul pilot fee: ~45% of Market freight quote for the
+ * same OD / commodity / kg, with legacy kg+nm soft floor (does not retune
+ * Market formation).
+ */
+export function quoteInternalHaulPayUsd(
+  world: CareerEconomyWorld,
+  opts: {
+    originIcao: string;
+    destIcao: string;
+    commodityId: CommodityId;
+    kg: number;
+    distanceNm?: number;
+  },
+): number {
+  const kg = Math.max(0, opts.kg);
+  const origin = opts.originIcao.trim().toUpperCase();
+  const dest = opts.destIcao.trim().toUpperCase();
+  const distanceNm =
+    opts.distanceNm != null && Number.isFinite(opts.distanceNm)
+      ? Math.max(0, opts.distanceNm)
+      : bridgeDistanceNm(world, origin, dest);
+  const legacy = quoteInternalHaulLegacyPayUsd({ kg, distanceNm });
+  if (kg <= 0 || !origin || !dest || origin === dest) {
+    return legacy;
+  }
+  let marketPayUsd = 0;
+  try {
+    marketPayUsd = quoteWarehouseHaulPayUsd(world, {
+      originIcao: origin,
+      destIcao: dest,
+      commodityId: opts.commodityId,
+      kg,
+    });
+  } catch {
+    marketPayUsd = 0;
+  }
+  const fromMarket = money(Math.max(0, marketPayUsd) * INTERNAL_HAUL_MARKET_FRAC);
+  return money(
+    Math.max(INTERNAL_HAUL_PAY_MIN_USD, fromMarket, legacy),
   );
 }
 
@@ -99,23 +151,53 @@ export function clampInternalHaulPayUsd(
 
 export function quoteInternalHaulForRoute(
   world: CareerEconomyWorld,
-  opts: { originIcao: string; destIcao: string; kg: number },
+  opts: {
+    originIcao: string;
+    destIcao: string;
+    kg: number;
+    commodityId?: CommodityId;
+  },
 ): {
   distanceNm: number;
   suggestedPayUsd: number;
   minPayUsd: number;
   maxPayUsd: number;
+  marketPayUsd: number;
+  marketFrac: number;
 } {
   const origin = opts.originIcao.trim().toUpperCase();
   const dest = opts.destIcao.trim().toUpperCase();
   const kg = Math.max(0, Math.floor(opts.kg));
+  const commodityId = (opts.commodityId ?? 'general') as CommodityId;
   const distanceNm = Math.round(bridgeDistanceNm(world, origin, dest) * 10) / 10;
-  const suggestedPayUsd = quoteInternalHaulPayUsd({ kg, distanceNm });
+  let marketPayUsd = 0;
+  try {
+    marketPayUsd =
+      kg > 0
+        ? quoteWarehouseHaulPayUsd(world, {
+            originIcao: origin,
+            destIcao: dest,
+            commodityId,
+            kg,
+          })
+        : 0;
+  } catch {
+    marketPayUsd = 0;
+  }
+  const suggestedPayUsd = quoteInternalHaulPayUsd(world, {
+    originIcao: origin,
+    destIcao: dest,
+    commodityId,
+    kg,
+    distanceNm,
+  });
   return {
     distanceNm,
     suggestedPayUsd,
     minPayUsd: money(suggestedPayUsd * INTERNAL_HAUL_PAY_BAND_MIN),
     maxPayUsd: money(suggestedPayUsd * INTERNAL_HAUL_PAY_BAND_MAX),
+    marketPayUsd: money(marketPayUsd),
+    marketFrac: INTERNAL_HAUL_MARKET_FRAC,
   };
 }
 
@@ -124,19 +206,17 @@ function resolveBridgePilotPayUsd(
   opts: {
     originIcao: string;
     destIcao: string;
+    commodityId: CommodityId;
     kg: number;
     /** Omit = suggest; explicit 0 = unpaid bridge. */
     pilotPayUsd?: number | null;
   },
 ): { pilotPayUsd: number; internalHaul: boolean; unitPriceUsd: number } {
-  const distanceNm = bridgeDistanceNm(
-    world,
-    opts.originIcao,
-    opts.destIcao,
-  );
-  const suggested = quoteInternalHaulPayUsd({
+  const suggested = quoteInternalHaulPayUsd(world, {
+    originIcao: opts.originIcao,
+    destIcao: opts.destIcao,
+    commodityId: opts.commodityId,
     kg: opts.kg,
-    distanceNm,
   });
   if (opts.pilotPayUsd === 0) {
     return { pilotPayUsd: 0, internalHaul: false, unitPriceUsd: 0 };
@@ -242,6 +322,7 @@ export function holdWarehouseBridge(
   const pay = resolveBridgePilotPayUsd(world, {
     originIcao: origin,
     destIcao: dest,
+    commodityId: opts.commodityId,
     kg,
     pilotPayUsd: opts.pilotPayUsd,
   });
@@ -448,6 +529,7 @@ export function acceptWarehouseBridge(
   const pay = resolveBridgePilotPayUsd(world, {
     originIcao: origin,
     destIcao: dest,
+    commodityId: opts.commodityId,
     kg,
     pilotPayUsd: opts.pilotPayUsd,
   });
@@ -569,6 +651,7 @@ export function dispatchWarehouseBridgeHold(
   const pay = resolveBridgePilotPayUsd(world, {
     originIcao: hold.originIcao,
     destIcao: hold.destIcao,
+    commodityId: hold.commodityId,
     kg,
     pilotPayUsd:
       opts.pilotPayUsd !== undefined ? opts.pilotPayUsd : holdPayForSlice ?? 0,

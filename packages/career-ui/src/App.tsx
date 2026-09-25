@@ -6005,8 +6005,7 @@ export function App() {
               status.lastEvent?.type === 'settle' ||
               (status.sawAirborne &&
                 status.onGround === true &&
-                (status.enginesRunning === false ||
-                  status.parkingBrake === true) &&
+                status.parkingBrake === true &&
                 status.lastEvent?.type !== 'settle_blocked'));
           if (settleIntent && !justSettled) {
             queueMicrotask(() => setSettleOverlaySticky(true));
@@ -6505,8 +6504,7 @@ export function App() {
       nearDestForSettle &&
       Boolean(watch?.sawAirborne) &&
       watch?.onGround === true &&
-      (watch?.enginesRunning === false ||
-        watch?.parkingBrake === true ||
+      (watch?.parkingBrake === true ||
         watch?.lastEvent?.type === 'settle' ||
         Boolean(watch?.settling));
     if (liveInFlight && (watch?.settling || optimisticLandedSettle)) {
@@ -6518,7 +6516,6 @@ export function App() {
   }, [
     watch?.settling,
     watch?.onGround,
-    watch?.enginesRunning,
     watch?.parkingBrake,
     watch?.sawAirborne,
     watch?.destProximity?.ok,
@@ -12973,7 +12970,7 @@ export function App() {
       (Boolean(watch?.destProximity?.ok) &&
         Boolean(watch?.sawAirborne) &&
         watch?.onGround === true &&
-        (watch?.enginesRunning === false || watch?.parkingBrake === true) &&
+        watch?.parkingBrake === true &&
         watch?.lastEvent?.type !== 'settle_blocked'));
   const dispatchStep = deriveDispatchStep({
     hasDraft: Boolean(staging || charterManifest),

@@ -117,6 +117,10 @@ O **comando** deve chamar a **mesma regra pura** com um *world view* mínimo (`g
 ## Como validar a fatia 1–2
 
 - Settle live: overlay Settling → debrief; save ainda consistente no reload (missão completed, wallet, dest stock, tail no dest).
-- **UI (2026-09-05):** overlay `Settling…` arma no brake/engines-off/`lastEvent=settle`; server **250ms** com `settling=true` antes do persist (poll consegue pintar); debrief imediato; toast só fallback.
+- **UI (2026-09-05):** overlay `Settling…` arma no brake/`lastEvent=settle`; server **250ms** com `settling=true` antes do persist (poll consegue pintar); debrief imediato; toast só fallback.
+
+**iFly idle false Settling overlay (2026-09-25):** sintoma = pouso no dest; overlay Settling eterno; missão ainda `in_flight`; log sem `settle begin`. Causa = UI `showSettleBusyOverlay` / optimistic armavam com `enginesRunning===false` (idle iFly) **sem** Watch ter settleado; World API às vezes `fetch failed` no write. Fix = auto-settle só com **parking brake**; overlay só brake / `settling` / `lastEvent=settle`; freeze sticky não bloqueia settle no solo com brake; log `settle begin/saved/failed`.
+
+**iFly idle false settle + sticky Settling (2026-09-25):** sintoma = pouso 737 iFly sem parking brake / sem cutoff → overlay Settling; idle lia `enginesRunning=false`; reinício mantinha overlay; missão ainda `in_flight`. Causa = `isShutdownOrParked` + UI optimistic aceitavam engines-off sozinho; World API `fetch failed` no settle write. Fix = settle só com **parking brake** (GS baixo); overlay optimistic só brake / `settling` / `lastEvent=settle`.
 - Log/tempo: `saveEconomy` no settle **sem** `DELETE FROM airports` (watch-debug ou timer no store).
 - Teste unitário: segundo `SettleFlight` no mesmo `missionId` não duplica payout.

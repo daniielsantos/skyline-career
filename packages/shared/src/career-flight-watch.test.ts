@@ -285,7 +285,7 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(spool.event.type, 'none');
   });
 
-  it('settles when near dest after airborne + engines off', () => {
+  it('settles when near dest after airborne + parking brake', () => {
     const plannedMs = 3_600_000;
     let state = createMissionFlightWatchState({
       sawAirborne: true,
@@ -299,12 +299,37 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
       { destCoords: SBRF, nowMs: Date.now() },
     );
     assert.equal(down.event.type, 'settle');
+  });
+
+  it('does not settle on engines-off alone (payware idle false off)', () => {
+    const plannedMs = 3_600_000;
+    const state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: false,
+      airborneAtMs: Date.now() - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
+    const idle = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        parkingBrake: false,
+        groundSpeedKt: 0,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      { destCoords: SBRF, nowMs: Date.now() },
+    );
+    assert.equal(idle.event.type, 'none');
   });
 
   it('blocks settle when landed far from destination', () => {
@@ -321,6 +346,8 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
         position: { lat: SBPA.lat, lon: SBPA.lon },
       },
       state,
@@ -343,14 +370,19 @@ describe('evaluateMissionFlightTransition', () => {
 
     const noPos = evaluateMissionFlightTransition(
       mission('in_flight'),
-      { onGround: true, enginesRunning: false },
+      {
+        onGround: true,
+        enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
+      },
       state,
       { destCoords: SBRF, nowMs: Date.now() },
     );
     assert.equal(noPos.event.type, 'settle_blocked');
   });
 
-  it('waits for engines off after touchdown by default', () => {
+  it('waits for parking brake after touchdown by default', () => {
     const plannedMs = 3_600_000;
     const nowMs = Date.now();
     let state = createMissionFlightWatchState({
@@ -374,18 +406,35 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(taxi.event.type, 'none');
     state = taxi.nextState;
 
-    const shutdown = evaluateMissionFlightTransition(
+    // Engines-off alone (payware idle) must not settle.
+    const idle = evaluateMissionFlightTransition(
       mission('in_flight'),
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: false,
         groundSpeedKt: 0.5,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
       { destCoords: SBRF, nowMs },
     );
-    assert.equal(shutdown.event.type, 'settle');
+    assert.equal(idle.event.type, 'none');
+    state = idle.nextState;
+
+    const parked = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0.5,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(parked.event.type, 'settle');
   });
 
   it('does not settle on touchdown while still rolling even if engines read off', () => {
@@ -416,6 +465,7 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: true,
         groundSpeedKt: 1,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
@@ -769,6 +819,8 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,
@@ -788,6 +840,8 @@ describe('evaluateMissionFlightTransition', () => {
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
         position: { lat: SBRF.lat, lon: SBRF.lon },
       },
       state,

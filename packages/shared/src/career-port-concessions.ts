@@ -7,6 +7,7 @@ import { applyWalletDelta } from './career-ledger.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { getCareerPort, listCareerPorts } from './career-ports.js';
 import { ensurePlayerWarehouses } from './career-warehouse.js';
+import { WAREHOUSE_CAPACITY_KG } from './career-warehouse-stock.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
@@ -857,14 +858,16 @@ export function debugForceClaimPortConcession(
     wh = {
       id: `wh_${hub.toLowerCase()}_debug_t3`,
       icao: hub,
-      capacityKg: 6_804,
+      capacityKg: WAREHOUSE_CAPACITY_KG[3],
       tier: 3,
       lifetimeShippedKg: PORT_CONCESSION_SHIPPED_KG,
     };
     warehouses.warehouses.push(wh);
   } else {
     wh.tier = Math.max(wh.tier ?? 1, 3) as 1 | 2 | 3 | 4;
-    if ((wh.capacityKg ?? 0) < 6_804) wh.capacityKg = 6_804;
+    if ((wh.capacityKg ?? 0) < WAREHOUSE_CAPACITY_KG[3]) {
+      wh.capacityKg = WAREHOUSE_CAPACITY_KG[3];
+    }
     wh.lifetimeShippedKg = Math.max(
       wh.lifetimeShippedKg ?? 0,
       PORT_CONCESSION_SHIPPED_KG,

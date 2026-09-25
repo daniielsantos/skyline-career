@@ -13,6 +13,7 @@ import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import {
   depositCargoToWarehouse,
   ensurePlayerWarehouses,
+  WAREHOUSE_CAPACITY_KG,
 } from './career-warehouse-stock.js';
 import { listDemandHolds } from './career-demand.js';
 import { economyDayIndex } from './career-weather.js';
@@ -42,7 +43,7 @@ function grantWh(
   warehouses.warehouses.push({
     id,
     icao,
-    capacityKg: 6_804,
+    capacityKg: WAREHOUSE_CAPACITY_KG[3],
     tier: 3,
     lifetimeShippedKg: PORT_CONCESSION_SHIPPED_KG,
   });

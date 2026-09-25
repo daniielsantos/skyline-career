@@ -98,8 +98,8 @@ function warehouseStaffSlotsUnlocked(tier: number): number {
   return 1;
 }
 const WH_T1_CAPACITY_KG = 2_268;
-const WH_T2_CAPACITY_KG = 4_536;
-const WH_T3_CAPACITY_KG = 6_804;
+const WH_T2_CAPACITY_KG = 5_443;
+const WH_T3_CAPACITY_KG = 11_340;
 const WH_T4_CAPACITY_KG = 45_000;
 /** Mirror of shared MIN_WAREHOUSE_INBOUND_KG — avoid Mass 0.0 klb ghost rows. */
 const MIN_WAREHOUSE_INBOUND_KG = 25;

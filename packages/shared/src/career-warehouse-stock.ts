@@ -41,12 +41,14 @@ export const WAREHOUSE_LOT_MERGE_REL_BAND = 0.03;
 
 /**
  * Bonded storage capacity by warehouse tier (literal klb → kg).
- * T1 5 klb · T2 10 klb · T3 15 klb · T4 Port Bonded ~99 klb (45 t).
+ * T1 5 klb · T2 12 klb · T3 25 klb · T4 Port Bonded ~99 klb (45 t).
+ * T2/T3 stepped up 2026-09-25 so mid upgrades change what you can stage
+ * (feeder → light regional), without inflating T1 or the T4 trunk cliff.
  */
 export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3 | 4, number> = {
   1: 2_268,
-  2: 4_536,
-  3: 6_804,
+  2: 5_443,
+  3: 11_340,
   4: 45_000,
 };
 
@@ -59,6 +61,9 @@ export const MIN_WAREHOUSE_INBOUND_KG = 25;
 /** Legacy caps before klb-literal T1/T2/T3 (5 t / 12 t). */
 const LEGACY_WAREHOUSE_T1_CAP_KG = 5_000;
 const LEGACY_WAREHOUSE_T2_CAP_KG = 12_000;
+/** Pre-2026-09-25 mid ladder (10 / 15 klb). */
+const PREV_WAREHOUSE_T2_CAP_KG = 4_536;
+const PREV_WAREHOUSE_T3_CAP_KG = 6_804;
 
 export type WarehouseTier = 1 | 2 | 3 | 4;
 
@@ -72,6 +77,7 @@ export function warehouseTierOf(tier: unknown): WarehouseTier {
 /**
  * Remap saved WH row to current T1–T4.
  * Old T1 (~5 t) → T2; old T2 (~12 t) → T3; new caps keep declared tier.
+ * Pre-retune 10/15 klb caps stay on the same tier and expand to 12/25 klb.
  * `capacityKg = max(usedKg, tierCap)` so stock is never truncated.
  */
 export function migrateWarehouseTierAndCapacity(opts: {
@@ -83,18 +89,26 @@ export function migrateWarehouseTierAndCapacity(opts: {
   const usedKg = Math.max(0, Math.floor(opts.usedKg ?? 0));
   const declared = warehouseTierOf(opts.tier);
 
+  const near = (cap: number) => Math.abs(rawCap - cap) <= 2;
   const matchesNewCap = (t: WarehouseTier) =>
-    rawCap === WAREHOUSE_CAPACITY_KG[t] ||
-    Math.abs(rawCap - WAREHOUSE_CAPACITY_KG[t]) <= 2;
+    rawCap === WAREHOUSE_CAPACITY_KG[t] || near(WAREHOUSE_CAPACITY_KG[t]);
 
   let tier: WarehouseTier;
   if (matchesNewCap(4) || (declared === 4 && rawCap >= 40_000)) {
     tier = 4;
   } else if (matchesNewCap(1)) {
     tier = 1;
-  } else if (matchesNewCap(2)) {
+  } else if (
+    matchesNewCap(2) ||
+    near(PREV_WAREHOUSE_T2_CAP_KG) ||
+    (declared === 2 && rawCap < 8_000)
+  ) {
     tier = 2;
-  } else if (matchesNewCap(3)) {
+  } else if (
+    matchesNewCap(3) ||
+    near(PREV_WAREHOUSE_T3_CAP_KG) ||
+    (declared === 3 && rawCap < 20_000)
+  ) {
     tier = 3;
   } else if (
     rawCap >= LEGACY_WAREHOUSE_T2_CAP_KG - 500 ||

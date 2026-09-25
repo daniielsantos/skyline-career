@@ -16,7 +16,10 @@ import {
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import { ensurePlayerPortPickups } from './career-ports.js';
-import { ensurePlayerWarehouses } from './career-warehouse-stock.js';
+import {
+  ensurePlayerWarehouses,
+  WAREHOUSE_CAPACITY_KG,
+} from './career-warehouse-stock.js';
 
 function missionsAtSantos() {
   const world = createSeedEconomyWorld({ seed: 'port-stevedore' });
@@ -38,7 +41,7 @@ function grantPickupWarehouse(
   warehouses.warehouses.push({
     id,
     icao,
-    capacityKg: 6_804,
+    capacityKg: WAREHOUSE_CAPACITY_KG[3],
     tier: 3,
     lifetimeShippedKg: shippedKg,
   });

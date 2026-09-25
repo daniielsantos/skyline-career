@@ -12,7 +12,7 @@ import {
 } from './career-ports.js';
 import { acceptDemandOrder } from './career-demand.js';
 import { departMission, settleMission } from './career-mission.js';
-import { depositCargoToWarehouse } from './career-warehouse-stock.js';
+import { depositCargoToWarehouse, WAREHOUSE_CAPACITY_KG } from './career-warehouse-stock.js';
 import {
   PORT_CONCESSION_CLAIM_USD,
   PORT_CONCESSION_LEASE_DAYS,
@@ -78,7 +78,7 @@ function grantT3PickupWarehouse(
   warehouses.warehouses.push({
     id: `wh_${icao.toLowerCase()}_t3`,
     icao,
-    capacityKg: 6_804,
+    capacityKg: WAREHOUSE_CAPACITY_KG[3],
     tier: 3,
     lifetimeShippedKg: shippedKg,
   });

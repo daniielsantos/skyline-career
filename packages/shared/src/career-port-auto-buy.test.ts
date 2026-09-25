@@ -21,7 +21,7 @@ import {
 } from './career-port-auto-buy.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
-import { ensurePlayerWarehouses } from './career-warehouse-stock.js';
+import { ensurePlayerWarehouses, WAREHOUSE_CAPACITY_KG } from './career-warehouse-stock.js';
 import { economyDayIndex } from './career-weather.js';
 
 function missionsAtSantos() {
@@ -44,7 +44,7 @@ function grantT3PickupWarehouse(
   warehouses.warehouses.push({
     id,
     icao,
-    capacityKg: 6_804,
+    capacityKg: WAREHOUSE_CAPACITY_KG[3],
     tier: 3,
     lifetimeShippedKg: shippedKg,
   });

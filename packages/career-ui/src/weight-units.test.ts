@@ -8,7 +8,7 @@ import {
 } from './weight-units.js';
 
 // Local mirror — T2 cap used in ports UI round-trip checks.
-const T2_KG = 4_536;
+const T2_KG = 5_443;
 
 describe('displayAmountToStoredKg', () => {
   it('imperial Max snaps to full kg (no ~2 lb dust)', () => {

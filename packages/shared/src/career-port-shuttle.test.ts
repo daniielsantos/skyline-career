@@ -22,6 +22,7 @@ import {
   depositCargoToWarehouse,
   ensurePlayerWarehouses,
   warehouseFreeCommodityKg,
+  WAREHOUSE_CAPACITY_KG,
 } from './career-warehouse-stock.js';
 import { holdWarehouseBridge } from './career-warehouse-bridge.js';
 
@@ -44,7 +45,7 @@ function grantWh(
   warehouses.warehouses.push({
     id,
     icao,
-    capacityKg: 6_804,
+    capacityKg: WAREHOUSE_CAPACITY_KG[3],
     tier: 3,
     lifetimeShippedKg: PORT_CONCESSION_SHIPPED_KG,
   });

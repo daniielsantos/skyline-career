@@ -2,6 +2,8 @@
 
 Related: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), Value/Supplies CLOSED (`21` / `22`).
 
+Atualizado 2026-09-25: **WH T2/T3 mid ladder** — caps 10/15 klb → **12/25 klb** (5443 / 11340 kg); T1 5 klb + T4 45 t intactos. Migrate expande saves no mesmo tier. CAPEX/shipped gates inalterados (mid fica mais valioso).
+
 ## Fantasia
 
 Porto descarrega carga oceânica → hub de pickup → **WH do player (T4 tronco)** e/ou **Market XL** → missão **Wide** (player ou NPC). Demand continua feeder 8–12 t.
@@ -10,7 +12,7 @@ Porto descarrega carga oceânica → hub de pickup → **WH do player (T4 tronco
 
 | Peça | Decisão |
 |------|----------|
-| WH T1–T3 | Intactos (~5 / 10 / 15 klb) — jogo diário / feeder |
+| WH T1–T3 | Feeder ladder **5 / 12 / 25 klb** (T2/T3 stepped 2026-09-25) |
 | **WH T4 Port Bonded** | **45_000 kg**; só em ICAO ∈ `pickupHubs`; unlock T3→T4 com `lifetimeShippedKg ≥ 25_000` + CAPEX |
 | Demand | **não** sobe para XL |
 | Market Port XL | Bias formação quando **origin** é pickup de porto **e** major↔major; soft cap global XL |

@@ -765,7 +765,10 @@ describe('career warehouse + demand', () => {
       inboundTransfers: [],
     });
     assert.equal(migrated.warehouses[0]!.tier, 2);
-    assert.equal(migrated.warehouses[0]!.capacityKg, 4_800);
+    assert.equal(
+      migrated.warehouses[0]!.capacityKg,
+      WAREHOUSE_T2_CAPACITY_KG,
+    );
     assert.equal(migrated.stock[0]!.kg, 4_800);
   });
 

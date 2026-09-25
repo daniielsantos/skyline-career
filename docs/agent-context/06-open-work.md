@@ -844,7 +844,7 @@ Atualizado 2026-08-21: Market ATR 42/72, Titan, Corvalis em `main` (`62b8ea9`). 
 ## Feito (shipped 0.3.47)
 
 - **Ground staff:** hire desk per WH; Ace→Green grades; logistics / yard / procurement / demand_desk / wh_ops.
-- **WH caps:** T1/T2/T3 = 5/10/15 klb; Ports Ground staff shelf compact (fixed head + scroll body).
+- **WH caps:** T1/T2/T3 = 5/12/25 klb (+ T4 45 t); Ports Ground staff shelf compact (fixed head + scroll body).
 
 
 
@@ -928,7 +928,7 @@ centralizados; stations 5/coluna iguais; escala fluido + labels legíveis em til
 - **Bush trips board off:** product **removed** (was `BUSH_TRIPS_BOARD_ENABLED=false`) — see top of this file.
 - **Demand warehouse holds:** pledge WH kg + decrement world `remainingKg` without a flight; Dispatch = today’s Fly now; TTL T1/T2/T3 48/72/96 ticks; cancel/expire restores remaining. Several holds OK; one active Demand mission.
 - **Demand Edit cargo:** reduzir devolve kg à WH + restaura `remainingKg` do pedido; aumentar retira da WH (UI `demandEditMaxKg`).
-- **Ports yard lock:** buy split (free→WH / rest→yard); partial Store; Abandon oversized yard (no refund). T1 WH = **5 klb** (2268 kg); T2/T3 = 10/15 klb.
+- **Ports yard lock:** buy split (free→WH / rest→yard); partial Store; Abandon oversized yard (no refund). T1 WH = **5 klb**; T2/T3 = **12/25 klb** (retune 2026-09-25); T4 = 45 t.
 - **WH T2 hybrid upgrade:** unlock after `WAREHOUSE_T2_SHIPPED_KG` (10t) Demand Board settle from that WH + CAPEX; capacity 5t→12t.
 - **Max cargo (missão):** online → SimBrief (`mzfw−oew` estrutural; `maxcargo` só se ≥½ estrutural / freighter). Catálogo JSON = fallback offline/API down (não short-circuit). Prefill light_ga ainda `manualpayload`.
 - **Accept OFP cargo** também em **contract-pilot** (ex.: Blue Ridge + BN2): botão + CTA primário; trim escala pilot fee / gross.

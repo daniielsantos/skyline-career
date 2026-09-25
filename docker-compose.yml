@@ -1,7 +1,7 @@
 # Base stack — safe default: Postgres is NOT published on the host.
 # World API / Adminer port bindings come from an overlay:
 #   lab:  docker-compose.lab.yml   (local playtest)
-#   prod: docker-compose.prod.yml  (VPS — loopback API; DB private)
+#   prod: docker-compose.prod.yml  (VPS — loopback API + loopback PG :5432; no public DB)
 #
 # Examples:
 #   npm run db:up                      → postgres + Adminer (lab overlay)

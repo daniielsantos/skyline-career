@@ -1,12 +1,18 @@
-# Prod / VPS overlay — Postgres stays Docker-internal (no host :5432 / Adminer).
+# Prod / VPS overlay — Postgres on loopback only (SSH tunnel / Tailscale).
 # World API on loopback only — put Caddy (profile `tls`) or another proxy in front.
+# Never publish 0.0.0.0:5432 or Adminer on a VPS.
 #
 #   npm run career:stack:world -- --prod
 #   npm run career:stack:world -- --prod --tls   # + Caddy :80/:443 (needs CAREER_WORLD_HOST)
 #
-# DB access: SSH tunnel / Tailscale — docs/agent-context/14-mp-world-clock.md
+# DB access: SSH tunnel → 127.0.0.1:5432 — docs/agent-context/14-mp-world-clock.md
 
 services:
+  postgres:
+    ports:
+      # Host loopback only — DBeaver/ssh -L 5432:127.0.0.1:5432. Survives recreate.
+      - '127.0.0.1:5432:5432'
+
   world-api:
     ports:
       - '127.0.0.1:8787:8787'

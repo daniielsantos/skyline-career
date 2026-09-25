@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **3ed33e55** / desktop **0.3.304** shipped: Unfreeze Watch clock when sticky IS PAUSED still moves the aircraft. Release: [v0.3.304](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.304).
+
+
 `main` **7d97e34b** / desktop **0.3.303** shipped: Freeze Watch airborne clock when MSFS reports pause or slew. Release: [v0.3.303](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.303).
 
 

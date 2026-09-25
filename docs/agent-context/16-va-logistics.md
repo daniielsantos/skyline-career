@@ -108,6 +108,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Crew tab order (2026-09-25):** sintoma = Roster/Hangar antes do loop diário. Fix = `Hauls → Ports → Hangar → Roster → Ledger → Logbook → Config`; default pane **Hauls**.
 
+**Hauls prose trim (2026-09-25):** sintoma = lede + bloco “Reserved until Accept…” + empty densos. Fix = lede curto; remove section-help; empties e network hint enxutos.
+
 **Roster list stuck at bottom (2026-09-22):** sintoma = título Roster no topo, lista no terço inferior (gap enorme). Causa = `va-pane-card` com `flex:1` + `.settings-card` `display:grid` → `align-content:stretch` inflava as tracks. Fix = `align-content: start` no card do shell (conteúdo cola no topo; shell ainda preenche altura).
 
 **VA directory BusyBlock (2026-09-22):** sintoma = abrir VAs mostrava toolbar vazia / “No VAs…” sem animação. Causa = fetch sem `loaded` gate. Fix = `BusyBlock` “Loading VAs…” (mesmo padrão My VA) até `fetchVaDirectory` resolver.

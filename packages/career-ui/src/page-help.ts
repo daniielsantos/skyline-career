@@ -109,6 +109,7 @@ export const PAGE_HELP = {
       'Buy or lease into the Hangar. One Market card is a glass family (variants share the SKU).',
       'Pax = Charter seats. “dual” = cargo glass + passenger glass on this SKU (not Cargo kg). Fit needs the passenger config.',
       'Condition and hours on used frames change what you pay and what MX will cost later.',
+      'Identify live aircraft reads the MSFS title (not paint) and shows Market / OFP / inject match.',
     ],
   },
   company: {

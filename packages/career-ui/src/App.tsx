@@ -227,6 +227,7 @@ import {
   AircraftMarketCountryCombobox,
   type AircraftMarketCountryOption,
 } from './AircraftMarketCountryCombobox';
+import { LiveAircraftIdentify } from './LiveAircraftIdentify';
 import { marketCountryLabel } from './market-country-label';
 import { BrandMark } from './BrandMark';
 import { SidebarFlightStrip } from './SidebarFlightStrip';
@@ -20928,6 +20929,7 @@ export function App() {
               Refresh board
             </button>
           </div>
+          <LiveAircraftIdentify disabled={busy} />
           <div className="aircraft-market-toolbar">
             <input
               type="search"

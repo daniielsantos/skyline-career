@@ -7560,6 +7560,106 @@ button.logbook-card-hit:focus-visible {
   margin: 0 0 1rem;
 }
 
+.live-aircraft-identify {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.live-aircraft-identify-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.live-aircraft-identify-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.live-aircraft-identify-hint {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.live-aircraft-identify-error {
+  margin: 0.65rem 0 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.live-aircraft-identify-result {
+  margin: 0.75rem 0 0;
+  padding: 0.7rem 0.8rem;
+  border-left: 3px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+.live-aircraft-identify-result.verdict-ready {
+  border-left-color: var(--ok);
+}
+
+.live-aircraft-identify-result.verdict-recognized {
+  border-left-color: var(--info);
+}
+
+.live-aircraft-identify-result.verdict-unknown,
+.live-aircraft-identify-result.verdict-no_aircraft {
+  border-left-color: var(--danger);
+}
+
+.live-aircraft-identify-verdict {
+  margin: 0 0 0.35rem;
+  font-weight: 650;
+}
+
+.live-aircraft-identify-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+.live-aircraft-identify-layers {
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.live-aircraft-identify-layers > div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.35rem 0.75rem;
+  align-items: start;
+}
+
+.live-aircraft-identify-layers dt {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.live-aircraft-identify-layers dd {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.live-aircraft-identify-skus {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+
 .aircraft-market-board {
   position: relative;
   min-height: 12rem;

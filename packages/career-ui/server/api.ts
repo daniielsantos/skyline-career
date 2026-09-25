@@ -388,6 +388,7 @@ import {
   probeSimBridgeStatus,
   requestOfpLoadCancel,
 } from './ofp-load-helpers.ts';
+import { identifyLiveAircraftFromTitle } from './identify-live-aircraft.ts';
 import { beginOfpLoadActive, endOfpLoadActive, isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight, lastPreflightFromInjectLive } from './preflight-helpers.ts';
 import {
@@ -14873,6 +14874,44 @@ export function createCareerApiServer(port = 8787) {
           pipeName: url.searchParams.get('pipe') ?? undefined,
         });
         send(res, 200, status);
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/simbridge/identify-aircraft') {
+        const body = (await readBody(req)) as {
+          title?: string;
+          pipeName?: string;
+        };
+        const titleOverride = body.title?.trim() || '';
+        let connected: boolean | null = null;
+        let probeError: string | null = null;
+        let aircraftTitle: string | null = titleOverride || null;
+        let source: 'probe' | 'title_override' | 'none' = 'none';
+
+        if (titleOverride) {
+          source = 'title_override';
+        } else {
+          const status = await probeSimBridgeStatus({
+            watchSession,
+            pipeName: body.pipeName ?? undefined,
+          });
+          connected = status.connected;
+          probeError = status.error;
+          aircraftTitle = status.aircraftTitle?.trim() || null;
+          source = 'probe';
+        }
+
+        const identified = await identifyLiveAircraftFromTitle({
+          title: aircraftTitle ?? '',
+          repoRoot,
+        });
+        send(res, 200, {
+          ...identified,
+          aircraftTitle: identified.aircraftTitle ?? aircraftTitle,
+          connected,
+          source,
+          error: probeError,
+        });
         return;
       }
 

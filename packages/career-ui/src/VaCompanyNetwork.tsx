@@ -84,7 +84,7 @@ export function VaCompanyNetwork(props: Props) {
           `${whCount} WH${whCount === 1 ? '' : 's'}`,
         ]
           .filter(Boolean)
-          .join(' · ') + ' · select a node to open the desk'
+          .join(' · ') + ' · select a node'
       : nodes[0]
         ? nodeRoomLine(nodes[0], weightSystem)
         : '';

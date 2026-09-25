@@ -5078,6 +5078,50 @@ export function fetchSimBridgeStatus() {
   return api<SimBridgeStatus>('/api/simbridge/status');
 }
 
+export type IdentifyLiveAircraftResponse = {
+  aircraftTitle: string | null;
+  connected: boolean | null;
+  source: 'probe' | 'title_override' | 'none';
+  error: string | null;
+  market: {
+    matched: boolean;
+    skus: Array<{
+      typeId: string;
+      label: string;
+      aircraftClassId: string;
+      enabled: boolean;
+      via: 'live_title_sku' | 'ofp_pack' | 'heuristic';
+    }>;
+  };
+  ofp: {
+    matched: boolean;
+    ofpId: string | null;
+    icao: string | null;
+    packRelPath: string | null;
+    via: string | null;
+    loadMethod: string | null;
+    injectCapable: boolean | null;
+  };
+  inject: {
+    matched: boolean;
+    profileKey: string | null;
+    displayName: string | null;
+    path: string | null;
+    reason: string | null;
+    confidence: number | null;
+  };
+  verdict: 'no_aircraft' | 'ready' | 'recognized' | 'unknown';
+};
+
+export function postIdentifyLiveAircraft(opts?: { title?: string }) {
+  return api<IdentifyLiveAircraftResponse>('/api/simbridge/identify-aircraft', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(opts?.title?.trim() ? { title: opts.title.trim() } : {}),
+    }),
+  });
+}
+
 export type OfpLoadResult = {
   ok: boolean;
   mission: Mission;

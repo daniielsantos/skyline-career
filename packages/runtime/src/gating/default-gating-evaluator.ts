@@ -19,16 +19,10 @@ export class DefaultGatingEvaluator implements GatingEvaluator {
       return { allowed: false, reason: 'SIM_PAUSED' };
     }
 
-    if (rules.blockWhenSlew && snapshot.slewActive) {
-      return { allowed: false, reason: 'SLEW_ACTIVE' };
-    }
-
-    const minRate = rules.minSimRate ?? 0.9;
-    const maxRate = rules.maxSimRate ?? 1.1;
-
-    if (snapshot.simRate < minRate || snapshot.simRate > maxRate) {
-      return { allowed: false, reason: 'SIM_RATE_OUT_OF_RANGE' };
-    }
+    // Intentionally ignore blockWhenSlew, minSimRate, maxSimRate.
+    // Career does not use slew/accel as product gates; MSFS 2024 Host does not
+    // even pack IS SLEW ACTIVE (alignment), and SIMULATION RATE often reports
+    // 0 / garbage that false-failed inject.
 
     return { allowed: true };
   }

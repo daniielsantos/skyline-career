@@ -20,6 +20,8 @@ Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./1
 
 **Inject `SIM_PAUSED` com cockpit “unpaused” (2026-09-25):** sintoma = Aerostar (e outros) Airframe inject → `fuel SIM_PAUSED, payload SIM_PAUSED` / ROLLBACK INCOMPLETE; MSFS não mostra pause. Causa = gating `blockWhenPaused` lê `IS PAUSED` sticky (MSFS 2024); Watch já override via Absolute Time, inject não. Fix = `clearStickyPausedForGating` no `DefaultProfileEngine.applyLoadPlan` (probe Absolute Time ~450ms; dt≥0.2s → trata como live).
 
+**Inject `SIM_RATE_OUT_OF_RANGE` / slew (2026-09-25):** sintoma = após sticky-pause fix, Aerostar falha com `SIM_RATE_OUT_OF_RANGE`. Causa = gating defaultava rate 0.9–1.1 (+ `blockWhenSlew`); Career não usa accel/slew e MSFS reporta 0/lixo (Host nem empacota IS SLEW ACTIVE). Fix = **não** gatear por sim rate nem slew.
+
 **Não existe um SimVar único confiável de “payload total”** no fluxo clássico. O Watch lê:
 
 - Batch 1 (≤32 Host): fuel/empty/gross + `PAYLOAD STATION COUNT` + `PAYLOAD STATION WEIGHT:1` … `:16`

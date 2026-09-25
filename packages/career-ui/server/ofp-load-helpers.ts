@@ -3591,6 +3591,9 @@ async function applyMissionOfpLoadExclusive(
       if (parts.some((p) => p.includes('SIM_PAUSED'))) {
         error +=
           ' — MSFS reports paused (ESC/menu or sticky IS PAUSED); unpause and retry';
+      } else if (parts.some((p) => p.includes('SIM_RATE_OUT_OF_RANGE'))) {
+        error +=
+          ' — sim rate gate is disabled in current builds; update desktop and retry';
       } else if (skipPayloadRollback && !restoreFuelOnRollback) {
         error += ' — check CDU/EFB load manually (no classic station rollback)';
       } else if (rollbackOk === false) {

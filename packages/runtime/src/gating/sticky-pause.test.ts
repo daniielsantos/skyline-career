@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { clearStickyPausedForGating } from './sticky-pause.js';
+import { DefaultGatingEvaluator } from './default-gating-evaluator.js';
 import type { SimBridge, SimSnapshot } from '../types.js';
 
 function baseSnap(over: Partial<SimSnapshot> = {}): SimSnapshot {
@@ -73,5 +74,22 @@ describe('clearStickyPausedForGating', () => {
     });
     assert.equal(result.stickyCleared, false);
     assert.equal(result.snapshot.paused, true);
+  });
+});
+
+describe('DefaultGatingEvaluator unused gates', () => {
+  it('does not block on SIMULATION RATE or slew', () => {
+    const gating = new DefaultGatingEvaluator();
+    const result = gating.evaluate(
+      {
+        requireOnGround: true,
+        blockWhenPaused: true,
+        blockWhenSlew: true,
+        minSimRate: 0.9,
+        maxSimRate: 1.1,
+      },
+      baseSnap({ paused: false, simRate: 0, slewActive: true }),
+    );
+    assert.equal(result.allowed, true);
   });
 });

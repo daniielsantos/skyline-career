@@ -47,8 +47,7 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'This sidebar Ports is your personal company — warehouses, Demand, and Port FBO you claim solo. Shared airline desk is under Crew → Ports.',
-      'Seaport listings sell at factory price into a warehouse at a pickup hub. Overflow sits in the yard — listings do not spawn just because you opened this page.',
-      'The yard restocks on a daily inbound discharge. Concession lease grows yard cap; renew cost follows recent settled throughput (Demand / WH haul).',
+      'Seaport listings sell at factory price into a warehouse at a pickup hub. Overflow sits in the yard; the yard restocks on a daily inbound discharge.',
       'Buy warehouse space (T1–T3), then Store yard lots into it. Fees apply when you move cargo into the warehouse.',
       'Demand Board is the sell tab: terminals pay when stock is low. Hold pledges warehouse kg; Fly now or Dispatch stages the flight.',
       'On Warehouse, pick a hub. Move sends company stock to another warehouse (no payout). Overflow lands in the dest hub yard, not the terminal.',
@@ -60,11 +59,10 @@ export const PAGE_HELP = {
     kicker: 'Page guide',
     bullets: [
       'Crew is the desk for one company — yours when published, or the airline you joined. It is not a second company.',
-      'Fresh listing = shared fleet + pilot cut on Freights. Port FBO is a later company CAPEX (WH T3 → claim) — see Path to Port FBO on Hauls / Ports.',
-      'Hauls = Open desk holds: pick a company tail, Accept if it fits at origin, or Prepare (ferry / partial load). Ports here = company desk: claim FBO, buy WH, Scout, Demand. Sidebar Ports stays your personal company.',
-      'Topbar Wallet = your home company. Ledger here = shared company cash when you fly that desk. Open Money map (? next to Company wallet) for who pays Jet-A, cut, ferry, and MX.',
-      'Hangar here is that company fleet; sidebar Hangar stays home. Members ferry/reserve; owner does MX/OH/sell.',
-      'Freights with an airline-labeled aircraft: cut % of route net → your home Wallet; rest stays on the listed company.',
+      'Fresh listing = shared fleet + pilot cut on Freights. Port FBO is later CAPEX (WH T3 → claim) — Path to Port FBO on Hauls / Ports.',
+      'Hauls = Open desk holds (Accept / Prepare). Ports here = company desk (claim FBO, WH, Scout, Demand). Sidebar Ports stays personal.',
+      'Topbar Wallet = home company; Ledger here = shared cash on that desk. Money map (? by Company wallet) shows who pays Jet-A, cut, ferry, MX.',
+      'Hangar here is company fleet (sidebar Hangar = home). Freights on an airline tail: cut % → your Wallet; rest stays on the listed company.',
     ],
   },
   vaDirectory: {
@@ -74,10 +72,9 @@ export const PAGE_HELP = {
     bullets: [
       'Lists only companies that published — not every company in the world.',
       'Open a card for the airline profile: HQ, Port FBOs, and warehouses on the map.',
-      'Joining keeps your personal company, wallet, and fleet. Early value is company aircraft + cut; Port FBO desk/Hauls come after the company builds WH T3 and claims a port.',
+      'Joining keeps your personal company, wallet, and fleet. Early value is company aircraft + cut; Port FBO desk/Hauls come after WH T3 + claim.',
       'Quality chip is settle flight score + on-time over ~7 days (needs a few flights).',
-      'Request to join when hiring is open, or use a private invite code anytime.',
-      'Owners publish from Company; manage seats under Crew (same company, crew desk).',
+      'Request to join when hiring is open, or use a private invite code. Owners publish from Company; manage seats under Crew.',
     ],
   },
   vaRanking: {

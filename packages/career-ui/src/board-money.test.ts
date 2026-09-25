@@ -5,7 +5,10 @@ import {
   boardNetClassName,
   formatBoardDistanceNm,
   formatBoardMoney,
+  formatUsdAmountInput,
   isFiniteMoney,
+  maskUsdAmountInput,
+  parseUsdAmountInput,
 } from './board-money.ts';
 
 test('isFiniteMoney rejects null NaN and non-numbers', () => {
@@ -42,4 +45,15 @@ test('boardNetClassName tones finite nets and stays neutral otherwise', () => {
 test('formatBoardDistanceNm survives null distance', () => {
   assert.equal(formatBoardDistanceNm(null), '—');
   assert.equal(formatBoardDistanceNm(196.4), '196 nm');
+});
+
+test('maskUsdAmountInput groups whole dollars while typing', () => {
+  assert.equal(maskUsdAmountInput(''), '');
+  assert.equal(maskUsdAmountInput('22593'), '22,593');
+  assert.equal(maskUsdAmountInput('22,593'), '22,593');
+  assert.equal(maskUsdAmountInput('$1,200.50'), '1,200');
+  assert.equal(parseUsdAmountInput('22,593'), 22593);
+  assert.equal(parseUsdAmountInput(''), 0);
+  assert.equal(formatUsdAmountInput(22593.9), '22,593');
+  assert.equal(formatUsdAmountInput(0), '');
 });

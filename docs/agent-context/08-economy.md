@@ -16,6 +16,7 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 - **Forward burn omits credit interest (2026-09-25):** sintoma = draw de crédito não subia o `/day`. Causa = `estimateCareerBurnUsdPerDay` só somava footprint (crew/parking/storage/leases). Fix = linha `credit_interest` = `principalUsd × COMPANY_CREDIT_DAILY_RATE` (mesmo Day interest do painel Credit).
 
+- **Credit draw/repay input mask (2026-09-25):** sintoma = campos Draw/Repay `type=number` sem agrupamento (`22593`). Causa = sem máscara. Fix = `maskUsdAmountInput` / `parseUsdAmountInput` (`board-money.ts`) → `22,593` enquanto digita; placeholders/Max iguais. Suite `page-help`: Ports/Crew/Airlines ≤5 bullets.
 - **Hub level maintenance (2026-09-25):** sintoma = terminais sobem a L5 só com tempo/NPC e ficam lá pra sempre (level sticky-up). Causa = XP de settle NPC = player + level nunca descia. Fix = (1) settle NPC/fuel truck **0.4×**, lot formation **0.5×**; (2) quiet (`activityScore < 8`) decai **0.45 XP/tick** → demote abaixo da histerese (25% do span do nível); (3) L5 exige activityScore ≥35 + tráfego nas últimas 12h. Cap/stock rescale no demote (igual promote inverso). UI: tooltip `at risk` + barra L5 = banda de manutenção.
 
 - **Dev Claim port picker (2026-09-25):** sintoma = Settings → Developer só tinha **Claim Santos**. Fix = `GET /api/debug/port-catalog` + select de todos `CAREER_PORTS` (optgroup por país) + `POST /api/debug/claim-port` exige `portId` válido (sem default BRSSZ).

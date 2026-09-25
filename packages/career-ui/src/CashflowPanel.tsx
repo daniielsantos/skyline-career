@@ -7,7 +7,7 @@ import type {
   CompanyCreditSnapshot,
 } from './api';
 import { postCreditDraw, postCreditRepay } from './api';
-import { boardMoneyLabel, isFiniteMoney } from './board-money';
+import { boardMoneyLabel, isFiniteMoney, formatUsdAmountInput, maskUsdAmountInput, parseUsdAmountInput } from './board-money';
 
 const CASHFLOW_PAGE_SIZE = 15;
 
@@ -271,7 +271,7 @@ export function CompanyCreditBlock(props: {
   const overdue = credit.overdueDays > 0;
 
   async function runDraw() {
-    const amount = Number(drawAmount);
+    const amount = parseUsdAmountInput(drawAmount);
     if (!(amount > 0)) {
       props.onError('Enter a positive draw amount');
       return;
@@ -292,7 +292,7 @@ export function CompanyCreditBlock(props: {
   }
 
   async function runRepay() {
-    const amount = Number(repayAmount);
+    const amount = parseUsdAmountInput(repayAmount);
     if (!(amount > 0)) {
       props.onError('Enter a positive repay amount');
       return;
@@ -362,14 +362,14 @@ export function CompanyCreditBlock(props: {
             <span className="company-credit-action-label">Draw</span>
             <div className="company-credit-action-row">
               <input
-                type="number"
-                min={0}
-                step={100}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
                 value={drawAmount}
                 disabled={locked || overdue || credit.availableUsd <= 0}
-                placeholder={String(Math.floor(credit.availableUsd))}
+                placeholder={formatUsdAmountInput(credit.availableUsd)}
                 aria-label="Draw amount"
-                onChange={(e) => setDrawAmount(e.target.value)}
+                onChange={(e) => setDrawAmount(maskUsdAmountInput(e.target.value))}
               />
               <button
                 type="button"
@@ -385,14 +385,14 @@ export function CompanyCreditBlock(props: {
             <span className="company-credit-action-label">Repay</span>
             <div className="company-credit-action-row">
               <input
-                type="number"
-                min={0}
-                step={100}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
                 value={repayAmount}
                 disabled={locked || credit.principalUsd <= 0}
-                placeholder={String(Math.floor(credit.principalUsd))}
+                placeholder={formatUsdAmountInput(credit.principalUsd)}
                 aria-label="Repay amount"
-                onChange={(e) => setRepayAmount(e.target.value)}
+                onChange={(e) => setRepayAmount(maskUsdAmountInput(e.target.value))}
               />
               <button
                 type="button"
@@ -409,11 +409,8 @@ export function CompanyCreditBlock(props: {
                   disabled={locked || props.walletUsd <= 0}
                   onClick={() => {
                     setRepayAmount(
-                      String(
-                        Math.min(
-                          Math.floor(credit.principalUsd),
-                          Math.floor(props.walletUsd),
-                        ),
+                      formatUsdAmountInput(
+                        Math.min(credit.principalUsd, props.walletUsd),
                       ),
                     );
                   }}

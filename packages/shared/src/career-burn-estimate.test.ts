@@ -88,6 +88,23 @@ describe('estimateCareerBurnUsdPerDay', () => {
       Math.floor(14_000 / est.totalUsdPerDay),
     );
   });
+
+  it('includes daily credit interest on outstanding principal', () => {
+    const state = emptyState({
+      walletUsd: 50_000,
+      companyCredit: {
+        principalUsd: 651_000,
+        overdueDays: 0,
+        lastSettledDayIndex: 0,
+      },
+    });
+    const est = estimateCareerBurnUsdPerDay(state, worldStub());
+    const interest = est.lines.find((l) => l.id === 'credit_interest');
+    assert.ok(interest);
+    assert.equal(interest!.usdPerDay, 520.8);
+    assert.equal(est.totalUsdPerDay, 520.8);
+    assert.equal(est.runwayDays, Math.floor(50_000 / 520.8));
+  });
 });
 
 function moneySum(a: number, b: number): number {

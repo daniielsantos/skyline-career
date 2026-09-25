@@ -12,7 +12,9 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 **Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
-- **Est. burn on Ledger (2026-09-24):** Hangar Cashflow + My VA Ledger mostram burn recorrente forward (`estimateCareerBurnUsdPerDay` → `burnEstimate` em `/api/cashflow`): salários, leases (/7), parking, storage WH/yard/base, Port FBO lease; runway ≈ wallet/burn. Estimate no footprint atual — não fatura. **UI (mesmo dia):** card **Forward burn** (total à direita + grid de linhas); sem tooltip / prosa de rodapé. Valores do burn em ink (não `cashflow-neg`) — vermelho fica para P&L/activity.
+- **Est. burn on Ledger (2026-09-24):** Hangar Cashflow + My VA Ledger mostram burn recorrente forward (`estimateCareerBurnUsdPerDay` → `burnEstimate` em `/api/cashflow`): salários, leases (/7), parking, storage WH/yard/base, Port FBO lease, **credit interest** (principal × 0.08%/day); runway ≈ wallet/burn. Estimate no footprint atual — não fatura. **UI (mesmo dia):** card **Forward burn** (total à direita + grid de linhas); sem tooltip / prosa de rodapé. Valores do burn em ink (não `cashflow-neg`) — vermelho fica para P&L/activity.
+
+- **Forward burn omits credit interest (2026-09-25):** sintoma = draw de crédito não subia o `/day`. Causa = `estimateCareerBurnUsdPerDay` só somava footprint (crew/parking/storage/leases). Fix = linha `credit_interest` = `principalUsd × COMPANY_CREDIT_DAILY_RATE` (mesmo Day interest do painel Credit).
 
 - **Freights paginator `of N` (2026-09-23):** `N` = lots **após filtros** da board (`queryMarketBoardPage` → `totalLots`), não inventário bruto do mundo. Swing ~17k↔20k (pós-densify) é equilíbrio vivo **formLots × expireLots** (+ troca Your/Operator/airframe/Near) — **não** retunar Dry/`CARGO_FLOW_BALANCE`. UI: `… of N matching`.
 

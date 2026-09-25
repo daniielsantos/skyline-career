@@ -120,11 +120,13 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Ferry tanks untouched (2026-09-22):** sintoma = Hangar/Line-crew ferry top-up + burn → tanques chegavam vazios mesmo com Jet-A no preço. Causa = `executeFerry` enchia shortfall e queimava `fuelNeededKg`. Fix = não mutar `fuelKg`; hop Jet-A continua em `totalCostUsd` (serviço incluso); copy Journey/toast.
 
-**Crew Ledger layout + tenant cashflow (2026-09-22):** sintoma = Money map / week·month·all time abaixo do hero; Recent 15/página. Validação = `/api/cashflow` já resume ledger da company do header (`loadMissions({ companyId })`); wallet da tela bate com all-time ± credit drawn. Fix = Money map + `CashflowSummaryGrid` acima do hero; `fetchCashflow({ companyId })` explícito no VaPage; Recent **10**/página.
+**Crew Ledger layout + tenant cashflow (2026-09-22):** sintoma = Money map / week·month·all time abaixo do hero; Recent 10/página. Validação = `/api/cashflow` já resume ledger da company do header (`loadMissions({ companyId })`); wallet da tela bate com all-time ± credit drawn. Fix = Money map + `CashflowSummaryGrid` acima do hero; `fetchCashflow({ companyId })` explícito no VaPage; Recent **10**/página.
+
+**Ledger Recent activity chrome (2026-09-25):** sintoma = label “Recent activity” colada na tabela; rodapé com **duas** linhas (última `td` border-bottom + `.pagination` border-top). Fix = mais gap/margin no label; zera border-bottom da última row; uma só regra no pager. Page size 10→15.
 
 **Ledger Day off-by-one (2026-09-24):** sintoma = settle no Day 83 (logbook/topbar) aparecia como Day **82** no Recent activity. Causa = `dayIndex = floor(tick/96)` 0-based na row; UI pintava o índice cru. Fix = `ledgerDisplayDay` = `dayIndex + 1` no `CashflowPanel` (Hangar + Crew Ledger). Storage/windows intactos.
 
-**Est. burn on Ledger (2026-09-24):** sintoma = Cashflow/Ledger só mostra passado; jogador não via custo fixo futuro. Fix = `estimateCareerBurnUsdPerDay` … card **Forward burn** (total + runway + grid de linhas; sem tooltip/rodapé). Estimate no footprint atual (não fatura).
+**Est. burn on Ledger (2026-09-24):** sintoma = Cashflow/Ledger só mostra passado; jogador não via custo fixo futuro. Fix = `estimateCareerBurnUsdPerDay` … card **Forward burn** (total + runway + grid de linhas; sem tooltip/rodapé). Estimate no footprint atual (não fatura). **2026-09-25:** burn inclui `credit_interest` (principal × 0.08%/day).
 
 **Money map → dialog (2026-09-24):** sintoma = tabela de referência (Job/Pays/Pilot earns) ocupava o topo do Ledger e empurrava wallet/activity. Causa = referência sempre inline. Fix = `?` ao lado de Company wallet abre `VaMoneyMapDialog`; page guide aponta pro atalho.
 

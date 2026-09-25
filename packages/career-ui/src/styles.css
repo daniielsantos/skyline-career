@@ -6863,7 +6863,11 @@ button.logbook-card-hit:focus-visible {
 
 .cashflow-history {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.75rem;
+}
+
+.cashflow-history > .aircraft-card-section-label {
+  margin: 0 0 0.15rem;
 }
 
 .cashflow-table {
@@ -6875,9 +6879,19 @@ button.logbook-card-hit:focus-visible {
 .cashflow-table th,
 .cashflow-table td {
   padding: 0.55rem 0.65rem;
+  border-top: 0;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
+}
+
+.cashflow-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.cashflow-history > .pagination {
+  border-top: 1px solid var(--line);
+  padding-top: 0.75rem;
 }
 
 .cashflow-table th {
@@ -15035,12 +15049,13 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   align-items: center;
   gap: 0.35rem;
 }
-.va-ledger-money-help {
-  min-width: 1.65rem;
-  height: 1.65rem;
+.va-ledger-wallet-head .action.ghost.compact.va-ledger-money-help {
+  min-width: 1.15rem;
+  width: 1.15rem;
+  height: 1.15rem;
   padding: 0;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.68rem;
   font-weight: 650;
   line-height: 1;
 }

@@ -9,7 +9,7 @@ import type {
 import { postCreditDraw, postCreditRepay } from './api';
 import { boardMoneyLabel, isFiniteMoney } from './board-money';
 
-const CASHFLOW_PAGE_SIZE = 10;
+const CASHFLOW_PAGE_SIZE = 15;
 
 /**
  * Ledger `dayIndex` is 0-based (`floor(tick / 96)`). World topbar + logbook

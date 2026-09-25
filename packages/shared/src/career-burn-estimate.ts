@@ -22,6 +22,10 @@ import {
   portYardHoldUsdPerDay,
 } from './career-ports.js';
 import {
+  COMPANY_CREDIT_DAILY_RATE,
+  ensureCompanyCredit,
+} from './career-company-credit.js';
+import {
   ensureVaLineCrew,
   resolveVaLineCrewTier,
 } from './career-va-line-crew.js';
@@ -60,7 +64,8 @@ export type CareerBurnLineId =
   | 'warehouse_storage'
   | 'port_yard'
   | 'port_fbo_lease'
-  | 'base_storage';
+  | 'base_storage'
+  | 'credit_interest';
 
 export type CareerBurnLine = {
   id: CareerBurnLineId;
@@ -196,6 +201,12 @@ export function estimateCareerBurnUsdPerDay(
     baseStorage += hold.cargoKg * storageUsdPerKgDay(hold.commodityId, 'fbo');
   }
   pushLine(lines, 'base_storage', 'Base storage', baseStorage);
+
+  const credit = ensureCompanyCredit(state, tick);
+  const creditInterest = money(
+    Math.max(0, credit.principalUsd) * COMPANY_CREDIT_DAILY_RATE,
+  );
+  pushLine(lines, 'credit_interest', 'Credit interest', creditInterest);
 
   const totalUsdPerDay = money(lines.reduce((s, l) => s + l.usdPerDay, 0));
   const wallet = Math.max(0, state.walletUsd ?? 0);

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **fa98851b** / desktop **0.3.339** shipped: Trust Watch residual fuel on settle instead of the tripBurn hangar floor. Release: [v0.3.339](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.339).
+
+
 `main` **a5902c01** / desktop **0.3.338** shipped: Freeze the airborne clock on ESC pause even when Absolute Time keeps ticking. Release: [v0.3.338](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.338).
 
 

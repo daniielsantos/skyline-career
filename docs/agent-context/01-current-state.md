@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **5d6acc70** / desktop **0.3.314** shipped: Add hub level maintenance so terminals do not stay maxed forever. Release: [v0.3.314](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.314).
+
+
 `main` **891a8d62** / desktop **0.3.313** shipped: Keep Hangar OH cards aligned and show Demand route distance. Release: [v0.3.313](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.313).
 
 

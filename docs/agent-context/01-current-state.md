@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **65fbe9d2** / desktop **0.3.330** shipped: Stop MSFS/SIMBRIDGE footer flicker on app open with Ready. Release: [v0.3.330](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.330).
+
+
 `main` **988ac090** / desktop **0.3.329** shipped: Fix Ready stuck on DISPATCHED while footer shows PHASE CLIMB. Release: [v0.3.329](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.329).
 
 

@@ -58,7 +58,7 @@ Atualizado 2026-09-22: **MSFS flight restart @ origin → false “Settle” UX*
 3. `revertFalseDepart` só com elapsed &lt; ~8 min — voo já tinha ~14 min → fica `in_flight` no ramp do origin.
 4. Logbook erro = `gateway-proxy` 502 `world_unreachable` (fetch à VPS falhou naquele momento) — não apaga missão.
 
-**Fix:** `WatchStatusPayload.destProximity` no tick; `optimisticLandedSettle` exige `destProximity.ok`; En route headline/badge LANDED só near dest — senão “BACK AT DEPARTURE” / “NOT AT DESTINATION”.
+**Fix:** `WatchStatusPayload.destProximity` no tick; `optimisticLandedSettle` exige `destProximity.ok`; En route headline/badge LANDED só near dest — senão “BACK AT DEPARTURE” / “NOT AT DESTINATION”. **2026-09-25:** o poll Watch ainda armava `settleOverlaySticky` com parking brake **sem** nearDest → flash Settling ao abrir En route no DEP; alinhado ao mesmo gate.
 
 **Estado agora:** missão válida IN FLIGHT; pode decolar de novo do origin e completar, ou abandonar/cancelar. Não esperar settle em SBGR.
 
@@ -402,7 +402,7 @@ Atualizado 2026-09-06: **Port FBO Phase 0 shipped** — `PLAYER_LEASE_OUT_ENABLE
 
 Atualizado 2026-09-06: **Port FBO esboço** — concession = FBO de chão; Phase 0 disable/nerf lease-out; desk auto-buy / stevedore depois; airport FBO slim. Spec: [`24-port-fbo.md`](./24-port-fbo.md). Sem código até pedir fatia.
 
-Atualizado 2026-09-05: **Inject 150 lb probe** — freighter cabin-as-baggage only (não todo inject); Accu-Sim também passa e pisca no tablet; Skyline não pinta intermediário. Mantido (C408 dead holds). Sem skip Accu-Sim.
+Atualizado 2026-09-05: **Inject 150 lb probe** — freighter cabin-as-baggage only (C408 dead holds). **2026-09-25:** **não** rodar em Accu-Sim (`a2a-lvars` / `lvar-bridge`) — lê classic stations e marca Character3–6/Baggage como dead pós-restart → `PAYLOAD_NOT_APPLIED` 340 vs 921.
 
 Atualizado 2026-09-05: **Settle UX** — overlay só com missão `in_flight`; ao settle marca completed local + limpa sticky (Back to Freights não reabre loading). Server 250ms `settling=true` pra poll.
 

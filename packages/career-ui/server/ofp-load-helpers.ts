@@ -2071,9 +2071,20 @@ async function applyMissionOfpLoadExclusive(
     // Freighter: drop baggage indexes that ignore SimConnect before painting Due
     // across them (C408 S4/S5). Writability only — no clamp probe (stations often
     // accept any weight; that wizard path was dropped for the same reason).
-    // Accu-Sim also runs this: classic station mirrors flash 150 lb on the tablet
-    // briefly; Skyline UI does not paint that intermediate (plan stations only).
-    if (!preferSeatFill && !paxAndCargoClassic && baggageStations.length > 0) {
+    // Accu-Sim (a2a-lvars / lvar-bridge): NEVER run this. Probe writes LVars but
+    // reads classic PAYLOAD STATION WEIGHT — Character3–6 / Baggage rarely mirror
+    // after MSFS restart, so every cargo station looks "dead", cargoTarget→0,
+    // verify sees only crew (~340) vs planned (~921) → PAYLOAD_NOT_APPLIED.
+    // Preflight often still "worked" when S7 briefly mirrored; resume did not.
+    const skipClassicDeadProbe =
+      ofp.liveSources?.payload?.includes('a2a-lvars') === true ||
+      resolved.profile.payload.strategy === 'lvar-bridge';
+    if (
+      !preferSeatFill &&
+      !paxAndCargoClassic &&
+      !skipClassicDeadProbe &&
+      baggageStations.length > 0
+    ) {
       publishLiveProgress('balancing', 'Probing cargo stations for dead holds…');
       const probed = await probeFreighterBaggageStations({
         bridge,
@@ -2124,6 +2135,11 @@ async function applyMissionOfpLoadExclusive(
         tanks: afterLive.tanks,
         stations: { ...workingStations },
       };
+    } else if (skipClassicDeadProbe) {
+      watchDebugLog('inject', 'baggage writability probe skipped', {
+        reason: 'a2a-lvars / lvar-bridge — classic station mirrors are ghosts',
+        baggageStations,
+      });
     }
 
     const fuelOk =
@@ -2718,9 +2734,12 @@ async function applyMissionOfpLoadExclusive(
         // hid ghost holds (C408 S4/S5): UI showed 400/400/400 then collapsed to
         // S3-only at confirm. Sample every other freighter round so prune runs
         // mid-fill; counterweight rounds still verify every time.
+        // Accu-Sim: classic station mirrors are ghosts (only S1 often mirrors) —
+        // mid-fill classic reads would prune Character3–6/Baggage as "dead".
         const midFillLiveCheck =
           stillPlacing &&
           !preferSeatFill &&
+          !skipClassicDeadProbe &&
           baggageStations.length >= 2 &&
           (i + 1) % 2 === 0;
         if (stillPlacing && !midFillLiveCheck) {

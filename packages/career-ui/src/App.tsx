@@ -6025,15 +6025,20 @@ export function App() {
             Boolean(status.missionId);
           // Arm overlay as soon as we see settle intent — don't wait for a
           // second poll (settle can block the server for seconds).
+          // Parking-brake "landed" optimism requires near dest — MSFS restart
+          // at origin also has ground + sawAirborne + brake and must not flash
+          // Settling on En route open (BACK AT DEPARTURE).
           const missionLive =
             activeMissionRef.current?.status === 'in_flight' &&
             (!status.missionId ||
               activeMissionRef.current.id === status.missionId);
+          const nearDestForSettle = Boolean(status.destProximity?.ok);
           const settleIntent =
             missionLive &&
             (Boolean(status.settling) ||
               status.lastEvent?.type === 'settle' ||
-              (status.sawAirborne &&
+              (nearDestForSettle &&
+                status.sawAirborne &&
                 status.onGround === true &&
                 status.parkingBrake === true &&
                 status.lastEvent?.type !== 'settle_blocked'));

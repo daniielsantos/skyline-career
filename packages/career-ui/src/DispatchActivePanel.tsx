@@ -1362,14 +1362,18 @@ export function DispatchActivePanel(props: {
               nearOrigin: nearOriginNow,
               nearDest: nearDestNow,
             });
-            // Keep Resume prep chrome while inject owns the pipe (Watch may
-            // briefly look idle after server stop; don't snap back to cruise).
+            // Keep Resume prep chrome while inject owns the pipe or just failed
+            // (Watch may briefly look idle after server stop — button used to
+            // vanish then reappear).
+            const resumePrepHold =
+              props.loadOfpAutoStatus === 'loading' ||
+              props.loadOfpAutoStatus === 'done' ||
+              props.loadOfpAutoStatus === 'failed';
             const resumePrep =
               resumePrepCore ||
               (enRoute &&
                 mission.status === 'in_flight' &&
-                injectBusy &&
-                liveOnGroundNow &&
+                resumePrepHold &&
                 !nearDestNow);
             // Ground after airborne is only a "landing" for settle UX when near
             // dest. MSFS restart dumps the AC at origin and must not look settled.

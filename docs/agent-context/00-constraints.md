@@ -50,6 +50,8 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - **Watch auto-start + effect cancel:** com Loaded vs Due (ou `in_flight`), **não** `postWatchStop` só porque o effect remount cancelou o await — isso piscava MSFS↔SIMBRIDGE no open (2026-09-25).
 - **Resume prep (MSFS restart @ origin):** manter `in_flight`; **não** reverter status. Unlock reinject + Loaded vs Due no En route quando `isResumePrepAtOrigin` (chão + sawAirborne + nearOrigin + !nearDest). `/api/load-ofp` aceita `in_flight`. Watch deve **amostrar LV no ramp também em `in_flight`** (não só `dispatched`) — senão cards ficam congelados pós-restart. Layout = tiles En route (não `preflight-load-grid`). Detail: `16-va-logistics.md`.
 - **En route live fuel:** em `in_flight` airborne, Watch amostra **fuel-only** (~10s, `sampleLiveFuelLb`) — sem stations. Soft marks OFP dep; não flipar `ready` só por burn.
+- **Settle overlay @ origin:** poll Watch **não** arma `settleOverlaySticky` com parking brake no DEP — exige `destProximity.ok` (mesmo gate do optimisticLandedSettle). Senão BACK AT DEPARTURE pisca Settling.
+- **Accu-Sim dead-holds probe:** **não** rodar `probeFreighterBaggageStations` em `a2a-lvars` / `lvar-bridge` — lê classic mirrors e pode zerar cargo stations no resume inject.
 - Preflight **não** deve gravar `ORIGIN_NOT_ON_GROUND` como `location.ok=false` quando airborne **dentro** do raio (parece “NOT AT ORIGIN” com 0.3 nm ≤ 12).
 - Detail: `docs/agent-context/16-va-logistics.md` (Crew Live notes).
 

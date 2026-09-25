@@ -13670,10 +13670,7 @@ export function App() {
           <button
             type="button"
             className={!showAirport && tab === 'aircraft' ? 'tab active' : 'tab'}
-            onClick={() => {
-              selectTab('aircraft');
-              void refreshAircraftMarket().catch(() => undefined);
-            }}
+            onClick={() => selectTab('aircraft')}
             disabled={busy}
             title={
               aircraftListings.length

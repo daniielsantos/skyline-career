@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **8ac4887f** / desktop **0.3.318** shipped: Fix Ports focus defaults and map camera; drop bush-hub homologate. Release: [v0.3.318](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.318).
+
+
 `main` **26c6d8dd** / desktop **0.3.317** shipped: Add a home-hub map picker and lock sidebar until claim. Release: [v0.3.317](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.317).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **8b028227** / desktop **0.3.316** shipped: Fix MP auth errors after empty-world wipe and toast typecheck. Release: [v0.3.316](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.316).
+
+
 `main` **54e42f6e** / desktop **0.3.315** shipped: Replace Claim Santos with a Dev Mode port picker. Release: [v0.3.315](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.315).
 
 

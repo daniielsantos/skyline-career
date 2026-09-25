@@ -15663,7 +15663,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 
 .va-port-path {
-  margin: 0 0 1rem;
+  margin: 0 0 0.25rem;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -15711,7 +15711,11 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   background: #6fbf73;
 }
 .va-config-checklist {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0;
+}
+.va-config-card > .va-port-path {
+  margin-top: 0.95rem;
+  border-top: none;
 }
 .va-ledger-quality-value {
   margin: 0.25rem 0 0;

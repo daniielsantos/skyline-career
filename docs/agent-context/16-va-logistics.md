@@ -417,9 +417,9 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 |--|--|
 | **O que** | Desk cria Internal Hauls automaticamente a partir de `listPortScoutBridgeSuggestions` |
 | **Quem voa** | Pilots humanos (board Hauls); AI **não** voa |
-| **Caps** | max 1–3/dia (default 2); max 3 open bridge holds; pay = market×0.45 suggest × mult (0.8–1.5, Config); wallet floor |
+| **Caps** | max 1–3/dia (default 2); max 3 open bridge holds; pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0) |
 | **Gates** | `va_listed` + **≥2 members** + Port FBO (Scout) + enabled |
-| **UI** | My VA Config → Auto-haul desk; Hauls board unchanged |
+| **UI** | My VA Config → Auto-haul desk (enable, Max/day, Pay %, Wallet floor + tooltips); Hauls board unchanged |
 | **Não faz (v1)** | OD allowlist; Demand/Haul auto; IAP desk seat; snipar board global |
 
 ### Ordem de build (automação)
@@ -641,6 +641,18 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma / gap:** Scout confirma à mão; Hauls vazio até owner postar; Fase 3 doc aberta.
 **Causa:** automação desk parou em Fase 2 (suggest + confirm).
 **Fix:** `vaAutoHaul` em company_state; `tickVaAutoHaul` no day settle (com auto-buy); gates listed+≥2 members; Config enable + max/day; pay suggest×mult; não voa.
+
+### Auto-haul Wallet floor Config UI (2026-09-25)
+
+**Sintoma:** Floor só aparecia como stat read-only; owner não entendia / não podia mudar o cushion.
+**Causa:** API/`tickVaAutoHaul` já tinham `walletFloorUsd` (skip se `wallet − pilotPay < floor`); Config UI só Max/day + Pay %.
+**Fix:** owner select Wallet floor ($0–$100k presets) via `postVaAutoHaul({ walletFloorUsd })`; `title` tooltips em Floor / Max/day / Pay % (floor ≠ desliga desk).
+
+### Config Path to Port FBO CLS (2026-09-25)
+
+**Sintoma:** entrar em My VA → Config mostrava card “Path to Port FBO / Loading…” que empurrava o conteúdo e sumia.
+**Causa:** `VaPortPathCard` renderizava shell de loading; com FBO já claimed resolvia `null` (CLS). Config montava o card sempre; Hauls já gateava `!hasPortFbo`.
+**Fix:** card retorna `null` enquanto `!loaded` / `hasFbo`; Config usa tri-state `portFboStatus` (`unknown` | `none` | `owned`) e só monta o Path quando `none`. Layout Config: Next steps (só se aberto) → Path → People (recruit+invite+cuts) → Line crew → Auto-haul → Danger. **IH pay** permanece market×0.45 / banda 80–150% (sem retune).
 
 ### VA loop clarity — money map + Prepare chip (2026-09-21)
 
@@ -1079,7 +1091,8 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 - [x] **Ranking global** — Freights/Charter/`vaFlight` + desk; Airlines + Pilots global 7d (2026-09-23)
 - [x] Fase 3 / IH-3: VA auto-haul desk (Scout bridges, caps, ≥2 members) (2026-09-21)
 - [ ] UI surplus/tight por commodity no Ports / região
-- [ ] IH-3 extras: OD allowlist / pay fine-tune UI / Demand auto
+- [ ] IH-3 extras: OD allowlist / Demand auto
+- [x] IH-3 Config: Pay % + Wallet floor editáveis + tooltips (2026-09-25)
 - [x] Testes IH-1 + VA invite/cap/cross-pay/ranking
 - [x] Copy join / My VA: dual-tenant (frota home vs VA)
 - [x] **memberRouteCutPct** — schema v14 + Config + directory + settle Freights/Demand/Charter (net após fuel)

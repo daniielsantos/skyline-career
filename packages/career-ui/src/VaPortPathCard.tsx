@@ -47,7 +47,9 @@ export function VaPortPathCard(props: Props) {
       return;
     }
     try {
-      const snap: PortsSnapshot = await fetchPorts();
+      const snap: PortsSnapshot = await fetchPorts({
+        companyId: props.companyId,
+      });
       const owned = snap.ports.find(
         (p) =>
           p.concession?.status === 'yours' ||
@@ -182,16 +184,8 @@ export function VaPortPathCard(props: Props) {
     void refresh();
   }, [refresh]);
 
-  if (!loaded) {
-    return (
-      <section className="va-port-path">
-        <h4 className="va-config-section-title">Path to Port FBO</h4>
-        <p className="settings-help">Loading…</p>
-      </section>
-    );
-  }
-
-  if (hasFbo) return null;
+  // No Loading shell — avoids Config CLS when owned FBO resolves to null.
+  if (!loaded || hasFbo) return null;
 
   return (
     <section className="va-port-path">

@@ -281,6 +281,10 @@ export function VaPage(props: Props) {
     name: string;
     level: number;
   } | null>(null);
+  /** Tri-state so Config never mounts Path card while unknown / owned. */
+  const [portFboStatus, setPortFboStatus] = useState<
+    'unknown' | 'none' | 'owned'
+  >('unknown');
   const [displayName, setDisplayName] = useState('');
   const [homeHubIcao, setHomeHubIcao] = useState('');
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -546,6 +550,7 @@ export function VaPage(props: Props) {
   const loadPortFbo = useCallback(async () => {
     if (!canShow || !companyId) {
       setPortFbo(null);
+      setPortFboStatus('unknown');
       return;
     }
     try {
@@ -556,16 +561,18 @@ export function VaPage(props: Props) {
           (p.concession?.companyId &&
             p.concession.companyId === companyId),
       );
-      setPortFbo(
-        owned
-          ? {
-              name: owned.name,
-              level: owned.concession?.level ?? 1,
-            }
-          : null,
-      );
+      if (owned) {
+        setPortFbo({
+          name: owned.name,
+          level: owned.concession?.level ?? 1,
+        });
+        setPortFboStatus('owned');
+      } else {
+        setPortFbo(null);
+        setPortFboStatus('none');
+      }
     } catch {
-      setPortFbo(null);
+      // Keep last known status on blip — do not flash Path card.
     }
   }, [canShow, companyId]);
 
@@ -631,6 +638,12 @@ export function VaPage(props: Props) {
     if (pane !== 'hauls' && pane !== 'config') return;
     void loadPortFbo();
   }, [pane, loaded, listed, tenantSwitching, loadPortFbo]);
+
+  // Drop stale FBO chip when tenant changes (avoid Path flash for wrong company).
+  useEffect(() => {
+    setPortFbo(null);
+    setPortFboStatus('unknown');
+  }, [companyId]);
 
   // Soft-poll roster presence while the pane is open (online / flight / Live).
   useEffect(() => {
@@ -774,6 +787,14 @@ export function VaPage(props: Props) {
     (kg: number) => `${Math.round(kg).toLocaleString('en-US')} kg`,
     [],
   );
+
+  const ownerConfigChecklistDone =
+    Boolean(inviteCode) &&
+    members.length >= 2 &&
+    Boolean(lineCrew?.hired) &&
+    portFboStatus === 'owned';
+  const showOwnerConfigNextSteps = isOwner && !ownerConfigChecklistDone;
+  const showConfigPathCard = portFboStatus === 'none';
 
   if (!canShow) {
     return (
@@ -1727,85 +1748,91 @@ export function VaPage(props: Props) {
 
       {pane === 'config' ? (
         <div className="va-pane-card va-config-card">
-          <section className="va-config-section va-config-checklist">
-            <h4 className="va-config-section-title">Next steps</h4>
-            <ul className="va-checklist">
-              {isOwner ? (
-                <>
-                  <li className="is-done">
-                    Listed in Airlines · {displayName || 'company'}
-                    {homeHubIcao ? ` · ${homeHubIcao}` : ''}
-                  </li>
-                  <li className={inviteCode ? 'is-done' : undefined}>
-                    {inviteCode
-                      ? 'Invite code ready (share or renew below)'
-                      : 'Create an invite code so pilots can join'}
-                  </li>
-                  <li
-                    className={
-                      members.length >= 2 ? 'is-done' : undefined
-                    }
-                  >
-                    {members.length >= 2
-                      ? `Roster ${members.length}/${memberCap}`
-                      : pendingRequests.length > 0
-                        ? `${pendingRequests.length} join request${pendingRequests.length === 1 ? '' : 's'} on Roster`
-                        : 'Get a second pilot on the roster'}
-                  </li>
-                  <li
-                    className={
-                      lineCrew?.hired ? 'is-done' : undefined
-                    }
-                  >
-                    {lineCrew?.hired
-                      ? `Line crew · ${lineCrew.tierName ?? 'Desk'} (${lineCrew.remaining}/${lineCrew.allowance} ferry/wk)`
-                      : 'Hire Line crew so empty ferry does not drain the company wallet'}
-                  </li>
-                  <li className={portFbo ? 'is-done' : undefined}>
-                    {portFbo
-                      ? `Port FBO · ${portFbo.name} · P${portFbo.level}`
-                      : 'Path to Port FBO · WH T3 at hub, then claim on Ports (company CAPEX)'}
-                  </li>
-                  {portFbo ? (
-                    <li>
-                      Stock company WH (inbound deposits when it arrives) —
-                      then Scout Hold or Auto-haul fills Hauls
+          {showOwnerConfigNextSteps || !isOwner ? (
+            <section className="va-config-section va-config-checklist">
+              <h4 className="va-config-section-title">Next steps</h4>
+              <ul className="va-checklist">
+                {isOwner ? (
+                  <>
+                    <li className="is-done">
+                      Listed in Airlines · {displayName || 'company'}
+                      {homeHubIcao ? ` · ${homeHubIcao}` : ''}
                     </li>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <li className="is-done">
-                    Joined · market hire {memberRouteCutPct}% · airline desk{' '}
-                    {memberAirlineCutPct}% → your home Wallet
-                  </li>
-                  <li>
-                    Crew Hangar · Reserve a parked tail (4h) before Prepare
-                  </li>
-                  <li>
-                    Hauls · Accept desk work (bridges / Demand / Wide haul) when
-                    the company has stock
-                  </li>
-                  <li>
-                    Freights · pick an aircraft labeled Airline · settle pays market
-                    hire cut home
-                  </li>
-                </>
-              )}
-            </ul>
-          </section>
+                    <li className={inviteCode ? 'is-done' : undefined}>
+                      {inviteCode
+                        ? 'Invite code ready (share or renew below)'
+                        : 'Create an invite code so pilots can join'}
+                    </li>
+                    <li
+                      className={
+                        members.length >= 2 ? 'is-done' : undefined
+                      }
+                    >
+                      {members.length >= 2
+                        ? `Roster ${members.length}/${memberCap}`
+                        : pendingRequests.length > 0
+                          ? `${pendingRequests.length} join request${pendingRequests.length === 1 ? '' : 's'} on Roster`
+                          : 'Get a second pilot on the roster'}
+                    </li>
+                    <li
+                      className={
+                        lineCrew?.hired ? 'is-done' : undefined
+                      }
+                    >
+                      {lineCrew?.hired
+                        ? `Line crew · ${lineCrew.tierName ?? 'Desk'} (${lineCrew.remaining}/${lineCrew.allowance} ferry/wk)`
+                        : 'Hire Line crew so empty ferry does not drain the company wallet'}
+                    </li>
+                    {portFboStatus === 'owned' && portFbo ? (
+                      <li className="is-done">
+                        Port FBO · {portFbo.name} · P{portFbo.level}
+                      </li>
+                    ) : null}
+                    {portFboStatus === 'owned' ? (
+                      <li>
+                        Stock company WH — Scout Hold or Auto-haul fills Hauls
+                      </li>
+                    ) : null}
+                    {portFboStatus === 'unknown' ? (
+                      <li>
+                        Path to Port FBO · WH T3 at hub, then claim on Ports
+                      </li>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <li className="is-done">
+                      Joined · market hire {memberRouteCutPct}% · airline desk{' '}
+                      {memberAirlineCutPct}% → your home Wallet
+                    </li>
+                    <li>
+                      Crew Hangar · Reserve a parked tail (4h) before Prepare
+                    </li>
+                    <li>
+                      Hauls · Accept desk work when the company has stock
+                    </li>
+                    <li>
+                      Freights · airline tail · market hire cut settles home
+                    </li>
+                  </>
+                )}
+              </ul>
+            </section>
+          ) : null}
 
-          <VaPortPathCard
-            companyId={companyId || ''}
-            homeHubIcao={homeHubIcao}
-            walletUsd={resolvedWalletUsd ?? 0}
-            isOwner={isOwner}
-            busy={pageBusy}
-            onGoPorts={() => setPane('ports')}
-          />
+          {showConfigPathCard ? (
+            <VaPortPathCard
+              companyId={companyId || ''}
+              homeHubIcao={homeHubIcao}
+              walletUsd={resolvedWalletUsd ?? 0}
+              isOwner={isOwner}
+              busy={pageBusy}
+              onGoPorts={() => setPane('ports')}
+            />
+          ) : null}
 
           <section className="va-config-section">
-            <h4 className="va-config-section-title">Hiring</h4>
+            <h4 className="va-config-section-title">People</h4>
             {isOwner ? (
               <label className="va-config-check">
                 <input
@@ -1835,7 +1862,7 @@ export function VaPage(props: Props) {
                   Open recruiting
                   <span className="muted">
                     {' '}
-                    · listed in Airlines when on; invite still works when off
+                    · Airlines directory when on; invite still works when off
                   </span>
                 </span>
               </label>
@@ -1843,6 +1870,62 @@ export function VaPage(props: Props) {
               <p className="settings-sample va-config-readonly">
                 Recruiting is <strong>{recruiting ? 'on' : 'off'}</strong>
               </p>
+            )}
+            <div className="va-config-actions">
+              {canManage ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  disabled={pageBusy}
+                  onClick={() => {
+                    void (async () => {
+                      if (inviteCode) {
+                        const ok = await confirm({
+                          title: 'Renew invite code?',
+                          body: 'The current code stops working. Anyone still using the old link will need the new one.',
+                          confirmLabel: 'Renew',
+                          tone: 'warn',
+                        });
+                        if (!ok) return;
+                      }
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        const { invite } = await postVaInvite({});
+                        setInviteCode(invite.code);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error ? err.message : String(err),
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  {inviteCode ? 'Renew invite' : 'Create invite'}
+                </button>
+              ) : (
+                <span className="muted">Owner/dispatcher only</span>
+              )}
+              {isOwner && props.onGoCompany ? (
+                <button
+                  type="button"
+                  className="action ghost"
+                  onClick={props.onGoCompany}
+                >
+                  Edit listing
+                </button>
+              ) : null}
+            </div>
+            {inviteCode ? (
+              <p className="va-config-invite">
+                <span className="va-config-stat-label">Invite code</span>
+                <strong className="va-config-invite-code">{inviteCode}</strong>
+                <span className="muted"> · does not expire · renew replaces it</span>
+              </p>
+            ) : (
+              <p className="empty">No invite code yet.</p>
             )}
             {isOwner ? (
               <div className="va-config-field">
@@ -1953,7 +2036,7 @@ export function VaPage(props: Props) {
                   />
                   <span className="va-config-field-suffix">%</span>
                   <span className="muted va-config-field-hint">
-                    Demand / Wide haul from company WH (40–60; below solo 100%)
+                    Demand / Wide haul from company WH (40–60)
                   </span>
                 </div>
               </div>
@@ -1963,7 +2046,7 @@ export function VaPage(props: Props) {
           <section className="va-config-section">
             <h4 className="va-config-section-title">Line crew</h4>
             <p className="va-config-section-blurb">
-              Empty ferry desk — NPC repositions under weekly allowance.
+              Empty ferry desk — NPC hops under a weekly allowance.
             </p>
             {lineCrew == null ? (
               <p className="settings-sample va-config-readonly">
@@ -2112,11 +2195,8 @@ export function VaPage(props: Props) {
           <section className="va-config-section">
             <h4 className="va-config-section-title">Auto-haul desk</h4>
             <p className="va-config-section-blurb">
-              Posts Internal Hauls from Scout on the day tick (max{' '}
-              {autoHaul?.maxHaulsPerDay ?? 2}/day). Pilot suggest ≈ 45% of
-              Market freight for the OD, then your Pay %. Needs ≥
-              {autoHaulMinMembers} members + Port FBO stock. Manual Scout
-              Confirm has no AI daily cap.
+              Day-tick Scout bridges (max {autoHaul?.maxHaulsPerDay ?? 2}/day).
+              Needs ≥{autoHaulMinMembers} members + Port FBO stock.
             </p>
             {autoHaul == null ? (
               <p className="settings-sample va-config-readonly">
@@ -2125,20 +2205,26 @@ export function VaPage(props: Props) {
             ) : (
               <div className="va-config-line-crew">
                 <div className="va-config-line-crew-stats">
-                  <div>
+                  <div
+                    title="How many Auto-haul Internal Hauls the desk has posted today vs your Max / day cap."
+                  >
                     <span className="va-config-stat-label">Today</span>
                     <span className="va-config-stat-value">
                       {autoHaul.postedToday}/{autoHaul.maxHaulsPerDay}
                     </span>
                   </div>
-                  <div>
+                  <div
+                    title="Pilot fee = market-based suggest × this %. Applied when the desk posts a haul."
+                  >
                     <span className="va-config-stat-label">Pay</span>
                     <span className="va-config-stat-value">
                       {Math.round(autoHaul.payMult * 100)}%
                       <span className="muted"> suggest</span>
                     </span>
                   </div>
-                  <div>
+                  <div
+                    title="Skip posting a haul if VA wallet minus that haul's pilot pay would fall below this floor. $0 = no cushion."
+                  >
                     <span className="va-config-stat-label">Floor</span>
                     <span className="va-config-stat-value">
                       {formatBoardMoney(autoHaul.walletFloorUsd)}
@@ -2176,7 +2262,10 @@ export function VaPage(props: Props) {
                       />
                       <span>Enable auto-haul</span>
                     </label>
-                    <label className="va-config-field">
+                    <label
+                      className="va-config-field"
+                      title="Daily cap for AI desk posts only. Manual Scout Confirm is uncapped."
+                    >
                       <span>Max / day</span>
                       <select
                         value={autoHaul.maxHaulsPerDay}
@@ -2208,7 +2297,10 @@ export function VaPage(props: Props) {
                         <option value={3}>3</option>
                       </select>
                     </label>
-                    <label className="va-config-field">
+                    <label
+                      className="va-config-field"
+                      title="Pilot fee multiplier on the market-anchored suggest (80–150%)."
+                    >
                       <span>Pay % of suggest</span>
                       <select
                         value={Math.round(autoHaul.payMult * 100)}
@@ -2243,6 +2335,52 @@ export function VaPage(props: Props) {
                         <option value={150}>150%</option>
                       </select>
                     </label>
+                    <label
+                      className="va-config-field"
+                      title="Minimum VA wallet to keep after posting. Desk skips a haul when wallet − pilot pay would go below this. Does not turn Auto-haul off."
+                    >
+                      <span>Wallet floor</span>
+                      <select
+                        value={autoHaul.walletFloorUsd}
+                        disabled={pageBusy}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          void (async () => {
+                            setBusy(true);
+                            setError(null);
+                            try {
+                              const res = await postVaAutoHaul({
+                                walletFloorUsd: n,
+                              });
+                              setAutoHaul(res.autoHaul);
+                            } catch (err) {
+                              setError(
+                                err instanceof Error
+                                  ? err.message
+                                  : String(err),
+                              );
+                            } finally {
+                              setBusy(false);
+                            }
+                          })();
+                        }}
+                      >
+                        {![
+                          0, 5_000, 10_000, 25_000, 50_000, 100_000,
+                        ].includes(autoHaul.walletFloorUsd) ? (
+                          <option value={autoHaul.walletFloorUsd}>
+                            {formatBoardMoney(autoHaul.walletFloorUsd)}{' '}
+                            (current)
+                          </option>
+                        ) : null}
+                        <option value={0}>$0</option>
+                        <option value={5_000}>$5,000</option>
+                        <option value={10_000}>$10,000</option>
+                        <option value={25_000}>$25,000</option>
+                        <option value={50_000}>$50,000</option>
+                        <option value={100_000}>$100,000</option>
+                      </select>
+                    </label>
                   </div>
                 ) : (
                   <p className="settings-sample va-config-readonly">
@@ -2258,66 +2396,6 @@ export function VaPage(props: Props) {
                   </p>
                 ) : null}
               </div>
-            )}
-          </section>
-
-          <section className="va-config-section">
-            <h4 className="va-config-section-title">Invites &amp; listing</h4>
-            <div className="va-config-actions">
-              {canManage ? (
-                <button
-                  type="button"
-                  className="action ghost"
-                  disabled={pageBusy}
-                  onClick={() => {
-                    void (async () => {
-                      if (inviteCode) {
-                        const ok = await confirm({
-                          title: 'Renew invite code?',
-                          body: 'The current code stops working. Anyone still using the old link will need the new one.',
-                          confirmLabel: 'Renew',
-                          tone: 'warn',
-                        });
-                        if (!ok) return;
-                      }
-                      setBusy(true);
-                      setError(null);
-                      try {
-                        const { invite } = await postVaInvite({});
-                        setInviteCode(invite.code);
-                      } catch (err) {
-                        setError(
-                          err instanceof Error ? err.message : String(err),
-                        );
-                      } finally {
-                        setBusy(false);
-                      }
-                    })();
-                  }}
-                >
-                  {inviteCode ? 'Renew invite' : 'Create invite'}
-                </button>
-              ) : (
-                <span className="muted">Owner/dispatcher only</span>
-              )}
-              {isOwner && props.onGoCompany ? (
-                <button
-                  type="button"
-                  className="action ghost"
-                  onClick={props.onGoCompany}
-                >
-                  Edit listing
-                </button>
-              ) : null}
-            </div>
-            {inviteCode ? (
-              <p className="va-config-invite">
-                <span className="va-config-stat-label">Invite code</span>
-                <strong className="va-config-invite-code">{inviteCode}</strong>
-                <span className="muted"> · does not expire · renew replaces it</span>
-              </p>
-            ) : (
-              <p className="empty">No invite code yet.</p>
             )}
           </section>
 

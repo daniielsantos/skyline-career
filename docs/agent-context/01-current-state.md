@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **407db5ba** / desktop **0.3.327** shipped: Stop gating inject on unused sim rate and slew flags. Release: [v0.3.327](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.327).
+
+
 `main` **3f9b2401** / desktop **0.3.326** shipped: Allow inject when MSFS leaves IS PAUSED sticky. Release: [v0.3.326](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.326).
 
 

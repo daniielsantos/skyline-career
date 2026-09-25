@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **988ac090** / desktop **0.3.329** shipped: Fix Ready stuck on DISPATCHED while footer shows PHASE CLIMB. Release: [v0.3.329](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.329).
+
+
 `main` **0b2e0520** / desktop **0.3.328** shipped: Start Watch after Ready even when leaving the Dispatch tab. Release: [v0.3.328](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.328).
 
 

@@ -76,10 +76,6 @@ public sealed class SimSnapshotDto
     [JsonPropertyName("slewActive")]
     public bool SlewActive { get; set; }
 
-    /// <summary>SimConnect ABSOLUTE TIME (seconds) — stops while the sim is truly paused.</summary>
-    [JsonPropertyName("absoluteTimeSec")]
-    public double AbsoluteTimeSec { get; set; }
-
     [JsonPropertyName("simRate")]
     public double SimRate { get; set; } = 1;
 

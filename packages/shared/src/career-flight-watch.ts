@@ -1,6 +1,5 @@
 import {
   DEFAULT_SETTLE_RADIUS_NM,
-  distanceNm,
   isNearAirport,
 } from './career-economy.js';
 import type { MissionIntent, MissionStatus } from './types/career-economy.js';
@@ -54,111 +53,9 @@ function finitePositive(n: number | undefined, min: number): boolean {
   return typeof n === 'number' && Number.isFinite(n) && n >= min;
 }
 
-/**
- * Pause / slew diagnostics — shared by freeze gate + Watch debug log.
- *
- * MSFS 2024 can leave `IS PAUSED` sticky after ESC → Resume while the sim is
- * already running. Prefer ABSOLUTE TIME advancing (and fresh position motion)
- * over the sticky flag. Soft-held lat/lon must not count as "no motion".
- */
-export function inspectSimPlaybackFreeze(
-  sample: FlightGroundSample,
-  prev?: FlightGroundSample | null,
-): {
-  frozen: boolean;
-  reason:
-    | 'live'
-    | 'slew'
-    | 'paused'
-    | 'paused_but_time_live'
-    | 'paused_but_moved';
-  simAbsDtSec: number | null;
-  movedNm: number | null;
-  positionHeld: boolean;
-} {
-  const positionHeld = sample.positionHeld === true;
-  let simAbsDtSec: number | null = null;
-  if (
-    typeof sample.simAbsoluteTimeSec === 'number' &&
-    Number.isFinite(sample.simAbsoluteTimeSec) &&
-    typeof prev?.simAbsoluteTimeSec === 'number' &&
-    Number.isFinite(prev.simAbsoluteTimeSec)
-  ) {
-    simAbsDtSec = sample.simAbsoluteTimeSec - prev.simAbsoluteTimeSec;
-  }
-  let movedNm: number | null = null;
-  if (
-    !positionHeld &&
-    prev?.position &&
-    sample.position &&
-    Number.isFinite(prev.position.lat) &&
-    Number.isFinite(prev.position.lon) &&
-    Number.isFinite(sample.position.lat) &&
-    Number.isFinite(sample.position.lon)
-  ) {
-    movedNm = distanceNm(prev.position, sample.position);
-  }
-
-  if (sample.slewActive === true) {
-    // MSFS 2024 / misaligned Host snapshots can stick IS SLEW ACTIVE while the
-    // aircraft is clearly flying (GS 400kt + position advancing). Only trust
-    // slew when there is no real motion.
-    const flying =
-      finitePositive(sample.groundSpeedKt, 30) ||
-      (movedNm != null && movedNm >= 0.015);
-    if (!flying) {
-      return {
-        frozen: true,
-        reason: 'slew',
-        simAbsDtSec,
-        movedNm,
-        positionHeld,
-      };
-    }
-  }
-  if (sample.paused !== true) {
-    return {
-      frozen: false,
-      reason: 'live',
-      simAbsDtSec,
-      movedNm,
-      positionHeld,
-    };
-  }
-  // One Watch poll is typically 0.5–2s of sim time while live.
-  if (simAbsDtSec != null && simAbsDtSec >= 0.2) {
-    return {
-      frozen: false,
-      reason: 'paused_but_time_live',
-      simAbsDtSec,
-      movedNm,
-      positionHeld,
-    };
-  }
-  // ~0.015 nm ≈ 90 ft
-  if (movedNm != null && movedNm >= 0.015) {
-    return {
-      frozen: false,
-      reason: 'paused_but_moved',
-      simAbsDtSec,
-      movedNm,
-      positionHeld,
-    };
-  }
-  return {
-    frozen: true,
-    reason: 'paused',
-    simAbsDtSec,
-    movedNm,
-    positionHeld,
-  };
-}
-
-export function isSimPlaybackFrozen(
-  sample: FlightGroundSample,
-  prev?: FlightGroundSample | null,
-): boolean {
-  return inspectSimPlaybackFreeze(sample, prev).frozen;
+/** Pause / slew — do not edge-detect depart or touchdown / count airborne time. */
+export function isSimPlaybackFrozen(sample: FlightGroundSample): boolean {
+  return sample.paused === true || sample.slewActive === true;
 }
 
 /**
@@ -215,16 +112,6 @@ export interface FlightGroundSample {
   paused?: boolean;
   /** Slew / slew-to-spawn — GS is meaningless. */
   slewActive?: boolean;
-  /**
-   * SimConnect ABSOLUTE TIME (seconds). Stalls while the sim is truly paused;
-   * keeps advancing under sticky IS PAUSED after Resume.
-   */
-  simAbsoluteTimeSec?: number;
-  /**
-   * True when `position` was copied from the previous sample after a soft-fail
-   * lat/lon read — must not count as proof the aircraft is stationary.
-   */
-  positionHeld?: boolean;
 }
 
 /**

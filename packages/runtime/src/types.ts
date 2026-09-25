@@ -34,8 +34,6 @@ export interface SimSnapshot {
   parkingBrake: boolean;
   paused: boolean;
   slewActive: boolean;
-  /** SimConnect ABSOLUTE TIME seconds — stalls while truly paused. */
-  absoluteTimeSec?: number;
   simRate: number;
   cgPercent?: number;
   grossWeightLb?: number;

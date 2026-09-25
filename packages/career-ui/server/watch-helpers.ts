@@ -20,7 +20,7 @@ import {
   evaluateMissionFlightTransition,
   forceEnginesOffWhenParkedSpoolDead,
   inferEnginesRunning,
-  inspectSimPlaybackFreeze,
+  isSimPlaybackFrozen,
   enterLedgerActorAccountId,
   mergeAirborneClockOntoMission,
   resolveLiveAirborneElapsedMs,
@@ -559,7 +559,6 @@ export async function sampleLiveFlight(
   const lat = finiteNum(v[0]);
   const lon = finiteNum(v[1]);
   let position: { lat: number; lon: number } | undefined;
-  let positionHeld = false;
   if (
     lat !== undefined &&
     lon !== undefined &&
@@ -575,7 +574,6 @@ export async function sampleLiveFlight(
       !(prev.lat === 0 && prev.lon === 0)
     ) {
       position = { lat: prev.lat, lon: prev.lon };
-      positionHeld = true;
     }
   }
   const gs = finiteNum(v[2]);
@@ -686,19 +684,13 @@ export async function sampleLiveFlight(
     rpm,
   });
 
-  const absRaw = snap.absoluteTimeSec;
-  const simAbsoluteTimeSec =
-    typeof absRaw === 'number' && Number.isFinite(absRaw) ? absRaw : undefined;
-
   return {
     onGround: snap.onGround,
     enginesRunning,
     parkingBrake: snap.parkingBrake === true,
     paused: snap.paused === true,
     slewActive: snap.slewActive === true,
-    simAbsoluteTimeSec,
     position,
-    positionHeld: positionHeld || undefined,
     groundSpeedKt,
     verticalSpeedFpm,
     bankDeg,
@@ -1450,11 +1442,10 @@ export class CareerWatchSession {
     stallWarning?: boolean;
   }) | null = null;
   /**
-   * Effective pause freeze for the latest Watch tick (sticky IS PAUSED after
-   * ESC Resume is cleared when sim absolute time / position advances).
+   * True while the latest Watch sample reports IS PAUSED (or slew).
+   * Freezes the airborne settle-gate clock only — not flight phase.
    */
   private playbackFrozen = false;
-  private playbackFreezeReason: string | null = null;
   /** Throttle periodic freeze heartbeats while stuck paused. */
   private lastPlaybackFreezeLogAtMs = 0;
   /** Sticky flight phase for UI + adaptive poll. */
@@ -1853,7 +1844,6 @@ export class CareerWatchSession {
     this.liveTrackCompanyId = opts.liveTrackCompanyId?.trim() || null;
     this.lastSample = null;
     this.playbackFrozen = false;
-    this.playbackFreezeReason = null;
     this.lastPlaybackFreezeLogAtMs = 0;
     this.lastPhase = null;
     this.intervalMs = watchIntervalMsForPhase('ground', {
@@ -2150,7 +2140,6 @@ export class CareerWatchSession {
     this.watchState = createMissionFlightWatchState();
     this.lastSample = null;
     this.playbackFrozen = false;
-    this.playbackFreezeReason = null;
     this.lastPlaybackFreezeLogAtMs = 0;
     this.lastPhase = null;
     this.lastLiveFuelLb = null;
@@ -2402,41 +2391,21 @@ export class CareerWatchSession {
       if (!this.running || isOfpLoadActive()) {
         return;
       }
-      const prevSample = this.lastSample;
       this.lastSample = sample;
-      const freeze = inspectSimPlaybackFreeze(sample, prevSample);
       const wasFrozen = this.playbackFrozen;
-      this.playbackFrozen = freeze.frozen;
-      this.playbackFreezeReason = freeze.reason;
+      this.playbackFrozen = isSimPlaybackFrozen(sample);
       const nowTickMs = Date.now();
       if (
-        wasFrozen !== freeze.frozen ||
-        (freeze.frozen &&
-          nowTickMs - this.lastPlaybackFreezeLogAtMs >= 10_000) ||
-        (!freeze.frozen &&
-          (freeze.reason === 'paused_but_time_live' ||
-            freeze.reason === 'paused_but_moved'))
+        wasFrozen !== this.playbackFrozen ||
+        (this.playbackFrozen &&
+          nowTickMs - this.lastPlaybackFreezeLogAtMs >= 10_000)
       ) {
         this.lastPlaybackFreezeLogAtMs = nowTickMs;
         watchDebugLog('watch', 'playback freeze', {
           missionId: this.missionId,
-          frozen: freeze.frozen,
-          reason: freeze.reason,
+          frozen: this.playbackFrozen,
           paused: sample.paused === true,
           slew: sample.slewActive === true,
-          simAbsSec:
-            typeof sample.simAbsoluteTimeSec === 'number'
-              ? Math.round(sample.simAbsoluteTimeSec * 10) / 10
-              : null,
-          simAbsDtSec:
-            freeze.simAbsDtSec != null
-              ? Math.round(freeze.simAbsDtSec * 100) / 100
-              : null,
-          movedNm:
-            freeze.movedNm != null
-              ? Math.round(freeze.movedNm * 1000) / 1000
-              : null,
-          positionHeld: freeze.positionHeld,
           gsKt:
             typeof sample.groundSpeedKt === 'number'
               ? Math.round(sample.groundSpeedKt)

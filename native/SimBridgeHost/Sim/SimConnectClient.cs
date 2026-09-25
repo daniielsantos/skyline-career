@@ -145,10 +145,8 @@ public sealed class SimConnectClient : ISimClient
 
     /// <summary>
     /// Fixed snapshot layout — field order must match AddToDataDefinition order below.
-    /// IS PAUSED freezes Watch airborne elapsed. Do NOT pack ABSOLUTE TIME / IS SLEW
-    /// ACTIVE here — those SimVars mis-align the FLOAT64 block on MSFS 2024 (Watch
-    /// saw simAbsSec=1 + sticky slew while GS 400kt). Slew is inferred in Watch from
-    /// kinematics when needed.
+    /// IS PAUSED freezes Watch airborne elapsed. Do NOT pack IS SLEW ACTIVE or
+    /// ABSOLUTE TIME here — extra FLOAT64s mis-aligned the block on MSFS 2024.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     private struct SnapshotData
@@ -697,10 +695,8 @@ public sealed class SimConnectClient : ISimClient
             EnginesRunning = data.EnginesRunning > 0.5,
             ParkingBrake = data.ParkingBrake > 0.5,
             Paused = data.Paused > 0.5,
-            // Soft-false: packing IS SLEW ACTIVE / ABSOLUTE TIME broke snapshot
-            // alignment on MSFS 2024. Watch treats high-GS "slew" as live.
+            // Live Host never packs IS SLEW ACTIVE (breaks FLOAT64 alignment).
             SlewActive = false,
-            AbsoluteTimeSec = 0,
             SimRate = data.SimRate,
             CgPercent = cgMacPercent,
             GrossWeightLb = data.GrossWeightLb,

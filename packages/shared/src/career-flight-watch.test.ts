@@ -936,51 +936,35 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(gate.elapsedMs, 20 * 60_000);
   });
 
-  it('treats sticky IS PAUSED as live when position moved', () => {
-    const prev = {
-      onGround: false,
-      enginesRunning: true,
-      paused: true,
-      position: { lat: -25.5, lon: -49.2 },
-    };
-    const stuck = {
-      ...prev,
-      position: { lat: -25.5, lon: -49.2 },
-    };
-    const moved = {
-      ...prev,
-      position: { lat: -25.52, lon: -49.18 },
-    };
-    assert.equal(isSimPlaybackFrozen(stuck, prev), true);
-    assert.equal(isSimPlaybackFrozen(moved, prev), false);
-    assert.equal(isSimPlaybackFrozen(moved), true);
+  it('freezes playback only for pause or slew flags', () => {
     assert.equal(
-      isSimPlaybackFrozen({ ...moved, positionHeld: true }, prev),
+      isSimPlaybackFrozen({
+        onGround: false,
+        enginesRunning: true,
+        paused: true,
+        groundSpeedKt: 400,
+      }),
       true,
     );
-  });
-
-  it('ignores false slew while the aircraft is clearly flying', () => {
-    const prev = {
-      onGround: false,
-      enginesRunning: true,
-      slewActive: true,
-      position: { lat: -25.5, lon: -49.2 },
-    };
-    const flying = {
-      ...prev,
-      groundSpeedKt: 400,
-      position: { lat: -25.52, lon: -49.18 },
-    };
-    const parkedSlew = {
-      onGround: true,
-      enginesRunning: false,
-      slewActive: true,
-      groundSpeedKt: 0,
-      position: { lat: -25.5, lon: -49.2 },
-    };
-    assert.equal(isSimPlaybackFrozen(flying, prev), false);
-    assert.equal(isSimPlaybackFrozen(parkedSlew, prev), true);
+    assert.equal(
+      isSimPlaybackFrozen({
+        onGround: false,
+        enginesRunning: true,
+        slewActive: true,
+        groundSpeedKt: 0,
+      }),
+      true,
+    );
+    assert.equal(
+      isSimPlaybackFrozen({
+        onGround: false,
+        enginesRunning: true,
+        paused: false,
+        slewActive: false,
+        groundSpeedKt: 400,
+      }),
+      false,
+    );
   });
 
   it('uses 50% airborne gate for routes under 100 nm', () => {

@@ -192,6 +192,12 @@ export function DispatchActivePanel(props: {
     stickyFuelRef.current = {};
   }
   stickyInjectStatusRef.current = props.loadOfpAutoStatus;
+  // Resume-prep inject chrome: survives Watch reconnect after OFP load yields
+  // the pipe (toggle used to blink off then on when inject finished).
+  const resumePrepLatchRef = useRef<{
+    missionId: string | null;
+    on: boolean;
+  }>({ missionId: null, on: false });
   const preflightWasReadyRef = useRef(false);
   useEffect(() => {
     preflightWasReadyRef.current = false;
@@ -1362,32 +1368,45 @@ export function DispatchActivePanel(props: {
               nearOrigin: nearOriginNow,
               nearDest: nearDestNow,
             });
-            // Keep Resume prep chrome while inject owns the pipe or just failed
-            // (Watch may briefly look idle after server stop — button used to
-            // vanish then reappear).
-            const resumePrepHold =
+            // Latch Resume prep chrome across Watch yield after inject (pipe
+            // stop briefly drops running/onGround → toggle used to vanish).
+            // Clear only on real takeoff or near dest — not on Watch flaps.
+            if (resumePrepLatchRef.current.missionId !== mission.id) {
+              resumePrepLatchRef.current = {
+                missionId: mission.id,
+                on: false,
+              };
+            }
+            const resumePrepInjectHold =
               props.loadOfpAutoStatus === 'loading' ||
               props.loadOfpAutoStatus === 'done' ||
               props.loadOfpAutoStatus === 'failed';
+            const clearResumePrepLatch =
+              nearDestNow ||
+              mission.status !== 'in_flight' ||
+              (watchLive && liveOnGroundNow === false);
+            if (clearResumePrepLatch) {
+              resumePrepLatchRef.current.on = false;
+            } else if (resumePrepCore || resumePrepInjectHold) {
+              resumePrepLatchRef.current.on = true;
+            }
             const resumePrep =
               resumePrepCore ||
               (enRoute &&
                 mission.status === 'in_flight' &&
-                resumePrepHold &&
+                resumePrepLatchRef.current.on &&
                 !nearDestNow);
             // Ground after airborne is only a "landing" for settle UX when near
             // dest. MSFS restart dumps the AC at origin and must not look settled.
+            // Resume prep title stays fixed length — READY/BUSY flips used to
+            // shove the inject switch in the head row.
             const enRouteHeadline = !liveOnGroundNow
               ? 'EN ROUTE · LIVE LOAD'
               : !sawAirborneNow
                 ? 'ON GROUND · WAITING FOR DEPARTURE'
                 : !nearDestNow
-                  ? nearOriginNow
-                    ? injectBusy
-                      ? 'ON GROUND · RESUME PREP'
-                      : ready
-                        ? 'ON GROUND · RESUME PREP READY'
-                        : 'ON GROUND · BACK AT DEPARTURE'
+                  ? resumePrep || nearOriginNow
+                    ? 'ON GROUND · RESUME PREP'
                     : 'ON GROUND · NOT AT DESTINATION'
                   : !watchLive
                     ? 'LANDED · WATCH RECONNECTING'
@@ -1399,7 +1418,7 @@ export function DispatchActivePanel(props: {
               : !sawAirborneNow
                 ? 'Still on the ramp — Watch ignores the MSFS menu and aircraft reloads. Take off to depart.'
                 : !nearDestNow
-                  ? nearOriginNow
+                  ? resumePrep || nearOriginNow
                     ? 'Back at departure (MSFS reload or return) — enable Airframe inject to reload fuel/payload, then take off again. Settle only at the destination.'
                     : 'On the ground away from the destination — relocate to the arrival airport (or abandon). Settle only near dest.'
                   : !watchLive
@@ -1949,110 +1968,100 @@ export function DispatchActivePanel(props: {
                           {enRouteHeadline}
                         </h3>
                         <div className="dispatch-enroute-live-head-actions">
-                          {resumePrep &&
-                          (loadPath === 'inject' ||
-                            mission.injectCapable === true ||
-                            props.loadOfpAutoStatus === 'failed' ||
-                            props.loadOfpAutoStatus === 'loading' ||
-                            props.loadOfpAutoStatus === 'done' ||
-                            props.skylineInjectEnabled) ? (
-                            <div className="skyline-inject-row">
-                              {(() => {
-                                const injectStatus =
-                                  injectFailed
-                                    ? (props.loadOfpAutoError ??
-                                      'Inject failed — turn Airframe inject on to retry.')
-                                    : props.loadOfpAutoStatus === 'loading'
-                                      ? (props.loadOfpProgress?.message ??
-                                        'Writing fuel + payload. Turn off to stop.')
-                                      : confirming
-                                        ? 'Writes finished — waiting for Loaded vs Due.'
-                                        : !props.simBridge?.connected &&
-                                            !watchLive
-                                          ? 'Start SimBridge, then turn inject on.'
-                                          : !ready
-                                            ? 'Turn Airframe inject on to reload after the MSFS restart.'
-                                            : null;
-                                return injectStatus ? (
-                                  <p
-                                    className={`skyline-inject-status${
-                                      injectFailed
-                                        ? ' skyline-inject-status-fail'
-                                        : injectBusy
-                                          ? ' skyline-inject-status-busy'
-                                          : ''
-                                    }`}
-                                    aria-live="polite"
-                                  >
-                                    {injectStatus}
-                                  </p>
-                                ) : null;
-                              })()}
-                              <button
-                                type="button"
-                                role="switch"
-                                className={`skyline-inject-switch${
-                                  injectSwitchOn
-                                    ? ' skyline-inject-switch-on'
-                                    : ''
-                                }${
-                                  injectBusy
-                                    ? ' skyline-inject-switch-busy'
-                                    : ''
-                                }`}
-                                aria-checked={injectSwitchOn}
-                                disabled={
-                                  injecting
-                                    ? false
-                                    : busy ||
-                                      !(
-                                        props.simBridge?.connected ||
-                                        watchLive
-                                      )
-                                }
-                                title={
-                                  injectSwitchOn
-                                    ? injecting
-                                      ? 'Turn off to cancel fuel/payload inject'
-                                      : confirming
-                                        ? 'Waiting for live sample — turn off to dismiss'
-                                        : 'Airframe inject is on — turn off to leave load as-is'
-                                    : 'Turn on to reload OFP fuel and payload after restart'
-                                }
-                                onClick={() =>
-                                  props.onToggleSkylineInject(!injectSwitchOn)
-                                }
+                          {resumePrep ? (
+                            <button
+                              type="button"
+                              role="switch"
+                              className={`skyline-inject-switch${
+                                injectSwitchOn
+                                  ? ' skyline-inject-switch-on'
+                                  : ''
+                              }${
+                                injectBusy
+                                  ? ' skyline-inject-switch-busy'
+                                  : ''
+                              }`}
+                              aria-checked={injectSwitchOn}
+                              disabled={
+                                injecting
+                                  ? false
+                                  : busy ||
+                                    !(
+                                      props.simBridge?.connected ||
+                                      watchLive
+                                    )
+                              }
+                              title={
+                                injectSwitchOn
+                                  ? injecting
+                                    ? 'Turn off to cancel fuel/payload inject'
+                                    : confirming
+                                      ? 'Waiting for live sample — turn off to dismiss'
+                                      : 'Airframe inject is on — turn off to leave load as-is'
+                                  : 'Turn on to reload OFP fuel and payload after restart'
+                              }
+                              onClick={() =>
+                                props.onToggleSkylineInject(!injectSwitchOn)
+                              }
+                            >
+                              <span
+                                className="skyline-inject-switch-track"
+                                aria-hidden="true"
                               >
-                                <span
-                                  className="skyline-inject-switch-track"
-                                  aria-hidden="true"
-                                >
-                                  <span className="skyline-inject-switch-knob" />
-                                </span>
-                                <span className="skyline-inject-switch-label">
-                                  <strong>Airframe inject</strong>
-                                  <small>
-                                    {injecting
-                                      ? 'Writing…'
-                                      : confirming
-                                        ? 'Checking…'
-                                        : injectFailed
-                                          ? 'Failed · retry'
-                                          : props.skylineInjectEnabled
-                                            ? 'On'
-                                            : 'Off'}
-                                  </small>
-                                </span>
-                              </button>
-                            </div>
+                                <span className="skyline-inject-switch-knob" />
+                              </span>
+                              <span className="skyline-inject-switch-label">
+                                <strong>Airframe inject</strong>
+                                <small>
+                                  {injecting
+                                    ? 'Writing…'
+                                    : confirming
+                                      ? 'Checking…'
+                                      : injectFailed
+                                        ? 'Failed · retry'
+                                        : props.skylineInjectEnabled
+                                          ? 'On'
+                                          : 'Off'}
+                                </small>
+                              </span>
+                            </button>
                           ) : null}
-                          <span className="dispatch-enroute-live-checked">
-                            Checked{' '}
-                            {new Date(check.checkedAtIso).toLocaleTimeString()}
-                          </span>
                         </div>
                       </div>
                       <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
+                      {resumePrep
+                        ? (() => {
+                            const injectStatus =
+                              injectFailed
+                                ? (props.loadOfpAutoError ??
+                                  'Inject failed — turn Airframe inject on to retry.')
+                                : props.loadOfpAutoStatus === 'loading'
+                                  ? (props.loadOfpProgress?.message ??
+                                    'Writing fuel + payload. Turn off to stop.')
+                                  : confirming
+                                    ? 'Writes finished — waiting for Loaded vs Due.'
+                                    : !props.simBridge?.connected &&
+                                        !watchLive
+                                      ? 'Start SimBridge, then turn inject on.'
+                                      : !ready
+                                        ? 'Turn Airframe inject on to reload after the MSFS restart.'
+                                        : null;
+                            return injectStatus ? (
+                              <p
+                                className={`skyline-inject-status dispatch-enroute-inject-status${
+                                  injectFailed
+                                    ? ' skyline-inject-status-fail'
+                                    : injectBusy
+                                      ? ' skyline-inject-status-busy'
+                                      : ''
+                                }`}
+                                aria-live="polite"
+                              >
+                                {injectStatus}
+                              </p>
+                            ) : null;
+                          })()
+                        : null}
                       {liveLoadGrid}
                     </div>
                   </>

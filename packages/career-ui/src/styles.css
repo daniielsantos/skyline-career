@@ -3762,9 +3762,9 @@ tr.lot-locked {
 
 .dispatch-enroute-live-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin: 0;
   padding: 0;
   min-width: 0;
@@ -3772,11 +3772,11 @@ tr.lot-locked {
 
 .dispatch-enroute-live-head-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.45rem 0.75rem;
-  flex-shrink: 0;
+  gap: 0.45rem;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
@@ -3786,7 +3786,14 @@ tr.lot-locked {
 
 .dispatch-enroute-live-head .dispatch-enroute-block-title {
   color: var(--ok);
+  flex: 1 1 auto;
   min-width: 0;
+  /* En route rule sets width:100% on titles — that shoved the inject switch. */
+  width: auto !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dispatch-enroute-live-checked {
@@ -3800,6 +3807,13 @@ tr.lot-locked {
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.3;
+}
+
+.dispatch-enroute-inject-status {
+  margin: 0;
+  max-width: none;
+  text-align: left;
+  flex: none;
 }
 
 .dispatch-enroute-live .preflight-load-grid {

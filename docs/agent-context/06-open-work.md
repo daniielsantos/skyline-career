@@ -4,7 +4,17 @@ Atualizado 2026-09-24: **Ports Network IA** — Catalog + Network (chips/mapa); 
 
 Atualizado 2026-09-24: **Charter → Class Ops** — settle Charter credita horas/cleans Class Ops (sem Cargo Ops). Spec: [`08-economy.md`](./08-economy.md) + [`29-flight-debrief.md`](./29-flight-debrief.md).
 
-Atualizado 2026-09-24: **EN ROUTE live load polish** — tanks `--live-fuel-*` + Aircraft|Origin 50/50 (preflight intact). Shipping w/ desktop release.
+Atualizado 2026-09-24: **EN ROUTE live load scale-down** — tanks/stations/CG ~25–30% menores (herói → densos como OFP/Cargo).
+
+Atualizado 2026-09-24: **EN ROUTE live load polish** — tanks `--live-fuel-*` + Aircraft|Origin 50/50 (preflight intact).
+
+### EN ROUTE live load too tall (2026-09-24) — diag
+
+**Sintoma:** faixa Fuel/Stations/CG dominava o painel EN ROUTE (OFP/Cargo miúdos em cima; blocos verdes “hero”).
+
+**Causa:** `--live-fuel-h` até `8rem`, tile `min-height: 12.5rem`, cells stations até `4.5rem` — pensado para widar tanks, passou do ponto.
+
+**Fix:** só CSS `.dispatch-enroute-live-tiles` — fuel ≈ `3.6–5.25rem`, cells ≈ `2.45–3.25rem`, tile min ≈ `9.25rem`, CG min `5rem`, gaps/padding menores. Preflight intacto.
 
 ### EN ROUTE tanks + Aircraft|Origin (2026-09-24) — diag
 

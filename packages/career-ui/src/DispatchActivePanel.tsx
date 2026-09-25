@@ -1969,99 +1969,100 @@ export function DispatchActivePanel(props: {
                         </h3>
                         <div className="dispatch-enroute-live-head-actions">
                           {resumePrep ? (
-                            <button
-                              type="button"
-                              role="switch"
-                              className={`skyline-inject-switch${
-                                injectSwitchOn
-                                  ? ' skyline-inject-switch-on'
-                                  : ''
-                              }${
-                                injectBusy
-                                  ? ' skyline-inject-switch-busy'
-                                  : ''
-                              }`}
-                              aria-checked={injectSwitchOn}
-                              disabled={
-                                injecting
-                                  ? false
-                                  : busy ||
-                                    !(
-                                      props.simBridge?.connected ||
-                                      watchLive
-                                    )
-                              }
-                              title={
-                                injectSwitchOn
-                                  ? injecting
-                                    ? 'Turn off to cancel fuel/payload inject'
-                                    : confirming
-                                      ? 'Waiting for live sample — turn off to dismiss'
-                                      : 'Airframe inject is on — turn off to leave load as-is'
-                                  : 'Turn on to reload OFP fuel and payload after restart'
-                              }
-                              onClick={() =>
-                                props.onToggleSkylineInject(!injectSwitchOn)
-                              }
-                            >
-                              <span
-                                className="skyline-inject-switch-track"
-                                aria-hidden="true"
+                            <div className="skyline-inject-row">
+                              {(() => {
+                                const injectStatus =
+                                  injectFailed
+                                    ? (props.loadOfpAutoError ??
+                                      'Inject failed — turn Airframe inject on to retry.')
+                                    : props.loadOfpAutoStatus === 'loading'
+                                      ? (props.loadOfpProgress?.message ??
+                                        'Writing fuel + payload. Turn off to stop.')
+                                      : confirming
+                                        ? 'Writes finished — waiting for Loaded vs Due.'
+                                        : !props.simBridge?.connected &&
+                                            !watchLive
+                                          ? 'Start SimBridge, then turn inject on.'
+                                          : !ready
+                                            ? 'Turn Airframe inject on to reload after the MSFS restart.'
+                                            : null;
+                                return injectStatus ? (
+                                  <p
+                                    className={`skyline-inject-status${
+                                      injectFailed
+                                        ? ' skyline-inject-status-fail'
+                                        : injectBusy
+                                          ? ' skyline-inject-status-busy'
+                                          : ''
+                                    }`}
+                                    aria-live="polite"
+                                    title={injectStatus}
+                                  >
+                                    {injectStatus}
+                                  </p>
+                                ) : null;
+                              })()}
+                              <button
+                                type="button"
+                                role="switch"
+                                className={`skyline-inject-switch${
+                                  injectSwitchOn
+                                    ? ' skyline-inject-switch-on'
+                                    : ''
+                                }${
+                                  injectBusy
+                                    ? ' skyline-inject-switch-busy'
+                                    : ''
+                                }`}
+                                aria-checked={injectSwitchOn}
+                                disabled={
+                                  injecting
+                                    ? false
+                                    : busy ||
+                                      !(
+                                        props.simBridge?.connected ||
+                                        watchLive
+                                      )
+                                }
+                                title={
+                                  injectSwitchOn
+                                    ? injecting
+                                      ? 'Turn off to cancel fuel/payload inject'
+                                      : confirming
+                                        ? 'Waiting for live sample — turn off to dismiss'
+                                        : 'Airframe inject is on — turn off to leave load as-is'
+                                    : 'Turn on to reload OFP fuel and payload after restart'
+                                }
+                                onClick={() =>
+                                  props.onToggleSkylineInject(!injectSwitchOn)
+                                }
                               >
-                                <span className="skyline-inject-switch-knob" />
-                              </span>
-                              <span className="skyline-inject-switch-label">
-                                <strong>Airframe inject</strong>
-                                <small>
-                                  {injecting
-                                    ? 'Writing…'
-                                    : confirming
-                                      ? 'Checking…'
-                                      : injectFailed
-                                        ? 'Failed · retry'
-                                        : props.skylineInjectEnabled
-                                          ? 'On'
-                                          : 'Off'}
-                                </small>
-                              </span>
-                            </button>
+                                <span
+                                  className="skyline-inject-switch-track"
+                                  aria-hidden="true"
+                                >
+                                  <span className="skyline-inject-switch-knob" />
+                                </span>
+                                <span className="skyline-inject-switch-label">
+                                  <strong>Airframe inject</strong>
+                                  <small>
+                                    {injecting
+                                      ? 'Writing…'
+                                      : confirming
+                                        ? 'Checking…'
+                                        : injectFailed
+                                          ? 'Failed · retry'
+                                          : props.skylineInjectEnabled
+                                            ? 'On'
+                                            : 'Off'}
+                                  </small>
+                                </span>
+                              </button>
+                            </div>
                           ) : null}
                         </div>
                       </div>
                       <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
-                      {resumePrep
-                        ? (() => {
-                            const injectStatus =
-                              injectFailed
-                                ? (props.loadOfpAutoError ??
-                                  'Inject failed — turn Airframe inject on to retry.')
-                                : props.loadOfpAutoStatus === 'loading'
-                                  ? (props.loadOfpProgress?.message ??
-                                    'Writing fuel + payload. Turn off to stop.')
-                                  : confirming
-                                    ? 'Writes finished — waiting for Loaded vs Due.'
-                                    : !props.simBridge?.connected &&
-                                        !watchLive
-                                      ? 'Start SimBridge, then turn inject on.'
-                                      : !ready
-                                        ? 'Turn Airframe inject on to reload after the MSFS restart.'
-                                        : null;
-                            return injectStatus ? (
-                              <p
-                                className={`skyline-inject-status dispatch-enroute-inject-status${
-                                  injectFailed
-                                    ? ' skyline-inject-status-fail'
-                                    : injectBusy
-                                      ? ' skyline-inject-status-busy'
-                                      : ''
-                                }`}
-                                aria-live="polite"
-                              >
-                                {injectStatus}
-                              </p>
-                            ) : null;
-                          })()
-                        : null}
                       {liveLoadGrid}
                     </div>
                   </>

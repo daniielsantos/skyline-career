@@ -2424,6 +2424,14 @@ export function postDebugClaimPort(opts?: {
   });
 }
 
+/** Dev-only — persist unlock of every Class Ops freighter class. */
+export function postDebugUnlockClassOps() {
+  return api<{ classOps: CareerClassOps }>('/api/debug/unlock-class-ops', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export function postAccept(opts: {
   lotId: string;
   kg?: number;

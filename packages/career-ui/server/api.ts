@@ -12336,6 +12336,23 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/debug/unlock-class-ops') {
+        if (!requestDevMode(req)) {
+          send(res, 403, { error: 'Dev Mode is required' });
+          return;
+        }
+        const unlockCompanyId = companyIdFromRequest(req);
+        const payload = await withCareerWrite(
+          (_world, missions) => {
+            missions.classOps = unlockAllCareerClassOps(missions.classOps);
+            return { classOps: missions.classOps };
+          },
+          { persist: 'company', companyId: unlockCompanyId },
+        );
+        send(res, 200, payload);
+        return;
+      }
+
       if (req.method === 'GET' && path === '/api/debug/economy-pulse') {
         const payload = await withCareerRead((world) => computeEconomyPulse(world));
         send(res, 200, payload);

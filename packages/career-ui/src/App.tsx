@@ -84,6 +84,7 @@ import {
   postTick,
   postDebugCreditWallet,
   postDebugClaimPort,
+  postDebugUnlockClassOps,
   postWatchStart,
   postWatchStop,
   type AircraftClass,
@@ -8076,6 +8077,15 @@ export function App() {
     });
   }
 
+  async function onDebugUnlockClassOps() {
+    await run(async () => {
+      const result = await postDebugUnlockClassOps();
+      setClassOps(result.classOps ?? null);
+      setToastKind('ok');
+      setToast('Class Ops unlocked (all freighter classes)');
+    });
+  }
+
   async function onTick(ticks = 1) {
     const hoursLabel =
       ticks === 1
@@ -14053,82 +14063,6 @@ export function App() {
               <strong>{formatClock(continuousHours)}</strong>
             </div>
           </div>
-          {devMode ? (
-            <div className="topbar-actions">
-              <button
-                type="button"
-                className="action"
-                onClick={() => void onTick(96)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 1 day (96 ticks)"
-              >
-                {formatTickAdvanceButton(96, '+1 day')}
-              </button>
-              <button
-                type="button"
-                className="action"
-                onClick={() => void onTick(96 * 3)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 3 days (288 ticks)"
-              >
-                {formatTickAdvanceButton(96 * 3, '+3 day')}
-              </button>
-              <button
-                type="button"
-                className="action"
-                onClick={() => void onTick(96 * 7)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 7 days (672 ticks)"
-              >
-                {formatTickAdvanceButton(96 * 7, '+7 day')}
-              </button>
-              <button
-                type="button"
-                className="action"
-                onClick={() => void onTick(96 * 14)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
-              >
-                {formatTickAdvanceButton(96 * 14, '+14 day')}
-              </button>
-              <button
-                type="button"
-                className="action"
-                onClick={() => void onTick(96 * 30)}
-                disabled={busy}
-                title="Advance economy + crew wall-clock by 30 days (2880 ticks)"
-              >
-                {formatTickAdvanceButton(96 * 30, '+30 day')}
-              </button>
-              <button
-                type="button"
-                className="action ghost"
-                onClick={() => void onDebugCreditWallet(5_000)}
-                disabled={busy}
-                title="Dev Mode — add $5,000 to the wallet"
-              >
-                +$5K
-              </button>
-              <button
-                type="button"
-                className="action ghost"
-                onClick={() => void onDebugCreditWallet(100_000)}
-                disabled={busy}
-                title="Dev Mode — add $100,000 to the wallet"
-              >
-                +$100K
-              </button>
-              <button
-                type="button"
-                className="action ghost"
-                onClick={() => void onDebugClaimSantos()}
-                disabled={busy}
-                title="Dev Mode — force Port FBO at Port of Santos (BRSSZ) for the active company"
-              >
-                Claim Santos
-              </button>
-            </div>
-          ) : null}
         </header>
 
         <div className="main-content">
@@ -20150,10 +20084,9 @@ export function App() {
             <div className="settings-card">
               <h3>Developer</h3>
               <p className="settings-help">
-                Shows Rivals, Lab, Pulse, time-skip, wallet credit, reset world, and
-                Dispatch Advanced cheats (depart / settle without MSFS). Unlocks
-                Cargo Ops, Class Ops, and aircraft lease while on. Leave off for
-                normal play.
+                Shows Rivals, Lab, Pulse, and Dispatch Advanced cheats (depart /
+                settle without MSFS). While on, Cargo Ops, Class Ops, and lease
+                gates open for the session. Leave off for normal play.
               </p>
               <div className="settings-choice" role="radiogroup" aria-label="Dev mode">
                 <button
@@ -20187,6 +20120,115 @@ export function App() {
                   <small>Cheats &amp; debug</small>
                 </button>
               </div>
+              {devMode ? (
+                <div className="settings-dev-tools">
+                  <div className="settings-dev-group">
+                    <p className="aircraft-card-section-label">Time</p>
+                    <div className="settings-dev-actions">
+                      <button
+                        type="button"
+                        className="action"
+                        onClick={() => void onTick(96)}
+                        disabled={busy}
+                        title="Advance economy + crew wall-clock by 1 day (96 ticks)"
+                      >
+                        {formatTickAdvanceButton(96, '+1 day')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action"
+                        onClick={() => void onTick(96 * 3)}
+                        disabled={busy}
+                        title="Advance economy + crew wall-clock by 3 days (288 ticks)"
+                      >
+                        {formatTickAdvanceButton(96 * 3, '+3 day')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action"
+                        onClick={() => void onTick(96 * 7)}
+                        disabled={busy}
+                        title="Advance economy + crew wall-clock by 7 days (672 ticks)"
+                      >
+                        {formatTickAdvanceButton(96 * 7, '+7 day')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action"
+                        onClick={() => void onTick(96 * 14)}
+                        disabled={busy}
+                        title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
+                      >
+                        {formatTickAdvanceButton(96 * 14, '+14 day')}
+                      </button>
+                      <button
+                        type="button"
+                        className="action"
+                        onClick={() => void onTick(96 * 30)}
+                        disabled={busy}
+                        title="Advance economy + crew wall-clock by 30 days (2880 ticks)"
+                      >
+                        {formatTickAdvanceButton(96 * 30, '+30 day')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="settings-dev-group">
+                    <p className="aircraft-card-section-label">Wallet</p>
+                    <div className="settings-dev-actions">
+                      <button
+                        type="button"
+                        className="action ghost"
+                        onClick={() => void onDebugCreditWallet(5_000)}
+                        disabled={busy}
+                        title="Add $5,000 to the active company wallet"
+                      >
+                        +$5K
+                      </button>
+                      <button
+                        type="button"
+                        className="action ghost"
+                        onClick={() => void onDebugCreditWallet(100_000)}
+                        disabled={busy}
+                        title="Add $100,000 to the active company wallet"
+                      >
+                        +$100K
+                      </button>
+                    </div>
+                  </div>
+                  <div className="settings-dev-group">
+                    <p className="aircraft-card-section-label">Ports</p>
+                    <div className="settings-dev-actions">
+                      <button
+                        type="button"
+                        className="action ghost"
+                        onClick={() => void onDebugClaimSantos()}
+                        disabled={busy}
+                        title="Force Port FBO at Port of Santos (BRSSZ) for the active company"
+                      >
+                        Claim Santos
+                      </button>
+                    </div>
+                  </div>
+                  <div className="settings-dev-group">
+                    <p className="aircraft-card-section-label">Progression</p>
+                    <p className="settings-help">
+                      Writes unlocks into the company save (unlike the session
+                      gates above).
+                    </p>
+                    <div className="settings-dev-actions">
+                      <button
+                        type="button"
+                        className="action ghost"
+                        onClick={() => void onDebugUnlockClassOps()}
+                        disabled={busy}
+                        title="Persist unlock of every freighter Class Ops rung"
+                      >
+                        Unlock Class Ops
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </section>

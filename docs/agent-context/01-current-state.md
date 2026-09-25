@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **80563f6c** / desktop **0.3.322** shipped: Stop Airframes sidebar click from double-fetching the market board. Release: [v0.3.322](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.322).
+
+
 `main` **c46405fc** / desktop **0.3.321** shipped: Reorder sidebar and stop Crew from painting VA cash on home Wallet. Release: [v0.3.321](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.321).
 
 

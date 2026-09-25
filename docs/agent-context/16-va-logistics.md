@@ -110,6 +110,8 @@ Entrar numa VA **não** funde tenants. Register já cria `co_<login>` (owner). J
 
 **Hauls prose trim (2026-09-25):** sintoma = lede + bloco “Reserved until Accept…” + empty densos. Fix = lede curto; remove section-help; empties e network hint enxutos.
 
+**Dispatch Draft some após logout/switch de conta (2026-09-25):** sintoma = Prepare no Manifest → logout (ex. contratar Line crew no owner) → login de volta → card DISPATCH DRAFT sumia até reiniciar o app. Causa = draft vivia no `localStorage` mas (1) restore tentava **uma vez por profile** (`stagingRestoreAttemptedRef`) e não resetava no auth switch; (2) falha de restore com `activeMission` **apagava** o draft. Fix = key por profile+accountId; reset restore no auth; `shouldDiscardPersistedStagingDraft` só limpa draft obsoleto (não bloqueio temporário).
+
 **Roster list stuck at bottom (2026-09-22):** sintoma = título Roster no topo, lista no terço inferior (gap enorme). Causa = `va-pane-card` com `flex:1` + `.settings-card` `display:grid` → `align-content:stretch` inflava as tracks. Fix = `align-content: start` no card do shell (conteúdo cola no topo; shell ainda preenche altura).
 
 **VA directory BusyBlock (2026-09-22):** sintoma = abrir VAs mostrava toolbar vazia / “No VAs…” sem animação. Causa = fetch sem `loaded` gate. Fix = `BusyBlock` “Loading VAs…” (mesmo padrão My VA) até `fetchVaDirectory` resolver.

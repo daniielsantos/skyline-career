@@ -238,6 +238,7 @@ import {
   clearPersistedStagingDraft,
   readPersistedStagingDraft,
   writePersistedStagingDraft,
+  shouldDiscardPersistedStagingDraft,
 } from './staging-draft-persist';
 import { AirportNamesProvider, IcaoLink } from './IcaoLink';
 import { BusyBlock, BusyBoot, BusyChip, BusyStatus, TableSkeleton } from './Busy';
@@ -5991,12 +5992,16 @@ export function App() {
 
   useEffect(() => {
     stagingRestoreAttemptedRef.current = null;
-  }, [activeCareerProfile?.id]);
+  }, [activeCareerProfile?.id, authAccountId, authSessionEpoch]);
 
   useEffect(() => {
     if (!activeCareerProfile?.id || !staging) return;
-    writePersistedStagingDraft(activeCareerProfile.id, staging);
-  }, [activeCareerProfile?.id, staging]);
+    writePersistedStagingDraft(
+      activeCareerProfile.id,
+      staging,
+      authAccountId,
+    );
+  }, [activeCareerProfile?.id, authAccountId, staging]);
 
   // Poll MSFS watch session while active. One shot when idle so a mid-flight
   // reload can still attach; stop interval after settle (no forever /api/watch/status).
@@ -6775,10 +6780,14 @@ export function App() {
     ) {
       return;
     }
-    if (stagingRestoreAttemptedRef.current === activeCareerProfile.id) return;
-    stagingRestoreAttemptedRef.current = activeCareerProfile.id;
+    const restoreKey = `${activeCareerProfile.id}:${authAccountId ?? 'local'}`;
+    if (stagingRestoreAttemptedRef.current === restoreKey) return;
+    stagingRestoreAttemptedRef.current = restoreKey;
 
-    const persisted = readPersistedStagingDraft(activeCareerProfile.id);
+    const persisted = readPersistedStagingDraft(
+      activeCareerProfile.id,
+      authAccountId,
+    );
     if (!persisted) return;
     if (
       !canRestoreStagingDraft(
@@ -6787,7 +6796,18 @@ export function App() {
         activeMission?.id,
       )
     ) {
-      clearPersistedStagingDraft(activeCareerProfile.id);
+      if (
+        shouldDiscardPersistedStagingDraft(
+          persisted,
+          missions,
+          activeMission?.id,
+        )
+      ) {
+        clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
+      } else {
+        // Temporarily blocked (e.g. open flight) — allow another attempt later.
+        stagingRestoreAttemptedRef.current = null;
+      }
       return;
     }
     setStaging(persisted as StagingDraft);
@@ -6814,6 +6834,7 @@ export function App() {
   }, [
     showProfileGate,
     activeCareerProfile?.id,
+    authAccountId,
     careerReady,
     missions,
     staging,
@@ -7787,7 +7808,7 @@ export function App() {
       return;
     }
     if (activeCareerProfile?.id) {
-      clearPersistedStagingDraft(activeCareerProfile.id);
+      clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
     }
     setStaging(null);
   }, [
@@ -7795,6 +7816,8 @@ export function App() {
     activeMission?.status,
     staging?.intoMissionId,
     staging?.replaceManifest,
+    activeCareerProfile?.id,
+    authAccountId,
   ]);
 
   async function run(
@@ -11067,14 +11090,14 @@ export function App() {
     setStagingFerryOpen(false);
     if (staging?.replaceManifest) {
       if (activeCareerProfile?.id) {
-        clearPersistedStagingDraft(activeCareerProfile.id);
+        clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
       }
       setStaging(null);
       goToTab('staging');
       return;
     }
     if (activeCareerProfile?.id) {
-      clearPersistedStagingDraft(activeCareerProfile.id);
+      clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
     }
     setStaging(null);
     // Keep Active Tour after Discard Manifest — Resume card → Base until Drop.
@@ -11532,7 +11555,7 @@ export function App() {
           await switchCompanyForVa(memberVaCompanyIdRef.current);
         }
         if (activeCareerProfile?.id) {
-          clearPersistedStagingDraft(activeCareerProfile.id);
+          clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
         }
         setStaging(null);
         setWatchAutoPaused(false);
@@ -11670,7 +11693,7 @@ export function App() {
             await switchCompanyForVa(memberVaCompanyIdRef.current);
           }
           if (activeCareerProfile?.id) {
-            clearPersistedStagingDraft(activeCareerProfile.id);
+            clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
           }
           setStaging(null);
           setWatchAutoPaused(false);

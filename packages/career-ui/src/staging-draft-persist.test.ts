@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   canRestoreStagingDraft,
+  shouldDiscardPersistedStagingDraft,
   type PersistedStagingDraft,
 } from './staging-draft-persist.js';
 
@@ -108,5 +109,39 @@ describe('canRestoreStagingDraft', () => {
       },
     };
     assert.equal(canRestoreStagingDraft(draft, [], 'mission-open'), false);
+  });
+
+  it('keeps desk-hold draft when restore is only blocked by an open flight', () => {
+    const draft: PersistedStagingDraft = {
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      originName: 'SBGR',
+      destName: 'SBKP',
+      aircraft: 'light_turboprop',
+      aircraftId: 'acf-va-1',
+      lines: [],
+      deskHold: {
+        id: 'hold-1',
+        kind: 'demand',
+        commodityId: 'dry',
+        kg: 1000,
+      },
+    };
+    assert.equal(
+      shouldDiscardPersistedStagingDraft(draft, [], 'mission-open'),
+      false,
+    );
+  });
+
+  it('keeps lot draft when restore is only blocked by an open flight', () => {
+    assert.equal(
+      shouldDiscardPersistedStagingDraft(baseDraft(), [], 'mission-open'),
+      false,
+    );
+  });
+
+  it('discards empty lot draft with no desk hold', () => {
+    const draft = { ...baseDraft(), lines: [] };
+    assert.equal(shouldDiscardPersistedStagingDraft(draft, []), true);
   });
 });

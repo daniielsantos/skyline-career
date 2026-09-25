@@ -1259,18 +1259,15 @@ export function resolveSettledAircraftFuelKg(
     Number.isFinite(opts.residualFuelKg)
   ) {
     const hangarBefore = Math.max(0, aircraft.fuelKg);
-    // Never credit unpaid sim fuel above the hangar tank.
+    // Live Watch residual is source of truth for what remains in tanks.
+    // Never credit unpaid sim fuel above the hangar (no free Jet-A).
+    // Do not floor with tripBurn — that class/nm estimate is not real burn and
+    // was leaving hangar ~100 lb above Accu-Sim after short hops.
     const residualUse = Math.min(
       Math.max(0, opts.residualFuelKg),
       hangarBefore,
     );
-    let next = residualUse - mxLedger;
-    // Preserve hangar surplus that never entered the sim (OFP inject < hangar).
-    const tripBurn = resolveTripBurnKg();
-    if (tripBurn > 0) {
-      next = Math.max(next, hangarBefore - tripBurn - mxLedger);
-    }
-    next = Math.min(next, hangarBefore);
+    const next = residualUse - mxLedger;
     return {
       fuelKg: clamp(next),
       mxFuelDrainAppliedKg: Math.round(mxLedger * 10) / 10,

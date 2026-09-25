@@ -648,7 +648,7 @@ describe('career fleet hangar', () => {
     assert.ok(resolved.mxFuelDrainAppliedKg > 5);
   });
 
-  it('settle preserves hangar surplus and rejects unpaid sim fuel', () => {
+  it('settle trusts live residual and rejects unpaid sim fuel', () => {
     const world = createSeedEconomyWorld({ seed: 'mx-surplus' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
     const aircraft = state.fleet[0]!;
@@ -665,13 +665,13 @@ describe('career fleet hangar', () => {
       tripFuelBurnKg: 60,
     } as never;
 
-    const surplus = resolveSettledAircraftFuelKg(aircraft, mission, world, {
+    // Sim burned more than tripBurn estimate — hangar follows residual, not floor.
+    const burnedMore = resolveSettledAircraftFuelKg(aircraft, mission, world, {
       residualFuelKg: 40,
       mxFuelDrainTotalKg: 10,
     });
-    // hangar 200 − trip 60 − mx 10 = 130 (surplus kept; not residual−mx = 30)
-    assert.equal(surplus.fuelKg, 130);
-    assert.equal(surplus.mxFuelDrainAppliedKg, 10);
+    assert.equal(burnedMore.fuelKg, 30);
+    assert.equal(burnedMore.mxFuelDrainAppliedKg, 10);
 
     aircraft.fuelKg = 100;
     const unpaid = resolveSettledAircraftFuelKg(aircraft, mission, world, {

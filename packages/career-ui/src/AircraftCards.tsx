@@ -1253,6 +1253,38 @@ export function HangarAircraftCard(props: {
             }
           : null;
 
+  /** Visible locked primary — keeps footer height with Travel/Inspect neighbors. */
+  const lockedPrimaryLabel = !primaryAction
+    ? acf.overhaulKind
+      ? ohLeft
+        ? `Shop · ${ohLeft}`
+        : 'In shop'
+      : acf.status === 'assigned'
+        ? 'On mission'
+        : null
+    : null;
+  const lockedPrimaryTitle = acf.overhaulKind
+    ? ohLeft
+      ? `Overhaul in progress · ${ohLeft}`
+      : 'Overhaul in progress — ferry unlocks when the shop finishes'
+    : acf.status === 'assigned'
+      ? 'Finish or cancel the Dispatch mission before moving this aircraft'
+      : undefined;
+
+  const moveLockReason = !showMove
+    ? acf.overhaulKind
+      ? ohLeft
+        ? `Shop at ${acf.locationIcao} · ${ohLeft}`
+        : `Shop at ${acf.locationIcao} — ferry after overhaul`
+      : acf.status === 'maintenance'
+        ? 'In maintenance — Inspect before ferry'
+        : acf.status === 'assigned'
+          ? 'On mission — finish or cancel in Dispatch'
+          : acf.status === 'listed'
+            ? 'Listed on Market — unlist to ferry'
+            : 'Ferry unavailable'
+    : null;
+
   const ferryBlockedForBush =
     /ferry unavailable|flown mission/i.test(ferryPlanError ?? '');
   const destReady =
@@ -1534,6 +1566,15 @@ export function HangarAircraftCard(props: {
             >
               {primaryAction.label}
             </button>
+          ) : lockedPrimaryLabel ? (
+            <button
+              type="button"
+              className="action ghost hangar-primary hangar-primary-locked"
+              disabled
+              title={lockedPrimaryTitle}
+            >
+              {lockedPrimaryLabel}
+            </button>
           ) : (
             <div className="hangar-primary-spacer" aria-hidden="true" />
           )}
@@ -1697,7 +1738,46 @@ export function HangarAircraftCard(props: {
               ) : null}
             </div>
           ) : (
-            <div className="hangar-move-spacer" aria-hidden="true" />
+            <div className="hangar-move hangar-move-locked">
+              <div className="hangar-move-row">
+                <label className="staging-aircraft ferry-hub-label">
+                  Destination
+                  <FerryHubCombobox
+                    hubs={props.hubOptions}
+                    excludeIcao={acf.locationIcao}
+                    value=""
+                    onChange={() => {}}
+                    disabled
+                    placeholder={
+                      acf.overhaulKind
+                        ? 'Available after overhaul…'
+                        : 'Unavailable…'
+                    }
+                  />
+                </label>
+                <div className="hangar-move-actions">
+                  <button
+                    type="button"
+                    className="ghost hangar-move-go"
+                    disabled
+                    title={moveLockReason ?? undefined}
+                  >
+                    Plan ferry
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost hangar-move-go"
+                    disabled
+                    title={moveLockReason ?? undefined}
+                  >
+                    Plan empty flight
+                  </button>
+                </div>
+              </div>
+              {moveLockReason ? (
+                <p className="ferry-plan-meta">{moveLockReason}</p>
+              ) : null}
+            </div>
           )}
         </div>
 

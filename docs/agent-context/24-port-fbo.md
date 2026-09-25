@@ -24,6 +24,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **UI Port FBO tab (2026-09-12):** Ports sections = Catalog | **Port FBO** | Warehouse | Demand. Scout + desk auto-buy + port stock on Port FBO; Catalog = map + listings BUY + discharge ETA.
 
+**Demand Dist column (2026-09-25):** sintoma = board Demand só mostrava Dest sem nm do pickup. Causa = origem é sempre desk pickup do porto, mas UI não calculava. Fix = coluna **Dist** (GC nm pickup→dest, sortável) via `greatCircleDistanceNm` + `destLat/Lon` do snapshot.
+
 **Port FBO quiet by state (2026-09-21):** Yours → Scout first (one ranked table + All/Haul/Demand/Bridge filter); Desk auto-buy in `<details>`; Port stock collapsed. Vacant/Held → one-line hint (Claim CTA stays in title). Less desk prose.
 
 **Scout Hold amount picker (2026-09-22):** sintoma = Scout Hold reservava o kg inteiro da sugestão (esgotava WH → Demand sumia). Causa = confirm mandava `s.kg` sem UI. Fix = diálogo Hold com slider + presets 25/50/75/Max (floor 200 kg); API `kg` já existia.

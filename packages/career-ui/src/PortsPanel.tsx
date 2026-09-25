@@ -230,6 +230,7 @@ function leaseDaysLeftFromTicks(
 type DemandSortKey =
   | 'country'
   | 'dest'
+  | 'dist'
   | 'commodity'
   | 'wanted'
   | 'price'
@@ -292,12 +293,20 @@ function formatExpiresIn(
   return `${formatDuration(remainingTicks * HOURS_PER_TICK)} left`;
 }
 
-function demandSortValue(order: DemandOrderView, key: DemandSortKey): string | number {
+function demandSortValue(
+  order: DemandOrderView,
+  key: DemandSortKey,
+  distNmById?: ReadonlyMap<string, number | null>,
+): string | number {
   switch (key) {
     case 'country':
       return demandDestCountryId(order) || 'ZZ';
     case 'dest':
       return order.destIcao.toUpperCase();
+    case 'dist': {
+      const n = distNmById?.get(order.id);
+      return n != null && Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
+    }
     case 'commodity':
       return commodityLabel(order).toLowerCase();
     case 'wanted':
@@ -313,9 +322,10 @@ function compareDemandOrders(
   a: DemandOrderView,
   b: DemandOrderView,
   sort: DemandSort,
+  distNmById?: ReadonlyMap<string, number | null>,
 ): number {
-  const av = demandSortValue(a, sort.key);
-  const bv = demandSortValue(b, sort.key);
+  const av = demandSortValue(a, sort.key, distNmById);
+  const bv = demandSortValue(b, sort.key, distNmById);
   let cmp = 0;
   if (typeof av === 'number' && typeof bv === 'number') {
     cmp = av - bv;
@@ -3468,6 +3478,48 @@ export function PortsPanel(props: {
     );
   }, [demand, port]);
 
+  /** Desk pickup hub → dest great-circle nm (Demand origin is always the port pickup). */
+  const demandDistNmById = useMemo(() => {
+    const map = new Map<string, number | null>();
+    if (!port) return map;
+    const deskIcao = resolvePortDeskPickupHub(port.pickupHubs);
+    const detail = (port.pickupHubDetails ?? []).find(
+      (h) => h.icao.trim().toUpperCase() === (deskIcao ?? ''),
+    );
+    const oLat = detail?.lat ?? port.lat;
+    const oLon = detail?.lon ?? port.lon;
+    if (
+      oLat == null ||
+      oLon == null ||
+      !Number.isFinite(oLat) ||
+      !Number.isFinite(oLon)
+    ) {
+      for (const o of portDeskOrders) map.set(o.id, null);
+      return map;
+    }
+    const origin = { lat: oLat, lon: oLon };
+    for (const o of portDeskOrders) {
+      const dLat = o.destLat;
+      const dLon = o.destLon;
+      if (
+        dLat == null ||
+        dLon == null ||
+        !Number.isFinite(dLat) ||
+        !Number.isFinite(dLon)
+      ) {
+        map.set(o.id, null);
+        continue;
+      }
+      map.set(
+        o.id,
+        Math.round(greatCircleDistanceNm(origin, { lat: dLat, lon: dLon })),
+      );
+    }
+    return map;
+  }, [port, portDeskOrders]);
+
+  const demandDeskPickupIcao = resolvePortDeskPickupHub(port?.pickupHubs);
+
   const demandPortsForSwitcher = useMemo(() => {
     return snap?.ports ?? [];
   }, [snap?.ports]);
@@ -3484,8 +3536,15 @@ export function PortsPanel(props: {
     const filtered = country
       ? unique.filter((o) => demandDestCountryId(o) === country)
       : unique;
-    return filtered.sort((a, b) => compareDemandOrders(a, b, demandSort));
-  }, [portDeskOrders, demandSort, demandCountryFilter]);
+    return filtered.sort((a, b) =>
+      compareDemandOrders(a, b, demandSort, demandDistNmById),
+    );
+  }, [
+    portDeskOrders,
+    demandSort,
+    demandCountryFilter,
+    demandDistNmById,
+  ]);
 
   const demandCountryOptions = useMemo(() => {
     const ids = new Set<string>();
@@ -5879,6 +5938,20 @@ export function PortsPanel(props: {
                           Dest <span>{demandSortIndicator('dest')}</span>
                         </button>
                       </th>
+                      <th aria-sort={demandAriaSort('dist')}>
+                        <button
+                          type="button"
+                          className={`sort-header${demandSort.key === 'dist' ? ' is-sorted' : ''}`}
+                          title={
+                            demandDeskPickupIcao
+                              ? `Sort by distance from pickup ${demandDeskPickupIcao}`
+                              : 'Sort by distance from port pickup hub'
+                          }
+                          onClick={() => toggleDemandSort('dist')}
+                        >
+                          Dist <span>{demandSortIndicator('dist')}</span>
+                        </button>
+                      </th>
                       <th aria-sort={demandAriaSort('commodity')}>
                         <button
                           type="button"
@@ -5927,7 +6000,7 @@ export function PortsPanel(props: {
                   <tbody key={demandTableKey}>
                     {sortedDemand.length === 0 ? (
                       <tr>
-                        <td colSpan={7}>
+                        <td colSpan={8}>
                           <p className="empty">
                             {!port
                               ? 'Select a port.'
@@ -5975,6 +6048,21 @@ export function PortsPanel(props: {
                             >
                               {o.destIcao}
                             </button>
+                          </td>
+                          <td
+                            className="muted"
+                            title={
+                              demandDeskPickupIcao
+                                ? `${demandDeskPickupIcao} → ${o.destIcao}`
+                                : undefined
+                            }
+                          >
+                            {(() => {
+                              const nm = demandDistNmById.get(o.id);
+                              return nm != null
+                                ? `${nm.toLocaleString()} nm`
+                                : '—';
+                            })()}
                           </td>
                           <td>
                             <div className="commodity-cell">

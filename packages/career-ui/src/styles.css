@@ -6985,6 +6985,12 @@ button.logbook-card-hit:focus-visible {
   pointer-events: none;
 }
 
+.hangar-primary-locked:disabled {
+  opacity: 0.72;
+  cursor: default;
+  color: var(--muted);
+}
+
 .hangar-footer-move {
   min-height: 5.4rem;
   display: grid;
@@ -6993,6 +6999,14 @@ button.logbook-card-hit:focus-visible {
 
 .hangar-move-spacer {
   min-height: 5.4rem;
+}
+
+.hangar-move-locked {
+  opacity: 0.78;
+}
+
+.hangar-move-locked .ferry-hub-combobox input:disabled {
+  opacity: 0.85;
 }
 
 .hangar-footer-manage {

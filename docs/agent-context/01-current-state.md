@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **ac0c3ad7** / desktop **0.3.305** shipped: Unfreeze Watch via sim Absolute Time and log playback freeze. Release: [v0.3.305](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.305).
+
+
 `main` **3ed33e55** / desktop **0.3.304** shipped: Unfreeze Watch clock when sticky IS PAUSED still moves the aircraft. Release: [v0.3.304](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.304).
 
 

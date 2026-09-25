@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **c587d1ad** / desktop **0.3.335** shipped: Fix resume Accu-Sim cargo wipe and settle flash at departure. Release: [v0.3.335](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.335).
+
+
 `main` **68bd0632** / desktop **0.3.334** shipped: Fix Resume prep layout and frozen load cards; paint live fuel burn in En route. Release: [v0.3.334](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.334).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **7d97e34b** / desktop **0.3.303** shipped: Freeze Watch airborne clock when MSFS reports pause or slew. Release: [v0.3.303](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.303).
+
+
 `main` **e72eabf1** / desktop **0.3.302** shipped: Suggest Dispatch origin on Travel and polish Settings Dev tools. Release: [v0.3.302](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.302).
 
 

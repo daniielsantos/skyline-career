@@ -57,6 +57,8 @@ Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 - **Pause/menu:** `airborneElapsedMs` só avança com sim “vivo” (`IS PAUSED` / slew congelam o chip + gate); wall `airborneAtMs` continua âncora de ETA/resume.
 
 **Pause ESC does not freeze footer clock (2026-09-24):** sintoma = ESC pause no MSFS; chip `12m/59m` e % continuam subindo; Mission ainda IN FLIGHT. Causa = Watch **tem** `tickAirbornePlaybackClock` + `isSimPlaybackFrozen(paused|slew)` (shipped 0.3.50), mas `SimConnectClient` live **hardcodava** `Paused = false` / `SlewActive = false` e **não** pedia `IS PAUSED` / `IS SLEW ACTIVE` no `SnapshotData` (só o mock host lia). Fix = esses dois doubles no snapshot + DTO; Host rebuild no pack/release.
+
+**Sticky IS PAUSED after Resume freezes chip (2026-09-24):** sintoma = após ESC→Resume o chip fica preso (ex. `20m/59m · 33%`) mesmo voando. Causa = MSFS 2024 pode deixar `IS PAUSED` true com o avião já em movimento; Watch congelava o clock para sempre. Fix = `isSimPlaybackFrozen(sample, prev)` trata pause sticky como live se a posição avançou ≥~0.015 nm; Watch guarda `prevSample` antes de sobrescrever `lastSample` e espelha em `playbackFrozen` pro status.
 - Crew ops due / orphan cancel: **não** no settle; próximo write de company que já abra missões, ou o timer de 60s.
 - Tick NPC, port discharge, dealer pool, `persistWorldAirports` full rewrite.
 

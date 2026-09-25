@@ -1441,6 +1441,11 @@ export class CareerWatchSession {
     overspeedWarning?: boolean;
     stallWarning?: boolean;
   }) | null = null;
+  /**
+   * Effective pause freeze for the latest Watch tick (sticky IS PAUSED after
+   * ESC Resume is cleared when position moved vs previous sample).
+   */
+  private playbackFrozen = false;
   /** Sticky flight phase for UI + adaptive poll. */
   private lastPhase: string | null = null;
   /** Effective poll interval for the current phase (ms). */
@@ -1660,9 +1665,7 @@ export class CareerWatchSession {
       Number.isFinite(expectedRouteMs) &&
       expectedRouteMs > 0
     ) {
-      const frozen = this.lastSample
-        ? isSimPlaybackFrozen(this.lastSample)
-        : false;
+      const frozen = this.playbackFrozen;
       const airborneElapsedMs =
         resolveLiveAirborneElapsedMs(this.watchState, nowMs, frozen) ??
         undefined;
@@ -1838,6 +1841,7 @@ export class CareerWatchSession {
     this.missionId = opts.missionId;
     this.liveTrackCompanyId = opts.liveTrackCompanyId?.trim() || null;
     this.lastSample = null;
+    this.playbackFrozen = false;
     this.lastPhase = null;
     this.intervalMs = watchIntervalMsForPhase('ground', {
       cruiseCapMs: Math.max(1, Math.floor(opts.intervalSec ?? 5)) * 1000,
@@ -2132,6 +2136,7 @@ export class CareerWatchSession {
     this.missionStatus = null;
     this.watchState = createMissionFlightWatchState();
     this.lastSample = null;
+    this.playbackFrozen = false;
     this.lastPhase = null;
     this.lastLiveFuelLb = null;
     this.lastLivePayloadLb = null;
@@ -2230,9 +2235,7 @@ export class CareerWatchSession {
       return;
     }
     const nowMs = Date.now();
-    const frozen = this.lastSample
-      ? isSimPlaybackFrozen(this.lastSample)
-      : false;
+    const frozen = this.playbackFrozen;
     const airborneElapsedMs =
       typeof airborneAtMs === 'number' && Number.isFinite(airborneAtMs)
         ? resolveLiveAirborneElapsedMs(this.watchState, nowMs, frozen)
@@ -2384,7 +2387,9 @@ export class CareerWatchSession {
       if (!this.running || isOfpLoadActive()) {
         return;
       }
+      const prevSample = this.lastSample;
       this.lastSample = sample;
+      this.playbackFrozen = isSimPlaybackFrozen(sample, prevSample);
       this.lastError = null;
       this.pipeBackoffMs = 0;
       this.pipeRetryAtMs = 0;
@@ -3336,7 +3341,7 @@ export class CareerWatchSession {
       // airborne flight-time clock so menu time does not count.
       nextState = tickAirbornePlaybackClock(nextState, {
         nowMs,
-        frozen: isSimPlaybackFrozen(sample),
+        frozen: this.playbackFrozen,
       });
       // Drop premature airborne stamps while still preparing at origin
       // (accepted/dispatched on the ground, not near dest). A SIM ON GROUND
@@ -3447,7 +3452,7 @@ export class CareerWatchSession {
         (nextState.sawAirborne && sample.onGround && nextState.landingFpm != null) ||
         Boolean(this.scoreAcc.landing);
 
-      if (!isSimPlaybackFrozen(sample)) {
+      if (!this.playbackFrozen) {
         this.lastPhase = advanceFlightPhase(
           this.lastPhase,
           {
@@ -3658,7 +3663,7 @@ export class CareerWatchSession {
       }
 
       // Live weather-ops: headwind / rain / visibility while airborne.
-      if (!sample.onGround && !isSimPlaybackFrozen(sample) && this.bridge) {
+      if (!sample.onGround && !this.playbackFrozen && this.bridge) {
         try {
           const wx = await sampleLiveWeatherAmbient(this.bridge);
           this.weatherAcc = pushWeatherOpsTick(this.weatherAcc, {
@@ -3738,7 +3743,7 @@ export class CareerWatchSession {
             aglFt: sample.aglFt,
             gForce: sample.gForce,
             enginesRunning: sample.enginesRunning,
-            frozen: isSimPlaybackFrozen(sample),
+            frozen: this.playbackFrozen,
             lat: sample.position?.lat,
             lon: sample.position?.lon,
           },
@@ -4027,7 +4032,7 @@ export class CareerWatchSession {
                   resolveLiveAirborneElapsedMs(
                     nextState,
                     nowMs,
-                    isSimPlaybackFrozen(sample),
+                    this.playbackFrozen,
                   ) ?? undefined,
                 distanceNm,
               })
@@ -4120,7 +4125,7 @@ export class CareerWatchSession {
             resolveLiveAirborneElapsedMs(
               nextState,
               nowMs,
-              isSimPlaybackFrozen(sample),
+              this.playbackFrozen,
             ) ?? undefined,
           distanceNm,
         });

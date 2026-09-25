@@ -11,6 +11,7 @@ import {
   inferEnginesRunningFromProbeBatch,
   forceEnginesOffWhenParkedSpoolDead,
   isNearAirport,
+  isSimPlaybackFrozen,
   mergeAirborneClockOntoMission,
   parseBlockTimeToMs,
   rebaseExpectedRouteMsFromCruise,
@@ -933,6 +934,26 @@ describe('evaluateMissionFlightTransition', () => {
     // Wall would be 55m (≥70% of 40m) but sim-active is only 20m → blocked.
     assert.equal(gate.ok, false);
     assert.equal(gate.elapsedMs, 20 * 60_000);
+  });
+
+  it('treats sticky IS PAUSED as live when position moved', () => {
+    const prev = {
+      onGround: false,
+      enginesRunning: true,
+      paused: true,
+      position: { lat: -25.5, lon: -49.2 },
+    };
+    const stuck = {
+      ...prev,
+      position: { lat: -25.5, lon: -49.2 },
+    };
+    const moved = {
+      ...prev,
+      position: { lat: -25.52, lon: -49.18 },
+    };
+    assert.equal(isSimPlaybackFrozen(stuck, prev), true);
+    assert.equal(isSimPlaybackFrozen(moved, prev), false);
+    assert.equal(isSimPlaybackFrozen(moved), true);
   });
 
   it('uses 50% airborne gate for routes under 100 nm', () => {

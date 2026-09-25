@@ -1,5 +1,6 @@
 import {
   DEFAULT_SETTLE_RADIUS_NM,
+  distanceNm,
   isNearAirport,
 } from './career-economy.js';
 import type { MissionIntent, MissionStatus } from './types/career-economy.js';
@@ -53,9 +54,32 @@ function finitePositive(n: number | undefined, min: number): boolean {
   return typeof n === 'number' && Number.isFinite(n) && n >= min;
 }
 
-/** Pause / slew / hangar — do not edge-detect depart or touchdown. */
-export function isSimPlaybackFrozen(sample: FlightGroundSample): boolean {
-  return sample.paused === true || sample.slewActive === true;
+/**
+ * Pause / slew — do not edge-detect depart or touchdown / count airborne time.
+ *
+ * MSFS 2024 can leave `IS PAUSED` sticky after ESC → Resume while the aircraft
+ * is already moving. When `prev` is provided and position advanced, treat as live.
+ */
+export function isSimPlaybackFrozen(
+  sample: FlightGroundSample,
+  prev?: FlightGroundSample | null,
+): boolean {
+  if (sample.slewActive === true) return true;
+  if (sample.paused !== true) return false;
+  if (
+    prev?.position &&
+    sample.position &&
+    Number.isFinite(prev.position.lat) &&
+    Number.isFinite(prev.position.lon) &&
+    Number.isFinite(sample.position.lat) &&
+    Number.isFinite(sample.position.lon)
+  ) {
+    // ~0.015 nm ≈ 90 ft — one Watch poll in taxi/cruise clears this; GPS
+    // jitter while truly paused does not.
+    const movedNm = distanceNm(prev.position, sample.position);
+    if (movedNm >= 0.015) return false;
+  }
+  return true;
 }
 
 /**

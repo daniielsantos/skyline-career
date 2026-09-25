@@ -15,6 +15,12 @@ import {
   listPortScoutBridgeSuggestions,
   listPortScoutDemandSuggestions,
   listPortScoutHaulSuggestions,
+  nmInPortScoutHaulBand,
+  pickPortScoutHaulByBands,
+  portScoutHaulBandTargets,
+  PORT_SCOUT_HAUL_BAND_MID_NM,
+  PORT_SCOUT_HAUL_BAND_NEAR_NM,
+  PORT_SCOUT_HAUL_MAX_NM,
   PORT_SCOUT_MIN_KG,
 } from './career-port-scout.js';
 import { createSeedEconomyWorld } from './career-economy.js';
@@ -341,5 +347,100 @@ describe('port scout', () => {
       ).length,
       0,
     );
+  });
+
+  it('Haul scout band targets are 2/3/3 within 1800 nm', () => {
+    const bands = portScoutHaulBandTargets(8);
+    assert.deepEqual(
+      bands.map((b) => b.targetSlots),
+      [2, 3, 3],
+    );
+    assert.equal(bands[0]!.maxNm, PORT_SCOUT_HAUL_BAND_NEAR_NM);
+    assert.equal(bands[1]!.maxNm, PORT_SCOUT_HAUL_BAND_MID_NM);
+    assert.equal(bands[2]!.maxNm, PORT_SCOUT_HAUL_MAX_NM);
+    assert.equal(nmInPortScoutHaulBand(500, bands[0]!), true);
+    assert.equal(nmInPortScoutHaulBand(501, bands[1]!), true);
+    assert.equal(nmInPortScoutHaulBand(1200, bands[1]!), true);
+    assert.equal(nmInPortScoutHaulBand(1201, bands[2]!), true);
+    assert.equal(nmInPortScoutHaulBand(1801, bands[2]!), false);
+  });
+
+  it('pickPortScoutHaulByBands does not steal empty rings', () => {
+    const rows = [
+      { id: 'f1', distanceNm: 1400, score: 100, payUsd: 100 },
+      { id: 'f2', distanceNm: 1500, score: 90, payUsd: 90 },
+      { id: 'f3', distanceNm: 1600, score: 80, payUsd: 80 },
+      { id: 'f4', distanceNm: 1700, score: 70, payUsd: 70 },
+      { id: 'm1', distanceNm: 800, score: 50, payUsd: 50 },
+    ];
+    const picked = pickPortScoutHaulByBands(rows, 8);
+    assert.equal(
+      picked.filter((r) => r.distanceNm <= 500).length,
+      0,
+      'near empty',
+    );
+    assert.equal(
+      picked.filter(
+        (r) => r.distanceNm > 500 && r.distanceNm <= 1200,
+      ).length,
+      1,
+    );
+    assert.equal(
+      picked.filter((r) => r.distanceNm > 1200).length,
+      3,
+      'far capped at 3',
+    );
+    assert.ok(!picked.some((r) => r.id === 'f4'), '4th far must not steal near');
+  });
+
+  it('Haul scout board mixes near/mid/far when short-fill exists in each ring', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 8_000,
+      avgCostUsdPerKg: 1.0,
+      tick: world.tick,
+    });
+    for (const ap of world.airports) {
+      ap.inventory.general = {
+        capacityKg: 40_000,
+        stockKg: 40_000,
+      };
+    }
+    // SBGR→ SBGL ~182 near · SBRF ~1134 mid · SBEG ~1457 far (all ≤1800)
+    for (const icao of ['SBGL', 'SBRF', 'SBEG', 'SCEL'] as const) {
+      const ap = world.airports.find((a) => a.icao === icao);
+      if (!ap) continue;
+      ap.inventory.general = {
+        capacityKg: 40_000,
+        stockKg: 2_000,
+      };
+    }
+    const suggestions = listPortScoutHaulSuggestions(state, world);
+    const near = suggestions.filter((s) => s.distanceNm <= 500);
+    const mid = suggestions.filter(
+      (s) => s.distanceNm > 500 && s.distanceNm <= 1200,
+    );
+    const far = suggestions.filter(
+      (s) => s.distanceNm > 1200 && s.distanceNm <= 1800,
+    );
+    assert.ok(
+      suggestions.some((s) => s.destIcao === 'SBGL'),
+      'expected near SBGL on board',
+    );
+    assert.ok(
+      suggestions.some((s) => s.destIcao === 'SBRF'),
+      'expected mid SBRF on board',
+    );
+    assert.ok(
+      suggestions.some((s) => s.destIcao === 'SBEG' || s.destIcao === 'SCEL'),
+      'expected far dest on board',
+    );
+    assert.ok(near.length <= 2);
+    assert.ok(mid.length <= 3);
+    assert.ok(far.length <= 3);
   });
 });

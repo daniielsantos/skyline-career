@@ -30,9 +30,13 @@ import {
   DEMAND_PORT_CORRIDOR_NM,
   corridorNmForLevel,
   demandOrdersCapForPortDesk,
+  demandSpawnBandIndexForDest,
+  demandSpawnBandTargets,
   destNearAnyHub,
   destWithinCorridorNm,
   listBoundCareerPorts,
+  minNmToHubs,
+  nmInDemandSpawnBand,
   worldPortDeskCorridorLevel,
 } from './career-port-corridor.js';
 import { isBushHub, isBushTripOnlyHub } from './career-bush.js';
@@ -842,8 +846,13 @@ export {
   DEMAND_CORRIDOR_NM_BY_LEVEL,
   DEMAND_ORDERS_PER_PORT_BASE,
   DEMAND_ORDERS_PER_PORT_OPERATOR_EXTRA,
+  DEMAND_SPAWN_BAND_NEAR_NM,
+  DEMAND_SPAWN_BAND_MID_NM,
   corridorNmForLevel,
   clampPortCorridorLevel,
+  demandSpawnBandTargets,
+  nmInDemandSpawnBand,
+  demandSpawnBandIndexForDest,
   formatPortCorridorReachLabel,
   resolvePlayerPortCorridorLevel,
   destWithinCorridorNm,
@@ -853,7 +862,11 @@ export {
   demandOrdersCapForPortDesk,
   listBoundCareerPorts,
 } from './career-port-corridor.js';
-export type { PortCorridorLevel, PortDeskDef } from './career-port-corridor.js';
+export type {
+  PortCorridorLevel,
+  PortDeskDef,
+  DemandSpawnBand,
+} from './career-port-corridor.js';
 export { DEMAND_PORT_CORRIDOR_NM, destNearAnyHub };
 
 export function destInPortSurplusCorridor(
@@ -1018,82 +1031,128 @@ export function ensureDemandOrders(
     const { level } = worldPortDeskCorridorLevel(world, portId);
     const maxNm = corridorNmForLevel(level);
     const commodities = portDeskCommodityOrder(world, pickups);
+    const bands = demandSpawnBandTargets(level, portCap);
+    if (bands.length === 0) continue;
+
+    const openByBand = bands.map(() => 0);
+    for (const o of orders) {
+      if (!isOpen(o)) continue;
+      if (o.portId!.trim().toUpperCase() !== portId) continue;
+      const bi = demandSpawnBandIndexForDest(o.destIcao, pickups, bands);
+      if (bi >= 0) openByBand[bi] = (openByBand[bi] ?? 0) + 1;
+    }
 
     const catchmentAirports = boardAirports.filter((ap) => {
-    const icao = ap.icao.trim().toUpperCase();
+      const icao = ap.icao.trim().toUpperCase();
       if (!CAREER_HUB_COORDS[icao]) return false;
       if (pickups.includes(icao)) return false; // no dest = own pickup
       return destWithinCorridorNm(icao, pickups, maxNm);
     });
 
-    for (const ap of catchmentAirports) {
+    for (let bi = 0; bi < bands.length; bi++) {
       if (openGlobal() >= boardCap || portSlots <= 0) break;
-      const icao = ap.icao.trim().toUpperCase();
-    const country = demandAirportCountryId(ap);
-      if (!country) continue;
-    const quota = quotas.get(country) ?? 0;
-      if ((openByCountry.get(country) ?? 0) >= quota) continue;
+      const band = bands[bi]!;
+      let bandSlots = band.targetSlots - (openByBand[bi] ?? 0);
+      if (bandSlots <= 0) continue;
 
-    const openHere = orders.filter(
-      (o) =>
-          isOpen(o) &&
-        o.destIcao === icao &&
-          o.portId?.trim().toUpperCase() === portId,
-      );
-      let hubSlots = DEMAND_ORDERS_PER_HUB - openHere.length;
-      if (hubSlots <= 0) continue;
-
-      for (const commodityId of commodities) {
-        if (hubSlots <= 0 || portSlots <= 0) break;
-        if (openGlobal() >= boardCap) break;
-      if ((openByCountry.get(country) ?? 0) >= quota) break;
-      if (openHere.some((o) => o.commodityId === commodityId)) continue;
-
-      const pile = ap.inventory[commodityId];
-      if (!pile || pile.capacityKg <= 0) continue;
-      const frac = pile.stockKg / pile.capacityKg;
-      if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
-
-      const deficitKg = Math.max(
-        0,
-          Math.floor(
-            pile.capacityKg * DEMAND_STOCK_FRAC_THRESHOLD - pile.stockKg,
-          ),
-      );
-      if (deficitKg < 200) continue;
-
-        const { min: bandMin, max: bandMax } = demandWantedKgBand(commodityId);
-      const wantedKg = Math.min(
-        deficitKg,
-        bandMin + Math.floor(rng() * (bandMax - bandMin)),
-      );
-      if (wantedKg < bandMin) continue;
-
-      const spot = money(localUnitPriceUsd(commodityId, pile));
-      const premium =
-        DEMAND_PRICE_PREMIUM_MIN +
-        rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
-      const maxUnitPriceUsd = money(spot * premium);
-
-        const row: DemandOrder = {
-        id: nextId('demand', world.tick),
-          portId,
-        destIcao: icao,
-        commodityId,
-        wantedKg,
-        remainingKg: wantedKg,
-        maxUnitPriceUsd,
-        arrivedAtTick: world.tick,
-        expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
-        status: 'open',
-        };
-        orders.push(row);
-        openHere.push(row);
-      openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
-        openByPort.set(portId, (openByPort.get(portId) ?? 0) + 1);
-        hubSlots -= 1;
-        portSlots -= 1;
+      const bandAirports = catchmentAirports.filter((ap) => {
+        const nm = minNmToHubs(ap.icao, pickups);
+        return nm != null && nmInDemandSpawnBand(nm, band);
+      });
+      // Rotate + shuffle so densify order does not starve a ring.
+      const rot =
+        bandAirports.length > 0
+          ? Math.floor(rng() * bandAirports.length)
+          : 0;
+      const rotated =
+        rot === 0
+          ? [...bandAirports]
+          : [
+              ...bandAirports.slice(rot),
+              ...bandAirports.slice(0, rot),
+            ];
+      for (let i = rotated.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        const tmp = rotated[i]!;
+        rotated[i] = rotated[j]!;
+        rotated[j] = tmp;
       }
+
+      for (const ap of rotated) {
+        if (openGlobal() >= boardCap || portSlots <= 0 || bandSlots <= 0) {
+          break;
+        }
+        const icao = ap.icao.trim().toUpperCase();
+        const country = demandAirportCountryId(ap);
+        if (!country) continue;
+        const quota = quotas.get(country) ?? 0;
+        if ((openByCountry.get(country) ?? 0) >= quota) continue;
+
+        const openHere = orders.filter(
+          (o) =>
+            isOpen(o) &&
+            o.destIcao === icao &&
+            o.portId?.trim().toUpperCase() === portId,
+        );
+        let hubSlots = DEMAND_ORDERS_PER_HUB - openHere.length;
+        if (hubSlots <= 0) continue;
+
+        for (const commodityId of commodities) {
+          if (hubSlots <= 0 || portSlots <= 0 || bandSlots <= 0) break;
+          if (openGlobal() >= boardCap) break;
+          if ((openByCountry.get(country) ?? 0) >= quota) break;
+          if (openHere.some((o) => o.commodityId === commodityId)) continue;
+
+          const pile = ap.inventory[commodityId];
+          if (!pile || pile.capacityKg <= 0) continue;
+          const frac = pile.stockKg / pile.capacityKg;
+          if (frac >= DEMAND_STOCK_FRAC_THRESHOLD) continue;
+
+          const deficitKg = Math.max(
+            0,
+            Math.floor(
+              pile.capacityKg * DEMAND_STOCK_FRAC_THRESHOLD - pile.stockKg,
+            ),
+          );
+          if (deficitKg < 200) continue;
+
+          const { min: bandMin, max: bandMax } =
+            demandWantedKgBand(commodityId);
+          const wantedKg = Math.min(
+            deficitKg,
+            bandMin + Math.floor(rng() * (bandMax - bandMin)),
+          );
+          if (wantedKg < bandMin) continue;
+
+          const spot = money(localUnitPriceUsd(commodityId, pile));
+          const premium =
+            DEMAND_PRICE_PREMIUM_MIN +
+            rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
+          const maxUnitPriceUsd = money(spot * premium);
+
+          const row: DemandOrder = {
+            id: nextId('demand', world.tick),
+            portId,
+            destIcao: icao,
+            commodityId,
+            wantedKg,
+            remainingKg: wantedKg,
+            maxUnitPriceUsd,
+            arrivedAtTick: world.tick,
+            expiresAtTick: world.tick + Math.floor(DEMAND_TTL_TICKS),
+            status: 'open',
+          };
+          orders.push(row);
+          openHere.push(row);
+          openByCountry.set(country, (openByCountry.get(country) ?? 0) + 1);
+          openByPort.set(portId, (openByPort.get(portId) ?? 0) + 1);
+          openByBand[bi] = (openByBand[bi] ?? 0) + 1;
+          hubSlots -= 1;
+          portSlots -= 1;
+          bandSlots -= 1;
+        }
+      }
+      // Empty band stays empty — do not steal slots from other rings.
     }
   }
 

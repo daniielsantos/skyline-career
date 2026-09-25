@@ -40,6 +40,21 @@ export const DEMAND_ORDERS_PER_PORT_BASE = 6;
 /** Extra open slots when world operator is P2+. */
 export const DEMAND_ORDERS_PER_PORT_OPERATOR_EXTRA = 1;
 
+/** Regional ring upper (nm) — P1 corridor + near band for P2/P3. */
+export const DEMAND_SPAWN_BAND_NEAR_NM = DEMAND_CORRIDOR_NM_BY_LEVEL[1]!;
+/** Continental ring upper (nm) — P2 corridor + mid band for P3. */
+export const DEMAND_SPAWN_BAND_MID_NM = DEMAND_CORRIDOR_NM_BY_LEVEL[2]!;
+
+/**
+ * Exclusive distance ring for Demand desk spawn mix.
+ * Dest matches when `nm > minNmExclusive` and (`maxNm == null` or `nm <= maxNm`).
+ */
+export type DemandSpawnBand = {
+  minNmExclusive: number;
+  maxNm: number | null;
+  targetSlots: number;
+};
+
 export function clampPortCorridorLevel(n: number): PortCorridorLevel {
   if (n >= 3) return 3;
   if (n >= 2) return 2;
@@ -49,6 +64,94 @@ export function clampPortCorridorLevel(n: number): PortCorridorLevel {
 /** `null` = open (no distance cap). */
 export function corridorNmForLevel(level: PortCorridorLevel): number | null {
   return DEMAND_CORRIDOR_NM_BY_LEVEL[clampPortCorridorLevel(level)];
+}
+
+/**
+ * Per-desk spawn mix targets. Accept reach stays open at P3; only the shelf
+ * composition is banded. Sum of `targetSlots` === `portCap`.
+ *
+ * - P1: all ≤500
+ * - P2: ~half ≤500, rest (500, 1800]
+ * - P3: 2 / 2 / rest → ≤500 / (500, 1800] / >1800
+ */
+export function demandSpawnBandTargets(
+  level: PortCorridorLevel,
+  portCap: number,
+): DemandSpawnBand[] {
+  const cap = Math.max(0, Math.floor(portCap));
+  const lv = clampPortCorridorLevel(level);
+  if (cap <= 0) return [];
+
+  if (lv === 1) {
+    return [
+      {
+        minNmExclusive: -1,
+        maxNm: DEMAND_SPAWN_BAND_NEAR_NM,
+        targetSlots: cap,
+      },
+    ];
+  }
+
+  if (lv === 2) {
+    const near = Math.ceil(cap / 2);
+    const mid = Math.max(0, cap - near);
+    return [
+      {
+        minNmExclusive: -1,
+        maxNm: DEMAND_SPAWN_BAND_NEAR_NM,
+        targetSlots: near,
+      },
+      {
+        minNmExclusive: DEMAND_SPAWN_BAND_NEAR_NM,
+        maxNm: DEMAND_SPAWN_BAND_MID_NM,
+        targetSlots: mid,
+      },
+    ];
+  }
+
+  const near = Math.min(2, cap);
+  const mid = Math.min(2, Math.max(0, cap - near));
+  const far = Math.max(0, cap - near - mid);
+  return [
+    {
+      minNmExclusive: -1,
+      maxNm: DEMAND_SPAWN_BAND_NEAR_NM,
+      targetSlots: near,
+    },
+    {
+      minNmExclusive: DEMAND_SPAWN_BAND_NEAR_NM,
+      maxNm: DEMAND_SPAWN_BAND_MID_NM,
+      targetSlots: mid,
+    },
+    {
+      minNmExclusive: DEMAND_SPAWN_BAND_MID_NM,
+      maxNm: null,
+      targetSlots: far,
+    },
+  ];
+}
+
+export function nmInDemandSpawnBand(
+  nm: number,
+  band: Pick<DemandSpawnBand, 'minNmExclusive' | 'maxNm'>,
+): boolean {
+  if (!(nm > band.minNmExclusive)) return false;
+  if (band.maxNm != null && nm > band.maxNm) return false;
+  return true;
+}
+
+/** Classify dest into a spawn band index, or -1 if no coords / no match. */
+export function demandSpawnBandIndexForDest(
+  destIcao: string,
+  hubs: readonly string[],
+  bands: readonly DemandSpawnBand[],
+): number {
+  const nm = minNmToHubs(destIcao, hubs);
+  if (nm == null) return -1;
+  for (let i = 0; i < bands.length; i++) {
+    if (nmInDemandSpawnBand(nm, bands[i]!)) return i;
+  }
+  return -1;
 }
 
 export function formatPortCorridorReachLabel(

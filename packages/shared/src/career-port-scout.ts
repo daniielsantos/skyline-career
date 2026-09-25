@@ -53,6 +53,100 @@ export const PORT_SCOUT_MAX_SUGGESTIONS = 8;
 /** Max nm for haul dest candidates (P2 corridor-ish). */
 export const PORT_SCOUT_HAUL_MAX_NM = 1_800;
 
+/** Haul Scout board mix — regional ring upper (nm). */
+export const PORT_SCOUT_HAUL_BAND_NEAR_NM = 500;
+/** Haul Scout board mix — continental mid ring upper (nm). */
+export const PORT_SCOUT_HAUL_BAND_MID_NM = 1_200;
+
+/**
+ * Exclusive distance ring for Haul Scout top-N mix (within {@link PORT_SCOUT_HAUL_MAX_NM}).
+ * Dest matches when `nm > minNmExclusive` and `nm <= maxNm`.
+ */
+export type PortScoutHaulBand = {
+  minNmExclusive: number;
+  maxNm: number;
+  targetSlots: number;
+};
+
+/**
+ * Slot targets for Haul Scout board. Default max=8 → **2 / 3 / 3**
+ * (≤500 / (500,1200] / (1200,1800]). Empty rings do not steal.
+ */
+export function portScoutHaulBandTargets(
+  maxSuggestions: number = PORT_SCOUT_MAX_SUGGESTIONS,
+): PortScoutHaulBand[] {
+  const max = Math.max(1, Math.floor(maxSuggestions));
+  if (max <= 2) {
+    return [
+      {
+        minNmExclusive: -1,
+        maxNm: PORT_SCOUT_HAUL_MAX_NM,
+        targetSlots: max,
+      },
+    ];
+  }
+  const near = Math.min(2, Math.max(1, Math.round((max * 2) / 8)));
+  const mid = Math.min(3, Math.max(1, Math.round((max * 3) / 8)));
+  const far = Math.max(0, max - near - mid);
+  return [
+    {
+      minNmExclusive: -1,
+      maxNm: PORT_SCOUT_HAUL_BAND_NEAR_NM,
+      targetSlots: near,
+    },
+    {
+      minNmExclusive: PORT_SCOUT_HAUL_BAND_NEAR_NM,
+      maxNm: PORT_SCOUT_HAUL_BAND_MID_NM,
+      targetSlots: mid,
+    },
+    {
+      minNmExclusive: PORT_SCOUT_HAUL_BAND_MID_NM,
+      maxNm: PORT_SCOUT_HAUL_MAX_NM,
+      targetSlots: far,
+    },
+  ];
+}
+
+export function nmInPortScoutHaulBand(
+  nm: number,
+  band: Pick<PortScoutHaulBand, 'minNmExclusive' | 'maxNm'>,
+): boolean {
+  if (!(nm > band.minNmExclusive)) return false;
+  if (nm > band.maxNm) return false;
+  return true;
+}
+
+/**
+ * Pick top suggestions by band quotas from a score-sorted list.
+ * Empty rings stay empty (no steal). Final order = score desc.
+ */
+export function pickPortScoutHaulByBands<
+  T extends { id: string; distanceNm: number; score: number; payUsd: number },
+>(sortedByScore: readonly T[], maxSuggestions: number): T[] {
+  const bands = portScoutHaulBandTargets(maxSuggestions);
+  const picked: T[] = [];
+  const used = new Set<string>();
+  for (const band of bands) {
+    let need = band.targetSlots;
+    for (const row of sortedByScore) {
+      if (need <= 0) break;
+      if (used.has(row.id)) continue;
+      if (!nmInPortScoutHaulBand(row.distanceNm, band)) continue;
+      picked.push(row);
+      used.add(row.id);
+      need -= 1;
+    }
+  }
+  picked.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.payUsd - a.payUsd ||
+      a.distanceNm - b.distanceNm ||
+      a.id.localeCompare(b.id),
+  );
+  return picked;
+}
+
 /**
  * Haul = short-fill only: dest warehouse fill must be ≤ this (hard gate).
  * Absolute room alone is not enough — large hubs near full still have tons
@@ -426,8 +520,8 @@ export function listPortScoutDemandSuggestions(
       });
       const payUsd = money(kg * unitPriceUsd);
       const distanceNm = Math.round(moneyNm(world, origin, dest));
-      // Prefer pay, then shorter hops.
-      const score = payUsd - Math.min(distanceNm, 800) * 0.25;
+      // Prefer pay, then shorter hops (uncapped nm penalty so mid/regional compete).
+      const score = payUsd - distanceNm * 2;
       out.push({
         id: `${order.id}|${origin}`,
         orderId: order.id,
@@ -591,8 +685,8 @@ export function listPortScoutHaulSuggestions(
 
         const unitPriceUsd = money(payUsd / kg);
         const nm = Math.round(distanceNm);
-        // Prefer emptier dests among the short-fill band.
-        const score = payUsd - Math.min(nm, 800) * 0.2 - fill * 800;
+        // Prefer pay + emptier dest; uncapped nm so mid/regional can compete in-band.
+        const score = payUsd - nm * 2 - fill * 800;
         out.push({
           id: `${origin}|${dest}|${commodityId}`,
           originIcao: origin,
@@ -619,7 +713,7 @@ export function listPortScoutHaulSuggestions(
       a.distanceNm - b.distanceNm ||
       a.id.localeCompare(b.id),
   );
-  return out.slice(0, max);
+  return pickPortScoutHaulByBands(out, max);
 }
 
 /**

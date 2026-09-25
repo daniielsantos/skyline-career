@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **03bbc700** / desktop **0.3.310** shipped: Require parking brake to settle; anchor Internal Haul pay to market. Release: [v0.3.310](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.310).
+
+
 `main` **5bbaa799** / desktop **0.3.309** shipped: Unfreeze sticky IS PAUSED via flight-sample Absolute Time and motion. Release: [v0.3.309](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.309).
 
 

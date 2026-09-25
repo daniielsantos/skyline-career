@@ -2917,6 +2917,18 @@ async function main(): Promise<void> {
 
       let watchState = createMissionFlightWatchState();
       let lastBlockedLog = '';
+      let prevSample:
+        | {
+            onGround: boolean;
+            enginesRunning: boolean;
+            paused?: boolean;
+            slewActive?: boolean;
+            position?: { lat: number; lon: number };
+            groundSpeedKt?: number;
+            indicatedAirspeedKt?: number;
+            simAbsoluteTimeSec?: number;
+          }
+        | null = null;
 
       await withBridge(pipeName, async (bridge) => {
         while (!stop) {
@@ -2953,6 +2965,17 @@ async function main(): Promise<void> {
             indicatedAirspeedKt = undefined;
           }
 
+          let simAbsoluteTimeSec: number | undefined;
+          try {
+            const abs = await bridge.readSimVar({
+              name: 'ABSOLUTE TIME',
+              unit: 'seconds',
+            });
+            if (Number.isFinite(abs)) simAbsoluteTimeSec = abs;
+          } catch {
+            simAbsoluteTimeSec = undefined;
+          }
+
           const sample = {
             onGround: snap.onGround,
             enginesRunning: snap.enginesRunning,
@@ -2961,6 +2984,7 @@ async function main(): Promise<void> {
             position,
             groundSpeedKt,
             indicatedAirspeedKt,
+            simAbsoluteTimeSec,
           };
 
           const world = await loadOrCreateCareerEconomy(savePath);
@@ -2979,9 +3003,11 @@ async function main(): Promise<void> {
               requireDestProximity,
               destCoords,
               settleRadiusNm,
+              prevSample,
             },
           );
           watchState = nextState;
+          prevSample = sample;
 
           const phaseLabel = sample.onGround
             ? sample.enginesRunning

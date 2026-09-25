@@ -166,8 +166,11 @@ export function isSimPlaybackFrozen(
  * AGL-only is not enough: MSFS menu / aircraft reload often reports
  * onGround=false with AGL in the hundreds while GS/IAS stay ~0.
  */
-export function isConvincingAirborne(sample: FlightGroundSample): boolean {
-  if (sample.onGround || isSimPlaybackFrozen(sample)) return false;
+export function isConvincingAirborne(
+  sample: FlightGroundSample,
+  prev?: FlightGroundSample | null,
+): boolean {
+  if (sample.onGround || isSimPlaybackFrozen(sample, prev)) return false;
   return (
     finitePositive(sample.groundSpeedKt, DEPART_MIN_GROUND_SPEED_KT) ||
     finitePositive(sample.indicatedAirspeedKt, DEPART_MIN_IAS_KT)
@@ -180,8 +183,11 @@ export function isConvincingAirborne(sample: FlightGroundSample): boolean {
  * When GS and IAS are both missing (CLI host without those simvars), ticks
  * still accumulate — that is the legacy fallback, not a 0 kt reading.
  */
-export function hasAirborneKinematics(sample: FlightGroundSample): boolean {
-  if (sample.onGround || isSimPlaybackFrozen(sample)) return false;
+export function hasAirborneKinematics(
+  sample: FlightGroundSample,
+  prev?: FlightGroundSample | null,
+): boolean {
+  if (sample.onGround || isSimPlaybackFrozen(sample, prev)) return false;
   if (finitePositive(sample.groundSpeedKt, DEPART_KINEMATICS_GS_KT)) return true;
   if (finitePositive(sample.indicatedAirspeedKt, DEPART_KINEMATICS_IAS_KT)) {
     return true;
@@ -513,6 +519,13 @@ export interface EvaluateMissionFlightOpts {
   distanceNm?: number;
   /** Fallback block hours when OFP + distance unavailable. */
   fallbackHours?: number;
+  /**
+   * Prior Watch tick — required to clear sticky `IS PAUSED` when Absolute Time
+   * or position advances (same policy as {@link inspectSimPlaybackFreeze}).
+   * Without this, MSFS 2024 sticky pause blocks depart forever while the
+   * display-only phase still advances to climb/cruise.
+   */
+  prevSample?: FlightGroundSample | null;
 }
 
 const DEFAULT_DEPART_FROM: readonly MissionStatus[] = ['accepted', 'dispatched'];
@@ -1116,12 +1129,15 @@ export function evaluateMissionFlightTransition(
 ): { event: MissionFlightEvent; nextState: MissionFlightWatchState } {
   const requireEnginesOff = opts.requireEnginesOffToSettle !== false;
   const departFrom = opts.departFrom ?? DEFAULT_DEPART_FROM;
+  const prevSample = opts.prevSample ?? null;
 
   // Menu / slew: ignore the sample entirely so lastOnGround does not flip
   // and unpause on the ramp does not look like a touchdown.
   // Exception: already on the ground after airborne — still allow settle when
   // parking brake is set (sticky IS PAUSED must not trap Settling forever).
-  if (isSimPlaybackFrozen(sample)) {
+  // Pass prevSample so sticky IS PAUSED + advancing Absolute Time / motion is
+  // treated as live (matches Watch playbackFrozen + inject gating).
+  if (isSimPlaybackFrozen(sample, prevSample)) {
     const canSettleWhileFrozen =
       sample.onGround === true &&
       state.sawAirborne === true &&
@@ -1134,10 +1150,10 @@ export function evaluateMissionFlightTransition(
 
   const confirmTicks = sample.onGround
     ? 0
-    : hasAirborneKinematics(sample)
+    : hasAirborneKinematics(sample, prevSample)
       ? (state.airborneConfirmTicks ?? 0) + 1
       : 0;
-  const convincing = isConvincingAirborne(sample);
+  const convincing = isConvincingAirborne(sample, prevSample);
   const confirmReady =
     !sample.onGround && confirmTicks >= DEPART_CONFIRM_TICKS;
   // Do not mark sawAirborne on a lone onGround=false flicker at 0 kt — that

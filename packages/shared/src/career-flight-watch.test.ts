@@ -247,6 +247,66 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(back.nextState.sawAirborne, false);
   });
 
+  it('departs through sticky IS PAUSED when Absolute Time advances', () => {
+    let state = createMissionFlightWatchState();
+    // Bootstrap on the ramp while sim is live (not paused).
+    state = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        groundSpeedKt: 0,
+        simAbsoluteTimeSec: 1000,
+        position: { lat: 32.3, lon: -86.4 },
+      },
+      state,
+    ).nextState;
+
+    const prev = {
+      onGround: true,
+      enginesRunning: true,
+      groundSpeedKt: 0,
+      paused: true,
+      simAbsoluteTimeSec: 1000,
+      position: { lat: 32.3, lon: -86.4 },
+    };
+    // Without prevSample, sticky pause alone would block forever even at climb
+    // speeds — footer PHASE CLIMB while mission stays DISPATCHED.
+    const blocked = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        groundSpeedKt: 140,
+        indicatedAirspeedKt: 130,
+        paused: true,
+        simAbsoluteTimeSec: 1005,
+        position: { lat: 32.35, lon: -86.35 },
+      },
+      state,
+    );
+    assert.equal(blocked.event.type, 'none');
+    assert.equal(blocked.nextState.sawAirborne, false);
+    assert.equal(blocked.nextState.lastOnGround, true);
+
+    const up = evaluateMissionFlightTransition(
+      mission('dispatched'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        groundSpeedKt: 140,
+        indicatedAirspeedKt: 130,
+        paused: true,
+        simAbsoluteTimeSec: 1005,
+        position: { lat: 32.35, lon: -86.35 },
+      },
+      state,
+      { prevSample: prev },
+    );
+    assert.equal(up.event.type, 'depart');
+    assert.equal(up.nextState.sawAirborne, true);
+  });
+
   it('departs on IAS when GS is low (headwind rotate)', () => {
     let state = createMissionFlightWatchState();
     state = evaluateMissionFlightTransition(
@@ -1101,20 +1161,22 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(down.nextState.landingFpm, -212);
     state = down.nextState;
 
-    // Later taxi sample must not overwrite the captured touchdown rate.
-    const taxi = evaluateMissionFlightTransition(
+    // Later parked sample must not overwrite the captured touchdown rate.
+    const parked = evaluateMissionFlightTransition(
       mission('in_flight'),
       {
         onGround: true,
         enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
         position: { lat: SBRF.lat, lon: SBRF.lon },
         verticalSpeedFpm: 0,
       },
       state,
       { destCoords: SBRF, nowMs },
     );
-    assert.equal(taxi.nextState.landingFpm, -212);
-    assert.equal(taxi.event.type, 'settle');
+    assert.equal(parked.nextState.landingFpm, -212);
+    assert.equal(parked.event.type, 'settle');
   });
 
   it('clears premature touchdown stamp on go-around climb', () => {

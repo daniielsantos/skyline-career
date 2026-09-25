@@ -46,6 +46,7 @@ Acumulado das sessões Skyline Career / msfs-compat-layer.
 - Uplink Crew Live = **soft POST do sample do Watch** only (2026-09-22 shipped). Sem segundo pipe / probe / Preflight. Detail: `16-va-logistics.md` → “Sketch: soft Live uplink”.
 - **Pipe hygiene (Watch, não Live):** depois do 1º Loaded vs Due, Preflight e probe **param** até Watch `running` (ou `in_flight`); Watch auto-start ~2s com LV. Reverter isso “junto com Live” quebra Ready→En route de novo.
 - **Watch após Ready:** auto-start **não** exige aba Dispatch — sair pra Crew/Hangar com LV e decolar sem Watch deixava DISPATCHED (2026-09-25).
+- **Watch depart + sticky pause:** `evaluateMissionFlightTransition` **deve** receber `prevSample` — sem isso, sticky `IS PAUSED` bloqueia En route enquanto o footer ainda mostra PHASE CLIMB (2026-09-25).
 - Preflight **não** deve gravar `ORIGIN_NOT_ON_GROUND` como `location.ok=false` quando airborne **dentro** do raio (parece “NOT AT ORIGIN” com 0.3 nm ≤ 12).
 - Detail: `docs/agent-context/16-va-logistics.md` (Crew Live notes).
 

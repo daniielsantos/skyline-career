@@ -3364,6 +3364,34 @@ export class CareerWatchSession {
           }
         }
       }
+      // Watch started mid-air (or only saw airborne ticks): the ramp latch never
+      // re-ran. Keep Validated origin OK, or clear once clearly past the hub with
+      // Loaded vs Due — otherwise catch-up depart stays blocked forever.
+      if (
+        !this.originClearedForDepart &&
+        sample.onGround !== true &&
+        current.lastPreflightCheck?.loadVerification?.ready === true
+      ) {
+        const preflightLocOk =
+          current.lastPreflightCheck.location?.ok === true;
+        const leftOrigin =
+          typeof liveDistToOriginNm === 'number' &&
+          liveDistToOriginNm > settleRadiusNm;
+        if (preflightLocOk || leftOrigin) {
+          this.originClearedForDepart = true;
+          this.preflightDepartBlockedLogged = false;
+          if (this.lastError?.startsWith('Not at origin')) {
+            this.lastError = null;
+          }
+          watchDebugLog('watch', 'origin latch (mid-air)', {
+            cleared: true,
+            preflightLocOk,
+            leftOrigin,
+            liveDistToOriginNm: liveDistToOriginNm ?? null,
+            originIcao: current.originIcao,
+          });
+        }
+      }
       const fallbackHours = estimateMissionBlockHours(
         world,
         current.originIcao,
@@ -3386,6 +3414,9 @@ export class CareerWatchSession {
         expectedRouteMs,
         distanceNm,
         fallbackHours,
+        // Sticky IS PAUSED must see Absolute Time / motion vs prior tick —
+        // without prevSample, depart stays blocked while PHASE still climbs.
+        prevSample,
       };
       let { event, nextState } = evaluateMissionFlightTransition(
         current,

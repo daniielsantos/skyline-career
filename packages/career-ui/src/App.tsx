@@ -4608,6 +4608,17 @@ export function App() {
       setShowProfileGate(false);
       setShowAuthGate(true);
       setAuthSessionEpoch((epoch) => epoch + 1);
+      // Refresh register policy (invite / product key) — AUTH_REQUIRED often
+      // fires after truncate/stale Bearer without going through warmCareer.
+      void fetchAuthStatus()
+        .then((status) => {
+          setAuthRegisterEnabled(status.registerEnabled !== false);
+          setAuthInviteRequired(status.inviteRequired === true);
+          setAuthAccessKeysRequired(status.accessKeysRequired === true);
+        })
+        .catch(() => {
+          /* keep prior flags */
+        });
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
     return () => {
@@ -8096,7 +8107,7 @@ export function App() {
   async function onDebugClaimPort() {
     const portId = debugClaimPortId.trim().toUpperCase();
     if (!portId) {
-      setToastKind('err');
+      setToastKind('fail');
       setToast('Pick a port to claim');
       return;
     }
@@ -8775,6 +8786,15 @@ export function App() {
         setActiveBushTrip(null);
         setBushWatch(null);
         setWatch(null);
+        void fetchAuthStatus()
+          .then((status) => {
+            setAuthRegisterEnabled(status.registerEnabled !== false);
+            setAuthInviteRequired(status.inviteRequired === true);
+            setAuthAccessKeysRequired(status.accessKeysRequired === true);
+          })
+          .catch(() => {
+            /* keep prior flags */
+          });
         return;
       }
       await postCareerProfileClear();

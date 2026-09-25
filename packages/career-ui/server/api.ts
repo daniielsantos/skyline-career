@@ -764,9 +764,37 @@ function resetMsfsStampState(): void {
 
 function requireStore(): CareerStore {
   if (!store) {
+    if (isCareerWorldFixed()) {
+      throw new Error(
+        fixedWorldOpenError
+          ? `World database unavailable: ${fixedWorldOpenError}`
+          : 'World is not ready yet — try again in a moment',
+      );
+    }
     throw new Error('Select a career profile first');
   }
   return store;
+}
+
+/** Auth/register before the store is open — never reuse the SP profile-gate copy on MP. */
+function sendMissingStoreForAuth(
+  res: import('node:http').ServerResponse,
+): void {
+  if (isCareerWorldFixed()) {
+    send(res, 503, {
+      error: fixedWorldOpenError
+        ? `World database unavailable: ${fixedWorldOpenError}`
+        : 'World is not ready yet — try again in a moment',
+      code: fixedWorldOpenError
+        ? 'world_store_unavailable'
+        : 'world_store_opening',
+    });
+    return;
+  }
+  send(res, 409, {
+    error: 'Select a career profile first',
+    code: 'needs_profile',
+  });
 }
 
 /** Row cap for the market board — filters must run server-side to survive it. */
@@ -3879,10 +3907,7 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'POST' && path === '/api/auth/register') {
         if (!store) {
-          send(res, 409, {
-            error: 'Select a career profile first',
-            code: 'needs_profile',
-          });
+          sendMissingStoreForAuth(res);
           return;
         }
         if (!store.supportsAuth) {
@@ -4012,10 +4037,7 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'POST' && path === '/api/auth/login') {
         if (!store) {
-          send(res, 409, {
-            error: 'Select a career profile first',
-            code: 'needs_profile',
-          });
+          sendMissingStoreForAuth(res);
           return;
         }
         if (!store.supportsAuth) {
@@ -4079,10 +4101,7 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/auth/me') {
         if (!store) {
-          send(res, 409, {
-            error: 'Select a career profile first',
-            code: 'needs_profile',
-          });
+          sendMissingStoreForAuth(res);
           return;
         }
         const session = authSessionFromRequest(req);
@@ -15273,6 +15292,18 @@ export function createCareerApiServer(port = 8787) {
       const message = error instanceof Error ? error.message : String(error);
       if (/Select a career profile first/i.test(message)) {
         send(res, 409, { error: message, code: 'needs_profile' });
+        return;
+      }
+      if (
+        /World is not ready yet/i.test(message) ||
+        /World database unavailable/i.test(message)
+      ) {
+        send(res, 503, {
+          error: message,
+          code: /unavailable/i.test(message)
+            ? 'world_store_unavailable'
+            : 'world_store_opening',
+        });
         return;
       }
       sendRouteError(res, error, 500);

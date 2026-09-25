@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **e72eabf1** / desktop **0.3.302** shipped: Suggest Dispatch origin on Travel and polish Settings Dev tools. Release: [v0.3.302](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.302).
+
+
 `main` **0f9284ea** / desktop **0.3.301** shipped: Move Dev Mode cheats into Settings and add Class Ops unlock. Release: [v0.3.301](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.301).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **6c2b5201** / desktop **0.3.312** shipped: Include credit interest in forward burn and tidy Ledger recent activity. Release: [v0.3.312](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.312).
+
+
 `main` **dddb0c04** / desktop **0.3.311** shipped: Polish My VA Config, fix Path FBO flash, and make Auto-haul wallet floor editable. Release: [v0.3.311](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.311).
 
 

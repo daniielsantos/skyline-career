@@ -1213,6 +1213,157 @@ export async function sampleLiveLoadLb(
   };
 }
 
+/** Fuel tanks + totals only — one small Host batch (no stations / empty / gross).
+ * Used for En route cruise burn paint without thrashing SimBridge. */
+const FUEL_ONLY_SAMPLE_VARS = [
+  { name: 'FUEL WEIGHT PER GALLON', unit: 'pounds' },
+  { name: 'FUEL TOTAL CAPACITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT MAIN QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT MAIN QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK CENTER QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK CENTER2 QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT AUX QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT AUX QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK LEFT TIP QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TANK RIGHT TIP QUANTITY', unit: 'gallons' },
+  { name: 'FUEL TOTAL QUANTITY WEIGHT', unit: 'pounds' },
+  { name: 'FUEL TOTAL QUANTITY', unit: 'gallons' },
+] as const;
+
+export async function sampleLiveFuelLb(
+  bridge: NamedPipeSimBridge,
+  opts: {
+    preferTfdiEfb?: boolean;
+    preferA2aLvars?: boolean;
+    shouldAbort?: () => boolean;
+  } = {},
+): Promise<{
+  fuelLb: number | null;
+  fuelTanks?: FuelTankBreakdown;
+  sessionDied?: boolean;
+}> {
+  const aborted = () => opts.shouldAbort?.() === true;
+  if (aborted()) {
+    return { fuelLb: null };
+  }
+
+  let v: number[];
+  try {
+    v = await bridge.readSimVars([...FUEL_ONLY_SAMPLE_VARS]);
+  } catch (err) {
+    if (simIpcSessionDied(err)) {
+      return { fuelLb: null, sessionDied: true };
+    }
+    throw err;
+  }
+  if (aborted()) {
+    return { fuelLb: null };
+  }
+
+  const densRaw = finiteNum(v[0]);
+  const totalCapacityGalRaw = finiteNum(v[1]);
+  const totalCapacityGal =
+    totalCapacityGalRaw !== undefined && totalCapacityGalRaw > 0
+      ? totalCapacityGalRaw
+      : undefined;
+  const density = sanitizeFuelDensityLbPerGal(
+    densRaw !== undefined && densRaw > 0.1 ? densRaw : undefined,
+    { totalCapacityGal },
+  );
+
+  const leftMain = galOrZero(v[2]);
+  const rightMain = galOrZero(v[3]);
+  const centerGal = galOrZero(v[4]) + galOrZero(v[5]);
+  const leftAux = galOrZero(v[6]);
+  const rightAux = galOrZero(v[7]);
+  const leftTip = galOrZero(v[8]);
+  const rightTip = galOrZero(v[9]);
+
+  const leftLb = leftMain * density;
+  const rightLb = rightMain * density;
+  const centerLb = centerGal * density;
+  const leftAuxLb = leftAux * density;
+  const rightAuxLb = rightAux * density;
+  const leftTipLb = leftTip * density;
+  const rightTipLb = rightTip * density;
+  const tankTotalLb =
+    leftLb +
+    rightLb +
+    centerLb +
+    leftAuxLb +
+    rightAuxLb +
+    leftTipLb +
+    rightTipLb;
+  const fuelTanks: FuelTankBreakdown = {
+    left: leftLb,
+    right: rightLb,
+    center: centerLb,
+    ...(leftAuxLb > 0.5 ? { leftAux: leftAuxLb } : {}),
+    ...(rightAuxLb > 0.5 ? { rightAux: rightAuxLb } : {}),
+    ...(leftTipLb > 0.5 ? { leftTip: leftTipLb } : {}),
+    ...(rightTipLb > 0.5 ? { rightTip: rightTipLb } : {}),
+  };
+
+  let fuelLb: number | null = tankTotalLb > 0 ? tankTotalLb : null;
+  const fuelWeight = finiteNum(v[10]);
+  if (fuelWeight !== undefined && fuelWeight >= 0) {
+    fuelLb =
+      fuelWeight > tankTotalLb * 1.02 + 1
+        ? fuelWeight
+        : Math.max(tankTotalLb, fuelWeight);
+  } else {
+    const gal = finiteNum(v[11]);
+    if (gal !== undefined) {
+      const fuel = gal * density;
+      if (Number.isFinite(fuel) && fuel >= 0) {
+        fuelLb =
+          fuel > tankTotalLb * 1.02 + 1 ? fuel : Math.max(tankTotalLb, fuel);
+      }
+    }
+  }
+
+  if (opts.preferTfdiEfb) {
+    try {
+      const tfdi = await readTfdiMd11EfbLvars(bridge);
+      if (typeof tfdi.fuelLb === 'number' && tfdi.fuelLb > 0) {
+        fuelLb = tfdi.fuelLb;
+      }
+    } catch {
+      /* keep classic */
+    }
+  }
+
+  if (opts.preferA2aLvars) {
+    try {
+      const a2a = await readA2aAccusimLvars(bridge, density);
+      if (typeof a2a.fuelLb === 'number' && a2a.fuelLb > 0) {
+        fuelLb = a2a.fuelLb;
+        Object.assign(fuelTanks, {
+          left: a2a.tanks.left,
+          right: a2a.tanks.right,
+          center: a2a.tanks.center,
+          ...(a2a.tanks.leftTip !== undefined
+            ? { leftTip: a2a.tanks.leftTip }
+            : {}),
+          ...(a2a.tanks.rightTip !== undefined
+            ? { rightTip: a2a.tanks.rightTip }
+            : {}),
+        });
+      }
+    } catch {
+      /* keep classic */
+    }
+  }
+
+  const usableTanks = isUsableFuelTankBreakdown(fuelTanks, fuelLb)
+    ? fuelTanks
+    : undefined;
+  return {
+    fuelLb,
+    ...(usableTanks ? { fuelTanks: usableTanks } : {}),
+  };
+}
+
 export async function readLiveResidualFuelKg(
   bridge: NamedPipeSimBridge,
 ): Promise<number> {
@@ -2488,8 +2639,10 @@ export class CareerWatchSession {
       }
 
       // Loaded vs Due: Watch owns the pipe — sample + persist (single source of truth).
-      // v0.3.9 on the ramp: every tick (EFB payload/fuel edits). Airborne READY: 10s
-      // so cruise ticks do not thrash SimBridge with 16 station reads.
+      // Ramp: every tick (EFB edits + resume prep after MSFS restart @ origin).
+      // Airborne READY: 10s so cruise ticks do not thrash SimBridge with 16 station reads.
+      // `in_flight` on the ground must sample too — otherwise BACK AT DEPARTURE shows
+      // frozen pre-crash LV and looks "RESUME PREP READY" with dead numbers.
       if (!this.running || isOfpLoadActive()) {
         return;
       }
@@ -2501,9 +2654,11 @@ export class CareerWatchSession {
         : !prevVerification?.ready ||
           this.lastLoadSampleAtMs === 0 ||
           Date.now() - this.lastLoadSampleAtMs >= 10_000;
+      const rampLoadStatuses =
+        current.status === 'dispatched' || current.status === 'in_flight';
       if (
         prevVerification &&
-        current.status === 'dispatched' &&
+        rampLoadStatuses &&
         sample.onGround &&
         loadDue
       ) {
@@ -3210,6 +3365,138 @@ export class CareerWatchSession {
           this.lastError = formatIpcError(loadErr);
           watchDebugLog('load', 'sample failed', { error: this.lastError });
           if (simIpcSessionDied(loadErr)) {
+            this.pendingSimConnectReset = true;
+          }
+        }
+      } else if (
+        prevVerification &&
+        current.status === 'in_flight' &&
+        sample.onGround === false &&
+        loadDue
+      ) {
+        // Cruise: fuel-only ~10s — paint tank drain without station thrash.
+        try {
+          const prevWatchFuel =
+            prevVerification.fuel as WatchLoadVerification['fuel'];
+          const preferTfdiEfb =
+            /tfdi-md11/i.test(current.rolesPackRelPath ?? '') ||
+            /tfdi-md11/i.test(current.airframeTypeId ?? '');
+          const preferA2aLvars =
+            /a2a-/i.test(current.rolesPackRelPath ?? '') ||
+            /a2a-/i.test(current.airframeTypeId ?? '');
+          const load = await sampleLiveFuelLb(this.bridge, {
+            preferTfdiEfb,
+            preferA2aLvars,
+            shouldAbort: () => !this.running || isOfpLoadActive(),
+          });
+          this.lastLoadSampleAtMs = Date.now();
+          if (load.sessionDied) {
+            this.pendingSimConnectReset = true;
+            watchDebugLog('load', 'cruise fuel sample TIMEOUT — reset SimConnect next tick');
+          }
+          const rawFuelLb =
+            load.fuelLb !== null ? load.fuelLb : undefined;
+          const liveFuelLb = pickStableLiveFuelLb({
+            next: rawFuelLb,
+            prev: prevVerification.fuel.liveLb,
+            plannedLb: prevVerification.fuel.plannedLb,
+            nextTanks: load.fuelTanks,
+            prevTanks: prevWatchFuel.tanks,
+          });
+          const fuelSampleRejected =
+            typeof rawFuelLb === 'number' &&
+            typeof liveFuelLb === 'number' &&
+            Math.abs(rawFuelLb - liveFuelLb) > 1;
+          if (typeof liveFuelLb !== 'number' || !Number.isFinite(liveFuelLb)) {
+            watchDebugLog('load', 'cruise fuel sample skipped — no live fuel');
+          } else {
+            const fuelOnlyWeights = evaluateLoadVerification({
+              plannedFuelLb: prevVerification.fuel.plannedLb,
+              liveFuelLb,
+              plannedPayloadLb: prevVerification.payload.plannedLb,
+              livePayloadLb: prevVerification.payload.liveLb,
+              ...(typeof prevWatchFuel.taxiBurnLb === 'number'
+                ? { taxiBurnLb: prevWatchFuel.taxiBurnLb }
+                : {}),
+            });
+            const tanks = pickFuelTankBreakdown(
+              fuelSampleRejected ? undefined : load.fuelTanks,
+              prevWatchFuel.tanks,
+              liveFuelLb,
+            );
+            const { tanks: _prevTanks, ...prevFuelRest } = prevWatchFuel;
+            // Keep payload + ready from takeoff — burn below OFP dep is expected.
+            this.lastLoadVerification = {
+              ...prevVerification,
+              ready: prevVerification.ready,
+              fuel: {
+                ...prevFuelRest,
+                liveLb: liveFuelLb,
+                ok: fuelOnlyWeights.fuel.ok,
+                ...(tanks ? { tanks } : {}),
+                ...(typeof prevWatchFuel.taxiBurnLb === 'number'
+                  ? { taxiBurnLb: prevWatchFuel.taxiBurnLb }
+                  : {}),
+              },
+              payload: prevVerification.payload,
+            };
+            this.lastLiveFuelLb = liveFuelLb;
+            const fuelDrifted =
+              typeof prevWatchFuel.liveLb === 'number'
+                ? Math.abs(liveFuelLb - prevWatchFuel.liveLb) >= 15
+                : true;
+            const tanksDrifted =
+              Boolean(tanks) &&
+              Boolean(prevWatchFuel.tanks) &&
+              (Math.abs(
+                fuelTankBreakdownSum(tanks!) -
+                  fuelTankBreakdownSum(prevWatchFuel.tanks!),
+              ) >= 15 ||
+                Math.abs(tanks!.left - prevWatchFuel.tanks!.left) >= 5 ||
+                Math.abs(tanks!.right - prevWatchFuel.tanks!.right) >= 5 ||
+                Math.abs(tanks!.center - prevWatchFuel.tanks!.center) >= 5);
+            watchDebugLog('load', 'cruise fuel sample', {
+              liveFuelLb,
+              fuelOk: fuelOnlyWeights.fuel.ok,
+              tanks: tanks ?? null,
+              fuelDrifted,
+              tanksDrifted,
+            });
+            if (fuelDrifted || tanksDrifted) {
+              await this.cb.updateOpenMission(
+                this.missionId,
+                (_missions, openMission) => {
+                  const prev = openMission.lastPreflightCheck;
+                  if (!prev?.loadVerification) return false;
+                  const prevLv =
+                    prev.loadVerification as WatchLoadVerification;
+                  const { tanks: _pTanks, ...prevFuelKeep } = prevLv.fuel;
+                  openMission.lastPreflightCheck = {
+                    ...prev,
+                    checkedAtIso: new Date().toISOString(),
+                    loadVerification: {
+                      ...prevLv,
+                      ready: prevLv.ready,
+                      fuel: {
+                        ...prevFuelKeep,
+                        liveLb: liveFuelLb,
+                        ok: fuelOnlyWeights.fuel.ok,
+                        ...(tanks ? { tanks } : {}),
+                      },
+                      payload: prevLv.payload,
+                    },
+                  };
+                  return true;
+                },
+              );
+            }
+          }
+        } catch (fuelErr) {
+          this.lastError = formatIpcError(fuelErr);
+          watchDebugLog('load', 'cruise fuel sample failed', {
+            error: this.lastError,
+          });
+          if (simIpcSessionDied(fuelErr)) {
             this.pendingSimConnectReset = true;
           }
         }

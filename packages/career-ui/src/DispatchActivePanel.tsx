@@ -1391,7 +1391,7 @@ export function DispatchActivePanel(props: {
                       ? 'LANDED · AWAITING SHUTDOWN'
                       : 'LANDED · READY TO SETTLE';
             const enRouteSub = !liveOnGroundNow
-              ? 'Live load only — fuel burn below OFP departure is normal. Settle after landing + engines off.'
+              ? 'Live fuel drains as you burn — below OFP departure is normal. Settle after landing + engines off.'
               : !sawAirborneNow
                 ? 'Still on the ramp — Watch ignores the MSFS menu and aircraft reloads. Take off to depart.'
                 : !nearDestNow
@@ -1403,9 +1403,13 @@ export function DispatchActivePanel(props: {
                     : liveEnginesNow
                       ? 'Shut down engines (or set parking brake) in MSFS — Watch settles after engines off at the destination.'
                       : 'Engines off — Watch will settle when destination proximity and airborne time gates pass.';
-            const cruiseLive = enRoute && !resumePrep;
+            // Keep the EN ROUTE live-tile layout for resume prep (don't switch to
+            // the denser preflight-load-grid — that looked "shrunk").
+            const enRouteTiles = enRoute;
+            // Resume prep still needs honest Due match marks (not soft cruise ·).
+            const softLiveMarks = enRoute && !resumePrep;
             const loadTileClass = (ok: boolean) =>
-              cruiseLive
+              softLiveMarks
                 ? ok
                   ? 'preflight-load-ok'
                   : 'preflight-load-live'
@@ -1413,7 +1417,7 @@ export function DispatchActivePanel(props: {
                   ? 'preflight-load-ok'
                   : 'preflight-load-fail';
             const loadTileMark = (ok: boolean) =>
-              cruiseLive ? (ok ? '✓' : '·') : ok ? '✓' : '✗';
+              softLiveMarks ? (ok ? '✓' : '·') : ok ? '✓' : '✗';
             const noteLabel =
               view?.weightNoteCount &&
               view.weightNoteCount === check.findings.length
@@ -1506,7 +1510,7 @@ export function DispatchActivePanel(props: {
                       <span>Fuel</span>
                       <strong>Sim {massFromLb(view.fuel.liveLb)}</strong>
                       <small>
-                        {cruiseLive ? 'OFP dep' : 'Due'}{' '}
+                        {softLiveMarks ? 'OFP dep' : 'Due'}{' '}
                         {massFromLb(view.fuel.plannedLb)}
                       </small>
                       <b>{loadTileMark(fuelOk)}</b>
@@ -1652,7 +1656,7 @@ export function DispatchActivePanel(props: {
                   </div>
                 );
 
-                return cruiseLive ? (
+                return enRouteTiles ? (
                   <div className="dispatch-enroute-live-load">
                     <div className="dispatch-enroute-live-tiles">
                       {liveLoadTiles}
@@ -1760,7 +1764,7 @@ export function DispatchActivePanel(props: {
                 }`}
                 aria-live="polite"
               >
-                {enRoute && !resumePrep ? (
+                {enRoute ? (
                   enRouteBriefItems.length > 0 ? (
                     <div className="dispatch-enroute-block">
                       <h3 className="dispatch-enroute-block-title">OFP</h3>
@@ -1779,22 +1783,14 @@ export function DispatchActivePanel(props: {
                     <div>
                       <strong>
                         {injecting
-                          ? resumePrep
-                            ? 'RESUME PREP · INJECTING'
-                            : 'INJECTING LOAD'
+                          ? 'INJECTING LOAD'
                           : confirming
-                            ? resumePrep
-                              ? 'RESUME PREP · CONFIRMING'
-                              : 'CONFIRMING LOAD'
+                            ? 'CONFIRMING LOAD'
                             : ready
-                            ? resumePrep
-                              ? 'RESUME PREP READY'
-                              : 'PREFLIGHT READY'
+                            ? 'PREFLIGHT READY'
                             : loadReady && !locationOk
                               ? 'NOT AT ORIGIN'
-                              : resumePrep
-                                ? 'RESUME PREP · FIX LOAD'
-                                : 'PREFLIGHT FAILED'}
+                              : 'PREFLIGHT FAILED'}
                       </strong>
                       <small>
                         {injecting
@@ -1803,9 +1799,7 @@ export function DispatchActivePanel(props: {
                           : confirming
                             ? 'Writes finished — waiting for Loaded vs Due to match (times out if Sim stays short).'
                           : ready
-                            ? resumePrep
-                              ? 'Fuel and cargo match the OFP again. Take off to continue — settle only at the destination.'
-                              : 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
+                            ? 'Fuel and cargo match the confirmed OFP. Take off when Watch is connected.'
                             : loadReady && !locationOk
                               ? liveLocation
                                 ? liveLocation.code === 'ORIGIN_NOT_ON_GROUND'
@@ -1818,9 +1812,7 @@ export function DispatchActivePanel(props: {
                                   ? `Aircraft is ${liveLocation.distanceNm.toFixed(1)} nm from ${liveLocation.originIcao} (need ≤${liveLocation.radiusNm} nm). Relocate before takeoff — Watch will not auto-depart.`
                                   : `Not verified at ${liveLocation.originIcao}. Relocate before takeoff — Watch will not auto-depart.`
                                 : 'Relocate to the mission origin before takeoff — Watch will not auto-depart.'
-                            : resumePrep
-                              ? 'Reload fuel and payload (Airframe inject), then take off again.'
-                              : 'Fix the mismatched aircraft load before departure.'}
+                            : 'Fix the mismatched aircraft load before departure.'}
                       </small>
                     </div>
                     <div className="preflight-head-actions">
@@ -1848,9 +1840,7 @@ export function DispatchActivePanel(props: {
                                       'Watch reconnecting to SimBridge…')
                                     : !props.simBridge?.connected
                                       ? 'Start SimBridge, then turn inject on.'
-                                      : resumePrep && !ready
-                                        ? 'Turn Airframe inject on to reload after the MSFS restart.'
-                                        : null;
+                                      : null;
                             return injectStatus ? (
                               <p
                                 className={`skyline-inject-status${
@@ -1893,9 +1883,7 @@ export function DispatchActivePanel(props: {
                                   : confirming
                                     ? 'Waiting for live sample — turn off to dismiss'
                                   : 'Airframe inject is on — turn off to leave load as-is'
-                                : resumePrep
-                                  ? 'Turn on to reload OFP fuel and payload after restart'
-                                  : 'Turn on to write OFP fuel and payload into the sim'
+                                : 'Turn on to write OFP fuel and payload into the sim'
                             }
                             onClick={() =>
                               props.onToggleSkylineInject(!injectSwitchOn)
@@ -1956,10 +1944,109 @@ export function DispatchActivePanel(props: {
                         <h3 className="dispatch-enroute-block-title">
                           {enRouteHeadline}
                         </h3>
-                        <span className="dispatch-enroute-live-checked">
-                          Checked{' '}
-                          {new Date(check.checkedAtIso).toLocaleTimeString()}
-                        </span>
+                        <div className="dispatch-enroute-live-head-actions">
+                          {resumePrep &&
+                          (loadPath === 'inject' ||
+                            mission.injectCapable === true ||
+                            props.loadOfpAutoStatus === 'failed' ||
+                            props.loadOfpAutoStatus === 'loading' ||
+                            props.loadOfpAutoStatus === 'done' ||
+                            props.skylineInjectEnabled) ? (
+                            <div className="skyline-inject-row">
+                              {(() => {
+                                const injectStatus =
+                                  injectFailed
+                                    ? (props.loadOfpAutoError ??
+                                      'Inject failed — turn Airframe inject on to retry.')
+                                    : props.loadOfpAutoStatus === 'loading'
+                                      ? (props.loadOfpProgress?.message ??
+                                        'Writing fuel + payload. Turn off to stop.')
+                                      : confirming
+                                        ? 'Writes finished — waiting for Loaded vs Due.'
+                                        : !props.simBridge?.connected &&
+                                            !watchLive
+                                          ? 'Start SimBridge, then turn inject on.'
+                                          : !ready
+                                            ? 'Turn Airframe inject on to reload after the MSFS restart.'
+                                            : null;
+                                return injectStatus ? (
+                                  <p
+                                    className={`skyline-inject-status${
+                                      injectFailed
+                                        ? ' skyline-inject-status-fail'
+                                        : injectBusy
+                                          ? ' skyline-inject-status-busy'
+                                          : ''
+                                    }`}
+                                    aria-live="polite"
+                                  >
+                                    {injectStatus}
+                                  </p>
+                                ) : null;
+                              })()}
+                              <button
+                                type="button"
+                                role="switch"
+                                className={`skyline-inject-switch${
+                                  injectSwitchOn
+                                    ? ' skyline-inject-switch-on'
+                                    : ''
+                                }${
+                                  injectBusy
+                                    ? ' skyline-inject-switch-busy'
+                                    : ''
+                                }`}
+                                aria-checked={injectSwitchOn}
+                                disabled={
+                                  injecting
+                                    ? false
+                                    : busy ||
+                                      !(
+                                        props.simBridge?.connected ||
+                                        watchLive
+                                      )
+                                }
+                                title={
+                                  injectSwitchOn
+                                    ? injecting
+                                      ? 'Turn off to cancel fuel/payload inject'
+                                      : confirming
+                                        ? 'Waiting for live sample — turn off to dismiss'
+                                        : 'Airframe inject is on — turn off to leave load as-is'
+                                    : 'Turn on to reload OFP fuel and payload after restart'
+                                }
+                                onClick={() =>
+                                  props.onToggleSkylineInject(!injectSwitchOn)
+                                }
+                              >
+                                <span
+                                  className="skyline-inject-switch-track"
+                                  aria-hidden="true"
+                                >
+                                  <span className="skyline-inject-switch-knob" />
+                                </span>
+                                <span className="skyline-inject-switch-label">
+                                  <strong>Airframe inject</strong>
+                                  <small>
+                                    {injecting
+                                      ? 'Writing…'
+                                      : confirming
+                                        ? 'Checking…'
+                                        : injectFailed
+                                          ? 'Failed · retry'
+                                          : props.skylineInjectEnabled
+                                            ? 'On'
+                                            : 'Off'}
+                                  </small>
+                                </span>
+                              </button>
+                            </div>
+                          ) : null}
+                          <span className="dispatch-enroute-live-checked">
+                            Checked{' '}
+                            {new Date(check.checkedAtIso).toLocaleTimeString()}
+                          </span>
+                        </div>
                       </div>
                       <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
                       {liveLoadGrid}

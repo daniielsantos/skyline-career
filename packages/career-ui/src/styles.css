@@ -3770,6 +3770,20 @@ tr.lot-locked {
   min-width: 0;
 }
 
+.dispatch-enroute-live-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem 0.75rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.dispatch-enroute-live-head-actions .skyline-inject-row {
+  margin: 0;
+}
+
 .dispatch-enroute-live-head .dispatch-enroute-block-title {
   color: var(--ok);
   min-width: 0;

@@ -954,6 +954,31 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(isSimPlaybackFrozen(stuck, prev), true);
     assert.equal(isSimPlaybackFrozen(moved, prev), false);
     assert.equal(isSimPlaybackFrozen(moved), true);
+    assert.equal(
+      isSimPlaybackFrozen({ ...moved, positionHeld: true }, prev),
+      true,
+    );
+  });
+
+  it('treats sticky IS PAUSED as live when absolute time advances', () => {
+    const prev = {
+      onGround: false,
+      enginesRunning: true,
+      paused: true,
+      simAbsoluteTimeSec: 1000,
+      position: { lat: -25.5, lon: -49.2 },
+      positionHeld: true,
+    };
+    const stuckTime = {
+      ...prev,
+      simAbsoluteTimeSec: 1000.05,
+    };
+    const liveTime = {
+      ...prev,
+      simAbsoluteTimeSec: 1001.5,
+    };
+    assert.equal(isSimPlaybackFrozen(stuckTime, prev), true);
+    assert.equal(isSimPlaybackFrozen(liveTime, prev), false);
   });
 
   it('uses 50% airborne gate for routes under 100 nm', () => {

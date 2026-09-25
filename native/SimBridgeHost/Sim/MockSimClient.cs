@@ -133,6 +133,7 @@ public sealed class MockSimClient : ISimClient
             ParkingBrake = Get("BRAKE PARKING POSITION", "Bool") > 0.5,
             Paused = Get("IS PAUSED", "Bool") > 0.5,
             SlewActive = Get("IS SLEW ACTIVE", "Bool") > 0.5,
+            AbsoluteTimeSec = Get("ABSOLUTE TIME", "Seconds"),
             SimRate = Get("SIMULATION RATE", "Number"),
             CgPercent = Get("CG PERCENT", "Percent over 100"),
             GrossWeightLb = Get("TOTAL WEIGHT", "pounds"),
@@ -287,6 +288,7 @@ public sealed class MockSimClient : ISimClient
         Set("ENG COMBUSTION:1", "Bool", 0);
         Set("IS PAUSED", "Bool", 0);
         Set("IS SLEW ACTIVE", "Bool", 0);
+        Set("ABSOLUTE TIME", "Seconds", 0);
         Set("SIMULATION RATE", "Number", 1);
         Set("CG PERCENT", "Percent over 100", 28.0);
         Set("TOTAL WEIGHT", "pounds", 2300);

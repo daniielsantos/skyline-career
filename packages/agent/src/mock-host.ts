@@ -20,6 +20,7 @@ type Snapshot = {
   parkingBrake: boolean;
   paused: boolean;
   slewActive: boolean;
+  absoluteTimeSec?: number;
   simRate: number;
   cgPercent: number;
   grossWeightLb: number;
@@ -49,6 +50,7 @@ function seed() {
   set('ENG COMBUSTION:1', 'Bool', 0);
   set('IS PAUSED', 'Bool', 0);
   set('IS SLEW ACTIVE', 'Bool', 0);
+  set('ABSOLUTE TIME', 'Seconds', 0);
   set('SIMULATION RATE', 'Number', 1);
   set('CG PERCENT', 'Percent over 100', 28);
   set('TOTAL WEIGHT', 'pounds', 2300);
@@ -84,6 +86,7 @@ function snapshot(): Snapshot {
     parkingBrake: get('BRAKE PARKING POSITION', 'Bool') > 0.5,
     paused: get('IS PAUSED', 'Bool') > 0.5,
     slewActive: get('IS SLEW ACTIVE', 'Bool') > 0.5,
+    absoluteTimeSec: get('ABSOLUTE TIME', 'Seconds'),
     simRate: get('SIMULATION RATE', 'Number'),
     cgPercent: get('CG PERCENT', 'Percent over 100'),
     grossWeightLb: get('TOTAL WEIGHT', 'pounds'),

@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **c46405fc** / desktop **0.3.321** shipped: Reorder sidebar and stop Crew from painting VA cash on home Wallet. Release: [v0.3.321](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.321).
+
+
 `main` **208db5ba** / desktop **0.3.320** shipped: Show Demand total pay if you fill remaining Wanted. Release: [v0.3.320](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.320).
 
 

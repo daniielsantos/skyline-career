@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **5aa25084** / desktop **0.3.324** shipped: Add Airframes live-aircraft identify and trim Crew Hauls copy. Release: [v0.3.324](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.324).
+
+
 `main` **db5f76e2** / desktop **0.3.323** shipped: Fix desk auto-buy lb round-trip and put Crew Hauls first. Release: [v0.3.323](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.323).
 
 

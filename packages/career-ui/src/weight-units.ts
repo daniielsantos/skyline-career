@@ -51,6 +51,25 @@ export function displayToKg(value: number, system: WeightSystem): number {
 }
 
 /**
+ * Whole display units (lb or kg) → stored kg for open-ended inputs (desk
+ * auto-buy max/day, etc.). Imperial uses round so typed `10000` lb round-trips
+ * to `10000` on screen — `Math.floor(lb/KG_TO_LB)` was eating ~2 lb (9998).
+ */
+export function displayMassToStoredKg(
+  displayAmount: number,
+  system: WeightSystem,
+): number {
+  const display = Math.max(0, Math.floor(Number(displayAmount) || 0));
+  if (display <= 0) return 0;
+  if (system !== 'imperial') return display;
+  let kg = Math.round(display / KG_TO_LB);
+  if (Math.round(kg * KG_TO_LB) === display) return Math.max(0, kg);
+  if (Math.round((kg + 1) * KG_TO_LB) === display) return kg + 1;
+  if (kg > 0 && Math.round((kg - 1) * KG_TO_LB) === display) return kg - 1;
+  return Math.max(0, kg);
+}
+
+/**
  * Floored display input → stored kg, capped at `maxKg`.
  * When the input is the floored display of `maxKg` (or any `snapKg`), return that
  * exact kg — imperial Max otherwise leaves ~1 kg (~2 lb) dust forever.

@@ -36,6 +36,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Demand Total pay column (2026-09-25):** sintoma = board mostrava Max $/unit sem o payout se preenchesse o Wanted restante. Causa = UI só listava preço unitário. Fix = coluna **Total pay** = `remainingKg × maxUnitPriceUsd` (sortável), tooltip com Wanted × rate.
 
+**Desk auto-buy 10k lb → 9,998 (2026-09-25):** sintoma = Max lb/day digitado 10000 gravava e reexibia 9998. Causa = `Math.floor(lb/KG_TO_LB)` no upsert. Fix = `displayMassToStoredKg` (round + nudge) para round-trip do label.
+
 **Port FBO quiet by state (2026-09-21):** Yours → Scout first (one ranked table + All/Haul/Demand/Bridge filter); Desk auto-buy in `<details>`; Port stock collapsed. Vacant/Held → one-line hint (Claim CTA stays in title). Less desk prose.
 
 **Scout Hold amount picker (2026-09-22):** sintoma = Scout Hold reservava o kg inteiro da sugestão (esgotava WH → Demand sumia). Causa = confirm mandava `s.kg` sem UI. Fix = diálogo Hold com slider + presets 25/50/75/Max (floor 200 kg); API `kg` já existia.

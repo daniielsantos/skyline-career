@@ -80,6 +80,7 @@ import {
 import { pickDefaultPortId } from './ports-default-pick';
 import {
   displayAmountToStoredKg,
+  displayMassToStoredKg,
   displayToKg,
   KG_TO_LB,
   kgToDisplay,
@@ -1588,8 +1589,9 @@ export function PortsPanel(props: {
       props.weightSystem === 'imperial'
         ? priceDisplay * KG_TO_LB
         : priceDisplay;
-    const maxKgPerDay = Math.floor(
-      displayToKg(massDisplay, props.weightSystem),
+    const maxKgPerDay = Math.max(
+      1,
+      displayMassToStoredKg(massDisplay, props.weightSystem),
     );
     if (
       !Number.isFinite(priceDisplay) ||

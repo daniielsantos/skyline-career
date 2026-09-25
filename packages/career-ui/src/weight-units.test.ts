@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   displayAmountToStoredKg,
+  displayMassToStoredKg,
   displayToKg,
   formatMassPreferExact,
   kgToDisplay,
@@ -39,6 +40,18 @@ describe('displayAmountToStoredKg', () => {
 
   it('metric Max is identity', () => {
     assert.equal(displayAmountToStoredKg(2_268, 'metric', 2_268), 2_268);
+  });
+});
+
+describe('displayMassToStoredKg', () => {
+  it('imperial 10000 lb round-trips on the desk label', () => {
+    const kg = displayMassToStoredKg(10_000, 'imperial');
+    assert.equal(Math.round(kgToDisplay(kg, 'imperial')), 10_000);
+    assert.ok(kg > Math.floor(displayToKg(10_000, 'imperial')));
+  });
+
+  it('metric is identity for whole kg', () => {
+    assert.equal(displayMassToStoredKg(4_536, 'metric'), 4_536);
   });
 });
 

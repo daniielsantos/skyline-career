@@ -253,7 +253,7 @@ type Props = {
 export function VaPage(props: Props) {
   const token = getAuthToken();
   const companyId = props.activeCompanyId || getStoredCompanyId();
-  const [pane, setPane] = useState<VaPane>('roster');
+  const [pane, setPane] = useState<VaPane>('hauls');
   const [members, setMembers] = useState<VaMember[]>([]);
   const [role, setRole] = useState<string | null>(null);
   const [viewerAccountId, setViewerAccountId] = useState<string | null>(null);
@@ -908,25 +908,6 @@ export function VaPage(props: Props) {
           <button
             type="button"
             role="tab"
-            aria-selected={pane === 'roster'}
-            className={pane === 'roster' ? 'tab active' : 'tab'}
-            onClick={() => setPane('roster')}
-          >
-            Roster
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={pane === 'hangar'}
-            className={pane === 'hangar' ? 'tab active' : 'tab'}
-            onClick={() => setPane('hangar')}
-          >
-            Hangar
-            {props.fleet.length > 0 ? ` (${props.fleet.length})` : ''}
-          </button>
-          <button
-            type="button"
-            role="tab"
             aria-selected={pane === 'hauls'}
             className={pane === 'hauls' ? 'tab active' : 'tab'}
             onClick={() => setPane('hauls')}
@@ -941,6 +922,25 @@ export function VaPage(props: Props) {
             onClick={() => setPane('ports')}
           >
             Ports
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'hangar'}
+            className={pane === 'hangar' ? 'tab active' : 'tab'}
+            onClick={() => setPane('hangar')}
+          >
+            Hangar
+            {props.fleet.length > 0 ? ` (${props.fleet.length})` : ''}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={pane === 'roster'}
+            className={pane === 'roster' ? 'tab active' : 'tab'}
+            onClick={() => setPane('roster')}
+          >
+            Roster
           </button>
           <button
             type="button"

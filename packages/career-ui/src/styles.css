@@ -4647,7 +4647,23 @@ tr.lot-locked {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  align-items: center;
+  align-items: flex-end;
+}
+
+.settings-dev-port-claim {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-dev-port-pick {
+  display: grid;
+  gap: 0.25rem;
+  min-width: min(100%, 22rem);
+}
+
+.settings-dev-port-pick select {
+  width: 100%;
+  max-width: 28rem;
 }
 
 .settings-choice-btn.active {

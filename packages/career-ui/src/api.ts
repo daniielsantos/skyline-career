@@ -2404,9 +2404,16 @@ export function postDebugCreditWallet(opts?: { amountUsd?: number }) {
   );
 }
 
-/** Dev-only — force Port FBO claim (default Port of Santos / BRSSZ). */
-export function postDebugClaimPort(opts?: {
-  portId?: string;
+/** Dev-only — static CAREER_PORTS catalog for force-claim picker. */
+export function fetchDebugPortCatalog() {
+  return api<{
+    ports: Array<{ id: string; name: string; countryId: string }>;
+  }>('/api/debug/port-catalog');
+}
+
+/** Dev-only — force Port FBO claim for any CAREER_PORTS id. */
+export function postDebugClaimPort(opts: {
+  portId: string;
   companyId?: string;
 }) {
   return api<{
@@ -2420,8 +2427,8 @@ export function postDebugClaimPort(opts?: {
   }>('/api/debug/claim-port', {
     method: 'POST',
     body: JSON.stringify({
-      portId: opts?.portId ?? 'BRSSZ',
-      companyId: opts?.companyId,
+      portId: opts.portId,
+      companyId: opts.companyId,
     }),
   });
 }

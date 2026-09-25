@@ -360,6 +360,7 @@ import {
   isFlightTrackFresh,
   FLIGHT_TRACK_FRESH_MS,
   getCareerPort,
+  listCareerPorts,
   type CareerEconomyWorld,
   type CareerMissionsState,
   type CharterOffer,
@@ -12299,6 +12300,21 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/debug/port-catalog') {
+        if (!requestDevMode(req)) {
+          send(res, 403, { error: 'Dev Mode is required' });
+          return;
+        }
+        send(res, 200, {
+          ports: listCareerPorts().map((p) => ({
+            id: p.id,
+            name: p.name,
+            countryId: p.countryId,
+          })),
+        });
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/debug/claim-port') {
         if (!requestDevMode(req)) {
           send(res, 403, { error: 'Dev Mode is required' });
@@ -12308,7 +12324,11 @@ export function createCareerApiServer(port = 8787) {
           portId?: string;
           companyId?: string;
         };
-        const portId = (body.portId ?? 'BRSSZ').trim().toUpperCase();
+        const portId = (body.portId ?? '').trim().toUpperCase();
+        if (!portId || !getCareerPort(portId)) {
+          send(res, 400, { error: 'Unknown portId — pick one from CAREER_PORTS' });
+          return;
+        }
         const claimCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           const payload = await withCareerWrite(

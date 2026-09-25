@@ -18,6 +18,8 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 - **Hub level maintenance (2026-09-25):** sintoma = terminais sobem a L5 só com tempo/NPC e ficam lá pra sempre (level sticky-up). Causa = XP de settle NPC = player + level nunca descia. Fix = (1) settle NPC/fuel truck **0.4×**, lot formation **0.5×**; (2) quiet (`activityScore < 8`) decai **0.45 XP/tick** → demote abaixo da histerese (25% do span do nível); (3) L5 exige activityScore ≥35 + tráfego nas últimas 12h. Cap/stock rescale no demote (igual promote inverso). UI: tooltip `at risk` + barra L5 = banda de manutenção.
 
+- **Dev Claim port picker (2026-09-25):** sintoma = Settings → Developer só tinha **Claim Santos**. Fix = `GET /api/debug/port-catalog` + select de todos `CAREER_PORTS` (optgroup por país) + `POST /api/debug/claim-port` exige `portId` válido (sem default BRSSZ).
+
 - **Freights paginator `of N` (2026-09-23):** `N` = lots **após filtros** da board (`queryMarketBoardPage` → `totalLots`), não inventário bruto do mundo. Swing ~17k↔20k (pós-densify) é equilíbrio vivo **formLots × expireLots** (+ troca Your/Operator/airframe/Near) — **não** retunar Dry/`CARGO_FLOW_BALANCE`. UI: `… of N matching`.
 
 - **Hangar assigned mark (2026-09-23):** card `assigned` deixa de mostrar a prosa “Finish or cancel…”. Badge ASSIGNED + ícone de avião no canto da arte (par do wrench de MX); hover explica o gate.

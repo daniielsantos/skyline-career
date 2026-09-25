@@ -85,6 +85,7 @@ import {
   postDebugCreditWallet,
   postDebugClaimPort,
   postDebugUnlockClassOps,
+  fetchDebugPortCatalog,
   postWatchStart,
   postWatchStop,
   type AircraftClass,
@@ -3832,6 +3833,10 @@ export function App() {
   const [weightSystem, setWeightSystem] = useState<WeightSystem>(loadWeightSystem);
   const [uiSoundMode, setUiSoundMode] = useState<UiSoundMode>(loadUiSoundMode);
   const [devMode, setDevMode] = useState(loadDevMode);
+  const [debugClaimPortId, setDebugClaimPortId] = useState('USHOU');
+  const [debugPortCatalog, setDebugPortCatalog] = useState<
+    Array<{ id: string; name: string; countryId: string }>
+  >([]);
   /** VA-listed company + non-owner → Hangar MX/sell locked (ferry ok). */
   const [vaHangarMutationsLocked, setVaHangarMutationsLocked] = useState(false);
   const [worldPresence, setWorldPresence] = useState<{
@@ -6613,6 +6618,31 @@ export function App() {
     saveDevMode(devMode);
   }, [devMode]);
 
+  useEffect(() => {
+    if (!devMode) return;
+    let cancelled = false;
+    void fetchDebugPortCatalog()
+      .then((res) => {
+        if (cancelled) return;
+        const ports = [...res.ports].sort((a, b) => {
+          if (a.countryId !== b.countryId) {
+            return a.countryId.localeCompare(b.countryId);
+          }
+          return a.name.localeCompare(b.name);
+        });
+        setDebugPortCatalog(ports);
+        setDebugClaimPortId((cur) =>
+          ports.some((p) => p.id === cur) ? cur : (ports.find((p) => p.countryId === 'US')?.id ?? ports[0]?.id ?? cur),
+        );
+      })
+      .catch(() => {
+        /* soft — picker stays empty until next open */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [devMode]);
+
   // Lab / Pulse / Rivals are dev-only — leave those tabs if Dev Mode is off.
   useEffect(() => {
     if (devMode) return;
@@ -8063,9 +8093,15 @@ export function App() {
     });
   }
 
-  async function onDebugClaimSantos() {
+  async function onDebugClaimPort() {
+    const portId = debugClaimPortId.trim().toUpperCase();
+    if (!portId) {
+      setToastKind('err');
+      setToast('Pick a port to claim');
+      return;
+    }
     await run(async () => {
-      const result = await postDebugClaimPort({ portId: 'BRSSZ' });
+      const result = await postDebugClaimPort({ portId });
       commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
@@ -20208,15 +20244,54 @@ export function App() {
                 </div>
                 <div className="settings-dev-group">
                   <p className="aircraft-card-section-label">Ports</p>
-                  <div className="settings-dev-actions">
+                  <div className="settings-dev-actions settings-dev-port-claim">
+                    <label className="settings-dev-port-pick">
+                      <span className="muted">Force claim Port FBO</span>
+                      <select
+                        value={debugClaimPortId}
+                        disabled={busy || debugPortCatalog.length === 0}
+                        onChange={(e) => setDebugClaimPortId(e.target.value)}
+                        title="Any CAREER_PORTS id — skips CAPEX/gates"
+                      >
+                        {debugPortCatalog.length === 0 ? (
+                          <option value={debugClaimPortId}>Loading ports…</option>
+                        ) : (
+                          Object.entries(
+                            debugPortCatalog.reduce<
+                              Record<string, Array<{ id: string; name: string }>>
+                            >((acc, p) => {
+                              const list = acc[p.countryId] ?? (acc[p.countryId] = []);
+                              list.push({ id: p.id, name: p.name });
+                              return acc;
+                            }, {}),
+                          )
+                            .sort(([a], [b]) => {
+                              if (a === 'US') return -1;
+                              if (b === 'US') return 1;
+                              if (a === 'BR') return -1;
+                              if (b === 'BR') return 1;
+                              return a.localeCompare(b);
+                            })
+                            .map(([countryId, ports]) => (
+                            <optgroup key={countryId} label={countryId}>
+                              {ports.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} ({p.id})
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))
+                        )}
+                      </select>
+                    </label>
                     <button
                       type="button"
                       className="action ghost"
-                      onClick={() => void onDebugClaimSantos()}
-                      disabled={busy}
-                      title="Force Port FBO at Port of Santos (BRSSZ) for the active company"
+                      onClick={() => void onDebugClaimPort()}
+                      disabled={busy || !debugClaimPortId}
+                      title="Force Port FBO for the selected port (active company)"
                     >
-                      Claim Santos
+                      Claim port
                     </button>
                   </div>
                 </div>

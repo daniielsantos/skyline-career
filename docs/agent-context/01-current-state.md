@@ -1,5 +1,8 @@
 # Current state (2026-09-25)
 
+`main` **26c6d8dd** / desktop **0.3.317** shipped: Add a home-hub map picker and lock sidebar until claim. Release: [v0.3.317](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.317).
+
+
 `main` **8b028227** / desktop **0.3.316** shipped: Fix MP auth errors after empty-world wipe and toast typecheck. Release: [v0.3.316](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.316).
 
 

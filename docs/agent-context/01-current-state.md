@@ -1,4 +1,7 @@
-# Current state (2026-09-25)
+# Current state (2026-09-26)
+
+`main` **b5217481** / desktop **0.3.341** shipped: Keep MP on Listening mid-deploy and let owners drop a Port FBO without refund. Release: [v0.3.341](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.341).
+
 
 `main` **07428f87** / desktop **0.3.340** shipped: Mix Demand desk and Scout Haul boards by distance bands so long-haul pay no longer monopolizes the shelf. Release: [v0.3.340](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.340).
 

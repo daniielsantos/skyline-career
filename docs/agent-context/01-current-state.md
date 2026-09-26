@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **e3984d38** / desktop **0.3.349** shipped: Redesign terminal commodity stickers with distinct cargo motifs so the inventory set no longer looks like a mild refresh of the old icons. Release: [v0.3.349](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.349).
+
+
 `main` **7d0928ab** / desktop **0.3.348** shipped: Tighten Demand ultra-short pay and Wanted kg so bay hops stop printing while mid/long desks stay intact. Release: [v0.3.348](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.348).
 
 

@@ -125,15 +125,31 @@ export const DEMAND_INTL_NM_START = 200;
 /** Full {@link DEMAND_INTL_PAY_MULT} at/above this nm. */
 export const DEMAND_INTL_NM_FULL = 1_500;
 
-/** Demand unit-price nm scale anchors (shortage still in spot; this is haul). */
+/**
+ * Demand unit-price nm scale anchors (shortage still in spot; this is haul).
+ * Ultra-short floor is aggressive so 18 nm electronics desks are not a print;
+ * mid/long stay near 1× so real hauls keep their juice.
+ */
+export const DEMAND_NM_SCALE_ULTRA_NM = 50;
+export const DEMAND_NM_SCALE_ULTRA = 0.28;
 export const DEMAND_NM_SCALE_NEAR_NM = 150;
-export const DEMAND_NM_SCALE_NEAR = 0.6;
+export const DEMAND_NM_SCALE_NEAR = 0.48;
 export const DEMAND_NM_SCALE_MID_NM = 500;
 export const DEMAND_NM_SCALE_MID = 0.85;
 export const DEMAND_NM_SCALE_FAIR_NM = 1_200;
 export const DEMAND_NM_SCALE_FAIR = 1;
 export const DEMAND_NM_SCALE_LONG_NM = 2_500;
 export const DEMAND_NM_SCALE_LONG = 1.06;
+
+/**
+ * Wanted-kg nm scale — short hops ask for feeder-sized loads, not 5–8 klb
+ * electronics across the bay. Full band by ~500 nm.
+ */
+export const DEMAND_WANTED_NM_ULTRA = 0.32;
+export const DEMAND_WANTED_NM_NEAR = 0.55;
+export const DEMAND_WANTED_NM_MID = 1;
+/** Absolute floor after nm scale (matches deficit gate). */
+export const DEMAND_WANTED_ABS_MIN_KG = 200;
 
 function demandLerp(a: number, b: number, t: number): number {
   const u = Math.min(1, Math.max(0, t));
@@ -152,14 +168,25 @@ export function demandNmSmooth01(
 }
 
 /**
- * Haul scale on Demand unit price (spawn). Short hops compress shortage juice
- * so nearby electronics desks are not a money print; long hops keep ~1–1.06×.
- * Unknown/invalid nm → 1 (do not distort).
+ * Haul scale on Demand unit price (spawn). Ultra-short compresses hard;
+ * long hops keep ~1–1.06×. Unknown/invalid nm → 1 (do not distort).
  */
 export function demandNmScale(nm: number | null | undefined): number {
   if (nm == null || !Number.isFinite(nm) || nm <= 0) return 1;
+  if (nm <= DEMAND_NM_SCALE_ULTRA_NM) {
+    return demandLerp(
+      0.22,
+      DEMAND_NM_SCALE_ULTRA,
+      nm / DEMAND_NM_SCALE_ULTRA_NM,
+    );
+  }
   if (nm <= DEMAND_NM_SCALE_NEAR_NM) {
-    return demandLerp(0.55, DEMAND_NM_SCALE_NEAR, nm / DEMAND_NM_SCALE_NEAR_NM);
+    return demandLerp(
+      DEMAND_NM_SCALE_ULTRA,
+      DEMAND_NM_SCALE_NEAR,
+      (nm - DEMAND_NM_SCALE_ULTRA_NM) /
+        (DEMAND_NM_SCALE_NEAR_NM - DEMAND_NM_SCALE_ULTRA_NM),
+    );
   }
   if (nm <= DEMAND_NM_SCALE_MID_NM) {
     return demandLerp(
@@ -186,6 +213,50 @@ export function demandNmScale(nm: number | null | undefined): number {
     );
   }
   return DEMAND_NM_SCALE_LONG;
+}
+
+/**
+ * Fraction of rolled Wanted kg kept vs hop length. Short desks stay feeder-
+ * sized; ≥{@link DEMAND_NM_SCALE_MID_NM} keeps the full roll.
+ */
+export function demandWantedNmScale(nm: number | null | undefined): number {
+  if (nm == null || !Number.isFinite(nm) || nm <= 0) return 1;
+  if (nm <= DEMAND_NM_SCALE_ULTRA_NM) {
+    return demandLerp(
+      0.28,
+      DEMAND_WANTED_NM_ULTRA,
+      nm / DEMAND_NM_SCALE_ULTRA_NM,
+    );
+  }
+  if (nm <= DEMAND_NM_SCALE_NEAR_NM) {
+    return demandLerp(
+      DEMAND_WANTED_NM_ULTRA,
+      DEMAND_WANTED_NM_NEAR,
+      (nm - DEMAND_NM_SCALE_ULTRA_NM) /
+        (DEMAND_NM_SCALE_NEAR_NM - DEMAND_NM_SCALE_ULTRA_NM),
+    );
+  }
+  if (nm <= DEMAND_NM_SCALE_MID_NM) {
+    return demandLerp(
+      DEMAND_WANTED_NM_NEAR,
+      DEMAND_WANTED_NM_MID,
+      (nm - DEMAND_NM_SCALE_NEAR_NM) /
+        (DEMAND_NM_SCALE_MID_NM - DEMAND_NM_SCALE_NEAR_NM),
+    );
+  }
+  return DEMAND_WANTED_NM_MID;
+}
+
+/** Apply {@link demandWantedNmScale} after the commodity band roll. */
+export function demandWantedKgForNm(
+  rolledKg: number,
+  nm: number | null | undefined,
+  deficitKg: number,
+): number {
+  const rolled = Math.max(0, Math.floor(rolledKg));
+  const deficit = Math.max(0, Math.floor(deficitKg));
+  const scaled = Math.floor(rolled * demandWantedNmScale(nm));
+  return Math.min(deficit, Math.max(DEMAND_WANTED_ABS_MIN_KG, scaled));
 }
 
 /**
@@ -1212,17 +1283,18 @@ export function ensureDemandOrders(
 
           const { min: bandMin, max: bandMax } =
             demandWantedKgBand(commodityId);
-          const wantedKg = Math.min(
-            deficitKg,
-            bandMin + Math.floor(rng() * (bandMax - bandMin)),
-          );
-          if (wantedKg < bandMin) continue;
+          const odNm = minNmToHubs(icao, pickups);
+          const rolledKg =
+            bandMin + Math.floor(rng() * (bandMax - bandMin));
+          const wantedKg = demandWantedKgForNm(rolledKg, odNm, deficitKg);
+          // Ultra-short nm scale can land below commodity bandMin — keep the
+          // absolute floor, not the full feeder-jet band.
+          if (wantedKg < DEMAND_WANTED_ABS_MIN_KG) continue;
 
           const spot = money(localUnitPriceUsd(commodityId, pile));
           const premium =
             DEMAND_PRICE_PREMIUM_MIN +
             rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
-          const odNm = minNmToHubs(icao, pickups);
           const maxUnitPriceUsd = money(
             spot * premium * demandNmScale(odNm),
           );

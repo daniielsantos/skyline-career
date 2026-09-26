@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-26: **Demand short-hop retune (price + Wanted)** — sintoma pós 0.3.347 = Miami KFLL 18 nm electronics ainda ~$52k Total (scale 0.55× unit só). Fix = `demandNmScale` ultra (≤50 ~0.22–0.28, 150 ~0.48; mid/long intactos) + `demandWantedNmScale` / `demandWantedKgForNm` (Wanted ~⅓ em ultra-curto, full ≥500 nm). Sem Dry/factory/Freights. Avançar dias p/ respawn.
+
 Atualizado 2026-09-26: **Demand nm pay (anti money-print)** — sintoma = Total pay alto em hops curtos (electronics 150 nm) porque spawn usava só spot×premium e intl dava ×1.28 flat. Fix = `demandNmScale(nm)` no `maxUnitPriceUsd` (≤150 ~0.55–0.6 … ≥2500 ~1.06) + `demandIntlPayMultForNm` (ramp 200→1500 nm até 1.28). Sem Dry/factory/Freights.
 
 Atualizado 2026-09-26: **Desk auto-buy day cap optional with fill quota** — sintoma = Add desk exigia Max lb/day mesmo com Fill quota %. Fix = `maxKgPerDay` 0 = sem teto diário quando `targetFillPct` set; UI libera mass vazio + placeholder “optional · fill quota”; summary “no day cap”. Sem quota, mass/day continua obrigatório.

@@ -12,6 +12,8 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 **Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
+- **Demand short-hop retune (2026-09-26):** sintoma pós nm-scale v1 = KFLL 18 nm electronics ainda ~$52k Total (só unit×0.55). Fix = ultra floor no `demandNmScale` + Wanted×nm (`demandWantedKgForNm`). Mid/long ~intactos. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
+
 - **Demand nm pay anti money-print (2026-09-26):** sintoma = Demand electronics curto (150 nm) com Total pay altíssimo — preço = só spot dest×premium, intl ×1.28 flat. Fix = `demandNmScale` no spawn + intl ramp por nm (`demandIntlPayMultForNm`). Sem Dry/factory/Freights. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
 
 - **Freights US domestic all ≤4.4 klb / zero large (2026-09-26):** sintoma = Domestic·pilot US **~1757** lots, **todos ≤4.4 klb** (`SMALL_LOT_MAX_KG`=2000), **nenhum** ≥`LARGE_LOT_MIN_KG` (2200), Near me off; pay ~$7–9k ok pra 2 t. Filtro OK. Causa = loop **`skipAll` + feeder bypass**: `tryFormPair` aborta em `skipAll` (bulk/large morre); `formLotsRegionalFeeder` / `formLotsSpokeFeeder` **ignoravam** skipAll e re-topavam a shelf com LTL ≤2 t. **Fix v1 (0.3.343):** feeder nunca forma se `n≥quota`; soft headroom 0.85; sob `skipAll`+`largeN=0` para. **Ainda sticky pós +2d:** `skipHeavy |= skipAll` congelava trunk mesmo com 0 large — expire+last-mile vitality não abriam room. **Fix definitivo:** `skipAll` = só LTL/small; `skipHeavy` = só capacity/large quota (não herda skipAll). Bulk/intl/tryFormPair formam large sob skipAll; feeder sticky gate permanece. Sem Dry.

@@ -9,6 +9,7 @@ import {
   assertDemandInternationalAccept,
   DEMAND_INTL_PAY_MULT,
   DEMAND_ORDERS_GLOBAL_CAP,
+  DEMAND_WANTED_ABS_MIN_KG,
   demandCountryOpenQuotas,
   demandEffectiveUnitPriceUsd,
   demandHubCountryId,
@@ -16,6 +17,8 @@ import {
   demandNmScale,
   demandOrdersGlobalCap,
   demandWantedKgBand,
+  demandWantedKgForNm,
+  demandWantedNmScale,
   ensureDemandOrders,
   isDemandInternationalCountryPair,
   listOpenDemandOrders,
@@ -333,9 +336,10 @@ describe('demand wanted kg band', () => {
 });
 
 describe('demand nm pay scale', () => {
-  it('compresses short hops and keeps long hops near 1×', () => {
-    assert.ok(demandNmScale(120) < 0.65);
-    assert.ok(demandNmScale(150) <= 0.61);
+  it('compresses ultra-short hard and keeps long hops near 1×', () => {
+    assert.ok(demandNmScale(18) < 0.28);
+    assert.ok(demandNmScale(50) <= 0.29);
+    assert.ok(demandNmScale(150) <= 0.5);
     assert.ok(Math.abs(demandNmScale(500) - 0.85) < 0.02);
     assert.ok(Math.abs(demandNmScale(1200) - 1) < 0.02);
     assert.ok(demandNmScale(2500) >= 1.05);
@@ -348,5 +352,17 @@ describe('demand nm pay scale', () => {
     assert.ok(demandIntlPayMultForNm(400) < DEMAND_INTL_PAY_MULT);
     assert.equal(demandIntlPayMultForNm(1500), DEMAND_INTL_PAY_MULT);
     assert.equal(demandIntlPayMultForNm(4000), DEMAND_INTL_PAY_MULT);
+  });
+
+  it('shrinks Wanted kg on short hops and keeps full band by mid range', () => {
+    assert.ok(demandWantedNmScale(18) < 0.35);
+    assert.ok(demandWantedNmScale(150) <= 0.56);
+    assert.equal(demandWantedNmScale(500), 1);
+    assert.equal(demandWantedNmScale(2000), 1);
+    const short = demandWantedKgForNm(5_500, 18, 20_000);
+    assert.ok(short < 2_000);
+    assert.ok(short >= DEMAND_WANTED_ABS_MIN_KG);
+    assert.equal(demandWantedKgForNm(5_500, 800, 20_000), 5_500);
+    assert.equal(demandWantedKgForNm(5_500, 18, 300), 300);
   });
 });

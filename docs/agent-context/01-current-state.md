@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **850c97d6** / desktop **0.3.347** shipped: Scale Demand pay by hop length and ramp intl premium by nm so short desks stop money-printing; ignore Buildx GHA cache export flakes so world image push is not failed by blob not_found. Release: [v0.3.347](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.347).
+
+
 `main` **acbdca5b** / desktop **0.3.346** shipped: Allow Port desk auto-buy without a day mass cap when a fill quota is set. Release: [v0.3.346](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.346).
 
 

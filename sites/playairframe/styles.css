@@ -1,0 +1,244 @@
+:root {
+  --bg: #0b0e13;
+  --bg-deep: #07090d;
+  --ink: #e8edf4;
+  --muted: #8b97a8;
+  --panel: #141a23;
+  --line: rgba(232, 237, 244, 0.1);
+  --accent: #f0a35a;
+  --accent-ink: #1a1008;
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.page-shell {
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+main {
+  border-top: 1px solid var(--line);
+  background:
+    radial-gradient(900px 420px at 0% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%),
+    radial-gradient(700px 380px at 100% 0%, rgba(106, 168, 216, 0.05), transparent 50%),
+    var(--bg-deep);
+}
+
+/* —— Hero (same lockup art as app login gates) —— */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--bg-deep);
+}
+
+.hero-stage {
+  position: relative;
+  z-index: 1;
+  width: min(44rem, 100%);
+  padding: clamp(2rem, 6vw, 3.5rem) clamp(1.25rem, 5vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: hero-fade-in 1s ease-out both;
+}
+
+.hero-lockup {
+  display: block;
+  width: min(36rem, 100%);
+  height: auto;
+  margin: 0 auto 1.5rem;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  animation: hero-lockup-in 1.2s ease-out both;
+}
+
+.hero-copy {
+  max-width: 34rem;
+}
+
+.hero-headline {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 5vw, 2.75rem);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.hero-lede {
+  margin: 0 auto 1.75rem;
+  max-width: 38ch;
+  font-size: clamp(1rem, 2.2vw, 1.125rem);
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.hero-cta-note {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* —— Content —— */
+.section,
+.feature {
+  max-width: 92rem;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 4rem) clamp(1.25rem, 4vw, 2.5rem);
+  border-bottom: 1px solid var(--line);
+}
+
+.section .section-lede,
+.section .beats,
+.section .flow,
+.feature-copy {
+  max-width: 40rem;
+}
+
+.feature {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section:last-of-type,
+.feature:last-of-type {
+  border-bottom: none;
+}
+
+.section-title {
+  margin: 0 0 0.85rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.section-lede {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+  text-wrap: pretty;
+}
+
+.beats,
+.flow {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+}
+
+.beats li,
+.flow li {
+  margin-bottom: 0.65rem;
+}
+
+.beats li:last-child,
+.flow li:last-child {
+  margin-bottom: 0;
+}
+
+.beats li strong,
+.flow li strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.feature-shot {
+  margin: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.feature-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.section-status .status-line {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.site-footer {
+  padding: 2rem clamp(1.25rem, 5vw, 2rem) 2.5rem;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.footer-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-lockup-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-stage,
+  .hero-lockup {
+    animation: none;
+  }
+}
+

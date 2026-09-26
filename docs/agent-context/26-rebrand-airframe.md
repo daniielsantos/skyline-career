@@ -13,10 +13,20 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 
 ## Fase 1 — infra URL (sem rebrand visual)
 
-- [ ] Landing / Pages em `playairframe.com` (opcional; não bloqueia MP) — precisa brief visual
+- [x] Landing source em [`sites/playairframe`](../../sites/playairframe) — vitrine estática (pele do app); hero = login lockup com fundo transparente; **sem** links públicos pro GitHub (beta por invite). Preview: `npx --yes serve sites/playairframe`.
+- [ ] Cloudflare Pages → apex `playairframe.com` (+ `www`): Connect repo, root `sites/playairframe`, build none. **Não** tocar DNS de `world.playairframe.com`. Setup: `sites/playairframe/README.md`. Apex hoje pode 500 até Pages ligar.
 - [ ] `flyairframe.com` redirect → play (se registado) — DNS Cloudflare
 - [x] Desktop default MP URL: PlayModeGate prefill/placeholder + resolve fallback → `https://world.playairframe.com` (`PUBLIC_WORLD_API_URL`). Lab continua `http://127.0.0.1:8787` via `DEFAULT_WORLD_API_URL` / env.
 - [ ] Email Routing `hello@playairframe.com` (quando houver site)
+
+### Landing (2026-09-26)
+
+- **Sintoma:** apex `playairframe.com` sem vitrine (500 / parking); marca Airframe só no desktop.
+- **Causa:** domínio/MP vivos; landing nunca shipada.
+- **Fix:** HTML estático no monorepo; Pages no apex; visual = app shell. Checkout/admin fora de escopo.
+- **Hero:** login lockup com fundo transparente (`airframe-hero-lockup.png`).
+- **Copy + shots:** seções economy / airframes / ports / VA / MP; prints reais de `:8788` (Freights, Airframes market, Ports, Crew/VA Hauls) em `assets/shot-*.png`.
+- **Prints estreitos (2026-09-26):** o crop de Freights era 670px e o layout punha cada shot numa coluna de ~64rem, então a UI ficava ilegível. Novos crops são a coluna principal (sem sidebar, sem footer “MSFS not connected”), ~1646px, e a seção empilha o texto em cima do print em até 92rem.
 
 ### Diagnóstico CI (2026-09-17)
 
@@ -129,4 +139,4 @@ Atualizado 2026-09-20: **userData migrator shipped** — `migrate-userdata.mjs` 
 - Mudar AppData sem migrator *(feito — migrator shipped)*
 - Trocar `appId` no mesmo ship que o path (Fase 3b separado)
 - Trocar logo sem brief de arte (AIR|FRAME ≠ SKY|LINE simétrico)
-- Landing genérica sem direção visual (ver user design rules)
+- Landing genérica sem direção visual (ver user design rules) — **fechado:** pele do app (`sites/playairframe`)

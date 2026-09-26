@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **a592963a** / desktop **0.3.351** shipped: Replace the sidebar MD-11F with a geometric A mark, clarify commodity stickers, and bust Electron static cache so inventory icons update. Release: [v0.3.351](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.351).
+
+
 `main` **ae700686** / desktop **0.3.350** shipped: Swap the desktop lettermark A for the MD-11F glyph and enlarge commodity stickers so inventory rows share optical weight with Passengers. Release: [v0.3.350](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.350).
 
 

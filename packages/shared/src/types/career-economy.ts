@@ -1820,6 +1820,10 @@ export interface PortAutoBuyOrder {
   commodityId: CommodityId;
   /** Skip listing when effective unit price exceeds this. */
   maxPriceUsdPerKg: number;
+  /**
+   * Soft daily mass cap (kg). `0` = no day cap — pace by fill quota / WH room
+   * only (requires `targetFillPct`).
+   */
   maxKgPerDay: number;
   /** Must be a player WH at a pickup hub of `portId`. */
   warehouseId: string;

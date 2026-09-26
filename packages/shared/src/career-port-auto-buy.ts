@@ -64,6 +64,18 @@ export function portAutoBuyTargetFillPct(
   return Math.min(100, Math.floor(n));
 }
 
+/**
+ * Daily mass cap. `maxKgPerDay <= 0` = no day cap (fill quota / WH room only).
+ * Requires a fill quota on upsert when uncapped.
+ */
+export function portAutoBuyDayCapKg(order: PortAutoBuyOrder): number {
+  const n = order.maxKgPerDay;
+  if (n == null || !Number.isFinite(n) || n <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.floor(n);
+}
+
 function normalizeCommodityId(raw: string): CommodityId | null {
   const id = raw.trim().toLowerCase() as CommodityId;
   return PORT_AUTO_BUY_COMMODITIES.includes(id) ? id : null;
@@ -197,6 +209,10 @@ export type UpsertPortAutoBuyOrderOpts = {
   portId: string;
   commodityId: string;
   maxPriceUsdPerKg: number;
+  /**
+   * Daily mass cap (kg). `0` = no day cap — only valid with `targetFillPct`
+   * (fill quota / WH room pace the buys).
+   */
   maxKgPerDay: number;
   warehouseId: string;
   walletFloorUsd?: number;
@@ -225,15 +241,29 @@ export function upsertPortAutoBuyOrder(
     portId,
     opts.warehouseId.trim(),
   );
-  const maxPriceUsdPerKg = money(Math.max(0.01, opts.maxPriceUsdPerKg));
-  const maxKgPerDay = Math.max(1, Math.floor(opts.maxKgPerDay));
-  const walletFloorUsd = money(Math.max(0, opts.walletFloorUsd ?? 0));
-  const paused = opts.paused === true;
   const orders = ensurePortAutoBuyOrders(state);
   const existingId = opts.id?.trim();
   const existing = existingId
     ? orders.find((o) => o.id === existingId)
     : undefined;
+  const maxPriceUsdPerKg = money(Math.max(0.01, opts.maxPriceUsdPerKg));
+  const whOnly = resolveWhOnly(opts.whOnly, existing);
+  const targetFillPct = resolveTargetFillPct(opts.targetFillPct, existing);
+  const rawDay = Number(opts.maxKgPerDay);
+  if (!Number.isFinite(rawDay) || rawDay < 0) {
+    throw new Error('maxKgPerDay must be zero or more');
+  }
+  let maxKgPerDay = Math.floor(rawDay);
+  if (maxKgPerDay < 1) {
+    if (targetFillPct == null) {
+      throw new Error(
+        'maxKgPerDay required unless a fill quota % is set',
+      );
+    }
+    maxKgPerDay = 0;
+  }
+  const walletFloorUsd = money(Math.max(0, opts.walletFloorUsd ?? 0));
+  const paused = opts.paused === true;
 
   if (!existing && !paused && countActiveOrders(orders) >= PORT_AUTO_BUY_MAX_ACTIVE) {
     throw new Error(
@@ -250,9 +280,6 @@ export function upsertPortAutoBuyOrder(
       `Port FBO desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
     );
   }
-
-  const whOnly = resolveWhOnly(opts.whOnly, existing);
-  const targetFillPct = resolveTargetFillPct(opts.targetFillPct, existing);
 
   if (!paused && targetFillPct != null) {
     const others = sumActiveAutoBuyQuotaPct(
@@ -381,7 +408,7 @@ export function tickPortAutoBuyOrders(
       order.paused = true;
       continue;
     }
-    const remaining = order.maxKgPerDay - order.boughtKgToday;
+    const remaining = portAutoBuyDayCapKg(order) - order.boughtKgToday;
     if (remaining <= 0) continue;
     if (!cargoOpsIsUnlocked(state.cargoOps, order.commodityId)) continue;
     if (!isFboHoldCommodityAllowed(order.commodityId)) continue;
@@ -410,7 +437,7 @@ export function tickPortAutoBuyOrders(
       .sort((a, b) => a.id.localeCompare(b.id));
 
     for (const listing of candidates) {
-      const rem = order.maxKgPerDay - order.boughtKgToday;
+      const rem = portAutoBuyDayCapKg(order) - order.boughtKgToday;
       if (rem <= 0) break;
 
       const unit = effectivePortBuyUnitPriceUsd(

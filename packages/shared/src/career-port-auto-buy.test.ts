@@ -439,4 +439,37 @@ describe('port auto-buy desk', () => {
         .reduce((s, t) => s + t.kg, 0);
     assert.ok(stock <= quotaKg);
   });
+
+  it('allows maxKgPerDay 0 when fill quota is set (no day cap)', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    seedSbgrGeneralListing(world, 5_000);
+    const listing = (world.portListings ?? []).find((l) =>
+      l.id.startsWith('portlot_auto_'),
+    )!;
+    const unit = effectivePortBuyUnitPriceUsd(state, world, listing);
+    assert.throws(
+      () =>
+        upsertPortAutoBuyOrder(state, world, {
+          portId: 'BRSSZ',
+          commodityId: 'general',
+          maxPriceUsdPerKg: unit + 5,
+          maxKgPerDay: 0,
+          warehouseId,
+        }),
+      /fill quota/i,
+    );
+    const order = upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: unit + 5,
+      maxKgPerDay: 0,
+      warehouseId,
+      targetFillPct: 25,
+      whOnly: true,
+    });
+    assert.equal(order.maxKgPerDay, 0);
+    const result = tickPortAutoBuyOrders(state, world);
+    assert.ok(result.kg > 0, 'expected buys paced by fill quota only');
+  });
 });

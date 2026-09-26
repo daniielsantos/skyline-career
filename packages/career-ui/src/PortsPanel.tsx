@@ -1639,7 +1639,8 @@ export function PortsPanel(props: {
       return;
     }
     const priceDisplay = Number(deskMaxPrice);
-    const massDisplay = Number(deskMaxKgDay);
+    const massRaw = deskMaxKgDay.trim();
+    const massDisplay = massRaw === '' ? NaN : Number(massRaw);
     const walletFloorUsd =
       deskWalletFloor.trim() === '' ? 0 : Number(deskWalletFloor);
     // Inputs follow Settings weight system; economy always stores $/kg + kg.
@@ -1647,30 +1648,6 @@ export function PortsPanel(props: {
       props.weightSystem === 'imperial'
         ? priceDisplay * KG_TO_LB
         : priceDisplay;
-    const maxKgPerDay = Math.max(
-      1,
-      displayMassToStoredKg(massDisplay, props.weightSystem),
-    );
-    if (
-      !Number.isFinite(priceDisplay) ||
-      priceDisplay < 0.01 ||
-      !Number.isFinite(massDisplay) ||
-      massDisplay < 1 ||
-      !Number.isFinite(maxPriceUsdPerKg) ||
-      maxPriceUsdPerKg < 0.01 ||
-      !Number.isFinite(maxKgPerDay) ||
-      maxKgPerDay < 1
-    ) {
-      props.onToast?.(
-        'fail',
-        'Set max price and max mass/day before adding a desk order',
-      );
-      return;
-    }
-    if (!Number.isFinite(walletFloorUsd) || walletFloorUsd < 0) {
-      props.onToast?.('fail', 'Wallet floor must be zero or more');
-      return;
-    }
     let targetFillPct: number | null = null;
     if (deskTargetFillPct.trim() !== '') {
       const pct = Math.floor(Number(deskTargetFillPct));
@@ -1679,6 +1656,44 @@ export function PortsPanel(props: {
         return;
       }
       targetFillPct = pct;
+    }
+    const massOptional = targetFillPct != null;
+    if (
+      !Number.isFinite(priceDisplay) ||
+      priceDisplay < 0.01 ||
+      !Number.isFinite(maxPriceUsdPerKg) ||
+      maxPriceUsdPerKg < 0.01
+    ) {
+      props.onToast?.(
+        'fail',
+        massOptional
+          ? 'Set max price before adding a desk order'
+          : 'Set max price and max mass/day before adding a desk order',
+      );
+      return;
+    }
+    let maxKgPerDay = 0;
+    if (massRaw === '') {
+      if (!massOptional) {
+        props.onToast?.(
+          'fail',
+          'Set max price and max mass/day before adding a desk order',
+        );
+        return;
+      }
+    } else {
+      maxKgPerDay = Math.max(
+        1,
+        displayMassToStoredKg(massDisplay, props.weightSystem),
+      );
+      if (!Number.isFinite(massDisplay) || massDisplay < 1 || !Number.isFinite(maxKgPerDay)) {
+        props.onToast?.('fail', 'Max mass/day must be a positive amount');
+        return;
+      }
+    }
+    if (!Number.isFinite(walletFloorUsd) || walletFloorUsd < 0) {
+      props.onToast?.('fail', 'Wallet floor must be zero or more');
+      return;
     }
     const warehouseId =
       deskWarehouseId ||
@@ -4452,14 +4467,16 @@ export function PortsPanel(props: {
                                           </strong>
                                         </span>
                                         {o.paused ? ' · paused' : ''} · max{' '}
-                                        {formatUnitPrice(o.maxPriceUsdPerKg)} ·{' '}
-                                        {Math.round(
-                                          kgToDisplay(
-                                            o.maxKgPerDay,
-                                            props.weightSystem,
-                                          ),
-                                        ).toLocaleString('en-US')}{' '}
-                                        {unit}/day · today{' '}
+                                        {formatUnitPrice(o.maxPriceUsdPerKg)}
+                                        {o.maxKgPerDay > 0
+                                          ? ` · ${Math.round(
+                                              kgToDisplay(
+                                                o.maxKgPerDay,
+                                                props.weightSystem,
+                                              ),
+                                            ).toLocaleString('en-US')} ${unit}/day`
+                                          : ' · no day cap'}{' '}
+                                        · today{' '}
                                         {Math.round(
                                           kgToDisplay(
                                             o.boughtKgToday,
@@ -4552,9 +4569,11 @@ export function PortsPanel(props: {
                                           : 100
                                       }
                                       placeholder={
-                                        props.weightSystem === 'imperial'
-                                          ? 'e.g. 11000'
-                                          : 'e.g. 5000'
+                                        deskTargetFillPct.trim() !== ''
+                                          ? 'optional · fill quota'
+                                          : props.weightSystem === 'imperial'
+                                            ? 'e.g. 11000'
+                                            : 'e.g. 5000'
                                       }
                                       value={deskMaxKgDay}
                                       onChange={(e) =>

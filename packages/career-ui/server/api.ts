@@ -9491,11 +9491,28 @@ export function createCareerApiServer(port = 8787) {
                 !body.portId ||
                 !body.commodityId ||
                 body.maxPriceUsdPerKg == null ||
-                body.maxKgPerDay == null ||
                 !body.warehouseId
               ) {
                 throw new Error(
-                  'portId, commodityId, maxPriceUsdPerKg, maxKgPerDay, warehouseId required',
+                  'portId, commodityId, maxPriceUsdPerKg, warehouseId required',
+                );
+              }
+              const targetFillPct =
+                body.targetFillPct === undefined
+                  ? undefined
+                  : body.targetFillPct == null
+                    ? null
+                    : Number(body.targetFillPct);
+              const maxKgPerDay =
+                body.maxKgPerDay == null ? 0 : Number(body.maxKgPerDay);
+              if (
+                (!Number.isFinite(maxKgPerDay) || maxKgPerDay < 1) &&
+                (targetFillPct == null ||
+                  !Number.isFinite(targetFillPct) ||
+                  targetFillPct <= 0)
+              ) {
+                throw new Error(
+                  'maxKgPerDay required unless targetFillPct is set',
                 );
               }
               upsertPortAutoBuyOrder(missions, world, {
@@ -9503,7 +9520,7 @@ export function createCareerApiServer(port = 8787) {
                 portId: body.portId,
                 commodityId: body.commodityId,
                 maxPriceUsdPerKg: Number(body.maxPriceUsdPerKg),
-                maxKgPerDay: Number(body.maxKgPerDay),
+                maxKgPerDay,
                 warehouseId: body.warehouseId,
                 walletFloorUsd:
                   body.walletFloorUsd != null
@@ -9511,12 +9528,7 @@ export function createCareerApiServer(port = 8787) {
                     : undefined,
                 whOnly:
                   body.whOnly === undefined ? undefined : body.whOnly === true,
-                targetFillPct:
-                  body.targetFillPct === undefined
-                    ? undefined
-                    : body.targetFillPct == null
-                      ? null
-                      : Number(body.targetFillPct),
+                targetFillPct,
                 paused: body.paused === true,
                 companyId: ports_auto_buyCompanyId,
               });

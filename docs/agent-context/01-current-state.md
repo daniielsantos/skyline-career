@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **2cd5194b** / desktop **0.3.342** shipped: Add desk auto-buy WH-only toggle and per-commodity fill quotas so purchases stop at warehouse headroom instead of spilling to yard. Release: [v0.3.342](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.342).
+
+
 `main` **b5217481** / desktop **0.3.341** shipped: Keep MP on Listening mid-deploy and let owners drop a Port FBO without refund. Release: [v0.3.341](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.341).
 
 

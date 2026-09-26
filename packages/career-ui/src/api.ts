@@ -3192,9 +3192,12 @@ export type DemandSnapshot = {
   warehouses?: PlayerWarehouseSnapshot;
 };
 
-export function fetchPorts(opts?: { companyId?: string }) {
+export function fetchPorts(opts?: { companyId?: string; soft?: boolean }) {
   const companyId = opts?.companyId?.trim();
-  return api<PortsSnapshot>('/api/ports', {
+  const params = new URLSearchParams();
+  if (opts?.soft) params.set('soft', '1');
+  const qs = params.toString();
+  return api<PortsSnapshot>(`/api/ports${qs ? `?${qs}` : ''}`, {
     headers: companyId
       ? { 'X-Skyline-Company-Id': companyId }
       : undefined,

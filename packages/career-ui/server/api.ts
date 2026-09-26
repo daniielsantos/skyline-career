@@ -9372,27 +9372,58 @@ export function createCareerApiServer(port = 8787) {
 
       if (req.method === 'GET' && path === '/api/ports') {
         const portsCompanyId = companyIdFromRequest(req);
+        const soft = url.searchParams.get('soft') === '1';
 
         try {
-          // ensurePortListings may expire/refill; persist those tables only so
-          // buy can find the same listing IDs after reload.
           const companyNames = await companyDisplayNameMap(requireStore());
           const alliedCompanyIds = await portOperatorAlliedCompanyIds(req);
-          const result = await withCareerWrite(
-            (world, missions) => {
+
+          const buildSnap = (
+            world: CareerEconomyWorld,
+            missions: MissionsFile,
+            seedMarket: boolean,
+          ) => {
+            // Settle inbound only on the write/seed path — soft peek must not
+            // mutate missions under the pulse without a lock.
+            if (seedMarket) {
               settleWarehouseInboundTransfers(missions, world);
-              const groundStaff = groundStaffSnapshot(missions, world);
-              const ports = portSnapshot(world, missions, {
-                companyDisplayNames: companyNames,
-                viewerCompanyId: portsCompanyId,
-                alliedCompanyIds,
-              });
-              return {
-                ...ports,
-                groundStaff,
-                warehouses: { ...ports.warehouses, groundStaff },
-              };
-            },
+            }
+            const groundStaff = groundStaffSnapshot(missions, world);
+            const ports = portSnapshot(world, missions, {
+              companyDisplayNames: companyNames,
+              viewerCompanyId: portsCompanyId,
+              alliedCompanyIds,
+              seedMarket,
+            });
+            return {
+              ...ports,
+              groundStaff,
+              warehouses: { ...ports.warehouses, groundStaff },
+            };
+          };
+
+          if (soft) {
+            // Soft poll / pulse: peek RAM, no portMarket rewrite. Fall back to
+            // write seed when market tables were never filled (cold boot).
+            try {
+              const peeked = await withCareerPeekRead((world, missions) => {
+                const seeded = (world.portListings?.length ?? 0) > 0;
+                if (!seeded) return null;
+                return buildSnap(world, missions, false);
+              }, { companyId: portsCompanyId });
+              if (peeked) {
+                send(res, 200, peeked);
+                return;
+              }
+            } catch {
+              /* fall through to write seed */
+            }
+          }
+
+          // ensurePortListings may expire/refill; persist those tables only so
+          // buy can find the same listing IDs after reload.
+          const result = await withCareerWrite(
+            (world, missions) => buildSnap(world, missions, true),
             { persist: 'portMarket', companyId: portsCompanyId },
           );
           send(res, 200, result);
@@ -10521,7 +10552,9 @@ export function createCareerApiServer(port = 8787) {
               });
               return;
             }
-            const result = await withCareerWrite((world, missions) => {
+            // Slim confirm: hold + snaps under lock only. Scout desk rebuild
+            // (listPortScoutDesk) stays off the write path — client refreshes via list.
+            const held = await withCareerWrite((world, missions) => {
               assertCompanyCreditAllowsOps(missions);
               const confirmed = confirmPortScoutDemand(missions, world, {
                 orderId: body.orderId!,
@@ -10533,19 +10566,18 @@ export function createCareerApiServer(port = 8787) {
               return {
                 hold: confirmed.hold,
                 kg: confirmed.kg,
-                ...listPortScoutDesk(missions, world, {
-                  companyId: ports_scoutCompanyId,
+                ports: portSnapshot(world, missions, {
+                  viewerCompanyId: ports_scoutCompanyId,
                 }),
-                ports: portSnapshot(world, missions, { viewerCompanyId: ports_scoutCompanyId }),
                 warehouses: playerWarehouseSnapshot(missions, world),
                 demand: demandSnapshot(world, {
-                  warehouseIcaos: (missions.playerWarehouses?.warehouses ?? []).map(
-                    (w) => w.icao,
-                  ),
+                  warehouseIcaos: (
+                    missions.playerWarehouses?.warehouses ?? []
+                  ).map((w) => w.icao),
                 }),
               };
             }, { persist: 'company', companyId: ports_scoutCompanyId });
-            send(res, 200, result);
+            send(res, 200, held);
             return;
           }
           if (kind === 'haul') {
@@ -10560,7 +10592,7 @@ export function createCareerApiServer(port = 8787) {
               });
               return;
             }
-            const result = await withCareerWrite((world, missions) => {
+            const held = await withCareerWrite((world, missions) => {
               assertCompanyCreditAllowsOps(missions);
               const confirmed = confirmPortScoutHaul(missions, world, {
                 originIcao: body.originIcao!,
@@ -10576,14 +10608,13 @@ export function createCareerApiServer(port = 8787) {
                 hold: confirmed.hold,
                 kg: confirmed.kg,
                 payUsd: confirmed.payUsd,
-                ...listPortScoutDesk(missions, world, {
-                  companyId: ports_scoutCompanyId,
+                ports: portSnapshot(world, missions, {
+                  viewerCompanyId: ports_scoutCompanyId,
                 }),
-                ports: portSnapshot(world, missions, { viewerCompanyId: ports_scoutCompanyId }),
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
             }, { persist: 'company', companyId: ports_scoutCompanyId });
-            send(res, 200, result);
+            send(res, 200, held);
             return;
           }
           if (
@@ -10596,7 +10627,7 @@ export function createCareerApiServer(port = 8787) {
             });
             return;
           }
-          const result = await withCareerWrite((world, missions) => {
+          const held = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const confirmed = confirmPortScoutBridge(missions, world, {
               originIcao: body.originIcao!,
@@ -10611,14 +10642,13 @@ export function createCareerApiServer(port = 8787) {
             return {
               hold: confirmed.hold,
               kg: confirmed.kg,
-              ...listPortScoutDesk(missions, world, {
-                companyId: ports_scoutCompanyId,
+              ports: portSnapshot(world, missions, {
+                viewerCompanyId: ports_scoutCompanyId,
               }),
-              ports: portSnapshot(world, missions, { viewerCompanyId: ports_scoutCompanyId }),
               warehouses: playerWarehouseSnapshot(missions, world),
             };
           }, { persist: 'company', companyId: ports_scoutCompanyId });
-          send(res, 200, result);
+          send(res, 200, held);
         } catch (error) {
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),

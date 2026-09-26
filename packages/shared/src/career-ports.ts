@@ -2697,6 +2697,12 @@ export function portSnapshot(
     viewerCompanyId?: string | null;
     /** Listed VA company ids this pilot belongs to — inherit operator UI. */
     alliedCompanyIds?: readonly string[] | null;
+    /**
+     * When false, skip expire/tick/ensurePortListings/ensureDemandOrders.
+     * Use for soft peek reads (GET /api/ports?soft=1) so UI does not mutate
+     * or rewrite the port market under a write lock.
+     */
+    seedMarket?: boolean;
   },
 ): {
   ports: Array<
@@ -2771,7 +2777,7 @@ export function portSnapshot(
   concessions: NonNullable<CareerMissionsState['playerPortConcessions']>;
   autoBuyOrders: NonNullable<CareerMissionsState['portAutoBuyOrders']>;
 } {
-  if (state) {
+  if (state && opts?.seedMarket !== false) {
     healMissingPortConcessionFromLedger(state, world);
     expireDemandHolds(state, world);
     expireTourLotSoftHolds(world, state);
@@ -2783,10 +2789,12 @@ export function portSnapshot(
     opts?.viewerCompanyId?.trim() || LOCAL_COMPANY_ID;
   // opts.alliedCompanyIds still accepted for callers; buy/ETA inheritance is
   // applied in buyPortListing / effectivePortBuyUnitPriceUsd — not status "yours".
-  ensurePortListings(world);
-  ensureDemandOrders(world, {
-    operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
-  });
+  if (opts?.seedMarket !== false) {
+    ensurePortListings(world);
+    ensureDemandOrders(world, {
+      operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+    });
+  }
   const pickups = state ? ensurePlayerPortPickups(state) : [];
   const pickupViews = pickups.map((p) => {
     const holdUsdPerDay = portYardHoldUsdPerDay({

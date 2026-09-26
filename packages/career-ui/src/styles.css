@@ -5974,6 +5974,21 @@ button.logbook-card-hit:focus-visible {
   border-width: 2px;
 }
 
+/* Spinner on orange primary confirm CTAs (dark track, light tip). */
+.busy-spinner.on-accent,
+.busy-spinner-on-accent {
+  border-color: color-mix(in srgb, #1a1008 28%, transparent);
+  border-top-color: #1a1008;
+}
+
+.confirm-actions .action,
+.confirm-actions .accept {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
 .busy-chip {
   display: inline-flex;
   align-items: center;

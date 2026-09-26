@@ -52,7 +52,7 @@ import {
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
-import { BusyBlock } from './Busy';
+import { BusyBlock, BusyButton } from './Busy';
 import { CommodityIcon } from './CommodityIcon';
 import { CrewPortrait } from './CrewPanel';
 import { crewPortraitUrl } from './crewPortraits';
@@ -537,14 +537,21 @@ export function PortsPanel(props: {
     return Boolean(row && !row.unlocked);
   }
 
-  async function refresh(opts?: { includeScout?: boolean }) {
+  async function refresh(opts?: { includeScout?: boolean; soft?: boolean }) {
     const includeScout = opts?.includeScout !== false;
+    const soft = opts?.soft === true;
     setLoadError(null);
     try {
       const logisticsId = props.logisticsCompanyId?.trim() || undefined;
-      const nextPorts = await fetchPorts(
-        logisticsId ? { companyId: logisticsId } : undefined,
-      );
+      // Scout list is independent and heavy — kick it off in parallel so the
+      // catalog/map can paint as soon as /api/ports returns.
+      if (includeScout) {
+        void reloadScoutDesk(logisticsId).catch(() => undefined);
+      }
+      const nextPorts = await fetchPorts({
+        companyId: logisticsId,
+        soft: soft || undefined,
+      });
       setSnap(nextPorts);
       setDemand(nextPorts.demand?.orders ?? []);
       setWarehouses(nextPorts.warehouses ?? null);
@@ -574,12 +581,6 @@ export function PortsPanel(props: {
           })
         );
       });
-      if (!includeScout) return;
-      try {
-        await reloadScoutDesk(logisticsId);
-      } catch {
-        /* keep current scout desk on list fail */
-      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setLoadError(message);
@@ -648,15 +649,6 @@ export function PortsPanel(props: {
       });
       if (result.ports) setSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
-      if (
-        Array.isArray(result.suggestions) &&
-        Array.isArray(result.demandSuggestions) &&
-        Array.isArray(result.haulSuggestions)
-      ) {
-        applyScoutDesk(result);
-      } else {
-        await reloadScoutDesk(logisticsId).catch(() => undefined);
-      }
       setScoutHoldDraft(null);
       props.onToast?.(
         'ok',
@@ -670,6 +662,7 @@ export function PortsPanel(props: {
             : ' — Dispatch when ready'
         }`,
       );
+      void reloadScoutDesk(logisticsId).catch(() => undefined);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -703,15 +696,6 @@ export function PortsPanel(props: {
       if (result.ports) setSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
       if (result.demand?.orders) setDemand(result.demand.orders);
-      if (
-        Array.isArray(result.suggestions) &&
-        Array.isArray(result.demandSuggestions) &&
-        Array.isArray(result.haulSuggestions)
-      ) {
-        applyScoutDesk(result);
-      } else {
-        await reloadScoutDesk(logisticsId).catch(() => undefined);
-      }
       setScoutHoldDraft(null);
       const payUsd =
         s.kg > 0
@@ -725,6 +709,7 @@ export function PortsPanel(props: {
             : ' — Dispatch when ready'
         }`,
       );
+      void reloadScoutDesk(logisticsId).catch(() => undefined);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -758,15 +743,6 @@ export function PortsPanel(props: {
       });
       if (result.ports) setSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
-      if (
-        Array.isArray(result.suggestions) &&
-        Array.isArray(result.demandSuggestions) &&
-        Array.isArray(result.haulSuggestions)
-      ) {
-        applyScoutDesk(result);
-      } else {
-        await reloadScoutDesk(logisticsId).catch(() => undefined);
-      }
       setScoutHoldDraft(null);
       props.onToast?.(
         'ok',
@@ -776,6 +752,7 @@ export function PortsPanel(props: {
             : ' — Dispatch when ready'
         }`,
       );
+      void reloadScoutDesk(logisticsId).catch(() => undefined);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -956,7 +933,9 @@ export function PortsPanel(props: {
     setScoutDemandSuggestions([]);
     setScoutHaulSuggestions([]);
     setScoutEmptyHint(null);
-    void refresh({ includeScout: true }).catch(() => undefined);
+    // First paint: soft peek when market already seeded (server falls back to
+    // write seed on cold boot); Scout loads in parallel inside refresh.
+    void refresh({ includeScout: true, soft: true }).catch(() => undefined);
     skipPulsePortsRefresh.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tenant / first paint
   }, [props.logisticsCompanyId]);
@@ -968,7 +947,7 @@ export function PortsPanel(props: {
       skipPulsePortsRefresh.current = false;
       return;
     }
-    void refresh({ includeScout: false }).catch(() => undefined);
+    void refresh({ includeScout: false, soft: true }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clock pulse only
   }, [props.economyTick, props.economyLastBatchAtMs]);
 
@@ -976,7 +955,7 @@ export function PortsPanel(props: {
   useEffect(() => {
     const id = window.setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      void refresh({ includeScout: false }).catch(() => undefined);
+      void refresh({ includeScout: false, soft: true }).catch(() => undefined);
     }, 20_000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- interval per tenant
@@ -6874,18 +6853,20 @@ function PortBuyDialog(props: {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (props.busy) return;
         onCancelRef.current();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [props.busy]);
 
   return (
     <div
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
+        if (props.busy) return;
         if (event.target === event.currentTarget) onCancelRef.current();
       }}
     >
@@ -7051,14 +7032,15 @@ function PortBuyDialog(props: {
           >
             Cancel
           </button>
-          <button
-            type="button"
+          <BusyButton
             className="accept"
+            busy={props.busy}
+            busyLabel="Buying…"
             disabled={!canConfirm}
             onClick={props.onConfirm}
           >
             Confirm buy
-          </button>
+          </BusyButton>
         </div>
       </div>
     </div>
@@ -7107,12 +7089,13 @@ function ScoutHoldDialog(props: {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (props.busy) return;
         onCancelRef.current();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [props.busy]);
 
   function clampKg(next: number): number {
     if (maxKg < minKg) return 0;
@@ -7146,6 +7129,7 @@ function ScoutHoldDialog(props: {
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
+        if (props.busy) return;
         if (event.target === event.currentTarget) onCancelRef.current();
       }}
     >
@@ -7239,14 +7223,15 @@ function ScoutHoldDialog(props: {
           >
             Cancel
           </button>
-          <button
-            type="button"
+          <BusyButton
             className="action"
+            busy={props.busy}
+            busyLabel="Holding…"
             disabled={!canConfirm}
             onClick={() => props.onConfirm(kg)}
           >
             Hold {props.formatTonnes(kg)}
-          </button>
+          </BusyButton>
         </div>
       </div>
     </div>
@@ -7346,18 +7331,20 @@ function DemandAcceptDialog(props: {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (props.busy) return;
         onCancelRef.current();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [props.busy]);
 
   return (
     <div
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
+        if (props.busy) return;
         if (event.target === event.currentTarget) onCancelRef.current();
       }}
     >
@@ -7600,18 +7587,20 @@ function DemandAcceptDialog(props: {
             Cancel
           </button>
           {props.mode === 'hold' ? (
-            <button
-              type="button"
+            <BusyButton
               className="accept"
+              busy={props.busy}
+              busyLabel="Holding…"
               disabled={!canHold}
               onClick={props.onConfirmHold}
             >
               Hold at WH
-            </button>
+            </BusyButton>
           ) : (
-            <button
-              type="button"
+            <BusyButton
               className="accept"
+              busy={props.busy}
+              busyLabel="Starting…"
               disabled={!canFly}
               title={
                 updateBlocked
@@ -7621,7 +7610,7 @@ function DemandAcceptDialog(props: {
               onClick={props.onConfirmFly}
             >
               {updateBlocked ? formatClientUpdateCtaLabel() : 'Fly now'}
-            </button>
+            </BusyButton>
           )}
         </div>
         {updateBlocked ? (
@@ -7685,6 +7674,7 @@ function DemandDispatchHoldDialog(props: {
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
+        if (props.busy) return;
         if (event.target === event.currentTarget) props.onCancel();
       }}
     >
@@ -7813,9 +7803,12 @@ function DemandDispatchHoldDialog(props: {
           >
             Cancel
           </button>
-          <button
-            type="button"
+          <BusyButton
             className="accept"
+            busy={props.busy}
+            busyLabel={
+              props.mode === 'shuttle' && isBridge ? 'Launching…' : 'Starting…'
+            }
             disabled={!canConfirm}
             title={
               updateBlocked
@@ -7829,7 +7822,7 @@ function DemandDispatchHoldDialog(props: {
               : props.mode === 'shuttle' && isBridge
                 ? 'Launch shuttle'
                 : 'Fly now'}
-          </button>
+          </BusyButton>
         </div>
         {updateBlocked ? (
           <p className="demand-accept-hint cargo-dialog-error">
@@ -7893,6 +7886,7 @@ function WarehouseBridgeDialog(props: {
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
+        if (props.busy) return;
         if (event.target === event.currentTarget) props.onCancel();
       }}
     >
@@ -8069,9 +8063,10 @@ function WarehouseBridgeDialog(props: {
           >
             Cancel
           </button>
-          <button
-            type="button"
+          <BusyButton
             className="accept"
+            busy={props.busy}
+            busyLabel={props.mode === 'hold' ? 'Holding…' : 'Starting…'}
             disabled={!canConfirm}
             title={
               updateBlocked
@@ -8085,7 +8080,7 @@ function WarehouseBridgeDialog(props: {
               : props.mode === 'hold'
                 ? 'Hold'
                 : 'Fly now'}
-          </button>
+          </BusyButton>
         </div>
         {updateBlocked ? (
           <p className="demand-accept-hint cargo-dialog-error">
@@ -8168,6 +8163,7 @@ function WarehouseHaulDialog(props: {
       className="confirm-overlay"
       role="presentation"
       onMouseDown={(event) => {
+        if (props.busy) return;
         if (event.target === event.currentTarget) props.onCancel();
       }}
     >
@@ -8352,9 +8348,10 @@ function WarehouseHaulDialog(props: {
           >
             Cancel
           </button>
-          <button
-            type="button"
+          <BusyButton
             className="accept"
+            busy={props.busy}
+            busyLabel={props.mode === 'hold' ? 'Holding…' : 'Starting…'}
             disabled={!canConfirm}
             title={
               updateBlocked
@@ -8368,7 +8365,7 @@ function WarehouseHaulDialog(props: {
               : props.mode === 'hold'
                 ? 'Hold'
                 : 'Fly now'}
-          </button>
+          </BusyButton>
         </div>
         {updateBlocked ? (
           <p className="demand-accept-hint cargo-dialog-error">

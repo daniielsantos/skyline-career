@@ -1,5 +1,9 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-26: **Ports first-paint / soft-poll fast path** — sintoma = aba Ports entre as mais lentas. Causa = `GET /api/ports` sempre `withCareerWrite`+`persist:portMarket` (seed+settle sob write lock) e Scout `list` em série depois. Fix = `?soft=1` → `withCareerPeekRead` + `portSnapshot({ seedMarket:false })` (fallback write se market vazio); client soft no first paint/pulse/poll; Scout em paralelo (não bloqueia catalog/map).
+
+Atualizado 2026-09-26: **Confirm busy + slim Scout confirm** — sintoma = Hold Scout (etc.) congelava ~5s sem feedback. Causa = (1) CTA só `disabled` sem spinner; (2) `listPortScoutDesk` rodava **dentro** de `withCareerWrite` no confirm. Fix = `BusyButton` nos confirm overlays Ports; confirm devolve hold+snaps só; client fecha diálogo e `reloadScoutDesk` em background.
+
 Atualizado 2026-09-26: **Demand short-hop retune (price + Wanted)** — sintoma pós 0.3.347 = Miami KFLL 18 nm electronics ainda ~$52k Total (scale 0.55× unit só). Fix = `demandNmScale` ultra (≤50 ~0.22–0.28, 150 ~0.48; mid/long intactos) + `demandWantedNmScale` / `demandWantedKgForNm` (Wanted ~⅓ em ultra-curto, full ≥500 nm). Sem Dry/factory/Freights. Avançar dias p/ respawn.
 
 Atualizado 2026-09-26: **Demand nm pay (anti money-print)** — sintoma = Total pay alto em hops curtos (electronics 150 nm) porque spawn usava só spot×premium e intl dava ×1.28 flat. Fix = `demandNmScale(nm)` no `maxUnitPriceUsd` (≤150 ~0.55–0.6 … ≥2500 ~1.06) + `demandIntlPayMultForNm` (ramp 200→1500 nm até 1.28). Sem Dry/factory/Freights.

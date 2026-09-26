@@ -1,3 +1,5 @@
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
+
 type BusySize = 'sm' | 'md' | 'lg';
 
 export function BusySpinner(props: { size?: BusySize; className?: string }) {
@@ -13,6 +15,46 @@ export function BusySpinner(props: { size?: BusySize; className?: string }) {
       className={`busy-spinner${sizeClass}${props.className ? ` ${props.className}` : ''}`}
       aria-hidden
     />
+  );
+}
+
+/**
+ * Primary/confirm CTA that shows spinner + busyLabel while an async action runs.
+ * Keeps the same className (action / accept) for existing confirm styles.
+ */
+export function BusyButton(
+  props: ButtonHTMLAttributes<HTMLButtonElement> & {
+    busy?: boolean;
+    busyLabel?: string;
+    children: ReactNode;
+  },
+) {
+  const {
+    busy = false,
+    busyLabel = 'Working…',
+    children,
+    className,
+    disabled,
+    type,
+    ...rest
+  } = props;
+  return (
+    <button
+      {...rest}
+      type={type ?? 'button'}
+      className={className}
+      disabled={Boolean(disabled || busy)}
+      aria-busy={busy || undefined}
+    >
+      {busy ? (
+        <>
+          <BusySpinner size="sm" className="busy-spinner-on-accent" />
+          <span>{busyLabel}</span>
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 

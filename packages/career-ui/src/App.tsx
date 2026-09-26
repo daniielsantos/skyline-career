@@ -3545,6 +3545,25 @@ function FleetRoster(props: {
   );
 }
 
+function sameFleetPaint(a: PlayerAircraft[], b: PlayerAircraft[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const left = a[i];
+    const right = b[i];
+    if (!left || !right) return false;
+    if (left.id !== right.id) return false;
+    if (left.status !== right.status) return false;
+    if (left.locationIcao !== right.locationIcao) return false;
+    if ((left.ownership ?? 'owned') !== (right.ownership ?? 'owned')) return false;
+    if (Math.round(left.fuelKg) !== Math.round(right.fuelKg)) return false;
+    if (Math.round(left.airframeConditionPct ?? 0) !== Math.round(right.airframeConditionPct ?? 0)) return false;
+    if (Math.round(left.engineConditionPct ?? 0) !== Math.round(right.engineConditionPct ?? 0)) return false;
+    if ((left.parkingUsdPerDay ?? null) !== (right.parkingUsdPerDay ?? null)) return false;
+    if (left.airframeTypeId !== right.airframeTypeId) return false;
+  }
+  return true;
+}
+
 export function App() {
   const { confirm, confirmDialog, setConfirmDisabled } = useConfirm();
   const initialLocation = readCareerLocation();
@@ -4156,6 +4175,29 @@ export function App() {
       return;
     }
     setFleet(nextFleet);
+  }
+
+  /**
+   * Chrome Hangar is the home company. Strip VA tails that leaked into a home
+   * payload. When the owner's home company *is* the airline, those ids are the
+   * hangar — stripping them blanks the page, then the aircraft-market paint
+   * puts them back (the load blink).
+   */
+  function chromeHomeFleet(rows: PlayerAircraft[]): PlayerAircraft[] {
+    const homeId = homeCompanyIdRef.current?.trim() || '';
+    const vaId = memberVaCompanyIdRef.current?.trim() || '';
+    if (!vaId || (homeId && homeId === vaId)) return rows;
+    const vaIds = new Set(
+      vaSessionFleetRef.current
+        .map((a) => a.id?.trim())
+        .filter(Boolean) as string[],
+    );
+    if (vaIds.size === 0) return rows;
+    return rows.filter((a) => !vaIds.has(a.id?.trim() ?? ''));
+  }
+
+  function setFleetIfChanged(next: PlayerAircraft[]) {
+    setFleet((prev) => (sameFleetPaint(prev, next) ? prev : next));
   }
 
   /** Keep My VA Ledger wallet card in sync when ops debit/credit the VA. */
@@ -4940,17 +4982,7 @@ export function App() {
     }
     setHubSelected(Boolean(state.hubSelected));
     if (isHomeState) {
-      const vaIds = new Set(
-        vaSessionFleetRef.current
-          .map((a) => a.id?.trim())
-          .filter(Boolean) as string[],
-      );
-      const homeFleet = state.fleet ?? [];
-      setFleet(
-        vaIds.size > 0
-          ? homeFleet.filter((a) => !vaIds.has(a.id?.trim() ?? ''))
-          : homeFleet,
-      );
+      setFleetIfChanged(chromeHomeFleet(state.fleet ?? []));
       if (state.airframePerf) {
         setAirframePerf((prev) => ({ ...prev, ...state.airframePerf }));
       }
@@ -5143,7 +5175,9 @@ export function App() {
         paintWallet(acMarket.walletUsd, {
           sourceCompanyId: stateCompanyId || requestTenant,
         });
-        if (Array.isArray(acMarket.fleet)) setFleet(acMarket.fleet);
+        if (Array.isArray(acMarket.fleet)) {
+          setFleetIfChanged(chromeHomeFleet(acMarket.fleet));
+        }
       } else if (Array.isArray(acMarket.fleet)) {
         setVaSessionFleet(acMarket.fleet);
       }
@@ -8058,7 +8092,10 @@ export function App() {
     writeCareerLocation({ tab, airportIcao: null });
   }
 
-  function goToTab(next: Tab, opts: { replace?: boolean } = {}) {
+  function goToTab(
+    next: Tab,
+    opts: { replace?: boolean } = {},
+  ): Promise<void> | undefined {
     airportOpenSeqRef.current += 1;
     setAirportIcao(null);
     setAirportView(null);
@@ -8094,9 +8131,10 @@ export function App() {
         home !== activeCompanyIdRef.current &&
         !activeVaDispatch
       ) {
-        void switchCompanyForVa(home).catch(() => undefined);
+        return switchCompanyForVa(home);
       }
     }
+    return undefined;
   }
 
   function selectTab(next: Tab) {
@@ -8127,9 +8165,15 @@ export function App() {
       onVaTenant && next !== 'va' && !activeVaDispatch;
     // Paint the sidebar highlight in this click — never await session/network
     // first (Crew→Airlines felt stuck until postCompanySessionOpen returned).
-    goToTab(next);
+    const switching = goToTab(next);
     void (async () => {
-      if (mustRestoreHome && home) {
+      if (switching) {
+        try {
+          await switching;
+        } catch {
+          /* soft — refresh below may still heal */
+        }
+      } else if (mustRestoreHome && home) {
         try {
           await switchCompanyForVa(home);
         } catch {
@@ -8958,7 +9002,18 @@ export function App() {
         setAircraftBrowseCountry(aircraftBrowseCountryRef.current);
       }
       if (acMarket.poolCountries) setAircraftPoolCountries(acMarket.poolCountries);
-      if (acMarket.fleet) setFleet(acMarket.fleet);
+      if (acMarket.fleet) {
+        const homeId = homeCompanyIdRef.current?.trim() || '';
+        const active =
+          getStoredCompanyId()?.trim() ||
+          activeCompanyIdRef.current?.trim() ||
+          '';
+        setFleetIfChanged(
+          !homeId || !active || homeId === active
+            ? chromeHomeFleet(acMarket.fleet)
+            : acMarket.fleet,
+        );
+      }
       if (acMarket.leaseUnlock) setLeaseUnlock(acMarket.leaseUnlock);
       return acMarket;
     } finally {
@@ -20995,6 +21050,7 @@ export function App() {
       ) : hubSelected && tab === 'aircraft' ? (
         <section className="panel">
           <div className="panel-head panel-head-end">
+            <LiveAircraftIdentify disabled={busy} />
             <button
               type="button"
               className="action ghost"
@@ -21006,7 +21062,6 @@ export function App() {
               Refresh board
             </button>
           </div>
-          <LiveAircraftIdentify disabled={busy} />
           <div className="aircraft-market-toolbar">
             <input
               type="search"

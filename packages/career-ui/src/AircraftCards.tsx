@@ -377,11 +377,15 @@ export function AircraftClassStripe(props: {
   badges?: ReactNode;
   /** Corner mark on the art (e.g. hangar maintenance wrench). */
   mark?: ReactNode;
+  /** Hangar heroes are on screen immediately — don't lazy-pop them in. */
+  imageLoading?: 'lazy' | 'eager';
 }) {
   const hasArt = Boolean(props.imageSrc);
+  const [artReadySrc, setArtReadySrc] = useState<string | undefined>(undefined);
+  const artReady = Boolean(props.imageSrc) && artReadySrc === props.imageSrc;
   return (
     <div
-      className={`aircraft-card-stripe class-${props.aircraftClassId}${hasArt ? ' has-art' : ''}`}
+      className={`aircraft-card-stripe class-${props.aircraftClassId}${hasArt ? ' has-art' : ''}${artReady ? ' art-ready' : ''}`}
       aria-hidden={hasArt ? undefined : 'true'}
     >
       {props.badges ? (
@@ -392,8 +396,20 @@ export function AircraftClassStripe(props: {
           className="aircraft-card-art"
           src={props.imageSrc}
           alt={props.imageAlt ?? ''}
-          loading="lazy"
+          loading={props.imageLoading ?? 'lazy'}
           decoding="async"
+          ref={(node) => {
+            if (
+              node?.complete &&
+              node.naturalWidth > 0 &&
+              props.imageSrc
+            ) {
+              setArtReadySrc(props.imageSrc);
+            }
+          }}
+          onLoad={() => {
+            if (props.imageSrc) setArtReadySrc(props.imageSrc);
+          }}
         />
       ) : (
         <div className="aircraft-silhouette" />
@@ -1307,6 +1323,7 @@ export function HangarAircraftCard(props: {
         aircraftClassId={acf.aircraftClassId}
         imageSrc={airframeCardArtUrl(acf.airframeTypeId)}
         imageAlt={acf.label}
+        imageLoading="eager"
         mark={
           acf.status === 'maintenance' ? (
             <HangarMaintenanceMark
@@ -1368,6 +1385,81 @@ export function HangarAircraftCard(props: {
           <div className="aircraft-card-title">
             <div className="aircraft-card-title-row">
               <strong>{acf.label}</strong>
+              <HangarMoneyButton
+                label={acf.label}
+                tone={
+                  acf.leaseOverdue
+                    ? 'overdue'
+                    : acf.lease || acf.leaseOut
+                      ? 'lease'
+                      : 'plain'
+                }
+              >
+                {acf.parkingUsdPerDay != null && acf.parkingUsdPerDay > 0 ? (
+                  <span>
+                    Parking {props.formatMoney(acf.parkingUsdPerDay)}/day at{' '}
+                    {acf.locationIcao}
+                  </span>
+                ) : acf.parkingUsdPerDay === 0 ? (
+                  <span>Parking free at HQ ({acf.locationIcao})</span>
+                ) : acf.status === 'assigned' ? (
+                  <span>Parking waived while assigned</span>
+                ) : acf.status === 'leased_out' ? (
+                  <span>Parking waived while leased out</span>
+                ) : acf.status === 'listed' ? (
+                  <span>Parking waived while listed</span>
+                ) : (
+                  <span className="muted">No parking charge right now</span>
+                )}
+                {acf.lease ? (
+                  <>
+                    <span>
+                      Lease {props.formatMoney(acf.lease.monthlyUsd)}/wk
+                      {acf.leaseOverdue && overdueWeeks > 0 ? (
+                        <>
+                          {' '}
+                          ·{' '}
+                          <span className="hangar-lease-overdue-note">
+                            {overdueWeeks} wk overdue (
+                            {props.formatMoney(overdueAmountUsd)})
+                          </span>
+                        </>
+                      ) : props.formatClock ? (
+                        <> · next due {props.formatClock(acf.lease.nextDueTick)}</>
+                      ) : (
+                        <> · next due tick {acf.lease.nextDueTick}</>
+                      )}
+                    </span>
+                    {canPayLeaseOverdue ? (
+                      <button
+                        type="button"
+                        className="action hangar-pay-lease"
+                        disabled={props.busy}
+                        title={leaseOverdueTitle}
+                        onClick={() => props.onPayLeaseOverdue(acf.id)}
+                      >
+                        Pay {props.formatMoney(overdueAmountUsd)} now
+                      </button>
+                    ) : null}
+                    {acf.lease.buyoutUsd != null ? (
+                      <span>Buyout {props.formatMoney(acf.lease.buyoutUsd)}</span>
+                    ) : null}
+                  </>
+                ) : null}
+                {acf.leaseOut ? (
+                  <>
+                    <span>
+                      Income {props.formatMoney(acf.leaseOut.monthlyUsd)}/wk
+                      {acf.leaseOut.lesseeName
+                        ? ` · ${acf.leaseOut.lesseeName}`
+                        : ''}
+                    </span>
+                    <span>
+                      Deposit held {props.formatMoney(acf.leaseOut.depositUsd)}
+                    </span>
+                  </>
+                ) : null}
+              </HangarMoneyButton>
               <AirframeAddonInfo
                 airframeTypeId={acf.airframeTypeId}
                 label={acf.label}
@@ -1427,11 +1519,12 @@ export function HangarAircraftCard(props: {
             </li>
             {(() => {
               const cabin = formatHangarCabinSpec(props.cabinStatus);
-              if (!cabin) return null;
               return (
                 <li>
                   <span>Pax</span>
-                  <strong title={cabin.title}>{cabin.value}</strong>
+                  <strong title={cabin?.title}>
+                    {cabin ? cabin.value : '—'}
+                  </strong>
                 </li>
               );
             })()}
@@ -1475,78 +1568,6 @@ export function HangarAircraftCard(props: {
               </strong>
             </li>
           </ul>
-        </div>
-
-        <div className="hangar-section hangar-section-money">
-          <p className="aircraft-card-section-label">Money</p>
-          <div className="aircraft-card-money">
-            {acf.parkingUsdPerDay != null && acf.parkingUsdPerDay > 0 ? (
-              <span>
-                Parking {props.formatMoney(acf.parkingUsdPerDay)}/day at{' '}
-                {acf.locationIcao}
-              </span>
-            ) : acf.parkingUsdPerDay === 0 ? (
-              <span>
-                Parking free at HQ ({acf.locationIcao})
-              </span>
-            ) : acf.status === 'assigned' ? (
-              <span>Parking waived while assigned</span>
-            ) : acf.status === 'leased_out' ? (
-              <span>Parking waived while leased out</span>
-            ) : acf.status === 'listed' ? (
-              <span>Parking waived while listed</span>
-            ) : (
-              <span className="muted">No parking charge right now</span>
-            )}
-            {acf.lease ? (
-              <>
-                <span>
-                  Lease {props.formatMoney(acf.lease.monthlyUsd)}/wk
-                  {acf.leaseOverdue && overdueWeeks > 0 ? (
-                    <>
-                      {' '}
-                      ·{' '}
-                      <span className="hangar-lease-overdue-note">
-                        {overdueWeeks} wk overdue (
-                        {props.formatMoney(overdueAmountUsd)})
-                      </span>
-                    </>
-                  ) : props.formatClock ? (
-                    <> · next due {props.formatClock(acf.lease.nextDueTick)}</>
-                  ) : (
-                    <> · next due tick {acf.lease.nextDueTick}</>
-                  )}
-                </span>
-                {canPayLeaseOverdue ? (
-                  <button
-                    type="button"
-                    className="action hangar-pay-lease"
-                    disabled={props.busy}
-                    title={leaseOverdueTitle}
-                    onClick={() => props.onPayLeaseOverdue(acf.id)}
-                  >
-                    Pay {props.formatMoney(overdueAmountUsd)} now
-                  </button>
-                ) : null}
-                {acf.lease.buyoutUsd != null ? (
-                  <span>Buyout {props.formatMoney(acf.lease.buyoutUsd)}</span>
-                ) : null}
-              </>
-            ) : null}
-            {acf.leaseOut ? (
-              <>
-                <span>
-                  Income {props.formatMoney(acf.leaseOut.monthlyUsd)}/wk
-                  {acf.leaseOut.lesseeName
-                    ? ` · ${acf.leaseOut.lesseeName}`
-                    : ''}
-                </span>
-                <span>
-                  Deposit held {props.formatMoney(acf.leaseOut.depositUsd)}
-                </span>
-              </>
-            ) : null}
-          </div>
         </div>
       </div>
 
@@ -1926,6 +1947,64 @@ export function HangarAircraftCard(props: {
         />
       ) : null}
     </li>
+  );
+}
+
+function HangarMoneyButton(props: {
+  label: string;
+  tone: 'plain' | 'lease' | 'overdue';
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const titleId = useId();
+  return (
+    <>
+      <button
+        type="button"
+        className={`aircraft-addon-info hangar-money-info is-${props.tone}`}
+        aria-label={`Money for ${props.label}`}
+        title="Parking, lease, and buyout"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        $
+      </button>
+      {open ? (
+        <div
+          className="confirm-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            className="confirm-dialog aircraft-addon-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+          >
+            <p className="confirm-kicker">Money</p>
+            <h2 id={titleId} className="confirm-title">
+              {props.label}
+            </h2>
+            <div className="confirm-body">
+              <div className="aircraft-card-money">{props.children}</div>
+            </div>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="accept"
+                onClick={() => setOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 

@@ -71,7 +71,7 @@ Vidros: `profiles/examples/microsoft-atr-*-highline-*.json` etc. + `matchTitles`
 
 **Livery ≠ identidade:** Market/Dispatch/OFP casam pelo **TITLE** SimConnect (`aircraft.cfg` `title=`), não pela textura. Paint custom costuma manter o título base (`iFly 737-MAX8 (189Seats) …`) → `liveTitleMatchesMarketSku` / `matchTitlePattern` ainda batem (regex sem âncora). Se a livery **reescrever** o title para só a companhia (`LATAM 737 MAX` sem `iFly`/`(NSeats)`), deixa de reconhecer até incluir em `matchTitles` ou alargar o pattern.
 
-**Identify live (Airframes):** botão → `POST /api/simbridge/identify-aircraft` (probe TITLE) → Market SKU / pack OFP / perfil inject. Helper: `packages/career-ui/server/identify-live-aircraft.ts`. Não é homologação colaborativa (`13`).
+**Identify live (Airframes):** botão ghost **In the sim** no canto da página (sem faixa de texto) → `POST /api/simbridge/identify-aircraft` (probe TITLE) → Market SKU / pack OFP / perfil inject. Helper: `packages/career-ui/server/identify-live-aircraft.ts`. Não é homologação colaborativa (`13`).
 
 Prompts de arte de card: `docs/market-airframe-card-prompts.md` (kit da classe, 16:9, PNG em `career-ui/public/airframes/`).
 

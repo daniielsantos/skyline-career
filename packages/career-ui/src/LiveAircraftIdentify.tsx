@@ -55,27 +55,18 @@ export function LiveAircraftIdentify(props: Props) {
   }
 
   return (
-    <div className="live-aircraft-identify">
-      <div className="live-aircraft-identify-head">
-        <div className="live-aircraft-identify-copy">
-          <p className="live-aircraft-identify-label">Live aircraft</p>
-          <p className="muted live-aircraft-identify-hint">
-            Spawn in MSFS, then check whether Airframe recognizes this title
-            (Market, Dispatch OFP, inject profile). Paint/livery does not matter
-            — only the aircraft title.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="action"
-          disabled={props.disabled || busy}
-          onClick={() => {
-            void onIdentify();
-          }}
-        >
-          {busy ? 'Checking…' : 'Identify live aircraft'}
-        </button>
-      </div>
+    <>
+      <button
+        type="button"
+        className="action ghost live-aircraft-identify-btn"
+        disabled={props.disabled || busy}
+        title="Match the aircraft loaded in MSFS"
+        onClick={() => {
+          void onIdentify();
+        }}
+      >
+        {busy ? 'Checking…' : 'In the sim'}
+      </button>
       {error ? (
         <p className="live-aircraft-identify-error" role="alert">
           {error}
@@ -145,6 +136,6 @@ export function LiveAircraftIdentify(props: Props) {
           </dl>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

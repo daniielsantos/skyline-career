@@ -7542,7 +7542,7 @@ button.logbook-card-hit:focus-visible {
 
 .hangar-card-body {
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto auto auto;
   gap: 0.75rem;
   padding: 0.9rem 1rem 0.75rem;
   align-content: start;
@@ -7590,14 +7590,6 @@ button.logbook-card-hit:focus-visible {
   font-size: 0.82rem;
 }
 
-.hangar-section-money {
-  align-self: end;
-}
-
-.hangar-section-money .aircraft-card-money {
-  min-height: 3.4rem;
-}
-
 .hangar-card-note {
   margin: 0;
   color: var(--muted);
@@ -7617,35 +7609,10 @@ button.logbook-card-hit:focus-visible {
   margin: 0 0 1rem;
 }
 
-.live-aircraft-identify {
-  margin: 0 0 1rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-}
-
-.live-aircraft-identify-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-}
-
-.live-aircraft-identify-label {
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.live-aircraft-identify-hint {
-  margin: 0;
-  max-width: 42rem;
-  font-size: 0.88rem;
-  line-height: 1.35;
+.panel-head .live-aircraft-identify-error,
+.panel-head .live-aircraft-identify-result {
+  flex: 1 0 100%;
+  margin-top: 0.35rem;
 }
 
 .live-aircraft-identify-error {
@@ -7868,7 +7835,7 @@ button.logbook-card-hit:focus-visible {
     linear-gradient(135deg, var(--class-tone-a), var(--class-tone-b));
 }
 
-.aircraft-card-stripe.has-art::before {
+.aircraft-card-stripe.has-art.art-ready::before {
   opacity: 0;
 }
 
@@ -7880,6 +7847,11 @@ button.logbook-card-hit:focus-visible {
   object-fit: cover;
   object-position: center 42%;
   display: block;
+  opacity: 0;
+}
+
+.aircraft-card-stripe.art-ready .aircraft-card-art {
+  opacity: 1;
 }
 
 .aircraft-card-stripe.class-light_ga {
@@ -8046,6 +8018,16 @@ button.logbook-card-hit:focus-visible {
   color: #f0a35a;
 }
 
+.hangar-money-info.is-lease {
+  border-color: rgba(240, 163, 90, 0.55);
+  color: #f0a35a;
+}
+
+.hangar-money-info.is-overdue {
+  border-color: rgba(196, 92, 38, 0.8);
+  color: #e8a090;
+}
+
 .aircraft-addon-list {
   list-style: none;
   margin: 0.65rem 0 0;
@@ -8133,9 +8115,9 @@ button.logbook-card-hit:focus-visible {
 }
 
 .hangar-card-body .aircraft-card-specs strong {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.2;
 }
 

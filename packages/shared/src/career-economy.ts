@@ -1451,8 +1451,17 @@ const LAST_MILE_SPOKE_STOCK_SHARE = 0.55;
  */
 export const LAST_MILE_REGIONAL_STOCK_SHARE = 0.4;
 /**
- * Under soft-cap skipAll, still post this many regional→major feeder LTL lots
- * per country×SKU / tick so TP/light-jet boards exist outside majors.
+ * Under soft-cap skipAll with **zero** large lots, feeder must not top up
+ * (sticky LTL shelf — US densify trap). When the partition still has room /
+ * some large presence, a thin vitality trickle may run (see formLots).
+ * Soft frac of partition quota reserved so bulk/large can still form.
+ */
+export const FEEDER_PARTITION_SOFT_FRAC = 0.85;
+/** Max feeder forms per country×SKU / tick while skipAll (vitality only). */
+export const FEEDER_SKIPALL_VITALITY_BUDGET = 1;
+/**
+ * Regional→major feeder LTL budget per country×SKU / tick when the partition
+ * is not skipAll-bloated (TP/light-jet boards outside majors).
  */
 export const REGIONAL_FEEDER_FORM_BUDGET = 3;
 /** Open feeder-band lots kept per regional origin×commodity. */
@@ -1462,9 +1471,8 @@ export const REGIONAL_FEEDER_SOFT_ORIGIN_FILL = 0.4;
 /** Min regional warehouse fill before offering a feeder hop. */
 export const REGIONAL_FEEDER_MIN_ORIGIN_FILL = 0.42;
 /**
- * Under soft-cap skipAll, still post this many spoke→major/regional feeder LTL
- * lots per country×SKU / tick so TP/light-jet boards exist outside regionals.
- * Slightly above regional budget; open-per-origin is tighter (many more spokes).
+ * Spoke→major/regional feeder LTL budget per country×SKU / tick when not
+ * skipAll-bloated. Slightly above regional; open-per-origin is tighter.
  */
 export const SPOKE_FEEDER_FORM_BUDGET = 4;
 /** Open feeder-band lots kept per spoke origin×commodity. */
@@ -10995,9 +11003,9 @@ function* formLotsFromImbalances(
       /** Floor on (dest − origin) price used for pay, as a fraction of base. */
       minPayGapMult?: number;
       lastMile?: boolean;
-      /** Regional→major TP/LJ feeder (bypass soft-cap skipAll via budgeted pass). */
+      /** Regional→major TP/LJ feeder (quota/skipAll gated — see formLots). */
       regionalFeeder?: boolean;
-      /** Spoke→major/regional TP/LJ feeder (same bypass; separate budget). */
+      /** Spoke→major/regional TP/LJ feeder (same gates; separate budget). */
       spokeFeeder?: boolean;
     },
   ): boolean => {
@@ -11921,9 +11929,11 @@ function* formLotsFromImbalances(
   lotsPhaseAt = performance.now();
 
   // --- Domestic feeder LTL (regional / spoke → major|regional) ---
-  // Soft-cap skipAll kills bulk formation, so Curitiba/Ilhéus-class hubs only
-  // posted GA last-mile scraps. These budgeted passes ignore skipAll/skipSmall
-  // and force feeder-band lots along curated corridors to majors/regionals.
+  // Soft-cap skipAll kills bulk — feeder used to ignore skipAll entirely and
+  // flooded densified partitions (US) with ≤2 t LTL so large never returned.
+  // Gates (2026-09-26): never form at/over partition quota; leave soft headroom
+  // for bulk; under skipAll+zero large → stop; under skipAll with some large →
+  // vitality only (origins with 0 open feeder, budget 1).
   //
   // Open-count MUST be indexed: a full lots scan per spoke×SKU (spoke densify)
   // was O(countries × commodities × spokes × lots) and stalled the VPS pulse
@@ -11972,8 +11982,29 @@ function* formLotsFromImbalances(
   ): void => {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     if (countryAirports.length === 0) return;
+    const quota = partitionAvailableQuota(world, countryId);
+    const softCap = Math.max(
+      COUNTRY_AVAILABLE_FLOOR,
+      Math.floor(quota * FEEDER_PARTITION_SOFT_FRAC),
+    );
 
     for (const commodity of CAREER_CARGO_COMMODITIES) {
+      const pKey = partitionKey(commodity.id, countryId);
+      const n = availableCounts.byCommodityPartition.get(pKey) ?? 0;
+      if (n >= quota) continue;
+
+      const pressure = boardPressureOf(commodity.id, countryId);
+      const largeN = availableCounts.largeByCommodityPartition.get(pKey) ?? 0;
+      // Sticky LTL shelf: skipAll with no large — do not top up feeder.
+      if (pressure.skipAll && largeN <= 0) continue;
+      // Leave headroom for bulk/large when the board is healthy.
+      if (!pressure.skipAll && n >= softCap) continue;
+
+      const vitalityOnly = pressure.skipAll;
+      const effectiveBudget = vitalityOnly
+        ? FEEDER_SKIPALL_VITALITY_BUDGET
+        : cfg.formBudget;
+
       const ranked = rankAirports(countryAirports, commodity);
       const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
       const origins = ranked.filter((origin) => {
@@ -11981,10 +12012,14 @@ function* formLotsFromImbalances(
         if (origin.fill < cfg.minFill) return false;
         const surplus = surplusKgAboveSoftOrigin(origin.stock, cfg.softFill);
         if (surplus < FEEDER_LTL_MIN_KG) return false;
-        return (
-          countOpenFeederBandFrom(origin.ap.icao, commodity.id) <
-          cfg.openPerOrigin
-        );
+        const open = countOpenFeederBandFrom(origin.ap.icao, commodity.id);
+        if (vitalityOnly) {
+          // Only origins with no feeder on the board yet.
+          if (open > 0) return false;
+        } else if (open >= cfg.openPerOrigin) {
+          return false;
+        }
+        return true;
       });
       if (origins.length === 0) continue;
 
@@ -11997,10 +12032,13 @@ function* formLotsFromImbalances(
 
       let formedThisTick = 0;
       for (const origin of rotated) {
-        if (formedThisTick >= cfg.formBudget) break;
+        if (formedThisTick >= effectiveBudget) break;
+        const nNow = availableCounts.byCommodityPartition.get(pKey) ?? 0;
+        if (nNow >= quota) break;
+        if (!vitalityOnly && nNow >= softCap) break;
         if (
           countOpenFeederBandFrom(origin.ap.icao, commodity.id) >=
-          cfg.openPerOrigin
+          (vitalityOnly ? 1 : cfg.openPerOrigin)
         ) {
           continue;
         }
@@ -12026,7 +12064,7 @@ function* formLotsFromImbalances(
         });
 
         for (const { dest, cw } of partnerRows) {
-          if (formedThisTick >= cfg.formBudget) break;
+          if (formedThisTick >= effectiveBudget) break;
           const liveRoom = destRoomKg(dest.stock, commodity.id);
           if (liveRoom < FEEDER_LTL_MIN_KG) continue;
           const priceGap = dest.price - origin.price;

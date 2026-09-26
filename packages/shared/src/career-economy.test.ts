@@ -31,6 +31,8 @@ import {
   LAST_MILE_REGIONAL_STOCK_SHARE,
   FEEDER_LTL_MIN_KG,
   DOMESTIC_REGIONAL_OVERFLOW_ORIGIN_FILL,
+  FEEDER_PARTITION_SOFT_FRAC,
+  FEEDER_SKIPALL_VITALITY_BUDGET,
   REGIONAL_FEEDER_FORM_BUDGET,
   REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN,
   SPOKE_FEEDER_FORM_BUDGET,
@@ -3679,51 +3681,11 @@ describe('tickEconomyN market formation', () => {
         );
       }
     }
-    // Soft-cap skipAll is the live bind at ~14k lots — feeder pass must still run.
-    const padFor = (commodityId: CommodityId) => {
-      const quota = partitionAvailableQuota(world, 'BR');
-      while (
-        world.lots.filter(
-          (l) =>
-            l.status === 'available' &&
-            l.commodityId === commodityId &&
-            countryIdFromRegion(
-              world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
-            ) === 'BR',
-        ).length <
-        quota + 20
-      ) {
-        world.lots.push({
-          id: `lot_skipall_pad_${commodityId}_${world.lots.length}`,
-          commodityId,
-          originIcao: 'SBGR',
-          destIcao: 'SBSP',
-          quantityKg: 400,
-          reservedKg: 0,
-          createdAtTick: world.tick,
-          expiresAtTick: world.tick + 200,
-          payUsd: 4_000,
-          basePayUsd: 4_000,
-          urgency: 'normal',
-          reason: 'skipAll pad',
-          status: 'available',
-        });
-      }
-    };
-    for (const id of [
-      'general',
-      'supplies',
-      'electronics',
-      'machinery',
-      'perishables',
-    ] as const) {
-      padFor(id);
-    }
+    // Healthy board (no skipAll pad) — feeder must still fill regional/spoke.
     tickEconomyN(world, TICKS_PER_DAY);
 
     const fromRegional = world.lots.filter((l) => {
       if (l.status !== 'available' && l.status !== 'reserved') return false;
-      if (l.reason.includes('skipAll pad')) return false;
       const origin = world.airports.find((a) => a.icao === l.originIcao);
       if (countryIdFromRegion(origin?.region ?? '') !== 'BR') return false;
       return (
@@ -3770,6 +3732,8 @@ describe('tickEconomyN market formation', () => {
     assert.equal(REGIONAL_FEEDER_OPEN_LOTS_PER_ORIGIN, 2);
     assert.equal(SPOKE_FEEDER_FORM_BUDGET, 4);
     assert.equal(SPOKE_FEEDER_OPEN_LOTS_PER_ORIGIN, 1);
+    assert.equal(FEEDER_PARTITION_SOFT_FRAC, 0.85);
+    assert.equal(FEEDER_SKIPALL_VITALITY_BUDGET, 1);
 
     const sbctFeeder = feeder.filter((l) => l.originIcao === 'SBCT');
     assert.ok(
@@ -3779,7 +3743,6 @@ describe('tickEconomyN market formation', () => {
 
     const fromSpoke = world.lots.filter((l) => {
       if (l.status !== 'available' && l.status !== 'reserved') return false;
-      if (l.reason.includes('skipAll pad')) return false;
       const origin = world.airports.find((a) => a.icao === l.originIcao);
       if (countryIdFromRegion(origin?.region ?? '') !== 'BR') return false;
       return hubTierOf(origin ?? { icao: l.originIcao, hubTier: 'major' }) ===
@@ -3794,6 +3757,96 @@ describe('tickEconomyN market formation', () => {
     assert.ok(
       spokeFeeder.length >= 1,
       `expected spoke-feeder tag; tagged=${spokeFeeder.length} spokeLots=${fromSpoke.length}`,
+    );
+  });
+
+  it('does not top up feeder when skipAll and the partition has zero large lots', () => {
+    const world = createSeedEconomyWorld({ seed: 'feeder-skipall-no-large' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+    }
+    for (const ap of world.airports) {
+      if (countryIdFromRegion(ap.region) !== 'BR') continue;
+      const tier = hubTierOf(ap);
+      if (tier !== 'regional' && tier !== 'spoke') continue;
+      for (const id of [
+        'general',
+        'supplies',
+        'electronics',
+        'machinery',
+        'perishables',
+      ] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        pile.stockKg = Math.max(
+          pile.stockKg,
+          Math.round(pile.capacityKg * 0.78),
+        );
+      }
+    }
+    const padFor = (commodityId: CommodityId) => {
+      const quota = partitionAvailableQuota(world, 'BR');
+      while (
+        world.lots.filter(
+          (l) =>
+            l.status === 'available' &&
+            l.commodityId === commodityId &&
+            countryIdFromRegion(
+              world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+            ) === 'BR',
+        ).length <
+        quota + 20
+      ) {
+        world.lots.push({
+          id: `lot_skipall_pad_${commodityId}_${world.lots.length}`,
+          commodityId,
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+          quantityKg: 400,
+          reservedKg: 0,
+          createdAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          payUsd: 4_000,
+          basePayUsd: 4_000,
+          urgency: 'normal',
+          reason: 'skipAll pad',
+          status: 'available',
+        });
+      }
+    };
+    for (const id of [
+      'general',
+      'supplies',
+      'electronics',
+      'machinery',
+      'perishables',
+    ] as const) {
+      padFor(id);
+    }
+    const before = world.lots.filter(
+      (l) =>
+        (l.status === 'available' || l.status === 'reserved') &&
+        /regional feeder|spoke feeder/i.test(l.reason) &&
+        countryIdFromRegion(
+          world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+        ) === 'BR',
+    ).length;
+    tickEconomyN(world, TICKS_PER_DAY);
+    const after = world.lots.filter(
+      (l) =>
+        (l.status === 'available' || l.status === 'reserved') &&
+        /regional feeder|spoke feeder/i.test(l.reason) &&
+        countryIdFromRegion(
+          world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+        ) === 'BR',
+    ).length;
+    assert.equal(
+      after,
+      before,
+      `BR feeder must not top up under skipAll+zero large (before=${before} after=${after})`,
     );
   });
 

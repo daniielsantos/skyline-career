@@ -2069,6 +2069,7 @@ export type CareerLedgerKind =
   | 'port_concession_claim'
   | 'port_concession_lease'
   | 'port_concession_upgrade'
+  | 'port_concession_surrender'
   | 'warehouse_buy'
   | 'warehouse_storage'
   | 'warehouse_upgrade'

@@ -175,6 +175,7 @@ import {
 } from './ops-fleet';
 import { AuthGate } from './AuthGate';
 import { WorldWaitingGate } from './WorldWaitingGate';
+import { shouldKeepWorldWaitingOnUnfixedHealth } from './world-waiting-policy';
 import {
   pathForLocation,
   readCareerLocation,
@@ -4020,6 +4021,10 @@ export function App() {
   /** Host CAREER_WORLD_FIXED — clients attach, no ProfileGate. */
   const [worldFixed, setWorldFixed] = useState(false);
   const [worldWaiting, setWorldWaiting] = useState(false);
+  /** Sticky: health once reported CAREER_WORLD_FIXED this session. */
+  const sawWorldFixedRef = useRef(false);
+  /** Desktop play mode for mid-deploy WorldWaiting vs ProfileGate. */
+  const playModeRef = useRef<'sp' | 'mp' | null>(null);
 
   useEffect(() => {
     if (!careerReady || showAuthGate || !(authRequired || worldFixed)) {
@@ -5255,6 +5260,7 @@ export function App() {
     let cancelled = false;
     void desktop.getPlayConfig().then((cfg) => {
       if (cancelled) return;
+      playModeRef.current = cfg.mode;
       setPlayModeConfig({
         mode: cfg.mode,
         worldApiUrl: cfg.worldApiUrl,
@@ -5321,6 +5327,7 @@ export function App() {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : String(err));
           // Host may be mid-deploy — WorldWaitingGate poll retries attach.
+          setShowProfileGate(false);
           setWorldWaiting(true);
         }
         return false;
@@ -5337,6 +5344,7 @@ export function App() {
       const health = await fetchCareerHealth();
       if (cancelled) return 'done';
       const fixed = Boolean(health.worldFixed);
+      if (fixed) sawWorldFixedRef.current = true;
       setWorldFixed(fixed);
       setAuthRequired(Boolean(health.authRequired));
       void resolveClientUpdateBlock(health.clientUpdatePolicy).then((block) => {
@@ -5356,6 +5364,20 @@ export function App() {
           health.activeProfileName,
         );
         return ok ? 'done' : 'wait-host';
+      }
+
+      // Deploy blip: gateway/local health without worldFixed — stay Listening
+      // for MP instead of dumping onto the SP profile picker.
+      if (
+        shouldKeepWorldWaitingOnUnfixedHealth({
+          playMode: playModeRef.current,
+          sawWorldFixed: sawWorldFixedRef.current,
+        })
+      ) {
+        setProfilesLoading(false);
+        setShowProfileGate(false);
+        setWorldWaiting(true);
+        return 'wait-host';
       }
 
       const data = await fetchCareerProfiles();
@@ -5391,6 +5413,16 @@ export function App() {
     }
 
     void (async () => {
+      // Know SP vs MP before the first health probe — otherwise a deploy blip
+      // without worldFixed dumps MP onto ProfileGate before getPlayConfig returns.
+      if (window.skylineDesktop?.getPlayConfig) {
+        try {
+          const cfg = await window.skylineDesktop.getPlayConfig();
+          if (!cancelled) playModeRef.current = cfg.mode;
+        } catch {
+          /* keep null — SP-safe default in shouldKeepWorldWaiting */
+        }
+      }
       // Deploy/restart: keep probing health instead of a one-shot ProfileGate.
       for (;;) {
         if (cancelled) return;
@@ -5429,6 +5461,7 @@ export function App() {
         try {
           const health = await fetchCareerHealth();
           if (cancelled) return;
+          if (health.worldFixed) sawWorldFixedRef.current = true;
           setWorldFixed(Boolean(health.worldFixed));
           setAuthRequired(Boolean(health.authRequired));
           void resolveClientUpdateBlock(health.clientUpdatePolicy).then(
@@ -5437,7 +5470,17 @@ export function App() {
             },
           );
           if (!health.worldFixed) {
-            // Unexpected SP health while waiting — drop gate so ProfileGate can run.
+            if (
+              shouldKeepWorldWaitingOnUnfixedHealth({
+                playMode: playModeRef.current,
+                sawWorldFixed: sawWorldFixedRef.current,
+              })
+            ) {
+              // Mid-deploy blip — stay on Listening; do not open ProfileGate.
+              setShowProfileGate(false);
+              return;
+            }
+            // Explicit SP (or never-fixed session) — drop gate so ProfileGate can run.
             setWorldWaiting(false);
             setShowProfileGate(true);
             return;

@@ -61,6 +61,7 @@ const KIND_LABEL: Record<string, string> = {
   port_concession_claim: 'Port FBO claim',
   port_concession_lease: 'Port FBO lease',
   port_concession_upgrade: 'Port FBO upgrade',
+  port_concession_surrender: 'Port FBO surrender',
   fbo_reroute: 'Base reroute',
   warehouse_buy: 'Warehouse purchase',
   warehouse_storage: 'Warehouse storage',

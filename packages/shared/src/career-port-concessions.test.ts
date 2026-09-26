@@ -45,6 +45,7 @@ import {
   portOperatorEtaMult,
   portRestockFracPerDay,
   renewPortConcession,
+  surrenderPortConcession,
   tickPortConcessions,
   upgradePortConcession,
 } from './career-port-concessions.js';
@@ -252,6 +253,55 @@ describe('port concessions', () => {
     assert.equal(
       state.playerPortConcessions![0]!.leasePaidThroughTick,
       through + 7 * 96,
+    );
+  });
+
+  it('surrender drops Port FBO without refund and blocks heal restore', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 500_000;
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    const walletAfterClaim = state.walletUsd;
+    state.portAutoBuyOrders = [
+      {
+        id: 'pabo_test',
+        portId: 'BRSSZ',
+        commodityId: 'general',
+        maxPriceUsdPerKg: 1,
+        maxKgPerDay: 1_000,
+        warehouseId: 'wh_sbgr',
+        walletFloorUsd: 0,
+        paused: false,
+        boughtKgToday: 0,
+        boughtDayIndex: 0,
+        createdAtTick: world.tick,
+      },
+    ];
+
+    const dropped = surrenderPortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(dropped.portId, 'BRSSZ');
+    assert.equal(dropped.removedAutoBuyOrders, 1);
+    assert.equal(state.playerPortConcessions?.length ?? 0, 0);
+    assert.equal(state.portAutoBuyOrders?.length ?? 0, 0);
+    assert.equal(state.walletUsd, walletAfterClaim, 'no refund');
+    assert.equal(
+      (world.portConcessions ?? []).some(
+        (c) => c.portId === 'BRSSZ' && c.leasePaidThroughTick > world.tick,
+      ),
+      false,
+    );
+    assert.ok(
+      (state.ledger ?? []).some((e) => e.kind === 'port_concession_surrender'),
+    );
+    assert.equal(
+      healMissingPortConcessionFromLedger(state, world),
+      'none',
+      'heal must not restore a voluntary drop',
+    );
+    assert.equal(state.playerPortConcessions?.length ?? 0, 0);
+    // WH remains
+    assert.ok(
+      ensurePlayerWarehouses(state).warehouses.some((w) => w.icao === 'SBGR'),
     );
   });
 

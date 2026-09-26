@@ -226,6 +226,7 @@ import {
   claimPortConcession,
   debugForceClaimPortConcession,
   renewPortConcession,
+  surrenderPortConcession,
   upgradePortConcession,
   tickPortConcessions,
   healMissingPortConcessionFromLedger,
@@ -9610,6 +9611,52 @@ export function createCareerApiServer(port = 8787) {
               ports: portSnapshot(world, missions, { viewerCompanyId: ports_concession_renewCompanyId }),
             };
           }, { persist: 'company', persistPortConcessions: true, companyId: ports_concession_renewCompanyId });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, vaPermissionStatus(error), {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/concession/surrender') {
+        const body = (await readBody(req)) as {
+          portId?: string;
+          companyId?: string;
+        };
+        const ports_concession_surrenderCompanyId = companyIdFromRequest(
+          req,
+          body.companyId,
+        );
+        if (!body.portId) {
+          send(res, 400, { error: 'portId required' });
+          return;
+        }
+        try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            ports_concession_surrenderCompanyId,
+            'drop a Port FBO',
+          );
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const dropped = surrenderPortConcession(missions, world, {
+              portId: body.portId!,
+              companyId: ports_concession_surrenderCompanyId,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              ...dropped,
+              ports: portSnapshot(world, missions, {
+                viewerCompanyId: ports_concession_surrenderCompanyId,
+              }),
+            };
+          }, {
+            persist: 'company',
+            persistPortConcessions: true,
+            companyId: ports_concession_surrenderCompanyId,
+          });
           send(res, 200, result);
         } catch (error) {
           send(res, vaPermissionStatus(error), {

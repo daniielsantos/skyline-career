@@ -3653,6 +3653,19 @@ export function postPortConcessionRenew(opts: {
   });
 }
 
+export function postPortConcessionSurrender(opts: { portId: string }) {
+  return api<{
+    walletUsd: number;
+    portId: string;
+    companyId: string;
+    removedAutoBuyOrders: number;
+    ports: PortsSnapshot;
+  }>('/api/ports/concession/surrender', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export function postPortConcessionUpgrade(opts: { portId: string }) {
   return api<{
     walletUsd: number;

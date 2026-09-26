@@ -62,6 +62,7 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   port_concession_claim: 'Port FBO claim',
   port_concession_lease: 'Port FBO lease',
   port_concession_upgrade: 'Port FBO upgrade',
+  port_concession_surrender: 'Port FBO surrender',
   warehouse_buy: 'Warehouse purchase',
   warehouse_storage: 'Warehouse storage',
   warehouse_upgrade: 'Warehouse upgrade',
@@ -271,6 +272,41 @@ export function applyWalletDelta(
     note: opts.note?.slice(0, 120),
     aircraftId: opts.aircraftId,
     missionId: opts.missionId,
+    icao: opts.icao?.toUpperCase(),
+    ...(actorAccountId ? { actorAccountId } : {}),
+  };
+  const ledger = state.ledger ? [...state.ledger] : [];
+  ledger.push(entry);
+  state.ledger =
+    ledger.length > CAREER_LEDGER_MAX_ENTRIES
+      ? ledger.slice(ledger.length - CAREER_LEDGER_MAX_ENTRIES)
+      : ledger;
+  return entry;
+}
+
+/**
+ * Zero-dollar ledger row (audit markers — e.g. Port FBO surrender so heal
+ * does not restore/refund a voluntary drop).
+ */
+export function appendLedgerMarker(
+  state: CareerMissionsState,
+  opts: {
+    kind: CareerLedgerKind;
+    atTick: number;
+    note?: string;
+    icao?: string;
+    actorAccountId?: string | null;
+  },
+): CareerLedgerEntry {
+  const atTick = Math.max(0, Math.floor(opts.atTick));
+  const actorAccountId = resolveLedgerActorAccountId(state, opts);
+  const entry: CareerLedgerEntry = {
+    id: nextLedgerId(atTick),
+    atTick,
+    dayIndex: economyDayIndex(atTick),
+    amountUsd: 0,
+    kind: opts.kind,
+    note: opts.note?.slice(0, 120),
     icao: opts.icao?.toUpperCase(),
     ...(actorAccountId ? { actorAccountId } : {}),
   };

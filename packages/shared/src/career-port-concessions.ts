@@ -3,7 +3,7 @@
  * Operator buffs listings; restock is world-driven (no marketplace bids).
  */
 
-import { applyWalletDelta } from './career-ledger.js';
+import { appendLedgerMarker, applyWalletDelta } from './career-ledger.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { getCareerPort, listCareerPorts } from './career-ports.js';
 import { ensurePlayerWarehouses } from './career-warehouse.js';
@@ -247,6 +247,13 @@ export function healMissingPortConcessionFromLedger(
       e.atTick >= claim.atTick,
   );
   if (alreadyRefunded) return 'none';
+
+  // Voluntary Drop concession — never restore or refund CAPEX/lease.
+  const surrendered = ledger.some(
+    (e) =>
+      e.kind === 'port_concession_surrender' && e.atTick >= claim.atTick,
+  );
+  if (surrendered) return 'none';
 
   const lease = ledger.find(
     (e) =>
@@ -933,6 +940,59 @@ export function renewPortConcession(
   conc.leasePaidThroughTick = base + days * 96;
   syncWorldPortConcessions(world, state, { companyId });
   return conc;
+}
+
+/**
+ * Voluntary Drop Port FBO — no CAPEX/lease refund. Clears operator + desk
+ * auto-buy for this port; warehouses and stock stay.
+ */
+export function surrenderPortConcession(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { portId: string; companyId?: string },
+): { portId: string; companyId: string; removedAutoBuyOrders: number } {
+  const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const port = getCareerPort(opts.portId);
+  if (!port) throw new Error('Unknown port');
+  const before = ensurePlayerPortConcessions(state);
+  const conc = before.find(
+    (c) =>
+      c.portId === port.id &&
+      c.companyId === companyId &&
+      c.leasePaidThroughTick > world.tick,
+  );
+  if (!conc) {
+    throw new Error('No active Port FBO to drop on this port');
+  }
+
+  state.playerPortConcessions = before.filter(
+    (c) => !(c.portId === port.id && c.companyId === companyId),
+  );
+
+  // Drop world index first — syncWorldPortConcessions would otherwise heal
+  // LOCAL orphans back into player state when live is empty.
+  world.portConcessions = (world.portConcessions ?? []).filter(
+    (c) => !(c.portId === port.id && c.companyId === companyId),
+  );
+
+  const orders = Array.isArray(state.portAutoBuyOrders)
+    ? state.portAutoBuyOrders
+    : [];
+  const kept = orders.filter(
+    (o) => o.portId.trim().toUpperCase() !== port.id,
+  );
+  const removedAutoBuyOrders = orders.length - kept.length;
+  state.portAutoBuyOrders = kept;
+
+  appendLedgerMarker(state, {
+    kind: 'port_concession_surrender',
+    atTick: world.tick,
+    icao: port.pickupHubs[0],
+    note: `Surrendered Port FBO · ${port.name}`,
+  });
+
+  syncWorldPortConcessions(world, state, { companyId });
+  return { portId: port.id, companyId, removedAutoBuyOrders };
 }
 
 export function evaluatePortConcessionUpgrade(

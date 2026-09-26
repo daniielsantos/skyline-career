@@ -18,6 +18,7 @@ import {
   postPortShuttle,
   postPortConcessionClaim,
   postPortConcessionRenew,
+  postPortConcessionSurrender,
   postPortConcessionUpgrade,
   postPortDeposit,
   postPortPickupAbandon,
@@ -1506,6 +1507,56 @@ export function PortsPanel(props: {
           groundStaff,
       );
       props.onToast?.('ok', 'Port FBO lease renewed');
+      setConcessionOpen(false);
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onSurrenderConcession(portIdToDrop: string, portName: string) {
+    if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the company owner can drop a Port FBO');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Drop Port FBO?',
+      body: (
+        <>
+          <p>
+            Release the Port FBO at <strong>{portName}</strong>. Operator rates
+            and the desk auto-buy for this port end immediately.
+          </p>
+          <p className="muted">
+            No refund of claim or lease. Warehouses and stock stay yours. Anyone
+            who meets the gates can claim the vacant Port FBO later.
+          </p>
+        </>
+      ),
+      confirmLabel: 'Drop concession',
+      cancelLabel: 'Keep',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const result = await postPortConcessionSurrender({
+        portId: portIdToDrop,
+      });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      setWarehouses(result.ports.warehouses ?? warehouses);
+      setGroundStaff(
+        result.ports.groundStaff ??
+          result.ports.warehouses?.groundStaff ??
+          groundStaff,
+      );
+      props.onToast?.('ok', 'Port FBO dropped — port is vacant');
       setConcessionOpen(false);
     } catch (err) {
       props.onToast?.(
@@ -6365,6 +6416,18 @@ export function PortsPanel(props: {
                   >
                     Close
                   </button>
+                  {canPortCapex ? (
+                    <button
+                      type="button"
+                      className="action ghost"
+                      disabled={props.busy || loading}
+                      onClick={() =>
+                        void onSurrenderConcession(port.id, port.name)
+                      }
+                    >
+                      Drop concession
+                    </button>
+                  ) : null}
                   {canPortCapex &&
                   port.concession.upgrade &&
                   (port.concession.level ?? 1) < 3 ? (
@@ -6421,7 +6484,7 @@ export function PortsPanel(props: {
                         : ''}
                   </button>
                   ) : (
-                    <p className="muted">Only the company owner can renew or upgrade.</p>
+                    <p className="muted">Only the company owner can renew, upgrade, or drop.</p>
                   )}
                 </div>
               </>

@@ -40,6 +40,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Scout Haul band mix (2026-09-25):** sintoma = top-8 Haul só 1200–1800 nm (pay domina; multa `min(nm,800)` irrelevante). Causa = `slice(0,max)` pós-score sem anéis. Fix = seleção por bandas **2/3/3** ≤500 / (500,1200] / (1200,1800] (`pickPortScoutHaulByBands`); anel vazio não rouba; score `pay − nm×2 − fill×800`. Gate fill ≤40% + teto 1800 inalterados. Sem Dry.
 
+**Drop Port FBO concession (2026-09-25):** sintoma = Endgame só Renew/P2 — claim errado ou “não uso” = esperar lease expirar. Fix = `surrenderPortConcession` + `POST /api/ports/concession/surrender` + botão **Drop concession** (owner). Sem refund CAPEX/lease; limpa operator + desk auto-buy do porto; WH/stock ficam; ledger `port_concession_surrender` bloqueia heal restore/refund.
+
 **Demand Total pay column (2026-09-25):** sintoma = board mostrava Max $/unit sem o payout se preenchesse o Wanted restante. Causa = UI só listava preço unitário. Fix = coluna **Total pay** = `remainingKg × maxUnitPriceUsd` (sortável), tooltip com Wanted × rate.
 
 **Desk auto-buy 10k lb → 9,998 (2026-09-25):** sintoma = Max lb/day digitado 10000 gravava e reexibia 9998. Causa = `Math.floor(lb/KG_TO_LB)` no upsert. Fix = `displayMassToStoredKg` (round + nudge) para round-trip do label.

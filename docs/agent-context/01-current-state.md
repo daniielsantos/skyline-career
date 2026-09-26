@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **22b0e5d1** / desktop **0.3.356** shipped: Align Hangar cards and quiet the Airframes sim check. Release: [v0.3.356](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.356).
+
+
 `main` **100d0642** / desktop **0.3.355** shipped: Stop hiding heavy freight lots on an empty hangar. Release: [v0.3.355](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.355).
 
 

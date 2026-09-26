@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **20a17734** / desktop **0.3.345** shipped: Stop skipAll from freezing heavy formation so sticky LTL boards can grow large lots again. Release: [v0.3.345](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.345).
+
+
 `main` **09d4e5f2** / desktop **0.3.344** shipped: Add Pulse domestic size/skipAll diag across BR/US and regional lenses. Release: [v0.3.344](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.344).
 
 

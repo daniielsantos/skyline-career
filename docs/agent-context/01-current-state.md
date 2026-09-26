@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **c7ea9c23** / desktop **0.3.353** shipped: Speed Ports confirm and first paint: busy CTAs, slim Scout confirm, soft peek poll. Release: [v0.3.353](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.353).
+
+
 `main` **4c7f852f** / desktop **0.3.352** shipped: Ship isometric commodity cutouts, clear desktop icon corners, and simplify the sidebar AIRFRAME wordmark with glow. Release: [v0.3.352](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.352).
 
 

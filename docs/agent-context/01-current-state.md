@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **ae700686** / desktop **0.3.350** shipped: Swap the desktop lettermark A for the MD-11F glyph and enlarge commodity stickers so inventory rows share optical weight with Passengers. Release: [v0.3.350](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.350).
+
+
 `main` **e3984d38** / desktop **0.3.349** shipped: Redesign terminal commodity stickers with distinct cargo motifs so the inventory set no longer looks like a mild refresh of the old icons. Release: [v0.3.349](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.349).
 
 

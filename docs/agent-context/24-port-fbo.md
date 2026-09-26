@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-26: **Scout empty after claim** — sintoma = claim Port FBO e o Scout board só aparece depois de trocar de tab. Causa = `onClaimConcession` atualizava snap/wallet mas **não** chamava `reloadScoutDesk` (list pré-claim vinha vazio). Fix = reload Scout após claim + abrir FBO.
+
 Atualizado 2026-09-26: **Desk auto-buy WH-only + fill quotas** — sintoma = auto-buy enchendo yard quando WH cheia (hold/day infinito). Fix = `whOnly` (default on; nunca yard) + `targetFillPct` opcional (cota % da capacidade WH por commodity; stock+inbound; Demand holds contam via stock); soma das cotas ativas no mesmo WH ≤100%. UI desk: checkbox WH only + Fill quota % Off/25/50/75.
 
 Atualizado 2026-09-25: **Port map pin SVG** — `anchor.png` pixelado trocado por glyph SVG (`companyNetworkIconSvg('port')`), mesmo traço dos ícones FBO/WH.

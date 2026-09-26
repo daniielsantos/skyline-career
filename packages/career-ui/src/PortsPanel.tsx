@@ -1470,6 +1470,10 @@ export function PortsPanel(props: {
       );
       setConcessionOpen(false);
       openNetworkSurface('fbo', { portId: portIdToClaim });
+      // Scout list was empty pre-claim; remount (tab hop) used to be the only
+      // refresh. Reload now so Haul/Demand/Bridge appear without leaving Ports.
+      const logisticsId = props.logisticsCompanyId?.trim() || undefined;
+      await reloadScoutDesk(logisticsId).catch(() => undefined);
     } catch (err) {
       props.onToast?.(
         'fail',

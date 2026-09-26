@@ -2893,9 +2893,18 @@ async function tryServeStatic(
     return false;
   }
   const type = STATIC_MIME[extname(filePath).toLowerCase()] ?? 'application/octet-stream';
+  // Commodity stickers iterate often in polish builds; long browser/Electron
+  // max-age stuck the taskbar inventory on old art while public/ already had
+  // the new PNGs. HTML stays no-cache; commodities short; other assets 1d.
+  const cacheControl =
+    rel === 'index.html'
+      ? 'no-cache'
+      : rel.startsWith('commodities/')
+        ? 'public, max-age=60, must-revalidate'
+        : 'public, max-age=86400';
   res.writeHead(200, {
     'Content-Type': type,
-    'Cache-Control': rel === 'index.html' ? 'no-cache' : 'public, max-age=86400',
+    'Cache-Control': cacheControl,
   });
   if (req.method === 'HEAD') {
     res.end();

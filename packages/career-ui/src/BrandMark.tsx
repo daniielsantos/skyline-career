@@ -1,10 +1,10 @@
 /**
  * Brand lockup — compact sidebar mark or baked hero image.
- * Hero: Airframe PNG; compact: AIR|FRAME wordmark (+ md11f mark).
- * `skyline-hero-lockup.png` kept as archive.
+ * Hero: Airframe PNG; compact: AIR|FRAME wordmark + geometric A mark.
+ * `skyline-hero-lockup.png` / `md11f-mark.png` kept as archive.
  */
 
-import md11fMarkUrl from './assets/brand/md11f-mark.png';
+import airframeMarkUrl from './assets/brand/airframe-mark.png';
 import airframeHeroLockupUrl from './assets/brand/airframe-hero-lockup.png';
 
 type BrandMarkProps = {
@@ -12,7 +12,7 @@ type BrandMarkProps = {
   /** Optional secondary line (e.g. "Career" on the compact mark). */
   subtitle?: string;
   /**
-   * `compact` — front mark + AIRFRAME (sidebar).
+   * `compact` — A mark + AIRFRAME (sidebar).
    * `hero` — baked AIR · MD-11F · FRAME / CAREER (gates / login).
    */
   variant?: 'compact' | 'hero';
@@ -45,7 +45,7 @@ export function BrandMark(props: BrandMarkProps) {
       <span className="brand-mark-row" aria-label="Airframe">
         <img
           className="brand-mark-icon"
-          src={md11fMarkUrl}
+          src={airframeMarkUrl}
           alt=""
           width={40}
           height={40}

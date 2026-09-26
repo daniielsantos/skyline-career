@@ -29,7 +29,7 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - [x] Logo AIR|FRAME hero: `packages/career-ui/src/assets/brand/airframe-hero-lockup.png` (arquivo Skyline mantido)
 - [x] `BrandMark` `variant="hero"` → Airframe (AuthGate / ProfileGate / PlayModeGate / WorldWaitingGate)
 - [x] Hero no painel: inset + `mix-blend-mode: lighten` (sem slab); FRAME `#f0a35a`
-- [x] Compact sidebar **AIR|FRAME** (texto CSS + `md11f-mark`)
+- [x] Compact sidebar **AIR|FRAME** + geometric **A** mark (`airframe-mark.png`; `md11f-mark.png` archive)
 - [x] Display name desktop → **Airframe Career** (productName / Setup / Start Menu / window)
 - [x] `userData` pin em `%APPDATA%\Airframe Career` + migrator one-shot (legado Skyline copiado; pasta antiga fica)
 - [x] `appId` `com.skyline.career` **mantido** (Fase 3b) — não mudar AUMID/updater no mesmo ship

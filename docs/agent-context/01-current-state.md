@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **100d0642** / desktop **0.3.355** shipped: Stop hiding heavy freight lots on an empty hangar. Release: [v0.3.355](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.355).
+
+
 `main` **20b71c7c** / desktop **0.3.354** shipped: Strip Pax from Market airframe labels, sync listing labels, fix Hangar Manage card stretch. Release: [v0.3.354](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.354).
 
 

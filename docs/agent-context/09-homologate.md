@@ -44,6 +44,8 @@ node packages/agent/dist/cli.js smoke --profile profiles/drafts\<arquivo>.json
 
 ## Market SKU (família vs vidro)
 
+**Market `label`:** short type name only (e.g. `Cessna 208B`, `TBM 930`, `Boeing 737-800`, `A340-600 PRO`). Never bake `Passengers` / `Pax` / `Preset Pax` into the display label — cabin role stays in `configurations[].label`; glass titles stay in OFP `matchTitles`. Wizard already strips via `suggestShortMarketLabel`. Fleet normalize + Market refresh re-read catalog label so Hangar/board pick up renames without save migration.
+
 Não criar um `typeId` de catálogo por Highline/Passenger/Stol. Um SKU + um (ou poucos) OFP pack(s):
 
 | SKU | Classe | Pack / roles | SimBrief |
@@ -88,6 +90,8 @@ Homologação **não** é só cargo writetest. Se o SKU tem assentos (ou `loadLa
 Pure freighter SKUs (BCF, C-130, …): cargo-only — **não** inventar passenger stamp.
 
 Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço em [`13-collaborative-homologation.md`](./13-collaborative-homologation.md).
+
+- **Market labels Passengers/Pax (2026-09-26):** sintoma = Hangar/Market cards `CESSNA 208B PASSENGERS`, `TBM 930 Passengers`, `Boeing 737-800 PAX`, `A340-600 PRO Preset Pax`. Causa = top-level catalog `label` baked glass/cabin wording. Fix = short type names only; `refreshAircraftMarket` syncs `listing.label` from catalog; fleet already preferred `airframe.label` on normalize. typeIds / matchTitles / config `Passenger` intact.
 
 - **A300-600 iniBuilds promote (2026-09-23):** sintoma = 4 glasses homologated (Passenger/Freighter × GE/PW) still fora do Market / OFP Default. Fix = SKU `inibuilds-a300-600` + family packs pax/freighter; SimBrief **A306** `iniBuilds (MSFS) - A300-600R GE/PW` via title inference (pack match Default so PW não fica preso em GE). Sem Preighter no SimBrief — freighter usa a row do motor. Arte de card: prompt em `docs/market-airframe-card-prompts.md` (PNG pendente).
 

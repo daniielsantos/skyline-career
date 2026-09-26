@@ -1144,7 +1144,7 @@ export function HangarAircraftCard(props: {
       canBuyout ||
       canPayLeaseOverdue ||
       canReturnLease);
-  /** Keep Manage row on every owned hangar card so neighbors stay aligned. */
+  /** Always show Manage chrome on owned cards (collapsed until opened). */
   const showManageChrome = !mutationsLocked;
 
   // Prefill from App navigation (market/board → Hangar) without syncing

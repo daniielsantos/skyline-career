@@ -1125,6 +1125,13 @@ export function ensureAircraftMarket(
       : listing;
   });
 
+  // Keep Market card titles in sync with catalog (e.g. strip Passengers/Pax renames).
+  listings = listings.map((listing) => {
+    const catalogLabel = findCareerPlayerAirframe(listing.airframeTypeId)?.label;
+    if (!catalogLabel || catalogLabel === listing.label) return listing;
+    return { ...listing, label: catalogLabel };
+  });
+
   // Expire stale player listings; Phase 0 also kills open lease-out listings immediately.
   listings = listings.map((l) => {
     const killLeaseOut =

@@ -1185,7 +1185,7 @@
   {
     "typeId": "c208-caravan-cargo",
     "aircraftClassId": "light_turboprop",
-    "label": "Cessna 208B Passengers",
+    "label": "Cessna 208B",
     "rolesPackRelPath": "profiles/ofp/blacksquare-caravan-cargo-pod.json",
     "familyRolesPackRelPaths": [
       "profiles/ofp/asobo-c208b-cargo.json",
@@ -1582,7 +1582,7 @@
   {
     "typeId": "workingtitle-tbm-930-passengers",
     "aircraftClassId": "light_turboprop",
-    "label": "TBM 930 Passengers",
+    "label": "TBM 930",
     "rolesPackRelPath": "profiles/ofp/workingtitle-tbm-930-passengers.json",
     "simbriefIcao": "TBM9",
     "simbriefAirframeMatch": "Default",
@@ -2109,7 +2109,7 @@
   {
     "typeId": "pmdg-738-pax-family",
     "aircraftClassId": "narrow_freighter",
-    "label": "Boeing 737-800 PAX",
+    "label": "Boeing 737-800",
     "injectCapable": true,
     "loadLayout": "pax_and_cargo",
     "maxPaxSeats": 163,
@@ -2460,7 +2460,7 @@
   {
     "typeId": "toliss-toliss-a346-pro-preset-pax",
     "aircraftClassId": "wide_freighter",
-    "label": "A340-600 PRO Preset Pax",
+    "label": "A340-600 PRO",
     "rolesPackRelPath": "profiles/ofp/toliss-a346.json",
     "simbriefIcao": "A346",
     "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",

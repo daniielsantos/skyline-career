@@ -29,13 +29,19 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - [x] Logo AIR|FRAME hero: `packages/career-ui/src/assets/brand/airframe-hero-lockup.png` (arquivo Skyline mantido)
 - [x] `BrandMark` `variant="hero"` → Airframe (AuthGate / ProfileGate / PlayModeGate / WorldWaitingGate)
 - [x] Hero no painel: inset + `mix-blend-mode: lighten` (sem slab); FRAME `#f0a35a`
-- [x] Compact sidebar **AIR|FRAME** + geometric **A** mark (`airframe-mark.png`; `md11f-mark.png` archive)
+- [x] Compact sidebar: wordmark CSS **AIR|FRAME** (sem glyph abstrato / spar; lockup PNG arquivado) — menor que o PNG anterior
 - [x] Display name desktop → **Airframe Career** (productName / Setup / Start Menu / window)
 - [x] `userData` pin em `%APPDATA%\Airframe Career` + migrator one-shot (legado Skyline copiado; pasta antiga fica)
 - [x] `appId` `com.skyline.career` **mantido** (Fase 3b) — não mudar AUMID/updater no mesmo ship
 - [x] Setup artifact → `Airframe-Setup-…exe`
 - [x] Copy UI visível → Airframe (inject, help, hubs, updates, `index.html` title, SimBridge session names)
-- [x] Ícone installer/taskbar: lettermark **A** amber `#f0a35a` on charcoal (`packages/desktop/build/icon.ico` + `icon.png`) — substitui MD-11F genérico (2026-09-26)
+- [x] Ícone installer/taskbar: lettermark **A** amber `#f0a35a` on charcoal (`packages/desktop/build/icon.ico` + `icon.png`) — substitui MD-11F genérico (2026-09-26); cantos do squircle transparentes (sem resíduo branco, 2026-09-26)
+
+### Desktop icon — white corner residue (2026-09-26)
+
+- **Sintoma:** 4 pontas do ícone desktop/taskbar com mancha branca.
+- **Causa:** fora do squircle charcoal o PNG tinha branco opaco (não alpha 0).
+- **Fix:** flood dos cantos whiteish → transparente em `build/icon.png`; rebuild `icon.ico` multi-size. Reaparece no exe só após rebuild/release.
 - [ ] IDs internos (`skylineDesktop`, `X-Skyline-*`, localStorage `skyline.*`, CSS `.skyline-inject-*`) — legado OK
 
 ### Auditoria copy UI (2026-09-17)
@@ -49,6 +55,16 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - **Sintoma:** login parece card dentro de card / sem degrade / FRAME “outra cor”.
 - **Causa:** full-bleed do PNG cobria o gradient do `.panel.profile-gate`; laranja gerado ≠ LINE/accent `#f0a35a`. Sidebar nunca mudou.
 - **Fix:** hero inset; PNG field `#000` + `mix-blend-mode: lighten` (degrade do panel aparece; sem retângulo); FRAME → `#f0a35a`; rebuild `career-ui` dist.
+
+### Sidebar brand — glyph vs wordmark (2026-09-26)
+
+- **Sintoma:** lockup da sidebar grande; desenho ao lado ilegível (spar/frame abstrato).
+- **Causa:** PNG `airframe-sidebar-lockup.png` ~14.5rem com monograma estrutural sem leitura óbvia.
+- **Fix:** `BrandMark` compact → CSS AIR|FRAME + underline; sidebar ~1.85rem centrado; glow amber (radial) sob o lockup ecoando o hero. PNG fica arquivo.
+
+- **Sintoma:** Passengers + General com tile cinza; depois knockout agressivo comeu madeira/rodas; set seguinte intacto mas estilo misturado (Passengers flat).
+- **Causa:** flood charcoal nos sujeitos; gerações sem brief isométrico único.
+- **Fix:** set **isométrico toy** (opção 1) — 8 ícones chroma `#00FF00` → key verde (protege teal); tag `2026-09-26n`. Avaliar com o user se a direção cola.
 
 ## Auditoria de nomes (2026-09-17)
 

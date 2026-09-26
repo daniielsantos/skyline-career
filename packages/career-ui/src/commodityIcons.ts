@@ -7,7 +7,7 @@
  * static server caches non-HTML assets for 24h (`max-age=86400`), so without
  * a query tag Electron keeps serving the previous stickers.
  */
-export const COMMODITY_ICON_CACHE_TAG = '2026-09-26f';
+export const COMMODITY_ICON_CACHE_TAG = '2026-09-26p';
 
 const COMMODITY_ICON_FILES: Record<string, string> = {
   general: 'general.png',

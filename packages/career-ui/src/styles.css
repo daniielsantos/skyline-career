@@ -78,6 +78,7 @@ body {
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   height: var(--app-topbar-h);
   min-height: var(--app-topbar-h);
@@ -85,6 +86,46 @@ body {
   padding: 0 1.2rem;
   border-bottom: 1px solid var(--line);
   color: var(--ink);
+  overflow: visible;
+}
+
+.sidebar-brand .brand-mark {
+  align-items: center;
+}
+
+.sidebar-brand .brand-mark-lockup {
+  padding-bottom: 0.45rem;
+}
+
+/* Soft amber floor glow — echoes hero lockup light under the plane. */
+.sidebar-brand .brand-mark-lockup::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 0;
+  width: 125%;
+  height: 0.7rem;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 100% at 50% 50%,
+    color-mix(in srgb, var(--accent) 70%, #fff 8%) 0%,
+    color-mix(in srgb, var(--accent) 35%, transparent) 42%,
+    transparent 72%
+  );
+  filter: blur(3px);
+  opacity: 0.9;
+}
+
+.sidebar-brand .brand-mark-word {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-brand .brand-mark-line {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .brand-mark {
@@ -96,33 +137,6 @@ body {
   color: var(--ink);
 }
 
-.brand-mark-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.brand-mark-icon {
-  flex: 0 0 auto;
-  width: 2.55rem;
-  height: 2.55rem;
-  object-fit: contain;
-  object-position: center;
-  display: block;
-  user-select: none;
-  pointer-events: none;
-}
-
-.sidebar-brand .brand-mark-icon {
-  width: 2.75rem;
-  height: 2.75rem;
-}
-
-.profile-gate-brand.brand-mark .brand-mark-icon {
-  width: clamp(3.2rem, 10vw, 4.2rem);
-  height: clamp(3.2rem, 10vw, 4.2rem);
-}
-
 .brand-mark-lockup {
   position: relative;
   display: inline-block;
@@ -131,14 +145,22 @@ body {
 .brand-mark-word {
   display: inline-block;
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 2.6vw, 2.55rem);
-  letter-spacing: 0.1em;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   line-height: 1;
   white-space: nowrap;
 }
 
 .sidebar-brand .brand-mark-word {
-  font-size: clamp(2.1rem, 2.6vw, 2.55rem);
+  /* Above nav tab labels (~1.02rem) so the mark reads as a header. */
+  font-size: 1.85rem;
+  letter-spacing: 0.11em;
+}
+
+.profile-gate-brand.brand-mark .brand-mark-word {
+  font-size: clamp(1.35rem, 3.2vw, 1.7rem);
+  letter-spacing: 0.14em;
 }
 
 .brand-mark-sky {
@@ -148,18 +170,8 @@ body {
 
 .brand-mark-line {
   color: var(--accent);
-}
-
-/* Horizon cuts AIR only — stops before FRAME. */
-.brand-mark-horizon {
-  position: absolute;
-  left: 0.06em;
-  width: 2.35em;
-  top: 48%;
-  height: 0.09rem;
-  color: var(--accent);
-  opacity: 0.9;
-  pointer-events: none;
+  border-bottom: 0.08rem solid color-mix(in srgb, var(--accent) 95%, transparent);
+  padding-bottom: 0.08em;
 }
 
 .brand-mark-subtitle {
@@ -169,29 +181,19 @@ body {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--accent);
-  padding-left: calc(2.55rem + 0.55rem);
+  padding-left: 0;
 }
 
 .sidebar-brand .brand-mark-subtitle {
-  padding-left: calc(2.75rem + 0.55rem);
+  padding-left: 0;
 }
 
 .profile-gate-brand.brand-mark {
   margin-bottom: 0.85rem;
 }
 
-.profile-gate-brand.brand-mark .brand-mark-word {
-  font-size: clamp(1.85rem, 4.5vw, 2.35rem);
-}
-
 .profile-gate-brand.brand-mark .brand-mark-subtitle {
-  padding-left: calc(clamp(3.2rem, 10vw, 4.2rem) + 0.55rem);
-}
-
-.profile-gate-brand.brand-mark .brand-mark-row {
-  align-items: center;
-  gap: 0.85rem;
-  flex-wrap: nowrap;
+  padding-left: 0;
 }
 
 /* Hero lockup: black field + lighten blends into panel gradient (no nested slab). */
@@ -3231,8 +3233,8 @@ th {
   display: block;
   flex: 0 0 auto;
   object-fit: contain;
-  border-radius: 0.55rem;
-  /* Clip antialiased cream rim tips that read as white dots on dark UI. */
+  /* Cutouts — no rounded tile clip (that made filled subjects look boxed). */
+  border-radius: 0;
   background-color: transparent;
 }
 

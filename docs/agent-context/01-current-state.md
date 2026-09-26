@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **acbdca5b** / desktop **0.3.346** shipped: Allow Port desk auto-buy without a day mass cap when a fill quota is set. Release: [v0.3.346](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.346).
+
+
 `main` **20a17734** / desktop **0.3.345** shipped: Stop skipAll from freezing heavy formation so sticky LTL boards can grow large lots again. Release: [v0.3.345](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.345).
 
 

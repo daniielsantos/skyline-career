@@ -35,7 +35,7 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - [x] `appId` `com.skyline.career` **mantido** (Fase 3b) — não mudar AUMID/updater no mesmo ship
 - [x] Setup artifact → `Airframe-Setup-…exe`
 - [x] Copy UI visível → Airframe (inject, help, hubs, updates, `index.html` title, SimBridge session names)
-- [x] Ícone installer: mantém MD-11F (`packages/desktop/build/icon.ico`)
+- [x] Ícone installer/taskbar: lettermark **A** amber `#f0a35a` on charcoal (`packages/desktop/build/icon.ico` + `icon.png`) — substitui MD-11F genérico (2026-09-26)
 - [ ] IDs internos (`skylineDesktop`, `X-Skyline-*`, localStorage `skyline.*`, CSS `.skyline-inject-*`) — legado OK
 
 ### Auditoria copy UI (2026-09-17)

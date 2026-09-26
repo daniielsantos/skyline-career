@@ -134,8 +134,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha,scope=world-amd64
-          cache-to: type=gha,mode=max,scope=world-amd64
+          # ignore-error: GHA cache export can 404 layer blobs and fail the
+          # whole job even after a successful image push (known BuildKit flake).
+          cache-from: type=gha,scope=world-amd64,ignore-error=true
+          cache-to: type=gha,mode=max,scope=world-amd64,ignore-error=true
 
   deploy-production:
     name: Deploy VPS production

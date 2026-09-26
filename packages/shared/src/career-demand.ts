@@ -116,10 +116,102 @@ export const DEMAND_PRICE_PREMIUM_MIN = 1.05;
 export const DEMAND_PRICE_PREMIUM_MAX = 1.15;
 
 /**
- * Extra pay multiplier when fulfilling Demand cross-border from a port WH.
- * Stacks on the order's frozen maxUnitPriceUsd (already ~5–15% over spot).
+ * Peak intl pay multiplier at long range (legacy flat was this constant).
+ * Short cross-border legs ramp via {@link demandIntlPayMultForNm}.
  */
 export const DEMAND_INTL_PAY_MULT = 1.28;
+/** Intl bonus starts ramping above this nm. */
+export const DEMAND_INTL_NM_START = 200;
+/** Full {@link DEMAND_INTL_PAY_MULT} at/above this nm. */
+export const DEMAND_INTL_NM_FULL = 1_500;
+
+/** Demand unit-price nm scale anchors (shortage still in spot; this is haul). */
+export const DEMAND_NM_SCALE_NEAR_NM = 150;
+export const DEMAND_NM_SCALE_NEAR = 0.6;
+export const DEMAND_NM_SCALE_MID_NM = 500;
+export const DEMAND_NM_SCALE_MID = 0.85;
+export const DEMAND_NM_SCALE_FAIR_NM = 1_200;
+export const DEMAND_NM_SCALE_FAIR = 1;
+export const DEMAND_NM_SCALE_LONG_NM = 2_500;
+export const DEMAND_NM_SCALE_LONG = 1.06;
+
+function demandLerp(a: number, b: number, t: number): number {
+  const u = Math.min(1, Math.max(0, t));
+  return a + (b - a) * u;
+}
+
+/** Smooth 0→1 between lo/hi nm (clamped). */
+export function demandNmSmooth01(
+  nm: number,
+  lo: number,
+  hi: number,
+): number {
+  if (!Number.isFinite(nm) || nm <= lo) return 0;
+  if (nm >= hi) return 1;
+  return (nm - lo) / (hi - lo);
+}
+
+/**
+ * Haul scale on Demand unit price (spawn). Short hops compress shortage juice
+ * so nearby electronics desks are not a money print; long hops keep ~1–1.06×.
+ * Unknown/invalid nm → 1 (do not distort).
+ */
+export function demandNmScale(nm: number | null | undefined): number {
+  if (nm == null || !Number.isFinite(nm) || nm <= 0) return 1;
+  if (nm <= DEMAND_NM_SCALE_NEAR_NM) {
+    return demandLerp(0.55, DEMAND_NM_SCALE_NEAR, nm / DEMAND_NM_SCALE_NEAR_NM);
+  }
+  if (nm <= DEMAND_NM_SCALE_MID_NM) {
+    return demandLerp(
+      DEMAND_NM_SCALE_NEAR,
+      DEMAND_NM_SCALE_MID,
+      (nm - DEMAND_NM_SCALE_NEAR_NM) /
+        (DEMAND_NM_SCALE_MID_NM - DEMAND_NM_SCALE_NEAR_NM),
+    );
+  }
+  if (nm <= DEMAND_NM_SCALE_FAIR_NM) {
+    return demandLerp(
+      DEMAND_NM_SCALE_MID,
+      DEMAND_NM_SCALE_FAIR,
+      (nm - DEMAND_NM_SCALE_MID_NM) /
+        (DEMAND_NM_SCALE_FAIR_NM - DEMAND_NM_SCALE_MID_NM),
+    );
+  }
+  if (nm <= DEMAND_NM_SCALE_LONG_NM) {
+    return demandLerp(
+      DEMAND_NM_SCALE_FAIR,
+      DEMAND_NM_SCALE_LONG,
+      (nm - DEMAND_NM_SCALE_FAIR_NM) /
+        (DEMAND_NM_SCALE_LONG_NM - DEMAND_NM_SCALE_FAIR_NM),
+    );
+  }
+  return DEMAND_NM_SCALE_LONG;
+}
+
+/**
+ * Intl fulfill mult vs nm. Domestic callers never use this (stay at 1).
+ * Short cross-border ≈ 1+ε; full {@link DEMAND_INTL_PAY_MULT} by ~1500 nm.
+ */
+export function demandIntlPayMultForNm(nm: number | null | undefined): number {
+  const t = demandNmSmooth01(
+    nm == null || !Number.isFinite(nm) ? 0 : nm,
+    DEMAND_INTL_NM_START,
+    DEMAND_INTL_NM_FULL,
+  );
+  return 1 + (DEMAND_INTL_PAY_MULT - 1) * t;
+}
+
+function demandRouteNm(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+): number | null {
+  const a = originIcao.trim().toUpperCase();
+  const b = destIcao.trim().toUpperCase();
+  const nm =
+    hubDistanceNm(a, b) ?? routeDistanceNm(world, a, b) ?? null;
+  return nm != null && Number.isFinite(nm) && nm > 0 ? nm : null;
+}
 
 /** Hold TTL by warehouse tier (economy ticks). T1 ~12h, T2 ~18h, T3 ~1d, T4 ~1.25d. */
 export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3 | 4, number> = {
@@ -276,7 +368,9 @@ export function demandInternationalUnitPriceMult(
   if (!originCountry || !destCountry || originCountry === destCountry) {
     return 1;
   }
-  return DEMAND_INTL_PAY_MULT;
+  return demandIntlPayMultForNm(
+    demandRouteNm(world, originIcao, destIcao),
+  );
 }
 
 /**
@@ -310,7 +404,7 @@ export function assertDemandInternationalAccept(
   }
   return {
     international: true,
-    unitPriceMult: DEMAND_INTL_PAY_MULT,
+    unitPriceMult: demandIntlPayMultForNm(demandRouteNm(world, origin, dest)),
     originCountryId,
     destCountryId,
   };
@@ -1128,7 +1222,10 @@ export function ensureDemandOrders(
           const premium =
             DEMAND_PRICE_PREMIUM_MIN +
             rng() * (DEMAND_PRICE_PREMIUM_MAX - DEMAND_PRICE_PREMIUM_MIN);
-          const maxUnitPriceUsd = money(spot * premium);
+          const odNm = minNmToHubs(icao, pickups);
+          const maxUnitPriceUsd = money(
+            spot * premium * demandNmScale(odNm),
+          );
 
           const row: DemandOrder = {
             id: nextId('demand', world.tick),

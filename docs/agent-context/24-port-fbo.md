@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-26: **Demand nm pay (anti money-print)** — sintoma = Total pay alto em hops curtos (electronics 150 nm) porque spawn usava só spot×premium e intl dava ×1.28 flat. Fix = `demandNmScale(nm)` no `maxUnitPriceUsd` (≤150 ~0.55–0.6 … ≥2500 ~1.06) + `demandIntlPayMultForNm` (ramp 200→1500 nm até 1.28). Sem Dry/factory/Freights.
+
 Atualizado 2026-09-26: **Desk auto-buy day cap optional with fill quota** — sintoma = Add desk exigia Max lb/day mesmo com Fill quota %. Fix = `maxKgPerDay` 0 = sem teto diário quando `targetFillPct` set; UI libera mass vazio + placeholder “optional · fill quota”; summary “no day cap”. Sem quota, mass/day continua obrigatório.
 
 Atualizado 2026-09-26: **Scout empty after claim** — sintoma = claim Port FBO e o Scout board só aparece depois de trocar de tab. Causa = `onClaimConcession` atualizava snap/wallet mas **não** chamava `reloadScoutDesk` (list pré-claim vinha vazio). Fix = reload Scout após claim + abrir FBO.

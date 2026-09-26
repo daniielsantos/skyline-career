@@ -19,6 +19,10 @@ Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
 - CI ignores `docs/agent-context/**` and `.cursor/**` so handoff-note commits
   do not rebuild the World image. `release:desktop --bump` writes the
   `01-current-state.md` line in the same bump commit.
+- **Buildx GHA cache flake:** `error writing layer blob: not_found` during
+  "exporting to GitHub Actions Cache" is a known BuildKit/GHA hiccup, not a
+  Dockerfile/app failure. `cache-from` / `cache-to` use `ignore-error=true` so
+  a bad cache write does not fail the job after a successful image push.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
 - `world-api` is the single writer: it owns HTTP commands and the background
   economy clock. A failed health check rolls the application image back, but

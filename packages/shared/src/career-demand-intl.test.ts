@@ -12,18 +12,23 @@ import {
   demandCountryOpenQuotas,
   demandEffectiveUnitPriceUsd,
   demandHubCountryId,
+  demandIntlPayMultForNm,
+  demandNmScale,
   demandOrdersGlobalCap,
   demandWantedKgBand,
   ensureDemandOrders,
   isDemandInternationalCountryPair,
   listOpenDemandOrders,
 } from './career-demand.js';
+import { hubDistanceNm } from './career-ferry-route.js';
+import { routeDistanceNm } from './career-economy.js';
 import {
   buyWarehouseAtPickupHub,
   depositCargoToWarehouse,
   ensurePlayerWarehouses,
 } from './career-warehouse.js';
 import { createSeedEconomyWorld } from './career-economy.js';
+import { unlockAllCareerClassOps } from './career-class-ops.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import type { PlayerWarehouse } from './types/career-economy.js';
 
@@ -46,7 +51,7 @@ describe('demand international accept', () => {
     assert.equal(demandHubCountryId(world, 'MMMX'), 'MX');
   });
 
-  it('allows SAEZ port WH → KMIA with intl pay mult', () => {
+  it('allows SAEZ port WH → KMIA with full long-range intl pay mult', () => {
     const world = createSeedEconomyWorld({ seed: 'demand-intl-saez-kmia' });
     const gate = assertDemandInternationalAccept(world, 'SAEZ', 'KMIA');
     assert.equal(gate.international, true);
@@ -61,6 +66,20 @@ describe('demand international accept', () => {
     assert.equal(
       demandEffectiveUnitPriceUsd(world, order, 'SAEZ'),
       Math.round(2 * DEMAND_INTL_PAY_MULT * 100) / 100,
+    );
+  });
+
+  it('scales short Miami→Cuba intl pay below the long-range peak', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-intl-kmia-short' });
+    const gate = assertDemandInternationalAccept(world, 'KMIA', 'MUTD');
+    assert.equal(gate.international, true);
+    assert.ok(
+      gate.unitPriceMult < DEMAND_INTL_PAY_MULT,
+      `expected short intl mult < ${DEMAND_INTL_PAY_MULT}, got ${gate.unitPriceMult}`,
+    );
+    assert.ok(
+      gate.unitPriceMult > 1,
+      `expected short intl mult > 1, got ${gate.unitPriceMult}`,
     );
   });
 
@@ -134,7 +153,10 @@ describe('demand international accept', () => {
       kg: 200,
     });
     assert.ok(accepted.kg > 0 && accepted.kg <= 200);
-    const expectedUnit = Math.round(3 * DEMAND_INTL_PAY_MULT * 100) / 100;
+    const nm =
+      hubDistanceNm('CYVR', 'KSEA') ?? routeDistanceNm(world, 'CYVR', 'KSEA');
+    const expectedUnit =
+      Math.round(3 * demandIntlPayMultForNm(nm) * 100) / 100;
     assert.equal(
       accepted.payUsd,
       Math.round(expectedUnit * accepted.kg * 100) / 100,
@@ -184,6 +206,7 @@ describe('demand international accept', () => {
     aircraft.locationIcao = 'MMMX';
     // Wide freighter range so distance is not the failure mode.
     aircraft.aircraftClassId = 'wide_freighter';
+    state.classOps = unlockAllCareerClassOps(state.classOps);
 
     assert.throws(
       () =>
@@ -306,5 +329,24 @@ describe('demand wanted kg band', () => {
   it('allows feeder-jet Demand sizes, not only 4 t general', () => {
     assert.equal(demandWantedKgBand('supplies').max, 12_000);
     assert.equal(demandWantedKgBand('electronics').max, 8_000);
+  });
+});
+
+describe('demand nm pay scale', () => {
+  it('compresses short hops and keeps long hops near 1×', () => {
+    assert.ok(demandNmScale(120) < 0.65);
+    assert.ok(demandNmScale(150) <= 0.61);
+    assert.ok(Math.abs(demandNmScale(500) - 0.85) < 0.02);
+    assert.ok(Math.abs(demandNmScale(1200) - 1) < 0.02);
+    assert.ok(demandNmScale(2500) >= 1.05);
+    assert.equal(demandNmScale(null), 1);
+  });
+
+  it('ramps intl mult from ~1 toward the long-range peak', () => {
+    assert.equal(demandIntlPayMultForNm(100), 1);
+    assert.ok(demandIntlPayMultForNm(400) > 1);
+    assert.ok(demandIntlPayMultForNm(400) < DEMAND_INTL_PAY_MULT);
+    assert.equal(demandIntlPayMultForNm(1500), DEMAND_INTL_PAY_MULT);
+    assert.equal(demandIntlPayMultForNm(4000), DEMAND_INTL_PAY_MULT);
   });
 });

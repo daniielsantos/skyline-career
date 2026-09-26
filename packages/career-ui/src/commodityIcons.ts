@@ -1,7 +1,7 @@
 /**
  * Commodity sticker art under career-ui/public/commodities/.
  * Filenames: general, supplies, electronics, perishables, machinery,
- * jet-a (fuel), mro-parts.
+ * jet-a (fuel), mro-parts, passengers (charter pool).
  */
 
 const COMMODITY_ICON_FILES: Record<string, string> = {
@@ -12,6 +12,7 @@ const COMMODITY_ICON_FILES: Record<string, string> = {
   machinery: 'machinery.png',
   fuel: 'jet-a.png',
   mro_parts: 'mro-parts.png',
+  passengers: 'passengers.png',
 };
 
 export function commodityIconUrl(

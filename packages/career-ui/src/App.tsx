@@ -16778,8 +16778,19 @@ export function App() {
                           {airportView.charter ? (
                             <tr>
                               <td>
-                                <strong>Passengers</strong>
-                                <small>Charter pool · waiting at terminal</small>
+                                <div className="commodity-cell">
+                                  <CommodityIcon
+                                    commodityId="passengers"
+                                    size={48}
+                                    title="Passengers"
+                                  />
+                                  <div>
+                                    <strong>Passengers</strong>
+                                    <small>
+                                      Charter pool · waiting at terminal
+                                    </small>
+                                  </div>
+                                </div>
                               </td>
                               <td>
                                 {airportView.charter.waitingPax}

@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **a27be294** / desktop **0.3.343** shipped: Stop domestic feeder from flooding skipAll partitions so bulk and large lots can form again. Release: [v0.3.343](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.343).
+
+
 `main` **2cd5194b** / desktop **0.3.342** shipped: Add desk auto-buy WH-only toggle and per-commodity fill quotas so purchases stop at warehouse headroom instead of spilling to yard. Release: [v0.3.342](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.342).
 
 

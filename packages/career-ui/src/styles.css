@@ -13051,6 +13051,20 @@ span.dispatch-route-hub-dest {
   padding: 0.25rem 0.35rem;
 }
 
+.ports-desk-form-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+}
+
+.ports-desk-form-check input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  margin: 0;
+}
+
 .ports-stock-details {
   margin: 0.55rem 0.65rem 0;
   padding-bottom: 0.45rem;

@@ -1825,6 +1825,16 @@ export interface PortAutoBuyOrder {
   warehouseId: string;
   /** Skip buy when wallet − debit would fall below this. */
   walletFloorUsd: number;
+  /**
+   * When true (default), never spill to yard — buy only into free WH inbound room.
+   * Missing/`undefined` on old saves = true.
+   */
+  whOnly?: boolean;
+  /**
+   * Optional stock quota: keep this commodity ≤ N% of WH capacity
+   * (stock + inbound; Demand holds count via stock). `null`/omit = no quota.
+   */
+  targetFillPct?: number | null;
   paused: boolean;
   boughtKgToday: number;
   /** `economyDayIndex(tick)` when `boughtKgToday` last applied. */

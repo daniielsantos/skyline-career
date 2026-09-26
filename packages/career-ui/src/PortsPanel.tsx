@@ -428,6 +428,9 @@ export function PortsPanel(props: {
   const [deskMaxKgDay, setDeskMaxKgDay] = useState('');
   const [deskWalletFloor, setDeskWalletFloor] = useState('');
   const [deskWarehouseId, setDeskWarehouseId] = useState('');
+  const [deskWhOnly, setDeskWhOnly] = useState(true);
+  /** '' = off; else percent string e.g. '25'. */
+  const [deskTargetFillPct, setDeskTargetFillPct] = useState('');
   const [amountText, setAmountText] = useState('1000');
   const [acceptOrder, setAcceptOrder] = useState<DemandOrderView | null>(null);
   const [acceptOrigin, setAcceptOrigin] = useState('');
@@ -1664,6 +1667,15 @@ export function PortsPanel(props: {
       props.onToast?.('fail', 'Wallet floor must be zero or more');
       return;
     }
+    let targetFillPct: number | null = null;
+    if (deskTargetFillPct.trim() !== '') {
+      const pct = Math.floor(Number(deskTargetFillPct));
+      if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+        props.onToast?.('fail', 'Target fill % must be 1–100 (or Off)');
+        return;
+      }
+      targetFillPct = pct;
+    }
     const warehouseId =
       deskWarehouseId ||
       (warehouses?.warehouses ?? []).find((w) => {
@@ -1693,6 +1705,8 @@ export function PortsPanel(props: {
         maxKgPerDay,
         warehouseId,
         walletFloorUsd,
+        whOnly: deskWhOnly,
+        targetFillPct,
         paused: false,
         companyId: props.logisticsCompanyId?.trim() || undefined,
       });
@@ -1702,6 +1716,8 @@ export function PortsPanel(props: {
       setDeskMaxPrice('');
       setDeskMaxKgDay('');
       setDeskWalletFloor('');
+      setDeskTargetFillPct('');
+      setDeskWhOnly(true);
       setDeskOpen(true);
       props.onToast?.('ok', 'Port FBO desk order saved');
     } catch (err) {
@@ -4447,6 +4463,13 @@ export function PortsPanel(props: {
                                           ),
                                         ).toLocaleString('en-US')}{' '}
                                         {unit}
+                                        {o.whOnly === false
+                                          ? ' · yard OK'
+                                          : ' · WH only'}
+                                        {o.targetFillPct != null &&
+                                        o.targetFillPct > 0
+                                          ? ` · fill ≤${Math.floor(o.targetFillPct)}%`
+                                          : ''}
                                       </span>
                                       {canPortDeskOps ? (
                                         <span className="ports-desk-order-actions">
@@ -4576,6 +4599,34 @@ export function PortsPanel(props: {
                                         </option>
                                       ))}
                                     </select>
+                                  </label>
+                                  <label>
+                                    Fill quota %
+                                    <select
+                                      value={deskTargetFillPct}
+                                      onChange={(e) =>
+                                        setDeskTargetFillPct(e.target.value)
+                                      }
+                                      disabled={props.busy || loading}
+                                      title="Keep this commodity ≤ N% of WH capacity (stock + inbound; Demand holds count). Sum of active quotas on the WH ≤ 100%."
+                                    >
+                                      <option value="">Off</option>
+                                      <option value="25">25%</option>
+                                      <option value="50">50%</option>
+                                      <option value="75">75%</option>
+                                    </select>
+                                  </label>
+                                  <label className="ports-desk-form-check">
+                                    <span>WH only</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={deskWhOnly}
+                                      onChange={(e) =>
+                                        setDeskWhOnly(e.target.checked)
+                                      }
+                                      disabled={props.busy || loading}
+                                      title="When on, never spill purchases to yard hold"
+                                    />
                                   </label>
                                   <button
                                     type="button"

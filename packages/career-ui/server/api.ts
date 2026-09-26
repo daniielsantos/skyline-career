@@ -9461,6 +9461,8 @@ export function createCareerApiServer(port = 8787) {
           maxKgPerDay?: number;
           warehouseId?: string;
           walletFloorUsd?: number;
+          whOnly?: boolean;
+          targetFillPct?: number | null;
           paused?: boolean;
           companyId?: string;
         };
@@ -9507,6 +9509,14 @@ export function createCareerApiServer(port = 8787) {
                   body.walletFloorUsd != null
                     ? Number(body.walletFloorUsd)
                     : undefined,
+                whOnly:
+                  body.whOnly === undefined ? undefined : body.whOnly === true,
+                targetFillPct:
+                  body.targetFillPct === undefined
+                    ? undefined
+                    : body.targetFillPct == null
+                      ? null
+                      : Number(body.targetFillPct),
                 paused: body.paused === true,
                 companyId: ports_auto_buyCompanyId,
               });

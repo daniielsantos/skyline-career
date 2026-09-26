@@ -245,4 +245,198 @@ describe('port auto-buy desk', () => {
       false,
     );
   });
+
+  it('defaults new orders to WH-only and never spills to yard', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    const wh = ensurePlayerWarehouses(state).warehouses.find(
+      (w) => w.id === warehouseId,
+    )!;
+    ensurePlayerWarehouses(state).stock.push({
+      id: 'pile_full',
+      warehouseId,
+      commodityId: 'supplies',
+      kg: wh.capacityKg,
+      avgCostUsdPerKg: 1,
+      acquiredAtTick: world.tick,
+    });
+    seedSbgrGeneralListing(world, 5_000);
+    const listing = (world.portListings ?? []).find((l) =>
+      l.id.startsWith('portlot_auto_'),
+    )!;
+    const unit = effectivePortBuyUnitPriceUsd(state, world, listing);
+    const order = upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: unit + 5,
+      maxKgPerDay: 5_000,
+      warehouseId,
+    });
+    assert.equal(order.whOnly, true);
+    const pickupsBefore = (state.portPickups ?? []).length;
+    const result = tickPortAutoBuyOrders(state, world);
+    assert.equal(result.buys, 0);
+    assert.equal(result.kg, 0);
+    assert.equal((state.portPickups ?? []).length, pickupsBefore);
+  });
+
+  it('whOnly false may spill excess to yard', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    const wh = ensurePlayerWarehouses(state).warehouses.find(
+      (w) => w.id === warehouseId,
+    )!;
+    ensurePlayerWarehouses(state).stock.push({
+      id: 'pile_full2',
+      warehouseId,
+      commodityId: 'supplies',
+      kg: wh.capacityKg,
+      avgCostUsdPerKg: 1,
+      acquiredAtTick: world.tick,
+    });
+    seedSbgrGeneralListing(world, 500);
+    const listing = (world.portListings ?? []).find((l) =>
+      l.id.startsWith('portlot_auto_'),
+    )!;
+    const unit = effectivePortBuyUnitPriceUsd(state, world, listing);
+    upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: unit + 5,
+      maxKgPerDay: 500,
+      warehouseId,
+      whOnly: false,
+    });
+    const result = tickPortAutoBuyOrders(state, world);
+    assert.ok(result.kg > 0);
+    assert.ok((state.portPickups ?? []).some((p) => p.commodityId === 'general'));
+  });
+
+  it('stops at targetFillPct; Demand holds count via stock', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    const wh = ensurePlayerWarehouses(state).warehouses.find(
+      (w) => w.id === warehouseId,
+    )!;
+    const quotaKg = Math.floor((wh.capacityKg * 25) / 100);
+    ensurePlayerWarehouses(state).stock.push({
+      id: 'pile_quota',
+      warehouseId,
+      commodityId: 'general',
+      kg: quotaKg,
+      avgCostUsdPerKg: 1,
+      acquiredAtTick: world.tick,
+    });
+    ensurePlayerWarehouses(state).demandHolds = [
+      {
+        id: 'hold_quota',
+        kind: 'demand',
+        orderId: 'dem_x',
+        warehouseId,
+        originIcao: 'SBGR',
+        destIcao: 'SBCT',
+        commodityId: 'general',
+        kg: Math.min(400, quotaKg),
+        unitPriceUsd: 1,
+        heldAtTick: world.tick,
+        expiresAtTick: world.tick + 96 * 7,
+      },
+    ];
+    seedSbgrGeneralListing(world, 5_000);
+    const listing = (world.portListings ?? []).find((l) =>
+      l.id.startsWith('portlot_auto_'),
+    )!;
+    const unit = effectivePortBuyUnitPriceUsd(state, world, listing);
+    upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: unit + 5,
+      maxKgPerDay: 5_000,
+      warehouseId,
+      targetFillPct: 25,
+    });
+    const result = tickPortAutoBuyOrders(state, world);
+    assert.equal(result.buys, 0);
+    assert.equal(result.kg, 0);
+  });
+
+  it('rejects active fill quotas summing over 100%', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: 10,
+      maxKgPerDay: 100,
+      warehouseId,
+      targetFillPct: 50,
+    });
+    upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'supplies',
+      maxPriceUsdPerKg: 10,
+      maxKgPerDay: 100,
+      warehouseId,
+      targetFillPct: 40,
+    });
+    assert.throws(
+      () =>
+        upsertPortAutoBuyOrder(state, world, {
+          portId: 'BRSSZ',
+          commodityId: 'machinery',
+          maxPriceUsdPerKg: 10,
+          maxKgPerDay: 100,
+          warehouseId,
+          targetFillPct: 20,
+        }),
+      /cannot exceed 100%/,
+    );
+  });
+
+  it('tops up only the quota gap', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    const wh = ensurePlayerWarehouses(state).warehouses.find(
+      (w) => w.id === warehouseId,
+    )!;
+    const quotaKg = Math.floor((wh.capacityKg * 25) / 100);
+    const already = Math.max(0, quotaKg - 150);
+    ensurePlayerWarehouses(state).stock.push({
+      id: 'pile_gap',
+      warehouseId,
+      commodityId: 'general',
+      kg: already,
+      avgCostUsdPerKg: 1,
+      acquiredAtTick: world.tick,
+    });
+    seedSbgrGeneralListing(world, 5_000);
+    const listing = (world.portListings ?? []).find((l) =>
+      l.id.startsWith('portlot_auto_'),
+    )!;
+    const unit = effectivePortBuyUnitPriceUsd(state, world, listing);
+    upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: unit + 5,
+      maxKgPerDay: 5_000,
+      warehouseId,
+      targetFillPct: 25,
+      whOnly: true,
+    });
+    const result = tickPortAutoBuyOrders(state, world);
+    assert.ok(result.kg > 0);
+    assert.ok(result.kg <= 150);
+    const stock =
+      ensurePlayerWarehouses(state)
+        .stock.filter(
+          (s) => s.warehouseId === warehouseId && s.commodityId === 'general',
+        )
+        .reduce((s, p) => s + p.kg, 0) +
+      (ensurePlayerWarehouses(state).inboundTransfers ?? [])
+        .filter(
+          (t) => t.warehouseId === warehouseId && t.commodityId === 'general',
+        )
+        .reduce((s, t) => s + t.kg, 0);
+    assert.ok(stock <= quotaKg);
+  });
 });

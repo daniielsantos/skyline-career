@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-26: **Desk auto-buy WH-only + fill quotas** — sintoma = auto-buy enchendo yard quando WH cheia (hold/day infinito). Fix = `whOnly` (default on; nunca yard) + `targetFillPct` opcional (cota % da capacidade WH por commodity; stock+inbound; Demand holds contam via stock); soma das cotas ativas no mesmo WH ≤100%. UI desk: checkbox WH only + Fill quota % Off/25/50/75.
+
 Atualizado 2026-09-25: **Port map pin SVG** — `anchor.png` pixelado trocado por glyph SVG (`companyNetworkIconSvg('port')`), mesmo traço dos ícones FBO/WH.
 
 Atualizado 2026-09-25: **Ports map snap-back** — sintoma = pan/navega noutro porto e a câmera volta (ex. Santos) a cada soft-poll. Causa = efeito de markers re-`easeTo` no `selectedPortId` sempre que `ports` mudava. Fix = `lastCameraKeyRef` só re-foca em seleção/highlight/scout/route; center inicial deixa de ser Santos.
@@ -398,7 +400,7 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 
 - `PortAutoBuyOrder` + `career-port-auto-buy.ts`; persist `port_auto_buy_orders_json`.
 - Tick after `ensurePortListings` (catch-up + `/api/tick`): `tickPortAutoBuyOrders` → **`buyPortListing`** only (same price/fila).
-- Gates: active Port FBO; max **3** active; max $/kg; max kg/day; wallet floor; WH at pickup hub.
+- Gates: active Port FBO; max **3** active; max $/kg; max kg/day; wallet floor; WH at pickup hub; **WH-only** (default) + optional **fill quota %** (sum ≤100% per WH).
 - API `POST /api/ports/auto-buy`; UI desk no dialog Port FBO.
 
 ### Phase 1 — shipped

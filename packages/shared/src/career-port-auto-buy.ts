@@ -11,7 +11,11 @@ import {
 } from './career-ports.js';
 import { isPortOperator } from './career-port-concessions.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
-import { ensurePlayerWarehouses } from './career-warehouse-stock.js';
+import {
+  ensurePlayerWarehouses,
+  MIN_WAREHOUSE_INBOUND_KG,
+  warehouseInboundFreeKg,
+} from './career-warehouse-stock.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
 import { isFboHoldCommodityAllowed } from './career-fbo.js';
 import type {
@@ -23,6 +27,9 @@ import type {
 
 /** Solo MVP — max active (non-paused) desk orders per company. */
 export const PORT_AUTO_BUY_MAX_ACTIVE = 3;
+
+/** Active desk orders on one WH may not sum targetFillPct above this. */
+export const PORT_AUTO_BUY_MAX_QUOTA_SUM_PCT = 100;
 
 const PORT_AUTO_BUY_COMMODITIES: readonly CommodityId[] = [
   'general',
@@ -44,6 +51,19 @@ export function ensurePortAutoBuyOrders(
   return state.portAutoBuyOrders;
 }
 
+/** Missing field on legacy saves = WH-only (no yard spill). */
+export function portAutoBuyWhOnly(order: PortAutoBuyOrder): boolean {
+  return order.whOnly !== false;
+}
+
+export function portAutoBuyTargetFillPct(
+  order: PortAutoBuyOrder,
+): number | null {
+  const n = order.targetFillPct;
+  if (n == null || !Number.isFinite(n) || n <= 0) return null;
+  return Math.min(100, Math.floor(n));
+}
+
 function normalizeCommodityId(raw: string): CommodityId | null {
   const id = raw.trim().toLowerCase() as CommodityId;
   return PORT_AUTO_BUY_COMMODITIES.includes(id) ? id : null;
@@ -57,7 +77,7 @@ function assertWarehouseForPort(
   state: CareerMissionsState,
   portId: string,
   warehouseId: string,
-): { warehouseId: string; hubIcao: string } {
+): { warehouseId: string; hubIcao: string; capacityKg: number } {
   const port = getCareerPort(portId);
   if (!port) throw new Error(`Unknown port ${portId}`);
   const wh = ensurePlayerWarehouses(state).warehouses.find(
@@ -71,7 +91,105 @@ function assertWarehouseForPort(
       `Desk auto-buy for ${port.name} delivers to ${desk} only. Use Truck from yard or move stock via stevedore.`,
     );
   }
-  return { warehouseId: wh.id, hubIcao: hub };
+  return {
+    warehouseId: wh.id,
+    hubIcao: hub,
+    capacityKg: wh.capacityKg,
+  };
+}
+
+/** Stock of one commodity in a WH (Demand holds still sit in stock). */
+export function warehouseCommodityStockKg(
+  state: CareerMissionsState,
+  warehouseId: string,
+  commodityId: CommodityId,
+): number {
+  return ensurePlayerWarehouses(state)
+    .stock.filter(
+      (s) =>
+        s.warehouseId === warehouseId &&
+        s.commodityId === commodityId &&
+        s.kg > 0,
+    )
+    .reduce((sum, s) => sum + s.kg, 0);
+}
+
+/** Inbound transfers of one commodity toward a WH. */
+export function warehouseCommodityInboundKg(
+  state: CareerMissionsState,
+  warehouseId: string,
+  commodityId: CommodityId,
+): number {
+  return (ensurePlayerWarehouses(state).inboundTransfers ?? [])
+    .filter(
+      (t) =>
+        t.warehouseId === warehouseId && t.commodityId === commodityId && t.kg > 0,
+    )
+    .reduce((sum, t) => sum + t.kg, 0);
+}
+
+/**
+ * Gap (kg) until this order's fill quota. `null` = no quota cap.
+ * Counts stock + inbound (holds occupy stock → count as used).
+ */
+export function portAutoBuyQuotaGapKg(
+  state: CareerMissionsState,
+  order: PortAutoBuyOrder,
+): number | null {
+  const pct = portAutoBuyTargetFillPct(order);
+  if (pct == null) return null;
+  const wh = ensurePlayerWarehouses(state).warehouses.find(
+    (w) => w.id === order.warehouseId,
+  );
+  if (!wh || !(wh.capacityKg > 0)) return 0;
+  const quotaKg = Math.floor((wh.capacityKg * pct) / 100);
+  const used =
+    warehouseCommodityStockKg(state, order.warehouseId, order.commodityId) +
+    warehouseCommodityInboundKg(state, order.warehouseId, order.commodityId);
+  return Math.max(0, quotaKg - used);
+}
+
+/** Sum of targetFillPct for active orders on a WH (optional exclude id). */
+export function sumActiveAutoBuyQuotaPct(
+  orders: readonly PortAutoBuyOrder[],
+  warehouseId: string,
+  excludeOrderId?: string,
+): number {
+  let sum = 0;
+  for (const o of orders) {
+    if (o.paused) continue;
+    if (o.warehouseId !== warehouseId) continue;
+    if (excludeOrderId && o.id === excludeOrderId) continue;
+    const pct = portAutoBuyTargetFillPct(o);
+    if (pct != null) sum += pct;
+  }
+  return sum;
+}
+
+function resolveWhOnly(
+  raw: boolean | undefined,
+  existing?: PortAutoBuyOrder,
+): boolean {
+  if (raw !== undefined) return raw === true;
+  if (existing) return portAutoBuyWhOnly(existing);
+  return true;
+}
+
+function resolveTargetFillPct(
+  raw: number | null | undefined,
+  existing?: PortAutoBuyOrder,
+): number | null {
+  if (raw === null) return null;
+  if (raw !== undefined) {
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    const n = Math.floor(raw);
+    if (n > 100) {
+      throw new Error('Target fill % must be between 1 and 100');
+    }
+    return n;
+  }
+  if (existing) return portAutoBuyTargetFillPct(existing);
+  return null;
 }
 
 export type UpsertPortAutoBuyOrderOpts = {
@@ -82,6 +200,10 @@ export type UpsertPortAutoBuyOrderOpts = {
   maxKgPerDay: number;
   warehouseId: string;
   walletFloorUsd?: number;
+  /** Default true on new orders. */
+  whOnly?: boolean;
+  /** 1–100, or null/0 to clear. Omit keeps existing on update. */
+  targetFillPct?: number | null;
   paused?: boolean;
   companyId?: string;
 };
@@ -129,6 +251,22 @@ export function upsertPortAutoBuyOrder(
     );
   }
 
+  const whOnly = resolveWhOnly(opts.whOnly, existing);
+  const targetFillPct = resolveTargetFillPct(opts.targetFillPct, existing);
+
+  if (!paused && targetFillPct != null) {
+    const others = sumActiveAutoBuyQuotaPct(
+      orders,
+      warehouseId,
+      existing?.id,
+    );
+    if (others + targetFillPct > PORT_AUTO_BUY_MAX_QUOTA_SUM_PCT) {
+      throw new Error(
+        `Desk fill quotas on this warehouse cannot exceed ${PORT_AUTO_BUY_MAX_QUOTA_SUM_PCT}% (others ${others}% + this ${targetFillPct}%)`,
+      );
+    }
+  }
+
   const day = economyDayIndex(world.tick);
   if (existing) {
     existing.portId = portId;
@@ -137,6 +275,8 @@ export function upsertPortAutoBuyOrder(
     existing.maxKgPerDay = maxKgPerDay;
     existing.warehouseId = warehouseId;
     existing.walletFloorUsd = walletFloorUsd;
+    existing.whOnly = whOnly;
+    existing.targetFillPct = targetFillPct;
     existing.paused = paused;
     return existing;
   }
@@ -149,6 +289,8 @@ export function upsertPortAutoBuyOrder(
     maxKgPerDay,
     warehouseId,
     walletFloorUsd,
+    whOnly,
+    targetFillPct,
     paused,
     boughtKgToday: 0,
     boughtDayIndex: day,
@@ -171,6 +313,17 @@ export function setPortAutoBuyOrderPaused(
       `Port FBO desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
     );
   }
+  if (!paused) {
+    const pct = portAutoBuyTargetFillPct(order);
+    if (pct != null) {
+      const others = sumActiveAutoBuyQuotaPct(orders, order.warehouseId, order.id);
+      if (others + pct > PORT_AUTO_BUY_MAX_QUOTA_SUM_PCT) {
+        throw new Error(
+          `Resuming would exceed ${PORT_AUTO_BUY_MAX_QUOTA_SUM_PCT}% fill quotas on this warehouse`,
+        );
+      }
+    }
+  }
   order.paused = paused;
   return order;
 }
@@ -192,6 +345,15 @@ function alignOrderDay(order: PortAutoBuyOrder, day: number): void {
     order.boughtDayIndex = day;
     order.boughtKgToday = 0;
   }
+}
+
+/** Free inbound room used by WH-only buys (mirrors buyPortListing tiny-slot rule). */
+function autoBuyInboundRoomKg(
+  state: CareerMissionsState,
+  warehouseId: string,
+): number {
+  const freeRaw = warehouseInboundFreeKg(state, warehouseId);
+  return freeRaw >= MIN_WAREHOUSE_INBOUND_KG ? freeRaw : 0;
 }
 
 /**
@@ -232,6 +394,9 @@ export function tickPortAutoBuyOrders(
       continue;
     }
 
+    const quotaGap = portAutoBuyQuotaGapKg(state, order);
+    if (quotaGap === 0) continue;
+
     const candidates = (world.portListings ?? [])
       .filter(
         (l) =>
@@ -259,7 +424,19 @@ export function tickPortAutoBuyOrders(
       const maxByWallet = Math.floor(
         Math.max(0, state.walletUsd - order.walletFloorUsd) / unit,
       );
-      const buyKg = Math.min(listing.availableKg, rem, maxByWallet);
+      const gapNow = portAutoBuyQuotaGapKg(state, order);
+      const maxByQuota = gapNow == null ? Number.POSITIVE_INFINITY : gapNow;
+      const maxByWh = portAutoBuyWhOnly(order)
+        ? autoBuyInboundRoomKg(state, order.warehouseId)
+        : Number.POSITIVE_INFINITY;
+
+      const buyKg = Math.min(
+        listing.availableKg,
+        rem,
+        maxByWallet,
+        maxByQuota,
+        maxByWh,
+      );
       if (buyKg <= 0) continue;
 
       try {

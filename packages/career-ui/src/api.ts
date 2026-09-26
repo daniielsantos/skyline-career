@@ -3060,6 +3060,10 @@ export type PortsSnapshot = {
     maxKgPerDay: number;
     warehouseId: string;
     walletFloorUsd: number;
+    /** Default true when omitted (legacy). */
+    whOnly?: boolean;
+    /** 1–100 of WH capacity; omit/null = no quota. */
+    targetFillPct?: number | null;
     paused: boolean;
     boughtKgToday: number;
     boughtDayIndex: number;
@@ -3208,6 +3212,8 @@ export function postPortAutoBuy(opts: {
   maxKgPerDay?: number;
   warehouseId?: string;
   walletFloorUsd?: number;
+  whOnly?: boolean;
+  targetFillPct?: number | null;
   paused?: boolean;
   companyId?: string;
 }) {

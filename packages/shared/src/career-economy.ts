@@ -10746,9 +10746,9 @@ function commodityBoardBloated(
     skipAll = true;
   }
 
-  // Transport capacity, not shelf space, is the real ceiling. Heavy freight
-  // gets its own slice sized from local Narrow/Wide lift, so LTL cannot crowd
-  // out the trunk market and heavy blocks cannot bury the GA board.
+  // Transport capacity, not shelf lot-count, is the heavy ceiling. LTL soft-cap
+  // (skipAll) must NOT freeze large/XL — that inverted the design and trapped
+  // densified partitions as sticky all-LTL (US Freights ≤2 t forever).
   const boardKg = counts.kgByPartition.get(partitionId) ?? 0;
   if (boardKg >= partitionBoardKgTarget(world, partitionId)) skipAll = true;
 
@@ -10764,7 +10764,6 @@ function commodityBoardBloated(
     globalLargeCap != null && globalLargeN >= globalLargeCap;
 
   const skipHeavy =
-    skipAll ||
     heavyOverCapacity ||
     globalLargeFull ||
     (largeQuota != null && largeN >= largeQuota);
@@ -11343,7 +11342,9 @@ function* formLotsFromImbalances(
     }
 
     const boardPressure = boardPressureOf(commodity.id, opts.partitionId);
-    if (boardPressure.skipAll) return false;
+    // skipAll gates small/LTL only (checked below). Do not abort the whole
+    // pair — heavy still forms when skipHeavy is false (sticky LTL recovery).
+    if (boardPressure.skipAll && boardPressure.skipHeavy) return false;
     const rng = lotRng(opts.partitionId, commodity.id);
 
     if (cw <= 1) {
@@ -11558,7 +11559,9 @@ function* formLotsFromImbalances(
   const runDomesticBulkForCountry = (countryId: string): void => {
     const countryAirports = airportsByCountry.get(countryId) ?? [];
     for (const commodity of CAREER_CARGO_COMMODITIES) {
-      if (boardPressureOf(commodity.id, countryId).skipAll) continue;
+      const pressure = boardPressureOf(commodity.id, countryId);
+      // Lot-count skipAll alone must not kill bulk — heavy may still form.
+      if (pressure.skipAll && pressure.skipHeavy) continue;
       const ranked = rankAirports(countryAirports, commodity);
       // Rank by fill pressure, not absolute kg. Absolute room/surplus is a proxy
       // for warehouse size, so the same high-capacity majors won every slot every
@@ -11668,7 +11671,8 @@ function* formLotsFromImbalances(
       };
 
       for (const origin of origins) {
-        if (boardPressureOf(commodity.id, countryId).skipAll) break;
+        const originPressure = boardPressureOf(commodity.id, countryId);
+        if (originPressure.skipAll && originPressure.skipHeavy) break;
         const hasOpenCorridor = originHasOpenCorridor(origin);
         const orderedDests = [...destinations].sort((a, b) => {
           const wa = corridorWeight(origin.ap.icao, a.ap.icao);
@@ -11676,7 +11680,8 @@ function* formLotsFromImbalances(
           return wb - wa;
         });
         for (const dest of orderedDests) {
-          if (boardPressureOf(commodity.id, countryId).skipAll) break;
+          const destPressure = boardPressureOf(commodity.id, countryId);
+          if (destPressure.skipAll && destPressure.skipHeavy) break;
           const cw = corridorWeight(origin.ap.icao, dest.ap.icao);
           if (cw > 1) {
             const minGapMult = cw >= 1.5 ? 0.15 : 0.22;
@@ -12088,10 +12093,11 @@ function* formLotsFromImbalances(
   lotsPhaseAt = performance.now();
 
   // --- Domestic feeder LTL (regional / spoke → major|regional) ---
-  // Soft-cap skipAll kills bulk — feeder used to ignore skipAll entirely and
-  // flooded densified partitions (US) with ≤2 t LTL so large never returned.
-  // Gates (2026-09-26): never form at/over partition quota; leave soft headroom
-  // for bulk; under skipAll+zero large → stop; under skipAll with some large →
+  // Soft-cap skipAll used to kill ALL bulk (incl. large) while feeder ignored
+  // skipAll and flooded densified partitions (US) with ≤2 t LTL so large never
+  // returned. Gates (2026-09-26): skipAll ≠ skipHeavy (heavy still forms);
+  // feeder never forms at/over partition quota; leave soft headroom for bulk;
+  // under skipAll+zero large → stop; under skipAll with some large →
   // vitality only (origins with 0 open feeder, budget 1).
   //
   // Open-count MUST be indexed: a full lots scan per spoke×SKU (spoke densify)
@@ -12373,8 +12379,9 @@ function* formLotsFromImbalances(
   );
   for (const commodity of CAREER_CARGO_COMMODITIES) {
     // Intl cw is always ≥ INTERNATIONAL_CORRIDOR_WEIGHT (2) — no spoke rng.
-    let skipAll = boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll;
-    if (skipAll) continue;
+    let pressure = boardPressureOf(commodity.id, INTL_BOARD_PARTITION);
+    // skipAll alone must not freeze INTL heavy (same sticky trap as domestic).
+    if (pressure.skipAll && pressure.skipHeavy) continue;
     const rankedAll = rankAirports(intlAirports, commodity);
     const rankedByIcao = new Map(
       rankedAll.map((r) => [r.ap.icao.toUpperCase(), r]),
@@ -12468,18 +12475,18 @@ function* formLotsFromImbalances(
       intlOpts.capacityKgPerDay = dir.lane.capacityKgPerDay;
       intlOpts.precomputedLaneSat = laneSat;
       if (tryFormPair(commodity, origin, dest, dir.lane.cw, intlOpts)) {
-        skipAll = boardPressureOf(commodity.id, INTL_BOARD_PARTITION).skipAll;
+        pressure = boardPressureOf(commodity.id, INTL_BOARD_PARTITION);
       }
     };
 
-    // Pass 1: regional-band only (≤2500 nm) until skipAll.
+    // Pass 1: regional-band only (≤2500 nm) until LTL+heavy both blocked.
     for (const dir of collectDirs(true)) {
-      if (skipAll) break;
+      if (pressure.skipAll && pressure.skipHeavy) break;
       tryIntlDir(dir);
     }
     // Pass 2: medium then ultra for remaining quota (fair within band).
     for (const dir of collectDirs(false)) {
-      if (skipAll) break;
+      if (pressure.skipAll && pressure.skipHeavy) break;
       tryIntlDir(dir);
     }
   }

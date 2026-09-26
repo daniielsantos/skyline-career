@@ -3850,6 +3850,104 @@ describe('tickEconomyN market formation', () => {
     );
   });
 
+  it('forms domestic large under skipAll when the partition has zero large lots', () => {
+    // Sticky trap: old skipHeavy|=skipAll froze trunk forever on densified boards.
+    const world = createSeedEconomyWorld({ seed: 'bulk-large-under-skipall' });
+    const parkUntil =
+      (world.lastBatchAtMs ?? Date.now()) + 365 * 24 * 3_600_000;
+    for (const npc of world.npcs) {
+      npc.status = 'resting';
+      npc.restUntilMs = parkUntil;
+    }
+    for (const ap of world.airports) {
+      if (countryIdFromRegion(ap.region) !== 'BR') continue;
+      for (const id of [
+        'general',
+        'supplies',
+        'electronics',
+        'machinery',
+        'perishables',
+      ] as const) {
+        const pile = ap.inventory[id];
+        if (!pile || pile.capacityKg <= 0) continue;
+        const tier = hubTierOf(ap);
+        if (tier === 'major') {
+          pile.stockKg = Math.max(
+            pile.stockKg,
+            Math.round(pile.capacityKg * 0.88),
+          );
+        } else if (tier === 'spoke' || tier === 'regional') {
+          pile.stockKg = Math.min(
+            pile.stockKg,
+            Math.round(pile.capacityKg * 0.2),
+          );
+        }
+      }
+    }
+    const padFor = (commodityId: CommodityId) => {
+      const quota = partitionAvailableQuota(world, 'BR');
+      while (
+        world.lots.filter(
+          (l) =>
+            l.status === 'available' &&
+            l.commodityId === commodityId &&
+            countryIdFromRegion(
+              world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+            ) === 'BR',
+        ).length <
+        quota + 20
+      ) {
+        world.lots.push({
+          id: `lot_skipall_pad_large_${commodityId}_${world.lots.length}`,
+          commodityId,
+          originIcao: 'SBGR',
+          destIcao: 'SBSP',
+          quantityKg: 400,
+          reservedKg: 0,
+          createdAtTick: world.tick,
+          expiresAtTick: world.tick + 200,
+          payUsd: 4_000,
+          basePayUsd: 4_000,
+          urgency: 'normal',
+          reason: 'skipAll pad',
+          status: 'available',
+        });
+      }
+    };
+    for (const id of [
+      'general',
+      'supplies',
+      'electronics',
+      'machinery',
+      'perishables',
+    ] as const) {
+      padFor(id);
+    }
+    const largeBefore = world.lots.filter(
+      (l) =>
+        l.status === 'available' &&
+        l.quantityKg >= LARGE_LOT_MIN_KG &&
+        !l.reason.includes('skipAll pad') &&
+        countryIdFromRegion(
+          world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+        ) === 'BR',
+    ).length;
+    tickEconomyN(world, 8);
+    const largeAfter = world.lots.filter(
+      (l) =>
+        (l.status === 'available' || l.status === 'reserved') &&
+        l.quantityKg >= LARGE_LOT_MIN_KG &&
+        !l.reason.includes('skipAll pad') &&
+        countryIdFromRegion(
+          world.airports.find((a) => a.icao === l.originIcao)?.region ?? '',
+        ) === 'BR',
+    ).length;
+    assert.ok(
+      largeAfter > largeBefore,
+      `expected BR large under skipAll+zero large (before=${largeBefore} after=${largeAfter})`,
+    );
+  });
+
   it('forms last-mile Dry when dests are above soft 58% room (abs headroom)', () => {
     // Postmortem: Dry sat ~85% zeroed soft roomKg / fill≤0.62 and killed hops.
     // BR/US densify later sat ~93% — a 0.92 fill gate still blocked neighbors.

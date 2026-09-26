@@ -109,6 +109,19 @@ describe('computeEconomyPulse', () => {
       r.rejectDryGap + r.rejectThinQty + r.rejectNoSizePath + r.canForm,
       r.eligible,
     );
+    assert.ok(pulse.domesticBoard);
+    assert.ok(Array.isArray(pulse.domesticBoard.lenses));
+    assert.ok(pulse.domesticBoard.lenses.length >= 5);
+    const brDom = pulse.domesticBoard.lenses.find((l) => l.lensId === 'BR');
+    const usDom = pulse.domesticBoard.lenses.find((l) => l.lensId === 'US');
+    const amDom = pulse.domesticBoard.lenses.find((l) => l.lensId === 'AM');
+    assert.ok(brDom);
+    assert.ok(usDom);
+    assert.ok(amDom);
+    assert.ok(brDom!.available >= 0);
+    assert.ok(brDom!.le2000Share >= 0 && brDom!.le2000Share <= 1);
+    assert.ok(usDom!.largeShare >= 0 && usDom!.largeShare <= 1);
+    assert.ok(amDom!.countries >= 2);
     assert.equal(
       pulse.internationalLanes.day,
       Math.floor(world.tick / TICKS_PER_DAY),
@@ -401,6 +414,29 @@ describe('computeEconomyPulse', () => {
     assert.equal(electronics!.availableLots, 1);
     assert.ok(electronics!.hubsSurplus >= 1);
     assert.ok(electronics!.hubsShortage >= 1);
+  });
+
+  it('reports domestic size mix and skipAll by Pulse lens', () => {
+    const world = createSeedEconomyWorld({ seed: 'pulse-domestic-board' });
+    ensureSeedMarketFormed(world);
+    tickEconomyN(world, 12);
+    const pulse = computeEconomyPulse(world);
+    const byId = new Map(pulse.domesticBoard.lenses.map((l) => [l.lensId, l]));
+    for (const id of ['BR', 'US', 'AM', 'EUR', 'MENA', 'AS'] as const) {
+      assert.ok(byId.has(id), `expected lens ${id}`);
+    }
+    const br = byId.get('BR')!;
+    const us = byId.get('US')!;
+    const am = byId.get('AM')!;
+    // BR+US domestic lots are a subset of Americas.
+    assert.ok(am.available >= br.available + us.available);
+    assert.ok(br.le2000 + br.large <= br.available);
+    assert.ok(br.large >= br.xl);
+    assert.ok(br.le2000Share >= 0 && br.le2000Share <= 1);
+    assert.ok(us.largeShare >= 0 && us.largeShare <= 1);
+    assert.ok(typeof br.skusSkipAll === 'number');
+    assert.ok(typeof us.skusStickyLtl === 'number');
+    assert.ok(am.countries >= 2);
   });
 });
 

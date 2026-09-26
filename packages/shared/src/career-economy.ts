@@ -1151,6 +1151,7 @@ export {
 } from './career-hub-level.js';
 export type { HubActivitySource } from './career-hub-level.js';
 import { maybeQueueHubEconomyDaySample } from './career-hub-economy-sample.js';
+import { PULSE_SYNTHETIC_REGIONS } from './career-hub-economy-history-pulse.js';
 
 export {
   countFuelHaulsEnroute,
@@ -10563,6 +10564,164 @@ export function computeIntlFormationDiag(
     shelf,
     commodities,
   };
+}
+
+/**
+ * Pulse lenses for domestic size/skipAll (ISO + synthetic).
+ * Mirrors Network history focus (minus world/spoke).
+ */
+export const DOMESTIC_BOARD_DIAG_LENSES = [
+  'BR',
+  'US',
+  'AM',
+  'EU',
+  'EUR',
+  'MENA',
+  'AS',
+  'SEA',
+  'AF',
+  'OC',
+  'DE',
+  'FR',
+  'GB',
+] as const;
+
+export type DomesticBoardLensDiag = {
+  lensId: string;
+  /** ISO members of this lens present in the world. */
+  countries: number;
+  available: number;
+  /** qty ≤ SMALL_LOT_MAX_KG (2 t feeder/GA shelf). */
+  le2000: number;
+  /** qty ≥ LARGE_LOT_MIN_KG (2.2 t). */
+  large: number;
+  /** qty ≥ XL_LOT_MIN_KG. */
+  xl: number;
+  le2000Share: number;
+  largeShare: number;
+  /** country×SKU pairs at formation skipAll. */
+  skusSkipAll: number;
+  /** skipAll + zero large lots (sticky LTL / feeder flood). */
+  skusStickyLtl: number;
+  /** Member countries with ≥1 cargo SKU at skipAll. */
+  countriesSkipAll: number;
+  /** Member countries with sticky LTL on ≥1 SKU. */
+  countriesStickyLtl: number;
+};
+
+export type DomesticBoardDiag = {
+  lenses: DomesticBoardLensDiag[];
+};
+
+/**
+ * Read-only: domestic board size mix + skipAll by Pulse lens (BR/US + regions).
+ * Same skipAll gates as formLots (`commodityBoardBloated`); measure-only.
+ */
+export function computeDomesticBoardDiag(
+  world: CareerEconomyWorld,
+): DomesticBoardDiag {
+  const countryByIcao = countryByIcaoMap(world);
+  const counts = countAvailableLots(world, countryByIcao);
+  const worldCountries = new Set(listWorldCountryIds(world));
+
+  type SizeRow = {
+    available: number;
+    le2000: number;
+    large: number;
+    xl: number;
+  };
+  const sizeByCountry = new Map<string, SizeRow>();
+  for (const lot of world.lots ?? []) {
+    if (lot.status !== 'available') continue;
+    const partitionId = lotBoardPartition(lot, countryByIcao);
+    if (partitionId === INTL_BOARD_PARTITION) continue;
+    let row = sizeByCountry.get(partitionId);
+    if (!row) {
+      row = { available: 0, le2000: 0, large: 0, xl: 0 };
+      sizeByCountry.set(partitionId, row);
+    }
+    row.available += 1;
+    if (lot.quantityKg <= SMALL_LOT_MAX_KG) row.le2000 += 1;
+    if (lot.quantityKg >= LARGE_LOT_MIN_KG) row.large += 1;
+    if (lot.quantityKg >= XL_LOT_MIN_KG) row.xl += 1;
+  }
+
+  type SkipRow = {
+    skusSkipAll: number;
+    skusStickyLtl: number;
+  };
+  const skipByCountry = new Map<string, SkipRow>();
+  for (const countryId of worldCountries) {
+    let skusSkipAll = 0;
+    let skusStickyLtl = 0;
+    for (const commodity of CAREER_CARGO_COMMODITIES) {
+      const { skipAll } = commodityBoardBloated(
+        world,
+        counts,
+        commodity.id,
+        countryId,
+      );
+      if (!skipAll) continue;
+      skusSkipAll += 1;
+      const largeN =
+        counts.largeByCommodityPartition.get(
+          partitionKey(commodity.id, countryId),
+        ) ?? 0;
+      if (largeN === 0) skusStickyLtl += 1;
+    }
+    skipByCountry.set(countryId, { skusSkipAll, skusStickyLtl });
+  }
+
+  const lenses: DomesticBoardLensDiag[] = DOMESTIC_BOARD_DIAG_LENSES.map(
+    (lensId) => {
+      const synth = PULSE_SYNTHETIC_REGIONS[lensId];
+      const members = synth
+        ? synth.filter((c) => worldCountries.has(c))
+        : worldCountries.has(lensId)
+          ? [lensId]
+          : [];
+      let available = 0;
+      let le2000 = 0;
+      let large = 0;
+      let xl = 0;
+      let skusSkipAll = 0;
+      let skusStickyLtl = 0;
+      let countriesSkipAll = 0;
+      let countriesStickyLtl = 0;
+      for (const cid of members) {
+        const size = sizeByCountry.get(cid);
+        if (size) {
+          available += size.available;
+          le2000 += size.le2000;
+          large += size.large;
+          xl += size.xl;
+        }
+        const skip = skipByCountry.get(cid);
+        if (skip) {
+          skusSkipAll += skip.skusSkipAll;
+          skusStickyLtl += skip.skusStickyLtl;
+          if (skip.skusSkipAll > 0) countriesSkipAll += 1;
+          if (skip.skusStickyLtl > 0) countriesStickyLtl += 1;
+        }
+      }
+      return {
+        lensId,
+        countries: members.length,
+        available,
+        le2000,
+        large,
+        xl,
+        le2000Share: available > 0 ? le2000 / available : 0,
+        largeShare: available > 0 ? large / available : 0,
+        skusSkipAll,
+        skusStickyLtl,
+        countriesSkipAll,
+        countriesStickyLtl,
+      };
+    },
+  );
+
+  return { lenses };
 }
 
 function commodityBoardBloated(

@@ -2279,6 +2279,25 @@ export type IntlFormationDiagView = {
   }>;
 };
 
+export type DomesticBoardLensDiagView = {
+  lensId: string;
+  countries: number;
+  available: number;
+  le2000: number;
+  large: number;
+  xl: number;
+  le2000Share: number;
+  largeShare: number;
+  skusSkipAll: number;
+  skusStickyLtl: number;
+  countriesSkipAll: number;
+  countriesStickyLtl: number;
+};
+
+export type DomesticBoardDiagView = {
+  lenses: DomesticBoardLensDiagView[];
+};
+
 export type EconomyPulseView = {
   tick: number;
   homeCountryId: string | null;
@@ -2321,6 +2340,7 @@ export type EconomyPulseView = {
   };
   board: EconomyPulseBoardView;
   intlFormation: IntlFormationDiagView;
+  domesticBoard: DomesticBoardDiagView;
   notes: string[];
 };
 

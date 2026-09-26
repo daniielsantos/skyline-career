@@ -4,12 +4,14 @@
  */
 import {
   CAREER_CARGO_COMMODITIES,
+  computeDomesticBoardDiag,
   computeIntlFormationDiag,
   DYNAMIC_INTL_REGIONAL_MAX_NM,
   DYNAMIC_INTL_ULTRA_MIN_NM,
   localUnitPriceUsd,
   routeDistanceNm,
   tickEconomyN,
+  type DomesticBoardDiag,
   type IntlFormationDiag,
 } from './career-economy.js';
 import { TICKS_PER_DAY } from './career-clock.js';
@@ -264,6 +266,11 @@ export interface EconomyPulse {
    * Read-only; same gates as formLotsIntl surplus∩shortage.
    */
   intlFormation: IntlFormationDiag;
+  /**
+   * Domestic size mix + skipAll by Pulse lens (BR/US + synthetic regions).
+   * Measure-only; same skipAll gates as formLots.
+   */
+  domesticBoard: DomesticBoardDiag;
   notes: string[];
 }
 
@@ -722,6 +729,30 @@ function buildNotes(
     }
   }
 
+  const domestic = pulse.domesticBoard;
+  if (domestic?.lenses?.length) {
+    for (const lens of domestic.lenses) {
+      if (lens.available === 0) continue;
+      // Sticky LTL on ISO focus (BR/US) and regional lenses with ≥2 sticky countries.
+      const isoFocus = lens.lensId === 'BR' || lens.lensId === 'US';
+      const regionalSticky = lens.countriesStickyLtl >= 2;
+      if (lens.skusStickyLtl > 0 && (isoFocus || regionalSticky)) {
+        notes.push(
+          `${lens.lensId}: domestic sticky LTL ${lens.skusStickyLtl} SKU (skipAll + 0 large) · ≤2t ${(lens.le2000Share * 100).toFixed(0)}% · ≥2.2t ${(lens.largeShare * 100).toFixed(0)}%`,
+        );
+      } else if (
+        isoFocus &&
+        lens.available >= 50 &&
+        lens.le2000Share >= 0.95 &&
+        lens.largeShare === 0
+      ) {
+        notes.push(
+          `${lens.lensId}: domestic ${(lens.le2000Share * 100).toFixed(0)}% ≤2t · 0 large (board ${lens.available})`,
+        );
+      }
+    }
+  }
+
   if (pulse.availableLots > 0) {
     const dry = pulse.commodities.filter((c) => c.availableLots === 0);
     if (dry.length > 0 && dry.length < pulse.commodities.length) {
@@ -1145,6 +1176,7 @@ export function computeEconomyPulse(
       return a.region.localeCompare(b.region);
     });
   const intlFormation = computeIntlFormationDiag(world);
+  const domesticBoard = computeDomesticBoardDiag(world);
   const base: Omit<EconomyPulse, 'notes'> = {
     tick: world.tick,
     homeCountryId: world.homeCountryId ?? null,
@@ -1193,6 +1225,7 @@ export function computeEconomyPulse(
     },
     flow: cloneFlowStats(ensureFlowStats(world)),
     intlFormation,
+    domesticBoard,
   };
 
   return {

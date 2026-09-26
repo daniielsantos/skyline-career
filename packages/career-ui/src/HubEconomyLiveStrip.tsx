@@ -25,6 +25,22 @@ const COMMODITY_LABEL: Record<string, string> = {
   perishables: 'Perishables',
 };
 
+const DOMESTIC_LENS_LABEL: Record<string, string> = {
+  BR: 'BR',
+  US: 'US',
+  AM: 'Americas',
+  EU: 'EU-West',
+  EUR: 'Europe',
+  MENA: 'MENA',
+  AS: 'Asia',
+  SEA: 'SE-Asia',
+  AF: 'Africa',
+  OC: 'Oceania',
+  DE: 'DE',
+  FR: 'FR',
+  GB: 'GB',
+};
+
 type FillAlert = 'ok' | 'dry' | 'sat' | 'blocked';
 
 type CommodityFillRow = {
@@ -347,6 +363,39 @@ export function HubEconomyLiveStrip(props: {
             Dead {br?.deadHubs ?? '—'} / {us?.deadHubs ?? '—'}
           </span>
         </div>
+        <div className="hub-pulse-live-card">
+          <span className="muted">Domestic size</span>
+          <strong>
+            {(() => {
+              const lenses = pulse.domesticBoard?.lenses ?? [];
+              const brD = lenses.find((l) => l.lensId === 'BR');
+              const usD = lenses.find((l) => l.lensId === 'US');
+              const fmt = (l: (typeof lenses)[number] | undefined) =>
+                l && l.available > 0
+                  ? `${pct01(l.largeShare)} large`
+                  : '—';
+              return `BR ${fmt(brD)} · US ${fmt(usD)}`;
+            })()}
+          </strong>
+          <span className="muted">
+            {(() => {
+              const lenses = pulse.domesticBoard?.lenses ?? [];
+              const brD = lenses.find((l) => l.lensId === 'BR');
+              const usD = lenses.find((l) => l.lensId === 'US');
+              const tip = (l: (typeof lenses)[number] | undefined, id: string) => {
+                if (!l || l.available === 0) return `${id} —`;
+                const sticky =
+                  l.skusStickyLtl > 0
+                    ? ` · sticky ${l.skusStickyLtl}`
+                    : l.skusSkipAll > 0
+                      ? ` · skipAll ${l.skusSkipAll}`
+                      : '';
+                return `${id} ${l.available.toLocaleString('en-US')} · ≤2t ${pct01(l.le2000Share)}${sticky}`;
+              };
+              return `${tip(brD, 'BR')} · ${tip(usD, 'US')}`;
+            })()}
+          </span>
+        </div>
         <div className="hub-pulse-live-card hub-pulse-live-commodities">
           <span className="muted">Bookable GA pay</span>
           <strong>
@@ -363,6 +412,73 @@ export function HubEconomyLiveStrip(props: {
           </span>
         </div>
       </div>
+
+      {pulse.domesticBoard?.lenses?.length ? (
+        <div className="hub-pulse-commodity-fill">
+          <div className="hub-pulse-commodity-fill-head">
+            <h4>Domestic board (Pulse lenses)</h4>
+            <p className="muted">
+              Available domestic lots by lens · ≤2t vs ≥2.2t mix · skipAll /
+              sticky LTL (skipAll + 0 large). Same gates as formation.
+            </p>
+          </div>
+          <div className="table-wrap hub-pulse-commodity-table-wrap">
+            <table className="hub-pulse-commodity-table">
+              <thead>
+                <tr>
+                  <th>Lens</th>
+                  <th>Lots</th>
+                  <th>≤2t</th>
+                  <th>≥2.2t</th>
+                  <th>skipAll</th>
+                  <th>Sticky LTL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pulse.domesticBoard.lenses.map((lens) => {
+                  const sticky = lens.skusStickyLtl > 0;
+                  const thinLarge =
+                    lens.available >= 50 &&
+                    lens.le2000Share >= 0.95 &&
+                    lens.largeShare === 0;
+                  const alert = sticky || thinLarge;
+                  return (
+                    <tr
+                      key={lens.lensId}
+                      className={
+                        alert
+                          ? 'hub-pulse-commodity-row hub-pulse-live-warn'
+                          : 'hub-pulse-commodity-row'
+                      }
+                    >
+                      <th scope="row">
+                        {DOMESTIC_LENS_LABEL[lens.lensId] ?? lens.lensId}
+                      </th>
+                      <td>{lens.available.toLocaleString('en-US')}</td>
+                      <td>{pct01(lens.le2000Share)}</td>
+                      <td>{pct01(lens.largeShare)}</td>
+                      <td className="muted">
+                        {lens.skusSkipAll > 0
+                          ? `${lens.skusSkipAll} SKU · ${lens.countriesSkipAll}c`
+                          : '—'}
+                      </td>
+                      <td
+                        className={
+                          sticky ? 'hub-pulse-commodity-alert' : 'muted'
+                        }
+                      >
+                        {sticky
+                          ? `${lens.skusStickyLtl} SKU · ${lens.countriesStickyLtl}c`
+                          : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <div className="hub-pulse-commodity-fill">
         <div className="hub-pulse-commodity-fill-head">

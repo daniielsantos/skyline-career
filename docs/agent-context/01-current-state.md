@@ -1,5 +1,8 @@
 # Current state (2026-09-26)
 
+`main` **09d4e5f2** / desktop **0.3.344** shipped: Add Pulse domestic size/skipAll diag across BR/US and regional lenses. Release: [v0.3.344](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.344).
+
+
 `main` **a27be294** / desktop **0.3.343** shipped: Stop domestic feeder from flooding skipAll partitions so bulk and large lots can form again. Release: [v0.3.343](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.343).
 
 

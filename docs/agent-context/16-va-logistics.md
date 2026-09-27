@@ -335,7 +335,9 @@ v1 flat hire replaced by tiers (JSON `vaLineCrew.tier`; no PG migrate):
 
 Ops de missão + IH pay + cut + **MX/inspect** = custo VA (shipped; MX só owner). Empty ferry = Line crew + overflow no piloto (**shipped**).
 
-Ainda OPEN (não bloqueia cut nem ferry desk): rake no IH; salary dispatcher humano; cap hauls/dia.
+Ainda OPEN (não bloqueia cut nem ferry desk): salary dispatcher humano; cap hauls/dia.
+
+**Rake no IH — não fazer (2026-09-26).** O pay do piloto já é o stamp IH → home, 100% da fee, debitado da carteira da VA. Um % extra seria a company ficar com parte do que ela mesma pagou; o dono já define o valor no stamp. O corte de Freights/Charter não entra em cima.
 
 ---
 

@@ -581,6 +581,102 @@ describe('career fleet hangar', () => {
     assert.equal(departFuel.fuelDebitUsd, 0);
   });
 
+  it('sells hangar fuel above the OFP block once and returns it to the airport', () => {
+    const world = createSeedEconomyWorld({ seed: 'ofp-fuel-surplus' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    const requiredBlockFuelKg = Math.max(
+      1,
+      Math.floor(aircraft.fuelCapacityKg * 0.4),
+    );
+    aircraft.fuelKg = aircraft.fuelCapacityKg;
+    const surplusKg = Math.floor(aircraft.fuelKg) - requiredBlockFuelKg;
+    assert.ok(surplusKg > 0);
+    const mission = {
+      id: 'msn_ofp_surplus',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'dispatched',
+    } as never;
+
+    const quote = quotePlayerMissionOfpFuel(world, state, mission, {
+      ofpId: 'ofp-surplus',
+      requiredBlockFuelKg,
+    });
+    assert.equal(quote.shortfallKg, 0);
+    assert.equal(quote.surplusKg, surplusKg);
+    assert.equal(quote.uplift.costUsd, 0);
+    assert.equal(
+      quote.surplusCreditUsd,
+      Math.round(surplusKg * quote.uplift.unitPriceUsd),
+    );
+    assert.ok(quote.surplusCreditUsd > 0);
+
+    const pile = world.airports.find((a) => a.icao === 'SBGR')?.inventory.fuel;
+    assert.ok(pile);
+    const stockBefore = pile.stockKg;
+    const room = Math.max(0, pile.capacityKg - stockBefore);
+
+    const purchase = purchasePlayerMissionOfpFuel(world, state, mission, {
+      ofpId: 'ofp-surplus',
+      requiredBlockFuelKg,
+    });
+    assert.equal(aircraft.fuelKg, requiredBlockFuelKg);
+    assert.equal(purchase.fuelDebitUsd, 0);
+    assert.equal(purchase.fuelCreditUsd, purchase.quote.surplusCreditUsd);
+    assert.equal(
+      purchase.fuelCreditUsd,
+      Math.round(surplusKg * purchase.quote.uplift.unitPriceUsd),
+    );
+    assert.equal(purchase.mission.fuelAuthorizedOfpId, 'ofp-surplus');
+    assert.equal(pile.stockKg, stockBefore + Math.min(surplusKg, room));
+
+    const again = purchasePlayerMissionOfpFuel(
+      world,
+      state,
+      purchase.mission,
+      { ofpId: 'ofp-surplus', requiredBlockFuelKg },
+    );
+    assert.equal(again.fuelCreditUsd, 0);
+    assert.equal(again.fuelDebitUsd, 0);
+    assert.equal(aircraft.fuelKg, requiredBlockFuelKg);
+    assert.equal(pile.stockKg, stockBefore + Math.min(surplusKg, room));
+
+    const departFuel = applyPlayerDepartFuel(world, state, purchase.mission);
+    assert.equal(departFuel.fuelDebitUsd, 0);
+  });
+
+  it('does not sell surplus fuel for a contract pilot', () => {
+    const world = createSeedEconomyWorld({ seed: 'ofp-fuel-surplus-contract' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);
+    const aircraft = state.fleet[0]!;
+    const requiredBlockFuelKg = Math.max(
+      1,
+      Math.floor(aircraft.fuelCapacityKg * 0.4),
+    );
+    aircraft.fuelKg = aircraft.fuelCapacityKg;
+    const mission = {
+      id: 'msn_ofp_surplus_contract',
+      aircraftId: aircraft.id,
+      aircraftClassId: aircraft.aircraftClassId,
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      status: 'dispatched',
+      contractPilot: true,
+    } as never;
+
+    const purchase = purchasePlayerMissionOfpFuel(world, state, mission, {
+      ofpId: 'ofp-contract',
+      requiredBlockFuelKg,
+    });
+    assert.equal(purchase.fuelCreditUsd, 0);
+    assert.equal(purchase.fuelDebitUsd, 0);
+    assert.equal(purchase.quote.surplusKg, 0);
+    assert.equal(aircraft.fuelKg, aircraft.fuelCapacityKg);
+  });
+
   it('settle debits accrued MX drain from live residual fuel', () => {
     const world = createSeedEconomyWorld({ seed: 'mx-drain-live' });
     const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', pilot);

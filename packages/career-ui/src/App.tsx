@@ -84,6 +84,7 @@ import {
   postTick,
   postDebugCreditWallet,
   postDebugClaimPort,
+  postDebugEvolvePortFbo,
   postDebugUnlockClassOps,
   fetchDebugPortCatalog,
   postWatchStart,
@@ -7355,7 +7356,13 @@ export function App() {
             ),
           );
           paintOpsMutationFleet(purchased.fleet, opsCompanyId);
-          commitWallet(purchased.walletUsd);
+          paintOpsMutationWallet(opsCompanyId, purchased.walletUsd);
+          if ((purchased.fuelCreditUsd ?? 0) > 0) {
+            setToastKind('ok');
+            setToast(
+              `Surplus fuel sold · ${formatMoney(purchased.fuelCreditUsd ?? 0)}`,
+            );
+          }
           setMissionFuelQuote(null);
           setMissionFuelQuoteStatus('ready');
           return;
@@ -8231,6 +8238,23 @@ export function App() {
     }
     await run(async () => {
       const result = await postDebugClaimPort({ portId });
+      commitWallet(result.walletUsd);
+      setToastKind('ok');
+      setToast(
+        `Debug Port FBO · ${result.concession.portId} P${result.concession.level}`,
+      );
+    });
+  }
+
+  async function onDebugEvolvePortFbo() {
+    const portId = debugClaimPortId.trim().toUpperCase();
+    if (!portId) {
+      setToastKind('fail');
+      setToast('Pick a port to evolve');
+      return;
+    }
+    await run(async () => {
+      const result = await postDebugEvolvePortFbo({ portId });
       commitWallet(result.walletUsd);
       setToastKind('ok');
       setToast(
@@ -12427,8 +12451,8 @@ export function App() {
       const result = await postFuelPurchase(mission.id, {
         companyId: opsCompanyId || undefined,
       });
-      commitWallet(result.walletUsd);
       paintOpsMutationFleet(result.fleet, opsCompanyId);
+      paintOpsMutationWallet(opsCompanyId, result.walletUsd);
       setMissions((current) =>
         current.map((m) => (m.id === result.mission.id ? result.mission : m)),
       );
@@ -20551,6 +20575,15 @@ export function App() {
                       title="Force Port FBO for the selected port (active company)"
                     >
                       Claim port
+                    </button>
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void onDebugEvolvePortFbo()}
+                      disabled={busy || !debugClaimPortId}
+                      title="Raise the selected Port FBO one level (P1→P2→P3). Skips throughput and cash. Active company must already hold it."
+                    >
+                      Evolve FBO
                     </button>
                   </div>
                 </div>

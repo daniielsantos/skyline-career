@@ -224,6 +224,7 @@ import {
   ensurePortListings,
   claimPortConcession,
   debugForceClaimPortConcession,
+  debugForceUpgradePortConcession,
   renewPortConcession,
   surrenderPortConcession,
   upgradePortConcession,
@@ -12473,6 +12474,51 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/debug/evolve-port-fbo') {
+        if (!requestDevMode(req)) {
+          send(res, 403, { error: 'Dev Mode is required' });
+          return;
+        }
+        const body = (await readBody(req)) as {
+          portId?: string;
+          companyId?: string;
+        };
+        const portId = (body.portId ?? '').trim().toUpperCase();
+        if (!portId || !getCareerPort(portId)) {
+          send(res, 400, { error: 'Unknown portId — pick one from CAREER_PORTS' });
+          return;
+        }
+        const evolveCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          const payload = await withCareerWrite(
+            (world, missions) => {
+              const concession = debugForceUpgradePortConcession(missions, world, {
+                portId,
+                companyId: evolveCompanyId,
+              });
+              return {
+                walletUsd: missions.walletUsd,
+                concession,
+                ports: portSnapshot(world, missions, {
+                  viewerCompanyId: evolveCompanyId,
+                }),
+              };
+            },
+            {
+              persist: 'company',
+              persistPortConcessions: true,
+              companyId: evolveCompanyId,
+            },
+          );
+          send(res, 200, payload);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/debug/unlock-class-ops') {
         if (!requestDevMode(req)) {
           send(res, 403, { error: 'Dev Mode is required' });
@@ -14184,8 +14230,12 @@ export function createCareerApiServer(port = 8787) {
               quote: quoted.quote,
               walletUsd: quoted.walletUsd,
               walletAfterUsd:
-                Math.round((quoted.walletUsd - quoted.quote.uplift.costUsd) * 100) /
-                100,
+                Math.round(
+                  (quoted.walletUsd -
+                    quoted.quote.uplift.costUsd +
+                    (quoted.quote.surplusCreditUsd ?? 0)) *
+                    100,
+                ) / 100,
             });
             return;
           }
@@ -14234,6 +14284,16 @@ export function createCareerApiServer(port = 8787) {
                 note: `${mission.originIcao}→${mission.destIcao}`,
               });
             }
+            if (result.fuelCreditUsd > 0) {
+              applyWalletDelta(missions, {
+                amountUsd: result.fuelCreditUsd,
+                kind: 'fuel',
+                atTick: world.tick,
+                missionId: mission.id,
+                icao: mission.originIcao,
+                note: `${mission.originIcao}→${mission.destIcao} · surplus`,
+              });
+            }
             return {
               kind: 'ok' as const,
               mission: result.mission,
@@ -14245,6 +14305,7 @@ export function createCareerApiServer(port = 8787) {
                 mxCappedByTank: mxPad.cappedByTank,
               },
               fuelDebitUsd: result.fuelDebitUsd,
+              fuelCreditUsd: result.fuelCreditUsd,
               walletUsd: missions.walletUsd,
               fleet: withParkingRates(missions.fleet),
             };
@@ -14260,6 +14321,7 @@ export function createCareerApiServer(port = 8787) {
             mission: await toClientMission(purchased.mission),
             quote: purchased.quote,
             fuelDebitUsd: purchased.fuelDebitUsd,
+            fuelCreditUsd: purchased.fuelCreditUsd,
             walletUsd: purchased.walletUsd,
             fleet: purchased.fleet,
           });

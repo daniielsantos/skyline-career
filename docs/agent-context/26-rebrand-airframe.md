@@ -14,10 +14,10 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 ## Fase 1 — infra URL (sem rebrand visual)
 
 - [x] Landing source em [`sites/playairframe`](../../sites/playairframe) — vitrine estática (pele do app); hero = login lockup com fundo transparente; **sem** links públicos pro GitHub (beta por invite). Preview: `npx --yes serve sites/playairframe`.
-- [ ] Cloudflare Pages → apex `playairframe.com` (+ `www`): Connect repo, root `sites/playairframe`, build none. **Não** tocar DNS de `world.playairframe.com`. Setup: `sites/playairframe/README.md`. Apex hoje pode 500 até Pages ligar.
+- [x] Apex e `www` no Worker `playairframe` (Workers Builds, root `sites/playairframe`, build vazio, `npx wrangler deploy`). Conferido 2026-09-26: os dois hostnames, HTTP 200, HTML da vitrine. **Não** mexer no DNS de `world.playairframe.com` (API segue no ar, 401 sem auth).
 - [ ] `flyairframe.com` redirect → play (se registado) — DNS Cloudflare
 - [x] Desktop default MP URL: PlayModeGate prefill/placeholder + resolve fallback → `https://world.playairframe.com` (`PUBLIC_WORLD_API_URL`). Lab continua `http://127.0.0.1:8787` via `DEFAULT_WORLD_API_URL` / env.
-- [ ] Email Routing `hello@playairframe.com` (quando houver site)
+- [x] Email Routing `hello@playairframe.com` (2026-09-26): encaminha para uma caixa já existente. Receber é grátis; enviar para qualquer destinatário não entra no plano grátis.
 
 ### Landing (2026-09-26)
 
@@ -27,6 +27,7 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - **Hero:** login lockup com fundo transparente (`airframe-hero-lockup.png`).
 - **Copy + shots:** seções economy / airframes / ports / VA / MP; prints reais de `:8788` (Freights, Airframes market, Ports, Crew/VA Hauls) em `assets/shot-*.png`.
 - **Prints estreitos (2026-09-26):** o crop de Freights era 670px e o layout punha cada shot numa coluna de ~64rem, então a UI ficava ilegível. Novos crops são a coluna principal (sem sidebar, sem footer “MSFS not connected”), ~1646px, e a seção empilha o texto em cima do print em até 92rem.
+- **Apex e www no ar (2026-09-26):** Worker `playairframe`, custom domains `playairframe.com` e `www.playairframe.com`, os dois Production na zona `playairframe.com`. `workers.dev` da conta não resolve; o domínio custom basta.
 
 ### Diagnóstico CI (2026-09-17)
 

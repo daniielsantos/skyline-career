@@ -9,6 +9,7 @@ import {
 } from './career-economy.js';
 import { assertFerryNotBush, isBushHub, isBushTripOnlyHub } from './career-bush.js';
 import {
+  creditAirportFuelStock,
   deliverFuelUplift,
   estimateUpliftKg,
   quoteFuelUplift,
@@ -1409,6 +1410,9 @@ export interface PlayerMissionOfpFuelQuote {
   currentFuelKg: number;
   fuelCapacityKg: number;
   shortfallKg: number;
+  /** Hangar fuel above the OFP block, sold back at the airport spot price. */
+  surplusKg: number;
+  surplusCreditUsd: number;
   authorized: boolean;
   uplift: FuelUpliftQuote;
   /** Operator covers Jet-A — no player tank / wallet. */
@@ -1437,6 +1441,8 @@ export function quotePlayerMissionOfpFuel(
       currentFuelKg: requiredBlockFuelKg,
       fuelCapacityKg: requiredBlockFuelKg,
       shortfallKg: 0,
+      surplusKg: 0,
+      surplusCreditUsd: 0,
       authorized: mission.fuelAuthorizedOfpId === opts.ofpId,
       contractPilot: true,
       uplift: {
@@ -1471,6 +1477,7 @@ export function quotePlayerMissionOfpFuel(
     Math.min(aircraft.fuelCapacityKg, aircraft.fuelKg),
   );
   const shortfallKg = Math.max(0, requiredBlockFuelKg - Math.floor(currentFuelKg));
+  const surplusKg = Math.max(0, Math.floor(currentFuelKg) - requiredBlockFuelKg);
   const priced = quoteFuelUplift(world, {
     originIcao: mission.originIcao,
     destIcao: mission.destIcao,
@@ -1496,6 +1503,9 @@ export function quotePlayerMissionOfpFuel(
     currentFuelKg,
     fuelCapacityKg: aircraft.fuelCapacityKg,
     shortfallKg,
+    surplusKg,
+    surplusCreditUsd:
+      surplusKg > 0 ? Math.round(surplusKg * priced.unitPriceUsd) : 0,
     authorized: mission.fuelAuthorizedOfpId === opts.ofpId,
     uplift,
   };
@@ -1531,12 +1541,13 @@ export function purchasePlayerMissionOfpFuel(
   mission: MissionIntent;
   quote: PlayerMissionOfpFuelQuote;
   fuelDebitUsd: number;
+  fuelCreditUsd: number;
   aircraft?: PlayerAircraft;
 } {
   const quote = quotePlayerMissionOfpFuel(world, state, mission, opts);
   if (quote.contractPilot || mission.contractPilot) {
     if (quote.authorized) {
-      return { mission, quote, fuelDebitUsd: 0 };
+      return { mission, quote, fuelDebitUsd: 0, fuelCreditUsd: 0 };
     }
     return {
       mission: {
@@ -1545,6 +1556,7 @@ export function purchasePlayerMissionOfpFuel(
       },
       quote: { ...quote, authorized: true },
       fuelDebitUsd: 0,
+      fuelCreditUsd: 0,
     };
   }
   const aircraft = quote.aircraftId
@@ -1552,7 +1564,7 @@ export function purchasePlayerMissionOfpFuel(
     : undefined;
   if (!aircraft) throw new Error(`Unknown player aircraft ${quote.aircraftId}`);
   if (quote.authorized) {
-    return { mission, quote, fuelDebitUsd: 0, aircraft };
+    return { mission, quote, fuelDebitUsd: 0, fuelCreditUsd: 0, aircraft };
   }
 
   const purchased =
@@ -1567,6 +1579,12 @@ export function purchasePlayerMissionOfpFuel(
           scarcity: 'ok' as const,
           upliftedAtTick: world.tick,
         };
+  let fuelCreditUsd = 0;
+  if (quote.surplusKg > 0) {
+    aircraft.fuelKg = quote.requiredBlockFuelKg;
+    creditAirportFuelStock(world, quote.originIcao, quote.surplusKg);
+    fuelCreditUsd = quote.surplusCreditUsd;
+  }
   aircraft.fuelKg = Math.min(
     aircraft.fuelCapacityKg,
     aircraft.fuelKg + purchased.deliveredKg,
@@ -1583,6 +1601,7 @@ export function purchasePlayerMissionOfpFuel(
     mission: nextMission,
     quote,
     fuelDebitUsd: purchased.costUsd,
+    fuelCreditUsd,
     aircraft,
   };
 }

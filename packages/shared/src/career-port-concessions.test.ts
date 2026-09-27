@@ -29,6 +29,7 @@ import {
   PORT_OPERATOR_ETA_MULT,
   PORT_RESTOCK_FRAC_PER_DAY,
   claimPortConcession,
+  debugForceUpgradePortConcession,
   concessionLeaseUsdPerDay,
   debitPortInventory,
   ensurePortInventories,
@@ -530,6 +531,30 @@ describe('port concessions', () => {
     assert.ok(
       (state.playerPortConcessions?.[0]?.throughputWindowKg?.[0] ?? 0) >=
         accepted.kg,
+    );
+  });
+
+  it('debug evolve raises P1→P2→P3 without cash or throughput', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 1_000_000;
+    const claimed = claimPortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(claimed.level ?? 1, 1);
+    const wallet = state.walletUsd;
+
+    const p2 = debugForceUpgradePortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(p2.level, 2);
+    assert.equal(state.walletUsd, wallet);
+    const p3 = debugForceUpgradePortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(p3.level, 3);
+    assert.equal(state.walletUsd, wallet);
+    assert.throws(
+      () => debugForceUpgradePortConcession(state, world, { portId: 'BRSSZ' }),
+      /already P3/i,
+    );
+    assert.throws(
+      () => debugForceUpgradePortConcession(state, world, { portId: 'BRSUA' }),
+      /claim it first/i,
     );
   });
 });

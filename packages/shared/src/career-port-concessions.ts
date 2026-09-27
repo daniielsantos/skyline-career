@@ -898,6 +898,37 @@ export function debugForceClaimPortConcession(
   return row;
 }
 
+/**
+ * Dev Mode aid — raise an active Port FBO one level (P1→P2→P3).
+ * Skips throughput and cash gates. Does not claim a port that is not held.
+ */
+export function debugForceUpgradePortConcession(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { portId: string; companyId?: string },
+): PlayerPortConcession {
+  const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const port = getCareerPort(opts.portId);
+  if (!port) throw new Error(`Unknown port ${opts.portId}`);
+  const existing = ensurePlayerPortConcessions(state).find(
+    (c) =>
+      c.portId === port.id &&
+      c.companyId === companyId &&
+      c.leasePaidThroughTick > world.tick,
+  );
+  if (!existing) {
+    throw new Error(`No active Port FBO on ${port.id} — claim it first`);
+  }
+  const from: PortConcessionLevel =
+    existing.level === 2 || existing.level === 3 ? existing.level : 1;
+  if (from >= 3) {
+    throw new Error(`Port FBO at ${port.id} is already P3`);
+  }
+  existing.level = (from + 1) as PortConcessionLevel;
+  syncWorldPortConcessions(world, state, { companyId });
+  return existing;
+}
+
 export function renewPortConcession(
   state: CareerMissionsState,
   world: CareerEconomyWorld,

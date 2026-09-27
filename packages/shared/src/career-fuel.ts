@@ -178,6 +178,27 @@ export function deliverFuelUplift(
   };
 }
 
+/** Return defueled Jet-A to the departure farm. Kg that does not fit is dropped. */
+export function creditAirportFuelStock(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  kg: number,
+): number {
+  const add = Math.max(0, Math.floor(kg));
+  if (add <= 0) return 0;
+  const icao = originIcao.trim().toUpperCase();
+  const ap = world.airports.find((a) => a.icao === icao);
+  if (!ap) {
+    throw new Error(`Unknown airport for fuel return: ${icao}`);
+  }
+  ensureAirportFuelInventory(ap);
+  const stock = fuelPile(ap);
+  const room = Math.max(0, stock.capacityKg - stock.stockKg);
+  const taken = Math.min(add, room);
+  stock.stockKg = clamp(stock.stockKg + taken, 0, stock.capacityKg);
+  return taken;
+}
+
 export function applyNpcFuelUplift(
   world: CareerEconomyWorld,
   opts: {

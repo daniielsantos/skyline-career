@@ -2431,6 +2431,28 @@ export function fetchDebugPortCatalog() {
   }>('/api/debug/port-catalog');
 }
 
+/** Dev-only — raise an active Port FBO one level (P1→P2→P3), no cash. */
+export function postDebugEvolvePortFbo(opts: {
+  portId: string;
+  companyId?: string;
+}) {
+  return api<{
+    walletUsd: number;
+    concession: {
+      portId: string;
+      companyId: string;
+      level: number;
+      leasePaidThroughTick: number;
+    };
+  }>('/api/debug/evolve-port-fbo', {
+    method: 'POST',
+    body: JSON.stringify({
+      portId: opts.portId,
+      companyId: opts.companyId,
+    }),
+  });
+}
+
 /** Dev-only — force Port FBO claim for any CAREER_PORTS id. */
 export function postDebugClaimPort(opts: {
   portId: string;
@@ -4740,6 +4762,9 @@ export type MissionFuelQuote = {
   currentFuelKg: number;
   fuelCapacityKg: number;
   shortfallKg: number;
+  /** Hangar fuel above the OFP block. Sold when the OFP fuel step authorizes. */
+  surplusKg?: number;
+  surplusCreditUsd?: number;
   authorized: boolean;
   /** Healthy SimBrief OFP block (before MX pad). */
   ofpBlockFuelKg?: number;
@@ -4783,6 +4808,7 @@ export function postFuelPurchase(
     mission: Mission;
     quote: MissionFuelQuote;
     fuelDebitUsd: number;
+    fuelCreditUsd?: number;
     walletUsd: number;
     fleet: PlayerAircraft[];
   }>('/api/fuel/purchase', {

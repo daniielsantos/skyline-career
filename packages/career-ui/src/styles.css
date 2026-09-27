@@ -13120,6 +13120,143 @@ span.dispatch-route-hub-dest {
   margin: 0;
 }
 
+.ports-jeta {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.1rem 0 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ports-jeta-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.ports-jeta-vessel {
+  width: 4.15rem;
+  height: 6.2rem;
+  flex: 0 0 auto;
+}
+
+.ports-jeta-leg,
+.ports-jeta-hatch {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 42%, transparent);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.ports-jeta-well {
+  fill: color-mix(in srgb, var(--bg) 78%, #000);
+}
+
+.ports-jeta-fuel {
+  fill: color-mix(in srgb, var(--accent) 72%, #6a4210);
+}
+
+.ports-jeta-surface {
+  fill: color-mix(in srgb, var(--accent) 88%, #fff);
+  opacity: 0.85;
+}
+
+.ports-jeta-shell,
+.ports-jeta-dome {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ink) 38%, transparent);
+  stroke-width: 1.35;
+}
+
+.ports-jeta-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ports-jeta-copy .ports-scout-title,
+.ports-jeta-fetch .ports-scout-title {
+  margin: 0;
+}
+
+.ports-jeta-qty {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  line-height: 0.9;
+}
+
+.ports-jeta-qty span {
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+
+.ports-jeta-buy {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.ports-jeta-buy label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.ports-jeta-buy input {
+  width: 7.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  padding: 0.32rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.2rem;
+  background: var(--surface-2);
+}
+
+.ports-jeta-buy .action {
+  min-height: 2rem;
+  padding: 0.28rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.ports-jeta-price {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ports-jeta-fetch {
+  display: grid;
+  gap: 0.3rem;
+  max-width: 28rem;
+}
+
+.ports-jeta-sources {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ports-jeta-source {
+  display: grid;
+  grid-template-columns: 4.2rem 4.4rem 6.4rem auto;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.ports-jeta-source .action.ghost {
+  min-height: 1.65rem;
+  padding: 0.16rem 0.55rem;
+  font-size: 0.78rem;
+}
+
 .ports-fbo-main .ports-scout-table-wrap {
   max-height: none;
   overflow: visible;

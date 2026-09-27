@@ -327,6 +327,46 @@ function demandSortValue(
   }
 }
 
+/** Vertical fuel-farm tank. Fill rises from the bottom, same idea as the preflight cells. */
+function PortJetATankMark(props: { kg: number; capacityKg: number }) {
+  const cap = props.capacityKg > 0 ? props.capacityKg : 1;
+  const ratio = Math.min(1, Math.max(0, props.kg / cap));
+  const span = 80;
+  const visual = props.kg > 0 ? Math.max(ratio, 0.045) : 0;
+  const height = visual * span;
+  const y = 96 - height;
+  return (
+    <svg
+      className="ports-jeta-vessel"
+      viewBox="0 0 72 108"
+      aria-hidden="true"
+    >
+      <defs>
+        <clipPath id="ports-jeta-vessel-clip">
+          <rect x="16" y="22" width="40" height="68" />
+          <ellipse cx="36" cy="22" rx="20" ry="7" />
+          <ellipse cx="36" cy="90" rx="20" ry="7" />
+        </clipPath>
+      </defs>
+      <line className="ports-jeta-leg" x1="26" y1="97" x2="22" y2="106" />
+      <line className="ports-jeta-leg" x1="46" y1="97" x2="50" y2="106" />
+      <g clipPath="url(#ports-jeta-vessel-clip)">
+        <rect className="ports-jeta-well" x="0" y="0" width="72" height="108" />
+        {height > 0 ? (
+          <rect className="ports-jeta-fuel" x="10" y={y} width="52" height={height} />
+        ) : null}
+        {height > 8 ? (
+          <ellipse className="ports-jeta-surface" cx="36" cy={y} rx="20" ry="3.5" />
+        ) : null}
+      </g>
+      <rect className="ports-jeta-shell" x="16" y="22" width="40" height="68" />
+      <ellipse className="ports-jeta-shell" cx="36" cy="90" rx="20" ry="7" />
+      <ellipse className="ports-jeta-dome" cx="36" cy="22" rx="20" ry="7" />
+      <circle className="ports-jeta-hatch" cx="36" cy="18" r="2.1" />
+    </svg>
+  );
+}
+
 function compareDemandOrders(
   a: DemandOrderView,
   b: DemandOrderView,
@@ -4309,71 +4349,106 @@ export function PortsPanel(props: {
                   <div className="ports-listings ports-fbo-panel">
                     <>
                         {port.concession?.jetATank ? (
-                          <div className="ports-jeta-tank" aria-label="Port FBO Jet-A tank">
-                            <p className="ports-scout-title">
-                              Jet-A tank{' '}
-                              <span className="muted">
-                                {props.formatTonnes(port.concession.jetATank.kg)} /{' '}
-                                {props.formatTonnes(port.concession.jetATank.capacityKg)}
-                              </span>
-                            </p>
-                            <p className="muted ports-warehouse-hint">
-                              Dispatch here draws the tank before the airport price.
-                              Stocking flights are not paid.
-                            </p>
-                            <div className="confirm-actions">
-                              <input
-                                type="number"
-                                min={1}
-                                inputMode="numeric"
-                                placeholder={`Buy at ${port.pickupHubs?.[0] ?? 'spot'} · ${unit}`}
-                                value={jetABuyText}
-                                disabled={props.busy || loading}
-                                onChange={(event) => setJetABuyText(event.target.value)}
+                          <div
+                            className="ports-jeta"
+                            aria-label={`Jet-A tank ${props.formatTonnes(port.concession.jetATank.kg)} of ${props.formatTonnes(port.concession.jetATank.capacityKg)}`}
+                          >
+                            <div className="ports-jeta-head">
+                              <PortJetATankMark
+                                kg={port.concession.jetATank.kg}
+                                capacityKg={port.concession.jetATank.capacityKg}
                               />
+                              <div className="ports-jeta-copy">
+                                <p className="ports-scout-title">Jet-A tank</p>
+                                <p className="ports-jeta-qty">
+                                  {props.formatTonnes(port.concession.jetATank.kg)}
+                                  <span>
+                                    {' '}
+                                    / {props.formatTonnes(port.concession.jetATank.capacityKg)}
+                                  </span>
+                                </p>
+                                <p className="muted ports-warehouse-hint">
+                                  Dispatch here draws the tank before the airport price.
+                                  Stocking flights are not paid.
+                                </p>
+                              </div>
+                            </div>
+                            <form
+                              className="ports-jeta-buy"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                void onBuyPortJetA(port.id);
+                              }}
+                            >
+                              <label>
+                                <span>
+                                  Buy at {port.pickupHubs?.[0] ?? 'spot'}
+                                  <span className="ports-jeta-price">
+                                    {' '}
+                                    · {formatUnitPrice(port.concession.jetATank.spotUnitUsd)}
+                                  </span>
+                                </span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  inputMode="numeric"
+                                  placeholder={unit}
+                                  value={jetABuyText}
+                                  disabled={props.busy || loading}
+                                  onChange={(event) => setJetABuyText(event.target.value)}
+                                />
+                              </label>
                               <button
-                                type="button"
+                                type="submit"
                                 className="action"
                                 disabled={props.busy || loading}
-                                onClick={() => void onBuyPortJetA(port.id)}
                               >
-                                Buy spot
+                                Buy
                               </button>
-                            </div>
+                            </form>
                             {port.concession.jetATank.sources.length > 0 ? (
-                              <div className="confirm-actions">
-                                {port.concession.jetATank.sources.map((source) => {
-                                  const parked = props.fleet.find(
-                                    (aircraft) =>
-                                      aircraft.status === 'parked' &&
-                                      aircraft.locationIcao.trim().toUpperCase() ===
-                                        source.icao,
-                                  );
-                                  return (
-                                    <button
-                                      key={source.icao}
-                                      type="button"
-                                      className="action ghost"
-                                      disabled={props.busy || loading || !parked}
-                                      title={
-                                        parked
-                                          ? `Buy Jet-A at ${source.icao} and fly it into the tank. Not paid.`
-                                          : `Park an aircraft at ${source.icao} to fetch Jet-A`
-                                      }
-                                      onClick={() =>
-                                        parked
-                                          ? void onFetchPortJetA(
-                                              port.id,
-                                              source.icao,
-                                              parked.id,
-                                            )
-                                          : undefined
-                                      }
-                                    >
-                                      Fetch {source.icao} · {source.distanceNm} nm
-                                    </button>
-                                  );
-                                })}
+                              <div className="ports-jeta-fetch">
+                                <p className="ports-scout-title">Fetch</p>
+                                <ul className="ports-jeta-sources">
+                                  {port.concession.jetATank.sources.map((source) => {
+                                    const parked = props.fleet.find(
+                                      (aircraft) =>
+                                        aircraft.status === 'parked' &&
+                                        aircraft.locationIcao.trim().toUpperCase() ===
+                                          source.icao,
+                                    );
+                                    return (
+                                      <li key={source.icao} className="ports-jeta-source">
+                                        <strong>{source.icao}</strong>
+                                        <span className="muted">{source.distanceNm} nm</span>
+                                        <span className="ports-jeta-price">
+                                          {formatUnitPrice(source.unitUsd)}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          className="action ghost"
+                                          disabled={props.busy || loading || !parked}
+                                          title={
+                                            parked
+                                              ? `Buy Jet-A at ${source.icao} and fly it into the tank. Not paid.`
+                                              : `Park an aircraft at ${source.icao} to fetch Jet-A`
+                                          }
+                                          onClick={() =>
+                                            parked
+                                              ? void onFetchPortJetA(
+                                                  port.id,
+                                                  source.icao,
+                                                  parked.id,
+                                                )
+                                              : undefined
+                                          }
+                                        >
+                                          Fetch
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
                               </div>
                             ) : null}
                           </div>

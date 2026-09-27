@@ -7,6 +7,7 @@ import type {
   CareerMissionsState,
   MissionIntent,
 } from '@msfs-compat/shared';
+import { watchDebugLog } from './debug-log.ts';
 import type { WatchWorldMutations } from './watch-helpers.js';
 import {
   WorldApiClient,
@@ -37,14 +38,24 @@ export function createGatewayWatchMutations(
   return {
     async departFlight(opts) {
       try {
+        // Watch already gated origin + wheels-up. Takeoff burn can flip
+        // loadVerification.ready false a few hundred pounds under Due; the
+        // world preflight check would then 400 forever and Watch stop/start
+        // would flap the SimBridge pipe (Load ↔ En route).
         await client.withAuth(getAuth()).depart({
           missionId: opts.missionId,
           nowMs: opts.nowMs,
           distanceNm: opts.distanceNm,
           expectedRouteMs: opts.expectedRouteMs,
+          override: true,
         });
         return true;
-      } catch {
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        watchDebugLog('watch', 'depart world failed', {
+          missionId: opts.missionId,
+          message,
+        });
         return false;
       }
     },

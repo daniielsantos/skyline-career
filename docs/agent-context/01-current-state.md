@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **12f7d5bc** / desktop **0.3.361** shipped: Remove the active-flight board stripe and redraw the Supplies and Perishables icons. Release: [v0.3.361](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.361).
+
+
 `main` **b89cb0af** / desktop **0.3.360** shipped: Ask which version is in the sim when a livery title misses the purchased airframe. Release: [v0.3.360](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.360).
 
 

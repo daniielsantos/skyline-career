@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **32c97333** / desktop **0.3.365** shipped: Let a Port FBO keep a Jet-A tank and fly rare restock hauls. Release: [v0.3.365](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.365).
+
+
 `main` **4ecd0735** / desktop **0.3.364** shipped: Stop treating a renamed aircraft as a homologated glass. Release: [v0.3.364](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.364).
 
 

@@ -187,3 +187,35 @@ export async function resolveDispatchTitle(opts: {
   }
   return { kind: 'choose', choices: decision.choices };
 }
+
+/**
+ * World host has no SimBridge. The desktop gateway already sampled structure
+ * and sent the canonical title. Here we only check that title belongs to the
+ * purchased family, then persist the pin.
+ */
+export async function acceptDispatchTitleWithoutSim(opts: {
+  repoRoot: string;
+  airframeTypeId?: string | null;
+  rolesPackRelPath: string;
+  liveTitle: string;
+  variantTitle?: string | null;
+}): Promise<{ title: string; saveVariant: string | null }> {
+  const liveTitle = opts.liveTitle.trim();
+  const hinted = opts.variantTitle?.trim() ?? '';
+  const typeId = opts.airframeTypeId?.trim() ?? '';
+  if (!typeId) {
+    return { title: liveTitle, saveVariant: null };
+  }
+  const titleForPack = hinted || liveTitle;
+  await resolveMissionRolesPack({
+    repoRoot: opts.repoRoot,
+    rolesPackRelPath: opts.rolesPackRelPath,
+    airframeTypeId: typeId,
+    strictAirframeMatch: true,
+    liveTitle: titleForPack,
+  });
+  return {
+    title: titleForPack,
+    saveVariant: hinted || null,
+  };
+}

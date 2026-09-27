@@ -12053,7 +12053,9 @@ export function App() {
         open: true,
         weightSystem,
         liveTitle: simBridgeRef.current?.aircraftTitle ?? null,
-        variantTitle,
+        variantTitle: variantTitle ?? mission.liveVariantTitle ?? null,
+        airframeTypeId: mission.airframeTypeId,
+        rolesPackRelPath: mission.rolesPackRelPath,
         companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
       });
       if (result.needsVariantChoice && result.variants?.length) {

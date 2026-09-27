@@ -18,6 +18,7 @@ COPY tsconfig.base.json ./
 COPY packages ./packages
 COPY scripts ./scripts
 COPY profiles/career ./profiles/career
+COPY profiles/ofp ./profiles/ofp
 
 RUN npm run build -w @msfs-compat/shared \
     && npm run build -w @msfs-compat/runtime
@@ -46,6 +47,7 @@ COPY --from=builder /app/packages/career-ui/server ./packages/career-ui/server
 COPY --from=builder /app/scripts/career-world-worker-pg.mjs ./scripts/career-world-worker-pg.mjs
 COPY --from=builder /app/scripts/mint-access-keys.mjs ./scripts/mint-access-keys.mjs
 COPY --from=builder /app/profiles/career ./profiles/career
+COPY --from=builder /app/profiles/ofp ./profiles/ofp
 
 RUN mkdir -p node_modules/@msfs-compat /data/career/world \
     && ln -s /app/packages/shared node_modules/@msfs-compat/shared \

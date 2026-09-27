@@ -543,6 +543,8 @@ export type Mission = {
   aircraftClassId: string;
   /** Concrete Market airframe assigned to this flight. */
   airframeTypeId?: string;
+  /** Purchased family OFP pack, used to resolve a livery on the desktop. */
+  rolesPackRelPath?: string;
   /** Preferred OFP load path for this class (manual always allowed). */
   loadMethod?: 'native-simbrief' | 'direct-injection';
   /** True when Skyline can inject fuel/payload for this class. */
@@ -4689,6 +4691,9 @@ export function postDispatch(opts: {
   liveTitle?: string | null;
   /** Canonical glass title after the tie-break question. */
   variantTitle?: string | null;
+  /** Purchased SKU — gateway resolves the glass before the world builds the OFP. */
+  airframeTypeId?: string | null;
+  rolesPackRelPath?: string | null;
   companyId?: string;
 }) {
   return api<{

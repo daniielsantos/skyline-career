@@ -7,7 +7,7 @@ import {
   type AircraftProfile,
 } from '@msfs-compat/shared';
 import { getRepoRoot } from './skyline-paths.ts';
-import { decideFamilyVariant, resolveDispatchTitle } from './variant-tiebreak.ts';
+import { acceptDispatchTitleWithoutSim, decideFamilyVariant, resolveDispatchTitle } from './variant-tiebreak.ts';
 
 async function profileStructure(rel: string) {
   const raw = await readFile(join(getRepoRoot(), rel), 'utf8');
@@ -114,5 +114,35 @@ describe('resolveDispatchTitle', () => {
     if (second.kind !== 'title') return;
     assert.equal(second.title, 'iFly 737-MAX8200');
     assert.equal(second.saveVariant, 'iFly 737-MAX8200');
+  });
+});
+
+describe('acceptDispatchTitleWithoutSim', () => {
+  const repoRoot = getRepoRoot();
+  const rolesPackRelPath = 'profiles/ofp/asobo-737-max-8-passengers.json';
+
+  it('keeps a canonical title the desktop already resolved', async () => {
+    const accepted = await acceptDispatchTitleWithoutSim({
+      repoRoot,
+      airframeTypeId: 'asobo-737-max-8-passengers',
+      rolesPackRelPath,
+      liveTitle: 'iFly 737-MAX8200',
+      variantTitle: 'iFly 737-MAX8200',
+    });
+    assert.equal(accepted.title, 'iFly 737-MAX8200');
+    assert.equal(accepted.saveVariant, 'iFly 737-MAX8200');
+  });
+
+  it('rejects a livery title when the desktop did not send a glass', async () => {
+    await assert.rejects(
+      () =>
+        acceptDispatchTitleWithoutSim({
+          repoRoot,
+          airframeTypeId: 'asobo-737-max-8-passengers',
+          rolesPackRelPath,
+          liveTitle: 'HUES RYANAIR (MALTA AIR) 9H-VUM 2026 B737-8200',
+        }),
+      /not homologated for the purchased airframe/,
+    );
   });
 });

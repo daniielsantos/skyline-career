@@ -1,6 +1,8 @@
 # Crash detection (Watch) — sketch
 
-Atualizado 2026-09-23. **Fase 1 shipped (código):** detector próprio + poll boost + auto-fail confiança alta. Sem MSFS `Crashed`. Sem perguntar ao jogador. Sem write-off de casco.
+Atualizado 2026-09-27. **Fase 1 shipped (código):** detector próprio + poll boost + auto-fail confiança alta. Sem MSFS `Crashed`. Sem perguntar ao jogador. Sem write-off de casco.
+
+**2026-09-27 — teste KMIA→SYMD (737), manobra forte + montanha, nada falhou.** Sintoma: voo segue `in_flight`, sem debrief de impacto. Causa: curva inclinada com o avião ainda voando não é crash (voto de G só em ≥4,5). No impacto (~23:23Z) o poll chegou a 500 ms e em seguida o sim ficou `paused` com `movedNm` 0 e GS ainda ~289 kt. `stepCrashDetect` zerava o episódio em todo tick frozen, então os 3 ticks mortos nunca fechavam. Fix: pausa com o avião parado (`motionStopped`) e GS anterior ≥ 60 kt não apaga o episódio; a GS congelada conta como parada. Pausa em altitude (AGL alto, sem episódio) continua muda.
 
 ## O que já temos
 

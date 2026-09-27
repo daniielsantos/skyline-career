@@ -139,6 +139,68 @@ describe('stepCrashDetect', () => {
     assert.equal(step.state.episodeAtMs, null);
   });
 
+  it('fires when a fast flight stops on the ground under sticky pause', () => {
+    let state = emptyCrashDetectState();
+    const ctx = { nearDest: false, simAlive: true };
+    let step = stepCrashDetect(
+      state,
+      base({ atMs: 1000, aglFt: 600, groundSpeedKt: 220, gForce: 1.1 }),
+      ctx,
+    );
+    state = step.state;
+    let verdict = null;
+    for (let i = 0; i < CRASH_DEAD_TICKS + 1; i++) {
+      step = stepCrashDetect(
+        state,
+        base({
+          atMs: 1600 + i * 500,
+          frozen: true,
+          motionStopped: true,
+          onGround: true,
+          aglFt: 400,
+          groundSpeedKt: 289,
+          gForce: 1.0,
+          verticalSpeedFpm: 0,
+        }),
+        ctx,
+      );
+      state = step.state;
+      if (step.verdict) {
+        verdict = step.verdict;
+        break;
+      }
+    }
+    assert.ok(verdict);
+    assert.equal(verdict!.confidence, 'high');
+    assert.ok(verdict!.reasonBits.includes('gs_collapse'));
+    assert.ok(verdict!.reasonBits.includes('agl_slam'));
+  });
+
+  it('does not fail an altitude pause with a stuck groundspeed', () => {
+    let state = emptyCrashDetectState();
+    const ctx = { nearDest: false, simAlive: true };
+    let step = stepCrashDetect(
+      state,
+      base({ atMs: 1000, aglFt: 8000, groundSpeedKt: 250 }),
+      ctx,
+    );
+    for (let i = 0; i < 6; i++) {
+      step = stepCrashDetect(
+        step.state,
+        base({
+          atMs: 2000 + i * 500,
+          frozen: true,
+          motionStopped: true,
+          aglFt: 8000,
+          groundSpeedKt: 250,
+          verticalSpeedFpm: 0,
+        }),
+        ctx,
+      );
+      assert.equal(step.verdict, null);
+    }
+  });
+
   it('stays silent while frozen', () => {
     let state = emptyCrashDetectState();
     const ctx = { nearDest: false, simAlive: true };

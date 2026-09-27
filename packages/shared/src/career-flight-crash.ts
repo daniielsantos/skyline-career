@@ -14,6 +14,11 @@ export type CrashSample = {
   enginesRunning?: boolean;
   /** Pause / slew / menu — ignore episode. */
   frozen?: boolean;
+  /**
+   * Sticky IS PAUSED and the aircraft stopped moving. The GS simvar often
+   * stays at the last cruise value, so a terrain impact looks like a pause.
+   */
+  motionStopped?: boolean;
   lat?: number;
   lon?: number;
 };
@@ -192,11 +197,31 @@ export function stepCrashDetect(
     };
   }
 
+  // Terrain impact often pauses the sim and freezes GS at the last airborne
+  // value. That used to wipe the episode on the first stopped tick. A real
+  // ESC pause at altitude has no fast prior GS and no open episode, so it
+  // still resets.
+  const pauseStop =
+    sample.frozen === true &&
+    sample.motionStopped === true &&
+    sample.sawAirborne &&
+    ctx.simAlive &&
+    !ctx.nearDest &&
+    ((finite(state.lastGs) && state.lastGs >= CRASH_GS_FAST_KT) ||
+      state.episodeAtMs != null);
+  const gsForDetect =
+    pauseStop && finite(state.lastGs) && state.lastGs >= CRASH_GS_FAST_KT
+      ? 0
+      : sample.groundSpeedKt;
+  const detectSample: CrashSample = pauseStop
+    ? { ...sample, frozen: false, groundSpeedKt: gsForDetect }
+    : sample;
+
   if (
     !sample.sawAirborne ||
-    sample.frozen ||
     !ctx.simAlive ||
-    ctx.nearDest
+    ctx.nearDest ||
+    (sample.frozen && !pauseStop)
   ) {
     state = {
       ...emptyCrashDetectState(),
@@ -234,28 +259,32 @@ export function stepCrashDetect(
   }
 
   let spikeBits = 0;
-  const g = gAbs(sample);
-  if (g >= CRASH_G_SPIKE || (finite(sample.gForce) && sample.gForce <= -1)) {
+  const g = gAbs(detectSample);
+  if (g >= CRASH_G_SPIKE || (finite(detectSample.gForce) && detectSample.gForce <= -1)) {
     spikeBits |= CRASH_SPIKE_G;
   }
-  const vs = absVs(sample);
+  const vs = absVs(detectSample);
   if (vs >= CRASH_VS_SPIKE_FPM) {
     spikeBits |= CRASH_SPIKE_VS;
   }
+  const groundStop = pauseStop && detectSample.onGround === true;
   if (
     finite(state.lastAgl) &&
     state.lastAgl! >= CRASH_AGL_HIGH_FT &&
-    finite(sample.aglFt) &&
-    sample.aglFt <= CRASH_AGL_LOW_FT
+    ((finite(detectSample.aglFt) &&
+      detectSample.aglFt <= CRASH_AGL_LOW_FT) ||
+      groundStop)
   ) {
     spikeBits |= CRASH_SPIKE_AGL;
   }
   if (
     finite(state.lastGs) &&
     state.lastGs! >= CRASH_GS_FAST_KT &&
-    finite(sample.groundSpeedKt) &&
-    sample.groundSpeedKt <= CRASH_GS_DEAD_KT &&
-    (!finite(sample.aglFt) || sample.aglFt <= CRASH_AGL_HIGH_FT)
+    finite(gsForDetect) &&
+    gsForDetect <= CRASH_GS_DEAD_KT &&
+    (!finite(detectSample.aglFt) ||
+      detectSample.aglFt <= CRASH_AGL_HIGH_FT ||
+      groundStop)
   ) {
     spikeBits |= CRASH_SPIKE_GS;
   }
@@ -268,7 +297,7 @@ export function stepCrashDetect(
       spikeBits: state.spikeBits | spikeBits,
       peakG: Math.max(state.peakG, g),
       peakAbsVs: Math.max(state.peakAbsVs, vs),
-      deadTicks: isDead(sample) ? state.deadTicks + 1 : 0,
+      deadTicks: isDead(detectSample) ? state.deadTicks + 1 : 0,
     };
   } else if (state.episodeAtMs != null) {
     if (nowMs - state.episodeAtMs > CRASH_EPISODE_MS) {
@@ -283,7 +312,7 @@ export function stepCrashDetect(
       };
       return { state, verdict: null, boostPoll };
     }
-    if (isDead(sample)) {
+    if (isDead(detectSample)) {
       state = { ...state, deadTicks: state.deadTicks + 1 };
     } else {
       state = { ...state, deadTicks: 0 };

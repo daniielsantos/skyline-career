@@ -4131,6 +4131,8 @@ export class CareerWatchSession {
             gForce: sample.gForce,
             enginesRunning: sample.enginesRunning,
             frozen: this.playbackFrozen,
+            motionStopped:
+              this.playbackFreezeReason === 'paused' && this.playbackFrozen,
             lat: sample.position?.lat,
             lon: sample.position?.lon,
           },

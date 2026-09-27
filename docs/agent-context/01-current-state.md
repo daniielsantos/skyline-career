@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **b89cb0af** / desktop **0.3.360** shipped: Ask which version is in the sim when a livery title misses the purchased airframe. Release: [v0.3.360](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.360).
+
+
 `main` **4793fa37** / desktop **0.3.359** shipped: Load same-route desk holds onto one flight. Release: [v0.3.359](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.359).
 
 

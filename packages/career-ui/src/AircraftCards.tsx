@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { listAirframeAddons } from './airframe-addons';
 import { estimateFairUsd, estimateHoursMxCostMult, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks, estimateOverhaulQuote, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
@@ -336,6 +336,31 @@ export function airframeCardArtUrl(
   return family !== id ? AIRFRAME_CARD_ART[family] : undefined;
 }
 
+/** Decoded card PNGs. Hangar mounts only when the tab opens, so warm these first. */
+const warmCardArt = new Set<string>();
+
+export function airframeCardArtIsWarm(url: string | undefined): boolean {
+  return Boolean(url && warmCardArt.has(url));
+}
+
+export function warmAirframeCardArt(
+  typeIds: readonly (string | null | undefined)[],
+): void {
+  const pending = new Set<string>();
+  for (const typeId of typeIds) {
+    const url = airframeCardArtUrl(typeId);
+    if (!url || warmCardArt.has(url) || pending.has(url)) continue;
+    pending.add(url);
+    const img = new Image();
+    const done = () => {
+      if (img.naturalWidth > 0) warmCardArt.add(url);
+    };
+    img.onload = done;
+    img.src = url;
+    if (img.complete) done();
+  }
+}
+
 function conditionTone(pct: number): 'ok' | 'warn' | 'danger' {
   if (pct < 40) return 'danger';
   if (pct < 55) return 'warn';
@@ -381,7 +406,23 @@ export function AircraftClassStripe(props: {
   imageLoading?: 'lazy' | 'eager';
 }) {
   const hasArt = Boolean(props.imageSrc);
-  const [artReadySrc, setArtReadySrc] = useState<string | undefined>(undefined);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [artReadySrc, setArtReadySrc] = useState<string | undefined>(() =>
+    airframeCardArtIsWarm(props.imageSrc) ? props.imageSrc : undefined,
+  );
+  const markArtReady = (src: string | undefined) => {
+    if (!src) return;
+    warmCardArt.add(src);
+    setArtReadySrc((current) => (current === src ? current : src));
+  };
+  useLayoutEffect(() => {
+    const src = props.imageSrc;
+    const node = imgRef.current;
+    if (!src) return;
+    if (airframeCardArtIsWarm(src) || (node?.complete && node.naturalWidth > 0)) {
+      markArtReady(src);
+    }
+  }, [props.imageSrc]);
   const artReady = Boolean(props.imageSrc) && artReadySrc === props.imageSrc;
   return (
     <div
@@ -398,18 +439,8 @@ export function AircraftClassStripe(props: {
           alt={props.imageAlt ?? ''}
           loading={props.imageLoading ?? 'lazy'}
           decoding="async"
-          ref={(node) => {
-            if (
-              node?.complete &&
-              node.naturalWidth > 0 &&
-              props.imageSrc
-            ) {
-              setArtReadySrc(props.imageSrc);
-            }
-          }}
-          onLoad={() => {
-            if (props.imageSrc) setArtReadySrc(props.imageSrc);
-          }}
+          ref={imgRef}
+          onLoad={() => markArtReady(props.imageSrc)}
         />
       ) : (
         <div className="aircraft-silhouette" />

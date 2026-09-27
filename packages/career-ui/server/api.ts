@@ -395,6 +395,10 @@ import {
 import { identifyLiveAircraftFromTitle } from './identify-live-aircraft.ts';
 import { beginOfpLoadActive, endOfpLoadActive, isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight, lastPreflightFromInjectLive } from './preflight-helpers.ts';
+import { withSimBridgeExclusive } from './simbridge-gate.ts';
+import { resolveDispatchTitle } from './variant-tiebreak.ts';
+import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
+import { sampleAircraftStructure } from '../../agent/src/sample-structure.ts';
 import {
   CareerWatchSession,
   probeFirstContactPosition,
@@ -13807,6 +13811,8 @@ export function createCareerApiServer(port = 8787) {
           units?: 'KGS' | 'LBS';
           /** UI SimBridge title — preferred over last probe for family ICAO. */
           liveTitle?: string | null;
+          /** Canonical glass title after the one-question tie-break. */
+          variantTitle?: string | null;
           companyId?: string;
         };
         if (!body.missionId) {
@@ -13853,8 +13859,40 @@ export function createCareerApiServer(port = 8787) {
         }
 
         try {
-          const liveTitle =
-            body.liveTitle?.trim() || getLastProbeAircraftTitle();
+          const probedTitle =
+            body.liveTitle?.trim() || getLastProbeAircraftTitle() || '';
+          const hinted =
+            body.variantTitle?.trim() ||
+            prep.mission.liveVariantTitle?.trim() ||
+            '';
+          const resolvedTitle = await resolveDispatchTitle({
+            repoRoot,
+            airframeTypeId: prep.mission.airframeTypeId,
+            rolesPackRelPath: prep.mission.rolesPackRelPath,
+            liveTitle: probedTitle,
+            hintedTitle: hinted,
+            sampleStructure: async () => {
+              const bridge = new NamedPipeSimBridge();
+              return withSimBridgeExclusive(async () => {
+                await bridge.open('Airframe Career variant');
+                try {
+                  const { structure } = await sampleAircraftStructure(bridge);
+                  return structure;
+                } finally {
+                  await bridge.close({ disconnectHost: false });
+                }
+              });
+            },
+          });
+          if (resolvedTitle.kind === 'choose') {
+            send(res, 200, {
+              needsVariantChoice: true,
+              variants: resolvedTitle.choices,
+            });
+            return;
+          }
+          const liveTitle = resolvedTitle.title;
+          const saveVariant = resolvedTitle.saveVariant;
           const { built, flyable, cargoLimit } = await buildFlyableMissionDispatch(
             prep.mission,
             prep.dispatchDistanceNm,
@@ -13895,6 +13933,7 @@ export function createCareerApiServer(port = 8787) {
               lastPreflightCheck: undefined,
               injectBallastLb: undefined,
               fuelAuthorizedOfpId: undefined,
+              liveVariantTitle: saveVariant ?? undefined,
             };
             missions.missions[idx] = dispatched;
             return dispatched;

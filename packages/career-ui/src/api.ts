@@ -537,6 +537,8 @@ export type Mission = {
   lateTicks?: number;
   /** Set when status is failed — e.g. impact from Watch crash detection. */
   failReason?: string;
+  /** Canonical glass title when a livery needed a manual tie-break. */
+  liveVariantTitle?: string;
   urgency: string;
   aircraftClassId: string;
   /** Concrete Market airframe assigned to this flight. */
@@ -4673,23 +4675,33 @@ export function postBushTripAbandon() {
   });
 }
 
+export type DispatchVariantChoice = {
+  profileKey: string;
+  label: string;
+  canonicalTitle: string;
+};
+
 export function postDispatch(opts: {
   missionId: string;
   open?: boolean;
   weightSystem?: 'metric' | 'imperial';
   /** Live MSFS title — picks Bonanza BE36 vs BT36 (and other family glass). */
   liveTitle?: string | null;
+  /** Canonical glass title after the tie-break question. */
+  variantTitle?: string | null;
   companyId?: string;
 }) {
   return api<{
-    mission: Mission;
-    url: string;
-    staticId: string;
-    type: string;
-    airframeLabel: string;
+    mission?: Mission;
+    url?: string;
+    staticId?: string;
+    type?: string;
+    airframeLabel?: string;
     cargoThousands?: number;
     units?: 'KGS' | 'LBS';
-    opened: boolean;
+    opened?: boolean;
+    needsVariantChoice?: boolean;
+    variants?: DispatchVariantChoice[];
   }>('/api/dispatch', {
     method: 'POST',
     body: JSON.stringify(opts),

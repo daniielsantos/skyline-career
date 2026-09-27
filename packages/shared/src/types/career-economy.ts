@@ -924,6 +924,8 @@ export interface MissionIntent {
    * Cargo is lost (not restored to WH / board).
    */
   failReason?: string;
+  /** Canonical glass title when a livery title needed a manual tie-break. */
+  liveVariantTitle?: string;
   acceptedAtTick: number;
   /** Set when career dispatch opens SimBrief. */
   staticId?: string;

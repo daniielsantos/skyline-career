@@ -2201,6 +2201,19 @@ th {
   flex: 0 1 auto;
 }
 
+.variant-tiebreak {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1 1 16rem;
+}
+
+.variant-tiebreak-note {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
 .ofp-accept-actions {
   margin-top: 0.85rem;
   padding-top: 0.75rem;
@@ -10805,20 +10818,17 @@ button.linkish {
   padding: 0.55rem 0.75rem 0.35rem;
 }
 
-.freights-panel > .settings-choice {
-  flex: 0 0 auto;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.4rem;
-  margin: 0;
+.freights-panel .board-aircraft .hangar-pane-toggle {
+  align-self: end;
+  margin: 0 0.15rem 0.2rem 0;
+  padding-right: 0.85rem;
+  border-right: 1px solid var(--line);
 }
 
-.freights-panel .settings-choice-btn {
-  padding: 0.4rem 0.65rem;
-  gap: 0.08rem;
-}
-
-.freights-panel .settings-choice-btn small {
-  font-size: 0.68rem;
+.freights-panel .board-aircraft .hangar-pane-toggle .tab {
+  font-size: 0.92rem;
+  line-height: 1.2;
+  padding: 0.1rem 0.05rem 0.28rem;
 }
 
 .freights-panel > .panel-head {

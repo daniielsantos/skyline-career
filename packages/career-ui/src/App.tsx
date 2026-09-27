@@ -262,6 +262,7 @@ import {
   ListLeaseAskBody,
   ListSaleAskBody,
   MarketListingCard,
+  warmAirframeCardArt,
   aircraftClassLabel,
   aircraftListingMatchesQuery,
   hangarAircraftMatchesQuery,
@@ -3957,6 +3958,10 @@ export function App() {
   const [preflightBootstrapError, setPreflightBootstrapError] = useState<
     string | null
   >(null);
+  const [variantPrompt, setVariantPrompt] = useState<{
+    missionId: string;
+    choices: Array<{ label: string; canonicalTitle: string }>;
+  } | null>(null);
   const preflightBootstrapErrorRef = useRef<string | null>(null);
   /**
    * Watch started before the first Preflight card (SAMPLING) — keep it off until
@@ -4178,6 +4183,13 @@ export function App() {
     () => opsFleetAircraft(prepareOpsFleetEntries),
     [prepareOpsFleetEntries],
   );
+
+  useEffect(() => {
+    warmAirframeCardArt([
+      ...fleet.map((aircraft) => aircraft.airframeTypeId),
+      ...vaSessionFleet.map((aircraft) => aircraft.airframeTypeId),
+    ]);
+  }, [fleet, vaSessionFleet]);
   const vaAircraftIdSet = useMemo(() => {
     const s = new Set<string>();
     for (const e of opsFleetEntries) {
@@ -12028,7 +12040,7 @@ export function App() {
     }, { sync: { market: true } });
   }
 
-  async function onDispatch(mission: Mission) {
+  async function onDispatch(mission: Mission, variantTitle?: string) {
     // Always rebuild the SimBrief URL (Bonanza A36 vs A36TC → BE36 vs BT36).
     // Re-using a cached href kept the wrong type after switching glass.
     // Browser: reserve a tab under this click so await does not drop the gesture.
@@ -12041,11 +12053,25 @@ export function App() {
         open: true,
         weightSystem,
         liveTitle: simBridgeRef.current?.aircraftTitle ?? null,
+        variantTitle,
         companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
       });
+      if (result.needsVariantChoice && result.variants?.length) {
+        if (pendingTab && !pendingTab.closed) {
+          try {
+            pendingTab.close();
+          } catch {
+            /* ignore */
+          }
+        }
+        setVariantPrompt({ missionId: mission.id, choices: result.variants });
+        return;
+      }
+      setVariantPrompt(null);
       if (result.mission) {
+        const saved = result.mission;
         setMissions((current) =>
-          current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+          current.map((m) => (m.id === saved.id ? saved : m)),
         );
       }
       const href = typeof result.url === 'string' ? result.url.trim() : '';
@@ -17916,61 +17942,6 @@ export function App() {
         </section>
       ) : hubSelected && tab === 'market' ? (
         <section className="panel freights-panel">
-          <div className="settings-choice" role="tablist" aria-label="Freight boards">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={freightsBoard === 'aircraft'}
-              className={
-                freightsBoard === 'aircraft'
-                  ? 'settings-choice-btn active'
-                  : 'settings-choice-btn'
-              }
-              onClick={() => {
-                setFreightsBoard('aircraft');
-                setMarketPage(1);
-              }}
-              disabled={busy}
-            >
-              Your aircraft
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={freightsBoard === 'crew'}
-              className={
-                freightsBoard === 'crew'
-                  ? 'settings-choice-btn active'
-                  : 'settings-choice-btn'
-              }
-              onClick={() => {
-                setFreightsBoard('crew');
-                setMarketPage(1);
-              }}
-              disabled={busy}
-            >
-              Operator aircraft
-            </button>
-            {BUSH_TRIPS_BOARD_ENABLED ? (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={freightsBoard === 'bush'}
-                className={
-                  freightsBoard === 'bush'
-                    ? 'settings-choice-btn active'
-                    : 'settings-choice-btn'
-                }
-                onClick={() => {
-                  setFreightsBoard('bush');
-                  void refreshBushTrips();
-                }}
-                disabled={busy}
-              >
-                Bush trips
-              </button>
-            ) : null}
-          </div>
           {BUSH_TRIPS_BOARD_ENABLED && freightsBoard === 'bush' ? (
             <>
               <div className="panel-head">
@@ -18146,6 +18117,49 @@ export function App() {
             <>
           <div className="panel-head">
             <div className="board-aircraft">
+              <div className="hangar-pane-toggle" role="tablist" aria-label="Freight boards">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={freightsBoard === 'aircraft'}
+                  className={freightsBoard === 'aircraft' ? 'tab active' : 'tab'}
+                  onClick={() => {
+                    setFreightsBoard('aircraft');
+                    setMarketPage(1);
+                  }}
+                  disabled={busy}
+                >
+                  Your aircraft
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={freightsBoard === 'crew'}
+                  className={freightsBoard === 'crew' ? 'tab active' : 'tab'}
+                  onClick={() => {
+                    setFreightsBoard('crew');
+                    setMarketPage(1);
+                  }}
+                  disabled={busy}
+                >
+                  Operator aircraft
+                </button>
+                {BUSH_TRIPS_BOARD_ENABLED ? (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={freightsBoard === 'bush'}
+                    className={freightsBoard === 'bush' ? 'tab active' : 'tab'}
+                    onClick={() => {
+                      setFreightsBoard('bush');
+                      void refreshBushTrips();
+                    }}
+                    disabled={busy}
+                  >
+                    Bush trips
+                  </button>
+                ) : null}
+              </div>
               <label className="board-aircraft-picker">
                 Aircraft
                 <select
@@ -20162,7 +20176,12 @@ export function App() {
               mxFuelBurnAlert={activeMissionMxFuelBurn}
               onOpenAirport={openAirport}
               onSelectSettings={() => selectTab('settings')}
-              onDispatch={(m) => void onDispatch(m)}
+              onDispatch={(m, variantTitle) => void onDispatch(m, variantTitle)}
+              variantChoices={
+                variantPrompt?.missionId === activeMission.id
+                  ? variantPrompt.choices
+                  : null
+              }
               onCancel={(m) => void onCancel(m)}
               onEditManifest={(m) => void enterEditManifest(m)}
               onAcceptOfpCargo={(m) => void onAcceptOfpCargo(m)}

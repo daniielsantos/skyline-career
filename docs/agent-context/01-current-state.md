@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **77abe29c** / desktop **0.3.363** shipped: Show the glass choice as compact buttons with a short reason. Release: [v0.3.363](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.363).
+
+
 `main` **f1faad81** / desktop **0.3.362** shipped: Resolve the livery glass on the desktop before the world builds the SimBrief URL. Release: [v0.3.362](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.362).
 
 

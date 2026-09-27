@@ -4350,9 +4350,14 @@ export function PortsPanel(props: {
                     <>
                         {port.concession?.jetATank ? (
                           <div
-                            className="ports-jeta"
+                            className={
+                              port.concession.jetATank.sources.length > 0
+                                ? 'ports-jeta has-sources'
+                                : 'ports-jeta'
+                            }
                             aria-label={`Jet-A tank ${props.formatTonnes(port.concession.jetATank.kg)} of ${props.formatTonnes(port.concession.jetATank.capacityKg)}`}
                           >
+                            <div className="ports-jeta-main">
                             <div className="ports-jeta-head">
                               <PortJetATankMark
                                 kg={port.concession.jetATank.kg}
@@ -4406,9 +4411,10 @@ export function PortsPanel(props: {
                                 Buy
                               </button>
                             </form>
+                            </div>
                             {port.concession.jetATank.sources.length > 0 ? (
                               <div className="ports-jeta-fetch">
-                                <p className="ports-scout-title">Fetch</p>
+                                <p className="ports-scout-title">Stock</p>
                                 <ul className="ports-jeta-sources">
                                   {port.concession.jetATank.sources.map((source) => {
                                     const parked = props.fleet.find(
@@ -4419,7 +4425,20 @@ export function PortsPanel(props: {
                                     );
                                     return (
                                       <li key={source.icao} className="ports-jeta-source">
-                                        <strong>{source.icao}</strong>
+                                        <button
+                                          type="button"
+                                          className="linkish"
+                                          disabled={props.busy}
+                                          title={
+                                            source.name &&
+                                            source.name.toUpperCase() !== source.icao
+                                              ? source.name
+                                              : `Open ${source.icao}`
+                                          }
+                                          onClick={() => props.onOpenAirport?.(source.icao)}
+                                        >
+                                          {source.icao}
+                                        </button>
                                         <span className="muted">{source.distanceNm} nm</span>
                                         <span className="ports-jeta-price">
                                           {formatUnitPrice(source.unitUsd)}
@@ -4431,7 +4450,7 @@ export function PortsPanel(props: {
                                           title={
                                             parked
                                               ? `Buy Jet-A at ${source.icao} and fly it into the tank. Not paid.`
-                                              : `Park an aircraft at ${source.icao} to fetch Jet-A`
+                                              : `Park an aircraft at ${source.icao} to stock Jet-A`
                                           }
                                           onClick={() =>
                                             parked
@@ -4443,7 +4462,7 @@ export function PortsPanel(props: {
                                               : undefined
                                           }
                                         >
-                                          Fetch
+                                          Stock
                                         </button>
                                       </li>
                                     );

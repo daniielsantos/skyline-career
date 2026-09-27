@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **6fed5edd** / desktop **0.3.368** shipped: Keep Hangar cashflow on the home company and open the haul manifest when the pilot is away. Release: [v0.3.368](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.368).
+
+
 `main` **e629657b** / desktop **0.3.367** shipped: Put Jet-A stocking offers beside the tank and open each airport from its code. Release: [v0.3.367](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.367).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **f1faad81** / desktop **0.3.362** shipped: Resolve the livery glass on the desktop before the world builds the SimBrief URL. Release: [v0.3.362](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.362).
+
+
 `main` **12f7d5bc** / desktop **0.3.361** shipped: Remove the active-flight board stripe and redraw the Supplies and Perishables icons. Release: [v0.3.361](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.361).
 
 

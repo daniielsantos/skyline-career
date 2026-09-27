@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **c0fe0fbd** / desktop **0.3.366** shipped: Show the Port FBO Jet-A tank as a storage gauge with spot prices. Release: [v0.3.366](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.366).
+
+
 `main` **32c97333** / desktop **0.3.365** shipped: Let a Port FBO keep a Jet-A tank and fly rare restock hauls. Release: [v0.3.365](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.365).
 
 

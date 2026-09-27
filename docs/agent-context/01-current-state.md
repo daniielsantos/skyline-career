@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **4ecd0735** / desktop **0.3.364** shipped: Stop treating a renamed aircraft as a homologated glass. Release: [v0.3.364](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.364).
+
+
 `main` **77abe29c** / desktop **0.3.363** shipped: Show the glass choice as compact buttons with a short reason. Release: [v0.3.363](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.363).
 
 

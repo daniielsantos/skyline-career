@@ -56,6 +56,7 @@ import {
   acceptWarehouseHaul,
   cancelWarehouseHaulHold,
   dispatchWarehouseHaulHold,
+  dispatchWarehouseHaulHolds,
   holdWarehouseHaul,
 } from './career-warehouse-haul.js';
 import {
@@ -1724,5 +1725,94 @@ describe('career warehouse + demand', () => {
         }),
       /before starting a warehouse haul/i,
     );
+  });
+
+  it('dispatches two same-route haul holds as one mission and restores both on cancel', () => {
+    const world = createSeedEconomyWorld({ seed: 'desk-hold-pair' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'PairDesk',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 900_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    wh.tier = 4;
+    wh.capacityKg = WAREHOUSE_T4_CAPACITY_KG;
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 80,
+      avgCostUsdPerKg: 1.5,
+      tick: world.tick,
+    });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'supplies',
+      kg: 60,
+      avgCostUsdPerKg: 2.25,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const general = holdWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      kg: 40,
+    });
+    const supplies = holdWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'supplies',
+      kg: 30,
+    });
+    const stock = (commodityId: 'general' | 'supplies') =>
+      state.playerWarehouses!.stock
+        .filter((pile) => pile.commodityId === commodityId)
+        .reduce((sum, pile) => sum + pile.kg, 0);
+    const generalBefore = stock('general');
+    const suppliesBefore = stock('supplies');
+    const flown = dispatchWarehouseHaulHolds(state, world, {
+      aircraftId: aircraft.id,
+      holds: [
+        { holdId: general.hold.id, kg: 40 },
+        { holdId: supplies.hold.id, kg: 25 },
+      ],
+    });
+    assert.equal(flown.kg, 65);
+    assert.equal(flown.mission.lots.length, 2);
+    assert.equal(flown.mission.originIcao, 'SBGR');
+    assert.equal(flown.mission.destIcao, 'SBSP');
+    assert.equal(flown.mission.cargoKg, 65);
+    assert.equal(
+      flown.mission.lots.reduce((sum, line) => sum + line.payUsd, 0),
+      flown.payUsd,
+    );
+    assert.equal(stock('general'), generalBefore - 40);
+    assert.equal(stock('supplies'), suppliesBefore - 25);
+    const remain = state.playerWarehouses!.demandHolds!.find(
+      (hold) => hold.id === supplies.hold.id,
+    );
+    assert.equal(remain?.kg, 5);
+    assert.equal(
+      state.playerWarehouses!.demandHolds!.some(
+        (hold) => hold.id === general.hold.id,
+      ),
+      false,
+    );
+    assert.throws(
+      () =>
+        dispatchWarehouseHaulHolds(state, world, {
+          aircraftId: aircraft.id,
+          holds: [
+            { holdId: 'nope', kg: 1 },
+            { holdId: 'nope2', kg: 1 },
+          ],
+        }),
+      /Haul hold not found/,
+    );
+    cancelMission(world, flown.mission, { fleet: state });
+    assert.equal(stock('general'), generalBefore);
+    assert.equal(stock('supplies'), suppliesBefore);
   });
 });

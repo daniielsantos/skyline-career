@@ -22,6 +22,17 @@ export type PersistedStagingDraft = {
     pilotPayUsd?: number;
     expiresAtTick?: number;
   };
+  /** Other same-route desk holds offered on this manifest. loadKg 0 = not on this flight. */
+  deskHoldExtras?: Array<{
+    id: string;
+    kind: 'demand' | 'bridge' | 'haul';
+    commodityId: string;
+    kg: number;
+    loadKg?: number;
+    unitPriceUsd?: number;
+    pilotPayUsd?: number;
+    expiresAtTick?: number;
+  }>;
 };
 
 type MissionRef = {

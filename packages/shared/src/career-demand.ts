@@ -57,12 +57,14 @@ import {
   findCareerPlayerAirframe,
   resolveAirframeMaxRangeNm,
 } from './career-player-airframes.js';
-import type {
-  CareerMissionsState,
-  CommodityId,
-  DemandOrder,
-  MissionIntent,
-  PlayerDemandHold,
+import {
+  MAX_MANIFEST_LOTS,
+  type CareerMissionsState,
+  type CommodityId,
+  type DemandOrder,
+  type MissionIntent,
+  type MissionLotLine,
+  type PlayerDemandHold,
 } from './types/career-economy.js';
 
 export const DEMAND_COMMODITIES: readonly CommodityId[] = [
@@ -825,6 +827,196 @@ export function dispatchDemandHold(
   };
 }
 
+/** One flight for several demand holds that share origin and destination. */
+export function dispatchDemandHolds(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    aircraftId: string;
+    holds: Array<{ holdId: string; kg?: number }>;
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
+    actorIsVaOwner?: boolean;
+  },
+): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
+  if (opts.holds.length === 1) {
+    const only = opts.holds[0]!;
+    return dispatchDemandHold(state, world, {
+      holdId: only.holdId,
+      aircraftId: opts.aircraftId,
+      kg: only.kg,
+      pilotAccountId: opts.pilotAccountId,
+      pilotHomeCompanyId: opts.pilotHomeCompanyId,
+      vaFlight: opts.vaFlight,
+      actorIsVaOwner: opts.actorIsVaOwner,
+    });
+  }
+  if (opts.holds.length > MAX_MANIFEST_LOTS) {
+    throw new Error(`At most ${MAX_MANIFEST_LOTS} holds on one flight`);
+  }
+  ensureDemandOrders(world);
+  expireDemandHolds(state, world);
+  const holds = listDemandHolds(state);
+  const seen = new Set<string>();
+  const picked: Array<{ hold: PlayerDemandHold; kg: number; orderId: string }> =
+    [];
+  for (const row of opts.holds) {
+    const holdId = row.holdId.trim();
+    if (!holdId || seen.has(holdId)) {
+      throw new Error('Each desk hold can be loaded once');
+    }
+    seen.add(holdId);
+    const hold = holds.find((candidate) => candidate.id === holdId);
+    if (!hold) throw new Error('Demand hold not found');
+    if ((hold.kind ?? 'demand') === 'bridge') {
+      throw new Error('Use warehouse bridge dispatch for this hold');
+    }
+    if (hold.kind === 'haul') {
+      throw new Error('Use warehouse haul dispatch for this hold');
+    }
+    if (!cargoOpsIsUnlocked(state.cargoOps, hold.commodityId)) {
+      const name = getCommodity(hold.commodityId).name;
+      throw new Error(
+        `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+    }
+    const orderId = hold.orderId?.trim();
+    if (!orderId) throw new Error('Demand hold is missing an order');
+    const takeKg = Math.max(
+      0,
+      Math.floor(
+        row.kg != null && Number.isFinite(row.kg) ? Number(row.kg) : hold.kg,
+      ),
+    );
+    const kg = Math.min(hold.kg, takeKg);
+    if (kg <= 0) throw new Error('Dispatch amount must be positive');
+    picked.push({ hold, kg, orderId });
+  }
+  const origin = picked[0]!.hold.originIcao.trim().toUpperCase();
+  const dest = picked[0]!.hold.destIcao.trim().toUpperCase();
+  for (const row of picked) {
+    if (
+      row.hold.originIcao.trim().toUpperCase() !== origin ||
+      row.hold.destIcao.trim().toUpperCase() !== dest
+    ) {
+      throw new Error(
+        'Desk holds on one flight must share origin and destination',
+      );
+    }
+  }
+  const open = listActivePlayerMissionsForPilot(
+    state.missions ?? [],
+    opts.pilotAccountId,
+  );
+  if (open.length > 0) {
+    throw new Error(
+      `Finish or cancel ${open[0]!.id} before dispatching a demand hold`,
+    );
+  }
+  const aircraft = findPlayerAircraft(state, opts.aircraftId);
+  if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  const airframeTypeId = aircraft.airframeTypeId;
+  if (!airframeTypeId) {
+    throw new Error(`Aircraft ${aircraft.id} has no airframe`);
+  }
+  if (aircraft.status !== 'parked') {
+    throw new Error(`Aircraft ${aircraft.id} is not parked`);
+  }
+  if (aircraft.locationIcao.trim().toUpperCase() !== origin) {
+    throw new Error(
+      `Aircraft is at ${aircraft.locationIcao}, not warehouse hub ${origin}`,
+    );
+  }
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
+  const dispatchAircraft = {
+    id: aircraft.id,
+    aircraftClassId: aircraft.aircraftClassId,
+    airframeTypeId,
+  };
+  const totalKg = picked.reduce((sum, row) => sum + row.kg, 0);
+  const maxCargoKg = demandRouteMaxCargoKg(world, dispatchAircraft, origin, dest);
+  if (totalKg > maxCargoKg) {
+    throw new Error(
+      `Load ${totalKg} kg exceeds this airframe's ${maxCargoKg} kg ops cap for ${origin}→${dest} — lower the load or use a larger aircraft`,
+    );
+  }
+  const lines: Array<{
+    commodityId: CommodityId;
+    kg: number;
+    payUsd: number;
+    orderId: string;
+    avgCostUsdPerKg: number;
+    deadlineTick: number;
+    international: boolean;
+  }> = [];
+  let warehouseId = '';
+  let firstOrder: DemandOrder | undefined;
+  for (const row of picked) {
+    const order = (world.demandOrders ?? []).find((o) => o.id === row.orderId);
+    if (!firstOrder && order) firstOrder = order;
+    const withdrawn = withdrawCargoFromWarehouse(state, {
+      icao: row.hold.originIcao,
+      commodityId: row.hold.commodityId,
+      kg: row.kg,
+    });
+    warehouseId = withdrawn.warehouseId;
+    const remainKg = row.hold.kg - row.kg;
+    const idx = holds.findIndex((candidate) => candidate.id === row.hold.id);
+    if (idx < 0) throw new Error('Demand hold not found');
+    if (remainKg <= 0) holds.splice(idx, 1);
+    else holds[idx] = { ...holds[idx]!, kg: remainKg };
+    const deadlineTick = Math.min(
+      order?.expiresAtTick ?? world.tick + TICKS_PER_HOUR * 72,
+      world.tick + TICKS_PER_HOUR * 72,
+    );
+    lines.push({
+      commodityId: row.hold.commodityId,
+      kg: row.kg,
+      payUsd: money(row.hold.unitPriceUsd * row.kg),
+      orderId: row.orderId,
+      avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
+      deadlineTick,
+      international:
+        demandInternationalUnitPriceMult(world, origin, dest) > 1,
+    });
+  }
+  state.playerWarehouses!.demandHolds = holds;
+  const payUsd = money(lines.reduce((sum, line) => sum + line.payUsd, 0));
+  const mission = createDemandMission(state, world, {
+    origin,
+    dest,
+    commodityId: lines[0]!.commodityId,
+    kg: totalKg,
+    payUsd,
+    aircraft: dispatchAircraft,
+    orderId: lines[0]!.orderId,
+    warehouseId,
+    avgCostUsdPerKg: lines[0]!.avgCostUsdPerKg,
+    international: lines.some((line) => line.international),
+    originCountryId: demandHubCountryId(world, origin) ?? '',
+    destCountryId: demandHubCountryId(world, dest) ?? '',
+    deadlineTick: Math.min(...lines.map((line) => line.deadlineTick)),
+    lines,
+    pilotAccountId: opts.pilotAccountId,
+    pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    vaFlight: opts.vaFlight,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
+  const order = firstOrder ?? {
+    id: lines[0]!.orderId,
+    destIcao: dest,
+    commodityId: lines[0]!.commodityId,
+    wantedKg: totalKg,
+    remainingKg: 0,
+    maxUnitPriceUsd: 0,
+    arrivedAtTick: world.tick,
+    expiresAtTick: lines[0]!.deadlineTick,
+    status: 'filled' as const,
+  };
+  return { mission, order: { ...order }, kg: totalKg, payUsd };
+}
+
 export function demandRouteMaxCargoKg(
   world: CareerEconomyWorld,
   aircraft: { aircraftClassId: MissionIntent['aircraftClassId']; airframeTypeId: string },
@@ -910,6 +1102,15 @@ function createDemandMission(
     pilotHomeCompanyId?: string;
     vaFlight?: boolean;
     actorIsVaOwner?: boolean;
+    lines?: Array<{
+      commodityId: CommodityId;
+      kg: number;
+      payUsd: number;
+      orderId: string;
+      avgCostUsdPerKg: number;
+      deadlineTick: number;
+      international: boolean;
+    }>;
   },
 ): MissionIntent {
   const classDef = getAircraftClass(opts.aircraft.aircraftClassId);
@@ -919,46 +1120,75 @@ function createDemandMission(
     routeDistanceNm(world, opts.origin, opts.dest) ??
     0;
   const missionId = `msn_demand_${world.tick}_${opts.origin}_${opts.dest}_${Math.floor(Math.random() * 1e6)}`;
-  const lotId = `demand_${opts.orderId}_${opts.kg}`;
+  const lineInputs = opts.lines ?? [
+    {
+      commodityId: opts.commodityId,
+      kg: opts.kg,
+      payUsd: opts.payUsd,
+      orderId: opts.orderId,
+      avgCostUsdPerKg: opts.avgCostUsdPerKg,
+      deadlineTick: opts.deadlineTick,
+      international: opts.international,
+    },
+  ];
+  const lots: MissionLotLine[] = lineInputs.map((line, index) => {
+    const lotId =
+      lineInputs.length === 1
+        ? `demand_${line.orderId}_${line.kg}`
+        : `demand_${line.orderId}_${index}_${line.kg}`;
+    return {
+      shipmentLotId: lotId,
+      commodityId: line.commodityId,
+      cargoKg: line.kg,
+      payUsd: line.payUsd,
+      urgency: 'normal',
+      reason: line.international
+        ? `Intl demand · ${getCommodity(line.commodityId).name} → ${opts.dest}`
+        : `Demand · ${getCommodity(line.commodityId).name} → ${opts.dest}`,
+      deadlineTick: line.deadlineTick,
+      avgCostUsdPerKg: line.avgCostUsdPerKg,
+      demandOrderId: line.orderId,
+    };
+  });
+  const lotId = lots[0]!.shipmentLotId;
+  const cargoKg = lots.reduce((sum, line) => sum + line.cargoKg, 0);
+  const payUsd = money(lots.reduce((sum, line) => sum + line.payUsd, 0));
+  const deadlineTick = Math.min(...lots.map((line) => line.deadlineTick));
+  const costKg = cargoKg;
+  const avgCostUsdPerKg =
+    costKg > 0
+      ? lots.reduce(
+          (sum, line) => sum + (line.avgCostUsdPerKg ?? 0) * line.cargoKg,
+          0,
+        ) / costKg
+      : opts.avgCostUsdPerKg;
   const laneLabel = opts.international
     ? `Intl demand · ${opts.originCountryId}→${opts.destCountryId}`
     : `Demand delivery · ${opts.origin}→${opts.dest}`;
   const home = opts.pilotHomeCompanyId?.trim() || undefined;
   const mission = recomputeMissionTotals({
     id: missionId,
-    lots: [
-      {
-        shipmentLotId: lotId,
-        commodityId: opts.commodityId,
-        cargoKg: opts.kg,
-        payUsd: opts.payUsd,
-        urgency: 'normal',
-        reason: opts.international
-          ? `Intl demand · ${getCommodity(opts.commodityId).name} → ${opts.dest}`
-          : `Demand · ${getCommodity(opts.commodityId).name} → ${opts.dest}`,
-        deadlineTick: opts.deadlineTick,
-      },
-    ],
+    lots,
     shipmentLotId: lotId,
-    commodityId: opts.commodityId,
+    commodityId: lots[0]!.commodityId,
     originIcao: opts.origin,
     destIcao: opts.dest,
-    cargoKg: opts.kg,
+    cargoKg,
     pax: 0,
     aircraftClassId: opts.aircraft.aircraftClassId,
     airframeTypeId: opts.aircraft.airframeTypeId,
     rolesPackRelPath:
       airframe?.rolesPackRelPath ?? classDef.rolesPackRelPath,
-    deadlineTick: opts.deadlineTick,
-    payUsd: opts.payUsd,
+    deadlineTick,
+    payUsd,
     urgency: 'normal',
     reason: laneLabel,
     status: 'accepted',
     acceptedAtTick: world.tick,
     aircraftId: opts.aircraft.id,
-    demandOrderId: opts.orderId,
+    demandOrderId: lineInputs[0]!.orderId,
     warehouseId: opts.warehouseId,
-    warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
+    warehouseAvgCostUsdPerKg: avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
     ...(opts.pilotAccountId?.trim()
       ? { pilotAccountId: opts.pilotAccountId.trim() }

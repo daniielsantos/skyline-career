@@ -856,6 +856,10 @@ export interface MissionLotLine {
   urgency: 'normal' | 'urgent';
   reason: string;
   deadlineTick: number;
+  /** Warehouse cost basis for this line (desk hold). Omit = mission average. */
+  avgCostUsdPerKg?: number;
+  /** Demand Board order this line delivers. Omit = mission.demandOrderId. */
+  demandOrderId?: string;
 }
 
 /** Soft cap: how many market lots can share one flight. */

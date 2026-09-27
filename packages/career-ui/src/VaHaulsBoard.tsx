@@ -126,7 +126,11 @@ type Props = {
   onMissions?: (missions: Mission[]) => void;
   onStaged?: (mission: Mission) => void;
   /** Off-origin or oversize hold: open Dispatch Manifest (ferry / partial load). */
-  onPrepareHold?: (hold: VaHaulHold, aircraftId: string) => void;
+  onPrepareHold?: (
+    hold: VaHaulHold,
+    aircraftId: string,
+    sameRouteHolds?: VaHaulHold[],
+  ) => void;
   /** Ops payload estimate for the selected tail (fallback if unknown). */
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   onGoPorts?: () => void;
@@ -253,6 +257,20 @@ export function VaHaulsBoard(props: Props) {
     return parkedFleet.find((a) => a.id === id) ?? null;
   }
 
+  function sameRouteSiblings(hold: VaHaulHold): VaHaulHold[] {
+    const origin = hold.originIcao.trim().toUpperCase();
+    const dest = hold.destIcao.trim().toUpperCase();
+    const kind = hold.kind ?? 'demand';
+    return holds.filter((other) => {
+      if (other.id === hold.id) return false;
+      if ((other.kind ?? 'demand') !== kind) return false;
+      return (
+        other.originIcao.trim().toUpperCase() === origin &&
+        other.destIcao.trim().toUpperCase() === dest
+      );
+    });
+  }
+
   /** True when the hold won't fit this airframe's ops cap — Manifest slider. */
   function holdNeedsPartialLoad(
     hold: VaHaulHold,
@@ -278,7 +296,11 @@ export function VaHaulsBoard(props: Props) {
     const origin = hold.originIcao.trim().toUpperCase();
     const atOrigin =
       (acf.locationIcao ?? '').trim().toUpperCase() === origin;
-    return !atOrigin || holdNeedsPartialLoad(hold, acf);
+    return (
+      !atOrigin ||
+      holdNeedsPartialLoad(hold, acf) ||
+      sameRouteSiblings(hold).length > 0
+    );
   }
 
   async function acceptHold(hold: VaHaulHold) {
@@ -290,7 +312,7 @@ export function VaHaulsBoard(props: Props) {
       return;
     }
     if (shouldPrepareHold(hold, acf)) {
-      props.onPrepareHold?.(hold, aircraftId);
+      props.onPrepareHold?.(hold, aircraftId, sameRouteSiblings(hold));
       return;
     }
     if ((acf.locationIcao ?? '').trim().toUpperCase() !== origin) {
@@ -354,7 +376,7 @@ export function VaHaulsBoard(props: Props) {
       void acceptHold(hold);
       return;
     }
-    props.onPrepareHold(hold, aircraftId);
+    props.onPrepareHold(hold, aircraftId, sameRouteSiblings(hold));
   }
 
   async function cancelHold(hold: VaHaulHold) {

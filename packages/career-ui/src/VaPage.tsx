@@ -220,7 +220,11 @@ type Props = {
   /** After Accept Internal Haul — open Dispatch / staging. */
   onHaulStaged?: (mission: Mission) => void;
   /** Open Dispatch Manifest for a desk hold (ferry off-origin there). */
-  onPrepareHaulHold?: (hold: VaHaulHold, aircraftId: string) => void;
+  onPrepareHaulHold?: (
+    hold: VaHaulHold,
+    aircraftId: string,
+    sameRouteHolds?: VaHaulHold[],
+  ) => void;
   onMissions?: (missions: Mission[]) => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
   /**

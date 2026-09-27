@@ -37,11 +37,13 @@ import {
   warehouseFreeCommodityKg,
   withdrawCargoFromWarehouse,
 } from './career-warehouse-stock.js';
-import type {
-  CareerMissionsState,
-  CommodityId,
-  MissionIntent,
-  PlayerDemandHold,
+import {
+  MAX_MANIFEST_LOTS,
+  type CareerMissionsState,
+  type CommodityId,
+  type MissionIntent,
+  type MissionLotLine,
+  type PlayerDemandHold,
 } from './types/career-economy.js';
 
 function money(n: number): number {
@@ -152,6 +154,13 @@ function createHaulMission(
     pilotHomeCompanyId?: string;
     vaFlight?: boolean;
     actorIsVaOwner?: boolean;
+    /** Same-route holds already withdrawn. Omit = one line from the scalar fields. */
+    lines?: Array<{
+      commodityId: CommodityId;
+      kg: number;
+      payUsd: number;
+      avgCostUsdPerKg: number;
+    }>;
   },
 ): MissionIntent {
   const classDef = getAircraftClass(opts.aircraft.aircraftClassId);
@@ -161,33 +170,57 @@ function createHaulMission(
     routeDistanceNm(world, opts.origin, opts.dest) ??
     0;
   const deadlineTick = world.tick + TICKS_PER_HOUR * 72;
-  const lotId = `whhaul_${opts.origin}_${opts.dest}_${opts.kg}`;
-  const sizeNote = opts.kg >= XL_LOT_MIN_KG ? ' · Wide' : '';
+  const lineInputs = opts.lines ?? [
+    {
+      commodityId: opts.commodityId,
+      kg: opts.kg,
+      payUsd: opts.payUsd,
+      avgCostUsdPerKg: opts.avgCostUsdPerKg,
+    },
+  ];
+  const lots: MissionLotLine[] = lineInputs.map((line, index) => {
+    const sizeNote = line.kg >= XL_LOT_MIN_KG ? ' · Wide' : '';
+    const lotId =
+      lineInputs.length === 1
+        ? `whhaul_${opts.origin}_${opts.dest}_${line.kg}`
+        : `whhaul_${opts.origin}_${opts.dest}_${line.commodityId}_${index}_${line.kg}`;
+    return {
+      shipmentLotId: lotId,
+      commodityId: line.commodityId,
+      cargoKg: line.kg,
+      payUsd: line.payUsd,
+      urgency: 'normal',
+      reason: `WH haul${sizeNote} · ${getCommodity(line.commodityId).name} → ${opts.dest}`,
+      deadlineTick,
+      avgCostUsdPerKg: line.avgCostUsdPerKg,
+    };
+  });
+  const lotId = lots[0]!.shipmentLotId;
+  const cargoKg = lots.reduce((sum, line) => sum + line.cargoKg, 0);
+  const payUsd = money(lots.reduce((sum, line) => sum + line.payUsd, 0));
+  const costKg = lots.reduce((sum, line) => sum + line.cargoKg, 0);
+  const avgCostUsdPerKg =
+    costKg > 0
+      ? lots.reduce(
+          (sum, line) => sum + (line.avgCostUsdPerKg ?? 0) * line.cargoKg,
+          0,
+        ) / costKg
+      : opts.avgCostUsdPerKg;
   const mission = recomputeMissionTotals({
     id: `msn_whhaul_${world.tick}_${opts.origin}_${opts.dest}_${Math.floor(Math.random() * 1e6)}`,
-    lots: [
-      {
-        shipmentLotId: lotId,
-        commodityId: opts.commodityId,
-        cargoKg: opts.kg,
-        payUsd: opts.payUsd,
-        urgency: 'normal',
-        reason: `WH haul${sizeNote} · ${getCommodity(opts.commodityId).name} → ${opts.dest}`,
-        deadlineTick,
-      },
-    ],
+    lots,
     shipmentLotId: lotId,
-    commodityId: opts.commodityId,
+    commodityId: lots[0]!.commodityId,
     originIcao: opts.origin,
     destIcao: opts.dest,
-    cargoKg: opts.kg,
+    cargoKg,
     pax: 0,
     aircraftClassId: opts.aircraft.aircraftClassId,
     airframeTypeId: opts.aircraft.airframeTypeId,
     rolesPackRelPath:
       airframe?.rolesPackRelPath ?? classDef.rolesPackRelPath,
     deadlineTick,
-    payUsd: opts.payUsd,
+    payUsd,
     urgency: 'normal',
     reason: `Warehouse haul · ${opts.origin}→${opts.dest}`,
     status: 'accepted',
@@ -195,7 +228,7 @@ function createHaulMission(
     aircraftId: opts.aircraft.id,
     warehouseHaul: true,
     warehouseId: opts.warehouseId,
-    warehouseAvgCostUsdPerKg: opts.avgCostUsdPerKg,
+    warehouseAvgCostUsdPerKg: avgCostUsdPerKg,
     distanceNm: Math.round(distanceNm),
     ...(opts.pilotAccountId?.trim()
       ? { pilotAccountId: opts.pilotAccountId.trim() }
@@ -497,4 +530,131 @@ export function dispatchWarehouseHaulHold(
     actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg, payUsd };
+}
+
+/** One flight for several haul holds that share origin and destination. */
+export function dispatchWarehouseHaulHolds(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    aircraftId: string;
+    holds: Array<{ holdId: string; kg?: number }>;
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
+    actorIsVaOwner?: boolean;
+  },
+): { mission: MissionIntent; kg: number; payUsd: number } {
+  if (opts.holds.length === 1) {
+    const only = opts.holds[0]!;
+    return dispatchWarehouseHaulHold(state, world, {
+      holdId: only.holdId,
+      aircraftId: opts.aircraftId,
+      kg: only.kg,
+      pilotAccountId: opts.pilotAccountId,
+      pilotHomeCompanyId: opts.pilotHomeCompanyId,
+      vaFlight: opts.vaFlight,
+      actorIsVaOwner: opts.actorIsVaOwner,
+    });
+  }
+  if (opts.holds.length > MAX_MANIFEST_LOTS) {
+    throw new Error(`At most ${MAX_MANIFEST_LOTS} holds on one flight`);
+  }
+  expireDemandHolds(state, world);
+  const holds = listDemandHolds(state);
+  const seen = new Set<string>();
+  const picked: Array<{ hold: PlayerDemandHold; kg: number }> = [];
+  for (const row of opts.holds) {
+    const holdId = row.holdId.trim();
+    if (!holdId || seen.has(holdId)) {
+      throw new Error('Each desk hold can be loaded once');
+    }
+    seen.add(holdId);
+    const hold = holds.find((candidate) => candidate.id === holdId);
+    if (!hold) throw new Error('Haul hold not found');
+    if (hold.kind !== 'haul') throw new Error('Not a warehouse haul hold');
+    if (!cargoOpsIsUnlocked(state.cargoOps, hold.commodityId)) {
+      const name = getCommodity(hold.commodityId).name;
+      throw new Error(
+        `Cargo Ops: ${name} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+    }
+    const takeKg = Math.max(
+      0,
+      Math.floor(
+        row.kg != null && Number.isFinite(row.kg) ? Number(row.kg) : hold.kg,
+      ),
+    );
+    const kg = Math.min(hold.kg, takeKg);
+    if (kg <= 0) throw new Error('Dispatch amount must be positive');
+    picked.push({ hold, kg });
+  }
+  const origin = picked[0]!.hold.originIcao.trim().toUpperCase();
+  const dest = picked[0]!.hold.destIcao.trim().toUpperCase();
+  for (const row of picked) {
+    if (
+      row.hold.originIcao.trim().toUpperCase() !== origin ||
+      row.hold.destIcao.trim().toUpperCase() !== dest
+    ) {
+      throw new Error(
+        'Desk holds on one flight must share origin and destination',
+      );
+    }
+  }
+  const totalKg = picked.reduce((sum, row) => sum + row.kg, 0);
+  const aircraft = parkedAircraftAt(
+    state,
+    world,
+    opts.aircraftId,
+    origin,
+    dest,
+    totalKg,
+    opts.pilotAccountId,
+  );
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
+  const lines: Array<{
+    commodityId: CommodityId;
+    kg: number;
+    payUsd: number;
+    avgCostUsdPerKg: number;
+  }> = [];
+  let warehouseId = '';
+  for (const row of picked) {
+    const payUsd = money(row.hold.unitPriceUsd * row.kg);
+    const withdrawn = withdrawCargoFromWarehouse(state, {
+      icao: row.hold.originIcao,
+      commodityId: row.hold.commodityId,
+      kg: row.kg,
+    });
+    warehouseId = withdrawn.warehouseId;
+    const remainKg = row.hold.kg - row.kg;
+    const idx = holds.findIndex((candidate) => candidate.id === row.hold.id);
+    if (idx < 0) throw new Error('Haul hold not found');
+    if (remainKg <= 0) holds.splice(idx, 1);
+    else holds[idx] = { ...holds[idx]!, kg: remainKg };
+    lines.push({
+      commodityId: row.hold.commodityId,
+      kg: row.kg,
+      payUsd,
+      avgCostUsdPerKg: withdrawn.avgCostUsdPerKg,
+    });
+  }
+  state.playerWarehouses!.demandHolds = holds;
+  const payUsd = money(lines.reduce((sum, line) => sum + line.payUsd, 0));
+  const mission = createHaulMission(state, world, {
+    origin,
+    dest,
+    commodityId: lines[0]!.commodityId,
+    kg: totalKg,
+    payUsd,
+    aircraft,
+    warehouseId,
+    avgCostUsdPerKg: lines[0]!.avgCostUsdPerKg,
+    lines,
+    pilotAccountId: opts.pilotAccountId,
+    pilotHomeCompanyId: opts.pilotHomeCompanyId,
+    vaFlight: opts.vaFlight,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
+  return { mission, kg: totalKg, payUsd };
 }

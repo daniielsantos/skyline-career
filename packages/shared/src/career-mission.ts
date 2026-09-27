@@ -2199,6 +2199,43 @@ export function replaceMissionManifest(
   }
 }
 
+/** Put desk-hold cargo back in the origin warehouse, one commodity per line. */
+function restoreDeskCargoLines(
+  world: CareerEconomyWorld,
+  fleet: CareerMissionsState,
+  mission: MissionIntent,
+  lines: MissionLotLine[],
+): void {
+  const tick = mission.acceptedAtTick ?? world.tick;
+  for (const line of lines) {
+    const kg = Math.max(0, Math.floor(line.cargoKg));
+    if (kg <= 0) continue;
+    try {
+      depositCargoToWarehouse(fleet, {
+        icao: mission.originIcao,
+        commodityId: line.commodityId,
+        kg,
+        avgCostUsdPerKg:
+          line.avgCostUsdPerKg ?? mission.warehouseAvgCostUsdPerKg ?? 0,
+        tick,
+      });
+    } catch {
+      // Warehouse may be gone — cancel/trim still succeeds.
+    }
+    const orderId =
+      line.demandOrderId?.trim() ||
+      (lines.length === 1 ? mission.demandOrderId?.trim() : undefined);
+    if (!orderId) continue;
+    if (!Array.isArray(world.demandOrders)) world.demandOrders = [];
+    const order = world.demandOrders.find((row) => row.id === orderId);
+    if (!order) continue;
+    order.remainingKg = Math.min(order.wantedKg, order.remainingKg + kg);
+    if (order.status === 'filled' && order.remainingKg > 0) {
+      order.status = 'open';
+    }
+  }
+}
+
 export function cancelMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
@@ -2250,69 +2287,12 @@ export function cancelMission(
   }
   if (opts.fleet) {
     releaseAircraftOnCancel(opts.fleet, normalized);
-    if (normalized.warehouseBridge) {
-      const line = normalized.lots[0];
-      const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
-      if (kg > 0) {
-        try {
-          depositCargoToWarehouse(opts.fleet, {
-            icao: normalized.originIcao,
-            commodityId: line?.commodityId ?? normalized.commodityId,
-            kg,
-            avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
-            tick: normalized.acceptedAtTick ?? world.tick,
-          });
-        } catch {
-          // Warehouse may be gone — cancel still succeeds.
-        }
-      }
-    } else if (normalized.warehouseHaul) {
-      const line = normalized.lots[0];
-      const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
-      if (kg > 0) {
-        try {
-          depositCargoToWarehouse(opts.fleet, {
-            icao: normalized.originIcao,
-            commodityId: line?.commodityId ?? normalized.commodityId,
-            kg,
-            avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
-            tick: normalized.acceptedAtTick ?? world.tick,
-          });
-        } catch {
-          // Warehouse may be gone — cancel still succeeds.
-        }
-      }
-    } else if (normalized.demandOrderId) {
-      const line = normalized.lots[0];
-      const kg = line?.cargoKg ?? normalized.cargoKg ?? 0;
-      if (kg > 0) {
-        try {
-          depositCargoToWarehouse(opts.fleet, {
-            icao: normalized.originIcao,
-            commodityId: line?.commodityId ?? normalized.commodityId,
-            kg,
-            avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
-            tick: normalized.acceptedAtTick ?? world.tick,
-          });
-        } catch {
-          // Warehouse may be gone — cancel still succeeds.
-        }
-        if (!Array.isArray(world.demandOrders)) {
-          world.demandOrders = [];
-        }
-        const order = world.demandOrders.find(
-          (o) => o.id === normalized.demandOrderId,
-        );
-        if (order) {
-          order.remainingKg = Math.min(
-            order.wantedKg,
-            order.remainingKg + kg,
-          );
-          if (order.status === 'filled') {
-            order.status = 'open';
-          }
-        }
-      }
+    if (
+      normalized.warehouseBridge ||
+      normalized.warehouseHaul ||
+      normalized.demandOrderId
+    ) {
+      restoreDeskCargoLines(world, opts.fleet, normalized, normalized.lots);
     } else if (normalized.portPickupId) {
       const pickups = Array.isArray(opts.fleet.portPickups)
         ? opts.fleet.portPickups
@@ -2940,7 +2920,8 @@ export function settleMission(
             icao: working.destIcao,
             commodityId: line.commodityId,
             kg: line.cargoKg,
-            avgCostUsdPerKg: working.warehouseAvgCostUsdPerKg ?? 0,
+            avgCostUsdPerKg:
+              line.avgCostUsdPerKg ?? working.warehouseAvgCostUsdPerKg ?? 0,
             tick: settleTick,
             portId: destPortId,
           });
@@ -3037,7 +3018,7 @@ export function settleMission(
           creditPortOperatorThroughputOnOutboundSettle(opts.fleet, world, {
             originIcao: working.originIcao,
             kg: line.cargoKg,
-            demandOrderId: working.demandOrderId,
+            demandOrderId: line.demandOrderId ?? working.demandOrderId,
           });
         }
         continue;
@@ -4174,36 +4155,15 @@ export function trimMissionCargoToKg(
       normalized.warehouseBridge ||
       normalized.demandOrderId)
   ) {
-    const line = nextLots[0] ?? normalized.lots[0];
-    const commodityId = line?.commodityId ?? normalized.commodityId;
-    try {
-      depositCargoToWarehouse(fleet, {
-        icao: normalized.originIcao,
-        commodityId,
-        kg: releasedKg,
-        avgCostUsdPerKg: normalized.warehouseAvgCostUsdPerKg ?? 0,
-        tick: normalized.acceptedAtTick ?? world.tick,
-      });
-    } catch {
-      // Warehouse may be gone — trim still succeeds (same as cancel).
-    }
-    if (normalized.demandOrderId) {
-      if (!Array.isArray(world.demandOrders)) {
-        world.demandOrders = [];
-      }
-      const order = world.demandOrders.find(
-        (o) => o.id === normalized.demandOrderId,
+    const drops: MissionLotLine[] = [];
+    for (const before of normalized.lots) {
+      const kept = nextLots.find(
+        (line) => line.shipmentLotId === before.shipmentLotId,
       );
-      if (order) {
-        order.remainingKg = Math.min(
-          order.wantedKg,
-          order.remainingKg + releasedKg,
-        );
-        if (order.status === 'filled' && order.remainingKg > 0) {
-          order.status = 'open';
-        }
-      }
+      const dropKg = before.cargoKg - (kept?.cargoKg ?? 0);
+      if (dropKg > 0) drops.push({ ...before, cargoKg: dropKg });
     }
+    restoreDeskCargoLines(world, fleet, normalized, drops);
   }
 
   return {

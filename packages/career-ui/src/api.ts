@@ -3890,11 +3890,12 @@ export function postWarehouseBridgeAccept(opts: {
 }
 
 export function postWarehouseBridgeDispatchHold(opts: {
-  holdId: string;
+  holdId?: string;
   aircraftId: string;
   pilotPayUsd?: number | null;
   kg?: number;
   companyId?: string;
+  holds?: Array<{ holdId: string; kg?: number }>;
 }) {
   return api<{
     walletUsd: number;
@@ -3983,10 +3984,11 @@ export function postWarehouseHaulAccept(opts: {
 }
 
 export function postWarehouseHaulDispatchHold(opts: {
-  holdId: string;
+  holdId?: string;
   aircraftId: string;
   kg?: number;
   companyId?: string;
+  holds?: Array<{ holdId: string; kg?: number }>;
 }) {
   return api<{
     walletUsd: number;
@@ -4062,10 +4064,11 @@ export function postDemandHoldCancel(opts: {
 }
 
 export function postDemandDispatchHold(opts: {
-  holdId: string;
+  holdId?: string;
   aircraftId: string;
   kg?: number;
   companyId?: string;
+  holds?: Array<{ holdId: string; kg?: number }>;
 }) {
   return api<{
     walletUsd: number;

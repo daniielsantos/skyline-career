@@ -577,6 +577,11 @@ type StagingDraft = {
     /** Desk hold TTL — same clock as Open desk. */
     expiresAtTick?: number;
   };
+  /**
+   * Other open holds with the same origin, destination, and kind.
+   * loadKg 0 keeps them on the Open desk.
+   */
+  deskHoldExtras?: Array<NonNullable<StagingDraft['deskHold']>>;
 };
 
 function deskHoldEffectiveLoadKg(
@@ -588,6 +593,13 @@ function deskHoldEffectiveLoadKg(
       ? Math.floor(desk.loadKg)
       : holdKg;
   return Math.max(0, Math.min(holdKg, raw));
+}
+
+function deskHoldLines(draft: StagingDraft): Array<NonNullable<StagingDraft['deskHold']>> {
+  return [
+    ...(draft.deskHold ? [draft.deskHold] : []),
+    ...(draft.deskHoldExtras ?? []),
+  ];
 }
 
 function deskHoldPayUsd(desk: NonNullable<StagingDraft['deskHold']>): number {
@@ -603,6 +615,44 @@ function deskHoldPayUsd(desk: NonNullable<StagingDraft['deskHold']>): number {
     return Math.max(0, Math.round(desk.unitPriceUsd * loadKg));
   }
   return 0;
+}
+
+function clampDeskHoldDraft(draft: StagingDraft, capKg: number): StagingDraft {
+  let remaining = Math.max(0, Math.floor(capKg));
+  const clampOne = (
+    hold: NonNullable<StagingDraft['deskHold']>,
+    allowZero: boolean,
+  ) => {
+    const holdKg = Math.max(0, Math.floor(hold.kg));
+    const maxLoad = Math.max(0, Math.min(holdKg, remaining));
+    const raw = deskHoldEffectiveLoadKg(hold);
+    let loadKg = Math.min(maxLoad, raw > 0 ? raw : allowZero ? 0 : maxLoad);
+    if (!allowZero && maxLoad > 0) loadKg = Math.max(1, loadKg);
+    if (allowZero) loadKg = Math.max(0, Math.floor(loadKg));
+    remaining = Math.max(0, remaining - loadKg);
+    return { ...hold, loadKg };
+  };
+  return {
+    ...draft,
+    deskHold: draft.deskHold ? clampOne(draft.deskHold, false) : undefined,
+    deskHoldExtras: (draft.deskHoldExtras ?? []).map((hold) =>
+      clampOne(hold, true),
+    ),
+  };
+}
+
+function deskHoldMaxLoadKg(
+  draft: StagingDraft,
+  hold: NonNullable<StagingDraft['deskHold']>,
+  capKg: number,
+): number {
+  const others = deskHoldLines(draft)
+    .filter((line) => line.id !== hold.id)
+    .reduce((sum, line) => sum + deskHoldEffectiveLoadKg(line), 0);
+  return Math.max(
+    0,
+    Math.min(Math.floor(hold.kg), Math.floor(capKg) - others),
+  );
 }
 
 function lotQuantityKg(lot: MarketLot): number {
@@ -10874,18 +10924,7 @@ export function App() {
       return { ...line, cargoKg };
     });
     if (!draft.deskHold) return { ...draft, lines };
-    const holdKg = Math.max(0, Math.floor(draft.deskHold.kg));
-    const maxLoad = Math.max(0, Math.floor(Math.min(holdKg, remaining)));
-    const raw = deskHoldEffectiveLoadKg(draft.deskHold);
-    const loadKg =
-      maxLoad <= 0
-        ? 0
-        : Math.max(1, Math.min(maxLoad, raw > 0 ? raw : maxLoad));
-    return {
-      ...draft,
-      lines,
-      deskHold: { ...draft.deskHold, loadKg },
-    };
+    return clampDeskHoldDraft({ ...draft, lines }, remaining);
   }
 
   function fleetTailAtOrigin(icao: string, preferId?: string) {
@@ -11017,7 +11056,11 @@ export function App() {
     }
   }
 
-  function enterStagingForVaHaulHold(hold: VaHaulHold, aircraftId: string) {
+  function enterStagingForVaHaulHold(
+    hold: VaHaulHold,
+    aircraftId: string,
+    sameRouteHolds: VaHaulHold[] = [],
+  ) {
     if (!hubSelected) {
       setError('Create your pilot profile first (name + home hub)');
       goToTab('pilot');
@@ -11074,6 +11117,19 @@ export function App() {
         pilotPayUsd: hold.pilotPayUsd,
         expiresAtTick: hold.expiresAtTick,
       },
+      deskHoldExtras: sameRouteHolds
+        .filter((other) => other.id !== hold.id)
+        .slice(0, MAX_STAGING_LOTS - 1)
+        .map((other) => ({
+          id: other.id,
+          kind: other.kind ?? kind,
+          commodityId: other.commodityId,
+          kg: Math.max(0, Math.floor(other.kg)),
+          loadKg: 0,
+          unitPriceUsd: other.unitPriceUsd,
+          pilotPayUsd: other.pilotPayUsd,
+          expiresAtTick: other.expiresAtTick,
+        })),
     };
     setFlightDebrief(null);
     setStagingFerryOpen(false);
@@ -11464,69 +11520,65 @@ export function App() {
       remaining = Math.max(0, remaining - cargoKg);
       return { ...line, cargoKg };
     });
-    let deskHold = staging.deskHold;
-    if (deskHold) {
-      const holdKg = Math.max(0, Math.floor(deskHold.kg));
-      const maxLoad = Math.max(0, Math.floor(Math.min(holdKg, remaining)));
-      const raw = deskHoldEffectiveLoadKg(deskHold);
-      const loadKg =
-        maxLoad <= 0
-          ? 0
-          : Math.max(1, Math.min(maxLoad, raw > 0 ? raw : maxLoad));
-      deskHold = { ...deskHold, loadKg };
-    }
-    setStaging({
-      ...staging,
-      aircraft: next,
-      aircraftId: selected.id,
-      intoMissionId: openFlight?.id,
-      lines,
-      deskHold,
-    });
+    const nextDraft = clampDeskHoldDraft(
+      {
+        ...staging,
+        aircraft: next,
+        aircraftId: selected.id,
+        intoMissionId: openFlight?.id,
+        lines,
+      },
+      remaining,
+    );
+    setStaging(nextDraft);
     setPreferredAircraft(next);
     setStagingFerryOpen(false);
   }
 
-  function updateStagingDeskHoldKg(rawKg: number) {
+  function updateStagingDeskHoldKg(holdId: string, rawKg: number) {
     setStaging((current) => {
       if (!current?.deskHold) return current;
-      const holdKg = Math.max(0, Math.floor(current.deskHold.kg));
-      const maxLoad = Math.max(
-        0,
-        Math.floor(Math.min(holdKg, aircraftCapKg(current.aircraft))),
-      );
-      const loadKg =
-        maxLoad <= 0
-          ? 0
-          : Math.max(1, Math.min(maxLoad, Math.floor(rawKg) || 0));
+      const cap = aircraftCapKg(current.aircraft);
+      const apply = (hold: NonNullable<StagingDraft['deskHold']>) => {
+        if (hold.id !== holdId) return hold;
+        const allowZero = hold.id !== current.deskHold!.id;
+        const maxLoad = deskHoldMaxLoadKg(current, hold, cap);
+        const loadKg = allowZero
+          ? Math.max(0, Math.min(maxLoad, Math.floor(rawKg) || 0))
+          : maxLoad <= 0
+            ? 0
+            : Math.max(1, Math.min(maxLoad, Math.floor(rawKg) || 0));
+        return { ...hold, loadKg };
+      };
       return {
         ...current,
-        deskHold: { ...current.deskHold, loadKg },
+        deskHold: apply(current.deskHold),
+        deskHoldExtras: (current.deskHoldExtras ?? []).map(apply),
       };
     });
   }
 
-  function setStagingDeskHoldFraction(fraction: number) {
+  function setStagingDeskHoldFraction(holdId: string, fraction: number) {
     setStaging((current) => {
       if (!current?.deskHold) return current;
-      const holdKg = Math.max(0, Math.floor(current.deskHold.kg));
-      const maxLoad = Math.max(
-        0,
-        Math.floor(Math.min(holdKg, aircraftCapKg(current.aircraft))),
-      );
-      if (maxLoad <= 0) {
-        return {
-          ...current,
-          deskHold: { ...current.deskHold, loadKg: 0 },
-        };
-      }
-      const loadKg =
-        fraction >= 1
-          ? maxLoad
-          : Math.max(1, Math.min(maxLoad, Math.round(maxLoad * fraction)));
+      const cap = aircraftCapKg(current.aircraft);
+      const apply = (hold: NonNullable<StagingDraft['deskHold']>) => {
+        if (hold.id !== holdId) return hold;
+        const allowZero = hold.id !== current.deskHold!.id;
+        const maxLoad = deskHoldMaxLoadKg(current, hold, cap);
+        if (maxLoad <= 0) return { ...hold, loadKg: 0 };
+        const loadKg =
+          fraction >= 1
+            ? maxLoad
+            : allowZero && fraction <= 0
+              ? 0
+              : Math.max(1, Math.min(maxLoad, Math.round(maxLoad * fraction)));
+        return { ...hold, loadKg };
+      };
       return {
         ...current,
-        deskHold: { ...current.deskHold, loadKg },
+        deskHold: apply(current.deskHold),
+        deskHoldExtras: (current.deskHoldExtras ?? []).map(apply),
       };
     });
   }
@@ -11630,28 +11682,31 @@ export function App() {
         const vaOps =
           Boolean(memberVaCompanyIdRef.current) &&
           opsCompanyId === memberVaCompanyIdRef.current;
-        const loadKg = deskHoldEffectiveLoadKg(hold);
-        const result =
-          hold.kind === 'bridge'
-            ? await postWarehouseBridgeDispatchHold({
+        const loaded = deskHoldLines(staging).filter(
+          (line) => deskHoldEffectiveLoadKg(line) > 0,
+        );
+        const dispatchOpts =
+          loaded.length > 1
+            ? {
+                aircraftId,
+                companyId: opsCompanyId,
+                holds: loaded.map((line) => ({
+                  holdId: line.id,
+                  kg: deskHoldEffectiveLoadKg(line),
+                })),
+              }
+            : {
                 holdId: hold.id,
                 aircraftId,
-                kg: loadKg,
+                kg: deskHoldEffectiveLoadKg(hold),
                 companyId: opsCompanyId,
-              })
+              };
+        const result =
+          hold.kind === 'bridge'
+            ? await postWarehouseBridgeDispatchHold(dispatchOpts)
             : hold.kind === 'haul'
-              ? await postWarehouseHaulDispatchHold({
-                  holdId: hold.id,
-                  aircraftId,
-                  kg: loadKg,
-                  companyId: opsCompanyId,
-                })
-              : await postDemandDispatchHold({
-                  holdId: hold.id,
-                  aircraftId,
-                  kg: loadKg,
-                  companyId: opsCompanyId,
-                });
+              ? await postWarehouseHaulDispatchHold(dispatchOpts)
+              : await postDemandDispatchHold(dispatchOpts);
         if (result.fleet) {
           paintOpsMutationFleet(result.fleet, opsCompanyId);
         }
@@ -11691,8 +11746,11 @@ export function App() {
               ? ` · ${formatMoney(result.payUsd)}`
               : '';
         setToastKind('ok');
+        const holdCount = deskHoldLines(staging).filter(
+          (line) => deskHoldEffectiveLoadKg(line) > 0,
+        ).length;
         setToast(
-          `Desk hold ${result.mission.originIcao}→${result.mission.destIcao} · ${formatTonnes(result.kg)}${payNote} · open Dispatch`,
+          `${holdCount > 1 ? `${holdCount} desk holds` : 'Desk hold'} ${result.mission.originIcao}→${result.mission.destIcao} · ${formatTonnes(result.kg)}${payNote} · open Dispatch`,
         );
       });
       return;
@@ -12988,7 +13046,10 @@ export function App() {
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
   const stagingPayUsd = staging
     ? staging.deskHold
-      ? deskHoldPayUsd(staging.deskHold)
+      ? deskHoldLines(staging).reduce(
+          (sum, line) => sum + deskHoldPayUsd(line),
+          0,
+        )
       : staging.lines.reduce(
           (sum, line) => sum + proRataPayUsd(line.lot, line.cargoKg),
           0,
@@ -13002,19 +13063,14 @@ export function App() {
       : null;
   const stagingTotalKg = staging
     ? staging.deskHold
-      ? deskHoldEffectiveLoadKg(staging.deskHold)
+      ? deskHoldLines(staging).reduce(
+          (sum, line) => sum + deskHoldEffectiveLoadKg(line),
+          0,
+        )
       : stagingUsedKg(staging)
     : 0;
-  const stagingDeskHoldMaxKg = staging?.deskHold
-    ? Math.max(
-        0,
-        Math.floor(
-          Math.min(
-            Math.floor(staging.deskHold.kg),
-            aircraftCapKg(staging.aircraft),
-          ),
-        ),
-      )
+  const stagingDeskHoldCapKg = staging?.deskHold
+    ? aircraftCapKg(staging.aircraft)
     : 0;
   const stagingFreeKg = staging
     ? Math.max(0, aircraftCapKg(staging.aircraft) - stagingTotalKg)
@@ -13037,7 +13093,13 @@ export function App() {
       stagingRangeOk(staging) &&
       routeFuelFeasible !== false &&
       deskHoldEffectiveLoadKg(staging.deskHold) > 0 &&
-      deskHoldEffectiveLoadKg(staging.deskHold) <= stagingDeskHoldMaxKg
+      stagingTotalKg <= stagingDeskHoldCapKg &&
+      deskHoldLines(staging).every(
+        (line) =>
+          deskHoldEffectiveLoadKg(line) <= Math.floor(line.kg) &&
+          deskHoldEffectiveLoadKg(line) <=
+            deskHoldMaxLoadKg(staging, line, stagingDeskHoldCapKg),
+      )
     : Boolean(staging) &&
       staging!.lines.length > 0 &&
       stagingAircraftAtOrigin &&
@@ -14036,10 +14098,15 @@ export function App() {
             destIcao={staging.destIcao}
             detail={
               staging.deskHold
-                ? `Desk ${staging.deskHold.kind ?? 'hold'} · ${formatTonnes(deskHoldEffectiveLoadKg(staging.deskHold))}${
-                    deskHoldEffectiveLoadKg(staging.deskHold) <
-                    Math.floor(staging.deskHold.kg)
-                      ? ` of ${formatTonnes(staging.deskHold.kg)}`
+                ? `Desk ${staging.deskHold.kind ?? 'hold'} · ${formatTonnes(stagingTotalKg)}${
+                    deskHoldLines(staging).filter(
+                      (line) => deskHoldEffectiveLoadKg(line) > 0,
+                    ).length > 1
+                      ? ` · ${
+                          deskHoldLines(staging).filter(
+                            (line) => deskHoldEffectiveLoadKg(line) > 0,
+                          ).length
+                        } holds`
                       : ''
                   }`
                 : `${staging.lines.length} lot(s) staged`
@@ -19553,96 +19620,111 @@ export function App() {
               {staging.deskHold ? (
                 <div className="staging-section">
                   <h3>Airline desk hold</h3>
+                  {(staging.deskHoldExtras?.length ?? 0) > 0 ? (
+                    <p className="muted staging-line-meta">
+                      Same destination — add another hold to this flight. Load 0
+                      leaves it on the Open desk.
+                    </p>
+                  ) : null}
                   <ul className="staging-lines">
-                    <li className="staging-line staging-line-compact">
-                      <div className="staging-line-head">
-                        <div className="staging-line-title">
-                          <strong>
-                            {staging.deskHold.commodityId
-                              ? staging.deskHold.commodityId.charAt(0).toUpperCase() +
-                                staging.deskHold.commodityId.slice(1)
-                              : 'Cargo'}
-                          </strong>
-                          <span className="tag">
-                            {staging.deskHold.kind === 'bridge'
-                              ? 'Bridge'
-                              : staging.deskHold.kind === 'haul'
-                                ? 'Wide haul'
-                                : 'Demand'}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="staging-line-meta">
-                        {staging.originIcao}→{staging.destIcao} · hold{' '}
-                        {formatTonnes(staging.deskHold.kg)} · load{' '}
-                        {formatTonnes(stagingTotalKg)} · pay{' '}
-                        {formatMoney(stagingContractPayUsd)}
-                        {staging.deskHold.expiresAtTick != null ? (
-                          <>
-                            {' '}
-                            ·{' '}
-                            {formatExpiry({
-                              expiresAtTick: staging.deskHold.expiresAtTick,
-                              currentTick: tick,
-                              continuousHours,
-                            })}
-                          </>
-                        ) : null}
-                        {stagingTotalKg < Math.floor(staging.deskHold.kg) ? (
-                          <>
-                            {' '}
-                            · remainder{' '}
-                            {formatTonnes(
-                              Math.floor(staging.deskHold.kg) - stagingTotalKg,
-                            )}{' '}
-                            stays on Open desk
-                          </>
-                        ) : null}
-                      </p>
-                      {(() => {
-                        const maxKg = stagingDeskHoldMaxKg;
-                        const displayMax = Math.max(
-                          0,
-                          Math.floor(kgToDisplay(maxKg, weightSystem)),
-                        );
-                        const displayValue = Math.round(
-                          kgToDisplay(stagingTotalKg, weightSystem),
-                        );
-                        const unit = massUnitLabel(weightSystem);
-                        return (
+                    {deskHoldLines(staging).map((holdLine) => {
+                      const loadKg = deskHoldEffectiveLoadKg(holdLine);
+                      const holdKg = Math.floor(holdLine.kg);
+                      const isPrimary = holdLine.id === staging.deskHold?.id;
+                      const maxKg = deskHoldMaxLoadKg(
+                        staging,
+                        holdLine,
+                        stagingDeskHoldCapKg,
+                      );
+                      const displayMax = Math.max(
+                        0,
+                        Math.floor(kgToDisplay(maxKg, weightSystem)),
+                      );
+                      const displayValue = Math.round(
+                        kgToDisplay(loadKg, weightSystem),
+                      );
+                      const unit = massUnitLabel(weightSystem);
+                      const sliderMin = isPrimary ? 1 : 0;
+                      return (
+                        <li
+                          key={holdLine.id}
+                          className="staging-line staging-line-compact"
+                        >
+                          <div className="staging-line-head">
+                            <div className="staging-line-title">
+                              <strong>
+                                {holdLine.commodityId
+                                  ? holdLine.commodityId.charAt(0).toUpperCase() +
+                                    holdLine.commodityId.slice(1)
+                                  : 'Cargo'}
+                              </strong>
+                              <span className="tag">
+                                {holdLine.kind === 'bridge'
+                                  ? 'Bridge'
+                                  : holdLine.kind === 'haul'
+                                    ? 'Wide haul'
+                                    : 'Demand'}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="staging-line-meta">
+                            {staging.originIcao}→{staging.destIcao} · hold{' '}
+                            {formatTonnes(holdKg)} · load {formatTonnes(loadKg)}{' '}
+                            · pay {formatMoney(deskHoldPayUsd(holdLine))}
+                            {holdLine.expiresAtTick != null ? (
+                              <>
+                                {' '}
+                                ·{' '}
+                                {formatExpiry({
+                                  expiresAtTick: holdLine.expiresAtTick,
+                                  currentTick: tick,
+                                  continuousHours,
+                                })}
+                              </>
+                            ) : null}
+                            {loadKg < holdKg ? (
+                              <>
+                                {' '}
+                                · remainder {formatTonnes(holdKg - loadKg)} stays
+                                on Open desk
+                              </>
+                            ) : null}
+                          </p>
                           <div className="staging-line-controls">
                             <label className="cargo-amount staging-cargo-amount">
                               Load
                               <div>
                                 <input
                                   type="number"
-                                  min={1}
-                                  max={Math.max(1, displayMax)}
+                                  min={sliderMin}
+                                  max={Math.max(sliderMin, displayMax)}
                                   step={weightSystem === 'imperial' ? 10 : 100}
                                   value={displayValue}
                                   onChange={(e) =>
                                     updateStagingDeskHoldKg(
+                                      holdLine.id,
                                       displayToKg(
                                         Number(e.target.value),
                                         weightSystem,
                                       ),
                                     )
                                   }
-                                  disabled={busy || maxKg <= 0}
+                                  disabled={busy || (isPrimary && maxKg <= 0)}
                                 />
                                 <span>{unit}</span>
                               </div>
                               <input
                                 type="range"
-                                min={1}
-                                max={Math.max(1, displayMax)}
+                                min={sliderMin}
+                                max={Math.max(sliderMin, displayMax)}
                                 step={1}
                                 value={Math.min(
                                   displayValue,
-                                  Math.max(1, displayMax),
+                                  Math.max(sliderMin, displayMax),
                                 )}
                                 onChange={(e) =>
                                   updateStagingDeskHoldKg(
+                                    holdLine.id,
                                     displayToKg(
                                       Number(e.target.value),
                                       weightSystem,
@@ -19660,7 +19742,10 @@ export function App() {
                                   className="staging-preset-chip"
                                   disabled={busy || maxKg <= 0}
                                   onClick={() =>
-                                    setStagingDeskHoldFraction(fraction)
+                                    setStagingDeskHoldFraction(
+                                      holdLine.id,
+                                      fraction,
+                                    )
                                   }
                                 >
                                   {fraction === 1
@@ -19670,9 +19755,9 @@ export function App() {
                               ))}
                             </div>
                           </div>
-                        );
-                      })()}
-                    </li>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ) : (
@@ -19914,7 +19999,7 @@ export function App() {
                           ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
                           : staging.deskHold
                             ? stagingTotalKg <= 0 ||
-                              stagingTotalKg > stagingDeskHoldMaxKg
+                              stagingTotalKg > stagingDeskHoldCapKg
                               ? 'Lower the load to the aircraft ops cap (or pick a larger tail) before Accept & Dispatch.'
                               : 'Finish the desk hold before Accept & Dispatch.'
                           : staging.lines.some((line) => {
@@ -20844,8 +20929,8 @@ export function App() {
           onHaulStaged={() => {
             goToTab('staging');
           }}
-          onPrepareHaulHold={(hold, aircraftId) => {
-            enterStagingForVaHaulHold(hold, aircraftId);
+          onPrepareHaulHold={(hold, aircraftId, sameRouteHolds) => {
+            enterStagingForVaHaulHold(hold, aircraftId, sameRouteHolds);
           }}
           onMissions={setMissions}
           onToast={(kind, message) => {

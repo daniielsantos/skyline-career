@@ -80,6 +80,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 **Company Network map per-node (2026-09-21):** sintoma = WH em pickup hub (ex. SBGR p/ Santos) sumia do mapa/chips; plot usava anchor/container do PortsMap. Causa = `hubsCoveredByFbo` omitia WH no nó; `pickupHubDetails` copiava coords do porto. Fix = um nó WH por ICAO; `CompanyNetworkMap` com mesmos glyphs dos chips; FBO no porto, WH no hub; feeder tracejado porto→WH.
 
+**Same-route desk holds on one flight (2026-09-27):** sintoma = dois holds KMIA→MMUN (Supplies + General) só voavam em missões separadas. Causa = manifesto/`*DispatchHold` amarravam um `holdId`. Fix = extras do mesmo origin+dest+kind no manifesto (load 0 fica no Open desk; Prepare abre quando há irmão); `dispatch*Holds` cria uma missão com N linhas (teto 5). Cancel/trim devolve cada commodity (e cada demand order). Settle de bridge usa o custo de cada linha.
+
 **Scout empty after Hold (2026-09-22 b):** sintoma = Hold no Scout → “No open Demand matches…” + banner ainda “N Demand matches”. Causa = hold reserva free kg (Scout some) mas loop banner usava stock bruto; empty hint não mencionava holds. Fix = banner com free kg (−demandHolds); empty hint / UI citam desk holds → Hauls; toast VA aponta Hauls.
 
 **Scout board gone after Hold (2026-09-22):** sintoma = Hold no Scout → tabela some (“No open Demand matches…”). Causa = confirm **não** mandava `companyId` (list sim) → re-list no tenant errado / `?? []` limpava arrays. Fix = `companyId` em bridge/demand/haul confirm + `applyScoutDesk` só troca arrays presentes + fallback `list`.

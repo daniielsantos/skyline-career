@@ -186,10 +186,12 @@ import {
   holdDemandOrder,
   cancelDemandHold,
   dispatchDemandHold,
+  dispatchDemandHolds,
   holdWarehouseBridge,
   cancelWarehouseBridgeHold,
   acceptWarehouseBridge,
   dispatchWarehouseBridgeHold,
+  dispatchWarehouseBridgeHolds,
   quoteInternalHaulForRoute,
   listOpenAirlineDeskHolds,
   listAirlineDeskMissions,
@@ -218,6 +220,7 @@ import {
   cancelWarehouseHaulHold,
   acceptWarehouseHaul,
   dispatchWarehouseHaulHold,
+  dispatchWarehouseHaulHolds,
   quoteWarehouseHaulPayUsd,
   replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
@@ -410,6 +413,37 @@ import {
   type CareerApiMode,
 } from './career-api-mode.ts';
 import { proxyToWorldApi } from './gateway-proxy.ts';
+
+function deskHoldDispatchSlices(body: {
+  holdId?: string;
+  kg?: number;
+  holds?: Array<{ holdId?: string; kg?: number }>;
+}): Array<{ holdId: string; kg?: number }> {
+  if (Array.isArray(body.holds) && body.holds.length > 0) {
+    const slices: Array<{ holdId: string; kg?: number }> = [];
+    for (const row of body.holds) {
+      const holdId = row?.holdId?.trim();
+      if (!holdId) continue;
+      const kg =
+        row.kg != null && Number.isFinite(Number(row.kg))
+          ? Number(row.kg)
+          : undefined;
+      slices.push({ holdId, kg });
+    }
+    return slices;
+  }
+  const holdId = body.holdId?.trim();
+  if (!holdId) return [];
+  return [
+    {
+      holdId,
+      kg:
+        body.kg != null && Number.isFinite(Number(body.kg))
+          ? Number(body.kg)
+          : undefined,
+    },
+  ];
+}
 import { homeCountryPersistence } from './home-country-persistence.ts';
 import {
   authRateLimitKeyFromRequest,
@@ -11240,9 +11274,11 @@ export function createCareerApiServer(port = 8787) {
           pilotPayUsd?: number | null;
           kg?: number;
           companyId?: string;
+          holds?: Array<{ holdId?: string; kg?: number }>;
         };
         const warehouses_bridge_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
-        if (!body.holdId || !body.aircraftId) {
+        const bridgeSlices = deskHoldDispatchSlices(body);
+        if (bridgeSlices.length === 0 || !body.aircraftId) {
           send(res, 400, {
             error: 'holdId and aircraftId required',
           });
@@ -11280,22 +11316,28 @@ export function createCareerApiServer(port = 8787) {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () =>
               withProgressionGates(missions, bridgeHoldProgression, () => {
-                const dispatched = dispatchWarehouseBridgeHold(missions, world, {
-                  holdId: body.holdId!,
-                  aircraftId: body.aircraftId!,
-                  kg:
-                    body.kg != null && Number.isFinite(Number(body.kg))
-                      ? Number(body.kg)
-                      : undefined,
-                  pilotPayUsd:
-                    body.pilotPayUsd === null
-                      ? 0
-                      : body.pilotPayUsd != null
-                        ? Number(body.pilotPayUsd)
-                        : undefined,
-                  ...pilotStamp,
-                  actorIsVaOwner: bridgeHoldActor.isOwner,
-                });
+                const bridgePilotPay =
+                  body.pilotPayUsd === null
+                    ? 0
+                    : body.pilotPayUsd != null
+                      ? Number(body.pilotPayUsd)
+                      : undefined;
+                const dispatched =
+                  bridgeSlices.length === 1
+                    ? dispatchWarehouseBridgeHold(missions, world, {
+                        holdId: bridgeSlices[0]!.holdId,
+                        aircraftId: body.aircraftId!,
+                        kg: bridgeSlices[0]!.kg,
+                        pilotPayUsd: bridgePilotPay,
+                        ...pilotStamp,
+                        actorIsVaOwner: bridgeHoldActor.isOwner,
+                      })
+                    : dispatchWarehouseBridgeHolds(missions, world, {
+                        aircraftId: body.aircraftId!,
+                        holds: bridgeSlices,
+                        ...pilotStamp,
+                        actorIsVaOwner: bridgeHoldActor.isOwner,
+                      });
                 return {
                   walletUsd: missions.walletUsd,
                   mission: withMissionClientView(
@@ -11547,9 +11589,11 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           kg?: number;
           companyId?: string;
+          holds?: Array<{ holdId?: string; kg?: number }>;
         };
         const warehouses_haul_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
-        if (!body.holdId || !body.aircraftId) {
+        const haulSlices = deskHoldDispatchSlices(body);
+        if (haulSlices.length === 0 || !body.aircraftId) {
           send(res, 400, {
             error: 'holdId and aircraftId required',
           });
@@ -11587,16 +11631,21 @@ export function createCareerApiServer(port = 8787) {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () =>
               withProgressionGates(missions, haulHoldProgression, () => {
-                const dispatched = dispatchWarehouseHaulHold(missions, world, {
-                  holdId: body.holdId!,
-                  aircraftId: body.aircraftId!,
-                  kg:
-                    body.kg != null && Number.isFinite(Number(body.kg))
-                      ? Number(body.kg)
-                      : undefined,
-                  ...haulPilotStamp,
-                  actorIsVaOwner: haulHoldActor.isOwner,
-                });
+                const dispatched =
+                  haulSlices.length === 1
+                    ? dispatchWarehouseHaulHold(missions, world, {
+                        holdId: haulSlices[0]!.holdId,
+                        aircraftId: body.aircraftId!,
+                        kg: haulSlices[0]!.kg,
+                        ...haulPilotStamp,
+                        actorIsVaOwner: haulHoldActor.isOwner,
+                      })
+                    : dispatchWarehouseHaulHolds(missions, world, {
+                        aircraftId: body.aircraftId!,
+                        holds: haulSlices,
+                        ...haulPilotStamp,
+                        actorIsVaOwner: haulHoldActor.isOwner,
+                      });
                 return {
                   walletUsd: missions.walletUsd,
                   mission: withMissionClientView(
@@ -11828,9 +11877,11 @@ export function createCareerApiServer(port = 8787) {
           aircraftId?: string;
           kg?: number;
           companyId?: string;
+          holds?: Array<{ holdId?: string; kg?: number }>;
         };
         const demand_dispatch_holdCompanyId = companyIdFromRequest(req, body.companyId);
-        if (!body.holdId || !body.aircraftId) {
+        const demandSlices = deskHoldDispatchSlices(body);
+        if (demandSlices.length === 0 || !body.aircraftId) {
           send(res, 400, {
             error: 'holdId and aircraftId required',
           });
@@ -11868,16 +11919,21 @@ export function createCareerApiServer(port = 8787) {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () =>
               withProgressionGates(missions, demandHoldProgression, () => {
-                const dispatched = dispatchDemandHold(missions, world, {
-                  holdId: body.holdId!,
-                  aircraftId: body.aircraftId!,
-                  kg:
-                    body.kg != null && Number.isFinite(Number(body.kg))
-                      ? Number(body.kg)
-                      : undefined,
-                  ...demandHoldStamp,
-                  actorIsVaOwner: demandHoldActor.isOwner,
-                });
+                const dispatched =
+                  demandSlices.length === 1
+                    ? dispatchDemandHold(missions, world, {
+                        holdId: demandSlices[0]!.holdId,
+                        aircraftId: body.aircraftId!,
+                        kg: demandSlices[0]!.kg,
+                        ...demandHoldStamp,
+                        actorIsVaOwner: demandHoldActor.isOwner,
+                      })
+                    : dispatchDemandHolds(missions, world, {
+                        aircraftId: body.aircraftId!,
+                        holds: demandSlices,
+                        ...demandHoldStamp,
+                        actorIsVaOwner: demandHoldActor.isOwner,
+                      });
                 const warehouses = playerWarehouseSnapshot(missions, world);
                 return {
                   walletUsd: missions.walletUsd,

@@ -290,18 +290,30 @@ export function DispatchActivePanel(props: {
     if (props.variantChoices?.length) {
       return (
         <div className="variant-tiebreak">
-          <p className="variant-tiebreak-note">Which version is in the sim?</p>
-          {props.variantChoices.map((choice) => (
+          <p className="variant-tiebreak-note">
+            Which version is in the sim?
             <button
-              key={choice.canonicalTitle}
               type="button"
-              className="action"
-              disabled={busy}
-              onClick={() => props.onDispatch(mission, choice.canonicalTitle)}
+              className="variant-tiebreak-help"
+              title="This paint does not name the version. SimBrief needs it for the OFP weight."
+              aria-label="This paint does not name the version. SimBrief needs it for the OFP weight."
             >
-              {choice.label}
+              ?
             </button>
-          ))}
+          </p>
+          <div className="variant-tiebreak-choices">
+            {props.variantChoices.map((choice) => (
+              <button
+                key={choice.canonicalTitle}
+                type="button"
+                className="action variant-tiebreak-choice"
+                disabled={busy}
+                onClick={() => props.onDispatch(mission, choice.canonicalTitle)}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
         </div>
       );
     }

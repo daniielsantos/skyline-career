@@ -253,6 +253,7 @@ body {
   font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-box: trim-both cap alphabetic;
   padding: 0.55rem 0.75rem 0.55rem 0.68rem;
   cursor: pointer;
   transition:
@@ -1134,6 +1135,8 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   line-height: 1;
+  /* Bebas Neue sits high in the em box; trim so the caps center in the control. */
+  text-box: trim-both cap alphabetic;
   cursor: pointer;
   transform: none;
   filter: none;
@@ -1165,6 +1168,7 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   line-height: 1;
+  text-box: trim-both cap alphabetic;
   cursor: pointer;
   opacity: 1;
   transform: none;

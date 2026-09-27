@@ -1,4 +1,7 @@
-# Current state (2026-09-26)
+# Current state (2026-09-27)
+
+`main` **afe07e3d** / desktop **0.3.357** shipped: Sell surplus Jet-A when an OFP authorizes fuel, and let Dev mode raise a Port FBO one level. Release: [v0.3.357](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.357).
+
 
 `main` **22b0e5d1** / desktop **0.3.356** shipped: Align Hangar cards and quiet the Airframes sim check. Release: [v0.3.356](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.356).
 

@@ -1715,7 +1715,8 @@ export function fetchCashflow(opts?: { companyId?: string }) {
   });
 }
 
-export function postCreditDraw(amountUsd: number) {
+export function postCreditDraw(amountUsd: number, companyId?: string) {
+  const id = companyId?.trim();
   return api<{
     walletUsd: number;
     drawnUsd: number;
@@ -1723,11 +1724,13 @@ export function postCreditDraw(amountUsd: number) {
     fleet?: PlayerAircraft[];
   }>('/api/credit/draw', {
     method: 'POST',
-    body: JSON.stringify({ amountUsd }),
+    body: JSON.stringify(id ? { amountUsd, companyId: id } : { amountUsd }),
+    headers: id ? { 'X-Skyline-Company-Id': id } : undefined,
   });
 }
 
-export function postCreditRepay(amountUsd: number) {
+export function postCreditRepay(amountUsd: number, companyId?: string) {
+  const id = companyId?.trim();
   return api<{
     walletUsd: number;
     repaidUsd: number;
@@ -1735,7 +1738,8 @@ export function postCreditRepay(amountUsd: number) {
     fleet?: PlayerAircraft[];
   }>('/api/credit/repay', {
     method: 'POST',
-    body: JSON.stringify({ amountUsd }),
+    body: JSON.stringify(id ? { amountUsd, companyId: id } : { amountUsd }),
+    headers: id ? { 'X-Skyline-Company-Id': id } : undefined,
   });
 }
 

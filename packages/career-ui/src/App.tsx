@@ -4276,6 +4276,29 @@ export function App() {
   const [hangarPane, setHangarPane] = useState<
     'aircraft' | 'cashflow' | 'cargo' | 'crew'
   >('aircraft');
+  /** Hangar cashflow is the home company. The request header is the VA while Crew is pinned. */
+  const hangarCashflowGen = useRef(0);
+  const refreshHangarCashflow = useCallback(() => {
+    const gen = ++hangarCashflowGen.current;
+    const companyId = homeCompanyIdRef.current?.trim();
+    return fetchCashflow(companyId ? { companyId } : undefined).then((snap) => {
+      if (gen !== hangarCashflowGen.current) return snap;
+      setCashflow(snap);
+      commitWallet(snap.walletUsd, {
+        sourceCompanyId: companyId || undefined,
+      });
+      if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
+      return snap;
+    });
+  }, [commitWallet]);
+  useEffect(() => {
+    if (tab !== 'hangar' || hangarPane !== 'cashflow') return;
+    if (!homeCompanyId?.trim()) return;
+    void refreshHangarCashflow().catch(() => undefined);
+    return () => {
+      hangarCashflowGen.current += 1;
+    };
+  }, [tab, hangarPane, homeCompanyId, refreshHangarCashflow]);
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
   const [pilotFlightHours, setPilotFlightHours] = useState(0);
@@ -8281,9 +8304,7 @@ export function App() {
       commitWallet(result.walletUsd);
       // Hangar cashflow + My VA Ledger keep their own snapshots — refresh both.
       try {
-        const snap = await fetchCashflow();
-        setCashflow(snap);
-        if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
+        await refreshHangarCashflow();
       } catch {
         /* soft — wallet paint already committed */
       }
@@ -11161,6 +11182,14 @@ export function App() {
       setToast(
         `Manifest · ${selectedAircraft.label} is at ${selectedAircraft.locationIcao} — ferry to ${origin} before Accept & Dispatch`,
       );
+    } else {
+      const pilot = pilotIcao.trim().toUpperCase();
+      if (pilot && pilot !== origin) {
+        setToastKind('warn');
+        setToast(
+          `Pilot is at ${pilot}, not ${origin} — travel there before dispatch`,
+        );
+      }
     }
   }
 
@@ -13102,9 +13131,15 @@ export function App() {
       stagingAssignedAircraft.locationIcao.trim().toUpperCase() ===
         staging.originIcao.trim().toUpperCase(),
   );
+  const stagingPilot = pilotIcao.trim().toUpperCase();
+  const stagingPilotAtOrigin =
+    !staging ||
+    !stagingPilot ||
+    stagingPilot === staging.originIcao.trim().toUpperCase();
   const stagingValid = staging?.deskHold
     ? Boolean(staging.aircraftId) &&
       stagingAircraftAtOrigin &&
+      stagingPilotAtOrigin &&
       stagingRangeOk(staging) &&
       routeFuelFeasible !== false &&
       deskHoldEffectiveLoadKg(staging.deskHold) > 0 &&
@@ -19962,7 +19997,9 @@ export function App() {
                     <p className="cargo-dialog-error">
                       {!stagingAircraftAtOrigin
                         ? `Aircraft must be at ${staging.originIcao} — ferry first, then Accept & Dispatch.`
-                        : !stagingInRange
+                        : !stagingPilotAtOrigin
+                          ? `Pilot is at ${stagingPilot}, not ${staging.originIcao} — travel there before dispatch`
+                          : !stagingInRange
                         ? 'Route exceeds aircraft range — pick another airframe or shorter hop.'
                         : !stagingFuelOk
                           ? 'Planning fuel exceeds tank capacity — reduce payload or pick another aircraft.'
@@ -20895,6 +20932,7 @@ export function App() {
             clientUpdateBlock?.minClientVersion ?? null
           }
           onOpenUpdates={() => selectTab('settings')}
+          pilotIcao={pilotIcao}
           onHaulStaged={() => {
             goToTab('staging');
           }}
@@ -21328,16 +21366,7 @@ export function App() {
                   className={hangarPane === 'cashflow' ? 'tab active' : 'tab'}
                   onClick={() => {
                     setHangarPane('cashflow');
-                    void fetchCashflow()
-                      .then((snap) => {
-                        setCashflow(snap);
-                        // commitWallet is chrome-sticky when active ≠ home.
-                        commitWallet(snap.walletUsd);
-                        if (snap.companyCredit) {
-                          setCompanyCredit(snap.companyCredit);
-                        }
-                      })
-                      .catch(() => undefined);
+                    void refreshHangarCashflow().catch(() => undefined);
                   }}
                 >
                   Cashflow
@@ -21375,15 +21404,13 @@ export function App() {
               walletUsd={wallet}
               busy={busy}
               formatMoney={formatMoney}
+              creditCompanyId={homeCompanyId ?? undefined}
               onCreditUpdated={({ walletUsd, companyCredit: next }) => {
-                commitWallet(walletUsd);
+                commitWallet(walletUsd, {
+                  sourceCompanyId: homeCompanyIdRef.current?.trim(),
+                });
                 setCompanyCredit(next);
-                void fetchCashflow()
-                  .then((snap) => {
-                    setCashflow(snap);
-                    if (snap.companyCredit) setCompanyCredit(snap.companyCredit);
-                  })
-                  .catch(() => undefined);
+                void refreshHangarCashflow().catch(() => undefined);
                 setToastKind('ok');
                 setToast(
                   next.principalUsd > 0

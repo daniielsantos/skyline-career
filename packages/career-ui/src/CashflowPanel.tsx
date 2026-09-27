@@ -247,6 +247,8 @@ export function CompanyCreditBlock(props: {
    */
   vaOwnerOpsLabels?: boolean;
   formatMoney: (n: number) => string;
+  /** Home company when the session header is a VA. Omit to use the active tenant. */
+  creditCompanyId?: string;
   onUpdated: (next: {
     walletUsd: number;
     companyCredit: CompanyCreditSnapshot;
@@ -279,7 +281,7 @@ export function CompanyCreditBlock(props: {
     }
     setLocalBusy(true);
     try {
-      const result = await postCreditDraw(amount);
+      const result = await postCreditDraw(amount, props.creditCompanyId);
       props.onUpdated({
         walletUsd: result.walletUsd,
         companyCredit: result.companyCredit,
@@ -300,7 +302,7 @@ export function CompanyCreditBlock(props: {
     }
     setLocalBusy(true);
     try {
-      const result = await postCreditRepay(amount);
+      const result = await postCreditRepay(amount, props.creditCompanyId);
       props.onUpdated({
         walletUsd: result.walletUsd,
         companyCredit: result.companyCredit,
@@ -436,6 +438,8 @@ export function HangarCashflowPanel(props: {
   creditActionsLocked?: boolean;
   /** VA Ledger hero owns Credit — omit the inline block here. */
   hideCredit?: boolean;
+  /** Draw/repay target. Hangar passes the home company so a VA session cannot touch the airline line. */
+  creditCompanyId?: string;
   /** When true, omit week/month/all-time (rendered above by CashflowSummaryGrid). */
   hideSummaries?: boolean;
   /** VA listed: label credit Cargo Ops as owner ladder (formula unchanged). */
@@ -489,6 +493,7 @@ export function HangarCashflowPanel(props: {
           walletUsd={props.walletUsd}
           busy={props.busy}
           actionsLocked={props.creditActionsLocked}
+          creditCompanyId={props.creditCompanyId}
           vaOwnerOpsLabels={props.vaOwnerOpsLabels}
           formatMoney={props.formatMoney}
           onUpdated={props.onCreditUpdated}

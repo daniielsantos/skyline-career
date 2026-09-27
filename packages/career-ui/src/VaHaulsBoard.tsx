@@ -125,6 +125,8 @@ type Props = {
   onFleet?: (fleet: PlayerAircraft[]) => void;
   onMissions?: (missions: Mission[]) => void;
   onStaged?: (mission: Mission) => void;
+  /** Logged-in pilot hub. Off-location opens the manifest instead of failing Accept. */
+  pilotIcao?: string;
   /** Off-origin or oversize hold: open Dispatch Manifest (ferry / partial load). */
   onPrepareHold?: (
     hold: VaHaulHold,
@@ -296,8 +298,11 @@ export function VaHaulsBoard(props: Props) {
     const origin = hold.originIcao.trim().toUpperCase();
     const atOrigin =
       (acf.locationIcao ?? '').trim().toUpperCase() === origin;
+    const pilot = (props.pilotIcao ?? '').trim().toUpperCase();
+    const pilotAway = Boolean(pilot) && pilot !== origin;
     return (
       !atOrigin ||
+      pilotAway ||
       holdNeedsPartialLoad(hold, acf) ||
       sameRouteSiblings(hold).length > 0
     );

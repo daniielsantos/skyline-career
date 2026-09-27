@@ -219,6 +219,8 @@ type Props = {
   onOpenUpdates?: () => void;
   /** After Accept Internal Haul — open Dispatch / staging. */
   onHaulStaged?: (mission: Mission) => void;
+  /** Logged-in pilot hub — Hauls opens the manifest when they are not at the hold origin. */
+  pilotIcao?: string;
   /** Open Dispatch Manifest for a desk hold (ferry off-origin there). */
   onPrepareHaulHold?: (
     hold: VaHaulHold,
@@ -1433,6 +1435,7 @@ export function VaPage(props: Props) {
           }}
           onMissions={props.onMissions}
           onStaged={props.onHaulStaged}
+          pilotIcao={props.pilotIcao}
           onPrepareHold={props.onPrepareHaulHold}
           resolveMaxCargoKg={props.resolveMaxCargoKg}
           economyTick={props.economyTick}

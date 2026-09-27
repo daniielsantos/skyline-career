@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **f7df1b2e** / desktop **0.3.358** shipped: Quiet the en-route MX burn line and shrink the roster Live pill. Release: [v0.3.358](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.358).
+
+
 `main` **afe07e3d** / desktop **0.3.357** shipped: Sell surplus Jet-A when an OFP authorizes fuel, and let Dev mode raise a Port FBO one level. Release: [v0.3.357](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.357).
 
 

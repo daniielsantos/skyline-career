@@ -4,6 +4,7 @@
  */
 
 import { appendLedgerMarker, applyWalletDelta } from './career-ledger.js';
+import { liquidateConcessionJetA } from './career-port-jet-a.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { getCareerPort, listCareerPorts } from './career-ports.js';
 import { ensurePlayerWarehouses } from './career-warehouse.js';
@@ -996,6 +997,8 @@ export function surrenderPortConcession(
     throw new Error('No active Port FBO to drop on this port');
   }
 
+  liquidateConcessionJetA(state, world, conc);
+
   state.playerPortConcessions = before.filter(
     (c) => !(c.portId === port.id && c.companyId === companyId),
   );
@@ -1122,6 +1125,11 @@ export function tickPortConcessions(
   world: CareerEconomyWorld,
 ): boolean {
   const before = ensurePlayerPortConcessions(state);
+  for (const conc of before) {
+    if (conc.leasePaidThroughTick <= world.tick) {
+      liquidateConcessionJetA(state, world, conc);
+    }
+  }
   const touchIds = [...new Set(before.map((c) => c.companyId).filter(Boolean))];
   state.playerPortConcessions = before.filter(
     (c) => c.leasePaidThroughTick > world.tick,

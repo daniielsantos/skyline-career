@@ -80,6 +80,7 @@ export const LEDGER_KIND_LABEL: Record<CareerLedgerKind, string> = {
   ferry: 'Ferry',
   pilot_travel: 'Pilot travel',
   fuel: 'Jet-A',
+  port_fbo_jet_a: 'Port FBO Jet-A',
   inspection: 'Inspection',
   repair: 'Repair',
   engine_overhaul: 'Engine overhaul',

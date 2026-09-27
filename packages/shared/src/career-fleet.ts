@@ -20,6 +20,7 @@ import {
   isFerryRouteWaypoint,
 } from './career-ferry-route.js';
 import { fboServiceCostMult } from './career-fbo-perks.js';
+import { peekPortJetAKg, takePortJetAForUplift } from './career-port-jet-a.js';
 import { formatDisplayLabel } from './career-display-name.js';
 import {
   ensureAircraftConditionPcts,
@@ -1360,7 +1361,14 @@ export function applyPlayerDepartFuel(
   const distanceNm =
     routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
   const neededKg = estimateUpliftKg(aircraft.aircraftClassId, distanceNm);
-  const shortfall = Math.max(0, neededKg - Math.floor(aircraft.fuelKg));
+  const gap = Math.max(0, neededKg - Math.floor(aircraft.fuelKg));
+  const drawn = takePortJetAForUplift(
+    state,
+    world.tick,
+    mission.originIcao,
+    gap,
+  );
+  const shortfall = Math.max(0, gap - drawn);
 
   let fuelDebitUsd = 0;
   let fuelUplift: MissionFuelUplift;
@@ -1377,18 +1385,24 @@ export function applyPlayerDepartFuel(
     fuelDebitUsd = fuelUplift.costUsd;
     aircraft.fuelKg = Math.min(
       aircraft.fuelCapacityKg,
-      aircraft.fuelKg + fuelUplift.deliveredKg,
+      aircraft.fuelKg + fuelUplift.deliveredKg + drawn,
     );
   } else {
     fuelUplift = {
       originIcao: mission.originIcao.toUpperCase(),
       requestedKg: 0,
-      deliveredKg: 0,
+      deliveredKg: drawn,
       unitPriceUsd: 0,
       costUsd: 0,
       scarcity: 'ok',
       upliftedAtTick: world.tick,
     };
+    if (drawn > 0) {
+      aircraft.fuelKg = Math.min(
+        aircraft.fuelCapacityKg,
+        aircraft.fuelKg + drawn,
+      );
+    }
   }
 
   return {
@@ -1410,6 +1424,10 @@ export interface PlayerMissionOfpFuelQuote {
   currentFuelKg: number;
   fuelCapacityKg: number;
   shortfallKg: number;
+  /** Already-paid Port FBO tank kg applied before spot. */
+  tankKg: number;
+  /** Spot purchase after the tank. */
+  spotShortfallKg: number;
   /** Hangar fuel above the OFP block, sold back at the airport spot price. */
   surplusKg: number;
   surplusCreditUsd: number;
@@ -1441,6 +1459,8 @@ export function quotePlayerMissionOfpFuel(
       currentFuelKg: requiredBlockFuelKg,
       fuelCapacityKg: requiredBlockFuelKg,
       shortfallKg: 0,
+      tankKg: 0,
+      spotShortfallKg: 0,
       surplusKg: 0,
       surplusCreditUsd: 0,
       authorized: mission.fuelAuthorizedOfpId === opts.ofpId,
@@ -1478,15 +1498,23 @@ export function quotePlayerMissionOfpFuel(
   );
   const shortfallKg = Math.max(0, requiredBlockFuelKg - Math.floor(currentFuelKg));
   const surplusKg = Math.max(0, Math.floor(currentFuelKg) - requiredBlockFuelKg);
+  const tankKg =
+    surplusKg > 0
+      ? 0
+      : Math.min(
+          shortfallKg,
+          peekPortJetAKg(state, world.tick, mission.originIcao),
+        );
+  const spotShortfallKg = Math.max(0, shortfallKg - tankKg);
   const priced = quoteFuelUplift(world, {
     originIcao: mission.originIcao,
     destIcao: mission.destIcao,
     aircraftClassId: aircraft.aircraftClassId,
-    requestedKg: Math.max(1, shortfallKg),
+    requestedKg: Math.max(1, spotShortfallKg),
     costMult: fboServiceCostMult(state, mission.originIcao),
   });
   const uplift: FuelUpliftQuote =
-    shortfallKg > 0
+    spotShortfallKg > 0
       ? priced
       : {
           ...priced,
@@ -1503,6 +1531,8 @@ export function quotePlayerMissionOfpFuel(
     currentFuelKg,
     fuelCapacityKg: aircraft.fuelCapacityKg,
     shortfallKg,
+    tankKg,
+    spotShortfallKg,
     surplusKg,
     surplusCreditUsd:
       surplusKg > 0 ? Math.round(surplusKg * priced.unitPriceUsd) : 0,
@@ -1568,8 +1598,11 @@ export function purchasePlayerMissionOfpFuel(
   }
 
   const purchased =
-    quote.shortfallKg > 0
-      ? deliverFuelUplift(world, quote.uplift)
+    quote.spotShortfallKg > 0
+      ? deliverFuelUplift(world, {
+          ...quote.uplift,
+          requestedKg: quote.spotShortfallKg,
+        })
       : {
           originIcao: quote.originIcao,
           requestedKg: 0,
@@ -1579,6 +1612,12 @@ export function purchasePlayerMissionOfpFuel(
           scarcity: 'ok' as const,
           upliftedAtTick: world.tick,
         };
+  const drawn = takePortJetAForUplift(
+    state,
+    world.tick,
+    quote.originIcao,
+    quote.tankKg ?? 0,
+  );
   let fuelCreditUsd = 0;
   if (quote.surplusKg > 0) {
     aircraft.fuelKg = quote.requiredBlockFuelKg;
@@ -1587,7 +1626,7 @@ export function purchasePlayerMissionOfpFuel(
   }
   aircraft.fuelKg = Math.min(
     aircraft.fuelCapacityKg,
-    aircraft.fuelKg + purchased.deliveredKg,
+    aircraft.fuelKg + purchased.deliveredKg + drawn,
   );
   const distanceNm =
     routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;

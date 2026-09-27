@@ -3070,6 +3070,19 @@ export type PortsSnapshot = {
         fromLevel: number;
         toLevel: number;
       } | null;
+      jetATank?: {
+        kg: number;
+        capacityKg: number;
+        spotSellableKg: number;
+        spotUnitUsd: number;
+        sources: Array<{
+          icao: string;
+          name: string;
+          distanceNm: number;
+          sellableKg: number;
+          unitUsd: number;
+        }>;
+      } | null;
     };
   }>;
   pickups: PlayerPortPickupView[];
@@ -3209,6 +3222,8 @@ export type DemandOrderView = {
   expiresAtTick: number;
   status: string;
   localSpotUsd: number | null;
+  /** Restricted Jet-A haul. Unit price is the flight fee. */
+  fuelHaul?: { pickupIcao: string };
 };
 
 export type DemandSnapshot = {
@@ -3714,6 +3729,54 @@ export function postPortConcessionSurrender(opts: { portId: string }) {
     removedAutoBuyOrders: number;
     ports: PortsSnapshot;
   }>('/api/ports/concession/surrender', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortJetABuy(opts: { portId: string; kg: number }) {
+  return api<{
+    kg: number;
+    costUsd: number;
+    walletUsd: number;
+    ports: PortsSnapshot;
+  }>('/api/ports/jet-a/buy', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortJetAFetch(opts: {
+  portId: string;
+  originIcao: string;
+  aircraftId: string;
+  kg?: number;
+}) {
+  return api<{
+    kg: number;
+    costUsd: number;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+    mission: Mission;
+    missions: Mission[];
+    ports: PortsSnapshot;
+  }>('/api/ports/jet-a/fetch', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortJetAHaul(opts: { orderId: string; aircraftId: string }) {
+  return api<{
+    kg: number;
+    payUsd: number;
+    fuelCostUsd: number;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+    mission: Mission;
+    missions: Mission[];
+    ports: PortsSnapshot;
+  }>('/api/ports/jet-a/haul', {
     method: 'POST',
     body: JSON.stringify(opts),
   });
@@ -4767,6 +4830,8 @@ export type MissionFuelQuote = {
   currentFuelKg: number;
   fuelCapacityKg: number;
   shortfallKg: number;
+  tankKg?: number;
+  spotShortfallKg?: number;
   /** Hangar fuel above the OFP block. Sold when the OFP fuel step authorizes. */
   surplusKg?: number;
   surplusCreditUsd?: number;

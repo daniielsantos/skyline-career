@@ -20,6 +20,9 @@ import {
   postPortConcessionRenew,
   postPortConcessionSurrender,
   postPortConcessionUpgrade,
+  postPortJetABuy,
+  postPortJetAFetch,
+  postPortJetAHaul,
   postPortDeposit,
   postPortPickupAbandon,
   postWarehouseBuy,
@@ -423,6 +426,7 @@ export function PortsPanel(props: {
   const [mapFocusToken, setMapFocusToken] = useState(0);
   const [buyListing, setBuyListing] = useState<PortListingView | null>(null);
   const [concessionOpen, setConcessionOpen] = useState(false);
+  const [jetABuyText, setJetABuyText] = useState('');
   const [deskCommodity, setDeskCommodity] = useState('general');
   const [deskMaxPrice, setDeskMaxPrice] = useState('');
   const [deskMaxKgDay, setDeskMaxKgDay] = useState('');
@@ -1453,6 +1457,87 @@ export function PortsPanel(props: {
       // refresh. Reload now so Haul/Demand/Bridge appear without leaving Ports.
       const logisticsId = props.logisticsCompanyId?.trim() || undefined;
       await reloadScoutDesk(logisticsId).catch(() => undefined);
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onBuyPortJetA(portIdToBuy: string) {
+    if (props.busy || loading) return;
+    const kg = displayMassToStoredKg(Number(jetABuyText), props.weightSystem);
+    if (!(kg > 0)) {
+      props.onToast?.('fail', 'Enter how much Jet-A to buy into the tank');
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await postPortJetABuy({ portId: portIdToBuy, kg });
+      props.onWallet?.(result.walletUsd);
+      setSnap(result.ports);
+      setJetABuyText('');
+      props.onToast?.(
+        'ok',
+        `Port FBO tank · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.costUsd)}`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onFetchPortJetA(
+    portIdToFetch: string,
+    originIcao: string,
+    aircraftId: string,
+  ) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortJetAFetch({
+        portId: portIdToFetch,
+        originIcao,
+        aircraftId,
+      });
+      props.onWallet?.(result.walletUsd);
+      props.onFleet?.(result.fleet);
+      props.onMissions?.(result.missions.slice().reverse());
+      setSnap(result.ports);
+      props.onToast?.(
+        'ok',
+        `Jet-A stock ${originIcao} → tank · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.costUsd)} · unpaid`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onFlyPortJetAHaul(orderId: string, aircraftId: string) {
+    if (props.busy || loading) return;
+    setLoading(true);
+    try {
+      const result = await postPortJetAHaul({ orderId, aircraftId });
+      props.onWallet?.(result.walletUsd);
+      props.onFleet?.(result.fleet);
+      props.onMissions?.(result.missions.slice().reverse());
+      setSnap(result.ports);
+      props.onToast?.(
+        'ok',
+        `Jet-A haul · ${props.formatTonnes(result.kg)} · fee ${props.formatMoney(result.payUsd)}`,
+      );
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -4223,6 +4308,76 @@ export function PortsPanel(props: {
                 <div className="ports-main ports-fbo-main ports-network-detail">
                   <div className="ports-listings ports-fbo-panel">
                     <>
+                        {port.concession?.jetATank ? (
+                          <div className="ports-jeta-tank" aria-label="Port FBO Jet-A tank">
+                            <p className="ports-scout-title">
+                              Jet-A tank{' '}
+                              <span className="muted">
+                                {props.formatTonnes(port.concession.jetATank.kg)} /{' '}
+                                {props.formatTonnes(port.concession.jetATank.capacityKg)}
+                              </span>
+                            </p>
+                            <p className="muted ports-warehouse-hint">
+                              Dispatch here draws the tank before the airport price.
+                              Stocking flights are not paid.
+                            </p>
+                            <div className="confirm-actions">
+                              <input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                placeholder={`Buy at ${port.pickupHubs?.[0] ?? 'spot'} · ${unit}`}
+                                value={jetABuyText}
+                                disabled={props.busy || loading}
+                                onChange={(event) => setJetABuyText(event.target.value)}
+                              />
+                              <button
+                                type="button"
+                                className="action"
+                                disabled={props.busy || loading}
+                                onClick={() => void onBuyPortJetA(port.id)}
+                              >
+                                Buy spot
+                              </button>
+                            </div>
+                            {port.concession.jetATank.sources.length > 0 ? (
+                              <div className="confirm-actions">
+                                {port.concession.jetATank.sources.map((source) => {
+                                  const parked = props.fleet.find(
+                                    (aircraft) =>
+                                      aircraft.status === 'parked' &&
+                                      aircraft.locationIcao.trim().toUpperCase() ===
+                                        source.icao,
+                                  );
+                                  return (
+                                    <button
+                                      key={source.icao}
+                                      type="button"
+                                      className="action ghost"
+                                      disabled={props.busy || loading || !parked}
+                                      title={
+                                        parked
+                                          ? `Buy Jet-A at ${source.icao} and fly it into the tank. Not paid.`
+                                          : `Park an aircraft at ${source.icao} to fetch Jet-A`
+                                      }
+                                      onClick={() =>
+                                        parked
+                                          ? void onFetchPortJetA(
+                                              port.id,
+                                              source.icao,
+                                              parked.id,
+                                            )
+                                          : undefined
+                                      }
+                                    >
+                                      Fetch {source.icao} · {source.distanceNm} nm
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div
                           className="ports-scout-desk"
                           aria-label="Port FBO scout suggestions"
@@ -6230,6 +6385,12 @@ export function PortsPanel(props: {
                               />
                               <div>
                                 <strong>{commodityLabel(o)}</strong>
+                                {o.fuelHaul ? (
+                                  <span className="muted">
+                                    {' '}
+                                    · {o.fuelHaul.pickupIcao} → {o.destIcao}
+                                  </span>
+                                ) : null}
                                 {cargoLocked ? (
                                   <span
                                     className="tag"
@@ -6282,6 +6443,43 @@ export function PortsPanel(props: {
                                 title="Already held at your warehouse — Dispatch or Release from Warehouse"
                               >
                                 Held
+                              </button>
+                            ) : o.fuelHaul ? (
+                              <button
+                                type="button"
+                                className="accept"
+                                disabled={
+                                  props.busy ||
+                                  loading ||
+                                  !props.fleet.some(
+                                    (aircraft) =>
+                                      aircraft.status === 'parked' &&
+                                      aircraft.locationIcao
+                                        .trim()
+                                        .toUpperCase() ===
+                                        o.fuelHaul!.pickupIcao
+                                          .trim()
+                                          .toUpperCase(),
+                                  )
+                                }
+                                title="Restricted haul. The fee is for the flight. Park at the pickup airport."
+                                onClick={() => {
+                                  const parked = props.fleet.find(
+                                    (aircraft) =>
+                                      aircraft.status === 'parked' &&
+                                      aircraft.locationIcao
+                                        .trim()
+                                        .toUpperCase() ===
+                                        o.fuelHaul!.pickupIcao
+                                          .trim()
+                                          .toUpperCase(),
+                                  );
+                                  if (parked) {
+                                    void onFlyPortJetAHaul(o.id, parked.id);
+                                  }
+                                }}
+                              >
+                                Fly
                               </button>
                             ) : (
                               <button

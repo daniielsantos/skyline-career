@@ -183,6 +183,9 @@ import {
   expireDemandHolds,
   demandSnapshot,
   acceptDemandOrder,
+  acceptPortJetAHaul,
+  startPortJetAReposition,
+  buyPortFboJetA,
   holdDemandOrder,
   cancelDemandHold,
   dispatchDemandHold,
@@ -364,6 +367,7 @@ import {
   isFlightTrackFresh,
   FLIGHT_TRACK_FRESH_MS,
   getCareerPort,
+  resolvePortPickupHub,
   listCareerPorts,
   type CareerEconomyWorld,
   type CareerMissionsState,
@@ -9745,6 +9749,148 @@ export function createCareerApiServer(port = 8787) {
           send(res, 200, result);
         } catch (error) {
           send(res, vaPermissionStatus(error), {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/jet-a/buy') {
+        const body = (await readBody(req)) as {
+          portId?: string;
+          kg?: number;
+          companyId?: string;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!body.portId) {
+          send(res, 400, { error: 'portId required' });
+          return;
+        }
+        try {
+          await assertVaPortDeskOps(
+            req,
+            companyId,
+            'buy Jet-A into the Port FBO tank',
+          );
+          const port = getCareerPort(body.portId);
+          if (!port) {
+            send(res, 400, { error: 'Unknown port' });
+            return;
+          }
+          const hub = resolvePortPickupHub(port);
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const bought = buyPortFboJetA(missions, world, {
+              portId: body.portId!,
+              kg: Number(body.kg),
+              companyId,
+            });
+            return {
+              kg: bought.kg,
+              costUsd: bought.costUsd,
+              walletUsd: missions.walletUsd,
+              ports: portSnapshot(world, missions, { viewerCompanyId: companyId }),
+            };
+          }, {
+            commandSliceIcaos: [hub.trim().toUpperCase()],
+            companyId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, vaPermissionStatus(error), {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/jet-a/fetch') {
+        const body = (await readBody(req)) as {
+          portId?: string;
+          originIcao?: string;
+          aircraftId?: string;
+          kg?: number;
+          companyId?: string;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!body.portId || !body.originIcao || !body.aircraftId) {
+          send(res, 400, { error: 'portId, originIcao, and aircraftId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const started = startPortJetAReposition(missions, world, {
+              portId: body.portId!,
+              originIcao: body.originIcao!,
+              aircraftId: body.aircraftId!,
+              kg: body.kg != null ? Number(body.kg) : undefined,
+              companyId,
+            });
+            return {
+              kg: started.kg,
+              costUsd: started.costUsd,
+              walletUsd: missions.walletUsd,
+              fleet: missions.fleet,
+              mission: withMissionClientView(world, missions, started.mission),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+              ports: portSnapshot(world, missions, { viewerCompanyId: companyId }),
+            };
+          }, {
+            commandSliceAircraftId: body.aircraftId,
+            commandSliceIcaos: [body.originIcao.trim().toUpperCase()],
+            companyId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/jet-a/haul') {
+        const body = (await readBody(req)) as {
+          orderId?: string;
+          aircraftId?: string;
+          companyId?: string;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!body.orderId || !body.aircraftId) {
+          send(res, 400, { error: 'orderId and aircraftId required' });
+          return;
+        }
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const accepted = acceptPortJetAHaul(missions, world, {
+              orderId: body.orderId!,
+              aircraftId: body.aircraftId!,
+              companyId,
+            });
+            return {
+              kg: accepted.kg,
+              payUsd: accepted.payUsd,
+              fuelCostUsd: accepted.fuelCostUsd,
+              walletUsd: missions.walletUsd,
+              fleet: missions.fleet,
+              mission: withMissionClientView(world, missions, accepted.mission),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+              ports: portSnapshot(world, missions, { viewerCompanyId: companyId }),
+            };
+          }, {
+            persistDemandOrderId: body.orderId,
+            commandSliceAircraftId: body.aircraftId,
+            companyId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
           });
         }

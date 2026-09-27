@@ -958,6 +958,21 @@ export interface MissionIntent {
   /** SimBrief OFP whose block-fuel requirement has been funded/accepted. */
   fuelAuthorizedOfpId?: string;
   /**
+   * Career Jet-A moved by this flight. Not sim payload — holds stay empty.
+   * `reposition` stocks the company tank (unpaid). `demand` delivers to a
+   * short field and pays only the haul fee.
+   */
+  fuelHaul?: {
+    kind: 'reposition' | 'demand';
+    portId: string;
+    kg: number;
+    fromTankKg: number;
+    boughtKg: number;
+    boughtUsd: number;
+    orderId?: string;
+    refunded?: boolean;
+  };
+  /**
    * Bumped on every lastOfpCheck write (and cargo-trim before reconfirm).
    * Stale auto-confirm must not overwrite a newer Accept OFP cargo snapshot.
    */
@@ -1738,6 +1753,11 @@ export interface DemandOrder {
   arrivedAtTick: number;
   expiresAtTick: number;
   status: DemandOrderStatus;
+  /**
+   * Restricted Jet-A haul. Pickup is a surplus airport; dest is the short field.
+   * The unit price is the haul fee, not a Jet-A markup.
+   */
+  fuelHaul?: { pickupIcao: string };
 }
 
 /** Open factory catalog row at a real-world seaport. */
@@ -1812,6 +1832,8 @@ export interface PlayerPortConcession {
   throughputWindowDay?: number;
   /** Last 7 economy days of port throughput, `[today, yesterday, …]`. */
   throughputWindowKg?: number[];
+  /** Company Jet-A already paid for, stored at this Port FBO (kg). */
+  jetAKg?: number;
 }
 
 /**
@@ -2105,6 +2127,7 @@ export type CareerLedgerKind =
   | 'ferry'
   | 'pilot_travel'
   | 'fuel'
+  | 'port_fbo_jet_a'
   | 'inspection'
   | 'repair'
   | 'engine_overhaul'

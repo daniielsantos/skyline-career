@@ -49,6 +49,11 @@ import {
   syncWorldPortConcessions,
   tickPortConcessions,
 } from './career-port-concessions.js';
+import {
+  listJetASurplusSources,
+  portJetATankCapacityKg,
+} from './career-port-jet-a.js';
+import { fuelTerminalSellableKg } from './career-fuel.js';
 import { demandSnapshot, ensureDemandOrders, expireDemandHolds } from './career-demand.js';
 import { expireTourLotSoftHolds } from './career-base-dispatch-tour.js';
 import { bindPortCorridorLookups } from './career-port-corridor.js';
@@ -1965,6 +1970,35 @@ export function portPickupMarketSignals(
     }
     if (best) signals.push(best);
   }
+  const fuelBest = pickupHubs.reduce<{
+    fill: number;
+    hub: string;
+  } | null>((best, raw) => {
+    const hub = raw.trim().toUpperCase();
+    if (!hub) return best;
+    const pile = airportByIcao(world, hub)?.inventory?.fuel;
+    if (!pile || !(pile.capacityKg > 0)) return best;
+    const fill = Math.min(1, Math.max(0, pile.stockKg / pile.capacityKg));
+    if (!best || Math.abs(fill - 0.5) > Math.abs(best.fill - 0.5)) {
+      return { fill, hub };
+    }
+    return best;
+  }, null);
+  if (fuelBest) {
+    const balance: PortMarketSignalBalance =
+      fuelBest.fill >= PORT_HUB_SURPLUS_FILL
+        ? 'surplus'
+        : fuelBest.fill <= PORT_HUB_TIGHT_FILL
+          ? 'shortage'
+          : 'balanced';
+    signals.push({
+      commodityId: 'fuel',
+      commodityName: 'Jet-A',
+      balance,
+      fillPct: Math.round(fuelBest.fill * 1000) / 10,
+      hubIcao: fuelBest.hub,
+    });
+  }
   return signals;
 }
 
@@ -2750,6 +2784,13 @@ export function portSnapshot(
         renewLeaseUsd: number | null;
         claim: ReturnType<typeof evaluatePortConcessionClaim> | null;
         upgrade: ReturnType<typeof evaluatePortConcessionUpgrade> | null;
+        jetATank: {
+          kg: number;
+          capacityKg: number;
+          spotSellableKg: number;
+          spotUnitUsd: number;
+          sources: ReturnType<typeof listJetASurplusSources>;
+        } | null;
       };
     }
   >;
@@ -2937,6 +2978,33 @@ export function portSnapshot(
             state && operatorExact
               ? evaluatePortConcessionUpgrade(state, world, port.id)
               : null,
+          jetATank: yoursConc
+            ? {
+                kg: Math.max(0, Math.floor(yoursConc.jetAKg ?? 0)),
+                capacityKg: portJetATankCapacityKg(
+                  yoursConc.level === 2 || yoursConc.level === 3
+                    ? yoursConc.level
+                    : 1,
+                ),
+                spotSellableKg: (() => {
+                  const hub = resolvePortPickupHub(port);
+                  const ap = airportByIcao(world, hub);
+                  return ap ? fuelTerminalSellableKg(ap) : 0;
+                })(),
+                spotUnitUsd: (() => {
+                  const hub = resolvePortPickupHub(port);
+                  const pile = airportByIcao(world, hub)?.inventory.fuel;
+                  return pile
+                    ? Math.round(localUnitPriceUsd('fuel', pile) * 1000) / 1000
+                    : 0;
+                })(),
+                sources: listJetASurplusSources(
+                  world,
+                  resolvePortPickupHub(port),
+                  4,
+                ),
+              }
+            : null,
         },
       };
     }),

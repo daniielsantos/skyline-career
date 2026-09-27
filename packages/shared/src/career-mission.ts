@@ -20,6 +20,10 @@ import {
   releaseAircraftOnCancel,
 } from './career-fleet.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
+import {
+  deliverPortJetAHaul,
+  refundPortJetAHaul,
+} from './career-port-jet-a.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { depositCargoToWarehouse, depositCargoToWarehouseOrYard, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
 import { creditPortOperatorThroughputOnOutboundSettle } from './career-port-throughput.js';
@@ -1137,7 +1141,8 @@ export function syncPlayerInbound(
     return;
   }
   // Demand Board hauls are company inventory → terminal fill, not market soft-fill.
-  if (normalized.demandOrderId || normalized.portPickupId) {
+  // Jet-A hauls are a booked load, not freight soft-fill.
+  if (normalized.demandOrderId || normalized.portPickupId || normalized.fuelHaul) {
     return;
   }
   if (!Array.isArray(world.inboundPending)) {
@@ -2287,7 +2292,9 @@ export function cancelMission(
   }
   if (opts.fleet) {
     releaseAircraftOnCancel(opts.fleet, normalized);
-    if (
+    if (normalized.fuelHaul) {
+      refundPortJetAHaul(opts.fleet, world, normalized);
+    } else if (
       normalized.warehouseBridge ||
       normalized.warehouseHaul ||
       normalized.demandOrderId
@@ -2899,7 +2906,11 @@ export function settleMission(
   // Allocate penalty across lines proportional to payUsd.
   let penaltyLeft = pay.penaltyUsd;
 
-  if (!isEmptyLegMission(working)) {
+  if (working.fuelHaul && opts.fleet) {
+    deliverPortJetAHaul(opts.fleet, world, working);
+  }
+
+  if (!isEmptyLegMission(working) && !working.fuelHaul) {
     for (let i = 0; i < working.lots.length; i++) {
       const line = working.lots[i]!;
       // Empty / CP reposition legs have no freight to deliver.
@@ -3240,7 +3251,8 @@ export function settleMission(
     opts.fleet &&
     !working.crewDeadhead &&
     !working.contractPilotReposition &&
-    !working.emptyFlight
+    !working.emptyFlight &&
+    working.fuelHaul?.kind !== 'reposition'
   ) {
     const progressionHost = opts.progression ?? opts.fleet;
     const applied = applyCargoOpsOnSettle(progressionHost.cargoOps, settled, {

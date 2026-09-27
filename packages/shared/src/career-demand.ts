@@ -18,6 +18,7 @@ import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import { countryIdFromRegion } from './career-partition.js';
 import { demandDeskMultForWarehouse } from './career-ground-staff.js';
+import { ensurePortJetAHaulOrders } from './career-port-jet-a.js';
 import {
   depositCargoToWarehouse,
   findPlayerWarehouseAtIcao,
@@ -572,6 +573,9 @@ export function holdDemandOrder(
   );
   if (!order || order.status !== 'open' || order.remainingKg <= 0) {
     throw new Error('Demand order not available');
+  }
+  if (order.commodityId === 'fuel' || order.fuelHaul) {
+    throw new Error('Jet-A hauls are flown from the Demand desk, not held in the warehouse');
   }
   if (!order.portId?.trim()) {
     throw new Error('Demand order has no port desk — refresh the board');
@@ -1327,6 +1331,7 @@ export function ensureDemandOrders(
   const rng = mulberry32(hashSeed(`${world.seed}:demand:${world.tick}`));
 
   const isOpen = (o: DemandOrder) =>
+    o.commodityId !== 'fuel' &&
     o.status === 'open' &&
     o.remainingKg > 0 &&
     o.expiresAtTick > world.tick &&
@@ -1566,6 +1571,7 @@ export function listOpenDemandOrders(
   opts: { destIcao?: string; commodityId?: CommodityId } = {},
 ): DemandOrder[] {
   ensureDemandOrders(world);
+  ensurePortJetAHaulOrders(world);
   const dest = opts.destIcao?.trim().toUpperCase();
   return (world.demandOrders ?? []).filter(
     (o) =>
@@ -1601,6 +1607,9 @@ export function acceptDemandOrder(
   );
   if (!order || order.status !== 'open' || order.remainingKg <= 0) {
     throw new Error('Demand order not available');
+  }
+  if (order.commodityId === 'fuel' || order.fuelHaul) {
+    throw new Error('Jet-A hauls are flown from the Demand desk, not held in the warehouse');
   }
   if (!order.portId?.trim()) {
     throw new Error('Demand order has no port desk — refresh the board');

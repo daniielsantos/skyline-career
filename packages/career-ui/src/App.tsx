@@ -7403,7 +7403,10 @@ export function App() {
           companyId: opsCompanyId || undefined,
         });
         if (cancelled) return;
-        if (result.quote.shortfallKg <= 0) {
+        const spotKg =
+          result.quote.spotShortfallKg ?? result.quote.shortfallKg;
+        const tankKg = result.quote.tankKg ?? 0;
+        if (result.quote.shortfallKg <= 0 || (tankKg > 0 && spotKg <= 0)) {
           const purchased = await postFuelPurchase(mission.id, {
             companyId: opsCompanyId || undefined,
           });
@@ -7420,6 +7423,9 @@ export function App() {
             setToast(
               `Surplus fuel sold · ${formatMoney(purchased.fuelCreditUsd ?? 0)}`,
             );
+          } else if (tankKg > 0 && spotKg <= 0) {
+            setToastKind('ok');
+            setToast('Port FBO tank covered the fuel');
           }
           setMissionFuelQuote(null);
           setMissionFuelQuoteStatus('ready');

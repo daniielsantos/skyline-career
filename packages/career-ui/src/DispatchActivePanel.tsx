@@ -911,11 +911,23 @@ export function DispatchActivePanel(props: {
                 <dt>To purchase</dt>
                 <dd>
                   {formatMassExact(
-                    props.missionFuelQuote.quote.shortfallKg,
+                    props.missionFuelQuote.quote.spotShortfallKg ??
+                      props.missionFuelQuote.quote.shortfallKg,
                     weightSystem,
                   )}
                 </dd>
               </div>
+              {(props.missionFuelQuote.quote.tankKg ?? 0) > 0 ? (
+                <div>
+                  <dt>From Port FBO tank</dt>
+                  <dd>
+                    {formatMassExact(
+                      props.missionFuelQuote.quote.tankKg ?? 0,
+                      weightSystem,
+                    )}
+                  </dd>
+                </div>
+              ) : null}
               <div>
                 <dt>Total</dt>
                 <dd>

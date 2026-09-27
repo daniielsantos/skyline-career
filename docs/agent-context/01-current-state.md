@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **e55a825b** / desktop **0.3.369** shipped: Let an airborne Watch depart skip the ground fuel gate. Release: [v0.3.369](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.369).
+
+
 `main` **6fed5edd** / desktop **0.3.368** shipped: Keep Hangar cashflow on the home company and open the haul manifest when the pilot is away. Release: [v0.3.368](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.368).
 
 

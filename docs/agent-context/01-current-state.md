@@ -1,5 +1,8 @@
 # Current state (2026-09-27)
 
+`main` **4793fa37** / desktop **0.3.359** shipped: Load same-route desk holds onto one flight. Release: [v0.3.359](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.359).
+
+
 `main` **f7df1b2e** / desktop **0.3.358** shipped: Quiet the en-route MX burn line and shrink the roster Live pill. Release: [v0.3.358](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.358).
 
 

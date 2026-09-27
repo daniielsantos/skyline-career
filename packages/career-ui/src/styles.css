@@ -10843,12 +10843,6 @@ button.linkish {
   gap: 0.4rem 0.65rem;
 }
 
-.freights-panel > .banner {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 0.45rem 0.75rem;
-}
-
 .freights-panel > .table-wrap,
 .freights-panel > .freights-board-table {
   /* Size to the rows; shrink+scroll only when the panel is too short.

@@ -17408,25 +17408,6 @@ export function App() {
                         </button>
                       ) : null}
                     </nav>
-                    {playerDispatchMission && contractsLane === 'outbound' ? (
-                      <p
-                        className="banner warn"
-                        title={playerDispatchMission.id}
-                      >
-                        Active flight{' '}
-                        {activeFlightRouteLabel(playerDispatchMission)} — finish
-                        or cancel it in{' '}
-                        <button
-                          type="button"
-                          className="linkish"
-                          onClick={() => selectTab('staging')}
-                          disabled={busy}
-                        >
-                          Dispatch
-                        </button>{' '}
-                        before preparing another.
-                      </p>
-                    ) : null}
                     <div
                       className={`table-wrap${airportHydrating ? ' is-loading' : ''}`}
                     >
@@ -18244,21 +18225,6 @@ export function App() {
               )}
             />
           </div>
-          {playerDispatchMission ? (
-            <p className="banner warn" title={playerDispatchMission.id}>
-              Active flight {activeFlightRouteLabel(playerDispatchMission)} —
-              finish or cancel it in{' '}
-              <button
-                type="button"
-                className="linkish"
-                onClick={() => selectTab('staging')}
-                disabled={busy}
-              >
-                Dispatch
-              </button>{' '}
-              before preparing another.
-            </p>
-          ) : null}
           <div
             className={`table-wrap freights-board-table${
               marketBoardLoading ? ' is-loading' : ''

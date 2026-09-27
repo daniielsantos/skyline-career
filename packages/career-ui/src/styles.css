@@ -2201,49 +2201,6 @@ th {
   flex: 0 1 auto;
 }
 
-.variant-tiebreak {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.45rem;
-  flex: 1 1 auto;
-}
-
-.variant-tiebreak-note {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.35;
-}
-
-.variant-tiebreak-help {
-  width: 1.15rem;
-  height: 1.15rem;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.72rem;
-  line-height: 1;
-  cursor: help;
-}
-
-.variant-tiebreak-choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.variant-tiebreak-choice {
-  flex: 0 0 auto;
-  width: auto;
-}
-
 .ofp-accept-actions {
   margin-top: 0.85rem;
   padding-top: 0.75rem;

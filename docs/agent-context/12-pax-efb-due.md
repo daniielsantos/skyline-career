@@ -129,3 +129,11 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 **Causa:** packs `ifly-737-max-8` / `ifly-737-max-8200` tinham `crewStations:[1,2]`. Watch/Preflight **Sim** = passenger+baggage (crew fora). EFB iFly carrega massa do OFP também em S1/S2 → exclusão cortava ~7 350 lb.
 
 **Fix:** `crewStations: []`; S1–S11 em `baggageStations` + `stationMap` role baggage. Asobo Max 8 pack **não** mudado (publisher/EFB diferente).
+
+### Ryanair — stations = Due, headline Sim usa ZFW−OEW (2026-09-27)
+
+**Sintoma:** Import no tablet iFly (livery Ryanair). Fuel Sim = Due. As stations somam o Due (39 683 lb). O número **Sim** do card fica 22 225 lb e o payload reprova. Faixa verde das stations ausente; combustível continua verde.
+
+**Sim:** em `pax_and_cargo`, `careerPaxAndCargoLivePayloadLb` devolve `ZFW ao vivo − empty do OFP` (`weights.oew`) e para, se a diferença for > 500 lb. A soma das stations é o fallback e não roda. O card compara esse residual com o Due. Com a livery Ryanair, stations = Due (39 683 lb) e o residual deu 22 225 lb: o ZFW ao vivo ficou ~17 458 lb abaixo de empty+stations. Sem a livery, no mesmo OFP (fuel 12 505, Due 39 683), Sim passou a 39 681. O hash do desempate só inclui índice/capacidade de tanque e índice de station (`hashStructure`); peso vazio não entra. A livery muda o ZFW que o sim reporta sem mudar esse hash. Row SimBrief Default (OEW 96 560) vs iFly LBS (99 360) são 2 800 lb e não explicam os 17 458.
+
+**Fix:** desempate por hash removido no mesmo dia. Título que não casa o pack não vira vidro canônico. No 8200 oficial o título continua `iFly 737-MAX8200` e Sim fecha com o Due.

@@ -537,13 +537,11 @@ export type Mission = {
   lateTicks?: number;
   /** Set when status is failed — e.g. impact from Watch crash detection. */
   failReason?: string;
-  /** Canonical glass title when a livery needed a manual tie-break. */
-  liveVariantTitle?: string;
   urgency: string;
   aircraftClassId: string;
   /** Concrete Market airframe assigned to this flight. */
   airframeTypeId?: string;
-  /** Purchased family OFP pack, used to resolve a livery on the desktop. */
+  /** OFP roles pack for this flight. */
   rolesPackRelPath?: string;
   /** Preferred OFP load path for this class (manual always allowed). */
   loadMethod?: 'native-simbrief' | 'direct-injection';
@@ -4677,23 +4675,12 @@ export function postBushTripAbandon() {
   });
 }
 
-export type DispatchVariantChoice = {
-  profileKey: string;
-  label: string;
-  canonicalTitle: string;
-};
-
 export function postDispatch(opts: {
   missionId: string;
   open?: boolean;
   weightSystem?: 'metric' | 'imperial';
   /** Live MSFS title — picks Bonanza BE36 vs BT36 (and other family glass). */
   liveTitle?: string | null;
-  /** Canonical glass title after the tie-break question. */
-  variantTitle?: string | null;
-  /** Purchased SKU — gateway resolves the glass before the world builds the OFP. */
-  airframeTypeId?: string | null;
-  rolesPackRelPath?: string | null;
   companyId?: string;
 }) {
   return api<{
@@ -4705,8 +4692,6 @@ export function postDispatch(opts: {
     cargoThousands?: number;
     units?: 'KGS' | 'LBS';
     opened?: boolean;
-    needsVariantChoice?: boolean;
-    variants?: DispatchVariantChoice[];
   }>('/api/dispatch', {
     method: 'POST',
     body: JSON.stringify(opts),

@@ -131,8 +131,7 @@ export function DispatchActivePanel(props: {
   mxFuelBurnAlert?: { excessPct: number; conditionPct: number } | null;
   onOpenAirport: (icao: string) => void;
   onSelectSettings: () => void;
-  onDispatch: (mission: Mission, variantTitle?: string) => void;
-  variantChoices?: Array<{ label: string; canonicalTitle: string }> | null;
+  onDispatch: (mission: Mission) => void;
   onCancel: (mission: Mission) => void;
   onEditManifest: (mission: Mission) => void;
   onAcceptOfpCargo?: (mission: Mission) => void;
@@ -287,36 +286,6 @@ export function DispatchActivePanel(props: {
     : undefined;
 
   const primaryCta = (() => {
-    if (props.variantChoices?.length) {
-      return (
-        <div className="variant-tiebreak">
-          <p className="variant-tiebreak-note">
-            Which version is in the sim?
-            <button
-              type="button"
-              className="variant-tiebreak-help"
-              title="This paint does not name the version. SimBrief needs it for the OFP weight."
-              aria-label="This paint does not name the version. SimBrief needs it for the OFP weight."
-            >
-              ?
-            </button>
-          </p>
-          <div className="variant-tiebreak-choices">
-            {props.variantChoices.map((choice) => (
-              <button
-                key={choice.canonicalTitle}
-                type="button"
-                className="action variant-tiebreak-choice"
-                disabled={busy}
-                onClick={() => props.onDispatch(mission, choice.canonicalTitle)}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-    }
     if (step === 'flight_plan') {
       if (ofpCargoUnderOnly) {
         return (

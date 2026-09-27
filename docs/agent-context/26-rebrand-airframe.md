@@ -29,6 +29,7 @@ Decisão (2026-09-15): domínio ≠ rename automático do monorepo. Fases abaixo
 - **Prints estreitos (2026-09-26):** o crop de Freights era 670px e o layout punha cada shot numa coluna de ~64rem, então a UI ficava ilegível. Novos crops são a coluna principal (sem sidebar, sem footer “MSFS not connected”), ~1646px, e a seção empilha o texto em cima do print em até 92rem.
 - **Living economy = terminal (2026-09-26):** a seção mostrava o board de Freights. Troca pelo inventário do terminal (KMIA): stock, fill, surplus/shortage, flow e preço. Crop `shot-terminal.png` 1646×1020. Freights sai dessa seção.
 - **Apex e www no ar (2026-09-26):** Worker `playairframe`, custom domains `playairframe.com` e `www.playairframe.com`, os dois Production na zona `playairframe.com`. `workers.dev` da conta não resolve; o domínio custom basta.
+- **Airframes / liveries (2026-09-27):** a seção Airframes ganhou a linha de que pintura na aba Livery do avião homologado vale, e add-on que aparece como outro avião não. Fonte só; o Worker no ar não muda até o deploy.
 
 ### Diagnóstico CI (2026-09-17)
 

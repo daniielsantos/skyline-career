@@ -3958,10 +3958,6 @@ export function App() {
   const [preflightBootstrapError, setPreflightBootstrapError] = useState<
     string | null
   >(null);
-  const [variantPrompt, setVariantPrompt] = useState<{
-    missionId: string;
-    choices: Array<{ label: string; canonicalTitle: string }>;
-  } | null>(null);
   const preflightBootstrapErrorRef = useRef<string | null>(null);
   /**
    * Watch started before the first Preflight card (SAMPLING) — keep it off until
@@ -12040,7 +12036,7 @@ export function App() {
     }, { sync: { market: true } });
   }
 
-  async function onDispatch(mission: Mission, variantTitle?: string) {
+  async function onDispatch(mission: Mission) {
     // Always rebuild the SimBrief URL (Bonanza A36 vs A36TC → BE36 vs BT36).
     // Re-using a cached href kept the wrong type after switching glass.
     // Browser: reserve a tab under this click so await does not drop the gesture.
@@ -12053,23 +12049,8 @@ export function App() {
         open: true,
         weightSystem,
         liveTitle: simBridgeRef.current?.aircraftTitle ?? null,
-        variantTitle: variantTitle ?? mission.liveVariantTitle ?? null,
-        airframeTypeId: mission.airframeTypeId,
-        rolesPackRelPath: mission.rolesPackRelPath,
         companyId: resolveOpsCompanyId(mission.aircraftId) || undefined,
       });
-      if (result.needsVariantChoice && result.variants?.length) {
-        if (pendingTab && !pendingTab.closed) {
-          try {
-            pendingTab.close();
-          } catch {
-            /* ignore */
-          }
-        }
-        setVariantPrompt({ missionId: mission.id, choices: result.variants });
-        return;
-      }
-      setVariantPrompt(null);
       if (result.mission) {
         const saved = result.mission;
         setMissions((current) =>
@@ -20144,12 +20125,7 @@ export function App() {
               mxFuelBurnAlert={activeMissionMxFuelBurn}
               onOpenAirport={openAirport}
               onSelectSettings={() => selectTab('settings')}
-              onDispatch={(m, variantTitle) => void onDispatch(m, variantTitle)}
-              variantChoices={
-                variantPrompt?.missionId === activeMission.id
-                  ? variantPrompt.choices
-                  : null
-              }
+              onDispatch={(m) => void onDispatch(m)}
               onCancel={(m) => void onCancel(m)}
               onEditManifest={(m) => void enterEditManifest(m)}
               onAcceptOfpCargo={(m) => void onAcceptOfpCargo(m)}

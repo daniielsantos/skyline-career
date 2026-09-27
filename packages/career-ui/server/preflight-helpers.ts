@@ -53,11 +53,6 @@ import {
 import { withSimBridgeExclusive } from './simbridge-gate.ts';
 import { applyTargetBlockFuelKg } from './ofp-target-fuel.ts';
 import { getRepoRoot } from './skyline-paths.ts';
-import { sampleAircraftStructure } from '../../agent/src/sample-structure.ts';
-import {
-  decideFamilyVariant,
-  variantChoiceAllowed,
-} from './variant-tiebreak.ts';
 const repoRoot = getRepoRoot();
 const ofpCache = new Map<string, Promise<OfpExpectation>>();
 
@@ -224,24 +219,7 @@ export async function runMissionPreflight(
     ]);
     const ofpBase = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
     const liveTitle = normalizeAircraftTitle(identity.title ?? '');
-    let rolesTitle = liveTitle || identity.title || '';
-    const pinned = mission.liveVariantTitle?.trim();
-    if (pinned && mission.airframeTypeId) {
-      const { structure } = await sampleAircraftStructure(bridge);
-      const decision = await decideFamilyVariant({
-        repoRoot,
-        airframeTypeId: mission.airframeTypeId,
-        liveStructure: structure,
-      });
-      if (!variantChoiceAllowed(decision, pinned)) {
-        const airframe = findCareerPlayerAirframe(mission.airframeTypeId);
-        const purchased = airframe?.label?.trim() || mission.rolesPackRelPath;
-        throw new Error(
-          `Live aircraft "${identity.title ?? liveTitle}" is not homologated for the purchased airframe (${purchased})`,
-        );
-      }
-      rolesTitle = pinned;
-    }
+    const rolesTitle = liveTitle || identity.title || '';
     let ofp = ofpBase;
     try {
       const roles = await resolveMissionRolesPack({

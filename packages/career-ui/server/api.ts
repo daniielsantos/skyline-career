@@ -395,10 +395,6 @@ import {
 import { identifyLiveAircraftFromTitle } from './identify-live-aircraft.ts';
 import { beginOfpLoadActive, endOfpLoadActive, isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight, lastPreflightFromInjectLive } from './preflight-helpers.ts';
-import { withSimBridgeExclusive } from './simbridge-gate.ts';
-import { acceptDispatchTitleWithoutSim, resolveDispatchTitle } from './variant-tiebreak.ts';
-import { NamedPipeSimBridge } from '../../agent/src/named-pipe-sim-bridge.ts';
-import { sampleAircraftStructure } from '../../agent/src/sample-structure.ts';
 import {
   CareerWatchSession,
   probeFirstContactPosition,
@@ -3546,19 +3542,6 @@ function mapAirportMovements(
   return { arrivals, departures };
 }
 
-async function sampleDispatchAircraftStructure() {
-  const bridge = new NamedPipeSimBridge();
-  return withSimBridgeExclusive(async () => {
-    await bridge.open('Airframe Career variant');
-    try {
-      const { structure } = await sampleAircraftStructure(bridge);
-      return structure;
-    } finally {
-      await bridge.close({ disconnectHost: false });
-    }
-  });
-}
-
 async function readBody(req: import('node:http').IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
@@ -3754,78 +3737,6 @@ export function createCareerApiServer(port = 8787) {
                 ? worldHealth.clientUpdatePolicy
                 : DEFAULT_CLIENT_UPDATE_POLICY,
           });
-          return;
-        }
-        if (req.method === 'POST' && path === '/api/dispatch') {
-          const body = (await readBody(req)) as {
-            missionId?: string;
-            liveTitle?: string | null;
-            variantTitle?: string | null;
-            airframeTypeId?: string | null;
-            rolesPackRelPath?: string | null;
-          };
-          try {
-            const probedTitle =
-              (typeof body.liveTitle === 'string' ? body.liveTitle.trim() : '') ||
-              getLastProbeAircraftTitle() ||
-              '';
-            const resolvedTitle = await resolveDispatchTitle({
-              repoRoot,
-              airframeTypeId:
-                typeof body.airframeTypeId === 'string' ? body.airframeTypeId : null,
-              rolesPackRelPath:
-                typeof body.rolesPackRelPath === 'string' ? body.rolesPackRelPath : '',
-              liveTitle: probedTitle,
-              hintedTitle:
-                typeof body.variantTitle === 'string' ? body.variantTitle : null,
-              sampleStructure: () => sampleDispatchAircraftStructure(),
-            });
-            if (resolvedTitle.kind === 'choose') {
-              send(res, 200, {
-                needsVariantChoice: true,
-                variants: resolvedTitle.choices,
-              });
-              return;
-            }
-            body.liveTitle = resolvedTitle.title;
-            body.variantTitle = resolvedTitle.saveVariant;
-          } catch (error) {
-            send(res, 400, {
-              error: error instanceof Error ? error.message : String(error),
-            });
-            return;
-          }
-          const worldUrl = careerWorldApiUrlFromEnv()!;
-          const auth = worldAuthFromIncoming(req);
-          let upstream: Response;
-          try {
-            upstream = await fetch(`${worldUrl}/api/dispatch`, {
-              method: 'POST',
-              headers: {
-                'content-type': 'application/json',
-                ...(auth.authorization
-                  ? { authorization: auth.authorization }
-                  : {}),
-                ...(auth.companyId
-                  ? { 'x-skyline-company-id': auth.companyId }
-                  : {}),
-              },
-              body: JSON.stringify(body),
-            });
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            send(res, 502, {
-              error: `World API unreachable: ${message}`,
-              code: 'world_unreachable',
-            });
-            return;
-          }
-          const text = await upstream.text();
-          res.writeHead(upstream.status, {
-            'content-type': 'application/json; charset=utf-8',
-            'access-control-allow-origin': '*',
-          });
-          res.end(text);
           return;
         }
         if (isGatewayEnrichApiPath(path) && req.method === 'POST' && path === '/api/settle') {
@@ -13896,8 +13807,6 @@ export function createCareerApiServer(port = 8787) {
           units?: 'KGS' | 'LBS';
           /** UI SimBridge title — preferred over last probe for family ICAO. */
           liveTitle?: string | null;
-          /** Canonical glass title after the one-question tie-break. */
-          variantTitle?: string | null;
           companyId?: string;
         };
         if (!body.missionId) {
@@ -13944,43 +13853,8 @@ export function createCareerApiServer(port = 8787) {
         }
 
         try {
-          let liveTitle: string;
-          let saveVariant: string | null;
-          if (isSimDisabledMode(careerApiMode)) {
-            const accepted = await acceptDispatchTitleWithoutSim({
-              repoRoot,
-              airframeTypeId: prep.mission.airframeTypeId,
-              rolesPackRelPath: prep.mission.rolesPackRelPath,
-              liveTitle: body.liveTitle?.trim() || '',
-              variantTitle: body.variantTitle,
-            });
-            liveTitle = accepted.title;
-            saveVariant = accepted.saveVariant;
-          } else {
-            const probedTitle =
-              body.liveTitle?.trim() || getLastProbeAircraftTitle() || '';
-            const hinted =
-              body.variantTitle?.trim() ||
-              prep.mission.liveVariantTitle?.trim() ||
-              '';
-            const resolvedTitle = await resolveDispatchTitle({
-              repoRoot,
-              airframeTypeId: prep.mission.airframeTypeId,
-              rolesPackRelPath: prep.mission.rolesPackRelPath,
-              liveTitle: probedTitle,
-              hintedTitle: hinted,
-              sampleStructure: () => sampleDispatchAircraftStructure(),
-            });
-            if (resolvedTitle.kind === 'choose') {
-              send(res, 200, {
-                needsVariantChoice: true,
-                variants: resolvedTitle.choices,
-              });
-              return;
-            }
-            liveTitle = resolvedTitle.title;
-            saveVariant = resolvedTitle.saveVariant;
-          }
+          const liveTitle =
+            body.liveTitle?.trim() || getLastProbeAircraftTitle() || '';
           const { built, flyable, cargoLimit } = await buildFlyableMissionDispatch(
             prep.mission,
             prep.dispatchDistanceNm,
@@ -14021,7 +13895,6 @@ export function createCareerApiServer(port = 8787) {
               lastPreflightCheck: undefined,
               injectBallastLb: undefined,
               fuelAuthorizedOfpId: undefined,
-              liveVariantTitle: saveVariant ?? undefined,
             };
             missions.missions[idx] = dispatched;
             return dispatched;

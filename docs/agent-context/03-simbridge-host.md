@@ -66,6 +66,14 @@ Sinais:
 **Causa:** (1) `/api/preflight` lia originCoords com `withCareerRead` (world lock atrás do pulse); (2) SimBrief OFP serializado antes do pipe open; (3) UI retentava a cada 5s no bootstrap.
 **Fix:** coords via `withCareerPeekRead`; `loadPreflightOfp` em paralelo com open+identity; poll bootstrap 1.5s até `lastPreflightCheck`, depois 5s.
 
+### RECONNECTING no rodapé a cada minuto (2026-09-26)
+
+**Sintoma:** em voo (KMIA→KFLL, `msn_demand_3298`), o rodapé fica RECONNECTING por alguns segundos, sempre no segundo :43. Sim não caiu; fuel/fase/pipe estavam saudáveis no tick anterior (`phase: climb`, `lastError: null`).
+
+**Causa:** um segundo cliente da UI (aba em background em `127.0.0.1:8788`, missão antiga `msn_demand_3294` ainda no estado local) manda `POST /api/watch/start` ~1×/min — timer de background do browser. `start()` de missão diferente faz `stop({ fromStart: true })` na missão ao vivo, fecha o pipe, e o cliente do voo reabre em ~5s. Log: `stop` 3298 → `start joined — already starting` 3294 → `client.close` → `start` 3298. Não é SimConnect exception 7 nem pause do sim (`playback freeze` / `paused: true` é o sim pausado; o relógio absoluto continua).
+
+**Fix imediato:** fechar a aba extra. Depois de fechar, o ciclo parou (último `stop` 02:26:20Z; tick 02:28Z ainda em 3298, `pipeConnected: true`, sem `stop` no :43 seguinte). Endurecer depois (não feito): `start()` não deve derrubar um Watch `in_flight` com pipe ok só porque outro cliente pediu outra missão.
+
 ## Hot-swap (dev)
 
 Build Release → copiar `SimBridgeHost.dll` (+ exe/pdb) para  

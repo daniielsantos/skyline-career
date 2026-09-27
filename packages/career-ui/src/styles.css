@@ -10600,6 +10600,19 @@ button.linkish {
   border-color: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
+/* MX wear is a settle note, not a blocking alert. */
+.banner.warn.mx-fuel-burn-alert {
+  margin: 0;
+  padding: 0.05rem 0 0.1rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  animation: none;
+}
+
 /* Floating toasts — after dark banner overrides so they keep their own look. */
 .app-toast-stack {
   position: fixed;
@@ -16108,19 +16121,18 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.va-roster-live {
+.action.ghost.va-roster-live {
   flex: 0 0 auto;
-  font-size: 0.68rem;
-  padding: 0.15rem 0.4rem;
-  line-height: 1.2;
+  font-size: 0.62rem;
+  padding: 0.05rem 0.28rem;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
 }
-.va-roster-live.is-active {
-  border-color: color-mix(in srgb, #d4a574 55%, transparent);
-  color: #d4a574;
+.action.ghost.va-roster-live.is-active {
+  --ghost-tone: #d4a574;
 }
-.va-roster-live.is-hot {
-  border-color: color-mix(in srgb, #7cb87c 50%, transparent);
-  color: #7cb87c;
+.action.ghost.va-roster-live.is-hot {
+  --ghost-tone: var(--danger);
 }
 .va-live-pane {
   display: grid;

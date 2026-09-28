@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **da43bd15** / desktop **0.3.377** shipped: Show the Jet-A hold on Ready the same way as other cargo. Release: [v0.3.377](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.377).
+
+
 `main` **f12fdd08** / desktop **0.3.376** shipped: Show the Jet-A stock purchase total on the manifest. Release: [v0.3.376](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.376).
 
 

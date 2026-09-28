@@ -11373,6 +11373,12 @@ export function App() {
       );
       return;
     }
+    if (mission.fuelHaul) {
+      setError(
+        'Jet-A on this flight is the load already bought. Cancel the flight to change it.',
+      );
+      return;
+    }
     if (!['accepted', 'dispatched'].includes(mission.status)) {
       setError('Only accepted or dispatched flights can edit the manifest');
       return;

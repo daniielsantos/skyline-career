@@ -130,27 +130,49 @@ describe('port FBO Jet-A', () => {
       vaFlight: true,
     });
     assert.equal(started.mission.payUsd, 0);
-    assert.equal(started.mission.cargoKg, 0);
+    assert.equal(started.mission.cargoKg, started.kg);
+    assert.equal(started.mission.lots?.[0]?.cargoKg, started.kg);
+    assert.equal(started.mission.fuelHaul?.kg, started.kg);
+    assert.ok(started.kg > 0);
+    assert.ok(started.kg < 1_000);
     assert.equal(started.mission.pilotAccountId, 'acc_pilot');
     assert.equal(started.mission.vaFlight, true);
-    assert.equal(started.kg, 1_000);
     assert.ok(state.walletUsd < walletBefore);
     const tankBefore = state.playerPortConcessions?.[0]?.jetAKg ?? 0;
     deliverPortJetAHaul(state, world, started.mission);
-    assert.equal(state.playerPortConcessions?.[0]?.jetAKg, tankBefore + 1_000);
+    assert.equal(
+      state.playerPortConcessions?.[0]?.jetAKg,
+      tankBefore + started.kg,
+    );
 
     const sellableBefore = fuelTerminalSellableKg(
       world.airports.find((ap) => ap.icao === 'SBGR')!,
     );
     const orderId = 'fj_test';
+    aircraft.locationIcao = 'SBGR';
+    aircraft.status = 'parked';
+    state.pilotIcao = 'SBGR';
     world.demandOrders = [
+      {
+        id: 'fj_heavy',
+        portId: 'BRSSZ',
+        destIcao: 'SBKP',
+        commodityId: 'fuel',
+        wantedKg: 5_000,
+        remainingKg: 5_000,
+        maxUnitPriceUsd: 0.5,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 100,
+        status: 'open',
+        fuelHaul: { pickupIcao: 'SBGR' },
+      },
       {
         id: orderId,
         portId: 'BRSSZ',
         destIcao: 'SBKP',
         commodityId: 'fuel',
-        wantedKg: 500,
-        remainingKg: 500,
+        wantedKg: 80,
+        remainingKg: 80,
         maxUnitPriceUsd: 0.5,
         arrivedAtTick: world.tick,
         expiresAtTick: world.tick + 100,
@@ -158,16 +180,23 @@ describe('port FBO Jet-A', () => {
         fuelHaul: { pickupIcao: 'SBGR' },
       },
     ];
-    aircraft.locationIcao = 'SBGR';
-    aircraft.status = 'parked';
-    state.pilotIcao = 'SBGR';
+    assert.throws(
+      () =>
+        acceptPortJetAHaul(state, world, {
+          orderId: 'fj_heavy',
+          aircraftId: aircraft.id,
+        }),
+      /can carry/,
+    );
+    assert.equal(aircraft.status, 'parked');
     const cash = state.walletUsd;
     const accepted = acceptPortJetAHaul(state, world, {
       orderId,
       aircraftId: aircraft.id,
     });
-    assert.equal(accepted.payUsd, 250);
-    assert.equal(accepted.mission.cargoKg, 0);
+    assert.equal(accepted.payUsd, 40);
+    assert.equal(accepted.mission.cargoKg, 80);
+    assert.equal(accepted.mission.lots?.[0]?.cargoKg, 80);
     assert.ok(state.walletUsd <= cash);
     const dest = world.airports.find((ap) => ap.icao === 'SBKP')!;
     const destBefore = dest.inventory.fuel!.stockKg;

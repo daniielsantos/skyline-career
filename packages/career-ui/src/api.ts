@@ -587,7 +587,7 @@ export type Mission = {
   internalHaul?: boolean;
   /** Accepted under a listed VA (VA aircraft / VA ops). */
   vaFlight?: boolean;
-  /** Jet-A stocking or Demand fuel haul. Payload stays empty. */
+  /** Jet-A stocking or Demand fuel haul. cargoKg is that fuel in the hold. */
   fuelHaul?: {
     kind: 'reposition' | 'demand';
     portId?: string;

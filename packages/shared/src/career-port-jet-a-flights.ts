@@ -1,7 +1,9 @@
 /**
- * Player flights that move Jet-A: unpaid stocking into the Port FBO tank,
- * and the rare paid Demand haul. Payload stays empty so the sim load plan
- * is the flight, not a cargo station full of fuel.
+ * Player flights that move Jet-A as cargo in the hold.
+ * Stocking flights are unpaid — the Jet-A was already bought at the origin.
+ * Demand hauls pay the transport fee only.
+ * The hauled kg is the sim payload (manifest, OFP, cargo stations).
+ * Wing tanks stay the trip fuel. Settle still credits fuelHaul.kg.
  */
 
 import { routeDistanceNm } from './career-economy.js';
@@ -10,7 +12,9 @@ import {
   releaseAircraftOnCancel,
 } from './career-fleet.js';
 import {
+  estimateRouteCargoLimit,
   getAircraftClass,
+  resolveConservativeOpsWeights,
   syncPlayerInbound,
 } from './career-mission.js';
 import { findCareerPlayerAirframe } from './career-player-airframes.js';
@@ -58,6 +62,58 @@ function pilotFields(opts: {
     ...(pilotHomeCompanyId ? { pilotHomeCompanyId } : {}),
     ...(opts.vaFlight ? { vaFlight: true as const } : {}),
   };
+}
+
+/** Kg this airframe can put in the hold on the leg, after trip fuel and crew. */
+function jetAHoldKg(
+  world: CareerEconomyWorld,
+  aircraft: {
+    aircraftClassId: MissionIntent['aircraftClassId'];
+    airframeTypeId?: string;
+  },
+  origin: string,
+  dest: string,
+): number {
+  const airframeTypeId = aircraft.airframeTypeId?.trim();
+  if (!airframeTypeId) {
+    throw new Error('This aircraft has no airframe for a Jet-A cargo load');
+  }
+  const classDef = getAircraftClass(aircraft.aircraftClassId);
+  const airframe = findCareerPlayerAirframe(airframeTypeId);
+  const structuralMax =
+    (typeof airframe?.maxCargoKg === 'number' && airframe.maxCargoKg > 0
+      ? airframe.maxCargoKg
+      : undefined) ?? classDef.maxCargoKg;
+  const distanceNm = routeDistanceNm(world, origin, dest);
+  if (distanceNm == null || !(distanceNm >= 0)) {
+    return Math.max(0, Math.floor(structuralMax));
+  }
+  const opsWeights = resolveConservativeOpsWeights({
+    oewKg: airframe?.oewKg,
+    mtowKg: airframe?.mtowKg,
+    catalogOewKg: airframe?.oewKg,
+    catalogMtowKg: airframe?.mtowKg,
+  });
+  const routeLimit = estimateRouteCargoLimit(
+    aircraft.aircraftClassId,
+    distanceNm,
+    structuralMax,
+    {
+      oewKg: opsWeights.oewKg,
+      mtowKg: opsWeights.mtowKg,
+      fuelCapacityKg: airframe?.fuelCapacityKg,
+      fuelBurnKgPerNm: airframe?.fuelBurnKgPerNm,
+      airframeTypeId,
+      crewKg: opsWeights.crewKg,
+    },
+  );
+  if (!routeLimit.fuelFeasible) {
+    throw new Error(
+      `Estimated block fuel ${routeLimit.estimatedBlockFuelKg} kg exceeds ` +
+        `tank capacity ${routeLimit.fuelCapacityKg} kg for ${origin}→${dest}`,
+    );
+  }
+  return Math.max(0, Math.floor(routeLimit.operationalMaxCargoKg));
 }
 
 function commitFuelMission(
@@ -113,6 +169,12 @@ export function startPortJetAReposition(
   if (kg <= 0) throw new Error('Nothing to fetch — the tank is full');
   const aircraft = state.fleet.find((a) => a.id === opts.aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  const hauledKg = Math.min(kg, jetAHoldKg(world, aircraft, origin, dest));
+  if (hauledKg <= 0) {
+    throw new Error(
+      `This aircraft cannot carry Jet-A as cargo on ${origin}→${dest}`,
+    );
+  }
   const classDef = getAircraftClass(aircraft.aircraftClassId);
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const deadlineTick = world.tick + 96 * 3;
@@ -125,7 +187,7 @@ export function startPortJetAReposition(
   try {
     booked = bookJetAAtAirport(state, world, {
       originIcao: origin,
-      kg,
+      kg: hauledKg,
       note: `Jet-A stock · ${origin} → ${dest}`,
     });
   } catch (error) {
@@ -136,7 +198,7 @@ export function startPortJetAReposition(
     } as MissionIntent);
     throw error;
   }
-  const reason = `Jet-A stock · ${origin} → ${dest} · ${kg} kg`;
+  const reason = `Jet-A stock · ${origin} → ${dest} · ${hauledKg} kg`;
   const mission: MissionIntent = {
     id,
     missionType: 'freight',
@@ -144,7 +206,7 @@ export function startPortJetAReposition(
       {
         shipmentLotId: `jeta_${id}`,
         commodityId: 'fuel',
-        cargoKg: 0,
+        cargoKg: hauledKg,
         payUsd: 0,
         urgency: 'normal',
         reason,
@@ -155,7 +217,7 @@ export function startPortJetAReposition(
     commodityId: 'fuel',
     originIcao: origin,
     destIcao: dest,
-    cargoKg: 0,
+    cargoKg: hauledKg,
     pax: 0,
     aircraftClassId: aircraft.aircraftClassId,
     airframeTypeId: aircraft.airframeTypeId,
@@ -172,7 +234,7 @@ export function startPortJetAReposition(
     fuelHaul: {
       kind: 'reposition',
       portId: conc.portId,
-      kg,
+      kg: hauledKg,
       fromTankKg: booked.fromTankKg,
       boughtKg: booked.boughtKg,
       boughtUsd: booked.boughtUsd,
@@ -180,7 +242,7 @@ export function startPortJetAReposition(
     ...pilotFields(opts),
   };
   commitFuelMission(state, world, mission);
-  return { mission, kg, costUsd: booked.boughtUsd };
+  return { mission, kg: hauledKg, costUsd: booked.boughtUsd };
 }
 
 export function acceptPortJetAHaul(
@@ -217,6 +279,12 @@ export function acceptPortJetAHaul(
   const payUsd = Math.round(kg * order.maxUnitPriceUsd);
   const aircraft = state.fleet.find((a) => a.id === opts.aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  const liftKg = jetAHoldKg(world, aircraft, origin, dest);
+  if (kg > liftKg) {
+    throw new Error(
+      `This aircraft can carry ${liftKg} kg of cargo on ${origin}→${dest}; this Jet-A haul is ${kg} kg`,
+    );
+  }
   const classDef = getAircraftClass(aircraft.aircraftClassId);
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const deadlineTick = world.tick + 96 * 3;
@@ -250,7 +318,7 @@ export function acceptPortJetAHaul(
       {
         shipmentLotId: `jeta_${id}`,
         commodityId: 'fuel',
-        cargoKg: 0,
+        cargoKg: kg,
         payUsd,
         urgency: 'normal',
         reason,
@@ -261,7 +329,7 @@ export function acceptPortJetAHaul(
     commodityId: 'fuel',
     originIcao: origin,
     destIcao: dest,
-    cargoKg: 0,
+    cargoKg: kg,
     pax: 0,
     aircraftClassId: aircraft.aircraftClassId,
     airframeTypeId: aircraft.airframeTypeId,

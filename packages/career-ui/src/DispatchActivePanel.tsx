@@ -268,6 +268,7 @@ export function DispatchActivePanel(props: {
   const canEditCargo =
     ['accepted', 'dispatched'].includes(mission.status) &&
     !mission.contractPilot &&
+    !mission.fuelHaul &&
     mission.missionType !== 'charter';
   const showManifestSection =
     !isEnRoute &&

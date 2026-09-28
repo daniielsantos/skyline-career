@@ -89,6 +89,7 @@ import {
   fetchDebugPortCatalog,
   postWatchStart,
   postWatchStop,
+  postPortJetAStockKg,
   type AircraftClass,
   type AircraftDeliveryQuoteView,
   type AircraftLeaseUnlock,
@@ -11366,6 +11367,13 @@ export function App() {
     exitStaging();
   }
 
+  async function onJetAStockKg(mission: Mission, kg: number) {
+    const result = await postPortJetAStockKg({ missionId: mission.id, kg });
+    commitWallet(result.walletUsd);
+    setMissions(result.missions.slice().reverse());
+    setError(null);
+  }
+
   async function enterEditManifest(mission: Mission) {
     if (mission.contractPilot) {
       setError(
@@ -11375,7 +11383,9 @@ export function App() {
     }
     if (mission.fuelHaul) {
       setError(
-        'Jet-A on this flight is the load already bought. Cancel the flight to change it.',
+        mission.fuelHaul.kind === 'reposition'
+          ? 'Use the load slider on this Jet-A stock flight.'
+          : 'This Jet-A haul is the desk order. Cancel the flight to change it.',
       );
       return;
     }
@@ -20167,6 +20177,7 @@ export function App() {
               onDispatch={(m) => void onDispatch(m)}
               onCancel={(m) => void onCancel(m)}
               onEditManifest={(m) => void enterEditManifest(m)}
+              onJetAStockKg={onJetAStockKg}
               onAcceptOfpCargo={(m) => void onAcceptOfpCargo(m)}
               onBuyFuel={(m) => void onBuyMissionFuel(m)}
               onRetryFuelQuote={() =>

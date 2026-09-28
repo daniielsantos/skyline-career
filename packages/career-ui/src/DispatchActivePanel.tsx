@@ -1,5 +1,5 @@
 import type { Mission, MissionFuelQuote, SimBridgeStatus, WatchStatus } from './api';
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DISPATCH_STEP_LABEL,
   DISPATCH_STEP_ORDER,
@@ -10,7 +10,15 @@ import {
   type DispatchStepId,
   type LoadPath,
 } from './dispatch-flow';
-import { formatMassExact, formatWeightText, KG_TO_LB, type WeightSystem } from './weight-units';
+import {
+  displayAmountToStoredKg,
+  formatMassExact,
+  formatWeightText,
+  kgToDisplay,
+  massUnitLabel,
+  KG_TO_LB,
+  type WeightSystem,
+} from './weight-units';
 import {
   CgEnvelopeSchematic,
   FuelTankSchematic,
@@ -135,6 +143,8 @@ export function DispatchActivePanel(props: {
   onDispatch: (mission: Mission) => void;
   onCancel: (mission: Mission) => void;
   onEditManifest: (mission: Mission) => void;
+  /** Resize a Jet-A stock load. Demand hauls stay fixed. */
+  onJetAStockKg?: (mission: Mission, kg: number) => Promise<void>;
   onAcceptOfpCargo?: (mission: Mission) => void;
   onBuyFuel: (mission: Mission) => void;
   onRetryFuelQuote: () => void;
@@ -271,12 +281,16 @@ export function DispatchActivePanel(props: {
     !mission.contractPilot &&
     !mission.fuelHaul &&
     mission.missionType !== 'charter';
+  const canAdjustJetAStock =
+    mission.fuelHaul?.kind === 'reposition' &&
+    ['accepted', 'dispatched'].includes(mission.status) &&
+    !isEnRoute;
   const showManifestSection =
     !isEnRoute &&
     (isFerryLeg
       ? true
       : opsFirst
-        ? canEditCargo
+        ? canEditCargo || canAdjustJetAStock
         : (mission.lots?.length ?? 0) > 0 ||
           ['accepted', 'dispatched'].includes(mission.status));
 
@@ -664,6 +678,15 @@ export function DispatchActivePanel(props: {
           ) : (
             <p className="empty">No cargo lots on this flight yet.</p>
           )}
+          {canAdjustJetAStock && props.onJetAStockKg ? (
+            <JetAStockSlider
+              mission={mission}
+              weightSystem={weightSystem}
+              busy={busy}
+              formatTonnes={props.formatTonnes}
+              onCommit={props.onJetAStockKg}
+            />
+          ) : null}
         </div>
       ) : showManifestSection && isFerryLeg ? (
         <div className="staging-section">
@@ -2211,6 +2234,194 @@ export function DispatchActivePanel(props: {
           </div>
         </details>
       ) : null}
+    </div>
+  );
+}
+
+function JetAStockSlider(props: {
+  mission: Mission;
+  weightSystem: WeightSystem;
+  busy: boolean;
+  formatTonnes: (kg: number) => string;
+  onCommit: (mission: Mission, kg: number) => Promise<void>;
+}) {
+  const haul = props.mission.fuelHaul;
+  const current = Math.max(
+    1,
+    Math.floor(haul?.kg ?? props.mission.cargoKg ?? 1),
+  );
+  const maxKg = Math.max(current, Math.floor(haul?.maxKg ?? current));
+  const [kg, setKg] = useState(current);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ceilingReady, setCeilingReady] = useState(haul?.maxKg != null);
+  const timer = useRef<number | null>(null);
+  const missionRef = useRef(props.mission);
+  const onCommitRef = useRef(props.onCommit);
+  const inflight = useRef(false);
+  const queued = useRef<number | null>(null);
+  missionRef.current = props.mission;
+  onCommitRef.current = props.onCommit;
+
+  useEffect(() => {
+    setKg(current);
+  }, [props.mission.id, current]);
+
+  useEffect(() => {
+    if (haul?.maxKg != null) {
+      setCeilingReady(true);
+      return;
+    }
+    if (haul?.kind !== 'reposition') return;
+    let cancelled = false;
+    setCeilingReady(false);
+    const kgNow = Math.floor(haul.kg ?? props.mission.cargoKg ?? 0);
+    if (kgNow <= 0) {
+      setCeilingReady(true);
+      return;
+    }
+    void onCommitRef
+      .current(props.mission, kgNow)
+      .then(() => {
+        if (!cancelled) setCeilingReady(true);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setCeilingReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.mission.id, haul?.kind, haul?.maxKg]);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current != null) window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  async function flush(next: number) {
+    const live = Math.max(
+      1,
+      Math.floor(
+        missionRef.current.fuelHaul?.kg ?? missionRef.current.cargoKg ?? 1,
+      ),
+    );
+    if (next === live) return;
+    if (inflight.current) {
+      queued.current = next;
+      return;
+    }
+    inflight.current = true;
+    setPending(true);
+    setError(null);
+    try {
+      await onCommitRef.current(missionRef.current, next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setKg(
+        Math.max(
+          1,
+          Math.floor(
+            missionRef.current.fuelHaul?.kg ??
+              missionRef.current.cargoKg ??
+              1,
+          ),
+        ),
+      );
+    } finally {
+      inflight.current = false;
+      setPending(false);
+      const follow = queued.current;
+      queued.current = null;
+      if (follow != null && follow !== next) void flush(follow);
+    }
+  }
+
+  function schedule(next: number) {
+    const clamped = Math.max(1, Math.min(maxKg, Math.floor(next)));
+    setKg(clamped);
+    if (timer.current != null) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      void flush(clamped);
+    }, 350);
+  }
+
+  const unit = massUnitLabel(props.weightSystem);
+  const displayMax = Math.max(1, Math.floor(kgToDisplay(maxKg, props.weightSystem)));
+  const displayValue = Math.max(
+    1,
+    Math.min(displayMax, Math.floor(kgToDisplay(kg, props.weightSystem))),
+  );
+  const disabled = props.busy || pending || !ceilingReady;
+
+  return (
+    <div className="fbo-hold-amount">
+      <p className="muted">
+        Up to {props.formatTonnes(maxKg)} — what this aircraft lifts, what{' '}
+        {props.mission.originIcao} has for sale, and what still fits in the tank.
+        The flight stays unpaid. Moving this charges or returns the origin price.
+      </p>
+      <label className="cargo-amount">
+        Jet-A in the hold
+        <div>
+          <input
+            type="number"
+            min={1}
+            max={displayMax}
+            step={props.weightSystem === 'imperial' ? 10 : 100}
+            value={displayValue}
+            disabled={disabled}
+            onChange={(e) => {
+              const next = displayAmountToStoredKg(
+                Number(e.target.value),
+                props.weightSystem,
+                maxKg,
+              );
+              schedule(Math.max(1, next));
+            }}
+          />
+          <span>{unit}</span>
+        </div>
+        <input
+          type="range"
+          min={1}
+          max={displayMax}
+          step={props.weightSystem === 'imperial' ? 10 : 100}
+          value={displayValue}
+          disabled={disabled}
+          onChange={(e) => {
+            const next = displayAmountToStoredKg(
+              Number(e.target.value),
+              props.weightSystem,
+              maxKg,
+            );
+            schedule(Math.max(1, next));
+          }}
+        />
+      </label>
+      <div className="cargo-presets">
+        {[0.25, 0.5, 0.75, 1].map((fraction) => (
+          <button
+            key={fraction}
+            type="button"
+            disabled={disabled || maxKg <= 0}
+            onClick={() => {
+              const next =
+                fraction >= 1
+                  ? maxKg
+                  : Math.max(1, Math.min(maxKg, Math.round(maxKg * fraction)));
+              setKg(next);
+              if (timer.current != null) window.clearTimeout(timer.current);
+              void flush(next);
+            }}
+          >
+            {fraction === 1 ? 'Max' : `${fraction * 100}%`}
+          </button>
+        ))}
+      </div>
+      {error ? <p className="muted">{error}</p> : null}
     </div>
   );
 }

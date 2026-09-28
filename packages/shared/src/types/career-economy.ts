@@ -964,14 +964,17 @@ export interface MissionIntent {
   /** SimBrief OFP whose block-fuel requirement has been funded/accepted. */
   fuelAuthorizedOfpId?: string;
   /**
-   * Career Jet-A moved by this flight. Not sim payload — holds stay empty.
-   * `reposition` stocks the company tank (unpaid). `demand` delivers to a
-   * short field and pays only the haul fee.
+   * Career Jet-A moved as hold cargo (manifest, OFP, cargo stations).
+   * Wing tanks stay trip fuel. `reposition` stocks the company tank (unpaid).
+   * `demand` delivers to a short field and pays only the haul fee.
+   * `maxKg` is the Stock slider ceiling: tank room, aircraft lift, origin stock.
    */
   fuelHaul?: {
     kind: 'reposition' | 'demand';
     portId: string;
     kg: number;
+    /** Stock only. Upper bound the manifest slider can reach. */
+    maxKg?: number;
     fromTankKg: number;
     boughtKg: number;
     boughtUsd: number;

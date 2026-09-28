@@ -44,7 +44,11 @@ export const PORT_JET_A_TANK_KG: Record<PortConcessionLevel, number> = {
   3: 28_000,
 };
 
-/** One unpaid stocking flight cannot exceed this (kg), by FBO level. */
+/**
+ * Old per-level Stock cap (kg). Stock no longer uses it — the flight is
+ * limited by tank room, what the aircraft lifts, and what the origin sells.
+ * Demand haul ceilings stay on `fuelHaulCeilingKg`.
+ */
 export const PORT_JET_A_TRIP_KG: Record<PortConcessionLevel, number> = {
   1: 2_500,
   2: 5_000,
@@ -503,6 +507,54 @@ export function deliverPortJetAHaul(
     missionId: mission.id,
     note: `Port FBO tank full · ${overflow} kg sold`,
   });
+}
+
+/**
+ * Give back a slice of Jet-A already booked for a Stock flight.
+ * Does not set `refunded` — cancel still uses `refundPortJetAHaul`.
+ */
+export function releaseBookedJetA(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: {
+    originIcao: string;
+    fromTankKg: number;
+    boughtKg: number;
+    boughtUsd: number;
+    missionId?: string;
+    note: string;
+  },
+): void {
+  const origin = opts.originIcao.trim().toUpperCase();
+  const fromTankKg = Math.max(0, Math.floor(opts.fromTankKg));
+  const boughtKg = Math.max(0, Math.floor(opts.boughtKg));
+  const boughtUsd = Math.max(0, Math.round(opts.boughtUsd));
+  if (fromTankKg > 0) {
+    const conc = concessionForPickupHub(state, world.tick, origin);
+    if (conc) {
+      const level = clampLevel(conc.level);
+      const cap = portJetATankCapacityKg(level);
+      conc.jetAKg = Math.min(
+        cap,
+        Math.floor(conc.jetAKg ?? 0) + fromTankKg,
+      );
+    } else {
+      creditAirportFuelStock(world, origin, fromTankKg);
+    }
+  }
+  if (boughtKg > 0) {
+    creditAirportFuelStock(world, origin, boughtKg);
+    if (boughtUsd > 0) {
+      applyWalletDelta(state, {
+        amountUsd: boughtUsd,
+        kind: 'port_fbo_jet_a',
+        atTick: world.tick,
+        icao: origin,
+        missionId: opts.missionId,
+        note: opts.note,
+      });
+    }
+  }
 }
 
 export function refundPortJetAHaul(

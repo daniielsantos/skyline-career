@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createSeedEconomyWorld } from './career-economy.js';
+import { departMission } from './career-mission.js';
 import { fuelTerminalSellableKg } from './career-fuel.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import {
@@ -12,7 +13,11 @@ import {
   claimPortConcession,
   PORT_CONCESSION_SHIPPED_KG,
 } from './career-port-concessions.js';
-import { acceptPortJetAHaul, startPortJetAReposition } from './career-port-jet-a-flights.js';
+import {
+  acceptPortJetAHaul,
+  setPortJetAStockKg,
+  startPortJetAReposition,
+} from './career-port-jet-a-flights.js';
 import {
   buyPortFboJetA,
   deliverPortJetAHaul,
@@ -135,9 +140,26 @@ describe('port FBO Jet-A', () => {
     assert.equal(started.mission.fuelHaul?.kg, started.kg);
     assert.ok(started.kg > 0);
     assert.ok(started.kg < 1_000);
+    assert.equal(started.mission.fuelHaul?.maxKg, started.kg);
     assert.equal(started.mission.pilotAccountId, 'acc_pilot');
     assert.equal(started.mission.vaFlight, true);
     assert.ok(state.walletUsd < walletBefore);
+    const beforeSlider = state.walletUsd;
+    const half = Math.max(1, Math.floor(started.kg / 2));
+    const reduced = setPortJetAStockKg(state, world, {
+      missionId: started.mission.id,
+      kg: half,
+    });
+    assert.equal(reduced.kg, half);
+    assert.equal(reduced.mission.cargoKg, half);
+    assert.ok(state.walletUsd > beforeSlider);
+    const raised = setPortJetAStockKg(state, world, {
+      missionId: started.mission.id,
+      kg: started.kg,
+    });
+    assert.equal(raised.kg, started.kg);
+    assert.equal(raised.mission.cargoKg, started.kg);
+    assert.ok(Math.abs(state.walletUsd - beforeSlider) <= 1);
     const tankBefore = state.playerPortConcessions?.[0]?.jetAKg ?? 0;
     deliverPortJetAHaul(state, world, started.mission);
     assert.equal(
@@ -210,6 +232,37 @@ describe('port FBO Jet-A', () => {
       world.demandOrders.find((o) => o.id === orderId)?.status,
       'open',
     );
+  });
+
+  it('stocks up to the tank when the aircraft and the hub can cover it', () => {
+    const { world, state } = atSantos();
+    const light = state.fleet[0]!;
+    const sbkp = world.airports.find((ap) => ap.icao === 'SBKP');
+    assert.ok(sbkp?.inventory.fuel);
+    sbkp!.inventory.fuel!.stockKg = sbkp!.inventory.fuel!.capacityKg * 0.9;
+    state.fleet.push({
+      ...light,
+      id: 'acf_heavy',
+      registration: 'N737TS',
+      airframeTypeId: 'asobo-737-max-8-passengers',
+      aircraftClassId: 'narrow_freighter',
+      locationIcao: 'SBKP',
+      status: 'parked',
+      fuelKg: 0,
+    });
+    state.pilotIcao = 'SBKP';
+    const started = startPortJetAReposition(state, world, {
+      portId: 'BRSSZ',
+      originIcao: 'SBKP',
+      aircraftId: 'acf_heavy',
+    });
+    assert.equal(started.kg, portJetATankCapacityKg(1));
+    assert.ok(started.kg > 2_500);
+    assert.equal(started.mission.fuelHaul?.maxKg, started.kg);
+    assert.equal(started.mission.cargoKg, started.kg);
+    assert.ok(started.mission.lots?.[0]?.shipmentLotId.startsWith('jeta_'));
+    const departed = departMission(world, started.mission, { fleet: state });
+    assert.equal(departed.mission.status, 'in_flight');
   });
 
   it('posts at most one restricted line for a short quiet field', () => {

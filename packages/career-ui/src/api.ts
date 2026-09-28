@@ -592,6 +592,9 @@ export type Mission = {
     kind: 'reposition' | 'demand';
     portId?: string;
     kg?: number;
+    /** Stock slider ceiling (tank room, aircraft lift, origin stock). */
+    maxKg?: number;
+    boughtUsd?: number;
   };
   /**
    * What the pilot’s home wallet received on settle (member cut / IH fee).
@@ -3777,6 +3780,20 @@ export function postPortJetAFetch(opts: {
     missions: Mission[];
     ports: PortsSnapshot;
   }>('/api/ports/jet-a/fetch', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortJetAStockKg(opts: { missionId: string; kg: number }) {
+  return api<{
+    kg: number;
+    maxKg: number;
+    costUsd: number;
+    walletUsd: number;
+    mission: Mission;
+    missions: Mission[];
+  }>('/api/ports/jet-a/stock-kg', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

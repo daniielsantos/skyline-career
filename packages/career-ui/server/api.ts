@@ -184,6 +184,7 @@ import {
   demandSnapshot,
   acceptDemandOrder,
   acceptPortJetAHaul,
+  setPortJetAStockKg,
   startPortJetAReposition,
   buyPortFboJetA,
   holdDemandOrder,
@@ -9858,6 +9859,54 @@ export function createCareerApiServer(port = 8787) {
           }, {
             commandSliceAircraftId: body.aircraftId,
             commandSliceIcaos: [body.originIcao.trim().toUpperCase()],
+            companyId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/jet-a/stock-kg') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          kg?: number;
+          companyId?: string;
+        };
+        const companyId = companyIdFromRequest(req, body.companyId);
+        if (!body.missionId || body.kg == null || !Number.isFinite(Number(body.kg))) {
+          send(res, 400, { error: 'missionId and kg required' });
+          return;
+        }
+        try {
+          const originIcao = await withCareerPeekRead((_world, missions) => {
+            const mission = missions.missions.find((m) => m.id === body.missionId);
+            return mission?.originIcao?.trim().toUpperCase() ?? '';
+          }, { companyId });
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const mission = missions.missions.find((m) => m.id === body.missionId);
+            if (!mission) throw new Error('Flight not found');
+            const adjusted = setPortJetAStockKg(missions, world, {
+              missionId: body.missionId!,
+              kg: Number(body.kg),
+            });
+            return {
+              kg: adjusted.kg,
+              maxKg: adjusted.maxKg,
+              costUsd: adjusted.costUsd,
+              walletUsd: missions.walletUsd,
+              mission: withMissionClientView(world, missions, adjusted.mission),
+              missions: missions.missions.map((m) =>
+                withMissionClientView(world, missions, m),
+              ),
+            };
+          }, {
+            commandSliceMissionId: body.missionId,
+            commandSliceIcaos: originIcao ? [originIcao] : undefined,
             companyId,
           });
           send(res, 200, result);

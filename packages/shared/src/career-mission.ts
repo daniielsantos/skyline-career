@@ -2389,6 +2389,7 @@ export function failMissionImpact(
       id.startsWith('demand_') ||
       id.startsWith('whbridge_') ||
       id.startsWith('whhaul_') ||
+      id.startsWith('jeta_') ||
       id.startsWith('charter_')
     ) {
       continue;
@@ -2484,7 +2485,8 @@ export function revertFalseDepartMission(
         line.shipmentLotId.startsWith('portpk_') ||
         line.shipmentLotId.startsWith('demand_') ||
         line.shipmentLotId.startsWith('whbridge_') ||
-        line.shipmentLotId.startsWith('whhaul_')
+        line.shipmentLotId.startsWith('whhaul_') ||
+        line.shipmentLotId.startsWith('jeta_')
       ) {
         continue;
       }
@@ -2537,7 +2539,8 @@ export function departMission(
         line.shipmentLotId.startsWith('portpk_') ||
         line.shipmentLotId.startsWith('demand_') ||
         line.shipmentLotId.startsWith('whbridge_') ||
-        line.shipmentLotId.startsWith('whhaul_')
+        line.shipmentLotId.startsWith('whhaul_') ||
+        line.shipmentLotId.startsWith('jeta_')
       ) {
         continue;
       }

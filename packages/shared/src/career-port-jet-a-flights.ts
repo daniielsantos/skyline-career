@@ -6,11 +6,12 @@
  * Wing tanks stay the trip fuel. Settle still credits fuelHaul.kg.
  */
 
-import { routeDistanceNm } from './career-economy.js';
+import { airportByIcao, routeDistanceNm } from './career-economy.js';
 import {
   assignAircraftToMission,
   releaseAircraftOnCancel,
 } from './career-fleet.js';
+import { fuelTerminalSellableKg } from './career-fuel.js';
 import {
   estimateRouteCargoLimit,
   getAircraftClass,
@@ -21,7 +22,7 @@ import { findCareerPlayerAirframe } from './career-player-airframes.js';
 import {
   bookJetAAtAirport,
   portJetATankCapacityKg,
-  portJetATripCeilingKg,
+  releaseBookedJetA,
 } from './career-port-jet-a.js';
 import { portPickupHubsBound } from './career-port-corridor.js';
 import type {
@@ -161,15 +162,22 @@ export function startPortJetAReposition(
     portJetATankCapacityKg(level) - Math.floor(conc.jetAKg ?? 0),
   );
   if (room <= 0) throw new Error('Port FBO Jet-A tank is full');
-  const cap = Math.min(room, portJetATripCeilingKg(level));
-  const kg = Math.min(
-    cap,
-    Math.max(0, Math.floor(opts.kg ?? cap)),
-  );
-  if (kg <= 0) throw new Error('Nothing to fetch — the tank is full');
   const aircraft = state.fleet.find((a) => a.id === opts.aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
-  const hauledKg = Math.min(kg, jetAHoldKg(world, aircraft, origin, dest));
+  const liftKg = jetAHoldKg(world, aircraft, origin, dest);
+  const available = jetAAvailableAtOriginKg(state, world, origin);
+  const maxKg = Math.max(0, Math.min(room, liftKg, available));
+  if (maxKg <= 0) {
+    throw new Error(
+      available <= 0
+        ? `Not enough Jet-A at ${origin}`
+        : `This aircraft cannot carry Jet-A as cargo on ${origin}→${dest}`,
+    );
+  }
+  const hauledKg = Math.min(
+    maxKg,
+    Math.max(0, Math.floor(opts.kg ?? maxKg)),
+  );
   if (hauledKg <= 0) {
     throw new Error(
       `This aircraft cannot carry Jet-A as cargo on ${origin}→${dest}`,
@@ -235,6 +243,7 @@ export function startPortJetAReposition(
       kind: 'reposition',
       portId: conc.portId,
       kg: hauledKg,
+      maxKg,
       fromTankKg: booked.fromTankKg,
       boughtKg: booked.boughtKg,
       boughtUsd: booked.boughtUsd,
@@ -243,6 +252,119 @@ export function startPortJetAReposition(
   };
   commitFuelMission(state, world, mission);
   return { mission, kg: hauledKg, costUsd: booked.boughtUsd };
+}
+
+/** Spot still for sale, plus any company tank parked at this airport. */
+function jetAAvailableAtOriginKg(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  originIcao: string,
+): number {
+  const origin = originIcao.trim().toUpperCase();
+  const ap = airportByIcao(world, origin);
+  const sellable = ap ? fuelTerminalSellableKg(ap) : 0;
+  let tank = 0;
+  for (const conc of state.playerPortConcessions ?? []) {
+    if (conc.leasePaidThroughTick <= world.tick) continue;
+    const hubs = portPickupHubsBound(conc.portId).map((hub) =>
+      hub.trim().toUpperCase(),
+    );
+    if (!hubs.includes(origin)) continue;
+    tank += Math.max(0, Math.floor(conc.jetAKg ?? 0));
+  }
+  return sellable + tank;
+}
+
+function jetAStockSliderMaxKg(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  heldKg: number,
+): number {
+  const haul = mission.fuelHaul;
+  const held = Math.max(0, Math.floor(heldKg));
+  if (!haul) return held;
+  const aircraft = state.fleet.find((a) => a.id === mission.aircraftId);
+  const conc = activeConcession(state, world.tick, haul.portId);
+  const level = conc?.level === 2 || conc?.level === 3 ? conc.level : 1;
+  const room = conc
+    ? Math.max(0, portJetATankCapacityKg(level) - Math.floor(conc.jetAKg ?? 0))
+    : 0;
+  const liftKg = aircraft
+    ? jetAHoldKg(world, aircraft, mission.originIcao, mission.destIcao)
+    : 0;
+  const available = jetAAvailableAtOriginKg(state, world, mission.originIcao);
+  const ceiling = Math.max(0, Math.min(room, liftKg, held + available));
+  return Math.max(held, ceiling);
+}
+
+/** Change how much Jet-A a Stock flight is carrying. Demand hauls stay fixed. */
+export function setPortJetAStockKg(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  opts: { missionId: string; kg: number },
+): { mission: MissionIntent; kg: number; maxKg: number; costUsd: number } {
+  const mission = state.missions.find((m) => m.id === opts.missionId);
+  if (!mission) throw new Error('Flight not found');
+  const haul = mission.fuelHaul;
+  if (!haul || haul.kind !== 'reposition' || haul.refunded) {
+    throw new Error('Only a Jet-A stock flight can change this load');
+  }
+  if (!['accepted', 'dispatched'].includes(mission.status)) {
+    throw new Error('Jet-A load is locked once the flight is underway');
+  }
+  const current = Math.max(0, Math.floor(haul.kg));
+  const maxKg = jetAStockSliderMaxKg(state, world, mission, current);
+  const next = Math.max(1, Math.min(maxKg, Math.floor(opts.kg)));
+  if (next === current) {
+    haul.maxKg = maxKg;
+    return { mission, kg: current, maxKg, costUsd: haul.boughtUsd };
+  }
+  const origin = mission.originIcao.trim().toUpperCase();
+  const dest = mission.destIcao.trim().toUpperCase();
+  if (next < current) {
+    const cut = current - next;
+    const cutTank = Math.min(cut, haul.fromTankKg);
+    const cutBought = cut - cutTank;
+    const refundUsd =
+      haul.boughtKg > 0 && cutBought > 0
+        ? Math.round((haul.boughtUsd * cutBought) / haul.boughtKg)
+        : 0;
+    releaseBookedJetA(state, world, {
+      originIcao: origin,
+      fromTankKg: cutTank,
+      boughtKg: cutBought,
+      boughtUsd: refundUsd,
+      missionId: mission.id,
+      note: `Jet-A stock reduced · ${origin}`,
+    });
+    haul.fromTankKg -= cutTank;
+    haul.boughtKg -= cutBought;
+    haul.boughtUsd = Math.max(0, haul.boughtUsd - refundUsd);
+  } else {
+    const booked = bookJetAAtAirport(state, world, {
+      originIcao: origin,
+      kg: next - current,
+      note: `Jet-A stock · ${origin} → ${dest}`,
+    });
+    haul.fromTankKg += booked.fromTankKg;
+    haul.boughtKg += booked.boughtKg;
+    haul.boughtUsd += booked.boughtUsd;
+  }
+  haul.kg = next;
+  haul.maxKg = maxKg;
+  const reason = `Jet-A stock · ${origin} → ${dest} · ${next} kg`;
+  mission.cargoKg = next;
+  mission.reason = reason;
+  if (mission.lots?.[0]) {
+    mission.lots[0].cargoKg = next;
+    mission.lots[0].reason = reason;
+  }
+  mission.status = 'accepted';
+  mission.lastOfpCheck = undefined;
+  mission.lastPreflightCheck = undefined;
+  mission.fuelAuthorizedOfpId = undefined;
+  return { mission, kg: next, maxKg, costUsd: haul.boughtUsd };
 }
 
 export function acceptPortJetAHaul(

@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **1ffdbf83** / desktop **0.3.373** shipped: Show destination runways from the dispatch route title before the OFP. Release: [v0.3.373](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.373).
+
+
 `main` **0a537166** / desktop **0.3.372** shipped: Stop showing an unstamped Jet-A flight to every VA member. Release: [v0.3.372](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.372).
 
 

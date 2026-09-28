@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Station pallets** — v0.3.382 (`a7bfbe03`). O quadrado saiu. Cada station é uma caixa verde em cima de um estrado (pés). Sem teto, a altura segue a station mais pesada. Preflight e En route. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.382
+Atualizado 2026-09-28: **Station pallets** — v0.3.382 (estrado) não leu bem: a célula é larga e baixa, a caixa virou faixa. Agora é um contêiner deitado; a carga enche na horizontal. Sem teto, a largura segue a station mais pesada.
 
 Atualizado 2026-09-28: **Port tank draw ledger** — v0.3.380 (`7761803e`). Retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. A linha nasce no world; o voo já autorizado não retroage. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380
 

@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **f5dc8a79** / desktop **0.3.385** shipped: Make the payload station container tall enough to read as a box. Release: [v0.3.385](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.385).
+
+
 `main` **0242b60d** / desktop **0.3.384** shipped: Ignore a station cap that cannot hold the load. Release: [v0.3.384](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.384).
 
 

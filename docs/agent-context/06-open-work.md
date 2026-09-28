@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Wallet chip após settle** — o saldo pessoal não foi gravado por cima. O Watch pintava o caixa da VA no chip; o Hangar relia a home e corrigia. Fix local: `walletCompanyId` no status; chrome só aceita figura da home. Sem release. Detail: [`16-va-logistics.md`](./16-va-logistics.md).
+Atualizado 2026-09-28: **Wallet chip após settle** — v0.3.386 (`91e94286`). O saldo pessoal não foi gravado por cima; o Watch pintava o caixa da VA no chip. Chrome só aceita figura da home. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.386
 
 Atualizado 2026-09-28: **Station containers** — v0.3.385 (`778cb4da`). Contêiner mais alto: 1.75rem no Preflight, 1.45rem no En route. Escala segue a station mais pesada. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.385
 

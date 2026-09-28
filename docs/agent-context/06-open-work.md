@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Station pallets** — Preflight e En route: station é um porão escuro com a carga subindo até a fração do máximo. O visto do card continua o match.
+Atualizado 2026-09-28: **Station pallets** — v0.3.381 (`1a9c7523`). Preflight e En route: station é um porão escuro com a carga subindo até a fração do máximo. O visto do card continua o match. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.381
 
 Atualizado 2026-09-28: **Port tank draw ledger** — v0.3.380 (`7761803e`). Retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. A linha nasce no world; o voo já autorizado não retroage. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380
 

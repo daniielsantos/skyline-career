@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **cd85c3ca** / desktop **0.3.378** shipped: Show the economy clock time on ledger recent activity. Release: [v0.3.378](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.378).
+
+
 `main` **da43bd15** / desktop **0.3.377** shipped: Show the Jet-A hold on Ready the same way as other cargo. Release: [v0.3.377](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.377).
 
 

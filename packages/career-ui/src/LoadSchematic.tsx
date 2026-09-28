@@ -28,14 +28,28 @@ function SchematicCell(props: {
   maxLb?: number;
   weightSystem: WeightSystem;
 }) {
-  const fill = fillRatio(props.valueLb, props.maxLb);
+  const isStation = props.className.includes('load-schematic-station');
+  const ratio = fillRatio(props.valueLb, props.maxLb);
+  // Stations without a published max still show a cargo stack when loaded.
+  const fill =
+    ratio !== undefined
+      ? ratio
+      : isStation && props.valueLb > 0.5
+        ? 0.55
+        : isStation
+          ? 0
+          : undefined;
   const style =
     fill !== undefined
       ? ({ '--schematic-fill': String(fill) } as CSSProperties)
       : undefined;
   return (
     <div
-      className={props.className}
+      className={
+        isStation && !(props.valueLb > 0.5)
+          ? `${props.className} load-schematic-station-empty`
+          : props.className
+      }
       style={style}
       title={
         props.maxLb !== undefined && props.maxLb > 0

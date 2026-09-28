@@ -4082,7 +4082,7 @@ tr.lot-locked {
 
 .dispatch-enroute-live-tiles .load-schematic-stations .load-schematic-station {
   display: grid;
-  align-content: center;
+  align-content: space-between;
   justify-items: center;
   gap: 0.05rem;
   min-width: 0;
@@ -4102,9 +4102,11 @@ tr.lot-locked {
   letter-spacing: 0;
   line-height: 1.1;
   text-align: center;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  hyphens: auto;
+  white-space: nowrap;
+}
+
+.dispatch-enroute-live-tiles .load-schematic-station {
+  --station-track: 0.62rem;
 }
 
 .dispatch-enroute-live-tiles .load-schematic-stations .load-schematic-label {
@@ -9783,6 +9785,58 @@ table.contracts-table .col-access .action {
   width: 100%;
 }
 
+/* Payload bays: dark hold, cargo stack in a floor track. Not a pass/fail tile. */
+.load-schematic-station {
+  --station-track: 1.05rem;
+  grid-template-rows: auto auto var(--station-track);
+  align-content: stretch;
+  justify-items: center;
+  min-height: 3.55rem;
+  padding: 0.2rem 0.22rem 0.16rem;
+  border-radius: 0.18rem;
+  background: color-mix(in srgb, var(--bg-deep) 82%, var(--surface));
+}
+
+.load-schematic-station .load-schematic-label {
+  align-self: start;
+}
+
+.load-schematic-station strong {
+  align-self: end;
+  white-space: nowrap;
+}
+
+.load-schematic-station::before {
+  content: '';
+  position: absolute;
+  left: 0.16rem;
+  right: 0.16rem;
+  bottom: 0.14rem;
+  height: var(--station-track);
+  border-radius: 0.08rem;
+  background: color-mix(in srgb, black 35%, transparent);
+  z-index: 0;
+}
+
+.load-schematic-station .load-schematic-fill {
+  left: 0.16rem;
+  right: 0.16rem;
+  bottom: 0.14rem;
+  height: calc(var(--schematic-fill, 0) * var(--station-track));
+  border-radius: 0.08rem 0.08rem 0.05rem 0.05rem;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 82%, white) 0%,
+    color-mix(in srgb, var(--accent) 70%, #6a4324) 100%
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 32%, transparent);
+}
+
+.load-schematic-station-empty strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .load-schematic-label {
   color: var(--muted);
   font-size: 0.62rem;
@@ -9798,7 +9852,6 @@ table.contracts-table .col-access .action {
 
 .preflight-load-ok .load-schematic-wing,
 .preflight-load-ok .load-schematic-center,
-.preflight-load-ok .load-schematic-station,
 .preflight-load-ok .load-schematic-tip,
 .preflight-load-ok .load-schematic-aux {
   border-color: color-mix(in srgb, var(--ok) 35%, var(--line));
@@ -9806,7 +9859,6 @@ table.contracts-table .col-access .action {
 
 .preflight-load-live .load-schematic-wing,
 .preflight-load-live .load-schematic-center,
-.preflight-load-live .load-schematic-station,
 .preflight-load-live .load-schematic-tip,
 .preflight-load-live .load-schematic-aux {
   border-color: color-mix(in srgb, var(--muted) 40%, var(--line));
@@ -9814,7 +9866,6 @@ table.contracts-table .col-access .action {
 
 .preflight-load-fail .load-schematic-wing,
 .preflight-load-fail .load-schematic-center,
-.preflight-load-fail .load-schematic-station,
 .preflight-load-fail .load-schematic-tip,
 .preflight-load-fail .load-schematic-aux {
   border-color: color-mix(in srgb, var(--danger) 35%, var(--line));

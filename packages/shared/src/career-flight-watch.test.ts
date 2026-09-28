@@ -417,6 +417,122 @@ describe('evaluateMissionFlightTransition', () => {
     if (wrongAirport.event.type === 'settle_blocked') {
       assert.ok((wrongAirport.event.distanceNm ?? 0) > 100);
     }
+    assert.equal(wrongAirport.nextState.destRelocationBlocksSettle, undefined);
+  });
+
+  it('does not settle a paused jump that lands inside the dest radius', () => {
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    const state = createMissionFlightWatchState({
+      sawAirborne: true,
+      lastOnGround: true,
+      airborneAtMs: nowMs - plannedMs,
+      expectedRouteMs: plannedMs,
+    });
+    const parked: Parameters<typeof evaluateMissionFlightTransition>[1] = {
+      onGround: true,
+      enginesRunning: false,
+      parkingBrake: true,
+      groundSpeedKt: 0,
+      paused: true,
+      position: { lat: SBRF.lat, lon: SBRF.lon },
+    };
+    const jumped = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      parked,
+      state,
+      {
+        destCoords: SBRF,
+        nowMs,
+        prevSample: {
+          onGround: true,
+          enginesRunning: false,
+          paused: true,
+          position: { lat: SBPA.lat, lon: SBPA.lon },
+        },
+      },
+    );
+    assert.equal(jumped.event.type, 'settle_blocked');
+    assert.equal(jumped.nextState.destRelocationBlocksSettle, true);
+
+    const stillParked = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      parked,
+      jumped.nextState,
+      {
+        destCoords: SBRF,
+        nowMs,
+        prevSample: parked,
+      },
+    );
+    assert.equal(stillParked.event.type, 'settle_blocked');
+    assert.equal(stillParked.nextState.destRelocationBlocksSettle, true);
+
+    const left = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: false,
+        enginesRunning: true,
+        paused: false,
+        groundSpeedKt: 220,
+        position: { lat: SBRF.lat + 0.9, lon: SBRF.lon },
+      },
+      stillParked.nextState,
+      {
+        destCoords: SBRF,
+        nowMs,
+        prevSample: parked,
+      },
+    );
+    assert.equal(left.nextState.destRelocationBlocksSettle, undefined);
+
+    const arrived = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: false,
+        parkingBrake: true,
+        groundSpeedKt: 0,
+        paused: false,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+      },
+      {
+        ...left.nextState,
+        lastOnGround: false,
+      },
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(arrived.event.type, 'settle');
+  });
+
+  it('still settles a paused parking brake when the aircraft did not jump', () => {
+    const plannedMs = 3_600_000;
+    const nowMs = Date.now();
+    const here = {
+      onGround: true,
+      enginesRunning: false,
+      parkingBrake: true,
+      groundSpeedKt: 0,
+      paused: true,
+      position: { lat: SBRF.lat, lon: SBRF.lon },
+    };
+    const parked = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      here,
+      createMissionFlightWatchState({
+        sawAirborne: true,
+        lastOnGround: true,
+        airborneAtMs: nowMs - plannedMs,
+        expectedRouteMs: plannedMs,
+      }),
+      {
+        destCoords: SBRF,
+        nowMs,
+        prevSample: here,
+      },
+    );
+    assert.equal(parked.event.type, 'settle');
+    assert.equal(parked.nextState.destRelocationBlocksSettle, undefined);
   });
 
   it('blocks settle when position is missing', () => {

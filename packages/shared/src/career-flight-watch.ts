@@ -21,6 +21,12 @@ export const TAXI_GROUND_SPEED_EXIT_KT = 2;
  * Covers payware turboprops (PC-12) where ENG COMBUSTION:1 stays true after cutoff.
  */
 export const PARKED_GROUND_SPEED_KT = 3;
+/**
+ * One paused tick that moves at least this far and lands inside the dest
+ * radius is a menu / world-map relocation, not an arrival. A real approach
+ * covers this distance over minutes of unpaused samples, not one pause tick.
+ */
+export const PAUSED_DEST_RELOCATION_NM = 15;
 /** TURB ENG N1 below this (%) is spooled down — not producing thrust. */
 export const ENGINE_N1_OFF_PCT = 20;
 /** GENERAL ENG RPM below this is stopped (piston / leftover Ng). */
@@ -506,6 +512,11 @@ export interface MissionFlightWatchState {
    * Captured once per watch session.
    */
   landingFpm?: number;
+  /**
+   * Paused jump landed inside the dest radius. Settle stays blocked until
+   * the aircraft flies (unpaused) back outside that radius.
+   */
+  destRelocationBlocksSettle?: boolean;
 }
 
 export type MissionFlightEvent =
@@ -579,7 +590,60 @@ export function createMissionFlightWatchState(
     routeDistanceNm: seed.routeDistanceNm,
     lastAirborneVsFpm: seed.lastAirborneVsFpm,
     landingFpm: seed.landingFpm,
+    ...(seed.destRelocationBlocksSettle
+      ? { destRelocationBlocksSettle: true as const }
+      : {}),
   };
+}
+
+function pausedRelocationNm(
+  sample: FlightGroundSample,
+  prev: FlightGroundSample | null,
+): number | null {
+  if (sample.paused !== true || !prev?.position || !sample.position) return null;
+  if (sample.positionHeld === true || prev.positionHeld === true) return null;
+  const nm = distanceNm(prev.position, sample.position);
+  return Number.isFinite(nm) ? nm : null;
+}
+
+/**
+ * Latch a menu spawn that drops inside the dest radius. Clear it only after
+ * the aircraft is airborne, unpaused, and outside that radius again.
+ */
+function destRelocationBlocksSettle(
+  state: MissionFlightWatchState,
+  sample: FlightGroundSample,
+  prev: FlightGroundSample | null,
+  opts: EvaluateMissionFlightOpts,
+): boolean {
+  const radius = opts.settleRadiusNm ?? DEFAULT_SETTLE_RADIUS_NM;
+  const dest = opts.destCoords;
+  const pos = sample.position;
+  const inside =
+    Boolean(pos && dest) && isNearAirport(pos!, dest!, radius).near;
+  const jumpNm = pausedRelocationNm(sample, prev);
+  if (
+    jumpNm != null &&
+    jumpNm >= PAUSED_DEST_RELOCATION_NM &&
+    inside
+  ) {
+    return true;
+  }
+  if (state.destRelocationBlocksSettle !== true) return false;
+  const live =
+    sample.paused !== true &&
+    sample.slewActive !== true &&
+    !isSimPlaybackFrozen(sample, prev);
+  if (
+    live &&
+    sample.onGround === false &&
+    pos &&
+    dest &&
+    !isNearAirport(pos, dest, radius).near
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -1075,6 +1139,12 @@ function gateSettleByDestination(
   opts: EvaluateMissionFlightOpts,
   baseReason: string,
 ): MissionFlightEvent {
+  if (state.destRelocationBlocksSettle) {
+    return {
+      type: 'settle_blocked',
+      reason: `${baseReason}, but a paused relocation put the aircraft at dest — fly the arrival`,
+    };
+  }
   const timeBlock = gateSettleByMinAirborne(state, opts, baseReason);
   if (timeBlock) return timeBlock;
 
@@ -1155,11 +1225,18 @@ export function evaluateMissionFlightTransition(
   const requireEnginesOff = opts.requireEnginesOffToSettle !== false;
   const departFrom = opts.departFrom ?? DEFAULT_DEPART_FROM;
   const prevSample = opts.prevSample ?? null;
+  const relocationBlocks = destRelocationBlocksSettle(
+    state,
+    sample,
+    prevSample,
+    opts,
+  );
 
   // Menu / slew: ignore the sample entirely so lastOnGround does not flip
   // and unpause on the ramp does not look like a touchdown.
   // Exception: already on the ground after airborne — still allow settle when
   // parking brake is set (sticky IS PAUSED must not trap Settling forever).
+  // A paused jump into the dest radius is not that landing.
   // Pass prevSample so sticky IS PAUSED + position motion is treated as live
   // (matches Watch playbackFrozen). Absolute Time alone does not clear pause.
   if (isSimPlaybackFrozen(sample, prevSample)) {
@@ -1168,6 +1245,16 @@ export function evaluateMissionFlightTransition(
       state.sawAirborne === true &&
       mission.status === 'in_flight' &&
       isShutdownOrParked(sample);
+    if (canSettleWhileFrozen && relocationBlocks) {
+      return {
+        event: {
+          type: 'settle_blocked',
+          reason:
+            'parking brake after a paused relocation — fly the arrival',
+        },
+        nextState: { ...state, destRelocationBlocksSettle: true },
+      };
+    }
     if (!canSettleWhileFrozen) {
       return { event: { type: 'none' }, nextState: state };
     }
@@ -1205,6 +1292,7 @@ export function evaluateMissionFlightTransition(
         : state.routeDistanceNm,
     lastAirborneVsFpm: state.lastAirborneVsFpm,
     landingFpm: state.landingFpm,
+    ...(relocationBlocks ? { destRelocationBlocksSettle: true as const } : {}),
   };
   if (
     !sample.onGround &&

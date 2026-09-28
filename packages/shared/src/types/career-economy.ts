@@ -942,6 +942,12 @@ export interface MissionIntent {
    */
   airborneElapsedMs?: number;
   /**
+   * Watch saw a paused jump of at least 15 nm into the destination radius.
+   * Settle stays blocked until an unpaused airborne sample leaves that radius.
+   * Missing on older saves.
+   */
+  destRelocationBlocksSettle?: boolean;
+  /**
    * Planned route duration (ms) stamped at airborne — OFP air time / distance
    * estimate. May tighten after stable cruise TAS rebase (floor 55% of OFP).
    */

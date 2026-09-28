@@ -1,5 +1,19 @@
 # Runway touchdown / debrief
 
+## Sintoma (2026-09-27) — KMIA→SYMD pagou depois de spawn no menu
+
+Debrief `msn_whhaul_3362_KMIA_SYMD_648462`: ON TIME, OFF RWY, +311 fpm, RWY 09 · 1.20 km · 30 m wide · unlit · 116767 m past THR · 45353 m left. Piloto (737) só viu o tamanho da pista na chegada, não pousou, foi ao menu, deu spawn e o parking brake fechou o settle.
+
+## Causa
+
+SYMD (Mahdia) é spoke de mineração de verdade: uma faixa 09/27, 1200×30 m, asfalto, `lighted: false` (`career-runways.json` + `career-gy-hubs-densify.ts`). Não há filtro de comprimento/largura por classe, então um haul de narrow freighter pode ser despachado para lá. Comprimento e luzes só aparecem no diagrama do debrief. O catálogo não tem frequências de rádio.
+
+O marcador a ~125 km não é a faixa. Watch 23:25:48Z: pausa + `movedNm` 62.8 (teleporte) e first-contact em 5.966, -58.266 — SYLD Linden, não Mahdia (5.277, -59.152). +311 fpm é taxa de posicionamento. 23:29:00Z: segundo salto pausado de 67.2 nm, que cai em cima de Mahdia. 23:29:02Z `settle begin` com parking brake, motores off, `paused: true`. `gateSettleByDestination` só exige ≤12 nm da posição **ao vivo**; `paused_but_moved` deixa o tick valer como chegada. Pause não bloqueia settle.
+
+## Fix
+
+Porta no Watch, sem trilha gravada. `PAUSED_DEST_RELOCATION_NM` (15 nm): um tick pausado que cai dentro do raio de settle marca `destRelocationBlocksSettle` na missão. `gateSettleByDestination` devolve `settle_blocked` (também no settle congelado com parking brake) até um sample airborne, não pausado, sair do raio. Pause parado em cima da faixa continua podendo settle. Resume no origin não entra no raio do destino, então não arma o latch. O campo vai no JSON da missão (save antigo sem a chave = livre). Filtro de jato em faixa curta não entrou; Mahdia continua no mapa.
+
 ## Sintoma (2026-09-06)
 
 Settle debrief em **SBCH**: `RWY 11 · 0 m past THR · 5860752 m left · OFF runway` com dot fora da strip — player pousou na **29** na pista.

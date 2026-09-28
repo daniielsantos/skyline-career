@@ -2123,6 +2123,10 @@ export class CareerWatchSession {
       ...(hasPersistedAirborne && mission.status === 'in_flight'
         ? { lastOnGround: false as const }
         : {}),
+      ...(mission.status === 'in_flight' &&
+      mission.destRelocationBlocksSettle === true
+        ? { destRelocationBlocksSettle: true as const }
+        : {}),
     });
     // Floor for cruise TAS rebase — prefer OFP airTime even if mission already
     // carries a tightened expectedRouteMs from a prior Watch session.
@@ -2148,7 +2152,8 @@ export class CareerWatchSession {
           if (
             openMission.airborneAtMs == null &&
             openMission.airborneElapsedMs == null &&
-            openMission.expectedRouteMs == null
+            openMission.expectedRouteMs == null &&
+            openMission.destRelocationBlocksSettle !== true
           ) {
             return false;
           }
@@ -2156,6 +2161,7 @@ export class CareerWatchSession {
           delete cleaned.airborneAtMs;
           delete cleaned.airborneElapsedMs;
           delete cleaned.expectedRouteMs;
+          delete cleaned.destRelocationBlocksSettle;
           freshMissions.missions[openIdx] = cleaned;
           return true;
         },
@@ -2447,6 +2453,31 @@ export class CareerWatchSession {
       );
     } catch (err) {
       watchDebugLog('watch', 'persist airborne clock failed', {
+        missionId: this.missionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /** Remember a menu spawn at dest so a later Watch restart still refuses settle. */
+  private async persistDestRelocation(blocked: boolean): Promise<void> {
+    if (!this.missionId) return;
+    try {
+      await this.cb.updateOpenMission(
+        this.missionId,
+        async (freshMissions, openMission, openIdx) => {
+          if ((openMission.destRelocationBlocksSettle === true) === blocked) {
+            return false;
+          }
+          freshMissions.missions[openIdx] = {
+            ...openMission,
+            destRelocationBlocksSettle: blocked,
+          };
+          return true;
+        },
+      );
+    } catch (err) {
+      watchDebugLog('watch', 'persist dest relocation failed', {
         missionId: this.missionId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -3757,6 +3788,19 @@ export class CareerWatchSession {
       this.watchState = nextState;
       this.lastEvent = event;
       this.lastEventAtIso = new Date().toISOString();
+      if (
+        (nextState.destRelocationBlocksSettle === true) !==
+        (current.destRelocationBlocksSettle === true)
+      ) {
+        await this.persistDestRelocation(
+          nextState.destRelocationBlocksSettle === true,
+        );
+        current = {
+          ...current,
+          destRelocationBlocksSettle:
+            nextState.destRelocationBlocksSettle === true,
+        };
+      }
 
       const touchdownCleared =
         prevHadTouchdown &&

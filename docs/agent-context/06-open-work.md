@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Station containers** — v0.3.384 escala ok; o contêiner estava fino demais (0.68rem no En route). Corpo sobe para 1.75rem no Preflight e 1.45rem no En route. Local, sem release.
+Atualizado 2026-09-28: **Station containers** — v0.3.385 (`778cb4da`). Contêiner mais alto: 1.75rem no Preflight, 1.45rem no En route. Escala segue a station mais pesada. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.385
 
 Atualizado 2026-09-28: **Port tank draw ledger** — v0.3.380 (`7761803e`). Retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. A linha nasce no world; o voo já autorizado não retroage. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380
 

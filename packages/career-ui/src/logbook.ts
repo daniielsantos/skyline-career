@@ -257,16 +257,6 @@ export function filterVaMissionsForPilot(
     if (pilot) return pilot === accountId;
     const home = mission.pilotHomeCompanyId?.trim();
     if (home && homeId) return home === homeId;
-    // Jet-A stock created before the pilot stamp: the tail stays assigned
-    // and a member must still see the leg to cancel or fly it.
-    if (
-      mission.fuelHaul &&
-      (mission.status === 'accepted' ||
-        mission.status === 'dispatched' ||
-        mission.status === 'in_flight')
-    ) {
-      return true;
-    }
     return opts.includeUnstampedLegacy === true;
   });
 }

@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **8df271a3** / desktop **0.3.371** shipped: Load Jet-A stock and demand hauls as cargo in the hold. Release: [v0.3.371](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.371).
+
+
 `main` **78252011** / desktop **0.3.370** shipped: Keep a VA Jet-A stock flight on the member who started it. Release: [v0.3.370](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.370).
 
 

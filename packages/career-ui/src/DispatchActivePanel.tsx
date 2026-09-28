@@ -1471,7 +1471,7 @@ export function DispatchActivePanel(props: {
                       ? 'LANDED · AWAITING SHUTDOWN'
                       : 'LANDED · READY TO SETTLE';
             const enRouteSub = !liveOnGroundNow
-              ? 'Live fuel drains as you burn — below OFP departure is normal. Settle after landing + engines off.'
+              ? ''
               : !sawAirborneNow
                 ? 'Still on the ramp — Watch ignores the MSFS menu and aircraft reloads. Take off to depart.'
                 : !nearDestNow
@@ -2119,7 +2119,9 @@ export function DispatchActivePanel(props: {
                           ) : null}
                         </div>
                       </div>
-                      <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
+                      {enRouteSub ? (
+                        <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
+                      ) : null}
                       {liveLoadGrid}
                     </div>
                   </>

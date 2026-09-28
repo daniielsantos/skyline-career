@@ -4456,6 +4456,10 @@ tr.lot-locked {
   flex: 0 0 auto;
 }
 
+.dispatch-active-enroute > .preflight-summary-card > .dispatch-enroute-live {
+  margin-top: 0.85rem;
+}
+
 .dispatch-active-enroute .dispatch-enroute-block {
   display: grid;
   gap: 0.28rem;

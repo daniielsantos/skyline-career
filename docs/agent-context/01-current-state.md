@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **30a1eaa0** / desktop **0.3.386** shipped: Keep the personal wallet chip from showing airline cash after settle. Release: [v0.3.386](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.386).
+
+
 `main` **f5dc8a79** / desktop **0.3.385** shipped: Make the payload station container tall enough to read as a box. Release: [v0.3.385](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.385).
 
 

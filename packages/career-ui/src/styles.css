@@ -4106,7 +4106,7 @@ tr.lot-locked {
 }
 
 .dispatch-enroute-live-tiles .load-schematic-station {
-  --station-body: 0.68rem;
+  --station-body: 1.45rem;
   border: none;
   background: transparent;
 }
@@ -9789,11 +9789,11 @@ table.contracts-table .col-access .action {
 
 /* Payload bays: a wide container. Load fills across, which is the room these cells have. */
 .load-schematic-station {
-  --station-body: 0.9rem;
+  --station-body: 1.75rem;
   grid-template-rows: auto auto var(--station-body);
   align-content: stretch;
   justify-items: center;
-  min-height: 3.45rem;
+  min-height: 4.35rem;
   padding: 0.08rem 0.1rem 0.16rem;
   border: none;
   border-radius: 0;
@@ -9827,9 +9827,9 @@ table.contracts-table .col-access .action {
 .load-schematic-station .load-schematic-fill {
   left: 0.34rem;
   right: auto;
-  bottom: calc(0.04rem + 0.16rem);
+  bottom: 0.14rem;
   width: calc((100% - 0.52rem) * var(--schematic-fill, 0));
-  height: calc(var(--station-body) - 0.32rem);
+  height: calc(var(--station-body) - 0.2rem);
   border: none;
   border-radius: 0.06rem;
   background: color-mix(in srgb, var(--ok) 70%, transparent);

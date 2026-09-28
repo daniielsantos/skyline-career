@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **fb5107f0** / desktop **0.3.387** shipped: Credit Port FBO throughput when settle has no world port index. Release: [v0.3.387](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.387).
+
+
 `main` **30a1eaa0** / desktop **0.3.386** shipped: Keep the personal wallet chip from showing airline cash after settle. Release: [v0.3.386](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.386).
 
 

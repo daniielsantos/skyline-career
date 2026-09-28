@@ -1,7 +1,7 @@
 /**
  * Player flights that move Jet-A as cargo in the hold.
- * Stocking flights are unpaid — the Jet-A was already bought at the origin.
- * Demand hauls pay the transport fee only.
+ * Stock opens the flight unpaid. The manifest load button buys the Jet-A once.
+ * Demand hauls pay the transport fee only. The fuel itself is bought at accept.
  * The hauled kg is the sim payload (manifest, OFP, cargo stations).
  * Wing tanks stay the trip fuel. Settle still credits fuelHaul.kg.
  */
@@ -142,7 +142,7 @@ export function startPortJetAReposition(
     actorAccountId?: string | null;
     actorIsVaOwner?: boolean;
   },
-): { mission: MissionIntent; kg: number; costUsd: number } {
+): { mission: MissionIntent; kg: number; maxKg: number; costUsd: number } {
   const conc = activeConcession(
     state,
     world.tick,
@@ -174,15 +174,6 @@ export function startPortJetAReposition(
         : `This aircraft cannot carry Jet-A as cargo on ${origin}→${dest}`,
     );
   }
-  const hauledKg = Math.min(
-    maxKg,
-    Math.max(0, Math.floor(opts.kg ?? maxKg)),
-  );
-  if (hauledKg <= 0) {
-    throw new Error(
-      `This aircraft cannot carry Jet-A as cargo on ${origin}→${dest}`,
-    );
-  }
   const classDef = getAircraftClass(aircraft.aircraftClassId);
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const deadlineTick = world.tick + 96 * 3;
@@ -191,22 +182,7 @@ export function startPortJetAReposition(
     actorAccountId: opts.actorAccountId,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
-  let booked;
-  try {
-    booked = bookJetAAtAirport(state, world, {
-      originIcao: origin,
-      kg: hauledKg,
-      note: `Jet-A stock · ${origin} → ${dest}`,
-    });
-  } catch (error) {
-    releaseAircraftOnCancel(state, {
-      id,
-      aircraftId: aircraft.id,
-      originIcao: origin,
-    } as MissionIntent);
-    throw error;
-  }
-  const reason = `Jet-A stock · ${origin} → ${dest} · ${hauledKg} kg`;
+  const reason = `Jet-A stock · ${origin} → ${dest} · set the load`;
   const mission: MissionIntent = {
     id,
     missionType: 'freight',
@@ -214,7 +190,7 @@ export function startPortJetAReposition(
       {
         shipmentLotId: `jeta_${id}`,
         commodityId: 'fuel',
-        cargoKg: hauledKg,
+        cargoKg: 0,
         payUsd: 0,
         urgency: 'normal',
         reason,
@@ -225,7 +201,7 @@ export function startPortJetAReposition(
     commodityId: 'fuel',
     originIcao: origin,
     destIcao: dest,
-    cargoKg: hauledKg,
+    cargoKg: 0,
     pax: 0,
     aircraftClassId: aircraft.aircraftClassId,
     airframeTypeId: aircraft.airframeTypeId,
@@ -242,16 +218,16 @@ export function startPortJetAReposition(
     fuelHaul: {
       kind: 'reposition',
       portId: conc.portId,
-      kg: hauledKg,
+      kg: 0,
       maxKg,
-      fromTankKg: booked.fromTankKg,
-      boughtKg: booked.boughtKg,
-      boughtUsd: booked.boughtUsd,
+      fromTankKg: 0,
+      boughtKg: 0,
+      boughtUsd: 0,
     },
     ...pilotFields(opts),
   };
   commitFuelMission(state, world, mission);
-  return { mission, kg: hauledKg, costUsd: booked.boughtUsd };
+  return { mission, kg: 0, maxKg, costUsd: 0 };
 }
 
 /** Spot still for sale, plus any company tank parked at this airport. */
@@ -310,8 +286,12 @@ export function setPortJetAStockKg(
   if (!haul || haul.kind !== 'reposition' || haul.refunded) {
     throw new Error('Only a Jet-A stock flight can change this load');
   }
-  if (!['accepted', 'dispatched'].includes(mission.status)) {
-    throw new Error('Jet-A load is locked once the flight is underway');
+  if (mission.status !== 'accepted') {
+    throw new Error('Jet-A load is fixed once the flight plan is open');
+  }
+  const ofpVerdict = mission.lastOfpCheck?.verdict;
+  if (ofpVerdict === 'pass' || ofpVerdict === 'warn' || mission.fuelAuthorizedOfpId) {
+    throw new Error('Jet-A load is fixed once the flight plan is confirmed');
   }
   const current = Math.max(0, Math.floor(haul.kg));
   const maxKg = jetAStockSliderMaxKg(state, world, mission, current);

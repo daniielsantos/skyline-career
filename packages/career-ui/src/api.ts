@@ -3773,6 +3773,7 @@ export function postPortJetAFetch(opts: {
 }) {
   return api<{
     kg: number;
+    maxKg: number;
     costUsd: number;
     walletUsd: number;
     fleet: PlayerAircraft[];

@@ -716,6 +716,12 @@ export function deriveDispatchStep(input: {
   if (!mission) return 'manifest';
   if (mission.status === 'in_flight') return 'en_route';
   if (
+    mission.fuelHaul?.kind === 'reposition' &&
+    !(mission.fuelHaul.kg != null && mission.fuelHaul.kg > 0)
+  ) {
+    return 'manifest';
+  }
+  if (
     fuelAuthorizedForOfp(mission) &&
     loadVerificationReady(mission) &&
     originLocationAllowsDepart(mission)

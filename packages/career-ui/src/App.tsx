@@ -12078,6 +12078,13 @@ export function App() {
   }
 
   async function onDispatch(mission: Mission) {
+    if (
+      mission.fuelHaul?.kind === 'reposition' &&
+      !(mission.fuelHaul.kg != null && mission.fuelHaul.kg > 0)
+    ) {
+      setError('Set the Jet-A load on the manifest before opening SimBrief.');
+      return;
+    }
     // Always rebuild the SimBrief URL (Bonanza A36 vs A36TC → BE36 vs BT36).
     // Re-using a cached href kept the wrong type after switching glass.
     // Browser: reserve a tab under this click so await does not drop the gesture.

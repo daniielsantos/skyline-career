@@ -285,14 +285,19 @@ export function DispatchActivePanel(props: {
     mission.fuelHaul?.kind === 'reposition' &&
     ['accepted', 'dispatched'].includes(mission.status) &&
     !isEnRoute;
+  const jetALoadUnset =
+    mission.fuelHaul?.kind === 'reposition' &&
+    !(mission.fuelHaul.kg != null && mission.fuelHaul.kg > 0);
   const showManifestSection =
     !isEnRoute &&
-    (isFerryLeg
-      ? true
-      : opsFirst
-        ? canEditCargo || canAdjustJetAStock
-        : (mission.lots?.length ?? 0) > 0 ||
-          ['accepted', 'dispatched'].includes(mission.status));
+    (mission.fuelHaul?.kind === 'reposition'
+      ? step === 'manifest'
+      : isFerryLeg
+        ? true
+        : opsFirst
+          ? canEditCargo
+          : (mission.lots?.length ?? 0) > 0 ||
+            ['accepted', 'dispatched'].includes(mission.status));
 
   const ofpCargoUnderOnly =
     isOfpCargoUnderOnlyFailureUi(mission.lastOfpCheck) &&
@@ -321,9 +326,13 @@ export function DispatchActivePanel(props: {
             <button
               type="button"
               className="action ghost"
-              disabled={busy}
+              disabled={busy || jetALoadUnset}
               onClick={() => props.onDispatch(mission)}
-              title="Open SimBrief with the current cargo"
+              title={
+                jetALoadUnset
+                  ? 'Buy the Jet-A load on the manifest first'
+                  : 'Open SimBrief with the current cargo'
+              }
             >
               {busy ? (
                 <>
@@ -344,9 +353,13 @@ export function DispatchActivePanel(props: {
           <button
             type="button"
             className="accept"
-            disabled={busy}
+            disabled={busy || jetALoadUnset}
             onClick={() => props.onDispatch(mission)}
-            title="Open SimBrief dispatch in your browser"
+            title={
+              jetALoadUnset
+                ? 'Buy the Jet-A load on the manifest first'
+                : 'Open SimBrief dispatch in your browser'
+            }
           >
             {busy ? (
               <>
@@ -2188,9 +2201,13 @@ export function DispatchActivePanel(props: {
               <button
                 type="button"
                 className="action ghost"
-                disabled={busy}
+                disabled={busy || jetALoadUnset}
                 onClick={() => props.onDispatch(mission)}
-                title="Open SimBrief dispatch in your browser"
+                title={
+                  jetALoadUnset
+                    ? 'Buy the Jet-A load on the manifest first'
+                    : 'Open SimBrief dispatch in your browser'
+                }
               >
                 Re-open SimBrief
               </button>
@@ -2246,159 +2263,87 @@ function JetAStockSlider(props: {
   onCommit: (mission: Mission, kg: number) => Promise<void>;
 }) {
   const haul = props.mission.fuelHaul;
-  const current = Math.max(
-    1,
-    Math.floor(haul?.kg ?? props.mission.cargoKg ?? 1),
-  );
-  const maxKg = Math.max(current, Math.floor(haul?.maxKg ?? current));
-  const [kg, setKg] = useState(current);
+  const booked = Math.max(0, Math.floor(haul?.kg ?? props.mission.cargoKg ?? 0));
+  const maxKg = Math.max(booked, Math.floor(haul?.maxKg ?? booked));
+  const [kg, setKg] = useState(booked);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ceilingReady, setCeilingReady] = useState(haul?.maxKg != null);
-  const timer = useRef<number | null>(null);
   const missionRef = useRef(props.mission);
   const onCommitRef = useRef(props.onCommit);
-  const inflight = useRef(false);
-  const queued = useRef<number | null>(null);
   missionRef.current = props.mission;
   onCommitRef.current = props.onCommit;
 
   useEffect(() => {
-    setKg(current);
-  }, [props.mission.id, current]);
+    setKg(booked);
+  }, [props.mission.id, booked]);
 
-  useEffect(() => {
-    if (haul?.maxKg != null) {
-      setCeilingReady(true);
-      return;
-    }
-    if (haul?.kind !== 'reposition') return;
-    let cancelled = false;
-    setCeilingReady(false);
-    const kgNow = Math.floor(haul.kg ?? props.mission.cargoKg ?? 0);
-    if (kgNow <= 0) {
-      setCeilingReady(true);
-      return;
-    }
-    void onCommitRef
-      .current(props.mission, kgNow)
-      .then(() => {
-        if (!cancelled) setCeilingReady(true);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : String(err));
-        setCeilingReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [props.mission.id, haul?.kind, haul?.maxKg]);
-
-  useEffect(() => {
-    return () => {
-      if (timer.current != null) window.clearTimeout(timer.current);
-    };
-  }, []);
-
-  async function flush(next: number) {
-    const live = Math.max(
-      1,
-      Math.floor(
-        missionRef.current.fuelHaul?.kg ?? missionRef.current.cargoKg ?? 1,
+  function draftKg(displayAmount: number): number {
+    return Math.max(
+      0,
+      Math.min(
+        maxKg,
+        displayAmountToStoredKg(displayAmount, props.weightSystem, maxKg),
       ),
     );
-    if (next === live) return;
-    if (inflight.current) {
-      queued.current = next;
-      return;
-    }
-    inflight.current = true;
+  }
+
+  async function buy(next: number) {
+    const live = Math.max(
+      0,
+      Math.floor(missionRef.current.fuelHaul?.kg ?? missionRef.current.cargoKg ?? 0),
+    );
+    if (next <= 0 || next === live) return;
     setPending(true);
     setError(null);
     try {
       await onCommitRef.current(missionRef.current, next);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setKg(
-        Math.max(
-          1,
-          Math.floor(
-            missionRef.current.fuelHaul?.kg ??
-              missionRef.current.cargoKg ??
-              1,
-          ),
-        ),
-      );
+      setKg(live);
     } finally {
-      inflight.current = false;
       setPending(false);
-      const follow = queued.current;
-      queued.current = null;
-      if (follow != null && follow !== next) void flush(follow);
     }
   }
 
-  function schedule(next: number) {
-    const clamped = Math.max(1, Math.min(maxKg, Math.floor(next)));
-    setKg(clamped);
-    if (timer.current != null) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      void flush(clamped);
-    }, 350);
-  }
-
   const unit = massUnitLabel(props.weightSystem);
-  const displayMax = Math.max(1, Math.floor(kgToDisplay(maxKg, props.weightSystem)));
+  const displayMax = Math.max(0, Math.floor(kgToDisplay(maxKg, props.weightSystem)));
   const displayValue = Math.max(
-    1,
+    0,
     Math.min(displayMax, Math.floor(kgToDisplay(kg, props.weightSystem))),
   );
-  const disabled = props.busy || pending || !ceilingReady;
+  const disabled = props.busy || pending;
+  const dirty = Math.floor(kg) !== booked;
 
   return (
     <div className="fbo-hold-amount">
       <p className="muted">
         Up to {props.formatTonnes(maxKg)} — what this aircraft lifts, what{' '}
         {props.mission.originIcao} has for sale, and what still fits in the tank.
-        The flight stays unpaid. Moving this charges or returns the origin price.
+        Nothing is charged until you buy this load. That writes one ledger line
+        at the origin price.
       </p>
       <label className="cargo-amount">
         Jet-A in the hold
         <div>
           <input
             type="number"
-            min={1}
+            min={0}
             max={displayMax}
             step={props.weightSystem === 'imperial' ? 10 : 100}
             value={displayValue}
             disabled={disabled}
-            onChange={(e) => {
-              const next = displayAmountToStoredKg(
-                Number(e.target.value),
-                props.weightSystem,
-                maxKg,
-              );
-              schedule(Math.max(1, next));
-            }}
+            onChange={(e) => setKg(draftKg(Number(e.target.value)))}
           />
           <span>{unit}</span>
         </div>
         <input
           type="range"
-          min={1}
-          max={displayMax}
+          min={0}
+          max={Math.max(1, displayMax)}
           step={props.weightSystem === 'imperial' ? 10 : 100}
           value={displayValue}
           disabled={disabled}
-          onChange={(e) => {
-            const next = displayAmountToStoredKg(
-              Number(e.target.value),
-              props.weightSystem,
-              maxKg,
-            );
-            schedule(Math.max(1, next));
-          }}
+          onChange={(e) => setKg(draftKg(Number(e.target.value)))}
         />
       </label>
       <div className="cargo-presets">
@@ -2413,14 +2358,20 @@ function JetAStockSlider(props: {
                   ? maxKg
                   : Math.max(1, Math.min(maxKg, Math.round(maxKg * fraction)));
               setKg(next);
-              if (timer.current != null) window.clearTimeout(timer.current);
-              void flush(next);
             }}
           >
             {fraction === 1 ? 'Max' : `${fraction * 100}%`}
           </button>
         ))}
       </div>
+      <button
+        type="button"
+        className="accept"
+        disabled={disabled || !dirty || kg <= 0}
+        onClick={() => void buy(Math.floor(kg))}
+      >
+        {pending ? 'Buying…' : booked <= 0 ? 'Buy this load' : 'Update load'}
+      </button>
       {error ? <p className="muted">{error}</p> : null}
     </div>
   );

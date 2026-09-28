@@ -1553,7 +1553,7 @@ export function PortsPanel(props: {
       setSnap(result.ports);
       props.onToast?.(
         'ok',
-        `Jet-A stock ${originIcao} → tank · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.costUsd)} · unpaid`,
+        `Jet-A stock ${originIcao} → tank · set the load on the manifest · up to ${props.formatTonnes(result.maxKg)}`,
       );
     } catch (err) {
       props.onToast?.(

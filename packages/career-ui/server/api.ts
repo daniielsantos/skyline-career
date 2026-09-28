@@ -9847,6 +9847,7 @@ export function createCareerApiServer(port = 8787) {
             });
             return {
               kg: started.kg,
+              maxKg: started.maxKg,
               costUsd: started.costUsd,
               walletUsd: missions.walletUsd,
               fleet: missions.fleet,
@@ -13201,6 +13202,11 @@ export function createCareerApiServer(port = 8787) {
                 const idx = missions.missions.findIndex((m) => m.id === mission.id);
                 let next = mission;
                 if (flyable.cargoKg < mission.cargoKg) {
+                  if (mission.fuelHaul) {
+                    throw new Error(
+                      `This aircraft can carry ${Math.floor(flyable.cargoKg)} kg on this leg; the Jet-A load is ${Math.floor(mission.cargoKg)} kg`,
+                    );
+                  }
                   next = trimMissionCargoToKg(
                     world,
                     mission,
@@ -13784,6 +13790,11 @@ export function createCareerApiServer(port = 8787) {
                 const idx = missions.missions.findIndex((m) => m.id === mission.id);
                 let next = mission;
                 if (flyable.cargoKg < mission.cargoKg) {
+                  if (mission.fuelHaul) {
+                    throw new Error(
+                      `This aircraft can carry ${Math.floor(flyable.cargoKg)} kg on this leg; the Jet-A load is ${Math.floor(mission.cargoKg)} kg`,
+                    );
+                  }
                   next = trimMissionCargoToKg(
                     world,
                     mission,
@@ -14068,6 +14079,16 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        if (
+          prep.kind === 'ok' &&
+          prep.mission.fuelHaul?.kind === 'reposition' &&
+          !(prep.mission.fuelHaul.kg > 0)
+        ) {
+          send(res, 400, {
+            error: 'Set the Jet-A load on the manifest before opening SimBrief.',
+          });
+          return;
+        }
 
         try {
           const liveTitle =
@@ -14095,6 +14116,11 @@ export function createCareerApiServer(port = 8787) {
             }
             let next = open;
             if (flyable.cargoKg < open.cargoKg) {
+              if (open.fuelHaul) {
+                throw new Error(
+                  `This aircraft can carry ${Math.floor(flyable.cargoKg)} kg on this leg; the Jet-A load is ${Math.floor(open.cargoKg)} kg`,
+                );
+              }
               next = trimMissionCargoToKg(
                 world,
                 open,

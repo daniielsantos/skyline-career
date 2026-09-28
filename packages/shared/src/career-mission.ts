@@ -2530,6 +2530,12 @@ export function departMission(
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot depart mission in status=${normalized.status}`);
   }
+  if (
+    normalized.fuelHaul?.kind === 'reposition' &&
+    !(normalized.fuelHaul.kg > 0)
+  ) {
+    throw new Error('Set the Jet-A load on the manifest before departure');
+  }
   if (!isEmptyLegMission(normalized)) {
     for (const line of normalized.lots) {
       // Synthetic deadhead / empty ids are never real market lots.

@@ -135,17 +135,24 @@ describe('port FBO Jet-A', () => {
       vaFlight: true,
     });
     assert.equal(started.mission.payUsd, 0);
-    assert.equal(started.mission.cargoKg, started.kg);
-    assert.equal(started.mission.lots?.[0]?.cargoKg, started.kg);
-    assert.equal(started.mission.fuelHaul?.kg, started.kg);
-    assert.ok(started.kg > 0);
-    assert.ok(started.kg < 1_000);
-    assert.equal(started.mission.fuelHaul?.maxKg, started.kg);
+    assert.equal(started.kg, 0);
+    assert.equal(started.costUsd, 0);
+    assert.equal(started.mission.cargoKg, 0);
+    assert.equal(state.walletUsd, walletBefore);
+    const ceiling = started.mission.fuelHaul?.maxKg ?? 0;
+    assert.ok(ceiling > 0);
+    assert.ok(ceiling < 1_000);
     assert.equal(started.mission.pilotAccountId, 'acc_pilot');
     assert.equal(started.mission.vaFlight, true);
+    const bought = setPortJetAStockKg(state, world, {
+      missionId: started.mission.id,
+      kg: ceiling,
+    });
+    assert.equal(bought.kg, ceiling);
+    assert.equal(bought.mission.cargoKg, ceiling);
     assert.ok(state.walletUsd < walletBefore);
     const beforeSlider = state.walletUsd;
-    const half = Math.max(1, Math.floor(started.kg / 2));
+    const half = Math.max(1, Math.floor(ceiling / 2));
     const reduced = setPortJetAStockKg(state, world, {
       missionId: started.mission.id,
       kg: half,
@@ -155,16 +162,16 @@ describe('port FBO Jet-A', () => {
     assert.ok(state.walletUsd > beforeSlider);
     const raised = setPortJetAStockKg(state, world, {
       missionId: started.mission.id,
-      kg: started.kg,
+      kg: ceiling,
     });
-    assert.equal(raised.kg, started.kg);
-    assert.equal(raised.mission.cargoKg, started.kg);
+    assert.equal(raised.kg, ceiling);
+    assert.equal(raised.mission.cargoKg, ceiling);
     assert.ok(Math.abs(state.walletUsd - beforeSlider) <= 1);
     const tankBefore = state.playerPortConcessions?.[0]?.jetAKg ?? 0;
     deliverPortJetAHaul(state, world, started.mission);
     assert.equal(
       state.playerPortConcessions?.[0]?.jetAKg,
-      tankBefore + started.kg,
+      tankBefore + ceiling,
     );
 
     const sellableBefore = fuelTerminalSellableKg(
@@ -256,13 +263,31 @@ describe('port FBO Jet-A', () => {
       originIcao: 'SBKP',
       aircraftId: 'acf_heavy',
     });
-    assert.equal(started.kg, portJetATankCapacityKg(1));
-    assert.ok(started.kg > 2_500);
-    assert.equal(started.mission.fuelHaul?.maxKg, started.kg);
-    assert.equal(started.mission.cargoKg, started.kg);
-    assert.ok(started.mission.lots?.[0]?.shipmentLotId.startsWith('jeta_'));
-    const departed = departMission(world, started.mission, { fleet: state });
+    assert.equal(started.mission.cargoKg, 0);
+    assert.equal(started.costUsd, 0);
+    assert.equal(started.mission.fuelHaul?.maxKg, portJetATankCapacityKg(1));
+    assert.ok((started.mission.fuelHaul?.maxKg ?? 0) > 2_500);
+    assert.throws(
+      () => departMission(world, started.mission, { fleet: state }),
+      /manifest/,
+    );
+    const bought = setPortJetAStockKg(state, world, {
+      missionId: started.mission.id,
+      kg: started.mission.fuelHaul?.maxKg ?? 0,
+    });
+    assert.equal(bought.kg, portJetATankCapacityKg(1));
+    assert.ok(bought.mission.lots?.[0]?.shipmentLotId.startsWith('jeta_'));
+    const departed = departMission(world, bought.mission, { fleet: state });
     assert.equal(departed.mission.status, 'in_flight');
+    bought.mission.status = 'dispatched';
+    assert.throws(
+      () =>
+        setPortJetAStockKg(state, world, {
+          missionId: bought.mission.id,
+          kg: 1,
+        }),
+      /flight plan is open/,
+    );
   });
 
   it('posts at most one restricted line for a short quiet field', () => {

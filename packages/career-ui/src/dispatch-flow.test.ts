@@ -48,6 +48,38 @@ describe('deriveDispatchStep', () => {
     );
   });
 
+  it('keeps an unloaded Jet-A stock flight on the manifest', () => {
+    assert.equal(
+      deriveDispatchStep({
+        hasDraft: false,
+        hasDebrief: false,
+        mission: mission({
+          status: 'accepted',
+          fuelHaul: { kind: 'reposition', kg: 0, maxKg: 12000 },
+        }),
+      }),
+      'manifest',
+    );
+    assert.equal(
+      deriveDispatchStep({
+        hasDraft: false,
+        hasDebrief: false,
+        mission: mission({
+          status: 'dispatched',
+          fuelHaul: { kind: 'reposition', kg: 5000, maxKg: 12000 },
+          lastOfpCheck: {
+            verdict: 'pass',
+            summary: 'ok',
+            checkedAtIso: new Date().toISOString(),
+            ofpId: 'ofp1',
+            findings: [],
+          },
+        }),
+      }),
+      'fuel',
+    );
+  });
+
   it('walks flight_plan → fuel → load → ready → en_route', () => {
     assert.equal(
       deriveDispatchStep({

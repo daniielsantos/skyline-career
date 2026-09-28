@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **0242b60d** / desktop **0.3.384** shipped: Ignore a station cap that cannot hold the load. Release: [v0.3.384](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.384).
+
+
 `main` **21ee9116** / desktop **0.3.383** shipped: Draw payload stations as wide containers filled across. Release: [v0.3.383](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.383).
 
 

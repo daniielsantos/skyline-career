@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **f12fdd08** / desktop **0.3.376** shipped: Show the Jet-A stock purchase total on the manifest. Release: [v0.3.376](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.376).
+
+
 `main` **aea5c152** / desktop **0.3.375** shipped: Buy the Jet-A stock load on the manifest, and keep that choice off later steps. Release: [v0.3.375](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.375).
 
 

@@ -2,7 +2,7 @@
 
 ## Handoff 2026-09-28 — chat novo começa aqui
 
-Desktop **v0.3.375** publicado: https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.375 (`main` `8891ea09`). O world sobe com essa GitHub release. Não reabrir este desenho sem pedido.
+Desktop **v0.3.376** publicado: https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.376 (`main` `f9bd1658`). O world sobe com essa GitHub release. Não reabrir este desenho sem pedido.
 
 **Stock (fonte da verdade):** o clique abre o voo com `cargoKg` 0 e sem débito. O manifesto mostra o total em dinheiro do kg selecionado (spot da origem; tanque da company nesse ICAO já pago não entra) e **Buy this load** fica à direita, com margem acima do botão. `maxKg` = menor entre sala do tanque, o que o avião levanta na rota e o Jet-A vendável na origem (mais o tanque da company nesse ICAO). O slider só existe no passo Manifest. **Buy this load** (ou **Update load**) é o único POST (`setPortJetAStockKg`): uma linha no ledger, ou um delta se mudar antes do plano. OFP e depart recusam kg 0, então o passo fica no Manifest. Com o plano aberto (`dispatched`), OFP `pass`/`warn` ou combustível da viagem autorizado, mudar o kg é recusado e o OFP não é apagado. No despacho, frete normal ainda pode cortar carga; um Jet-A mais pesado do que a perna levanta é recusado (`fuelHaul` não passa por `trimMissionCargoToKg`).
 

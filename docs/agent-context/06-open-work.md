@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Handoff Jet-A Stock** — v0.3.375 no ar. Chat novo: bloco do topo de [`24-port-fbo.md`](./24-port-fbo.md). Não reabrir compra no clique, slider fora do Manifest, teto de nível, nem o cap de 18 linhas (esse cap segue aberto só se pedirem). Árvore suja de propósito: 3 PLN em `profiles/career/bush_PLN/`, `perishables.png`, `tools/` — não commitar.
+Atualizado 2026-09-28: **Handoff Jet-A Stock** — v0.3.376 no ar. O manifesto mostra o total da compra e o botão à direita. Chat novo: bloco do topo de [`24-port-fbo.md`](./24-port-fbo.md). Não reabrir compra no clique, slider fora do Manifest, teto de nível, nem o cap de 18 linhas (esse cap segue aberto só se pedirem). Árvore suja de propósito: 3 PLN em `profiles/career/bush_PLN/`, `perishables.png`, `tools/` — não commitar.
 
 Atualizado 2026-09-25: **Sidebar order** — `Freights → Charter → Ports → Hangar → Airframes → Base → Company → Network → Airlines → Crew → Ranking → Logbook` (Ports sobe pro bloco de trabalho; Hangar antes de Airframes).
 

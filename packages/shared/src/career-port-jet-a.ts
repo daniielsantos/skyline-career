@@ -20,7 +20,7 @@ import {
   creditAirportFuelStock,
   fuelTerminalSellableKg,
 } from './career-fuel.js';
-import { applyWalletDelta } from './career-ledger.js';
+import { appendLedgerMarker, applyWalletDelta } from './career-ledger.js';
 import {
   distanceHubsNm,
   listBoundCareerPorts,
@@ -159,6 +159,31 @@ export function takePortJetAForUplift(
   const take = Math.min(want, have);
   conc.jetAKg = have - take;
   return take;
+}
+
+/** Audit row when already-paid tank kg goes into an aircraft. Does not move cash. */
+export function recordPortJetATankDraw(
+  state: CareerMissionsState,
+  opts: {
+    kg: number;
+    atTick: number;
+    originIcao: string;
+    destIcao?: string;
+    missionId?: string;
+  },
+): void {
+  const kg = Math.max(0, Math.floor(opts.kg));
+  if (kg <= 0) return;
+  const origin = opts.originIcao.trim().toUpperCase();
+  const dest = opts.destIcao?.trim().toUpperCase();
+  const route = dest ? `${origin}→${dest}` : origin;
+  appendLedgerMarker(state, {
+    kind: 'port_fbo_jet_a',
+    atTick: opts.atTick,
+    missionId: opts.missionId,
+    icao: origin,
+    note: `From tank · ${kg} kg · ${route}`,
+  });
 }
 
 function fuelPileOf(ap: AirportTerminal | undefined) {

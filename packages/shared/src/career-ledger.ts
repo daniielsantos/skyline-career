@@ -212,7 +212,9 @@ export function normalizeCareerLedger(raw: unknown): CareerLedgerEntry[] {
       typeof r.kind === 'string' && KIND_SET.has(r.kind)
         ? (r.kind as CareerLedgerKind)
         : null;
-    if (amountUsd == null || atTick == null || !kind || amountUsd === 0) continue;
+    if (amountUsd == null || atTick == null || !kind) continue;
+    // $0 rows are dropped, except a Port FBO tank draw (already paid; audit only).
+    if (amountUsd === 0 && kind !== 'port_fbo_jet_a') continue;
     const actorRaw =
       typeof r.actorAccountId === 'string'
         ? r.actorAccountId.trim()
@@ -295,12 +297,14 @@ export function appendLedgerMarker(
     kind: CareerLedgerKind;
     atTick: number;
     note?: string;
+    missionId?: string;
     icao?: string;
     actorAccountId?: string | null;
   },
 ): CareerLedgerEntry {
   const atTick = Math.max(0, Math.floor(opts.atTick));
   const actorAccountId = resolveLedgerActorAccountId(state, opts);
+  const missionId = opts.missionId?.trim();
   const entry: CareerLedgerEntry = {
     id: nextLedgerId(atTick),
     atTick,
@@ -308,6 +312,7 @@ export function appendLedgerMarker(
     amountUsd: 0,
     kind: opts.kind,
     note: opts.note?.slice(0, 120),
+    ...(missionId ? { missionId } : {}),
     icao: opts.icao?.toUpperCase(),
     ...(actorAccountId ? { actorAccountId } : {}),
   };

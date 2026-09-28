@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-28: **Tank draw no ledger** — o Jet-A já pago do tanque do porto entra no avião no authorize do OFP (ou no depart, se o bloco ainda não foi comprado) e não mexe no caixa. A Recent activity ganha uma linha `port_fbo_jet_a` com $0, o membro e o kg (`From tank · N kg · ORIG→DEST`). O voo que já autorizou o combustível não ganha linha retroativa. Queima em voo não tira mais do tanque.
+
 ## Handoff 2026-09-28 — chat novo começa aqui
 
 Desktop **v0.3.377** publicado: https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.377 (`main` `dd59c0d7`). O world sobe com essa GitHub release. Não reabrir este desenho sem pedido.

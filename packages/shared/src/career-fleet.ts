@@ -20,7 +20,11 @@ import {
   isFerryRouteWaypoint,
 } from './career-ferry-route.js';
 import { fboServiceCostMult } from './career-fbo-perks.js';
-import { peekPortJetAKg, takePortJetAForUplift } from './career-port-jet-a.js';
+import {
+  peekPortJetAKg,
+  recordPortJetATankDraw,
+  takePortJetAForUplift,
+} from './career-port-jet-a.js';
 import { formatDisplayLabel } from './career-display-name.js';
 import {
   ensureAircraftConditionPcts,
@@ -1368,6 +1372,13 @@ export function applyPlayerDepartFuel(
     mission.originIcao,
     gap,
   );
+  recordPortJetATankDraw(state, {
+    kg: drawn,
+    atTick: world.tick,
+    originIcao: mission.originIcao,
+    destIcao: mission.destIcao,
+    missionId: mission.id,
+  });
   const shortfall = Math.max(0, gap - drawn);
 
   let fuelDebitUsd = 0;
@@ -1618,6 +1629,13 @@ export function purchasePlayerMissionOfpFuel(
     quote.originIcao,
     quote.tankKg ?? 0,
   );
+  recordPortJetATankDraw(state, {
+    kg: drawn,
+    atTick: world.tick,
+    originIcao: quote.originIcao,
+    destIcao: mission.destIcao,
+    missionId: mission.id,
+  });
   let fuelCreditUsd = 0;
   if (quote.surplusKg > 0) {
     aircraft.fuelKg = quote.requiredBlockFuelKg;

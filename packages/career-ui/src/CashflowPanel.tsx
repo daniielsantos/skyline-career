@@ -8,6 +8,7 @@ import type {
 } from './api';
 import { postCreditDraw, postCreditRepay } from './api';
 import { boardMoneyLabel, isFiniteMoney, formatUsdAmountInput, maskUsdAmountInput, parseUsdAmountInput } from './board-money';
+import { formatMassPreferExact, loadWeightSystem } from './weight-units';
 
 const CASHFLOW_PAGE_SIZE = 15;
 /** Economy batches per career day (matches shared TICKS_PER_DAY). */
@@ -94,6 +95,7 @@ const KIND_LABEL: Record<string, string> = {
   ferry: 'Ferry',
   pilot_travel: 'Pilot travel',
   fuel: 'Jet-A',
+  port_fbo_jet_a: 'Port FBO Jet-A',
   inspection: 'Inspection',
   repair: 'Repair',
   engine_overhaul: 'Engine overhaul',
@@ -112,7 +114,21 @@ function kindLabel(kind: string, note?: string): string {
   ) {
     return 'Debug credit';
   }
+  if (kind === 'port_fbo_jet_a' && note?.startsWith('From tank')) {
+    return 'Jet-A from tank';
+  }
   return KIND_LABEL[kind] ?? kind.replace(/_/g, ' ');
+}
+
+/** `From tank · 1240 kg · KMIA→KATL` → mass in the player's units, plus the route. */
+function tankDrawNote(note: string | undefined): string | null {
+  const match = note?.match(/^From tank · (\d+) kg(?: · (.+))?$/);
+  if (!match) return null;
+  const kg = Number(match[1]);
+  if (!Number.isFinite(kg)) return null;
+  const mass = formatMassPreferExact(kg, loadWeightSystem());
+  const route = match[2]?.trim();
+  return route ? `${mass} · ${route} · already paid` : `${mass} · already paid`;
 }
 
 function memberLabel(
@@ -241,6 +257,7 @@ export function CashflowSummaryGrid(props: {
 }
 
 function amountCell(entry: CareerLedgerEntry, formatMoney: (n: number) => string) {
+  if (entry.amountUsd === 0) return <span className="muted">—</span>;
   const positive = entry.amountUsd >= 0;
   return (
     <span className={positive ? 'cashflow-pos' : 'cashflow-neg'}>
@@ -572,7 +589,8 @@ export function HangarCashflowPanel(props: {
                           ) : null}
                           <td>{entry.icao ?? '—'}</td>
                           <td className="cashflow-col-note">
-                            {entry.note?.trim() ? entry.note : '—'}
+                            {tankDrawNote(entry.note) ??
+                              (entry.note?.trim() ? entry.note : '—')}
                           </td>
                           <td className="cashflow-col-amount">
                             {amountCell(entry, props.formatMoney)}

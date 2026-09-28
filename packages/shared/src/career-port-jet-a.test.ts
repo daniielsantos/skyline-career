@@ -106,6 +106,11 @@ describe('port FBO Jet-A', () => {
     assert.equal(purchased.fuelDebitUsd, 0);
     assert.equal(aircraft.fuelKg, 120);
     assert.equal(state.playerPortConcessions?.[0]?.jetAKg, 700);
+    const draw = state.ledger?.find((row) => row.note?.startsWith('From tank'));
+    assert.equal(draw?.amountUsd, 0);
+    assert.equal(draw?.kind, 'port_fbo_jet_a');
+    assert.match(draw?.note ?? '', /100 kg/);
+    assert.equal(draw?.icao, 'SBGR');
 
     aircraft.fuelKg = 140;
     const surplus = quotePlayerMissionOfpFuel(world, state, mission, {

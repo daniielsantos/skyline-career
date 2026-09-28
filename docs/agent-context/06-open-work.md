@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-28: **Port tank draw ledger** — retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. World precisa do commit; o voo já autorizado não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
+Atualizado 2026-09-28: **EN ROUTE live load** — subtítulo do voo (“Live fuel drains…”) removido; título Live Load com margem acima da borda do Cargo. Local, sem release.
+
 Atualizado 2026-09-28: **Ledger Day clock** — v0.3.378 no ar (`b798318a`). Recent activity mostra o dia e a hora do relógio da economia (`atTick`, passos de 15 min). https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.378
 
 Atualizado 2026-09-28: **Handoff Jet-A Stock** — v0.3.377 no ar. Ready lista o Jet-A no card de carga; o slider continua só no Manifest. Chat novo: bloco do topo de [`24-port-fbo.md`](./24-port-fbo.md). Não reabrir compra no clique, slider fora do Manifest, teto de nível, nem o cap de 18 linhas (esse cap segue aberto só se pedirem).

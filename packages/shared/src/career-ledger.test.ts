@@ -131,6 +131,23 @@ describe('career ledger', () => {
     assert.equal(cleaned[0]?.amountUsd, 5);
   });
 
+  it('keeps a zero-dollar Port FBO tank draw', () => {
+    const cleaned = normalizeCareerLedger([
+      {
+        id: 'led_draw',
+        atTick: 10,
+        amountUsd: 0,
+        kind: 'port_fbo_jet_a',
+        note: 'From tank · 100 kg · SBGR→SBKP',
+        actorAccountId: 'acct_pilot',
+      },
+      { id: 'led_zero_fuel', atTick: 10, amountUsd: 0, kind: 'fuel' },
+    ]);
+    assert.equal(cleaned.length, 1);
+    assert.equal(cleaned[0]?.note, 'From tank · 100 kg · SBGR→SBKP');
+    assert.equal(cleaned[0]?.actorAccountId, 'acct_pilot');
+  });
+
   it('recent order uses append seq, not lexicographic id (same tick)', () => {
     // Legacy ids: led_676_10_* sorts before led_676_4_* as strings — broke Recent activity.
     const cleaned = normalizeCareerLedger([

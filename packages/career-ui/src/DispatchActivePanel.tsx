@@ -284,15 +284,17 @@ export function DispatchActivePanel(props: {
     mission.missionType !== 'charter';
   const canAdjustJetAStock =
     mission.fuelHaul?.kind === 'reposition' &&
+    step === 'manifest' &&
     ['accepted', 'dispatched'].includes(mission.status) &&
     !isEnRoute;
   const jetALoadUnset =
     mission.fuelHaul?.kind === 'reposition' &&
     !(mission.fuelHaul.kg != null && mission.fuelHaul.kg > 0);
+  const jetACargoKg = Math.max(0, mission.fuelHaul?.kg ?? mission.cargoKg ?? 0);
   const showManifestSection =
     !isEnRoute &&
-    (mission.fuelHaul?.kind === 'reposition'
-      ? step === 'manifest'
+    (mission.fuelHaul
+      ? step === 'manifest' || jetACargoKg > 0
       : isFerryLeg
         ? true
         : opsFirst

@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **31422f46** / desktop **0.3.374** shipped: Let a Jet-A stock flight depart, and choose the load on the manifest. Release: [v0.3.374](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.374).
+
+
 `main` **1ffdbf83** / desktop **0.3.373** shipped: Show destination runways from the dispatch route title before the OFP. Release: [v0.3.373](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.373).
 
 

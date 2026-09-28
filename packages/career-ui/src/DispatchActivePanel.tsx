@@ -10,6 +10,7 @@ import {
   type DispatchStepId,
   type LoadPath,
 } from './dispatch-flow';
+import { quoteJetAStockCashUsd } from './jet-a-stock-quote';
 import {
   displayAmountToStoredKg,
   formatMassExact,
@@ -697,6 +698,7 @@ export function DispatchActivePanel(props: {
               weightSystem={weightSystem}
               busy={busy}
               formatTonnes={props.formatTonnes}
+              formatMoney={props.formatMoney}
               onCommit={props.onJetAStockKg}
             />
           ) : null}
@@ -2260,6 +2262,7 @@ function JetAStockSlider(props: {
   weightSystem: WeightSystem;
   busy: boolean;
   formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
   onCommit: (mission: Mission, kg: number) => Promise<void>;
 }) {
   const haul = props.mission.fuelHaul;
@@ -2313,14 +2316,27 @@ function JetAStockSlider(props: {
   );
   const disabled = props.busy || pending;
   const dirty = Math.floor(kg) !== booked;
+  const haulQuote = haul
+    ? quoteJetAStockCashUsd({
+        bookedKg: booked,
+        nextKg: Math.floor(kg),
+        fromTankKg: haul.fromTankKg ?? 0,
+        boughtKg: haul.boughtKg ?? 0,
+        boughtUsd: haul.boughtUsd ?? 0,
+        originTankKg: haul.originTankKg ?? 0,
+        unitUsdPerKg: haul.spotUnitUsd ?? 0,
+      })
+    : null;
+  const rateLabel =
+    haul?.spotUnitUsd != null && haul.spotUnitUsd > 0
+      ? formatJetASpotRate(haul.spotUnitUsd, props.weightSystem)
+      : null;
 
   return (
     <div className="fbo-hold-amount">
       <p className="muted">
-        Up to {props.formatTonnes(maxKg)} — what this aircraft lifts, what{' '}
-        {props.mission.originIcao} has for sale, and what still fits in the tank.
-        Nothing is charged until you buy this load. That writes one ledger line
-        at the origin price.
+        Up to {props.formatTonnes(maxKg)}. Charged at the {props.mission.originIcao}{' '}
+        price when you buy this load.
       </p>
       <label className="cargo-amount">
         Jet-A in the hold
@@ -2364,15 +2380,31 @@ function JetAStockSlider(props: {
           </button>
         ))}
       </div>
-      <button
-        type="button"
-        className="accept"
-        disabled={disabled || !dirty || kg <= 0}
-        onClick={() => void buy(Math.floor(kg))}
-      >
-        {pending ? 'Buying…' : booked <= 0 ? 'Buy this load' : 'Update load'}
-      </button>
+      <div className="jeta-stock-buy">
+        {haul?.spotUnitUsd != null && haulQuote ? (
+          <p className="jeta-stock-total">
+            <span>Total</span>
+            <strong>{props.formatMoney(haulQuote.totalUsd)}</strong>
+            {rateLabel ? <span className="muted">{rateLabel}</span> : null}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="accept"
+          disabled={disabled || !dirty || kg <= 0}
+          onClick={() => void buy(Math.floor(kg))}
+        >
+          {pending ? 'Buying…' : booked <= 0 ? 'Buy this load' : 'Update load'}
+        </button>
+      </div>
       {error ? <p className="muted">{error}</p> : null}
     </div>
   );
+}
+
+function formatJetASpotRate(usdPerKg: number, weightSystem: WeightSystem): string {
+  const shown = Math.round(usdPerKg * 1000) / 1000;
+  const per = weightSystem === 'imperial' ? shown / KG_TO_LB : shown;
+  const unit = weightSystem === 'imperial' ? 'lb' : 'kg';
+  return `$${per.toFixed(2)}/${unit}`;
 }

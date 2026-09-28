@@ -187,6 +187,7 @@ import {
   setPortJetAStockKg,
   startPortJetAReposition,
   buyPortFboJetA,
+  concessionForPickupHub,
   holdDemandOrder,
   cancelDemandHold,
   dispatchDemandHold,
@@ -897,13 +898,38 @@ function withMissionClientView(
     opts?.forceVaFlight === true ||
     normalized.vaFlight === true ||
     (normalized.warehouseBridge === true && normalized.internalHaul === true);
+  const fuelHaul =
+    base.fuelHaul?.kind === 'reposition'
+      ? {
+          ...base.fuelHaul,
+          ...jetAStockQuoteFields(world, missions, normalized.originIcao),
+        }
+      : base.fuelHaul;
   return {
     ...base,
     lots,
+    ...(fuelHaul ? { fuelHaul } : {}),
     ...(airframeLabel ? { airframeLabel } : {}),
     ...(distanceNm !== undefined ? { distanceNm } : {}),
     ...(demandEditMaxKg !== undefined ? { demandEditMaxKg } : {}),
     ...(vaFlight ? { vaFlight: true as const } : {}),
+  };
+}
+
+/** Live origin price for the Stock slider. Not written back onto the flight. */
+function jetAStockQuoteFields(
+  world: CareerEconomyWorld,
+  missions: CareerMissionsState,
+  originIcao: string,
+): { spotUnitUsd: number; originTankKg: number } {
+  const origin = originIcao.trim().toUpperCase();
+  const pile = airportByIcao(world, origin)?.inventory.fuel;
+  const spotUnitUsd =
+    pile && pile.capacityKg > 0 ? localUnitPriceUsd('fuel', pile) : 0;
+  const tank = concessionForPickupHub(missions, world.tick, origin);
+  return {
+    spotUnitUsd,
+    originTankKg: tank ? Math.max(0, Math.floor(tank.jetAKg ?? 0)) : 0,
   };
 }
 

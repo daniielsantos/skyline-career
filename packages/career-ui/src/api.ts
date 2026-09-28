@@ -594,7 +594,13 @@ export type Mission = {
     kg?: number;
     /** Stock slider ceiling (tank room, aircraft lift, origin stock). */
     maxKg?: number;
+    fromTankKg?: number;
+    boughtKg?: number;
     boughtUsd?: number;
+    /** Origin spot, USD per kg. Client view only — not stored on the flight. */
+    spotUnitUsd?: number;
+    /** Company tank still at the origin. Already paid, so the slider does not charge it. */
+    originTankKg?: number;
   };
   /**
    * What the pilot’s home wallet received on settle (member cut / IH fee).

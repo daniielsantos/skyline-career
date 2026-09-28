@@ -1,4 +1,7 @@
-# Current state (2026-09-27)
+# Current state (2026-09-28)
+
+`main` **78252011** / desktop **0.3.370** shipped: Keep a VA Jet-A stock flight on the member who started it. Release: [v0.3.370](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.370).
+
 
 `main` **e55a825b** / desktop **0.3.369** shipped: Let an airborne Watch depart skip the ground fuel gate. Release: [v0.3.369](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.369).
 

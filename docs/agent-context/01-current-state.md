@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **9c3eb1e1** / desktop **0.3.379** shipped: Enlarge the sidebar Airframe wordmark. Release: [v0.3.379](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.379).
+
+
 `main` **cd85c3ca** / desktop **0.3.378** shipped: Show the economy clock time on ledger recent activity. Release: [v0.3.378](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.378).
 
 

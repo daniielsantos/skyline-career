@@ -21,24 +21,35 @@ function fillRatio(current: number, max: number | undefined): number | undefined
   return Math.min(1, Math.max(0, current / max));
 }
 
+/**
+ * Bay fill. A published ceiling uses weight/max. Stations with no ceiling
+ * (common on large jets) scale to the heaviest open bay so 1,050 lb reads
+ * shorter than 2,100 lb.
+ */
+export function stationBayFill(
+  lb: number,
+  maxLb: number | undefined,
+  openScaleLb: number,
+): number {
+  const capped = fillRatio(lb, maxLb);
+  if (capped !== undefined) return capped;
+  if (!(lb > 0.5) || !(openScaleLb > 0.5)) return 0;
+  return Math.min(1, Math.max(0, lb / openScaleLb));
+}
+
 function SchematicCell(props: {
   className: string;
   label: string;
   valueLb: number;
   maxLb?: number;
+  /** Precomputed bay fill. Fuel cells omit this and use value/max. */
+  fill?: number;
   weightSystem: WeightSystem;
 }) {
   const isStation = props.className.includes('load-schematic-station');
-  const ratio = fillRatio(props.valueLb, props.maxLb);
-  // Stations without a published max still show a cargo stack when loaded.
-  const fill =
-    ratio !== undefined
-      ? ratio
-      : isStation && props.valueLb > 0.5
-        ? 0.55
-        : isStation
-          ? 0
-          : undefined;
+  const ratio =
+    props.fill !== undefined ? props.fill : fillRatio(props.valueLb, props.maxLb);
+  const fill = ratio !== undefined ? ratio : isStation ? 0 : undefined;
   const style =
     fill !== undefined
       ? ({ '--schematic-fill': String(fill) } as CSSProperties)
@@ -388,6 +399,11 @@ export function PayloadStationSchematic(props: {
     : entries.filter((e) => e.lb > 0.5 || (e.maxLb !== undefined && e.maxLb > 0));
   if (visible.length === 0) return null;
 
+  const openScaleLb = visible.reduce((peak, entry) => {
+    if (fillRatio(entry.lb, entry.maxLb) !== undefined) return peak;
+    return Math.max(peak, entry.lb);
+  }, 0);
+
   return (
     <div
       className="load-schematic load-schematic-stations"
@@ -400,6 +416,7 @@ export function PayloadStationSchematic(props: {
           label={`S${e.index}`}
           valueLb={e.lb}
           maxLb={e.maxLb}
+          fill={stationBayFill(e.lb, e.maxLb, openScaleLb)}
           weightSystem={props.weightSystem}
         />
       ))}

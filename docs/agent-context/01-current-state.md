@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **aea5c152** / desktop **0.3.375** shipped: Buy the Jet-A stock load on the manifest, and keep that choice off later steps. Release: [v0.3.375](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.375).
+
+
 `main` **31422f46** / desktop **0.3.374** shipped: Let a Jet-A stock flight depart, and choose the load on the manifest. Release: [v0.3.374](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.374).
 
 

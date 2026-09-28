@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **1bfb6371** / desktop **0.3.380** shipped: Log already-paid port tank draws on the company ledger. Release: [v0.3.380](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380).
+
+
 `main` **9c3eb1e1** / desktop **0.3.379** shipped: Enlarge the sidebar Airframe wordmark. Release: [v0.3.379](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.379).
 
 

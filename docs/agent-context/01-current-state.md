@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **21ee9116** / desktop **0.3.383** shipped: Draw payload stations as wide containers filled across. Release: [v0.3.383](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.383).
+
+
 `main` **7ec55840** / desktop **0.3.382** shipped: Draw each payload station as a crate on a pallet. Release: [v0.3.382](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.382).
 
 

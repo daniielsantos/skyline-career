@@ -1715,10 +1715,63 @@ td.net-neg {
 }
 
 .missions-head-center h2 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   margin: 0;
   font-size: 2.25rem;
   letter-spacing: 0.06em;
   line-height: 1.15;
+}
+
+.dest-runway-arrow {
+  color: var(--muted);
+}
+
+.dest-runway-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.dest-runway-trigger:hover {
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.dest-runway-dialog {
+  width: min(100%, 460px);
+}
+
+.dest-runway-list {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dest-runway-list li {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.dest-runway-list strong {
+  letter-spacing: 0.06em;
+}
+
+.dest-runway-list span {
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .missions-head-center .icao-link {

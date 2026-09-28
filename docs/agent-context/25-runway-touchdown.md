@@ -1,5 +1,17 @@
 # Runway touchdown / debrief
 
+## Sintoma (2026-09-27) — pista do destino só no debrief
+
+Comprimento, largura e luz só apareciam no diagrama depois do settle. O piloto descobria a faixa curta já na chegada.
+
+## Causa
+
+O catálogo já tinha a faixa. O Dispatch não lia `getAirportRunways` antes do OFP.
+
+## Fix
+
+Ícone ao lado do ICAO de destino no título da rota (Manifesto inclusive, antes do SimBrief). O clique abre um modal; a faixa mais longa vem primeiro. Identificador, comprimento, largura, superfície e luz. Sem frequência — o catálogo não tem. O ICAO continua abrindo o terminal. Despacho não é bloqueado.
+
 ## Sintoma (2026-09-27) — KMIA→SYMD pagou depois de spawn no menu
 
 Debrief `msn_whhaul_3362_KMIA_SYMD_648462`: ON TIME, OFF RWY, +311 fpm, RWY 09 · 1.20 km · 30 m wide · unlit · 116767 m past THR · 45353 m left. Piloto (737) só viu o tamanho da pista na chegada, não pousou, foi ao menu, deu spawn e o parking brake fechou o settle.

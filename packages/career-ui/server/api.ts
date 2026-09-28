@@ -9114,6 +9114,18 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      const runwayMatch = path.match(
+        /^\/api\/airport\/([A-Za-z0-9]{3,4})\/runways$/,
+      );
+      if (req.method === 'GET' && runwayMatch) {
+        const icao = runwayMatch[1]!.toUpperCase();
+        send(res, 200, {
+          icao,
+          runways: getAirportRunways(icao),
+        });
+        return;
+      }
+
       const airportMatch = path.match(/^\/api\/airport\/([A-Za-z0-9]{3,4})$/);
       if (req.method === 'GET' && airportMatch) {
         const icao = airportMatch[1]!.toUpperCase();

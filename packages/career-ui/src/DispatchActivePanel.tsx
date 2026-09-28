@@ -38,6 +38,7 @@ import {
 import { mxFuelBurnAlertText, mxFuelBurnAlertTitle } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
 import { CargoLotCards } from './CargoLotCards';
+import { DestRunwaysButton } from './DestRunwaysButton';
 import { playPreflightReadySound, notePreflightNotReady } from './ui-sounds';
 
 export function DispatchStepper(props: { current: DispatchStepId }) {
@@ -414,13 +415,16 @@ export function DispatchActivePanel(props: {
               icao={mission.originIcao}
               onOpen={props.onOpenAirport}
               disabled={busy}
-            />{' '}
-            →{' '}
+            />
+            <span className="dest-runway-arrow" aria-hidden="true">
+              →
+            </span>
             <IcaoLink
               icao={mission.destIcao}
               onOpen={props.onOpenAirport}
               disabled={busy}
             />
+            <DestRunwaysButton icao={mission.destIcao} />
           </h2>
           <p>
             {assignedAircraft}

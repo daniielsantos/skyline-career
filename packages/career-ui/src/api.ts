@@ -2064,6 +2064,12 @@ export async function fetchSatelliteMapStyle() {
   );
 }
 
+export function fetchAirportRunways(icao: string) {
+  return api<{ icao: string; runways: CareerRunway[] }>(
+    `/api/airport/${encodeURIComponent(icao.trim().toUpperCase())}/runways`,
+  );
+}
+
 export function fetchAirport(
   icao: string,
   opts: {

@@ -46,6 +46,20 @@ function activeConcession(
   );
 }
 
+function pilotFields(opts: {
+  pilotAccountId?: string;
+  pilotHomeCompanyId?: string;
+  vaFlight?: boolean;
+}): Pick<MissionIntent, 'pilotAccountId' | 'pilotHomeCompanyId' | 'vaFlight'> {
+  const pilotAccountId = opts.pilotAccountId?.trim();
+  const pilotHomeCompanyId = opts.pilotHomeCompanyId?.trim();
+  return {
+    ...(pilotAccountId ? { pilotAccountId } : {}),
+    ...(pilotHomeCompanyId ? { pilotHomeCompanyId } : {}),
+    ...(opts.vaFlight ? { vaFlight: true as const } : {}),
+  };
+}
+
 function commitFuelMission(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
@@ -65,6 +79,11 @@ export function startPortJetAReposition(
     aircraftId: string;
     kg?: number;
     companyId?: string;
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; costUsd: number } {
   const conc = activeConcession(
@@ -98,7 +117,10 @@ export function startPortJetAReposition(
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const deadlineTick = world.tick + 96 * 3;
   const id = nextMissionId(world.tick);
-  assignAircraftToMission(state, aircraft.id, id, origin);
+  assignAircraftToMission(state, aircraft.id, id, origin, {
+    actorAccountId: opts.actorAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
   let booked;
   try {
     booked = bookJetAAtAirport(state, world, {
@@ -155,6 +177,7 @@ export function startPortJetAReposition(
       boughtKg: booked.boughtKg,
       boughtUsd: booked.boughtUsd,
     },
+    ...pilotFields(opts),
   };
   commitFuelMission(state, world, mission);
   return { mission, kg, costUsd: booked.boughtUsd };
@@ -167,6 +190,11 @@ export function acceptPortJetAHaul(
     orderId: string;
     aircraftId: string;
     companyId?: string;
+    pilotAccountId?: string;
+    pilotHomeCompanyId?: string;
+    vaFlight?: boolean;
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
   },
 ): { mission: MissionIntent; kg: number; payUsd: number; fuelCostUsd: number } {
   const order = (world.demandOrders ?? []).find(
@@ -193,7 +221,10 @@ export function acceptPortJetAHaul(
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const deadlineTick = world.tick + 96 * 3;
   const id = nextMissionId(world.tick);
-  assignAircraftToMission(state, aircraft.id, id, origin);
+  assignAircraftToMission(state, aircraft.id, id, origin, {
+    actorAccountId: opts.actorAccountId,
+    actorIsVaOwner: opts.actorIsVaOwner,
+  });
   let booked;
   try {
     booked = bookJetAAtAirport(state, world, {
@@ -254,6 +285,7 @@ export function acceptPortJetAHaul(
       boughtUsd: booked.boughtUsd,
       orderId: order.id,
     },
+    ...pilotFields(opts),
   };
   try {
     commitFuelMission(state, world, mission);

@@ -284,6 +284,23 @@ describe('filterVaMissionsForPilot', () => {
     assert.equal(asOwner.length, 1);
     assert.equal(asOwner[0]?.id, 'msn_legacy');
   });
+
+  it('keeps an unstamped Jet-A stock so the assigned tail can be opened', () => {
+    const stock = mission({
+      id: 'jeta_stuck',
+      status: 'accepted',
+      fuelHaul: { kind: 'reposition', kg: 2500 },
+    });
+    const legacy = mission({ id: 'msn_legacy', status: 'accepted' });
+    const filtered = filterVaMissionsForPilot([stock, legacy], {
+      viewerAccountId: 'acc_a',
+      viewerHomeCompanyId: 'co_a',
+    });
+    assert.deepEqual(
+      filtered.map((m) => m.id),
+      ['jeta_stuck'],
+    );
+  });
 });
 
 describe('vaLogbookPilotLabel', () => {

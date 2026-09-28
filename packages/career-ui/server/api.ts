@@ -9818,6 +9818,8 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const jetAActor = await resolveVaFleetActor(req, companyId);
+          const jetAStamp = await vaPilotMissionStamp(req, companyId);
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const started = startPortJetAReposition(missions, world, {
@@ -9826,6 +9828,9 @@ export function createCareerApiServer(port = 8787) {
               aircraftId: body.aircraftId!,
               kg: body.kg != null ? Number(body.kg) : undefined,
               companyId,
+              actorAccountId: jetAActor.accountId,
+              actorIsVaOwner: jetAActor.isOwner,
+              ...jetAStamp,
             });
             return {
               kg: started.kg,
@@ -9864,12 +9869,17 @@ export function createCareerApiServer(port = 8787) {
           return;
         }
         try {
+          const jetAHaulActor = await resolveVaFleetActor(req, companyId);
+          const jetAHaulStamp = await vaPilotMissionStamp(req, companyId);
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             const accepted = acceptPortJetAHaul(missions, world, {
               orderId: body.orderId!,
               aircraftId: body.aircraftId!,
               companyId,
+              actorAccountId: jetAHaulActor.accountId,
+              actorIsVaOwner: jetAHaulActor.isOwner,
+              ...jetAHaulStamp,
             });
             return {
               kg: accepted.kg,

@@ -2208,6 +2208,20 @@ function isFboSplitSisterMission(mission: Mission): boolean {
 }
 
 /**
+ * Stay on the VA session while the sidebar flight is a real Dispatch leg
+ * or a Jet-A stock/haul. A bare accepted freight still returns home.
+ */
+function vaOpsSessionPinned(
+  missions: Mission[],
+  pilotAccountId?: string | null,
+): boolean {
+  const board = findDispatchBoardMission(missions, pilotAccountId);
+  if (!board) return false;
+  if (board.fuelHaul) return true;
+  return isPlayerDispatchMission(board);
+}
+
+/**
  * Mission shown on the Dispatch board / Watch automation.
  * Excludes crew airborne and Split sisters waiting for Crew fly.
  * When `pilotAccountId` is set (VA), prefer that pilot's mission so a friend's
@@ -8151,15 +8165,7 @@ export function App() {
       Boolean(homeCo) && homeCo !== activeCompanyIdRef.current;
     if (onVaTenant && homeCo) {
       const me = authAccountIdRef.current?.trim() || '';
-      const activeVaDispatch = missions.some((m) => {
-        if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
-          return false;
-        }
-        if (!me) return true;
-        const owner = m.pilotAccountId?.trim() || '';
-        if (!owner) return true;
-        return owner === me;
-      });
+      const activeVaDispatch = vaOpsSessionPinned(missions, me);
       if (!activeVaDispatch) {
         void switchCompanyForVa(homeCo).catch(() => undefined);
       }
@@ -8211,15 +8217,7 @@ export function App() {
     if (next === 'hangar') {
       const home = homeCompanyIdRef.current?.trim();
       const me = authAccountIdRef.current?.trim() || '';
-      const activeVaDispatch = missions.some((m) => {
-        if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
-          return false;
-        }
-        if (!me) return true;
-        const owner = m.pilotAccountId?.trim() || '';
-        if (!owner) return true;
-        return owner === me;
-      });
+      const activeVaDispatch = vaOpsSessionPinned(missions, me);
       if (
         home &&
         home !== activeCompanyIdRef.current &&
@@ -8244,15 +8242,7 @@ export function App() {
     // Company port desk lives under My VA → Ports (session already VA there).
     // Sidebar Ports is always home logistics.
     const me = authAccountIdRef.current?.trim() || '';
-    const activeVaDispatch = missions.some((m) => {
-      if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
-        return false;
-      }
-      if (!me) return true;
-      const owner = m.pilotAccountId?.trim() || '';
-      if (!owner) return true;
-      return owner === me;
-    });
+    const activeVaDispatch = vaOpsSessionPinned(missions, me);
     const onVaTenant =
       Boolean(home) && home !== activeCompanyIdRef.current;
     const mustRestoreHome =

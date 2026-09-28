@@ -587,6 +587,12 @@ export type Mission = {
   internalHaul?: boolean;
   /** Accepted under a listed VA (VA aircraft / VA ops). */
   vaFlight?: boolean;
+  /** Jet-A stocking or Demand fuel haul. Payload stays empty. */
+  fuelHaul?: {
+    kind: 'reposition' | 'demand';
+    portId?: string;
+    kg?: number;
+  };
   /**
    * What the pilot’s home wallet received on settle (member cut / IH fee).
    * Prefer this over payoutUsd in the logbook when present.

@@ -126,9 +126,13 @@ describe('port FBO Jet-A', () => {
       originIcao: 'SBKP',
       aircraftId: aircraft.id,
       kg: 1_000,
+      pilotAccountId: 'acc_pilot',
+      vaFlight: true,
     });
     assert.equal(started.mission.payUsd, 0);
     assert.equal(started.mission.cargoKg, 0);
+    assert.equal(started.mission.pilotAccountId, 'acc_pilot');
+    assert.equal(started.mission.vaFlight, true);
     assert.equal(started.kg, 1_000);
     assert.ok(state.walletUsd < walletBefore);
     const tankBefore = state.playerPortConcessions?.[0]?.jetAKg ?? 0;

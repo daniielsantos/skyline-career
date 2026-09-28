@@ -65,27 +65,35 @@ function creditOperator(
   world: CareerEconomyWorld,
   portId: string,
   kg: number,
-): void {
+): boolean {
   const id = portId.trim().toUpperCase();
   const op = (world.portConcessions ?? []).find(
     (c) =>
-      c.portId === id &&
+      c.portId.trim().toUpperCase() === id &&
       c.leasePaidThroughTick > world.tick &&
-      Boolean(c.companyId),
+      Boolean(c.companyId?.trim()),
   );
-  if (!op) return;
-  const conc = ensurePlayerPortConcessions(state).find(
+  const rows = ensurePlayerPortConcessions(state).filter(
     (c) =>
-      c.portId === op.portId &&
-      c.companyId === op.companyId &&
+      c.portId.trim().toUpperCase() === id &&
       c.leasePaidThroughTick > world.tick,
   );
-  if (!conc) return;
+  // World index is who occupies the port. Settle often runs on a snapshot
+  // that never loaded that index (command slice / RAM before a Ports write).
+  // The company JSON is the lease. Credit it when nobody else is published
+  // as the operator. A rival in the index still blocks the credit.
+  const conc = op
+    ? rows.find((c) => c.companyId === op.companyId.trim())
+    : rows.length === 1
+      ? rows[0]
+      : undefined;
+  if (!conc) return false;
   const add = Math.max(0, Math.floor(kg));
-  if (add <= 0) return;
+  if (add <= 0) return false;
   conc.lifetimeThroughputKg = (conc.lifetimeThroughputKg ?? 0) + add;
   const window = alignThroughputWindow(conc, world.tick);
   window[0] = (window[0] ?? 0) + add;
+  return true;
 }
 
 /**
@@ -112,9 +120,10 @@ export function creditPortOperatorThroughputOnOutboundSettle(
     );
     portId = order?.portId?.trim().toUpperCase() || '';
   }
-  if (!portId) {
-    portId = portIdForPickupHubBound(opts.originIcao)?.trim().toUpperCase() || '';
+  const originPort =
+    portIdForPickupHubBound(opts.originIcao)?.trim().toUpperCase() || '';
+  if (portId && creditOperator(state, world, portId, add)) return;
+  if (originPort && originPort !== portId) {
+    creditOperator(state, world, originPort, add);
   }
-  if (!portId) return;
-  creditOperator(state, world, portId, add);
 }

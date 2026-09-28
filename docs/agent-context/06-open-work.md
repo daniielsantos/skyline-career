@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-28: **Port FBO 7d zerado** — Demand settle da VA não gravava throughput quando o índice mundial do porto vinha vazio. Fix no world (`creditPortOperatorThroughputOnOutboundSettle`); o voo já settled não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md). Ainda sem release.
+
 Atualizado 2026-09-28: **Wallet chip após settle** — v0.3.386 (`91e94286`). O saldo pessoal não foi gravado por cima; o Watch pintava o caixa da VA no chip. Chrome só aceita figura da home. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.386
 
 Atualizado 2026-09-28: **Station containers** — v0.3.385 (`778cb4da`). Contêiner mais alto: 1.75rem no Preflight, 1.45rem no En route. Escala segue a station mais pesada. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.385

@@ -12,6 +12,7 @@ import {
 } from './career-ports.js';
 import { acceptDemandOrder } from './career-demand.js';
 import { departMission, settleMission } from './career-mission.js';
+import { creditPortOperatorThroughputOnOutboundSettle } from './career-port-throughput.js';
 import { depositCargoToWarehouse, WAREHOUSE_CAPACITY_KG } from './career-warehouse-stock.js';
 import {
   PORT_CONCESSION_CLAIM_USD,
@@ -531,6 +532,160 @@ describe('port concessions', () => {
     assert.ok(
       (state.playerPortConcessions?.[0]?.throughputWindowKg?.[0] ?? 0) >=
         accepted.kg,
+    );
+  });
+
+  it('Demand settle credits when the world port index is empty', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 500_000;
+    claimPortConcession(state, world, {
+      portId: 'BRSSZ',
+      companyId: 'co_va',
+    });
+    world.portConcessions = [];
+    const before =
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0;
+
+    creditPortOperatorThroughputOnOutboundSettle(state, world, {
+      originIcao: 'SBGR',
+      kg: 5_990,
+      demandOrderId: 'demand_missing_from_slice',
+    });
+
+    assert.equal(
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0,
+      before + 5_990,
+    );
+    assert.equal(
+      state.playerPortConcessions?.[0]?.throughputWindowKg?.[0] ?? 0,
+      5_990,
+    );
+  });
+
+  it('Demand settle credits the origin port when the order names another port', () => {
+    const { world, state } = missionsAtSantos();
+    state.playerPortConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_va',
+        level: 1,
+        claimedAtTick: world.tick,
+        leasePaidThroughTick: world.tick + 500,
+        lifetimeThroughputKg: 39_054,
+      },
+    ];
+    world.portConcessions = [];
+    world.demandOrders = [
+      {
+        id: 'demand_other_port',
+        destIcao: 'MKTP',
+        commodityId: 'general',
+        wantedKg: 6_000,
+        remainingKg: 0,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'filled',
+        portId: 'BRSSZ',
+      },
+    ];
+
+    creditPortOperatorThroughputOnOutboundSettle(state, world, {
+      originIcao: 'KMIA',
+      kg: 5_990,
+      demandOrderId: 'demand_other_port',
+    });
+
+    assert.equal(
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg,
+      39_054 + 5_990,
+    );
+  });
+
+  it('does not credit a company when another operator holds the port', () => {
+    const { world, state } = missionsAtSantos();
+    state.playerPortConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_va',
+        level: 1,
+        claimedAtTick: world.tick,
+        leasePaidThroughTick: world.tick + 500,
+        lifetimeThroughputKg: 100,
+      },
+    ];
+    world.portConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_rival',
+        leasePaidThroughTick: world.tick + 500,
+        level: 1,
+      },
+    ];
+
+    creditPortOperatorThroughputOnOutboundSettle(state, world, {
+      originIcao: 'KMIA',
+      kg: 5_990,
+      demandOrderId: 'demand_rival',
+    });
+
+    assert.equal(state.playerPortConcessions?.[0]?.lifetimeThroughputKg, 100);
+  });
+
+  it('Demand settle credits a warehouse-bridge leg when the port index is empty', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 500_000;
+    claimPortConcession(state, world, {
+      portId: 'BRSSZ',
+      companyId: 'co_va',
+    });
+    world.portConcessions = [];
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 300,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const dest = world.airports.find((a) => a.icao === 'SBKP');
+    assert.ok(dest);
+    dest!.inventory.general!.stockKg = Math.floor(
+      dest!.inventory.general!.capacityKg * 0.05,
+    );
+    world.demandOrders = [
+      {
+        id: 'demand_bridge_settle',
+        destIcao: 'SBKP',
+        commodityId: 'general',
+        wantedKg: 4_000,
+        remainingKg: 4_000,
+        maxUnitPriceUsd: 4,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 200,
+        status: 'open',
+        portId: 'BRSSZ',
+      },
+    ];
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const accepted = acceptDemandOrder(state, world, {
+      orderId: 'demand_bridge_settle',
+      originIcao: 'SBGR',
+      aircraftId: aircraft.id,
+      kg: 250,
+    });
+    const departed = departMission(world, accepted.mission, { fleet: state });
+    departed.mission.warehouseBridge = true;
+    world.portConcessions = [];
+    settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    assert.equal(
+      state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0,
+      accepted.kg,
     );
   });
 

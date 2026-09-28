@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-09-28: **Throughput 7d continua 0 depois do app** — sintoma = Demand da VA (KMIA→MKTP, ~13.2 klb) settle, modal do Port of Miami segue `86.1 klb · 7d 0.0` depois de reabrir o diálogo e fechar o app. Causa = `creditOperator` só gravava se `world.portConcessions` já tivesse o operador; o settle (command slice / RAM sem esse índice) saía cedo, e o GET do Ports mostra a concessão do JSON da company mesmo assim. Um Demand que também vinha com `warehouseBridge` caía no `continue` antes do crédito. Fix = creditar a concessão ativa desta company quando o índice está vazio (um rival no índice continua a bloquear); se o pedido apontar outro porto, cair no porto do hub de origem; bridge com Demand/WH haul também credita. O voo já settled não retroage. O crédito corre no world — desktop sozinho não grava o 7d até o world subir com esse commit.
+
 Atualizado 2026-09-28: **Tank draw no ledger** — desktop v0.3.380 (`7761803e`). O Jet-A já pago do tanque do porto entra no avião no authorize do OFP (ou no depart, se o bloco ainda não foi comprado) e não mexe no caixa. A Recent activity ganha uma linha `port_fbo_jet_a` com $0, o membro e o kg (`From tank · N kg · ORIG→DEST`). O voo que já autorizou o combustível não ganha linha retroativa. Queima em voo não tira mais do tanque. A linha só aparece depois que o world sobe com esse commit.
 
 ## Handoff 2026-09-28 — chat novo começa aqui

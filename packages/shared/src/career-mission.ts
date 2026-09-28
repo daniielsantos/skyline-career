@@ -2980,6 +2980,21 @@ export function settleMission(
             payoutUsd: 0,
           });
         }
+        // Demand chip is demandOrderId, checked before Bridge in the logbook.
+        // A leg that also has warehouseBridge used to skip throughput here.
+        if (
+          opts.fleet &&
+          (working.demandOrderId ||
+            working.warehouseHaul ||
+            line.shipmentLotId.startsWith('demand_') ||
+            line.shipmentLotId.startsWith('whhaul_'))
+        ) {
+          creditPortOperatorThroughputOnOutboundSettle(opts.fleet, world, {
+            originIcao: working.originIcao,
+            kg: line.cargoKg,
+            demandOrderId: line.demandOrderId ?? working.demandOrderId,
+          });
+        }
         continue;
       }
       // Demand Board / WH haul: company warehouse cargo — fill dest only (no origin debit).

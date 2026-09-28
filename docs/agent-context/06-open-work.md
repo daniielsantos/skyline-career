@@ -1,8 +1,8 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Port tank draw ledger** — retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. World precisa do commit; o voo já autorizado não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+Atualizado 2026-09-28: **Port tank draw ledger** — v0.3.380 (`7761803e`). Retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. A linha nasce no world; o voo já autorizado não retroage. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380
 
-Atualizado 2026-09-28: **EN ROUTE live load** — subtítulo do voo (“Live fuel drains…”) removido; título Live Load com margem acima da borda do Cargo. Local, sem release.
+Atualizado 2026-09-28: **EN ROUTE live load** — v0.3.380. Subtítulo do voo (“Live fuel drains…”) removido; título Live Load com margem acima da borda do Cargo.
 
 Atualizado 2026-09-28: **Ledger Day clock** — v0.3.378 no ar (`b798318a`). Recent activity mostra o dia e a hora do relógio da economia (`atTick`, passos de 15 min). https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.378
 

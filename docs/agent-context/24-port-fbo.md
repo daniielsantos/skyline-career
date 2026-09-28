@@ -1,6 +1,6 @@
 # Port FBO — chão, não ar
 
-Atualizado 2026-09-28: **Tank draw no ledger** — o Jet-A já pago do tanque do porto entra no avião no authorize do OFP (ou no depart, se o bloco ainda não foi comprado) e não mexe no caixa. A Recent activity ganha uma linha `port_fbo_jet_a` com $0, o membro e o kg (`From tank · N kg · ORIG→DEST`). O voo que já autorizou o combustível não ganha linha retroativa. Queima em voo não tira mais do tanque.
+Atualizado 2026-09-28: **Tank draw no ledger** — desktop v0.3.380 (`7761803e`). O Jet-A já pago do tanque do porto entra no avião no authorize do OFP (ou no depart, se o bloco ainda não foi comprado) e não mexe no caixa. A Recent activity ganha uma linha `port_fbo_jet_a` com $0, o membro e o kg (`From tank · N kg · ORIG→DEST`). O voo que já autorizou o combustível não ganha linha retroativa. Queima em voo não tira mais do tanque. A linha só aparece depois que o world sobe com esse commit.
 
 ## Handoff 2026-09-28 — chat novo começa aqui
 

@@ -3668,9 +3668,26 @@ export function createCareerApiServer(port = 8787) {
   }
   /** Account id captured on Watch start for full-mode local flight-track. */
   let watchLiveAccountId: string | null = null;
+  /** Company of the wallet figure the Watch just read — stamped before the await. */
+  let watchWalletCompanyId: string | null = null;
+  function stampWatchWalletCompany(): void {
+    const fromGateway =
+      careerApiMode === 'gateway'
+        ? gatewayAuthScope.current().companyId?.trim() || ''
+        : '';
+    const fromStore = store?.getActiveCompanyId()?.trim() || '';
+    watchWalletCompanyId = fromGateway || fromStore || null;
+  }
   const watchSession = new CareerWatchSession({
-    withCareerRead,
-    withCareerWrite,
+    withCareerRead: (fn) => {
+      stampWatchWalletCompany();
+      return withCareerRead(fn);
+    },
+    withCareerWrite: (fn, opts) => {
+      stampWatchWalletCompany();
+      return withCareerWrite(fn, opts);
+    },
+    activeCompanyId: () => watchWalletCompanyId,
     updateOpenMission,
     ...(careerApiMode === 'gateway' && gatewayWorldClient
       ? {

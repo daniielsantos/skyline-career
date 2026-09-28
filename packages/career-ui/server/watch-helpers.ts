@@ -241,6 +241,8 @@ export type WatchStatusPayload = {
     impactEnded?: boolean;
   } | null;
   walletUsd: number | null;
+  /** Company that owned `walletUsd` when it was read. Absent on older hosts. */
+  walletCompanyId?: string | null;
   autoDepart: boolean;
   autoSettle: boolean;
   /** Cruise poll cap (seconds) — adaptive phase intervals may be faster. */
@@ -345,6 +347,11 @@ type WatchCallbacks = {
    * persist (e.g. mission already cancelled). Missions-only — do not nest
    * withCareerRead/Write (those hold world then company).
    */
+  /**
+   * Company that the last withCareerRead/Write actually loaded. Captured
+   * before the await so a later request cannot relabel the wallet.
+   */
+  activeCompanyId?: () => string | null;
   updateOpenMission: (
     missionId: string,
     update: (
@@ -1632,6 +1639,7 @@ export class CareerWatchSession {
   private settling = false;
   private settlement: WatchStatusPayload['settlement'] = null;
   private walletUsd: number | null = null;
+  private walletCompanyId: string | null = null;
   /** Wall clock of last fully successful Watch tick (pipe + sample). */
   private lastSuccessfulTickAtMs = 0;
   /** Last time we ran the heavy Loaded vs Due SimVar pass. */
@@ -1782,6 +1790,13 @@ export class CareerWatchSession {
     });
   }
 
+  /** Remember which company the wallet figure belongs to. */
+  private noteWallet(usd: number | null): void {
+    this.walletUsd = usd;
+    const id = this.cb.activeCompanyId?.()?.trim() || '';
+    this.walletCompanyId = usd == null || !id ? null : id;
+  }
+
   /** Latched / sim touchdown position for manual settle. */
   getCapturedTouchdownPosition():
     | { lat: number; lon: number; headingTrueDeg?: number }
@@ -1898,6 +1913,7 @@ export class CareerWatchSession {
       settling: this.settling,
       settlement: this.settlement,
       walletUsd: this.walletUsd,
+      walletCompanyId: this.walletCompanyId,
       autoDepart: this.opts.autoDepart,
       autoSettle: this.opts.autoSettle,
       intervalSec: this.opts.intervalSec,
@@ -2083,7 +2099,7 @@ export class CareerWatchSession {
       throw new Error(`Mission ${mission.id} is ${mission.status} — nothing to watch`);
     }
     this.missionStatus = mission.status;
-    this.walletUsd = loaded.walletUsd;
+    this.noteWallet(loaded.walletUsd);
     // Seed from last Validate; Watch re-evaluates on the ground each tick.
     this.originClearedForDepart =
       mission.lastPreflightCheck?.location?.ok === true;
@@ -2331,7 +2347,7 @@ export class CareerWatchSession {
     this.lastError = null;
     this.settling = false;
     this.settlement = null;
-    this.walletUsd = null;
+    this.noteWallet(null);
     this.lastSuccessfulTickAtMs = 0;
     this.lastLoadSampleAtMs = 0;
     this.consecutivePipeErrors = 0;
@@ -2664,7 +2680,7 @@ export class CareerWatchSession {
       const { world } = snap;
       let current = snap.current;
       this.missionStatus = current.status;
-      this.walletUsd = snap.missions.walletUsd;
+      this.noteWallet(snap.missions.walletUsd);
 
       if (current.status === 'settled' || current.status === 'cancelled' || current.status === 'failed') {
         watchDebugLog('watch', 'mission terminal — stop', {
@@ -4390,7 +4406,7 @@ export class CareerWatchSession {
           }
           freshMissions.missions[openIdx] = departed.result.mission;
           this.missionStatus = departed.result.mission.status;
-          this.walletUsd = freshMissions.walletUsd;
+          this.noteWallet(freshMissions.walletUsd);
           this.watchState = {
             ...this.watchState,
             sawAirborne: true,
@@ -4718,7 +4734,7 @@ export class CareerWatchSession {
               });
               if (!snap.mission) return false;
               this.missionStatus = snap.mission.status;
-              this.walletUsd = snap.walletUsd;
+              this.noteWallet(snap.walletUsd);
               // Mirror settlementFromSettledMission — world settle returns bool only.
               const lateTicks = snap.mission.lateTicks ?? 0;
               this.settlement = {
@@ -4796,7 +4812,7 @@ export class CareerWatchSession {
               },
             );
             this.missionStatus = result.mission.status;
-            this.walletUsd = freshMissions.walletUsd;
+            this.noteWallet(freshMissions.walletUsd);
             const leaseCleanAfter = dryCleanSettlesOk(freshMissions.cargoOps);
             const outcome = applyPilotCareerSettle(freshMissions, {
               atTick: worldFresh.tick,
@@ -5009,8 +5025,9 @@ export class CareerWatchSession {
       );
       if (result.kind === 'applied' || result.kind === 'replay') {
         this.missionStatus = 'failed';
-        this.walletUsd =
-          typeof result.walletUsd === 'number' ? result.walletUsd : null;
+        this.noteWallet(
+          typeof result.walletUsd === 'number' ? result.walletUsd : null,
+        );
         this.settlement = {
           payoutUsd: 0,
           penaltyUsd: 0,

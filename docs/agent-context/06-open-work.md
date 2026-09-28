@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-28: **Wallet chip após settle** — o saldo pessoal não foi gravado por cima. O Watch pintava o caixa da VA no chip; o Hangar relia a home e corrigia. Fix local: `walletCompanyId` no status; chrome só aceita figura da home. Sem release. Detail: [`16-va-logistics.md`](./16-va-logistics.md).
+
 Atualizado 2026-09-28: **Station containers** — v0.3.385 (`778cb4da`). Contêiner mais alto: 1.75rem no Preflight, 1.45rem no En route. Escala segue a station mais pesada. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.385
 
 Atualizado 2026-09-28: **Port tank draw ledger** — v0.3.380 (`7761803e`). Retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. A linha nasce no world; o voo já autorizado não retroage. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380

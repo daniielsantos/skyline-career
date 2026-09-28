@@ -3834,6 +3834,13 @@ export function App() {
         setVaSessionWallet(next);
         return;
       }
+      // Explicit home figure always wins — a settle hold must not keep airline
+      // cash on the personal chip after the home refresh lands.
+      if (home && source && source === home) {
+        walletCommitHoldRef.current = null;
+        setWalletState(next);
+        return;
+      }
       // Prefer live request tenant (URL/memory) — ref can lag one tick behind setState.
       const active =
         getStoredCompanyId()?.trim() ||
@@ -6251,7 +6258,25 @@ export function App() {
               );
               if (debrief) setFlightDebrief(debrief);
               if (typeof status.walletUsd === 'number') {
-                commitWallet(status.walletUsd);
+                const source = status.walletCompanyId?.trim();
+                const homeNow = homeCompanyIdRef.current?.trim();
+                const vaNow = memberVaCompanyIdRef.current?.trim();
+                const activeNow =
+                  getStoredCompanyId()?.trim() ||
+                  activeCompanyIdRef.current?.trim();
+                if (source) {
+                  commitWallet(status.walletUsd, { sourceCompanyId: source });
+                } else if (vaNow && homeNow && vaNow !== homeNow) {
+                  // Untagged figure on a member: airline cash must not replace
+                  // the personal chip. Home refresh below paints the real one.
+                  if (activeNow && activeNow !== homeNow) {
+                    setVaSessionWallet(status.walletUsd);
+                  }
+                } else {
+                  commitWallet(status.walletUsd, {
+                    sourceCompanyId: activeNow || homeNow,
+                  });
+                }
               }
               // Debrief sheet carries P&L — only toast when we could not build it.
               if (!debrief) {
@@ -12668,7 +12693,11 @@ export function App() {
         else setFleet(result.fleet);
       }
       if (result.pilotIcao) setPilotIcao(result.pilotIcao);
-      if (typeof result.walletUsd === 'number') commitWallet(result.walletUsd);
+      if (typeof result.walletUsd === 'number') {
+        commitWallet(result.walletUsd, {
+          sourceCompanyId: opsCompanyId || home,
+        });
+      }
       if (result.activeTour !== undefined) {
         setActiveTour(result.activeTour ?? null);
       }

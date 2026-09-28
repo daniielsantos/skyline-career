@@ -5070,6 +5070,8 @@ export type WatchStatus = {
   parkingBrake?: boolean | null;
   settlement: MissionSettlement | CharterMissionSettlement | null;
   walletUsd: number | null;
+  /** Company that owned walletUsd. Missing on older desktop builds. */
+  walletCompanyId?: string | null;
   autoDepart: boolean;
   autoSettle: boolean;
   intervalSec: number;

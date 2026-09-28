@@ -10,9 +10,8 @@ Cursor trava quando a conversa fica enorme — leia só os arquivos desta pasta 
 1. `@docs/agent-context/project-overview.md` — visão geral do projeto
 2. `@docs/agent-context/README.md` — índice desta pasta
 3. Abra **só** o tópico de sessão necessário (não carregue todos de uma vez)
-4. Transcript antigo (só se precisar de detalhe histórico) — **não** commitar:
-   `%USERPROFILE%\.cursor\projects\c-Users-daniel-Documents-msfs-compat-layer\agent-transcripts\`
-   Sessão longa recente: `dbbbb643-2609-41b5-a827-560e59cb4138` (ATR/Titan/Corvalis + BBJ2 park; anterior: `4ed8b204-f6f8-49c7-8d5a-e577ad7d0d93`)
+4. Transcript antigo (só se precisar de detalhe histórico) — **não** commitar.
+   Handoff ativo 2026-09-28: Jet-A Stock **v0.3.375** — bloco do topo de [`24-port-fbo.md`](./24-port-fbo.md). Não carregar o transcript desta sessão.
 
 ## Índice
 

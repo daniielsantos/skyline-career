@@ -10,5 +10,9 @@ test('uncapped stations scale to the heaviest bay', () => {
 
 test('a published ceiling still uses weight over max', () => {
   assert.equal(stationBayFill(500, 2000, 2100), 0.25);
-  assert.equal(stationBayFill(2500, 2000, 2100), 1);
+});
+
+test('a cap below the load is not a ceiling', () => {
+  assert.equal(stationBayFill(2100, 500, 2100), 1);
+  assert.equal(stationBayFill(1050, 500, 2100), 0.5);
 });

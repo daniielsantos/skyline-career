@@ -22,17 +22,29 @@ function fillRatio(current: number, max: number | undefined): number | undefined
 }
 
 /**
- * Bay fill. A published ceiling uses weight/max. Stations with no ceiling
- * (common on large jets) scale to the heaviest open bay so 1,050 lb reads
- * shorter than 2,100 lb.
+ * A published max only counts when it can hold the weight. Caps below the
+ * load (common placeholder, e.g. 500 lb under a 2,100 lb station) are not a ceiling.
+ */
+export function stationCeilingLb(
+  lb: number,
+  maxLb: number | undefined,
+): number | undefined {
+  if (maxLb === undefined || !(maxLb > 0) || !Number.isFinite(lb)) return undefined;
+  if (lb > maxLb + 0.5) return undefined;
+  return maxLb;
+}
+
+/**
+ * Bay fill. A real ceiling uses weight/max. Otherwise the heaviest open bay
+ * on this aircraft is the ceiling, so 1,050 lb reads shorter than 2,100 lb.
  */
 export function stationBayFill(
   lb: number,
   maxLb: number | undefined,
   openScaleLb: number,
 ): number {
-  const capped = fillRatio(lb, maxLb);
-  if (capped !== undefined) return capped;
+  const ceiling = stationCeilingLb(lb, maxLb);
+  if (ceiling !== undefined) return Math.min(1, Math.max(0, lb / ceiling));
   if (!(lb > 0.5) || !(openScaleLb > 0.5)) return 0;
   return Math.min(1, Math.max(0, lb / openScaleLb));
 }
@@ -400,7 +412,7 @@ export function PayloadStationSchematic(props: {
   if (visible.length === 0) return null;
 
   const openScaleLb = visible.reduce((peak, entry) => {
-    if (fillRatio(entry.lb, entry.maxLb) !== undefined) return peak;
+    if (stationCeilingLb(entry.lb, entry.maxLb) !== undefined) return peak;
     return Math.max(peak, entry.lb);
   }, 0);
 
@@ -415,7 +427,7 @@ export function PayloadStationSchematic(props: {
           className="load-schematic-station"
           label={`S${e.index}`}
           valueLb={e.lb}
-          maxLb={e.maxLb}
+          maxLb={stationCeilingLb(e.lb, e.maxLb)}
           fill={stationBayFill(e.lb, e.maxLb, openScaleLb)}
           weightSystem={props.weightSystem}
         />

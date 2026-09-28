@@ -1,6 +1,6 @@
 # Open work / backlog curto
 
-Atualizado 2026-09-28: **Station containers** — v0.3.383 (`d2d1b4d3`). Célula larga: contêiner deitado, carga enche na horizontal. Sem teto, a largura segue a station mais pesada. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.383
+Atualizado 2026-09-28: **Station containers** — v0.3.383 pintava tudo cheio porque o teto do perfil (ex. 500 lb) é menor que a carga. Teto abaixo do peso não conta; a station mais pesada vira a escala. Local, sem release.
 
 Atualizado 2026-09-28: **Port tank draw ledger** — v0.3.380 (`7761803e`). Retirada do tanque do porto (já pago) escreve Recent activity com membro e kg, sem segundo débito. A linha nasce no world; o voo já autorizado não retroage. https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.380
 

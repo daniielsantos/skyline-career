@@ -7103,6 +7103,23 @@ button.logbook-card-hit:focus-visible {
   background: color-mix(in srgb, var(--panel) 70%, transparent);
 }
 
+.cashflow-col-day {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashflow-day,
+.cashflow-day-time {
+  display: block;
+}
+
+.cashflow-day-time {
+  margin-top: 0.12rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
 .cashflow-col-note {
   max-width: 22rem;
   color: var(--muted);

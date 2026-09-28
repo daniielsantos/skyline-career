@@ -10,13 +10,28 @@ import { postCreditDraw, postCreditRepay } from './api';
 import { boardMoneyLabel, isFiniteMoney, formatUsdAmountInput, maskUsdAmountInput, parseUsdAmountInput } from './board-money';
 
 const CASHFLOW_PAGE_SIZE = 15;
+/** Economy batches per career day (matches shared TICKS_PER_DAY). */
+const TICKS_PER_DAY = 96;
+/** One economy tick is 15 minutes on the career clock. */
+const MINUTES_PER_TICK = 15;
 
 /**
  * Ledger `dayIndex` is 0-based (`floor(tick / 96)`). World topbar + logbook
- * use Day N = that index + 1 — show the same number here.
+ * use Day N = that index + 1. Time of day comes from `atTick` on the same clock.
  */
-function ledgerDisplayDay(dayIndex: number): number {
-  return Math.max(0, Math.floor(Number(dayIndex) || 0)) + 1;
+export function ledgerDayClock(entry: {
+  dayIndex: number;
+  atTick: number;
+}): { day: number; time: string } {
+  const tick = Math.max(0, Math.floor(Number(entry.atTick) || 0));
+  const day = Math.max(0, Math.floor(Number(entry.dayIndex) || 0)) + 1;
+  const minutesIntoDay = (tick % TICKS_PER_DAY) * MINUTES_PER_TICK;
+  const hour = Math.floor(minutesIntoDay / 60);
+  const minute = minutesIntoDay % 60;
+  return {
+    day,
+    time: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+  };
 }
 
 
@@ -543,9 +558,14 @@ export function HangarCashflowPanel(props: {
                       </tr>
                     </thead>
                     <tbody>
-                      {pageEntries.map((entry) => (
+                      {pageEntries.map((entry) => {
+                        const clock = ledgerDayClock(entry);
+                        return (
                         <tr key={entry.id}>
-                          <td>{ledgerDisplayDay(entry.dayIndex)}</td>
+                          <td className="cashflow-col-day">
+                            <span className="cashflow-day">{clock.day}</span>
+                            <span className="cashflow-day-time">{clock.time}</span>
+                          </td>
                           <td>{kindLabel(entry.kind, entry.note)}</td>
                           {showMember ? (
                             <td>{memberLabel(entry, props.memberNamesByAccountId)}</td>
@@ -558,7 +578,8 @@ export function HangarCashflowPanel(props: {
                             {amountCell(entry, props.formatMoney)}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

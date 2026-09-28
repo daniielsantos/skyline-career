@@ -1,5 +1,8 @@
 # Current state (2026-09-28)
 
+`main` **0a537166** / desktop **0.3.372** shipped: Stop showing an unstamped Jet-A flight to every VA member. Release: [v0.3.372](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.372).
+
+
 `main` **8df271a3** / desktop **0.3.371** shipped: Load Jet-A stock and demand hauls as cargo in the hold. Release: [v0.3.371](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.371).
 
 

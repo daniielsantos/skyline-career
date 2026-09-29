@@ -39,12 +39,14 @@ export const LOGIN_CATCH_UP_TICKS = 12;
 
 /**
  * Background drain while the Career API is open: batches simulated per pulse
- * (full tickEconomyN — nothing skipped). Keep pulseMs above typical pulse wall
- * time on a large save so pulses do not pile up on the career lock.
+ * (full tickEconomyN — nothing skipped). 30s keeps NPC and fuel-haul landings
+ * inside half a minute and cuts the quiet fleet scan in half versus 15s.
+ * Keep pulseMs above typical pulse wall time on a large save so pulses do not
+ * pile up on the career lock.
  */
 export const CATCH_UP_TICKS_PER_PULSE = 8;
 /** Wall ms between background catch-up pulses (see CATCH_UP_TICKS_PER_PULSE). */
-export const CATCH_UP_PULSE_MS = 15_000;
+export const CATCH_UP_PULSE_MS = 30_000;
 
 /**
  * Release the career write lock every N batches during a pulse so /api/state

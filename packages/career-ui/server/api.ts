@@ -14570,7 +14570,7 @@ export function createCareerApiServer(port = 8787) {
         const fuelCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           if (path === '/api/fuel/quote') {
-            // Peek — quote must not sit behind the world pulse (~15s).
+            // Peek — quote must not sit behind the world pulse (~30s).
             const quoted = await withCareerPeekRead((world, missions) => {
               const idx = missions.missions.findIndex((m) => m.id === body.missionId);
               if (idx < 0) return { kind: 'missing' as const };

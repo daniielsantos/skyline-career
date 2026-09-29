@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  CATCH_UP_PULSE_MS,
   ECONOMY_TICK_BUDGET_SCALE,
   takeCalibratedTickBudget,
   TICKS_PER_DAY,
@@ -23,5 +24,9 @@ describe('economy clock', () => {
       sum += n;
     }
     assert.equal(sum, 8);
+  });
+
+  it('wakes the background pulse every 30 seconds', () => {
+    assert.equal(CATCH_UP_PULSE_MS, 30_000);
   });
 });

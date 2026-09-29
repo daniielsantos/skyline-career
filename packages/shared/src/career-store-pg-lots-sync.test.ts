@@ -17,6 +17,7 @@ import {
   charterOfferPgRowMatchesRetain,
   lotPgRetainKeepFromTick,
   lotPgRowMatchesRetain,
+  planLotSync,
 } from './career-store-pg-world.js';
 import type { CharterOffer, ShipmentLot } from './types/career-economy.js';
 
@@ -118,5 +119,38 @@ describe('PG lots/charter retain parity (Wave 1 upsert)', () => {
         `${offer.status}@${offer.expiresAtTick}`,
       );
     }
+  });
+});
+
+describe('planLotSync', () => {
+  const world = (lots: ShipmentLot[], tick = 500) => ({
+    lots,
+    airports: [],
+    tick,
+  });
+
+  it('asks for a full sync until a baseline exists', () => {
+    const lot = stubLot({ status: 'available' });
+    const plan = planLotSync(null, world([lot]));
+    assert.equal(plan.delta, null);
+    assert.equal(plan.next.size, 1);
+    assert.equal(plan.next.has(lot.id), true);
+  });
+
+  it('skips unchanged lots and does not delete the rest of the table', () => {
+    const lot = stubLot({ status: 'available' });
+    const first = planLotSync(null, world([lot]));
+    const second = planLotSync(first.next, world([lot]));
+    assert.deepEqual(second.delta, { upsertIds: [], deleteIds: [] });
+  });
+
+  it('upserts a reservation change and deletes only a lot the pulse dropped', () => {
+    const kept = stubLot({ status: 'available', id: 'keep' });
+    const gone = stubLot({ status: 'available', id: 'gone' });
+    const first = planLotSync(null, world([kept, gone]));
+    const reserved = { ...kept, reservedKg: 40 };
+    const second = planLotSync(first.next, world([reserved]));
+    assert.deepEqual(second.delta?.upsertIds, ['keep']);
+    assert.deepEqual(second.delta?.deleteIds, ['gone']);
   });
 });

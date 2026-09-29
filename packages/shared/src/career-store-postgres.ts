@@ -110,6 +110,7 @@ import {
   hydrateMissionsFromPg,
   isPgEconomyMiscEmpty,
   persistEconomyTablesToPg,
+  planLotSync,
   persistAircraftPoolToPg,
   claimAircraftInstanceInPg,
   releaseAircraftInstanceClaimInPg,
@@ -503,6 +504,11 @@ export class PostgresCareerStore implements CareerStore {
   private ramRevision: bigint | null = null;
   /** Lot ids patched by command slices while a pulse snapshot may be saving. */
   private dirtyCommandLotIds = new Set<string>();
+  /** Previous pulse's retained-lot signatures. Null forces a full lots sync. */
+  private lotSyncBaseline: Map<string, string> | null = null;
+  /** Pulse saves since boot. Every Nth one rewrites lots so a missed column self-heals. */
+  private lotPulseSaves = 0;
+  private static readonly LOT_PULSE_FULL_SYNC_EVERY = 16;
   private writerLeaseClient: pg.PoolClient | null = null;
   private ready: Promise<void>;
 
@@ -2172,6 +2178,18 @@ export class PostgresCareerStore implements CareerStore {
     }
     ensureHomeCountryId(toSave);
     const applyToRam = opts?.applyToRam !== false;
+    const pulseSnapshot = !applyToRam;
+    let nextLotBaseline: Map<string, string> | null = null;
+    let lotDelta: { upsertIds: string[]; deleteIds: string[] } | null = null;
+    if (pulseSnapshot) {
+      this.lotPulseSaves += 1;
+      const full =
+        this.lotSyncBaseline == null ||
+        this.lotPulseSaves % PostgresCareerStore.LOT_PULSE_FULL_SYNC_EVERY === 0;
+      const plan = planLotSync(full ? null : this.lotSyncBaseline, toSave);
+      lotDelta = plan.delta;
+      nextLotBaseline = plan.next;
+    }
     await this.persistRevisioned(
       (expected) =>
         persistEconomyTablesToPg(
@@ -2181,11 +2199,13 @@ export class PostgresCareerStore implements CareerStore {
           // Pulse snapshot off-lock: never CAS against a tip commands may have
           // advanced; lease holder already skips tip via persistRevisioned.
           applyToRam ? expected : undefined,
+          lotDelta,
         ),
       () => {
         if (applyToRam) {
           this.ram = toSave;
           world.pendingHubEconomySamples = undefined;
+          this.lotSyncBaseline = null;
         } else {
           // Pulse snapshot: keep live RAM (may include newer command slices).
           world.pendingHubEconomySamples = undefined;
@@ -2194,6 +2214,7 @@ export class PostgresCareerStore implements CareerStore {
             this.ram.lastBatchAtMs = toSave.lastBatchAtMs;
             this.ram.lastSyncedAtMs = toSave.lastSyncedAtMs;
           }
+          if (nextLotBaseline) this.lotSyncBaseline = nextLotBaseline;
         }
       },
     );
@@ -2462,6 +2483,7 @@ export class PostgresCareerStore implements CareerStore {
       () => {
         this.ram = toSave;
         world.pendingHubEconomySamples = undefined;
+        this.lotSyncBaseline = null;
       },
     );
   }

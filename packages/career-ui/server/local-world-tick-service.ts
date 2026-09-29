@@ -47,10 +47,28 @@ export type PulseChunkTiming = {
   saveMs: number;
   settleMs: number;
   lots: number;
+  /** Economy ticks actually simulated in this chunk (not the requested count). */
+  realAdvancedTicks: number;
+  /** NPC flights and fuel hauls that arrived during this chunk. */
+  settledFlights: number;
+  /**
+   * Planet rows changed (tick, arrival, reservation repair, cancelled haul).
+   * A clock-anchor refresh alone stays false.
+   */
+  economyDirty: boolean;
 };
 
 export function emptyPulseChunkTiming(): PulseChunkTiming {
-  return { lockWaitMs: 0, tickMs: 0, saveMs: 0, settleMs: 0, lots: 0 };
+  return {
+    lockWaitMs: 0,
+    tickMs: 0,
+    saveMs: 0,
+    settleMs: 0,
+    lots: 0,
+    realAdvancedTicks: 0,
+    settledFlights: 0,
+    economyDirty: false,
+  };
 }
 
 /** Minimal hooks the Career API already exposes under `withCareerLock` / writes. */
@@ -69,7 +87,18 @@ export type LocalWorldTickDeps = {
   runCatchUpWrite(opts: {
     catchUpTicks: number;
     cooperative: boolean;
+    /**
+     * Background pulse passes false on every chunk and saves once at the end.
+     * Omitted keeps the per-chunk snapshot (`POST /api/tick`).
+     */
+    persistPulseSnapshot?: boolean;
   }): Promise<PulseChunkTiming>;
+
+  /**
+   * Clone live RAM under the career lock and `saveEconomy` off it.
+   * One call per pulse, only when a chunk marked the planet dirty.
+   */
+  persistPulseSnapshot?(): Promise<PulseChunkTiming>;
 
   /**
    * Company passive fee settlement + lastSeenTick persist (MP session/open path).
@@ -94,6 +123,8 @@ export class LocalWorldTickService implements WorldTickService {
   private readonly worldId: WorldId;
   private pulseTimer: ReturnType<typeof setInterval> | undefined;
   private pulseInFlight = false;
+  /** Chunks mutated RAM and the end-of-pulse save did not land. */
+  private economyUnpersisted = false;
 
   constructor(private readonly deps: LocalWorldTickDeps) {
     this.worldId = deps.defaultWorldId ?? LOCAL_WORLD_ID;
@@ -138,10 +169,12 @@ export class LocalWorldTickService implements WorldTickService {
     const t0 = performance.now();
     this.pulseInFlight = true;
     const totals = emptyPulseChunkTiming();
+    const coalesceSave = typeof this.deps.persistPulseSnapshot === 'function';
     try {
       await this.deps.beforeAdvance?.();
       let remaining = totalTicks;
       let advancedTicks = 0;
+      let economyDirty = this.economyUnpersisted;
       while (remaining > 0) {
         const chunk = cooperative
           ? Math.min(CATCH_UP_LOCK_CHUNK_TICKS, remaining)
@@ -149,17 +182,35 @@ export class LocalWorldTickService implements WorldTickService {
         const chunkTiming = await this.deps.runCatchUpWrite({
           catchUpTicks: chunk,
           cooperative,
+          ...(coalesceSave ? { persistPulseSnapshot: false } : {}),
         });
         totals.lockWaitMs += chunkTiming.lockWaitMs;
         totals.tickMs += chunkTiming.tickMs;
         totals.saveMs += chunkTiming.saveMs;
         totals.settleMs += chunkTiming.settleMs;
         totals.lots = Math.max(totals.lots, chunkTiming.lots);
+        totals.realAdvancedTicks += chunkTiming.realAdvancedTicks;
+        totals.settledFlights += chunkTiming.settledFlights;
+        if (chunkTiming.economyDirty) economyDirty = true;
         advancedTicks += chunk;
         remaining -= chunk;
         if (remaining > 0) {
           await new Promise<void>((resolve) => setImmediate(resolve));
         }
+      }
+      if (coalesceSave && economyDirty) {
+        try {
+          const saved = await this.deps.persistPulseSnapshot!();
+          totals.lockWaitMs += saved.lockWaitMs;
+          totals.saveMs += saved.saveMs;
+          totals.lots = Math.max(totals.lots, saved.lots);
+          this.economyUnpersisted = false;
+        } catch (error) {
+          this.economyUnpersisted = true;
+          throw error;
+        }
+      } else if (coalesceSave) {
+        this.economyUnpersisted = false;
       }
       const world = this.deps.peekWorld();
       const ticksBehind = world
@@ -168,18 +219,19 @@ export class LocalWorldTickService implements WorldTickService {
       const wallMs = performance.now() - t0;
       const slow = wallMs >= 60_000;
       console.log(
-        `[career] economy-pulse ${slow ? 'SLOW ' : ''}ok ticks=${advancedTicks} ${Math.round(wallMs)}ms` +
+        `[career] economy-pulse ${slow ? 'SLOW ' : ''}ok ticks=${advancedTicks} sim=${totals.realAdvancedTicks} ${Math.round(wallMs)}ms` +
           ` lockWait=${Math.round(totals.lockWaitMs)}ms` +
           ` tick=${Math.round(totals.tickMs)}ms` +
           ` save=${Math.round(totals.saveMs)}ms` +
           ` settle=${Math.round(totals.settleMs)}ms` +
-          ` lots=${totals.lots}`,
+          ` lots=${totals.lots}` +
+          ` dirty=${economyDirty ? 1 : 0}`,
       );
       return {
         advancedTicks,
         wantedTicks: advancedTicks + ticksBehind,
         capped: ticksBehind > 0,
-        settledFlights: 0,
+        settledFlights: totals.settledFlights,
         wallMs,
       };
     } catch (error) {

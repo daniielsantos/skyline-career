@@ -1359,7 +1359,15 @@ async function loadEconomyUnlocked(opts?: {
   /** Background pulse: yield between countries and use lock chunks in caller. */
   cooperative?: boolean;
   /** Pulse spike diag — optional accumulator. */
-  catchUpTiming?: Pick<PulseChunkTiming, 'tickMs' | 'saveMs' | 'lots'>;
+  catchUpTiming?: Pick<
+    PulseChunkTiming,
+    | 'tickMs'
+    | 'saveMs'
+    | 'lots'
+    | 'realAdvancedTicks'
+    | 'settledFlights'
+    | 'economyDirty'
+  >;
   /**
    * Tick / heal under worldLock but skip economy PG/SQLite saves — caller
    * persists a snapshot after releasing the lock (two-queue pulse).
@@ -1369,6 +1377,7 @@ async function loadEconomyUnlocked(opts?: {
   const activeStore = requireStore();
   let caught: CareerEconomyWorld;
   let advancedTicks: number;
+  let settledFlights = 0;
   let dirty: boolean;
   const timing = opts?.catchUpTiming;
   const deferPersist = opts?.deferPersist === true;
@@ -1399,6 +1408,7 @@ async function loadEconomyUnlocked(opts?: {
     if (timing) timing.tickMs += performance.now() - tickStarted;
     caught = coop.world;
     advancedTicks = coop.advancedTicks;
+    settledFlights = coop.settledFlights;
     dirty =
       loaded.dirty ||
       coop.advancedTicks > 0 ||
@@ -1417,6 +1427,7 @@ async function loadEconomyUnlocked(opts?: {
     }
     caught = loaded.world;
     advancedTicks = loaded.advancedTicks;
+    settledFlights = loaded.settledFlights;
     dirty = loaded.dirty;
   }
   if (timing) timing.lots = Math.max(timing.lots, caught.lots?.length ?? 0);
@@ -1493,6 +1504,12 @@ async function loadEconomyUnlocked(opts?: {
         activeStore.persistPortConcessionIndex(caught.portConcessions ?? []),
       );
     }
+  }
+  if (timing) {
+    timing.economyDirty =
+      timing.economyDirty || needsSave || concessionHeal !== 'none';
+    timing.realAdvancedTicks += advancedTicks;
+    timing.settledFlights += settledFlights;
   }
   return caught;
 }
@@ -2157,6 +2174,11 @@ type CareerWriteOpts = {
   catchUpTiming?: PulseChunkTiming;
   /** `performance.now()` when the caller queued this write (lock-wait diag). */
   lockQueuedAtMs?: number;
+  /**
+   * Catch-up snapshot after unlock. Background pulse passes false on each
+   * chunk and saves once at the end. Default true (`POST /api/tick`).
+   */
+  persistPulseSnapshot?: boolean;
   /** Per-request company tenant (avoids ambient activeCompanyId thrash). */
   companyId?: string;
   /** Stamp ledger rows for this account (overrides request ambient). */
@@ -2486,9 +2508,15 @@ async function withCareerWrite<T>(
         : opts?.housekeeping !== false;
     if (housekeeping) {
       settleCrewOpsDue(missions, world, Date.now());
-      reconcileLotReservations(world, missions);
-      cancelOrphanPlayerMissions(world, missions);
-      expireStaleActiveMissions(world, missions);
+      const repaired = reconcileLotReservations(world, missions);
+      const orphans = cancelOrphanPlayerMissions(world, missions);
+      const stale = expireStaleActiveMissions(world, missions);
+      if (
+        opts?.catchUpTiming &&
+        (repaired.repairedLots > 0 || orphans.length > 0 || stale.length > 0)
+      ) {
+        opts.catchUpTiming.economyDirty = true;
+      }
     }
     const result = await fn(world, missions);
     if (!sliceMissionId && sliceLotIds.length > 0) {
@@ -2584,10 +2612,11 @@ async function withCareerWrite<T>(
           await activeStore.persistNpcLiveWorld(world);
         }
       }
-    } else if (isCatchUp) {
+    } else if (isCatchUp && opts?.persistPulseSnapshot !== false) {
       // Tick already mutated live RAM (cooperative load or /api/tick handler).
       // Persist a frozen snapshot outside the lock — must be the mutated world,
-      // not a stale pre-isolate peek.
+      // not a stale pre-isolate peek. The background pulse skips this and
+      // saves once after the last chunk.
       deferred.pulseSnapshot = structuredClone(world);
     } else {
       const timing = opts?.catchUpTiming;
@@ -3623,7 +3652,11 @@ export function createCareerApiServer(port = 8787) {
             msfsStampNeeded = false;
           });
         },
-        runCatchUpWrite: async ({ catchUpTicks, cooperative }) => {
+        runCatchUpWrite: async ({
+          catchUpTicks,
+          cooperative,
+          persistPulseSnapshot,
+        }) => {
           const timing = emptyPulseChunkTiming();
           const queuedAt = performance.now();
           await withCareerWrite(() => undefined, {
@@ -3632,6 +3665,7 @@ export function createCareerApiServer(port = 8787) {
             cooperative,
             catchUpTiming: timing,
             lockQueuedAtMs: queuedAt,
+            persistPulseSnapshot,
           });
           const settleStarted = performance.now();
           await withCareerLock(async () => {
@@ -3647,6 +3681,24 @@ export function createCareerApiServer(port = 8787) {
             timing.lots = Math.max(timing.lots, world.lots?.length ?? 0);
           });
           timing.settleMs = performance.now() - settleStarted;
+          return timing;
+        },
+        persistPulseSnapshot: async () => {
+          const timing = emptyPulseChunkTiming();
+          const queuedAt = performance.now();
+          let snapshot: CareerEconomyWorld | undefined;
+          await withCareerLock(async () => {
+            timing.lockWaitMs = performance.now() - queuedAt;
+            const world = store?.peekEconomyWorld();
+            if (!world) return;
+            snapshot = structuredClone(world);
+            timing.lots = world.lots?.length ?? 0;
+          });
+          if (!snapshot || !store) return timing;
+          const t0 = performance.now();
+          await store.saveEconomy(snapshot, { applyToRam: false });
+          await store.flushDirtyCommandLots?.();
+          timing.saveMs = performance.now() - t0;
           return timing;
         },
         applyCompanySessionSettlement: async ({ fromTick, toTick }) => {

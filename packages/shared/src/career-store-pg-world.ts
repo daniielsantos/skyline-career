@@ -832,17 +832,120 @@ WHERE charter_offers.demand_id IS DISTINCT FROM EXCLUDED.demand_id
    OR charter_offers.status IS DISTINCT FROM EXCLUDED.status
    OR charter_offers.mission_id IS DISTINCT FROM EXCLUDED.mission_id`;
 
+/** Columns written to `lots`. Extra RAM fields must not enter this, or every tick looks dirty. */
+export function lotPersistSignature(
+  lot: ShipmentLot,
+  originCountry: string,
+  destCountry: string,
+): string {
+  return [
+    lot.commodityId,
+    lot.originIcao,
+    lot.destIcao,
+    lot.quantityKg,
+    lot.reservedKg,
+    lot.createdAtTick,
+    lot.expiresAtTick,
+    lot.payUsd,
+    lot.basePayUsd ?? '',
+    lot.urgency,
+    lot.reason ?? '',
+    lot.status,
+    originCountry,
+    destCountry,
+    lot.claimedByCompanyId?.trim() ?? '',
+  ].join('\u001f');
+}
+
+export type LotSyncDelta = {
+  upsertIds: string[];
+  deleteIds: string[];
+};
+
+/**
+ * Diff retained lots against the previous pulse signature.
+ * `delta: null` means a full sync (first pulse, periodic realign, or a writer
+ * that replaced the lots table). A delta never orphan-deletes the world, so a
+ * reservation committed after the snapshot is not removed.
+ */
+export function planLotSync(
+  previous: ReadonlyMap<string, string> | null,
+  world: Pick<CareerEconomyWorld, 'lots' | 'airports' | 'tick'>,
+): { delta: LotSyncDelta | null; next: Map<string, string> } {
+  const tick = sqlNum(world.tick);
+  const countries = icaoCountryMap(world.airports ?? []);
+  const next = new Map<string, string>();
+  for (const lot of world.lots ?? []) {
+    if (!shouldRetainLot(lot, tick)) continue;
+    next.set(
+      lot.id,
+      lotPersistSignature(
+        lot,
+        countryForIcao(countries, lot.originIcao) || '',
+        countryForIcao(countries, lot.destIcao) || '',
+      ),
+    );
+  }
+  if (!previous) return { delta: null, next };
+  const upsertIds: string[] = [];
+  for (const [id, signature] of next) {
+    if (previous.get(id) !== signature) upsertIds.push(id);
+  }
+  const deleteIds: string[] = [];
+  for (const id of previous.keys()) {
+    if (!next.has(id)) deleteIds.push(id);
+  }
+  return { delta: { upsertIds, deleteIds }, next };
+}
+
 /**
  * Sync RAM retained lots → PG without full wipe. Deletes orphans / dead rows
  * not in `lotRows`, then UPSERTs (skips no-op updates via IS DISTINCT FROM).
+ * With `delta`, only those ids are deleted or upserted.
  */
 export async function syncLotsTableToPg(
   client: pg.PoolClient,
   worldId: string,
   lotRows: unknown[][],
+  delta?: LotSyncDelta | null,
 ): Promise<{ deleted: number; upserted: number; ms: number }> {
   const t0 = performance.now();
   const wid = worldId.trim() || LOCAL_WORLD_ID;
+  if (delta) {
+    let deleted = 0;
+    if (delta.deleteIds.length > 0) {
+      const gone = await client.query(
+        `DELETE FROM lots WHERE world_id = $1 AND id = ANY($2::text[])`,
+        [wid, delta.deleteIds],
+      );
+      deleted = gone.rowCount ?? 0;
+    }
+    const upsertIds = new Set(delta.upsertIds);
+    const rows =
+      upsertIds.size === 0
+        ? []
+        : lotRows.filter((row) => upsertIds.has(String(row[0])));
+    if (rows.length > 0) {
+      await upsertChunks(
+        client,
+        `INSERT INTO lots (
+         id, commodity_id, origin_icao, dest_icao, quantity_kg, reserved_kg,
+         created_at_tick, expires_at_tick, pay_usd, base_pay_usd, urgency, reason, status,
+         origin_country_id, dest_country_id, world_id, claimed_by_company_id
+       )`,
+        17,
+        rows,
+        LOT_UPSERT_ON_CONFLICT,
+      );
+    }
+    const stats = {
+      deleted,
+      upserted: rows.length,
+      ms: performance.now() - t0,
+    };
+    logPgPersistTiming('lots', stats);
+    return stats;
+  }
   const retainedIds = lotRows.map((row) => String(row[0]));
   let deleted = 0;
   if (retainedIds.length === 0) {
@@ -2798,13 +2901,20 @@ export async function persistEconomyTablesToPg(
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
   expectedRevision?: bigint,
+  lotDelta?: LotSyncDelta | null,
 ): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const airports = world.airports ?? [];
   const lots = world.lots ?? [];
+  const lotUpsertIds = lotDelta ? new Set(lotDelta.upsertIds) : null;
   const inbound = world.inboundPending ?? [];
   const { hubRows, stockRows } = airportTableRows(wid, airports);
-  const lotRows = lotTableRows(wid, lots, airports, sqlNum(world.tick));
+  const lotRows = lotTableRows(
+    wid,
+    lotUpsertIds ? lots.filter((lot) => lotUpsertIds.has(lot.id)) : lots,
+    airports,
+    sqlNum(world.tick),
+  );
   const inboundRows = inboundTableRows(wid, inbound);
   const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
   const eventRows = economyEventTableRows(wid, world.events ?? []);
@@ -2901,7 +3011,7 @@ export async function persistEconomyTablesToPg(
       );
     }
 
-    await syncLotsTableToPg(client, wid, lotRows);
+    await syncLotsTableToPg(client, wid, lotRows, lotDelta);
 
     await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
     if (inboundRows.length > 0) {

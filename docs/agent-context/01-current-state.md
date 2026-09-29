@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **5022d0fc** / desktop **0.3.393** shipped: Paint career clocks and deadlines in ten-minute ticks. Release: [v0.3.393](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.393).
+
+
 `main` **22860cd6** / desktop **0.3.392** shipped: Advance the economy every ten minutes without shortening the career day. Release: [v0.3.392](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.392).
 
 

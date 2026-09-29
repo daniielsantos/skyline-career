@@ -2,6 +2,7 @@
  * Player hangar — owned aircraft parked at terminals, ferry, mission assignment.
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   CAREER_HUB_COORDS,
   routeDistanceNm,
@@ -688,13 +689,13 @@ function normalizePlayerAircraft(raw: PlayerAircraft): PlayerAircraft | null {
             startedAtTick:
               typeof raw.leaseOut.startedAtTick === 'number'
                 ? raw.leaseOut.startedAtTick
-                : raw.leaseOut.nextDueTick - 96 * 30,
+                : raw.leaseOut.nextDueTick - TICKS_PER_DAY * 30,
             lastWearTick:
               typeof raw.leaseOut.lastWearTick === 'number'
                 ? raw.leaseOut.lastWearTick
                 : typeof raw.leaseOut.startedAtTick === 'number'
                   ? raw.leaseOut.startedAtTick
-                  : raw.leaseOut.nextDueTick - 96 * 30,
+                  : raw.leaseOut.nextDueTick - TICKS_PER_DAY * 30,
           }
         : undefined,
     airframeConditionPct:

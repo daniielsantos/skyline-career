@@ -11,6 +11,7 @@ import type {
   CareerEconomyWorld,
   CommodityId,
 } from './types/career-economy.js';
+import { ECONOMY_TICK_BUDGET_SCALE, TICKS_PER_HOUR } from './career-clock.js';
 
 /** Keep in sync with CAREER_COMMODITIES ids (avoid circular import). */
 const COMMODITY_IDS: readonly CommodityId[] = [
@@ -123,14 +124,14 @@ export const HUB_ACTIVITY_SOURCE_MULT: Record<HubActivitySource, number> = {
   market: 0.5,
 };
 
-/** Hard cap so a busy formation hour cannot dump a whole level alone (~6/hour ÷ 4). */
-export const HUB_LEVEL_XP_PER_TICK_CAP = 1.5;
+/** Hard cap so a busy formation hour cannot dump a whole level alone (~6 XP/hour). */
+export const HUB_LEVEL_XP_PER_TICK_CAP = 1.5 * ECONOMY_TICK_BUDGET_SCALE;
 
 /**
- * Quiet hubs lose XP each tick. ~0.45 × 96 ≈ 43 XP/day.
- * L5 hysteresis slack (~675) drains in ~2 weeks of neglect.
+ * Quiet hubs lose XP each tick. Hourly decay stays ~1.8 XP
+ * (0.45 × 4 ticks on the old 15-min clock).
  */
-export const HUB_LEVEL_XP_DECAY_PER_TICK = 0.45;
+export const HUB_LEVEL_XP_DECAY_PER_TICK = 0.45 * ECONOMY_TICK_BUDGET_SCALE;
 
 /**
  * Demote only after XP falls this fraction of the span *into* the current level
@@ -141,10 +142,10 @@ export const HUB_LEVEL_DEMOTE_SLACK_FRAC = 0.25;
 /** L5 promotion needs recent traffic, not XP + warehouse alone. */
 export const HUB_LEVEL_L5_MIN_ACTIVITY_SCORE = 35;
 /** Max idle ticks since last XP grant to allow L5 (~12 wall-hours). */
-export const HUB_LEVEL_L5_MAX_IDLE_TICKS = 48;
+export const HUB_LEVEL_L5_MAX_IDLE_TICKS = Math.round(48 * (TICKS_PER_HOUR / 4));
 
-/** Per 15-min tick; ≈ 0.985 per wall-hour (0.985^(1/4)). */
-const ACTIVITY_DECAY_PER_TICK = 0.99622;
+/** Per tick; 0.99622^96 on the old clock ≈ the same daily fade at 6 ticks/hour. */
+const ACTIVITY_DECAY_PER_TICK = Math.pow(0.99622, 4 / TICKS_PER_HOUR);
 const ACTIVITY_SCORE_CAP = 100;
 export const HUB_QUIET_ACTIVITY_SCORE = 8;
 const QUIET_FLOW_MULT = 0.92;

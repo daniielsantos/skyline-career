@@ -55,7 +55,7 @@ Ship: desktop installer (`npm run pack:desktop` / `release:desktop`).
 - **Aircraft profile** — fingerprint (title/ICAO) → tanks, stations, writePlan, verify, constraints MAC.  
 - **OFP load plan** — `buildOfpLoadPlan` / helpers em career-ui; density Jet-A; clamp capacidade.  
 - **SimBridge exclusive gate** — serializa probe/watch start/inject no Node (`simbridge-gate.ts`).  
-- **Economy** — ticks 15 min (`TICKS_PER_DAY=96`), hubs por país/região, NPC, fuel trucks, SQLite store. Detalhe: `.cursor/rules/career-economy-roadmap.mdc`.  
+- **Economy** — ticks 10 min (`TICKS_PER_HOUR=6`, `TICKS_PER_DAY=144`, orçamento horário igual ao antigo 15 min), hubs por país/região, NPC, fuel trucks, SQLite store. Detalhe: `.cursor/rules/career-economy-roadmap.mdc`.  
 - **Map expansion** — checklist obrigatório: `.cursor/rules/career-map-expansion.mdc`.  
 - **Bush trips** — **removed** 2026-09-03 (APIs `410`; soft hubs = normal spokes).
 - **Homologate hubs** — facility MSFS deve bater ICAO catalog e ≤25 nm.

@@ -3,6 +3,7 @@
  * Kept free of career-mission / career-ports imports (cycle break).
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import { portIdForPickupHubBound } from './career-port-corridor.js';
 import type {
   CareerEconomyWorld,
@@ -13,7 +14,7 @@ import type {
 const THROUGHPUT_WINDOW_DAYS = 7;
 
 function economyDayIndex(tick: number): number {
-  return Math.floor(Math.max(0, tick) / 96);
+  return Math.floor(Math.max(0, tick) / TICKS_PER_DAY);
 }
 
 function ensurePlayerPortConcessions(

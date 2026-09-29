@@ -4,6 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   buyPortListing,
   effectivePortBuyUnitPriceUsd,
@@ -199,7 +200,7 @@ describe('port auto-buy desk', () => {
     const second = tickPortAutoBuyOrders(state, world);
     assert.equal(second.buys, 0);
 
-    world.tick += 96;
+    world.tick += TICKS_PER_DAY;
     seedSbgrGeneralListing(world, 5_000);
     assert.equal(economyDayIndex(world.tick), order.boughtDayIndex + 1);
     const third = tickPortAutoBuyOrders(state, world);

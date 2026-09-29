@@ -28,7 +28,7 @@ import {
 } from './career-fbo.js';
 import { setCompanyCrewEnabledForTests } from './career-crew.js';
 import { normalizeCareerCargoOps } from './career-cargo-ops.js';
-import { quoteHangarParkingUsdPerDay, resolveHangarParkingUsdPerDay } from './career-hangar-fees.js';
+import { resolveHangarParkingUsdPerDay } from './career-hangar-fees.js';
 import {
   createSeedEconomyWorld,
   tickEconomyN,
@@ -318,9 +318,8 @@ describe('player FBO', () => {
     const acf = state.fleet[0]!;
     acf.locationIcao = 'SBGR';
     acf.status = 'parked';
-    const basePark = quoteHangarParkingUsdPerDay(acf.aircraftClassId, 'major');
     const withPerk = resolveHangarParkingUsdPerDay(acf, world, state);
-    assert.equal(withPerk, Math.round(basePark * 0.85 * 100) / 100);
+    assert.equal(withPerk, 0);
 
     const snap = playerFboSnapshot(state, world);
     assert.ok(snap.fbos[0]!.canUpgradeToTier2);

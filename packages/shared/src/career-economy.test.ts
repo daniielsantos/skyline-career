@@ -5340,11 +5340,11 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     const start = 1_700_000_000_000;
     world.lastBatchAtMs = start;
     world.tick = 0;
-    // +3h 20m → 13 × 15-min batches + 5m remainder
-    const threeHoursPlus = start + 3 * MS_PER_HOUR + 20 * 60 * 1000;
+    // +3h 25m → 20 × 10-min batches + 5m remainder
+    const threeHoursPlus = start + 3 * MS_PER_HOUR + 25 * 60 * 1000;
     const { advancedTicks } = ensureEconomyCaughtUp(world, threeHoursPlus);
-    assert.equal(advancedTicks, 13);
-    assert.equal(world.tick, 13);
+    assert.equal(advancedTicks, 20);
+    assert.equal(world.tick, 20);
     assert.equal(world.lastBatchAtMs, threeHoursPlus - 5 * 60 * 1000);
   });
 
@@ -5360,7 +5360,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
       { maxTicks: 1 },
     );
     assert.equal(advancedTicks, 1);
-    assert.equal(wantedTicks, 28);
+    assert.equal(wantedTicks, 7 * (MS_PER_HOUR / MS_PER_TICK));
     assert.equal(capped, true);
     assert.equal(world.tick, 1);
     assert.equal(world.lastBatchAtMs, start + MS_PER_TICK);
@@ -5382,7 +5382,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
       { maxTicks: 2 },
     );
     assert.equal(advancedTicks, 2);
-    assert.equal(wantedTicks, 28);
+    assert.equal(wantedTicks, 7 * (MS_PER_HOUR / MS_PER_TICK));
     assert.equal(capped, true);
     assert.equal(world.tick, 2);
     assert.equal(world.lastBatchAtMs, start + 2 * MS_PER_TICK);
@@ -5393,7 +5393,7 @@ describe('migrateEconomyWorld / ensureEconomyCaughtUp', () => {
     const start = 1_700_000_000_000;
     world.lastBatchAtMs = start;
     const before = world.tick;
-    const { advancedTicks } = ensureEconomyCaughtUp(world, start + 14 * 60 * 1000);
+    const { advancedTicks } = ensureEconomyCaughtUp(world, start + 9 * 60 * 1000);
     assert.equal(advancedTicks, 0);
     assert.equal(world.tick, before);
   });

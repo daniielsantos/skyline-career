@@ -1002,9 +1002,11 @@ import {
   worseWeather,
 } from './career-weather.js';
 import {
+  ECONOMY_TICK_BUDGET_SCALE,
   hoursToMs,
   MAX_CATCH_UP_TICKS,
   MS_PER_TICK,
+  takeCalibratedTickBudget,
   TICKS_PER_DAY,
 } from './career-clock.js';
 import { boardDisplayPayUsd } from './market-board-query.js';
@@ -1513,10 +1515,18 @@ function lastMileOpenLotsCap(tier: HubTier): number {
   return LAST_MILE_OPEN_LOTS_PER_ORIGIN;
 }
 
-function lastMileFormCap(tier: HubTier): number {
-  return tier === 'spoke'
-    ? LAST_MILE_MAX_FORM_PER_SPOKE_TICK
-    : LAST_MILE_MAX_FORM_PER_TICK;
+function lastMileFormCap(
+  world: object,
+  tier: HubTier,
+  originIcao: string,
+  recoveryBonus: boolean,
+): number {
+  const calibrated =
+    (tier === 'spoke'
+      ? LAST_MILE_MAX_FORM_PER_SPOKE_TICK
+      : LAST_MILE_MAX_FORM_PER_TICK) +
+    (recoveryBonus ? REGIONAL_RECOVERY_SPOKE_FORM_CAP_BONUS : 0);
+  return takeCalibratedTickBudget(world, `lastMile:${originIcao}`, calibrated);
 }
 
 type RegionalRecoverySnapshot = {
@@ -8911,7 +8921,7 @@ export function migrateEconomyWorld(
 }
 
 /**
- * Advance the world by whole batches elapsed since lastBatchAtMs (15-min ticks),
+ * Advance the world by whole batches elapsed since lastBatchAtMs (10-min ticks),
  * and settle continuous NPC ops due at nowMs. Partial batches are preserved.
  * When `maxTicks` caps the run, the wall-clock anchor advances only by the
  * simulated ticks so a later pulse can drain the remainder (no silent skip).
@@ -9109,7 +9119,7 @@ function baseConsOf(ap: AirportTerminal, commodityId: CommodityId): number {
   return ap.baseConsumption?.[commodityId] ?? ap.consumption[commodityId] ?? 0;
 }
 
-/** Day-of-year style season from tick (96 ticks ≈ 1 day). */
+/** Day-of-year style season from tick (one economy day = TICKS_PER_DAY). */
 function seasonalFactor(commodityId: CommodityId, tick: number): number {
   const day = Math.floor(tick / TICKS_PER_DAY) % 365;
   const wave = Math.sin((2 * Math.PI * day) / 365);
@@ -9301,7 +9311,7 @@ export function economyEventActiveCap(regionCount: number): number {
 
 function maybeSpawnEvents(world: CareerEconomyWorld, rng: () => number): void {
   if (!world.events) world.events = [];
-  // Drop finished events older than ~48 wall-hours (192 × 15-min ticks).
+  // Drop finished events older than ~48 wall-hours.
   world.events = world.events.filter(
     (e) => e.endsAtTick > world.tick - TICKS_PER_DAY * 2,
   );
@@ -9496,7 +9506,8 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
             noise *
             health *
             bal.production *
-            postOutageProd,
+            postOutageProd *
+            ECONOMY_TICK_BUDGET_SCALE,
         ),
       );
       const cons = Math.max(
@@ -9510,7 +9521,8 @@ function applyProductionConsumption(world: CareerEconomyWorld, rng: () => number
             (0.9 + rng() * 0.2) *
             health *
             bal.consumption *
-            postOutageCons,
+            postOutageCons *
+            ECONOMY_TICK_BUDGET_SCALE,
         ),
       );
 
@@ -11769,12 +11781,24 @@ function* formLotsFromImbalances(
       if (tier === 'spoke') cargoSpokeCount += 1;
       else if (tier === 'regional') cargoRegionalCount += 1;
     }
-    const spokeFormBudget = lastMileSkipAllSpokeFormBudget(cargoSpokeCount);
+    const spokeFormBudget = takeCalibratedTickBudget(
+      world,
+      `lastMileSkipSpoke:${countryId}`,
+      lastMileSkipAllSpokeFormBudget(cargoSpokeCount),
+    );
     const spokeVitalityCap = lastMileDeadSpokeVitalityCap(cargoSpokeCount);
-    const regionalFormBudget =
-      lastMileSkipAllRegionalFormBudget(cargoRegionalCount);
+    const regionalFormBudget = takeCalibratedTickBudget(
+      world,
+      `lastMileSkipRegional:${countryId}`,
+      lastMileSkipAllRegionalFormBudget(cargoRegionalCount),
+    );
     const regionalVitalityCap =
       lastMileDeadRegionalVitalityCap(cargoRegionalCount);
+    const majorFormBudget = takeCalibratedTickBudget(
+      world,
+      `lastMileSkipMajor:${countryId}`,
+      LAST_MILE_SKIPALL_MAJOR_FORM_BUDGET,
+    );
 
     for (const commodity of CAREER_CARGO_COMMODITIES) {
       const dryLastMile = LAST_MILE_DRY_IDS.has(commodity.id);
@@ -11906,11 +11930,12 @@ function* formLotsFromImbalances(
               ? REGIONAL_RECOVERY_MIN_VIABLE_KG
               : LAST_MILE_SKIPALL_MIN_VIABLE_KG
             : BOARD_SMALL_MIN_VIABLE_KG;
-        const formCap =
-          lastMileFormCap(origin.tier) +
-          (recoveryActive && origin.tier === 'spoke'
-            ? REGIONAL_RECOVERY_SPOKE_FORM_CAP_BONUS
-            : 0);
+        const formCap = lastMileFormCap(
+          world,
+          origin.tier,
+          origin.ap.icao,
+          recoveryActive && origin.tier === 'spoke',
+        );
         if (open >= openCap) continue;
         if (vitalityOnly) {
           if (
@@ -11927,7 +11952,7 @@ function* formLotsFromImbalances(
           }
           if (
             origin.tier === 'major' &&
-            skipAllMajorFormed >= LAST_MILE_SKIPALL_MAJOR_FORM_BUDGET
+            skipAllMajorFormed >= majorFormBudget
           ) {
             continue;
           }
@@ -11999,7 +12024,7 @@ function* formLotsFromImbalances(
             }
             if (
               origin.tier === 'major' &&
-              skipAllMajorFormed >= LAST_MILE_SKIPALL_MAJOR_FORM_BUDGET
+              skipAllMajorFormed >= majorFormBudget
             ) {
               break;
             }
@@ -12166,9 +12191,11 @@ function* formLotsFromImbalances(
       if (!pressure.skipAll && n >= softCap) continue;
 
       const vitalityOnly = pressure.skipAll;
-      const effectiveBudget = vitalityOnly
-        ? FEEDER_SKIPALL_VITALITY_BUDGET
-        : cfg.formBudget;
+      const effectiveBudget = takeCalibratedTickBudget(
+        world,
+        `feeder:${cfg.feederKind}:${vitalityOnly ? 'vital' : 'full'}:${countryId}:${commodity.id}`,
+        vitalityOnly ? FEEDER_SKIPALL_VITALITY_BUDGET : cfg.formBudget,
+      );
 
       const ranked = rankAirports(countryAirports, commodity);
       const byIcao = new Map(ranked.map((r) => [r.ap.icao, r]));
@@ -12816,7 +12843,7 @@ export function shiftEconomyWallClock(
 }
 
 /**
- * Advance n 15-minute batches. When advanceWallClock is true (default for UI +1 day /
+ * Advance n economy batches (10 min each). When advanceWallClock is true (default for UI +1 day /
  * catch-up), shifts lastBatchAtMs and uses coherent batch wall times for NPC claims.
  *
  * Instant +N (no fromBatchAtMs) rewinds wall timestamps so the previous lastBatch
@@ -12973,14 +13000,14 @@ export type EconomyTickBenchReport = {
   availableLotsAfterWarm: number;
   /** Profiled single tick after warm. */
   oneTick: TickPhaseProfile;
-  /** Profiled +1 day (96 ticks) after the one-tick sample. */
+  /** Profiled +1 day (TICKS_PER_DAY) after the one-tick sample. */
   oneDay: TickPhaseProfile;
   availableLotsAfterDay: number;
   npcFlightsInFlightAfterDay: number;
 };
 
 /**
- * In-memory timing harness: warm one day (unprofiled), then profile 1 tick + 96 ticks.
+ * In-memory timing harness: warm one day (unprofiled), then profile 1 tick + one day.
  * Does not change economy rules — only measures wall time.
  */
 export function benchEconomyTicks(opts: {
@@ -13031,7 +13058,7 @@ export function benchEconomyTicks(opts: {
 
 /**
  * Fresh seeds start at tick 0 with an empty board. Warm one batch so
- * Freights/Contracts exist on first boot without a 96-tick (+1 day) wait.
+ * Freights/Contracts exist on first boot without waiting a full economy day.
  * No-op when the world already has time or available lots.
  */
 export function ensureSeedMarketFormed(world: CareerEconomyWorld): boolean {

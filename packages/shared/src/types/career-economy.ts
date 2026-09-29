@@ -500,7 +500,7 @@ export interface RegionalRecoveryState {
 export interface CareerEconomyWorld {
   version: 3;
   seed: string;
-  /** Completed hourly economy batches. */
+  /** Completed economy batches. */
   tick: number;
   /**
    * Wall-clock when the last hourly batch completed (or was anchored).

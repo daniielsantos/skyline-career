@@ -1,16 +1,27 @@
 /**
- * Career economy clock: 15-minute batches on a 24h wall-clock day.
+ * Career economy clock: 10-minute batches on a 24h wall-clock day.
  * Physics (flight / rest / MX / fuel haul) uses real hours via MS_PER_HOUR.
+ * Per-tick budgets stay calibrated at 4 ticks/hour and are scaled at apply time.
  */
 
 /** Real wall-clock hour in ms (physics). */
 export const MS_PER_HOUR = 3_600_000;
-/** Economy batches per wall-clock hour. */
-export const TICKS_PER_HOUR = 4;
-/** Batches per ~24h career day (4 × 24). */
-export const TICKS_PER_DAY = 96;
-/** 1 economy tick = 15 real minutes. */
+/** Economy batches per wall-clock hour. 6 × 10 min. */
+export const TICKS_PER_HOUR = 6;
+/**
+ * Batches per 24h career day. Kept as 24 × ticks/hour so a day stays 24 wall hours.
+ * A fresh world is required. Saved tick numbers from the 15-minute clock are not rewritten.
+ */
+export const TICKS_PER_DAY = 24 * TICKS_PER_HOUR;
+/** 1 economy tick = 10 real minutes. */
 export const MS_PER_TICK = MS_PER_HOUR / TICKS_PER_HOUR;
+/**
+ * Per-tick kg, XP and form-lot caps in data were calibrated at 4 ticks/hour.
+ * Multiply a calibrated per-tick budget by this so the hour stays the same.
+ */
+export const ECONOMY_BUDGET_TICKS_PER_HOUR = 4;
+export const ECONOMY_TICK_BUDGET_SCALE =
+  ECONOMY_BUDGET_TICKS_PER_HOUR / TICKS_PER_HOUR;
 /** Cap catch-up per load so a long offline stretch stays responsive (14 days). */
 export const MAX_CATCH_UP_TICKS = TICKS_PER_DAY * 14;
 /**
@@ -43,7 +54,7 @@ export const CATCH_UP_LOCK_CHUNK_TICKS = 2;
 
 /**
  * Whole economy batches still owed vs wall clock (0 when within the current
- * 15-minute fraction). Used for catch-up UX / drain progress.
+ * 10-minute fraction). Used for catch-up UX / drain progress.
  */
 export function economyTicksBehind(
   lastBatchAtMs: number,
@@ -66,4 +77,25 @@ export function msToHours(ms: number): number {
 export function hoursToTicks(hours: number): number {
   if (!(hours > 0) || !Number.isFinite(hours)) return 0;
   return Math.max(1, Math.ceil(hours * TICKS_PER_HOUR));
+}
+
+const tickBudgetRemainder = new WeakMap<object, Map<string, number>>();
+
+/**
+ * Whole units of a per-tick cap this tick.
+ * `calibrated` is the count tuned at 4 ticks/hour. Every tick takes its
+ * 4/6 share; the fraction carries so the hour matches (2 per 15 min stays
+ * 8 per hour). A tick is never skipped.
+ */
+export function takeCalibratedTickBudget(
+  world: object,
+  key: string,
+  calibrated: number,
+): number {
+  const bag = tickBudgetRemainder.get(world) ?? new Map<string, number>();
+  tickBudgetRemainder.set(world, bag);
+  const next = (bag.get(key) ?? 0) + calibrated * ECONOMY_TICK_BUDGET_SCALE;
+  const whole = Math.floor(next + 1e-9);
+  bag.set(key, next - whole);
+  return whole;
 }

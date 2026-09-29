@@ -3,6 +3,7 @@
  * Operator buffs listings; restock is world-driven (no marketplace bids).
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import { appendLedgerMarker, applyWalletDelta } from './career-ledger.js';
 import { liquidateConcessionJetA } from './career-port-jet-a.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
@@ -41,10 +42,10 @@ export const PORT_INVENTORY_CAP_KG: Record<CommodityId, number> = {
   mro_parts: 0,
 };
 
-/** Passive restock toward cap per economy day (96 ticks). */
+/** Passive restock toward cap per economy day. */
 export const PORT_RESTOCK_FRAC_PER_DAY = 0.08;
 /** One discharge per economy day — cargo is cap × frac, computed on arrival. */
-export const PORT_RESTOCK_INTERVAL_TICKS = 96;
+export const PORT_RESTOCK_INTERVAL_TICKS = TICKS_PER_DAY;
 
 export const PORT_CONCESSION_CLAIM_USD = 175_000;
 /** Lease fee per economy day while concession is held (P1, idle). */
@@ -52,7 +53,7 @@ export const PORT_CONCESSION_LEASE_USD_PER_DAY = 2_500;
 /** Initial / renew window length in economy days. */
 export const PORT_CONCESSION_LEASE_DAYS = 7;
 export const PORT_CONCESSION_LEASE_TICKS =
-  PORT_CONCESSION_LEASE_DAYS * 96;
+  PORT_CONCESSION_LEASE_DAYS * TICKS_PER_DAY;
 /** WH lifetime shipped kg gate at a pickup hub of the port. */
 export const PORT_CONCESSION_SHIPPED_KG = 25_000;
 
@@ -595,7 +596,7 @@ export function portStockPriceFactor(
 const THROUGHPUT_WINDOW_DAYS = 7;
 
 function economyDayIndex(tick: number): number {
-  return Math.floor(Math.max(0, tick) / 96);
+  return Math.floor(Math.max(0, tick) / TICKS_PER_DAY);
 }
 
 export function alignConcessionThroughputWindow(
@@ -968,7 +969,7 @@ export function renewPortConcession(
     note: `Renew Port FBO lease ${days}d · ${port.name}`,
   });
   const base = Math.max(conc.leasePaidThroughTick, world.tick);
-  conc.leasePaidThroughTick = base + days * 96;
+  conc.leasePaidThroughTick = base + days * TICKS_PER_DAY;
   syncWorldPortConcessions(world, state, { companyId });
   return conc;
 }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   __testApplyNpcDemand,
   applyAircraftHoursAfterMission,
@@ -343,8 +344,8 @@ describe('aircraft market', () => {
     aircraft.leaseOverdue = true;
     aircraft.lease = {
       monthlyUsd: 1_000,
-      nextDueTick: world.tick - 96 * 7 * 2,
-      termEndsTick: world.tick + 96 * 60,
+      nextDueTick: world.tick - TICKS_PER_DAY * 7 * 2,
+      termEndsTick: world.tick + TICKS_PER_DAY * 60,
       buyoutUsd: 50_000,
       listingId: 'acfl_test',
     };
@@ -365,8 +366,8 @@ describe('aircraft market', () => {
     aircraft.leaseOverdue = true;
     aircraft.lease = {
       monthlyUsd: 2_000,
-      nextDueTick: world.tick - 96 * 7,
-      termEndsTick: world.tick + 96 * 60,
+      nextDueTick: world.tick - TICKS_PER_DAY * 7,
+      termEndsTick: world.tick + TICKS_PER_DAY * 60,
       buyoutUsd: 80_000,
       listingId: 'acfl_catch',
     };
@@ -383,7 +384,7 @@ describe('aircraft market', () => {
     assert.equal(result.paidUsd, 4_000);
     assert.equal(state.walletUsd, 1_000);
     assert.equal(aircraft.leaseOverdue, false);
-    assert.equal(lease.nextDueTick, beforeDue + 96 * 7 * 2);
+    assert.equal(lease.nextDueTick, beforeDue + TICKS_PER_DAY * 7 * 2);
     assert.ok(world.tick < lease.nextDueTick);
   });
 
@@ -619,7 +620,7 @@ describe('aircraft market', () => {
         condition: 'good',
         hoursAirframe: 0,
         hoursEngine: 0,
-        expiresAtTick: world.tick + 96 * 7,
+        expiresAtTick: world.tick + TICKS_PER_DAY * 7,
         status: 'available',
         source: 'player_lease',
         sellerAircraftId: 'acf_greedy',
@@ -629,7 +630,7 @@ describe('aircraft market', () => {
     state.aircraftMarketDay = economyDayIndex(world.tick);
     let taken = 0;
     for (let d = 0; d < 30 && taken === 0; d++) {
-      world.tick += 96;
+      world.tick += TICKS_PER_DAY;
       taken = __testApplyNpcDemand(state, world, economyDayIndex(world.tick));
     }
     assert.equal(taken, 0);
@@ -658,12 +659,12 @@ describe('aircraft market', () => {
     });
 
     const lessee = world.npcs.find((n) => !n.leasedPlayerAircraftId) ?? world.npcs[0]!;
-    const startedAtTick = world.tick - 96 * 14;
+    const startedAtTick = world.tick - TICKS_PER_DAY * 14;
     starter.status = 'leased_out';
     starter.leaseOut = {
       monthlyUsd: 500,
-      nextDueTick: world.tick - 96 * 7,
-      termEndsTick: world.tick + 96 * 60,
+      nextDueTick: world.tick - TICKS_PER_DAY * 7,
+      termEndsTick: world.tick + TICKS_PER_DAY * 60,
       depositUsd: 2000,
       listingId: 'acfl_fake',
       lesseeNpcId: lessee.id,
@@ -688,7 +689,7 @@ describe('aircraft market', () => {
         condition: 'good',
         hoursAirframe: 0,
         hoursEngine: 0,
-        expiresAtTick: world.tick + 96 * 7,
+        expiresAtTick: world.tick + TICKS_PER_DAY * 7,
         status: 'available',
         source: 'player_lease',
         sellerAircraftId: 'acf_spare_wear',
@@ -768,7 +769,7 @@ describe('aircraft market', () => {
     // Min 1 day on board, then retry until NPC takes (cheap ask).
     let taken = 0;
     for (let d = 0; d < 40 && taken === 0; d++) {
-      world.tick += 96; // +1 economy day
+      world.tick += TICKS_PER_DAY; // +1 economy day
       taken = __testApplyNpcDemand(state, world, economyDayIndex(world.tick));
     }
     assert.ok(taken >= 1, 'expected NPC to buy the cheap player sale');
@@ -939,7 +940,7 @@ describe('aircraft market', () => {
         condition: 'good',
         hoursAirframe: 0,
         hoursEngine: 0,
-        expiresAtTick: world.tick + 96 * 7,
+        expiresAtTick: world.tick + TICKS_PER_DAY * 7,
         status: 'available',
         source: 'player_lease',
         sellerAircraftId: 'acf_lease_spare',

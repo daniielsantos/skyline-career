@@ -295,7 +295,7 @@ export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3 | 4, number> = {
   4: (TICKS_PER_DAY * 5) / 4,
 };
 
-const DEMAND_TTL_TICKS = 96 * 2.5; // ~2.5 economy days
+const DEMAND_TTL_TICKS = TICKS_PER_DAY * 2.5; // ~2.5 economy days
 
 function money(n: number): number {
   return Math.round(n * 100) / 100;
@@ -1391,7 +1391,7 @@ export function ensureDemandOrders(
 
   if (openGlobal() >= boardCap) {
     world.demandOrders = orders.filter(
-      (o) => o.status === 'open' || o.expiresAtTick > world.tick - 96,
+      (o) => o.status === 'open' || o.expiresAtTick > world.tick - TICKS_PER_DAY,
     );
     return world.demandOrders;
   }
@@ -1561,7 +1561,7 @@ export function ensureDemandOrders(
   }
 
   world.demandOrders = orders.filter(
-    (o) => o.status === 'open' || o.expiresAtTick > world.tick - 96,
+    (o) => o.status === 'open' || o.expiresAtTick > world.tick - TICKS_PER_DAY,
   );
   return world.demandOrders;
 }

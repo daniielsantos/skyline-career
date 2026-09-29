@@ -4,6 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   abandonPortPickup,
   buyPortListing,
@@ -59,7 +60,7 @@ describe('career ports', () => {
       },
     ];
     const fromTick = world.tick;
-    const toTick = world.tick + 96; // 1 economy day
+    const toTick = world.tick + TICKS_PER_DAY; // 1 economy day
     const fees = settlePortYardHoldFees(state, { fromTick, toTick });
     assert.equal(fees.daysCharged, 1);
     assert.ok(fees.debitUsd > 0);
@@ -72,7 +73,7 @@ describe('career ports', () => {
 
   it('exposes yard hold $/day and held days on port snapshot', () => {
     const world = createSeedEconomyWorld({ seed: 'ports-yard-ui' });
-    world.tick = 96 * 5;
+    world.tick = TICKS_PER_DAY * 5;
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
       pilotName: 'YardUi',
       airframeTypeId: 'asobo-c172sp-cargo',
@@ -85,7 +86,7 @@ describe('career ports', () => {
         commodityId: 'general',
         kg: 2_000,
         avgCostUsdPerKg: 1,
-        purchasedAtTick: world.tick - 96 * 3,
+        purchasedAtTick: world.tick - TICKS_PER_DAY * 3,
       },
     ];
     const snap = portSnapshot(world, state);

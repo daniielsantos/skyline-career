@@ -4,6 +4,7 @@
  * collected at pickup hubs.
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   airportByIcao,
   CAREER_HUB_COORDS,
@@ -2205,7 +2206,7 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
         unitPriceUsd: quoted.unitPriceUsd,
         allocatedHubIcao: hub,
         arrivedAtTick: world.tick,
-        expiresAtTick: world.tick + 96 * 3, // ~3 economy days
+        expiresAtTick: world.tick + TICKS_PER_DAY * 3, // ~3 economy days
         status: 'open',
       });
       need -= 1;

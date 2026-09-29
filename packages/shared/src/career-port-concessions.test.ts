@@ -4,6 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   buyPortListing,
   ensurePortListings,
@@ -101,7 +102,7 @@ describe('port inventory', () => {
     );
 
     const mid = getPortInventoryStock(world, 'BRSSZ', 'general');
-    world.tick += 96; // 1 economy day
+    world.tick += TICKS_PER_DAY; // 1 economy day
     ensurePortInventoryRestock(world);
     assert.ok(getPortInventoryStock(world, 'BRSSZ', 'general') > mid);
   });
@@ -254,7 +255,7 @@ describe('port concessions', () => {
     renewPortConcession(state, world, { portId: 'BRSSZ', days: 7 });
     assert.equal(
       state.playerPortConcessions![0]!.leasePaidThroughTick,
-      through + 7 * 96,
+      through + 7 * TICKS_PER_DAY,
     );
   });
 
@@ -329,7 +330,7 @@ describe('port concessions', () => {
     assert.equal(idleLease, PORT_CONCESSION_LEASE_USD_PER_DAY);
 
     conc.lifetimeThroughputKg = PORT_P2_THROUGHPUT_KG;
-    conc.throughputWindowDay = Math.floor(world.tick / 96);
+    conc.throughputWindowDay = Math.floor(world.tick / TICKS_PER_DAY);
     conc.throughputWindowKg = [PORT_P2_THROUGHPUT_KG, 0, 0, 0, 0, 0, 0];
     const busyLease = concessionLeaseUsdPerDay(conc, world.tick);
     assert.ok(busyLease > idleLease);
@@ -605,7 +606,7 @@ describe('port concessions', () => {
 
   it('credits the 7d window when a zero week was already saved', () => {
     const { world, state } = missionsAtSantos();
-    const day = Math.floor(world.tick / 96);
+    const day = Math.floor(world.tick / TICKS_PER_DAY);
     state.playerPortConcessions = [
       {
         portId: 'USMIA',

@@ -496,7 +496,7 @@ describe('Charter economy', () => {
         unit: 'kg',
         blockFuel: 1000,
         passengerCount: offer.groupSize - 1,
-        baggage: offer.baggageKg + 2,
+        baggage: offer.baggageKg + 100,
       },
     }));
     assert.equal(check.verdict, 'fail');

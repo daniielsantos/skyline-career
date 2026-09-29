@@ -44,7 +44,7 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 ## Em poucas linhas
 
 - **Economy events soft-cap (2026-09-20):** teto ativo escala com regioes (ceil(regions/10), min 4 / max 24); spawn base ~7%/h com catch-up leve se <50% cheio; prefere regiao sem evento; **multiplicadores inalterados** (sem Dry).
-- Tick = **15 min** wall-clock (`TICKS_PER_DAY = 96`). Física de voo/MX em horas reais.
+- Tick = **10 min** wall-clock (`TICKS_PER_HOUR = 6`, `TICKS_PER_DAY = 144`). Cada tick roda a passagem inteira com pedaço `4/6` do calibrado em 4 ticks/hora. Física de voo/MX em horas reais. Base antiga não é migrada — mundo nasce zerado.
 - **MX fuel settle-only (2026-09-01):** wear &lt;90% → Watch **accrue** excess burn in flight (no sim writes); settle debita do tank career (`settledMxFuelDrainKg`). Inject e clássico iguais. Offline: `estimateMxFuelDrainKgForSettle`.
 - **MX burn banner copy (2026-09-23):** Dispatch alert encurtado → `MX burn +N% · cond N% — excess at settle` (essay no `title` hover). Finding `MX_FUEL_BURN` alinhado.
 - **MX burn banner quieter (2026-09-26):** sintoma = tarja azul full-width no En route, entre OFP e Cargo. Causa = a nota usa `banner warn`. Fix = `.banner.warn.mx-fuel-burn-alert` fica linha muted, sem fundo nem borda. Hover segue com o detalhe.

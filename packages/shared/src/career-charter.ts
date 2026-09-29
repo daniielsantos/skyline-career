@@ -10,7 +10,7 @@
  * airports get attempts without abandoning pool heat.
  */
 
-import { TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
+import { takeCalibratedTickBudget, TICKS_PER_DAY, TICKS_PER_HOUR } from './career-clock.js';
 import { countryIdFromRegion } from './career-partition.js';
 import {
   ensureDynamicInternationalLanes,
@@ -56,7 +56,8 @@ export const CHARTER_BOARD_MAX = 4_000;
  * Steady-state formation (freight-like trickle).
  * Old 48/tick made same-tick death waves → board full of identical Expires.
  * 2026-09-21: 10→20 (catch-up 40 / warm 48) to deepen shelf without a dump.
- * Mean life ~19h ≈ 76 ticks → 20×76 ≈ 1.5k equilibrium before catch-up.
+ * Mean life ~19h is about 114 ticks at 6/hour. The 20/tick cap is the old
+ * 15-min count; each tick takes a 4/6 share so the hour stays the same.
  */
 export const CHARTER_FORM_QUOTA_PER_TICK = 20;
 /** Soft catch-up while live board is under half of target (still a trickle). */
@@ -660,13 +661,17 @@ export function formCharterOffersForTick(
   const target = boardTarget(world);
   if (available >= CHARTER_BOARD_MAX || available >= target) return 0;
 
-  const quota =
+  const calibrated =
     opts.quota ??
     (available < CHARTER_BOARD_MIN
       ? CHARTER_WARM_QUOTA_PER_TICK
       : available < Math.floor(target * 0.5)
         ? CHARTER_CATCH_UP_QUOTA_PER_TICK
         : CHARTER_FORM_QUOTA_PER_TICK);
+  const quota =
+    opts.quota != null
+      ? calibrated
+      : takeCalibratedTickBudget(world, 'charterForm', calibrated);
   const room = Math.min(quota, CHARTER_BOARD_MAX - available, target - available);
   if (room <= 0) return 0;
 

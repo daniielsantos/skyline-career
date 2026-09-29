@@ -8,7 +8,7 @@ alwaysApply: false
 
 Use this whenever adding airports, regions, or a **new country/territory**. Do **not** invent ad-hoc one-offs.
 
-Clock: `1 tick = 15 min` wall-clock (`TICKS_PER_DAY = 96`). Physics durations stay in real hours via `MS_PER_HOUR`.
+Clock: `1 tick = 10 min` wall-clock (`TICKS_PER_HOUR = 6`, `TICKS_PER_DAY = 144`). Hourly economy matches the old 15-min chunk via `ECONOMY_TICK_BUDGET_SCALE`. Physics durations stay in real hours via `MS_PER_HOUR`.
 
 ## New country / territory (required first)
 

@@ -6,6 +6,7 @@
  * Wing tanks stay the trip fuel. Settle still credits fuelHaul.kg.
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import { airportByIcao, routeDistanceNm } from './career-economy.js';
 import {
   assignAircraftToMission,
@@ -176,7 +177,7 @@ export function startPortJetAReposition(
   }
   const classDef = getAircraftClass(aircraft.aircraftClassId);
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
-  const deadlineTick = world.tick + 96 * 3;
+  const deadlineTick = world.tick + TICKS_PER_DAY * 3;
   const id = nextMissionId(world.tick);
   assignAircraftToMission(state, aircraft.id, id, origin, {
     actorAccountId: opts.actorAccountId,
@@ -389,7 +390,7 @@ export function acceptPortJetAHaul(
   }
   const classDef = getAircraftClass(aircraft.aircraftClassId);
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
-  const deadlineTick = world.tick + 96 * 3;
+  const deadlineTick = world.tick + TICKS_PER_DAY * 3;
   const id = nextMissionId(world.tick);
   assignAircraftToMission(state, aircraft.id, id, origin, {
     actorAccountId: opts.actorAccountId,

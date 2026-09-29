@@ -4,6 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   abandonWarehouseStock,
   buyWarehouseAtPickupHub,
@@ -791,7 +792,7 @@ describe('career warehouse + demand', () => {
     const before = state.walletUsd;
     const fees = settleWarehouseStorageFees(state, {
       fromTick: world.tick,
-      toTick: world.tick + 96,
+      toTick: world.tick + TICKS_PER_DAY,
     });
     assert.ok(fees.debitUsd > 0);
     assert.equal(state.walletUsd, before - fees.debitUsd);

@@ -10,6 +10,7 @@
  * desk. The fee is for the flight. The Jet-A itself is a pass-through.
  */
 
+import { TICKS_PER_DAY } from './career-clock.js';
 import { recordFuelUpliftActivity } from './career-hub-level.js';
 import {
   airportByIcao,
@@ -67,7 +68,7 @@ const COVER_FILL = 0.4;
 /** A field counts as surplus for pickup. */
 const SURPLUS_FILL = 0.7;
 
-const HAUL_TTL_TICKS = 96 * 3;
+const HAUL_TTL_TICKS = TICKS_PER_DAY * 3;
 
 const HAUL_MIN_NM = 80;
 const HAUL_MAX_NM = 2_200;
@@ -639,7 +640,7 @@ export function refundPortJetAHaul(
     order.remainingKg = haul.kg;
     order.wantedKg = Math.max(order.wantedKg, haul.kg);
     if (order.expiresAtTick <= world.tick) {
-      order.expiresAtTick = world.tick + 96;
+      order.expiresAtTick = world.tick + TICKS_PER_DAY;
     }
   }
 }

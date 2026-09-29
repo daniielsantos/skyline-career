@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createSeedEconomyWorld, hubTierOf } from './career-economy.js';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   isHangarParkingBillable,
   quoteHangarParkingUsdPerDay,
@@ -87,7 +88,7 @@ describe('hangar parking fees', () => {
     );
     const result = settleHangarParkingFees(state, world, {
       fromTick: 0,
-      toTick: 192, // 2 career days at 96 ticks/day
+      toTick: TICKS_PER_DAY * 2, // 2 career days
     });
 
     assert.equal(result.daysCharged, 2);
@@ -114,7 +115,7 @@ describe('hangar parking fees', () => {
 
     const result = settleHangarParkingFees(state, world, {
       fromTick: 0,
-      toTick: 96, // 1 career day
+      toTick: TICKS_PER_DAY, // 1 career day
     });
 
     assert.ok(result.requestedUsd > 50);
@@ -177,7 +178,7 @@ describe('hangar parking fees', () => {
 
     const result = settleHangarParkingFees(state, world, {
       fromTick: 0,
-      toTick: 96,
+      toTick: TICKS_PER_DAY,
     });
 
     assert.equal(result.daysCharged, 1);

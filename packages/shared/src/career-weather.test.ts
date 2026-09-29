@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createSeedEconomyWorld, tickEconomyN } from './career-economy.js';
+import { TICKS_PER_DAY } from './career-clock.js';
 import {
   economyDayIndex,
   listRegionalWeather,
@@ -23,7 +24,7 @@ describe('regional weather index', () => {
     assert.equal(a, regionalWeatherIndex({ seed: 'wx-det', tick: 48 }, 'BR-SE'));
     // Same sim-day keeps weather; next day may differ.
     assert.equal(c, a);
-    const nextDay = regionalWeatherIndex(world, 'BR-SE', 72);
+    const nextDay = regionalWeatherIndex(world, 'BR-SE', 48 + TICKS_PER_DAY);
     assert.ok(['fair', 'marginal', 'poor'].includes(nextDay));
   });
 

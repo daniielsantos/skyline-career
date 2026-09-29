@@ -1379,6 +1379,7 @@ async function loadEconomyUnlocked(opts?: {
   let advancedTicks: number;
   let settledFlights = 0;
   let dirty: boolean;
+  let arrivalOnly = false;
   const timing = opts?.catchUpTiming;
   const deferPersist = opts?.deferPersist === true;
 
@@ -1409,11 +1410,17 @@ async function loadEconomyUnlocked(opts?: {
     caught = coop.world;
     advancedTicks = coop.advancedTicks;
     settledFlights = coop.settledFlights;
+    const seeded = ensureSeedMarketFormed(caught);
     dirty =
       loaded.dirty ||
       coop.advancedTicks > 0 ||
       coop.settledFlights > 0 ||
-      ensureSeedMarketFormed(caught);
+      seeded;
+    arrivalOnly =
+      settledFlights > 0 &&
+      advancedTicks === 0 &&
+      !loaded.dirty &&
+      !seeded;
   } else {
     const loadOpts = opts?.skipCatchUp
       ? { maxCatchUpTicks: 0 }
@@ -1444,6 +1451,7 @@ async function loadEconomyUnlocked(opts?: {
     syncHomeCountryFromHub(caught, missions.homeHubIcao)
   ) {
     needsSave = true;
+    arrivalOnly = false;
   }
   if (needsSave) {
     await timedSave(() => activeStore.saveEconomy(caught));
@@ -1506,8 +1514,13 @@ async function loadEconomyUnlocked(opts?: {
     }
   }
   if (timing) {
+    const concessionDirty = concessionHeal !== 'none';
+    if (concessionDirty) arrivalOnly = false;
     timing.economyDirty =
-      timing.economyDirty || needsSave || concessionHeal !== 'none';
+      timing.economyDirty || needsSave || concessionDirty;
+    if ((needsSave || concessionDirty) && !arrivalOnly) {
+      timing.needsFullPersist = true;
+    }
     timing.realAdvancedTicks += advancedTicks;
     timing.settledFlights += settledFlights;
   }
@@ -2516,6 +2529,9 @@ async function withCareerWrite<T>(
         (repaired.repairedLots > 0 || orphans.length > 0 || stale.length > 0)
       ) {
         opts.catchUpTiming.economyDirty = true;
+        if (orphans.length > 0 || stale.length > 0) {
+          opts.catchUpTiming.needsFullPersist = true;
+        }
       }
     }
     const result = await fn(world, missions);
@@ -3683,7 +3699,7 @@ export function createCareerApiServer(port = 8787) {
           timing.settleMs = performance.now() - settleStarted;
           return timing;
         },
-        persistPulseSnapshot: async () => {
+        persistPulseSnapshot: async (pulseSave) => {
           const timing = emptyPulseChunkTiming();
           const queuedAt = performance.now();
           let snapshot: CareerEconomyWorld | undefined;
@@ -3696,9 +3712,17 @@ export function createCareerApiServer(port = 8787) {
           });
           if (!snapshot || !store) return timing;
           const t0 = performance.now();
-          await store.saveEconomy(snapshot, { applyToRam: false });
+          const arrivalOnly = pulseSave?.arrivalOnly === true;
+          let usedArrival = false;
+          if (arrivalOnly && typeof store.saveArrivalPulse === 'function') {
+            usedArrival = await store.saveArrivalPulse(snapshot);
+          }
+          if (!usedArrival) {
+            await store.saveEconomy(snapshot, { applyToRam: false });
+          }
           await store.flushDirtyCommandLots?.();
           timing.saveMs = performance.now() - t0;
+          timing.saveSlice = usedArrival ? 'arrival' : 'full';
           return timing;
         },
         applyCompanySessionSettlement: async ({ fromTick, toTick }) => {

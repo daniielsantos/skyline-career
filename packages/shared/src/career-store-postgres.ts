@@ -109,7 +109,9 @@ import {
   hydrateEconomyFromPg,
   hydrateMissionsFromPg,
   isPgEconomyMiscEmpty,
+  persistArrivalPulseToPg,
   persistEconomyTablesToPg,
+  planAirportSync,
   planLotSync,
   persistAircraftPoolToPg,
   claimAircraftInstanceInPg,
@@ -506,6 +508,8 @@ export class PostgresCareerStore implements CareerStore {
   private dirtyCommandLotIds = new Set<string>();
   /** Previous pulse's retained-lot signatures. Null forces a full lots sync. */
   private lotSyncBaseline: Map<string, string> | null = null;
+  /** Previous pulse's airport hub + stock signatures. Null forces a full planet save. */
+  private airportSyncBaseline: Map<string, string> | null = null;
   /** Pulse saves since boot. Every Nth one rewrites lots so a missed column self-heals. */
   private lotPulseSaves = 0;
   private static readonly LOT_PULSE_FULL_SYNC_EVERY = 16;
@@ -2180,6 +2184,7 @@ export class PostgresCareerStore implements CareerStore {
     const applyToRam = opts?.applyToRam !== false;
     const pulseSnapshot = !applyToRam;
     let nextLotBaseline: Map<string, string> | null = null;
+    let nextAirportBaseline: Map<string, string> | null = null;
     let lotDelta: { upsertIds: string[]; deleteIds: string[] } | null = null;
     if (pulseSnapshot) {
       this.lotPulseSaves += 1;
@@ -2189,6 +2194,10 @@ export class PostgresCareerStore implements CareerStore {
       const plan = planLotSync(full ? null : this.lotSyncBaseline, toSave);
       lotDelta = plan.delta;
       nextLotBaseline = plan.next;
+      nextAirportBaseline = planAirportSync(
+        full ? null : this.airportSyncBaseline,
+        toSave.airports,
+      ).next;
     }
     await this.persistRevisioned(
       (expected) =>
@@ -2206,6 +2215,7 @@ export class PostgresCareerStore implements CareerStore {
           this.ram = toSave;
           world.pendingHubEconomySamples = undefined;
           this.lotSyncBaseline = null;
+          this.airportSyncBaseline = null;
         } else {
           // Pulse snapshot: keep live RAM (may include newer command slices).
           world.pendingHubEconomySamples = undefined;
@@ -2215,9 +2225,72 @@ export class PostgresCareerStore implements CareerStore {
             this.ram.lastSyncedAtMs = toSave.lastSyncedAtMs;
           }
           if (nextLotBaseline) this.lotSyncBaseline = nextLotBaseline;
+          if (nextAirportBaseline) this.airportSyncBaseline = nextAirportBaseline;
         }
       },
     );
+  }
+
+  /**
+   * Quiet landing pulse. Returns false when the slice is not safe (no
+   * baseline, hub-day samples, or an airport left the catalog) so the caller
+   * writes the whole planet instead. Every 16th save realigns the lots table
+   * inside this slice.
+   */
+  async saveArrivalPulse(world: CareerEconomyWorld): Promise<boolean> {
+    await this.ready;
+    const toSave = migrateEconomyWorld(world);
+    toSave.lastBatchAtMs = world.lastBatchAtMs;
+    toSave.lastSyncedAtMs = world.lastBatchAtMs;
+    if (
+      (!toSave.pendingHubEconomySamples ||
+        toSave.pendingHubEconomySamples.length === 0) &&
+      world.pendingHubEconomySamples?.length
+    ) {
+      toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
+    }
+    ensureHomeCountryId(toSave);
+    if (this.lotSyncBaseline == null || this.airportSyncBaseline == null) {
+      return false;
+    }
+    const nextPulse = this.lotPulseSaves + 1;
+    const fullLotSync =
+      nextPulse % PostgresCareerStore.LOT_PULSE_FULL_SYNC_EVERY === 0;
+    const airportPlan = planAirportSync(this.airportSyncBaseline, toSave.airports);
+    if (
+      airportPlan.icaos == null ||
+      (toSave.pendingHubEconomySamples?.length ?? 0) > 0
+    ) {
+      return false;
+    }
+    const lotPlan = planLotSync(
+      fullLotSync ? null : this.lotSyncBaseline,
+      toSave,
+    );
+    if (!fullLotSync && !lotPlan.delta) return false;
+    const lotDelta = fullLotSync ? null : lotPlan.delta;
+    const airportIcaos = airportPlan.icaos;
+    await this.persistRevisioned(
+      () =>
+        persistArrivalPulseToPg(
+          this.pool,
+          toSave,
+          { lotDelta, airportIcaos },
+          LOCAL_WORLD_ID,
+        ),
+      () => {
+        world.pendingHubEconomySamples = undefined;
+        if (this.ram) {
+          this.ram.tick = toSave.tick;
+          this.ram.lastBatchAtMs = toSave.lastBatchAtMs;
+          this.ram.lastSyncedAtMs = toSave.lastSyncedAtMs;
+        }
+        this.lotSyncBaseline = lotPlan.next;
+        this.airportSyncBaseline = airportPlan.next;
+        this.lotPulseSaves = nextPulse;
+      },
+    );
+    return true;
   }
 
   readAirportInventory(icao: string): AirportInventorySnapshot | null {
@@ -2484,6 +2557,7 @@ export class PostgresCareerStore implements CareerStore {
         this.ram = toSave;
         world.pendingHubEconomySamples = undefined;
         this.lotSyncBaseline = null;
+        this.airportSyncBaseline = null;
       },
     );
   }

@@ -278,6 +278,11 @@ export interface CareerStore {
     },
   ): Promise<void>;
   /**
+   * Quiet NPC / fuel-haul landing. Postgres writes lots, touched airports, and
+   * the NPC/fuel tables. Returns false when the caller must save the planet.
+   */
+  saveArrivalPulse?(world: CareerEconomyWorld): Promise<boolean>;
+  /**
    * After an off-lock pulse snapshot save: re-UPSERT lots touched by commands
    * while the snapshot was writing (PG only).
    */

@@ -899,6 +899,73 @@ export function planLotSync(
 }
 
 /**
+ * Hub row + every stock pile, in the same order `airportTableRows` writes.
+ * A matching signature means the arrival save can skip that airport.
+ */
+export function airportPulseSignature(ap: AirportTerminal): string {
+  const icao = String(ap.icao ?? '')
+    .trim()
+    .toUpperCase();
+  const parts: Array<string | number | boolean> = [
+    icao,
+    ap.name ?? icao,
+    ap.region ?? '',
+    countryIdFromRegion(ap.region ?? '') || '',
+    ap.hubTier ?? '',
+    Boolean(ap.bush),
+    Boolean(ap.bushTripOnly),
+    sqlNum(ap.lat),
+    sqlNum(ap.lon),
+    sqlNum(ap.level, 1),
+    sqlNum(ap.levelXp),
+    sqlNum(ap.levelCurveVersion),
+    sqlNum(ap.activityScore),
+    sqlNum(ap.lastActivityTick),
+  ];
+  for (const id of STOCK_COMMODITY_IDS) {
+    const pile = ap.inventory?.[id];
+    parts.push(
+      id,
+      sqlNum(pile?.stockKg),
+      sqlNum(pile?.capacityKg),
+      sqlNum(ap.baseProduction?.[id]),
+      sqlNum(ap.baseConsumption?.[id]),
+      sqlNum(ap.production?.[id]),
+      sqlNum(ap.consumption?.[id]),
+    );
+  }
+  return parts.join('\u001f');
+}
+
+/**
+ * Diff airport hub + stock rows against the previous pulse.
+ * `icaos: null` means the caller must rewrite the planet (no baseline, or an
+ * airport disappeared). An empty list means no airport row changed.
+ */
+export function planAirportSync(
+  previous: ReadonlyMap<string, string> | null,
+  airports: readonly AirportTerminal[] | undefined,
+): { icaos: string[] | null; next: Map<string, string> } {
+  const next = new Map<string, string>();
+  for (const ap of airports ?? []) {
+    const icao = String(ap.icao ?? '')
+      .trim()
+      .toUpperCase();
+    if (!icao) continue;
+    next.set(icao, airportPulseSignature(ap));
+  }
+  if (!previous) return { icaos: null, next };
+  for (const icao of previous.keys()) {
+    if (!next.has(icao)) return { icaos: null, next };
+  }
+  const icaos: string[] = [];
+  for (const [icao, signature] of next) {
+    if (previous.get(icao) !== signature) icaos.push(icao);
+  }
+  return { icaos, next };
+}
+
+/**
  * Sync RAM retained lots → PG without full wipe. Deletes orphans / dead rows
  * not in `lotRows`, then UPSERTs (skips no-op updates via IS DISTINCT FROM).
  * With `delta`, only those ids are deleted or upserted.
@@ -3188,6 +3255,177 @@ export async function persistEconomyTablesToPg(
       );
     }
     await syncCharterOffersTableToPg(client, wid, charterOfferRows);
+    const revision = await client.query(
+      `SELECT revision FROM economy_meta WHERE world_id = $1`,
+      [wid],
+    );
+    return revisionBigInt(revision.rows[0]?.revision);
+  });
+}
+
+/**
+ * Quiet pulse after an NPC or fuel-haul landing. Writes the clock, the lots
+ * that changed, the airports whose stock or hub XP changed, and the NPC /
+ * fuel tables. Does not wipe charter, demand, events, inbound, ports, or the
+ * rest of the airport catalog. `lotDelta` null is the periodic lots realign
+ * (full retained upsert + orphan delete) and still leaves those tables alone.
+ */
+export async function persistArrivalPulseToPg(
+  pool: pg.Pool,
+  world: CareerEconomyWorld,
+  opts: {
+    lotDelta: LotSyncDelta | null;
+    airportIcaos: readonly string[];
+  },
+  worldId: string = LOCAL_WORLD_ID,
+  expectedRevision?: bigint,
+): Promise<bigint> {
+  const wid = worldId.trim() || LOCAL_WORLD_ID;
+  const icaoSet = new Set(
+    opts.airportIcaos.map((code) => code.trim().toUpperCase()).filter(Boolean),
+  );
+  const airports = (world.airports ?? []).filter((ap) =>
+    icaoSet.has(String(ap.icao ?? '').trim().toUpperCase()),
+  );
+  const { hubRows, stockRows } = airportTableRows(wid, airports);
+  const lotRows = lotTableRows(
+    wid,
+    world.lots ?? [],
+    world.airports ?? [],
+    sqlNum(world.tick),
+  );
+  const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], world.airports ?? []);
+  const npcRows = npcTableRows(wid, world.npcs ?? []);
+  const truckRows = fuelTruckTableRows(wid, world.fuelTrucks ?? []);
+  const haulRows = fuelHaulTableRows(wid, world.fuelHauls ?? []);
+  const icaoList = [...icaoSet];
+
+  return withTx(pool, async (client) => {
+    await ensureWorldRow(client, wid);
+    await lockEconomyRevision(client, wid, expectedRevision);
+
+    const leftoverCols = economyMetaLeftoverColumnParams(world);
+    await client.query(
+      `INSERT INTO economy_meta (
+         world_id, seed, tick, last_batch_at_ms, home_country_id, misc_json,
+         economy_version, aircraft_pool_catalog_hash,
+         force_client_update, min_client_version, flow_stats, revision
+       )
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11::jsonb, 1)
+       ON CONFLICT (world_id) DO UPDATE SET
+         seed = EXCLUDED.seed,
+         tick = EXCLUDED.tick,
+         last_batch_at_ms = EXCLUDED.last_batch_at_ms,
+         home_country_id = EXCLUDED.home_country_id,
+         misc_json = EXCLUDED.misc_json,
+         economy_version = EXCLUDED.economy_version,
+         aircraft_pool_catalog_hash = EXCLUDED.aircraft_pool_catalog_hash,
+         flow_stats = EXCLUDED.flow_stats,
+         revision = economy_meta.revision + 1`,
+      [
+        wid,
+        world.seed,
+        sqlNum(world.tick),
+        sqlBigint(world.lastBatchAtMs),
+        world.homeCountryId ?? '',
+        jsonParam(pickPgEconomyMisc(world)),
+        leftoverCols.economyVersion,
+        leftoverCols.aircraftPoolCatalogHash,
+        leftoverCols.forceClientUpdate,
+        leftoverCols.minClientVersion,
+        leftoverCols.flowStats,
+      ],
+    );
+
+    if (hubRows.length > 0) {
+      await upsertChunks(
+        client,
+        `INSERT INTO airports (
+           world_id, icao, name, region, country_id, hub_tier, bush, bush_trip_only,
+           lat, lon, level, level_xp, level_curve_version, activity_score, last_activity_tick
+         )`,
+        15,
+        hubRows,
+        AIRPORT_UPSERT_ON_CONFLICT,
+      );
+    }
+    if (icaoList.length > 0) {
+      await client.query(
+        `DELETE FROM airport_stock WHERE world_id = $1 AND icao = ANY($2::text[])`,
+        [wid, icaoList],
+      );
+      if (stockRows.length > 0) {
+        await insertChunks(
+          client,
+          `INSERT INTO airport_stock (
+             world_id, icao, commodity_id, stock_kg, capacity_kg,
+             base_production_per_tick_kg, base_consumption_per_tick_kg,
+             production_per_tick_kg, consumption_per_tick_kg
+           )`,
+          9,
+          stockRows,
+        );
+      }
+    }
+
+    await syncLotsTableToPg(client, wid, lotRows, opts.lotDelta);
+
+    await client.query(`DELETE FROM npc_flights WHERE world_id = $1`, [wid]);
+    if (npcFlightRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO npc_flights (
+           id, npc_id, lot_id, origin_icao, dest_icao, commodity_id, cargo_kg, pay_usd,
+           aircraft_class_id, departed_at_tick, arrives_at_tick, departed_at_ms, arrives_at_ms,
+           status, origin_country_id, dest_country_id, payload_json, world_id
+         )`,
+        18,
+        npcFlightRows,
+      );
+    }
+
+    await client.query(`DELETE FROM npcs WHERE world_id = $1`, [wid]);
+    if (npcRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO npcs (
+           world_id, id, name, aircraft_class_id, airframe_type_id, max_cargo_kg,
+           home_region, home_country_id, reliability, aggressiveness, fee_bias, status,
+           busy_until_tick, busy_until_ms, duty_hours_accum, last_leg_duty_hours,
+           rest_until_tick, rest_until_ms, hours_since_mx, location_icao, mx_until_ms,
+           mx_until_tick, leased_player_aircraft_id, current_flight_id, payload_json
+         )`,
+        25,
+        npcRows,
+      );
+    }
+
+    await client.query(`DELETE FROM fuel_trucks WHERE world_id = $1`, [wid]);
+    if (truckRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO fuel_trucks (
+           world_id, id, name, truck_class_id, home_region, status, current_haul_id,
+           busy_until_ms, payload_json
+         )`,
+        9,
+        truckRows,
+      );
+    }
+
+    await client.query(`DELETE FROM fuel_hauls WHERE world_id = $1`, [wid]);
+    if (haulRows.length > 0) {
+      await insertChunks(
+        client,
+        `INSERT INTO fuel_hauls (
+           world_id, id, truck_id, origin_icao, dest_icao, commodity_id, cargo_kg,
+           departed_at_ms, arrives_at_ms, status, payload_json
+         )`,
+        11,
+        haulRows,
+      );
+    }
+
     const revision = await client.query(
       `SELECT revision FROM economy_meta WHERE world_id = $1`,
       [wid],

@@ -56,6 +56,13 @@ export type PulseChunkTiming = {
    * A clock-anchor refresh alone stays false.
    */
   economyDirty: boolean;
+  /**
+   * Dirty for a reason the landing slice cannot cover (real tick, concession
+   * heal, cancelled mission, seed). Lot-only reservation repair stays false.
+   */
+  needsFullPersist: boolean;
+  /** Set by the end-of-pulse save. `arrival` skipped the rest of the planet. */
+  saveSlice?: 'arrival' | 'full';
 };
 
 export function emptyPulseChunkTiming(): PulseChunkTiming {
@@ -68,6 +75,7 @@ export function emptyPulseChunkTiming(): PulseChunkTiming {
     realAdvancedTicks: 0,
     settledFlights: 0,
     economyDirty: false,
+    needsFullPersist: false,
   };
 }
 
@@ -95,10 +103,14 @@ export type LocalWorldTickDeps = {
   }): Promise<PulseChunkTiming>;
 
   /**
-   * Clone live RAM under the career lock and `saveEconomy` off it.
+   * Clone live RAM under the career lock and save off it.
    * One call per pulse, only when a chunk marked the planet dirty.
+   * `arrivalOnly` writes the landing slice when the store can; otherwise the
+   * whole planet.
    */
-  persistPulseSnapshot?(): Promise<PulseChunkTiming>;
+  persistPulseSnapshot?(opts?: {
+    arrivalOnly?: boolean;
+  }): Promise<PulseChunkTiming>;
 
   /**
    * Company passive fee settlement + lastSeenTick persist (MP session/open path).
@@ -175,6 +187,7 @@ export class LocalWorldTickService implements WorldTickService {
       let remaining = totalTicks;
       let advancedTicks = 0;
       let economyDirty = this.economyUnpersisted;
+      let needsFullPersist = this.economyUnpersisted;
       while (remaining > 0) {
         const chunk = cooperative
           ? Math.min(CATCH_UP_LOCK_CHUNK_TICKS, remaining)
@@ -192,6 +205,9 @@ export class LocalWorldTickService implements WorldTickService {
         totals.realAdvancedTicks += chunkTiming.realAdvancedTicks;
         totals.settledFlights += chunkTiming.settledFlights;
         if (chunkTiming.economyDirty) economyDirty = true;
+        if (chunkTiming.needsFullPersist || chunkTiming.realAdvancedTicks > 0) {
+          needsFullPersist = true;
+        }
         advancedTicks += chunk;
         remaining -= chunk;
         if (remaining > 0) {
@@ -200,10 +216,14 @@ export class LocalWorldTickService implements WorldTickService {
       }
       if (coalesceSave && economyDirty) {
         try {
-          const saved = await this.deps.persistPulseSnapshot!();
+          const saved = await this.deps.persistPulseSnapshot!({
+            arrivalOnly: !needsFullPersist,
+          });
           totals.lockWaitMs += saved.lockWaitMs;
           totals.saveMs += saved.saveMs;
+          totals.settleMs += saved.settleMs;
           totals.lots = Math.max(totals.lots, saved.lots);
+          if (saved.saveSlice) totals.saveSlice = saved.saveSlice;
           this.economyUnpersisted = false;
         } catch (error) {
           this.economyUnpersisted = true;
@@ -225,7 +245,8 @@ export class LocalWorldTickService implements WorldTickService {
           ` save=${Math.round(totals.saveMs)}ms` +
           ` settle=${Math.round(totals.settleMs)}ms` +
           ` lots=${totals.lots}` +
-          ` dirty=${economyDirty ? 1 : 0}`,
+          ` dirty=${economyDirty ? 1 : 0}` +
+          (totals.saveSlice === 'arrival' ? ' slice=arrival' : ''),
       );
       return {
         advancedTicks,

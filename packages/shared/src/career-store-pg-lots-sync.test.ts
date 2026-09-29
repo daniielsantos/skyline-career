@@ -18,8 +18,9 @@ import {
   lotPgRetainKeepFromTick,
   lotPgRowMatchesRetain,
   planLotSync,
+  planAirportSync,
 } from './career-store-pg-world.js';
-import type { CharterOffer, ShipmentLot } from './types/career-economy.js';
+import type { AirportTerminal, CharterOffer, ShipmentLot } from './types/career-economy.js';
 
 function stubLot(
   overrides: Partial<ShipmentLot> & Pick<ShipmentLot, 'status'>,
@@ -152,5 +153,54 @@ describe('planLotSync', () => {
     const second = planLotSync(first.next, world([reserved]));
     assert.deepEqual(second.delta?.upsertIds, ['keep']);
     assert.deepEqual(second.delta?.deleteIds, ['gone']);
+  });
+});
+
+describe('planAirportSync', () => {
+  function stubAirport(icao: string, stockKg = 0): AirportTerminal {
+    return {
+      icao,
+      name: icao,
+      region: 'br-se',
+      lat: 0,
+      lon: 0,
+      level: 1,
+      inventory: {
+        general: { stockKg, capacityKg: 1000 },
+      },
+    } as AirportTerminal;
+  }
+
+  it('asks for a full sync until a baseline exists', () => {
+    const plan = planAirportSync(null, [stubAirport('SBGR')]);
+    assert.equal(plan.icaos, null);
+    assert.equal(plan.next.has('SBGR'), true);
+  });
+
+  it('skips an airport whose stock and hub row did not change', () => {
+    const first = planAirportSync(null, [stubAirport('SBGR', 10)]);
+    const second = planAirportSync(first.next, [stubAirport('SBGR', 10)]);
+    assert.deepEqual(second.icaos, []);
+  });
+
+  it('lists only the airport whose stock changed', () => {
+    const first = planAirportSync(null, [
+      stubAirport('SBGR', 10),
+      stubAirport('SBSP', 4),
+    ]);
+    const second = planAirportSync(first.next, [
+      stubAirport('SBGR', 25),
+      stubAirport('SBSP', 4),
+    ]);
+    assert.deepEqual(second.icaos, ['SBGR']);
+  });
+
+  it('refuses a slice when an airport disappeared', () => {
+    const first = planAirportSync(null, [
+      stubAirport('SBGR'),
+      stubAirport('SBSP'),
+    ]);
+    const second = planAirportSync(first.next, [stubAirport('SBGR')]);
+    assert.equal(second.icaos, null);
   });
 });

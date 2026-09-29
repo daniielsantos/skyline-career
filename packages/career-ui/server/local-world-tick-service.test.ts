@@ -34,6 +34,7 @@ describe('emptyPulseChunkTiming', () => {
       realAdvancedTicks: 0,
       settledFlights: 0,
       economyDirty: false,
+      needsFullPersist: false,
     });
   });
 });
@@ -128,5 +129,57 @@ describe('LocalWorldTickService pulse save', () => {
     assert.equal(saves, 2);
     await svc.advance(LOCAL_WORLD_ID, { n: 8 });
     assert.equal(saves, 2);
+  });
+
+  it('uses the landing slice when a quiet chunk only settled flights', async () => {
+    const modes: Array<boolean | undefined> = [];
+    const svc = new LocalWorldTickService({
+      requireStore: () => {
+        throw new Error('unused');
+      },
+      loadMissions: async () => {
+        throw new Error('unused');
+      },
+      peekWorld: () => undefined,
+      applyCompanySessionSettlement: async () => undefined,
+      runCatchUpWrite: async () => {
+        const timing = emptyPulseChunkTiming();
+        timing.economyDirty = true;
+        timing.settledFlights = 2;
+        return timing;
+      },
+      persistPulseSnapshot: async (opts) => {
+        modes.push(opts?.arrivalOnly);
+        return emptyPulseChunkTiming();
+      },
+    });
+    await svc.advance(LOCAL_WORLD_ID, { n: 2 });
+    assert.deepEqual(modes, [true]);
+  });
+
+  it('keeps a full planet save when a chunk simulated a tick', async () => {
+    const modes: Array<boolean | undefined> = [];
+    const svc = new LocalWorldTickService({
+      requireStore: () => {
+        throw new Error('unused');
+      },
+      loadMissions: async () => {
+        throw new Error('unused');
+      },
+      peekWorld: () => undefined,
+      applyCompanySessionSettlement: async () => undefined,
+      runCatchUpWrite: async () => {
+        const timing = emptyPulseChunkTiming();
+        timing.economyDirty = true;
+        timing.realAdvancedTicks = 1;
+        return timing;
+      },
+      persistPulseSnapshot: async (opts) => {
+        modes.push(opts?.arrivalOnly);
+        return emptyPulseChunkTiming();
+      },
+    });
+    await svc.advance(LOCAL_WORLD_ID, { n: 2 });
+    assert.deepEqual(modes, [false]);
   });
 });

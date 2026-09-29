@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **fe4eb6c0** / desktop **0.3.390** shipped: Save the economy pulse once, and only the lots that changed. Release: [v0.3.390](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.390).
+
+
 `main` **fcfa217b** / desktop **0.3.389** shipped: Keep Port FBO 7-day throughput on the saved window when a settle lands the same day. Release: [v0.3.389](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.389).
 
 

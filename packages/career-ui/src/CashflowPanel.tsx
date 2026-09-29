@@ -117,17 +117,23 @@ function kindLabel(kind: string, note?: string): string {
   if (kind === 'port_fbo_jet_a' && note?.startsWith('From tank')) {
     return 'Jet-A from tank';
   }
+  if (kind === 'port_fbo_jet_a' && note?.startsWith('Into tank')) {
+    return 'Jet-A into tank';
+  }
   return KIND_LABEL[kind] ?? kind.replace(/_/g, ' ');
 }
 
-/** `From tank · 1240 kg · KMIA→KATL` → mass in the player's units, plus the route. */
-function tankDrawNote(note: string | undefined): string | null {
-  const match = note?.match(/^From tank · (\d+) kg(?: · (.+))?$/);
+/** `From tank|Into tank · 1240 kg · KMIA→KATL` → mass in the player's units, plus the route. */
+function tankAuditNote(note: string | undefined): string | null {
+  const match = note?.match(/^(From tank|Into tank) · (\d+) kg(?: · (.+))?$/);
   if (!match) return null;
-  const kg = Number(match[1]);
+  const kg = Number(match[2]);
   if (!Number.isFinite(kg)) return null;
   const mass = formatMassPreferExact(kg, loadWeightSystem());
-  const route = match[2]?.trim();
+  const route = match[3]?.trim();
+  if (match[1] === 'Into tank') {
+    return route ? `${mass} · ${route}` : mass;
+  }
   return route ? `${mass} · ${route} · already paid` : `${mass} · already paid`;
 }
 
@@ -589,7 +595,7 @@ export function HangarCashflowPanel(props: {
                           ) : null}
                           <td>{entry.icao ?? '—'}</td>
                           <td className="cashflow-col-note">
-                            {tankDrawNote(entry.note) ??
+                            {tankAuditNote(entry.note) ??
                               (entry.note?.trim() ? entry.note : '—')}
                           </td>
                           <td className="cashflow-col-amount">

@@ -508,6 +508,20 @@ export function deliverPortJetAHaul(
   const room = conc ? Math.max(0, portJetATankCapacityKg(level) - have) : 0;
   const add = Math.min(haul.kg, room);
   if (conc) conc.jetAKg = have + add;
+  if (conc && add > 0 && haul.kind === 'reposition') {
+    const origin = mission.originIcao.trim().toUpperCase();
+    const dest = (
+      portPickupHubsBound(haul.portId)[0]?.trim().toUpperCase() ||
+      mission.destIcao.trim().toUpperCase()
+    );
+    appendLedgerMarker(state, {
+      kind: 'port_fbo_jet_a',
+      atTick: world.tick,
+      missionId: mission.id,
+      icao: dest,
+      note: `Into tank · ${add} kg · ${origin}→${dest}`,
+    });
+  }
   const overflow = haul.kg - add;
   if (overflow <= 0) return;
   const hub =

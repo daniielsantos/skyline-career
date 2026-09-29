@@ -178,6 +178,11 @@ describe('port FBO Jet-A', () => {
       state.playerPortConcessions?.[0]?.jetAKg,
       tankBefore + ceiling,
     );
+    const stored = state.ledger?.find((row) => row.note?.startsWith('Into tank'));
+    assert.equal(stored?.amountUsd, 0);
+    assert.equal(stored?.kind, 'port_fbo_jet_a');
+    assert.equal(stored?.actorAccountId, 'acc_pilot');
+    assert.match(stored?.note ?? '', new RegExp(`Into tank · ${ceiling} kg · SBKP→`));
 
     const sellableBefore = fuelTerminalSellableKg(
       world.airports.find((ap) => ap.icao === 'SBGR')!,
@@ -235,6 +240,14 @@ describe('port FBO Jet-A', () => {
     const dest = world.airports.find((ap) => ap.icao === 'SBKP')!;
     const destBefore = dest.inventory.fuel!.stockKg;
     deliverPortJetAHaul(state, world, accepted.mission);
+    assert.equal(
+      state.ledger?.some(
+        (row) =>
+          row.note?.startsWith('Into tank') &&
+          row.missionId === accepted.mission.id,
+      ),
+      false,
+    );
     assert.ok(dest.inventory.fuel!.stockKg >= destBefore);
     assert.ok(fuelTerminalSellableKg(
       world.airports.find((ap) => ap.icao === 'SBGR')!,

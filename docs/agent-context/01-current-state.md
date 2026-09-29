@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **7ea0d0ed** / desktop **0.3.391** shipped: Keep economy pulse chunks from saving the whole planet. Release: [v0.3.391](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.391).
+
+
 `main` **fe4eb6c0** / desktop **0.3.390** shipped: Save the economy pulse once, and only the lots that changed. Release: [v0.3.390](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.390).
 
 

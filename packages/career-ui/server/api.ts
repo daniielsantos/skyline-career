@@ -2618,7 +2618,7 @@ async function withCareerWrite<T>(
       // not a stale pre-isolate peek. The background pulse skips this and
       // saves once after the last chunk.
       deferred.pulseSnapshot = structuredClone(world);
-    } else {
+    } else if (!isCatchUp) {
       const timing = opts?.catchUpTiming;
       if (timing) {
         const t0 = performance.now();

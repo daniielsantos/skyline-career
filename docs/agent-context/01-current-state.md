@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **600ba442** / desktop **0.3.394** shipped: Wake the economy pulse every 30 seconds. Release: [v0.3.394](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.394).
+
+
 `main` **5022d0fc** / desktop **0.3.393** shipped: Paint career clocks and deadlines in ten-minute ticks. Release: [v0.3.393](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.393).
 
 

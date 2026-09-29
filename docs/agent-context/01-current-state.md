@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **fcfa217b** / desktop **0.3.389** shipped: Keep Port FBO 7-day throughput on the saved window when a settle lands the same day. Release: [v0.3.389](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.389).
+
+
 `main` **3f919a3e** / desktop **0.3.388** shipped: Log Jet-A stored in the Port FBO tank when a Stock flight settles. Release: [v0.3.388](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.388).
 
 

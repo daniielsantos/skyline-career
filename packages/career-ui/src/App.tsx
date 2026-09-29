@@ -205,6 +205,12 @@ import { resolvePageHelp } from './page-help';
 import { ContractPilotPick } from './ContractPilotPick';
 import { PilotTravelDialog } from './PilotTravelDialog';
 import { PortsPanel } from './PortsPanel';
+import {
+  HOURS_PER_TICK,
+  MINUTES_PER_TICK,
+  MS_PER_TICK,
+  TICKS_PER_DAY,
+} from './economy-clock';
 import { FboSplitDialog } from './FboSplitDialog';
 import { FboRouteMapCard } from './FboRouteMapCard';
 import { FerryHubCombobox } from './FerryHubCombobox';
@@ -540,11 +546,8 @@ const FLEET_PAGE_SIZE = 10;
 const MAX_STAGING_LOTS = 5;
 const SIMBRIEF_USER_KEY = 'skyline.simbriefUser';
 const LAST_FBO_ICAO_KEY = 'skyline.career.lastFboIcao';
-/** Career economy: 1 tick = 15 wall-clock minutes. */
-const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 const MS_PER_HOUR = 3_600_000;
-const MS_PER_TICK_DEFAULT = 900_000;
 
 type StagingLine = {
   lot: MarketLot;
@@ -2435,7 +2438,7 @@ function formatDuration(hours: number): string {
 function formatClock(continuousTicks: number): string {
   const totalMinutes = Math.max(
     0,
-    Math.floor(continuousTicks * HOURS_PER_TICK * 60),
+    Math.floor(continuousTicks * MINUTES_PER_TICK),
   );
   const day = Math.floor(totalMinutes / (HOURS_PER_DAY * 60)) + 1;
   const rem = totalMinutes % (HOURS_PER_DAY * 60);
@@ -2470,7 +2473,7 @@ function formatExpiry(opts: {
   if (opts.currentTick >= opts.expiresAtTick) {
     return 'Expired';
   }
-  // Soft continuous remaining within the current 15-min batch.
+  // Soft continuous remaining within the current 10-min batch.
   const frac = opts.continuousHours - opts.currentTick;
   const continuousRemainingTicks = Math.max(
     0,
@@ -2570,7 +2573,7 @@ function livePhase(
   etaHours: number,
   fallback?: string,
 ): 'enroute' | 'arriving' | string {
-  // Match server arriving window: last economy batch (~15 min).
+  // Match server arriving window: last economy batch (10 min).
   if (etaHours <= HOURS_PER_TICK) return 'arriving';
   if (fallback === 'boarding' || fallback === 'turnaround' || fallback === 'idle') {
     return fallback;
@@ -3674,7 +3677,7 @@ export function App() {
     useState<AircraftClass>('narrow_freighter');
   const [tick, setTick] = useState(0);
   const [lastBatchAtMs, setLastBatchAtMs] = useState(Date.now());
-  const [msPerTick, setMsPerTick] = useState(MS_PER_TICK_DEFAULT);
+  const [msPerTick, setMsPerTick] = useState(MS_PER_TICK);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [displayNowMs, setDisplayNowMs] = useState(Date.now());
   const [wallet, setWalletState] = useState(0);
@@ -5034,7 +5037,7 @@ export function App() {
     setServerOffsetMs(serverNow - clientNow);
     setTick(state.tick);
     setLastBatchAtMs(state.lastBatchAtMs ?? serverNow);
-    setMsPerTick(state.msPerTick ?? MS_PER_TICK_DEFAULT);
+    setMsPerTick(state.msPerTick ?? MS_PER_TICK);
     setDisplayNowMs((prev) => coalesceDisplayNowMs(prev, serverNow));
     const stateCompanyId =
       typeof state.companyId === 'string' ? state.companyId.trim() : '';
@@ -6815,7 +6818,7 @@ export function App() {
   // Stable title — a changing `title` every second makes native tooltips flicker.
   const worldClockTitle = tickAdvance
     ? `Advancing ${tickAdvance.label}… ${tickAdvance.done}/${tickAdvance.total} economy batches`
-    : 'Economy day/time (shared world clock). Label countdown = wall time to next 15-min tick pulse. Not your local timezone.';
+    : 'Economy day/time (shared world clock). Label countdown = wall time to next 10-min tick pulse. Not your local timezone.';
 
   const formatTickAdvanceButton = (total: number, idleLabel: string) => {
     if (!tickAdvance || tickAdvance.total !== total) return idleLabel;
@@ -8376,20 +8379,19 @@ export function App() {
   async function onTick(ticks = 1) {
     const hoursLabel =
       ticks === 1
-        ? '15 min'
-        : ticks === 96
+        ? `${MINUTES_PER_TICK} min`
+        : ticks === TICKS_PER_DAY
           ? '1 day'
-          : ticks === 96 * 7
+          : ticks === TICKS_PER_DAY * 7
             ? '7 days'
-            : ticks === 96 * 14
+            : ticks === TICKS_PER_DAY * 14
               ? '14 days'
-              : ticks === 96 * 30
+              : ticks === TICKS_PER_DAY * 30
                 ? '30 days'
-                : `${ticks * 15} min`;
-    // Progress every ≤¼ day so +1d isn't stuck at 0/96 for minutes on one POST.
-    // Still 4 saves/day vs the old 12 (chunk=8). Hub Stats sample = 1×/day boundary only.
-    const ticksPerDay = 96;
-    const chunkSize = ticks <= 8 ? ticks : Math.min(ticks, 24);
+                : `${ticks * MINUTES_PER_TICK} min`;
+    // Progress every ≤¼ day so +1d isn't stuck on one POST.
+    const ticksPerDay = TICKS_PER_DAY;
+    const chunkSize = ticks <= 8 ? ticks : Math.min(ticks, TICKS_PER_DAY / 4);
     const startedAtMs = Date.now();
     await run(async () => {
       let done = 0;
@@ -18859,7 +18861,7 @@ export function App() {
                             ? 'No Operator aircraft offers nearby — advance time or try Your aircraft.'
                             : boardEstimateFleet.length === 0
                               ? 'No Your aircraft lots you can take yet — open Operator aircraft, join an airline with a hangar, or buy a starter airframe.'
-                              : 'No freights yet — advance time (+15 min) or wait for a pulse.'
+                              : 'No freights yet — advance time (+10 min) or wait for a pulse.'
                           : freightsBoard === 'crew'
                             ? 'No Operator aircraft offers match the selected filters.'
                             : 'No Your aircraft lots match the selected filters.'}
@@ -20592,47 +20594,47 @@ export function App() {
                     <button
                       type="button"
                       className="action"
-                      onClick={() => void onTick(96)}
+                      onClick={() => void onTick(TICKS_PER_DAY)}
                       disabled={busy}
-                      title="Advance economy + crew wall-clock by 1 day (96 ticks)"
+                      title={`Advance economy + crew wall-clock by 1 day (${TICKS_PER_DAY} ticks)`}
                     >
-                      {formatTickAdvanceButton(96, '+1 day')}
+                      {formatTickAdvanceButton(TICKS_PER_DAY, '+1 day')}
                     </button>
                     <button
                       type="button"
                       className="action"
-                      onClick={() => void onTick(96 * 3)}
+                      onClick={() => void onTick(TICKS_PER_DAY * 3)}
                       disabled={busy}
-                      title="Advance economy + crew wall-clock by 3 days (288 ticks)"
+                      title={`Advance economy + crew wall-clock by 3 days (${TICKS_PER_DAY * 3} ticks)`}
                     >
-                      {formatTickAdvanceButton(96 * 3, '+3 day')}
+                      {formatTickAdvanceButton(TICKS_PER_DAY * 3, '+3 day')}
                     </button>
                     <button
                       type="button"
                       className="action"
-                      onClick={() => void onTick(96 * 7)}
+                      onClick={() => void onTick(TICKS_PER_DAY * 7)}
                       disabled={busy}
-                      title="Advance economy + crew wall-clock by 7 days (672 ticks)"
+                      title={`Advance economy + crew wall-clock by 7 days (${TICKS_PER_DAY * 7} ticks)`}
                     >
-                      {formatTickAdvanceButton(96 * 7, '+7 day')}
+                      {formatTickAdvanceButton(TICKS_PER_DAY * 7, '+7 day')}
                     </button>
                     <button
                       type="button"
                       className="action"
-                      onClick={() => void onTick(96 * 14)}
+                      onClick={() => void onTick(TICKS_PER_DAY * 14)}
                       disabled={busy}
-                      title="Advance economy + crew wall-clock by 14 days (1344 ticks)"
+                      title={`Advance economy + crew wall-clock by 14 days (${TICKS_PER_DAY * 14} ticks)`}
                     >
-                      {formatTickAdvanceButton(96 * 14, '+14 day')}
+                      {formatTickAdvanceButton(TICKS_PER_DAY * 14, '+14 day')}
                     </button>
                     <button
                       type="button"
                       className="action"
-                      onClick={() => void onTick(96 * 30)}
+                      onClick={() => void onTick(TICKS_PER_DAY * 30)}
                       disabled={busy}
-                      title="Advance economy + crew wall-clock by 30 days (2880 ticks)"
+                      title={`Advance economy + crew wall-clock by 30 days (${TICKS_PER_DAY * 30} ticks)`}
                     >
-                      {formatTickAdvanceButton(96 * 30, '+30 day')}
+                      {formatTickAdvanceButton(TICKS_PER_DAY * 30, '+30 day')}
                     </button>
                   </div>
                 </div>

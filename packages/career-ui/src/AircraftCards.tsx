@@ -1,4 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { HOURS_PER_TICK } from './economy-clock';
 import { listAirframeAddons } from './airframe-addons';
 import { estimateFairUsd, estimateHoursMxCostMult, estimateLeaseOverdueAmountUsd, estimateLeaseOverdueWeeks, estimateOverhaulQuote, estimateSellBackUsd } from './aircraft-pricing';
 import { FerryHubCombobox, type FerryHubOption } from './FerryHubCombobox';
@@ -839,7 +840,6 @@ function hangarStatusBadgeLabel(acf: PlayerAircraft): string {
 
 /** Mirror shared CRITICAL_CONDITION_PCT — hangar copy only. */
 const HANGAR_CRITICAL_CONDITION_PCT = 40;
-const HANGAR_HOURS_PER_TICK = 0.25;
 const HANGAR_HOURS_PER_DAY = 24;
 
 function formatHangarDurationHours(hours: number): string {
@@ -868,7 +868,7 @@ function hangarOverhaulRemainingLabel(
   const now = opts?.economyClock ?? opts?.economyTick ?? 0;
   const ticksLeft = Math.max(0, ready - Math.max(0, now));
   if (ticksLeft <= 0) return 'ready soon';
-  return `${formatHangarDurationHours(ticksLeft * HANGAR_HOURS_PER_TICK)} left`;
+  return `${formatHangarDurationHours(ticksLeft * HOURS_PER_TICK)} left`;
 }
 
 function hangarStatusNote(

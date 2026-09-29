@@ -1,5 +1,6 @@
 import type { Mission } from './api';
 import { aircraftClassLabel } from './AircraftCards';
+import { MINUTES_PER_TICK } from './economy-clock';
 
 export type LogbookFlightKind =
   | 'Freights'
@@ -305,14 +306,13 @@ export function logbookHasDetail(mission: Mission): boolean {
   );
 }
 
-const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 
 /** Economy day/time from a tick (same mold as the World topbar clock). */
 export function formatEconomyClock(continuousTicks: number): string {
   const totalMinutes = Math.max(
     0,
-    Math.floor(continuousTicks * HOURS_PER_TICK * 60),
+    Math.floor(continuousTicks * MINUTES_PER_TICK),
   );
   const day = Math.floor(totalMinutes / (HOURS_PER_DAY * 60)) + 1;
   const rem = totalMinutes % (HOURS_PER_DAY * 60);
@@ -354,7 +354,7 @@ export function logbookFlightDurationLabel(mission: Mission): string | null {
     mission.settledAtTick > mission.departedAtTick
   ) {
     const ticks = mission.settledAtTick - mission.departedAtTick;
-    return formatFlightDurationMs(ticks * 15 * 60 * 1000);
+    return formatFlightDurationMs(ticks * MINUTES_PER_TICK * 60 * 1000);
   }
   return null;
 }

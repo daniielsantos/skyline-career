@@ -7,7 +7,7 @@ import {
 import { BusyBlock } from './Busy';
 import { KG_TO_LB, massUnitLabel, type WeightSystem } from './weight-units';
 
-const TICKS_PER_DAY = 96;
+import { TICKS_PER_DAY } from './economy-clock';
 
 const COMMODITY_ORDER = [
   'general',

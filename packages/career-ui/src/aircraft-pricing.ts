@@ -4,6 +4,7 @@
  */
 
 import type { PlayerAircraft } from './api';
+import { TICKS_PER_WEEK } from './economy-clock';
 
 type FreighterClassId = PlayerAircraft['aircraftClassId'];
 type AirframeCondition = NonNullable<PlayerAircraft['condition']>;
@@ -165,10 +166,6 @@ export function estimateSellBackUsd(
 ): number {
   return Math.round(estimateFairUsd(aircraft, opts) * 0.5);
 }
-
-/** Career clock: 96 ticks/day × 7 days. */
-const TICKS_PER_DAY = 96;
-const TICKS_PER_WEEK = TICKS_PER_DAY * 7;
 
 /** Min life-frac before Hangar offers engine / airframe overhaul. */
 const OH_ENGINE_MIN_LIFE_FRAC = 0.45;

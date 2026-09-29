@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { HOURS_PER_TICK } from './economy-clock';
 import {
   fetchCharters,
   formatClientUpdateCtaLabel,
@@ -45,7 +46,7 @@ export function resolveBaseCharterOrigin(
 }
 
 export function charterExpiryLabel(ticksRemaining: number): string {
-  const hours = Math.max(0, ticksRemaining) * 0.25;
+  const hours = Math.max(0, ticksRemaining) * HOURS_PER_TICK;
   if (hours < 1) return `${Math.max(0, Math.ceil(hours * 60))} min`;
   if (hours < 24) return `${hours.toFixed(hours < 10 ? 1 : 0)} h`;
   return `${Math.ceil(hours / 24)} d`;

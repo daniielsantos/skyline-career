@@ -9,15 +9,12 @@ import type {
 import { postCreditDraw, postCreditRepay } from './api';
 import { boardMoneyLabel, isFiniteMoney, formatUsdAmountInput, maskUsdAmountInput, parseUsdAmountInput } from './board-money';
 import { formatMassPreferExact, loadWeightSystem } from './weight-units';
+import { MINUTES_PER_TICK, TICKS_PER_DAY } from './economy-clock';
 
 const CASHFLOW_PAGE_SIZE = 15;
-/** Economy batches per career day (matches shared TICKS_PER_DAY). */
-const TICKS_PER_DAY = 96;
-/** One economy tick is 15 minutes on the career clock. */
-const MINUTES_PER_TICK = 15;
 
 /**
- * Ledger `dayIndex` is 0-based (`floor(tick / 96)`). World topbar + logbook
+ * Ledger `dayIndex` is 0-based (`floor(tick / TICKS_PER_DAY)`). World topbar + logbook
  * use Day N = that index + 1. Time of day comes from `atTick` on the same clock.
  */
 export function ledgerDayClock(entry: {

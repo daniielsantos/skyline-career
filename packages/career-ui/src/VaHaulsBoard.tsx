@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { HOURS_PER_TICK } from './economy-clock';
 import {
   fetchVaHauls,
   postDemandDispatchHold,
@@ -61,7 +62,6 @@ function aircraftOptionLabel(
   return `${acf.label || acf.id} · ${where}`;
 }
 
-const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
 
 function formatHoldDuration(hours: number): string {

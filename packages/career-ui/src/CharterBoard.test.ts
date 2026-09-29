@@ -37,9 +37,9 @@ function offer(overrides: Partial<CharterOfferView> = {}): CharterOfferView {
 }
 
 test('formats charter expiry from economy ticks', () => {
-  assert.equal(charterExpiryLabel(2), '30 min');
-  assert.equal(charterExpiryLabel(8), '2.0 h');
-  assert.equal(charterExpiryLabel(96), '1 d');
+  assert.equal(charterExpiryLabel(2), '20 min');
+  assert.equal(charterExpiryLabel(6), '1.0 h');
+  assert.equal(charterExpiryLabel(144), '1 d');
 });
 
 test('uses typed dispatcher origin; empty means any (no Base lock)', () => {

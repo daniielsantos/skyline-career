@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { HOURS_PER_TICK, MINUTES_PER_TICK, TICKS_PER_DAY } from './economy-clock';
 import {
   fetchPorts,
   fetchWarehouses,
@@ -175,9 +176,9 @@ function inboundTransferTicksClient(
   return Math.max(2, Math.round(ticks * mult));
 }
 
-/** 15-min economy ticks → hours/minutes (exact). */
+/** Economy ticks → hours/minutes. */
 function ticksToHoursLabel(ticks: number): string {
-  const totalMin = Math.max(0, Math.round(Math.max(0, ticks) * 15));
+  const totalMin = Math.max(0, Math.round(Math.max(0, ticks) * MINUTES_PER_TICK));
   if (totalMin < 60) return `${totalMin} min`;
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
@@ -209,11 +210,7 @@ function commodityLabel(
 }
 
 const DEMAND_PAGE_SIZE = 11;
-/** 1 economy tick = 15 wall-clock minutes. */
-const HOURS_PER_TICK = 0.25;
 const HOURS_PER_DAY = 24;
-/** Economy batches per career day (matches shared TICKS_PER_DAY). */
-const TICKS_PER_DAY = 96;
 
 function leaseDaysLeftFromTicks(
   leasePaidThroughTick: number | null | undefined,
@@ -5980,7 +5977,7 @@ export function PortsPanel(props: {
                             <td
                               title={
                                 left > 0
-                                  ? `${left} economy tick(s) · 15 min each`
+                                  ? `${left} economy tick(s) · ${MINUTES_PER_TICK} min each`
                                   : 'Ready on the next economy settle'
                               }
                             >

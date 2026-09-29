@@ -2405,7 +2405,7 @@ export function fetchMissions(opts?: { companyId?: string }) {
   );
 }
 
-/** Advance economy batches; default one 15-min tick. */
+/** Advance economy batches; default one 10-min tick. */
 export function postTick(n = 1, opts?: { profile?: boolean }) {
   return api<{
     tick: number;

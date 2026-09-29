@@ -408,7 +408,7 @@ describe('logbookFlightDurationLabel', () => {
           expectedRouteMs: undefined,
         }),
       ),
-      '1h',
+      '40m',
     );
   });
 });
@@ -416,9 +416,9 @@ describe('logbookFlightDurationLabel', () => {
 describe('logbookFlightWhenLabel', () => {
   it('uses settle tick as world Day·time', () => {
     assert.equal(formatEconomyClock(0), 'Day 1 · 00:00');
-    assert.equal(formatEconomyClock(96), 'Day 2 · 00:00');
+    assert.equal(formatEconomyClock(144), 'Day 2 · 00:00');
     assert.equal(
-      logbookFlightWhenLabel(mission({ settledAtTick: 96 + 4 })),
+      logbookFlightWhenLabel(mission({ settledAtTick: 144 + 6 })),
       'Day 2 · 01:00',
     );
     assert.equal(
@@ -429,7 +429,7 @@ describe('logbookFlightWhenLabel', () => {
           acceptedAtTick: 1,
         }),
       ),
-      'Day 1 · 02:00',
+      'Day 1 · 01:20',
     );
   });
 });

@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **b603d80e** / desktop **0.3.395** shipped: Save NPC landings without rewriting the whole economy. Release: [v0.3.395](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.395).
+
+
 `main` **600ba442** / desktop **0.3.394** shipped: Wake the economy pulse every 30 seconds. Release: [v0.3.394](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.394).
 
 

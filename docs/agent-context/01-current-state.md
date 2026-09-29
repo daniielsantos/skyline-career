@@ -1,5 +1,8 @@
 # Current state (2026-09-29)
 
+`main` **22860cd6** / desktop **0.3.392** shipped: Advance the economy every ten minutes without shortening the career day. Release: [v0.3.392](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.392).
+
+
 `main` **7ea0d0ed** / desktop **0.3.391** shipped: Keep economy pulse chunks from saving the whole planet. Release: [v0.3.391](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.391).
 
 

@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-29: **Port FBO 7d cópia** — settle no mesmo dia somava o kg numa cópia da janela e o 7d ficava 0. Fix local, ainda sem release. O voo já settled não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
+
 Atualizado 2026-09-28: **Jet-A into tank** — settle do Stock grava `Into tank` na ledger (membro + kg, $0). Ainda sem release. A linha nasce no world. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 Atualizado 2026-09-28: **Port FBO 7d zerado** — Demand settle da VA não gravava throughput quando o índice mundial do porto vinha vazio. Fix no world (`creditPortOperatorThroughputOnOutboundSettle`); o voo já settled não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md). Ainda sem release.

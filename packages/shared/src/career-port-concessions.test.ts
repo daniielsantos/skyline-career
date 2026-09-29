@@ -603,6 +603,43 @@ describe('port concessions', () => {
     );
   });
 
+  it('credits the 7d window when a zero week was already saved', () => {
+    const { world, state } = missionsAtSantos();
+    const day = Math.floor(world.tick / 96);
+    state.playerPortConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_va',
+        level: 1,
+        claimedAtTick: world.tick,
+        leasePaidThroughTick: world.tick + 500,
+        lifetimeThroughputKg: 39_054,
+        throughputWindowDay: day,
+        throughputWindowKg: [0, 0, 0, 0, 0, 0, 0],
+      },
+    ];
+    world.portConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_va',
+        leasePaidThroughTick: world.tick + 500,
+        level: 1,
+      },
+    ];
+    creditPortOperatorThroughputOnOutboundSettle(state, world, {
+      originIcao: 'KMIA',
+      kg: 19_962,
+      demandOrderId: 'demand_same_day',
+    });
+    const conc = state.playerPortConcessions?.[0];
+    assert.equal(conc?.lifetimeThroughputKg, 39_054 + 19_962);
+    assert.equal(conc?.throughputWindowKg?.[0], 19_962);
+    assert.equal(
+      (conc?.throughputWindowKg ?? []).reduce((sum, n) => sum + n, 0),
+      19_962,
+    );
+  });
+
   it('does not credit a company when another operator holds the port', () => {
     const { world, state } = missionsAtSantos();
     state.playerPortConcessions = [

@@ -611,25 +611,24 @@ export function alignConcessionThroughputWindow(
   if (window.length !== THROUGHPUT_WINDOW_DAYS) {
     window = Array.from({ length: THROUGHPUT_WINDOW_DAYS }, () => 0);
     conc.throughputWindowDay = day;
-    conc.throughputWindowKg = window;
-    return window;
-  }
-  const prev = conc.throughputWindowDay ?? day;
-  const shift = day - prev;
-  if (shift > 0) {
-    if (shift >= THROUGHPUT_WINDOW_DAYS) {
-      window = Array.from({ length: THROUGHPUT_WINDOW_DAYS }, () => 0);
-    } else {
-      window = [
-        ...Array.from({ length: shift }, () => 0),
-        ...window.slice(0, THROUGHPUT_WINDOW_DAYS - shift),
-      ];
+  } else {
+    const prev = conc.throughputWindowDay ?? day;
+    const shift = day - prev;
+    if (shift > 0) {
+      if (shift >= THROUGHPUT_WINDOW_DAYS) {
+        window = Array.from({ length: THROUGHPUT_WINDOW_DAYS }, () => 0);
+      } else {
+        window = [
+          ...Array.from({ length: shift }, () => 0),
+          ...window.slice(0, THROUGHPUT_WINDOW_DAYS - shift),
+        ];
+      }
+      conc.throughputWindowDay = day;
+    } else if (conc.throughputWindowDay == null) {
+      conc.throughputWindowDay = day;
     }
-    conc.throughputWindowDay = day;
-    conc.throughputWindowKg = window;
-  } else if (conc.throughputWindowDay == null) {
-    conc.throughputWindowDay = day;
   }
+  conc.throughputWindowKg = window;
   return window;
 }
 

@@ -11,9 +11,6 @@ import {
   evaluateRunwayTouchdown,
   pickFirstContactCoords,
   formatRunwayTouchdownLine,
-  offsetAlongHeading,
-  mainGearAftMeters,
-  placeMainGearContact,
   isUsableRunwayCenter,
   headingDeltaDeg,
   type CareerRunway,
@@ -224,46 +221,6 @@ describe('evaluateRunwayTouchdown', () => {
     assert.ok(rwy);
     assert.ok(headingDeltaDeg(rwy!.headingTrueDeg, 125) < 5);
     assert.ok(headingDeltaDeg(rwy!.headingTrueDeg, 150) > 15);
-  });
-});
-
-describe('main gear contact', () => {
-  it('moves the datum aft along the nose heading', () => {
-    const moved = offsetAlongHeading(0, 0, 90, 100);
-    assert.ok(Math.abs(moved.lat) < 1e-6);
-    assert.ok(moved.lon < 0);
-    const back = offsetAlongHeading(moved.lat, moved.lon, 90, -100);
-    assert.ok(Math.abs(back.lon) < 1e-6);
-  });
-
-  it('places the marker on a measured main-gear station, not the datum', () => {
-    const placed = placeMainGearContact(0, 0, 90, {
-      longitudinalFt: -10,
-      verticalFt: -4,
-    });
-    assert.ok(placed);
-    const expected = mainGearAftMeters({ longitudinalFt: -10, verticalFt: -4 });
-    assert.ok(expected !== undefined && Math.abs(expected - 10 * 0.3048) < 1e-6);
-    assert.ok(Math.abs(placed!.aftM - expected!) < 1e-9);
-    assert.ok(placed!.lon < 0);
-  });
-
-  it('nose-up pitch shortens the aft arm of a wheel below the datum', () => {
-    const flat = mainGearAftMeters({ longitudinalFt: -6, verticalFt: -3 });
-    const pitched = mainGearAftMeters(
-      { longitudinalFt: -6, verticalFt: -3 },
-      8,
-    );
-    assert.ok(flat !== undefined && pitched !== undefined);
-    assert.ok(pitched! < flat!);
-    assert.ok(flat! - pitched! < 1);
-  });
-
-  it('rejects an arm that cannot be a gear station', () => {
-    assert.equal(
-      mainGearAftMeters({ longitudinalFt: -500, verticalFt: 0 }),
-      undefined,
-    );
   });
 });
 

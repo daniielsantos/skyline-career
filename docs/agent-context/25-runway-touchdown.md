@@ -8,13 +8,12 @@ O diagrama do debrief marca o toque dezenas de metros ao lado, com o avião na f
 
 `bestRunwayProjection` trocava o eixo da faixa pelo rumo do avião sempre que isso diminuía o |lateral|. No caranguejo, alguns graus giram a faixa: 800 m × sin 5° ≈ 70 m. O rumo do catálogo, quando não é o stub magnético ident×10, já é o eixo verdadeiro.
 
-`PLANE TOUCHDOWN LATITUDE/LONGITUDE` é o datum do avião no instante do toque, não o pneu. Não há SimVar com a posição da roda. A estação longitudinal do trem está no `flight_model.cfg` (`[CONTACT_POINTS]`, pés, positivo para a frente).
+O lat/lon do toque continua o datum que o MSFS trava (`PLANE TOUCHDOWN LATITUDE/LONGITUDE`). Recuar esse ponto até o trem lido no `flight_model.cfg` saiu: o arquivo quase nunca abre, e quando abre a diferença é de poucos metros, dentro do erro entre o centro do catálogo e o asfalto do simulador.
 
 ## Fix
 
 - Eixo do catálogo. O rumo do avião só substitui o eixo num stub magnético que discorda desse rumo em mais de 12° (declinação, não caranguejo). A cabeceira e a faixa paralela continuam usando o rumo do avião.
-- Rumo e pitch travados no toque (`PLANE TOUCHDOWN HEADING DEGREES TRUE`, `PLANE TOUCHDOWN PITCH DEGREES`), não o poll seguinte.
-- Se o perfil do avião tem `cfgPath` legível, o ponto anda para trás ao longo desse rumo até o trem principal (rodas sem esterço; no bogie, o eixo mais de trás). Sem esse arquivo o ponto fica no datum — não há braço inventado por classe. O CG vazio não é o pneu.
+- Rumo travado no toque (`PLANE TOUCHDOWN HEADING DEGREES TRUE`), não o poll seguinte.
 - O desenho continua a faixa do catálogo. Centro ou rumo diferente do asfalto do simulador ainda desloca o ponto.
 
 ## Sintoma (2026-09-27) — pista do destino só no debrief

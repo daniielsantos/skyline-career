@@ -233,7 +233,6 @@ export * from './charter-board-query.js';
 export * from './career-weather.js';
 export * from './career-weather-ops.js';
 export * from './career-runways.js';
-export * from './career-contact-points.js';
 export * from './career-fuel.js';
 export * from './career-fuel-logistics.js';
 export * from './career-hub-level.js';

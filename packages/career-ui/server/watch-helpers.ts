@@ -107,7 +107,6 @@ import {
   formatPilotPayDebriefLine,
 } from '@msfs-compat/shared';
 import { NamedPipeSimBridge, setNamedPipeDebugLog } from '../../agent/src/named-pipe-sim-bridge.ts';
-import { shiftDatumToMainGear } from './touchdown-gear.ts';
 import {
   formatIpcError,
   isIpcTimeout,
@@ -1476,22 +1475,6 @@ export async function readLiveTouchdownHeadingTrueDeg(
       unit: 'degrees',
     });
     if (Number.isFinite(hdg)) return ((hdg % 360) + 360) % 360;
-  } catch {
-    /* soft-fail */
-  }
-  return undefined;
-}
-
-/** Pitch latched with the touchdown position (degrees, nose up positive). */
-export async function readLiveTouchdownPitchDeg(
-  bridge: NamedPipeSimBridge,
-): Promise<number | undefined> {
-  try {
-    const pitch = await bridge.readSimVar({
-      name: 'PLANE TOUCHDOWN PITCH DEGREES',
-      unit: 'degrees',
-    });
-    if (Number.isFinite(pitch) && Math.abs(pitch) <= 40) return pitch;
   } catch {
     /* soft-fail */
   }
@@ -3883,7 +3866,6 @@ export class CareerWatchSession {
       ) {
         let simTd: { lat: number; lon: number } | undefined;
         let latchedHdg: number | undefined;
-        let latchedPitch: number | undefined;
         if (this.bridge) {
           try {
             simTd = await readLiveTouchdownPosition(this.bridge);
@@ -3894,11 +3876,6 @@ export class CareerWatchSession {
             latchedHdg = await readLiveTouchdownHeadingTrueDeg(this.bridge);
           } catch {
             latchedHdg = undefined;
-          }
-          try {
-            latchedPitch = await readLiveTouchdownPitchDeg(this.bridge);
-          } catch {
-            latchedPitch = undefined;
           }
         }
         const picked = pickFirstContactCoords({
@@ -3921,28 +3898,13 @@ export class CareerWatchSession {
           hdg = this.lastAirborneHeadingTrueDeg;
         }
         if (picked) {
-          let lat = picked.lat;
-          let lon = picked.lon;
-          let gearAftM: number | undefined;
-          if (this.bridge) {
-            const shifted = await shiftDatumToMainGear(
-              this.bridge,
-              picked,
-              hdg,
-              latchedPitch,
-            );
-            lat = shifted.lat;
-            lon = shifted.lon;
-            gearAftM = shifted.aftM;
-          }
-          this.touchdownLat = lat;
-          this.touchdownLon = lon;
+          this.touchdownLat = picked.lat;
+          this.touchdownLon = picked.lon;
           watchDebugLog('watch', 'first-contact position', {
             missionId: current.id,
             source: picked.source,
-            lat,
-            lon,
-            gearAftM: gearAftM ?? null,
+            lat: picked.lat,
+            lon: picked.lon,
             planeLat: sample.position?.lat ?? null,
             planeLon: sample.position?.lon ?? null,
             simLat: simTd?.lat ?? null,
@@ -4721,16 +4683,10 @@ export class CareerWatchSession {
           try {
             const tdPos = await readLiveTouchdownPosition(this.bridge);
             let latchedHdg: number | undefined;
-            let latchedPitch: number | undefined;
             try {
               latchedHdg = await readLiveTouchdownHeadingTrueDeg(this.bridge);
             } catch {
               latchedHdg = undefined;
-            }
-            try {
-              latchedPitch = await readLiveTouchdownPitchDeg(this.bridge);
-            } catch {
-              latchedPitch = undefined;
             }
             const picked = pickFirstContactCoords({
               simTouchdown: tdPos ?? null,
@@ -4741,21 +4697,10 @@ export class CareerWatchSession {
                   : null,
             });
             if (picked) {
-              const hdg =
-                latchedHdg ??
-                touchdownHeadingTrueDeg ??
-                this.lastAirborneHeadingTrueDeg ??
-                undefined;
-              const shifted = await shiftDatumToMainGear(
-                this.bridge,
-                picked,
-                hdg,
-                latchedPitch,
-              );
-              touchdownLat = shifted.lat;
-              touchdownLon = shifted.lon;
-              this.touchdownLat = shifted.lat;
-              this.touchdownLon = shifted.lon;
+              touchdownLat = picked.lat;
+              touchdownLon = picked.lon;
+              this.touchdownLat = picked.lat;
+              this.touchdownLon = picked.lon;
               if (latchedHdg != null && touchdownHeadingTrueDeg == null) {
                 touchdownHeadingTrueDeg = latchedHdg;
                 this.touchdownHeadingTrueDeg = latchedHdg;
@@ -4763,7 +4708,6 @@ export class CareerWatchSession {
               watchDebugLog('watch', 'settle touchdown position fallback', {
                 missionId: current.id,
                 source: picked.source,
-                gearAftM: shifted.aftM ?? null,
               });
             }
           } catch {

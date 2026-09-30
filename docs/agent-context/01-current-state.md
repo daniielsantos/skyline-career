@@ -1,4 +1,7 @@
-# Current state (2026-09-29)
+# Current state (2026-09-30)
+
+`main` **dd82a61b** / desktop **0.3.396** shipped: Let a freight contract wait at an intermediate hub until the next leg. Release: [v0.3.396](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.396).
+
 
 `main` **b603d80e** / desktop **0.3.395** shipped: Save NPC landings without rewriting the whole economy. Release: [v0.3.395](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.395).
 

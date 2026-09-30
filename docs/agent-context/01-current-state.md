@@ -1,5 +1,8 @@
 # Current state (2026-09-30)
 
+`main` **d0a01a2f** / desktop **0.3.400** shipped: Keep a sold aircraft out of the hangar after the dealer pays. Release: [v0.3.400](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.400).
+
+
 `main` **9ebdddf9** / desktop **0.3.399** shipped: Show a loading ball on buttons that stay locked while a request runs. Release: [v0.3.399](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.399).
 
 

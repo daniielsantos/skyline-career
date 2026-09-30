@@ -1,5 +1,8 @@
 # Current state (2026-09-30)
 
+`main` **9ebdddf9** / desktop **0.3.399** shipped: Show a loading ball on buttons that stay locked while a request runs. Release: [v0.3.399](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.399).
+
+
 `main` **37fd9cd6** / desktop **0.3.398** shipped: Leave the touchdown marker on the sim datum. Release: [v0.3.398](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.398).
 
 

@@ -1235,6 +1235,7 @@ async function careerFetch(path: string, init?: RequestInit): Promise<Response> 
   }
   const res = await fetch(path, {
     ...init,
+    cache: init?.cache ?? 'no-store',
     headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
   });
   if (res.status === 401) {

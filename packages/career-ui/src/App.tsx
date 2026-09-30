@@ -5025,6 +5025,7 @@ export function App() {
       bootstrapping || scopedFull || effectiveScope?.missions === true;
     const wantNpc = scopedFull || effectiveScope?.npc === true;
     const wantAircraft = scopedFull || effectiveScope?.aircraftMarket === true;
+    const preserveFleet = effectiveScope?.preserveFleet === true;
     if (wantAircraft) setAircraftMarketLoading(true);
     try {
     const wantBush = scopedFull || effectiveScope?.bushTrips === true;
@@ -5090,7 +5091,9 @@ export function App() {
     }
     setHubSelected(Boolean(state.hubSelected));
     if (isHomeState) {
-      setFleetIfChanged(chromeHomeFleet(state.fleet ?? []));
+      if (!preserveFleet) {
+        setFleetIfChanged(chromeHomeFleet(state.fleet ?? []));
+      }
       if (state.airframePerf) {
         setAirframePerf((prev) => ({ ...prev, ...state.airframePerf }));
       }
@@ -5178,7 +5181,7 @@ export function App() {
         }
       }
     } else if (tenantMatches) {
-      setVaSessionFleet(state.fleet ?? []);
+      if (!preserveFleet) setVaSessionFleet(state.fleet ?? []);
       if (state.airframePerf) {
         setAirframePerf((prev) => ({ ...prev, ...state.airframePerf }));
       }
@@ -5283,10 +5286,10 @@ export function App() {
         paintWallet(acMarket.walletUsd, {
           sourceCompanyId: stateCompanyId || requestTenant,
         });
-        if (Array.isArray(acMarket.fleet)) {
+        if (!preserveFleet && Array.isArray(acMarket.fleet)) {
           setFleetIfChanged(chromeHomeFleet(acMarket.fleet));
         }
-      } else if (Array.isArray(acMarket.fleet)) {
+      } else if (!preserveFleet && Array.isArray(acMarket.fleet)) {
         setVaSessionFleet(acMarket.fleet);
       }
       if (acMarket.homeCountryId) setAircraftHomeCountryId(acMarket.homeCountryId);
@@ -9243,7 +9246,7 @@ export function App() {
       if (result.listings) setAircraftListings(result.listings);
       setToastKind('ok');
       setToast(`Dealer paid ${formatMoney(result.creditUsd)}`);
-    }, { sync: { aircraftMarket: true } });
+    }, { sync: { aircraftMarket: true, preserveFleet: true } });
   }
 
   async function onListForSale(aircraftId: string) {

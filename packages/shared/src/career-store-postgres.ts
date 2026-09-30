@@ -2760,7 +2760,7 @@ export class PostgresCareerStore implements CareerStore {
 
   async saveMissions(
     state: CareerMissionsState,
-    opts?: { companyId?: string },
+    opts?: { companyId?: string; dropFleetAircraftIds?: string[] },
   ): Promise<void> {
     await this.ready;
     const companyId = (opts?.companyId ?? this.activeCompanyId).trim() || LOCAL_COMPANY_ID;

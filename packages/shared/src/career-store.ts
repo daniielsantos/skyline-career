@@ -347,7 +347,7 @@ export interface CareerStore {
   loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState>;
   saveMissions(
     state: CareerMissionsState,
-    opts?: { companyId?: string },
+    opts?: { companyId?: string; dropFleetAircraftIds?: string[] },
   ): Promise<void>;
   /** Active company tenant for load/save (SP default `local`). */
   getActiveCompanyId(): string;
@@ -1223,7 +1223,7 @@ class JsonCareerStore implements CareerStore {
 
   async saveMissions(
     state: CareerMissionsState,
-    _opts?: { companyId?: string },
+    _opts?: { companyId?: string; dropFleetAircraftIds?: string[] },
   ): Promise<void> {
     await writeJsonFileAtomic(this.missionsPath, missionsPayloadForBlob(state));
   }
@@ -1594,11 +1594,15 @@ class SqliteCareerStore implements CareerStore {
   private lastEconomyBlobJson: string | null = null;
   private lastCompanyPersistKey: string | null = null;
   private lastCompanyStateKey: string | null = null;
-  private lastFleetPersistKey: string | null = null;
   private lastMissionsTableKey: string | null = null;
   private lastLedgerPersistKey: string | null = null;
   private lastMissionsStubJson: string | null = null;
-  private lastFleetSignatures: Map<string, string> | null = null;
+  /**
+   * Per company. One shared map let a pulse save of company B forget company A's
+   * hull ids, so the next sell credited cash and left the tail in fleet_aircraft.
+   */
+  private fleetSignaturesByCompany = new Map<string, Map<string, string>>();
+  private fleetPersistKeyByCompany = new Map<string, string>();
   private lastMissionSignatures: Map<string, string> | null = null;
 
   constructor(sqlitePath: string) {
@@ -1617,11 +1621,9 @@ class SqliteCareerStore implements CareerStore {
     // Invalidate company persist caches when switching tenants.
     this.lastCompanyPersistKey = null;
     this.lastCompanyStateKey = null;
-    this.lastFleetPersistKey = null;
     this.lastMissionsTableKey = null;
     this.lastLedgerPersistKey = null;
     this.lastMissionsStubJson = null;
-    this.lastFleetSignatures = null;
     this.lastMissionSignatures = null;
   }
 
@@ -2475,7 +2477,7 @@ class SqliteCareerStore implements CareerStore {
 
   async saveMissions(
     state: CareerMissionsState,
-    opts?: { companyId?: string },
+    opts?: { companyId?: string; dropFleetAircraftIds?: string[] },
   ): Promise<void> {
     const companyId = opts?.companyId?.trim() || this.activeCompanyId || LOCAL_COMPANY_ID;
     const normalized = missionsPayloadForBlob(state);
@@ -2487,6 +2489,8 @@ class SqliteCareerStore implements CareerStore {
     }
     const fleetKey = JSON.stringify(normalized.fleet ?? []);
     const missionsKey = JSON.stringify(normalized.missions ?? []);
+    const previousFleet =
+      this.fleetSignaturesByCompany.get(companyId) ?? null;
     // Scope by company — an unscoped key can skip VA ledger writes after a
     // home save with the same JSON shape (or vice versa).
     const ledgerKey = `${companyId}:${JSON.stringify(ledger)}`;
@@ -2501,7 +2505,7 @@ class SqliteCareerStore implements CareerStore {
     const stubDirty =
       companyId === LOCAL_COMPANY_ID && json !== this.lastMissionsStubJson;
     const companyStateDirty = companyStateKey !== this.lastCompanyStateKey;
-    const fleetDirty = fleetKey !== this.lastFleetPersistKey;
+    const fleetDirty = fleetKey !== this.fleetPersistKeyByCompany.get(companyId);
     const missionsDirty = missionsKey !== this.lastMissionsTableKey;
     const ledgerDirty = ledgerKey !== this.lastLedgerPersistKey;
     const now = Date.now();
@@ -2525,21 +2529,26 @@ class SqliteCareerStore implements CareerStore {
         companyState: companyStateDirty,
         fleet: fleetDirty,
         missions: missionsDirty,
-        previousFleet: this.lastFleetSignatures,
+        previousFleet,
         previousMissions: this.lastMissionSignatures,
       });
       if (ledgerDirty) persistLedgerIncremental(this.db, ledger, companyId);
     });
     this.lastCompanyPersistKey = persistKey;
     this.lastCompanyStateKey = companyStateKey;
-    this.lastFleetPersistKey = fleetKey;
+    if (fleetDirty) {
+      this.fleetPersistKeyByCompany.set(companyId, fleetKey);
+    }
     this.lastMissionsTableKey = missionsKey;
     this.lastLedgerPersistKey = ledgerKey;
     if (companyId === LOCAL_COMPANY_ID) {
       this.lastMissionsStubJson = json;
     }
     if (fleetDirty) {
-      this.lastFleetSignatures = fleetSignatureMap(normalized.fleet ?? []);
+      this.fleetSignaturesByCompany.set(
+        companyId,
+        fleetSignatureMap(normalized.fleet ?? []),
+      );
     }
     if (missionsDirty) {
       this.lastMissionSignatures = missionSignatureMap(normalized.missions ?? []);
@@ -2573,11 +2582,11 @@ class SqliteCareerStore implements CareerStore {
     this.lastEconomyBlobJson = null;
     this.lastCompanyPersistKey = null;
     this.lastCompanyStateKey = null;
-    this.lastFleetPersistKey = null;
+    this.fleetPersistKeyByCompany.clear();
+    this.fleetSignaturesByCompany.clear();
     this.lastMissionsTableKey = null;
     this.lastLedgerPersistKey = null;
     this.lastMissionsStubJson = null;
-    this.lastFleetSignatures = null;
     this.lastMissionSignatures = null;
     this.db.close();
   }

@@ -1249,10 +1249,18 @@ function resolveMissionMxBlockFuel(
   return padOfpBlockFuelKgForMx(ofpBlockFuelKg, aircraft);
 }
 
+function dropFleetAircraft(missions: MissionsFile, ids: string[] | undefined): void {
+  if (!ids?.length) return;
+  const drop = new Set(ids.map((id) => id.trim()).filter(Boolean));
+  if (drop.size === 0) return;
+  missions.fleet = missions.fleet.filter((aircraft) => !drop.has(aircraft.id));
+}
+
 async function saveMissions(
   missions: MissionsFile,
-  opts?: { companyId?: string },
+  opts?: { companyId?: string; dropFleetAircraftIds?: string[] },
 ): Promise<void> {
+  dropFleetAircraft(missions, opts?.dropFleetAircraftIds);
   await requireStore().saveMissions(missions, opts);
 }
 
@@ -2215,6 +2223,12 @@ type CareerWriteOpts = {
   commandSliceLotIds?: string[];
   commandSliceIcaos?: string[];
   commandSliceAircraftId?: string;
+  /**
+   * Hull ids that must not be in the company fleet after this write.
+   * Stripped again after the handler returns so a later pool persist cannot
+   * put a sold tail back into the snapshot that gets saved.
+   */
+  dropFleetAircraftIds?: string[];
 };
 
 /**
@@ -2356,7 +2370,12 @@ async function withCareerWrite<T>(
     worldWriterLeaseError = null;
   }
   const companyId = opts?.companyId?.trim();
-  const companyOpts = companyId ? { companyId } : undefined;
+  const companyOpts = {
+    ...(companyId ? { companyId } : {}),
+    ...(opts?.dropFleetAircraftIds?.length
+      ? { dropFleetAircraftIds: opts.dropFleetAircraftIds }
+      : {}),
+  };
   const missions = await loadMissions(companyOpts);
   if (opts?.catchUp !== true) {
     await mirrorHomePilotIcaoOntoOps(missions, companyId, {
@@ -2536,6 +2555,10 @@ async function withCareerWrite<T>(
       }
     }
     const result = await fn(world, missions);
+    // Dealer sell (and any caller that passes ids) already filtered in memory.
+    // Strip again after awaits inside the handler so the saved snapshot cannot
+    // still contain the hull the response just paid out.
+    dropFleetAircraft(missions, opts?.dropFleetAircraftIds);
     if (!sliceMissionId && sliceLotIds.length > 0) {
       const found = missions.missions.find((m) =>
         m.lots.some((line) => sliceLotIds.includes(line.shipmentLotId)),
@@ -2880,6 +2903,7 @@ function send(res: import('node:http').ServerResponse, status: number, body: unk
   const json = JSON.stringify(body);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'Access-Control-Allow-Headers':
@@ -7117,10 +7141,11 @@ export function createCareerApiServer(port = 8787) {
         const sellCompanyId = companyIdFromRequest(req, body.companyId);
         try {
           await assertVaOwnerForFleetMutation(req, sellCompanyId, 'sell VA aircraft');
+          const soldAircraftId = body.aircraftId!;
           const result = await withCareerWrite((world, missions) => {
             const sold = sellPlayerAircraft(
               missions,
-              body.aircraftId!,
+              soldAircraftId,
               world.tick,
               world,
             );
@@ -7128,10 +7153,16 @@ export function createCareerApiServer(port = 8787) {
               walletUsd: missions.walletUsd,
               creditUsd: sold.creditUsd,
               restockId: sold.restockId,
-              fleet: withParkingRates(missions.fleet),
+              fleet: withParkingRates(missions.fleet).filter(
+                (aircraft) => aircraft.id !== soldAircraftId,
+              ),
               listings: listAircraftMarket(missions, world),
             };
-          }, { persist: 'aircraftMarket', companyId: sellCompanyId });
+          }, {
+            persist: 'aircraftMarket',
+            companyId: sellCompanyId,
+            dropFleetAircraftIds: [soldAircraftId],
+          });
           send(res, 200, result);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

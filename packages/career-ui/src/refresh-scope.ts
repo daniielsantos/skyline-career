@@ -7,6 +7,11 @@ export type CareerRefreshScope = {
   aircraftMarket?: boolean;
   bushTrips?: boolean;
   airport?: boolean;
+  /**
+   * Mutation already painted `fleet`. This refresh must not put a tail back
+   * (dealer sell: wallet hold keeps the credit while a stale board GET restores the hull).
+   */
+  preserveFleet?: boolean;
 };
 
 /**

@@ -107,8 +107,33 @@ export function BusyBlock(props: { label: string; className?: string }) {
 
 const ACTION_WAIT_MS = 180;
 
+type WaitSnap = {
+  /** Enabled buttons at the click, including the one just pressed. */
+  enabledAtClick: number;
+  /** Lowest enabled-button count seen since the click. */
+  minEnabled: number;
+  /** Title + label at the click, before the wait rewrite. */
+  signature: string;
+};
+
 function enabledButtonCount(): number {
   return document.querySelectorAll('button:not([disabled])').length;
+}
+
+function buttonSignature(btn: HTMLButtonElement): string {
+  return `${btn.getAttribute('title') ?? ''}\n${btn.textContent ?? ''}`;
+}
+
+function countRecovered(snap: WaitSnap): boolean {
+  const now = enabledButtonCount();
+  // The clicked control may stay disabled after the reply (Stock leaves the
+  // aircraft assigned). The shared lock is over once the other buttons return.
+  return now > snap.minEnabled && now >= snap.enabledAtClick - 1;
+}
+
+function labelStillWaiting(btn: HTMLButtonElement): boolean {
+  const text = btn.textContent ?? '';
+  return text.includes('…') || text.includes('...');
 }
 
 function clearActionWait(btn: HTMLButtonElement) {
@@ -123,46 +148,64 @@ function clearActionWait(btn: HTMLButtonElement) {
  * After a click, if that button stays disabled while the reply is in flight,
  * show the same small spinner the confirm CTAs use. Other buttons locked by
  * the same wait stay quiet. Fast clicks that re-enable before the delay
- * never flash. A confirm dialog that closes passes the spinner back to the
- * button that opened it, once that button is the one left waiting.
+ * never flash. A button that stays disabled after the reply (the aircraft
+ * left the ramp, the load is no longer dirty) drops the spinner once the
+ * other controls unlock or its own label settles. A confirm dialog that
+ * closes passes the spinner back to the button that opened it.
  */
 export function ActionWait() {
   useEffect(() => {
     let timer = 0;
+    let dip = 0;
     let watch = 0;
     let opener: HTMLButtonElement | null = null;
     let armed: HTMLButtonElement | null = null;
-    let baselineEnabled = 0;
+    let obs: MutationObserver | null = null;
 
     const disarm = () => {
       window.clearInterval(watch);
       watch = 0;
+      obs?.disconnect();
+      obs = null;
       if (armed) clearActionWait(armed);
       armed = null;
     };
 
-    const arm = (btn: HTMLButtonElement) => {
+    const arm = (btn: HTMLButtonElement, snap: WaitSnap) => {
       if (armed && armed !== btn) clearActionWait(armed);
+      obs?.disconnect();
       armed = btn;
-      baselineEnabled = enabledButtonCount();
+      const live: WaitSnap = {
+        ...snap,
+        minEnabled: Math.min(snap.minEnabled, enabledButtonCount()),
+        signature: buttonSignature(btn),
+      };
       btn.dataset.actionWait = '1';
       if (btn.getAttribute('aria-busy') !== 'true') {
         btn.setAttribute('aria-busy', 'true');
         btn.dataset.actionWaitAria = '1';
       }
+      obs = new MutationObserver(() => {
+        if (armed !== btn) return;
+        if (!btn.isConnected || !btn.disabled || buttonSignature(btn) !== live.signature) {
+          disarm();
+        }
+      });
+      obs.observe(btn, {
+        attributes: true,
+        attributeFilter: ['title', 'class', 'disabled'],
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
       window.clearInterval(watch);
       watch = window.setInterval(() => {
         if (!armed || !armed.isConnected) {
           disarm();
           return;
         }
-        if (!armed.disabled) {
-          disarm();
-          return;
-        }
-        // The whole screen was locked. Once any button is clickable again,
-        // this wait is over even if the clicked control stays disabled.
-        if (baselineEnabled === 0 && enabledButtonCount() > 0) disarm();
+        live.minEnabled = Math.min(live.minEnabled, enabledButtonCount());
+        if (!armed.disabled || countRecovered(live)) disarm();
       }, 120);
     };
 
@@ -176,19 +219,42 @@ export function ActionWait() {
       if (btn.disabled) return;
       const previous = opener;
       window.clearTimeout(timer);
+      window.clearInterval(dip);
       const clicked = btn;
+      const snap: WaitSnap = {
+        enabledAtClick: enabledButtonCount(),
+        minEnabled: enabledButtonCount(),
+        signature: buttonSignature(clicked),
+      };
       queueMicrotask(() => {
         if (!clicked.isConnected || clicked.disabled) return;
         opener = clicked;
       });
+      dip = window.setInterval(() => {
+        snap.minEnabled = Math.min(snap.minEnabled, enabledButtonCount());
+      }, 40);
       timer = window.setTimeout(() => {
+        window.clearInterval(dip);
+        dip = 0;
+        snap.minEnabled = Math.min(snap.minEnabled, enabledButtonCount());
         if (!clicked.isConnected) {
-          if (previous?.isConnected && previous.disabled) arm(previous);
+          if (previous?.isConnected && previous.disabled) {
+            const now = enabledButtonCount();
+            arm(previous, {
+              enabledAtClick: now + 1,
+              minEnabled: now,
+              signature: buttonSignature(previous),
+            });
+          }
           return;
         }
         if (!clicked.disabled) return;
+        const moved = buttonSignature(clicked) !== snap.signature;
+        const deepDip = snap.minEnabled < snap.enabledAtClick - 1;
+        if (countRecovered(snap)) return;
+        if (moved && !deepDip && !labelStillWaiting(clicked)) return;
         opener = null;
-        arm(clicked);
+        arm(clicked, snap);
       }, ACTION_WAIT_MS);
     };
 
@@ -196,6 +262,7 @@ export function ActionWait() {
     return () => {
       document.removeEventListener('click', onClick, true);
       window.clearTimeout(timer);
+      window.clearInterval(dip);
       disarm();
       opener = null;
     };

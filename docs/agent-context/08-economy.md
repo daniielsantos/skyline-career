@@ -12,6 +12,10 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 **Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
+- **Demand pay vs airplane cost (2026-09-30):** não é impressora geral. No board aberto, supplies 4,401 nm (~$43k) num wide (único com alcance; narrow máx 2,500 nm) perde ~$44k no dia: Jet-A classe ~$51k já passa o pay (12 kg/nm × $0,95/kg). General curto deixa poucos mil depois do lease do dia. Electronics 3,976 nm ($181k no board, ~$232k com intl 1,28× no accept) num wide de $14M / lease $30k/dia sobra ~$100k–$150k depois de fuel, MX e lease — rápido se fosse todo dia, mas a commodity está Locked em Cargo Ops e o resto do longo não paga o combustível. Tripulação e parking são ruído. Sem retune.
+
+- **Demand long-haul mass (2026-09-30):** sintoma = board com 4.000 nm pedindo 7–15 klb e Total alto (electronics ~$181k em 9.4 klb). Causa = Wanted é o roll da commodity (electronics/machinery 0.4–8 t, resto 0.4–12 t), cheio já aos 500 nm; distância não aumenta a massa. Total = spot da escassez × kg (`basePricePerKg`: electronics $18, machinery $6, supplies $2.50, general $2.20), e o nm só mexe ~0.85×→1.06× no preço por libra. Não é bug de uma linha. **Sem retune** — Demand segue feeder; trunk largo é Freights/haul.
+
 - **Demand short-hop retune (2026-09-26):** sintoma pós nm-scale v1 = KFLL 18 nm electronics ainda ~$52k Total (só unit×0.55). Fix = ultra floor no `demandNmScale` + Wanted×nm (`demandWantedKgForNm`). Mid/long ~intactos. Detail: [`24-port-fbo.md`](./24-port-fbo.md).
 
 - **Demand nm pay anti money-print (2026-09-26):** sintoma = Demand electronics curto (150 nm) com Total pay altíssimo — preço = só spot dest×premium, intl ×1.28 flat. Fix = `demandNmScale` no spawn + intl ramp por nm (`demandIntlPayMultForNm`). Sem Dry/factory/Freights. Detail: [`24-port-fbo.md`](./24-port-fbo.md).

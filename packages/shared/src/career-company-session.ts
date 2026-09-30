@@ -17,7 +17,10 @@ import { settleHangarParkingFees } from './career-hangar-fees.js';
 import { tickPortAutoBuyOrders } from './career-port-auto-buy.js';
 import { tickVaAutoHaul } from './career-va-auto-haul.js';
 import { tickPortConcessions } from './career-port-concessions.js';
-import { settlePortYardHoldFees } from './career-ports.js';
+import {
+  settleFreightHoldFees,
+  settlePortYardHoldFees,
+} from './career-ports.js';
 import {
   settleWarehouseInboundTransfers,
   settleWarehouseStorageFees,
@@ -149,6 +152,10 @@ export function settleCompanyPassiveFeesForTickRange(
     fromTick: feeRange.fromTick,
     toTick: feeRange.toTick,
   });
+  const freightHoldOps = settleFreightHoldFees(missions, {
+    fromTick: feeRange.fromTick,
+    toTick: feeRange.toTick,
+  });
   const crewDaily = settleCrewDailyOps(missions, world, {
     fromTick: feeRange.fromTick,
     toTick: feeRange.toTick,
@@ -173,6 +180,7 @@ export function settleCompanyPassiveFeesForTickRange(
     (fboOps.storage?.debitUsd ?? 0) +
     whOps.debitUsd +
     yardOps.debitUsd +
+    freightHoldOps.debitUsd +
     (crewDaily.salary?.debitUsd ?? 0) +
     (groundStaffDaily.salary?.debitUsd ?? 0) +
     (groundStaffDaily.vaLineCrewSalary?.debitUsd ?? 0) +
@@ -186,6 +194,7 @@ export function settleCompanyPassiveFeesForTickRange(
       hangar: hangarOps.debitUsd,
       warehouse: whOps.debitUsd,
       yard: yardOps.debitUsd,
+      freightHold: freightHoldOps.debitUsd,
       fboStorage: fboOps.storage?.debitUsd ?? 0,
       crewSalary: crewDaily.salary?.debitUsd ?? 0,
       groundStaffSalary:

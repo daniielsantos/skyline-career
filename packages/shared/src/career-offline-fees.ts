@@ -35,6 +35,7 @@ export type OfflineFeeSummary = {
     hangar: number;
     warehouse: number;
     yard: number;
+    freightHold: number;
     fboStorage: number;
     crewSalary: number;
     groundStaffSalary: number;

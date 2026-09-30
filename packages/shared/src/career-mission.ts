@@ -1,6 +1,9 @@
 import {
+  airportByIcao,
   applyFreightDelivery,
   CAREER_HUB_COORDS,
+  DEFAULT_SETTLE_RADIUS_NM,
+  distanceNm,
   getCommodity,
   listMarketLots,
   routeDistanceNm,
@@ -15,6 +18,7 @@ import { applyAircraftHoursAfterMission, estimateMissionBlockHours } from './car
 import {
   applyPlayerDepartFuel,
   assignAircraftToMission,
+  findMissionAircraft,
   findPlayerAircraft,
   relocateAircraftOnSettle,
   releaseAircraftOnCancel,
@@ -2321,7 +2325,10 @@ export function cancelMission(
       }
     }
   }
-  const cancelled = { ...normalized, status: 'cancelled' as const };
+  const cancelled = {
+    ...withoutFreightHold(normalized),
+    status: 'cancelled' as const,
+  };
   clearPlayerInbound(world, cancelled.id);
   return cancelled;
 }
@@ -2507,6 +2514,115 @@ export function revertFalseDepartMission(
   return reverted;
 }
 
+function withoutFreightHold(mission: MissionIntent): MissionIntent {
+  if (!mission.freightHold) return mission;
+  const { freightHold: _freightHold, ...rest } = mission;
+  return rest;
+}
+
+function freightHoldRefusal(mission: MissionIntent): string | null {
+  if (mission.missionType === 'charter') {
+    return 'Charter cannot be left at a hub';
+  }
+  if (mission.payloadLab) return 'Payload Lab cannot be left at a hub';
+  if (mission.fuelHaul) return 'Jet-A haul cannot be left at a hub';
+  if (isEmptyLegMission(mission) || mission.cargoKg <= 0) {
+    return 'Empty legs cannot be left at a hub';
+  }
+  return null;
+}
+
+/** Nearest career hub within the settle radius, or an explicit career ICAO. */
+export function resolveFreightHoldHub(
+  world: CareerEconomyWorld,
+  opts: { icao?: string; lat?: number; lon?: number },
+): string {
+  const lat = opts.lat;
+  const lon = opts.lon;
+  if (
+    typeof lat === 'number' &&
+    typeof lon === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon)
+  ) {
+    let bestIcao = '';
+    let bestNm = DEFAULT_SETTLE_RADIUS_NM;
+    for (const [code, coords] of Object.entries(CAREER_HUB_COORDS)) {
+      const nm = distanceNm({ lat, lon }, coords);
+      if (nm <= bestNm) {
+        bestNm = nm;
+        bestIcao = code;
+      }
+    }
+    if (!bestIcao || !airportByIcao(world, bestIcao)) {
+      throw new Error('Not at a career hub');
+    }
+    return bestIcao;
+  }
+  const icao = opts.icao?.trim().toUpperCase() ?? '';
+  if (!icao || !CAREER_HUB_COORDS[icao] || !airportByIcao(world, icao)) {
+    throw new Error(icao ? `${icao} is not a career hub` : 'icao required');
+  }
+  return icao;
+}
+
+/**
+ * End the airborne leg at an intermediate hub. The same contract stays open:
+ * origin becomes the hub, dest / lots / pay / deadline stay, status returns
+ * to accepted. No payout, no warehouse stock, no Port FBO throughput.
+ */
+export function leaveFreightAtHub(
+  world: CareerEconomyWorld,
+  fleet: CareerMissionsState,
+  mission: MissionIntent,
+  opts: { icao?: string; lat?: number; lon?: number },
+): MissionIntent {
+  const normalized = normalizeMissionIntent(mission);
+  if (normalized.status !== 'in_flight') {
+    throw new Error(`Cannot leave freight in status=${normalized.status}`);
+  }
+  const refusal = freightHoldRefusal(normalized);
+  if (refusal) throw new Error(refusal);
+  const icao = resolveFreightHoldHub(world, opts);
+  const origin = normalized.originIcao.trim().toUpperCase();
+  const dest = normalized.destIcao.trim().toUpperCase();
+  if (icao === origin || icao === dest) {
+    throw new Error('Leave freight only at an intermediate hub');
+  }
+  const aircraft = findMissionAircraft(fleet, normalized);
+  if (aircraft) {
+    aircraft.locationIcao = icao;
+    aircraft.assignedMissionId = normalized.id;
+    aircraft.status = 'assigned';
+  }
+  if (normalized.crewOperated !== true) {
+    syncPilotIcaoTo(fleet, icao);
+  }
+  const {
+    airborneAtMs: _airborneAtMs,
+    airborneElapsedMs: _airborneElapsedMs,
+    expectedRouteMs: _expectedRouteMs,
+    departedAtTick: _departedAtTick,
+    destRelocationBlocksSettle: _destRelocationBlocksSettle,
+    dispatchedAtTick: _dispatchedAtTick,
+    staticId: _staticId,
+    fuelUplift: _fuelUplift,
+    fuelAuthorizedOfpId: _fuelAuthorizedOfpId,
+    lastOfpCheck: _lastOfpCheck,
+    lastPreflightCheck: _lastPreflightCheck,
+    freightHold: _freightHold,
+    ...rest
+  } = normalized;
+  const next: MissionIntent = {
+    ...rest,
+    originIcao: icao,
+    status: 'accepted',
+    freightHold: { icao, sinceTick: world.tick },
+  };
+  syncPlayerInbound(world, next);
+  return next;
+}
+
 /**
  * Mark cargo airborne. Allowed from accepted or dispatched.
  * Fully-reserved lots flip to in_transit so the market stops offering them.
@@ -2590,7 +2706,7 @@ export function departMission(
 
   let fuelDebitUsd = 0;
   let nextMission: MissionIntent = {
-    ...normalized,
+    ...withoutFreightHold(normalized),
     status: 'in_flight',
     departedAtTick: world.tick,
     ...airborneStamp,

@@ -42,6 +42,7 @@ import {
   fetchLoadOfpProgress,
   postPreflight,
   postSettle,
+  postLeaveFreight,
   postSelectHub,
   fetchAircraftMarket,
   AIRCRAFT_MARKET_NEAR_NM,
@@ -12671,6 +12672,57 @@ export function App() {
     }, { sync: { airport: true } });
   }
 
+  async function onLeaveFreight(mission: Mission) {
+    const position = watch?.position ?? simBridge?.position ?? null;
+    const ok = await confirm({
+      title: 'Leave freight here?',
+      body: 'The contract stays open and unpaid. Yard storage starts at this hub. The next dispatch leaves from here, and the deadline keeps running.',
+      confirmLabel: 'Leave freight here',
+      cancelLabel: 'Keep flying',
+      tone: 'warn',
+    });
+    if (!ok) return;
+    await run(async () => {
+      const home = homeCompanyIdRef.current?.trim();
+      const active = activeCompanyIdRef.current?.trim();
+      const opsCompanyId =
+        resolveOpsCompanyId(mission.aircraftId) || active || home || undefined;
+      const result = await postLeaveFreight({
+        missionId: mission.id,
+        companyId: opsCompanyId,
+        ...(position &&
+        Number.isFinite(position.lat) &&
+        Number.isFinite(position.lon)
+          ? { lat: position.lat, lon: position.lon }
+          : {}),
+      });
+      if (Array.isArray(result.fleet)) {
+        const holdingVa = Boolean(home && active && home !== active);
+        if (holdingVa) setVaSessionFleet(result.fleet);
+        else setFleet(result.fleet);
+      }
+      if (result.pilotIcao) setPilotIcao(result.pilotIcao);
+      if (typeof result.walletUsd === 'number') {
+        commitWallet(result.walletUsd, {
+          sourceCompanyId: opsCompanyId || home,
+        });
+      }
+      setMissions((current) =>
+        current.map((m) => (m.id === result.mission.id ? result.mission : m)),
+      );
+      try {
+        await postWatchStop({ reset: true });
+      } catch {
+        /* watch may already be idle */
+      }
+      setWatch((prev) =>
+        prev?.missionId === mission.id ? null : prev,
+      );
+      const hub = result.mission.freightHold?.icao ?? result.mission.originIcao;
+      setToast(`Freight holding at ${hub}. Plan the next leg from there.`);
+    }, { sync: { missions: true, airport: true } });
+  }
+
   async function onSettle(mission: Mission) {
     const ok = await confirm({
       title: 'Settle without MSFS?',
@@ -20224,6 +20276,7 @@ export function App() {
               onToggleSkylineInject={onToggleSkylineInject}
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}
+              onLeaveFreight={(m) => void onLeaveFreight(m)}
               onCrewDispatch={(m, crewMemberId) =>
                 void onCrewDispatchMission(m, crewMemberId)
               }

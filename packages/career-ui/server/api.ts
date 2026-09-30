@@ -303,6 +303,7 @@ import {
   executeAcceptLot,
   executeAcceptManifest,
   executeDepartFlight,
+  leaveFreightAtHub,
   revertFalseDepartMission,
   executeBuyAircraft,
   executeCancelMission,
@@ -14949,6 +14950,59 @@ export function createCareerApiServer(port = 8787) {
             fuelDebitUsd: result.fuelDebitUsd,
             fleet: result.fleet,
             preflightOverride: body.override === true,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/missions/leave-freight') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          companyId?: string;
+          icao?: string;
+          lat?: number;
+          lon?: number;
+        };
+        if (!body.missionId) {
+          send(res, 400, { error: 'missionId required' });
+          return;
+        }
+        const holdCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          const result = await withCareerWrite((world, missions) => {
+            const idx = missions.missions.findIndex((m) => m.id === body.missionId);
+            if (idx < 0) return { kind: 'missing' as const };
+            const next = leaveFreightAtHub(world, missions, missions.missions[idx]!, {
+              ...(typeof body.icao === 'string' ? { icao: body.icao } : {}),
+              ...(typeof body.lat === 'number' ? { lat: body.lat } : {}),
+              ...(typeof body.lon === 'number' ? { lon: body.lon } : {}),
+            });
+            missions.missions[idx] = next;
+            return {
+              kind: 'ok' as const,
+              mission: next,
+              walletUsd: missions.walletUsd,
+              fleet: withParkingRates(missions.fleet),
+              pilotIcao: missions.pilotIcao,
+            };
+          }, {
+            commandSliceMissionId: body.missionId,
+            housekeeping: false,
+            companyId: holdCompanyId,
+          });
+          if (result.kind === 'missing') {
+            send(res, 404, { error: `Unknown mission ${body.missionId}` });
+            return;
+          }
+          send(res, 200, {
+            mission: await toClientMission(result.mission),
+            walletUsd: result.walletUsd,
+            fleet: result.fleet,
+            pilotIcao: result.pilotIcao,
           });
         } catch (error) {
           send(res, 400, {

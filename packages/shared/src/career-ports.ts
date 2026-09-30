@@ -2651,6 +2651,66 @@ export function settlePortYardHoldFees(
 }
 
 /**
+ * Daily yard rate for freight parked at an intermediate hub.
+ * Charged once per economy day the contract still carries `freightHold`.
+ */
+export function settleFreightHoldFees(
+  state: CareerMissionsState,
+  opts: { fromTick: number; toTick: number },
+): PortYardHoldSettleResult {
+  const daysCharged = Math.max(
+    0,
+    economyDayIndex(opts.toTick) - economyDayIndex(opts.fromTick),
+  );
+  const empty: PortYardHoldSettleResult = {
+    debitUsd: 0,
+    requestedUsd: 0,
+    shortfallUsd: 0,
+    daysCharged: 0,
+  };
+  if (daysCharged <= 0) return empty;
+  const held = (state.missions ?? []).filter(
+    (mission) =>
+      mission.freightHold &&
+      (mission.status === 'accepted' || mission.status === 'dispatched') &&
+      mission.cargoKg > 0,
+  );
+  if (held.length === 0) return { ...empty, daysCharged };
+
+  let requestedUsd = 0;
+  let kg = 0;
+  const hubs = new Set<string>();
+  for (const mission of held) {
+    const hub = mission.freightHold!.icao;
+    hubs.add(hub);
+    kg += mission.cargoKg;
+    requestedUsd +=
+      portYardHoldUsdPerDay({
+        kg: mission.cargoKg,
+        commodityId: mission.commodityId,
+        hubIcao: hub,
+        state,
+      }) * daysCharged;
+  }
+  requestedUsd = money(requestedUsd);
+  if (requestedUsd <= 0) return { ...empty, daysCharged };
+
+  const debitUsd = money(Math.min(state.walletUsd, requestedUsd));
+  const shortfallUsd = money(Math.max(0, requestedUsd - debitUsd));
+  if (debitUsd > 0) {
+    const hubList = [...hubs].join(', ');
+    applyWalletDelta(state, {
+      amountUsd: -debitUsd,
+      kind: 'freight_hold',
+      atTick: opts.toTick,
+      icao: [...hubs][0],
+      note: `Freight hold ${formatLedgerDaysNotePrefix(daysCharged)}${hubList} · ${Math.round(kg)} kg`,
+    });
+  }
+  return { debitUsd, requestedUsd, shortfallUsd, daysCharged };
+}
+
+/**
  * @deprecated FBO spot removed — use depositPortPickupToWarehouse.
  */
 export function depositPortPickupToFboSpot(

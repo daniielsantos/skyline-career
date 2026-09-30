@@ -14725,6 +14725,22 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   color: #f0a35a;
 }
 
+.dispatch-freight-hold {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  align-items: baseline;
+  padding: 0.55rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(240, 163, 90, 0.45);
+  background: rgba(240, 163, 90, 0.1);
+  font-size: 0.9rem;
+}
+
+.dispatch-freight-hold strong {
+  color: #f0a35a;
+}
+
 .payload-lab-layout-chip {
   display: flex;
   flex-wrap: wrap;

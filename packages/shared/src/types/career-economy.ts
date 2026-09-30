@@ -952,6 +952,15 @@ export interface MissionIntent {
    * estimate. May tighten after stable cruise TAS rebase (floor 55% of OFP).
    */
   expectedRouteMs?: number;
+  /**
+   * Freight parked at an intermediate hub. `originIcao` is that hub; dest,
+   * lots, pay, and deadline stay. Yard-rate storage runs until the next
+   * leg departs or the contract is cancelled.
+   */
+  freightHold?: {
+    icao: string;
+    sinceTick: number;
+  };
   /** Economy tick when settle ran. */
   settledAtTick?: number;
   /** Freight paid after late penalty. */
@@ -2106,6 +2115,7 @@ export type CareerLedgerKind =
   | 'fbo_spot_sale'
   | 'port_buy'
   | 'port_yard_hold'
+  | 'freight_hold'
   | 'port_drayage'
   | 'port_shuttle'
   | 'internal_haul_pay'

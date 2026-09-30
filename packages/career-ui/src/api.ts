@@ -579,6 +579,8 @@ export type Mission = {
   payloadLab?: boolean;
   /** Demand Board mission (warehouse → terminal). */
   demandOrderId?: string;
+  /** Freight parked at an intermediate hub. Next leg starts at `icao`. */
+  freightHold?: { icao: string; sinceTick: number };
   /** Wide / trunk haul from WH → terminal. */
   warehouseHaul?: boolean;
   /** WH→WH company bridge / Internal Haul. */
@@ -1625,6 +1627,7 @@ export type OfflineFeeSummary = {
     hangar: number;
     warehouse: number;
     yard: number;
+    freightHold: number;
     fboStorage: number;
     crewSalary: number;
     groundStaffSalary: number;
@@ -5186,6 +5189,24 @@ export function postPreflight(opts: {
       position?: { lat: number; lon: number };
     };
   }>('/api/preflight', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postLeaveFreight(opts: {
+  missionId: string;
+  companyId?: string;
+  icao?: string;
+  lat?: number;
+  lon?: number;
+}) {
+  return api<{
+    mission: Mission;
+    walletUsd: number;
+    fleet?: PlayerAircraft[];
+    pilotIcao?: string;
+  }>('/api/missions/leave-freight', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

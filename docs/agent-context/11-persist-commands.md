@@ -35,6 +35,10 @@ Não esperar o tick horário no clique. O mundo anda no timer (~60s).
 
 **Revision:** lease holder (world-api) não passa expected tip — só `FOR UPDATE` + bump. CAS tip = defesa de peer/worker sem lease. Assim Accept/Dispatch/fuel/settle/ports/… não toastam `expected N, actual N+1` enquanto o pulse bumpa revision off-lock. Dispatch sem trim de cargo → `persist:'company'`. **Ship MP = deploy world-api**.
 
+## Comando `leaveFreightAtHub`
+
+Um contrato de carga `in_flight` pode parar num hub que não é a origem nem o destino. `POST /api/missions/leave-freight` (gateway encaminha pro world) devolve a mesma missão para `accepted`, troca `originIcao` pelo hub, grava `freightHold: { icao, sinceTick }`, estaciona a cauda com a carga ainda assigned e limpa os carimbos de voo. Sem crédito, sem estoque de WH, sem throughput de Port FBO, sem linha de logbook. Charter, Jet-A haul, vazio, deadhead e Payload Lab recusam. A taxa é a do pátio (`freight_hold`, $0.05/kg/dia de economia) no settle passivo da company, até o próximo `depart` ou o cancel. O botão **Leave freight here** só aparece no En route em solo, já no ar, longe da origem e do destino. O gate de settle do Watch (`destProximity`) não muda.
+
 ## Comando `SettleFlight`
 
 **Quem dispara:** Watch (`event.type === 'settle'`) ou Advanced/manual settle. UI já pode mostrar `settling` (shipped `228d6c1`).

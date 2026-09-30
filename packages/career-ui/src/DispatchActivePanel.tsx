@@ -70,6 +70,39 @@ export function DispatchStepper(props: { current: DispatchStepId }) {
   );
 }
 
+/** Mirror of shared yard rate ($/kg/economy-day). Electronics and machinery are 2×. */
+function freightHoldUsdPerDay(mission: Mission): number {
+  const kg = Math.max(0, mission.cargoKg || 0);
+  const perKg =
+    mission.commodityId === 'electronics' || mission.commodityId === 'machinery'
+      ? 0.1
+      : 0.05;
+  return Math.round(kg * perKg * 100) / 100;
+}
+
+function canLeaveFreightHere(mission: Mission): boolean {
+  if (mission.missionType === 'charter') return false;
+  if (mission.payloadLab || mission.fuelHaul) return false;
+  if (
+    mission.emptyFlight ||
+    mission.crewDeadhead ||
+    mission.contractPilotReposition
+  ) {
+    return false;
+  }
+  return (mission.cargoKg ?? 0) > 0;
+}
+
+function holdPositionOk(
+  position: { lat: number; lon: number } | null | undefined,
+): boolean {
+  if (!position) return false;
+  if (!Number.isFinite(position.lat) || !Number.isFinite(position.lon)) {
+    return false;
+  }
+  return !(position.lat === 0 && position.lon === 0);
+}
+
 export function DispatchActivePanel(props: {
   mission: Mission;
   step: DispatchStepId;
@@ -152,6 +185,8 @@ export function DispatchActivePanel(props: {
   onToggleSkylineInject: (enabled: boolean) => void;
   onDepart: (mission: Mission) => void;
   onSettle: (mission: Mission) => void;
+  /** Park an in-flight freight contract at the hub under the aircraft. */
+  onLeaveFreight: (mission: Mission) => void;
   /** Company crew AI dispatch (accepted/dispatched only). */
   onCrewDispatch?: (mission: Mission, crewMemberId: string) => void;
   /** Persist preferred crew on the mission before Crew fly. */
@@ -433,6 +468,18 @@ export function DispatchActivePanel(props: {
           <span>
             Temporary inject harness — Cancel flight when done (no settle /
             payout).
+          </span>
+        </div>
+      ) : null}
+
+      {mission.freightHold &&
+      (mission.status === 'accepted' || mission.status === 'dispatched') ? (
+        <div className="dispatch-freight-hold" role="status">
+          <strong>Freight hold · {mission.freightHold.icao}</strong>
+          <span>
+            Ready to plan from {mission.freightHold.icao}. Yard storage{' '}
+            {props.formatMoney(freightHoldUsdPerDay(mission))}/day until the
+            next leg departs. Deadline still running.
           </span>
         </div>
       ) : null}
@@ -1477,7 +1524,7 @@ export function DispatchActivePanel(props: {
                 : !nearDestNow
                   ? resumePrep || nearOriginNow
                     ? 'Back at departure (MSFS reload or return) — enable Airframe inject to reload fuel/payload, then take off again. Settle only at the destination.'
-                    : 'On the ground away from the destination — relocate to the arrival airport (or abandon). Settle only near dest.'
+                    : 'On the ground away from the destination. Leave the freight here to end this leg, or relocate to the arrival airport. Settle only near dest.'
                   : !watchLive
                     ? 'Watch dropped mid-flight — reconnecting so shutdown at the destination can settle.'
                     : liveEnginesNow
@@ -2121,6 +2168,28 @@ export function DispatchActivePanel(props: {
                       </div>
                       {enRouteSub ? (
                         <p className="dispatch-enroute-live-sub">{enRouteSub}</p>
+                      ) : null}
+                      {enRoute &&
+                      mission.status === 'in_flight' &&
+                      liveOnGroundNow &&
+                      sawAirborneNow &&
+                      !nearDestNow &&
+                      !(resumePrep || nearOriginNow) &&
+                      canLeaveFreightHere(mission) ? (
+                        <button
+                          type="button"
+                          className="action warn"
+                          disabled={
+                            busy ||
+                            !holdPositionOk(
+                              props.watch?.position ?? props.simBridge?.position,
+                            )
+                          }
+                          title="The contract stays open. Yard storage starts at this hub. The next dispatch leaves from here."
+                          onClick={() => props.onLeaveFreight(mission)}
+                        >
+                          Leave freight here
+                        </button>
                       ) : null}
                       {liveLoadGrid}
                     </div>

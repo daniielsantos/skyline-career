@@ -1,5 +1,7 @@
 # Open work / backlog curto
 
+Atualizado 2026-09-29: **Freight hold** — um contrato de carga pode ficar num hub intermediário (`leaveFreightAtHub`). A taxa de pátio corre até o próximo depart. O botão está no desktop; o hold só grava depois do deploy do world. Spec: [`11-persist-commands.md`](./11-persist-commands.md).
+
 Atualizado 2026-09-29: **Port FBO 7d cópia** — settle no mesmo dia somava o kg numa cópia da janela e o 7d ficava 0. Fix local, ainda sem release. O voo já settled não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md).
 
 Atualizado 2026-09-28: **Jet-A into tank** — settle do Stock grava `Into tank` na ledger (membro + kg, $0). Ainda sem release. A linha nasce no world. Spec: [`24-port-fbo.md`](./24-port-fbo.md).

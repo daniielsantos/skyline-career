@@ -267,10 +267,16 @@ export function projectOntoRunway(
 }
 
 /**
- * Prefer catalog axis; if aircraft true heading yields a clearly better fit
- * (on pavement / much smaller |lateral|), use that axis instead.
- * Covers merge-missing stubs where headingTrueDeg ≈ runway number × 10
- * (magnetic) while MSFS coords are true.
+ * A crab of a few degrees is not a new runway axis. Only a magnetic ident×10
+ * stub that disagrees with the aircraft by more than this (local declination)
+ * may replace the catalog heading.
+ */
+const MAGNETIC_STUB_AXIS_MIN_DELTA_DEG = 12;
+
+/**
+ * Catalog true heading is the strip axis. Aircraft heading replaces it only
+ * for a leftover ident×10 magnetic stub that the aircraft clearly disagrees
+ * with. Crab on a surveyed heading used to swing lateral by tens of meters.
  */
 export function bestRunwayProjection(
   runway: CareerRunway,
@@ -282,34 +288,38 @@ export function bestRunwayProjection(
   const catalogAxis = runway.headingTrueDeg;
   if (
     typeof aircraftHeadingTrueDeg !== 'number' ||
-    !Number.isFinite(aircraftHeadingTrueDeg)
+    !Number.isFinite(aircraftHeadingTrueDeg) ||
+    !isLikelyMagneticHeadingStub(runway)
   ) {
     return { proj: catalog, axisHeadingTrueDeg: catalogAxis };
   }
-  const a = projectOntoRunway(runway, lat, lon, aircraftHeadingTrueDeg);
-  const b = projectOntoRunway(
-    runway,
-    lat,
-    lon,
-    aircraftHeadingTrueDeg + 180,
-  );
+  const heading = aircraftHeadingTrueDeg;
+  const stubDisagrees =
+    Math.min(
+      headingDeltaDeg(heading, runway.headingTrueDeg),
+      headingDeltaDeg(heading, runway.headingTrueDeg + 180),
+    ) > MAGNETIC_STUB_AXIS_MIN_DELTA_DEG;
+  if (!stubDisagrees) {
+    return { proj: catalog, axisHeadingTrueDeg: catalogAxis };
+  }
+  const a = projectOntoRunway(runway, lat, lon, heading);
+  const b = projectOntoRunway(runway, lat, lon, heading + 180);
   type Cand = { proj: RunwayProjection; axis: number; prefer: number };
-  const stub = isLikelyMagneticHeadingStub(runway);
   const cands: Cand[] = [
     {
       proj: catalog,
       axis: catalogAxis,
       // Magnetic stubs: demote catalog so aircraft true heading wins.
-      prefer: stub ? 2 : 0,
+      prefer: 2,
     },
     {
       proj: a,
-      axis: ((aircraftHeadingTrueDeg % 360) + 360) % 360,
+      axis: ((heading % 360) + 360) % 360,
       prefer: 0,
     },
     {
       proj: b,
-      axis: (((aircraftHeadingTrueDeg + 180) % 360) + 360) % 360,
+      axis: (((heading + 180) % 360) + 360) % 360,
       prefer: 0,
     },
   ];
@@ -324,6 +334,90 @@ export function bestRunwayProjection(
   });
   const best = cands[0]!;
   return { proj: best.proj, axisHeadingTrueDeg: best.axis };
+}
+
+const FT_TO_M = 0.3048;
+/** Longer than a nose-datum to main-gear arm on a current airliner. */
+const MAX_MAIN_GEAR_AFT_M = 45;
+
+/**
+ * Move a WGS84 point aft along `headingTrueDeg` (opposite the nose).
+ * Positive `aftM` is toward the tail. Used to place the debrief marker on
+ * the main-gear contact when the sim lat/lon is the aircraft datum.
+ */
+export function offsetAlongHeading(
+  lat: number,
+  lon: number,
+  headingTrueDeg: number,
+  aftM: number,
+): { lat: number; lon: number } {
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lon) ||
+    !Number.isFinite(headingTrueDeg) ||
+    !Number.isFinite(aftM) ||
+    Math.abs(aftM) < 1e-3
+  ) {
+    return { lat, lon };
+  }
+  const hdg = ((((headingTrueDeg % 360) + 360) % 360) * Math.PI) / 180;
+  const dNorth = -aftM * Math.cos(hdg);
+  const dEast = -aftM * Math.sin(hdg);
+  const latRad = (lat * Math.PI) / 180;
+  const mPerDegLat = 111_320;
+  const mPerDegLon = 111_320 * Math.cos(latRad);
+  return {
+    lat: lat + dNorth / mPerDegLat,
+    lon: lon + (mPerDegLon === 0 ? 0 : dEast / mPerDegLon),
+  };
+}
+
+/**
+ * Meters aft of the datum to the main-gear contact.
+ * Body frame: longitudinal feet positive forward, vertical feet positive up.
+ * Nose-up pitch swings a below-datum point slightly forward of its station.
+ * Returns undefined when the arm is not a real gear station.
+ */
+export function mainGearAftMeters(
+  station: { longitudinalFt: number; verticalFt: number },
+  pitchDeg?: number,
+): number | undefined {
+  if (
+    !Number.isFinite(station.longitudinalFt) ||
+    !Number.isFinite(station.verticalFt)
+  ) {
+    return undefined;
+  }
+  const pitch =
+    typeof pitchDeg === 'number' && Number.isFinite(pitchDeg)
+      ? (pitchDeg * Math.PI) / 180
+      : 0;
+  const forwardFt =
+    station.longitudinalFt * Math.cos(pitch) -
+    station.verticalFt * Math.sin(pitch);
+  const aftM = -forwardFt * FT_TO_M;
+  if (!Number.isFinite(aftM) || Math.abs(aftM) > MAX_MAIN_GEAR_AFT_M) {
+    return undefined;
+  }
+  return aftM;
+}
+
+/**
+ * Datum lat/lon plus a measured main-gear station → contact point.
+ * Null when the arm is missing or out of range.
+ */
+export function placeMainGearContact(
+  lat: number,
+  lon: number,
+  headingTrueDeg: number,
+  station: { longitudinalFt: number; verticalFt: number },
+  pitchDeg?: number,
+): { lat: number; lon: number; aftM: number } | null {
+  const aftM = mainGearAftMeters(station, pitchDeg);
+  if (aftM === undefined) return null;
+  if (!Number.isFinite(headingTrueDeg)) return null;
+  const moved = offsetAlongHeading(lat, lon, headingTrueDeg, aftM);
+  return { lat: moved.lat, lon: moved.lon, aftM };
 }
 
 /** Hub ICAOs missing runway rows in the committed catalog (for coverage tests). */
@@ -386,8 +480,8 @@ export function evaluateRunwayTouchdown(
       : {}),
     lengthM: runway.lengthM,
     widthM: runway.widthM,
-    // Keep catalog heading for strip identity; projection may have used aircraft
-    // true heading when the catalog value was a magnetic stub.
+    // Keep catalog heading for strip identity. Projection uses that axis unless
+    // the catalog value is still a magnetic ident×10 stub.
     headingTrueDeg: runway.headingTrueDeg,
     ...(runway.lighted !== undefined ? { lighted: runway.lighted } : {}),
     alongM: Math.round(pastThresholdM - runway.lengthM / 2),

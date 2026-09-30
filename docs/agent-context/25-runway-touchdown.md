@@ -1,5 +1,22 @@
 # Runway touchdown / debrief
 
+## Sintoma (2026-09-29) — ponto do toque longe da roda
+
+O diagrama do debrief marca o toque dezenas de metros ao lado, com o avião na faixa.
+
+## Causa
+
+`bestRunwayProjection` trocava o eixo da faixa pelo rumo do avião sempre que isso diminuía o |lateral|. No caranguejo, alguns graus giram a faixa: 800 m × sin 5° ≈ 70 m. O rumo do catálogo, quando não é o stub magnético ident×10, já é o eixo verdadeiro.
+
+`PLANE TOUCHDOWN LATITUDE/LONGITUDE` é o datum do avião no instante do toque, não o pneu. Não há SimVar com a posição da roda. A estação longitudinal do trem está no `flight_model.cfg` (`[CONTACT_POINTS]`, pés, positivo para a frente).
+
+## Fix
+
+- Eixo do catálogo. O rumo do avião só substitui o eixo num stub magnético que discorda desse rumo em mais de 12° (declinação, não caranguejo). A cabeceira e a faixa paralela continuam usando o rumo do avião.
+- Rumo e pitch travados no toque (`PLANE TOUCHDOWN HEADING DEGREES TRUE`, `PLANE TOUCHDOWN PITCH DEGREES`), não o poll seguinte.
+- Se o perfil do avião tem `cfgPath` legível, o ponto anda para trás ao longo desse rumo até o trem principal (rodas sem esterço; no bogie, o eixo mais de trás). Sem esse arquivo o ponto fica no datum — não há braço inventado por classe. O CG vazio não é o pneu.
+- O desenho continua a faixa do catálogo. Centro ou rumo diferente do asfalto do simulador ainda desloca o ponto.
+
 ## Sintoma (2026-09-27) — pista do destino só no debrief
 
 Comprimento, largura e luz só apareciam no diagrama depois do settle. O piloto descobria a faixa curta já na chegada.
@@ -58,7 +75,7 @@ Debrief `431 m past THR · 158 m right · OFF runway` com landing score cheio. R
    - senão stub ident×10 → mag→true via WMM (`geomagnetism`)
    - 2026-09-12: **37** geo + **207** declinação corrigidos; SBKG = 125°
 2. **merge-missing / generate:** não gravar ident×10 cru; convert WMM; preferir geometry OA.
-3. **Runtime:** `bestRunwayProjection` + `isLikelyMagneticHeadingStub` — se heading da aeronave no touchdown existir, prefere esse eixo (stubs remanescentes / crab).
+3. **Runtime:** `bestRunwayProjection` + `isLikelyMagneticHeadingStub` — eixo do catálogo; rumo do avião só entra se o stub discorda dele em mais de 12°.
 
 ## Paths
 

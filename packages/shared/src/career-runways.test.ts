@@ -11,6 +11,9 @@ import {
   evaluateRunwayTouchdown,
   pickFirstContactCoords,
   formatRunwayTouchdownLine,
+  offsetAlongHeading,
+  mainGearAftMeters,
+  placeMainGearContact,
   isUsableRunwayCenter,
   headingDeltaDeg,
   type CareerRunway,
@@ -158,11 +161,109 @@ describe('evaluateRunwayTouchdown', () => {
     assert.ok(Math.abs(proj.pastThresholdM - pastThr) < 25);
   });
 
+  it('keeps the catalog axis when the aircraft is crabbed on a true heading', () => {
+    const rwy: CareerRunway = {
+      ident: '27',
+      identReciprocal: '09',
+      headingTrueDeg: 274,
+      lengthM: 2500,
+      widthM: 45,
+      lat: -23.4,
+      lon: -46.5,
+      surface: 'asphalt',
+    };
+    const alongM = 400;
+    const lateralM = 25;
+    const latRad = (rwy.lat * Math.PI) / 180;
+    const mPerDegLat = 111_320;
+    const mPerDegLon = 111_320 * Math.cos(latRad);
+    const hdg = (rwy.headingTrueDeg * Math.PI) / 180;
+    const dNorth = alongM * Math.cos(hdg) - lateralM * Math.sin(hdg);
+    const dEast = alongM * Math.sin(hdg) + lateralM * Math.cos(hdg);
+    const lat = rwy.lat + dNorth / mPerDegLat;
+    const lon = rwy.lon + dEast / mPerDegLon;
+
+    const catalog = projectOntoRunway(rwy, lat, lon);
+    const crabbed = projectOntoRunway(rwy, lat, lon, 280);
+    assert.ok(Math.abs(catalog.lateralM - lateralM) < 2);
+    assert.ok(
+      Math.abs(crabbed.lateralM) + 5 < Math.abs(catalog.lateralM),
+      'crabbed axis must look closer to centerline than the catalog axis',
+    );
+
+    const { proj, axisHeadingTrueDeg } = bestRunwayProjection(rwy, lat, lon, 280);
+    assert.ok(Math.abs(proj.lateralM - catalog.lateralM) < 1);
+    assert.ok(Math.abs(proj.alongM - catalog.alongM) < 1);
+    assert.ok(headingDeltaDeg(axisHeadingTrueDeg, rwy.headingTrueDeg) < 1);
+  });
+
+  it('does not rotate a runway whose true heading matches the number when crab is small', () => {
+    const rwy: CareerRunway = {
+      ident: '09',
+      identReciprocal: '27',
+      headingTrueDeg: 90,
+      lengthM: 2000,
+      widthM: 45,
+      lat: 0,
+      lon: 0,
+      surface: 'asphalt',
+    };
+    const alongM = 400;
+    const lateralM = 20;
+    const mPerDegLon = 111_320;
+    const lat = -lateralM / 111_320;
+    const lon = alongM / mPerDegLon;
+    const catalog = projectOntoRunway(rwy, lat, lon);
+    const { proj } = bestRunwayProjection(rwy, lat, lon, 96);
+    assert.ok(Math.abs(proj.lateralM - catalog.lateralM) < 1);
+    assert.ok(Math.abs(catalog.lateralM) > 15);
+  });
+
   it('SBKG catalog heading is true (~125), not magnetic 150', () => {
     const rwy = getAirportRunways('SBKG')[0];
     assert.ok(rwy);
     assert.ok(headingDeltaDeg(rwy!.headingTrueDeg, 125) < 5);
     assert.ok(headingDeltaDeg(rwy!.headingTrueDeg, 150) > 15);
+  });
+});
+
+describe('main gear contact', () => {
+  it('moves the datum aft along the nose heading', () => {
+    const moved = offsetAlongHeading(0, 0, 90, 100);
+    assert.ok(Math.abs(moved.lat) < 1e-6);
+    assert.ok(moved.lon < 0);
+    const back = offsetAlongHeading(moved.lat, moved.lon, 90, -100);
+    assert.ok(Math.abs(back.lon) < 1e-6);
+  });
+
+  it('places the marker on a measured main-gear station, not the datum', () => {
+    const placed = placeMainGearContact(0, 0, 90, {
+      longitudinalFt: -10,
+      verticalFt: -4,
+    });
+    assert.ok(placed);
+    const expected = mainGearAftMeters({ longitudinalFt: -10, verticalFt: -4 });
+    assert.ok(expected !== undefined && Math.abs(expected - 10 * 0.3048) < 1e-6);
+    assert.ok(Math.abs(placed!.aftM - expected!) < 1e-9);
+    assert.ok(placed!.lon < 0);
+  });
+
+  it('nose-up pitch shortens the aft arm of a wheel below the datum', () => {
+    const flat = mainGearAftMeters({ longitudinalFt: -6, verticalFt: -3 });
+    const pitched = mainGearAftMeters(
+      { longitudinalFt: -6, verticalFt: -3 },
+      8,
+    );
+    assert.ok(flat !== undefined && pitched !== undefined);
+    assert.ok(pitched! < flat!);
+    assert.ok(flat! - pitched! < 1);
+  });
+
+  it('rejects an arm that cannot be a gear station', () => {
+    assert.equal(
+      mainGearAftMeters({ longitudinalFt: -500, verticalFt: 0 }),
+      undefined,
+    );
   });
 });
 

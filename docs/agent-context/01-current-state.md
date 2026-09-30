@@ -1,5 +1,8 @@
 # Current state (2026-09-30)
 
+`main` **37fd9cd6** / desktop **0.3.398** shipped: Leave the touchdown marker on the sim datum. Release: [v0.3.398](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.398).
+
+
 `main` **a309c15d** / desktop **0.3.397** shipped: Keep the touchdown marker on the catalog strip and the main gear. Release: [v0.3.397](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.397).
 
 

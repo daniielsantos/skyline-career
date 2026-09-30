@@ -6074,6 +6074,28 @@ button.logbook-card-hit:focus-visible {
   border-width: 2px;
 }
 
+/* Clicked action that is still waiting on a reply. The ball sits beside the
+   label. Buttons that already draw .busy-spinner keep that one. */
+button[data-action-wait='1']:not(:has(.busy-spinner))::before {
+  content: '';
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-inline-end: 0.4rem;
+  vertical-align: -0.12em;
+  box-sizing: border-box;
+  border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: profile-gate-spin 0.7s linear infinite;
+  pointer-events: none;
+}
+
+button.action[data-action-wait='1']:not(:has(.busy-spinner))::before,
+button.accept[data-action-wait='1']:not(:has(.busy-spinner))::before {
+  margin-inline-end: 0;
+}
+
 /* Spinner on orange primary confirm CTAs (dark track, light tip). */
 .busy-spinner.on-accent,
 .busy-spinner-on-accent {

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 type BusySize = 'sm' | 'md' | 'lg';
 
@@ -103,6 +103,104 @@ export function BusyBlock(props: { label: string; className?: string }) {
       <p className="busy-block-label">{props.label}</p>
     </div>
   );
+}
+
+const ACTION_WAIT_MS = 180;
+
+function enabledButtonCount(): number {
+  return document.querySelectorAll('button:not([disabled])').length;
+}
+
+function clearActionWait(btn: HTMLButtonElement) {
+  btn.removeAttribute('data-action-wait');
+  if (btn.dataset.actionWaitAria === '1') {
+    btn.removeAttribute('aria-busy');
+    delete btn.dataset.actionWaitAria;
+  }
+}
+
+/**
+ * After a click, if that button stays disabled while the reply is in flight,
+ * show the same small spinner the confirm CTAs use. Other buttons locked by
+ * the same wait stay quiet. Fast clicks that re-enable before the delay
+ * never flash. A confirm dialog that closes passes the spinner back to the
+ * button that opened it, once that button is the one left waiting.
+ */
+export function ActionWait() {
+  useEffect(() => {
+    let timer = 0;
+    let watch = 0;
+    let opener: HTMLButtonElement | null = null;
+    let armed: HTMLButtonElement | null = null;
+    let baselineEnabled = 0;
+
+    const disarm = () => {
+      window.clearInterval(watch);
+      watch = 0;
+      if (armed) clearActionWait(armed);
+      armed = null;
+    };
+
+    const arm = (btn: HTMLButtonElement) => {
+      if (armed && armed !== btn) clearActionWait(armed);
+      armed = btn;
+      baselineEnabled = enabledButtonCount();
+      btn.dataset.actionWait = '1';
+      if (btn.getAttribute('aria-busy') !== 'true') {
+        btn.setAttribute('aria-busy', 'true');
+        btn.dataset.actionWaitAria = '1';
+      }
+      window.clearInterval(watch);
+      watch = window.setInterval(() => {
+        if (!armed || !armed.isConnected) {
+          disarm();
+          return;
+        }
+        if (!armed.disabled) {
+          disarm();
+          return;
+        }
+        // The whole screen was locked. Once any button is clickable again,
+        // this wait is over even if the clicked control stays disabled.
+        if (baselineEnabled === 0 && enabledButtonCount() > 0) disarm();
+      }, 120);
+    };
+
+    const onClick = (ev: Event) => {
+      const target = ev.target;
+      if (!(target instanceof Element)) return;
+      const btn = target.closest('button');
+      if (!(btn instanceof HTMLButtonElement)) return;
+      if (btn.dataset.noActionWait === '1') return;
+      if (armed && armed !== btn && !btn.disabled) disarm();
+      if (btn.disabled) return;
+      const previous = opener;
+      window.clearTimeout(timer);
+      const clicked = btn;
+      queueMicrotask(() => {
+        if (!clicked.isConnected || clicked.disabled) return;
+        opener = clicked;
+      });
+      timer = window.setTimeout(() => {
+        if (!clicked.isConnected) {
+          if (previous?.isConnected && previous.disabled) arm(previous);
+          return;
+        }
+        if (!clicked.disabled) return;
+        opener = null;
+        arm(clicked);
+      }, ACTION_WAIT_MS);
+    };
+
+    document.addEventListener('click', onClick, true);
+    return () => {
+      document.removeEventListener('click', onClick, true);
+      window.clearTimeout(timer);
+      disarm();
+      opener = null;
+    };
+  }, []);
+  return null;
 }
 
 /** Boot splash while career state hydrates (freights, dispatch, etc.). */

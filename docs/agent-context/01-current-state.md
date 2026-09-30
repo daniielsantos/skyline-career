@@ -1,5 +1,8 @@
 # Current state (2026-09-30)
 
+`main` **a309c15d** / desktop **0.3.397** shipped: Keep the touchdown marker on the catalog strip and the main gear. Release: [v0.3.397](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.397).
+
+
 `main` **dd82a61b** / desktop **0.3.396** shipped: Let a freight contract wait at an intermediate hub until the next leg. Release: [v0.3.396](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.396).
 
 

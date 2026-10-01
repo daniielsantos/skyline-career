@@ -1,6 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-10-01: **Manifest mostra a ficha do outro hold** — sintoma = o bridge KIAH→KMIA aparecia só como “KMIA · machinery · 18.6 klb”. Causa = a caixa do Manifest imprimia destino, commodity e peso. Fix = a linha traz rota, tipo, commodity, massa, nm, pay, prazo e quem postou.
+Atualizado 2026-10-01: **Manifest lista todos os holds embaixo, no layout da trip** — sintoma = os wide hauls do mesmo destino ficavam em cartão com slider e o bridge de outro destino numa linha diferente. Fix = uma lista só, no formato da trip (rota, tipo, Cargo, Mass, Dist, Pay, Expires, By). A caixa marca o que entra no Accept. O hold que abriu o Manifest fica marcado.
 
 Atualizado 2026-10-01: **Add respeita a reserva do próprio piloto** — sintoma = Add na lista dizia “reserved by another pilot” com o cartão em RESERVED · YOU. Causa = ao devolver o avião ao voo, o Add não informava a conta que já tinha a reserva. Fix = o Add manda essa conta (e o dono da VA, se for o caso). O voo aberto não precisa ser cancelado.
 

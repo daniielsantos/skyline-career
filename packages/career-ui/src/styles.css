@@ -5269,12 +5269,6 @@ button.logbook-card-hit:focus-visible {
   background: var(--panel);
 }
 
-.staging-join-hold {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-}
-
 .staging-line-head {
   display: flex;
   justify-content: space-between;

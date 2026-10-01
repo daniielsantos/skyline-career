@@ -1,4 +1,7 @@
-# Current state (2026-09-30)
+# Current state (2026-10-01)
+
+`main` **b3e40e41** / desktop **0.3.401** shipped: Keep the Airframes board still when the list is already on screen. Release: [v0.3.401](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.401).
+
 
 `main` **d0a01a2f** / desktop **0.3.400** shipped: Keep a sold aircraft out of the hangar after the dealer pays. Release: [v0.3.400](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.400).
 

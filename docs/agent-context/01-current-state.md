@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **fbbda39c** / desktop **0.3.407** shipped: Put desk auto-buy beside the Jet-A tank and open Scout route hubs. Release: [v0.3.407](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.407).
+
+
 `main` **fb28a3d6** / desktop **0.3.406** shipped: Cap desk hauls at eight a day, grow the Jet-A tank with the roster, and draw that tank on its side. Release: [v0.3.406](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.406).
 
 

@@ -43,6 +43,7 @@ import {
   postPreflight,
   postSettle,
   postLeaveFreight,
+  postAddCargoStop,
   postSelectHub,
   fetchAircraftMarket,
   AIRCRAFT_MARKET_NEAR_NM,
@@ -2245,7 +2246,8 @@ function findDispatchBoardMission(
     if (
       !isActiveMissionStatus(m.status) ||
       m.crewOperated ||
-      isFboSplitSisterMission(m)
+      isFboSplitSisterMission(m) ||
+      m.throughHostId
     ) {
       return false;
     }
@@ -2270,6 +2272,7 @@ function findPlayerDispatchMission(
     if (!isActiveMissionStatus(m.status) || !isPlayerDispatchMission(m)) {
       return false;
     }
+    if (m.throughHostId) return false;
     if (!actor) return true;
     const owner = m.pilotAccountId?.trim() || '';
     if (!owner) return true;
@@ -6916,7 +6919,10 @@ export function App() {
   }, [devMode, tab]);
 
   const activeCount = useMemo(
-    () => missions.filter((m) => isActiveMissionStatus(m.status)).length,
+    () =>
+      missions.filter(
+        (m) => isActiveMissionStatus(m.status) && !m.throughHostId,
+      ).length,
     [missions],
   );
   const activeMission = useMemo(
@@ -12781,6 +12787,61 @@ export function App() {
       const hub = result.mission.freightHold?.icao ?? result.mission.originIcao;
       setToast(`Freight holding at ${hub}. Plan the next leg from there.`);
     }, { sync: { missions: true, airport: true } });
+  }
+
+  async function onAddCargoStop(riderMissionId: string) {
+    const host = activeMissionRef.current;
+    if (!host) return;
+    await run(async () => {
+      const home = homeCompanyIdRef.current?.trim();
+      const active = activeCompanyIdRef.current?.trim();
+      const opsCompanyId =
+        resolveOpsCompanyId(host.aircraftId) || active || home || undefined;
+      const result = await postAddCargoStop({
+        missionId: host.id,
+        riderMissionId,
+        companyId: opsCompanyId,
+      });
+      setMissions((current) =>
+        current.map((row) => {
+          if (row.id === result.mission.id) return result.mission;
+          if (result.rider && row.id === result.rider.id) return result.rider;
+          return row;
+        }),
+      );
+      setToast(
+        `Added ${result.rider?.destIcao ?? 'the next stop'}. The first OFP carries the combined load.`,
+      );
+    }, { sync: { missions: true } });
+  }
+
+  function cargoStopChoices(host: Mission) {
+    if (host.status !== 'accepted' || host.throughHostId) return [];
+    const taken = new Set<string>([
+      host.destIcao.toUpperCase(),
+      ...(host.throughLoads ?? []).map((row) => row.destIcao.toUpperCase()),
+    ]);
+    return missions
+      .filter((row) => {
+        if (row.id === host.id || row.status !== 'accepted') return false;
+        if (row.throughHostId || (row.throughLoads?.length ?? 0) > 0) return false;
+        if (row.missionType === 'charter' || row.payloadLab || row.fuelHaul) {
+          return false;
+        }
+        if (row.emptyFlight || row.crewDeadhead || row.contractPilotReposition) {
+          return false;
+        }
+        if (!(row.cargoKg > 0)) return false;
+        if (row.originIcao.toUpperCase() !== host.originIcao.toUpperCase()) {
+          return false;
+        }
+        return !taken.has(row.destIcao.toUpperCase());
+      })
+      .map((row) => ({
+        id: row.id,
+        destIcao: row.destIcao,
+        cargoKg: row.cargoKg,
+      }));
   }
 
   async function onSettle(mission: Mission) {
@@ -20337,6 +20398,8 @@ export function App() {
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}
               onLeaveFreight={(m) => void onLeaveFreight(m)}
+              cargoStopChoices={cargoStopChoices(activeMission)}
+              onAddCargoStop={(id) => void onAddCargoStop(id)}
               onCrewDispatch={(m, crewMemberId) =>
                 void onCrewDispatchMission(m, crewMemberId)
               }
@@ -21108,6 +21171,25 @@ export function App() {
           onPrepareHaulHold={(hold, aircraftId, sameRouteHolds) => {
             enterStagingForVaHaulHold(hold, aircraftId, sameRouteHolds);
           }}
+          haulTripHost={
+            activeMission &&
+            activeMission.status === 'accepted' &&
+            !activeMission.throughHostId &&
+            activeMission.missionType !== 'charter' &&
+            !activeMission.fuelHaul &&
+            !activeMission.payloadLab &&
+            !activeMission.emptyFlight &&
+            (activeMission.cargoKg ?? 0) > 0
+              ? {
+                  id: activeMission.id,
+                  originIcao: activeMission.originIcao,
+                  destIcao: activeMission.destIcao,
+                  stopIcaos: (activeMission.throughLoads ?? []).map(
+                    (row) => row.destIcao,
+                  ),
+                }
+              : null
+          }
           onMissions={setMissions}
           onToast={(kind, message) => {
             setToastKind(kind);

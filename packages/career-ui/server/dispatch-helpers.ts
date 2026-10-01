@@ -15,6 +15,7 @@ import {
   getAircraftClass,
   isPaxAndCargoLoadLayout,
   KG_TO_LB,
+  missionDispatchCargoKg,
   normalizeAircraftRegistration,
   ofpCargoKg,
   ofpFreightTowardMissionKg,
@@ -407,7 +408,11 @@ function simBriefPrefillsPayloadNotFreight(
 export function flyableDispatchCargoKg(
   mission: Pick<
     MissionIntent,
-    'cargoKg' | 'aircraftClassId' | 'airframeTypeId' | 'payloadLab'
+    | 'cargoKg'
+    | 'aircraftClassId'
+    | 'airframeTypeId'
+    | 'payloadLab'
+    | 'throughLoads'
   >,
   distanceNm: number,
   structuralMaxCargoKg: number,
@@ -456,7 +461,7 @@ export function flyableDispatchCargoKg(
       crewKg: ops.crewKg,
     },
   );
-  const booked = Math.max(0, Math.floor(mission.cargoKg));
+  const booked = Math.max(0, Math.floor(missionDispatchCargoKg(mission)));
   const structural = Math.max(0, Math.floor(structuralMaxCargoKg));
   // Payload Lab: keep the chosen inject payload — do not silently trim to the
   // Career route fuel+MTOW estimate (that cap is for economy booking).

@@ -1,5 +1,9 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-01: **Hold do desk entra no voo aberto** — sintoma = o Scout manda o contrato pro desk, mas o segundo Accept recusava com “finish or cancel” e o menu Add a stop ficava vazio. Causa = o desk só sabia abrir um voo novo, e o avião já estava nesse voo. Fix = no desk, com o voo ainda `accepted` (antes do SimBrief), hold do mesmo origem e outro destino mostra **Add to flight**. Isso consome o hold, cria o contrato e põe em `throughLoads`. O avião continua no primeiro voo. Mesmo destino segue no primeiro Accept. Spec abaixo do parágrafo da trip.
+
+Atualizado 2026-10-01: **Trip de carga, uma escala por OFP** — sintoma = o wide sobra espaço e o jogador quer levar contratos de destinos diferentes, escolhendo a ordem, uma perna de cada vez. Causa = um contrato era um voo, e inventar um segundo destino no mesmo OFP não cabe no SimBrief. Fix = `throughLoads` no voo atual e `throughHostId` nos seguintes (`addCargoStop`, teto de 3 escalas extras). O OFP da perna leva a soma; se não couber, o dispatch recusa em vez de cortar o contrato. No settle só essa escala paga e entrega. O próximo contrato vira o freight hold que já existia, no hub do pouso (mesmo dia de economia $0; o dia seguinte cobra a taxa de pátio sobre a carga que ainda segue, inclusive a das escalas posteriores). Charter, Jet-A, vazio e Payload Lab ficam de fora. Cancelar solta o vínculo: o contrato continua aceito onde já estava, e a carga de desk volta pelas regras de hoje.
+
 Atualizado 2026-09-14. SP usa o mesmo molde MP (tabelas/comando; `saveEconomy` só no tick). GET Freights = inbound patch; Demand = demand_orders; dealer GET = blob. **PG:** light slice helpers in `career-store-pg-world.ts` (inbound/demand/ports/npcLive/aircraft pool) — no stub→full `saveEconomy`.
 
 ## Objetivo

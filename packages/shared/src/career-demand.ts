@@ -694,6 +694,8 @@ export function dispatchDemandHold(
     pilotHomeCompanyId?: string;
     vaFlight?: boolean;
     actorIsVaOwner?: boolean;
+    /** Join this accepted flight instead of starting another. */
+    tripHostId?: string;
   },
 ): { mission: MissionIntent; order: DemandOrder; kg: number; payUsd: number } {
   ensureDemandOrders(world);
@@ -717,9 +719,14 @@ export function dispatchDemandHold(
   const orderId = hold.orderId?.trim();
   if (!orderId) throw new Error('Demand hold is missing an order');
 
+  const hostId = opts.tripHostId?.trim() || '';
   const open = listActivePlayerMissionsForPilot(
     state.missions ?? [],
     opts.pilotAccountId,
+  ).filter(
+    (mission) =>
+      !hostId ||
+      (mission.id !== hostId && mission.throughHostId !== hostId),
   );
   if (open.length > 0) {
     throw new Error(
@@ -745,7 +752,13 @@ export function dispatchDemandHold(
     throw new Error(`Aircraft ${aircraft.id} has no airframe`);
   }
   if (aircraft.status !== 'parked') {
-    throw new Error(`Aircraft ${aircraft.id} is not parked`);
+    const onThisFlight =
+      hostId !== '' &&
+      aircraft.status === 'assigned' &&
+      aircraft.assignedMissionId === hostId;
+    if (!onThisFlight) {
+      throw new Error(`Aircraft ${aircraft.id} is not parked`);
+    }
   }
   if (aircraft.locationIcao.trim().toUpperCase() !== hold.originIcao) {
     throw new Error(

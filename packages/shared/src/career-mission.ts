@@ -23,6 +23,11 @@ import {
   relocateAircraftOnSettle,
   releaseAircraftOnCancel,
 } from './career-fleet.js';
+import {
+  continueCargoTripAfterSettle,
+  missionDispatchCargoKg,
+  releaseCargoTripOnCancel,
+} from './career-cargo-trip.js';
 import { deliverFuelUplift, quoteFuelUplift } from './career-fuel.js';
 import {
   deliverPortJetAHaul,
@@ -2258,6 +2263,9 @@ export function cancelMission(
   ) {
     throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
+  if (opts.fleet) releaseCargoTripOnCancel(opts.fleet, normalized);
+  normalized.throughLoads = undefined;
+  normalized.throughHostId = undefined;
   if (normalized.missionType === 'charter') {
     // Payload Lab charter has no world offer/demand — cancel locally only.
     if (normalized.payloadLab) {
@@ -2645,6 +2653,11 @@ export function departMission(
   const normalized = normalizeMissionIntent(mission);
   if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
     throw new Error(`Cannot depart mission in status=${normalized.status}`);
+  }
+  if (normalized.throughHostId) {
+    throw new Error(
+      'This freight is riding on another leg. Dispatch that flight.',
+    );
   }
   if (
     normalized.fuelHaul?.kind === 'reposition' &&
@@ -3424,6 +3437,12 @@ export function settleMission(
     classOpsDeltas = classApplied.deltas;
   }
 
+  if (opts.fleet && (settled.throughLoads?.length ?? 0) > 0) {
+    const parked = continueCargoTripAfterSettle(world, opts.fleet, settled);
+    settled.throughLoads = undefined;
+    if (parked) syncPlayerInbound(world, parked);
+  }
+
   return {
     mission: settled,
     walletCreditUsd:
@@ -4094,7 +4113,9 @@ export function compareMissionIntentToOfp(
       : ofpFreightTowardMissionKg(ofp, airframe, {
           missionCargoKg: mission.cargoKg,
         });
-  const expectedCargoKg = charter ? mission.baggageKg ?? 0 : mission.cargoKg;
+  const expectedCargoKg = charter
+    ? mission.baggageKg ?? 0
+    : missionDispatchCargoKg(mission);
   if (ofpCargo === undefined) {
     findings.push({
       code: 'INTENT_CARGO_MISSING',

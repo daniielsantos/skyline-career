@@ -2691,6 +2691,17 @@ export function settleFreightHoldFees(
         hubIcao: hub,
         state,
       }) * daysCharged;
+    for (const row of mission.throughLoads ?? []) {
+      if (!(row.cargoKg > 0)) continue;
+      kg += row.cargoKg;
+      requestedUsd +=
+        portYardHoldUsdPerDay({
+          kg: row.cargoKg,
+          commodityId: row.commodityId,
+          hubIcao: hub,
+          state,
+        }) * daysCharged;
+    }
   }
   requestedUsd = money(requestedUsd);
   if (requestedUsd <= 0) return { ...empty, daysCharged };

@@ -8,6 +8,7 @@ import {
   postWarehouseBridgeHoldCancel,
   postWarehouseHaulDispatchHold,
   postWarehouseHaulHoldCancel,
+  postAddDeskHold,
   type Mission,
   type PlayerAircraft,
   type VaCompanyNetworkNode,
@@ -137,6 +138,13 @@ type Props = {
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   onGoPorts?: () => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
+  /** Accepted flight still waiting on SimBrief. Other desk dests can join it. */
+  tripHost?: {
+    id: string;
+    originIcao: string;
+    destIcao: string;
+    stopIcaos: string[];
+  } | null;
 };
 
 export function VaHaulsBoard(props: Props) {
@@ -306,6 +314,45 @@ export function VaHaulsBoard(props: Props) {
       holdNeedsPartialLoad(hold, acf) ||
       sameRouteSiblings(hold).length > 0
     );
+  }
+
+  function canAddHoldToTrip(hold: VaHaulHold): boolean {
+    const host = props.tripHost;
+    if (!host) return false;
+    if (hold.originIcao.trim().toUpperCase() !== host.originIcao.trim().toUpperCase()) {
+      return false;
+    }
+    const dest = hold.destIcao.trim().toUpperCase();
+    if (dest === host.destIcao.trim().toUpperCase()) return false;
+    return !host.stopIcaos.some((icao) => icao.trim().toUpperCase() === dest);
+  }
+
+  async function addHoldToTrip(hold: VaHaulHold) {
+    const host = props.tripHost;
+    if (!host) return;
+    setBusyHoldId(hold.id);
+    setError(null);
+    try {
+      const result = await postAddDeskHold({
+        missionId: host.id,
+        holdId: hold.id,
+        companyId: props.companyId,
+      });
+      props.onWallet?.(result.walletUsd);
+      if (result.fleet) props.onFleet?.(result.fleet);
+      props.onMissions?.(result.missions.slice().reverse());
+      props.onToast?.(
+        'ok',
+        `Added ${hold.destIcao} to this flight. Open Dispatch before SimBrief.`,
+      );
+      await refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      props.onToast?.('fail', message);
+    } finally {
+      setBusyHoldId(null);
+    }
   }
 
   async function acceptHold(hold: VaHaulHold) {
@@ -523,6 +570,7 @@ export function VaHaulsBoard(props: Props) {
                   const pay = holdPayParts(hold);
                   const busyThis = busyHoldId === hold.id;
                   const usePrepare = shouldPrepareHold(hold, selected ?? null);
+                  const addToTrip = canAddHoldToTrip(hold);
                   const needsPartial = holdNeedsPartialLoad(
                     hold,
                     selected ?? null,
@@ -642,27 +690,35 @@ export function VaHaulsBoard(props: Props) {
                         <button
                           type="button"
                           className="action"
-                          disabled={pageBusy || !selectedId}
+                          disabled={pageBusy || (!addToTrip && !selectedId)}
                           title={
-                            usePrepare
+                            addToTrip
+                              ? 'This flight is still open. The hold rides along and delivers at its own stop.'
+                              : usePrepare
                               ? needsPartial
                                 ? `Hold ${mass(hold.kg)} exceeds this airframe — open Manifest to load a slice`
                                 : `Open Dispatch — ferry to ${origin} before Accept`
                               : 'Dispatch the full hold on this aircraft'
                           }
                           onClick={() =>
-                            usePrepare
-                              ? prepareHold(hold)
-                              : void acceptHold(hold)
+                            addToTrip
+                              ? void addHoldToTrip(hold)
+                              : usePrepare
+                                ? prepareHold(hold)
+                                : void acceptHold(hold)
                           }
                         >
                           {busyThis
-                            ? usePrepare
-                              ? '…'
-                              : 'Accepting…'
-                            : usePrepare
-                              ? 'Prepare'
-                              : 'Accept'}
+                            ? addToTrip
+                              ? 'Adding…'
+                              : usePrepare
+                                ? '…'
+                                : 'Accepting…'
+                            : addToTrip
+                              ? 'Add to flight'
+                              : usePrepare
+                                ? 'Prepare'
+                                : 'Accept'}
                         </button>
                         <button
                           type="button"

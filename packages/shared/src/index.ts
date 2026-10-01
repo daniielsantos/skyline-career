@@ -286,6 +286,8 @@ export * from './career-postgres-retry.js';
 // `career-world-worker-pg`) import `pg` — do not barrel-export them. Desktop
 // packs omit `pg`; openCareerStore / worker scripts dynamic-import when needed.
 export * from './career-mission.js';
+export * from './career-cargo-trip.js';
+export * from './career-cargo-trip-desk.js';
 export * from './career-persist-commands.js';
 export * from './career-cargo-ops.js';
 export * from './career-class-ops.js';

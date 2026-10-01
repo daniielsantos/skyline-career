@@ -304,6 +304,9 @@ import {
   executeAcceptManifest,
   executeDepartFlight,
   leaveFreightAtHub,
+  addCargoStop,
+  missionDispatchCargoKg,
+  attachDeskHoldToCargoTrip,
   revertFalseDepartMission,
   executeBuyAircraft,
   executeCancelMission,
@@ -388,6 +391,7 @@ import {
   buildFlyableMissionDispatch,
   confirmMissionOfp,
   estimateFlyableRouteCargoLimit,
+  flyableDispatchCargoKg,
   resolveClassMaxCargoKg,
 } from './dispatch-helpers.ts';
 import {
@@ -14268,6 +14272,9 @@ export function createCareerApiServer(port = 8787) {
               id: mission.id,
             };
           }
+          if (mission.throughHostId) {
+            return { kind: 'riding' as const, id: mission.id };
+          }
           const dispatchDistanceNm =
             routeDistanceNm(world, mission.originIcao, mission.destIcao) ?? 0;
           const registration =
@@ -14291,6 +14298,13 @@ export function createCareerApiServer(port = 8787) {
         if (prep.kind === 'bad_status') {
           send(res, 400, {
             error: `Mission ${prep.id} cannot dispatch (status=${prep.status})`,
+          });
+          return;
+        }
+        if (prep.kind === 'riding') {
+          send(res, 400, {
+            error:
+              'This freight is riding on another leg. Dispatch that flight.',
           });
           return;
         }
@@ -14327,6 +14341,20 @@ export function createCareerApiServer(port = 8787) {
             if (open.status !== 'accepted' && open.status !== 'dispatched') {
               throw new Error(
                 `Mission ${open.id} cannot dispatch (status=${open.status})`,
+              );
+            }
+            if (open.throughHostId) {
+              throw new Error(
+                'This freight is riding on another leg. Dispatch that flight.',
+              );
+            }
+            const tripKg = missionDispatchCargoKg(open);
+            if (
+              (open.throughLoads?.length ?? 0) > 0 &&
+              flyable.cargoKg + 0.5 < tripKg
+            ) {
+              throw new Error(
+                `This aircraft can carry ${Math.floor(flyable.cargoKg)} kg on this leg; the trip is ${Math.floor(tripKg)} kg`,
               );
             }
             let next = open;
@@ -15118,6 +15146,193 @@ export function createCareerApiServer(port = 8787) {
             walletUsd: result.walletUsd,
             fleet: result.fleet,
             pilotIcao: result.pilotIcao,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/missions/add-cargo-stop') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          riderMissionId?: string;
+          companyId?: string;
+        };
+        if (!body.missionId || !body.riderMissionId) {
+          send(res, 400, { error: 'missionId and riderMissionId required' });
+          return;
+        }
+        const tripCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          const peeked = await withCareerPeekRead((world, missions) => {
+            const host = missions.missions.find((m) => m.id === body.missionId);
+            const rider = missions.missions.find(
+              (m) => m.id === body.riderMissionId,
+            );
+            if (!host || !rider) return { kind: 'missing' as const };
+            return {
+              kind: 'ok' as const,
+              host,
+              rider,
+              distanceNm:
+                routeDistanceNm(world, host.originIcao, host.destIcao) ?? 0,
+            };
+          }, { companyId: tripCompanyId });
+          if (peeked.kind === 'missing') {
+            send(res, 404, { error: 'Unknown mission' });
+            return;
+          }
+          const cargoLimit = await resolveClassMaxCargoKg(
+            peeked.host.aircraftClassId,
+            peeked.host.airframeTypeId,
+          );
+          const previewKg =
+            missionDispatchCargoKg(peeked.host) + peeked.rider.cargoKg;
+          const flyable = flyableDispatchCargoKg(
+            {
+              ...peeked.host,
+              cargoKg: previewKg,
+              throughLoads: undefined,
+            },
+            peeked.distanceNm,
+            cargoLimit.maxCargoKg,
+            cargoLimit,
+          );
+          if (!flyable.fuelFeasible) {
+            send(res, 400, {
+              error: `Estimated block fuel ${flyable.estimatedBlockFuelKg} kg exceeds tank capacity ${flyable.fuelCapacityKg} kg`,
+            });
+            return;
+          }
+          const result = await withCareerWrite((world, missions) => {
+            const host = addCargoStop(
+              missions,
+              body.missionId!,
+              body.riderMissionId!,
+              { maxCargoKg: flyable.operationalMaxCargoKg },
+            );
+            const rider = missions.missions.find(
+              (row) => row.id === body.riderMissionId,
+            );
+            return {
+              host,
+              rider,
+              walletUsd: missions.walletUsd,
+            };
+          }, {
+            persist: 'company',
+            housekeeping: false,
+            companyId: tripCompanyId,
+          });
+          send(res, 200, {
+            mission: await toClientMission(result.host),
+            rider: result.rider ? await toClientMission(result.rider) : undefined,
+            walletUsd: result.walletUsd,
+          });
+        } catch (error) {
+          send(res, 400, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/missions/add-desk-hold') {
+        const body = (await readBody(req)) as {
+          missionId?: string;
+          holdId?: string;
+          companyId?: string;
+        };
+        if (!body.missionId || !body.holdId) {
+          send(res, 400, { error: 'missionId and holdId required' });
+          return;
+        }
+        const tripCompanyId = companyIdFromRequest(req, body.companyId);
+        try {
+          const peeked = await withCareerPeekRead((world, missions) => {
+            const host = missions.missions.find((m) => m.id === body.missionId);
+            const hold = (missions.playerWarehouses?.demandHolds ?? []).find(
+              (row) => row.id === body.holdId,
+            );
+            if (!host || !hold) return { kind: 'missing' as const };
+            return {
+              kind: 'ok' as const,
+              host,
+              holdKg: hold.kg,
+              distanceNm:
+                routeDistanceNm(world, host.originIcao, host.destIcao) ?? 0,
+            };
+          }, { companyId: tripCompanyId });
+          if (peeked.kind === 'missing') {
+            send(res, 404, { error: 'Unknown mission or hold' });
+            return;
+          }
+          const cargoLimit = await resolveClassMaxCargoKg(
+            peeked.host.aircraftClassId,
+            peeked.host.airframeTypeId,
+          );
+          const previewKg =
+            missionDispatchCargoKg(peeked.host) + peeked.holdKg;
+          const flyable = flyableDispatchCargoKg(
+            {
+              ...peeked.host,
+              cargoKg: previewKg,
+              throughLoads: undefined,
+            },
+            peeked.distanceNm,
+            cargoLimit.maxCargoKg,
+            cargoLimit,
+          );
+          if (!flyable.fuelFeasible) {
+            send(res, 400, {
+              error: `Estimated block fuel ${flyable.estimatedBlockFuelKg} kg exceeds tank capacity ${flyable.fuelCapacityKg} kg`,
+            });
+            return;
+          }
+          const progPeek = await withCareerRead(
+            (_w, missions) => ({
+              cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
+            }),
+            { companyId: tripCompanyId },
+          );
+          const progression = await resolvePilotProgressionOps(
+            req,
+            tripCompanyId,
+            progPeek,
+          );
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            return withDevCargoOpsUnlock(req, missions, () =>
+              withProgressionGates(missions, progression, () => {
+                const host = attachDeskHoldToCargoTrip(missions, world, {
+                  hostMissionId: body.missionId!,
+                  holdId: body.holdId!,
+                  maxCargoKg: flyable.operationalMaxCargoKg,
+                });
+                return {
+                  host,
+                  walletUsd: missions.walletUsd,
+                  fleet: missions.fleet,
+                  missions: missions.missions.map((row) =>
+                    withMissionClientView(world, missions, row),
+                  ),
+                };
+              }),
+            );
+          }, {
+            persist: 'company',
+            housekeeping: false,
+            companyId: tripCompanyId,
+          });
+          send(res, 200, {
+            mission: result.missions.find((row) => row.id === result.host.id) ?? result.host,
+            walletUsd: result.walletUsd,
+            fleet: result.fleet,
+            missions: result.missions,
           });
         } catch (error) {
           send(res, 400, {

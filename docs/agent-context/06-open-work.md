@@ -1,5 +1,9 @@
 # Open work / backlog curto
 
+Atualizado 2026-10-01: **Desk → trip** — no Hauls, com um voo `accepted`, hold de outro destino no mesmo origem vira **Add to flight**. O primeiro Accept continua abrindo o voo. Ainda sem release. Spec: [`11-persist-commands.md`](./11-persist-commands.md).
+
+Atualizado 2026-10-01: **Trip de carga** — no Dispatch, com o contrato ainda em accepted, dá para acrescentar até 3 contratos do mesmo origem e destinos diferentes. O OFP leva a soma. No settle só a escala atual entrega; a próxima vira freight hold nesse hub (mesmo dia $0, dia seguinte taxa de pátio). Ainda sem release. Spec: [`11-persist-commands.md`](./11-persist-commands.md).
+
 Atualizado 2026-09-29: **Freight hold** — um contrato de carga pode ficar num hub intermediário (`leaveFreightAtHub`). A taxa de pátio corre até o próximo depart. O botão está no desktop; o hold só grava depois do deploy do world. Spec: [`11-persist-commands.md`](./11-persist-commands.md).
 
 Atualizado 2026-09-29: **Port FBO 7d cópia** — settle no mesmo dia somava o kg numa cópia da janela e o 7d ficava 0. Fix local, ainda sem release. O voo já settled não retroage. Spec: [`24-port-fbo.md`](./24-port-fbo.md).

@@ -255,10 +255,16 @@ function parkedAircraftAt(
   dest: string,
   kg: number,
   pilotAccountId?: string | null,
+  tripHostId?: string,
 ) {
+  const hostId = tripHostId?.trim() || '';
   const open = listActivePlayerMissionsForPilot(
     state.missions ?? [],
     pilotAccountId,
+  ).filter(
+    (mission) =>
+      !hostId ||
+      (mission.id !== hostId && mission.throughHostId !== hostId),
   );
   if (open.length > 0) {
     throw new Error(
@@ -272,7 +278,13 @@ function parkedAircraftAt(
     throw new Error(`Aircraft ${aircraft.id} has no airframe`);
   }
   if (aircraft.status !== 'parked') {
-    throw new Error(`Aircraft ${aircraft.id} is not parked`);
+    const onThisFlight =
+      hostId !== '' &&
+      aircraft.status === 'assigned' &&
+      aircraft.assignedMissionId === hostId;
+    if (!onThisFlight) {
+      throw new Error(`Aircraft ${aircraft.id} is not parked`);
+    }
   }
   if (aircraft.locationIcao.trim().toUpperCase() !== origin) {
     throw new Error(
@@ -466,6 +478,8 @@ export function dispatchWarehouseHaulHold(
     pilotHomeCompanyId?: string;
     vaFlight?: boolean;
     actorIsVaOwner?: boolean;
+    /** Join this accepted flight instead of starting another. */
+    tripHostId?: string;
   },
 ): { mission: MissionIntent; kg: number; payUsd: number } {
   expireDemandHolds(state, world);
@@ -500,6 +514,7 @@ export function dispatchWarehouseHaulHold(
     hold.destIcao,
     kg,
     opts.pilotAccountId,
+    opts.tripHostId,
   );
   assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
   const payUsd = money(hold.unitPriceUsd * kg);

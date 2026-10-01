@@ -72,12 +72,22 @@ export function DispatchStepper(props: { current: DispatchStepId }) {
 
 /** Mirror of shared yard rate ($/kg/economy-day). Electronics and machinery are 2×. */
 function freightHoldUsdPerDay(mission: Mission): number {
-  const kg = Math.max(0, mission.cargoKg || 0);
-  const perKg =
-    mission.commodityId === 'electronics' || mission.commodityId === 'machinery'
-      ? 0.1
-      : 0.05;
-  return Math.round(kg * perKg * 100) / 100;
+  const lines = [
+    { kg: mission.cargoKg || 0, commodityId: mission.commodityId },
+    ...(mission.throughLoads ?? []).map((row) => ({
+      kg: row.cargoKg,
+      commodityId: row.commodityId,
+    })),
+  ];
+  const usd = lines.reduce((sum, line) => {
+    const kg = Math.max(0, line.kg);
+    const perKg =
+      line.commodityId === 'electronics' || line.commodityId === 'machinery'
+        ? 0.1
+        : 0.05;
+    return sum + kg * perKg;
+  }, 0);
+  return Math.round(usd * 100) / 100;
 }
 
 function canLeaveFreightHere(mission: Mission): boolean {
@@ -103,6 +113,56 @@ function holdPositionOk(
   return !(position.lat === 0 && position.lon === 0);
 }
 
+function CargoTripStops(props: {
+  mission: Mission;
+  choices: Array<{ id: string; destIcao: string; cargoKg: number }>;
+  busy: boolean;
+  formatTonnes: (kg: number) => string;
+  onAdd?: (riderMissionId: string) => void;
+}) {
+  const stops = props.mission.throughLoads ?? [];
+  const room = stops.length < 3;
+  if (stops.length === 0 && props.choices.length === 0) return null;
+  return (
+    <div className="dispatch-freight-hold" role="status">
+      <strong>
+        Trip · {props.mission.destIcao}
+        {stops.map((row) => ` → ${row.destIcao}`).join('')}
+      </strong>
+      <span>
+        This OFP carries{' '}
+        {props.formatTonnes(
+          props.mission.cargoKg +
+            stops.reduce((sum, row) => sum + row.cargoKg, 0),
+        )}
+        . Landing at {props.mission.destIcao} delivers only that contract. The
+        next stop waits in the yard there until you depart.
+      </span>
+      {room && props.choices.length > 0 && props.onAdd ? (
+        <label className="dispatch-trip-add">
+          Add a stop
+          <select
+            disabled={props.busy}
+            defaultValue=""
+            onChange={(event) => {
+              const id = event.target.value;
+              event.target.value = '';
+              if (id) props.onAdd?.(id);
+            }}
+          >
+            <option value="">Choose a contract</option>
+            {props.choices.map((choice) => (
+              <option key={choice.id} value={choice.id}>
+                {choice.destIcao} · {props.formatTonnes(choice.cargoKg)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
 export function DispatchActivePanel(props: {
   mission: Mission;
   step: DispatchStepId;
@@ -117,6 +177,9 @@ export function DispatchActivePanel(props: {
   formatTonnes: (kg: number) => string;
   formatDeadline: (tick: number, hours: number) => string;
   aircraftClassLabel: (id: string) => string;
+  /** Other accepted contracts that can ride this leg. */
+  cargoStopChoices?: Array<{ id: string; destIcao: string; cargoKg: number }>;
+  onAddCargoStop?: (riderMissionId: string) => void;
   /** Structural cargo ceiling for this mission (kg) — bar denominator. */
   missionMaxCargoKg: (mission: Mission) => number;
   /** Route ops payload ceiling when known (kg) — MTOW/fuel estimate for this leg. */
@@ -480,6 +543,29 @@ export function DispatchActivePanel(props: {
             Ready to plan from {mission.freightHold.icao}. Yard storage{' '}
             {props.formatMoney(freightHoldUsdPerDay(mission))}/day until the
             next leg departs. Deadline still running.
+          </span>
+        </div>
+      ) : null}
+
+      {mission.status === 'accepted' && !mission.throughHostId ? (
+        <CargoTripStops
+          mission={mission}
+          choices={props.cargoStopChoices ?? []}
+          busy={props.busy}
+          formatTonnes={props.formatTonnes}
+          onAdd={props.onAddCargoStop}
+        />
+      ) : (mission.throughLoads?.length ?? 0) > 0 ? (
+        <div className="dispatch-freight-hold" role="status">
+          <strong>Also on this aircraft</strong>
+          <span>
+            {(mission.throughLoads ?? [])
+              .map(
+                (row) =>
+                  `${row.destIcao} ${props.formatTonnes(row.cargoKg)}`,
+              )
+              .join(' · ')}
+            . Only {mission.destIcao} delivers on this landing.
           </span>
         </div>
       ) : null}

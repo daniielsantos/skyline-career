@@ -961,6 +961,20 @@ export interface MissionIntent {
     icao: string;
     sinceTick: number;
   };
+  /**
+   * Later stops riding on this leg. They are not this mission's lots:
+   * settle pays and delivers only `cargoKg`. The next stop becomes a
+   * freight hold at this dest; the rest stay as its through-load.
+   */
+  throughLoads?: Array<{
+    missionId: string;
+    destIcao: string;
+    cargoKg: number;
+    commodityId: CommodityId;
+    stopIndex: number;
+  }>;
+  /** Set on a contract that is riding another flight. Dispatch that host. */
+  throughHostId?: string;
   /** Economy tick when settle ran. */
   settledAtTick?: number;
   /** Freight paid after late penalty. */

@@ -229,6 +229,13 @@ type Props = {
     aircraftId: string,
     sameRouteHolds?: VaHaulHold[],
   ) => void;
+  /** Accepted flight that can still take another desk destination. */
+  haulTripHost?: {
+    id: string;
+    originIcao: string;
+    destIcao: string;
+    stopIcaos: string[];
+  } | null;
   onMissions?: (missions: Mission[]) => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
   /**
@@ -1439,6 +1446,7 @@ export function VaPage(props: Props) {
           onStaged={props.onHaulStaged}
           pilotIcao={props.pilotIcao}
           onPrepareHold={props.onPrepareHaulHold}
+          tripHost={props.haulTripHost}
           resolveMaxCargoKg={props.resolveMaxCargoKg}
           economyTick={props.economyTick}
           economyClock={props.economyClock}

@@ -581,6 +581,16 @@ export type Mission = {
   demandOrderId?: string;
   /** Freight parked at an intermediate hub. Next leg starts at `icao`. */
   freightHold?: { icao: string; sinceTick: number };
+  /** Later stops riding this leg. Settle delivers only this contract. */
+  throughLoads?: Array<{
+    missionId: string;
+    destIcao: string;
+    cargoKg: number;
+    commodityId: string;
+    stopIndex: number;
+  }>;
+  /** Set when this contract is riding another flight. */
+  throughHostId?: string;
   /** Wide / trunk haul from WH → terminal. */
   warehouseHaul?: boolean;
   /** WH→WH company bridge / Internal Haul. */
@@ -5231,6 +5241,37 @@ export function postLeaveFreight(opts: {
     fleet?: PlayerAircraft[];
     pilotIcao?: string;
   }>('/api/missions/leave-freight', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAddCargoStop(opts: {
+  missionId: string;
+  riderMissionId: string;
+  companyId?: string;
+}) {
+  return api<{
+    mission: Mission;
+    rider?: Mission;
+    walletUsd: number;
+  }>('/api/missions/add-cargo-stop', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postAddDeskHold(opts: {
+  missionId: string;
+  holdId: string;
+  companyId?: string;
+}) {
+  return api<{
+    mission: Mission;
+    walletUsd: number;
+    fleet?: PlayerAircraft[];
+    missions: Mission[];
+  }>('/api/missions/add-desk-hold', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

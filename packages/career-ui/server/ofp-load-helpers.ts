@@ -18,6 +18,7 @@ import {
   KG_TO_LB,
   normalizeAircraftTitle,
   ofpFreightTowardMissionKg,
+  missionDispatchCargoKg,
   payloadMatchToleranceLb,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
@@ -1190,7 +1191,7 @@ async function applyMissionOfpLoadExclusive(
         ...(paxAndCargoFreightKg !== undefined
           ? { cargoKg: paxAndCargoFreightKg }
           : {}),
-        cargoKgFallback: mission.cargoKg,
+        cargoKgFallback: missionDispatchCargoKg(mission),
         // Career: fill to tank max instead of aborting when SimBrief plans past capacity
         // (e.g. Twin Otter fuselage-only profile on a 500+ NM leg).
         clampFuelToCapacity: true,

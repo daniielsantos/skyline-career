@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **a4c06356** / desktop **0.3.413** shipped: Replace an auto-haul when the dest hub stops paying more, without spending another daily post. Release: [v0.3.413](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.413).
+
+
 `main` **6cc59b43** / desktop **0.3.412** shipped: Raise the Auto-haul desk ceiling to ten posts a day and ten open holds. Release: [v0.3.412](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.412).
 
 

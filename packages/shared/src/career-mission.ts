@@ -2143,9 +2143,15 @@ export function replaceMissionManifest(
       }
       totalKg += line.cargoKg;
     }
-    if (totalKg > maxCargoKg) {
+    const throughKg = (normalized.throughLoads ?? []).reduce(
+      (sum, row) => sum + Math.max(0, Math.floor(row.cargoKg)),
+      0,
+    );
+    if (totalKg + throughKg > maxCargoKg) {
       throw new Error(
-        `Edited cargo ${totalKg} kg exceeds aircraft capacity ${maxCargoKg} kg`,
+        throughKg > 0
+          ? `Edited cargo ${totalKg} kg plus ${throughKg} kg still on this aircraft exceeds capacity ${maxCargoKg} kg`
+          : `Edited cargo ${totalKg} kg exceeds aircraft capacity ${maxCargoKg} kg`,
       );
     }
 
@@ -2198,6 +2204,7 @@ export function replaceMissionManifest(
       fuelAuthorizedOfpId: undefined,
       tripFuelBurnKg: undefined,
       dispatchedAtTick: undefined,
+      throughLoads: normalized.throughLoads,
     };
     syncPlayerInbound(world, replaced);
     return replaced;

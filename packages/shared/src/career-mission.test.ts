@@ -2848,6 +2848,52 @@ describe('replaceMissionManifest', () => {
     assert.equal(lot.status, 'available');
   });
 
+  it('keeps a later stop on the aircraft when this leg is edited', () => {
+    const world = createSeedEconomyWorld({ seed: 'replace-through' });
+    const lot = pushTestLot(world, {
+      id: 'lot_rep_through',
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      quantityKg: 3_000,
+      payUsd: 2_000,
+    });
+    const mission = {
+      ...acceptMission(world, {
+        lotId: lot.id,
+        cargoKg: 1_200,
+        aircraftClassId: 'light_turboprop',
+        maxCargoKg: 1_704,
+        missionId: 'msn_rep_through',
+      }),
+      throughLoads: [
+        {
+          missionId: 'msn_next',
+          destIcao: 'SBGL',
+          cargoKg: 400,
+          commodityId: 'machinery' as const,
+          stopIndex: 1,
+        },
+      ],
+    };
+    const replaced = replaceMissionManifest(world, mission, {
+      lines: [{ lotId: lot.id, cargoKg: 600 }],
+      aircraftClassId: 'light_turboprop',
+      maxCargoKg: 1_704,
+    });
+    assert.equal(replaced.cargoKg, 600);
+    assert.equal(replaced.throughLoads?.[0]?.destIcao, 'SBGL');
+    assert.equal(replaced.throughLoads?.[0]?.cargoKg, 400);
+    assert.throws(
+      () =>
+        replaceMissionManifest(world, replaced, {
+          lines: [{ lotId: lot.id, cargoKg: 1_400 }],
+          maxCargoKg: 1_704,
+        }),
+      /still on this aircraft/,
+    );
+    assert.equal(lot.reservedKg, 600);
+  });
+
   it('rolls back reservations if the new lines are invalid', () => {
     const world = createSeedEconomyWorld({ seed: 'replace-rollback' });
     const lot = pushTestLot(world, {

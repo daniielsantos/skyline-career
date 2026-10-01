@@ -136,24 +136,10 @@ function CargoTripStops(props: {
 }) {
   const stops = props.mission.throughLoads ?? [];
   const room = stops.length < 3;
-  if (stops.length === 0 && props.choices.length === 0) return null;
+  if (!room || props.choices.length === 0 || !props.onAdd) return null;
   return (
-    <div className="dispatch-freight-hold dispatch-trip" role="status">
-      <strong>
-        Trip · {props.mission.destIcao}
-        {stops.map((row) => ` → ${row.destIcao}`).join('')}
-      </strong>
-      <span>
-        This OFP carries{' '}
-        {props.formatTonnes(
-          props.mission.cargoKg +
-            stops.reduce((sum, row) => sum + row.cargoKg, 0),
-        )}
-        . Landing at {props.mission.destIcao} delivers only that contract. The
-        next stop waits in the yard there until you depart.
-      </span>
-      {room && props.choices.length > 0 && props.onAdd ? (
-        <ul className="dispatch-trip-list">
+    <div className="dispatch-trip">
+      <ul className="dispatch-trip-list">
           {props.choices.map((choice) => {
             const dist =
               typeof choice.distanceNm === 'number' && choice.distanceNm > 0
@@ -204,15 +190,14 @@ function CargoTripStops(props: {
                   type="button"
                   className="action compact"
                   disabled={props.busy}
-                  onClick={() => props.onAdd?.(choice.id)}
-                >
-                  Add
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+                onClick={() => props.onAdd?.(choice.id)}
+              >
+                Add
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -655,6 +640,18 @@ export function DispatchActivePanel(props: {
               onOpen={props.onOpenAirport}
               disabled={busy}
             />
+            {(mission.throughLoads ?? []).map((row) => (
+              <span key={row.missionId}>
+                <span className="dest-runway-arrow" aria-hidden="true">
+                  →
+                </span>
+                <IcaoLink
+                  icao={row.destIcao}
+                  onOpen={props.onOpenAirport}
+                  disabled={busy}
+                />
+              </span>
+            ))}
             <DestRunwaysButton icao={mission.destIcao} />
           </h2>
           <p>
@@ -736,7 +733,12 @@ export function DispatchActivePanel(props: {
             opsCapKg !== null
               ? Math.min(opsCapKg, structuralMaxKg)
               : structuralMaxKg;
-          const capacityLeftKg = Math.max(0, barCapKg - mission.cargoKg);
+          const throughKg = (mission.throughLoads ?? []).reduce(
+            (sum, row) => sum + row.cargoKg,
+            0,
+          );
+          const bookedKg = mission.cargoKg + throughKg;
+          const capacityLeftKg = Math.max(0, barCapKg - bookedKg);
           const routeOpsNote =
             opsCapKg !== null &&
             opsCapKg + 1 < structuralMaxKg
@@ -744,6 +746,13 @@ export function DispatchActivePanel(props: {
                 ? `Structural ${props.formatTonnes(structuralMaxKg)} (Lab keeps booked payload)`
                 : `Structural ${props.formatTonnes(structuralMaxKg)} · route ops is the booking cap`
               : undefined;
+          const deliversNote =
+            throughKg > 0
+              ? `${props.formatTonnes(mission.cargoKg)} delivers at ${mission.destIcao}`
+              : undefined;
+          const capacityNote =
+            [routeOpsNote, deliversNote].filter(Boolean).join(' · ') ||
+            undefined;
           const routeLabel =
             routeDistanceNm !== undefined
               ? `${Math.round(routeDistanceNm).toLocaleString()} nm`
@@ -851,10 +860,10 @@ export function DispatchActivePanel(props: {
               totalKg={
                 mission.missionType === 'charter'
                   ? ((mission.pax ?? 0) * 175) / KG_TO_LB + (mission.baggageKg ?? 0)
-                  : mission.cargoKg
+                  : bookedKg
               }
               capKg={barCapKg}
-              capacityNote={routeOpsNote}
+              capacityNote={capacityNote}
               highlights={summaryHighlights}
             />
           );

@@ -10996,13 +10996,29 @@ export function App() {
     return fallbackMaxCargoKg(aircraftClass);
   }
 
+  function stagingThroughLoads(draft: StagingDraft) {
+    if (!draft.replaceManifest || !draft.intoMissionId) return [];
+    return (
+      missions.find((m) => m.id === draft.intoMissionId)?.throughLoads ?? []
+    );
+  }
+
+  function stagingThroughKg(draft: StagingDraft): number {
+    return stagingThroughLoads(draft).reduce(
+      (sum, row) => sum + Math.max(0, Math.floor(row.cargoKg)),
+      0,
+    );
+  }
+
   function stagingUsedKg(draft: StagingDraft): number {
     const existing =
       draft.replaceManifest || !draft.intoMissionId
         ? 0
         : missions.find((m) => m.id === draft.intoMissionId)?.cargoKg ?? 0;
     return (
-      existing + draft.lines.reduce((sum, line) => sum + line.cargoKg, 0)
+      existing +
+      draft.lines.reduce((sum, line) => sum + line.cargoKg, 0) +
+      stagingThroughKg(draft)
     );
   }
 
@@ -11014,7 +11030,10 @@ export function App() {
     const staged = draft.lines
       .filter((line) => line.lot.id !== excludeLotId)
       .reduce((sum, line) => sum + line.cargoKg, 0);
-    return Math.max(0, aircraftCapKg(draft.aircraft) - existing - staged);
+    return Math.max(
+      0,
+      aircraftCapKg(draft.aircraft) - existing - staged - stagingThroughKg(draft),
+    );
   }
 
   function lineMaxKg(draft: StagingDraft, lot: MarketLot): number {
@@ -19687,6 +19706,18 @@ export function App() {
                         onOpen={openAirport}
                         disabled={busy}
                       />
+                      {staging.replaceManifest
+                        ? stagingThroughLoads(staging).map((row) => (
+                            <span key={row.missionId}>
+                              {' → '}
+                              <IcaoLink
+                                icao={row.destIcao}
+                                onOpen={openAirport}
+                                disabled={busy}
+                              />
+                            </span>
+                          ))
+                        : null}
                     </h2>
                     <p>
                       {stagingAssignedLabel}
@@ -19827,10 +19858,19 @@ export function App() {
                 totalKg={stagingTotalKg}
                 capKg={aircraftCapKg(staging.aircraft)}
                 capacityNote={
-                  structuralMaxCargoKg !== null &&
-                  aircraftCapKg(staging.aircraft) + 1 < structuralMaxCargoKg
-                    ? `Structural ${formatTonnes(structuralMaxCargoKg)} · route ops is the booking cap`
-                    : undefined
+                  [
+                    structuralMaxCargoKg !== null &&
+                    aircraftCapKg(staging.aircraft) + 1 < structuralMaxCargoKg
+                      ? `Structural ${formatTonnes(structuralMaxCargoKg)} · route ops is the booking cap`
+                      : undefined,
+                    staging.replaceManifest && stagingThroughKg(staging) > 0
+                      ? `${formatTonnes(
+                          stagingTotalKg - stagingThroughKg(staging),
+                        )} delivers at ${staging.destIcao}`
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || undefined
                 }
                 highlights={[
                   {
@@ -20574,6 +20614,43 @@ export function App() {
                     );
                   })}
                 </ul>
+                {staging.replaceManifest &&
+                stagingThroughLoads(staging).length > 0 ? (
+                  <ul className="staging-lines">
+                    {stagingThroughLoads(staging).map((row) => {
+                      const rider = missions.find(
+                        (mission) => mission.id === row.missionId,
+                      );
+                      const name =
+                        row.commodityId.charAt(0).toUpperCase() +
+                        row.commodityId.slice(1);
+                      return (
+                        <li
+                          key={row.missionId}
+                          className="staging-line staging-line-compact"
+                        >
+                          <div className="staging-line-head">
+                            <div className="staging-line-title">
+                              <strong>{name}</strong>
+                              <span>
+                                {staging.originIcao} → {row.destIcao}
+                              </span>
+                            </div>
+                          </div>
+                          <p>
+                            {formatTonnes(row.cargoKg)} stays on this aircraft
+                            and delivers at {row.destIcao}
+                            {typeof rider?.payUsd === 'number'
+                              ? ` · ${formatMoney(rider.payUsd)} on that stop`
+                              : ''}
+                            . This editor changes only the {staging.destIcao}{' '}
+                            lots.
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
               </div>
 
               <div className="staging-section">

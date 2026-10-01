@@ -1,6 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-10-01: **Manifest lista todos os holds embaixo, no layout da trip** — sintoma = os wide hauls do mesmo destino ficavam em cartão com slider e o bridge de outro destino numa linha diferente. Fix = uma lista só, no formato da trip (rota, tipo, Cargo, Mass, Dist, Pay, Expires, By). A caixa marca o que entra no Accept. O hold que abriu o Manifest fica marcado.
+Atualizado 2026-10-01: **Manifest: slider na primeira perna, Add nos outros** — sintoma = a lista única só tinha caixa, e o jogador não ajustava o peso. Fix = o hold que abriu o Manifest já nasce com o slider. Os outros ficam na lista da trip com **Add**; o slider daquele contrato aparece depois do Add. Load 0 devolve o hold ao desk. O bridge entra no total: kg no payload e `pilotPayUsd` (proporcional ao slider) no Contract pay.
 
 Atualizado 2026-10-01: **Add respeita a reserva do próprio piloto** — sintoma = Add na lista dizia “reserved by another pilot” com o cartão em RESERVED · YOU. Causa = ao devolver o avião ao voo, o Add não informava a conta que já tinha a reserva. Fix = o Add manda essa conta (e o dono da VA, se for o caso). O voo aberto não precisa ser cancelado.
 

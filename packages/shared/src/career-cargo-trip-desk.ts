@@ -21,6 +21,8 @@ export function attachDeskHoldToCargoTrip(
     hostMissionId: string;
     holdId: string;
     maxCargoKg?: number;
+    /** Partial load. Omit = the whole hold. The rest stays on the desk. */
+    kg?: number;
     /** Pilot clicking Add. The tail is already reserved for this flight. */
     actorAccountId?: string | null;
     actorIsVaOwner?: boolean;
@@ -54,7 +56,11 @@ export function attachDeskHoldToCargoTrip(
   if ((host.throughLoads?.length ?? 0) >= CARGO_TRIP_MAX_STOPS) {
     throw new Error(`A trip can add at most ${CARGO_TRIP_MAX_STOPS} stops`);
   }
-  const nextKg = missionDispatchCargoKg(host) + hold.kg;
+  const requested =
+    opts.kg != null && Number.isFinite(opts.kg) ? Math.floor(opts.kg) : hold.kg;
+  const takeKg = Math.min(hold.kg, Math.max(0, requested));
+  if (takeKg <= 0) throw new Error('Dispatch amount must be positive');
+  const nextKg = missionDispatchCargoKg(host) + takeKg;
   if (
     typeof opts.maxCargoKg === 'number' &&
     Number.isFinite(opts.maxCargoKg) &&
@@ -81,6 +87,7 @@ export function attachDeskHoldToCargoTrip(
     pilotAccountId: host.pilotAccountId?.trim() || actorAccountId,
     pilotHomeCompanyId: host.pilotHomeCompanyId,
     actorIsVaOwner: opts.actorIsVaOwner === true,
+    kg: takeKg,
   };
   let created: { mission: MissionIntent } | null = null;
   try {

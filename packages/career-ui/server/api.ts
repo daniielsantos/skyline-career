@@ -15245,6 +15245,7 @@ export function createCareerApiServer(port = 8787) {
           missionId?: string;
           holdId?: string;
           companyId?: string;
+          kg?: number;
         };
         if (!body.missionId || !body.holdId) {
           send(res, 400, { error: 'missionId and holdId required' });
@@ -15258,10 +15259,15 @@ export function createCareerApiServer(port = 8787) {
               (row) => row.id === body.holdId,
             );
             if (!host || !hold) return { kind: 'missing' as const };
+            const requested = Number(body.kg);
+            const holdKg =
+              Number.isFinite(requested) && requested > 0
+                ? Math.min(hold.kg, Math.floor(requested))
+                : hold.kg;
             return {
               kind: 'ok' as const,
               host,
-              holdKg: hold.kg,
+              holdKg,
               distanceNm:
                 routeDistanceNm(world, host.originIcao, host.destIcao) ?? 0,
             };
@@ -15312,6 +15318,7 @@ export function createCareerApiServer(port = 8787) {
                 const host = attachDeskHoldToCargoTrip(missions, world, {
                   hostMissionId: body.missionId!,
                   holdId: body.holdId!,
+                  kg: peeked.holdKg,
                   maxCargoKg: flyable.operationalMaxCargoKg,
                   actorAccountId: tripActor.accountId,
                   actorIsVaOwner: tripActor.isOwner,

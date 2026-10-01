@@ -6935,6 +6935,9 @@ export function App() {
 
   const [openDeskHolds, setOpenDeskHolds] = useState<VaHaulHold[]>([]);
   const [stagingJoinHoldIds, setStagingJoinHoldIds] = useState<string[]>([]);
+  const [stagingJoinKg, setStagingJoinKg] = useState<Record<string, number>>(
+    {},
+  );
   useEffect(() => {
     const preparing = Boolean(staging?.deskHold);
     const accepted =
@@ -11286,6 +11289,7 @@ export function App() {
     setCharterManifest(null);
     setStaging(draft);
     setStagingJoinHoldIds([]);
+    setStagingJoinKg({});
     setPreferredAircraft(selectedAircraft.aircraftClassId);
     setError(null);
     goToTab('staging');
@@ -11712,7 +11716,7 @@ export function App() {
   function updateStagingDeskHoldKg(holdId: string, rawKg: number) {
     setStaging((current) => {
       if (!current?.deskHold) return current;
-      const cap = aircraftCapKg(current.aircraft);
+      const cap = Math.max(0, aircraftCapKg(current.aircraft) - stagingJoinLoadKg);
       const apply = (hold: NonNullable<StagingDraft['deskHold']>) => {
         if (hold.id !== holdId) return hold;
         const allowZero = hold.id !== current.deskHold!.id;
@@ -11735,7 +11739,7 @@ export function App() {
   function setStagingDeskHoldFraction(holdId: string, fraction: number) {
     setStaging((current) => {
       if (!current?.deskHold) return current;
-      const cap = aircraftCapKg(current.aircraft);
+      const cap = Math.max(0, aircraftCapKg(current.aircraft) - stagingJoinLoadKg);
       const apply = (hold: NonNullable<StagingDraft['deskHold']>) => {
         if (hold.id !== holdId) return hold;
         const allowZero = hold.id !== current.deskHold!.id;
@@ -11912,7 +11916,9 @@ export function App() {
         setSimbriefLaunchUrl(null);
         goToTab('staging');
         const joinIds = stagingJoinHoldIds.slice();
+        const joinKg = stagingJoinKg;
         setStagingJoinHoldIds([]);
+        setStagingJoinKg({});
         const addedDests: string[] = [];
         for (const holdId of joinIds) {
           try {
@@ -11920,6 +11926,7 @@ export function App() {
               missionId: result.mission.id,
               holdId,
               companyId: opsCompanyId,
+              ...(joinKg[holdId] != null ? { kg: joinKg[holdId] } : {}),
             });
             if (added.fleet) paintOpsMutationFleet(added.fleet, opsCompanyId);
             if (added.missions?.length) {
@@ -12869,6 +12876,12 @@ export function App() {
       }
       setOpenDeskHolds((current) => current.filter((row) => row.id !== holdId));
       setStagingJoinHoldIds((current) => current.filter((id) => id !== holdId));
+      setStagingJoinKg((current) => {
+        if (!(holdId in current)) return current;
+        const next = { ...current };
+        delete next[holdId];
+        return next;
+      });
       setToast(
         `Added ${hold?.destIcao ?? 'the next stop'}. The first OFP carries the combined load.`,
       );
@@ -13416,12 +13429,26 @@ export function App() {
     ? findStagingBlockingMission(staging, missions)
     : undefined;
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
+  const stagingJoinPayUsd = staging?.deskHold
+    ? stagingJoinHoldIds.reduce((sum, id) => {
+        const hold = openDeskHolds.find((row) => row.id === id);
+        const kg = stagingJoinKg[id] ?? 0;
+        if (!hold || kg <= 0) return sum;
+        if ((hold.kind ?? 'demand') === 'bridge') {
+          const full = Math.max(0, hold.pilotPayUsd ?? 0);
+          return hold.kg > 0 ? sum + Math.round((full * kg) / hold.kg) : sum;
+        }
+        return hold.unitPriceUsd != null
+          ? sum + Math.round(hold.unitPriceUsd * kg)
+          : sum;
+      }, 0)
+    : 0;
   const stagingPayUsd = staging
     ? staging.deskHold
       ? deskHoldLines(staging).reduce(
           (sum, line) => sum + deskHoldPayUsd(line),
           0,
-        )
+        ) + stagingJoinPayUsd
       : staging.lines.reduce(
           (sum, line) => sum + proRataPayUsd(line.lot, line.cargoKg),
           0,
@@ -13433,12 +13460,16 @@ export function App() {
     estimatedFuelCostUsd !== null
       ? stagingContractPayUsd - estimatedFuelCostUsd
       : null;
+  const stagingJoinLoadKg = stagingJoinHoldIds.reduce(
+    (sum, id) => sum + Math.max(0, Math.floor(stagingJoinKg[id] ?? 0)),
+    0,
+  );
   const stagingTotalKg = staging
     ? staging.deskHold
       ? deskHoldLines(staging).reduce(
           (sum, line) => sum + deskHoldEffectiveLoadKg(line),
           0,
-        )
+        ) + stagingJoinLoadKg
       : stagingUsedKg(staging)
     : 0;
   const stagingDeskHoldCapKg = staging?.deskHold
@@ -19986,131 +20017,416 @@ export function App() {
                         ? Math.round(hold.unitPriceUsd * hold.kg)
                         : undefined;
                     };
-                    const renderRow = (row: {
+                    const capForLines = Math.max(
+                      0,
+                      stagingDeskHoldCapKg - stagingJoinLoadKg,
+                    );
+                    const loadSlider = (card: {
                       id: string;
+                      commodityId: string;
+                      kind?: string;
                       originIcao: string;
                       destIcao: string;
-                      kind?: string;
-                      commodityId: string;
-                      kg: number;
-                      distanceNm?: number;
-                      payUsd?: number;
+                      holdKg: number;
+                      loadKg: number;
+                      maxKg: number;
+                      payUsd: number;
                       expiresAtTick?: number;
-                      by?: string;
-                      checked: boolean;
-                      disabled: boolean;
-                      onChange: (on: boolean) => void;
+                      allowZero: boolean;
+                      onKg: (kg: number) => void;
                     }) => {
-                      const dist =
-                        typeof row.distanceNm === 'number' && row.distanceNm > 0
-                          ? `${Math.round(row.distanceNm).toLocaleString()} nm`
-                          : '—';
+                      const displayMax = Math.max(
+                        0,
+                        Math.floor(kgToDisplay(card.maxKg, weightSystem)),
+                      );
+                      const displayValue = Math.round(
+                        kgToDisplay(card.loadKg, weightSystem),
+                      );
+                      const unit = massUnitLabel(weightSystem);
+                      const sliderMin = card.allowZero ? 0 : card.maxKg > 0 ? 1 : 0;
                       return (
-                        <li key={row.id} className="dispatch-trip-row">
-                          <div className="dispatch-trip-id">
-                            <strong>
-                              {row.originIcao} → {row.destIcao}
-                            </strong>
-                            <span>{kindLabel(row.kind)}</span>
+                        <li
+                          key={card.id}
+                          className="staging-line staging-line-compact"
+                        >
+                          <div className="staging-line-head">
+                            <div className="staging-line-title">
+                              <strong>{commodityOf(card.commodityId)}</strong>
+                              <span className="tag">{kindLabel(card.kind)}</span>
+                            </div>
                           </div>
-                          <div className="dispatch-trip-stats">
-                            <span>
-                              <em>Cargo</em> {commodityOf(row.commodityId)}
-                            </span>
-                            <span>
-                              <em>Mass</em> {formatTonnes(row.kg)}
-                            </span>
-                            <span>
-                              <em>Dist</em> {dist}
-                            </span>
-                            <span>
-                              <em>Pay</em>{' '}
-                              {typeof row.payUsd === 'number'
-                                ? formatMoney(row.payUsd)
-                                : '—'}
-                            </span>
-                            <span>
-                              <em>Expires</em>{' '}
-                              {typeof row.expiresAtTick === 'number'
-                                ? formatDeadline(
-                                    row.expiresAtTick,
-                                    continuousHours,
+                          <p className="staging-line-meta">
+                            {card.originIcao}→{card.destIcao} · hold{' '}
+                            {formatTonnes(card.holdKg)} · load{' '}
+                            {formatTonnes(card.loadKg)} · pay{' '}
+                            {formatMoney(card.payUsd)}
+                            {card.expiresAtTick != null ? (
+                              <>
+                                {' '}
+                                ·{' '}
+                                {formatExpiry({
+                                  expiresAtTick: card.expiresAtTick,
+                                  currentTick: tick,
+                                  continuousHours,
+                                })}
+                              </>
+                            ) : null}
+                            {card.loadKg < card.holdKg ? (
+                              <>
+                                {' '}
+                                · remainder{' '}
+                                {formatTonnes(card.holdKg - card.loadKg)} stays
+                                on Open desk
+                              </>
+                            ) : null}
+                          </p>
+                          <div className="staging-line-controls">
+                            <label className="cargo-amount staging-cargo-amount">
+                              Load
+                              <div>
+                                <input
+                                  type="number"
+                                  min={sliderMin}
+                                  max={Math.max(sliderMin, displayMax)}
+                                  step={weightSystem === 'imperial' ? 10 : 100}
+                                  value={displayValue}
+                                  onChange={(event) =>
+                                    card.onKg(
+                                      displayToKg(
+                                        Number(event.target.value),
+                                        weightSystem,
+                                      ),
+                                    )
+                                  }
+                                  disabled={busy || (!card.allowZero && card.maxKg <= 0)}
+                                />
+                                <span>{unit}</span>
+                              </div>
+                              <input
+                                type="range"
+                                min={sliderMin}
+                                max={Math.max(sliderMin, displayMax)}
+                                step={1}
+                                value={Math.min(
+                                  displayValue,
+                                  Math.max(sliderMin, displayMax),
+                                )}
+                                onChange={(event) =>
+                                  card.onKg(
+                                    displayToKg(
+                                      Number(event.target.value),
+                                      weightSystem,
+                                    ),
                                   )
-                                : '—'}
-                            </span>
-                            <span>
-                              <em>By</em> {row.by?.trim() || '—'}
-                            </span>
+                                }
+                                disabled={busy || card.maxKg <= 0}
+                              />
+                            </label>
+                            <div className="cargo-presets staging-cargo-presets">
+                              {[0.25, 0.5, 0.75, 1].map((fraction) => (
+                                <button
+                                  key={fraction}
+                                  type="button"
+                                  className="staging-preset-chip"
+                                  disabled={busy || card.maxKg <= 0}
+                                  onClick={() =>
+                                    card.onKg(
+                                      fraction >= 1
+                                        ? card.maxKg
+                                        : Math.max(
+                                            card.allowZero ? 0 : 1,
+                                            Math.round(card.maxKg * fraction),
+                                          ),
+                                    )
+                                  }
+                                >
+                                  {fraction === 1 ? 'Max' : `${fraction * 100}%`}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                          <input
-                            type="checkbox"
-                            aria-label={`Add ${row.originIcao} to ${row.destIcao}`}
-                            checked={row.checked}
-                            disabled={row.disabled || busy}
-                            onChange={(event) => row.onChange(event.target.checked)}
-                          />
                         </li>
                       );
                     };
+                    const dropJoin = (holdId: string) => {
+                      setStagingJoinHoldIds((current) =>
+                        current.filter((id) => id !== holdId),
+                      );
+                      setStagingJoinKg((current) => {
+                        if (!(holdId in current)) return current;
+                        const next = { ...current };
+                        delete next[holdId];
+                        return next;
+                      });
+                    };
+                    const pendingLines = lines.filter(
+                      (holdLine) =>
+                        holdLine.id !== staging.deskHold?.id &&
+                        deskHoldEffectiveLoadKg(holdLine) <= 0,
+                    );
+                    const pendingOthers = others.filter(
+                      (hold) => !stagingJoinHoldIds.includes(hold.id),
+                    );
                     return (
-                      <div className="dispatch-freight-hold dispatch-trip">
-                        <span>
-                          Holds from {origin}. Checked ones join this flight
-                          when you accept.
-                        </span>
-                        <ul className="dispatch-trip-list">
-                          {lines.map((holdLine) => {
-                            const listed = openDeskHolds.find(
-                              (row) => row.id === holdLine.id,
-                            );
-                            const isPrimary =
-                              holdLine.id === staging.deskHold?.id;
-                            const loaded = deskHoldEffectiveLoadKg(holdLine) > 0;
-                            return renderRow({
-                              id: holdLine.id,
-                              originIcao: origin,
-                              destIcao: staging.destIcao,
-                              kind: holdLine.kind,
-                              commodityId: holdLine.commodityId,
-                              kg: holdLine.kg,
-                              distanceNm: listed?.distanceNm,
-                              payUsd: payOf(holdLine),
-                              expiresAtTick: holdLine.expiresAtTick,
-                              by: listed?.heldByName ?? undefined,
-                              checked: isPrimary || loaded,
-                              disabled: isPrimary,
-                              onChange: (on) => {
-                                if (isPrimary) return;
-                                if (on) setStagingDeskHoldFraction(holdLine.id, 1);
-                                else updateStagingDeskHoldKg(holdLine.id, 0);
-                              },
-                            });
-                          })}
-                          {others.map((hold) =>
-                            renderRow({
-                              id: hold.id,
-                              originIcao: hold.originIcao,
-                              destIcao: hold.destIcao,
-                              kind: hold.kind,
-                              commodityId: hold.commodityId,
-                              kg: hold.kg,
-                              distanceNm: hold.distanceNm,
-                              payUsd: payOf(hold),
-                              expiresAtTick: hold.expiresAtTick,
-                              by: hold.heldByName ?? undefined,
-                              checked: stagingJoinHoldIds.includes(hold.id),
-                              disabled: false,
-                              onChange: (on) => {
-                                setStagingJoinHoldIds((current) =>
-                                  on
-                                    ? [...current, hold.id]
-                                    : current.filter((id) => id !== hold.id),
-                                );
-                              },
-                            }),
-                          )}
+                      <>
+                        <ul className="staging-lines">
+                          {lines
+                            .filter(
+                              (holdLine) =>
+                                holdLine.id === staging.deskHold?.id ||
+                                deskHoldEffectiveLoadKg(holdLine) > 0,
+                            )
+                            .map((holdLine) => {
+                              const isPrimary =
+                                holdLine.id === staging.deskHold?.id;
+                              const maxKg = deskHoldMaxLoadKg(
+                                staging,
+                                holdLine,
+                                capForLines,
+                              );
+                              return loadSlider({
+                                id: holdLine.id,
+                                commodityId: holdLine.commodityId,
+                                kind: holdLine.kind,
+                                originIcao: origin,
+                                destIcao: staging.destIcao,
+                                holdKg: Math.floor(holdLine.kg),
+                                loadKg: deskHoldEffectiveLoadKg(holdLine),
+                                maxKg,
+                                payUsd: deskHoldPayUsd(holdLine),
+                                expiresAtTick: holdLine.expiresAtTick,
+                                allowZero: !isPrimary,
+                                onKg: (kg) =>
+                                  updateStagingDeskHoldKg(holdLine.id, kg),
+                              });
+                            })}
+                          {others
+                            .filter((hold) =>
+                              stagingJoinHoldIds.includes(hold.id),
+                            )
+                            .map((hold) => {
+                              const loadKg = Math.max(
+                                0,
+                                Math.floor(stagingJoinKg[hold.id] ?? hold.kg),
+                              );
+                              const otherJoins = stagingJoinHoldIds.reduce(
+                                (sum, id) =>
+                                  id === hold.id
+                                    ? sum
+                                    : sum +
+                                      Math.max(
+                                        0,
+                                        Math.floor(stagingJoinKg[id] ?? 0),
+                                      ),
+                                0,
+                              );
+                              const sameLoad = lines.reduce(
+                                (sum, line) =>
+                                  sum + deskHoldEffectiveLoadKg(line),
+                                0,
+                              );
+                              const maxKg = Math.max(
+                                0,
+                                Math.min(
+                                  Math.floor(hold.kg),
+                                  Math.floor(stagingDeskHoldCapKg) -
+                                    sameLoad -
+                                    otherJoins,
+                                ),
+                              );
+                              const pay =
+                                (hold.kind ?? 'demand') === 'bridge'
+                                  ? hold.kg > 0
+                                    ? Math.round(
+                                        ((hold.pilotPayUsd ?? 0) * loadKg) /
+                                          hold.kg,
+                                      )
+                                    : 0
+                                  : hold.unitPriceUsd != null
+                                    ? Math.round(hold.unitPriceUsd * loadKg)
+                                    : 0;
+                              return loadSlider({
+                                id: hold.id,
+                                commodityId: hold.commodityId,
+                                kind: hold.kind,
+                                originIcao: hold.originIcao,
+                                destIcao: hold.destIcao,
+                                holdKg: Math.floor(hold.kg),
+                                loadKg,
+                                maxKg,
+                                payUsd: pay,
+                                expiresAtTick: hold.expiresAtTick,
+                                allowZero: true,
+                                onKg: (kg) => {
+                                  const next = Math.max(0, Math.floor(kg));
+                                  if (next <= 0) {
+                                    dropJoin(hold.id);
+                                    return;
+                                  }
+                                  setStagingJoinKg((current) => ({
+                                    ...current,
+                                    [hold.id]: Math.min(maxKg, next),
+                                  }));
+                                },
+                              });
+                            })}
                         </ul>
-                      </div>
+                        {pendingLines.length + pendingOthers.length > 0 ? (
+                          <div className="dispatch-freight-hold dispatch-trip">
+                            <span>
+                              Other holds from {origin}. Add one, then set how
+                              much rides this flight.
+                            </span>
+                            <ul className="dispatch-trip-list">
+                              {pendingLines.map((holdLine) => {
+                                const listed = openDeskHolds.find(
+                                  (row) => row.id === holdLine.id,
+                                );
+                                const maxKg = deskHoldMaxLoadKg(
+                                  staging,
+                                  holdLine,
+                                  capForLines,
+                                );
+                                const dist =
+                                  typeof listed?.distanceNm === 'number' &&
+                                  listed.distanceNm > 0
+                                    ? `${Math.round(listed.distanceNm).toLocaleString()} nm`
+                                    : '—';
+                                return (
+                                  <li
+                                    key={holdLine.id}
+                                    className="dispatch-trip-row"
+                                  >
+                                    <div className="dispatch-trip-id">
+                                      <strong>
+                                        {origin} → {staging.destIcao}
+                                      </strong>
+                                      <span>{kindLabel(holdLine.kind)}</span>
+                                    </div>
+                                    <div className="dispatch-trip-stats">
+                                      <span>
+                                        <em>Cargo</em>{' '}
+                                        {commodityOf(holdLine.commodityId)}
+                                      </span>
+                                      <span>
+                                        <em>Mass</em> {formatTonnes(holdLine.kg)}
+                                      </span>
+                                      <span>
+                                        <em>Dist</em> {dist}
+                                      </span>
+                                      <span>
+                                        <em>Pay</em>{' '}
+                                        {typeof payOf(holdLine) === 'number'
+                                          ? formatMoney(payOf(holdLine)!)
+                                          : '—'}
+                                      </span>
+                                      <span>
+                                        <em>Expires</em>{' '}
+                                        {typeof holdLine.expiresAtTick ===
+                                        'number'
+                                          ? formatDeadline(
+                                              holdLine.expiresAtTick,
+                                              continuousHours,
+                                            )
+                                          : '—'}
+                                      </span>
+                                      <span>
+                                        <em>By</em>{' '}
+                                        {listed?.heldByName?.trim() || '—'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="action compact"
+                                      disabled={busy || maxKg <= 0}
+                                      onClick={() =>
+                                        setStagingDeskHoldFraction(
+                                          holdLine.id,
+                                          1,
+                                        )
+                                      }
+                                    >
+                                      Add
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                              {pendingOthers.map((hold) => {
+                                const dist =
+                                  typeof hold.distanceNm === 'number' &&
+                                  hold.distanceNm > 0
+                                    ? `${Math.round(hold.distanceNm).toLocaleString()} nm`
+                                    : '—';
+                                const maxKg = Math.max(
+                                  0,
+                                  Math.min(
+                                    Math.floor(hold.kg),
+                                    Math.floor(stagingFreeKg),
+                                  ),
+                                );
+                                return (
+                                  <li key={hold.id} className="dispatch-trip-row">
+                                    <div className="dispatch-trip-id">
+                                      <strong>
+                                        {hold.originIcao} → {hold.destIcao}
+                                      </strong>
+                                      <span>{kindLabel(hold.kind)}</span>
+                                    </div>
+                                    <div className="dispatch-trip-stats">
+                                      <span>
+                                        <em>Cargo</em>{' '}
+                                        {commodityOf(hold.commodityId)}
+                                      </span>
+                                      <span>
+                                        <em>Mass</em> {formatTonnes(hold.kg)}
+                                      </span>
+                                      <span>
+                                        <em>Dist</em> {dist}
+                                      </span>
+                                      <span>
+                                        <em>Pay</em>{' '}
+                                        {typeof payOf(hold) === 'number'
+                                          ? formatMoney(payOf(hold)!)
+                                          : '—'}
+                                      </span>
+                                      <span>
+                                        <em>Expires</em>{' '}
+                                        {typeof hold.expiresAtTick === 'number'
+                                          ? formatDeadline(
+                                              hold.expiresAtTick,
+                                              continuousHours,
+                                            )
+                                          : '—'}
+                                      </span>
+                                      <span>
+                                        <em>By</em> {hold.heldByName?.trim() || '—'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="action compact"
+                                      disabled={busy || maxKg <= 0}
+                                      onClick={() => {
+                                        setStagingJoinHoldIds((current) =>
+                                          current.includes(hold.id)
+                                            ? current
+                                            : [...current, hold.id],
+                                        );
+                                        setStagingJoinKg((current) => ({
+                                          ...current,
+                                          [hold.id]: maxKg,
+                                        }));
+                                      }}
+                                    >
+                                      Add
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </>
                     );
                   })()}
                 </div>

@@ -5265,6 +5265,8 @@ export function postAddDeskHold(opts: {
   missionId: string;
   holdId: string;
   companyId?: string;
+  /** Partial load. Omit = the whole hold. */
+  kg?: number;
 }) {
   return api<{
     mission: Mission;

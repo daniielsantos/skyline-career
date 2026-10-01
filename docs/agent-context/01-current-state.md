@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **86c02ffd** / desktop **0.3.418** shipped: Show route, pay, and an Add button for each later cargo contract on Dispatch. Release: [v0.3.418](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.418).
+
+
 `main` **1aca784e** / desktop **0.3.417** shipped: Add later desk holds from the Manifest, and block Prepare when the hold leaves from another airport. Release: [v0.3.417](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.417).
 
 

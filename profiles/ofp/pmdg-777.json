@@ -14,7 +14,7 @@
     "777-200ER → pmdg-777-pax.json; 777-200LR → pmdg-777-200lr-pax.json; 777-300ER → pmdg-777-300er-pax.json",
     "Homologated profile: pmdg/777f @1.0.0",
     "loadMethod: direct-injection; injectCapable: true — CDU FO TOTAL + ZFW (pmdg-cdu), experimental vs EFB",
-    "Cabin/deck stations mapped as baggage for Career cargo (pax=0)",
+    "Main deck S1–S3 is cargo on the freighter. S1/S2 are not crew; counting them as crew dropped ~16 klb from the CDU verify.",
     "SimBrief ICAO: B77F"
   ],
   "fuel": {
@@ -26,8 +26,8 @@
   "payload": {
     "unit": "lb",
     "stationRoles": {
-      "crewStations": [1, 2],
-      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      "crewStations": [],
+      "baggageStations": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
       "passengerStations": []
     }
   },
@@ -39,8 +39,8 @@
   "simbriefIcao": "B77F",
   "simbriefAirframeMatch": "PMDG \\(MSFS\\) - 766,800 MTOW",
   "stationMap": [
-    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
-    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "baggage" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "baggage" },
     { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
     { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
     { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },

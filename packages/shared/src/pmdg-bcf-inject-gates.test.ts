@@ -104,6 +104,16 @@ describe('pmdg BCF/PAX inject gates', () => {
     assert.equal(f.loadMethod, 'direct-injection');
     assert.equal(f.injectCapable, true);
     assert.doesNotThrow(() => assertRolesPackAllowsDirectInjection(f));
+    const freighter = JSON.parse(
+      readFileSync(join(root, 'profiles/ofp/pmdg-777.json'), 'utf8'),
+    ) as {
+      payload?: {
+        stationRoles?: { crewStations?: number[]; baggageStations?: number[] };
+      };
+    };
+    assert.deepEqual(freighter.payload?.stationRoles?.crewStations, []);
+    assert.equal(freighter.payload?.stationRoles?.baggageStations?.[0], 1);
+    assert.equal(freighter.payload?.stationRoles?.baggageStations?.[1], 2);
 
     const fSku = findCareerPlayerAirframe('pmdg-777f');
     assert.ok(fSku);

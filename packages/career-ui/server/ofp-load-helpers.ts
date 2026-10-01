@@ -41,6 +41,7 @@ import {
   applyPmdg777CduFuelOnce,
   applyPmdg777CduPayloadOnce,
   isPmdg777CduProfile,
+  PMDG_777_ZFW_LB_MAX,
 } from './pmdg-777-cdu-inject.ts';
 import {
   formatIpcError,
@@ -3292,7 +3293,10 @@ async function applyMissionOfpLoadExclusive(
       let liveZfw: number | undefined;
       try {
         const z = await bridge.readLVar('ZFW_Lvar');
-        if (Number.isFinite(z) && z >= 20_000 && z <= 200_000) liveZfw = z;
+        const zfwLbMax = isPmdg777CduProfile(resolved.profile)
+          ? PMDG_777_ZFW_LB_MAX
+          : 200_000;
+        if (Number.isFinite(z) && z >= 20_000 && z <= zfwLbMax) liveZfw = z;
         else if (Number.isFinite(z) && z >= 50 && z < 500) liveZfw = z * 1000;
       } catch {
         /* optional */

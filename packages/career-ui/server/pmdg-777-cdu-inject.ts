@@ -24,6 +24,13 @@ import {
   sendPmdgCduKeystream,
 } from './pmdg-cdu-inject.ts';
 
+/**
+ * Pound readings above this are still ZFW on a 777 (OEW alone is ~300 klb).
+ * The 737 reader stops at 200 klb; values in between were dropped and the
+ * payload tile flickered near that ceiling while the CDU was typing.
+ */
+export const PMDG_777_ZFW_LB_MAX = 500_000;
+
 /** PMDG 777 uses 77X SDK event IDs via SimBridge cduFamily=777 (not NG3 offsets). */
 export function isPmdg777CduProfile(profile: AircraftProfile): boolean {
   const title = profile.match?.title ?? '';
@@ -141,7 +148,7 @@ async function readLiveZfwLbAfterWrite(
 ): Promise<number | undefined> {
   try {
     const z = await bridge.readLVar('ZFW_Lvar');
-    if (Number.isFinite(z) && z >= 20_000 && z <= 200_000) return z;
+    if (Number.isFinite(z) && z >= 20_000 && z <= PMDG_777_ZFW_LB_MAX) return z;
     if (Number.isFinite(z) && z >= 40 && z < 500) return z * 1000;
   } catch {
     /* fall through */

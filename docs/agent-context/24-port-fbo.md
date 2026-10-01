@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-01: **Upgrade do FBO mostra alcance e tanque** — sintoma = o diálogo de P2 falava só do pátio e o de P3 só de restock, listing e caminhão. Causa = o texto escondia o que o nível muda na malha: Demand 500→1.800 nm no P2 e sem teto no P3, tanque 4→12→28 t. Fix = confirmação, botão e tooltip dizem esses dois. Cap, restock % e desconto de compra não mudam.
+
 Atualizado 2026-10-01: **Mesa do FBO um pouco mais alta** — sintoma = barra na mesa com tanque, desk e Scout já quase inteiros na tela. Causa = o palco do FBO parava em 50rem. Fix = 58rem (ou 84vh, o que for menor). Catálogo e mapa continuam no palco menor.
 
 Atualizado 2026-10-01: **Teto de 3 auto-buys é por porto** — sintoma = Houston recusou a segunda ordem com “at most 3” enquanto só tinha uma; Miami já tinha as outras. Causa = a conta era de todas as mesas da company. Fix = 3 ordens ativas por `portId`. A cota de fill continua por armazém.

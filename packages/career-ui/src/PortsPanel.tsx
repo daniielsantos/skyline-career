@@ -1724,22 +1724,27 @@ export function PortsPanel(props: {
     }
     const p3 = toLevel >= 3;
     const ok = await confirm({
-      title: p3 ? 'Unlock P3 terminal cadence?' : 'Enlarge port yard (P2)?',
+      title: p3 ? 'Upgrade to P3?' : 'Upgrade to P2?',
       body: p3 ? (
         <p>
-          Faster daily restock (~11% of cap), +1 listing slot, and a slightly
-          faster inbound for{' '}
-          <strong>{props.formatMoney(upgradeUsd)}</strong>. Same buy discount as
-          P1 — lease floor goes up.
+          Demand reach opens with no distance cap, and the Jet-A tank grows
+          from {props.formatTonnes(12_000)} to {props.formatTonnes(28_000)}{' '}
+          (roster multiplier unchanged, up to ×4). Daily restock rises to about
+          11% of the same yard cap, with one more listing and a slightly faster
+          inbound, for <strong>{props.formatMoney(upgradeUsd)}</strong>. The
+          10% buy discount stays. Lease floor goes up.
         </p>
       ) : (
         <p>
-          Bigger factory stock cap (same restock %, more kg per discharge) for{' '}
-          <strong>{props.formatMoney(upgradeUsd)}</strong>. Lease scales with
-          recent throughput — no extra buy discount.
+          Demand reach extends from 500 nm to 1,800 nm, and the Jet-A tank
+          grows from {props.formatTonnes(4_000)} to {props.formatTonnes(12_000)}{' '}
+          (roster multiplier unchanged, up to ×4). The yard cap also grows 35%,
+          so each discharge brings more cargo, for{' '}
+          <strong>{props.formatMoney(upgradeUsd)}</strong>. Lease floor goes up
+          20%. The 10% buy discount stays.
         </p>
       ),
-      confirmLabel: p3 ? 'Unlock P3' : 'Upgrade yard',
+      confirmLabel: p3 ? 'Upgrade to P3' : 'Upgrade to P2',
       cancelLabel: 'Cancel',
     });
     if (!ok) return;
@@ -1754,7 +1759,7 @@ export function PortsPanel(props: {
           result.ports.warehouses?.groundStaff ??
           groundStaff,
       );
-      props.onToast?.('ok', p3 ? 'P3 terminal unlocked' : 'P2 yard unlocked');
+      props.onToast?.('ok', p3 ? 'P3 unlocked' : 'P2 unlocked');
       setConcessionOpen(false);
     } catch (err) {
       props.onToast?.(
@@ -6865,8 +6870,8 @@ export function PortsPanel(props: {
                       title={
                         port.concession.upgrade.ok
                           ? (port.concession.level ?? 1) >= 2
-                            ? 'P3 restock cadence'
-                            : 'Enlarge factory cap'
+                            ? `Open Demand reach · Jet-A tank ${props.formatTonnes(28_000)} base`
+                            : `Demand to 1,800 nm · Jet-A tank ${props.formatTonnes(12_000)} base`
                           : port.concession.upgrade.reasons.join(' · ')
                       }
                       onClick={() =>
@@ -6881,7 +6886,7 @@ export function PortsPanel(props: {
                         )
                       }
                     >
-                      {(port.concession.level ?? 1) >= 2 ? 'P3 terminal' : 'P2 yard'}
+                      {(port.concession.level ?? 1) >= 2 ? 'Upgrade to P3' : 'Upgrade to P2'}
                       {port.concession.upgrade.upgradeUsd
                         ? ` · ${props.formatMoney(port.concession.upgrade.upgradeUsd)}`
                         : ''}

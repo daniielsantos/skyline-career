@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **ef149ce4** / desktop **0.3.403** shipped: Gate Jet-A stock on Class Ops, add a Cargo Ops unlock, and align OFP columns with Cargo. Release: [v0.3.403](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.403).
+
+
 `main` **75d73225** / desktop **0.3.402** shipped: Show cargo capacity on hangar aircraft cards. Release: [v0.3.402](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.402).
 
 

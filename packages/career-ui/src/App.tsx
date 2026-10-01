@@ -4501,6 +4501,8 @@ export function App() {
     AircraftMarketPoolCountry[]
   >([]);
   const aircraftBrowseCountryRef = useRef('');
+  const aircraftListingsRef = useRef(aircraftListings);
+  aircraftListingsRef.current = aircraftListings;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [networkHubs, setNetworkHubs] = useState<NetworkHub[]>([]);
   const [networkHubsLoading, setNetworkHubsLoading] = useState(false);
@@ -5026,7 +5028,11 @@ export function App() {
     const wantNpc = scopedFull || effectiveScope?.npc === true;
     const wantAircraft = scopedFull || effectiveScope?.aircraftMarket === true;
     const preserveFleet = effectiveScope?.preserveFleet === true;
-    if (wantAircraft) setAircraftMarketLoading(true);
+    // Cards already on screen stay put. The chip is for an empty board only.
+    // Refresh board and country changes use refreshAircraftMarket.
+    const showAircraftBoardSpinner =
+      wantAircraft && aircraftListingsRef.current.length === 0;
+    if (showAircraftBoardSpinner) setAircraftMarketLoading(true);
     try {
     const wantBush = scopedFull || effectiveScope?.bushTrips === true;
     const wantAirport =
@@ -5322,7 +5328,7 @@ export function App() {
     careerReadyRef.current = true;
     setCareerReady(true);
     } finally {
-      if (wantAircraft) setAircraftMarketLoading(false);
+      if (showAircraftBoardSpinner) setAircraftMarketLoading(false);
     }
   }, [airportIcao, loadMissionsMerged, refreshBushTrips]);
 

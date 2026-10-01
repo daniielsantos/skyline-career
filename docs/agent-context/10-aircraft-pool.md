@@ -6,6 +6,8 @@ F0–F6 shipped. **F7 shipped (2026-09-19):** RAM claim-before-debit + `ownerCom
 
 **Airframes double loading flash (2026-09-25):** sintoma = abrir Airframes → loading some → loading de novo. Causa = sidebar `onClick` chamava `refreshAircraftMarket()` **e** `selectTab` já faz `refresh({ aircraftMarket })` (às vezes depois do restore home). Fix = só `selectTab('aircraft')`; botão Refresh board mantém o fetch dedicado.
 
+**Airframes overlay on already-painted cards (2026-09-30):** sintoma = a página abre com os aviões visíveis e, em seguida, a bolinha “Updating airframes” escurece o grid. Causa = um único refresh ao entrar (`selectTab` → `refresh({ aircraftMarket })`). Os cards são o snapshot que já está na memória; `setAircraftMarketLoading(true)` rodava antes do GET e o CSS `.is-loading` aplicava opacidade 0.45 + `BusyChip`. Não era um segundo fetch. Fix = o refresh ao entrar só arma a bolinha quando a lista ainda está vazia. Refresh board e troca de país continuam com o overlay.
+
 Código hoje: `career-aircraft-market.ts`, `career-aircraft-registration.ts`, `career-partition.ts`, `career-player-airframes.ts`, `career-store-v6.ts`, `career-store-pg-world.ts`.
 
 **Diag MP 2026-09-16 — Worldwide ~833 vs ~500 antigo:** não é crescimento por tick. Seed atual com 1967 aeroportos/catálogo vigente = **834 available** (GA 413 / TP 203 / LJ 79 / medium 43 / narrow 60 / wide 36; BR 65). UI 833 / BR 64 = exatamente seed menos 1 casco adquirido. A alta vs saves antigos vem do mapa/catálogo ampliado e caps por país; pool só nasce vazio ou recebe floor incremental em mudança de catálogo.

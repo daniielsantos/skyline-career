@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **6cc59b43** / desktop **0.3.412** shipped: Raise the Auto-haul desk ceiling to ten posts a day and ten open holds. Release: [v0.3.412](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.412).
+
+
 `main` **e7fa5ac5** / desktop **0.3.411** shipped: Count 777F main-deck stations as cargo and keep the wider ZFW cap on every 777. Release: [v0.3.411](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.411).
 
 

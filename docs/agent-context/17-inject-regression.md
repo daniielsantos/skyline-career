@@ -1,6 +1,6 @@
 # Inject regression pack (GA / TP / light jet)
 
-Atualizado 2026-10-01: **777F inject certo, toast PAYLOAD_VERIFY_FAILED** — sintoma = CDU com main/fwd/aft/bulk e ZFW 361.4, card Ready (Sim ~42,760), toast `cargo live=26889 OFP=42483`. ZFW live 361,395 vs alvo 361,353 passou na tolerância. Causa = o freighter marcava S1/S2 como crew; a verificação do CDU somava só S3–S16 e ignorava ~16 klb do main deck. O flick ~200 mil era o leitor de ZFW descartando libras acima de 200,000. Fix = S1/S2 viram baggage em `pmdg-777.json`; o teto de ZFW em libras no leitor do 777 sobe para 500,000. Pax 777 e o leitor do 737 ficam no teto antigo.
+Atualizado 2026-10-01: **777F inject certo, toast PAYLOAD_VERIFY_FAILED** — sintoma = CDU com main/fwd/aft/bulk e ZFW 361.4, card Ready (Sim ~42,760), toast `cargo live=26889 OFP=42483`. ZFW live 361,395 vs alvo 361,353 passou na tolerância. Causa = o freighter marcava S1/S2 como crew; a verificação do CDU somava só S3–S16 e ignorava ~16 klb do main deck. O flick ~200 mil era o leitor de ZFW descartando libras acima de 200,000. Fix = S1/S2 viram baggage só em `pmdg-777.json`. O teto de ZFW em libras sobe para 500,000 em qualquer perfil cujo título ou chave contém 777 (F, 200ER, 200LR, 300ER). Pax não muda estação: S1/S2 são cockpit e a verificação usa ZFW menos o vazio. O leitor do 737 fica em 200,000.
 
 Pacote mínimo para **não quebrar um airframe ao consertar outro** quando o diff mexe em código compartilhado:
 

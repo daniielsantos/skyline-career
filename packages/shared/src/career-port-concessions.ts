@@ -56,6 +56,8 @@ export const PORT_CONCESSION_LEASE_TICKS =
   PORT_CONCESSION_LEASE_DAYS * TICKS_PER_DAY;
 /** WH lifetime shipped kg gate at a pickup hub of the port. */
 export const PORT_CONCESSION_SHIPPED_KG = 25_000;
+/** Active Port FBOs one company may hold. Two ends of a line, not a chain. */
+export const PORT_CONCESSION_MAX_ACTIVE = 2;
 
 /** P2 yard: larger soft caps (restock % unchanged → more kg per ship). */
 export const PORT_P2_CAP_MULT = 1.35;
@@ -697,6 +699,25 @@ export type PortConcessionClaimGate = {
   portOccupied: boolean;
 };
 
+/** Live FBO port ids for this company, from the save and the world index. */
+function activeConcessionPortIds(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  companyId: string,
+): Set<string> {
+  const ids = new Set<string>();
+  const id = companyId.trim();
+  for (const row of ensurePlayerPortConcessions(state)) {
+    if (row.companyId !== id || row.leasePaidThroughTick <= world.tick) continue;
+    ids.add(row.portId.trim().toUpperCase());
+  }
+  for (const row of world.portConcessions ?? []) {
+    if (row.companyId !== id || row.leasePaidThroughTick <= world.tick) continue;
+    ids.add(row.portId.trim().toUpperCase());
+  }
+  return ids;
+}
+
 export function evaluatePortConcessionClaim(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
@@ -722,11 +743,11 @@ export function evaluatePortConcessionClaim(
     };
   }
 
-  const concessions = ensurePlayerPortConcessions(state);
-  const alreadyHoldsConcession = concessions.some(
-    (c) =>
-      c.companyId === companyId && c.leasePaidThroughTick > world.tick,
-  );
+  const heldPortIds = activeConcessionPortIds(state, world, companyId);
+  const alreadyOperatesThisPort = heldPortIds.has(port.id);
+  const alreadyHoldsConcession =
+    alreadyOperatesThisPort ||
+    heldPortIds.size >= PORT_CONCESSION_MAX_ACTIVE;
   const occupied = findActivePortOperator(world, port.id);
   const portOccupied = Boolean(occupied && occupied.companyId !== companyId);
 
@@ -744,8 +765,12 @@ export function evaluatePortConcessionClaim(
   const hasTier3Warehouse = Boolean(best && best.tier >= 3);
   const shippedKg = best?.lifetimeShippedKg ?? 0;
 
-  if (alreadyHoldsConcession) {
-    reasons.push('Company already holds an active Port FBO');
+  if (alreadyOperatesThisPort) {
+    reasons.push('Company already holds this Port FBO');
+  } else if (heldPortIds.size >= PORT_CONCESSION_MAX_ACTIVE) {
+    reasons.push(
+      `A company can hold at most ${PORT_CONCESSION_MAX_ACTIVE} active Port FBOs`,
+    );
   }
   if (portOccupied) {
     reasons.push('Port already has an active Port FBO operator');

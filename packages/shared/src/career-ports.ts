@@ -3033,7 +3033,12 @@ export function portSnapshot(
               )
             : null,
           claim: state
-            ? evaluatePortConcessionClaim(state, world, port.id)
+            ? evaluatePortConcessionClaim(
+                state,
+                world,
+                port.id,
+                viewerCompanyId,
+              )
             : null,
           upgrade:
             state && operatorExact

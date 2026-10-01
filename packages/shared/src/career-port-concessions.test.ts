@@ -20,6 +20,7 @@ import {
   PORT_CONCESSION_LEASE_DAYS,
   PORT_CONCESSION_LEASE_TICKS,
   PORT_CONCESSION_LEASE_USD_PER_DAY,
+  PORT_CONCESSION_MAX_ACTIVE,
   PORT_CONCESSION_SHIPPED_KG,
   PORT_P2_CAP_MULT,
   PORT_P2_THROUGHPUT_KG,
@@ -62,6 +63,7 @@ import {
   selectStarterHub,
 } from './career-fleet.js';
 import { ensurePlayerWarehouses } from './career-warehouse.js';
+import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 
 function missionsAtSantos() {
   const world = createSeedEconomyWorld({ seed: 'port-conc-base' });
@@ -177,13 +179,15 @@ describe('port concessions', () => {
     );
   });
 
-  it('claims with gates, buffs buy price, blocks second claim', () => {
+  it('claims with gates, buffs buy price, and allows one more Port FBO', () => {
     const { world, state } = missionsAtSantos();
     grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    grantT3PickupWarehouse(state, 'SBCT', PORT_CONCESSION_SHIPPED_KG);
+    grantT3PickupWarehouse(state, 'SBRF', PORT_CONCESSION_SHIPPED_KG);
     const due =
       PORT_CONCESSION_CLAIM_USD +
       PORT_CONCESSION_LEASE_USD_PER_DAY * PORT_CONCESSION_LEASE_DAYS;
-    state.walletUsd = due + 200_000;
+    state.walletUsd = due * 3 + 200_000;
 
     const beforeWallet = state.walletUsd;
     const conc = claimPortConcession(state, world, { portId: 'BRSSZ' });
@@ -192,9 +196,13 @@ describe('port concessions', () => {
     assert.equal(state.walletUsd, beforeWallet - due);
     assert.equal(portListingSlotCap(world, 'BRSSZ'), 5);
 
+    const second = claimPortConcession(state, world, { portId: 'BRPNG' });
+    assert.equal(second.portId, 'BRPNG');
+    assert.ok(isPortOperator(world, 'BRPNG'));
+
     assert.throws(
       () => claimPortConcession(state, world, { portId: 'BRSUA' }),
-      /already holds/i,
+      /at most 2/i,
     );
 
     ensurePortListings(world);
@@ -213,6 +221,38 @@ describe('port concessions', () => {
       state.playerPortConcessions?.[0]?.lifetimeThroughputKg ?? 0,
       0,
       'port buy must not credit FBO throughput (settle-only)',
+    );
+  });
+
+  it('counts Port FBOs that exist only on the world index', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBRF', PORT_CONCESSION_SHIPPED_KG);
+    const due =
+      PORT_CONCESSION_CLAIM_USD +
+      PORT_CONCESSION_LEASE_USD_PER_DAY * PORT_CONCESSION_LEASE_DAYS;
+    state.walletUsd = due + 1;
+    state.playerPortConcessions = [];
+    world.portConcessions = [
+      {
+        portId: 'BRSSZ',
+        companyId: LOCAL_COMPANY_ID,
+        leasePaidThroughTick: world.tick + PORT_CONCESSION_LEASE_TICKS,
+        level: 3,
+      },
+      {
+        portId: 'BRPNG',
+        companyId: LOCAL_COMPANY_ID,
+        leasePaidThroughTick: world.tick + PORT_CONCESSION_LEASE_TICKS,
+        level: 1,
+      },
+    ];
+    assert.equal(PORT_CONCESSION_MAX_ACTIVE, 2);
+    const gate = evaluatePortConcessionClaim(state, world, 'BRSUA');
+    assert.equal(gate.ok, false);
+    assert.ok(gate.reasons.some((r) => /at most 2/i.test(r)));
+    assert.throws(
+      () => claimPortConcession(state, world, { portId: 'BRSUA' }),
+      /at most 2/i,
     );
   });
 

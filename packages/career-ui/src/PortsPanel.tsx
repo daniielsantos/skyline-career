@@ -1017,14 +1017,15 @@ export function PortsPanel(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tenant / first paint
   }, [props.logisticsCompanyId]);
 
-  // After each economy pulse (tick / lastBatchAtMs): desk today + inbound ETA.
-  // Skip scout list — pulse soft-refresh should stay cheap.
+  // After each economy pulse (tick / lastBatchAtMs): desk, inbound, and Scout.
+  // The suggestion list is live data; leaving it stale hid a route that had
+  // stopped paying. The 20s poll stays off Scout so this only runs on the pulse.
   useEffect(() => {
     if (skipPulsePortsRefresh.current) {
       skipPulsePortsRefresh.current = false;
       return;
     }
-    void refresh({ includeScout: false, soft: true }).catch(() => undefined);
+    void refresh({ includeScout: true, soft: true }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clock pulse only
   }, [props.economyTick, props.economyLastBatchAtMs]);
 

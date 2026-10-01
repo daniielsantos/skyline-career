@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **a4d10fe7** / desktop **0.3.423** shipped: Show the stop chain on Dispatch and keep later cargo when editing the first leg. Release: [v0.3.423](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.423).
+
+
 `main` **34c44a62** / desktop **0.3.422** shipped: Show a load slider for the first Manifest leg, and after Add for each extra hold. Release: [v0.3.422](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.422).
 
 

@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-01: **Teto de 3 auto-buys é por porto** — sintoma = Houston recusou a segunda ordem com “at most 3” enquanto só tinha uma; Miami já tinha as outras. Causa = a conta era de todas as mesas da company. Fix = 3 ordens ativas por `portId`. A cota de fill continua por armazém.
+
 Atualizado 2026-10-01: **Scout Route abre o hub** — origem e destino na coluna Route são o mesmo link do quadro de Demand (`onOpenAirport`). O clique no ICAO não seleciona a linha.
 
 Atualizado 2026-10-01: **Desk auto-buy à direita do tanque, sempre aberto** — o bloco saiu do accordion no fim da mesa e ficou na coluna ao lado do Jet-A. As ordens e o formulário ficam visíveis. Membro continua só lendo; Pause, Remove e Add ficam com owner ou dispatcher.

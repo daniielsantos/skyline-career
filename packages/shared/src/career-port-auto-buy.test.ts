@@ -247,6 +247,36 @@ describe('port auto-buy desk', () => {
     );
   });
 
+  it('counts the active cap on this port, not the other desks', () => {
+    const { world, state } = missionsAtSantos();
+    const warehouseId = claimSantosFbo(state, world);
+    const other = ['general', 'supplies', 'machinery'] as const;
+    state.portAutoBuyOrders = other.map((commodityId, i) => ({
+      id: `pabo_other_${i}`,
+      portId: 'USMIA',
+      commodityId,
+      maxPriceUsdPerKg: 100,
+      maxKgPerDay: 100,
+      warehouseId: 'wh_other',
+      walletFloorUsd: 0,
+      paused: false,
+      boughtKgToday: 0,
+      boughtDayIndex: 0,
+      createdAtTick: 0,
+    }));
+    upsertPortAutoBuyOrder(state, world, {
+      portId: 'BRSSZ',
+      commodityId: 'general',
+      maxPriceUsdPerKg: 100,
+      maxKgPerDay: 100,
+      warehouseId,
+    });
+    assert.equal(
+      (state.portAutoBuyOrders ?? []).filter((o) => o.portId === 'BRSSZ').length,
+      1,
+    );
+  });
+
   it('defaults new orders to WH-only and never spills to yard', () => {
     const { world, state } = missionsAtSantos();
     const warehouseId = claimSantosFbo(state, world);

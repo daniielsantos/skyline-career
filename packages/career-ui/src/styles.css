@@ -15445,6 +15445,11 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   background: color-mix(in srgb, var(--surface-2) 80%, var(--bg-deep));
   padding: 0.85rem 1rem;
 }
+.va-directory-list > .va-directory-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.5rem;
+  align-items: center;
+}
 .va-directory-card-main {
   display: flex;
   flex-wrap: wrap;
@@ -15461,6 +15466,52 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  display: grid;
+  grid-template-columns:
+    minmax(12.5rem, 14.5rem)
+    repeat(7, minmax(0, 1fr))
+    minmax(0, 1.35fr);
+  align-items: center;
+  column-gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+}
+.va-directory-card-open .va-directory-card-stats {
+  display: contents;
+}
+.va-directory-card-open .va-directory-card-id {
+  min-width: 0;
+}
+.va-directory-card-open .va-directory-card-stats > div,
+.va-directory-card-open .va-directory-card-stats > div.va-stat-cuts {
+  min-width: 0;
+  justify-items: center;
+  text-align: center;
+}
+.va-directory-card-open .va-stat-value {
+  white-space: nowrap;
+}
+@media (max-width: 980px) {
+  .va-directory-list > .va-directory-card {
+    display: flex;
+  }
+  .va-directory-card-open {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .va-directory-card-open .va-directory-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .va-directory-card-open .va-directory-card-stats > div,
+  .va-directory-card-open .va-directory-card-stats > div.va-stat-cuts {
+    min-width: 3.2rem;
+    justify-items: start;
+    text-align: left;
+  }
+  .va-directory-card-open .va-directory-card-stats > div.va-stat-cuts {
+    min-width: 7.5rem;
+  }
 }
 .va-directory-card-open:hover .va-directory-card-name {
   color: var(--accent);
@@ -15635,6 +15686,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
 }
 .va-directory-pending {
   font-size: 0.8rem;

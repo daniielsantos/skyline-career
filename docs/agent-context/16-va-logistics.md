@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-01: **Directory simétrico** — sintoma = HQ/Pilots/Fleet de uma airline não caíam na mesma coluna da outra (nome + badge e “Proven” / cuts empurravam o flex). Fix = cada card da lista usa a mesma grade: nome fixo e oito colunas iguais. O botão à direita reserva a mesma largura.
+
 Atualizado 2026-09-22. **UI copy:** directory = **Airlines**, desk = **Crew**, personal = **Company** (rotas/API `/api/va*` e códigos `VA-` intactos).
 Atualizado 2026-09-23. **IH-2 multi-piloto shipped** — invite/roster (cap 8), board Internal Haul, settle fee-to-operator (VA debita pay → home do piloto), ranking 7d (airline desk labor). Sem chat/crew. Spec abaixo + [24-port-fbo.md](./24-port-fbo.md).
 **IH-1** pay + Port FBO desk auto-buy (VA Fase 1 solo) intactos. Loops A/B + tiers 1–3 **decididos**.

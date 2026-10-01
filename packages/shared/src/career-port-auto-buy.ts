@@ -81,8 +81,14 @@ function normalizeCommodityId(raw: string): CommodityId | null {
   return PORT_AUTO_BUY_COMMODITIES.includes(id) ? id : null;
 }
 
-function countActiveOrders(orders: PortAutoBuyOrder[]): number {
-  return orders.filter((o) => !o.paused).length;
+function countActiveOrdersAtPort(
+  orders: PortAutoBuyOrder[],
+  portId: string,
+): number {
+  const id = portId.trim().toUpperCase();
+  return orders.filter(
+    (o) => !o.paused && o.portId.trim().toUpperCase() === id,
+  ).length;
 }
 
 function assertWarehouseForPort(
@@ -265,19 +271,23 @@ export function upsertPortAutoBuyOrder(
   const walletFloorUsd = money(Math.max(0, opts.walletFloorUsd ?? 0));
   const paused = opts.paused === true;
 
-  if (!existing && !paused && countActiveOrders(orders) >= PORT_AUTO_BUY_MAX_ACTIVE) {
+  if (
+    !existing &&
+    !paused &&
+    countActiveOrdersAtPort(orders, portId) >= PORT_AUTO_BUY_MAX_ACTIVE
+  ) {
     throw new Error(
-      `Port FBO desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
+      `This port desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
     );
   }
   if (
     existing &&
     existing.paused &&
     !paused &&
-    countActiveOrders(orders) >= PORT_AUTO_BUY_MAX_ACTIVE
+    countActiveOrdersAtPort(orders, portId) >= PORT_AUTO_BUY_MAX_ACTIVE
   ) {
     throw new Error(
-      `Port FBO desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
+      `This port desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
     );
   }
 
@@ -335,9 +345,13 @@ export function setPortAutoBuyOrderPaused(
   const orders = ensurePortAutoBuyOrders(state);
   const order = orders.find((o) => o.id === orderId);
   if (!order) throw new Error('Auto-buy order not found');
-  if (!paused && order.paused && countActiveOrders(orders) >= PORT_AUTO_BUY_MAX_ACTIVE) {
+  if (
+    !paused &&
+    order.paused &&
+    countActiveOrdersAtPort(orders, order.portId) >= PORT_AUTO_BUY_MAX_ACTIVE
+  ) {
     throw new Error(
-      `Port FBO desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
+      `This port desk allows at most ${PORT_AUTO_BUY_MAX_ACTIVE} active orders`,
     );
   }
   if (!paused) {

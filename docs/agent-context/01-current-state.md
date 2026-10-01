@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **b24110db** / desktop **0.3.416** shipped: Let one flight carry cargo for later stops, and add Scout desk holds before SimBrief. Release: [v0.3.416](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.416).
+
+
 `main` **ae39f7cc** / desktop **0.3.415** shipped: Let a company hold two Port FBOs, and refresh Scout on the economy pulse. Release: [v0.3.415](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.415).
 
 

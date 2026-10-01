@@ -20590,7 +20590,7 @@ export function App() {
                     expiresAtTick: hold.expiresAtTick,
                     by: hold.heldByName ?? undefined,
                   };
-                })}
+                })
               ]}
               onAddCargoStop={(id) => void onAddCargoStop(id)}
               onCrewDispatch={(m, crewMemberId) =>

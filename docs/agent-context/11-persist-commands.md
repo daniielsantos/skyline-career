@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-01: **Add respeita a reserva do próprio piloto** — sintoma = Add na lista dizia “reserved by another pilot” com o cartão em RESERVED · YOU. Causa = ao devolver o avião ao voo, o Add não informava a conta que já tinha a reserva. Fix = o Add manda essa conta (e o dono da VA, se for o caso). O voo aberto não precisa ser cancelado.
+
 Atualizado 2026-10-01: **Add a stop vira lista** — o combo no Dispatch só mostrava destino e peso. Cada hold do mesmo aeroporto aparece numa linha (rota, tipo, commodity, massa, nm, pay, prazo, quem postou) com **Add**.
 
 Atualizado 2026-10-01: **Manifest lista os outros holds** — sintoma = Prepare abria o Manifest e o jogador voltava ao desk para o Add to flight; um hold de outro aeroporto continuava com Prepare ativo. Causa = o Manifest só conhecia o hold da rota, e o desk tratava origem diferente como um voo novo. Fix = no Manifest, holds do mesmo aeroporto e outro destino podem ser marcados e entram no Accept; no Dispatch o Add a stop também lista esses holds. Com um voo aberto, hold de outra origem fica **Open flight**, sem Prepare.

@@ -15304,6 +15304,7 @@ export function createCareerApiServer(port = 8787) {
             tripCompanyId,
             progPeek,
           );
+          const tripActor = await resolveVaFleetActor(req, tripCompanyId);
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
             return withDevCargoOpsUnlock(req, missions, () =>
@@ -15312,6 +15313,8 @@ export function createCareerApiServer(port = 8787) {
                   hostMissionId: body.missionId!,
                   holdId: body.holdId!,
                   maxCargoKg: flyable.operationalMaxCargoKg,
+                  actorAccountId: tripActor.accountId,
+                  actorIsVaOwner: tripActor.isOwner,
                 });
                 return {
                   host,

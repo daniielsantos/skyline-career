@@ -17,7 +17,14 @@ import type {
 export function attachDeskHoldToCargoTrip(
   state: CareerMissionsState,
   world: CareerEconomyWorld,
-  opts: { hostMissionId: string; holdId: string; maxCargoKg?: number },
+  opts: {
+    hostMissionId: string;
+    holdId: string;
+    maxCargoKg?: number;
+    /** Pilot clicking Add. The tail is already reserved for this flight. */
+    actorAccountId?: string | null;
+    actorIsVaOwner?: boolean;
+  },
 ): MissionIntent {
   const host = state.missions.find((row) => row.id === opts.hostMissionId);
   if (!host) throw new Error(`Unknown mission ${opts.hostMissionId}`);
@@ -65,12 +72,15 @@ export function attachDeskHoldToCargoTrip(
     aircraft.status = 'parked';
     aircraft.assignedMissionId = undefined;
   }
+  const actorAccountId =
+    opts.actorAccountId?.trim() || host.pilotAccountId?.trim() || undefined;
   const shared = {
     holdId: hold.id,
     aircraftId: host.aircraftId,
     tripHostId: host.id,
-    pilotAccountId: host.pilotAccountId,
+    pilotAccountId: host.pilotAccountId?.trim() || actorAccountId,
     pilotHomeCompanyId: host.pilotHomeCompanyId,
+    actorIsVaOwner: opts.actorIsVaOwner === true,
   };
   let created: { mission: MissionIntent } | null = null;
   try {
@@ -107,14 +117,20 @@ export function attachDeskHoldToCargoTrip(
   rider.aircraftId = undefined;
   aircraft.status = 'parked';
   aircraft.assignedMissionId = undefined;
-  assignAircraftToMission(state, host.aircraftId, host.id, host.originIcao, {
-    requirePilotAtOrigin: false,
-  });
   try {
+    assignAircraftToMission(state, host.aircraftId, host.id, host.originIcao, {
+      requirePilotAtOrigin: false,
+      ...(actorAccountId ? { actorAccountId } : {}),
+      actorIsVaOwner: opts.actorIsVaOwner === true,
+    });
     return addCargoStop(state, host.id, rider.id, {
       ...(opts.maxCargoKg != null ? { maxCargoKg: opts.maxCargoKg } : {}),
     });
   } catch (error) {
+    if (aircraft.assignedMissionId !== host.id) {
+      aircraft.status = 'assigned';
+      aircraft.assignedMissionId = host.id;
+    }
     const leftover = state.missions.find((row) => row.id === rider.id);
     if (leftover && leftover.status === 'accepted') {
       const cancelled = cancelMission(world, leftover, { fleet: state });

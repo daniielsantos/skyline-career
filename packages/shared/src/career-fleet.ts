@@ -375,8 +375,8 @@ export function normalizeMissionsState(
               .maxHaulsPerDay;
             if (typeof n !== 'number' || !Number.isFinite(n)) return 2;
             // Keep in step with VA_AUTO_HAUL_MAX_PER_DAY_MAX. This load path
-            // used to clamp at 3 after Config had already accepted 4.
-            return Math.max(1, Math.min(4, Math.round(n)));
+            // used to clamp below the Config ceiling and snap the select back.
+            return Math.max(1, Math.min(10, Math.round(n)));
           })(),
           payMult: ((): number => {
             const n = (vaAutoHaulRaw as { payMult?: unknown }).payMult;

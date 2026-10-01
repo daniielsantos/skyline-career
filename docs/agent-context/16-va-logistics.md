@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-01: **Auto-haul desk teto 10** — Max/day e holds abertos (manual + auto) sobem para 10. O load em `normalizeMissionsState` usa o mesmo teto, senão o Config volta para o valor antigo. Default continua 2.
+
 Atualizado 2026-10-01: **Scout Bridge só na direção que paga mais** — sintoma = o filtro Bridge listava KMIA→KIAH mesmo com Houston mais barato, a mesma rota que o Auto haul recusa. Fix = `listPortScoutBridgeSuggestions` exige spot do destino maior que o da origem. Move no estoque do WH continua sem esse filtro.
 
 Atualizado 2026-10-01: **Scout Bridge KMIA→KIAH nas 4 commodities** — sintoma = filtro Bridge lista as quatro com pay "—", e some depois do cancel. Causa = a mesma lista do Auto haul: kg livre na origem e espaço no outro WH. As quatro linhas disputam o mesmo espaço de Houston, não somam. Um hold novo (o desk, se o destino paga mais) reserva esse espaço e o filtro esvazia. Pay do piloto só nasce no Hold. Scout manual não usa o filtro de preço.
@@ -449,7 +451,7 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 |--|--|
 | **O que** | Desk cria Internal Hauls automaticamente a partir de `listPortScoutBridgeSuggestions` |
 | **Quem voa** | Pilots humanos (board Hauls); AI **não** voa |
-| **Caps** | max 1–4/dia (default 2); max 4 open bridge holds (manual + auto); pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0) |
+| **Caps** | max 1–10/dia (default 2); max 10 open bridge holds (manual + auto); pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0) |
 | **Gates** | `va_listed` + **≥2 members** + Port FBO (Scout) + enabled |
 | **UI** | My VA Config → Auto-haul desk (enable, Max/day, Pay %, Wallet floor + tooltips); Hauls board unchanged |
 | **Não faz (v1)** | OD allowlist; Demand/Haul auto; IAP desk seat; snipar board global |

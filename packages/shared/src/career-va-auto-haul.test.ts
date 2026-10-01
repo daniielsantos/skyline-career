@@ -173,14 +173,14 @@ describe('tickVaAutoHaul', () => {
     );
   });
 
-  it('desk ceiling is 4 posts a day and 4 open bridge holds', () => {
-    assert.equal(VA_AUTO_HAUL_MAX_PER_DAY_MAX, 4);
-    assert.equal(VA_AUTO_HAUL_MAX_OPEN_HOLDS, 4);
-    assert.equal(clampMaxHaulsPerDay(4), 4);
-    assert.equal(clampMaxHaulsPerDay(5), 4);
+  it('desk ceiling is 10 posts a day and 10 open bridge holds', () => {
+    assert.equal(VA_AUTO_HAUL_MAX_PER_DAY_MAX, 10);
+    assert.equal(VA_AUTO_HAUL_MAX_OPEN_HOLDS, 10);
+    assert.equal(clampMaxHaulsPerDay(10), 10);
+    assert.equal(clampMaxHaulsPerDay(11), 10);
     const { state } = missionsAtSantos();
-    upsertVaAutoHaul(state, { maxHaulsPerDay: 4 });
-    assert.equal(state.vaAutoHaul?.maxHaulsPerDay, 4);
+    upsertVaAutoHaul(state, { maxHaulsPerDay: 10 });
+    assert.equal(state.vaAutoHaul?.maxHaulsPerDay, 10);
     const loaded = normalizeMissionsState(state);
     assert.equal(loaded.vaAutoHaul?.maxHaulsPerDay, VA_AUTO_HAUL_MAX_PER_DAY_MAX);
   });

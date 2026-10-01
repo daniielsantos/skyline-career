@@ -24,13 +24,13 @@ import type {
   VaAutoHaulState,
 } from './types/career-economy.js';
 
-/** AI desk daily posts — well under Scout's suggest list (8). */
+/** AI desk daily posts. Default stays low; Config can raise it to the max. */
 export const VA_AUTO_HAUL_MAX_PER_DAY_DEFAULT = 2;
 export const VA_AUTO_HAUL_MAX_PER_DAY_MIN = 1;
-export const VA_AUTO_HAUL_MAX_PER_DAY_MAX = 4;
+export const VA_AUTO_HAUL_MAX_PER_DAY_MAX = 10;
 
 /** Concurrent open bridge holds (manual + auto) before desk stops. */
-export const VA_AUTO_HAUL_MAX_OPEN_HOLDS = 4;
+export const VA_AUTO_HAUL_MAX_OPEN_HOLDS = 10;
 
 /** Need a second seat on the roster — solo owner uses Scout confirm. */
 export const VA_AUTO_HAUL_MIN_MEMBERS = 2;

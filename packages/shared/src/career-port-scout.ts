@@ -7,6 +7,7 @@ import { hubDistanceNm } from './career-ferry-route.js';
 import {
   airportByIcao,
   CAREER_HUB_COORDS,
+  localUnitPriceUsd,
   routeDistanceNm,
 } from './career-economy.js';
 import { cargoOpsIsUnlocked } from './career-cargo-ops.js';
@@ -337,8 +338,36 @@ function demandRouteReachable(
 }
 
 /**
+ * Scout and Auto haul share this gate. A bridge is only suggested toward the
+ * hub whose spot price for the commodity is higher. Equal prices and a missing
+ * pile do not qualify. Warehouse Move does not use this.
+ */
+export function bridgeDestPaysMore(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+  commodityId: CommodityId,
+): boolean {
+  const originPile = airportByIcao(world, originIcao)?.inventory?.[commodityId];
+  const destPile = airportByIcao(world, destIcao)?.inventory?.[commodityId];
+  if (
+    !originPile ||
+    !destPile ||
+    originPile.capacityKg <= 0 ||
+    destPile.capacityKg <= 0
+  ) {
+    return false;
+  }
+  return (
+    localUnitPriceUsd(commodityId, destPile) >
+    localUnitPriceUsd(commodityId, originPile)
+  );
+}
+
+/**
  * List WH→WH bridge ideas from company stock (Port FBO desk).
  * Requires an active Port FBO whose pickup hubs include the origin (or dest).
+ * Only the direction that pays more at the destination hub.
  */
 export function listPortScoutBridgeSuggestions(
   state: CareerMissionsState,
@@ -388,6 +417,7 @@ export function listPortScoutBridgeSuggestions(
         const room = warehouseBridgeDestRoomKg(state, destWh.id);
         const kg = Math.min(free, room);
         if (kg < PORT_SCOUT_MIN_KG) continue;
+        if (!bridgeDestPaysMore(world, origin, dest, commodityId)) continue;
 
         const distanceNm = Math.round(moneyNm(world, origin, dest));
         // Prefer more kg, mild preference for shorter hops.

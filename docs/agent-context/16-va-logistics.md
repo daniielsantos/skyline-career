@@ -1,5 +1,11 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-01: **Scout Bridge só na direção que paga mais** — sintoma = o filtro Bridge listava KMIA→KIAH mesmo com Houston mais barato, a mesma rota que o Auto haul recusa. Fix = `listPortScoutBridgeSuggestions` exige spot do destino maior que o da origem. Move no estoque do WH continua sem esse filtro.
+
+Atualizado 2026-10-01: **Scout Bridge KMIA→KIAH nas 4 commodities** — sintoma = filtro Bridge lista as quatro com pay "—", e some depois do cancel. Causa = a mesma lista do Auto haul: kg livre na origem e espaço no outro WH. As quatro linhas disputam o mesmo espaço de Houston, não somam. Um hold novo (o desk, se o destino paga mais) reserva esse espaço e o filtro esvazia. Pay do piloto só nasce no Hold. Scout manual não usa o filtro de preço.
+
+Atualizado 2026-10-01: **Max/day 4 voltava para 3** — sintoma = Config mostra 4, ao escolher grava 3 (Today x/3). Causa = `upsertVaAutoHaul` aceitava 4, mas `normalizeMissionsState` cortava em 3 em todo save/load. Fix = o load usa o mesmo teto 4.
+
 Atualizado 2026-10-01: **Auto-haul desk teto 4** — Max/day e holds abertos (manual + auto) sobem de 3 para 4. Default continua 2; quem já está em 2 ou 3 não muda até escolher 4 no Config. Scout continua 8+8: a lista maior não traz o segundo porto se o lote livre dele paga menos.
 
 Atualizado 2026-10-01: **WH com stock fora do Scout** — sintoma = KMIA cheio e o board quase só KIAH. Causa = electronics/machinery estavam 100% nos holds de bridge (Scout só vê kg livre); Haul e Demand são 8 vagas da company, não do porto. Supplies livre de Miami perde para o lote maior de Houston nos mesmos destinos ≤40%. General só vira Haul se algum aeroporto a ≤1800 nm estiver ≤40% nessa commodity; Demand de general ainda entra se o pay couber no top 8. Sem mudança de código.

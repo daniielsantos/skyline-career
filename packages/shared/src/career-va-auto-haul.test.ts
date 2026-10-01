@@ -9,7 +9,11 @@ import {
   PORT_CONCESSION_SHIPPED_KG,
 } from './career-port-concessions.js';
 import { airportByIcao, createSeedEconomyWorld } from './career-economy.js';
-import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import {
+  emptyMissionsStateV2,
+  normalizeMissionsState,
+  selectStarterHub,
+} from './career-fleet.js';
 import {
   depositCargoToWarehouse,
   ensurePlayerWarehouses,
@@ -161,7 +165,7 @@ describe('tickVaAutoHaul', () => {
       memberCount: 3,
     });
     assert.equal(result.posted, 0);
-    assert.equal(result.skipped, 'no_viable_spread');
+    assert.equal(result.skipped, 'no_routes');
     assert.equal(
       listDemandHolds(state).filter((h) => (h.kind ?? 'demand') === 'bridge')
         .length,
@@ -177,5 +181,7 @@ describe('tickVaAutoHaul', () => {
     const { state } = missionsAtSantos();
     upsertVaAutoHaul(state, { maxHaulsPerDay: 4 });
     assert.equal(state.vaAutoHaul?.maxHaulsPerDay, 4);
+    const loaded = normalizeMissionsState(state);
+    assert.equal(loaded.vaAutoHaul?.maxHaulsPerDay, VA_AUTO_HAUL_MAX_PER_DAY_MAX);
   });
 });

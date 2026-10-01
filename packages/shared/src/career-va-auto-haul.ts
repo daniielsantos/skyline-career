@@ -6,7 +6,6 @@
  * Caps stay tighter than manual Scout so a human dispatcher stays useful.
  */
 
-import { airportByIcao, localUnitPriceUsd } from './career-economy.js';
 import { economyDayIndex } from './career-weather.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import {
@@ -22,36 +21,8 @@ import { listDemandHolds } from './career-demand.js';
 import type {
   CareerEconomyWorld,
   CareerMissionsState,
-  CommodityId,
   VaAutoHaulState,
 } from './types/career-economy.js';
-
-/**
- * Auto haul only posts toward the hub that pays more for this commodity.
- * Company warehouse moves do not change airport spot prices, so the return
- * leg stays closed until the market actually flips.
- */
-export function autoHaulDestPaysMore(
-  world: CareerEconomyWorld,
-  originIcao: string,
-  destIcao: string,
-  commodityId: CommodityId,
-): boolean {
-  const originPile = airportByIcao(world, originIcao)?.inventory?.[commodityId];
-  const destPile = airportByIcao(world, destIcao)?.inventory?.[commodityId];
-  if (
-    !originPile ||
-    !destPile ||
-    originPile.capacityKg <= 0 ||
-    destPile.capacityKg <= 0
-  ) {
-    return false;
-  }
-  return (
-    localUnitPriceUsd(commodityId, destPile) >
-    localUnitPriceUsd(commodityId, originPile)
-  );
-}
 
 /** AI desk daily posts — well under Scout's suggest list (8). */
 export const VA_AUTO_HAUL_MAX_PER_DAY_DEFAULT = 2;
@@ -257,15 +228,8 @@ export function tickVaAutoHaul(
     return { posted: 0, skipped: 'no_routes' };
   }
 
-  const viable = suggestions.filter((s) =>
-    autoHaulDestPaysMore(world, s.originIcao, s.destIcao, s.commodityId),
-  );
-  if (viable.length === 0) {
-    return { posted: 0, skipped: 'no_viable_spread' };
-  }
-
   let posted = 0;
-  for (const s of viable) {
+  for (const s of suggestions) {
     if (remaining <= 0) break;
     if (openBridgeHoldCount(state) >= VA_AUTO_HAUL_MAX_OPEN_HOLDS) break;
 

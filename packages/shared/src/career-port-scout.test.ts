@@ -23,7 +23,7 @@ import {
   PORT_SCOUT_HAUL_MAX_NM,
   PORT_SCOUT_MIN_KG,
 } from './career-port-scout.js';
-import { createSeedEconomyWorld } from './career-economy.js';
+import { airportByIcao, createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import {
   ensurePlayerWarehouses,
@@ -56,6 +56,19 @@ function grantWh(
     lifetimeShippedKg: PORT_CONCESSION_SHIPPED_KG,
   });
   return id;
+}
+
+function setHubFill(
+  world: ReturnType<typeof createSeedEconomyWorld>,
+  icao: string,
+  commodityId: 'general',
+  fill: number,
+) {
+  const pile = airportByIcao(world, icao)?.inventory?.[commodityId];
+  if (!pile || pile.capacityKg <= 0) {
+    throw new Error(`no ${commodityId} pile at ${icao}`);
+  }
+  pile.stockKg = Math.floor(pile.capacityKg * fill);
 }
 
 function seedDemandOrder(
@@ -105,6 +118,8 @@ describe('port scout', () => {
       avgCostUsdPerKg: 1.2,
       tick: world.tick,
     });
+    setHubFill(world, 'SBGR', 'general', 0.95);
+    setHubFill(world, 'SBKP', 'general', 0.1);
     const suggestions = listPortScoutBridgeSuggestions(state, world);
     assert.ok(suggestions.length >= 1);
     const hit = suggestions.find(
@@ -130,6 +145,8 @@ describe('port scout', () => {
       avgCostUsdPerKg: 1.1,
       tick: world.tick,
     });
+    setHubFill(world, 'SBGR', 'general', 0.95);
+    setHubFill(world, 'SBKP', 'general', 0.1);
     const confirmed = confirmPortScoutBridge(state, world, {
       originIcao: 'SBGR',
       destIcao: 'SBKP',
@@ -150,6 +167,26 @@ describe('port scout', () => {
         s.commodityId === 'general',
     );
     assert.equal(again.length, 0);
+  });
+
+  it('omits a bridge toward the hub that pays less', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    grantWh(state, 'SBKP');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 1_500,
+      avgCostUsdPerKg: 1.2,
+      tick: world.tick,
+    });
+    setHubFill(world, 'SBGR', 'general', 0.1);
+    setHubFill(world, 'SBKP', 'general', 0.95);
+    const suggestions = listPortScoutBridgeSuggestions(state, world).filter(
+      (s) => s.originIcao === 'SBGR' && s.destIcao === 'SBKP',
+    );
+    assert.equal(suggestions.length, 0);
   });
 
   it('Demand scout empty without Port FBO or matching stock', () => {

@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **34c44a62** / desktop **0.3.422** shipped: Show a load slider for the first Manifest leg, and after Add for each extra hold. Release: [v0.3.422](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.422).
+
+
 `main` **e3c35c77** / desktop **0.3.421** shipped: Show every Manifest desk hold in one trip-style list. Release: [v0.3.421](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.421).
 
 

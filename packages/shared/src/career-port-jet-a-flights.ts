@@ -6,6 +6,7 @@
  * Wing tanks stay the trip fuel. Settle still credits fuelHaul.kg.
  */
 
+import { assertClassOpsUnlocked } from './career-class-ops.js';
 import { TICKS_PER_DAY } from './career-clock.js';
 import { airportByIcao, routeDistanceNm } from './career-economy.js';
 import {
@@ -165,6 +166,7 @@ export function startPortJetAReposition(
   if (room <= 0) throw new Error('Port FBO Jet-A tank is full');
   const aircraft = state.fleet.find((a) => a.id === opts.aircraftId);
   if (!aircraft) throw new Error(`Unknown aircraft ${opts.aircraftId}`);
+  assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
   const liftKg = jetAHoldKg(world, aircraft, origin, dest);
   const available = jetAAvailableAtOriginKg(state, world, origin);
   const maxKg = Math.max(0, Math.min(room, liftKg, available));

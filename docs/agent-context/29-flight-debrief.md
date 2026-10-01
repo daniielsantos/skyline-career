@@ -10,6 +10,14 @@ Glance layout inspired by other career addons: **three pillars first**, money/sc
 
 **Fix:** remover o inline + CSS `.dispatch-settle-busy`; fica só o overlay global (debrief opens next).
 
+## OFP and Cargo columns (2026-09-30)
+
+**Sintoma:** no En route, Distance/Cruise/Block/Air/Payload não alinham com Load/Contract/Deadline/Capacity left.
+
+**Causa:** cada faixa usava `auto-fit` e contava as próprias células (5 vs 4), então a largura de cada coluna divergia.
+
+**Fix:** as duas faixas compartilham `--enroute-metric-cols` (o maior dos dois) e a faixa mais curta ganha células vazias. Abaixo de 760px continua em 2 colunas.
+
 ## Charter Class Ops on settle (2026-09-24)
 
 **Sintoma:** Class Ops no Hangar não mudava após Charter; debrief sem `classOpsDeltas` em perna pax.

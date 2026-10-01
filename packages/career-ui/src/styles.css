@@ -4490,7 +4490,10 @@ tr.lot-locked {
   padding: 0;
   width: 100%;
   max-width: 100%;
-  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  grid-template-columns: repeat(
+    var(--enroute-metric-cols, 5),
+    minmax(0, 1fr)
+  );
 }
 
 .dispatch-active-enroute .dispatch-enroute-metrics > div {
@@ -10087,7 +10090,8 @@ table.contracts-table .col-access .action {
     max-width: 55%;
   }
 
-  .ofp-briefing-grid {
+  .ofp-briefing-grid,
+  .dispatch-active-enroute .ofp-briefing-grid.dispatch-enroute-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

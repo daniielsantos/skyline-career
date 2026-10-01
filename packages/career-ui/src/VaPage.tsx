@@ -30,6 +30,7 @@ import {
   type VaOrgPerks,
   type Mission,
   type CareerCargoOps,
+  type CareerClassOps,
   type VaHaulHold,
   type VaFlightTrack,
 } from './api';
@@ -213,6 +214,7 @@ type Props = {
   /** Advances with world pulse — Ports desk / inbound soft-refresh. */
   economyLastBatchAtMs?: number;
   cargoOps?: CareerCargoOps | null;
+  classOps?: CareerClassOps | null;
   onOpenCargoOps?: () => void;
   onOpenAirport?: (icao: string) => void;
   clientUpdateRequiredMin?: string | null;
@@ -1474,6 +1476,7 @@ export function VaPage(props: Props) {
               economyTick={props.economyTick}
               economyLastBatchAtMs={props.economyLastBatchAtMs}
               cargoOps={props.cargoOps}
+              classOps={props.classOps}
               onOpenCargoOps={props.onOpenCargoOps}
               onWallet={props.onWallet}
               onFleet={(next) => {

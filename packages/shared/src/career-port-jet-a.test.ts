@@ -4,6 +4,7 @@ import { createSeedEconomyWorld } from './career-economy.js';
 import { departMission } from './career-mission.js';
 import { fuelTerminalSellableKg } from './career-fuel.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import { syncClassOpsFromFleet } from './career-class-ops.js';
 import {
   quotePlayerMissionOfpFuel,
   purchasePlayerMissionOfpFuel,
@@ -275,6 +276,7 @@ describe('port FBO Jet-A', () => {
       status: 'parked',
       fuelKg: 0,
     });
+    state.classOps = syncClassOpsFromFleet(state.classOps, state.fleet);
     state.pilotIcao = 'SBKP';
     const started = startPortJetAReposition(state, world, {
       portId: 'BRSSZ',
@@ -305,6 +307,34 @@ describe('port FBO Jet-A', () => {
           kg: 1,
         }),
       /flight plan is open/,
+    );
+  });
+
+  it('refuses a stock flight when that aircraft class is locked', () => {
+    const { world, state } = atSantos();
+    const light = state.fleet[0]!;
+    state.fleet.push({
+      ...light,
+      id: 'acf_wide',
+      registration: 'N777TS',
+      airframeTypeId: 'pmdg-777f',
+      aircraftClassId: 'wide_freighter',
+      locationIcao: 'SBKP',
+      status: 'parked',
+      fuelKg: 0,
+    });
+    assert.throws(
+      () =>
+        startPortJetAReposition(state, world, {
+          portId: 'BRSSZ',
+          originIcao: 'SBKP',
+          aircraftId: 'acf_wide',
+        }),
+      /Class locked/,
+    );
+    assert.equal(
+      state.missions.some((mission) => mission.aircraftId === 'acf_wide'),
+      false,
     );
   });
 

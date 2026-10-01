@@ -40,6 +40,7 @@ import {
   postWarehouseHaulDispatchHold,
   postWarehouseHaulQuote,
   type CareerCargoOps,
+  type CareerClassOps,
   type DemandOrderView,
   type GroundStaffSnapshot,
   type Mission,
@@ -56,6 +57,7 @@ import {
   type PortsSnapshot,
 } from './api';
 import { PortsMap } from './PortsMap';
+import { classOpsUnlockProgress } from './class-ops-unlock';
 import { BusyBlock, BusyButton } from './Busy';
 import { CommodityIcon } from './CommodityIcon';
 import { CrewPortrait } from './CrewPanel';
@@ -430,6 +432,8 @@ export function PortsPanel(props: {
   /** Wall anchor of last economy pulse — refresh desk/inbound when it advances. */
   economyLastBatchAtMs?: number;
   cargoOps?: CareerCargoOps | null;
+  /** Home Class Ops ladder. Stock refuses a parked tail whose class is locked. */
+  classOps?: CareerClassOps | null;
   onOpenCargoOps?: () => void;
   onWallet?: (usd: number) => void;
   onFleet?: (fleet: PlayerAircraft[]) => void;
@@ -4420,6 +4424,13 @@ export function PortsPanel(props: {
                                         aircraft.locationIcao.trim().toUpperCase() ===
                                           source.icao,
                                     );
+                                    const classLock = parked
+                                      ? classOpsUnlockProgress(
+                                          props.classOps,
+                                          parked.aircraftClassId,
+                                        )
+                                      : null;
+                                    const classLocked = classLock != null && !classLock.unlocked;
                                     return (
                                       <li key={source.icao} className="ports-jeta-source">
                                         <button
@@ -4443,14 +4454,18 @@ export function PortsPanel(props: {
                                         <button
                                           type="button"
                                           className="action ghost"
-                                          disabled={props.busy || loading || !parked}
+                                          disabled={
+                                            props.busy || loading || !parked || classLocked
+                                          }
                                           title={
-                                            parked
-                                              ? `Buy Jet-A at ${source.icao} and fly it into the tank. Not paid.`
-                                              : `Park an aircraft at ${source.icao} to stock Jet-A`
+                                            classLocked
+                                              ? `Class locked — ${classLock?.label}. ${classLock?.summary}`
+                                              : parked
+                                                ? `Buy Jet-A at ${source.icao} and fly it into the tank. Not paid.`
+                                                : `Park an aircraft at ${source.icao} to stock Jet-A`
                                           }
                                           onClick={() =>
-                                            parked
+                                            parked && !classLocked
                                               ? void onFetchPortJetA(
                                                   port.id,
                                                   source.icao,

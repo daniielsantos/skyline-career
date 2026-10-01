@@ -1,5 +1,5 @@
 import type { Mission, MissionFuelQuote, SimBridgeStatus, WatchStatus } from './api';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   DISPATCH_STEP_LABEL,
   DISPATCH_STEP_ORDER,
@@ -1626,6 +1626,31 @@ export function DispatchActivePanel(props: {
                   : null,
               ] as Array<[string, string] | null>
             ).filter((item): item is [string, string] => item !== null);
+            const showEnRouteCapacityLeft = !isFerryLeg;
+            const showEnRouteFuelUplift = Boolean(
+              mission.fuelUplift &&
+                (mission.fuelUplift.costUsd > 0 ||
+                  mission.fuelUplift.requestedKg > 0.5),
+            );
+            const enRouteCargoCells =
+              3 +
+              (showEnRouteCapacityLeft ? 1 : 0) +
+              (showEnRouteFuelUplift ? 1 : 0);
+            const enRouteMetricCols = Math.max(
+              enRouteBriefItems.length,
+              enRouteCargoCells,
+              1,
+            );
+            const enRouteMetricStyle = {
+              '--enroute-metric-cols': String(enRouteMetricCols),
+            } as CSSProperties;
+            const enRouteMetricPad = (filled: number) =>
+              Array.from(
+                { length: Math.max(0, enRouteMetricCols - filled) },
+                (_, index) => (
+                  <div key={`metric-pad-${index}`} aria-hidden="true" />
+                ),
+              );
 
             const liveLoadGrid = !view ? (
               <p>Waiting for live Loaded vs Due data…</p>
@@ -1804,7 +1829,10 @@ export function DispatchActivePanel(props: {
                 <h3 className="dispatch-enroute-block-title">
                   {isFerryLeg ? 'Ferry' : 'Cargo'}
                 </h3>
-                <dl className="ofp-briefing-grid dispatch-enroute-metrics">
+                <dl
+                  className="ofp-briefing-grid dispatch-enroute-metrics"
+                  style={enRouteMetricStyle}
+                >
                   {isFerryLeg ? (
                     <div>
                       <dt>Load</dt>
@@ -1841,7 +1869,7 @@ export function DispatchActivePanel(props: {
                       )}
                     </dd>
                   </div>
-                  {!isFerryLeg ? (
+                  {showEnRouteCapacityLeft ? (
                     <div>
                       <dt>Capacity left</dt>
                       <dd>
@@ -1854,9 +1882,7 @@ export function DispatchActivePanel(props: {
                       </dd>
                     </div>
                   ) : null}
-                  {mission.fuelUplift &&
-                  (mission.fuelUplift.costUsd > 0 ||
-                    mission.fuelUplift.requestedKg > 0.5) ? (
+                  {showEnRouteFuelUplift && mission.fuelUplift ? (
                     <div>
                       <dt>Fuel</dt>
                       <dd>
@@ -1867,6 +1893,7 @@ export function DispatchActivePanel(props: {
                       </dd>
                     </div>
                   ) : null}
+                  {enRouteMetricPad(enRouteCargoCells)}
                 </dl>
                 {isFerryLeg ? (
                   <p className="empty dispatch-enroute-block-note">
@@ -1895,13 +1922,17 @@ export function DispatchActivePanel(props: {
                   enRouteBriefItems.length > 0 ? (
                     <div className="dispatch-enroute-block">
                       <h3 className="dispatch-enroute-block-title">OFP</h3>
-                      <dl className="ofp-briefing-grid dispatch-enroute-metrics">
+                      <dl
+                        className="ofp-briefing-grid dispatch-enroute-metrics"
+                        style={enRouteMetricStyle}
+                      >
                         {enRouteBriefItems.map(([label, value]) => (
                           <div key={label}>
                             <dt>{label}</dt>
                             <dd>{value}</dd>
                           </div>
                         ))}
+                        {enRouteMetricPad(enRouteBriefItems.length)}
                       </dl>
                     </div>
                   ) : null

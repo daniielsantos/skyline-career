@@ -87,6 +87,7 @@ import {
   postDebugClaimPort,
   postDebugEvolvePortFbo,
   postDebugUnlockClassOps,
+  postDebugUnlockCargoOps,
   fetchDebugPortCatalog,
   postWatchStart,
   postWatchStop,
@@ -8383,6 +8384,15 @@ export function App() {
       setClassOps(result.classOps ?? null);
       setToastKind('ok');
       setToast('Class Ops unlocked (all freighter classes)');
+    });
+  }
+
+  async function onDebugUnlockCargoOps() {
+    await run(async () => {
+      const result = await postDebugUnlockCargoOps();
+      setCargoOps(result.cargoOps ?? null);
+      setToastKind('ok');
+      setToast('Cargo Ops unlocked (all commodities)');
     });
   }
 
@@ -20797,6 +20807,15 @@ export function App() {
                     >
                       Unlock Class Ops
                     </button>
+                    <button
+                      type="button"
+                      className="action ghost"
+                      onClick={() => void onDebugUnlockCargoOps()}
+                      disabled={busy}
+                      title="Persist unlock of every Cargo Ops commodity"
+                    >
+                      Unlock Cargo Ops
+                    </button>
                   </div>
                 </div>
               </div>
@@ -20901,6 +20920,7 @@ export function App() {
           economyTick={tick}
           economyLastBatchAtMs={lastBatchAtMs}
           cargoOps={cargoOps}
+          classOps={classOps}
           onOpenCargoOps={() => {
             setHangarPane('cargo');
             goToTab('hangar');
@@ -21028,6 +21048,7 @@ export function App() {
           economyClock={continuousHours}
           economyLastBatchAtMs={lastBatchAtMs}
           cargoOps={cargoOps}
+          classOps={classOps}
           onOpenCargoOps={() => {
             setHangarPane('cargo');
             goToTab('hangar');

@@ -9984,30 +9984,44 @@ export function createCareerApiServer(port = 8787) {
         try {
           const jetAActor = await resolveVaFleetActor(req, companyId);
           const jetAStamp = await vaPilotMissionStamp(req, companyId);
+          const jetAPeek = await withCareerRead(
+            (_world, missions) => ({
+              cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
+            }),
+            { companyId },
+          );
+          const jetAProgression = await resolvePilotProgressionOps(
+            req,
+            companyId,
+            jetAPeek,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            const started = startPortJetAReposition(missions, world, {
-              portId: body.portId!,
-              originIcao: body.originIcao!,
-              aircraftId: body.aircraftId!,
-              kg: body.kg != null ? Number(body.kg) : undefined,
-              companyId,
-              actorAccountId: jetAActor.accountId,
-              actorIsVaOwner: jetAActor.isOwner,
-              ...jetAStamp,
+            return withProgressionGates(missions, jetAProgression, () => {
+              const started = startPortJetAReposition(missions, world, {
+                portId: body.portId!,
+                originIcao: body.originIcao!,
+                aircraftId: body.aircraftId!,
+                kg: body.kg != null ? Number(body.kg) : undefined,
+                companyId,
+                actorAccountId: jetAActor.accountId,
+                actorIsVaOwner: jetAActor.isOwner,
+                ...jetAStamp,
+              });
+              return {
+                kg: started.kg,
+                maxKg: started.maxKg,
+                costUsd: started.costUsd,
+                walletUsd: missions.walletUsd,
+                fleet: missions.fleet,
+                mission: withMissionClientView(world, missions, started.mission),
+                missions: missions.missions.map((m) =>
+                  withMissionClientView(world, missions, m),
+                ),
+                ports: portSnapshot(world, missions, { viewerCompanyId: companyId }),
+              };
             });
-            return {
-              kg: started.kg,
-              maxKg: started.maxKg,
-              costUsd: started.costUsd,
-              walletUsd: missions.walletUsd,
-              fleet: missions.fleet,
-              mission: withMissionClientView(world, missions, started.mission),
-              missions: missions.missions.map((m) =>
-                withMissionClientView(world, missions, m),
-              ),
-              ports: portSnapshot(world, missions, { viewerCompanyId: companyId }),
-            };
           }, {
             commandSliceAircraftId: body.aircraftId,
             commandSliceIcaos: [body.originIcao.trim().toUpperCase()],
@@ -12954,6 +12968,23 @@ export function createCareerApiServer(port = 8787) {
           (_world, missions) => {
             missions.classOps = unlockAllCareerClassOps(missions.classOps);
             return { classOps: missions.classOps };
+          },
+          { persist: 'company', companyId: unlockCompanyId },
+        );
+        send(res, 200, payload);
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/debug/unlock-cargo-ops') {
+        if (!requestDevMode(req)) {
+          send(res, 403, { error: 'Dev Mode is required' });
+          return;
+        }
+        const unlockCompanyId = companyIdFromRequest(req);
+        const payload = await withCareerWrite(
+          (_world, missions) => {
+            missions.cargoOps = unlockAllCareerCargoOps(missions.cargoOps);
+            return { cargoOps: missions.cargoOps };
           },
           { persist: 'company', companyId: unlockCompanyId },
         );

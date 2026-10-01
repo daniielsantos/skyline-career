@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-01: **Manifest mostra a ficha do outro hold** — sintoma = o bridge KIAH→KMIA aparecia só como “KMIA · machinery · 18.6 klb”. Causa = a caixa do Manifest imprimia destino, commodity e peso. Fix = a linha traz rota, tipo, commodity, massa, nm, pay, prazo e quem postou.
+
 Atualizado 2026-10-01: **Add respeita a reserva do próprio piloto** — sintoma = Add na lista dizia “reserved by another pilot” com o cartão em RESERVED · YOU. Causa = ao devolver o avião ao voo, o Add não informava a conta que já tinha a reserva. Fix = o Add manda essa conta (e o dono da VA, se for o caso). O voo aberto não precisa ser cancelado.
 
 Atualizado 2026-10-01: **Add a stop vira lista** — o combo no Dispatch só mostrava destino e peso. Cada hold do mesmo aeroporto aparece numa linha (rota, tipo, commodity, massa, nm, pay, prazo, quem postou) com **Add**.

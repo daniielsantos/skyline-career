@@ -20109,27 +20109,81 @@ export function App() {
                           flight when you accept.
                         </p>
                         <ul className="staging-lines">
-                          {others.map((hold) => (
-                            <li key={hold.id} className="staging-line staging-line-compact">
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  checked={stagingJoinHoldIds.includes(hold.id)}
-                                  disabled={busy}
-                                  onChange={(event) => {
-                                    const on = event.target.checked;
-                                    setStagingJoinHoldIds((current) =>
-                                      on
-                                        ? [...current, hold.id]
-                                        : current.filter((id) => id !== hold.id),
-                                    );
-                                  }}
-                                />{' '}
-                                {hold.destIcao} · {hold.commodityId} ·{' '}
-                                {formatTonnes(hold.kg)}
-                              </label>
-                            </li>
-                          ))}
+                          {others.map((hold) => {
+                            const kind = hold.kind ?? 'demand';
+                            const commodity = hold.commodityId
+                              ? hold.commodityId.charAt(0).toUpperCase() +
+                                hold.commodityId.slice(1)
+                              : 'Cargo';
+                            const payUsd =
+                              kind === 'bridge'
+                                ? (hold.pilotPayUsd ?? 0) > 0
+                                  ? hold.pilotPayUsd
+                                  : undefined
+                                : hold.unitPriceUsd != null
+                                  ? Math.round(hold.unitPriceUsd * hold.kg)
+                                  : undefined;
+                            const dist =
+                              typeof hold.distanceNm === 'number' &&
+                              hold.distanceNm > 0
+                                ? `${Math.round(hold.distanceNm).toLocaleString()} nm`
+                                : null;
+                            return (
+                              <li
+                                key={hold.id}
+                                className="staging-line staging-line-compact"
+                              >
+                                <label className="staging-join-hold">
+                                  <input
+                                    type="checkbox"
+                                    checked={stagingJoinHoldIds.includes(hold.id)}
+                                    disabled={busy}
+                                    onChange={(event) => {
+                                      const on = event.target.checked;
+                                      setStagingJoinHoldIds((current) =>
+                                        on
+                                          ? [...current, hold.id]
+                                          : current.filter((id) => id !== hold.id),
+                                      );
+                                    }}
+                                  />
+                                  <span className="staging-line-title">
+                                    <strong>
+                                      {hold.originIcao} → {hold.destIcao}
+                                    </strong>
+                                    <span className="tag">
+                                      {kind === 'bridge'
+                                        ? 'Bridge'
+                                        : kind === 'haul'
+                                          ? 'Wide haul'
+                                          : 'Demand'}
+                                    </span>
+                                  </span>
+                                </label>
+                                <p className="staging-line-meta">
+                                  {commodity} · {formatTonnes(hold.kg)}
+                                  {dist ? ` · ${dist}` : ''}
+                                  {typeof payUsd === 'number'
+                                    ? ` · pay ${formatMoney(payUsd)}`
+                                    : ''}
+                                  {hold.expiresAtTick != null ? (
+                                    <>
+                                      {' '}
+                                      ·{' '}
+                                      {formatExpiry({
+                                        expiresAtTick: hold.expiresAtTick,
+                                        currentTick: tick,
+                                        continuousHours,
+                                      })}
+                                    </>
+                                  ) : null}
+                                  {hold.heldByName?.trim()
+                                    ? ` · ${hold.heldByName.trim()}`
+                                    : ''}
+                                </p>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     );

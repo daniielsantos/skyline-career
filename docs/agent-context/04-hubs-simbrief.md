@@ -1,5 +1,7 @@
 # Hubs / SimBrief allowlist
 
+Atualizado 2026-10-01: **777F aceita contrato para MZPL** — sintoma = KIAH→MZPL com 777F; no sim a pista é 29/11, 2873×50 ft, grama curta, sem luz. Causa = Placencia está no catálogo como hub regional de Belize e o Accept não compara pista com a classe. O gate antigo de bush foi removido (2026-09-03) e `career-runways.json` ainda descreve MZPL como 08/26 asfalto de 650 m. Fix proposto, não feito: grama ou pista curta fica para GA/turboélice; jato e wide só entram em pista pavimentada longa o bastante. Não apagar o hub.
+
 ## Chile ICAO cleanup
 
 - La Serena = **SCSE**

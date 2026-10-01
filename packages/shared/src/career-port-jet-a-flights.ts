@@ -161,7 +161,7 @@ export function startPortJetAReposition(
   const level = conc.level === 2 || conc.level === 3 ? conc.level : 1;
   const room = Math.max(
     0,
-    portJetATankCapacityKg(level) - Math.floor(conc.jetAKg ?? 0),
+    portJetATankCapacityKg(level, state.companyRoster) - Math.floor(conc.jetAKg ?? 0),
   );
   if (room <= 0) throw new Error('Port FBO Jet-A tank is full');
   const aircraft = state.fleet.find((a) => a.id === opts.aircraftId);
@@ -267,7 +267,7 @@ function jetAStockSliderMaxKg(
   const conc = activeConcession(state, world.tick, haul.portId);
   const level = conc?.level === 2 || conc?.level === 3 ? conc.level : 1;
   const room = conc
-    ? Math.max(0, portJetATankCapacityKg(level) - Math.floor(conc.jetAKg ?? 0))
+    ? Math.max(0, portJetATankCapacityKg(level, state.companyRoster) - Math.floor(conc.jetAKg ?? 0))
     : 0;
   const liftKg = aircraft
     ? jetAHoldKg(world, aircraft, mission.originIcao, mission.destIcao)

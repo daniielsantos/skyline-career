@@ -4267,6 +4267,22 @@ async function readLedgerRows(
   );
 }
 
+async function readCompanyRosterCountPg(
+  pool: pg.Pool,
+  companyId: string,
+): Promise<number> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM company_members WHERE company_id = $1`,
+      [companyId],
+    );
+    const n = Number(rows[0]?.n ?? 0);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function hydrateMissionsFromPg(
   pool: pg.Pool,
   companyId: string,
@@ -4299,6 +4315,7 @@ export async function hydrateMissionsFromPg(
         }
       | undefined;
     if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
+    merged.companyRoster = await readCompanyRosterCountPg(pool, cid);
     // Never backfill pilotName from a listed VA display_name (airline ≠ pilot).
     if (company?.display_name && !merged.pilotName && !company.va_listed) {
       merged.pilotName = company.display_name;
@@ -4319,6 +4336,7 @@ export async function hydrateMissionsFromPg(
   return {
     ...blobFallback,
     ledger,
+    companyRoster: await readCompanyRosterCountPg(pool, cid),
   };
 }
 

@@ -2008,6 +2008,20 @@ export function persistCompanyTables(
   }
 }
 
+function readCompanyRosterCount(db: SqliteDb, companyId: string): number {
+  try {
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM company_members WHERE company_id = ?`,
+      )
+      .get(companyId) as { n: number } | undefined;
+    const n = Number(row?.n ?? 0);
+    return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function assembleMissionsFromTables(
   db: SqliteDb,
   blobFallback: CareerMissionsState,
@@ -2037,6 +2051,7 @@ export function assembleMissionsFromTables(
       | { home_hub_icao: string; display_name: string; va_listed: number }
       | undefined;
     if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
+    merged.companyRoster = readCompanyRosterCount(db, cid);
     // Never backfill pilotName from a listed VA display_name (airline ≠ pilot).
     // Pre-fleet auth companies: keep pilotName aligned with company identity so a
     // sticky UI draft (other save) cannot leave "Nothin" on a new "nullable" tenant.
@@ -2058,6 +2073,7 @@ export function assembleMissionsFromTables(
   return {
     ...blobFallback,
     ledger,
+    companyRoster: readCompanyRosterCount(db, cid),
   };
 }
 

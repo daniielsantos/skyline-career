@@ -339,7 +339,9 @@ v1 flat hire replaced by tiers (JSON `vaLineCrew.tier`; no PG migrate):
 
 Ops de missão + IH pay + cut + **MX/inspect** = custo VA (shipped; MX só owner). Empty ferry = Line crew + overflow no piloto (**shipped**).
 
-Ainda OPEN (não bloqueia cut nem ferry desk): salary dispatcher humano; cap hauls/dia.
+Ainda OPEN (não bloqueia cut nem ferry desk): salary dispatcher humano.
+
+**Cap hauls/dia da mesa humana — shipped.** Hold, Fly now e Scout confirm contam 8 Internal Hauls por dia econômico (`VA_MANUAL_HAUL_MAX_PER_DAY`). Auto-haul continua no próprio teto 1–3 e não gasta essa conta. Cancelar não devolve o post. O dia seguinte zera. Pay `$0` entra na conta — era o buraco (ponte grátis sem passar pelo caixa).
 
 **Rake no IH — não fazer (2026-09-26).** O pay do piloto já é o stamp IH → home, 100% da fee, debitado da carteira da VA. Um % extra seria a company ficar com parte do que ela mesma pagou; o dono já define o valor no stamp. O corte de Freights/Charter não entra em cima.
 
@@ -651,6 +653,12 @@ Fase 3 (auto-haul) →  precisa VA members + Fase 2 + caps sociais
 **Sintoma:** Owner com Santos P1 + WH T3 ainda via “Path to Port FBO · see Hauls…” unchecked no Config.
 **Causa:** checklist item hardcoded sem ler concessão.
 **Fix:** `fetchPorts` no refresh My VA; step `is-done` com nome/P#; próximo tip = stock WH → Scout/Auto-haul.
+
+### Mesa humana sem teto diário (2026-10-01)
+
+**Sintoma:** Auto-haul para em 1–3/dia; Hold / Fly now / Scout confirm não. Pay `$0` abre ponte sem debitar o caixa.
+**Causa:** `holdWarehouseBridge` e `acceptWarehouseBridge` não contavam posts. O teto de 3 holds abertos só faz o Auto-haul parar.
+**Fix:** `consumeManualHaulPost` — 8/dia econômico na company (`vaAutoHaul.manualPostedToday`, mesma coluna JSON). Auto (`heldByAuto`) não conta. Duplicata de rota não conta. Cancel não devolve. UI do stamp mostra “N of 8 desk posts today”.
 
 ### IH-3 VA Auto-haul desk v1 (2026-09-21)
 

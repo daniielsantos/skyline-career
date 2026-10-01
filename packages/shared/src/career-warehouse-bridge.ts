@@ -24,6 +24,7 @@ import {
 } from './career-mission.js';
 import { findCareerPlayerAirframe } from './career-player-airframes.js';
 import { careerPortIdForPickupHub } from './career-ports.js';
+import { consumeManualHaulPost } from './career-va-haul-desk.js';
 import { quoteWarehouseHaulPayUsd } from './career-warehouse-haul.js';
 import {
   findPlayerWarehouseAtIcao,
@@ -321,6 +322,9 @@ export function holdWarehouseBridge(
       `No free ${opts.commodityId} at ${origin}, or no room at ${dest}`,
     );
   }
+  if (opts.heldByAuto !== true) {
+    consumeManualHaulPost(state, world.tick);
+  }
   const pay = resolveBridgePilotPayUsd(world, {
     originIcao: origin,
     destIcao: dest,
@@ -573,6 +577,7 @@ export function acceptWarehouseBridge(
     opts.pilotAccountId,
   );
   assertClassOpsUnlocked(state.classOps, aircraft.aircraftClassId);
+  consumeManualHaulPost(state, world.tick);
   const withdrawn = withdrawCargoFromWarehouse(state, {
     icao: origin,
     commodityId: opts.commodityId,

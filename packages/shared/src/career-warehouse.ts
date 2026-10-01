@@ -12,6 +12,7 @@ import {
 } from './career-economy.js';
 import { applyWalletDelta, formatLedgerDaysNotePrefix } from './career-ledger.js';
 import { countryIdFromRegion } from './career-partition.js';
+import { manualHaulDeskView } from './career-va-haul-desk.js';
 import { economyDayIndex } from './career-weather.js';
 import {
   depositCargoToWarehouse,
@@ -507,7 +508,7 @@ export function settleWarehouseInboundTransfers(
 
 export function playerWarehouseSnapshot(
   state: CareerMissionsState,
-  world?: Pick<CareerEconomyWorld, 'airports'>,
+  world?: Pick<CareerEconomyWorld, 'airports' | 'tick'>,
 ): {
   warehouses: Array<
     PlayerWarehouse & {
@@ -534,6 +535,12 @@ export function playerWarehouseSnapshot(
   pickupHubs: string[];
   /** CAPEX quote per pickup hub (for Buy UI). */
   buyUsdByIcao: Record<string, number>;
+  /** Hand-posted Internal Hauls today. Absent when the snapshot has no world tick. */
+  manualHaulDesk?: {
+    postedToday: number;
+    maxPerDay: number;
+    remaining: number;
+  };
 } {
   const whs = ensurePlayerWarehouses(state);
   const pickupHubs = listPortPickupHubIcaos();
@@ -588,5 +595,8 @@ export function playerWarehouseSnapshot(
     demandHolds: (whs.demandHolds ?? []).map((h) => ({ ...h })),
     pickupHubs,
     buyUsdByIcao,
+    ...(world
+      ? { manualHaulDesk: manualHaulDeskView(state, world.tick) }
+      : {}),
   };
 }

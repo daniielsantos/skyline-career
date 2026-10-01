@@ -1476,6 +1476,12 @@ export interface CareerMissionsState {
    * Only meaningful on va_listed companies with members.
    */
   vaAutoHaul?: VaAutoHaulState;
+  /**
+   * `company_members` count, stamped when the company file is loaded.
+   * Widens the Port FBO Jet-A tank. Not a saved column — the next load
+   * overwrites it. Missing means one seat.
+   */
+  companyRoster?: number;
 };
 
 /** Owner-configured VA desk that auto-posts WH→WH Internal Hauls (IH-3). */
@@ -1490,6 +1496,10 @@ export interface VaAutoHaulState {
   postedToday: number;
   /** `economyDayIndex(tick)` when `postedToday` last applied. */
   postedDayIndex: number;
+  /** Hand-posted WH→WH bridges today (Hold, Fly now, Scout confirm). */
+  manualPostedToday?: number;
+  /** `economyDayIndex(tick)` when `manualPostedToday` last applied. */
+  manualPostedDayIndex?: number;
 }
 
 /** Player FBO ownership + bonded warehouse holds. */

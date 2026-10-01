@@ -51,6 +51,8 @@ export function defaultVaAutoHaulState(): VaAutoHaulState {
     walletFloorUsd: 0,
     postedToday: 0,
     postedDayIndex: 0,
+    manualPostedToday: 0,
+    manualPostedDayIndex: 0,
   };
 }
 
@@ -81,6 +83,15 @@ export function normalizeVaAutoHaulState(
     typeof o.postedDayIndex === 'number' && Number.isFinite(o.postedDayIndex)
       ? Math.floor(o.postedDayIndex)
       : 0;
+  const manualPostedToday =
+    typeof o.manualPostedToday === 'number' && Number.isFinite(o.manualPostedToday)
+      ? Math.max(0, Math.floor(o.manualPostedToday))
+      : 0;
+  const manualPostedDayIndex =
+    typeof o.manualPostedDayIndex === 'number' &&
+    Number.isFinite(o.manualPostedDayIndex)
+      ? Math.floor(o.manualPostedDayIndex)
+      : 0;
   return {
     enabled: o.enabled === true,
     maxHaulsPerDay,
@@ -88,6 +99,8 @@ export function normalizeVaAutoHaulState(
     walletFloorUsd,
     postedToday,
     postedDayIndex,
+    manualPostedToday,
+    manualPostedDayIndex,
   };
 }
 

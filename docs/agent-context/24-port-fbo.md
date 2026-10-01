@@ -1,5 +1,9 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-01: **Desenho do tanque Jet-A** — o vaso em pé virou um cilindro deitado. O nível sobe por baixo, com medidor em cima e boia na superfície. O número ao lado não muda.
+
+Atualizado 2026-10-01: **Tanque Jet-A da VA escala com a roster** — sintoma = P3 (28 t / 61,7 klb) acaba na primeira onda de widebodies. Causa = um tanque por concessão, tamanho fixo de operador solo. Fix = capacidade = base do nível × roster (`company_members`, piso 1, teto 4). Quem sai não apaga o Jet-A já pago: Buy e Stock novo veem sala 0 até os voos puxarem o nível para baixo do teto. Devolução de voo cancelado soma o kg de volta, sem cortar o excedente. Linhas de Stock (2,5 / 5 / 8 t) e `PORT_JET_A_HAUL_CAP` 18 não mudam.
+
 Atualizado 2026-09-30: **Stock de Jet-A ignora Class Ops** — sintoma = 777F (`wide_freighter`) em voo de Stock com Wide locked na tela Cargo Ops (Light jet ainda é o próximo). Causa = `POST /api/ports/jet-a/fetch` → `startPortJetAReposition` só exigia o avião na frota e um Port FBO. Fix = o início do Stock chama `assertClassOpsUnlocked` na ladder da home (membro de VA incluso; Dev Mode continua aberto). O botão Stock no porto fica desabilitado com o motivo. Voo já aceito não é cancelado. Compra de kg (`stock-kg`) não reabre a trava.
 
 Atualizado 2026-09-30: **Buy this load 502** — sintoma = Stock MUCC→KMIA, clique em Buy this load, texto `World API timed out (HTTP 502)`. Causa = o corpo não é JSON do career; é a página HTML do proxy (Cloudflare). `setPortJetAStockKg` recusaria com 400 e uma frase. O corte do pulso (0.3.395) encurtou o save do pouso (~0,9 s) e o tick real continua ~3–4 s fora do lock; a compra espera o lock da varredura (~2 s) e a revisão do Postgres enquanto um save escreve. Isso são segundos, não o timeout do túnel. Neste caso o primeiro clique não commitou (porão seguiu 0); o segundo Buy passou. O caminho da compra está são.

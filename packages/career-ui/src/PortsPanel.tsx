@@ -326,42 +326,75 @@ function demandSortValue(
   }
 }
 
-/** Vertical fuel-farm tank. Fill rises from the bottom, same idea as the preflight cells. */
+/** Horizontal Jet-A cistern. Fill rises from the bottom; the float follows the surface. */
 function PortJetATankMark(props: { kg: number; capacityKg: number }) {
+  const clipId = useId().replace(/:/g, '');
   const cap = props.capacityKg > 0 ? props.capacityKg : 1;
   const ratio = Math.min(1, Math.max(0, props.kg / cap));
-  const span = 80;
-  const visual = props.kg > 0 ? Math.max(ratio, 0.045) : 0;
+  const span = 52;
+  const visual = props.kg > 0 ? Math.max(ratio, 0.04) : 0;
   const height = visual * span;
-  const y = 96 - height;
+  const surfaceY = 78 - height;
+  const showFloat = height > 7 && height < span - 3;
   return (
     <svg
       className="ports-jeta-vessel"
-      viewBox="0 0 72 108"
+      viewBox="0 0 168 100"
       aria-hidden="true"
     >
       <defs>
-        <clipPath id="ports-jeta-vessel-clip">
-          <rect x="16" y="22" width="40" height="68" />
-          <ellipse cx="36" cy="22" rx="20" ry="7" />
-          <ellipse cx="36" cy="90" rx="20" ry="7" />
+        <clipPath id={clipId}>
+          <rect x="36" y="26" width="96" height="52" />
+          <ellipse cx="36" cy="52" rx="14" ry="26" />
+          <ellipse cx="132" cy="52" rx="14" ry="26" />
         </clipPath>
       </defs>
-      <line className="ports-jeta-leg" x1="26" y1="97" x2="22" y2="106" />
-      <line className="ports-jeta-leg" x1="46" y1="97" x2="50" y2="106" />
-      <g clipPath="url(#ports-jeta-vessel-clip)">
-        <rect className="ports-jeta-well" x="0" y="0" width="72" height="108" />
+      <rect className="ports-jeta-saddle" x="50" y="80" width="20" height="8" rx="1.5" />
+      <rect className="ports-jeta-saddle" x="98" y="80" width="20" height="8" rx="1.5" />
+      <g clipPath={`url(#${clipId})`}>
+        <rect className="ports-jeta-well" x="0" y="0" width="168" height="100" />
         {height > 0 ? (
-          <rect className="ports-jeta-fuel" x="10" y={y} width="52" height={height} />
+          <rect
+            className="ports-jeta-fuel"
+            x="16"
+            y={surfaceY}
+            width="136"
+            height={height + 2}
+          />
         ) : null}
-        {height > 8 ? (
-          <ellipse className="ports-jeta-surface" cx="36" cy={y} rx="20" ry="3.5" />
+        {height > 4 ? (
+          <rect
+            className="ports-jeta-surface"
+            x="20"
+            y={surfaceY - 1.1}
+            width="128"
+            height="2.2"
+          />
+        ) : null}
+        {showFloat ? (
+          <rect
+            className="ports-jeta-float"
+            x="70"
+            y={surfaceY - 2.2}
+            width="28"
+            height="3.4"
+            rx="1.4"
+          />
         ) : null}
       </g>
-      <rect className="ports-jeta-shell" x="16" y="22" width="40" height="68" />
-      <ellipse className="ports-jeta-shell" cx="36" cy="90" rx="20" ry="7" />
-      <ellipse className="ports-jeta-dome" cx="36" cy="22" rx="20" ry="7" />
-      <circle className="ports-jeta-hatch" cx="36" cy="18" r="2.1" />
+      <line className="ports-jeta-shell" x1="36" y1="26" x2="132" y2="26" />
+      <line className="ports-jeta-shell" x1="36" y1="78" x2="132" y2="78" />
+      <ellipse className="ports-jeta-shell" cx="36" cy="52" rx="14" ry="26" />
+      <ellipse className="ports-jeta-dome" cx="132" cy="52" rx="14" ry="26" />
+      {showFloat ? (
+        <line className="ports-jeta-rod" x1="84" y1="14" x2="84" y2={surfaceY - 2} />
+      ) : (
+        <line className="ports-jeta-rod" x1="84" y1="14" x2="84" y2="26" />
+      )}
+      <rect className="ports-jeta-gauge" x="74" y="2" width="20" height="12" rx="1.5" />
+      <line className="ports-jeta-rod" x1="79" y1="8" x2="89" y2="8" />
+      <ellipse className="ports-jeta-hatch" cx="108" cy="26" rx="6" ry="2.4" />
+      <ellipse className="ports-jeta-hatch" cx="122" cy="26" rx="6" ry="2.4" />
     </svg>
   );
 }
@@ -4377,6 +4410,13 @@ export function PortsPanel(props: {
                                   Dispatch here draws the tank before the airport price.
                                   Stocking flights are not paid.
                                 </p>
+                                {port.concession.jetATank.kg >
+                                port.concession.jetATank.capacityKg ? (
+                                  <p className="muted ports-warehouse-hint">
+                                    Above the roster cap. This fuel stays until
+                                    flights draw it down.
+                                  </p>
+                                ) : null}
                               </div>
                             </div>
                             <form
@@ -7014,6 +7054,7 @@ export function PortsPanel(props: {
           aircraftOptions={bridgeAircraftOptions}
           pilotPayUsd={bridgePilotPayUsd}
           payQuote={bridgePayQuote}
+          manualHaulDesk={warehouses?.manualHaulDesk}
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
           formatMoney={props.formatMoney}
@@ -7076,6 +7117,9 @@ export function PortsPanel(props: {
           busy={Boolean(props.busy || loading)}
           formatTonnes={props.formatTonnes}
           formatMoney={props.formatMoney}
+          manualHaulDesk={
+            scoutHoldDraft.kind === 'bridge' ? warehouses?.manualHaulDesk : null
+          }
           onCancel={() => setScoutHoldDraft(null)}
           onConfirm={(kg) => {
             const draft = scoutHoldDraft;
@@ -7361,6 +7405,11 @@ function ScoutHoldDialog(props: {
   busy: boolean;
   formatTonnes: (kg: number) => string;
   formatMoney: (n: number) => string;
+  manualHaulDesk?: {
+    postedToday: number;
+    maxPerDay: number;
+    remaining: number;
+  } | null;
   onCancel: () => void;
   onConfirm: (kg: number) => void;
 }) {
@@ -7426,7 +7475,10 @@ function ScoutHoldDialog(props: {
     props.suggestion.kg > 0
       ? Math.round((props.suggestion.payUsd * kg) / props.suggestion.kg)
       : null;
-  const canConfirm = !props.busy && kg >= minKg && kg <= maxKg && maxKg > 0;
+  const deskFull =
+    props.kind === 'bridge' && (props.manualHaulDesk?.remaining ?? 1) <= 0;
+  const canConfirm =
+    !props.busy && !deskFull && kg >= minKg && kg <= maxKg && maxKg > 0;
 
   return (
     <div
@@ -7517,6 +7569,13 @@ function ScoutHoldDialog(props: {
           ) : (
             <p className="demand-accept-hint">{props.formatTonnes(kg)}</p>
           )}
+          {props.kind === 'bridge' && props.manualHaulDesk ? (
+            <p className="demand-accept-hint">
+              {props.manualHaulDesk.postedToday} of{' '}
+              {props.manualHaulDesk.maxPerDay} desk posts today
+              {deskFull ? '. The next economy day opens more.' : '.'}
+            </p>
+          ) : null}
         </div>
         <div className="confirm-actions">
           <button
@@ -8160,6 +8219,11 @@ function WarehouseBridgeDialog(props: {
   aircraftOptions: PlayerAircraft[];
   pilotPayUsd: number | null;
   payQuote: InternalHaulPayQuote | null;
+  manualHaulDesk?: {
+    postedToday: number;
+    maxPerDay: number;
+    remaining: number;
+  } | null;
   busy: boolean;
   formatTonnes: (kg: number) => string;
   formatMoney: (n: number) => string;
@@ -8178,11 +8242,13 @@ function WarehouseBridgeDialog(props: {
   const payUsd = props.pilotPayUsd ?? quote?.suggestedPayUsd ?? 0;
   const updateBlocked =
     props.mode === 'fly' && Boolean(props.clientUpdateRequiredMin);
+  const deskFull = (props.manualHaulDesk?.remaining ?? 1) <= 0;
   const canConfirm =
     Boolean(props.destIcao) &&
     props.destOptions.length > 0 &&
     !props.busy &&
     !updateBlocked &&
+    !deskFull &&
     (props.mode === 'hold' ||
       (Boolean(props.aircraftId) && props.aircraftOptions.length > 0));
   return (
@@ -8209,6 +8275,13 @@ function WarehouseBridgeDialog(props: {
             WH→WH company cargo. Pilot pay is company→pilot (solo = ledger
             only). Set pay to $0 for an unpaid bridge (Port shuttle OK).
           </p>
+          {props.manualHaulDesk ? (
+            <p className="demand-accept-hint">
+              {props.manualHaulDesk.postedToday} of{' '}
+              {props.manualHaulDesk.maxPerDay} desk posts today
+              {deskFull ? '. The next economy day opens more.' : '.'}
+            </p>
+          ) : null}
           <div className="demand-accept-section">
             <span className="demand-accept-label">Destination warehouse</span>
             {props.destOptions.length === 0 ? (

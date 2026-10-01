@@ -360,4 +360,58 @@ describe('port FBO Jet-A', () => {
     assert.ok(mine!.remainingKg <= 2_500);
     assert.equal(ensurePortJetAHaulOrders(world), 0);
   });
+
+  it('widens the tank with the roster and keeps fuel when the roster shrinks', () => {
+    assert.equal(portJetATankCapacityKg(3, 1), 28_000);
+    assert.equal(portJetATankCapacityKg(3, 0), 28_000);
+    assert.equal(portJetATankCapacityKg(1, 2), 8_000);
+    assert.equal(portJetATankCapacityKg(3, 4), 112_000);
+    assert.equal(portJetATankCapacityKg(3, 8), 112_000);
+
+    const { world, state } = atSantos();
+    const conc = state.playerPortConcessions?.[0];
+    assert.ok(conc);
+    conc.level = 3;
+    conc.jetAKg = 100_000;
+    state.companyRoster = 2;
+    assert.throws(
+      () => buyPortFboJetA(state, world, { portId: 'BRSSZ', kg: 100 }),
+      /full/,
+    );
+    assert.equal(conc.jetAKg, 100_000);
+
+    deliverPortJetAHaul(state, world, {
+      id: 'msn_over_cap',
+      originIcao: 'SBKP',
+      destIcao: 'SBGR',
+      fuelHaul: {
+        kind: 'reposition',
+        portId: 'BRSSZ',
+        kg: 500,
+        fromTankKg: 0,
+        boughtKg: 500,
+        boughtUsd: 400,
+      },
+    } as MissionIntent);
+    assert.equal(conc.jetAKg, 100_000);
+    assert.equal(
+      state.ledger?.some((row) => row.note?.includes('tank full')),
+      true,
+    );
+
+    state.companyRoster = 1;
+    refundPortJetAHaul(state, world, {
+      id: 'msn_return',
+      originIcao: 'SBGR',
+      fuelHaul: {
+        kind: 'reposition',
+        portId: 'BRSSZ',
+        kg: 800,
+        fromTankKg: 800,
+        boughtKg: 0,
+        boughtUsd: 0,
+      },
+    } as MissionIntent);
+    assert.equal(conc.jetAKg, 100_800);
+  });
 });

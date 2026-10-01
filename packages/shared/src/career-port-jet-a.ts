@@ -38,12 +38,15 @@ import type {
   PortConcessionLevel,
 } from './types/career-economy.js';
 
-/** Company tank at the Port FBO (kg). P1 small, P2/P3 larger. */
+/** Company tank at the Port FBO (kg). P1 small, P2/P3 larger. One seat. */
 export const PORT_JET_A_TANK_KG: Record<PortConcessionLevel, number> = {
   1: 4_000,
   2: 12_000,
   3: 28_000,
 };
+
+/** Roster multiplier ceiling. A larger company does not get a private fuel farm. */
+export const PORT_JET_A_TANK_ROSTER_MAX = 4;
 
 /**
  * Old per-level Stock cap (kg). Stock no longer uses it — the flight is
@@ -73,8 +76,30 @@ const HAUL_TTL_TICKS = TICKS_PER_DAY * 3;
 const HAUL_MIN_NM = 80;
 const HAUL_MAX_NM = 2_200;
 
-export function portJetATankCapacityKg(level: PortConcessionLevel): number {
-  return PORT_JET_A_TANK_KG[level] ?? PORT_JET_A_TANK_KG[1];
+/**
+ * Seats that widen the cistern. Missing, 0, or 1 stays at the base tank.
+ * Five or more seats stop at {@link PORT_JET_A_TANK_ROSTER_MAX}.
+ */
+export function portJetATankRosterMult(memberCount?: number): number {
+  if (memberCount == null || !Number.isFinite(memberCount)) return 1;
+  const seats = Math.floor(memberCount);
+  if (seats <= 1) return 1;
+  return Math.min(PORT_JET_A_TANK_ROSTER_MAX, seats);
+}
+
+export function portJetATankCapacityKg(
+  level: PortConcessionLevel,
+  memberCount?: number,
+): number {
+  const base = PORT_JET_A_TANK_KG[level] ?? PORT_JET_A_TANK_KG[1];
+  return base * portJetATankRosterMult(memberCount);
+}
+
+function tankCapacityKg(
+  state: CareerMissionsState,
+  level: PortConcessionLevel,
+): number {
+  return portJetATankCapacityKg(level, state.companyRoster);
 }
 
 export function portJetATripCeilingKg(level: PortConcessionLevel): number {
@@ -211,7 +236,7 @@ export function buyPortFboJetA(
   const level = clampLevel(conc.level);
   const room = Math.max(
     0,
-    portJetATankCapacityKg(level) - Math.floor(conc.jetAKg ?? 0),
+    tankCapacityKg(state, level) - Math.floor(conc.jetAKg ?? 0),
   );
   if (room <= 0) throw new Error('Port FBO Jet-A tank is full');
   const ap = airportByIcao(world, hub);
@@ -506,7 +531,7 @@ export function deliverPortJetAHaul(
   );
   const level = clampLevel(conc?.level);
   const have = Math.max(0, Math.floor(conc?.jetAKg ?? 0));
-  const room = conc ? Math.max(0, portJetATankCapacityKg(level) - have) : 0;
+  const room = conc ? Math.max(0, tankCapacityKg(state, level) - have) : 0;
   const add = Math.min(haul.kg, room);
   if (conc) conc.jetAKg = have + add;
   if (conc && add > 0 && haul.kind === 'reposition') {
@@ -572,12 +597,7 @@ export function releaseBookedJetA(
   if (fromTankKg > 0) {
     const conc = concessionForPickupHub(state, world.tick, origin);
     if (conc) {
-      const level = clampLevel(conc.level);
-      const cap = portJetATankCapacityKg(level);
-      conc.jetAKg = Math.min(
-        cap,
-        Math.floor(conc.jetAKg ?? 0) + fromTankKg,
-      );
+      conc.jetAKg = Math.floor(conc.jetAKg ?? 0) + fromTankKg;
     } else {
       creditAirportFuelStock(world, origin, fromTankKg);
     }
@@ -609,12 +629,7 @@ export function refundPortJetAHaul(
   if (haul.fromTankKg > 0) {
     const conc = concessionForPickupHub(state, world.tick, origin);
     if (conc) {
-      const level = clampLevel(conc.level);
-      const cap = portJetATankCapacityKg(level);
-      conc.jetAKg = Math.min(
-        cap,
-        Math.floor(conc.jetAKg ?? 0) + haul.fromTankKg,
-      );
+      conc.jetAKg = Math.floor(conc.jetAKg ?? 0) + haul.fromTankKg;
     } else {
       creditAirportFuelStock(world, origin, haul.fromTankKg);
     }

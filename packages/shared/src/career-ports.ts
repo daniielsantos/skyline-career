@@ -3046,6 +3046,7 @@ export function portSnapshot(
                   yoursConc.level === 2 || yoursConc.level === 3
                     ? yoursConc.level
                     : 1,
+                  state?.companyRoster,
                 ),
                 spotSellableKg: (() => {
                   const hub = resolvePortPickupHub(port);

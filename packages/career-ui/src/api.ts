@@ -3239,6 +3239,12 @@ export type PlayerWarehouseSnapshot = {
   pickupHubs: string[];
   buyUsdByIcao?: Record<string, number>;
   groundStaff?: GroundStaffSnapshot;
+  /** Hand-posted Internal Hauls this economy day. */
+  manualHaulDesk?: {
+    postedToday: number;
+    maxPerDay: number;
+    remaining: number;
+  };
 };
 
 export type DemandOrderView = {

@@ -5163,6 +5163,7 @@ export function postPreflight(opts: {
   simbriefUser?: string;
   simbriefUserid?: string;
   companyId?: string;
+  signal?: AbortSignal;
 }) {
   return api<{
     mission: Mission;
@@ -5199,7 +5200,13 @@ export function postPreflight(opts: {
     };
   }>('/api/preflight', {
     method: 'POST',
-    body: JSON.stringify(opts),
+    body: JSON.stringify({
+      missionId: opts.missionId,
+      simbriefUser: opts.simbriefUser,
+      simbriefUserid: opts.simbriefUserid,
+      companyId: opts.companyId,
+    }),
+    signal: opts.signal,
   });
 }
 
@@ -5284,8 +5291,8 @@ export type SimBridgeStatus = {
   checkedAtIso: string;
 };
 
-export function fetchSimBridgeStatus() {
-  return api<SimBridgeStatus>('/api/simbridge/status');
+export function fetchSimBridgeStatus(signal?: AbortSignal) {
+  return api<SimBridgeStatus>('/api/simbridge/status', { signal });
 }
 
 export type IdentifyLiveAircraftResponse = {

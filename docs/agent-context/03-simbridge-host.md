@@ -1,5 +1,13 @@
 # SimBridge Host / PIPE CLOSED
 
+## Waiting for Preflight com pipe em rajada (2026-09-30)
+
+**Sintoma:** OFP gerado com o 777F ainda fora do solo; Dispatch fica em `Waiting for Preflight` / `Reading “777F”…` e não abre o card. Parece SimConnect morto.
+
+**Causa:** SimConnect não travou. Host 0.3.403 (`SunRise`) sem `TIMEOUT`, sem `0xC00000B0`, sem `timeout storm`. `exception=7` só no boot (NAME_UNRECOGNIZED num índice do batch — sessão segue). Voo anterior `jeta_589` fez settle às 01:20Z e o Watch fechou o pipe. Às 01:23Z o pipe passa a abrir e fechar várias vezes por segundo (sessões de ~30–200 ms — probe, não um sample de fuel/payload). Probe ao vivo responde: `connected`, título `777F`, `onGround: true`, motores off, GS ~0. O card “Waiting for Preflight” **não é** o flag de solo: a copy de airborne não apareceu, então a UI já sabe que está no chão. O texto só troca quando `POST /api/preflight` grava `lastPreflightCheck`. O poll de 1,5 s existe, mas `inFlight` ignora o tick seguinte enquanto a chamada não volta, e a rajada fecha o pipe antes do sample pesado terminar. Por isso pousar não muda essa linha.
+
+**Fix (código, ainda não no app instalado):** o efeito de Preflight guardava `inFlight` local e, ao remontar (`onGround`), marcava `cancelled` e descartava o sample. Cada remount abria outro pipe. Agora uma só `POST /api/preflight` por missão (ref que sobrevive ao remount); o resultado grava mesmo se o efeito limpou; abort do cliente em 20s. Servidor recusa um segundo sample com 409 (`preflight_active`) sem abrir outro client; SimBrief resolve antes do gate; leitura no pipe corta em 20s e solta o gate. Probe de status não reabre o pipe com menos de 7s entre chamadas, e corta em 8s. 409 / timeout / abort não viram erro sticky no card — o retry de 1,5 s continua. Este voo já preso: fechar e abrir o Airframe no solo (o processo velho não tem o patch). Não matar `SimBridgeHost.exe` no caminho quente.
+
 ## Arquitetura
 
 - Desktop sobe `SimBridgeHost.exe` (named pipe `msfs-compat-simbridge`).
@@ -64,7 +72,7 @@ Sinais:
 
 **Sintoma:** Load inject mostra título live (“Reading …”) mas o card Preflight demora (às vezes ~15s+).
 **Causa:** (1) `/api/preflight` lia originCoords com `withCareerRead` (world lock atrás do pulse); (2) SimBrief OFP serializado antes do pipe open; (3) UI retentava a cada 5s no bootstrap.
-**Fix:** coords via `withCareerPeekRead`; `loadPreflightOfp` em paralelo com open+identity; poll bootstrap 1.5s até `lastPreflightCheck`, depois 5s.
+**Fix:** coords via `withCareerPeekRead`; poll bootstrap 1.5s até `lastPreflightCheck`, depois 5s. O OFP em paralelo *dentro* do gate segurava o pipe durante o SimBrief — revertido em 2026-09-30 (OFP antes do gate). Ver a seção do topo.
 
 ### RECONNECTING no rodapé a cada minuto (2026-09-26)
 

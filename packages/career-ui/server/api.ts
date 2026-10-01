@@ -402,6 +402,9 @@ import {
 import { identifyLiveAircraftFromTitle } from './identify-live-aircraft.ts';
 import { beginOfpLoadActive, endOfpLoadActive, isOfpLoadActive } from './ofp-load-state.ts';
 import { preflightBlocksDepart, runMissionPreflight, lastPreflightFromInjectLive } from './preflight-helpers.ts';
+
+/** One live Preflight pipe sample at a time. A second POST must not open another client. */
+let preflightSampleActive = false;
 import {
   CareerWatchSession,
   probeFirstContactPosition,
@@ -14840,6 +14843,13 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
+        if (preflightSampleActive) {
+          send(res, 409, {
+            error: 'Preflight sample already running',
+            code: 'preflight_active',
+          });
+          return;
+        }
         const preflightCompanyId = companyIdFromRequest(req, body.companyId);
         const probe = await loadMissions({ companyId: preflightCompanyId });
         const probeMission = probe.missions.find((m) => m.id === body.missionId);
@@ -14861,12 +14871,25 @@ export function createCareerApiServer(port = 8787) {
             const terminal = airportByIcao(world, probeMission.originIcao);
             return resolveAirportCoords(probeMission.originIcao, terminal);
           });
-          const result = await runMissionPreflight(probeMission, {
-            username: body.simbriefUser,
-            userid: body.simbriefUserid,
-            pipeName: body.pipeName,
-            ...(originCoords ? { originCoords } : {}),
-          });
+          if (preflightSampleActive) {
+            send(res, 409, {
+              error: 'Preflight sample already running',
+              code: 'preflight_active',
+            });
+            return;
+          }
+          preflightSampleActive = true;
+          let result;
+          try {
+            result = await runMissionPreflight(probeMission, {
+              username: body.simbriefUser,
+              userid: body.simbriefUserid,
+              pipeName: body.pipeName,
+              ...(originCoords ? { originCoords } : {}),
+            });
+          } finally {
+            preflightSampleActive = false;
+          }
           const mxFinding = mxFuelBurnFindingForAircraft(fleetAcf);
           const findings = mxFinding
             ? [

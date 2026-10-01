@@ -15,6 +15,7 @@ import {
   isOfpCargoUnderOnlyFailureUi,
   isResumePrepAtOrigin,
   livePreflightWaitHint,
+  preflightBootstrapIsSoftRetry,
   ofpCargoKgFromUnderFinding,
   resolveLoadPath,
 } from './dispatch-flow.ts';
@@ -752,6 +753,32 @@ describe('airborneResumeShouldOpenDispatch', () => {
         playerMissionStatus: 'in_flight',
       }),
       'mark-done',
+    );
+  });
+});
+
+describe('preflightBootstrapIsSoftRetry', () => {
+  it('keeps retrying when another sample already owns the pipe', () => {
+    assert.equal(
+      preflightBootstrapIsSoftRetry('Preflight sample already running'),
+      true,
+    );
+    assert.equal(
+      preflightBootstrapIsSoftRetry('Preflight sample timed out'),
+      true,
+    );
+    assert.equal(
+      preflightBootstrapIsSoftRetry('The operation was aborted'),
+      true,
+    );
+  });
+
+  it('still surfaces a real sample failure', () => {
+    assert.equal(
+      preflightBootstrapIsSoftRetry(
+        'Live aircraft does not match the purchased airframe',
+      ),
+      false,
     );
   });
 });

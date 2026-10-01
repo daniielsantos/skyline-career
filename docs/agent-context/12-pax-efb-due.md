@@ -1,5 +1,13 @@
 # pax_and_cargo — Loaded vs Due vs EFB
 
+## Station weights overlapping on Preflight (2026-09-30)
+
+**Sintoma:** no card Payload (stations) do Preflight, `27,378 lb` pinta em cima da estação vizinha. No En route os mesmos números cabem.
+
+**Causa:** `.load-schematic-stations` usa `auto-fill` / `minmax(2.5rem)` e a célula tem `min-width: 2.6rem` + `overflow: visible` + `white-space: nowrap`. Um 777F cabe ~10 baías numa linha; o texto é mais largo que a célula. En route já força 5 colunas (`.dispatch-enroute-live-tiles`).
+
+**Fix:** `.preflight-load-grid .load-schematic-stations` também em 5 colunas (4 / 3 se o tile for estreito), `min-width: 0`, `overflow: hidden`, fonte `clamp` pela largura da célula.
+
 Jets de passageiro no Career: freight vai na **cabine + leftover cargo**, não `pax=1`. Catálogo: `packages/shared/src/data/career-player-airframes.json`. Watch: `packages/career-ui/server/watch-helpers.ts`. Helpers: `clampPaxAndCargoDueToHoldsLb`, `adjustPaxAndCargoDueForEfbPaxLb`, `simconnectCabinOvershootLb` em `career-mission.ts` / `career-player-airframes.ts`.
 
 SimBrief Dispatch usa **175+55 lb/assento** (`paxwgt`/`bagwgt`). O Due do Preflight **não** é o klb do contrato no topo (isso é freight da missão). Due = payload OFP (pax+bags+cargo), depois os ajustes abaixo.

@@ -777,6 +777,9 @@ async function probeSimBridgeStatusUnlocked(opts: {
     opts.pipeName ? { pipeName: opts.pipeName } : {},
   );
   return withSimBridgeExclusive(async () => {
+  const budget = setTimeout(() => {
+    void bridge.close({ disconnectHost: false });
+  }, 8_000);
   try {
     await bridge.open('Airframe Career UI SimBridge Probe');
     const ping = await bridge.ping();
@@ -858,6 +861,7 @@ async function probeSimBridgeStatusUnlocked(opts: {
       checkedAtIso,
     };
   } finally {
+    clearTimeout(budget);
     try {
       await bridge.close({ disconnectHost: false });
     } catch {

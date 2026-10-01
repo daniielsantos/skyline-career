@@ -172,6 +172,9 @@ export type MissionPreflightResult = {
   };
 };
 
+/** Hard cap so a hung SimVar read cannot hold the SimBridge gate forever. */
+const PREFLIGHT_PIPE_BUDGET_MS = 20_000;
+
 export async function runMissionPreflight(
   mission: MissionIntent,
   opts: {
@@ -203,21 +206,24 @@ export async function runMissionPreflight(
     );
   }
 
-  // Kick SimBrief OFP fetch before we take the SimBridge exclusive gate so a
-  // cold cache does not serialize behind pipe open.
-  const ofpPromise = loadPreflightOfp(mission, { username, userid });
+  // Resolve SimBrief before the exclusive gate. Awaiting the OFP inside the
+  // gate held the pipe for the whole fetch and starved the fuel/payload sample.
+  const ofpFetched = await loadPreflightOfp(mission, { username, userid });
 
   const bridge = new NamedPipeSimBridge(
     opts.pipeName ? { pipeName: opts.pipeName } : {},
   );
   return withSimBridgeExclusive(async () => {
+  let timedOut = false;
+  const budget = setTimeout(() => {
+    timedOut = true;
+    // Drop this IPC client so a hung SimVar read releases the gate.
+    void bridge.close({ disconnectHost: false });
+  }, PREFLIGHT_PIPE_BUDGET_MS);
   try {
     await bridge.open('Airframe Career UI Preflight');
-    const [expectation, identity] = await Promise.all([
-      ofpPromise,
-      bridge.getAircraftIdentity(),
-    ]);
-    const ofpBase = applyTargetBlockFuelKg(expectation, opts.targetBlockFuelKg);
+    const identity = await bridge.getAircraftIdentity();
+    const ofpBase = applyTargetBlockFuelKg(ofpFetched, opts.targetBlockFuelKg);
     const liveTitle = normalizeAircraftTitle(identity.title ?? '');
     const rolesTitle = liveTitle || identity.title || '';
     let ofp = ofpBase;
@@ -741,7 +747,11 @@ export async function runMissionPreflight(
         enginesRunning: live.enginesRunning,
       },
     };
+  } catch (err) {
+    if (timedOut) throw new Error('Preflight sample timed out');
+    throw err;
   } finally {
+    clearTimeout(budget);
     try {
       // The host owns one shared SimConnect session. Closing this short-lived
       // pipe client must not disconnect Watch or a following operation.

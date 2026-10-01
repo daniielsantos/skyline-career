@@ -399,6 +399,7 @@ import {
   formatLandingFpm,
   formatRunwayTouchdownDebriefLine,
   fuelAuthorizedForOfp,
+  preflightBootstrapIsSoftRetry,
   resolveLoadPath,
   airborneResumeShouldOpenDispatch,
   type FlightDebrief,
@@ -3995,6 +3996,16 @@ export function App() {
     useState(false);
   const holdWatchOffForPreflightRef = useRef(false);
   holdWatchOffForPreflightRef.current = holdWatchOffForPreflight;
+  /** Effect remounts must not open a new probe more often than the 8s poll. */
+  const lastBridgeProbeAtRef = useRef(0);
+  /**
+   * One /api/preflight at a time across effect remounts. A local `inFlight`
+   * flag reset on every onGround change and dropped the sample that landed.
+   */
+  const preflightSampleRef = useRef<{
+    missionId: string;
+    promise: Promise<void>;
+  } | null>(null);
   /**
    * Survives Watch auto-start effect remounts so overlapping tryStartWatch
    * calls await one POST (server also coalesces; this cuts duplicate storms).
@@ -6932,8 +6943,14 @@ export function App() {
     let cancelled = false;
     let consecutiveFailures = 0;
     async function pollBridge() {
+      const now = Date.now();
+      // Remounting this effect (mission hydrate, hold flag) used to call
+      // pollBridge immediately and reopen the pipe every few hundred ms,
+      // so the heavy Preflight sample never kept a session.
+      if (now - lastBridgeProbeAtRef.current < 7_000) return;
+      lastBridgeProbeAtRef.current = now;
       try {
-        const status = await fetchSimBridgeStatus();
+        const status = await fetchSimBridgeStatus(AbortSignal.timeout(10_000));
         if (cancelled) return;
         consecutiveFailures = 0;
         setSimBridge((prev) => {
@@ -7731,36 +7748,49 @@ export function App() {
       !staging?.replaceManifest;
     if (!eligible || !activeMission) return;
 
-    let cancelled = false;
-    let inFlight = false;
+    const missionId = activeMission.id;
+    const companyId = resolveOpsCompanyId(activeMission.aircraftId) || undefined;
     async function refreshLiveLoad() {
-      if (cancelled || inFlight || !activeMission) return;
-      inFlight = true;
-      try {
-        const result = await postPreflight({
-          missionId: activeMission.id,
-          simbriefUser: username,
-          companyId: resolveOpsCompanyId(activeMission.aircraftId) || undefined,
-        });
-        if (cancelled) return;
-        setPreflightBootstrapError(null);
-        preflightBootstrapErrorRef.current = null;
-        setMissions((current) =>
-          current.map((mission) =>
-            mission.id === result.mission.id ? result.mission : mission,
-          ),
-        );
-      } catch (err) {
-        // Soft background refresh — but surface the first failure so Load
-        // isn't a blank wait when SimBridge is up and the sample still fails.
-        if (cancelled || activeMission.lastPreflightCheck) return;
-        const message = err instanceof Error ? err.message : String(err);
-        if (preflightBootstrapErrorRef.current === message) return;
-        preflightBootstrapErrorRef.current = message;
-        setPreflightBootstrapError(message);
-      } finally {
-        inFlight = false;
+      const existing = preflightSampleRef.current;
+      if (existing?.missionId === missionId) {
+        await existing.promise;
+        return;
       }
+      const slot: { promise: Promise<void> } = { promise: Promise.resolve() };
+      slot.promise = (async () => {
+        try {
+          const result = await postPreflight({
+            missionId,
+            simbriefUser: username,
+            companyId,
+            signal: AbortSignal.timeout(20_000),
+          });
+          // Apply even if this effect was cleaned up (onGround flicker).
+          // Dropping the result here left Load on "Reading…" forever.
+          if (activeMissionRef.current?.id !== missionId) return;
+          setPreflightBootstrapError(null);
+          preflightBootstrapErrorRef.current = null;
+          setMissions((current) =>
+            current.map((mission) =>
+              mission.id === result.mission.id ? result.mission : mission,
+            ),
+          );
+        } catch (err) {
+          if (activeMissionRef.current?.id !== missionId) return;
+          if (activeMissionRef.current?.lastPreflightCheck) return;
+          const message = err instanceof Error ? err.message : String(err);
+          if (preflightBootstrapIsSoftRetry(message)) return;
+          if (preflightBootstrapErrorRef.current === message) return;
+          preflightBootstrapErrorRef.current = message;
+          setPreflightBootstrapError(message);
+        } finally {
+          if (preflightSampleRef.current?.promise === slot.promise) {
+            preflightSampleRef.current = null;
+          }
+        }
+      })();
+      preflightSampleRef.current = { missionId, promise: slot.promise };
+      await slot.promise;
     }
 
     void refreshLiveLoad();
@@ -7774,7 +7804,6 @@ export function App() {
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      cancelled = true;
       window.clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };

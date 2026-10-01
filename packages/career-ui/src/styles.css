@@ -9850,6 +9850,52 @@ table.contracts-table .col-access .action {
   white-space: nowrap;
 }
 
+/* Preflight payload tile is often wide enough for ~10 bays. auto-fill at 2.5rem
+   plus nowrap + overflow:visible paints "27,378 lb" across the next station.
+   En route already uses 5 equal columns; match that here. */
+.preflight-load-grid > div:has(> .load-schematic-stations) {
+  container-type: inline-size;
+  container-name: preflight-payload;
+}
+
+.preflight-load-grid .load-schematic-stations {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem 0.2rem;
+  padding-right: 0;
+}
+
+.preflight-load-grid .load-schematic-stations .load-schematic-station {
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  overflow: hidden;
+  container-type: inline-size;
+  padding-inline: 0.04rem;
+}
+
+.preflight-load-grid .load-schematic-stations .load-schematic-label,
+.preflight-load-grid .load-schematic-stations .load-schematic-station strong {
+  max-width: 100%;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.preflight-load-grid .load-schematic-stations .load-schematic-station strong {
+  font-size: clamp(0.48rem, 17cqi, 0.72rem);
+}
+
+@container preflight-payload (max-width: 22rem) {
+  .preflight-load-grid .load-schematic-stations {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@container preflight-payload (max-width: 16rem) {
+  .preflight-load-grid .load-schematic-stations {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .load-schematic-station::before {
   content: '';
   position: absolute;

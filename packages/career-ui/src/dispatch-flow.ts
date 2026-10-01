@@ -613,6 +613,16 @@ export function livePreflightWaitHint(input: {
   return `SimBridge is up, but no aircraft title yet — load the ${input.aircraftLabel} at the gate (cold & dark is fine).`;
 }
 
+/**
+ * Failures the Load card should keep retrying. A remount storm used to surface
+ * these as a sticky Preflight error, or drop the sample that actually landed.
+ */
+export function preflightBootstrapIsSoftRetry(message: string): boolean {
+  return /preflight sample already running|preflight paused|OFP inject in progress|Flight Watch owns SimBridge|Preflight sample timed out|operation was aborted|signal timed out/i.test(
+    message,
+  );
+}
+
 export function ofpAccepted(mission: Mission): boolean {
   const v = mission.lastOfpCheck?.verdict;
   return v === 'pass' || v === 'warn';

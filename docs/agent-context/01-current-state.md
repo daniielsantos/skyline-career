@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **200a64c0** / desktop **0.3.408** shipped: Align airline directory columns and cap desk auto-buy at three orders per port. Release: [v0.3.408](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.408).
+
+
 `main` **fbbda39c** / desktop **0.3.407** shipped: Put desk auto-buy beside the Jet-A tank and open Scout route hubs. Release: [v0.3.407](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.407).
 
 

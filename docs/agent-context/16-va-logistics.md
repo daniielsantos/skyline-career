@@ -1,5 +1,11 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-01: **Auto-haul desk teto 4** — Max/day e holds abertos (manual + auto) sobem de 3 para 4. Default continua 2; quem já está em 2 ou 3 não muda até escolher 4 no Config. Scout continua 8+8: a lista maior não traz o segundo porto se o lote livre dele paga menos.
+
+Atualizado 2026-10-01: **WH com stock fora do Scout** — sintoma = KMIA cheio e o board quase só KIAH. Causa = electronics/machinery estavam 100% nos holds de bridge (Scout só vê kg livre); Haul e Demand são 8 vagas da company, não do porto. Supplies livre de Miami perde para o lote maior de Houston nos mesmos destinos ≤40%. General só vira Haul se algum aeroporto a ≤1800 nm estiver ≤40% nessa commodity; Demand de general ainda entra se o pay couber no top 8. Sem mudança de código.
+
+Atualizado 2026-10-01: **Auto haul só na direção que paga mais** — sintoma = dois WH faziam ida e volta da mesma commodity, porque a mesa só olhava kg livre e espaço. Fix = o Auto haul só posta se o preço spot do hub de destino for maior que o da origem. Mover o armazém da company não muda esse preço, então a volta não abre até o mercado virar. Scout manual continua sem esse filtro.
+
 Atualizado 2026-10-01: **Directory simétrico** — sintoma = HQ/Pilots/Fleet de uma airline não caíam na mesma coluna da outra (nome + badge e “Proven” / cuts empurravam o flex). Fix = cada card da lista usa a mesma grade: nome fixo e oito colunas iguais. O botão à direita reserva a mesma largura.
 
 Atualizado 2026-09-22. **UI copy:** directory = **Airlines**, desk = **Crew**, personal = **Company** (rotas/API `/api/va*` e códigos `VA-` intactos).
@@ -437,7 +443,7 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 |--|--|
 | **O que** | Desk cria Internal Hauls automaticamente a partir de `listPortScoutBridgeSuggestions` |
 | **Quem voa** | Pilots humanos (board Hauls); AI **não** voa |
-| **Caps** | max 1–3/dia (default 2); max 3 open bridge holds; pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0) |
+| **Caps** | max 1–4/dia (default 2); max 4 open bridge holds (manual + auto); pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0) |
 | **Gates** | `va_listed` + **≥2 members** + Port FBO (Scout) + enabled |
 | **UI** | My VA Config → Auto-haul desk (enable, Max/day, Pay %, Wallet floor + tooltips); Hauls board unchanged |
 | **Não faz (v1)** | OD allowlist; Demand/Haul auto; IAP desk seat; snipar board global |

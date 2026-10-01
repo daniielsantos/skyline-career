@@ -8,7 +8,7 @@ import {
   claimPortConcession,
   PORT_CONCESSION_SHIPPED_KG,
 } from './career-port-concessions.js';
-import { createSeedEconomyWorld } from './career-economy.js';
+import { airportByIcao, createSeedEconomyWorld } from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import {
   depositCargoToWarehouse,
@@ -18,10 +18,14 @@ import {
 import { listDemandHolds } from './career-demand.js';
 import { economyDayIndex } from './career-weather.js';
 import {
+  clampMaxHaulsPerDay,
   tickVaAutoHaul,
   upsertVaAutoHaul,
+  VA_AUTO_HAUL_MAX_OPEN_HOLDS,
+  VA_AUTO_HAUL_MAX_PER_DAY_MAX,
   VA_AUTO_HAUL_MIN_MEMBERS,
 } from './career-va-auto-haul.js';
+import type { CommodityId } from './types/career-economy.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 
 function missionsAtSantos() {
@@ -48,6 +52,19 @@ function grantWh(
     lifetimeShippedKg: PORT_CONCESSION_SHIPPED_KG,
   });
   return id;
+}
+
+function setHubFill(
+  world: ReturnType<typeof createSeedEconomyWorld>,
+  icao: string,
+  commodityId: CommodityId,
+  fill: number,
+) {
+  const pile = airportByIcao(world, icao)?.inventory?.[commodityId];
+  if (!pile || pile.capacityKg <= 0) {
+    throw new Error(`no ${commodityId} pile at ${icao}`);
+  }
+  pile.stockKg = Math.floor(pile.capacityKg * fill);
 }
 
 describe('tickVaAutoHaul', () => {
@@ -93,6 +110,8 @@ describe('tickVaAutoHaul', () => {
       avgCostUsdPerKg: 1.2,
       tick: world.tick,
     });
+    setHubFill(world, 'SBGR', 'general', 0.95);
+    setHubFill(world, 'SBKP', 'general', 0.1);
     upsertVaAutoHaul(state, { enabled: true, maxHaulsPerDay: 2 });
 
     const day = economyDayIndex(world.tick);
@@ -118,5 +137,45 @@ describe('tickVaAutoHaul', () => {
     });
     assert.equal(capped.posted, 0);
     assert.equal(capped.skipped, 'daily_cap');
+  });
+
+  it('does not post a bridge toward the cheaper hub', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    grantWh(state, 'SBKP');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 1_500,
+      avgCostUsdPerKg: 1.2,
+      tick: world.tick,
+    });
+    setHubFill(world, 'SBGR', 'general', 0.1);
+    setHubFill(world, 'SBKP', 'general', 0.95);
+    upsertVaAutoHaul(state, { enabled: true, maxHaulsPerDay: 2 });
+
+    const result = tickVaAutoHaul(state, world, {
+      companyId: LOCAL_COMPANY_ID,
+      vaListed: true,
+      memberCount: 3,
+    });
+    assert.equal(result.posted, 0);
+    assert.equal(result.skipped, 'no_viable_spread');
+    assert.equal(
+      listDemandHolds(state).filter((h) => (h.kind ?? 'demand') === 'bridge')
+        .length,
+      0,
+    );
+  });
+
+  it('desk ceiling is 4 posts a day and 4 open bridge holds', () => {
+    assert.equal(VA_AUTO_HAUL_MAX_PER_DAY_MAX, 4);
+    assert.equal(VA_AUTO_HAUL_MAX_OPEN_HOLDS, 4);
+    assert.equal(clampMaxHaulsPerDay(4), 4);
+    assert.equal(clampMaxHaulsPerDay(5), 4);
+    const { state } = missionsAtSantos();
+    upsertVaAutoHaul(state, { maxHaulsPerDay: 4 });
+    assert.equal(state.vaAutoHaul?.maxHaulsPerDay, 4);
   });
 });

@@ -13357,8 +13357,8 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-fbo-main {
-  /* Taller stage so desk + Scout tables fit without nested scroll. */
-  --ports-stage-h: min(74vh, 50rem);
+  /* Tank, desk, and the Scout table share one stage. 50rem clipped the last rows and left a bar. */
+  --ports-stage-h: min(84vh, 58rem);
 }
 
 .ports-fbo-main .ports-fbo-panel {

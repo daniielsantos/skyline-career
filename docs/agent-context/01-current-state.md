@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **5bfb47b0** / desktop **0.3.414** shipped: Show Demand reach and Jet-A tank size on the Port FBO upgrade. Release: [v0.3.414](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.414).
+
+
 `main` **a4c06356** / desktop **0.3.413** shipped: Replace an auto-haul when the dest hub stops paying more, without spending another daily post. Release: [v0.3.413](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.413).
 
 

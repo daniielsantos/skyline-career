@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **0ad4a3d3** / desktop **0.3.420** shipped: Show route, pay, and expiry for the other Manifest holds that join the flight. Release: [v0.3.420](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.420).
+
+
 `main` **5dfab1d0** / desktop **0.3.419** shipped: Let Add keep a cargo stop on the aircraft already reserved for that pilot. Release: [v0.3.419](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.419).
 
 

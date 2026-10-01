@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **5dfab1d0** / desktop **0.3.419** shipped: Let Add keep a cargo stop on the aircraft already reserved for that pilot. Release: [v0.3.419](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.419).
+
+
 `main` **86c02ffd** / desktop **0.3.418** shipped: Show route, pay, and an Add button for each later cargo contract on Dispatch. Release: [v0.3.418](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.418).
 
 

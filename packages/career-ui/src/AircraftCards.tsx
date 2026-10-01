@@ -1541,7 +1541,7 @@ export function HangarAircraftCard(props: {
             ]}
           />
           <ul className="aircraft-card-specs">
-            <li>
+            <li className="hangar-spec-fuel">
               <span>Fuel</span>
               <strong title={`${formatMassExact(acf.fuelKg, weightSystem)} / ${formatMassExact(acf.fuelCapacityKg, weightSystem)}`}>
                 {formatMassExact(acf.fuelKg, weightSystem)} /{' '}
@@ -1585,11 +1585,11 @@ export function HangarAircraftCard(props: {
                     : '—'}
               </strong>
             </li>
-            <li>
+            <li className="hangar-spec-hours">
               <span>Hours</span>
               <strong title={hoursMxTooltip(hoursMxMult)}>
-                {Math.round(acf.hoursAirframe ?? 0)}/
-                {Math.round(acf.hoursEngine ?? 0)} h
+                <span>{Math.round(acf.hoursAirframe ?? 0)}</span>
+                <span>/ {Math.round(acf.hoursEngine ?? 0)} h</span>
               </strong>
             </li>
             <li>

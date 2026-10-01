@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **7b5955da** / desktop **0.3.405** shipped: Let a VA member buy port cargo with the home Cargo Ops ladder the Hangar already shows. Release: [v0.3.405](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.405).
+
+
 `main` **c520943e** / desktop **0.3.404** shipped: Hold a single Preflight sample so the pipe stays open long enough to land the card, and keep station weights inside their cells. Release: [v0.3.404](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.404).
 
 

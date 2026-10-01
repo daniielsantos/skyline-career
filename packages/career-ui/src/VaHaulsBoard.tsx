@@ -571,6 +571,13 @@ export function VaHaulsBoard(props: Props) {
                   const busyThis = busyHoldId === hold.id;
                   const usePrepare = shouldPrepareHold(hold, selected ?? null);
                   const addToTrip = canAddHoldToTrip(hold);
+                  const openFlight =
+                    props.tripHost != null && !addToTrip
+                      ? hold.originIcao.trim().toUpperCase() !==
+                        props.tripHost.originIcao.trim().toUpperCase()
+                        ? `Open flight leaves from ${props.tripHost.originIcao}. This hold leaves from ${hold.originIcao.trim().toUpperCase()}.`
+                        : `This flight already stops at ${hold.destIcao.trim().toUpperCase()}.`
+                      : null;
                   const needsPartial = holdNeedsPartialLoad(
                     hold,
                     selected ?? null,
@@ -690,9 +697,15 @@ export function VaHaulsBoard(props: Props) {
                         <button
                           type="button"
                           className="action"
-                          disabled={pageBusy || (!addToTrip && !selectedId)}
+                          disabled={
+                            pageBusy ||
+                            Boolean(openFlight) ||
+                            (!addToTrip && !selectedId)
+                          }
                           title={
-                            addToTrip
+                            openFlight
+                              ? openFlight
+                              : addToTrip
                               ? 'This flight is still open. The hold rides along and delivers at its own stop.'
                               : usePrepare
                               ? needsPartial
@@ -700,13 +713,15 @@ export function VaHaulsBoard(props: Props) {
                                 : `Open Dispatch — ferry to ${origin} before Accept`
                               : 'Dispatch the full hold on this aircraft'
                           }
-                          onClick={() =>
-                            addToTrip
-                              ? void addHoldToTrip(hold)
-                              : usePrepare
-                                ? prepareHold(hold)
-                                : void acceptHold(hold)
-                          }
+                          onClick={() => {
+                            if (openFlight) return;
+                            if (addToTrip) {
+                              void addHoldToTrip(hold);
+                              return;
+                            }
+                            if (usePrepare) prepareHold(hold);
+                            else void acceptHold(hold);
+                          }}
                         >
                           {busyThis
                             ? addToTrip
@@ -714,7 +729,9 @@ export function VaHaulsBoard(props: Props) {
                               : usePrepare
                                 ? '…'
                                 : 'Accepting…'
-                            : addToTrip
+                            : openFlight
+                              ? 'Open flight'
+                              : addToTrip
                               ? 'Add to flight'
                               : usePrepare
                                 ? 'Prepare'

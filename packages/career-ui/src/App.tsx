@@ -44,6 +44,8 @@ import {
   postSettle,
   postLeaveFreight,
   postAddCargoStop,
+  postAddDeskHold,
+  fetchVaHauls,
   postSelectHub,
   fetchAircraftMarket,
   AIRCRAFT_MARKET_NEAR_NM,
@@ -6931,6 +6933,34 @@ export function App() {
   );
   activeMissionRef.current = activeMission;
 
+  const [openDeskHolds, setOpenDeskHolds] = useState<VaHaulHold[]>([]);
+  const [stagingJoinHoldIds, setStagingJoinHoldIds] = useState<string[]>([]);
+  useEffect(() => {
+    const preparing = Boolean(staging?.deskHold);
+    const accepted =
+      activeMission?.status === 'accepted' && !activeMission.throughHostId;
+    if (!preparing && !accepted) {
+      setOpenDeskHolds([]);
+      return;
+    }
+    let cancel = false;
+    void fetchVaHauls()
+      .then((board) => {
+        if (!cancel) setOpenDeskHolds(board.openHolds ?? []);
+      })
+      .catch(() => {
+        if (!cancel) setOpenDeskHolds([]);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [
+    staging?.deskHold?.id,
+    activeMission?.id,
+    activeMission?.status,
+    activeMission?.throughHostId,
+  ]);
+
   // Independent SimBridge probe — does not require Watch to be running.
   // When Watch is already sampling, skip probing entirely (server would only
   // mirror Watch anyway, and the extra poll re-rendered the status bar).
@@ -11255,6 +11285,7 @@ export function App() {
     setStagingFerryOpen(false);
     setCharterManifest(null);
     setStaging(draft);
+    setStagingJoinHoldIds([]);
     setPreferredAircraft(selectedAircraft.aircraftClassId);
     setError(null);
     goToTab('staging');
@@ -11880,6 +11911,29 @@ export function App() {
         setWatchAutoPaused(false);
         setSimbriefLaunchUrl(null);
         goToTab('staging');
+        const joinIds = stagingJoinHoldIds.slice();
+        setStagingJoinHoldIds([]);
+        const addedDests: string[] = [];
+        for (const holdId of joinIds) {
+          try {
+            const added = await postAddDeskHold({
+              missionId: result.mission.id,
+              holdId,
+              companyId: opsCompanyId,
+            });
+            if (added.fleet) paintOpsMutationFleet(added.fleet, opsCompanyId);
+            if (added.missions?.length) {
+              setMissions(added.missions.slice().reverse());
+            }
+            const dest = openDeskHolds.find((row) => row.id === holdId)?.destIcao;
+            if (dest) addedDests.push(dest);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            setToastKind('fail');
+            setToast(message);
+            return;
+          }
+        }
         const payNote =
           hold.kind === 'bridge' &&
           'pilotPayUsd' in result &&
@@ -11893,7 +11947,9 @@ export function App() {
           (line) => deskHoldEffectiveLoadKg(line) > 0,
         ).length;
         setToast(
-          `${holdCount > 1 ? `${holdCount} desk holds` : 'Desk hold'} ${result.mission.originIcao}→${result.mission.destIcao} · ${formatTonnes(result.kg)}${payNote} · open Dispatch`,
+          addedDests.length > 0
+            ? `Desk hold ${result.mission.originIcao}→${result.mission.destIcao} · also ${addedDests.join(', ')}${payNote}`
+            : `${holdCount > 1 ? `${holdCount} desk holds` : 'Desk hold'} ${result.mission.originIcao}→${result.mission.destIcao} · ${formatTonnes(result.kg)}${payNote} · open Dispatch`,
         );
       });
       return;
@@ -12789,7 +12845,41 @@ export function App() {
     }, { sync: { missions: true, airport: true } });
   }
 
+  async function onAddDeskHoldToFlight(holdId: string) {
+    const host = activeMissionRef.current;
+    if (!host) return;
+    const hold = openDeskHolds.find((row) => row.id === holdId);
+    await run(async () => {
+      const home = homeCompanyIdRef.current?.trim();
+      const active = activeCompanyIdRef.current?.trim();
+      const opsCompanyId =
+        resolveOpsCompanyId(host.aircraftId) || active || home || undefined;
+      const result = await postAddDeskHold({
+        missionId: host.id,
+        holdId,
+        companyId: opsCompanyId,
+      });
+      if (result.fleet) {
+        const holdingVa = Boolean(home && active && home !== active);
+        if (holdingVa) setVaSessionFleet(result.fleet);
+        else setFleet(result.fleet);
+      }
+      if (result.missions?.length) {
+        setMissions(result.missions.slice().reverse());
+      }
+      setOpenDeskHolds((current) => current.filter((row) => row.id !== holdId));
+      setStagingJoinHoldIds((current) => current.filter((id) => id !== holdId));
+      setToast(
+        `Added ${hold?.destIcao ?? 'the next stop'}. The first OFP carries the combined load.`,
+      );
+    }, { sync: { missions: true } });
+  }
+
   async function onAddCargoStop(riderMissionId: string) {
+    if (riderMissionId.startsWith('hold:')) {
+      await onAddDeskHoldToFlight(riderMissionId.slice('hold:'.length));
+      return;
+    }
     const host = activeMissionRef.current;
     if (!host) return;
     await run(async () => {
@@ -12842,6 +12932,15 @@ export function App() {
         destIcao: row.destIcao,
         cargoKg: row.cargoKg,
       }));
+  }
+
+  function deskHoldsForTrip(originIcao: string, taken: Set<string>, skipIds: Set<string>) {
+    const origin = originIcao.trim().toUpperCase();
+    return openDeskHolds.filter((hold) => {
+      if (skipIds.has(hold.id)) return false;
+      if (hold.originIcao.trim().toUpperCase() !== origin) return false;
+      return !taken.has(hold.destIcao.trim().toUpperCase());
+    });
   }
 
   async function onSettle(mission: Mission) {
@@ -19980,6 +20079,49 @@ export function App() {
                       );
                     })}
                   </ul>
+                  {(() => {
+                    const origin = staging.originIcao;
+                    const taken = new Set<string>([
+                      staging.destIcao.toUpperCase(),
+                      ...deskHoldLines(staging).map((line) =>
+                        staging.destIcao.toUpperCase(),
+                      ),
+                    ]);
+                    const skip = new Set(deskHoldLines(staging).map((line) => line.id));
+                    const others = deskHoldsForTrip(origin, taken, skip);
+                    if (others.length === 0) return null;
+                    return (
+                      <div className="staging-line-meta">
+                        <p className="muted">
+                          Other holds from {origin}. Checked ones join this
+                          flight when you accept.
+                        </p>
+                        <ul className="staging-lines">
+                          {others.map((hold) => (
+                            <li key={hold.id} className="staging-line staging-line-compact">
+                              <label>
+                                <input
+                                  type="checkbox"
+                                  checked={stagingJoinHoldIds.includes(hold.id)}
+                                  disabled={busy}
+                                  onChange={(event) => {
+                                    const on = event.target.checked;
+                                    setStagingJoinHoldIds((current) =>
+                                      on
+                                        ? [...current, hold.id]
+                                        : current.filter((id) => id !== hold.id),
+                                    );
+                                  }}
+                                />{' '}
+                                {hold.destIcao} · {hold.commodityId} ·{' '}
+                                {formatTonnes(hold.kg)}
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <>
@@ -20398,7 +20540,24 @@ export function App() {
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}
               onLeaveFreight={(m) => void onLeaveFreight(m)}
-              cargoStopChoices={cargoStopChoices(activeMission)}
+              cargoStopChoices={[
+                ...cargoStopChoices(activeMission),
+                ...deskHoldsForTrip(
+                  activeMission.originIcao,
+                  new Set([
+                    activeMission.destIcao.toUpperCase(),
+                    ...(activeMission.throughLoads ?? []).map((row) =>
+                      row.destIcao.toUpperCase(),
+                    ),
+                  ]),
+                  new Set(),
+                ).map((hold) => ({
+                  id: `hold:${hold.id}`,
+                  destIcao: hold.destIcao,
+                  cargoKg: hold.kg,
+                  label: `${hold.destIcao} · ${hold.commodityId} · ${formatTonnes(hold.kg)}`,
+                })),
+              ]}
               onAddCargoStop={(id) => void onAddCargoStop(id)}
               onCrewDispatch={(m, crewMemberId) =>
                 void onCrewDispatchMission(m, crewMemberId)

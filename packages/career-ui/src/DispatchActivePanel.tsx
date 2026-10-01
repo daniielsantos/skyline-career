@@ -115,7 +115,12 @@ function holdPositionOk(
 
 function CargoTripStops(props: {
   mission: Mission;
-  choices: Array<{ id: string; destIcao: string; cargoKg: number }>;
+  choices: Array<{
+    id: string;
+    destIcao: string;
+    cargoKg: number;
+    label?: string;
+  }>;
   busy: boolean;
   formatTonnes: (kg: number) => string;
   onAdd?: (riderMissionId: string) => void;
@@ -153,7 +158,8 @@ function CargoTripStops(props: {
             <option value="">Choose a contract</option>
             {props.choices.map((choice) => (
               <option key={choice.id} value={choice.id}>
-                {choice.destIcao} · {props.formatTonnes(choice.cargoKg)}
+                {choice.label ??
+                  `${choice.destIcao} · ${props.formatTonnes(choice.cargoKg)}`}
               </option>
             ))}
           </select>
@@ -178,7 +184,12 @@ export function DispatchActivePanel(props: {
   formatDeadline: (tick: number, hours: number) => string;
   aircraftClassLabel: (id: string) => string;
   /** Other accepted contracts that can ride this leg. */
-  cargoStopChoices?: Array<{ id: string; destIcao: string; cargoKg: number }>;
+  cargoStopChoices?: Array<{
+    id: string;
+    destIcao: string;
+    cargoKg: number;
+    label?: string;
+  }>;
   onAddCargoStop?: (riderMissionId: string) => void;
   /** Structural cargo ceiling for this mission (kg) — bar denominator. */
   missionMaxCargoKg: (mission: Mission) => number;

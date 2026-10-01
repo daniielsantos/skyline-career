@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **74f44fbc** / desktop **0.3.410** shipped: Suggest Scout bridges only toward the hub that pays more, and keep an auto-haul cap of four through save. Release: [v0.3.410](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.410).
+
+
 `main` **6319b2d5** / desktop **0.3.409** shipped: Send auto-haul only toward the hub that pays more, raise the desk cap to four, and give the FBO stage room for Scout. Release: [v0.3.409](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.409).
 
 

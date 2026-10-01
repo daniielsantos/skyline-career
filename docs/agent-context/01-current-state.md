@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **1aca784e** / desktop **0.3.417** shipped: Add later desk holds from the Manifest, and block Prepare when the hold leaves from another airport. Release: [v0.3.417](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.417).
+
+
 `main` **b24110db** / desktop **0.3.416** shipped: Let one flight carry cargo for later stops, and add Scout desk holds before SimBrief. Release: [v0.3.416](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.416).
 
 

@@ -13196,15 +13196,8 @@ span.dispatch-route-hub-dest {
   background: color-mix(in srgb, var(--surface-2, #121820) 88%, transparent);
   padding: 0.35rem 0.65rem 0.55rem;
 }
-.ports-desk-details > summary {
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-  list-style: none;
-  padding: 0.25rem 0;
-}
-.ports-desk-details > summary::-webkit-details-marker {
-  display: none;
+.ports-desk-details > .ports-scout-title {
+  margin: 0.1rem 0 0.45rem;
 }
 .ports-desk-details .ports-desk-panel {
   margin: 0.35rem 0 0;
@@ -13231,6 +13224,12 @@ span.dispatch-route-hub-dest {
 .ports-scout-filters .fbo-icao-chip {
   font-size: 0.75rem;
   padding: 0.18rem 0.55rem;
+}
+.ports-scout-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  white-space: nowrap;
 }
 
 .ports-desk-panel {
@@ -13373,6 +13372,30 @@ span.dispatch-route-hub-dest {
 
 .ports-fbo-panel .ports-scout-desk {
   margin: 0;
+}
+
+.ports-fbo-top {
+  display: grid;
+  grid-template-columns: max-content minmax(18rem, 1fr);
+  gap: 0.75rem 2rem;
+  align-items: start;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ports-fbo-top > .ports-jeta {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.ports-fbo-top > .ports-desk-details {
+  grid-column: 2;
+  margin: 0;
+  min-width: 0;
+}
+
+.ports-fbo-top:not(:has(.ports-jeta)) > .ports-desk-details {
+  grid-column: 1 / -1;
 }
 
 .ports-jeta {

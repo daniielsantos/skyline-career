@@ -1,5 +1,9 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-01: **Scout Route abre o hub** — origem e destino na coluna Route são o mesmo link do quadro de Demand (`onOpenAirport`). O clique no ICAO não seleciona a linha.
+
+Atualizado 2026-10-01: **Desk auto-buy à direita do tanque, sempre aberto** — o bloco saiu do accordion no fim da mesa e ficou na coluna ao lado do Jet-A. As ordens e o formulário ficam visíveis. Membro continua só lendo; Pause, Remove e Add ficam com owner ou dispatcher.
+
 Atualizado 2026-10-01: **Desenho do tanque Jet-A** — o vaso em pé virou um cilindro deitado. O nível sobe por baixo, com medidor em cima e boia na superfície. O número ao lado não muda.
 
 Atualizado 2026-10-01: **Tanque Jet-A da VA escala com a roster** — sintoma = P3 (28 t / 61,7 klb) acaba na primeira onda de widebodies. Causa = um tanque por concessão, tamanho fixo de operador solo. Fix = capacidade = base do nível × roster (`company_members`, piso 1, teto 4). Quem sai não apaga o Jet-A já pago: Buy e Stock novo veem sala 0 até os voos puxarem o nível para baixo do teto. Devolução de voo cancelado soma o kg de volta, sem cortar o excedente. Linhas de Stock (2,5 / 5 / 8 t) e `PORT_JET_A_HAUL_CAP` 18 não mudam.

@@ -6872,6 +6872,16 @@ export function App() {
     saveDevMode(devMode);
   }, [devMode]);
 
+  // Dev Mode paints every Cargo Ops tier open on the next state read, without
+  // saving. Turning it off has to reload that ladder or Hangar stays "open"
+  // while Port buy still sees the saved lock.
+  const devModeOverlayRef = useRef(devMode);
+  useEffect(() => {
+    const wasOn = devModeOverlayRef.current;
+    devModeOverlayRef.current = devMode;
+    if (wasOn && !devMode) void refresh();
+  }, [devMode, refresh]);
+
   useEffect(() => {
     if (!devMode) return;
     let cancelled = false;
@@ -8418,7 +8428,9 @@ export function App() {
 
   async function onDebugUnlockCargoOps() {
     await run(async () => {
-      const result = await postDebugUnlockCargoOps();
+      const result = await postDebugUnlockCargoOps({
+        companyId: homeCompanyId ?? activeCompanyId,
+      });
       setCargoOps(result.cargoOps ?? null);
       setToastKind('ok');
       setToast('Cargo Ops unlocked (all commodities)');

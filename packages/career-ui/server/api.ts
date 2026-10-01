@@ -9642,9 +9642,24 @@ export function createCareerApiServer(port = 8787) {
         }
         try {
           const alliedCompanyIds = await portOperatorAlliedCompanyIds(req);
+          // Hangar Cargo Ops is the pilot home ladder. Buy must use that
+          // same ladder — the ops company file can still be locked.
+          const buyProgPeek = await withCareerRead(
+            (_world, missions) => ({
+              cargoOps: missions.cargoOps,
+              classOps: missions.classOps,
+            }),
+            { companyId: ports_buyCompanyId },
+          );
+          const buyProgression = await resolvePilotProgressionOps(
+            req,
+            ports_buyCompanyId,
+            buyProgPeek,
+          );
           const result = await withCareerWrite((world, missions) => {
             assertCompanyCreditAllowsOps(missions);
-            return withDevCargoOpsUnlock(req, missions, () => {
+            return withProgressionGates(missions, buyProgression, () =>
+              withDevCargoOpsUnlock(req, missions, () => {
               const bought = buyPortListing(missions, world, {
                 listingId: body.listingId!,
                 kg: Number(body.kg),
@@ -9670,7 +9685,8 @@ export function createCareerApiServer(port = 8787) {
                 }),
                 warehouses: playerWarehouseSnapshot(missions, world),
               };
-            });
+            }),
+            );
           }, {
             persist: 'company',
             persistPortListingId: body.listingId,
@@ -12983,7 +12999,21 @@ export function createCareerApiServer(port = 8787) {
           send(res, 403, { error: 'Dev Mode is required' });
           return;
         }
-        const unlockCompanyId = companyIdFromRequest(req);
+        const body = (await readBody(req)) as { companyId?: string };
+        const headerCompanyId = companyIdFromRequest(req, body.companyId);
+        const peek = await withCareerRead(
+          (_world, missions) => ({
+            cargoOps: missions.cargoOps,
+            classOps: missions.classOps,
+          }),
+          { companyId: headerCompanyId },
+        );
+        const progression = await resolvePilotProgressionOps(
+          req,
+          headerCompanyId,
+          peek,
+        );
+        const unlockCompanyId = progression.homeCompanyId || headerCompanyId;
         const payload = await withCareerWrite(
           (_world, missions) => {
             missions.cargoOps = unlockAllCareerCargoOps(missions.cargoOps);

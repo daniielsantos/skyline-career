@@ -2514,11 +2514,13 @@ export function postDebugUnlockClassOps() {
   });
 }
 
-/** Dev-only — persist unlock of every Cargo Ops commodity. */
-export function postDebugUnlockCargoOps() {
+/** Dev-only — persist unlock of every Cargo Ops commodity on the home ladder. */
+export function postDebugUnlockCargoOps(opts?: { companyId?: string }) {
   return api<{ cargoOps: CareerCargoOps }>('/api/debug/unlock-cargo-ops', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      ...(opts?.companyId ? { companyId: opts.companyId } : {}),
+    }),
   });
 }
 

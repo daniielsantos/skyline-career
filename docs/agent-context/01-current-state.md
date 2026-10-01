@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **e7fa5ac5** / desktop **0.3.411** shipped: Count 777F main-deck stations as cargo and keep the wider ZFW cap on every 777. Release: [v0.3.411](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.411).
+
+
 `main` **74f44fbc** / desktop **0.3.410** shipped: Suggest Scout bridges only toward the hub that pays more, and keep an auto-haul cap of four through save. Release: [v0.3.410](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.410).
 
 

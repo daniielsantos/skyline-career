@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **e3c35c77** / desktop **0.3.421** shipped: Show every Manifest desk hold in one trip-style list. Release: [v0.3.421](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.421).
+
+
 `main` **0ad4a3d3** / desktop **0.3.420** shipped: Show route, pay, and expiry for the other Manifest holds that join the flight. Release: [v0.3.420](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.420).
 
 

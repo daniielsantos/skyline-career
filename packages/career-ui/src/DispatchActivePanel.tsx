@@ -117,19 +117,28 @@ function CargoTripStops(props: {
   mission: Mission;
   choices: Array<{
     id: string;
+    originIcao: string;
     destIcao: string;
     cargoKg: number;
-    label?: string;
+    commodityId: string;
+    kind: string;
+    distanceNm?: number;
+    payUsd?: number;
+    expiresAtTick?: number;
+    by?: string;
   }>;
   busy: boolean;
   formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
+  formatDeadline: (tick: number, hours: number) => string;
+  continuousHours: number;
   onAdd?: (riderMissionId: string) => void;
 }) {
   const stops = props.mission.throughLoads ?? [];
   const room = stops.length < 3;
   if (stops.length === 0 && props.choices.length === 0) return null;
   return (
-    <div className="dispatch-freight-hold" role="status">
+    <div className="dispatch-freight-hold dispatch-trip" role="status">
       <strong>
         Trip · {props.mission.destIcao}
         {stops.map((row) => ` → ${row.destIcao}`).join('')}
@@ -144,26 +153,65 @@ function CargoTripStops(props: {
         next stop waits in the yard there until you depart.
       </span>
       {room && props.choices.length > 0 && props.onAdd ? (
-        <label className="dispatch-trip-add">
-          Add a stop
-          <select
-            disabled={props.busy}
-            defaultValue=""
-            onChange={(event) => {
-              const id = event.target.value;
-              event.target.value = '';
-              if (id) props.onAdd?.(id);
-            }}
-          >
-            <option value="">Choose a contract</option>
-            {props.choices.map((choice) => (
-              <option key={choice.id} value={choice.id}>
-                {choice.label ??
-                  `${choice.destIcao} · ${props.formatTonnes(choice.cargoKg)}`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <ul className="dispatch-trip-list">
+          {props.choices.map((choice) => {
+            const dist =
+              typeof choice.distanceNm === 'number' && choice.distanceNm > 0
+                ? `${Math.round(choice.distanceNm).toLocaleString()} nm`
+                : '—';
+            const commodity = choice.commodityId
+              ? choice.commodityId.charAt(0).toUpperCase() +
+                choice.commodityId.slice(1)
+              : 'Cargo';
+            return (
+              <li key={choice.id} className="dispatch-trip-row">
+                <div className="dispatch-trip-id">
+                  <strong>
+                    {choice.originIcao} → {choice.destIcao}
+                  </strong>
+                  <span>{choice.kind}</span>
+                </div>
+                <div className="dispatch-trip-stats">
+                  <span>
+                    <em>Cargo</em> {commodity}
+                  </span>
+                  <span>
+                    <em>Mass</em> {props.formatTonnes(choice.cargoKg)}
+                  </span>
+                  <span>
+                    <em>Dist</em> {dist}
+                  </span>
+                  <span>
+                    <em>Pay</em>{' '}
+                    {typeof choice.payUsd === 'number'
+                      ? props.formatMoney(choice.payUsd)
+                      : '—'}
+                  </span>
+                  <span>
+                    <em>Expires</em>{' '}
+                    {typeof choice.expiresAtTick === 'number'
+                      ? props.formatDeadline(
+                          choice.expiresAtTick,
+                          props.continuousHours,
+                        )
+                      : '—'}
+                  </span>
+                  <span>
+                    <em>By</em> {choice.by?.trim() || '—'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="action compact"
+                  disabled={props.busy}
+                  onClick={() => props.onAdd?.(choice.id)}
+                >
+                  Add
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       ) : null}
     </div>
   );
@@ -186,9 +234,15 @@ export function DispatchActivePanel(props: {
   /** Other accepted contracts that can ride this leg. */
   cargoStopChoices?: Array<{
     id: string;
+    originIcao: string;
     destIcao: string;
     cargoKg: number;
-    label?: string;
+    commodityId: string;
+    kind: string;
+    distanceNm?: number;
+    payUsd?: number;
+    expiresAtTick?: number;
+    by?: string;
   }>;
   onAddCargoStop?: (riderMissionId: string) => void;
   /** Structural cargo ceiling for this mission (kg) — bar denominator. */
@@ -564,6 +618,9 @@ export function DispatchActivePanel(props: {
           choices={props.cargoStopChoices ?? []}
           busy={props.busy}
           formatTonnes={props.formatTonnes}
+          formatMoney={props.formatMoney}
+          formatDeadline={props.formatDeadline}
+          continuousHours={props.continuousHours}
           onAdd={props.onAddCargoStop}
         />
       ) : (mission.throughLoads?.length ?? 0) > 0 ? (

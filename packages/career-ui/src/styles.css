@@ -14868,6 +14868,60 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   color: #f0a35a;
 }
 
+.dispatch-trip {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.dispatch-trip-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.dispatch-trip-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.dispatch-trip-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.dispatch-trip-id span {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.dispatch-trip-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+}
+
+.dispatch-trip-stats em {
+  display: block;
+  font-style: normal;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
 .payload-lab-layout-chip {
   display: flex;
   flex-wrap: wrap;

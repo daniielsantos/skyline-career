@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-01: **Add a stop vira lista** — o combo no Dispatch só mostrava destino e peso. Cada hold do mesmo aeroporto aparece numa linha (rota, tipo, commodity, massa, nm, pay, prazo, quem postou) com **Add**.
+
 Atualizado 2026-10-01: **Manifest lista os outros holds** — sintoma = Prepare abria o Manifest e o jogador voltava ao desk para o Add to flight; um hold de outro aeroporto continuava com Prepare ativo. Causa = o Manifest só conhecia o hold da rota, e o desk tratava origem diferente como um voo novo. Fix = no Manifest, holds do mesmo aeroporto e outro destino podem ser marcados e entram no Accept; no Dispatch o Add a stop também lista esses holds. Com um voo aberto, hold de outra origem fica **Open flight**, sem Prepare.
 
 Atualizado 2026-10-01: **Hold do desk entra no voo aberto** — sintoma = o Scout manda o contrato pro desk, mas o segundo Accept recusava com “finish or cancel” e o menu Add a stop ficava vazio. Causa = o desk só sabia abrir um voo novo, e o avião já estava nesse voo. Fix = no desk, com o voo ainda `accepted` (antes do SimBrief), hold do mesmo origem e outro destino mostra **Add to flight**. Isso consome o hold, cria o contrato e põe em `throughLoads`. O avião continua no primeiro voo. Mesmo destino segue no primeiro Accept. Spec abaixo do parágrafo da trip.

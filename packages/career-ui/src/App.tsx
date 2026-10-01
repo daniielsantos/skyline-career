@@ -12929,8 +12929,20 @@ export function App() {
       })
       .map((row) => ({
         id: row.id,
+        originIcao: row.originIcao,
         destIcao: row.destIcao,
         cargoKg: row.cargoKg,
+        commodityId: row.commodityId,
+        kind: row.warehouseBridge
+          ? 'Bridge'
+          : row.warehouseHaul
+            ? 'Wide haul'
+            : row.demandOrderId
+              ? 'Demand'
+              : 'Freight',
+        distanceNm: row.distanceNm,
+        payUsd: row.payUsd,
+        expiresAtTick: row.deadlineTick,
       }));
   }
 
@@ -20551,12 +20563,34 @@ export function App() {
                     ),
                   ]),
                   new Set(),
-                ).map((hold) => ({
-                  id: `hold:${hold.id}`,
-                  destIcao: hold.destIcao,
-                  cargoKg: hold.kg,
-                  label: `${hold.destIcao} · ${hold.commodityId} · ${formatTonnes(hold.kg)}`,
-                })),
+                ).map((hold) => {
+                  const kind = hold.kind ?? 'demand';
+                  const payUsd =
+                    kind === 'bridge'
+                      ? (hold.pilotPayUsd ?? 0) > 0
+                        ? hold.pilotPayUsd
+                        : undefined
+                      : hold.unitPriceUsd != null
+                        ? Math.round(hold.unitPriceUsd * hold.kg)
+                        : undefined;
+                  return {
+                    id: `hold:${hold.id}`,
+                    originIcao: hold.originIcao,
+                    destIcao: hold.destIcao,
+                    cargoKg: hold.kg,
+                    commodityId: hold.commodityId,
+                    kind:
+                      kind === 'bridge'
+                        ? 'Bridge'
+                        : kind === 'haul'
+                          ? 'Wide haul'
+                          : 'Demand',
+                    distanceNm: hold.distanceNm,
+                    ...(typeof payUsd === 'number' ? { payUsd } : {}),
+                    expiresAtTick: hold.expiresAtTick,
+                    by: hold.heldByName ?? undefined,
+                  };
+                })}
               ]}
               onAddCargoStop={(id) => void onAddCargoStop(id)}
               onCrewDispatch={(m, crewMemberId) =>

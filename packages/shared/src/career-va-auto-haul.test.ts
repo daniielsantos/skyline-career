@@ -20,6 +20,7 @@ import {
   WAREHOUSE_CAPACITY_KG,
 } from './career-warehouse-stock.js';
 import { listDemandHolds } from './career-demand.js';
+import { holdWarehouseBridge } from './career-warehouse-bridge.js';
 import { economyDayIndex } from './career-weather.js';
 import {
   clampMaxHaulsPerDay,
@@ -171,6 +172,103 @@ describe('tickVaAutoHaul', () => {
         .length,
       0,
     );
+  });
+
+  const deskOpts = {
+    companyId: LOCAL_COMPANY_ID,
+    vaListed: true,
+    memberCount: 3,
+  };
+
+  it('replaces a stale auto hold without spending another daily post', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    grantWh(state, 'SBKP');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    for (const commodityId of ['general', 'supplies'] as const) {
+      depositCargoToWarehouse(state, {
+        icao: 'SBGR',
+        commodityId,
+        kg: 1_500,
+        avgCostUsdPerKg: 1.2,
+        tick: world.tick,
+      });
+      setHubFill(world, 'SBGR', commodityId, 0.95);
+      setHubFill(world, 'SBKP', commodityId, 0.1);
+    }
+    upsertVaAutoHaul(state, { enabled: true, maxHaulsPerDay: 1 });
+
+    const first = tickVaAutoHaul(state, world, deskOpts);
+    assert.equal(first.posted, 1);
+    assert.equal(first.retired, 0);
+    const posted = listDemandHolds(state).find(
+      (h) => (h.kind ?? 'demand') === 'bridge' && h.heldByAuto === true,
+    );
+    assert.ok(posted);
+    const staleCommodity = posted.commodityId;
+    assert.equal(state.vaAutoHaul?.postedToday, 1);
+
+    setHubFill(world, 'SBGR', staleCommodity, 0.1);
+    setHubFill(world, 'SBKP', staleCommodity, 0.95);
+    const swapped = tickVaAutoHaul(state, world, deskOpts);
+    assert.equal(swapped.retired, 1);
+    assert.equal(swapped.posted, 1);
+    assert.equal(state.vaAutoHaul?.postedToday, 1);
+    const bridges = listDemandHolds(state).filter(
+      (h) => (h.kind ?? 'demand') === 'bridge',
+    );
+    assert.equal(bridges.length, 1);
+    assert.equal(bridges[0]!.heldByAuto, true);
+    assert.notEqual(bridges[0]!.commodityId, staleCommodity);
+    assert.notEqual(bridges[0]!.id, posted.id);
+  });
+
+  it('drops a stale auto hold when nothing else qualifies and leaves a manual hold', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    grantWh(state, 'SBKP');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 1_500,
+      avgCostUsdPerKg: 1.2,
+      tick: world.tick,
+    });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'supplies',
+      kg: 1_500,
+      avgCostUsdPerKg: 1.2,
+      tick: world.tick,
+    });
+    setHubFill(world, 'SBGR', 'general', 0.95);
+    setHubFill(world, 'SBKP', 'general', 0.1);
+    setHubFill(world, 'SBGR', 'supplies', 0.1);
+    setHubFill(world, 'SBKP', 'supplies', 0.95);
+    upsertVaAutoHaul(state, { enabled: true, maxHaulsPerDay: 1 });
+    const manual = holdWarehouseBridge(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBKP',
+      commodityId: 'supplies',
+      kg: 1_500,
+    });
+
+    const first = tickVaAutoHaul(state, world, deskOpts);
+    assert.equal(first.posted, 1);
+    setHubFill(world, 'SBGR', 'general', 0.1);
+    setHubFill(world, 'SBKP', 'general', 0.95);
+    const dropped = tickVaAutoHaul(state, world, deskOpts);
+    assert.equal(dropped.retired, 1);
+    assert.equal(dropped.posted, 0);
+    assert.equal(dropped.skipped, 'no_routes');
+    assert.equal(state.vaAutoHaul?.postedToday, 1);
+    const bridges = listDemandHolds(state).filter(
+      (h) => (h.kind ?? 'demand') === 'bridge',
+    );
+    assert.equal(bridges.length, 1);
+    assert.equal(bridges[0]!.id, manual.hold.id);
+    assert.notEqual(bridges[0]!.heldByAuto, true);
   });
 
   it('desk ceiling is 10 posts a day and 10 open bridge holds', () => {

@@ -9,10 +9,12 @@
 import { economyDayIndex } from './career-weather.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import {
+  bridgeDestPaysMore,
   listPortScoutBridgeSuggestions,
   PORT_SCOUT_MIN_KG,
 } from './career-port-scout.js';
 import {
+  cancelWarehouseBridgeHold,
   clampInternalHaulPayUsd,
   holdWarehouseBridge,
   quoteInternalHaulPayUsd,
@@ -181,11 +183,45 @@ export type TickVaAutoHaulOpts = {
 
 export type TickVaAutoHaulResult = {
   posted: number;
+  /** Auto holds dropped because the dest hub no longer pays more. */
+  retired: number;
   skipped: string | null;
 };
 
 /**
+ * Drop Auto-haul holds whose dest hub no longer pays more for that commodity.
+ * Manual Scout holds stay. Accepted flights are already off this list.
+ */
+function retireAutoHaulsPastSpread(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+): number {
+  const stale = listDemandHolds(state).filter((hold) => {
+    if ((hold.kind ?? 'demand') !== 'bridge') return false;
+    if (hold.heldByAuto !== true) return false;
+    return !bridgeDestPaysMore(
+      world,
+      hold.originIcao,
+      hold.destIcao,
+      hold.commodityId,
+    );
+  });
+  let retired = 0;
+  for (const hold of stale) {
+    try {
+      cancelWarehouseBridgeHold(state, world, { holdId: hold.id });
+      retired += 1;
+    } catch {
+      continue;
+    }
+  }
+  return retired;
+}
+
+/**
  * Post up to remaining daily Internal Haul bridges from Scout suggestions.
+ * A hold this desk posted is replaced when the dest hub stops paying more.
+ * That replacement does not spend another daily post.
  * Call on the same day-boundary as Port auto-buy.
  */
 export function tickVaAutoHaul(
@@ -198,25 +234,27 @@ export function tickVaAutoHaul(
   alignPostedDay(cfg, day);
 
   if (!cfg.enabled) {
-    return { posted: 0, skipped: 'disabled' };
+    return { posted: 0, retired: 0, skipped: 'disabled' };
   }
   if (opts.vaListed === false) {
-    return { posted: 0, skipped: 'not_listed' };
+    return { posted: 0, retired: 0, skipped: 'not_listed' };
   }
   const members = opts.memberCount ?? 0;
   if (members < VA_AUTO_HAUL_MIN_MEMBERS) {
-    return { posted: 0, skipped: 'need_members' };
+    return { posted: 0, retired: 0, skipped: 'need_members' };
   }
 
   const companyId = opts.companyId ?? LOCAL_COMPANY_ID;
+  const retired = retireAutoHaulsPastSpread(state, world);
+  let replacementBudget = retired;
   let remaining = cfg.maxHaulsPerDay - cfg.postedToday;
-  if (remaining <= 0) {
-    return { posted: 0, skipped: 'daily_cap' };
+  if (replacementBudget <= 0 && remaining <= 0) {
+    return { posted: 0, retired, skipped: 'daily_cap' };
   }
 
   const open = openBridgeHoldCount(state);
-  if (open >= VA_AUTO_HAUL_MAX_OPEN_HOLDS) {
-    return { posted: 0, skipped: 'open_holds' };
+  if (replacementBudget <= 0 && open >= VA_AUTO_HAUL_MAX_OPEN_HOLDS) {
+    return { posted: 0, retired, skipped: 'open_holds' };
   }
 
   const suggestions = listPortScoutBridgeSuggestions(state, world, {
@@ -225,12 +263,12 @@ export function tickVaAutoHaul(
   }).filter((s) => s.kg >= PORT_SCOUT_MIN_KG);
 
   if (suggestions.length === 0) {
-    return { posted: 0, skipped: 'no_routes' };
+    return { posted: 0, retired, skipped: 'no_routes' };
   }
 
   let posted = 0;
   for (const s of suggestions) {
-    if (remaining <= 0) break;
+    if (replacementBudget <= 0 && remaining <= 0) break;
     if (openBridgeHoldCount(state) >= VA_AUTO_HAUL_MAX_OPEN_HOLDS) break;
 
     const suggested = quoteInternalHaulPayUsd(world, {
@@ -260,8 +298,12 @@ export function tickVaAutoHaul(
         pilotPayUsd,
         heldByAuto: true,
       });
-      cfg.postedToday += 1;
-      remaining -= 1;
+      if (replacementBudget > 0) {
+        replacementBudget -= 1;
+      } else {
+        cfg.postedToday += 1;
+        remaining -= 1;
+      }
       posted += 1;
     } catch {
       // Duplicate hold / stock race — try next suggestion.
@@ -271,6 +313,7 @@ export function tickVaAutoHaul(
 
   return {
     posted,
+    retired,
     skipped: posted > 0 ? null : 'no_affordable_route',
   };
 }

@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-01: **Auto-haul troca o hold que deixou de pagar** — sintoma = o contrato ficava no desk com kg e pay carimbados mesmo depois que o hub de destino deixava de pagar mais. Fix = no tick, o desk cancela só o hold `heldByAuto` que falha `bridgeDestPaysMore` e posta outro no lugar. Esse post não incrementa `postedToday`. Se não houver outra rota, o hold sai e o post do dia continua gasto. Hold manual e missão já aceita não entram.
+
 Atualizado 2026-10-01: **Auto-haul desk teto 10** — Max/day e holds abertos (manual + auto) sobem para 10. O load em `normalizeMissionsState` usa o mesmo teto, senão o Config volta para o valor antigo. Default continua 2.
 
 Atualizado 2026-10-01: **Scout Bridge só na direção que paga mais** — sintoma = o filtro Bridge listava KMIA→KIAH mesmo com Houston mais barato, a mesma rota que o Auto haul recusa. Fix = `listPortScoutBridgeSuggestions` exige spot do destino maior que o da origem. Move no estoque do WH continua sem esse filtro.
@@ -451,7 +453,7 @@ Princípio: **comodidade / tempo**, não poder. Mesmo board, mesmo preço, mesma
 |--|--|
 | **O que** | Desk cria Internal Hauls automaticamente a partir de `listPortScoutBridgeSuggestions` |
 | **Quem voa** | Pilots humanos (board Hauls); AI **não** voa |
-| **Caps** | max 1–10/dia (default 2); max 10 open bridge holds (manual + auto); pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0) |
+| **Caps** | max 1–10/dia (default 2); max 10 open bridge holds (manual + auto); pay = market×0.45 suggest × mult (0.8–1.5, Config); **wallet floor** (Config, default $0). Hold auto cujo destino deixou de pagar mais é trocado no tick sem gastar outro post do dia |
 | **Gates** | `va_listed` + **≥2 members** + Port FBO (Scout) + enabled |
 | **UI** | My VA Config → Auto-haul desk (enable, Max/day, Pay %, Wallet floor + tooltips); Hauls board unchanged |
 | **Não faz (v1)** | OD allowlist; Demand/Haul auto; IAP desk seat; snipar board global |

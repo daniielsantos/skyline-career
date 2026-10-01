@@ -1560,6 +1560,14 @@ export function HangarAircraftCard(props: {
               );
             })()}
             <li>
+              <span>Cargo</span>
+              <strong>
+                {catalog && catalog.maxCargoKg > 0
+                  ? formatCargoShort(catalog.maxCargoKg, props.formatMass)
+                  : '—'}
+              </strong>
+            </li>
+            <li>
               <span>Range</span>
               <strong>
                 {catalog && catalog.maxRangeNm > 0
@@ -1585,17 +1593,17 @@ export function HangarAircraftCard(props: {
                     : '—'}
               </strong>
             </li>
+            <li>
+              <span>Inspect</span>
+              <strong>
+                {inspLeft != null ? `${inspLeft}h` : '—'}
+              </strong>
+            </li>
             <li className="hangar-spec-hours">
               <span>Hours</span>
               <strong title={hoursMxTooltip(hoursMxMult)}>
                 <span>{Math.round(acf.hoursAirframe ?? 0)}</span>
                 <span>/ {Math.round(acf.hoursEngine ?? 0)} h</span>
-              </strong>
-            </li>
-            <li>
-              <span>Inspect</span>
-              <strong>
-                {inspLeft != null ? `${inspLeft}h` : '—'}
               </strong>
             </li>
           </ul>

@@ -1,5 +1,8 @@
 # Current state (2026-10-01)
 
+`main` **ae39f7cc** / desktop **0.3.415** shipped: Let a company hold two Port FBOs, and refresh Scout on the economy pulse. Release: [v0.3.415](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.415).
+
+
 `main` **5bfb47b0** / desktop **0.3.414** shipped: Show Demand reach and Jet-A tank size on the Port FBO upgrade. Release: [v0.3.414](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.414).
 
 

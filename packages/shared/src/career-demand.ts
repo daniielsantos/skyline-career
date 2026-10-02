@@ -1582,10 +1582,12 @@ export function ensureDemandOrders(
 
 export function listOpenDemandOrders(
   world: CareerEconomyWorld,
-  opts: { destIcao?: string; commodityId?: CommodityId } = {},
+  opts: { destIcao?: string; commodityId?: CommodityId; seed?: boolean } = {},
 ): DemandOrder[] {
-  ensureDemandOrders(world);
-  ensurePortJetAHaulOrders(world);
+  if (opts.seed !== false) {
+    ensureDemandOrders(world);
+    ensurePortJetAHaulOrders(world);
+  }
   const dest = opts.destIcao?.trim().toUpperCase();
   return (world.demandOrders ?? []).filter(
     (o) =>
@@ -2057,7 +2059,13 @@ export function replaceDemandMissionCargo(
 
 export function demandSnapshot(
   world: CareerEconomyWorld,
-  opts: { warehouseIcaos?: readonly string[] } = {},
+  opts: {
+    warehouseIcaos?: readonly string[];
+    /** When false, read orders already on the world. Do not refill the board. */
+    seed?: boolean;
+    /** When set, only these port desks. Empty list returns no orders. */
+    portIds?: readonly string[];
+  } = {},
 ): {
   orders: Array<
     DemandOrder & {
@@ -2077,7 +2085,16 @@ export function demandSnapshot(
         .filter(Boolean),
     ),
   ];
-  const open = listOpenDemandOrders(world).filter((o) => {
+  if (opts.portIds && opts.portIds.length === 0) {
+    return { orders: [] };
+  }
+  const portIds = opts.portIds
+    ? new Set(opts.portIds.map((id) => id.trim().toUpperCase()).filter(Boolean))
+    : null;
+  const open = listOpenDemandOrders(world, { seed: opts.seed }).filter((o) => {
+    if (portIds && !portIds.has((o.portId ?? '').trim().toUpperCase())) {
+      return false;
+    }
     // With warehouses owned: hide Dest = only-WH hub (no valid origin≠dest).
     // With no warehouses yet: still show the board as market intel.
     if (warehouseIcaos.length === 0) return true;

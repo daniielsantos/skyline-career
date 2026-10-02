@@ -9581,6 +9581,8 @@ export function createCareerApiServer(port = 8787) {
       if (req.method === 'GET' && path === '/api/ports') {
         const portsCompanyId = companyIdFromRequest(req);
         const soft = url.searchParams.get('soft') === '1';
+        const portsScope =
+          url.searchParams.get('scope') === 'network' ? 'network' : 'full';
 
         try {
           const companyNames = await companyDisplayNameMap(requireStore());
@@ -9602,6 +9604,7 @@ export function createCareerApiServer(port = 8787) {
               viewerCompanyId: portsCompanyId,
               alliedCompanyIds,
               seedMarket,
+              scope: portsScope,
             });
             return {
               ...ports,

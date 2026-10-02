@@ -577,6 +577,11 @@ export function PortsPanel(props: {
   const [loadError, setLoadError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
   const [section, setSection] = useState<'catalog' | 'network'>('catalog');
+  /** Full catalog + buy-warehouse hub list. Network paint does not wait for it. */
+  const [worldListReady, setWorldListReady] = useState(false);
+  const [worldListLoading, setWorldListLoading] = useState(false);
+  const worldListReadyRef = useRef(false);
+  const placedNetworkRef = useRef(false);
   /** What the Network tab shows after a node / action is chosen. */
   const [networkSurface, setNetworkSurface] = useState<
     'fbo' | 'wh' | 'demand' | 'buy' | 'staff'
@@ -617,9 +622,28 @@ export function PortsPanel(props: {
     return Boolean(row && !row.unlocked);
   }
 
-  async function refresh(opts?: { includeScout?: boolean; soft?: boolean }) {
+  function adoptSnap(next: PortsSnapshot) {
+    if (next.ports.length >= 20) {
+      worldListReadyRef.current = true;
+      setWorldListReady(true);
+    }
+    setSnap(next);
+  }
+
+  function snapshotHasCompanyNetwork(next: PortsSnapshot): boolean {
+    if ((next.warehouses?.warehouses.length ?? 0) > 0) return true;
+    return next.ports.some((p) => p.concession?.status === 'yours');
+  }
+
+  async function refresh(opts?: {
+    includeScout?: boolean;
+    soft?: boolean;
+    scope?: 'network' | 'full';
+  }) {
     const includeScout = opts?.includeScout !== false;
     const soft = opts?.soft === true;
+    const scope =
+      opts?.scope ?? (worldListReadyRef.current ? 'full' : 'network');
     setLoadError(null);
     try {
       const logisticsId = props.logisticsCompanyId?.trim() || undefined;
@@ -628,11 +652,30 @@ export function PortsPanel(props: {
       if (includeScout) {
         void reloadScoutDesk(logisticsId).catch(() => undefined);
       }
-      const nextPorts = await fetchPorts({
+      let nextPorts = await fetchPorts({
         companyId: logisticsId,
         soft: soft || undefined,
+        scope: scope === 'network' ? 'network' : undefined,
       });
-      setSnap(nextPorts);
+      const hasNetwork = snapshotHasCompanyNetwork(nextPorts);
+      if (scope === 'network' && !hasNetwork) {
+        nextPorts = await fetchPorts({
+          companyId: logisticsId,
+          soft: soft || undefined,
+        });
+      }
+      if (nextPorts.ports.length >= 20) {
+        worldListReadyRef.current = true;
+        setWorldListReady(true);
+      } else if (
+        scope === 'network' &&
+        hasNetwork &&
+        !placedNetworkRef.current
+      ) {
+        placedNetworkRef.current = true;
+        setSection('network');
+      }
+      adoptSnap(nextPorts);
       setDemand(nextPorts.demand?.orders ?? []);
       setWarehouses(nextPorts.warehouses ?? null);
       setGroundStaff(
@@ -665,6 +708,16 @@ export function PortsPanel(props: {
       const message = err instanceof Error ? err.message : String(err);
       setLoadError(message);
       props.onToast?.('fail', message);
+    }
+  }
+
+  async function ensureWorldList() {
+    if (worldListReadyRef.current) return;
+    setWorldListLoading(true);
+    try {
+      await refresh({ includeScout: false, soft: true, scope: 'full' });
+    } finally {
+      setWorldListLoading(false);
     }
   }
 
@@ -727,7 +780,7 @@ export function PortsPanel(props: {
         kg: holdKg,
         companyId: logisticsId,
       });
-      if (result.ports) setSnap(result.ports);
+      if (result.ports) adoptSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
       setScoutHoldDraft(null);
       props.onToast?.(
@@ -773,7 +826,7 @@ export function PortsPanel(props: {
         kg: holdKg,
         companyId: logisticsId,
       });
-      if (result.ports) setSnap(result.ports);
+      if (result.ports) adoptSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
       if (result.demand?.orders) setDemand(result.demand.orders);
       setScoutHoldDraft(null);
@@ -821,7 +874,7 @@ export function PortsPanel(props: {
         kg: holdKg,
         companyId: logisticsId,
       });
-      if (result.ports) setSnap(result.ports);
+      if (result.ports) adoptSnap(result.ports);
       if (result.warehouses) setWarehouses(result.warehouses);
       setScoutHoldDraft(null);
       props.onToast?.(
@@ -1456,7 +1509,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortBuy({ listingId: buyListing.id, kg });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.warehouses ?? result.ports.warehouses ?? null);
       setGroundStaff(
         result.ports.groundStaff ??
@@ -1517,7 +1570,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortConcessionClaim({ portId: portIdToClaim });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.ports.warehouses ?? warehouses);
       setGroundStaff(
         result.ports.groundStaff ??
@@ -1555,7 +1608,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortJetABuy({ portId: portIdToBuy, kg });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setJetABuyText('');
       props.onToast?.(
         'ok',
@@ -1587,7 +1640,7 @@ export function PortsPanel(props: {
       props.onWallet?.(result.walletUsd);
       props.onFleet?.(result.fleet);
       props.onMissions?.(result.missions.slice().reverse());
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       props.onToast?.(
         'ok',
         `Jet-A stock ${originIcao} → tank · set the load on the manifest · up to ${props.formatTonnes(result.maxKg)}`,
@@ -1610,7 +1663,7 @@ export function PortsPanel(props: {
       props.onWallet?.(result.walletUsd);
       props.onFleet?.(result.fleet);
       props.onMissions?.(result.missions.slice().reverse());
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       props.onToast?.(
         'ok',
         `Jet-A haul · ${props.formatTonnes(result.kg)} · fee ${props.formatMoney(result.payUsd)}`,
@@ -1647,7 +1700,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortConcessionRenew({ portId: portIdToRenew });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.ports.warehouses ?? warehouses);
       setGroundStaff(
         result.ports.groundStaff ??
@@ -1697,7 +1750,7 @@ export function PortsPanel(props: {
         portId: portIdToDrop,
       });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.ports.warehouses ?? warehouses);
       setGroundStaff(
         result.ports.groundStaff ??
@@ -1756,7 +1809,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortConcessionUpgrade({ portId: portIdToUpgrade });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.ports.warehouses ?? warehouses);
       setGroundStaff(
         result.ports.groundStaff ??
@@ -1876,7 +1929,7 @@ export function PortsPanel(props: {
         companyId: props.logisticsCompanyId?.trim() || undefined,
       });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.ports.warehouses ?? warehouses);
       setDeskMaxPrice('');
       setDeskMaxKgDay('');
@@ -1912,7 +1965,7 @@ export function PortsPanel(props: {
         companyId: props.logisticsCompanyId?.trim() || undefined,
       });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       props.onToast?.('ok', paused ? 'Desk order paused' : 'Desk order resumed');
     } catch (err) {
       props.onToast?.(
@@ -1941,7 +1994,7 @@ export function PortsPanel(props: {
         companyId: props.logisticsCompanyId?.trim() || undefined,
       });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       props.onToast?.('ok', 'Desk order removed');
     } catch (err) {
       props.onToast?.(
@@ -1995,7 +2048,7 @@ export function PortsPanel(props: {
         destWarehouseId,
       });
       if (result.walletUsd != null) props.onWallet?.(result.walletUsd);
-      if (result.ports) setSnap(result.ports);
+      if (result.ports) adoptSnap(result.ports);
       setWarehouses(result.warehouses ?? result.ports?.warehouses ?? warehouses);
       props.onToast?.(
         'ok',
@@ -2017,7 +2070,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortDeposit({ pickupId });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.warehouses ?? result.ports.warehouses ?? null);
       const left = result.remainingYardKg ?? 0;
       props.onToast?.(
@@ -2064,7 +2117,7 @@ export function PortsPanel(props: {
     try {
       const result = await postPortPickupAbandon({ pickupId });
       props.onWallet?.(result.walletUsd);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setWarehouses(result.warehouses ?? result.ports.warehouses ?? null);
       props.onToast?.(
         'ok',
@@ -2094,7 +2147,7 @@ export function PortsPanel(props: {
       });
       props.onWallet?.(result.walletUsd);
       setWarehouses(result.warehouses);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       setGroundStaff(
         result.ports.groundStaff ??
           result.warehouses?.groundStaff ??
@@ -2125,7 +2178,7 @@ export function PortsPanel(props: {
       setGroundStaff(result.groundStaff);
       if (result.warehouses) setWarehouses(result.warehouses);
       if (result.ports) {
-        setSnap(result.ports);
+        adoptSnap(result.ports);
         if (result.ports.demand?.orders) setDemand(result.ports.demand.orders);
       }
       props.onToast?.(
@@ -2162,7 +2215,7 @@ export function PortsPanel(props: {
       props.onWallet?.(result.walletUsd);
       setGroundStaff(result.groundStaff);
       if (result.warehouses) setWarehouses(result.warehouses);
-      if (result.ports) setSnap(result.ports);
+      if (result.ports) adoptSnap(result.ports);
       props.onToast?.(
         'ok',
         result.debitUsd > 0
@@ -2222,7 +2275,7 @@ export function PortsPanel(props: {
       const result = await postWarehouseUpgrade({ warehouseId });
       props.onWallet?.(result.walletUsd);
       setWarehouses(result.warehouses);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       props.onToast?.(
         'ok',
         `Warehouse ${icao} → T${result.warehouse.tier} · ${props.formatMoney(result.debitUsd)}`,
@@ -2265,7 +2318,7 @@ export function PortsPanel(props: {
       const result = await postWarehouseAbandon({ warehouseId });
       props.onWallet?.(result.walletUsd);
       setWarehouses(result.warehouses);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       props.onToast?.('ok', `Abandoned warehouse at ${result.icao}`);
     } catch (err) {
       props.onToast?.(
@@ -2310,7 +2363,7 @@ export function PortsPanel(props: {
       const result = await postWarehouseStockAbandon({ stockId });
       props.onWallet?.(result.walletUsd);
       setWarehouses(result.warehouses);
-      setSnap(result.ports);
+      adoptSnap(result.ports);
       if (selectedStockId === stockId) setSelectedStockId(null);
       props.onToast?.(
         'ok',
@@ -3563,6 +3616,7 @@ export function PortsPanel(props: {
       setWhShelf('buy');
       setSelectedStockId(null);
       setSelectedOwnedHubIcao(null);
+      void ensureWorldList();
       if (opts?.hubIcao) {
         setSelectedBuyHubIcao(opts.hubIcao.trim().toUpperCase());
       }
@@ -3976,7 +4030,10 @@ export function PortsPanel(props: {
                 section === 'catalog' ? 'fbo-icao-chip active' : 'fbo-icao-chip'
               }
               disabled={props.busy || loading}
-              onClick={() => setSection('catalog')}
+              onClick={() => {
+                setSection('catalog');
+                void ensureWorldList();
+              }}
             >
               Port catalog
             </button>
@@ -4041,6 +4098,9 @@ export function PortsPanel(props: {
           </div>
 
           {section === 'catalog' ? (
+            worldListLoading ? (
+              <BusyBlock label="Loading catalog" />
+            ) : (
             <>
               {port ? (
                 <h3 className="ports-selected-name ports-stage-title">
@@ -4289,6 +4349,7 @@ export function PortsPanel(props: {
                 </div>
               </div>
             </>
+            )
           ) : null}
 
           {section === 'network' ? (
@@ -4328,7 +4389,7 @@ export function PortsPanel(props: {
                   onClick={() => openNetworkSurface('buy')}
                 >
                   Buy warehouse
-                  {networkBuyableHubs.length > 0
+                  {worldListReady && networkBuyableHubs.length > 0
                     ? ` (${networkBuyableHubs.length}${
                         buyHubQuery.trim() ? '' : '+'
                       })`
@@ -5110,6 +5171,10 @@ export function PortsPanel(props: {
                       ? `Warehouse · ${highlightedHubIcao}`
                       : 'Your warehouses'}
               </h3>
+              {whShelf === 'buy' && worldListLoading ? (
+                <BusyBlock label="Loading warehouses" />
+              ) : (
+              <>
               <div
                 className={
                   whShelf === 'owned'
@@ -6410,6 +6475,8 @@ export function PortsPanel(props: {
                     </tbody>
                   </table>
                 </>
+              )}
+              </>
               )}
             </>
           ) : null}

@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-02: **Ports abria esperando o catálogo inteiro** — quem já tem FBO/WH cai na Network, mas o spinner esperava os 224 portos. Fix = `GET /api/ports?scope=network` traz a rede da company, o porto dela e o Demand desse porto. Port catalog e Buy warehouse pedem o snapshot completo ao abrir, com "Loading catalog" / "Loading warehouses". Quem não tem rede continua caindo direto no catálogo.
+
 Atualizado 2026-10-02: **Aba Ports lenta ao abrir** — sintoma = o catalog espera `GET /api/ports` no world. Causa = o inbound de cada porto varria a lista inteira de aeroportos, o estoque do porto reconstruía o inventário em toda leitura, e cada porto reseedia as listings. Fix = hub pelo índice `airportByIcao`, inventário indexado uma vez, listings lidas do que já está no world. O tick continua sendo quem expira e repõe card. Pay e o board não mudam.
 
 Atualizado 2026-10-01: **Scout acompanha o pulso** — sintoma = a lista de Haul/Demand/Bridge ficava parada com a rota que já não pagava, enquanto o Auto-haul no tick já tinha trocado o hold. Causa = o refresh do tick pedia o desk e deixava o Scout de fora de propósito. Fix = o mesmo pulso pede a lista de novo. O poll de 20s continua sem Scout. A lista não apaga enquanto carrega.

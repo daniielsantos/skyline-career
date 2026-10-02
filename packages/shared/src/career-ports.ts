@@ -2829,6 +2829,36 @@ export function hubSpotUnitPriceUsd(
   return money(localUnitPriceUsd(commodityId, pile));
 }
 
+/** Ports the company operates, plus any port that holds one of its warehouses. */
+function companyNetworkPortIds(
+  world: CareerEconomyWorld,
+  state: CareerMissionsState | undefined,
+  viewerCompanyId: string,
+  warehouseIcaos: readonly string[],
+): Set<string> {
+  const ids = new Set<string>();
+  const viewer = viewerCompanyId.trim();
+  for (const row of state?.playerPortConcessions ?? []) {
+    if (row.companyId !== viewer || row.leasePaidThroughTick <= world.tick) {
+      continue;
+    }
+    const id = row.portId.trim().toUpperCase();
+    if (id) ids.add(id);
+  }
+  for (const row of world.portConcessions ?? []) {
+    if (row.companyId !== viewer || row.leasePaidThroughTick <= world.tick) {
+      continue;
+    }
+    const id = row.portId.trim().toUpperCase();
+    if (id) ids.add(id);
+  }
+  for (const icao of warehouseIcaos) {
+    const portId = careerPortIdForPickupHub(icao);
+    if (portId) ids.add(portId.trim().toUpperCase());
+  }
+  return ids;
+}
+
 export function portSnapshot(
   world: CareerEconomyWorld,
   state?: CareerMissionsState,
@@ -2845,6 +2875,11 @@ export function portSnapshot(
      * or rewrite the port market under a write lock.
      */
     seedMarket?: boolean;
+    /**
+     * `network` builds only ports the company operates or where it has a
+     * warehouse. Catalog and the world buy-warehouse list use `full`.
+     */
+    scope?: 'network' | 'full';
   },
 ): {
   ports: Array<
@@ -2973,8 +3008,20 @@ export function portSnapshot(
         pickupHubs: [],
         buyUsdByIcao: {},
       };
+  const scope = opts?.scope === 'network' ? 'network' : 'full';
+  const networkPortIds =
+    scope === 'network'
+      ? companyNetworkPortIds(
+          world,
+          state,
+          viewerCompanyId,
+          warehouses.warehouses.map((w) => w.icao),
+        )
+      : null;
   const demand = demandSnapshot(world, {
     warehouseIcaos: warehouses.warehouses.map((w) => w.icao),
+    seed: scope === 'network' ? false : undefined,
+    portIds: networkPortIds ? [...networkPortIds] : undefined,
   });
   const ownedFbos = state
     ? ensurePlayerFbos(state).fbos.flatMap((fbo) => {
@@ -2997,7 +3044,12 @@ export function portSnapshot(
       })
     : [];
   return {
-    ports: CAREER_PORTS.map((port) => {
+    ports: (networkPortIds
+      ? CAREER_PORTS.filter((port) =>
+          networkPortIds.has(port.id.trim().toUpperCase()),
+        )
+      : CAREER_PORTS
+    ).map((port) => {
       const op = findActivePortOperator(world, port.id);
       const operatorExact = Boolean(
         op && op.companyId === viewerCompanyId,

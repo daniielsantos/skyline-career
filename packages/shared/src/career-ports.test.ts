@@ -119,6 +119,68 @@ describe('career ports', () => {
     assert.equal(world.portListings.length, before);
   });
 
+  it('network scope returns only the company ports and their demand', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-network-scope' });
+    const state = emptyMissionsStateV2();
+    state.playerPortConcessions = [
+      {
+        portId: 'BRSSZ',
+        companyId: 'local',
+        level: 1,
+        claimedAtTick: world.tick,
+        leasePaidThroughTick: world.tick + 500,
+        lifetimeThroughputKg: 0,
+      },
+    ];
+    world.demandOrders = [
+      {
+        id: 'dmd_net_brssz',
+        portId: 'BRSSZ',
+        destIcao: 'SBGL',
+        commodityId: 'general',
+        wantedKg: 1_000,
+        remainingKg: 1_000,
+        maxUnitPriceUsd: 2,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 500,
+        status: 'open',
+      },
+      {
+        id: 'dmd_net_usmia',
+        portId: 'USMIA',
+        destIcao: 'KMIA',
+        commodityId: 'general',
+        wantedKg: 1_000,
+        remainingKg: 1_000,
+        maxUnitPriceUsd: 2,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 500,
+        status: 'open',
+      },
+    ];
+    const beforeListings = world.portListings?.length ?? 0;
+    const snap = portSnapshot(world, state, {
+      seedMarket: false,
+      scope: 'network',
+      viewerCompanyId: 'local',
+    });
+    assert.deepEqual(
+      snap.ports.map((p) => p.id),
+      ['BRSSZ'],
+    );
+    assert.equal(
+      snap.demand.orders.some((o) => o.id === 'dmd_net_brssz'),
+      true,
+    );
+    assert.equal(
+      snap.demand.orders.some((o) => o.portId === 'USMIA'),
+      false,
+    );
+    assert.equal(world.portListings?.length ?? 0, beforeListings);
+    const full = portSnapshot(world, state, { seedMarket: false });
+    assert.ok(full.ports.length > 20);
+  });
+
   it('heals open listings onto desk pickup hub', () => {
     const world = createSeedEconomyWorld({ seed: 'desk-heal' });
     world.portListings = [

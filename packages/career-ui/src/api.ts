@@ -3287,10 +3287,16 @@ export type DemandSnapshot = {
   warehouses?: PlayerWarehouseSnapshot;
 };
 
-export function fetchPorts(opts?: { companyId?: string; soft?: boolean }) {
+export function fetchPorts(opts?: {
+  companyId?: string;
+  soft?: boolean;
+  /** Company network only. Omit for the full catalog. */
+  scope?: 'network';
+}) {
   const companyId = opts?.companyId?.trim();
   const params = new URLSearchParams();
   if (opts?.soft) params.set('soft', '1');
+  if (opts?.scope === 'network') params.set('scope', 'network');
   const qs = params.toString();
   return api<PortsSnapshot>(`/api/ports${qs ? `?${qs}` : ''}`, {
     headers: companyId

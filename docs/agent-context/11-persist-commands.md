@@ -1,6 +1,6 @@
 # Persist commands (MP-ready) — settle first
 
-Atualizado 2026-10-01: **Slider no Add do Dispatch** — cada rota de baixo tem o mesmo Load (25/50/75/Max). O Add manda esse peso; o que sobra fica no desk. O pay da linha acompanha o corte.
+Atualizado 2026-10-01: **Add do Dispatch igual ao Manifest** — a lista de baixo só tem os dados e o Add. O clique tira o contrato da lista e mostra o slider de Load que o Manifest já usa. Zerar devolve à lista. O peso entra no voo quando abre o SimBrief.
 
 Atualizado 2026-10-01: **Add da trip fica sob a carga** — a lista de rotas com Add no Dispatch estava acima do título da perna. Fica debaixo do card de Cargo, no mesmo bloco das outras listas.
 

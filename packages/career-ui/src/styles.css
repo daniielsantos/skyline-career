@@ -14891,13 +14891,6 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   align-items: center;
 }
 
-.dispatch-trip-load {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
-  align-items: end;
-}
   padding: 0.45rem 0.55rem;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.22);

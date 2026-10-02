@@ -6938,6 +6938,13 @@ export function App() {
   const [stagingJoinKg, setStagingJoinKg] = useState<Record<string, number>>(
     {},
   );
+  const [dispatchJoinKg, setDispatchJoinKg] = useState<Record<string, number>>(
+    {},
+  );
+  const dispatchMissionId = activeMission?.id;
+  useEffect(() => {
+    setDispatchJoinKg({});
+  }, [dispatchMissionId]);
   useEffect(() => {
     const preparing = Boolean(staging?.deskHold);
     const accepted =
@@ -12268,6 +12275,56 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
+      const staged = Object.entries(dispatchJoinKg).filter(([, kg]) => kg > 0);
+      if (staged.length > 0) {
+        const home = homeCompanyIdRef.current?.trim();
+        const active = activeCompanyIdRef.current?.trim();
+        const opsCompanyId =
+          resolveOpsCompanyId(mission.aircraftId) || active || home || undefined;
+        for (const [id, kg] of staged) {
+          if (!id.startsWith('hold:')) continue;
+          const holdId = id.slice('hold:'.length);
+          const taken = Math.floor(kg);
+          const result = await postAddDeskHold({
+            missionId: mission.id,
+            holdId,
+            companyId: opsCompanyId,
+            kg: taken,
+          });
+          if (result.fleet) {
+            const holdingVa = Boolean(home && active && home !== active);
+            if (holdingVa) setVaSessionFleet(result.fleet);
+            else setFleet(result.fleet);
+          }
+          if (result.missions?.length) {
+            setMissions(result.missions.slice().reverse());
+          }
+          setOpenDeskHolds((current) =>
+            current.flatMap((row) => {
+              if (row.id !== holdId) return [row];
+              const left = Math.max(0, row.kg - Math.min(row.kg, taken));
+              if (left <= 0) return [];
+              const remainPay =
+                row.pilotPayUsd != null && row.kg > 0
+                  ? (row.pilotPayUsd * left) / row.kg
+                  : row.pilotPayUsd;
+              return [
+                {
+                  ...row,
+                  kg: left,
+                  ...(remainPay != null ? { pilotPayUsd: remainPay } : {}),
+                },
+              ];
+            }),
+          );
+          setDispatchJoinKg((current) => {
+            if (!(id in current)) return current;
+            const next = { ...current };
+            delete next[id];
+            return next;
+          });
+        }
+      }
       const result = await postDispatch({
         missionId: mission.id,
         open: true,
@@ -12925,6 +12982,19 @@ export function App() {
         `Added ${hold?.destIcao ?? 'the next stop'}. The first OFP carries the combined load.`,
       );
     }, { sync: { missions: true } });
+  }
+
+  function stageDispatchCargoKg(id: string, kg: number) {
+    const next = Math.max(0, Math.floor(kg));
+    setDispatchJoinKg((current) => {
+      if (next <= 0) {
+        if (!(id in current)) return current;
+        const copy = { ...current };
+        delete copy[id];
+        return copy;
+      }
+      return { ...current, [id]: next };
+    });
   }
 
   async function onAddCargoStop(riderMissionId: string, kg?: number) {
@@ -20985,6 +21055,8 @@ export function App() {
                 })
               ]}
               onAddCargoStop={(id, kg) => void onAddCargoStop(id, kg)}
+              stagedCargoKg={dispatchJoinKg}
+              onStageCargoKg={stageDispatchCargoKg}
               onCrewDispatch={(m, crewMemberId) =>
                 void onCrewDispatchMission(m, crewMemberId)
               }

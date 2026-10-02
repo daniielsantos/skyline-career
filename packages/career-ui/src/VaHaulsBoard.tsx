@@ -70,6 +70,23 @@ function holdPayParts(hold: VaHaulHold): string | null {
   return null;
 }
 
+/** Rider contracts keep the warehouse they left. The desk shows where the airplane is. */
+function deskActiveOrigin(
+  row: VaHaulMission,
+  missions: Mission[] | undefined,
+): { icao: string; riding: boolean } {
+  const stored = row.originIcao.trim().toUpperCase();
+  const full = missions?.find((mission) => mission.id === row.id);
+  const hostId = full?.throughHostId?.trim();
+  if (!hostId) return { icao: stored, riding: false };
+  const hostOrigin = missions
+    ?.find((mission) => mission.id === hostId)
+    ?.originIcao?.trim()
+    .toUpperCase();
+  if (!hostOrigin) return { icao: stored, riding: false };
+  return { icao: hostOrigin, riding: hostOrigin !== stored };
+}
+
 function aircraftOptionLabel(
   acf: PlayerAircraft,
   originIcao: string,
@@ -260,9 +277,12 @@ export function VaHaulsBoard(props: Props) {
   const filteredActive = useMemo(
     () =>
       active.filter((m) =>
-        hubInNetworkFocus(focusNode, m.originIcao),
+        hubInNetworkFocus(
+          focusNode,
+          deskActiveOrigin(m, props.missions).icao,
+        ),
       ),
-    [active, focusNode],
+    [active, focusNode, props.missions],
   );
 
   /** All parked VA tails — Prepare/Accept like Freights (ferry off-origin in Manifest). */
@@ -797,7 +817,8 @@ export function VaHaulsBoard(props: Props) {
             ) : (
               <ul className="va-hauls-list">
                 {filteredActive.map((m) => {
-                  const origin = m.originIcao.trim().toUpperCase();
+                  const shown = deskActiveOrigin(m, props.missions);
+                  const origin = shown.icao;
                   const dest = m.destIcao.trim().toUpperCase();
                   const kind = m.kind ?? 'other';
                   const kindLabel =
@@ -810,6 +831,7 @@ export function VaHaulsBoard(props: Props) {
                     acf?.registration?.trim() ||
                     null;
                   const distNm =
+                    !shown.riding &&
                     typeof m.distanceNm === 'number' &&
                     Number.isFinite(m.distanceNm) &&
                     m.distanceNm > 0

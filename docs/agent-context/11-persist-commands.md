@@ -1,5 +1,9 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-02: **Capacity left no En route ignorava a carga das escalas seguintes** — o Flight Plan já somava `throughLoads`. O tile do En route subtraía só `mission.cargoKg`. Fix = o espaço livre desconta também o que segue no avião.
+
+Atualizado 2026-10-02: **Desk mostrava a origem antiga de um contrato que segue no avião** — o Leave freight grava o hub novo só na perna que está valendo. O contrato que continua guarda a origem de onde a carga saiu, porque o cancel devolve para essa warehouse. Fix = a linha do Desk mostra a origem da perna que está valendo. A distância some nessa linha, porque o número gravado ainda é a rota antiga.
+
 Atualizado 2026-10-02: **CI do catalog quebrava no boot** — sintoma = `catalog-api did not become ready` com `Cannot access 'portPickupsFn' before initialization` em `bindPortCorridorLookups`. Causa = o cancel fez a missão importar `career-ports` / o corredor. O corredor ainda está carregando (economia → concessão → `career-ports`) quando o bind grava o `let` que ainda não existe. Fix = os lookups ficam num módulo sem imports; a missão resolve o porto por `portIdForPickupHubBound`.
 
 Atualizado 2026-10-02: **Cancel de haul/bridge com a warehouse cheia engolia a carga** — sintoma = o estoque IN STOCK é o que está no prédio (o hold do desk ainda conta; o voo aceito já saiu no Prepare). No cancel, `depositCargoToWarehouse` falhava se não houvesse vaga e o `catch` descartava o kg. Fix = o que cabe volta para a warehouse de origem; o resto vira yard do porto daquele hub. Sem porto no hub, entra só o que cabe. O Open desk continua ocupando a warehouse até o Prepare.

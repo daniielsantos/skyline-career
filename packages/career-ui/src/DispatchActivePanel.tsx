@@ -1927,14 +1927,19 @@ export function DispatchActivePanel(props: {
                       )}
                     </dd>
                   </div>
-                  {showEnRouteCapacityLeft ? (
+                      {showEnRouteCapacityLeft ? (
                     <div>
                       <dt>Capacity left</dt>
                       <dd>
                         {props.formatTonnes(
                           Math.max(
                             0,
-                            props.missionMaxCargoKg(mission) - mission.cargoKg,
+                            props.missionMaxCargoKg(mission) -
+                              mission.cargoKg -
+                              (mission.throughLoads ?? []).reduce(
+                                (sum, row) => sum + row.cargoKg,
+                                0,
+                              ),
                           ),
                         )}
                       </dd>

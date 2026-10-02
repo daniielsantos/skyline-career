@@ -675,14 +675,20 @@ export function abandonWarehouseStock(
   if (!wh) throw new Error('Warehouse for stock lot not found');
   const kg = pile.kg;
   const commodityId = pile.commodityId;
-  const reserved = (whs.demandHolds ?? [])
+  const reserved = warehouseReservedCommodityKg(
+    state,
+    pile.warehouseId,
+    commodityId,
+  );
+  const onHand = whs.stock
     .filter(
-      (h) => h.warehouseId === pile.warehouseId && h.commodityId === commodityId,
+      (s) =>
+        s.warehouseId === pile.warehouseId && s.commodityId === commodityId,
     )
-    .reduce((sum, h) => sum + h.kg, 0);
-  if (reserved > 0) {
+    .reduce((sum, s) => sum + s.kg, 0);
+  if (onHand - kg < reserved) {
     throw new Error(
-      'Release the Demand hold on this commodity before abandoning the lot',
+      'Release the desk hold on this commodity before abandoning the lot',
     );
   }
   const avgCostUsdPerKg = pile.avgCostUsdPerKg;

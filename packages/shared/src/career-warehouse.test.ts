@@ -311,6 +311,54 @@ describe('career warehouse + demand', () => {
     );
   });
 
+  it('abandons an unreserved pile while another pile covers the hold', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-abandon-sibling' });
+    let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhSibling',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 200_000;
+    const bought = buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const loose = depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 800,
+      avgCostUsdPerKg: 1,
+      tick: world.tick,
+    });
+    const cover = depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 500,
+      avgCostUsdPerKg: 20,
+      tick: world.tick,
+    });
+    assert.notEqual(loose.id, cover.id);
+    state.playerWarehouses!.demandHolds = [
+      {
+        id: 'hold_cover',
+        kind: 'haul',
+        warehouseId: bought.warehouse.id,
+        originIcao: 'SBGR',
+        destIcao: 'SBSP',
+        commodityId: 'general',
+        kg: 500,
+        unitPriceUsd: 1,
+        heldAtTick: world.tick,
+        expiresAtTick: world.tick + 10,
+      },
+    ];
+    abandonWarehouseStock(state, { stockId: loose.id });
+    assert.equal(
+      (state.playerWarehouses?.stock ?? []).some((s) => s.id === cover.id),
+      true,
+    );
+    assert.throws(
+      () => abandonWarehouseStock(state, { stockId: cover.id }),
+      /desk hold/i,
+    );
+  });
+
   it('port buy queues inbound transfer when warehouse present', () => {
     const world = createSeedEconomyWorld({ seed: 'wh-port' });
     let state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {

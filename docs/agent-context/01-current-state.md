@@ -1,4 +1,7 @@
-# Current state (2026-10-01)
+# Current state (2026-10-02)
+
+`main` **4e254f78** / desktop **0.3.424** shipped: Show a load slider under Dispatch cargo for later stops, and keep the pilot's reservation when the first leg settles. Release: [v0.3.424](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.424).
+
 
 `main` **a4d10fe7** / desktop **0.3.423** shipped: Show the stop chain on Dispatch and keep later cargo when editing the first leg. Release: [v0.3.423](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.423).
 

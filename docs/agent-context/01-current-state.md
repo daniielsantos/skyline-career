@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **d0716c24** / desktop **0.3.436** shipped: Remember the Crew tab on sidebar Back, and page the ledger at 10 rows. Release: [v0.3.436](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.436).
+
+
 `main` **ba31ca06** / desktop **0.3.435** shipped: Count through-load in en-route capacity, show the live desk origin, and let an uncovered warehouse pile be abandoned. Release: [v0.3.435](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.435).
 
 

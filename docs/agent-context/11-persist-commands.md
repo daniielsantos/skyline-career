@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-02: **Desk Active mostrava só a commodity do contrato merged** — sintoma = dois Supplies e um Machinery para KMIA apareciam como uma linha “Machinery”. Causa = a linha do Desk usa `commodityId` da missão, e o merge guarda os lots dentro dela. Fix = a coluna Cargo lista cada commodity, com ×N quando repete.
+
 Atualizado 2026-10-02: **Faixa Freight hold saiu do Flight Plan** — “Freight hold · KTCS / Yard storage …/day” repetia o hub que já é a origem do voo. A diária continua sendo cobrada; a faixa saiu.
 
 Atualizado 2026-10-02: **Leave freight here ficou discreto** — no En route o botão era uma faixa laranja na largura do card. Agora é o ghost compacto, alinhado à esquerda, no tom do texto de apoio.

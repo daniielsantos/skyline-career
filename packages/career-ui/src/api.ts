@@ -5611,6 +5611,8 @@ export type VaHaulMission = {
   commodityId: string;
   cargoKg: number;
   payUsd: number;
+  /** Lots on this contract. A merged stop has more than one. */
+  lots?: Array<{ commodityId: string; cargoKg: number }>;
   status: string;
   distanceNm?: number;
   pilotAccountId?: string;

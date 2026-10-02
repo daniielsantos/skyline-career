@@ -237,6 +237,8 @@ type Props = {
     stopIcaos: string[];
   } | null;
   onMissions?: (missions: Mission[]) => void;
+  /** Accepted contracts, including lots merged onto one stop. */
+  missions?: Mission[];
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
   /**
    * Pilot home focus for nested Ports catalog default (nearest seaport).
@@ -1446,6 +1448,7 @@ export function VaPage(props: Props) {
           onStaged={props.onHaulStaged}
           pilotIcao={props.pilotIcao}
           onPrepareHold={props.onPrepareHaulHold}
+          missions={props.missions}
           tripHost={props.haulTripHost}
           resolveMaxCargoKg={props.resolveMaxCargoKg}
           economyTick={props.economyTick}

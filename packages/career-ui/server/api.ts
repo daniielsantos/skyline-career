@@ -5392,6 +5392,12 @@ export function createCareerApiServer(port = 8787) {
               commodityId: m.commodityId,
               cargoKg: m.cargoKg,
               payUsd: m.payUsd,
+              lots: (m.lots ?? [])
+                .filter((line) => line.cargoKg > 0)
+                .map((line) => ({
+                  commodityId: line.commodityId,
+                  cargoKg: line.cargoKg,
+                })),
               status: m.status,
               distanceNm: m.distanceNm,
               pilotAccountId,

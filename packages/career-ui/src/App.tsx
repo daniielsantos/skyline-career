@@ -21900,6 +21900,7 @@ export function App() {
           onHaulStaged={() => {
             goToTab('staging');
           }}
+          missions={missions}
           onPrepareHaulHold={(hold, aircraftId, sameRouteHolds) => {
             enterStagingForVaHaulHold(hold, aircraftId, sameRouteHolds);
           }}

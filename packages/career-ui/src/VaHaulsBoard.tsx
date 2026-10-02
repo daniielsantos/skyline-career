@@ -33,6 +33,24 @@ function commodityLabel(id: string): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+function activeCargoLabel(
+  row: VaHaulMission,
+  full: Mission | undefined,
+): string {
+  const lots = (full?.lots ?? row.lots ?? []).filter((line) => line.cargoKg > 0);
+  if (lots.length <= 1) {
+    return commodityLabel(lots[0]?.commodityId ?? row.commodityId);
+  }
+  const counts = new Map<string, number>();
+  for (const line of lots) {
+    const name = commodityLabel(line.commodityId);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => (count > 1 ? `${name} ×${count}` : name))
+    .join(' · ');
+}
+
 function holdKindLabel(kind: VaHaulHold['kind']): string {
   if (kind === 'bridge') return 'Bridge';
   if (kind === 'haul') return 'Wide haul';
@@ -138,6 +156,8 @@ type Props = {
   resolveMaxCargoKg?: (aircraft: PlayerAircraft) => number;
   onGoPorts?: () => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
+  /** Full contracts, so a merged stop can list every commodity. */
+  missions?: Mission[];
   /** Accepted flight still waiting on SimBrief. Other desk dests can join it. */
   tripHost?: {
     id: string;
@@ -821,8 +841,11 @@ export function VaHaulsBoard(props: Props) {
                       >
                         <div>
                           <span className="va-stat-label">Cargo</span>
-                          <span className="va-stat-value">
-                            {commodityLabel(m.commodityId)}
+                          <span className="va-stat-value va-stat-cargo">
+                            {activeCargoLabel(
+                              m,
+                              props.missions?.find((mission) => mission.id === m.id),
+                            )}
                           </span>
                         </div>
                         <div>

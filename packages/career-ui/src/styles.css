@@ -16413,6 +16413,13 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   font-size: 0.88rem;
 }
 
+.va-hauls-stats .va-stat-value.va-stat-cargo {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 1.25;
+}
+
 .va-hauls-expiry.is-urgent {
   color: color-mix(in srgb, #e07070 85%, white);
   font-weight: 600;

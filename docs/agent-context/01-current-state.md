@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **3b0be80b** / desktop **0.3.431** shipped: Close an empty warehouse, and park cancelled desk cargo in the yard when the building is full. Release: [v0.3.431](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.431).
+
+
 `main` **a39492e8** / desktop **0.3.430** shipped: Move the home-company pilot to the hub when freight is left there. Release: [v0.3.430](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.430).
 
 

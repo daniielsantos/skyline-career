@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **89d10ac2** / desktop **0.3.440** shipped: Open Ports on the company network and load the catalog when that tab is opened. Release: [v0.3.440](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.440).
+
+
 `main` **a50a803e** / desktop **0.3.439** shipped: Stop the Ports snapshot from rescanning every airport on open. Release: [v0.3.439](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.439).
 
 

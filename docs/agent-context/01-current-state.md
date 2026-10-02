@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **b6f7170d** / desktop **0.3.429** shipped: Show every commodity on a merged Desk contract, not only the first one. Release: [v0.3.429](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.429).
+
+
 `main` **3be58404** / desktop **0.3.428** shipped: Make Leave freight here a quiet control and drop the freight-hold banner from Flight Plan. Release: [v0.3.428](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.428).
 
 

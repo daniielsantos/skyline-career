@@ -11,7 +11,7 @@ import { boardMoneyLabel, isFiniteMoney, formatUsdAmountInput, maskUsdAmountInpu
 import { formatMassPreferExact, loadWeightSystem } from './weight-units';
 import { MINUTES_PER_TICK, TICKS_PER_DAY } from './economy-clock';
 
-const CASHFLOW_PAGE_SIZE = 15;
+const CASHFLOW_PAGE_SIZE = 10;
 
 /**
  * Ledger `dayIndex` is 0-based (`floor(tick / TICKS_PER_DAY)`). World topbar + logbook

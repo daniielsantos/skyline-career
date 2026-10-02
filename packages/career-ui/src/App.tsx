@@ -261,7 +261,7 @@ import {
   DesktopUpdateHeaderButton,
   DesktopUpdatesCard,
 } from './DesktopUpdates';
-import { VaPage } from './VaPage';
+import { VaPage, type VaPane } from './VaPage';
 import { VaDirectoryPage } from './VaDirectoryPage';
 import { VaRankingPage } from './VaRankingPage';
 import { CompanyVaPublishCard } from './CompanyVaPublishCard';
@@ -4342,6 +4342,8 @@ export function App() {
   const [hangarPane, setHangarPane] = useState<
     'aircraft' | 'cashflow' | 'cargo' | 'crew'
   >('aircraft');
+  /** Crew tabs stay put when Back returns from a terminal. */
+  const [vaPane, setVaPane] = useState<VaPane>('hauls');
   /** Hangar cashflow is the home company. The request header is the VA while Crew is pinned. */
   const hangarCashflowGen = useRef(0);
   const refreshHangarCashflow = useCallback(() => {
@@ -21816,6 +21818,8 @@ export function App() {
         />
       ) : hubSelected && tab === 'va' ? (
         <VaPage
+          pane={vaPane}
+          onPaneChange={setVaPane}
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
           homeFocus={portsHomeFocus}

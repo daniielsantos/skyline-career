@@ -126,7 +126,14 @@ function formatLiveGsKt(gsKt: number | null | undefined): string | null {
   return `${Math.round(gsKt)} kt`;
 }
 
-type VaPane = 'roster' | 'hangar' | 'hauls' | 'ports' | 'ledger' | 'logbook' | 'config';
+export type VaPane =
+  | 'roster'
+  | 'hangar'
+  | 'hauls'
+  | 'ports'
+  | 'ledger'
+  | 'logbook'
+  | 'config';
 
 function formatRosterLastSeen(
   lastSeenAtMs: number | null | undefined,
@@ -265,12 +272,20 @@ type Props = {
    * Ledger pane refetches instead of keeping a stale cashflow snapshot.
    */
   ledgerRefreshEpoch?: number;
+  /** Survives a terminal detour so sidebar Back reopens this tab. */
+  pane?: VaPane;
+  onPaneChange?: (pane: VaPane) => void;
 };
 
 export function VaPage(props: Props) {
   const token = getAuthToken();
   const companyId = props.activeCompanyId || getStoredCompanyId();
-  const [pane, setPane] = useState<VaPane>('hauls');
+  const [paneState, setPaneState] = useState<VaPane>(props.pane ?? 'hauls');
+  const pane = props.pane ?? paneState;
+  const setPane = (next: VaPane) => {
+    setPaneState(next);
+    props.onPaneChange?.(next);
+  };
   const [members, setMembers] = useState<VaMember[]>([]);
   const [role, setRole] = useState<string | null>(null);
   const [viewerAccountId, setViewerAccountId] = useState<string | null>(null);

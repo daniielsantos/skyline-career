@@ -15158,11 +15158,52 @@ export function createCareerApiServer(port = 8787) {
             send(res, 404, { error: `Unknown mission ${body.missionId}` });
             return;
           }
+          // Chrome pilot lives on the home company. The hold write above
+          // only moved the VA ops record, so the header stayed at the old hub.
+          const hub = (
+            result.mission.freightHold?.icao ??
+            result.mission.originIcao ??
+            ''
+          )
+            .trim()
+            .toUpperCase();
+          const opsId = holdCompanyId?.trim() || '';
+          let homeId = result.mission.pilotHomeCompanyId?.trim() || '';
+          if (!homeId && store?.supportsAuth) {
+            const accountId = authSessionFromRequest(req)?.account?.id?.trim();
+            if (accountId) {
+              homeId =
+                (await Promise.resolve(store.vaHomeCompanyId(accountId)))?.trim() ||
+                '';
+            }
+          }
+          let pilotIcao = result.pilotIcao;
+          if (
+            homeId &&
+            opsId &&
+            homeId !== opsId &&
+            hub &&
+            result.mission.crewOperated !== true
+          ) {
+            const homeWrite = await withCareerWrite(
+              (_world, missions) => {
+                syncPilotIcaoTo(missions, hub);
+                return { pilotIcao: missions.pilotIcao ?? hub };
+              },
+              {
+                persist: 'company',
+                companyId: homeId,
+                housekeeping: false,
+                catchUp: false,
+              },
+            );
+            pilotIcao = homeWrite.pilotIcao;
+          }
           send(res, 200, {
             mission: await toClientMission(result.mission),
             walletUsd: result.walletUsd,
             fleet: result.fleet,
-            pilotIcao: result.pilotIcao,
+            pilotIcao,
           });
         } catch (error) {
           send(res, 400, {

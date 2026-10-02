@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-02: **Leave freight não movia o piloto no header** — sintoma = a carga ficou em KTCS e o chip Pilot continuou em MMMY. Causa = o hold gravou `pilotIcao` na company da VA; o header lê a company de casa. O refresh depois do botão recolocava MMMY. Fix = o mesmo caminho do settle também grava o hub na company de casa. O voo que já está em KTCS não se corrige sozinho: o piloto ainda precisa ir até lá (Move) até esse world-api subir.
+
 Atualizado 2026-10-02: **Desk Active mostrava só a commodity do contrato merged** — sintoma = dois Supplies e um Machinery para KMIA apareciam como uma linha “Machinery”. Causa = a linha do Desk usa `commodityId` da missão, e o merge guarda os lots dentro dela. Fix = a coluna Cargo lista cada commodity, com ×N quando repete.
 
 Atualizado 2026-10-02: **Faixa Freight hold saiu do Flight Plan** — “Freight hold · KTCS / Yard storage …/day” repetia o hub que já é a origem do voo. A diária continua sendo cobrada; a faixa saiu.

@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **665542ef** / desktop **0.3.432** shipped: Fix the catalog boot crash when the port corridor is still loading. Release: [v0.3.432](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.432).
+
+
 `main` **3b0be80b** / desktop **0.3.431** shipped: Close an empty warehouse, and park cancelled desk cargo in the yard when the building is full. Release: [v0.3.431](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.431).
 
 

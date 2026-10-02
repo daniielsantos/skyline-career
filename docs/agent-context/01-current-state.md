@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **ea4a8d6b** / desktop **0.3.433** shipped: Gate port ships on pickup-hub pressure and give each port its own arrival. Release: [v0.3.433](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.433).
+
+
 `main` **665542ef** / desktop **0.3.432** shipped: Fix the catalog boot crash when the port corridor is still loading. Release: [v0.3.432](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.432).
 
 

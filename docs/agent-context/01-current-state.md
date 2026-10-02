@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **a39492e8** / desktop **0.3.430** shipped: Move the home-company pilot to the hub when freight is left there. Release: [v0.3.430](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.430).
+
+
 `main` **b6f7170d** / desktop **0.3.429** shipped: Show every commodity on a merged Desk contract, not only the first one. Release: [v0.3.429](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.429).
 
 

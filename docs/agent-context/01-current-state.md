@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **f7443b66** / desktop **0.3.425** shipped: Open the Manifest load slider after Add, instead of putting it on the Dispatch route row. Release: [v0.3.425](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.425).
+
+
 `main` **4e254f78** / desktop **0.3.424** shipped: Show a load slider under Dispatch cargo for later stops, and keep the pilot's reservation when the first leg settles. Release: [v0.3.424](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.424).
 
 

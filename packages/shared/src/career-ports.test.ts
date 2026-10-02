@@ -13,6 +13,7 @@ import {
   getCareerPort,
   listCareerPorts,
   listPortListings,
+  takeSoldPortListingPersist,
   quotePortListingUnitPriceUsd,
   resolvePortPickupHub,
   settlePortYardHoldFees,
@@ -119,6 +120,42 @@ describe('career ports', () => {
     const lot = world.portListings!.find((l) => l.id === 'portlot_sbkp');
     assert.ok(lot);
     assert.equal(lot!.allocatedHubIcao, 'SBGR');
+  });
+
+  it('keeps a sold-out listing for persist after the catalog drops it', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-sold-persist' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'PortSold',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 500_000;
+    world.portListings = [
+      {
+        id: 'portlot_general_full',
+        portId: 'BRSSZ',
+        commodityId: 'general',
+        availableKg: 7_500,
+        unitPriceUsd: 1,
+        allocatedHubIcao: 'SBGR',
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 10,
+        status: 'open',
+      },
+    ];
+    buyPortListing(state, world, {
+      listingId: 'portlot_general_full',
+      kg: 7_500,
+    });
+    listPortListings(world, 'BRSSZ');
+    assert.equal(
+      world.portListings?.some((l) => l.id === 'portlot_general_full'),
+      false,
+    );
+    const sold = takeSoldPortListingPersist(world);
+    assert.equal(sold?.id, 'portlot_general_full');
+    assert.equal(sold?.status, 'sold_out');
+    assert.equal(sold?.availableKg, 0);
+    assert.equal(takeSoldPortListingPersist(world), undefined);
   });
 
   it('rejects port buy when Cargo Ops commodity is locked', () => {

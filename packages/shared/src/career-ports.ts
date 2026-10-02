@@ -2131,6 +2131,21 @@ function hashSeed(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * Full buy marks the listing sold_out, then the catalog snapshot drops it
+ * from `world.portListings` before the company write can upsert that row.
+ * Hold the sold row here so the persist still finds it.
+ */
+const soldPortListingPersist = new WeakMap<CareerEconomyWorld, PortListing>();
+
+export function takeSoldPortListingPersist(
+  world: CareerEconomyWorld,
+): PortListing | undefined {
+  const row = soldPortListingPersist.get(world);
+  soldPortListingPersist.delete(world);
+  return row;
+}
+
 function mulberry32(a: number): () => number {
   return () => {
     let t = (a += 0x6d2b79f5);
@@ -2403,6 +2418,7 @@ export function buyPortListing(
   if (listing.availableKg <= 0) {
     listing.status = 'sold_out';
     listing.availableKg = 0;
+    soldPortListingPersist.set(world, { ...listing });
   }
 
   applyWalletDelta(state, {

@@ -171,6 +171,7 @@ import {
   upgradeFboToTier2,
   portSnapshot,
   buyPortListing,
+  takeSoldPortListingPersist,
   depositPortPickupToWarehouse,
   abandonPortPickup,
   buyWarehouseAtPickupHub,
@@ -2579,7 +2580,9 @@ async function withCareerWrite<T>(
         if (order) await activeStore.persistDemandOrder(order);
       }
       if (portListingId) {
-        const listing = world.portListings?.find((l) => l.id === portListingId);
+        const listing =
+          world.portListings?.find((l) => l.id === portListingId) ??
+          takeSoldPortListingPersist(world);
         if (listing) await activeStore.persistPortListing(listing);
       }
       if (persistPortConcessions) {

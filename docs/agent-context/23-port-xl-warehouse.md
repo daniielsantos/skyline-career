@@ -2,6 +2,10 @@
 
 Related: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), Value/Supplies CLOSED (`21` / `22`).
 
+Atualizado 2026-10-02: **Card comprado inteiro volta igual** — sintoma = electronics 16,5 klb some da carteira e entra no trânsito, e o mesmo card (mesmo kg, mesmo prazo curto) continua no balcão. Causa = a compra marca `sold_out`, o snapshot tira a linha da memória, e o save da company procura essa linha e não acha. O banco fica com o card aberto. Fix = a linha vendida fica guardada para o upsert.
+
+Atualizado 2026-10-02: **Catálogo do porto troca de listing sem o navio** — sintoma = comprou os cards de electronics e outro commodity apareceu na hora; sair e voltar trocou a linha de novo, com o Discharge ainda em ~10 h. Causa = o navio só põe kg no pátio. O balcão (P3 = 6 cards) completa o buraco na hora com kg que já estava no pátio, em qualquer commodity, inclusive no GET do catálogo. Card novo nasce com ~3 dias; um card com 1 h restante já estava aberto. Sem mudança de código.
+
 Atualizado 2026-10-02: **T5 acima do T4** — 45 t não cabe uma viagem de wide (~104 t). T5 = **100 t**, opt-in. T4 fica 45 t. Gate = 60 t embarcadas no Demand Board + CAPEX ~2× T4 (major $110k). Hold de Demand no T5 dura ~1,5 dia. Staff continua em 3 vagas.
 
 Atualizado 2026-10-02: **Abandon de lote travava a commodity inteira** — um hold reserva kg, não uma pilha. Qualquer hold dessa commodity recusava todas as pilhas. Fix = a pilha sai se o que sobra ainda cobre o hold. A pilha que deixaria o hold sem estoque continua recusada.

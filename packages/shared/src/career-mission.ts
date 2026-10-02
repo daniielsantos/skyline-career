@@ -41,7 +41,7 @@ import {
   recordWarehouseShipmentKg,
   warehouseFreeKg,
 } from './career-warehouse-stock.js';
-import { careerPortIdForPickupHub } from './career-ports.js';
+import { portIdForPickupHubBound } from './career-port-corridor.js';
 import { creditPortOperatorThroughputOnOutboundSettle } from './career-port-throughput.js';
 import { whOpsShippedMultForWarehouse } from './career-ground-staff.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
@@ -2278,7 +2278,7 @@ function restoreDeskCargoKg(
     tick: number;
   },
 ): { storedKg: number; yardKg: number } {
-  const portId = careerPortIdForPickupHub(opts.icao);
+  const portId = portIdForPickupHubBound(opts.icao);
   if (portId) {
     try {
       return depositCargoToWarehouseOrYard(fleet, { ...opts, portId });

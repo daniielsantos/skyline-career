@@ -4,6 +4,7 @@
  * Keep ladder in sync with packages/career-ui demand-accept-preview.ts.
  */
 
+import { portCorridorLookups } from './career-port-corridor-state.js';
 import {
   CAREER_HUB_COORDS,
   distanceNm,
@@ -169,35 +170,27 @@ export function formatPortCorridorReachLabel(
   return `Corridor · ${nm} nm · ${src}`;
 }
 
-type PortPickupsFn = (portId: string) => readonly string[] | undefined;
-type PortIdForHubFn = (icao: string) => string | undefined;
-type ListPortsFn = () => readonly PortDeskDef[];
-
-let portPickupsFn: PortPickupsFn | null = null;
-let portIdForHubFn: PortIdForHubFn | null = null;
-let listPortsFn: ListPortsFn | null = null;
-
 /** Called from career-ports after CAREER_PORTS is defined (breaks import cycle). */
 export function bindPortCorridorLookups(opts: {
-  portPickups: PortPickupsFn;
-  portIdForHub: PortIdForHubFn;
-  listPorts: ListPortsFn;
+  portPickups: (portId: string) => readonly string[] | undefined;
+  portIdForHub: (icao: string) => string | undefined;
+  listPorts: () => readonly PortDeskDef[];
 }): void {
-  portPickupsFn = opts.portPickups;
-  portIdForHubFn = opts.portIdForHub;
-  listPortsFn = opts.listPorts;
+  portCorridorLookups.portPickups = opts.portPickups;
+  portCorridorLookups.portIdForHub = opts.portIdForHub;
+  portCorridorLookups.listPorts = opts.listPorts;
 }
 
 export function listBoundCareerPorts(): readonly PortDeskDef[] {
-  return listPortsFn?.() ?? [];
+  return portCorridorLookups.listPorts?.() ?? [];
 }
 
 export function portIdForPickupHubBound(icao: string): string | undefined {
-  return portIdForHubFn?.(icao.trim().toUpperCase());
+  return portCorridorLookups.portIdForHub?.(icao.trim().toUpperCase());
 }
 
 export function portPickupHubsBound(portId: string): readonly string[] {
-  return portPickupsFn?.(portId.trim().toUpperCase()) ?? [];
+  return portCorridorLookups.portPickups?.(portId.trim().toUpperCase()) ?? [];
 }
 
 export function distanceHubsNm(a: string, b: string): number | null {

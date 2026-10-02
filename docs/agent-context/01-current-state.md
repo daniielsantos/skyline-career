@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **0b8aa713** / desktop **0.3.427** shipped: Edit a multi-stop flight on the Manifest, and add another contract for a stop before departure. Release: [v0.3.427](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.427).
+
+
 `main` **c07af3fd** / desktop **0.3.426** shipped: Restore the Add-list card and line up each contract field in the same column. Release: [v0.3.426](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.426).
 
 

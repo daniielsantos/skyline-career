@@ -71,26 +71,6 @@ export function DispatchStepper(props: { current: DispatchStepId }) {
   );
 }
 
-/** Mirror of shared yard rate ($/kg/economy-day). Electronics and machinery are 2×. */
-function freightHoldUsdPerDay(mission: Mission): number {
-  const lines = [
-    { kg: mission.cargoKg || 0, commodityId: mission.commodityId },
-    ...(mission.throughLoads ?? []).map((row) => ({
-      kg: row.cargoKg,
-      commodityId: row.commodityId,
-    })),
-  ];
-  const usd = lines.reduce((sum, line) => {
-    const kg = Math.max(0, line.kg);
-    const perKg =
-      line.commodityId === 'electronics' || line.commodityId === 'machinery'
-        ? 0.1
-        : 0.05;
-    return sum + kg * perKg;
-  }, 0);
-  return Math.round(usd * 100) / 100;
-}
-
 function aircraftCargoLines(
   mission: Mission,
   tripMissions: Mission[] | undefined,
@@ -524,18 +504,6 @@ export function DispatchActivePanel(props: {
           <span>
             Temporary inject harness — Cancel flight when done (no settle /
             payout).
-          </span>
-        </div>
-      ) : null}
-
-      {mission.freightHold &&
-      (mission.status === 'accepted' || mission.status === 'dispatched') ? (
-        <div className="dispatch-freight-hold" role="status">
-          <strong>Freight hold · {mission.freightHold.icao}</strong>
-          <span>
-            Ready to plan from {mission.freightHold.icao}. Yard storage{' '}
-            {props.formatMoney(freightHoldUsdPerDay(mission))}/day until the
-            next leg departs. Deadline still running.
           </span>
         </div>
       ) : null}
@@ -2299,7 +2267,7 @@ export function DispatchActivePanel(props: {
                       canLeaveFreightHere(mission) ? (
                         <button
                           type="button"
-                          className="action warn"
+                          className="action ghost compact dispatch-leave-freight"
                           disabled={
                             busy ||
                             !holdPositionOk(

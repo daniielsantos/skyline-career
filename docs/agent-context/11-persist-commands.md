@@ -1,5 +1,9 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-02: **Faixa Freight hold saiu do Flight Plan** — “Freight hold · KTCS / Yard storage …/day” repetia o hub que já é a origem do voo. A diária continua sendo cobrada; a faixa saiu.
+
+Atualizado 2026-10-02: **Leave freight here ficou discreto** — no En route o botão era uma faixa laranja na largura do card. Agora é o ghost compacto, alinhado à esquerda, no tom do texto de apoio.
+
 Atualizado 2026-10-01: **Faixa “Also on this aircraft” saiu do Flight Plan** — ela só aparecia com o voo fora de `accepted` e repetia KLAS/KMIA que a rota e os cards de carga já mostram. Removida. O freight hold de pátio continua.
 
 Atualizado 2026-10-01: **O toast do Machinery vem do world, não da API local** — sintoma = Edit cargo + Add do bridge KMIA ainda toastava “Add the next stop before dispatch”. Causa = o desktop está em MP (`desktop-play.json` → `https://world.playairframe.com`). O Save é proxy. O world publicado ainda recusa o stop quando o voo não está `accepted`. O código local já reabre `dispatched` e empilha o bridge do mesmo tipo; isso não roda nesse clique até o world-api ser atualizado. Reiniciar o desktop não muda o toast.

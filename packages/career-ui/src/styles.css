@@ -3887,6 +3887,14 @@ tr.lot-locked {
   line-height: 1.3;
 }
 
+.dispatch-active-enroute .dispatch-leave-freight {
+  justify-self: start;
+  width: auto;
+  margin-top: 0.15rem;
+  color: var(--muted);
+  --ghost-tone: var(--muted);
+}
+
 .dispatch-enroute-live .preflight-load-grid {
   margin: 0;
   width: 100%;

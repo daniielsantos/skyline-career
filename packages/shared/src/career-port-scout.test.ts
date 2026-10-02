@@ -23,7 +23,11 @@ import {
   PORT_SCOUT_HAUL_MAX_NM,
   PORT_SCOUT_MIN_KG,
 } from './career-port-scout.js';
-import { airportByIcao, createSeedEconomyWorld } from './career-economy.js';
+import {
+  airportByIcao,
+  createSeedEconomyWorld,
+  localUnitPriceUsd,
+} from './career-economy.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
 import {
   ensurePlayerWarehouses,
@@ -61,7 +65,7 @@ function grantWh(
 function setHubFill(
   world: ReturnType<typeof createSeedEconomyWorld>,
   icao: string,
-  commodityId: 'general',
+  commodityId: 'general' | 'electronics',
   fill: number,
 ) {
   const pile = airportByIcao(world, icao)?.inventory?.[commodityId];
@@ -187,6 +191,53 @@ describe('port scout', () => {
       (s) => s.originIcao === 'SBGR' && s.destIcao === 'SBKP',
     );
     assert.equal(suggestions.length, 0);
+  });
+
+  it('ranks a smaller wide price gap above a larger tiny gap', () => {
+    const { world, state } = missionsAtSantos();
+    grantWh(state, 'SBGR');
+    grantWh(state, 'SBKP');
+    claimPortConcession(state, world, { portId: 'BRSSZ' });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 8_000,
+      avgCostUsdPerKg: 1,
+      tick: world.tick,
+    });
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'electronics',
+      kg: 2_000,
+      avgCostUsdPerKg: 1,
+      tick: world.tick,
+    });
+    setHubFill(world, 'SBGR', 'general', 0.52);
+    setHubFill(world, 'SBKP', 'general', 0.5);
+    setHubFill(world, 'SBGR', 'electronics', 0.9);
+    setHubFill(world, 'SBKP', 'electronics', 0.1);
+    const suggestions = listPortScoutBridgeSuggestions(state, world).filter(
+      (s) => s.originIcao === 'SBGR' && s.destIcao === 'SBKP',
+    );
+    const general = suggestions.find((s) => s.commodityId === 'general');
+    const electronics = suggestions.find((s) => s.commodityId === 'electronics');
+    assert.ok(general);
+    assert.ok(electronics);
+    assert.ok(electronics!.kg < general!.kg);
+    const spread = (commodityId: 'general' | 'electronics') => {
+      const origin = airportByIcao(world, 'SBGR')!.inventory[commodityId]!;
+      const dest = airportByIcao(world, 'SBKP')!.inventory[commodityId]!;
+      return (
+        localUnitPriceUsd(commodityId, dest) -
+        localUnitPriceUsd(commodityId, origin)
+      );
+    };
+    assert.ok(spread('electronics') > spread('general'));
+    assert.ok(electronics!.score > general!.score);
+    assert.ok(
+      suggestions.findIndex((s) => s.commodityId === 'electronics') <
+        suggestions.findIndex((s) => s.commodityId === 'general'),
+    );
   });
 
   it('Demand scout empty without Port FBO or matching stock', () => {

@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-02: **Scout Bridge e Auto haul ordenavam pelo kg** — um lote grande com o destino um centavo mais caro ficava na frente de um lote menor com um ganho grande. Fix = a nota é (preço do destino − preço da origem) × kg. A porteira continua: o destino tem de pagar mais. Distância só desempata. O Auto haul posta essa mesma lista, então pega o maior ganho primeiro.
+
 Atualizado 2026-10-02: **Back da sidebar perdia a aba do Crew** — abrir um terminal desmontava a página e a aba voltava para Hauls. Fix = a aba fica no App. O Back reabre a mesma (Roster, Hangar, Ports, Ledger, Logbook, Config).
 
 Atualizado 2026-10-02: **Prepare e Cancel do Desk encolhiam para "…"** — o texto do botão virava reticências enquanto a resposta não voltava. Fix = o rótulo fica, e a bolinha de carregamento entra ao lado.

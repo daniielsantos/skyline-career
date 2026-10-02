@@ -257,6 +257,7 @@ export function tickVaAutoHaul(
     return { posted: 0, retired, skipped: 'open_holds' };
   }
 
+  // Scout Bridge order: largest spot-price gain (spread × kg) first.
   const suggestions = listPortScoutBridgeSuggestions(state, world, {
     max: 8,
     companyId,

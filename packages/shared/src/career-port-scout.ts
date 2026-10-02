@@ -364,6 +364,29 @@ export function bridgeDestPaysMore(
   );
 }
 
+/** Dest spot minus origin spot, per kg. Zero when either pile is missing. */
+function bridgeSpotSpreadUsdPerKg(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+  commodityId: CommodityId,
+): number {
+  const originPile = airportByIcao(world, originIcao)?.inventory?.[commodityId];
+  const destPile = airportByIcao(world, destIcao)?.inventory?.[commodityId];
+  if (
+    !originPile ||
+    !destPile ||
+    originPile.capacityKg <= 0 ||
+    destPile.capacityKg <= 0
+  ) {
+    return 0;
+  }
+  return (
+    localUnitPriceUsd(commodityId, destPile) -
+    localUnitPriceUsd(commodityId, originPile)
+  );
+}
+
 /**
  * List WH→WH bridge ideas from company stock (Port FBO desk).
  * Requires an active Port FBO whose pickup hubs include the origin (or dest).
@@ -420,8 +443,10 @@ export function listPortScoutBridgeSuggestions(
         if (!bridgeDestPaysMore(world, origin, dest, commodityId)) continue;
 
         const distanceNm = Math.round(moneyNm(world, origin, dest));
-        // Prefer more kg, mild preference for shorter hops.
-        const score = kg - Math.min(distanceNm, 800) * 0.5;
+        // Rank by the dollar gain of the move. A bigger pile only wins when
+        // its price gap × kg beats a smaller, wider gap. Distance breaks ties.
+        const score =
+          bridgeSpotSpreadUsdPerKg(world, origin, dest, commodityId) * kg;
         out.push({
           id: `${origin}|${dest}|${commodityId}`,
           originIcao: origin,

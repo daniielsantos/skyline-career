@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **a50a803e** / desktop **0.3.439** shipped: Stop the Ports snapshot from rescanning every airport on open. Release: [v0.3.439](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.439).
+
+
 `main` **223ab46a** / desktop **0.3.438** shipped: Save a sold-out port listing so the same card cannot be bought again. Release: [v0.3.438](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.438).
 
 

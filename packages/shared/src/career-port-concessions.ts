@@ -4,6 +4,7 @@
  */
 
 import { TICKS_PER_DAY } from './career-clock.js';
+import { airportByIcao } from './career-economy.js';
 import { appendLedgerMarker, applyWalletDelta } from './career-ledger.js';
 import { liquidateConcessionJetA } from './career-port-jet-a.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
@@ -387,6 +388,11 @@ export function portOperatorEtaMult(
     : PORT_OPERATOR_ETA_MULT;
 }
 
+const portInventoryIndex = new WeakMap<
+  PortInventoryRow[],
+  Map<string, PortInventoryRow>
+>();
+
 export function ensurePortInventories(
   world: CareerEconomyWorld,
 ): PortInventoryRow[] {
@@ -394,6 +400,15 @@ export function ensurePortInventories(
     world.portInventories = [];
   }
   const rows = world.portInventories;
+  const expected = listCareerPorts().length * PORT_CARGO.length;
+  const cached = portInventoryIndex.get(rows);
+  if (
+    cached &&
+    rows.length >= expected &&
+    cached.size === rows.length
+  ) {
+    return rows;
+  }
   const byKey = new Map<string, PortInventoryRow>(
     rows.map((r) => [`${r.portId}:${r.commodityId}`, r] as const),
   );
@@ -414,6 +429,7 @@ export function ensurePortInventories(
       byKey.set(key, row);
     }
   }
+  portInventoryIndex.set(rows, byKey);
   return rows;
 }
 
@@ -422,11 +438,9 @@ export function getPortInventoryStock(
   portId: string,
   commodityId: CommodityId,
 ): number {
-  ensurePortInventories(world);
+  const rows = ensurePortInventories(world);
   const id = portId.trim().toUpperCase();
-  const row = (world.portInventories ?? []).find(
-    (r) => r.portId === id && r.commodityId === commodityId,
-  );
+  const row = portInventoryIndex.get(rows)?.get(`${id}:${commodityId}`);
   return row?.stockKg ?? 0;
 }
 
@@ -444,7 +458,7 @@ function tightestPickupHubFill(
   for (const raw of hubs) {
     const icao = raw.trim().toUpperCase();
     if (!icao) continue;
-    const ap = world.airports.find((a) => a.icao.trim().toUpperCase() === icao);
+    const ap = airportByIcao(world, icao);
     const pile = ap?.inventory?.[commodityId];
     if (!pile || !(pile.capacityKg > 0)) continue;
     const fill = Math.min(1, Math.max(0, pile.stockKg / pile.capacityKg));

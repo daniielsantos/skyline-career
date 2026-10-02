@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-02: **Aba Ports lenta ao abrir** — sintoma = o catalog espera `GET /api/ports` no world. Causa = o inbound de cada porto varria a lista inteira de aeroportos, o estoque do porto reconstruía o inventário em toda leitura, e cada porto reseedia as listings. Fix = hub pelo índice `airportByIcao`, inventário indexado uma vez, listings lidas do que já está no world. O tick continua sendo quem expira e repõe card. Pay e o board não mudam.
+
 Atualizado 2026-10-01: **Scout acompanha o pulso** — sintoma = a lista de Haul/Demand/Bridge ficava parada com a rota que já não pagava, enquanto o Auto-haul no tick já tinha trocado o hold. Causa = o refresh do tick pedia o desk e deixava o Scout de fora de propósito. Fix = o mesmo pulso pede a lista de novo. O poll de 20s continua sem Scout. A lista não apaga enquanto carrega.
 
 Atualizado 2026-10-01: **Teto de dois FBO por company** — sintoma = o claim dizia “já tem um Port FBO” e mesmo assim um segundo porto entrava quando a concessão só estava no índice do world. Fix = a company pode ter 2 concessões ativas. A conta junta o save e o world. O terceiro claim recusa. Um porto continua com um operador só.

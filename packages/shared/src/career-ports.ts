@@ -2240,18 +2240,38 @@ export function ensurePortListings(world: CareerEconomyWorld): PortListing[] {
   return world.portListings;
 }
 
+function isOpenPortListing(world: CareerEconomyWorld, listing: PortListing): boolean {
+  return (
+    listing.status === 'open' &&
+    listing.availableKg > 0 &&
+    listing.expiresAtTick > world.tick
+  );
+}
+
+/** Open listings grouped by port. Does not seed or expire. */
+function openPortListingsByPort(
+  world: CareerEconomyWorld,
+): Map<string, PortListing[]> {
+  const byPort = new Map<string, PortListing[]>();
+  for (const listing of world.portListings ?? []) {
+    if (!isOpenPortListing(world, listing)) continue;
+    const id = listing.portId.trim().toUpperCase();
+    const bucket = byPort.get(id);
+    if (bucket) bucket.push(listing);
+    else byPort.set(id, [listing]);
+  }
+  return byPort;
+}
+
 export function listPortListings(
   world: CareerEconomyWorld,
   portId?: string,
+  opts?: { seed?: boolean },
 ): PortListing[] {
-  ensurePortListings(world);
+  if (opts?.seed !== false) ensurePortListings(world);
   const id = portId?.trim().toUpperCase();
   return (world.portListings ?? []).filter(
-    (l) =>
-      l.status === 'open' &&
-      l.availableKg > 0 &&
-      l.expiresAtTick > world.tick &&
-      (!id || l.portId === id),
+    (l) => isOpenPortListing(world, l) && (!id || l.portId === id),
   );
 }
 
@@ -2924,6 +2944,7 @@ export function portSnapshot(
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
     });
   }
+  const listingsByPort = openPortListingsByPort(world);
   const pickups = state ? ensurePlayerPortPickups(state) : [];
   const pickupViews = pickups.map((p) => {
     const holdUsdPerDay = portYardHoldUsdPerDay({
@@ -3011,7 +3032,7 @@ export function portSnapshot(
             },
           ];
         })(),
-        listings: listPortListings(world, port.id).map((l) => ({
+        listings: (listingsByPort.get(port.id.trim().toUpperCase()) ?? []).map((l) => ({
           ...l,
           commodityName: getCommodity(l.commodityId).name,
           hubSpotUnitPriceUsd: hubSpotUnitPriceUsd(

@@ -101,6 +101,24 @@ describe('career ports', () => {
     assert.ok(snap.pickups[0]!.heldDays >= PORT_YARD_HOLD_WARN_DAYS);
   });
 
+  it('reads listings without seeding when seed is off', () => {
+    const world = createSeedEconomyWorld({ seed: 'ports-read-listings' });
+    world.portListings = [];
+    assert.equal(listPortListings(world, 'BRSSZ', { seed: false }).length, 0);
+    assert.equal(world.portListings.length, 0);
+    const seeded = listPortListings(world, 'BRSSZ');
+    assert.ok(seeded.length > 0);
+    const soft = portSnapshot(world, emptyMissionsStateV2(), {
+      seedMarket: false,
+    });
+    const before = world.portListings.length;
+    assert.equal(
+      soft.ports.find((p) => p.id === 'BRSSZ')?.listings.length,
+      seeded.length,
+    );
+    assert.equal(world.portListings.length, before);
+  });
+
   it('heals open listings onto desk pickup hub', () => {
     const world = createSeedEconomyWorld({ seed: 'desk-heal' });
     world.portListings = [

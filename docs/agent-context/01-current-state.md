@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **bfc4abe8** / desktop **0.3.437** shipped: Add a 100 t warehouse tier above the 45 t Port Bonded cap. Release: [v0.3.437](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.437).
+
+
 `main` **d0716c24** / desktop **0.3.436** shipped: Remember the Crew tab on sidebar Back, and page the ledger at 10 rows. Release: [v0.3.436](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.436).
 
 

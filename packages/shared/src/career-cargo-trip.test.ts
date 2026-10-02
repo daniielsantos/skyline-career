@@ -223,15 +223,24 @@ describe('cargo trip', () => {
     assert.equal(aircraft.reservedByAccountId, 'pilot-a');
   });
 
-  it('releases riders at the original origin when the host is cancelled', () => {
+  it('cancels later stops when the host flight is cancelled', () => {
     const { world, state } = acceptedPair();
     addCargoStop(state, 'msn_trip_host', 'msn_trip_rider');
+    addCargoStop(state, 'msn_trip_host', 'msn_trip_later');
     const host = state.missions.find((row) => row.id === 'msn_trip_host')!;
-    cancelMission(world, host, { fleet: state });
+    const cancelled = cancelMission(world, host, { fleet: state });
+    state.missions = state.missions.map((row) =>
+      row.id === cancelled.id ? cancelled : row,
+    );
     const rider = state.missions.find((row) => row.id === 'msn_trip_rider')!;
+    assert.equal(cancelled.status, 'cancelled');
     assert.equal(rider.throughHostId, undefined);
     assert.equal(rider.originIcao, 'SBGR');
-    assert.equal(rider.status, 'accepted');
+    assert.equal(rider.status, 'cancelled');
+    assert.equal(
+      state.missions.find((row) => row.id === 'msn_trip_later')?.status,
+      'cancelled',
+    );
   });
 
   it('drops a cancelled rider off the host', () => {

@@ -2656,6 +2656,7 @@ export function postStagingCommit(opts: {
     lineCount?: number;
     remainingKg?: number;
     fleet?: PlayerAircraft[];
+    missions?: Mission[];
     dispatchError?: string | null;
     dispatch?: {
       url: string;

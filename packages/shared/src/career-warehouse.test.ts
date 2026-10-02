@@ -59,6 +59,7 @@ import {
   dispatchWarehouseHaulHold,
   dispatchWarehouseHaulHolds,
   holdWarehouseHaul,
+  replaceWarehouseDeskMissionCargo,
 } from './career-warehouse-haul.js';
 import {
   buyPortListing,
@@ -1815,5 +1816,59 @@ describe('career warehouse + demand', () => {
     cancelMission(world, flown.mission, { fleet: state });
     assert.equal(stock('general'), generalBefore);
     assert.equal(stock('supplies'), suppliesBefore);
+  });
+
+  it('edits an accepted haul without looking up a market lot', () => {
+    const world = createSeedEconomyWorld({ seed: 'haul-manifest-edit' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'HaulEdit',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 900_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    wh.tier = 4;
+    wh.capacityKg = WAREHOUSE_T4_CAPACITY_KG;
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 2_000,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const held = holdWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      kg: 200,
+    });
+    const accepted = dispatchWarehouseHaulHold(state, world, {
+      holdId: held.hold.id,
+      aircraftId: aircraft.id,
+      kg: 80,
+    });
+    const stockAfter = (state.playerWarehouses?.stock ?? []).reduce(
+      (sum, pile) => sum + pile.kg,
+      0,
+    );
+    const edited = replaceWarehouseDeskMissionCargo(
+      state,
+      world,
+      accepted.mission,
+      { cargoKg: 40 },
+    );
+    assert.equal(edited.cargoKg, 40);
+    assert.equal(edited.lots[0]?.shipmentLotId.startsWith('whhaul_'), true);
+    assert.equal(
+      Math.round(edited.payUsd),
+      Math.round((accepted.payUsd * 40) / accepted.kg),
+    );
+    assert.equal(
+      (state.playerWarehouses?.stock ?? []).reduce((sum, pile) => sum + pile.kg, 0),
+      stockAfter + 40,
+    );
+    assert.equal(edited.warehouseHaul, true);
   });
 });

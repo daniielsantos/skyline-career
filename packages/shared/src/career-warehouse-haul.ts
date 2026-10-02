@@ -33,6 +33,7 @@ import {
 } from './career-mission.js';
 import { findCareerPlayerAirframe } from './career-player-airframes.js';
 import {
+  depositCargoToWarehouse,
   findPlayerWarehouseAtIcao,
   warehouseFreeCommodityKg,
   withdrawCargoFromWarehouse,
@@ -672,4 +673,100 @@ export function dispatchWarehouseHaulHolds(
     actorIsVaOwner: opts.actorIsVaOwner,
   });
   return { mission, kg: totalKg, payUsd };
+}
+
+/**
+ * Edit an accepted warehouse haul or bridge. The lot id is synthetic
+ * (`whhaul_` / `whbridge_`), not a market lot. Delta goes back to, or comes
+ * out of, the origin warehouse. Later stops on the aircraft stay put.
+ */
+export function replaceWarehouseDeskMissionCargo(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  mission: MissionIntent,
+  opts: { cargoKg: number; maxCargoKg?: number },
+): MissionIntent {
+  const normalized = recomputeMissionTotals(mission);
+  if (!normalized.warehouseHaul && !normalized.warehouseBridge) {
+    throw new Error('Not a warehouse haul or bridge');
+  }
+  if (normalized.status !== 'accepted' && normalized.status !== 'dispatched') {
+    throw new Error(`Cannot edit mission in status=${normalized.status}`);
+  }
+  if (normalized.lots.length !== 1) {
+    throw new Error('This warehouse flight has more than one cargo line');
+  }
+
+  const newKg = Math.floor(opts.cargoKg);
+  if (!Number.isFinite(newKg) || newKg <= 0) {
+    throw new Error('Edited cargo must be at least 1 kg');
+  }
+  const line = normalized.lots[0]!;
+  const oldKg = Math.max(0, Math.floor(line.cargoKg));
+  if (oldKg <= 0) throw new Error('Warehouse flight has no cargo to edit');
+
+  const classDef = getAircraftClass(normalized.aircraftClassId);
+  const airframeMax = findCareerPlayerAirframe(
+    normalized.airframeTypeId,
+  )?.maxCargoKg;
+  const maxCargoKg =
+    opts.maxCargoKg !== undefined &&
+    Number.isFinite(opts.maxCargoKg) &&
+    opts.maxCargoKg > 0
+      ? Math.floor(opts.maxCargoKg)
+      : (airframeMax ?? classDef.maxCargoKg);
+  const throughKg = (normalized.throughLoads ?? []).reduce(
+    (sum, row) => sum + Math.max(0, Math.floor(row.cargoKg)),
+    0,
+  );
+  if (newKg + throughKg > maxCargoKg) {
+    throw new Error(
+      `Edited cargo ${newKg} kg exceeds aircraft capacity ${maxCargoKg} kg`,
+    );
+  }
+
+  const commodityId = line.commodityId;
+  const origin = normalized.originIcao.trim().toUpperCase();
+  const delta = newKg - oldKg;
+  let warehouseAvgCostUsdPerKg = normalized.warehouseAvgCostUsdPerKg ?? 0;
+  if (delta < 0) {
+    depositCargoToWarehouse(state, {
+      icao: origin,
+      commodityId,
+      kg: -delta,
+      avgCostUsdPerKg: warehouseAvgCostUsdPerKg,
+      tick: normalized.acceptedAtTick ?? world.tick,
+    });
+  } else if (delta > 0) {
+    const withdrawn = withdrawCargoFromWarehouse(state, {
+      icao: origin,
+      commodityId,
+      kg: delta,
+    });
+    warehouseAvgCostUsdPerKg = money(
+      (warehouseAvgCostUsdPerKg * oldKg + withdrawn.avgCostUsdPerKg * delta) /
+        newKg,
+    );
+  }
+
+  const payUsd = money((line.payUsd * newKg) / oldKg);
+  const replaced = recomputeMissionTotals({
+    ...normalized,
+    lots: [{ ...line, cargoKg: newKg, payUsd }],
+    shipmentLotId: line.shipmentLotId,
+    commodityId,
+    cargoKg: newKg,
+    payUsd,
+    warehouseAvgCostUsdPerKg,
+    status: 'accepted',
+    lastOfpCheck: undefined,
+    lastPreflightCheck: undefined,
+    fuelAuthorizedOfpId: undefined,
+    tripFuelBurnKg: undefined,
+    dispatchedAtTick: undefined,
+  });
+  const missionIdx = (state.missions ?? []).findIndex((row) => row.id === replaced.id);
+  if (missionIdx >= 0) state.missions![missionIdx] = replaced;
+  syncPlayerInbound(world, replaced);
+  return replaced;
 }

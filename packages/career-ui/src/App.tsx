@@ -43,7 +43,6 @@ import {
   postPreflight,
   postSettle,
   postLeaveFreight,
-  postAddCargoStop,
   postAddDeskHold,
   fetchVaHauls,
   postSelectHub,
@@ -587,6 +586,8 @@ type StagingDraft = {
     pilotPayUsd?: number;
     /** Desk hold TTL — same clock as Open desk. */
     expiresAtTick?: number;
+    /** Stop airport. Omitted on the hold that opened this Manifest. */
+    destIcao?: string;
   };
   /**
    * Other open holds with the same origin, destination, and kind.
@@ -626,6 +627,23 @@ function deskHoldPayUsd(desk: NonNullable<StagingDraft['deskHold']>): number {
     return Math.max(0, Math.round(desk.unitPriceUsd * loadKg));
   }
   return 0;
+}
+
+function deskEditKind(mission: {
+  warehouseHaul?: boolean;
+  warehouseBridge?: boolean;
+  demandOrderId?: string;
+  shipmentLotId?: string;
+  lots?: Array<{ shipmentLotId: string }>;
+}): 'demand' | 'bridge' | 'haul' | null {
+  if (mission.warehouseBridge) return 'bridge';
+  if (mission.warehouseHaul) return 'haul';
+  if (mission.demandOrderId) return 'demand';
+  const id = mission.lots?.[0]?.shipmentLotId ?? mission.shipmentLotId ?? '';
+  if (id.startsWith('whbridge_')) return 'bridge';
+  if (id.startsWith('whhaul_')) return 'haul';
+  if (id.startsWith('demand_')) return 'demand';
+  return null;
 }
 
 function clampDeskHoldDraft(draft: StagingDraft, capKg: number): StagingDraft {
@@ -2312,6 +2330,11 @@ function stagingManifestEditDirty(
   mission: Mission | undefined,
 ): boolean {
   if (!draft.replaceManifest || !mission) return false;
+  if (draft.deskHold) {
+    return deskHoldLines(draft).some(
+      (line) => deskHoldEffectiveLoadKg(line) !== Math.floor(line.kg),
+    );
+  }
   const saved = missionLotLines(mission).map((line) => ({
     lotId: line.shipmentLotId,
     cargoKg: Math.max(0, Math.floor(line.cargoKg)),
@@ -6938,13 +6961,6 @@ export function App() {
   const [stagingJoinKg, setStagingJoinKg] = useState<Record<string, number>>(
     {},
   );
-  const [dispatchJoinKg, setDispatchJoinKg] = useState<Record<string, number>>(
-    {},
-  );
-  const dispatchMissionId = activeMission?.id;
-  useEffect(() => {
-    setDispatchJoinKg({});
-  }, [dispatchMissionId]);
   useEffect(() => {
     const preparing = Boolean(staging?.deskHold);
     const accepted =
@@ -11039,7 +11055,11 @@ export function App() {
       .reduce((sum, line) => sum + line.cargoKg, 0);
     return Math.max(
       0,
-      aircraftCapKg(draft.aircraft) - existing - staged - stagingThroughKg(draft),
+      aircraftCapKg(draft.aircraft) -
+        existing -
+        staged -
+        stagingThroughKg(draft) -
+        stagingJoinLoadKg,
     );
   }
 
@@ -11454,6 +11474,8 @@ export function App() {
     if (busy) return;
     setPendingActiveTour(null);
     setStagingFerryOpen(false);
+    setStagingJoinHoldIds([]);
+    setStagingJoinKg({});
     if (staging?.replaceManifest) {
       if (activeCareerProfile?.id) {
         clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
@@ -11477,7 +11499,10 @@ export function App() {
   async function onBackFromManifestEdit() {
     if (!staging?.replaceManifest || busy) return;
     const mission = missions.find((m) => m.id === staging.intoMissionId);
-    if (stagingManifestEditDirty(staging, mission)) {
+    if (
+      stagingManifestEditDirty(staging, mission) ||
+      stagingJoinHoldIds.length > 0
+    ) {
       const ok = await confirm({
         title: 'Leave manifest editor?',
         body: (
@@ -11593,6 +11618,77 @@ export function App() {
           : { ...line },
       );
     }
+    const deskKind = deskEditKind(mission);
+    if (deskKind) {
+      const holdFrom = (
+        line: (typeof missionLots)[number],
+        dest: string,
+        lineKind: 'demand' | 'bridge' | 'haul',
+      ): NonNullable<StagingDraft['deskHold']> => {
+        const kg = Math.max(1, Math.floor(line.cargoKg));
+        const pay = Math.max(0, Math.round(line.payUsd));
+        return {
+          id: line.shipmentLotId,
+          kind: lineKind,
+          commodityId: line.commodityId,
+          kg,
+          loadKg: kg,
+          destIcao: dest,
+          expiresAtTick: line.deadlineTick,
+          ...(lineKind === 'bridge'
+            ? { pilotPayUsd: pay }
+            : { unitPriceUsd: kg > 0 ? line.payUsd / kg : 0 }),
+        };
+      };
+      const hostLots = [...editableLots.values()];
+      if (hostLots.length === 0) {
+        setError('This flight has no cargo lines to edit');
+        return;
+      }
+      const stopOrder = new Map(
+        (mission.throughLoads ?? []).map((row) => [row.missionId, row.stopIndex]),
+      );
+      const riders = missions
+        .filter(
+          (row) =>
+            row.throughHostId === mission.id &&
+            (row.status === 'accepted' || row.status === 'dispatched'),
+        )
+        .sort(
+          (a, b) => (stopOrder.get(a.id) ?? 0) - (stopOrder.get(b.id) ?? 0),
+        );
+      const [primary, ...hostRest] = hostLots;
+      const extras = [
+        ...hostRest.map((line) => holdFrom(line, mission.destIcao, deskKind)),
+        ...riders.flatMap((rider) => {
+          const riderKind = deskEditKind(rider) ?? deskKind;
+          return (rider.lots ?? [])
+            .filter((line) => line.shipmentLotId && line.cargoKg > 0)
+            .map((line) => holdFrom(line, rider.destIcao, riderKind));
+        }),
+      ].slice(0, MAX_STAGING_LOTS - 1);
+      const draft: StagingDraft = {
+        originIcao: mission.originIcao,
+        destIcao: mission.destIcao,
+        originName: mission.originIcao,
+        destName: mission.destIcao,
+        aircraft: mission.aircraftClassId as AircraftClass,
+        aircraftId: mission.aircraftId,
+        intoMissionId: mission.id,
+        replaceManifest: true,
+        lines: [],
+        deskHold: holdFrom(primary!, mission.destIcao, deskKind),
+        deskHoldExtras: extras,
+      };
+      setStaging(draft);
+      setStagingJoinHoldIds([]);
+      setStagingJoinKg({});
+      setPreferredAircraft(draft.aircraft);
+      setError(null);
+      setAirportReturn(null);
+      goToTab('staging');
+      return;
+    }
     const lines: StagingLine[] = [];
     for (const line of editableLots.values()) {
       const market = lots.find((lot) => lot.id === line.shipmentLotId);
@@ -11658,6 +11754,8 @@ export function App() {
       lines,
     };
     setStaging(draft);
+    setStagingJoinHoldIds([]);
+    setStagingJoinKg({});
     setPreferredAircraft(draft.aircraft);
     setError(null);
     setAirportReturn(null);
@@ -11868,6 +11966,124 @@ export function App() {
   async function onCommitStaging() {
     if (!staging) return;
     if (staging.deskHold) {
+      if (staging.replaceManifest && staging.intoMissionId) {
+        const aircraftId = staging.aircraftId?.trim();
+        const missionId = staging.intoMissionId;
+        if (!aircraftId || !stagingAircraftAtOrigin || !stagingPilotAtOrigin) {
+          return;
+        }
+        await run(async () => {
+          const opsCompanyId = resolveOpsCompanyId(aircraftId);
+          const vaOps =
+            Boolean(memberVaCompanyIdRef.current) &&
+            opsCompanyId === memberVaCompanyIdRef.current;
+          const lines = deskHoldLines(staging);
+          const changed = lines.some(
+            (line) => deskHoldEffectiveLoadKg(line) !== Math.floor(line.kg),
+          );
+          if (changed) {
+            const result = await postStagingCommit({
+              aircraft: staging.aircraft,
+              aircraftId,
+              missionId,
+              openDispatch: false,
+              replace: true,
+              weightSystem,
+              companyId: opsCompanyId,
+              lines: lines.map((line) => ({
+                lotId: line.id,
+                cargoKg: deskHoldEffectiveLoadKg(line),
+              })),
+            });
+            if (result.fleet) paintOpsMutationFleet(result.fleet, opsCompanyId);
+            if (result.missions?.length) {
+              setMissions(result.missions.slice().reverse());
+            } else if (result.mission) {
+              setMissions((prev) => {
+                const idx = prev.findIndex((row) => row.id === result.mission.id);
+                if (idx < 0) return [result.mission, ...prev];
+                const next = prev.slice();
+                next[idx] = result.mission;
+                return next;
+              });
+            }
+            if (typeof result.walletUsd === 'number') {
+              if (vaOps) setVaSessionWallet(result.walletUsd);
+              else commitWallet(result.walletUsd);
+            }
+            setStaging((current) => {
+              if (!current?.deskHold) return current;
+              const kept = (hold: NonNullable<StagingDraft['deskHold']>) => {
+                const loadKg = deskHoldEffectiveLoadKg(hold);
+                if (hold.id !== current.deskHold?.id && loadKg <= 0) return null;
+                return { ...hold, kg: Math.max(loadKg, 1), loadKg };
+              };
+              const deskHold = kept(current.deskHold);
+              if (!deskHold) return current;
+              return {
+                ...current,
+                deskHold,
+                deskHoldExtras: (current.deskHoldExtras ?? []).flatMap((hold) => {
+                  const next = kept(hold);
+                  return next ? [next] : [];
+                }),
+              };
+            });
+          }
+          const joinIds = stagingJoinHoldIds.slice();
+          const joinKg = stagingJoinKg;
+          const addedDests: string[] = [];
+          const joined: string[] = [];
+          for (const holdId of joinIds) {
+            try {
+              const added = await postAddDeskHold({
+                missionId,
+                holdId,
+                companyId: opsCompanyId,
+                ...(joinKg[holdId] != null ? { kg: joinKg[holdId] } : {}),
+              });
+              if (added.fleet) paintOpsMutationFleet(added.fleet, opsCompanyId);
+              if (added.missions?.length) {
+                setMissions(added.missions.slice().reverse());
+              }
+              joined.push(holdId);
+              const dest = openDeskHolds.find((row) => row.id === holdId)?.destIcao;
+              if (dest) addedDests.push(dest);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              setStagingJoinHoldIds((current) =>
+                current.filter((id) => !joined.includes(id)),
+              );
+              setStagingJoinKg((current) => {
+                const next = { ...current };
+                for (const id of joined) delete next[id];
+                return next;
+              });
+              setToastKind('fail');
+              setToast(message);
+              return;
+            }
+          }
+          if (activeCareerProfile?.id) {
+            clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
+          }
+          setStaging(null);
+          setStagingJoinHoldIds([]);
+          setStagingJoinKg({});
+          setWatchAutoPaused(false);
+          setSimbriefLaunchUrl(null);
+          goToTab('staging');
+          setToastKind('ok');
+          setToast(
+            addedDests.length > 0
+              ? `Manifest ${staging.originIcao}→${staging.destIcao} · also ${addedDests.join(', ')}`
+              : changed
+                ? `Manifest ${staging.originIcao}→${staging.destIcao} updated`
+                : `Manifest ${staging.originIcao}→${staging.destIcao}`,
+          );
+        });
+        return;
+      }
       const hold = staging.deskHold;
       const aircraftId = staging.aircraftId?.trim();
       if (!aircraftId) return;
@@ -12069,18 +12285,18 @@ export function App() {
           // Commit with explicit companyId first — do not wait on VA session
           // pin (that was stacking ~session open ahead of the world write).
           const result = await postStagingCommit({
-            aircraft: clamped.aircraft,
-            aircraftId: clamped.aircraftId,
-            missionId: clamped.intoMissionId,
-            openDispatch: false,
-            replace: Boolean(clamped.replaceManifest),
-            weightSystem,
-            companyId: opsCompanyId,
-            lines: clamped.lines.map((line) => ({
-              lotId: line.lot.id,
-              cargoKg: line.cargoKg,
-            })),
-          });
+                aircraft: clamped.aircraft,
+                aircraftId: clamped.aircraftId,
+                missionId: clamped.intoMissionId,
+                openDispatch: false,
+                replace: Boolean(clamped.replaceManifest),
+                weightSystem,
+                companyId: opsCompanyId,
+                lines: clamped.lines.map((line) => ({
+                  lotId: line.lot.id,
+                  cargoKg: line.cargoKg,
+                })),
+              });
           if (result.fleet) {
             paintOpsMutationFleet(result.fleet, opsCompanyId);
           }
@@ -12106,6 +12322,56 @@ export function App() {
           if (activeCareerProfile?.id) {
             clearPersistedStagingDraft(activeCareerProfile.id, authAccountId);
           }
+          const joinIds = stagingJoinHoldIds.slice();
+          const joinKg = stagingJoinKg;
+          const addedIds: string[] = [];
+          let joinFailed = false;
+          if (joinIds.length > 0 && result.mission?.id) {
+            const addedDests: string[] = [];
+            for (const holdId of joinIds) {
+              try {
+                const added = await postAddDeskHold({
+                  missionId: result.mission.id,
+                  holdId,
+                  companyId: opsCompanyId,
+                  ...(joinKg[holdId] != null ? { kg: joinKg[holdId] } : {}),
+                });
+                if (added.fleet) paintOpsMutationFleet(added.fleet, opsCompanyId);
+                if (added.missions?.length) {
+                  setMissions(added.missions.slice().reverse());
+                }
+                addedIds.push(holdId);
+                const dest = openDeskHolds.find((row) => row.id === holdId)?.destIcao;
+                if (dest) addedDests.push(dest);
+              } catch (error) {
+                const message =
+                  error instanceof Error ? error.message : String(error);
+                setToastKind('fail');
+                setToast(message);
+                joinFailed = true;
+                break;
+              }
+            }
+            if (addedDests.length > 0 && !joinFailed) {
+              setToastKind('ok');
+              setToast(
+                `Manifest saved · also ${addedDests.join(', ')}. The first OFP carries the combined load.`,
+              );
+            }
+          }
+          if (joinFailed) {
+            setStagingJoinHoldIds((current) =>
+              current.filter((id) => !addedIds.includes(id)),
+            );
+            setStagingJoinKg((current) => {
+              const next = { ...current };
+              for (const id of addedIds) delete next[id];
+              return next;
+            });
+            return;
+          }
+          setStagingJoinHoldIds([]);
+          setStagingJoinKg({});
           setStaging(null);
           setWatchAutoPaused(false);
           if (result.replaced || result.mission) {
@@ -12275,57 +12541,7 @@ export function App() {
     setBusy(true);
     setError(null);
     try {
-      const staged = Object.entries(dispatchJoinKg).filter(([, kg]) => kg > 0);
-      if (staged.length > 0) {
-        const home = homeCompanyIdRef.current?.trim();
-        const active = activeCompanyIdRef.current?.trim();
-        const opsCompanyId =
-          resolveOpsCompanyId(mission.aircraftId) || active || home || undefined;
-        for (const [id, kg] of staged) {
-          if (!id.startsWith('hold:')) continue;
-          const holdId = id.slice('hold:'.length);
-          const taken = Math.floor(kg);
-          const result = await postAddDeskHold({
-            missionId: mission.id,
-            holdId,
-            companyId: opsCompanyId,
-            kg: taken,
-          });
-          if (result.fleet) {
-            const holdingVa = Boolean(home && active && home !== active);
-            if (holdingVa) setVaSessionFleet(result.fleet);
-            else setFleet(result.fleet);
-          }
-          if (result.missions?.length) {
-            setMissions(result.missions.slice().reverse());
-          }
-          setOpenDeskHolds((current) =>
-            current.flatMap((row) => {
-              if (row.id !== holdId) return [row];
-              const left = Math.max(0, row.kg - Math.min(row.kg, taken));
-              if (left <= 0) return [];
-              const remainPay =
-                row.pilotPayUsd != null && row.kg > 0
-                  ? (row.pilotPayUsd * left) / row.kg
-                  : row.pilotPayUsd;
-              return [
-                {
-                  ...row,
-                  kg: left,
-                  ...(remainPay != null ? { pilotPayUsd: remainPay } : {}),
-                },
-              ];
-            }),
-          );
-          setDispatchJoinKg((current) => {
-            if (!(id in current)) return current;
-            const next = { ...current };
-            delete next[id];
-            return next;
-          });
-        }
-      }
-      const result = await postDispatch({
+    const result = await postDispatch({
         missionId: mission.id,
         open: true,
         weightSystem,
@@ -12487,9 +12703,14 @@ export function App() {
     if (!ok) return;
     await run(async () => {
       // Clear active flight immediately so auto-OFP / Preflight / Watch polls stop.
+      const ridingIds = new Set(
+        (mission.throughLoads ?? []).map((row) => row.missionId),
+      );
       setMissions((current) =>
         current.map((m) =>
-          m.id === mission.id ? { ...m, status: 'cancelled' } : m,
+          m.id === mission.id || ridingIds.has(m.id)
+            ? { ...m, status: 'cancelled' }
+            : m,
         ),
       );
       setFlightDebrief(null);
@@ -12540,7 +12761,7 @@ export function App() {
         );
       }
       goToTab('staging');
-    }, { sync: { market: true } });
+    }, { sync: { market: true, missions: true } });
   }
 
   async function onAcceptBushTrip(trip: BushTripBoardRow) {
@@ -12926,146 +13147,6 @@ export function App() {
       const hub = result.mission.freightHold?.icao ?? result.mission.originIcao;
       setToast(`Freight holding at ${hub}. Plan the next leg from there.`);
     }, { sync: { missions: true, airport: true } });
-  }
-
-  async function onAddDeskHoldToFlight(holdId: string, kg?: number) {
-    const host = activeMissionRef.current;
-    if (!host) return;
-    const hold = openDeskHolds.find((row) => row.id === holdId);
-    await run(async () => {
-      const home = homeCompanyIdRef.current?.trim();
-      const active = activeCompanyIdRef.current?.trim();
-      const opsCompanyId =
-        resolveOpsCompanyId(host.aircraftId) || active || home || undefined;
-      const result = await postAddDeskHold({
-        missionId: host.id,
-        holdId,
-        companyId: opsCompanyId,
-        ...(kg != null && kg > 0 ? { kg: Math.floor(kg) } : {}),
-      });
-      if (result.fleet) {
-        const holdingVa = Boolean(home && active && home !== active);
-        if (holdingVa) setVaSessionFleet(result.fleet);
-        else setFleet(result.fleet);
-      }
-      if (result.missions?.length) {
-        setMissions(result.missions.slice().reverse());
-      }
-      setOpenDeskHolds((current) =>
-        current.flatMap((row) => {
-          if (row.id !== holdId) return [row];
-          const taken =
-            kg != null && kg > 0 ? Math.min(row.kg, Math.floor(kg)) : row.kg;
-          const left = Math.max(0, row.kg - taken);
-          if (left <= 0) return [];
-          const remainPay =
-            row.pilotPayUsd != null && row.kg > 0
-              ? (row.pilotPayUsd * left) / row.kg
-              : row.pilotPayUsd;
-          return [
-            {
-              ...row,
-              kg: left,
-              ...(remainPay != null ? { pilotPayUsd: remainPay } : {}),
-            },
-          ];
-        }),
-      );
-      setStagingJoinHoldIds((current) => current.filter((id) => id !== holdId));
-      setStagingJoinKg((current) => {
-        if (!(holdId in current)) return current;
-        const next = { ...current };
-        delete next[holdId];
-        return next;
-      });
-      setToast(
-        `Added ${hold?.destIcao ?? 'the next stop'}. The first OFP carries the combined load.`,
-      );
-    }, { sync: { missions: true } });
-  }
-
-  function stageDispatchCargoKg(id: string, kg: number) {
-    const next = Math.max(0, Math.floor(kg));
-    setDispatchJoinKg((current) => {
-      if (next <= 0) {
-        if (!(id in current)) return current;
-        const copy = { ...current };
-        delete copy[id];
-        return copy;
-      }
-      return { ...current, [id]: next };
-    });
-  }
-
-  async function onAddCargoStop(riderMissionId: string, kg?: number) {
-    if (riderMissionId.startsWith('hold:')) {
-      await onAddDeskHoldToFlight(riderMissionId.slice('hold:'.length), kg);
-      return;
-    }
-    const host = activeMissionRef.current;
-    if (!host) return;
-    await run(async () => {
-      const home = homeCompanyIdRef.current?.trim();
-      const active = activeCompanyIdRef.current?.trim();
-      const opsCompanyId =
-        resolveOpsCompanyId(host.aircraftId) || active || home || undefined;
-      const result = await postAddCargoStop({
-        missionId: host.id,
-        riderMissionId,
-        companyId: opsCompanyId,
-      });
-      setMissions((current) =>
-        current.map((row) => {
-          if (row.id === result.mission.id) return result.mission;
-          if (result.rider && row.id === result.rider.id) return result.rider;
-          return row;
-        }),
-      );
-      setToast(
-        `Added ${result.rider?.destIcao ?? 'the next stop'}. The first OFP carries the combined load.`,
-      );
-    }, { sync: { missions: true } });
-  }
-
-  function cargoStopChoices(host: Mission) {
-    if (host.status !== 'accepted' || host.throughHostId) return [];
-    const taken = new Set<string>([
-      host.destIcao.toUpperCase(),
-      ...(host.throughLoads ?? []).map((row) => row.destIcao.toUpperCase()),
-    ]);
-    return missions
-      .filter((row) => {
-        if (row.id === host.id || row.status !== 'accepted') return false;
-        if (row.throughHostId || (row.throughLoads?.length ?? 0) > 0) return false;
-        if (row.missionType === 'charter' || row.payloadLab || row.fuelHaul) {
-          return false;
-        }
-        if (row.emptyFlight || row.crewDeadhead || row.contractPilotReposition) {
-          return false;
-        }
-        if (!(row.cargoKg > 0)) return false;
-        if (row.originIcao.toUpperCase() !== host.originIcao.toUpperCase()) {
-          return false;
-        }
-        return !taken.has(row.destIcao.toUpperCase());
-      })
-      .map((row) => ({
-        id: row.id,
-        originIcao: row.originIcao,
-        destIcao: row.destIcao,
-        cargoKg: row.cargoKg,
-        commodityId: row.commodityId,
-        kind: row.warehouseBridge
-          ? 'Bridge'
-          : row.warehouseHaul
-            ? 'Wide haul'
-            : row.demandOrderId
-              ? 'Demand'
-              : 'Freight',
-        distanceNm: row.distanceNm,
-        payUsd: row.payUsd,
-        expiresAtTick: row.deadlineTick,
-      }));
   }
 
   function deskHoldsForTrip(originIcao: string, taken: Set<string>, skipIds: Set<string>) {
@@ -13538,7 +13619,7 @@ export function App() {
     ? findStagingBlockingMission(staging, missions)
     : undefined;
   const stagingExistingLots = stagingExisting?.lots?.length ?? 0;
-  const stagingJoinPayUsd = staging?.deskHold
+  const stagingJoinPayUsd = staging?.deskHold || staging?.replaceManifest
     ? stagingJoinHoldIds.reduce((sum, id) => {
         const hold = openDeskHolds.find((row) => row.id === id);
         const kg = stagingJoinKg[id] ?? 0;
@@ -13561,7 +13642,7 @@ export function App() {
       : staging.lines.reduce(
           (sum, line) => sum + proRataPayUsd(line.lot, line.cargoKg),
           0,
-        )
+        ) + stagingJoinPayUsd
     : 0;
   const stagingContractPayUsd =
     stagingPayUsd + (stagingExisting?.payUsd ?? 0);
@@ -13573,13 +13654,24 @@ export function App() {
     (sum, id) => sum + Math.max(0, Math.floor(stagingJoinKg[id] ?? 0)),
     0,
   );
+  const stagedLotCount = staging
+    ? staging.lines.length +
+      stagingJoinHoldIds.length +
+      (staging.replaceManifest
+        ? stagingThroughLoads(staging).reduce((sum, row) => {
+            const rider = missions.find((mission) => mission.id === row.missionId);
+            const lots = rider?.lots?.filter((line) => line.cargoKg > 0).length ?? 0;
+            return sum + (lots > 0 ? lots : 1);
+          }, 0)
+        : 0)
+    : 0;
   const stagingTotalKg = staging
     ? staging.deskHold
       ? deskHoldLines(staging).reduce(
           (sum, line) => sum + deskHoldEffectiveLoadKg(line),
           0,
         ) + stagingJoinLoadKg
-      : stagingUsedKg(staging)
+      : stagingUsedKg(staging) + stagingJoinLoadKg
     : 0;
   const stagingDeskHoldCapKg = staging?.deskHold
     ? aircraftCapKg(staging.aircraft)
@@ -13592,10 +13684,15 @@ export function App() {
       fleet.find((a) => a.id === staging.aircraftId) ??
       vaSessionFleet.find((a) => a.id === staging.aircraftId)
     : undefined;
+  const stagingTailOnThisFlight =
+    Boolean(staging?.replaceManifest) &&
+    stagingAssignedAircraft?.status === 'assigned' &&
+    (!stagingAssignedAircraft.assignedMissionId ||
+      stagingAssignedAircraft.assignedMissionId === staging?.intoMissionId);
   const stagingAircraftAtOrigin = Boolean(
     staging &&
       stagingAssignedAircraft &&
-      stagingAssignedAircraft.status === 'parked' &&
+      (stagingAssignedAircraft.status === 'parked' || stagingTailOnThisFlight) &&
       stagingAssignedAircraft.locationIcao.trim().toUpperCase() ===
         staging.originIcao.trim().toUpperCase(),
   );
@@ -19889,6 +19986,11 @@ export function App() {
                                 : opsAircraftSelectLabel(
                                     entry,
                                     staging.originIcao,
+                                    {
+                                      assignedToThisFlight:
+                                        Boolean(staging.replaceManifest) &&
+                                        entry.aircraft.id === staging.aircraftId,
+                                    },
                                   )}
                             </option>
                           );
@@ -20319,7 +20421,7 @@ export function App() {
                                 commodityId: holdLine.commodityId,
                                 kind: holdLine.kind,
                                 originIcao: origin,
-                                destIcao: staging.destIcao,
+                                destIcao: holdLine.destIcao ?? staging.destIcao,
                                 holdKg: Math.floor(holdLine.kg),
                                 loadKg: deskHoldEffectiveLoadKg(holdLine),
                                 maxKg,
@@ -20429,7 +20531,7 @@ export function App() {
                                   >
                                     <div className="dispatch-trip-id">
                                       <strong>
-                                        {origin} → {staging.destIcao}
+                                        {origin} → {holdLine.destIcao ?? staging.destIcao}
                                       </strong>
                                       <span>{kindLabel(holdLine.kind)}</span>
                                     </div>
@@ -20575,7 +20677,7 @@ export function App() {
 
               <div className="staging-section">
                 <h3>
-                  Staged lots ({staging.lines.length}
+                  Staged lots ({stagedLotCount}
                   {stagingExistingLots
                     ? ` + ${stagingExistingLots} existing`
                     : ''}
@@ -20707,37 +20809,52 @@ export function App() {
                 {staging.replaceManifest &&
                 stagingThroughLoads(staging).length > 0 ? (
                   <ul className="staging-lines">
-                    {stagingThroughLoads(staging).map((row) => {
+                    {stagingThroughLoads(staging).flatMap((row) => {
                       const rider = missions.find(
                         (mission) => mission.id === row.missionId,
                       );
-                      const name =
-                        row.commodityId.charAt(0).toUpperCase() +
-                        row.commodityId.slice(1);
-                      return (
-                        <li
-                          key={row.missionId}
-                          className="staging-line staging-line-compact"
-                        >
-                          <div className="staging-line-head">
-                            <div className="staging-line-title">
-                              <strong>{name}</strong>
-                              <span>
-                                {staging.originIcao} → {row.destIcao}
-                              </span>
+                      const lines =
+                        rider?.lots?.filter((line) => line.cargoKg > 0) ?? [
+                          {
+                            shipmentLotId: row.missionId,
+                            commodityId: row.commodityId,
+                            cargoKg: row.cargoKg,
+                            payUsd: rider?.payUsd ?? 0,
+                          },
+                        ];
+                      return lines.map((line) => {
+                        const name =
+                          line.commodityId.charAt(0).toUpperCase() +
+                          line.commodityId.slice(1);
+                        return (
+                          <li
+                            key={line.shipmentLotId}
+                            className="staging-line staging-line-compact"
+                          >
+                            <div className="staging-line-head">
+                              <div className="staging-line-title">
+                                <strong>{name}</strong>
+                                <span className="tag">
+                                  {rider?.warehouseBridge
+                                    ? 'Bridge'
+                                    : rider?.warehouseHaul
+                                      ? 'Wide haul'
+                                      : 'On board'}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          <p>
-                            {formatTonnes(row.cargoKg)} stays on this aircraft
-                            and delivers at {row.destIcao}
-                            {typeof rider?.payUsd === 'number'
-                              ? ` · ${formatMoney(rider.payUsd)} on that stop`
-                              : ''}
-                            . This editor changes only the {staging.destIcao}{' '}
-                            lots.
-                          </p>
-                        </li>
-                      );
+                            <p className="staging-line-meta">
+                              {staging.originIcao}→{row.destIcao} · load{' '}
+                              {formatTonnes(line.cargoKg)}
+                              {line.payUsd > 0
+                                ? ` · pay ${formatMoney(line.payUsd)}`
+                                : ''}
+                              {' · delivers at '}
+                              {row.destIcao}
+                            </p>
+                          </li>
+                        );
+                      });
                     })}
                   </ul>
                 ) : null}
@@ -20824,7 +20941,7 @@ export function App() {
                   <p>
                     {staging.deskHold
                       ? `Desk hold · ${formatTonnes(stagingTotalKg)} · ${formatMoney(stagingContractPayUsd)}`
-                      : `${staging.lines.length} staged · ${formatTonnes(stagingTotalKg)} · ${formatMoney(stagingContractPayUsd)} total`}
+                      : `${stagedLotCount} staged · ${formatTonnes(stagingTotalKg)} · ${formatMoney(stagingContractPayUsd)} total`}
                   </p>
                   {!stagingValid ? (
                     <p className="cargo-dialog-error">
@@ -20958,6 +21075,7 @@ export function App() {
               ) : null}
             <DispatchActivePanel
               mission={activeMission}
+              tripMissions={missions}
               step={dispatchStep}
               loadPath={activeLoadPath}
               busy={busy || crewDispatchBusy}
@@ -21014,49 +21132,6 @@ export function App() {
               onDepart={(m) => void onDepart(m)}
               onSettle={(m) => void onSettle(m)}
               onLeaveFreight={(m) => void onLeaveFreight(m)}
-              cargoStopChoices={[
-                ...cargoStopChoices(activeMission),
-                ...deskHoldsForTrip(
-                  activeMission.originIcao,
-                  new Set([
-                    activeMission.destIcao.toUpperCase(),
-                    ...(activeMission.throughLoads ?? []).map((row) =>
-                      row.destIcao.toUpperCase(),
-                    ),
-                  ]),
-                  new Set(),
-                ).map((hold) => {
-                  const kind = hold.kind ?? 'demand';
-                  const payUsd =
-                    kind === 'bridge'
-                      ? (hold.pilotPayUsd ?? 0) > 0
-                        ? hold.pilotPayUsd
-                        : undefined
-                      : hold.unitPriceUsd != null
-                        ? Math.round(hold.unitPriceUsd * hold.kg)
-                        : undefined;
-                  return {
-                    id: `hold:${hold.id}`,
-                    originIcao: hold.originIcao,
-                    destIcao: hold.destIcao,
-                    cargoKg: hold.kg,
-                    commodityId: hold.commodityId,
-                    kind:
-                      kind === 'bridge'
-                        ? 'Bridge'
-                        : kind === 'haul'
-                          ? 'Wide haul'
-                          : 'Demand',
-                    distanceNm: hold.distanceNm,
-                    ...(typeof payUsd === 'number' ? { payUsd } : {}),
-                    expiresAtTick: hold.expiresAtTick,
-                    by: hold.heldByName ?? undefined,
-                  };
-                })
-              ]}
-              onAddCargoStop={(id, kg) => void onAddCargoStop(id, kg)}
-              stagedCargoKg={dispatchJoinKg}
-              onStageCargoKg={stageDispatchCargoKg}
               onCrewDispatch={(m, crewMemberId) =>
                 void onCrewDispatchMission(m, crewMemberId)
               }

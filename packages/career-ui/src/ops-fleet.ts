@@ -140,11 +140,12 @@ export function isOpsAircraftBoardSelectable(aircraft: PlayerAircraft): boolean 
 export function opsAircraftSelectLabel(
   entry: OpsFleetEntry,
   originIcao: string,
+  opts?: { assignedToThisFlight?: boolean },
 ): string {
   const { aircraft, owner } = entry;
   const prefix = owner === 'va' ? 'Airline' : 'Yours';
   const atOrigin =
-    aircraft.status === 'parked' &&
+    (aircraft.status === 'parked' || opts?.assignedToThisFlight === true) &&
     aircraft.locationIcao.trim().toUpperCase() ===
       originIcao.trim().toUpperCase();
   const loc = atOrigin

@@ -227,7 +227,6 @@ import {
   dispatchWarehouseHaulHold,
   dispatchWarehouseHaulHolds,
   quoteWarehouseHaulPayUsd,
-  replaceDemandMissionCargo,
   demandMissionEditableMaxKg,
   ensurePortListings,
   claimPortConcession,
@@ -307,6 +306,7 @@ import {
   addCargoStop,
   missionDispatchCargoKg,
   attachDeskHoldToCargoTrip,
+  syncDeskTripLoads,
   revertFalseDepartMission,
   executeBuyAircraft,
   executeCancelMission,
@@ -13555,7 +13555,12 @@ export function createCareerApiServer(port = 8787) {
             return { kind: 'missing_mission' as const };
           }
           const demandReplace =
-            replace && Boolean(intoMission?.demandOrderId);
+            replace &&
+            Boolean(
+              intoMission?.demandOrderId ||
+                intoMission?.warehouseHaul ||
+                intoMission?.warehouseBridge,
+            );
           const firstLot = demandReplace
             ? undefined
             : world.lots.find((lot) => lot.id === lines[0]!.lotId);
@@ -13645,12 +13650,13 @@ export function createCareerApiServer(port = 8787) {
               throw new Error(`Unknown mission ${body.missionId}`);
             }
 
-            if (replace && intoMission?.demandOrderId) {
-              if (lines.length !== 1) {
-                throw new Error(
-                  'Demand Board edit allows exactly one cargo line',
-                );
-              }
+            if (
+              replace &&
+              intoMission &&
+              (intoMission.demandOrderId ||
+                intoMission.warehouseHaul ||
+                intoMission.warehouseBridge)
+            ) {
               let playerAircraft: PlayerAircraft | undefined = body.aircraftId
                 ? findPlayerAircraft(missions, body.aircraftId)
                 : undefined;
@@ -13710,8 +13716,7 @@ export function createCareerApiServer(port = 8787) {
                 );
               }
               const mission: MissionIntent = {
-                ...replaceDemandMissionCargo(missions, world, intoMission, {
-                  cargoKg: lines[0]!.cargoKg,
+                ...syncDeskTripLoads(missions, world, intoMission.id, lines, {
                   maxCargoKg: operationalMaxCargoKg,
                 }),
                 aircraftId: playerAircraft.id,
@@ -13728,11 +13733,14 @@ export function createCareerApiServer(port = 8787) {
                 kind: 'ok' as const,
                 mission,
                 appended: false,
-                lineCount: 1,
+                lineCount: lines.length,
                 operationalMaxCargoKg,
                 estimatedBlockFuelKg: routeCargoLimit.estimatedBlockFuelKg,
                 walletUsd: missions.walletUsd,
                 fleet: withParkingRates(missions.fleet),
+                missions: missions.missions.map((row) =>
+                  withMissionClientView(world, missions, row),
+                ),
               };
             }
 
@@ -14072,6 +14080,9 @@ export function createCareerApiServer(port = 8787) {
             dispatch: dispatch ?? null,
             dispatchError: dispatchError ?? null,
             fleet: committed.fleet,
+            ...('missions' in committed && committed.missions
+              ? { missions: committed.missions }
+              : {}),
           });
         } catch (error) {
           stagingDiag.failed = true;

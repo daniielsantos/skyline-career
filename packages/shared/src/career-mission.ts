@@ -2221,7 +2221,7 @@ export function replaceMissionManifest(
 }
 
 /** Put desk-hold cargo back in the origin warehouse, one commodity per line. */
-function restoreDeskCargoLines(
+export function restoreDeskCargoLines(
   world: CareerEconomyWorld,
   fleet: CareerMissionsState,
   mission: MissionIntent,
@@ -2270,7 +2270,25 @@ export function cancelMission(
   ) {
     throw new Error(`Cannot cancel mission in status=${normalized.status}`);
   }
-  if (opts.fleet) releaseCargoTripOnCancel(opts.fleet, normalized);
+  if (opts.fleet) {
+    const riderIds = (normalized.throughLoads ?? []).map((row) => row.missionId);
+    for (const riderId of riderIds) {
+      const rider = opts.fleet.missions.find((row) => row.id === riderId);
+      if (!rider || rider.throughHostId !== normalized.id) continue;
+      if (
+        rider.status !== 'accepted' &&
+        rider.status !== 'dispatched' &&
+        rider.status !== 'in_flight'
+      ) {
+        continue;
+      }
+      const cancelledRider = cancelMission(world, rider, opts);
+      opts.fleet.missions = opts.fleet.missions.map((row) =>
+        row.id === cancelledRider.id ? cancelledRider : row,
+      );
+    }
+    releaseCargoTripOnCancel(opts.fleet, normalized);
+  }
   normalized.throughLoads = undefined;
   normalized.throughHostId = undefined;
   if (normalized.missionType === 'charter') {
@@ -2848,6 +2866,11 @@ export interface SettleMissionResult {
   cargoOpsDeltas?: CargoOpsDelta[];
   /** Class Ops ladder deltas from this settle (when fleet provided). */
   classOpsDeltas?: ClassOpsDelta[];
+  /**
+   * Other contracts that unloaded at this same landing (a different desk
+   * kind for an airport already on the leg).
+   */
+  coSettled?: SettleMissionResult[];
 }
 
 /** Late penalty as a fraction of pay per overdue wall-clock hour. */
@@ -3444,10 +3467,43 @@ export function settleMission(
     classOpsDeltas = classApplied.deltas;
   }
 
+  const coSettled: SettleMissionResult[] = [];
   if (opts.fleet && (settled.throughLoads?.length ?? 0) > 0) {
-    const parked = continueCargoTripAfterSettle(world, opts.fleet, settled);
-    settled.throughLoads = undefined;
-    if (parked) syncPlayerInbound(world, parked);
+    const hub = settled.destIcao.toUpperCase();
+    const riding = settled.throughLoads ?? [];
+    const here = riding.filter((row) => row.destIcao.toUpperCase() === hub);
+    const later = riding.filter((row) => row.destIcao.toUpperCase() !== hub);
+    for (const row of here) {
+      const rider = opts.fleet.missions.find((mission) => mission.id === row.missionId);
+      if (!rider || rider.status === 'cancelled' || rider.status === 'settled') {
+        continue;
+      }
+      const prepared: MissionIntent = {
+        ...rider,
+        status: 'in_flight',
+        throughHostId: undefined,
+        throughLoads: undefined,
+        aircraftId: undefined,
+        airborneAtMs: working.airborneAtMs,
+        expectedRouteMs: working.expectedRouteMs,
+        departedAtTick: working.departedAtTick,
+      };
+      const unloaded = settleMission(world, prepared, {
+        fleet: opts.fleet,
+        skipMinAirborneGate: true,
+        nowMs: opts.nowMs,
+      });
+      opts.fleet.missions = opts.fleet.missions.map((mission) =>
+        mission.id === unloaded.mission.id ? unloaded.mission : mission,
+      );
+      coSettled.push(unloaded);
+    }
+    settled.throughLoads = later.length > 0 ? later : undefined;
+    if ((settled.throughLoads?.length ?? 0) > 0) {
+      const parked = continueCargoTripAfterSettle(world, opts.fleet, settled);
+      settled.throughLoads = undefined;
+      if (parked) syncPlayerInbound(world, parked);
+    }
   }
 
   return {
@@ -3459,6 +3515,7 @@ export function settleMission(
     fuelDebitUsd,
     cargoOpsDeltas,
     classOpsDeltas,
+    ...(coSettled.length > 0 ? { coSettled } : {}),
     settlement: {
       missionId: settled.id,
       deliveredKg: working.cargoKg,

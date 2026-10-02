@@ -47,7 +47,7 @@ import {
 } from './load-verification';
 import { mxFuelBurnAlertText, mxFuelBurnAlertTitle } from './mx-fuel-burn';
 import { logbookAircraftLabel, logbookFlightKind } from './logbook';
-import { CargoLotCards } from './CargoLotCards';
+import { CargoLotCards, type CargoLotCardLine } from './CargoLotCards';
 import { DestRunwaysButton } from './DestRunwaysButton';
 import { playPreflightReadySound, notePreflightNotReady } from './ui-sounds';
 
@@ -91,6 +91,49 @@ function freightHoldUsdPerDay(mission: Mission): number {
   return Math.round(usd * 100) / 100;
 }
 
+function aircraftCargoLines(
+  mission: Mission,
+  tripMissions: Mission[] | undefined,
+): CargoLotCardLine[] {
+  const multiStop = (mission.throughLoads?.length ?? 0) > 0;
+  const hostLots = mission.lots ?? [];
+  const lines: CargoLotCardLine[] = hostLots
+    .filter((line) => line.cargoKg > 0)
+    .map((line) => ({
+      shipmentLotId: line.shipmentLotId,
+      commodityId: line.commodityId,
+      cargoKg: line.cargoKg,
+      payUsd: line.payUsd,
+      urgency: line.urgency,
+      ...(multiStop ? { destIcao: mission.destIcao } : {}),
+    }));
+  for (const row of mission.throughLoads ?? []) {
+    const rider = tripMissions?.find((item) => item.id === row.missionId);
+    const riderLots = rider?.lots?.filter((line) => line.cargoKg > 0) ?? [];
+    if (riderLots.length > 0) {
+      for (const line of riderLots) {
+        lines.push({
+          shipmentLotId: line.shipmentLotId,
+          commodityId: line.commodityId,
+          cargoKg: line.cargoKg,
+          payUsd: line.payUsd,
+          urgency: line.urgency,
+          ...(multiStop
+            ? { destIcao: rider?.destIcao ?? row.destIcao }
+            : {}),
+        });
+      }
+      continue;
+    }
+    lines.push({
+      commodityId: row.commodityId,
+      cargoKg: row.cargoKg,
+      ...(multiStop ? { destIcao: row.destIcao } : {}),
+    });
+  }
+  return lines;
+}
+
 function canLeaveFreightHere(mission: Mission): boolean {
   if (mission.missionType === 'charter') return false;
   if (mission.payloadLab || mission.fuelHaul) return false;
@@ -114,238 +157,10 @@ function holdPositionOk(
   return !(position.lat === 0 && position.lon === 0);
 }
 
-type CargoTripChoice = {
-  id: string;
-  originIcao: string;
-  destIcao: string;
-  cargoKg: number;
-  commodityId: string;
-  kind: string;
-  distanceNm?: number;
-  payUsd?: number;
-  expiresAtTick?: number;
-  by?: string;
-};
-
-function CargoTripStops(props: {
-  mission: Mission;
-  choices: CargoTripChoice[];
-  stagedKg: Record<string, number>;
-  busy: boolean;
-  freeKg: number;
-  weightSystem: WeightSystem;
-  formatTonnes: (kg: number) => string;
-  formatMoney: (n: number) => string;
-  formatDeadline: (tick: number, hours: number) => string;
-  continuousHours: number;
-  onAdd?: (riderMissionId: string, kg: number) => void;
-  onStageKg?: (riderMissionId: string, kg: number) => void;
-}) {
-  const staged = props.choices.filter((choice) => choice.id in props.stagedKg);
-  const pending = props.choices.filter((choice) => !(choice.id in props.stagedKg));
-  const stops = props.mission.throughLoads ?? [];
-  const room = stops.length + staged.length < 3;
-  if (staged.length === 0 && (!room || pending.length === 0)) return null;
-  const stagedSum = staged.reduce(
-    (sum, choice) => sum + Math.max(0, Math.floor(props.stagedKg[choice.id] ?? 0)),
-    0,
-  );
-
-  function maxFor(choice: CargoTripChoice): number {
-    const others = stagedSum - Math.max(0, Math.floor(props.stagedKg[choice.id] ?? 0));
-    return Math.max(
-      0,
-      Math.floor(Math.min(choice.cargoKg, props.freeKg - others)),
-    );
-  }
-
-  return (
-    <>
-      {staged.length > 0 ? (
-        <ul className="staging-lines">
-          {staged.map((choice) => {
-            const maxKg = maxFor(choice);
-            const loadKg = Math.max(
-              0,
-              Math.min(maxKg, Math.floor(props.stagedKg[choice.id] ?? 0)),
-            );
-            const commodity = choice.commodityId
-              ? choice.commodityId.charAt(0).toUpperCase() + choice.commodityId.slice(1)
-              : 'Cargo';
-            const pay =
-              typeof choice.payUsd === 'number' && choice.cargoKg > 0
-                ? (choice.payUsd * loadKg) / choice.cargoKg
-                : choice.payUsd;
-            const unit = massUnitLabel(props.weightSystem);
-            const displayMax = Math.max(
-              0,
-              Math.floor(kgToDisplay(maxKg, props.weightSystem)),
-            );
-            const displayValue = Math.round(kgToDisplay(loadKg, props.weightSystem));
-            const step = props.weightSystem === 'imperial' ? 10 : 100;
-            const setLoad = (nextKg: number) => {
-              props.onStageKg?.(choice.id, Math.floor(nextKg));
-            };
-            return (
-              <li key={choice.id} className="staging-line staging-line-compact">
-                <div className="staging-line-head">
-                  <div className="staging-line-title">
-                    <strong>{commodity}</strong>
-                    <span className="tag">{choice.kind}</span>
-                  </div>
-                </div>
-                <p className="staging-line-meta">
-                  {choice.originIcao}→{choice.destIcao} · hold{' '}
-                  {props.formatTonnes(choice.cargoKg)} · load{' '}
-                  {props.formatTonnes(loadKg)} · pay{' '}
-                  {typeof pay === 'number' ? props.formatMoney(pay) : '—'}
-                  {typeof choice.expiresAtTick === 'number' ? (
-                    <>
-                      {' '}
-                      ·{' '}
-                      {props.formatDeadline(choice.expiresAtTick, props.continuousHours)}
-                    </>
-                  ) : null}
-                  {loadKg < choice.cargoKg ? (
-                    <>
-                      {' '}
-                      · remainder {props.formatTonnes(choice.cargoKg - loadKg)} stays
-                      on the desk
-                    </>
-                  ) : null}
-                </p>
-                <div className="staging-line-controls">
-                  <label className="cargo-amount staging-cargo-amount">
-                    Load
-                    <div>
-                      <input
-                        type="number"
-                        min={0}
-                        max={Math.max(0, displayMax)}
-                        step={step}
-                        value={displayValue}
-                        disabled={props.busy || maxKg <= 0}
-                        onChange={(event) =>
-                          setLoad(
-                            displayToKg(Number(event.target.value), props.weightSystem),
-                          )
-                        }
-                      />
-                      <span>{unit}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={Math.max(1, displayMax)}
-                      step={1}
-                      value={Math.min(displayValue, Math.max(0, displayMax))}
-                      disabled={props.busy || maxKg <= 0}
-                      onChange={(event) =>
-                        setLoad(
-                          displayToKg(Number(event.target.value), props.weightSystem),
-                        )
-                      }
-                    />
-                  </label>
-                  <div className="cargo-presets staging-cargo-presets">
-                    {[0.25, 0.5, 0.75, 1].map((fraction) => (
-                      <button
-                        key={fraction}
-                        type="button"
-                        className="staging-preset-chip"
-                        disabled={props.busy || maxKg <= 0}
-                        onClick={() =>
-                          setLoad(
-                            fraction >= 1
-                              ? maxKg
-                              : Math.max(0, Math.round(maxKg * fraction)),
-                          )
-                        }
-                      >
-                        {fraction === 1 ? 'Max' : `${fraction * 100}%`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-      {room && pending.length > 0 && props.onStageKg ? (
-        <div className="dispatch-trip">
-          <ul className="dispatch-trip-list">
-            {pending.map((choice) => {
-              const dist =
-                typeof choice.distanceNm === 'number' && choice.distanceNm > 0
-                  ? `${Math.round(choice.distanceNm).toLocaleString()} nm`
-                  : '—';
-              const commodity = choice.commodityId
-                ? choice.commodityId.charAt(0).toUpperCase() +
-                  choice.commodityId.slice(1)
-                : 'Cargo';
-              const maxKg = maxFor(choice);
-              const hold = choice.id.startsWith('hold:');
-              return (
-                <li key={choice.id} className="dispatch-trip-row">
-                  <div className="dispatch-trip-id">
-                    <strong>
-                      {choice.originIcao} → {choice.destIcao}
-                    </strong>
-                    <span>{choice.kind}</span>
-                  </div>
-                  <div className="dispatch-trip-stats">
-                    <span>
-                      <em>Cargo</em> {commodity}
-                    </span>
-                    <span>
-                      <em>Mass</em> {props.formatTonnes(choice.cargoKg)}
-                    </span>
-                    <span>
-                      <em>Dist</em> {dist}
-                    </span>
-                    <span>
-                      <em>Pay</em>{' '}
-                      {typeof choice.payUsd === 'number'
-                        ? props.formatMoney(choice.payUsd)
-                        : '—'}
-                    </span>
-                    <span>
-                      <em>Expires</em>{' '}
-                      {typeof choice.expiresAtTick === 'number'
-                        ? props.formatDeadline(
-                            choice.expiresAtTick,
-                            props.continuousHours,
-                          )
-                        : '—'}
-                    </span>
-                    <span>
-                      <em>By</em> {choice.by?.trim() || '—'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="action compact"
-                    disabled={props.busy || maxKg <= 0}
-                    onClick={() => {
-                      if (hold) props.onStageKg?.(choice.id, maxKg);
-                      else props.onAdd?.(choice.id, choice.cargoKg);
-                    }}
-                  >
-                    Add
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
 export function DispatchActivePanel(props: {
   mission: Mission;
+  /** Other contracts on this aircraft. Their lots ride until their own stop. */
+  tripMissions?: Mission[];
   step: DispatchStepId;
   loadPath: LoadPath;
   busy: boolean;
@@ -358,23 +173,6 @@ export function DispatchActivePanel(props: {
   formatTonnes: (kg: number) => string;
   formatDeadline: (tick: number, hours: number) => string;
   aircraftClassLabel: (id: string) => string;
-  /** Other accepted contracts that can ride this leg. */
-  cargoStopChoices?: Array<{
-    id: string;
-    originIcao: string;
-    destIcao: string;
-    cargoKg: number;
-    commodityId: string;
-    kind: string;
-    distanceNm?: number;
-    payUsd?: number;
-    expiresAtTick?: number;
-    by?: string;
-  }>;
-  onAddCargoStop?: (riderMissionId: string, kg: number) => void;
-  /** Desk holds moved out of the Add list. Zero kg puts one back. */
-  stagedCargoKg?: Record<string, number>;
-  onStageCargoKg?: (riderMissionId: string, kg: number) => void;
   /** Structural cargo ceiling for this mission (kg) — bar denominator. */
   missionMaxCargoKg: (mission: Mission) => number;
   /** Route ops payload ceiling when known (kg) — MTOW/fuel estimate for this leg. */
@@ -742,21 +540,6 @@ export function DispatchActivePanel(props: {
         </div>
       ) : null}
 
-      {mission.status !== 'accepted' && (mission.throughLoads?.length ?? 0) > 0 ? (
-        <div className="dispatch-freight-hold" role="status">
-          <strong>Also on this aircraft</strong>
-          <span>
-            {(mission.throughLoads ?? [])
-              .map(
-                (row) =>
-                  `${row.destIcao} ${props.formatTonnes(row.cargoKg)}`,
-              )
-              .join(' · ')}
-            . Only {mission.destIcao} delivers on this landing.
-          </span>
-        </div>
-      ) : null}
-
       <div className="panel-head missions-head">
         <div className="missions-head-spacer" aria-hidden="true" />
         <div className="missions-head-center">
@@ -774,7 +557,17 @@ export function DispatchActivePanel(props: {
               onOpen={props.onOpenAirport}
               disabled={busy}
             />
-            {(mission.throughLoads ?? []).map((row) => (
+            {(mission.throughLoads ?? [])
+              .filter((row, index, rows) => {
+                const dest = row.destIcao.trim().toUpperCase();
+                if (dest === mission.destIcao.trim().toUpperCase()) return false;
+                return (
+                  rows.findIndex(
+                    (other) => other.destIcao.trim().toUpperCase() === dest,
+                  ) === index
+                );
+              })
+              .map((row) => (
               <span key={row.missionId}>
                 <span className="dest-runway-arrow" aria-hidden="true">
                   →
@@ -871,11 +664,7 @@ export function DispatchActivePanel(props: {
             (sum, row) => sum + row.cargoKg,
             0,
           );
-          const stagedKg = Object.values(props.stagedCargoKg ?? {}).reduce(
-            (sum, kg) => sum + Math.max(0, Math.floor(kg)),
-            0,
-          );
-          const bookedKg = mission.cargoKg + throughKg + stagedKg;
+          const bookedKg = mission.cargoKg + throughKg;
           const capacityLeftKg = Math.max(0, barCapKg - bookedKg);
           const routeOpsNote =
             opsCapKg !== null &&
@@ -1019,7 +808,7 @@ export function DispatchActivePanel(props: {
                 type="button"
                 className="action ghost info dispatch-edit-btn"
                 disabled={busy}
-                title="Adjust cargo lots, then regenerate the OFP"
+                title="Return to Manifest to change the payload"
                 onClick={() => props.onEditManifest(mission)}
               >
                 Edit cargo
@@ -1033,9 +822,9 @@ export function DispatchActivePanel(props: {
               {formatMassExact(mission.baggageKg ?? 0, weightSystem)} baggage
               {mission.reason?.trim() ? ` · ${mission.reason.trim()}` : ''}
             </p>
-          ) : (mission.lots?.length ?? 0) > 0 ? (
+          ) : aircraftCargoLines(mission, props.tripMissions).length > 0 ? (
             <CargoLotCards
-              lots={mission.lots!}
+              lots={aircraftCargoLines(mission, props.tripMissions)}
               formatTonnes={props.formatTonnes}
               formatMoney={props.formatMoney}
             />
@@ -1050,35 +839,6 @@ export function DispatchActivePanel(props: {
               formatTonnes={props.formatTonnes}
               formatMoney={props.formatMoney}
               onCommit={props.onJetAStockKg}
-            />
-          ) : null}
-          {mission.status === 'accepted' && !mission.throughHostId ? (
-            <CargoTripStops
-              mission={mission}
-              choices={props.cargoStopChoices ?? []}
-              stagedKg={props.stagedCargoKg ?? {}}
-              busy={props.busy}
-              freeKg={(() => {
-                const structural = props.missionMaxCargoKg(mission);
-                const ops =
-                  typeof props.missionOpsCapacityHint === 'number' &&
-                  props.missionOpsCapacityHint > 0
-                    ? props.missionOpsCapacityHint
-                    : null;
-                const cap = ops !== null ? Math.min(ops, structural) : structural;
-                const through = (mission.throughLoads ?? []).reduce(
-                  (sum, row) => sum + row.cargoKg,
-                  0,
-                );
-                return Math.max(0, cap - mission.cargoKg - through);
-              })()}
-              weightSystem={weightSystem}
-              formatTonnes={props.formatTonnes}
-              formatMoney={props.formatMoney}
-              formatDeadline={props.formatDeadline}
-              continuousHours={props.continuousHours}
-              onAdd={props.onAddCargoStop}
-              onStageKg={props.onStageCargoKg}
             />
           ) : null}
         </div>
@@ -1890,7 +1650,7 @@ export function DispatchActivePanel(props: {
                 : formatMassExact(lb / KG_TO_LB, weightSystem);
 
             const ofpBriefing = mission.lastOfpCheck?.briefing;
-            const cargoLots = mission.lots ?? [];
+            const cargoLots = aircraftCargoLines(mission, props.tripMissions);
             const cargoCommodityLabel = (() => {
               if (isFerryLeg) return 'ferry / reposition';
               if (cargoLots.length === 0) {

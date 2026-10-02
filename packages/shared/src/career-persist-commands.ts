@@ -371,6 +371,15 @@ export function executeSettleFlight(
     memberRouteCutPct,
     memberAirlineCutPct,
   });
+  for (const extra of result.coSettled ?? []) {
+    const extraIdx = missions.missions.findIndex((row) => row.id === extra.mission.id);
+    if (extraIdx >= 0) missions.missions[extraIdx] = extra.mission;
+    applySettleWalletDeltas(missions, world.tick, extra, {
+      companyId,
+      memberRouteCutPct,
+      memberAirlineCutPct,
+    });
+  }
   // Stamp what the pilot’s home actually received (cut / IH fee / full route).
   const pilotPayoutUsd =
     wallet.pilotPayCredit?.amountUsd ??

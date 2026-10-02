@@ -2,8 +2,10 @@ export type CargoLotCardLine = {
   shipmentLotId?: string;
   commodityId: string;
   cargoKg: number;
-  payUsd: number;
+  payUsd?: number;
   urgency?: string;
+  /** Where this lot leaves the aircraft. */
+  destIcao?: string;
 };
 
 export function formatCargoCommodityLabel(commodityId: string): string {
@@ -33,6 +35,9 @@ export function CargoLotCards(props: {
           >
             <div className="cargo-lot-card-top">
               <strong>{formatCargoCommodityLabel(line.commodityId)}</strong>
+              {line.destIcao ? (
+                <span className="tag">{line.destIcao}</span>
+              ) : null}
               {urgent ? <span className="tag">Urgent</span> : null}
             </div>
             <dl className="cargo-lot-card-meta">
@@ -40,10 +45,12 @@ export function CargoLotCards(props: {
                 <dt>Weight</dt>
                 <dd>{props.formatTonnes(line.cargoKg)}</dd>
               </div>
-              <div>
-                <dt>Pay</dt>
-                <dd>{props.formatMoney(line.payUsd)}</dd>
-              </div>
+              {typeof line.payUsd === 'number' ? (
+                <div>
+                  <dt>Pay</dt>
+                  <dd>{props.formatMoney(line.payUsd)}</dd>
+                </div>
+              ) : null}
             </dl>
           </li>
         );

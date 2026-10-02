@@ -52,15 +52,34 @@ export function addCargoStop(
   state: CareerMissionsState,
   hostId: string,
   riderId: string,
-  opts: { maxCargoKg?: number } = {},
+  opts: { maxCargoKg?: number; allowSameDest?: boolean } = {},
 ): MissionIntent {
-  const host = state.missions.find((row) => row.id === hostId);
+  let host = state.missions.find((row) => row.id === hostId);
   const rider = state.missions.find((row) => row.id === riderId);
   if (!host) throw new Error(`Unknown mission ${hostId}`);
   if (!rider) throw new Error(`Unknown mission ${riderId}`);
   if (host.id === rider.id) throw new Error('A flight cannot stop for itself');
-  if (host.status !== 'accepted') {
-    throw new Error('Add the next stop before dispatch');
+  if (host.status === 'in_flight') {
+    throw new Error('This flight has already departed');
+  }
+  if (host.status !== 'accepted' && host.status !== 'dispatched') {
+    throw new Error('Add the next stop before the flight departs');
+  }
+  if (host.status === 'dispatched') {
+    const reopened: MissionIntent = {
+      ...host,
+      status: 'accepted',
+      dispatchedAtTick: undefined,
+      lastOfpCheck: undefined,
+      lastPreflightCheck: undefined,
+      fuelAuthorizedOfpId: undefined,
+      staticId: undefined,
+      tripFuelBurnKg: undefined,
+    };
+    host = reopened;
+    state.missions = state.missions.map((row) =>
+      row.id === reopened.id ? reopened : row,
+    );
   }
   if (rider.status !== 'accepted') {
     throw new Error('That contract is not waiting to fly');
@@ -82,7 +101,7 @@ export function addCargoStop(
     host.destIcao.toUpperCase(),
     ...(host.throughLoads ?? []).map((row) => row.destIcao.toUpperCase()),
   ]);
-  if (dests.has(rider.destIcao.toUpperCase())) {
+  if (!opts.allowSameDest && dests.has(rider.destIcao.toUpperCase())) {
     throw new Error('That destination is already on this trip');
   }
   const loads = host.throughLoads ?? [];
@@ -129,16 +148,16 @@ export function continueCargoTripAfterSettle(
   state: CareerMissionsState,
   host: MissionIntent,
 ): MissionIntent | undefined {
-  const loads = [...(host.throughLoads ?? [])].sort(
-    (a, b) => a.stopIndex - b.stopIndex,
-  );
+  const hub = host.destIcao.toUpperCase();
+  const loads = [...(host.throughLoads ?? [])]
+    .filter((row) => row.destIcao.toUpperCase() !== hub)
+    .sort((a, b) => a.stopIndex - b.stopIndex);
   const next = loads[0];
   if (!next) return undefined;
   const rider = state.missions.find((row) => row.id === next.missionId);
   if (!rider || rider.status === 'cancelled' || rider.status === 'settled') {
     return undefined;
   }
-  const hub = host.destIcao.toUpperCase();
   const rest: CargoThroughLoad[] = loads.slice(1).map((row, index) => ({
     ...row,
     stopIndex: index + 1,
@@ -180,7 +199,7 @@ export function continueCargoTripAfterSettle(
   return parked;
 }
 
-/** Cancel drops the link. Riders stay accepted where they already are. */
+/** Cancel drops the link. The caller cancels riders that were still on this flight. */
 export function releaseCargoTripOnCancel(
   state: CareerMissionsState,
   mission: MissionIntent,

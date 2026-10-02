@@ -582,6 +582,9 @@ export function VaHaulsBoard(props: Props) {
                     hold,
                     selected ?? null,
                   );
+                  const atOrigin =
+                    (selected?.locationIcao ?? '').trim().toUpperCase() ===
+                    origin;
                   const isSelected = selectedHoldId === hold.id;
                   const clock =
                     typeof props.economyClock === 'number' &&
@@ -707,10 +710,12 @@ export function VaHaulsBoard(props: Props) {
                               ? openFlight
                               : addToTrip
                               ? 'This flight is still open. The hold rides along and delivers at its own stop.'
-                              : usePrepare
+                              : props.onPrepareHold
                               ? needsPartial
                                 ? `Hold ${mass(hold.kg)} exceeds this airframe — open Manifest to load a slice`
-                                : `Open Dispatch — ferry to ${origin} before Accept`
+                                : !atOrigin
+                                  ? `Open Manifest — ferry to ${origin} before Accept`
+                                  : 'Open Manifest to set the payload before this flight is accepted'
                               : 'Dispatch the full hold on this aircraft'
                           }
                           onClick={() => {
@@ -719,8 +724,11 @@ export function VaHaulsBoard(props: Props) {
                               void addHoldToTrip(hold);
                               return;
                             }
-                            if (usePrepare) prepareHold(hold);
-                            else void acceptHold(hold);
+                            if (props.onPrepareHold && selectedId) {
+                              prepareHold(hold);
+                              return;
+                            }
+                            void acceptHold(hold);
                           }}
                         >
                           {busyThis
@@ -733,7 +741,7 @@ export function VaHaulsBoard(props: Props) {
                               ? 'Open flight'
                               : addToTrip
                               ? 'Add to flight'
-                              : usePrepare
+                              : props.onPrepareHold
                                 ? 'Prepare'
                                 : 'Accept'}
                         </button>

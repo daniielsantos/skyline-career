@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **223ab46a** / desktop **0.3.438** shipped: Save a sold-out port listing so the same card cannot be bought again. Release: [v0.3.438](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.438).
+
+
 `main` **bfc4abe8** / desktop **0.3.437** shipped: Add a 100 t warehouse tier above the 45 t Port Bonded cap. Release: [v0.3.437](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.437).
 
 

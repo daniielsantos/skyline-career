@@ -1,5 +1,11 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-01: **Slider no Add do Dispatch** — cada rota de baixo tem o mesmo Load (25/50/75/Max). O Add manda esse peso; o que sobra fica no desk. O pay da linha acompanha o corte.
+
+Atualizado 2026-10-01: **Add da trip fica sob a carga** — a lista de rotas com Add no Dispatch estava acima do título da perna. Fica debaixo do card de Cargo, no mesmo bloco das outras listas.
+
+Atualizado 2026-10-01: **Settle da primeira perna e a reserva do próprio piloto** — sintoma = com o tail ainda em RESERVED · YOU, o settle do host jogava “reserved by another pilot” e a escala seguinte não recebia o avião. Causa = `continueCargoTripAfterSettle` devolvia o avião sem a conta que já tinha a reserva. Fix = o settle manda essa conta (ou a que já está no tail). A carga que segue não entra no warehouse do pouso; vira freight hold e o próximo OFP é só essa perna.
+
 Atualizado 2026-10-01: **Edit cargo escondia a escala seguinte** — sintoma = ao abrir Edit cargo o payload caía (85.8 → 67.2 klb) e o bridge para o próximo destino sumia da lista. Causa = o editor só copiava os lots desta perna; `throughLoads` não entra nesses lots. O contrato seguia no voo, mas a tela e o Save não o contavam no teto. Fix = a rota do Dispatch mostra a cadeia (KIAH → SKBQ → KMIA) e o payload é a soma do OFP, com a nota do que entrega neste destino. O card âmbar da trip sai; a lista Add fica só quando ainda há hold. No Edit cargo a escala seguinte aparece travada, entra no payload reservado e no teto dos sliders, e o Save mantém `throughLoads`.
 
 Atualizado 2026-10-01: **Manifest: slider na primeira perna, Add nos outros** — sintoma = a lista única só tinha caixa, e o jogador não ajustava o peso. Fix = o hold que abriu o Manifest já nasce com o slider. Os outros ficam na lista da trip com **Add**; o slider daquele contrato aparece depois do Add. Load 0 devolve o hold ao desk. O bridge entra no total: kg no payload e `pilotPayUsd` (proporcional ao slider) no Contract pay.

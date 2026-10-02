@@ -12871,7 +12871,7 @@ export function App() {
     }, { sync: { missions: true, airport: true } });
   }
 
-  async function onAddDeskHoldToFlight(holdId: string) {
+  async function onAddDeskHoldToFlight(holdId: string, kg?: number) {
     const host = activeMissionRef.current;
     if (!host) return;
     const hold = openDeskHolds.find((row) => row.id === holdId);
@@ -12884,6 +12884,7 @@ export function App() {
         missionId: host.id,
         holdId,
         companyId: opsCompanyId,
+        ...(kg != null && kg > 0 ? { kg: Math.floor(kg) } : {}),
       });
       if (result.fleet) {
         const holdingVa = Boolean(home && active && home !== active);
@@ -12893,7 +12894,26 @@ export function App() {
       if (result.missions?.length) {
         setMissions(result.missions.slice().reverse());
       }
-      setOpenDeskHolds((current) => current.filter((row) => row.id !== holdId));
+      setOpenDeskHolds((current) =>
+        current.flatMap((row) => {
+          if (row.id !== holdId) return [row];
+          const taken =
+            kg != null && kg > 0 ? Math.min(row.kg, Math.floor(kg)) : row.kg;
+          const left = Math.max(0, row.kg - taken);
+          if (left <= 0) return [];
+          const remainPay =
+            row.pilotPayUsd != null && row.kg > 0
+              ? (row.pilotPayUsd * left) / row.kg
+              : row.pilotPayUsd;
+          return [
+            {
+              ...row,
+              kg: left,
+              ...(remainPay != null ? { pilotPayUsd: remainPay } : {}),
+            },
+          ];
+        }),
+      );
       setStagingJoinHoldIds((current) => current.filter((id) => id !== holdId));
       setStagingJoinKg((current) => {
         if (!(holdId in current)) return current;
@@ -12907,9 +12927,9 @@ export function App() {
     }, { sync: { missions: true } });
   }
 
-  async function onAddCargoStop(riderMissionId: string) {
+  async function onAddCargoStop(riderMissionId: string, kg?: number) {
     if (riderMissionId.startsWith('hold:')) {
-      await onAddDeskHoldToFlight(riderMissionId.slice('hold:'.length));
+      await onAddDeskHoldToFlight(riderMissionId.slice('hold:'.length), kg);
       return;
     }
     const host = activeMissionRef.current;
@@ -20964,7 +20984,7 @@ export function App() {
                   };
                 })
               ]}
-              onAddCargoStop={(id) => void onAddCargoStop(id)}
+              onAddCargoStop={(id, kg) => void onAddCargoStop(id, kg)}
               onCrewDispatch={(m, crewMemberId) =>
                 void onCrewDispatchMission(m, crewMemberId)
               }

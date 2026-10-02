@@ -15,6 +15,7 @@ import {
   displayAmountToStoredKg,
   formatMassExact,
   formatWeightText,
+  displayToKg,
   kgToDisplay,
   massUnitLabel,
   KG_TO_LB,
@@ -128,11 +129,13 @@ function CargoTripStops(props: {
     by?: string;
   }>;
   busy: boolean;
+  freeKg: number;
+  weightSystem: WeightSystem;
   formatTonnes: (kg: number) => string;
   formatMoney: (n: number) => string;
   formatDeadline: (tick: number, hours: number) => string;
   continuousHours: number;
-  onAdd?: (riderMissionId: string) => void;
+  onAdd?: (riderMissionId: string, kg: number) => void;
 }) {
   const stops = props.mission.throughLoads ?? [];
   const room = stops.length < 3;
@@ -140,65 +143,169 @@ function CargoTripStops(props: {
   return (
     <div className="dispatch-trip">
       <ul className="dispatch-trip-list">
-          {props.choices.map((choice) => {
-            const dist =
-              typeof choice.distanceNm === 'number' && choice.distanceNm > 0
-                ? `${Math.round(choice.distanceNm).toLocaleString()} nm`
-                : '—';
-            const commodity = choice.commodityId
-              ? choice.commodityId.charAt(0).toUpperCase() +
-                choice.commodityId.slice(1)
-              : 'Cargo';
-            return (
-              <li key={choice.id} className="dispatch-trip-row">
-                <div className="dispatch-trip-id">
-                  <strong>
-                    {choice.originIcao} → {choice.destIcao}
-                  </strong>
-                  <span>{choice.kind}</span>
-                </div>
-                <div className="dispatch-trip-stats">
-                  <span>
-                    <em>Cargo</em> {commodity}
-                  </span>
-                  <span>
-                    <em>Mass</em> {props.formatTonnes(choice.cargoKg)}
-                  </span>
-                  <span>
-                    <em>Dist</em> {dist}
-                  </span>
-                  <span>
-                    <em>Pay</em>{' '}
-                    {typeof choice.payUsd === 'number'
-                      ? props.formatMoney(choice.payUsd)
-                      : '—'}
-                  </span>
-                  <span>
-                    <em>Expires</em>{' '}
-                    {typeof choice.expiresAtTick === 'number'
-                      ? props.formatDeadline(
-                          choice.expiresAtTick,
-                          props.continuousHours,
-                        )
-                      : '—'}
-                  </span>
-                  <span>
-                    <em>By</em> {choice.by?.trim() || '—'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="action compact"
-                  disabled={props.busy}
-                onClick={() => props.onAdd?.(choice.id)}
-              >
-                Add
-              </button>
-            </li>
-          );
-        })}
+        {props.choices.map((choice) => (
+          <CargoTripStopRow
+            key={choice.id}
+            choice={choice}
+            busy={props.busy}
+            freeKg={props.freeKg}
+            weightSystem={props.weightSystem}
+            formatTonnes={props.formatTonnes}
+            formatMoney={props.formatMoney}
+            formatDeadline={props.formatDeadline}
+            continuousHours={props.continuousHours}
+            onAdd={props.onAdd!}
+          />
+        ))}
       </ul>
     </div>
+  );
+}
+
+function CargoTripStopRow(props: {
+  choice: {
+    id: string;
+    originIcao: string;
+    destIcao: string;
+    cargoKg: number;
+    commodityId: string;
+    kind: string;
+    distanceNm?: number;
+    payUsd?: number;
+    expiresAtTick?: number;
+    by?: string;
+  };
+  busy: boolean;
+  freeKg: number;
+  weightSystem: WeightSystem;
+  formatTonnes: (kg: number) => string;
+  formatMoney: (n: number) => string;
+  formatDeadline: (tick: number, hours: number) => string;
+  continuousHours: number;
+  onAdd: (riderMissionId: string, kg: number) => void;
+}) {
+  const choice = props.choice;
+  const partial = choice.id.startsWith('hold:');
+  const maxKg = Math.max(
+    0,
+    Math.floor(Math.min(choice.cargoKg, partial ? props.freeKg : choice.cargoKg)),
+  );
+  const [kg, setKg] = useState(maxKg);
+  const loadKg = maxKg > 0 ? Math.max(1, Math.min(maxKg, Math.floor(kg) || maxKg)) : 0;
+  const dist =
+    typeof choice.distanceNm === 'number' && choice.distanceNm > 0
+      ? `${Math.round(choice.distanceNm).toLocaleString()} nm`
+      : '—';
+  const commodity = choice.commodityId
+    ? choice.commodityId.charAt(0).toUpperCase() + choice.commodityId.slice(1)
+    : 'Cargo';
+  const pay =
+    typeof choice.payUsd === 'number' && choice.cargoKg > 0
+      ? (choice.payUsd * loadKg) / choice.cargoKg
+      : choice.payUsd;
+  const unit = massUnitLabel(props.weightSystem);
+  const displayMax = Math.max(0, Math.floor(kgToDisplay(maxKg, props.weightSystem)));
+  const displayValue = Math.round(kgToDisplay(loadKg, props.weightSystem));
+  const step = props.weightSystem === 'imperial' ? 10 : 100;
+
+  function setLoad(nextKg: number) {
+    setKg(Math.max(1, Math.min(maxKg, Math.floor(nextKg) || 1)));
+  }
+
+  return (
+    <li className="dispatch-trip-row">
+      <div className="dispatch-trip-id">
+        <strong>
+          {choice.originIcao} → {choice.destIcao}
+        </strong>
+        <span>{choice.kind}</span>
+      </div>
+      <div className="dispatch-trip-stats">
+        <span>
+          <em>Cargo</em> {commodity}
+        </span>
+        <span>
+          <em>Mass</em> {props.formatTonnes(choice.cargoKg)}
+        </span>
+        <span>
+          <em>Dist</em> {dist}
+        </span>
+        <span>
+          <em>Pay</em>{' '}
+          {typeof pay === 'number' ? props.formatMoney(pay) : '—'}
+        </span>
+        <span>
+          <em>Expires</em>{' '}
+          {typeof choice.expiresAtTick === 'number'
+            ? props.formatDeadline(choice.expiresAtTick, props.continuousHours)
+            : '—'}
+        </span>
+        <span>
+          <em>By</em> {choice.by?.trim() || '—'}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="action compact"
+        disabled={props.busy || loadKg <= 0}
+        onClick={() => props.onAdd(choice.id, loadKg)}
+      >
+        Add
+      </button>
+      {partial ? (
+        <div className="dispatch-trip-load">
+          <label className="cargo-amount staging-cargo-amount">
+            Load
+            <div>
+              <input
+                type="number"
+                min={maxKg > 0 ? 1 : 0}
+                max={Math.max(1, displayMax)}
+                step={step}
+                value={displayValue}
+                disabled={props.busy || maxKg <= 0}
+                onChange={(event) =>
+                  setLoad(displayToKg(Number(event.target.value), props.weightSystem))
+                }
+              />
+              <span>{unit}</span>
+            </div>
+            <input
+              type="range"
+              min={maxKg > 0 ? 1 : 0}
+              max={Math.max(1, displayMax)}
+              step={1}
+              value={Math.min(displayValue, Math.max(1, displayMax))}
+              disabled={props.busy || maxKg <= 0}
+              onChange={(event) =>
+                setLoad(displayToKg(Number(event.target.value), props.weightSystem))
+              }
+            />
+          </label>
+          <div className="cargo-presets staging-cargo-presets">
+            {[0.25, 0.5, 0.75, 1].map((fraction) => (
+              <button
+                key={fraction}
+                type="button"
+                className="staging-preset-chip"
+                disabled={props.busy || maxKg <= 0}
+                onClick={() =>
+                  setLoad(fraction >= 1 ? maxKg : Math.max(1, Math.round(maxKg * fraction)))
+                }
+              >
+                {fraction === 1 ? 'Max' : `${fraction * 100}%`}
+              </button>
+            ))}
+          </div>
+          {loadKg > 0 && loadKg < choice.cargoKg ? (
+            <p className="staging-line-meta">
+              Remainder {props.formatTonnes(choice.cargoKg - loadKg)} stays on
+              the desk.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
   );
 }
 
@@ -229,7 +336,7 @@ export function DispatchActivePanel(props: {
     expiresAtTick?: number;
     by?: string;
   }>;
-  onAddCargoStop?: (riderMissionId: string) => void;
+  onAddCargoStop?: (riderMissionId: string, kg: number) => void;
   /** Structural cargo ceiling for this mission (kg) — bar denominator. */
   missionMaxCargoKg: (mission: Mission) => number;
   /** Route ops payload ceiling when known (kg) — MTOW/fuel estimate for this leg. */
@@ -597,18 +704,7 @@ export function DispatchActivePanel(props: {
         </div>
       ) : null}
 
-      {mission.status === 'accepted' && !mission.throughHostId ? (
-        <CargoTripStops
-          mission={mission}
-          choices={props.cargoStopChoices ?? []}
-          busy={props.busy}
-          formatTonnes={props.formatTonnes}
-          formatMoney={props.formatMoney}
-          formatDeadline={props.formatDeadline}
-          continuousHours={props.continuousHours}
-          onAdd={props.onAddCargoStop}
-        />
-      ) : (mission.throughLoads?.length ?? 0) > 0 ? (
+      {mission.status !== 'accepted' && (mission.throughLoads?.length ?? 0) > 0 ? (
         <div className="dispatch-freight-hold" role="status">
           <strong>Also on this aircraft</strong>
           <span>
@@ -912,6 +1008,33 @@ export function DispatchActivePanel(props: {
               formatTonnes={props.formatTonnes}
               formatMoney={props.formatMoney}
               onCommit={props.onJetAStockKg}
+            />
+          ) : null}
+          {mission.status === 'accepted' && !mission.throughHostId ? (
+            <CargoTripStops
+              mission={mission}
+              choices={props.cargoStopChoices ?? []}
+              busy={props.busy}
+              freeKg={(() => {
+                const structural = props.missionMaxCargoKg(mission);
+                const ops =
+                  typeof props.missionOpsCapacityHint === 'number' &&
+                  props.missionOpsCapacityHint > 0
+                    ? props.missionOpsCapacityHint
+                    : null;
+                const cap = ops !== null ? Math.min(ops, structural) : structural;
+                const through = (mission.throughLoads ?? []).reduce(
+                  (sum, row) => sum + row.cargoKg,
+                  0,
+                );
+                return Math.max(0, cap - mission.cargoKg - through);
+              })()}
+              weightSystem={weightSystem}
+              formatTonnes={props.formatTonnes}
+              formatMoney={props.formatMoney}
+              formatDeadline={props.formatDeadline}
+              continuousHours={props.continuousHours}
+              onAdd={props.onAddCargoStop}
             />
           ) : null}
         </div>

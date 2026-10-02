@@ -161,8 +161,13 @@ export function continueCargoTripAfterSettle(
     ? findPlayerAircraft(state, host.aircraftId)
     : undefined;
   if (aircraft && aircraft.status === 'parked') {
+    const actorAccountId =
+      host.pilotAccountId?.trim() ||
+      aircraft.reservedByAccountId?.trim() ||
+      '';
     assignAircraftToMission(state, aircraft.id, rider.id, hub, {
       requirePilotAtOrigin: false,
+      ...(actorAccountId ? { actorAccountId } : {}),
     });
     parked.aircraftId = aircraft.id;
   }

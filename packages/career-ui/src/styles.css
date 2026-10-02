@@ -14871,6 +14871,7 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 .dispatch-trip {
   flex-direction: column;
   align-items: stretch;
+  margin-top: 0.85rem;
 }
 
 .dispatch-trip-list {
@@ -14888,6 +14889,15 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   grid-template-columns: minmax(9rem, 14rem) 1fr auto;
   gap: 0.5rem 0.75rem;
   align-items: center;
+}
+
+.dispatch-trip-load {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  align-items: end;
+}
   padding: 0.45rem 0.55rem;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.22);

@@ -193,6 +193,36 @@ describe('cargo trip', () => {
     assert.equal(afterDepart.debitUsd, 0);
   });
 
+  it('hands the aircraft to the next stop while it is still reserved for that pilot', () => {
+    const { world, state } = acceptedPair();
+    addCargoStop(state, 'msn_trip_host', 'msn_trip_rider');
+    const host = state.missions.find((row) => row.id === 'msn_trip_host')!;
+    host.pilotAccountId = 'pilot-a';
+    const aircraft = state.fleet[0]!;
+    assignAircraftToMission(state, aircraft.id, host.id, 'SBGR', {
+      requirePilotAtOrigin: false,
+      actorAccountId: 'pilot-a',
+    });
+    assert.equal(aircraft.reservedByAccountId, 'pilot-a');
+    const departed = departMission(
+      world,
+      { ...host, status: 'dispatched' },
+      { fleet: state },
+    );
+    state.missions = state.missions.map((row) =>
+      row.id === departed.mission.id ? departed.mission : row,
+    );
+    settleMission(world, departed.mission, {
+      fleet: state,
+      skipMinAirborneGate: true,
+    });
+    const rider = state.missions.find((row) => row.id === 'msn_trip_rider')!;
+    assert.equal(rider.aircraftId, aircraft.id);
+    assert.equal(aircraft.assignedMissionId, rider.id);
+    assert.equal(aircraft.locationIcao, 'SBKP');
+    assert.equal(aircraft.reservedByAccountId, 'pilot-a');
+  });
+
   it('releases riders at the original origin when the host is cancelled', () => {
     const { world, state } = acceptedPair();
     addCargoStop(state, 'msn_trip_host', 'msn_trip_rider');

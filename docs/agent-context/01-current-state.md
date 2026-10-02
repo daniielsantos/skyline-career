@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **6bd91f21** / desktop **0.3.434** shipped: Keep Desk Prepare and Cancel labeled while they wait, with the loading spinner. Release: [v0.3.434](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.434).
+
+
 `main` **ea4a8d6b** / desktop **0.3.433** shipped: Gate port ships on pickup-hub pressure and give each port its own arrival. Release: [v0.3.433](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.433).
 
 

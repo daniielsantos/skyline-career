@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **ba31ca06** / desktop **0.3.435** shipped: Count through-load in en-route capacity, show the live desk origin, and let an uncovered warehouse pile be abandoned. Release: [v0.3.435](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.435).
+
+
 `main` **6bd91f21** / desktop **0.3.434** shipped: Keep Desk Prepare and Cancel labeled while they wait, with the loading spinner. Release: [v0.3.434](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.434).
 
 

@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-01: **Lista de Add sem o cartão** — o padding e o fundo da linha tinham ficado fora da regra CSS, então rota, stats e Add colavam. A linha volta ao cartão, e Cargo, Mass, Dist, Pay, Expires e By ficam na mesma coluna em todas as rotas. O Add alinha à direita.
+
 Atualizado 2026-10-01: **Add do Dispatch igual ao Manifest** — a lista de baixo só tem os dados e o Add. O clique tira o contrato da lista e mostra o slider de Load que o Manifest já usa. Zerar devolve à lista. O peso entra no voo quando abre o SimBrief.
 
 Atualizado 2026-10-01: **Add da trip fica sob a carga** — a lista de rotas com Add no Dispatch estava acima do título da perna. Fica debaixo do card de Cargo, no mesmo bloco das outras listas.

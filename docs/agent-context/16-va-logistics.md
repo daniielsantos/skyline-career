@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-02: **Prepare e Cancel do Desk encolhiam para "…"** — o texto do botão virava reticências enquanto a resposta não voltava. Fix = o rótulo fica, e a bolinha de carregamento entra ao lado.
+
 Atualizado 2026-10-01: **Auto-haul troca o hold que deixou de pagar** — sintoma = o contrato ficava no desk com kg e pay carimbados mesmo depois que o hub de destino deixava de pagar mais. Fix = no tick, o desk cancela só o hold `heldByAuto` que falha `bridgeDestPaysMore` e posta outro no lugar. Esse post não incrementa `postedToday`. Se não houver outra rota, o hold sai e o post do dia continua gasto. Hold manual e missão já aceita não entram.
 
 Atualizado 2026-10-01: **Auto-haul desk teto 10** — Max/day e holds abertos (manual + auto) sobem para 10. O load em `normalizeMissionsState` usa o mesmo teto, senão o Config volta para o valor antigo. Default continua 2.

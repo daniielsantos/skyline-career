@@ -16,7 +16,7 @@ import {
   type VaHaulMission,
 } from './api';
 import { formatBoardMoney } from './board-money';
-import { BusyBlock } from './Busy';
+import { BusyBlock, BusySpinner } from './Busy';
 import {
   findNetworkNode,
   hubInNetworkFocus,
@@ -738,6 +738,7 @@ export function VaHaulsBoard(props: Props) {
                                   : 'Open Manifest to set the payload before this flight is accepted'
                               : 'Dispatch the full hold on this aircraft'
                           }
+                          data-no-action-wait="1"
                           onClick={() => {
                             if (openFlight) return;
                             if (addToTrip) {
@@ -751,15 +752,15 @@ export function VaHaulsBoard(props: Props) {
                             void acceptHold(hold);
                           }}
                         >
-                          {busyThis
-                            ? addToTrip
-                              ? 'Adding…'
-                              : usePrepare
-                                ? '…'
-                                : 'Accepting…'
-                            : openFlight
-                              ? 'Open flight'
-                              : addToTrip
+                          {busyThis ? (
+                            <BusySpinner
+                              size="sm"
+                              className="busy-spinner-on-accent"
+                            />
+                          ) : null}
+                          {openFlight
+                            ? 'Open flight'
+                            : addToTrip
                               ? 'Add to flight'
                               : props.onPrepareHold
                                 ? 'Prepare'
@@ -769,10 +770,12 @@ export function VaHaulsBoard(props: Props) {
                           type="button"
                           className="action ghost"
                           disabled={pageBusy}
+                          data-no-action-wait="1"
                           title="Release reserved cargo back to the desk"
                           onClick={() => void cancelHold(hold)}
                         >
-                          {busyThis ? '…' : 'Cancel'}
+                          {busyThis ? <BusySpinner size="sm" /> : null}
+                          Cancel
                         </button>
                       </div>
                     </li>

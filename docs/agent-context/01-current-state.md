@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **c07af3fd** / desktop **0.3.426** shipped: Restore the Add-list card and line up each contract field in the same column. Release: [v0.3.426](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.426).
+
+
 `main` **f7443b66** / desktop **0.3.425** shipped: Open the Manifest load slider after Add, instead of putting it on the Dispatch route row. Release: [v0.3.425](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.425).
 
 

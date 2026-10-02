@@ -4107,13 +4107,23 @@ export function PortsPanel(props: {
                         className="ports-discharge-strip muted"
                         aria-label="Next factory discharge"
                       >
-                        Discharge
-                        {port.inbound.ticksLeft <= 0
-                          ? ' · next tick'
-                          : ` · ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
-                        {port.inbound.totalKg > 0
-                          ? ` · ~${props.formatTonnes(port.inbound.totalKg)}`
-                          : ''}
+                        {port.inbound.totalKg > 0 ? (
+                          <>
+                            Discharge
+                            {port.inbound.ticksLeft <= 0
+                              ? ' · next tick'
+                              : ` · ~${ticksToHoursLabel(port.inbound.ticksLeft)}`}
+                            {` · ~${props.formatTonnes(port.inbound.totalKg)}`}
+                          </>
+                        ) : (port.marketSignals ?? []).some(
+                            (s) =>
+                              s.commodityId !== 'fuel' &&
+                              s.balance !== 'surplus',
+                          ) ? (
+                          'Yard is full · ship waits for room'
+                        ) : (
+                          'No inbound ship · pickup hubs are stocked'
+                        )}
                       </p>
                       {(() => {
                         const signals = (port.marketSignals ?? []).filter(

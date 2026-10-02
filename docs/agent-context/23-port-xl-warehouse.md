@@ -2,6 +2,8 @@
 
 Related: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), Value/Supplies CLOSED (`21` / `22`).
 
+Atualizado 2026-10-02: **Navio do porto não segue a pressão do hub** — sintoma = todo porto descarrega no mesmo minuto e o pátio enche até o teto mesmo com Machinery high. Causa = o primeiro navio nasce no tick do mundo e depois soma um dia fixo; o kg é 8% do teto, e a linha Hub pressure só é texto. Fix = o navio traz kg só na medida em que algum pickup hub está curto (surplus = zero, a mesma faixa 42/58). O próximo horário de cada porto fica espalhado no dia. Pátio cheio continua sem receber mais.
+
 Atualizado 2026-10-02: **Abandonar o prédio da warehouse** — só o lote tinha Abandon. O dono agora fecha a warehouse vazia (sem estoque, sem inbound, sem hold de desk na origem ou no destino). CAPEX não volta. Staff daquele prédio sai junto. Com carga dentro, recusa.
 
 Atualizado 2026-09-25: **WH T2/T3 mid ladder** — caps 10/15 klb → **12/25 klb** (5443 / 11340 kg); T1 5 klb + T4 45 t intactos. Migrate expande saves no mesmo tier. CAPEX/shipped gates inalterados (mid fica mais valioso).

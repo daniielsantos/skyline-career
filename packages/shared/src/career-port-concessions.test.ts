@@ -348,6 +348,43 @@ describe('port concessions', () => {
     );
   });
 
+  it('ship follows pickup-hub pressure and ports do not share a clock', () => {
+    const world = createSeedEconomyWorld({ seed: 'port-pressure-ship' });
+    ensurePortInventories(world);
+    const sbgr = world.airports.find((a) => a.icao === 'SBGR');
+    assert.ok(sbgr);
+    const general = sbgr!.inventory.general;
+    const supplies = sbgr!.inventory.supplies;
+    assert.ok(general && supplies && general.capacityKg > 0 && supplies.capacityKg > 0);
+    general.stockKg = Math.floor(general.capacityKg * 0.9);
+    supplies.stockKg = Math.floor(supplies.capacityKg * 0.1);
+    for (const row of world.portInventories ?? []) {
+      if (row.portId === 'BRSSZ' && (row.commodityId === 'general' || row.commodityId === 'supplies')) {
+        row.stockKg = 0;
+      }
+    }
+
+    const inbound = estimatePortInboundCargo(world, 'BRSSZ');
+    assert.equal(
+      inbound.find((c) => c.commodityId === 'general')?.kg ?? 0,
+      0,
+    );
+    const suppliesCap = portInventoryCapKg('supplies', { world, portId: 'BRSSZ' });
+    assert.equal(
+      inbound.find((c) => c.commodityId === 'supplies')?.kg ?? 0,
+      Math.floor(suppliesCap * PORT_RESTOCK_FRAC_PER_DAY),
+    );
+
+    ensurePortInventoryRestock(world);
+    const ships = world.portInboundShips ?? [];
+    assert.ok(ships.length > 2);
+    const clocks = new Set(ships.map((s) => s.arrivesAtTick));
+    assert.ok(clocks.size > 1);
+    for (const ship of ships) {
+      assert.ok(ship.arrivesAtTick > world.tick);
+    }
+  });
+
   it('listing spawn does not restock the yard', () => {
     const world = createSeedEconomyWorld({ seed: 'port-no-get-restock' });
     ensurePortInventories(world);
@@ -401,6 +438,11 @@ describe('port concessions', () => {
       (r) => r.portId === 'BRSSZ' && r.commodityId === 'general',
     );
     if (row) row.stockKg = 0;
+    const sbgrGeneral = world.airports.find((a) => a.icao === 'SBGR')?.inventory
+      .general;
+    if (sbgrGeneral && sbgrGeneral.capacityKg > 0) {
+      sbgrGeneral.stockKg = Math.floor(sbgrGeneral.capacityKg * 0.2);
+    }
     const p2Inbound = estimatePortInboundCargo(world, 'BRSSZ').find(
       (c) => c.commodityId === 'general',
     )!.kg;

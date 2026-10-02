@@ -7,7 +7,12 @@ import { TICKS_PER_DAY } from './career-clock.js';
 import { appendLedgerMarker, applyWalletDelta } from './career-ledger.js';
 import { liquidateConcessionJetA } from './career-port-jet-a.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
-import { getCareerPort, listCareerPorts } from './career-ports.js';
+import {
+  getCareerPort,
+  listCareerPorts,
+  PORT_HUB_SURPLUS_FILL,
+  PORT_HUB_TIGHT_FILL,
+} from './career-ports.js';
 import { ensurePlayerWarehouses } from './career-warehouse.js';
 import { WAREHOUSE_CAPACITY_KG } from './career-warehouse-stock.js';
 import type {
@@ -425,6 +430,46 @@ export function getPortInventoryStock(
   return row?.stockKg ?? 0;
 }
 
+/**
+ * Tightest pickup-hub fill for this commodity.
+ * Null when no hub has a pile — the ship then uses the full daily amount.
+ */
+function tightestPickupHubFill(
+  world: CareerEconomyWorld,
+  portId: string,
+  commodityId: CommodityId,
+): number | null {
+  const hubs = getCareerPort(portId)?.pickupHubs ?? [];
+  let tightest: number | null = null;
+  for (const raw of hubs) {
+    const icao = raw.trim().toUpperCase();
+    if (!icao) continue;
+    const ap = world.airports.find((a) => a.icao.trim().toUpperCase() === icao);
+    const pile = ap?.inventory?.[commodityId];
+    if (!pile || !(pile.capacityKg > 0)) continue;
+    const fill = Math.min(1, Math.max(0, pile.stockKg / pile.capacityKg));
+    if (tightest == null || fill < tightest) tightest = fill;
+  }
+  return tightest;
+}
+
+/**
+ * 1 when a pickup hub is short, 0 when every pickup hub is in surplus.
+ * Same bands as the Hub pressure line.
+ */
+export function portDischargePressureFactor(
+  world: CareerEconomyWorld,
+  portId: string,
+  commodityId: CommodityId,
+): number {
+  const fill = tightestPickupHubFill(world, portId, commodityId);
+  if (fill == null) return 1;
+  if (fill <= PORT_HUB_TIGHT_FILL) return 1;
+  if (fill >= PORT_HUB_SURPLUS_FILL) return 0;
+  const span = PORT_HUB_SURPLUS_FILL - PORT_HUB_TIGHT_FILL;
+  return span > 0 ? (PORT_HUB_SURPLUS_FILL - fill) / span : 0;
+}
+
 function restockKgForArrival(
   world: CareerEconomyWorld,
   portId: string,
@@ -432,10 +477,26 @@ function restockKgForArrival(
 ): number {
   const cap = portInventoryCapKg(commodityId, { world, portId });
   if (cap <= 0) return 0;
+  const pressure = portDischargePressureFactor(world, portId, commodityId);
+  if (pressure <= 0) return 0;
   const stock = getPortInventoryStock(world, portId, commodityId);
   const room = Math.max(0, cap - stock);
-  const add = Math.floor(cap * portRestockFracPerDay(world, portId));
+  const add = Math.floor(cap * portRestockFracPerDay(world, portId) * pressure);
   return Math.min(room, add);
+}
+
+/** Stable offset so ports do not discharge on the same economy tick. */
+function portDischargePhaseTicks(portId: string): number {
+  return hashSeed(`port-discharge:${portId.trim().toUpperCase()}`) % TICKS_PER_DAY;
+}
+
+function nextPhasedDischargeTick(afterTick: number, portId: string): number {
+  const after = Math.max(0, Math.floor(afterTick));
+  const phase = portDischargePhaseTicks(portId);
+  const dayStart = Math.floor(after / TICKS_PER_DAY) * TICKS_PER_DAY;
+  let arrives = dayStart + phase;
+  if (arrives <= after) arrives += TICKS_PER_DAY;
+  return arrives;
 }
 
 function dischargePortShip(world: CareerEconomyWorld, portId: string): void {
@@ -483,7 +544,10 @@ export function tickPortInboundShips(world: CareerEconomyWorld): void {
       dischargePortShip(world, portId);
       arrives += PORT_RESTOCK_INTERVAL_TICKS;
     }
-    next.push({ portId, arrivesAtTick: arrives });
+    next.push({
+      portId,
+      arrivesAtTick: nextPhasedDischargeTick(world.tick, portId),
+    });
   }
 
   for (const port of listCareerPorts()) {
@@ -495,7 +559,10 @@ export function tickPortInboundShips(world: CareerEconomyWorld): void {
       dischargePortShip(world, port.id);
       arrives += PORT_RESTOCK_INTERVAL_TICKS;
     }
-    next.push({ portId: port.id, arrivesAtTick: arrives });
+    next.push({
+      portId: port.id,
+      arrivesAtTick: nextPhasedDischargeTick(world.tick, port.id),
+    });
   }
 
   world.portInboundShips = next;

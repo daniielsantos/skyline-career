@@ -12737,6 +12737,16 @@ export function App() {
         result.activeTour?.status === 'active'
           ? result.activeTour.resumeHint
           : null;
+      const yardKg = result.yardKg ?? 0;
+      const warehouseKg = result.warehouseKg ?? 0;
+      const cargoBack =
+        yardKg > 0 && warehouseKg > 0
+          ? 'Cancelled · what fit is back in the warehouse. The rest is in the yard'
+          : yardKg > 0
+            ? 'Cancelled · the warehouse was full. Cargo is in the yard'
+            : result.returnedToWarehouse
+              ? 'Cancelled · cargo returned to warehouse at origin'
+              : null;
       if (tourHint) {
         setToastKind(
           result.activeTour?.resumeState === 'stranded' || result.warning
@@ -12746,8 +12756,8 @@ export function App() {
         setToast(
           result.returnedToMarket
             ? `Cancelled · ${formatTonnes(result.releasedKg)} released · ${tourHint}`
-            : result.returnedToWarehouse
-              ? `Cancelled · cargo returned to warehouse · ${tourHint}`
+            : cargoBack
+              ? `${cargoBack} · ${tourHint}`
               : `Cancelled · ${tourHint}`,
         );
       } else {
@@ -12755,9 +12765,8 @@ export function App() {
         setToast(
           result.returnedToMarket
             ? `Cancelled · ${formatTonnes(result.releasedKg)} released to market`
-            : result.returnedToWarehouse
-              ? 'Cancelled · cargo returned to warehouse at origin'
-              : `Cancelled · ${result.warning ?? 'no active lot to release'}`,
+            : cargoBack ??
+                `Cancelled · ${result.warning ?? 'no active lot to release'}`,
         );
       }
       goToTab('staging');

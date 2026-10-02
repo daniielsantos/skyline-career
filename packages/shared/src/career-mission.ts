@@ -34,7 +34,14 @@ import {
   refundPortJetAHaul,
 } from './career-port-jet-a.js';
 import { hubDistanceNm } from './career-ferry-route.js';
-import { depositCargoToWarehouse, depositCargoToWarehouseOrYard, recordWarehouseShipmentKg } from './career-warehouse-stock.js';
+import {
+  depositCargoToWarehouse,
+  depositCargoToWarehouseOrYard,
+  findPlayerWarehouseAtIcao,
+  recordWarehouseShipmentKg,
+  warehouseFreeKg,
+} from './career-warehouse-stock.js';
+import { careerPortIdForPickupHub } from './career-ports.js';
 import { creditPortOperatorThroughputOnOutboundSettle } from './career-port-throughput.js';
 import { whOpsShippedMultForWarehouse } from './career-ground-staff.js';
 import { syncPilotIcaoTo } from './career-pilot-travel.js';
@@ -2220,29 +2227,32 @@ export function replaceMissionManifest(
   }
 }
 
-/** Put desk-hold cargo back in the origin warehouse, one commodity per line. */
+/**
+ * Put desk cargo back at the origin. What fits returns to the warehouse.
+ * The rest becomes a port-yard pickup when this hub belongs to a port.
+ */
 export function restoreDeskCargoLines(
   world: CareerEconomyWorld,
   fleet: CareerMissionsState,
   mission: MissionIntent,
   lines: MissionLotLine[],
-): void {
+): { storedKg: number; yardKg: number } {
   const tick = mission.acceptedAtTick ?? world.tick;
+  let storedKg = 0;
+  let yardKg = 0;
   for (const line of lines) {
     const kg = Math.max(0, Math.floor(line.cargoKg));
     if (kg <= 0) continue;
-    try {
-      depositCargoToWarehouse(fleet, {
-        icao: mission.originIcao,
-        commodityId: line.commodityId,
-        kg,
-        avgCostUsdPerKg:
-          line.avgCostUsdPerKg ?? mission.warehouseAvgCostUsdPerKg ?? 0,
-        tick,
-      });
-    } catch {
-      // Warehouse may be gone — cancel/trim still succeeds.
-    }
+    const split = restoreDeskCargoKg(fleet, {
+      icao: mission.originIcao,
+      commodityId: line.commodityId,
+      kg,
+      avgCostUsdPerKg:
+        line.avgCostUsdPerKg ?? mission.warehouseAvgCostUsdPerKg ?? 0,
+      tick,
+    });
+    storedKg += split.storedKg;
+    yardKg += split.yardKg;
     const orderId =
       line.demandOrderId?.trim() ||
       (lines.length === 1 ? mission.demandOrderId?.trim() : undefined);
@@ -2255,12 +2265,49 @@ export function restoreDeskCargoLines(
       order.status = 'open';
     }
   }
+  return { storedKg, yardKg };
+}
+
+function restoreDeskCargoKg(
+  fleet: CareerMissionsState,
+  opts: {
+    icao: string;
+    commodityId: MissionLotLine['commodityId'];
+    kg: number;
+    avgCostUsdPerKg: number;
+    tick: number;
+  },
+): { storedKg: number; yardKg: number } {
+  const portId = careerPortIdForPickupHub(opts.icao);
+  if (portId) {
+    try {
+      return depositCargoToWarehouseOrYard(fleet, { ...opts, portId });
+    } catch {
+      return { storedKg: 0, yardKg: 0 };
+    }
+  }
+  try {
+    const wh = findPlayerWarehouseAtIcao(fleet, opts.icao);
+    const room = wh ? warehouseFreeKg(fleet, wh.id) : 0;
+    const storedKg = Math.min(opts.kg, room);
+    if (storedKg > 0) {
+      depositCargoToWarehouse(fleet, { ...opts, kg: storedKg });
+    }
+    return { storedKg, yardKg: 0 };
+  } catch {
+    return { storedKg: 0, yardKg: 0 };
+  }
 }
 
 export function cancelMission(
   world: CareerEconomyWorld,
   mission: MissionIntent,
-  opts: { fleet?: CareerMissionsState; nowMs?: number } = {},
+  opts: {
+    fleet?: CareerMissionsState;
+    nowMs?: number;
+    /** Filled when desk cargo is put back: warehouse first, overflow to the yard. */
+    cargoRestore?: { storedKg: number; yardKg: number };
+  } = {},
 ): MissionIntent {
   const normalized = normalizeMissionIntent(mission);
   if (
@@ -2336,7 +2383,16 @@ export function cancelMission(
       normalized.warehouseHaul ||
       normalized.demandOrderId
     ) {
-      restoreDeskCargoLines(world, opts.fleet, normalized, normalized.lots);
+      const restored = restoreDeskCargoLines(
+        world,
+        opts.fleet,
+        normalized,
+        normalized.lots,
+      );
+      if (opts.cargoRestore) {
+        opts.cargoRestore.storedKg += restored.storedKg;
+        opts.cargoRestore.yardKg += restored.yardKg;
+      }
     } else if (normalized.portPickupId) {
       const pickups = Array.isArray(opts.fleet.portPickups)
         ? opts.fleet.portPickups

@@ -6,8 +6,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { TICKS_PER_DAY } from './career-clock.js';
 import {
+  abandonWarehouse,
   abandonWarehouseStock,
   buyWarehouseAtPickupHub,
+  findPlayerWarehouseAtIcao,
   depositCargoToWarehouse,
   normalizePlayerWarehouseState,
   previewWithdrawCargoCost,
@@ -200,6 +202,77 @@ describe('career warehouse + demand', () => {
         }),
       /free capacity/i,
     );
+  });
+
+  it('abandons an empty warehouse without refund', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-close' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'WhClose',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 200_000;
+    const bought = buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const walletBefore = state.walletUsd;
+    const closed = abandonWarehouse(state, {
+      warehouseId: bought.warehouse.id,
+    });
+    assert.equal(closed.icao, 'SBGR');
+    assert.equal(state.walletUsd, walletBefore);
+    assert.equal(findPlayerWarehouseAtIcao(state, 'SBGR'), undefined);
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    const pile = depositCargoToWarehouse(state, {
+        icao: 'SBGR',
+        commodityId: 'general',
+        kg: 100,
+        avgCostUsdPerKg: 1,
+        tick: world.tick,
+      },
+    );
+    const again = findPlayerWarehouseAtIcao(state, 'SBGR')!;
+    assert.throws(
+      () => abandonWarehouse(state, { warehouseId: again.id }),
+      /still has cargo/i,
+    );
+    abandonWarehouseStock(state, { stockId: pile.id });
+    state.playerWarehouses!.inboundTransfers = [
+      {
+        id: 'in_1',
+        warehouseId: again.id,
+        hubIcao: 'SBGR',
+        portId: 'BRSSZ',
+        commodityId: 'general',
+        kg: 50,
+        unitCostUsd: 1,
+        purchasedAtTick: world.tick,
+        readyAtTick: world.tick + 4,
+      },
+    ];
+    assert.throws(
+      () => abandonWarehouse(state, { warehouseId: again.id }),
+      /on the way/i,
+    );
+    state.playerWarehouses!.inboundTransfers = [];
+    state.playerWarehouses!.demandHolds = [
+      {
+        id: 'hold_1',
+        kind: 'haul',
+        warehouseId: again.id,
+        originIcao: 'SBGR',
+        destIcao: 'SBSP',
+        commodityId: 'general',
+        kg: 10,
+        unitPriceUsd: 1,
+        heldAtTick: world.tick,
+        expiresAtTick: world.tick + 10,
+      },
+    ];
+    assert.throws(
+      () => abandonWarehouse(state, { warehouseId: again.id }),
+      /desk hold/i,
+    );
+    state.playerWarehouses!.demandHolds = [];
+    abandonWarehouse(state, { warehouseId: again.id });
+    assert.equal(findPlayerWarehouseAtIcao(state, 'SBGR'), undefined);
   });
 
   it('abandons a warehouse stock lot without refund', () => {
@@ -1346,6 +1419,51 @@ describe('career warehouse + demand', () => {
       yard.reduce((s, p) => s + p.kg, 0),
       110,
     );
+  });
+
+  it('cancel puts desk cargo back in the warehouse and the overflow in the yard', () => {
+    const world = createSeedEconomyWorld({ seed: 'wh-cancel-yard' });
+    const state = selectStarterHub(emptyMissionsStateV2(), 'SBGR', {
+      pilotName: 'CancelYard',
+      airframeTypeId: 'asobo-c172sp-cargo',
+    });
+    state.walletUsd = 800_000;
+    buyWarehouseAtPickupHub(state, world, 'SBGR');
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: 400,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    const aircraft = state.fleet.find((a) => a.status === 'parked')!;
+    aircraft.locationIcao = 'SBGR';
+    const accepted = acceptWarehouseHaul(state, world, {
+      originIcao: 'SBGR',
+      destIcao: 'SBSP',
+      commodityId: 'general',
+      aircraftId: aircraft.id,
+      kg: 150,
+    });
+    const wh = state.playerWarehouses!.warehouses[0]!;
+    const free = warehouseFreeKg(state, wh.id);
+    depositCargoToWarehouse(state, {
+      icao: 'SBGR',
+      commodityId: 'general',
+      kg: free - 40,
+      avgCostUsdPerKg: 2,
+      tick: world.tick,
+    });
+    cancelMission(world, accepted.mission, { fleet: state });
+    assert.equal(warehouseFreeKg(state, wh.id), 0);
+    const yard = (state.portPickups ?? []).filter(
+      (p) => p.hubIcao === 'SBGR' && p.commodityId === 'general',
+    );
+    assert.equal(
+      yard.reduce((s, p) => s + p.kg, 0),
+      110,
+    );
+    assert.equal(yard[0]?.portId, 'BRSSZ');
   });
 
   it('cannot fly a second cargo mission during an active bridge', () => {

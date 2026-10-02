@@ -3935,6 +3935,19 @@ export function postWarehouseUpgrade(opts: { warehouseId: string }) {
   });
 }
 
+export function postWarehouseAbandon(opts: { warehouseId: string }) {
+  return api<{
+    walletUsd: number;
+    icao: string;
+    warehouseId: string;
+    warehouses: PlayerWarehouseSnapshot;
+    ports: PortsSnapshot;
+  }>('/api/warehouses/abandon', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
 export function postWarehouseStockAbandon(opts: { stockId: string }) {
   return api<{
     walletUsd: number;
@@ -4595,6 +4608,10 @@ export function postCancel(opts: { missionId: string; companyId?: string }) {
     returnedToMarket: boolean;
     /** Haul/Bridge/Demand cancel deposited cargo back to origin WH (not Open desk). */
     returnedToWarehouse?: boolean;
+    /** Kg that fit back in the origin warehouse. */
+    warehouseKg?: number;
+    /** Kg that did not fit and went to the port yard. */
+    yardKg?: number;
     warning?: string | null;
     activeTour?: ActiveTourView | null;
   }>('/api/cancel', {

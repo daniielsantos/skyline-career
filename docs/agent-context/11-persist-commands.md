@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-02: **Cancel de haul/bridge com a warehouse cheia engolia a carga** — sintoma = o estoque IN STOCK é o que está no prédio (o hold do desk ainda conta; o voo aceito já saiu no Prepare). No cancel, `depositCargoToWarehouse` falhava se não houvesse vaga e o `catch` descartava o kg. Fix = o que cabe volta para a warehouse de origem; o resto vira yard do porto daquele hub. Sem porto no hub, entra só o que cabe. O Open desk continua ocupando a warehouse até o Prepare.
+
 Atualizado 2026-10-02: **Leave freight não movia o piloto no header** — sintoma = a carga ficou em KTCS e o chip Pilot continuou em MMMY. Causa = o hold gravou `pilotIcao` na company da VA; o header lê a company de casa. O refresh depois do botão recolocava MMMY. Fix = o mesmo caminho do settle também grava o hub na company de casa. O voo que já está em KTCS não se corrige sozinho: o piloto ainda precisa ir até lá (Move) até esse world-api subir.
 
 Atualizado 2026-10-02: **Desk Active mostrava só a commodity do contrato merged** — sintoma = dois Supplies e um Machinery para KMIA apareciam como uma linha “Machinery”. Causa = a linha do Desk usa `commodityId` da missão, e o merge guarda os lots dentro dela. Fix = a coluna Cargo lista cada commodity, com ×N quando repete.

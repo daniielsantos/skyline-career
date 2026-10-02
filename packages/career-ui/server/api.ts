@@ -175,6 +175,7 @@ import {
   abandonPortPickup,
   buyWarehouseAtPickupHub,
   upgradeWarehouse,
+  abandonWarehouse,
   abandonWarehouseStock,
   playerWarehouseSnapshot,
   quoteWarehouseBuyUsd,
@@ -11436,6 +11437,52 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'POST' && path === '/api/warehouses/abandon') {
+        const body = (await readBody(req)) as {
+          warehouseId?: string;
+          companyId?: string;
+        };
+        const warehouses_abandonCompanyId = companyIdFromRequest(
+          req,
+          body.companyId,
+        );
+        if (!body.warehouseId?.trim()) {
+          send(res, 400, { error: 'warehouseId required' });
+          return;
+        }
+        try {
+          await assertVaOwnerForFleetMutation(
+            req,
+            warehouses_abandonCompanyId,
+            'abandon a VA warehouse',
+          );
+          const result = await withCareerWrite((world, missions) => {
+            assertCompanyCreditAllowsOps(missions);
+            const closed = abandonWarehouse(missions, {
+              warehouseId: body.warehouseId!,
+            });
+            return {
+              walletUsd: missions.walletUsd,
+              icao: closed.icao,
+              warehouseId: closed.warehouse.id,
+              warehouses: playerWarehouseSnapshot(missions, world),
+              ports: portSnapshot(world, missions, {
+                viewerCompanyId: warehouses_abandonCompanyId,
+              }),
+            };
+          }, {
+            persist: 'company',
+            companyId: warehouses_abandonCompanyId,
+          });
+          send(res, 200, result);
+        } catch (error) {
+          send(res, vaPermissionStatus(error), {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/warehouses/stock/abandon') {
         const body = (await readBody(req)) as { stockId?: string; companyId?: string;
         };
@@ -14219,6 +14266,9 @@ export function createCareerApiServer(port = 8787) {
               releasedKg,
               returnedToMarket,
               returnedToWarehouse,
+              warehouseKg:
+                executed.kind === 'applied' ? executed.warehouseKg : 0,
+              yardKg: executed.kind === 'applied' ? executed.yardKg : 0,
               foundBefore: charter ? 1 : foundBefore,
               noBoardLot,
               charter,
@@ -14244,6 +14294,8 @@ export function createCareerApiServer(port = 8787) {
             releasedKg: result.releasedKg,
             returnedToMarket: result.returnedToMarket,
             returnedToWarehouse: result.returnedToWarehouse ?? false,
+            warehouseKg: result.warehouseKg ?? 0,
+            yardKg: result.yardKg ?? 0,
             activeTour: result.activeTour ?? null,
             charterActiveTour: result.charterActiveTour ?? null,
             warning:

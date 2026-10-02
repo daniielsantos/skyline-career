@@ -2,6 +2,8 @@
 
 Related: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), Value/Supplies CLOSED (`21` / `22`).
 
+Atualizado 2026-10-02: **Abandonar o prédio da warehouse** — só o lote tinha Abandon. O dono agora fecha a warehouse vazia (sem estoque, sem inbound, sem hold de desk na origem ou no destino). CAPEX não volta. Staff daquele prédio sai junto. Com carga dentro, recusa.
+
 Atualizado 2026-09-25: **WH T2/T3 mid ladder** — caps 10/15 klb → **12/25 klb** (5443 / 11340 kg); T1 5 klb + T4 45 t intactos. Migrate expande saves no mesmo tier. CAPEX/shipped gates inalterados (mid fica mais valioso).
 
 ## Fantasia

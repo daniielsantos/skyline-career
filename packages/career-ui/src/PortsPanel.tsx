@@ -28,6 +28,7 @@ import {
   postPortPickupAbandon,
   postWarehouseBuy,
   postWarehouseUpgrade,
+  postWarehouseAbandon,
   postWarehouseStockAbandon,
   postWarehouseBridgeHold,
   postWarehouseBridgeHoldCancel,
@@ -2214,6 +2215,46 @@ export function PortsPanel(props: {
         'ok',
         `Warehouse ${icao} → T${result.warehouse.tier} · ${props.formatMoney(result.debitUsd)}`,
       );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onAbandonWarehouse(warehouseId: string, icao: string) {
+    if (props.busy || loading) return;
+    if (!canPortCapex) {
+      props.onToast?.('fail', 'Only the company owner can abandon a warehouse');
+      return;
+    }
+    const ok = await confirm({
+      title: `Abandon warehouse at ${icao}?`,
+      body: (
+        <>
+          <p>
+            The building closes. Capacity and the tier are gone. Nothing you paid comes back.
+          </p>
+          <p>
+            It has to be empty: no stock, no cargo on the way in, and no desk hold tied to this warehouse. Ground staff here are released.
+          </p>
+        </>
+      ),
+      confirmLabel: 'Abandon warehouse',
+      cancelLabel: 'Keep warehouse',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const result = await postWarehouseAbandon({ warehouseId });
+      props.onWallet?.(result.walletUsd);
+      setWarehouses(result.warehouses);
+      setSnap(result.ports);
+      props.onToast?.('ok', `Abandoned warehouse at ${result.icao}`);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -5370,6 +5411,19 @@ export function PortsPanel(props: {
                                         : 'Tier 3 · max capacity'}
                                     </p>
                                   )}
+                                  {canPortCapex ? (
+                                    <button
+                                      type="button"
+                                      className="ports-wh-abandon-btn"
+                                      disabled={props.busy || loading}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void onAbandonWarehouse(wh.id, icao);
+                                      }}
+                                    >
+                                      Abandon warehouse
+                                    </button>
+                                  ) : null}
                                 </div>
                                 <div className="ports-wh-sections">
                                   <section

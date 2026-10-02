@@ -201,6 +201,58 @@ export function buyWarehouseAtPickupHub(
   return { warehouse, debitUsd };
 }
 
+/**
+ * Close an owned warehouse. No CAPEX refund.
+ * Refuses while lots, inbound transfers, or desk holds still use it.
+ * Ground staff assigned here are released with the building.
+ */
+export function abandonWarehouse(
+  state: CareerMissionsState,
+  opts: { warehouseId: string },
+): { warehouse: PlayerWarehouse; icao: string } {
+  const id = opts.warehouseId.trim();
+  const whs = ensurePlayerWarehouses(state);
+  const idx = whs.warehouses.findIndex((w) => w.id === id);
+  if (idx < 0) throw new Error('Warehouse not found');
+  const warehouse = whs.warehouses[idx]!;
+  const icao = warehouse.icao.trim().toUpperCase();
+  const stockKg = whs.stock
+    .filter((s) => s.warehouseId === warehouse.id && s.kg > 0)
+    .reduce((sum, s) => sum + s.kg, 0);
+  if (stockKg > 0) {
+    throw new Error(
+      `Warehouse at ${icao} still has cargo — abandon the lots first`,
+    );
+  }
+  const inboundKg = (whs.inboundTransfers ?? [])
+    .filter((t) => t.warehouseId === warehouse.id && t.kg > 0)
+    .reduce((sum, t) => sum + t.kg, 0);
+  if (inboundKg > 0) {
+    throw new Error(`Cargo is still on the way to ${icao}`);
+  }
+  const held = (whs.demandHolds ?? []).some(
+    (h) =>
+      h.kg > 0 &&
+      (h.warehouseId === warehouse.id || h.destWarehouseId === warehouse.id),
+  );
+  if (held) {
+    throw new Error(
+      `Release the desk hold tied to ${icao} before abandoning the warehouse`,
+    );
+  }
+  whs.warehouses.splice(idx, 1);
+  whs.stock = whs.stock.filter((s) => s.warehouseId !== warehouse.id);
+  if (state.groundStaff && Array.isArray(state.groundStaff.members)) {
+    state.groundStaff = {
+      ...state.groundStaff,
+      members: state.groundStaff.members.filter(
+        (m) => m.warehouseId !== warehouse.id,
+      ),
+    };
+  }
+  return { warehouse, icao };
+}
+
 export function quoteWarehouseTier2UpgradeUsd(
   world: Pick<CareerEconomyWorld, 'airports'>,
   icao: string,

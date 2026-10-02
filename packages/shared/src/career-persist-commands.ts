@@ -737,7 +737,14 @@ export type ExecuteCancelMissionResult =
   | { kind: 'missing' }
   | { kind: 'closed' }
   | { kind: 'replay'; mission: MissionIntent }
-  | { kind: 'applied'; mission: MissionIntent };
+  | {
+      kind: 'applied';
+      mission: MissionIntent;
+      /** Desk cargo that fit back in the origin warehouse. */
+      warehouseKg: number;
+      /** Desk cargo that did not fit and went to the port yard. */
+      yardKg: number;
+    };
 
 /**
  * CancelMission: release lots/tail once. Replay if already `cancelled`.
@@ -756,15 +763,22 @@ export function executeCancelMission(
   if (open.status === 'cancelled') {
     return { kind: 'replay', mission: open };
   }
+  const cargoRestore = { storedKg: 0, yardKg: 0 };
   const cancelled = cancelMission(world, open, {
     fleet: missions,
     nowMs: opts.nowMs,
+    cargoRestore,
   });
   if (open.crewOperated || open.crewMemberId) {
     releaseCompanyCrewFromMission(missions, cancelled.id);
   }
   missions.missions[idx] = cancelled;
-  return { kind: 'applied', mission: cancelled };
+  return {
+    kind: 'applied',
+    mission: cancelled,
+    warehouseKg: cargoRestore.storedKg,
+    yardKg: cargoRestore.yardKg,
+  };
 }
 
 export type ExecuteFailMissionImpactOpts = {

@@ -975,7 +975,7 @@ export function groundStaffSnapshot(
     {
       warehouseId: string;
       hubIcao: string;
-      tier: 1 | 2 | 3 | 4;
+      tier: 1 | 2 | 3 | 4 | 5;
       slotsUnlocked: number;
       slotsUsed: number;
       slotsFree: number;

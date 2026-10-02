@@ -964,7 +964,7 @@ export function debugForceClaimPortConcession(
     };
     warehouses.warehouses.push(wh);
   } else {
-    wh.tier = Math.max(wh.tier ?? 1, 3) as 1 | 2 | 3 | 4;
+    wh.tier = Math.max(wh.tier ?? 1, 3) as 1 | 2 | 3 | 4 | 5;
     if ((wh.capacityKg ?? 0) < WAREHOUSE_CAPACITY_KG[3]) {
       wh.capacityKg = WAREHOUSE_CAPACITY_KG[3];
     }

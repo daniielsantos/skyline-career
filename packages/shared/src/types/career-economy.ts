@@ -1702,10 +1702,10 @@ export interface PlayerWarehouse {
   id: string;
   icao: string;
   capacityKg: number;
-  tier: 1 | 2 | 3 | 4;
+  tier: 1 | 2 | 3 | 4 | 5;
   /**
    * Lifetime kg delivered from this warehouse via Demand Board settle.
-   * Used to unlock T1→T2 / T2→T3 / T3→T4 upgrades (hybrid money + throughput).
+   * Used to unlock T1→T2 / T2→T3 / T3→T4 / T4→T5 upgrades (hybrid money + throughput).
    */
   lifetimeShippedKg?: number;
 }

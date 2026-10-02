@@ -1066,7 +1066,7 @@ export type GroundStaffSnapshot = {
     {
       warehouseId: string;
       hubIcao: string;
-      tier: 1 | 2 | 3 | 4;
+      tier: 1 | 2 | 3 | 4 | 5;
       slotsUnlocked: number;
       slotsUsed: number;
       slotsFree: number;
@@ -3182,7 +3182,7 @@ export type PlayerWarehouseView = {
   id: string;
   icao: string;
   capacityKg: number;
-  tier: 1 | 2 | 3 | 4;
+  tier: 1 | 2 | 3 | 4 | 5;
   usedKg: number;
   freeKg: number;
   /** Kg reserved in port→WH inbound transfers. */
@@ -3193,7 +3193,7 @@ export type PlayerWarehouseView = {
   /** @deprecated Prefer shippedNeededForNextTierKg. */
   shippedNeededForT2Kg?: number;
   shippedNeededForNextTierKg?: number;
-  nextTier?: 2 | 3 | 4 | null;
+  nextTier?: 2 | 3 | 4 | 5 | null;
   upgradeUsd?: number | null;
   canUpgrade?: boolean;
   hubTier?: 'spoke' | 'regional' | 'major';
@@ -3913,7 +3913,7 @@ export function postWarehouseBuy(opts: { icao: string; companyId?: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;
-    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 | 4 };
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 | 4 | 5 };
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/buy', {
@@ -3926,7 +3926,7 @@ export function postWarehouseUpgrade(opts: { warehouseId: string }) {
   return api<{
     walletUsd: number;
     debitUsd: number;
-    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 | 4 };
+    warehouse: { id: string; icao: string; capacityKg: number; tier: 1 | 2 | 3 | 4 | 5 };
     warehouses: PlayerWarehouseSnapshot;
     ports: PortsSnapshot;
   }>('/api/warehouses/upgrade', {

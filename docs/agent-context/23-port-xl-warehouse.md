@@ -2,6 +2,8 @@
 
 Related: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-logistics.md), Value/Supplies CLOSED (`21` / `22`).
 
+Atualizado 2026-10-02: **T5 acima do T4** — 45 t não cabe uma viagem de wide (~104 t). T5 = **100 t**, opt-in. T4 fica 45 t. Gate = 60 t embarcadas no Demand Board + CAPEX ~2× T4 (major $110k). Hold de Demand no T5 dura ~1,5 dia. Staff continua em 3 vagas.
+
 Atualizado 2026-10-02: **Abandon de lote travava a commodity inteira** — um hold reserva kg, não uma pilha. Qualquer hold dessa commodity recusava todas as pilhas. Fix = a pilha sai se o que sobra ainda cobre o hold. A pilha que deixaria o hold sem estoque continua recusada.
 
 Atualizado 2026-10-02: **Navio do porto não segue a pressão do hub** — sintoma = todo porto descarrega no mesmo minuto e o pátio enche até o teto mesmo com Machinery high. Causa = o primeiro navio nasce no tick do mundo e depois soma um dia fixo; o kg é 8% do teto, e a linha Hub pressure só é texto. Fix = o navio traz kg só na medida em que algum pickup hub está curto (surplus = zero, a mesma faixa 42/58). O próximo horário de cada porto fica espalhado no dia. Pátio cheio continua sem receber mais.
@@ -20,6 +22,7 @@ Porto descarrega carga oceânica → hub de pickup → **WH do player (T4 tronco
 |------|----------|
 | WH T1–T3 | Feeder ladder **5 / 12 / 25 klb** (T2/T3 stepped 2026-09-25) |
 | **WH T4 Port Bonded** | **45_000 kg**; só em ICAO ∈ `pickupHubs`; unlock T3→T4 com `lifetimeShippedKg ≥ 25_000` + CAPEX |
+| **WH T5** | **100_000 kg**; mesmo pickup hub; unlock T4→T5 com `lifetimeShippedKg ≥ 60_000` + CAPEX ~2× T4 |
 | Demand | **não** sobe para XL |
 | Market Port XL | Bias formação quando **origin** é pickup de porto **e** major↔major; soft cap global XL |
 | Supplies high-fill | Fora deste trilho |

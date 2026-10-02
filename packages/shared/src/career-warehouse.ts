@@ -87,6 +87,7 @@ export const WAREHOUSE_T1_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[1];
 export const WAREHOUSE_T2_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[2];
 export const WAREHOUSE_T3_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[3];
 export const WAREHOUSE_T4_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[4];
+export const WAREHOUSE_T5_CAPACITY_KG = WAREHOUSE_CAPACITY_KG[5];
 
 /** CAPEX by hub tier (cheaper than FBO — storage only). */
 export const WAREHOUSE_T1_BUY_USD: Record<HubTier, number> = {
@@ -116,6 +117,13 @@ export const WAREHOUSE_T4_UPGRADE_USD: Record<HubTier, number> = {
   major: 55_000,
 };
 
+/** CAPEX to upgrade T4 → T5 (~2× T4 table). */
+export const WAREHOUSE_T5_UPGRADE_USD: Record<HubTier, number> = {
+  spoke: 36_000,
+  regional: 64_000,
+  major: 110_000,
+};
+
 /**
  * Lifetime Demand Board kg that must leave this warehouse (settle) before T2
  * upgrade is purchasable.
@@ -127,6 +135,9 @@ export const WAREHOUSE_T3_SHIPPED_KG = 12_000;
 
 /** Lifetime shipped kg gate for T3 → T4 Port Bonded. */
 export const WAREHOUSE_T4_SHIPPED_KG = 25_000;
+
+/** Lifetime shipped kg gate for T4 → T5. */
+export const WAREHOUSE_T5_SHIPPED_KG = 60_000;
 
 /** Mirror FBO bonded storage rates. */
 export const WAREHOUSE_STORAGE_USD_PER_KG_DAY = 0.02;
@@ -283,6 +294,16 @@ export function quoteWarehouseTier4UpgradeUsd(
   return WAREHOUSE_T4_UPGRADE_USD[hubTierOf(ap ?? { icao })];
 }
 
+export function quoteWarehouseTier5UpgradeUsd(
+  world: Pick<CareerEconomyWorld, 'airports'>,
+  icao: string,
+): number {
+  const ap = world.airports.find(
+    (a) => a.icao.toUpperCase() === icao.trim().toUpperCase(),
+  );
+  return WAREHOUSE_T5_UPGRADE_USD[hubTierOf(ap ?? { icao })];
+}
+
 export function quoteWarehouseUpgradeUsd(
   world: Pick<CareerEconomyWorld, 'airports'>,
   warehouse: Pick<PlayerWarehouse, 'tier' | 'icao' | 'id'>,
@@ -295,6 +316,8 @@ export function quoteWarehouseUpgradeUsd(
     base = quoteWarehouseTier3UpgradeUsd(world, warehouse.icao);
   } else if (warehouse.tier === 3) {
     base = quoteWarehouseTier4UpgradeUsd(world, warehouse.icao);
+  } else if (warehouse.tier === 4) {
+    base = quoteWarehouseTier5UpgradeUsd(world, warehouse.icao);
   } else {
     return null;
   }
@@ -308,7 +331,7 @@ export function warehouseUpgradeProgress(wh: PlayerWarehouse): {
   shippedKg: number;
   neededKg: number;
   unlocked: boolean;
-  nextTier: 2 | 3 | 4 | null;
+  nextTier: 2 | 3 | 4 | 5 | null;
 } {
   const shippedKg = Math.max(0, Math.floor(wh.lifetimeShippedKg ?? 0));
   if (wh.tier === 1) {
@@ -335,9 +358,17 @@ export function warehouseUpgradeProgress(wh: PlayerWarehouse): {
       nextTier: 4,
     };
   }
+  if (wh.tier === 4) {
+    return {
+      shippedKg,
+      neededKg: WAREHOUSE_T5_SHIPPED_KG,
+      unlocked: shippedKg >= WAREHOUSE_T5_SHIPPED_KG,
+      nextTier: 5,
+    };
+  }
   return {
     shippedKg,
-    neededKg: WAREHOUSE_T4_SHIPPED_KG,
+    neededKg: WAREHOUSE_T5_SHIPPED_KG,
     unlocked: false,
     nextTier: null,
   };
@@ -358,7 +389,7 @@ export function warehouseTier2Progress(wh: PlayerWarehouse): {
 }
 
 /**
- * Upgrade an owned warehouse T1→T2, T2→T3, or T3→T4 Port Bonded (same ICAO).
+ * Upgrade an owned warehouse T1→T2, T2→T3, T3→T4 Port Bonded, or T4→T5 (same ICAO).
  * Requires lifetime Demand Board shipped kg + CAPEX. Buy/upgrade only at pickup hubs.
  */
 export function upgradeWarehouse(
@@ -369,7 +400,7 @@ export function upgradeWarehouse(
   const whs = ensurePlayerWarehouses(state);
   const warehouse = whs.warehouses.find((w) => w.id === warehouseId.trim());
   if (!warehouse) throw new Error(`Unknown warehouse ${warehouseId}`);
-  if (warehouse.tier >= 4) {
+  if (warehouse.tier >= 5) {
     throw new Error(`Warehouse at ${warehouse.icao} is already Tier ${warehouse.tier}`);
   }
   const progress = warehouseUpgradeProgress(warehouse);
@@ -392,9 +423,11 @@ export function upgradeWarehouse(
   const nextTier = progress.nextTier;
   const nextCap = WAREHOUSE_CAPACITY_KG[nextTier];
   const tierNote =
-    nextTier === 4
-      ? `Warehouse T4 Port Bonded · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`
-      : `Warehouse T${nextTier} upgrade · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`;
+    nextTier === 5
+      ? `Warehouse T5 · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`
+      : nextTier === 4
+        ? `Warehouse T4 Port Bonded · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`
+        : `Warehouse T${nextTier} upgrade · ${warehouse.icao} · ${nextCap.toLocaleString()} kg`;
   applyWalletDelta(state, {
     amountUsd: -debitUsd,
     kind: 'warehouse_upgrade',
@@ -572,7 +605,7 @@ export function playerWarehouseSnapshot(
       /** @deprecated Prefer shippedNeededForNextTierKg. */
       shippedNeededForT2Kg: number;
       shippedNeededForNextTierKg: number;
-      nextTier: 2 | 3 | 4 | null;
+      nextTier: 2 | 3 | 4 | 5 | null;
       upgradeUsd: number | null;
       canUpgrade: boolean;
       hubTier: HubTier;

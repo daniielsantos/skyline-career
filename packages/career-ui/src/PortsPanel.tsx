@@ -110,10 +110,12 @@ const WH_T1_CAPACITY_KG = 2_268;
 const WH_T2_CAPACITY_KG = 5_443;
 const WH_T3_CAPACITY_KG = 11_340;
 const WH_T4_CAPACITY_KG = 45_000;
+const WH_T5_CAPACITY_KG = 100_000;
 /** Mirror of shared MIN_WAREHOUSE_INBOUND_KG — avoid Mass 0.0 klb ghost rows. */
 const MIN_WAREHOUSE_INBOUND_KG = 25;
 
 function warehouseCapForTier(tier: number): number {
+  if (tier >= 5) return WH_T5_CAPACITY_KG;
   if (tier >= 4) return WH_T4_CAPACITY_KG;
   if (tier === 3) return WH_T3_CAPACITY_KG;
   if (tier === 2) return WH_T2_CAPACITY_KG;
@@ -2184,7 +2186,17 @@ export function PortsPanel(props: {
       return;
     }
     const wh = (warehouses?.warehouses ?? []).find((w) => w.id === warehouseId);
-    const nextTier = wh?.nextTier ?? (wh?.tier === 1 ? 2 : wh?.tier === 2 ? 3 : wh?.tier === 3 ? 4 : null);
+    const nextTier =
+      wh?.nextTier ??
+      (wh?.tier === 1
+        ? 2
+        : wh?.tier === 2
+          ? 3
+          : wh?.tier === 3
+            ? 4
+            : wh?.tier === 4
+              ? 5
+              : null);
     if (!nextTier) return;
     const nextCap = warehouseCapForTier(nextTier);
     const price =
@@ -5260,11 +5272,19 @@ export function PortsPanel(props: {
                               const shipped = wh.lifetimeShippedKg ?? 0;
                               const nextTier =
                                 wh.nextTier ??
-                                (wh.tier < 3 ? ((wh.tier + 1) as 2 | 3) : null);
+                                (wh.tier < 5
+                                  ? ((wh.tier + 1) as 2 | 3 | 4 | 5)
+                                  : null);
                               const needed =
                                 wh.shippedNeededForNextTierKg ??
                                 wh.shippedNeededForT2Kg ??
-                                (nextTier === 3 ? 12_000 : 5_000);
+                                (nextTier === 5
+                                  ? 60_000
+                                  : nextTier === 4
+                                    ? 25_000
+                                    : nextTier === 3
+                                      ? 12_000
+                                      : 5_000);
                               const shippedPct = Math.min(
                                 100,
                                 Math.round((shipped / Math.max(1, needed)) * 100),
@@ -5416,9 +5436,11 @@ export function PortsPanel(props: {
                                     </div>
                                   ) : (
                                     <p className="ports-wh-upgrade-hint">
-                                      {wh.tier >= 4
-                                        ? 'Tier 4 Port Bonded · max capacity'
-                                        : 'Tier 3 · max capacity'}
+                                      {wh.tier >= 5
+                                        ? 'Tier 5 · max capacity'
+                                        : wh.tier >= 4
+                                          ? 'Tier 4 Port Bonded'
+                                          : 'Tier 3 · max capacity'}
                                     </p>
                                   )}
                                   {canPortCapex ? (

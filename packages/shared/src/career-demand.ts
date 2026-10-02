@@ -287,12 +287,13 @@ function demandRouteNm(
   return nm != null && Number.isFinite(nm) && nm > 0 ? nm : null;
 }
 
-/** Hold TTL by warehouse tier (economy ticks). T1 ~12h, T2 ~18h, T3 ~1d, T4 ~1.25d. */
-export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3 | 4, number> = {
+/** Hold TTL by warehouse tier (economy ticks). T1 ~12h, T2 ~18h, T3 ~1d, T4 ~1.25d, T5 ~1.5d. */
+export const DEMAND_HOLD_TTL_TICKS_BY_TIER: Record<1 | 2 | 3 | 4 | 5, number> = {
   1: TICKS_PER_DAY / 2,
   2: (TICKS_PER_DAY * 3) / 4,
   3: TICKS_PER_DAY,
   4: (TICKS_PER_DAY * 5) / 4,
+  5: (TICKS_PER_DAY * 3) / 2,
 };
 
 const DEMAND_TTL_TICKS = TICKS_PER_DAY * 2.5; // ~2.5 economy days
@@ -505,7 +506,7 @@ export function demandEffectiveUnitPriceUsd(
   return money(unit);
 }
 
-export function demandHoldTtlTicks(tier: 1 | 2 | 3 | 4): number {
+export function demandHoldTtlTicks(tier: 1 | 2 | 3 | 4 | 5): number {
   return DEMAND_HOLD_TTL_TICKS_BY_TIER[tier] ?? DEMAND_HOLD_TTL_TICKS_BY_TIER[1];
 }
 

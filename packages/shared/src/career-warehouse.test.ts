@@ -26,9 +26,11 @@ import {
   WAREHOUSE_T2_CAPACITY_KG,
   WAREHOUSE_T3_CAPACITY_KG,
   WAREHOUSE_T4_CAPACITY_KG,
+  WAREHOUSE_T5_CAPACITY_KG,
   WAREHOUSE_T2_SHIPPED_KG,
   WAREHOUSE_T3_SHIPPED_KG,
   WAREHOUSE_T4_SHIPPED_KG,
+  WAREHOUSE_T5_SHIPPED_KG,
 } from './career-warehouse.js';
 import {
   acceptDemandOrder,
@@ -861,7 +863,15 @@ describe('career warehouse + demand', () => {
     assert.equal(toT4.warehouse.capacityKg, WAREHOUSE_T4_CAPACITY_KG);
     assert.throws(
       () => upgradeWarehouse(state, world, whId),
-      /already Tier 4/i,
+      /Ship .* kg from SBGR/i,
+    );
+    row().lifetimeShippedKg = WAREHOUSE_T5_SHIPPED_KG;
+    const toT5 = upgradeWarehouse(state, world, whId);
+    assert.equal(toT5.warehouse.tier, 5);
+    assert.equal(toT5.warehouse.capacityKg, WAREHOUSE_T5_CAPACITY_KG);
+    assert.throws(
+      () => upgradeWarehouse(state, world, whId),
+      /already Tier 5/i,
     );
   });
 

@@ -41,15 +41,17 @@ export const WAREHOUSE_LOT_MERGE_REL_BAND = 0.03;
 
 /**
  * Bonded storage capacity by warehouse tier (literal klb → kg).
- * T1 5 klb · T2 12 klb · T3 25 klb · T4 Port Bonded ~99 klb (45 t).
+ * T1 5 klb · T2 12 klb · T3 25 klb · T4 Port Bonded ~99 klb (45 t) · T5 100 t.
  * T2/T3 stepped up 2026-09-25 so mid upgrades change what you can stage
  * (feeder → light regional), without inflating T1 or the T4 trunk cliff.
+ * T5 is opt-in above T4 (one wide load). Existing T4 rows stay T4.
  */
-export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3 | 4, number> = {
+export const WAREHOUSE_CAPACITY_KG: Record<1 | 2 | 3 | 4 | 5, number> = {
   1: 2_268,
   2: 5_443,
   3: 11_340,
   4: 45_000,
+  5: 100_000,
 };
 
 /**
@@ -65,9 +67,10 @@ const LEGACY_WAREHOUSE_T2_CAP_KG = 12_000;
 const PREV_WAREHOUSE_T2_CAP_KG = 4_536;
 const PREV_WAREHOUSE_T3_CAP_KG = 6_804;
 
-export type WarehouseTier = 1 | 2 | 3 | 4;
+export type WarehouseTier = 1 | 2 | 3 | 4 | 5;
 
 export function warehouseTierOf(tier: unknown): WarehouseTier {
+  if (tier === 5) return 5;
   if (tier === 4) return 4;
   if (tier === 3) return 3;
   if (tier === 2) return 2;
@@ -75,7 +78,7 @@ export function warehouseTierOf(tier: unknown): WarehouseTier {
 }
 
 /**
- * Remap saved WH row to current T1–T4.
+ * Remap saved WH row to current T1–T5.
  * Old T1 (~5 t) → T2; old T2 (~12 t) → T3; new caps keep declared tier.
  * Pre-retune 10/15 klb caps stay on the same tier and expand to 12/25 klb.
  * `capacityKg = max(usedKg, tierCap)` so stock is never truncated.
@@ -94,7 +97,9 @@ export function migrateWarehouseTierAndCapacity(opts: {
     rawCap === WAREHOUSE_CAPACITY_KG[t] || near(WAREHOUSE_CAPACITY_KG[t]);
 
   let tier: WarehouseTier;
-  if (matchesNewCap(4) || (declared === 4 && rawCap >= 40_000)) {
+  if (matchesNewCap(5) || declared === 5) {
+    tier = 5;
+  } else if (matchesNewCap(4) || (declared === 4 && rawCap >= 40_000)) {
     tier = 4;
   } else if (matchesNewCap(1)) {
     tier = 1;

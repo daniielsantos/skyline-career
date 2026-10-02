@@ -10,7 +10,7 @@ Measure tooling: recovery time após shock + soak NPC-only — [`20-economy-reco
 
 **Supplies shelf:** slice **CLOSED** (Phase A PASS — fill ~83%, flow 0.82/0.92). A2 dial-back só com ask. [`22-supplies-shelf.md`](./22-supplies-shelf.md).
 
-**Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
+**Port XL + WH T4:** porto → WH T4 (45 t, só pickup hubs) + T5 opt-in (100 t, 60 t shipped) + bias Market XL em origins de porto + haul Wide a partir do WH. Demand fica feeder. Spec: [`23-port-xl-warehouse.md`](./23-port-xl-warehouse.md).
 
 - **Demand pay vs airplane cost (2026-09-30):** não é impressora geral. No board aberto, supplies 4,401 nm (~$43k) num wide (único com alcance; narrow máx 2,500 nm) perde ~$44k no dia: Jet-A classe ~$51k já passa o pay (12 kg/nm × $0,95/kg). General curto deixa poucos mil depois do lease do dia. Electronics 3,976 nm ($181k no board, ~$232k com intl 1,28× no accept) num wide de $14M / lease $30k/dia sobra ~$100k–$150k depois de fuel, MX e lease — rápido se fosse todo dia, mas a commodity está Locked em Cargo Ops e o resto do longo não paga o combustível. Tripulação e parking são ruído. Sem retune.
 

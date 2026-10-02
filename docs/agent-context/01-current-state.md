@@ -1,5 +1,8 @@
 # Current state (2026-10-02)
 
+`main` **3be58404** / desktop **0.3.428** shipped: Make Leave freight here a quiet control and drop the freight-hold banner from Flight Plan. Release: [v0.3.428](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.428).
+
+
 `main` **0b8aa713** / desktop **0.3.427** shipped: Edit a multi-stop flight on the Manifest, and add another contract for a stop before departure. Release: [v0.3.427](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.427).
 
 

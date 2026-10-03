@@ -177,12 +177,23 @@ function airportDemandWeight(airport: AirportTerminal): number {
   return tier * (0.8 + level * 0.12 + activity / 500);
 }
 
+/** Same seats as the Jet-A tank. Five or more pilots stop at 4. Solo stays 1. */
+export const PORT_CHARTER_LOBBY_ROSTER_MAX = 4;
+
+export function portCharterLobbyRosterMult(memberCount?: number): number {
+  if (memberCount == null || !Number.isFinite(memberCount)) return 1;
+  const seats = Math.floor(memberCount);
+  if (seats <= 1) return 1;
+  return Math.min(PORT_CHARTER_LOBBY_ROSTER_MAX, seats);
+}
+
 export function portCharterLobbyCap(
   level: 1 | 2 | 3,
   airportCap: number,
+  memberCount?: number,
 ): number {
   const cap = Math.max(1, Math.floor(airportCap));
-  if (level >= 3) return cap;
+  if (level >= 3) return cap * portCharterLobbyRosterMult(memberCount);
   if (level === 2) return Math.min(cap, PORT_CHARTER_LOBBY_MED);
   return Math.min(cap, PORT_CHARTER_LOBBY_LIGHT);
 }
@@ -193,20 +204,46 @@ export function portCharterDripMult(level: 1 | 2 | 3): number {
   return 1;
 }
 
+type OwnedCharterLobby = { level: 1 | 2 | 3; roster: number };
+
 /** Pickup hubs whose outbound charter queue belongs to a Port FBO lobby. */
 export function concessionCharterOriginLevels(
   world: CareerEconomyWorld,
 ): Map<string, 1 | 2 | 3> {
   const map = new Map<string, 1 | 2 | 3>();
+  for (const [icao, lobby] of concessionCharterLobbies(world)) {
+    map.set(icao, lobby.level);
+  }
+  return map;
+}
+
+function concessionCharterLobbies(
+  world: CareerEconomyWorld,
+): Map<string, OwnedCharterLobby> {
+  const map = new Map<string, OwnedCharterLobby>();
   for (const row of world.portConcessions ?? []) {
     if (row.leasePaidThroughTick <= world.tick) continue;
     const icao = row.pickupIcao?.trim().toUpperCase();
     if (!icao) continue;
     const level: 1 | 2 | 3 = row.level === 2 || row.level === 3 ? row.level : 1;
+    const roster = Math.max(0, Math.floor(Number(row.roster) || 0));
     const prev = map.get(icao);
-    if (prev == null || level > prev) map.set(icao, level);
+    if (prev == null || level > prev.level) map.set(icao, { level, roster });
   }
   return map;
+}
+
+function ownedLobbyWaitingMax(
+  world: CareerEconomyWorld,
+  icao: string,
+  airportCap: number,
+): number {
+  const lobby = concessionCharterLobbies(world).get(icao.trim().toUpperCase());
+  if (!lobby) return airportCap;
+  return Math.max(
+    airportCap,
+    portCharterLobbyCap(lobby.level, airportCap, lobby.roster),
+  );
 }
 
 function hubCapacityPax(airport: AirportTerminal): number {
@@ -514,13 +551,20 @@ function normalizeOffer(raw: CharterOffer): CharterOffer | null {
   });
 }
 
-function normalizeHub(raw: CharterHubState): CharterHubState | null {
+function normalizeHub(
+  world: CareerEconomyWorld,
+  raw: CharterHubState,
+): CharterHubState | null {
   const icao = String(raw.icao ?? '').trim().toUpperCase();
   if (!icao) return null;
   const capacityPax = Math.max(8, Math.floor(Number(raw.capacityPax) || 24));
   return Object.assign(raw, {
     icao,
-    waitingPax: clamp(Math.floor(Number(raw.waitingPax) || 0), 0, capacityPax),
+    waitingPax: clamp(
+      Math.floor(Number(raw.waitingPax) || 0),
+      0,
+      ownedLobbyWaitingMax(world, icao, capacityPax),
+    ),
     attractPax: clamp(Math.floor(Number(raw.attractPax) || 0), 0, capacityPax),
     capacityPax,
     updatedAtTick: Math.max(0, Math.floor(Number(raw.updatedAtTick) || 0)),
@@ -617,7 +661,11 @@ function restoreOfferPax(world: CareerEconomyWorld, offer: CharterOffer): void {
   const destAp = byIcao.get(offer.destIcao);
   if (originAp) {
     const hub = hubFor(world, originAp);
-    hub.waitingPax = clamp(hub.waitingPax + offer.groupSize, 0, hub.capacityPax);
+    hub.waitingPax = clamp(
+      hub.waitingPax + offer.groupSize,
+      0,
+      ownedLobbyWaitingMax(world, hub.icao, hub.capacityPax),
+    );
     hub.updatedAtTick = world.tick;
   }
   if (destAp) {
@@ -660,7 +708,7 @@ export function ensureCharterEconomy(world: CareerEconomyWorld): boolean {
     .map(normalizeOffer)
     .filter((row): row is CharterOffer => row !== null);
   const hubsRaw = (world.charterHubs ?? [])
-    .map(normalizeHub)
+    .map((row) => normalizeHub(world, row))
     .filter((row): row is CharterHubState => row !== null);
   const hubsByIcao = new Map<string, CharterHubState>();
   for (const hub of hubsRaw) {
@@ -669,7 +717,11 @@ export function ensureCharterEconomy(world: CareerEconomyWorld): boolean {
       hubsByIcao.set(hub.icao, hub);
       continue;
     }
-    prev.waitingPax = clamp(prev.waitingPax + hub.waitingPax, 0, prev.capacityPax);
+    prev.waitingPax = clamp(
+      prev.waitingPax + hub.waitingPax,
+      0,
+      ownedLobbyWaitingMax(world, prev.icao, prev.capacityPax),
+    );
     prev.attractPax = clamp(prev.attractPax + hub.attractPax, 0, prev.capacityPax);
     prev.updatedAtTick = Math.max(prev.updatedAtTick, hub.updatedAtTick);
   }
@@ -692,23 +744,27 @@ export function ensureCharterEconomy(world: CareerEconomyWorld): boolean {
 export function tickCharterPools(world: CareerEconomyWorld): void {
   ensureCharterEconomy(world);
   const airports = activeAirports(world);
-  const ownedLobby = concessionCharterOriginLevels(world);
+  const ownedLobby = concessionCharterLobbies(world);
   const rng = mulberry32(hashSeed(`${world.seed}:charter-pools:${world.tick}`));
   for (const airport of airports) {
     const hub = hubFor(world, airport);
     const weight = airportDemandWeight(airport);
     const weather = regionalWeatherIndex(world, airport.region);
     const weatherBoost = weather === 'poor' ? 1.15 : weather === 'marginal' ? 1.05 : 1;
-    const lobbyLevel = ownedLobby.get(airport.icao.toUpperCase());
+    const lobby = ownedLobby.get(airport.icao.toUpperCase());
     // ~3× prior gain so majors can reach med/narrow band floors between forms.
     let waitingGain = weight * (0.11 + rng() * 0.16) * weatherBoost;
-    if (lobbyLevel) waitingGain *= portCharterDripMult(lobbyLevel);
+    if (lobby) {
+      waitingGain *=
+        portCharterDripMult(lobby.level) *
+        portCharterLobbyRosterMult(lobby.roster);
+    }
     const attractGain = weight * (0.09 + rng() * 0.14) * weatherBoost;
-    const waitingCap = lobbyLevel
-      ? portCharterLobbyCap(lobbyLevel, hub.capacityPax)
+    const waitingCap = lobby
+      ? portCharterLobbyCap(lobby.level, hub.capacityPax, lobby.roster)
       : hub.capacityPax;
     // Owned lobby turns over in about a day. Other hubs keep the slow decay.
-    const waitingDecay = lobbyLevel
+    const waitingDecay = lobby
       ? hub.waitingPax / TICKS_PER_DAY
       : hub.waitingPax * 0.003;
     hub.waitingPax = clamp(
@@ -726,7 +782,7 @@ export function tickCharterPools(world: CareerEconomyWorld): void {
     // An owned lobby does not keep that floor: unflown people leave.
     const floor = Math.floor(hub.capacityPax * 0.2);
     if (floor >= 13) {
-      if (!lobbyLevel && hub.waitingPax < floor) {
+      if (!lobby && hub.waitingPax < floor) {
         hub.waitingPax = Math.min(
           floor,
           hub.waitingPax + Math.max(0.8, (floor - hub.waitingPax) * 0.06),
@@ -1463,7 +1519,8 @@ export function listPortCharterDesk(
     (ap) => ap.icao.toUpperCase() === originCode,
   );
   const airportCap = origin ? hubCapacityPax(origin) : PORT_CHARTER_LOBBY_LIGHT;
-  const capacityPax = portCharterLobbyCap(level, airportCap);
+  const roster = concessionCharterLobbies(world).get(originCode)?.roster;
+  const capacityPax = portCharterLobbyCap(level, airportCap, roster);
   const hub = (world.charterHubs ?? []).find(
     (row) => row.icao.toUpperCase() === originCode,
   );
@@ -1577,10 +1634,13 @@ export function takePortCharterOffer(
   }
   const originHub = hubFor(world, origin);
   const destHub = hubFor(world, dest);
-  const waiting = Math.min(
-    portCharterLobbyCap(opts.level, originHub.capacityPax),
-    Math.floor(originHub.waitingPax),
+  const lobbyRoster = concessionCharterLobbies(world).get(originIcao)?.roster;
+  const lobbyCap = portCharterLobbyCap(
+    opts.level,
+    originHub.capacityPax,
+    lobbyRoster,
   );
+  const waiting = Math.min(lobbyCap, Math.floor(originHub.waitingPax));
   const attract = Math.floor(destHub.attractPax);
   const groupSize = portCharterGroupSize(
     world,
@@ -1603,7 +1663,7 @@ export function takePortCharterOffer(
   originHub.waitingPax = clamp(
     originHub.waitingPax - groupSize,
     0,
-    originHub.capacityPax,
+    lobbyCap,
   );
   destHub.attractPax = clamp(
     destHub.attractPax - groupSize,

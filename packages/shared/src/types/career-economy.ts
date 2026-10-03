@@ -1844,6 +1844,8 @@ export interface PortConcessionIndexRow {
   level?: PortConcessionLevel;
   /** Primary pickup hub. Stamped each tick so charter can skip this lobby. */
   pickupIcao?: string;
+  /** Company member count. 0 or 1 keeps the solo lobby. Stamped on concession sync. */
+  roster?: number;
 }
 
 /** Compact MP presence feed row (ring-buffer on the world). */

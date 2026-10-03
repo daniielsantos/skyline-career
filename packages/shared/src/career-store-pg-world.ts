@@ -472,6 +472,7 @@ CREATE TABLE IF NOT EXISTS port_concessions (
   company_id TEXT NOT NULL,
   lease_paid_through_tick INTEGER NOT NULL,
   level INTEGER NOT NULL DEFAULT 1,
+  roster INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (world_id, port_id)
 );
 
@@ -537,7 +538,7 @@ CREATE TABLE IF NOT EXISTS charter_offers (
   demand_id TEXT NOT NULL,
   origin_icao TEXT NOT NULL,
   dest_icao TEXT NOT NULL,
-  group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 230),
+  group_size INTEGER NOT NULL CHECK (group_size BETWEEN 1 AND 440),
   baggage_kg DOUBLE PRECISION NOT NULL DEFAULT 0,
   distance_nm DOUBLE PRECISION NOT NULL,
   tier TEXT NOT NULL,
@@ -1376,20 +1377,23 @@ export async function ensurePgWorldDdl(pool: pg.Pool): Promise<void> {
   await pool.query(
     `ALTER TABLE economy_meta ADD COLUMN IF NOT EXISTS misc_json JSONB`,
   );
+  await pool.query(
+    `ALTER TABLE port_concessions ADD COLUMN IF NOT EXISTS roster INTEGER NOT NULL DEFAULT 0`,
+  );
   // Schema v17 — cross-process API/worker cache coherence + stale-write guard.
   await pool.query(
     `ALTER TABLE economy_meta ADD COLUMN IF NOT EXISTS revision BIGINT NOT NULL DEFAULT 0`,
   );
   // Schema v18 — Hub Stats / Pulse daily samples (SQLite parity).
   await ensurePgHubEconomySamplesDdl(pool);
-  // Schema v19 — charter group_size 1…230 (med/narrow loads; was 1…12).
+  // Schema v19 — charter group_size widened with the cabin (12, then 230, now 440).
   await pool.query(
     `ALTER TABLE charter_offers DROP CONSTRAINT IF EXISTS charter_offers_group_size_check`,
   );
   await pool.query(
     `ALTER TABLE charter_offers
        ADD CONSTRAINT charter_offers_group_size_check
-       CHECK (group_size BETWEEN 1 AND 230)`,
+       CHECK (group_size BETWEEN 1 AND 440)`,
   );
   // Schema v20 — F7 dealer claim owner.
   await pool.query(
@@ -2328,7 +2332,7 @@ export async function hydrateEconomyFromPg(
   }
 
   const concessionRes = await pool.query(
-    `SELECT port_id, company_id, lease_paid_through_tick, level
+    `SELECT port_id, company_id, lease_paid_through_tick, level, roster
      FROM port_concessions WHERE world_id = $1 ORDER BY port_id ASC`,
     [wid],
   );
@@ -2341,6 +2345,7 @@ export async function hydrateEconomyFromPg(
         companyId: String(r.company_id ?? ''),
         leasePaidThroughTick: num(r.lease_paid_through_tick),
         level,
+        roster: Math.max(0, Math.floor(num(r.roster, 0))),
       } satisfies PortConcessionIndexRow;
     });
   }
@@ -2784,6 +2789,7 @@ function portConcessionTableRows(
       r.companyId,
       sqlNum(r.leasePaidThroughTick),
       level,
+      Math.max(0, Math.floor(Number(r.roster) || 0)),
     ];
   });
 }
@@ -3215,9 +3221,9 @@ export async function persistEconomyTablesToPg(
       await insertChunks(
         client,
         `INSERT INTO port_concessions (
-           world_id, port_id, company_id, lease_paid_through_tick, level
+           world_id, port_id, company_id, lease_paid_through_tick, level, roster
          )`,
-        5,
+        6,
         concessionRows,
       );
     }
@@ -3706,9 +3712,9 @@ export async function persistPortMarketToPg(
       await insertChunks(
         client,
         `INSERT INTO port_concessions (
-           world_id, port_id, company_id, lease_paid_through_tick, level
+           world_id, port_id, company_id, lease_paid_through_tick, level, roster
          )`,
-        5,
+        6,
         concessionRows,
       );
     }
@@ -3762,9 +3768,9 @@ export async function persistPortConcessionsToPg(
       await insertChunks(
         client,
         `INSERT INTO port_concessions (
-           world_id, port_id, company_id, lease_paid_through_tick, level
+           world_id, port_id, company_id, lease_paid_through_tick, level, roster
          )`,
-        5,
+        6,
         concessionRows,
       );
     }

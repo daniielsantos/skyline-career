@@ -200,6 +200,7 @@ export function syncWorldPortConcessions(
       c.leasePaidThroughTick > world.tick &&
       !touch.has(c.companyId),
   );
+  const roster = Math.max(0, Math.floor(Number(state.companyRoster) || 0));
   const mine = live
     .filter((c) => touch.has(c.companyId))
     .map((c): PortConcessionIndexRow => {
@@ -210,6 +211,7 @@ export function syncWorldPortConcessions(
         companyId: c.companyId,
         leasePaidThroughTick: c.leasePaidThroughTick,
         level: c.level === 2 || c.level === 3 ? c.level : 1,
+        roster,
         ...(pickupIcao ? { pickupIcao } : {}),
       };
     });

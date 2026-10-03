@@ -27,10 +27,14 @@ import {
   readCharterHubPoolView,
   isCharterEligibleAircraftClass,
   listPortCharterDesk,
+  portCharterLobbyCap,
+  portCharterLobbyRosterMult,
   overlayLiveEconomyOntoPulseSnapshot,
   reserveCharterOffer,
   settleCharterMission,
   tickCharterEconomy,
+  tickCharterPools,
+  syncWorldPortConcessions,
   tickEconomy,
   TICKS_PER_DAY,
 } from './index.js';
@@ -276,6 +280,104 @@ describe('Charter economy', () => {
     assert.equal(pickCharterGroupSize(rng, 400, 10, 8_436), 0);
     const short = pickCharterGroupSize(() => 0.95, 440, 440, 400);
     assert.ok(short >= 1 && short <= 12, `short=${short}`);
+  });
+
+  it('scales only a P3 port lobby with the company roster', () => {
+    assert.equal(portCharterLobbyRosterMult(0), 1);
+    assert.equal(portCharterLobbyRosterMult(1), 1);
+    assert.equal(portCharterLobbyCap(3, 450, 1), 450);
+    assert.equal(portCharterLobbyCap(3, 450, 4), 1_800);
+    assert.equal(portCharterLobbyCap(3, 450, 9), 1_800);
+    assert.equal(portCharterLobbyCap(1, 450, 4), 12);
+    assert.equal(portCharterLobbyCap(2, 450, 4), 48);
+  });
+
+  it('lets a four-pilot port lobby hold more than the airport cap', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-roster-lobby' });
+    assert.ok(world.airports.some((ap) => ap.icao === 'KMIA'));
+    world.portConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_va',
+        leasePaidThroughTick: world.tick + 50_000,
+        level: 3,
+        pickupIcao: 'KMIA',
+        roster: 4,
+      },
+    ];
+    tickCharterPools(world);
+    const seeded = world.charterHubs!.find((hub) => hub.icao === 'KMIA');
+    assert.ok(seeded);
+    const airportCap = seeded.capacityPax;
+    seeded.waitingPax = airportCap;
+    for (let i = 0; i < 48; i += 1) {
+      world.tick += 1;
+      tickCharterPools(world);
+    }
+    const after = world.charterHubs!.find((hub) => hub.icao === 'KMIA');
+    assert.ok(after);
+    assert.equal(after.capacityPax, airportCap);
+    assert.ok(
+      after.waitingPax > airportCap,
+      `waiting=${after.waitingPax} cap=${airportCap}`,
+    );
+    assert.equal(listPortCharterDesk(world, 'KMIA', 3).capacityPax, airportCap * 4);
+
+    const solo = createSeedEconomyWorld({ seed: 'charter-roster-solo' });
+    solo.portConcessions = [
+      {
+        portId: 'USMIA',
+        companyId: 'co_solo',
+        leasePaidThroughTick: solo.tick + 50_000,
+        level: 3,
+        pickupIcao: 'KMIA',
+        roster: 1,
+      },
+    ];
+    tickCharterPools(solo);
+    const soloHub = solo.charterHubs!.find((hub) => hub.icao === 'KMIA');
+    assert.ok(soloHub);
+    const soloCap = soloHub.capacityPax;
+    soloHub.waitingPax = soloCap;
+    for (let i = 0; i < 20; i += 1) {
+      solo.tick += 1;
+      tickCharterPools(solo);
+    }
+    const soloAfter = solo.charterHubs!.find((hub) => hub.icao === 'KMIA');
+    assert.ok(soloAfter);
+    assert.ok(soloAfter.waitingPax <= soloCap);
+  });
+
+  it('stamps the company roster onto that company port only', () => {
+    const world = createSeedEconomyWorld({ seed: 'charter-roster-stamp' });
+    world.portConcessions = [
+      {
+        portId: 'USBOS',
+        companyId: 'co_other',
+        leasePaidThroughTick: world.tick + 1_000,
+        level: 3,
+        pickupIcao: 'KBOS',
+        roster: 2,
+      },
+    ];
+    const state = emptyMissionsStateV2();
+    state.companyRoster = 4;
+    state.playerPortConcessions = [
+      {
+        portId: 'BRSSZ',
+        companyId: 'co_va',
+        level: 3,
+        claimedAtTick: 0,
+        leasePaidThroughTick: world.tick + 1_000,
+        lifetimeThroughputKg: 0,
+      },
+    ];
+    syncWorldPortConcessions(world, state, { companyId: 'co_va' });
+    const mine = world.portConcessions?.find((row) => row.companyId === 'co_va');
+    const other = world.portConcessions?.find((row) => row.companyId === 'co_other');
+    assert.equal(mine?.roster, 4);
+    assert.equal(mine?.pickupIcao, 'SBGR');
+    assert.equal(other?.roster, 2);
   });
 
   it('forms a few offers from the regular economy tick without a daily dump', () => {

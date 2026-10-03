@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **c1979ec2** / desktop **0.3.452** shipped: Keep long-haul charters to a wide cabin so a light group cannot take them. Release: [v0.3.452](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.452).
+
+
 `main` **e436bfd2** / desktop **0.3.451** shipped: Open widebody charter with long-haul desk bands and groups up to 440. Release: [v0.3.451](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.451).
 
 

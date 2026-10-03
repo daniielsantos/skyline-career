@@ -29,6 +29,7 @@ import {
   type VaFlightQualitySnapshot,
   type VaOrgPerks,
   type Mission,
+  type PortsSnapshot,
   type CareerCargoOps,
   type CareerClassOps,
   type VaHaulHold,
@@ -228,6 +229,13 @@ type Props = {
   onOpenUpdates?: () => void;
   /** After Accept Internal Haul — open Dispatch / staging. */
   onHaulStaged?: (mission: Mission) => void;
+  onOpenCharterManifest?: (args: {
+    portId: string;
+    destIcao: string;
+    originIcao: string;
+    aircraftId: string;
+    companyId?: string;
+  }) => Promise<PortsSnapshot | null>;
   /** Logged-in pilot hub — Hauls opens the manifest when they are not at the hold origin. */
   pilotIcao?: string;
   /** Open Dispatch Manifest for a desk hold (ferry off-origin there). */
@@ -1511,6 +1519,7 @@ export function VaPage(props: Props) {
               }}
               onMissions={props.onMissions}
               onOpenAirport={props.onOpenAirport}
+              onOpenCharterManifest={props.onOpenCharterManifest}
               onStaged={props.onHaulStaged}
               onToast={props.onToast}
               clientUpdateRequiredMin={props.clientUpdateRequiredMin}

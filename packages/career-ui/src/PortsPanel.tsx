@@ -27,7 +27,6 @@ import {
   postPortConcessionRenew,
   postPortConcessionSurrender,
   postPortConcessionUpgrade,
-  postPortCharterAccept,
   postPortJetABuy,
   postPortJetAFetch,
   postPortJetAHaul,
@@ -253,6 +252,10 @@ type DemandSortKey =
   | 'expires';
 
 type DemandSort = { key: DemandSortKey; direction: 'asc' | 'desc' };
+
+type CharterSortKey = 'country' | 'dest' | 'dist' | 'pax' | 'pay';
+
+type CharterSort = { key: CharterSortKey; direction: 'asc' | 'desc' };
 
 function demandCountryLabel(countryId: string | null | undefined): string {
   const id = countryId?.trim().toUpperCase() ?? '';
@@ -485,6 +488,17 @@ export function PortsPanel(props: {
   onVaWallet?: (usd: number) => void;
   onMissions?: (missions: Mission[]) => void;
   onOpenAirport?: (icao: string) => void;
+  /**
+   * Open the charter manifest for a lobby group. Carves the group, then
+   * Staging runs Fit and ferry. Returns the refreshed ports snap.
+   */
+  onOpenCharterManifest?: (args: {
+    portId: string;
+    destIcao: string;
+    originIcao: string;
+    aircraftId: string;
+    companyId?: string;
+  }) => Promise<PortsSnapshot | null>;
   onStaged?: (mission: Mission) => void;
   onToast?: (kind: 'ok' | 'fail', message: string) => void;
   /** World kill switch — Fly now / Dispatch blocked until desktop ≥ min. */
@@ -564,10 +578,6 @@ export function PortsPanel(props: {
   const [scoutFilter, setScoutFilter] = useState<
     'all' | 'haul' | 'demand' | 'bridge'
   >('all');
-  const [charterPick, setCharterPick] = useState<{
-    destIcao: string;
-    aircraftId: string;
-  } | null>(null);
   const [scoutBusy, setScoutBusy] = useState(false);
   const [scoutLoaded, setScoutLoaded] = useState(false);
   const [scoutHoldDraft, setScoutHoldDraft] = useState<
@@ -630,6 +640,12 @@ export function PortsPanel(props: {
   });
   const [demandPage, setDemandPage] = useState(1);
   const [demandCountryFilter, setDemandCountryFilter] = useState('');
+  const [charterSort, setCharterSort] = useState<CharterSort>({
+    key: 'pay',
+    direction: 'desc',
+  });
+  const [charterPage, setCharterPage] = useState(1);
+  const [charterCountryFilter, setCharterCountryFilter] = useState('');
 
   const unit = massUnitLabel(props.weightSystem);
 
@@ -1838,27 +1854,29 @@ export function PortsPanel(props: {
     }
   }
 
-  async function onAcceptPortCharter(destIcao: string, aircraftId: string) {
-    if (props.busy || loading || !port) return;
+  async function beginPortCharter(destIcao: string, originIcao: string) {
+    if (props.busy || loading || !port || !props.onOpenCharterManifest) return;
+    const parked = props.fleet.filter((aircraft) => aircraft.status === 'parked');
+    if (parked.length === 0) {
+      props.onToast?.('fail', 'Park an aircraft to open the charter manifest');
+      return;
+    }
+    const atOrigin = parked.find(
+      (aircraft) =>
+        aircraft.locationIcao.trim().toUpperCase() ===
+        originIcao.trim().toUpperCase(),
+    );
+    const aircraft = atOrigin ?? parked[0]!;
     setLoading(true);
     try {
-      if (props.ensureOpsCompany) await props.ensureOpsCompany(aircraftId);
-      const result = await postPortCharterAccept({
+      const ports = await props.onOpenCharterManifest({
         portId: port.id,
         destIcao,
-        aircraftId,
-        companyId: props.resolveOpsCompanyId?.(aircraftId),
+        originIcao,
+        aircraftId: aircraft.id,
+        companyId: props.logisticsCompanyId?.trim() || undefined,
       });
-      props.onWallet?.(result.walletUsd);
-      props.onFleet?.(result.fleet);
-      props.onMissions?.(result.missions);
-      adoptSnap(result.ports);
-      setCharterPick(null);
-      props.onToast?.(
-        'ok',
-        `Charter ${result.mission.originIcao}→${result.mission.destIcao} · ${result.mission.pax ?? 0} pax`,
-      );
-      props.onStaged?.(result.mission);
+      if (ports) adoptSnap(ports);
     } catch (err) {
       props.onToast?.(
         'fail',
@@ -1867,29 +1885,6 @@ export function PortsPanel(props: {
     } finally {
       setLoading(false);
     }
-  }
-
-  function beginPortCharter(destIcao: string, originIcao: string) {
-    const parked = props.fleet.filter(
-      (aircraft) =>
-        aircraft.status === 'parked' &&
-        aircraft.locationIcao.trim().toUpperCase() ===
-          originIcao.trim().toUpperCase(),
-    );
-    if (parked.length === 0) {
-      props.onToast?.(
-        'fail',
-        `Park a passenger aircraft at ${originIcao} to accept`,
-      );
-      return;
-    }
-    if (parked.length === 1) {
-      void onAcceptPortCharter(destIcao, parked[0]!.id);
-      return;
-    }
-    setCharterPick({ destIcao, aircraftId: parked[0]!.id });
-    setNetworkSurface('charter');
-    setSection('network');
   }
 
   async function onUpgradeConcession(
@@ -4104,6 +4099,77 @@ export function PortsPanel(props: {
     }
   }, [demandCountryFilter, demandCountryOptions]);
 
+  const charterDeskRows = port?.concession?.charterLobby?.rows ?? [];
+
+  const charterCountryOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const row of charterDeskRows) {
+      const id = row.destCountryId?.trim().toUpperCase() ?? '';
+      if (id) ids.add(id);
+    }
+    return [...ids].sort((a, b) => a.localeCompare(b));
+  }, [charterDeskRows]);
+
+  const sortedCharterRows = useMemo(() => {
+    const country = charterCountryFilter.trim().toUpperCase();
+    const filtered = country
+      ? charterDeskRows.filter(
+          (row) => (row.destCountryId?.trim().toUpperCase() ?? '') === country,
+        )
+      : [...charterDeskRows];
+    const dir = charterSort.direction === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      switch (charterSort.key) {
+        case 'country':
+          cmp = (a.destCountryId ?? '').localeCompare(b.destCountryId ?? '');
+          break;
+        case 'dest':
+          cmp = a.destIcao.localeCompare(b.destIcao);
+          break;
+        case 'dist':
+          cmp = a.distanceNm - b.distanceNm;
+          break;
+        case 'pax':
+          cmp = a.groupSize - b.groupSize;
+          break;
+        case 'pay':
+          cmp = a.payUsd - b.payUsd;
+          break;
+      }
+      if (cmp === 0) cmp = a.destIcao.localeCompare(b.destIcao);
+      return cmp * dir;
+    });
+    return filtered;
+  }, [charterDeskRows, charterCountryFilter, charterSort]);
+
+  const charterPageCount = Math.max(
+    1,
+    Math.ceil(sortedCharterRows.length / DEMAND_PAGE_SIZE) || 1,
+  );
+  const safeCharterPage = Math.min(Math.max(1, charterPage), charterPageCount);
+  const pagedCharterRows = useMemo(() => {
+    const start = (safeCharterPage - 1) * DEMAND_PAGE_SIZE;
+    return sortedCharterRows.slice(start, start + DEMAND_PAGE_SIZE);
+  }, [sortedCharterRows, safeCharterPage]);
+
+  useEffect(() => {
+    if (charterPage > charterPageCount) setCharterPage(charterPageCount);
+  }, [charterPage, charterPageCount]);
+
+  useEffect(() => {
+    setCharterPage(1);
+  }, [charterCountryFilter, port?.id]);
+
+  useEffect(() => {
+    if (
+      charterCountryFilter &&
+      !charterCountryOptions.includes(charterCountryFilter)
+    ) {
+      setCharterCountryFilter('');
+    }
+  }, [charterCountryFilter, charterCountryOptions]);
+
   function toggleDemandSort(key: DemandSortKey) {
     setDemandSort((current) => {
       if (current.key !== key) return { key, direction: 'asc' };
@@ -4125,6 +4191,29 @@ export function PortsPanel(props: {
   ): 'ascending' | 'descending' | 'none' {
     if (demandSort.key !== key) return 'none';
     return demandSort.direction === 'asc' ? 'ascending' : 'descending';
+  }
+
+  function toggleCharterSort(key: CharterSortKey) {
+    setCharterSort((current) => {
+      if (current.key !== key) return { key, direction: 'asc' };
+      return {
+        key,
+        direction: current.direction === 'asc' ? 'desc' : 'asc',
+      };
+    });
+    setCharterPage(1);
+  }
+
+  function charterSortIndicator(key: CharterSortKey): string {
+    if (charterSort.key !== key) return '↕';
+    return charterSort.direction === 'asc' ? '↑' : '↓';
+  }
+
+  function charterAriaSort(
+    key: CharterSortKey,
+  ): 'ascending' | 'descending' | 'none' {
+    if (charterSort.key !== key) return 'none';
+    return charterSort.direction === 'asc' ? 'ascending' : 'descending';
   }
 
   return (
@@ -6684,110 +6773,207 @@ export function PortsPanel(props: {
                       </p>
                     </div>
                   ) : null}
-                  {(port.concession.charterLobby?.rows.length ?? 0) === 0 ? (
-                    <p className="empty">
-                      {port.concession.charterLobby
-                        ? 'No destination in range yet.'
-                        : 'The lobby is empty.'}
-                    </p>
-                  ) : (
-                <>
-                  {charterPick ? (
-                    <div className="ports-demand-filters">
-                      <label className="ports-demand-origin-filter">
-                        <span>Aircraft at {port.concession.charterLobby?.rows[0]?.originIcao}</span>
-                        <select
-                          value={charterPick.aircraftId}
-                          aria-label="Aircraft for this charter"
-                          disabled={props.busy || loading}
-                          onChange={(e) =>
-                            setCharterPick({
-                              destIcao: charterPick.destIcao,
-                              aircraftId: e.target.value,
-                            })
-                          }
-                        >
-                          {props.fleet
-                            .filter(
-                              (aircraft) =>
-                                aircraft.status === 'parked' &&
-                                aircraft.locationIcao.trim().toUpperCase() ===
-                                  (
-                                    port.concession?.charterLobby?.rows[0]
-                                      ?.originIcao ?? ''
-                                  ).toUpperCase(),
-                            )
-                            .map((aircraft) => (
-                              <option key={aircraft.id} value={aircraft.id}>
-                                {aircraft.label}
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        className="accept"
-                        disabled={props.busy || loading}
-                        onClick={() =>
-                          void onAcceptPortCharter(
-                            charterPick.destIcao,
-                            charterPick.aircraftId,
-                          )
-                        }
-                      >
-                        Accept {charterPick.destIcao}
-                      </button>
-                    </div>
-                  ) : null}
                   <div className="table-wrap ports-demand-table-wrap">
                     <table className="data-table ports-demand-table">
                       <thead>
                         <tr>
-                          <th>Route</th>
-                          <th>Pax</th>
-                          <th>Pay</th>
-                          <th>Nm</th>
+                          <th
+                            className="ports-demand-country-th"
+                            aria-sort={charterAriaSort('country')}
+                          >
+                            <div className="ports-demand-country-th-inner">
+                              <button
+                                type="button"
+                                className={`sort-header${charterSort.key === 'country' ? ' is-sorted' : ''}`}
+                                title="Sort by destination country"
+                                onClick={() => toggleCharterSort('country')}
+                              >
+                                Country{' '}
+                                <span>{charterSortIndicator('country')}</span>
+                              </button>
+                              <label className="ports-demand-country-filter ports-demand-country-filter-in-th">
+                                <select
+                                  value={charterCountryFilter}
+                                  aria-label="Filter charter by destination country"
+                                  disabled={props.busy || loading}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) =>
+                                    setCharterCountryFilter(e.target.value)
+                                  }
+                                >
+                                  <option value="">All</option>
+                                  {charterCountryOptions.map((id) => (
+                                    <option key={id} value={id}>
+                                      {id}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+                          </th>
+                          <th aria-sort={charterAriaSort('dest')}>
+                            <button
+                              type="button"
+                              className={`sort-header${charterSort.key === 'dest' ? ' is-sorted' : ''}`}
+                              title="Sort by destination"
+                              onClick={() => toggleCharterSort('dest')}
+                            >
+                              Dest <span>{charterSortIndicator('dest')}</span>
+                            </button>
+                          </th>
+                          <th aria-sort={charterAriaSort('dist')}>
+                            <button
+                              type="button"
+                              className={`sort-header${charterSort.key === 'dist' ? ' is-sorted' : ''}`}
+                              title="Sort by distance"
+                              onClick={() => toggleCharterSort('dist')}
+                            >
+                              Dist <span>{charterSortIndicator('dist')}</span>
+                            </button>
+                          </th>
+                          <th>Commodity</th>
+                          <th aria-sort={charterAriaSort('pax')}>
+                            <button
+                              type="button"
+                              className={`sort-header${charterSort.key === 'pax' ? ' is-sorted' : ''}`}
+                              title="Sort by passengers"
+                              onClick={() => toggleCharterSort('pax')}
+                            >
+                              Pax <span>{charterSortIndicator('pax')}</span>
+                            </button>
+                          </th>
+                          <th aria-sort={charterAriaSort('pay')}>
+                            <button
+                              type="button"
+                              className={`sort-header${charterSort.key === 'pay' ? ' is-sorted' : ''}`}
+                              title="Sort by pay"
+                              onClick={() => toggleCharterSort('pay')}
+                            >
+                              Total pay{' '}
+                              <span>{charterSortIndicator('pay')}</span>
+                            </button>
+                          </th>
                           <th />
                         </tr>
                       </thead>
                       <tbody>
-                        {port.concession.charterLobby!.rows.map((row) => (
-                          <tr key={row.id}>
-                            <td>
-                              <button
-                                type="button"
-                                className="linkish"
-                                disabled={props.busy}
-                                onClick={() => {
-                                  setScoutFocusId(row.id);
-                                  props.onOpenAirport?.(row.destIcao);
-                                }}
-                              >
-                                {row.originIcao} → {row.destIcao}
-                              </button>
-                            </td>
-                            <td>{row.groupSize}</td>
-                            <td>{props.formatMoney(row.payUsd)}</td>
-                            <td className="muted">{row.distanceNm}</td>
-                            <td>
-                              <button
-                                type="button"
-                                className="accept"
-                                disabled={props.busy || loading}
-                                onClick={() =>
-                                  beginPortCharter(row.destIcao, row.originIcao)
-                                }
-                              >
-                                Accept
-                              </button>
+                        {sortedCharterRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={7}>
+                              <p className="empty">
+                                {!port.concession.charterLobby
+                                  ? 'The lobby is empty.'
+                                  : charterCountryFilter
+                                    ? 'No charter in this country — clear the filter.'
+                                    : 'No destination in range yet.'}
+                              </p>
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          pagedCharterRows.map((row) => {
+                            const countryId =
+                              row.destCountryId?.trim().toUpperCase() ?? '';
+                            return (
+                              <tr key={row.id}>
+                                <td
+                                  className="ports-demand-country-cell"
+                                  title={demandCountryLabel(countryId)}
+                                >
+                                  {countryId || '—'}
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="linkish"
+                                    disabled={props.busy}
+                                    title={row.destName?.trim() || row.destIcao}
+                                    onClick={() => {
+                                      setScoutFocusId(row.id);
+                                      props.onOpenAirport?.(row.destIcao);
+                                    }}
+                                  >
+                                    {row.destIcao}
+                                  </button>
+                                </td>
+                                <td
+                                  className="muted"
+                                  title={`${row.originIcao} → ${row.destIcao}`}
+                                >
+                                  {row.distanceNm.toLocaleString()} nm
+                                </td>
+                                <td>
+                                  <div className="commodity-cell">
+                                    <CommodityIcon
+                                      commodityId="passengers"
+                                      size={52}
+                                      title="Passengers"
+                                    />
+                                    <div>
+                                      <strong>Passengers</strong>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>{row.groupSize}</td>
+                                <td>{props.formatMoney(row.payUsd)}</td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="accept"
+                                    disabled={props.busy || loading}
+                                    onClick={() =>
+                                      beginPortCharter(
+                                        row.destIcao,
+                                        row.originIcao,
+                                      )
+                                    }
+                                  >
+                                    Accept
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
                   </div>
-                </>
-                  )}
+                  {sortedCharterRows.length > 0 ? (
+                    <nav className="pagination" aria-label="Charter pages">
+                      <p>
+                        {`${(safeCharterPage - 1) * DEMAND_PAGE_SIZE + 1}–${Math.min(
+                          safeCharterPage * DEMAND_PAGE_SIZE,
+                          sortedCharterRows.length,
+                        )} of ${sortedCharterRows.length}`}
+                      </p>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={safeCharterPage <= 1 || props.busy}
+                          onClick={() =>
+                            setCharterPage(Math.max(1, safeCharterPage - 1))
+                          }
+                        >
+                          Previous
+                        </button>
+                        <span>
+                          Page {safeCharterPage} of {charterPageCount}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={
+                            safeCharterPage >= charterPageCount || props.busy
+                          }
+                          onClick={() =>
+                            setCharterPage(
+                              Math.min(charterPageCount, safeCharterPage + 1),
+                            )
+                          }
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </nav>
+                  ) : null}
                 </>
               )}
             </div>

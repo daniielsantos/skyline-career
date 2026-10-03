@@ -13405,8 +13405,27 @@ span.dispatch-route-hub-dest {
 
 .ports-charter-lobby {
   flex: 0 0 auto;
-  max-width: 18rem;
+  max-width: none;
   margin: 0.15rem 0 0.85rem;
+}
+
+.ports-demand-board .ports-charter-lobby {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.85rem;
+  margin: 0 0 0.35rem;
+}
+
+.ports-demand-board .ports-charter-lobby .ports-scout-title,
+.ports-demand-board .ports-charter-lobby .ports-jeta-qty,
+.ports-demand-board .ports-charter-lobby .ports-warehouse-hint {
+  margin: 0;
+}
+
+.ports-demand-board .ports-charter-lobby-bar {
+  width: 7rem;
+  margin: 0;
 }
 
 .ports-charter-lobby-bar {

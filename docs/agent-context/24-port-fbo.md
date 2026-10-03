@@ -104,15 +104,19 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 ## Charter na concessão (shipped desktop 0.3.442, 2026-10-03)
 
+Atualizado 2026-10-03: **Charter do porto abre o manifesto** — sintoma = Accept exigia um avião já parado no hub e ia direto ao Dispatch, sem ferry. Causa = o desk reservava e criava a missão no mesmo clique. Fix = Accept chama `prepare` (trava o grupo fora do quadro da Base), abre o CharterManifest com Fit e ferry, e o Accept de lá usa o `/api/charters/accept`. Discard chama `release` e devolve a fila.
+
+Atualizado 2026-10-03: **Tabela do charter no molde do Demand** — sintoma = a mesa do lobby era Route/Pax/Pay/Nm, sem país, ícone, ordenação nem rodapé. Causa = o desk nasceu com colunas próprias. Fix = mesmas células do Demand (país + filtro, destino, distância em nm, ícone Passengers, pay, Accept, paginação). Sem coluna de expiração: o grupo não tem TTL de oferta.
+
 Atualizado 2026-10-03: **Scout sem charter** — sintoma = o filtro Charter do Scout repetia as 8 rotas da aba Charter, e o medidor da fila sentava ao lado do tanque de Jet-A. Causa = o desk já nasce curto (teto 8), então o Scout não encurta nada. Fix = Scout volta a All/Haul/Demand/Bridge; o medidor waiting/teto fica no topo da aba Charter. O clique na rota ainda desenha o trecho no mapa.
 
 Compensa como mesa fina, não como segundo cargo. A fila usa `waitingPax` / `attractPax` que já existem. O tick já pinga gente em todo aeroporto pelo peso do hub (`tickCharterPools`); o lobby da concessão mostra esse pingue. O bônus do FBO só acelera o pingue. O charter nasce no Accept: a fila sua casa com o attract de um destino, 80–2.000 nm. Enquanto a concessão é sua, o tick mundial não corta oferta dessa fila; gente acumula até o teto do aeroporto (spoke ~64, regional ~160, major ~280) e perde o dia se ninguém voa.
 
-UI: chip **Charter (n)** ao lado de Demand na Network. O Scout ficou só com carga (All/Haul/Demand/Bridge): o filtro Charter repetia as mesmas 8 rotas. O medidor da fila (waiting/teto, P1–P3, saída em um dia) fica no topo da aba Charter, não ao lado do tanque. Alcance 80–2.000 nm. O quadro Charters da Base continua para aeroportos que não são seus. A mesma pessoa não aparece nos dois.
+UI: chip **Charter (n)** ao lado de Demand na Network. A tabela do charter usa o mesmo desenho da de Demand (país, destino, distância, commodity, pay, filtro de país, ordenação, rodapé de página). O Scout ficou só com carga (All/Haul/Demand/Bridge): o filtro Charter repetia as mesmas 8 rotas. O medidor da fila (waiting/teto, P1–P3, saída em um dia) fica no topo da aba Charter, não ao lado do tanque. Alcance 80–2.000 nm. O quadro Charters da Base continua para aeroportos que não são seus. A mesma pessoa não aparece nos dois.
 
 Evolução: o único upgrade de charter é o P1–P3 do FBO. Não há trilha T1–T5 no molde do WH. O lobby é a superfície dessa mesa — medidor da fila no topo da aba Charter, chip Charter — e cresce quando o FBO sobe. O P1–P3 que já existe passa a mostrar o lado charter no mesmo upgrade. P1 fila leve, P2 média, P3 até o teto do aeroporto (spoke ~64, regional ~160, major ~280) — o gasto não fura esse teto. Attract é um bônus leve de enchimento, não um grupo comprado. O nível é um só: P2/P3 abre com throughput em kg **ou** passageiro voado. Carga não trava o lobby, e charter não trava o tanque.
 
-Lobby da concessão sua não guarda o piso de 20% do `tickCharterPools`. Quem não voa vai embora. O chip lista a fila sem exigir avião de passageiro no pátio; o Fit é no Accept, como no Demand. Attract de chegada no seu hub continua no quadro mundial. Só a fila de saída fica na mesa.
+Lobby da concessão sua não guarda o piso de 20% do `tickCharterPools`. Quem não voa vai embora. O chip lista a fila sem exigir avião no pátio. Accept abre o manifesto que já existe (Fit de lugares, bagagem, peso, alcance, Class Ops, e o ferry). O grupo sai da fila nesse momento e não aparece no quadro da Base. Discard devolve a gente. O voo só nasce no Accept do manifesto, com o avião parado no hub.
 
 Fora: armazém de gente, compra de passageiro, pátio, long haul oceânico, widebody, malha entre os dois FBO. O outro porto seu entra na lista só se o attract dele já estiver alto e a distância cair em 80–2.000 nm. Sem bônus por ser seu. Payload desses vidros continua frágil.
 

@@ -8483,6 +8483,15 @@ export function createCareerApiServer(port = 8787) {
               ) {
                 return false;
               }
+              // Port lobby holds are for the manifest only. The Base board
+              // must not list the same group.
+              const portHoldId = url.searchParams.get('offerId')?.trim();
+              if (
+                offer.id.startsWith('charter-offer:port:') &&
+                offer.id !== portHoldId
+              ) {
+                return false;
+              }
               if (originExact && offer.originIcao !== originExact) return false;
               if (destExact && offer.destIcao !== destExact) return false;
               const originName =
@@ -10179,6 +10188,101 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, {
             error: error instanceof Error ? error.message : String(error),
           });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/charter/prepare') {
+        const body = (await readBody(req)) as {
+          portId?: string;
+          destIcao?: string;
+          companyId?: string;
+        };
+        const prepareCompanyId = companyIdFromRequest(req, body.companyId);
+        if (!body.portId?.trim() || !body.destIcao?.trim()) {
+          send(res, 400, { error: 'portId and destIcao required' });
+          return;
+        }
+        try {
+          const prepared = await withCareerWrite((world, missions) => {
+            const portId = body.portId!.trim().toUpperCase();
+            const conc = (missions.playerPortConcessions ?? []).find(
+              (row) =>
+                row.portId === portId &&
+                row.companyId === prepareCompanyId &&
+                row.leasePaidThroughTick > world.tick,
+            );
+            if (!conc) throw new Error('No active Port FBO on this port');
+            const port = getCareerPort(portId);
+            if (!port) throw new Error('Unknown port');
+            const originIcao = port.pickupHubs[0]?.trim().toUpperCase();
+            if (!originIcao) throw new Error('Port has no pickup hub');
+            const level = conc.level === 2 || conc.level === 3 ? conc.level : 1;
+            const offer = takePortCharterOffer(world, {
+              originIcao,
+              destIcao: body.destIcao!,
+              level,
+            });
+            const airports = new Map(
+              world.airports.map((airport) => [airport.icao.toUpperCase(), airport]),
+            );
+            return {
+              offer: {
+                id: offer.id,
+                originIcao: offer.originIcao,
+                destIcao: offer.destIcao,
+                originName: airports.get(offer.originIcao)?.name ?? offer.originIcao,
+                destName: airports.get(offer.destIcao)?.name ?? offer.destIcao,
+                paxCount: offer.groupSize,
+                baggageKg: offer.baggageKg,
+                payUsd: offer.payUsd,
+                basePayUsd: offer.payUsd,
+                urgency: offer.urgency === 'normal' ? 'normal' : 'urgent',
+                reason: `Charter · ${offer.tier} · ${offer.groupSize} pax`,
+                createdAtTick: offer.createdAtTick,
+                expiresAtTick: offer.expiresAtTick,
+                ticksRemaining: Math.max(0, offer.expiresAtTick - world.tick),
+                distanceNm: offer.distanceNm,
+                international: offer.international,
+                status: offer.status,
+              },
+              ports: portSnapshot(world, missions, {
+                viewerCompanyId: prepareCompanyId,
+              }),
+            };
+          }, { housekeeping: false, companyId: prepareCompanyId });
+          send(res, 200, prepared);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, /^Unknown /.test(message) ? 404 : 400, { error: message });
+        }
+        return;
+      }
+
+      if (req.method === 'POST' && path === '/api/ports/charter/release') {
+        const body = (await readBody(req)) as {
+          offerId?: string;
+          companyId?: string;
+        };
+        const releaseCompanyId = companyIdFromRequest(req, body.companyId);
+        const offerId = body.offerId?.trim() ?? '';
+        if (!offerId.startsWith('charter-offer:port:')) {
+          send(res, 400, { error: 'offerId required' });
+          return;
+        }
+        try {
+          const released = await withCareerWrite((world, missions) => {
+            undoTakenCharterOffer(world, offerId);
+            return {
+              ports: portSnapshot(world, missions, {
+                viewerCompanyId: releaseCompanyId,
+              }),
+            };
+          }, { housekeeping: false, companyId: releaseCompanyId });
+          send(res, 200, released);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, 400, { error: message });
         }
         return;
       }

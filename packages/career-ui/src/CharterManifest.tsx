@@ -68,6 +68,7 @@ export function CharterManifest(props: CharterManifestProps) {
       dest: props.draft.offer.destIcao,
       aircraftId: aircraft.id,
       companyId: charterCompanyId,
+      offerId: props.draft.offer.id,
       page: 1,
       pageSize: 100,
     })

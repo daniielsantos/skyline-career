@@ -23,6 +23,8 @@ import {
   fetchSimBridgeStatus,
   postCancel,
   postCharterAccept,
+  postPortCharterPrepare,
+  postPortCharterRelease,
   postConfirmOfp,
   postAcceptOfpCargo,
   postBushTripAccept,
@@ -4221,6 +4223,7 @@ export function App() {
   const [staging, setStaging] = useState<StagingDraft | null>(null);
   const [charterManifest, setCharterManifest] =
     useState<CharterManifestDraft | null>(null);
+  const portCharterCompanyRef = useRef<string | undefined>(undefined);
   const [stagingRouteLots, setStagingRouteLots] = useState<MarketLot[]>([]);
   const [stagingRouteLotsLoading, setStagingRouteLotsLoading] = useState(false);
   const [stagingRouteLotsError, setStagingRouteLotsError] = useState<string | null>(null);
@@ -11371,6 +11374,83 @@ export function App() {
     }
   }
 
+  async function openPortCharterManifest(args: {
+    portId: string;
+    destIcao: string;
+    originIcao: string;
+    aircraftId: string;
+    companyId?: string;
+  }) {
+    if (!hubSelected) {
+      setError('Create your pilot profile first (name + home hub)');
+      goToTab('pilot');
+      return null;
+    }
+    if (playerDispatchMission) {
+      setError(
+        `Finish or cancel ${activeFlightRouteLabel(playerDispatchMission)} in Dispatch before preparing another flight`,
+      );
+      goToTab('staging');
+      return null;
+    }
+    if (charterManifest) {
+      setError('Discard the open charter manifest before preparing another');
+      goToTab('staging');
+      return null;
+    }
+    const aircraft =
+      findOpsEntry(opsFleetEntries, args.aircraftId)?.aircraft ??
+      fleet.find(
+        (item) => item.id === args.aircraftId && item.status === 'parked',
+      );
+    if (!aircraft || aircraft.status !== 'parked') {
+      setError('Park an aircraft to open the charter manifest');
+      return null;
+    }
+    const prepared = await postPortCharterPrepare({
+      portId: args.portId,
+      destIcao: args.destIcao,
+      companyId: args.companyId,
+    });
+    portCharterCompanyRef.current = args.companyId;
+    const restoreAirport = airportIcao
+      ? { icao: airportIcao, section: terminalSection }
+      : null;
+    setFlightDebrief(null);
+    setStaging(null);
+    setCharterManifest({ offer: prepared.offer, aircraftId: aircraft.id });
+    setError(null);
+    closeAirport();
+    setAirportReturn(restoreAirport);
+    goToTab('staging');
+    if (
+      aircraft.locationIcao.trim().toUpperCase() !==
+      args.originIcao.trim().toUpperCase()
+    ) {
+      setToastKind('warn');
+      setToast(
+        `Charter manifest · ${aircraft.label} is at ${aircraft.locationIcao} — ferry to ${args.originIcao} before accepting`,
+      );
+    }
+    return prepared.ports;
+  }
+
+  async function discardCharterManifest() {
+    const offerId = charterManifest?.offer.id;
+    if (!offerId?.startsWith('charter-offer:port:')) {
+      setCharterManifest(null);
+      return;
+    }
+    await run(async () => {
+      await postPortCharterRelease({
+        offerId,
+        companyId: portCharterCompanyRef.current,
+      });
+      portCharterCompanyRef.current = undefined;
+      setCharterManifest(null);
+    });
+  }
+
   function enterCharterManifest(
     offer: CharterOfferView,
     aircraftId: string,
@@ -11417,7 +11497,10 @@ export function App() {
   async function onAcceptCharter(draft: CharterManifestDraft) {
     await run(
       async () => {
-        const opsCompanyId = resolveOpsCompanyId(draft.aircraftId);
+        const portHold = draft.offer.id.startsWith('charter-offer:port:');
+        const opsCompanyId = portHold
+          ? portCharterCompanyRef.current || resolveOpsCompanyId(draft.aircraftId)
+          : resolveOpsCompanyId(draft.aircraftId);
         const vaOps =
           Boolean(memberVaCompanyIdRef.current) &&
           opsCompanyId === memberVaCompanyIdRef.current;
@@ -11440,6 +11523,7 @@ export function App() {
           ...current.filter((mission) => mission.id !== result.mission.id),
         ]);
         setCharterManifest(null);
+        portCharterCompanyRef.current = undefined;
         setWatchAutoPaused(false);
         setSimbriefLaunchUrl(null);
         goToTab('staging');
@@ -19841,7 +19925,7 @@ export function App() {
                 formatMoney={formatMoney}
                 formatMass={(kg) => formatMass(kg, weightSystem)}
                 onChange={setCharterManifest}
-                onCancel={() => setCharterManifest(null)}
+                onCancel={() => void discardCharterManifest()}
                 onFerry={(aircraftId, legDest, finalDest) =>
                   onFerry(aircraftId, legDest, { finalDest })
                 }
@@ -21869,6 +21953,7 @@ export function App() {
           onHaulStaged={() => {
             goToTab('staging');
           }}
+          onOpenCharterManifest={openPortCharterManifest}
           missions={missions}
           onPrepareHaulHold={(hold, aircraftId, sameRouteHolds) => {
             enterStagingForVaHaulHold(hold, aircraftId, sameRouteHolds);
@@ -22704,6 +22789,7 @@ export function App() {
             onOpenAirport={(icao) => {
               void openAirport(icao);
             }}
+            onOpenCharterManifest={openPortCharterManifest}
             onStaged={() => {
               goToTab('staging');
             }}

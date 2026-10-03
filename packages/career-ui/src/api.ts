@@ -1890,6 +1890,8 @@ export function fetchCharters(opts: {
   page?: number;
   pageSize?: number;
   sort?: string;
+  /** Include this port-lobby hold. The Base board hides those ids. */
+  offerId?: string;
 } = {}) {
   const qs = new URLSearchParams();
   const origin = opts.origin?.trim().toUpperCase();
@@ -1911,6 +1913,7 @@ export function fetchCharters(opts: {
   if (opts.page !== undefined) qs.set('page', String(opts.page));
   if (opts.pageSize !== undefined) qs.set('pageSize', String(opts.pageSize));
   if (opts.sort?.trim()) qs.set('sort', opts.sort.trim());
+  if (opts.offerId?.trim()) qs.set('offerId', opts.offerId.trim());
   return api<{
     offers: CharterOfferView[];
     total: number;
@@ -3144,6 +3147,7 @@ export type PortsSnapshot = {
           originIcao: string;
           destIcao: string;
           destName: string;
+          destCountryId?: string;
           groupSize: number;
           baggageKg: number;
           distanceNm: number;
@@ -3879,6 +3883,30 @@ export function postPortJetAHaul(opts: { orderId: string; aircraftId: string }) 
     missions: Mission[];
     ports: PortsSnapshot;
   }>('/api/ports/jet-a/haul', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortCharterPrepare(opts: {
+  portId: string;
+  destIcao: string;
+  companyId?: string;
+}) {
+  return api<{
+    offer: CharterOfferView;
+    ports: PortsSnapshot;
+  }>('/api/ports/charter/prepare', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortCharterRelease(opts: {
+  offerId: string;
+  companyId?: string;
+}) {
+  return api<{ ports: PortsSnapshot }>('/api/ports/charter/release', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

@@ -1311,6 +1311,7 @@ export type PortCharterDeskRow = {
   originIcao: string;
   destIcao: string;
   destName: string;
+  destCountryId: string;
   groupSize: number;
   baggageKg: number;
   distanceNm: number;
@@ -1415,6 +1416,7 @@ export function listPortCharterDesk(
         originIcao: origin.icao,
         destIcao: dest.icao,
         destName: dest.name,
+        destCountryId: countryIdFromRegion(dest.region),
         groupSize,
         baggageKg: charterBaggageKg(groupSize),
         distanceNm: Math.round(distance),

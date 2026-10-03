@@ -104,6 +104,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 ## Charter na concessão (shipped desktop 0.3.442, 2026-10-03)
 
+Atualizado 2026-10-03: **Reposicionamento sem origem do charter** — sintoma = depois do ferry, o modal Travel from SEGU não sugeria o hub de origem (KMIA). Causa = os atalhos do modal só liam Dispatch e missão aceita; o manifesto do charter fica em `charterManifest`. Fix = chip **Charter origin** com o ICAO do manifesto.
+
 Atualizado 2026-10-03: **Charter do porto abre o manifesto** — sintoma = Accept exigia um avião já parado no hub e ia direto ao Dispatch, sem ferry. Causa = o desk reservava e criava a missão no mesmo clique. Fix = Accept chama `prepare` (trava o grupo fora do quadro da Base), abre o CharterManifest com Fit e ferry, e o Accept de lá usa o `/api/charters/accept`. Discard chama `release` e devolve a fila.
 
 Atualizado 2026-10-03: **Tabela do charter no molde do Demand** — sintoma = a mesa do lobby era Route/Pax/Pay/Nm, sem país, ícone, ordenação nem rodapé. Causa = o desk nasceu com colunas próprias. Fix = mesmas células do Demand (país + filtro, destino, distância em nm, ícone Passengers, pay, Accept, paginação). Sem coluna de expiração: o grupo não tem TTL de oferta.

@@ -22854,9 +22854,21 @@ export function App() {
                   },
                 ]
               : []),
+            ...(charterManifest?.offer.originIcao?.trim() &&
+            charterManifest.offer.originIcao.trim().toUpperCase() !==
+              staging?.originIcao?.trim().toUpperCase()
+              ? [
+                  {
+                    icao: charterManifest.offer.originIcao,
+                    label: 'Charter origin',
+                  },
+                ]
+              : []),
             ...(activeMission?.originIcao?.trim() &&
             activeMission.originIcao.trim().toUpperCase() !==
-              staging?.originIcao?.trim().toUpperCase()
+              staging?.originIcao?.trim().toUpperCase() &&
+            activeMission.originIcao.trim().toUpperCase() !==
+              charterManifest?.offer.originIcao?.trim().toUpperCase()
               ? [
                   {
                     icao: activeMission.originIcao,

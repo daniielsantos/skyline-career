@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Demand e Charter ficam no porto** — sintoma = os dois chips sentavam na faixa da companhia, junto de Buy warehouse e Ground staff, e ao abrir o quadro o card do porto apagava. Causa = a faixa tratava o board do porto como ação da company. Fix = Demand e Charter saíram dessa faixa e foram para o título do porto selecionado. O card continua aceso. Outro FBO na mesma tela troca o quadro. Buy warehouse e Ground staff ficam na faixa. No armazém, Demand abre o quadro daquele porto e Desk volta para o galpão.
+
 Atualizado 2026-10-03: **Charter no ar não mostra carga general** — sintoma = no voo, o bloco Cargo dizia Load 0,0 klb · general e Capacity left do porão. Causa = a missão guarda `commodityId: general` e `cargoKg: 0` para caber no dispatch de frete, e o painel en route lia esses campos. Fix = o bloco vira Charter, a célula mostra a bagagem (e a classe, se houver), e Capacity left sai. Pax continua na linha do OFP. Frete e ferry não mudam.
 
 Atualizado 2026-10-03: **Bloco Fixed manifest saiu do charter** — sintoma = a frase “não pode dividir, redimensionar ou juntar” repetia passageiros, bagagem e pay que os cards e o rodapé já mostram. Causa = o diálogo nasceu no molde do manifesto de carga, onde o grupo se monta. Fix = o bloco saiu de `CharterManifest.tsx`. Contagem, pay, fit e o título do diálogo ficam. A classe (executive) saiu junto; não foi para um card.

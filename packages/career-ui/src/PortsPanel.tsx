@@ -3822,8 +3822,10 @@ export function PortsPanel(props: {
     if (!node) return;
     if (node.kind === 'fbo' && node.portId) {
       setPortId(node.portId);
-      setNetworkSurface('fbo');
-      setWhShelf('owned');
+      if (networkSurface !== 'demand' && networkSurface !== 'charter') {
+        setNetworkSurface('fbo');
+        setWhShelf('owned');
+      }
       const pickup = node.primaryHubIcao;
       if (pickup && ownedHubSet.has(pickup)) {
         setSelectedOwnedHubIcao(pickup);
@@ -3831,7 +3833,7 @@ export function PortsPanel(props: {
       return;
     }
     if (node.kind === 'wh') {
-      openNetworkSurface('wh', {
+      openNetworkSurface(networkSurface === 'demand' ? 'demand' : 'wh', {
         hubIcao: node.primaryHubIcao,
         networkId: node.id,
         portId: node.portId ?? undefined,
@@ -4060,10 +4062,6 @@ export function PortsPanel(props: {
   const demandOriginName = (port?.pickupHubDetails ?? []).find(
     (hub) => hub.icao.trim().toUpperCase() === (demandDeskPickupIcao ?? ''),
   )?.name;
-
-  const demandPortsForSwitcher = useMemo(() => {
-    return snap?.ports ?? [];
-  }, [snap?.ports]);
 
   const sortedDemand = useMemo(() => {
     const seen = new Set<string>();
@@ -4577,30 +4575,6 @@ export function PortsPanel(props: {
                 <button
                   type="button"
                   className={
-                    networkSurface === 'demand'
-                      ? 'fbo-icao-chip active'
-                      : 'fbo-icao-chip'
-                  }
-                  disabled={props.busy || loading}
-                  onClick={() => openNetworkSurface('demand')}
-                >
-                  Demand ({sortedDemand.length})
-                </button>
-                <button
-                  type="button"
-                  className={
-                    networkSurface === 'charter'
-                      ? 'fbo-icao-chip active'
-                      : 'fbo-icao-chip'
-                  }
-                  disabled={props.busy || loading}
-                  onClick={() => openNetworkSurface('charter')}
-                >
-                  Charter ({port?.concession?.charterLobby?.rows.length ?? 0})
-                </button>
-                <button
-                  type="button"
-                  className={
                     networkSurface === 'buy'
                       ? 'fbo-icao-chip active'
                       : 'fbo-icao-chip'
@@ -4636,10 +4610,7 @@ export function PortsPanel(props: {
                   className="ports-network-assets"
                   nodes={filteredNetworkNodes}
                   selectedId={
-                  networkSurface === 'demand' ||
-                  networkSurface === 'charter' ||
-                  networkSurface === 'buy' ||
-                  networkSurface === 'staff'
+                  networkSurface === 'buy' || networkSurface === 'staff'
                       ? null
                       : selectedNetworkId
                   }
@@ -4674,59 +4645,125 @@ export function PortsPanel(props: {
             </div>
           ) : null}
 
-          {section === 'network' && networkSurface === 'fbo' ? (
-            <>
-              {port ? (
-                <h3 className="ports-selected-name ports-stage-title">
-                  <span className="ports-selected-name-text">{port.name}</span>
-                  <span
-                    className={
-                      port.concession?.status === 'yours'
-                        ? 'tag ports-operator-badge ports-concession-status'
-                        : port.concession?.status === 'held'
-                          ? 'tag ports-concession-status'
-                          : 'tag muted ports-concession-status'
-                    }
-                    title="Port FBO status"
-                  >
-                    {port.concession?.status === 'yours'
-                      ? `Port FBO · P${port.concession.level ?? 1}`
+          {section === 'network' &&
+          (networkSurface === 'fbo' ||
+            networkSurface === 'demand' ||
+            networkSurface === 'charter') ? (
+            port ? (
+              <h3 className="ports-selected-name ports-stage-title">
+                <span className="ports-selected-name-text">{port.name}</span>
+                <span
+                  className={
+                    port.concession?.status === 'yours'
+                      ? 'tag ports-operator-badge ports-concession-status'
                       : port.concession?.status === 'held'
-                        ? 'Held'
-                        : 'Vacant'}
-                  </span>
+                        ? 'tag ports-concession-status'
+                        : 'tag muted ports-concession-status'
+                  }
+                  title="Port FBO status"
+                >
+                  {port.concession?.status === 'yours'
+                    ? `Port FBO · P${port.concession.level ?? 1}`
+                    : port.concession?.status === 'held'
+                      ? 'Held'
+                      : 'Vacant'}
+                </span>
+                <button
+                  type="button"
+                  className="action ghost ports-concession-open"
+                  disabled={props.busy}
+                  onClick={() => setConcessionOpen(true)}
+                  title={
+                    portLeaseDaysLeft != null
+                      ? `Lease · ${portLeaseDaysLeft}d left`
+                      : undefined
+                  }
+                >
+                  {port.concession?.status === 'yours'
+                    ? canPortCapex
+                      ? portLeaseDaysLeft != null
+                        ? `Lease · ${portLeaseDaysLeft}d`
+                        : 'Lease · Upgrade'
+                      : portLeaseDaysLeft != null
+                        ? `Lease · ${portLeaseDaysLeft}d`
+                        : 'Details'
+                    : port.concession?.status === 'held'
+                      ? 'Details'
+                      : canPortCapex
+                        ? 'Claim'
+                        : 'Details'}
+                </button>
+                {networkSurface !== 'fbo' ? (
                   <button
                     type="button"
-                    className="action ghost ports-concession-open"
-                    disabled={props.busy}
-                    onClick={() => setConcessionOpen(true)}
-                    title={
-                      portLeaseDaysLeft != null
-                        ? `Lease · ${portLeaseDaysLeft}d left`
-                        : undefined
+                    className="fbo-icao-chip"
+                    disabled={props.busy || loading}
+                    onClick={() => {
+                      const node = selectedNetworkNode;
+                      if (node?.kind === 'wh') {
+                        openNetworkSurface('wh', {
+                          hubIcao: node.primaryHubIcao,
+                          networkId: node.id,
+                          portId: node.portId ?? port.id,
+                        });
+                        return;
+                      }
+                      const fbo = companyNetworkNodes.find(
+                        (n) =>
+                          n.kind === 'fbo' &&
+                          (n.portId ?? '').toUpperCase() ===
+                            port.id.toUpperCase(),
+                      );
+                      openNetworkSurface('fbo', {
+                        portId: port.id,
+                        networkId: fbo?.id,
+                      });
+                    }}
+                  >
+                    Desk
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className={
+                    networkSurface === 'demand'
+                      ? 'fbo-icao-chip active'
+                      : 'fbo-icao-chip'
+                  }
+                  disabled={props.busy || loading}
+                  onClick={() =>
+                    openNetworkSurface('demand', { portId: port.id })
+                  }
+                >
+                  Demand ({sortedDemand.length})
+                </button>
+                {port.concession?.status === 'yours' ? (
+                  <button
+                    type="button"
+                    className={
+                      networkSurface === 'charter'
+                        ? 'fbo-icao-chip active'
+                        : 'fbo-icao-chip'
+                    }
+                    disabled={props.busy || loading}
+                    onClick={() =>
+                      openNetworkSurface('charter', { portId: port.id })
                     }
                   >
-                    {port.concession?.status === 'yours'
-                      ? canPortCapex
-                        ? portLeaseDaysLeft != null
-                          ? `Lease · ${portLeaseDaysLeft}d`
-                          : 'Lease · Upgrade'
-                        : portLeaseDaysLeft != null
-                          ? `Lease · ${portLeaseDaysLeft}d`
-                          : 'Details'
-                      : port.concession?.status === 'held'
-                        ? 'Details'
-                        : canPortCapex
-                          ? 'Claim'
-                          : 'Details'}
+                    Charter (
+                    {port.concession.charterLobby?.rows.length ?? 0})
                   </button>
-                </h3>
-              ) : (
-                <p className="ports-stage-title is-muted">
-                  Select a Port FBO on the network map.
-                </p>
-              )}
+                ) : null}
+              </h3>
+            ) : (
+              <p className="ports-stage-title is-muted">
+                Select a Port FBO on the network map.
+              </p>
+            )
+          ) : null}
 
+          {section === 'network' && networkSurface === 'fbo' ? (
+            <>
               {port && port.concession?.status === 'yours' ? (
                 <div className="ports-main ports-fbo-main ports-network-detail">
                   <div className="ports-listings ports-fbo-panel">
@@ -5381,14 +5418,28 @@ export function PortsPanel(props: {
             networkSurface === 'buy' ||
             networkSurface === 'staff') ? (
             <>
-              <h3 className="ports-stage-title">
-                {whShelf === 'staff'
-                  ? 'Ground staff'
-                  : whShelf === 'buy'
-                    ? 'Buy warehouse'
-                    : highlightedHubIcao
-                      ? `Warehouse · ${highlightedHubIcao}`
-                      : 'Your warehouses'}
+              <h3 className="ports-selected-name ports-stage-title">
+                <span className="ports-selected-name-text">
+                  {whShelf === 'staff'
+                    ? 'Ground staff'
+                    : whShelf === 'buy'
+                      ? 'Buy warehouse'
+                      : highlightedHubIcao
+                        ? `Warehouse · ${highlightedHubIcao}`
+                        : 'Your warehouses'}
+                </span>
+                {whShelf === 'owned' && port ? (
+                  <button
+                    type="button"
+                    className="fbo-icao-chip"
+                    disabled={props.busy || loading}
+                    onClick={() =>
+                      openNetworkSurface('demand', { portId: port.id })
+                    }
+                  >
+                    Demand ({sortedDemand.length})
+                  </button>
+                ) : null}
               </h3>
               {whShelf === 'buy' && worldListLoading ? (
                 <BusyBlock label="Loading warehouses" />
@@ -6703,9 +6754,6 @@ export function PortsPanel(props: {
 
           {section === 'network' && networkSurface === 'charter' ? (
             <div className="ports-demand-board">
-              <h3 className="ports-stage-title">
-                {port ? `Charter · ${port.name}` : 'Charter'}
-              </h3>
               {port?.concession?.status !== 'yours' ? (
                 <p className="empty">
                   Claim this Port FBO to open a passenger lobby.
@@ -6919,28 +6967,7 @@ export function PortsPanel(props: {
 
           {section === 'network' && networkSurface === 'demand' ? (
             <div className="ports-demand-board">
-              <h3 className="ports-stage-title">
-                {port ? `Demand · ${port.name}` : 'Demand Board'}
-              </h3>
               <div className="ports-demand-filters">
-                <label className="ports-demand-origin-filter">
-                  <span>Port</span>
-                  <select
-                    value={port?.id ?? ''}
-                    aria-label="Demand board port theater"
-                    disabled={props.busy || loading || demandPortsForSwitcher.length === 0}
-                    onChange={(e) => {
-                      const id = e.target.value.trim();
-                      if (id) setPortId(id);
-                    }}
-                  >
-                    {demandPortsForSwitcher.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <p className="ports-corridor-chip muted" aria-live="polite">
                   {port ? (
                     <>

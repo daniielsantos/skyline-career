@@ -7181,11 +7181,15 @@ export function App() {
     ) {
       return;
     }
-    if (fleet.length === 0) return;
+    // Home hangar can be empty while the tail lives on the airline.
+    // Wait for that prefetch before deciding there is nothing to reopen.
+    if (authRequired && vaOpsPrefetchGen === 0) return;
+    if (opsFleet.length === 0) return;
     const restoreKey = `${activeCareerProfile.id}:${authAccountId ?? 'local'}`;
     if (portCharterRestoreAttemptedRef.current === restoreKey) return;
     portCharterRestoreAttemptedRef.current = restoreKey;
     const profileId = activeCareerProfile.id;
+    const hangar = opsFleet;
     const companyId =
       homeCompanyId?.trim() || homeCompanyIdRef.current?.trim() || undefined;
     let cancelled = false;
@@ -7198,18 +7202,20 @@ export function App() {
         const saved = readPersistedPortCharterManifest(profileId, authAccountId);
         const savedAircraft =
           saved?.offerId === held.offer.id
-            ? fleet.find((item) => item.id === saved.aircraftId)
+            ? hangar.find((item) => item.id === saved.aircraftId)
             : undefined;
         const origin = held.offer.originIcao.trim().toUpperCase();
-        const parkedAtOrigin = fleet.find(
+        const parkedAtOrigin = hangar.find(
           (item) =>
             item.status === 'parked' &&
             item.locationIcao.trim().toUpperCase() === origin,
         );
-        const parked = fleet.find((item) => item.status === 'parked');
-        const aircraft = savedAircraft ?? parkedAtOrigin ?? parked ?? fleet[0];
+        const parked = hangar.find((item) => item.status === 'parked');
+        const aircraft = savedAircraft ?? parkedAtOrigin ?? parked ?? hangar[0];
         if (!aircraft) return;
-        portCharterCompanyRef.current = saved?.companyId || companyId;
+        portCharterCompanyRef.current =
+          (savedAircraft ? saved?.companyId?.trim() : undefined) ||
+          resolveOpsCompanyId(aircraft.id);
         setCharterManifest({ offer: held.offer, aircraftId: aircraft.id });
         writePersistedPortCharterManifest(
           profileId,
@@ -7236,7 +7242,9 @@ export function App() {
     careerReady,
     charterManifest,
     activeMission,
-    fleet,
+    opsFleet,
+    authRequired,
+    vaOpsPrefetchGen,
     homeCompanyId,
   ]);
 

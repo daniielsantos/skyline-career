@@ -1,5 +1,11 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Network sobe no lugar do Find** — a faixa do Find saiu, então o bloco Company network encosta nas abas e o mapa do porto desce de 30rem para 26rem. O desk (nome, tanque, quadro) sobe junto.
+
+Atualizado 2026-10-03: **Buy warehouse e Ground staff ficam no Company network** — os dois chips vão para a direita do rótulo Company network. O Find saiu. Na linha de baixo, Desk, Demand e Charter ficam à esquerda; o nome do porto e o Lease vão para a direita.
+
+Atualizado 2026-10-03: **Demand e Charter não trocam a página** — no FBO seu, o mapa, o tanque, o Stock e o desk auto-buy ficam. O chip só troca o bloco de baixo: Desk = Scout, Demand = quadro de pedidos, Charter = lobby e rotas. Armazém sem esse desk continua abrindo o quadro sozinho.
+
 Atualizado 2026-10-03: **Demand e Charter ficam no porto** — sintoma = os dois chips sentavam na faixa da companhia, junto de Buy warehouse e Ground staff, e ao abrir o quadro o card do porto apagava. Causa = a faixa tratava o board do porto como ação da company. Fix = Demand e Charter saíram dessa faixa e foram para o título do porto selecionado. O card continua aceso. Outro FBO na mesma tela troca o quadro. Buy warehouse e Ground staff ficam na faixa. No armazém, Demand abre o quadro daquele porto e Desk volta para o galpão.
 
 Atualizado 2026-10-03: **Charter no ar não mostra carga general** — sintoma = no voo, o bloco Cargo dizia Load 0,0 klb · general e Capacity left do porão. Causa = a missão guarda `commodityId: general` e `cargoKg: 0` para caber no dispatch de frete, e o painel en route lia esses campos. Fix = o bloco vira Charter, a célula mostra a bagagem (e a classe, se houver), e Capacity left sai. Pax continua na linha do OFP. Frete e ferry não mudam.

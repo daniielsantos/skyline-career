@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   type CompanyNetworkNode,
   findNetworkNode,
@@ -34,6 +35,8 @@ type Props = {
   className?: string;
   disabled?: boolean;
   weightSystem?: WeightSystem;
+  /** Ports: Buy warehouse and Ground staff, on the Company network row. */
+  headActions?: ReactNode;
 };
 
 function nodeRoomLine(
@@ -69,7 +72,19 @@ export function VaCompanyNetwork(props: Props) {
   } = props;
   const selected = findNetworkNode(nodes, selectedId);
 
-  if (nodes.length === 0) return null;
+  if (nodes.length === 0) {
+    if (!props.headActions) return null;
+    return (
+      <div
+        className={`va-company-network${props.className ? ` ${props.className}` : ''}`}
+      >
+        <div className="va-company-network-head">
+          <p className="va-company-network-label">Company network</p>
+          <div className="va-company-network-actions">{props.headActions}</div>
+        </div>
+      </div>
+    );
+  }
 
   const multi = nodes.length > 1;
   const whCount = nodes.filter((n) => n.kind === 'wh').length;
@@ -108,6 +123,9 @@ export function VaCompanyNetwork(props: Props) {
           >
             All
           </button>
+        ) : null}
+        {props.headActions ? (
+          <div className="va-company-network-actions">{props.headActions}</div>
         ) : null}
       </div>
       <div

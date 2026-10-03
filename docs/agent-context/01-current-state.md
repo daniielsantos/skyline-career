@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **5504829b** / desktop **0.3.445** shipped: Suggest the charter origin when repositioning the pilot from the manifest. Release: [v0.3.445](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.445).
+
+
 `main` **9b053386** / desktop **0.3.444** shipped: Open port charters in the manifest, with the lobby table laid out like Demand. Release: [v0.3.444](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.444).
 
 

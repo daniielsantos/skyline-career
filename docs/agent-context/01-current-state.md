@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **a8d319b0** / desktop **0.3.456** shipped: Keep Demand and Charter on the selected port instead of the company toolbar. Release: [v0.3.456](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.456).
+
+
 `main` **06e564d6** / desktop **0.3.455** shipped: Show charter baggage in flight instead of an empty general cargo load. Release: [v0.3.455](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.455).
 
 

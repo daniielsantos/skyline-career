@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **e5266d16** / desktop **0.3.442** shipped: Add a passenger lobby and charter desk on the Port FBO. Release: [v0.3.442](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.442).
+
+
 `main` **b3ecc4c5** / desktop **0.3.441** shipped: Open Ports without loading company history, and keep the map mounted. Release: [v0.3.441](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.441).
 
 

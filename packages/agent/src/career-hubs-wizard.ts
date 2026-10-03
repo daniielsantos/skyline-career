@@ -258,6 +258,14 @@ function filterMissingFacilityOverrides(icaos: string[]): string[] {
   return icaos.filter((icao) => !hasFacilityOverride(icao));
 }
 
+/** Facility pin already stored, but no MSFS runway list for the debrief. */
+function filterHubsMissingRunways(icaos: string[]): string[] {
+  return icaos.filter((icao) => {
+    const row = lookupMsfsBushHubOverride(icao);
+    return !row?.runways || row.runways.length === 0;
+  });
+}
+
 async function pickScope(
   ask: AskFn,
   opts: CareerHubsWizardOpts,
@@ -265,6 +273,9 @@ async function pickScope(
   if (opts.scope === 'all') return listCareerHubIcaos();
   if (opts.scope === 'missing') {
     return filterMissingFacilityOverrides(listCareerHubIcaos());
+  }
+  if (opts.scope === 'gaps') {
+    return filterHubsMissingRunways(listCareerHubIcaos());
   }
   if (opts.scope && opts.scope !== 'wizard') {
     const code = opts.scope.trim().toUpperCase();
@@ -306,7 +317,12 @@ export async function runCareerHubsWizard(
 
   const icaos = await withPrompts(async (ask) => {
     let list = await pickScope(ask, opts);
-    if (!opts.force && opts.scope !== 'missing' && list.length > 1) {
+    if (
+      !opts.force &&
+      opts.scope !== 'missing' &&
+      opts.scope !== 'gaps' &&
+      list.length > 1
+    ) {
       const before = list.length;
       list = filterMissingFacilityOverrides(list);
       const skipped = before - list.length;

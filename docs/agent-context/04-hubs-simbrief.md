@@ -1,5 +1,11 @@
 # Hubs / SimBrief allowlist
 
+Atualizado 2026-10-03: **Pista do debrief vem do MSFS, não do OurAirports** — o desenho lê faixa capturada no Facilities (`msfs-hub-overrides.json` → `runways`). `getAirportRunways` já prefere isso. `career-runways.json` (OurAirports) só cobre o hub que ainda não tem faixa do sim. Não recolocar o centro com LE+HE do OurAirports.
+
+Captura com o MSFS aberto: 2357 dos 2368 hubs têm faixa do sim. MZBZ é 07/25, centro 17.53984,-88.30460, 2956 m (meio real). Sem faixa, e por isso ainda caem no OurAirports: EHGR, LEGA, LEGT, LEVD, LFOT, LFRH, LFTH, RKTU (o sim devolveu o aeroporto e nenhuma faixa usável) e KPBI, UTSB, UTSS (não estão no cenário local).
+
+A primeira passada gravou 1173 hubs com `rwy×0` por um atalho do host: depois que a lista de aeroportos enchia o cache, `GetAirportFacilityAsync` devolvia o pino (lat/lon, zero faixas) e não pedia `RequestFacilityData`. Correção em `SimConnectClient`: cache só dispensa a consulta quando já há faixas. A segunda passada, com o host do repo, preencheu 1165. O host instalado em `AppData\Local\Programs` ainda é o antigo; o arquivo de faixas já foi copiado para `%AppData%\Airframe Career\career\`. O Career aberto só lê isso no próximo start.
+
 Atualizado 2026-10-01: **777F aceita contrato para MZPL** — sintoma = KIAH→MZPL com 777F; no sim a pista é 29/11, 2873×50 ft, grama curta, sem luz. Causa = Placencia está no catálogo como hub regional de Belize e o Accept não compara pista com a classe. O gate antigo de bush foi removido (2026-09-03) e `career-runways.json` ainda descreve MZPL como 08/26 asfalto de 650 m. Fix proposto, não feito: grama ou pista curta fica para GA/turboélice; jato e wide só entram em pista pavimentada longa o bastante. Não apagar o hub.
 
 ## Chile ICAO cleanup

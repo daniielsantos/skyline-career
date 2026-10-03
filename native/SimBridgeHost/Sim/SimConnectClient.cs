@@ -752,7 +752,8 @@ public sealed class SimConnectClient : ISimClient
             throw new SimClientException("INVALID_PARAMS", "icao required");
         }
 
-        if (_airportCache.TryGetValue(code, out var cached))
+        if (_airportCache.TryGetValue(code, out var cached) &&
+            cached.Runways is { Count: > 0 })
         {
             return cached;
         }
@@ -760,7 +761,8 @@ public sealed class SimConnectClient : ISimClient
         await _facilityGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_airportCache.TryGetValue(code, out cached))
+            if (_airportCache.TryGetValue(code, out cached) &&
+                cached.Runways is { Count: > 0 })
             {
                 return cached;
             }

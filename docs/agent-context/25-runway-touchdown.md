@@ -1,5 +1,19 @@
 # Runway touchdown / debrief
 
+## Sintoma (2026-10-03) — KMIA→MZBZ, toque no começo da 07, diagrama na metade
+
+Debrief `RWY 07 · 1866 m past THR · 2 m right · on pavement · 2.95 km · lighted`. O ponto no desenho fica depois do meio (1866/2950 ≈ 63%). O piloto tocou no começo da 07.
+
+## Causa
+
+O catálogo de MZBZ guarda a cabeceira 07 como se fosse o centro da faixa: `lat/lon` 17.5369, -88.318123 é o LE do OurAirports (distância 0 m). O meio real fica 1.475 m à frente, metade dos 2.950 m. `projectOntoRunway` soma `length/2` em cima desse ponto, então todo toque nessa pista anda meia pista para a frente. 1866 − 1475 = 391 m depois da cabeceira de verdade, zona de toque. Os 2 m à direita e o “on pavement” estão certos: o eixo lateral bate.
+
+Não é só Belize. Das faixas com as duas cabeceiras no OurAirports, 2.166 usam a cabeceira de origem como centro (2.034 a ~meia pista de distância do meio). 1.174 já estão no meio. Sem correção de catálogo.
+
+## Fix
+
+Não recolocar o centro a partir do OurAirports. A faixa do desenho é a capturada no MSFS (`msfs-hub-overrides.json`). MZBZ agora tem a faixa 07/25 do Facilities: centro 17.53984, -88.30460, 2956 m, rumo 77.1, asfalto — o meio geométrico, não a cabeceira. Um debrief novo nesse destino deixa o toque no começo da 07 perto dos 391 m, não em 1866. O voo já fechado não redesenha. O app aberto ainda tem o arquivo antigo na memória; o arquivo novo já está no perfil e entra no próximo start do Career. Detalhe em `04-hubs-simbrief.md`.
+
 ## Sintoma (2026-09-29) — ponto do toque longe da roda
 
 O diagrama do debrief marca o toque dezenas de metros ao lado, com o avião na faixa.

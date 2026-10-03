@@ -104,6 +104,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 ## Charter na concessão (shipped desktop 0.3.442, 2026-10-03)
 
+Atualizado 2026-10-03: **Manifesto diz que o 737 reservado por você é de outro piloto** — sintoma = cartão RESERVED · YOU e faixa vermelha `Aircraft N457DB is reserved by another pilot`, com Fit Not compatible. Causa = o avião está em KMIA e o charter sai de KLAX, então o Fit pede o orçamento do ferry. `quoteFerry` chama `assertAircraftReservationAllowsActor` sem a conta de quem pergunta. Reserva ativa e conta vazia cai na frase de “outro piloto”, mesmo sendo a sua. Fix = o Fit manda a conta (e se é dono da VA) na cotação. Reserva de outro piloto continua bloqueando. O “ferry to KLAX” continua: o avião não está na origem.
+
 Atualizado 2026-10-03: **Unknown aircraft no manifesto** — sintoma = Accept do charter abre o manifesto com `Unknown aircraft acf_…` e Fit “Not compatible”, mesmo com o Caravan no dropdown. Causa = o chrome está na company da casa e o rabo é da Airline; o Fit abria o hangar errado e parava antes dos lugares. Fix = `companyIdOwningAircraft` procura o id nas companies da conta e o Fit/Accept usam o hangar que tem o avião. Um refresh da VA que falha não apaga mais só o id da Airline.
 
 Atualizado 2026-10-03: **Accept não empurra as colunas** — sintoma = ao clicar Accept no quadro, as colunas andam enquanto carrega. Causa = a bolinha de espera entra na fileira do botão e alarga a última célula; a tabela reparte o espaço de novo. Fix = o padding do Accept já cabe a bolinha, e ela fica fora do fluxo.

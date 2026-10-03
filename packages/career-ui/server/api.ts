@@ -1043,6 +1043,10 @@ function charterAircraftFit(
   aircraft: PlayerAircraft,
   structuralMaxPayloadKg: number,
   ferryPlanner?: ReturnType<typeof createFerryRoutePlanner> | null,
+  reservationActor?: {
+    accountId?: string | null;
+    isOwner?: boolean;
+  },
 ) {
   const airframe = findCareerPlayerAirframe(aircraft.airframeTypeId);
   const configuration = findCareerAirframeConfiguration(
@@ -1132,6 +1136,8 @@ function charterAircraftFit(
         const quote = quoteFerry(world, missions, {
           aircraftId: aircraft.id,
           destIcao: offer.originIcao,
+          actorAccountId: reservationActor?.accountId,
+          actorIsVaOwner: reservationActor?.isOwner === true,
         });
         ferryNm = quote.distanceNm;
         ferryCostUsd = quote.totalCostUsd;
@@ -8509,6 +8515,9 @@ export function createCareerApiServer(port = 8787) {
             aircraftId,
           );
         }
+        const charterFitActor = aircraftId
+          ? await resolveVaFleetActor(req, chartersCompanyId)
+          : null;
         try {
           // Read-only board query — never tickCharterEconomy + full economy save here.
           // Sort/filter used withCareerWrite (default persist), which rewrote the whole
@@ -8671,6 +8680,7 @@ export function createCareerApiServer(port = 8787) {
                     snapshot.aircraft,
                     cargoLimit.maxCargoKg,
                     ferryPlanner,
+                    charterFitActor ?? undefined,
                   ),
                   gateClassOps,
                   snapshot.aircraft.aircraftClassId,
@@ -8719,6 +8729,8 @@ export function createCareerApiServer(port = 8787) {
                     offer,
                     snapshot.aircraft,
                     cargoLimit.maxCargoKg,
+                    null,
+                    charterFitActor ?? undefined,
                   ),
                   gateClassOps,
                   snapshot.aircraft.aircraftClassId,
@@ -8846,6 +8858,8 @@ export function createCareerApiServer(port = 8787) {
                   offer,
                   aircraft,
                   cargoLimit.maxCargoKg,
+                  null,
+                  charterActor,
                 ),
                 missions.classOps,
                 aircraft.aircraftClassId,
@@ -10465,6 +10479,8 @@ export function createCareerApiServer(port = 8787) {
                   offer,
                   aircraft,
                   cargoLimit.maxCargoKg,
+                  null,
+                  charterActor,
                 ),
                 missions.classOps,
                 aircraft.aircraftClassId,

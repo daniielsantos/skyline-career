@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **0ce208d7** / desktop **0.3.454** shipped: Drop the repeated fixed-manifest blurb from the charter dialog. Release: [v0.3.454](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.454).
+
+
 `main` **7b5eae6f** / desktop **0.3.453** shipped: Scale a port charter lobby with the company roster, up to four pilots. Release: [v0.3.453](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.453).
 
 

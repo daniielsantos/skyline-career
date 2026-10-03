@@ -102,7 +102,7 @@ Relacionado: [`08-economy.md`](./08-economy.md), [`16-va-logistics.md`](./16-va-
 
 Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mile terrestre e **você** (ou piloto VA humano) voa frete pago. Exceção: **Port shuttle** só move WH→WH bridge (custo, sem payout).
 
-## Charter na concessão (implementado 2026-10-03, sem release)
+## Charter na concessão (shipped desktop 0.3.442, 2026-10-03)
 
 Compensa como mesa fina, não como segundo cargo. A fila usa `waitingPax` / `attractPax` que já existem. O tick já pinga gente em todo aeroporto pelo peso do hub (`tickCharterPools`); o lobby da concessão mostra esse pingue. O bônus do FBO só acelera o pingue. O charter nasce no Accept: a fila sua casa com o attract de um destino, 80–2.000 nm. Enquanto a concessão é sua, o tick mundial não corta oferta dessa fila; gente acumula até o teto do aeroporto (spoke ~64, regional ~160, major ~280) e perde o dia se ninguém voa.
 

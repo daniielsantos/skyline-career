@@ -1,4 +1,10 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  peekPortsDesk,
+  portsDeskIsFresh,
+  prefetchPortsDesk,
+  rememberPortsDesk,
+} from './ports-session';
 import { HOURS_PER_TICK, MINUTES_PER_TICK, TICKS_PER_DAY } from './economy-clock';
 import {
   fetchPorts,
@@ -483,7 +489,10 @@ export function PortsPanel(props: {
   /** World kill switch — Fly now / Dispatch blocked until desktop ≥ min. */
   clientUpdateRequiredMin?: string | null;
   onOpenUpdates?: () => void;
+  /** False while the sidebar tab is parked so the map stays warm. */
+  active?: boolean;
 }) {
+  const cachedDesk = peekPortsDesk(props.logisticsCompanyId);
   const ownedShelfLabel = props.ownedShelfLabel?.trim() || 'Yours';
   const vaRole = props.vaMemberRole ?? null;
   /** Solo / home Ports: full. VA: owner + dispatcher. */
@@ -491,13 +500,15 @@ export function PortsPanel(props: {
     !vaRole || vaRole === 'owner' || vaRole === 'dispatcher';
   /** Solo / home Ports: full. VA: owner only. */
   const canPortCapex = !vaRole || vaRole === 'owner';
-  const [snap, setSnap] = useState<PortsSnapshot | null>(null);
-  const [demand, setDemand] = useState<DemandOrderView[]>([]);
+  const [snap, setSnap] = useState<PortsSnapshot | null>(cachedDesk);
+  const [demand, setDemand] = useState<DemandOrderView[]>(
+    cachedDesk?.demand?.orders ?? [],
+  );
   const [warehouses, setWarehouses] = useState<PlayerWarehouseSnapshot | null>(
-    null,
+    cachedDesk?.warehouses ?? null,
   );
   const [groundStaff, setGroundStaff] = useState<GroundStaffSnapshot | null>(
-    null,
+    cachedDesk?.groundStaff ?? cachedDesk?.warehouses?.groundStaff ?? null,
   );
   const [portId, setPortId] = useState<string | null>(null);
   const [mapFocusToken, setMapFocusToken] = useState(0);
@@ -576,11 +587,19 @@ export function PortsPanel(props: {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { confirm, confirmDialog } = useConfirm();
-  const [section, setSection] = useState<'catalog' | 'network'>('catalog');
+  const [section, setSection] = useState<'catalog' | 'network'>(
+    cachedDesk &&
+      ((cachedDesk.warehouses?.warehouses.length ?? 0) > 0 ||
+        cachedDesk.ports.some((p) => p.concession?.status === 'yours'))
+      ? 'network'
+      : 'catalog',
+  );
   /** Full catalog + buy-warehouse hub list. Network paint does not wait for it. */
-  const [worldListReady, setWorldListReady] = useState(false);
+  const [worldListReady, setWorldListReady] = useState(
+    (cachedDesk?.ports.length ?? 0) >= 20,
+  );
   const [worldListLoading, setWorldListLoading] = useState(false);
-  const worldListReadyRef = useRef(false);
+  const worldListReadyRef = useRef((cachedDesk?.ports.length ?? 0) >= 20);
   const placedNetworkRef = useRef(false);
   /** What the Network tab shows after a node / action is chosen. */
   const [networkSurface, setNetworkSurface] = useState<
@@ -627,6 +646,7 @@ export function PortsPanel(props: {
       worldListReadyRef.current = true;
       setWorldListReady(true);
     }
+    rememberPortsDesk(props.logisticsCompanyId, next);
     setSnap(next);
   }
 
@@ -652,11 +672,14 @@ export function PortsPanel(props: {
       if (includeScout) {
         void reloadScoutDesk(logisticsId).catch(() => undefined);
       }
-      let nextPorts = await fetchPorts({
-        companyId: logisticsId,
-        soft: soft || undefined,
-        scope: scope === 'network' ? 'network' : undefined,
-      });
+      let nextPorts =
+        scope === 'network' && logisticsId
+          ? await prefetchPortsDesk(logisticsId)
+          : await fetchPorts({
+              companyId: logisticsId,
+              soft: soft || undefined,
+              scope: scope === 'network' ? 'network' : undefined,
+            });
       const hasNetwork = snapshotHasCompanyNetwork(nextPorts);
       if (scope === 'network' && !hasNetwork) {
         nextPorts = await fetchPorts({
@@ -1061,14 +1084,41 @@ export function PortsPanel(props: {
   const skipPulsePortsRefresh = useRef(true);
 
   useEffect(() => {
+    const cached = peekPortsDesk(props.logisticsCompanyId);
+    if (!cached) {
+      setSnap(null);
+      setDemand([]);
+      setWarehouses(null);
+      setGroundStaff(null);
+    } else {
+      setSnap(cached);
+      setDemand(cached.demand?.orders ?? []);
+      setWarehouses(cached.warehouses ?? null);
+      setGroundStaff(
+        cached.groundStaff ?? cached.warehouses?.groundStaff ?? null,
+      );
+      if (snapshotHasCompanyNetwork(cached)) {
+        placedNetworkRef.current = true;
+        setSection('network');
+      }
+      if (cached.ports.length >= 20) {
+        worldListReadyRef.current = true;
+        setWorldListReady(true);
+      }
+    }
     setScoutLoaded(false);
     setScoutSuggestions([]);
     setScoutDemandSuggestions([]);
     setScoutHaulSuggestions([]);
     setScoutEmptyHint(null);
-    // First paint: soft peek when market already seeded (server falls back to
-    // write seed on cold boot); Scout loads in parallel inside refresh.
-    void refresh({ includeScout: true, soft: true }).catch(() => undefined);
+    // A fresh prefetch already painted. Scout is not in that snapshot.
+    if (portsDeskIsFresh(props.logisticsCompanyId)) {
+      void reloadScoutDesk(
+        props.logisticsCompanyId?.trim() || undefined,
+      ).catch(() => undefined);
+    } else {
+      void refresh({ includeScout: true, soft: true }).catch(() => undefined);
+    }
     skipPulsePortsRefresh.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tenant / first paint
   }, [props.logisticsCompanyId]);
@@ -1077,23 +1127,37 @@ export function PortsPanel(props: {
   // The suggestion list is live data; leaving it stale hid a route that had
   // stopped paying. The 20s poll stays off Scout so this only runs on the pulse.
   useEffect(() => {
+    if (props.active === false) return;
     if (skipPulsePortsRefresh.current) {
       skipPulsePortsRefresh.current = false;
       return;
     }
     void refresh({ includeScout: true, soft: true }).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clock pulse only
-  }, [props.economyTick, props.economyLastBatchAtMs]);
+  }, [props.economyTick, props.economyLastBatchAtMs, props.active]);
 
   // Soft poll while Ports is open so desk / In transit update without navigating.
   useEffect(() => {
+    if (props.active === false) return;
     const id = window.setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       void refresh({ includeScout: false, soft: true }).catch(() => undefined);
     }, 20_000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- interval per tenant
-  }, [props.logisticsCompanyId]);
+  }, [props.logisticsCompanyId, props.active]);
+
+  const skipReturnRefresh = useRef(true);
+  useEffect(() => {
+    if (skipReturnRefresh.current) {
+      skipReturnRefresh.current = false;
+      return;
+    }
+    if (props.active === false) return;
+    if (portsDeskIsFresh(props.logisticsCompanyId)) return;
+    void refresh({ includeScout: true, soft: true }).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-open only
+  }, [props.active]);
 
   const port =
     snap?.ports.find(
@@ -4164,6 +4228,7 @@ export function PortsPanel(props: {
 
               <div className="ports-main">
                 <PortsMap
+                  active={props.active !== false}
                   ports={mapPorts}
                   ownedFbos={mapWarehouses}
                   selectedPortId={portId ?? port?.id}
@@ -5184,6 +5249,7 @@ export function PortsPanel(props: {
               >
                 {whShelf !== 'owned' ? (
                 <PortsMap
+                  active={props.active !== false}
                   ports={mapPorts}
                   ownedFbos={mapWarehouses}
                   bridgeLegs={undefined}

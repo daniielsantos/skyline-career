@@ -2737,14 +2737,22 @@ export class PostgresCareerStore implements CareerStore {
     );
   }
 
-  async loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState> {
+  async loadMissions(opts?: {
+    companyId?: string;
+    portsDesk?: boolean;
+  }): Promise<CareerMissionsState> {
     await this.ready;
     const companyId = (opts?.companyId ?? this.activeCompanyId).trim() || LOCAL_COMPANY_ID;
+    const portsDesk = opts?.portsDesk === true;
     const fromTables = await hydrateMissionsFromPg(
       this.pool,
       companyId,
       emptyMissionsStateV2(),
+      { portsDesk },
     );
+    // Desk peek is a partial slice (no ledger / missions / fleet). Saving it
+    // would wipe those tables.
+    if (portsDesk) return fromTables;
     // Persist hubSelected heal (companies.home_hub set but flag cleared).
     if (fromTables.hubSelected && fromTables.homeHubIcao?.trim()) {
       const flag = await this.pool.query(

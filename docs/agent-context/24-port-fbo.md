@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Ports ainda levava ~3s para entrar na 0.3.440** — o snapshot da Network já era ~18 KB. O spinner só começava no clique, e o `GET` soft ainda hidratava ledger + histórico de voos + frota antes de montar a tela. O mapa era destruído ao sair da aba, então o estilo do OpenFreeMap baixava de novo depois. Fix = o peek do desk lê só o JSON da company (armazéns, concessões, staff, wallet), em paralelo; o app pede a Network assim que a company existe e guarda o painel (e o mapa) montado. Catálogo e Buy warehouse continuam no snapshot completo. Pay e o board não mudam.
+
 Atualizado 2026-10-02: **Ports abria esperando o catálogo inteiro** — quem já tem FBO/WH cai na Network, mas o spinner esperava os 224 portos. Fix = `GET /api/ports?scope=network` traz a rede da company, o porto dela e o Demand desse porto. Port catalog e Buy warehouse pedem o snapshot completo ao abrir, com "Loading catalog" / "Loading warehouses". Quem não tem rede continua caindo direto no catálogo.
 
 Atualizado 2026-10-02: **Aba Ports lenta ao abrir** — sintoma = o catalog espera `GET /api/ports` no world. Causa = o inbound de cada porto varria a lista inteira de aeroportos, o estoque do porto reconstruía o inventário em toda leitura, e cada porto reseedia as listings. Fix = hub pelo índice `airportByIcao`, inventário indexado uma vez, listings lidas do que já está no world. O tick continua sendo quem expira e repõe card. Pay e o board não mudam.

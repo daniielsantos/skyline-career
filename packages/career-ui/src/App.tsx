@@ -209,6 +209,7 @@ import { resolvePageHelp } from './page-help';
 import { ContractPilotPick } from './ContractPilotPick';
 import { PilotTravelDialog } from './PilotTravelDialog';
 import { PortsPanel } from './PortsPanel';
+import { prefetchPortsDesk } from './ports-session';
 import {
   HOURS_PER_TICK,
   MINUTES_PER_TICK,
@@ -4367,6 +4368,15 @@ export function App() {
       hangarCashflowGen.current += 1;
     };
   }, [tab, hangarPane, homeCompanyId, refreshHangarCashflow]);
+  const [portsPanelLive, setPortsPanelLive] = useState(false);
+  useEffect(() => {
+    if (tab === 'ports') setPortsPanelLive(true);
+  }, [tab]);
+  useEffect(() => {
+    const id = homeCompanyId?.trim();
+    if (!id || !hubSelected) return;
+    void prefetchPortsDesk(id).catch(() => undefined);
+  }, [homeCompanyId, hubSelected]);
   const [cargoOps, setCargoOps] = useState<CareerCargoOps | null>(null);
   const [classOps, setClassOps] = useState<CareerClassOps | null>(null);
   const [pilotFlightHours, setPilotFlightHours] = useState(0);
@@ -21738,61 +21748,7 @@ export function App() {
             />
           )}
         </section>
-      ) : hubSelected && tab === 'ports' ? (
-        <PortsPanel
-          busy={busy}
-          weightSystem={weightSystem}
-          formatMoney={formatMoney}
-          formatTonnes={formatTonnes}
-          fleet={prepareOpsFleet}
-          vaAircraftIds={vaAircraftIdSet}
-          logisticsCompanyId={homeCompanyId ?? activeCompanyId}
-          homeFocus={portsHomeFocus}
-          ownedShelfLabel="Yours"
-          resolveOpsCompanyId={(aircraftId) =>
-            resolveOpsCompanyId(aircraftId)
-          }
-          ensureOpsCompany={async (aircraftId) => {
-            const companyId = resolveOpsCompanyId(aircraftId);
-            if (
-              memberVaCompanyIdRef.current &&
-              companyId === memberVaCompanyIdRef.current
-            ) {
-              await switchCompanyForVa(companyId);
-            }
-          }}
-          resolveMaxCargoKg={(acf) =>
-            hangarCatalogEntry(acf)?.maxCargoKg ?? 0
-          }
-          economyTick={tick}
-          economyLastBatchAtMs={lastBatchAtMs}
-          cargoOps={cargoOps}
-          classOps={classOps}
-          onOpenCargoOps={() => {
-            setHangarPane('cargo');
-            goToTab('hangar');
-          }}
-          onWallet={commitWallet}
-          onFleet={setFleet}
-          onVaFleet={setVaSessionFleet}
-          onVaWallet={setVaSessionWallet}
-          onMissions={setMissions}
-          onOpenAirport={(icao) => {
-            void openAirport(icao);
-          }}
-          onStaged={() => {
-            goToTab('staging');
-          }}
-          onToast={(kind, message) => {
-            setToastKind(kind);
-            setToast(message);
-          }}
-          clientUpdateRequiredMin={
-            clientUpdateBlock?.minClientVersion ?? null
-          }
-          onOpenUpdates={() => selectTab('settings')}
-        />
-      ) : hubSelected && tab === 'vaDirectory' ? (
+      ) : hubSelected && tab === 'ports' ? null : hubSelected && tab === 'vaDirectory' ? (
         <VaDirectoryPage
           authRequired={authRequired}
           activeCompanyId={activeCompanyId}
@@ -22704,6 +22660,64 @@ export function App() {
           })()}
         </section>
       )}
+      {hubSelected && (portsPanelLive || tab === 'ports') ? (
+        <div hidden={tab !== 'ports'}>
+          <PortsPanel
+            active={tab === 'ports'}
+            busy={busy}
+            weightSystem={weightSystem}
+            formatMoney={formatMoney}
+            formatTonnes={formatTonnes}
+            fleet={prepareOpsFleet}
+            vaAircraftIds={vaAircraftIdSet}
+            logisticsCompanyId={homeCompanyId ?? activeCompanyId}
+            homeFocus={portsHomeFocus}
+            ownedShelfLabel="Yours"
+            resolveOpsCompanyId={(aircraftId) =>
+              resolveOpsCompanyId(aircraftId)
+            }
+            ensureOpsCompany={async (aircraftId) => {
+              const companyId = resolveOpsCompanyId(aircraftId);
+              if (
+                memberVaCompanyIdRef.current &&
+                companyId === memberVaCompanyIdRef.current
+              ) {
+                await switchCompanyForVa(companyId);
+              }
+            }}
+            resolveMaxCargoKg={(acf) =>
+              hangarCatalogEntry(acf)?.maxCargoKg ?? 0
+            }
+            economyTick={tick}
+            economyLastBatchAtMs={lastBatchAtMs}
+            cargoOps={cargoOps}
+            classOps={classOps}
+            onOpenCargoOps={() => {
+              setHangarPane('cargo');
+              goToTab('hangar');
+            }}
+            onWallet={commitWallet}
+            onFleet={setFleet}
+            onVaFleet={setVaSessionFleet}
+            onVaWallet={setVaSessionWallet}
+            onMissions={setMissions}
+            onOpenAirport={(icao) => {
+              void openAirport(icao);
+            }}
+            onStaged={() => {
+              goToTab('staging');
+            }}
+            onToast={(kind, message) => {
+              setToastKind(kind);
+              setToast(message);
+            }}
+            clientUpdateRequiredMin={
+              clientUpdateBlock?.minClientVersion ?? null
+            }
+            onOpenUpdates={() => selectTab('settings')}
+          />
+        </div>
+      ) : null}
 
         </div>
       <WatchStatusFooter

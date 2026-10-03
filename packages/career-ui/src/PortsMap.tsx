@@ -124,6 +124,8 @@ export function PortsMap(props: {
   onSelectPort?: (portId: string) => void;
   onSelectHub?: (icao: string) => void;
   className?: string;
+  /** False while the Ports tab is parked. Resize when it becomes visible again. */
+  active?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -184,6 +186,11 @@ export function PortsMap(props: {
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (props.active === false) return;
+    mapRef.current?.resize();
+  }, [props.active]);
 
   useEffect(() => {
     const map = mapRef.current;

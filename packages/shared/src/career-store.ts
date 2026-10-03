@@ -344,7 +344,14 @@ export interface CareerStore {
     world: CareerEconomyWorld,
     opts: PersistCommandWorldSliceOpts,
   ): Promise<void>;
-  loadMissions(opts?: { companyId?: string }): Promise<CareerMissionsState>;
+  loadMissions(opts?: {
+    companyId?: string;
+    /**
+     * Ports desk peek: company JSON the Network screen needs.
+     * Skips ledger, mission history, and fleet. Must not be saved.
+     */
+    portsDesk?: boolean;
+  }): Promise<CareerMissionsState>;
   saveMissions(
     state: CareerMissionsState,
     opts?: { companyId?: string; dropFleetAircraftIds?: string[] },

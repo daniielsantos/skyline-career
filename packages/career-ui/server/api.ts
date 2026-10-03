@@ -853,6 +853,8 @@ type MissionsFile = CareerMissionsState;
 
 async function loadMissions(opts?: {
   companyId?: string;
+  /** Ports desk peek — do not persist this slice. */
+  portsDesk?: boolean;
 }): Promise<MissionsFile> {
   if (careerApiMode === 'gateway' && gatewayWorldClient) {
     const auth: WorldApiAuth = {
@@ -2168,7 +2170,7 @@ async function withCareerRead<T>(
  */
 async function withCareerPeekRead<T>(
   fn: (world: CareerEconomyWorld, missions: MissionsFile) => Promise<T> | T,
-  opts?: { companyId?: string },
+  opts?: { companyId?: string; portsDesk?: boolean },
 ): Promise<T> {
   if (careerApiMode === 'gateway' && gatewayWorldClient) {
     const auth: WorldApiAuth = {
@@ -2185,7 +2187,14 @@ async function withCareerPeekRead<T>(
     throw new Error('Economy not loaded');
   }
   const companyId = opts?.companyId?.trim();
-  const missions = await loadMissions(companyId ? { companyId } : undefined);
+  const missions = await loadMissions(
+    companyId || opts?.portsDesk
+      ? {
+          ...(companyId ? { companyId } : {}),
+          ...(opts?.portsDesk ? { portsDesk: true } : {}),
+        }
+      : undefined,
+  );
   await mirrorHomePilotIcaoOntoOps(missions, companyId);
   return fn(world, missions);
 }
@@ -9585,8 +9594,10 @@ export function createCareerApiServer(port = 8787) {
           url.searchParams.get('scope') === 'network' ? 'network' : 'full';
 
         try {
-          const companyNames = await companyDisplayNameMap(requireStore());
-          const alliedCompanyIds = await portOperatorAlliedCompanyIds(req);
+          const [companyNames, alliedCompanyIds] = await Promise.all([
+            companyDisplayNameMap(requireStore()),
+            portOperatorAlliedCompanyIds(req),
+          ]);
 
           const buildSnap = (
             world: CareerEconomyWorld,
@@ -9621,7 +9632,7 @@ export function createCareerApiServer(port = 8787) {
                 const seeded = (world.portListings?.length ?? 0) > 0;
                 if (!seeded) return null;
                 return buildSnap(world, missions, false);
-              }, { companyId: portsCompanyId });
+              }, { companyId: portsCompanyId, portsDesk: true });
               if (peeked) {
                 send(res, 200, peeked);
                 return;

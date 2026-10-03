@@ -4283,12 +4283,66 @@ async function readCompanyRosterCountPg(
   }
 }
 
+/**
+ * Ports Network peek. Company JSON (warehouses, concessions, ground staff,
+ * wallet) in one round trip. Ledger, mission history, and fleet stay out —
+ * this slice must never be saved.
+ */
+async function hydratePortsDeskFromPg(
+  pool: pg.Pool,
+  cid: string,
+  blobFallback: CareerMissionsState,
+): Promise<CareerMissionsState> {
+  const [scalars, roster, companyRes] = await Promise.all([
+    readCompanyStateScalars(pool, cid),
+    readCompanyRosterCountPg(pool, cid),
+    pool.query(
+      `SELECT home_hub_icao, display_name, COALESCE(va_listed, false) AS va_listed
+       FROM companies WHERE id = $1`,
+      [cid],
+    ),
+  ]);
+  const company = companyRes.rows[0] as
+    | {
+        home_hub_icao: string;
+        display_name: string;
+        va_listed: boolean;
+      }
+    | undefined;
+  if (!scalars) {
+    return { ...blobFallback, companyRoster: roster };
+  }
+  const merged: CareerMissionsState = {
+    ...blobFallback,
+    ...scalars,
+    fleet: blobFallback.fleet ?? [],
+    missions: blobFallback.missions ?? [],
+    ledger: blobFallback.ledger ?? [],
+    companyRoster: roster,
+  };
+  if (company?.home_hub_icao) merged.homeHubIcao = company.home_hub_icao;
+  if (company?.display_name && !merged.pilotName && !company.va_listed) {
+    merged.pilotName = company.display_name;
+  }
+  if (
+    !merged.hubSelected &&
+    merged.homeHubIcao?.trim() &&
+    (merged.pilotName?.trim() || merged.pilotIcao?.trim())
+  ) {
+    merged.hubSelected = true;
+    if (!merged.pilotIcao?.trim()) merged.pilotIcao = merged.homeHubIcao;
+  }
+  return merged;
+}
+
 export async function hydrateMissionsFromPg(
   pool: pg.Pool,
   companyId: string,
   blobFallback: CareerMissionsState,
+  opts?: { portsDesk?: boolean },
 ): Promise<CareerMissionsState> {
   const cid = companyId.trim() || LOCAL_COMPANY_ID;
+  if (opts?.portsDesk) return hydratePortsDeskFromPg(pool, cid, blobFallback);
   const scalars = await readCompanyStateScalars(pool, cid);
   const ledgerRows = await readLedgerRows(pool, cid);
   const ledger =

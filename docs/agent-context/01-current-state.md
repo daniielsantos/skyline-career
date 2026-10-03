@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **e436bfd2** / desktop **0.3.451** shipped: Open widebody charter with long-haul desk bands and groups up to 440. Release: [v0.3.451](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.451).
+
+
 `main` **c04cd3e0** / desktop **0.3.450** shipped: Reopen a port charter manifest from the airline hangar. Release: [v0.3.450](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.450).
 
 

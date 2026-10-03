@@ -262,6 +262,22 @@ describe('Charter economy', () => {
     assert.ok(counts.narrower > counts.wide, `narrower=${counts.narrower} wide=${counts.wide}`);
   });
 
+  it('puts only a wide cabin on a leg past the narrow range', () => {
+    let seed = 3;
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < 80; i += 1) {
+      const n = pickCharterGroupSize(rng, 440, 440, 6_000);
+      assert.ok(n > CHARTER_NARROW_GROUP_MAX && n <= 440, `wide leg=${n}`);
+    }
+    assert.equal(pickCharterGroupSize(rng, 139, 400, 8_436), 0);
+    assert.equal(pickCharterGroupSize(rng, 400, 10, 8_436), 0);
+    const short = pickCharterGroupSize(() => 0.95, 440, 440, 400);
+    assert.ok(short >= 1 && short <= 12, `short=${short}`);
+  });
+
   it('forms a few offers from the regular economy tick without a daily dump', () => {
     const world = createSeedEconomyWorld({ seed: 'charter-tick-hook' });
     assert.equal(world.charterOffers?.length, 0);

@@ -403,11 +403,14 @@ export function quoteCharterPayUsd(opts: {
  * Deep pools (avail ≥ 49): mostly narrow, then med — otherwise continuous
  * 1–12 drains keep majors forever below the med/narrow thresholds.
  * Mid pools (13–48): prefer med. Shallow: light only.
+ * A leg past the narrow shelf ({@link CHARTER_MAX_DISTANCE_NM}) is a wide
+ * cabin only. A shallow lobby does not invent a 10-seat group for that range.
  */
 export function pickCharterGroupSize(
   rng: () => number,
   waiting: number,
   attract: number,
+  distanceNm?: number,
 ): number {
   const avail = Math.min(
     CHARTER_GROUP_SIZE_MAX,
@@ -415,6 +418,15 @@ export function pickCharterGroupSize(
     Math.floor(attract),
   );
   if (avail < 1) return 0;
+  if (
+    distanceNm != null &&
+    Number.isFinite(distanceNm) &&
+    distanceNm > CHARTER_MAX_DISTANCE_NM
+  ) {
+    if (avail <= CHARTER_NARROW_GROUP_MAX) return 0;
+    const lo = CHARTER_NARROW_GROUP_MAX + 1;
+    return lo + Math.floor(rng() * (avail - lo + 1));
+  }
   const roll = rng();
   let lo = 1;
   let hi = Math.min(12, avail);
@@ -979,7 +991,7 @@ export function formCharterOffersForTick(
     const offerRng = mulberry32(
       hashSeed(`${world.seed}:charter:${world.tick}:${demand.id}`),
     );
-    const groupSize = pickCharterGroupSize(offerRng, waiting, attract);
+    const groupSize = pickCharterGroupSize(offerRng, waiting, attract, distance);
     if (groupSize < 1) return false;
     const tier = chooseTier(offerRng, heat);
     const urgency = chooseUrgency(offerRng, heat);
@@ -1376,6 +1388,7 @@ function portCharterGroupSize(
   destIcao: string,
   waiting: number,
   attract: number,
+  distanceNm: number,
 ): number {
   const day = Math.floor(world.tick / TICKS_PER_DAY);
   const rng = mulberry32(
@@ -1383,7 +1396,7 @@ function portCharterGroupSize(
       `${world.seed}:port-charter:${day}:${originIcao}:${destIcao}`,
     ),
   );
-  return pickCharterGroupSize(rng, waiting, attract);
+  return pickCharterGroupSize(rng, waiting, attract, distanceNm);
 }
 
 type PortCharterDeskHeat = {
@@ -1488,6 +1501,7 @@ export function listPortCharterDesk(
         dest.icao,
         waitingPax,
         attract,
+        distance,
       );
       if (groupSize < 1) continue;
       const international =
@@ -1574,6 +1588,7 @@ export function takePortCharterOffer(
     dest.icao,
     waiting,
     attract,
+    distance,
   );
   if (groupSize < 1) {
     throw new Error('Lobby does not have a group for that destination');

@@ -13403,6 +13403,24 @@ span.dispatch-route-hub-dest {
   margin: 0;
 }
 
+.ports-charter-lobby {
+  margin-top: 0.65rem;
+}
+
+.ports-charter-lobby-bar {
+  height: 0.35rem;
+  margin: 0.25rem 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ports-charter-lobby-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent, #7eb6ff);
+}
+
 .ports-fbo-top {
   display: grid;
   grid-template-columns: max-content minmax(18rem, 1fr);

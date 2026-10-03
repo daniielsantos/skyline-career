@@ -23,6 +23,7 @@ import {
   PORT_CONCESSION_MAX_ACTIVE,
   PORT_CONCESSION_SHIPPED_KG,
   PORT_P2_CAP_MULT,
+  PORT_P2_CHARTER_PAX,
   PORT_P2_THROUGHPUT_KG,
   PORT_P2_UPGRADE_USD,
   PORT_P3_ETA_MULT,
@@ -417,6 +418,19 @@ describe('port concessions', () => {
     assert.equal(upgraded.level, 2);
     const p2Cap = portInventoryCapKg('general', { world, portId: 'BRSSZ' });
     assert.equal(p2Cap, Math.floor(p1Cap * PORT_P2_CAP_MULT));
+  });
+
+  it('P2 opens on passengers flown without cargo throughput', () => {
+    const { world, state } = missionsAtSantos();
+    grantT3PickupWarehouse(state, 'SBGR', PORT_CONCESSION_SHIPPED_KG);
+    state.walletUsd = 1_000_000;
+    const conc = claimPortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(conc.lifetimeThroughputKg, 0);
+    conc.lifetimeCharterPax = PORT_P2_CHARTER_PAX;
+    const gate = evaluatePortConcessionUpgrade(state, world, 'BRSSZ');
+    assert.equal(gate.ok, true);
+    const upgraded = upgradePortConcession(state, world, { portId: 'BRSSZ' });
+    assert.equal(upgraded.level, 2);
   });
 
   it('P3 raises restock cadence and listing slots without extra buy discount', () => {

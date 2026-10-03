@@ -22,6 +22,7 @@ import {
   quoteCharterPayUsd,
   readCharterHubPoolView,
   isCharterEligibleAircraftClass,
+  listPortCharterDesk,
   reserveCharterOffer,
   settleCharterMission,
   tickCharterEconomy,
@@ -686,6 +687,29 @@ describe('Charter economy', () => {
       `expected commodity-like worldwide charter board, got ${available}`,
     );
     assert.ok(available <= CHARTER_BOARD_MAX);
+  });
+
+  it('keeps a concession lobby off the world charter board', () => {
+    const world = createSeedEconomyWorld({ seed: 'port-charter-lobby' });
+    world.portConcessions = [
+      {
+        portId: 'BRSSZ',
+        companyId: 'local',
+        leasePaidThroughTick: world.tick + 10_000,
+        level: 1,
+        pickupIcao: 'SBGR',
+      },
+    ];
+    generateDailyCharterOffers(world, 0);
+    assert.ok(
+      (world.charterOffers ?? [])
+        .filter((offer) => offer.status === 'available')
+        .every((offer) => offer.originIcao !== 'SBGR'),
+    );
+    const desk = listPortCharterDesk(world, 'SBGR', 1);
+    assert.ok(desk.capacityPax <= 12);
+    assert.ok(desk.waitingPax <= desk.capacityPax);
+    assert.ok(desk.waitingPax > 0);
   });
 
   it('allows medium piston and narrowbody classes on the shared charter board', () => {

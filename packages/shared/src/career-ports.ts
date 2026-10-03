@@ -58,6 +58,7 @@ import { fuelTerminalSellableKg } from './career-fuel.js';
 import { demandSnapshot, ensureDemandOrders, expireDemandHolds } from './career-demand.js';
 import { expireTourLotSoftHolds } from './career-base-dispatch-tour.js';
 import { bindPortCorridorLookups } from './career-port-corridor.js';
+import { listPortCharterDesk } from './career-charter.js';
 import { LOCAL_COMPANY_ID } from './career-store-v3.js';
 import { economyDayIndex } from './career-weather.js';
 import type {
@@ -2934,6 +2935,7 @@ export function portSnapshot(
           spotUnitUsd: number;
           sources: ReturnType<typeof listJetASurplusSources>;
         } | null;
+        charterLobby: ReturnType<typeof listPortCharterDesk> | null;
       };
     }
   >;
@@ -3172,6 +3174,16 @@ export function portSnapshot(
                 ),
               }
             : null,
+          charterLobby:
+            yoursConc
+              ? listPortCharterDesk(
+                  world,
+                  resolvePortPickupHub(port),
+                  yoursConc.level === 2 || yoursConc.level === 3
+                    ? yoursConc.level
+                    : 1,
+                )
+              : null,
         },
       };
     }),

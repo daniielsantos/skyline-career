@@ -33,6 +33,7 @@ import {
   deliverPortJetAHaul,
   refundPortJetAHaul,
 } from './career-port-jet-a.js';
+import { creditPortCharterPassengers } from './career-port-concessions.js';
 import { hubDistanceNm } from './career-ferry-route.js';
 import {
   depositCargoToWarehouse,
@@ -3430,6 +3431,14 @@ export function settleMission(
         weatherBonusUsd: pay.weatherBonusUsd,
       },
     );
+    if (opts.fleet) {
+      creditPortCharterPassengers(
+        opts.fleet,
+        world,
+        working.originIcao,
+        charter.settlement.passengerCount,
+      );
+    }
     const charterMission = {
       ...charter.mission,
       settledFuelKg: settled.settledFuelKg,

@@ -24,6 +24,8 @@ Ver também: [`09-homologate.md`](./09-homologate.md), [`12-pax-efb-due.md`](./1
 
 **Inject `SIM_RATE_OUT_OF_RANGE` / slew (2026-09-25):** sintoma = após sticky-pause fix, Aerostar falha com `SIM_RATE_OUT_OF_RANGE`. Causa = gating defaultava rate 0.9–1.1 (+ `blockWhenSlew`); Career não usa accel/slew e MSFS reporta 0/lixo (Host nem empacota IS SLEW ACTIVE). Fix = **não** gatear por sim rate nem slew.
 
+**OnAir (A340-600, prints 2026-10-03):** mesma superfície. O diálogo Fuel and Weight Balance lista tanques clássicos (`Center`, `Center 2`, `Left/Right Main`, `Aux`, `Tip`) e estações com rótulo (`Pilot`, `Co-Pilot`, classes, `Forward`/`Rear Baggage`). Não há total mágico: o próprio UI pede Validate e, no print, não fecha — fuel 4,107 gal vs Due 4,197; balance Loaded 15,188 lb vs Due 15,588; o card ao lado diz Total Payload 20,435 (cargo 4,855 + 82 pax a 190 lb) e o frete nem aparece como linha do balance.
+
 **Não existe um SimVar único confiável de “payload total”** no fluxo clássico. O Watch lê:
 
 - Batch 1 (≤32 Host): fuel/empty/gross + `PAYLOAD STATION COUNT` + `PAYLOAD STATION WEIGHT:1` … `:16`

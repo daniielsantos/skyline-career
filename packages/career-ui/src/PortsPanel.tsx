@@ -27,6 +27,7 @@ import {
   postPortConcessionRenew,
   postPortConcessionSurrender,
   postPortConcessionUpgrade,
+  postPortCharterAccept,
   postPortJetABuy,
   postPortJetAFetch,
   postPortJetAHaul,
@@ -561,8 +562,12 @@ export function PortsPanel(props: {
   const [scoutFocusId, setScoutFocusId] = useState<string | null>(null);
   const [scoutFocusToken, setScoutFocusToken] = useState(0);
   const [scoutFilter, setScoutFilter] = useState<
-    'all' | 'haul' | 'demand' | 'bridge'
+    'all' | 'haul' | 'demand' | 'bridge' | 'charter'
   >('all');
+  const [charterPick, setCharterPick] = useState<{
+    destIcao: string;
+    aircraftId: string;
+  } | null>(null);
   const [scoutBusy, setScoutBusy] = useState(false);
   const [scoutLoaded, setScoutLoaded] = useState(false);
   const [scoutHoldDraft, setScoutHoldDraft] = useState<
@@ -603,7 +608,7 @@ export function PortsPanel(props: {
   const placedNetworkRef = useRef(false);
   /** What the Network tab shows after a node / action is chosen. */
   const [networkSurface, setNetworkSurface] = useState<
-    'fbo' | 'wh' | 'demand' | 'buy' | 'staff'
+    'fbo' | 'wh' | 'demand' | 'charter' | 'buy' | 'staff'
   >('wh');
   const [selectedNetworkId, setSelectedNetworkId] = useState<string | null>(
     null,
@@ -1833,6 +1838,60 @@ export function PortsPanel(props: {
     }
   }
 
+  async function onAcceptPortCharter(destIcao: string, aircraftId: string) {
+    if (props.busy || loading || !port) return;
+    setLoading(true);
+    try {
+      if (props.ensureOpsCompany) await props.ensureOpsCompany(aircraftId);
+      const result = await postPortCharterAccept({
+        portId: port.id,
+        destIcao,
+        aircraftId,
+        companyId: props.resolveOpsCompanyId?.(aircraftId),
+      });
+      props.onWallet?.(result.walletUsd);
+      props.onFleet?.(result.fleet);
+      props.onMissions?.(result.missions);
+      adoptSnap(result.ports);
+      setCharterPick(null);
+      props.onToast?.(
+        'ok',
+        `Charter ${result.mission.originIcao}→${result.mission.destIcao} · ${result.mission.pax ?? 0} pax`,
+      );
+      props.onStaged?.(result.mission);
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function beginPortCharter(destIcao: string, originIcao: string) {
+    const parked = props.fleet.filter(
+      (aircraft) =>
+        aircraft.status === 'parked' &&
+        aircraft.locationIcao.trim().toUpperCase() ===
+          originIcao.trim().toUpperCase(),
+    );
+    if (parked.length === 0) {
+      props.onToast?.(
+        'fail',
+        `Park a passenger aircraft at ${originIcao} to accept`,
+      );
+      return;
+    }
+    if (parked.length === 1) {
+      void onAcceptPortCharter(destIcao, parked[0]!.id);
+      return;
+    }
+    setCharterPick({ destIcao, aircraftId: parked[0]!.id });
+    setNetworkSurface('charter');
+    setSection('network');
+  }
+
   async function onUpgradeConcession(
     portIdToUpgrade: string,
     upgradeUsd: number,
@@ -1850,7 +1909,8 @@ export function PortsPanel(props: {
         <p>
           Demand reach opens with no distance cap, and the Jet-A tank grows
           from {props.formatTonnes(12_000)} to {props.formatTonnes(28_000)}{' '}
-          (roster multiplier unchanged, up to ×4). Daily restock rises to about
+          (roster multiplier unchanged, up to ×4). The passenger lobby opens to
+          the airport ceiling. Daily restock rises to about
           11% of the same yard cap, with one more listing and a slightly faster
           inbound, for <strong>{props.formatMoney(upgradeUsd)}</strong>. The
           10% buy discount stays. Lease floor goes up.
@@ -1859,7 +1919,8 @@ export function PortsPanel(props: {
         <p>
           Demand reach extends from 500 nm to 1,800 nm, and the Jet-A tank
           grows from {props.formatTonnes(4_000)} to {props.formatTonnes(12_000)}{' '}
-          (roster multiplier unchanged, up to ×4). The yard cap also grows 35%,
+          (roster multiplier unchanged, up to ×4). The passenger lobby grows
+          from a light queue to a medium one. The yard cap also grows 35%,
           so each discharge brings more cargo, for{' '}
           <strong>{props.formatMoney(upgradeUsd)}</strong>. Lease floor goes up
           20%. The 10% buy discount stays.
@@ -3155,6 +3216,21 @@ export function PortsPanel(props: {
         destLon: bridge.destLon,
       };
     }
+    const charterRow = port?.concession?.charterLobby?.rows.find(
+      (s) => s.id === scoutFocusId,
+    );
+    if (charterRow) {
+      return {
+        kind: 'charter' as const,
+        id: charterRow.id,
+        originIcao: charterRow.originIcao,
+        destIcao: charterRow.destIcao,
+        originLat: charterRow.originLat,
+        originLon: charterRow.originLon,
+        destLat: charterRow.destLat,
+        destLon: charterRow.destLon,
+      };
+    }
     const demandRow = scoutDemandSuggestions.find(
       (s) => s.id === scoutFocusId,
     );
@@ -3176,6 +3252,7 @@ export function PortsPanel(props: {
     scoutHaulSuggestions,
     scoutSuggestions,
     scoutDemandSuggestions,
+    port?.concession?.charterLobby,
   ]);
 
   const scoutRouteLegs = useMemo(() => {
@@ -3271,7 +3348,43 @@ export function PortsPanel(props: {
           payUsd: null;
           destFillPct: null;
           raw: PortScoutBridgeSuggestion;
+        }
+      | {
+          kind: 'charter';
+          id: string;
+          score: number;
+          originIcao: string;
+          destIcao: string;
+          commodityId: 'pax';
+          kg: number;
+          distanceNm: number;
+          payUsd: number;
+          destFillPct: null;
+          groupSize: number;
+          raw: NonNullable<
+            NonNullable<typeof port>['concession']
+          >['charterLobby'] extends infer L
+            ? L extends { rows: Array<infer R> }
+              ? R
+              : never
+            : never;
         };
+    const charterRows: Row[] = (
+      port?.concession?.charterLobby?.rows ?? []
+    ).map((s) => ({
+      kind: 'charter' as const,
+      id: s.id,
+      score: s.attractPax,
+      originIcao: s.originIcao,
+      destIcao: s.destIcao,
+      commodityId: 'pax' as const,
+      kg: s.groupSize,
+      distanceNm: s.distanceNm,
+      payUsd: s.payUsd,
+      destFillPct: null,
+      groupSize: s.groupSize,
+      raw: s,
+    }));
     const rows: Row[] = [
       ...scoutHaulSuggestions.map((s) => ({
         kind: 'haul' as const,
@@ -3312,6 +3425,7 @@ export function PortsPanel(props: {
         destFillPct: null,
         raw: s,
       })),
+      ...charterRows,
     ];
     rows.sort(
       (a, b) =>
@@ -3327,6 +3441,7 @@ export function PortsPanel(props: {
     scoutDemandSuggestions,
     scoutSuggestions,
     scoutFilter,
+    port?.concession?.charterLobby,
   ]);
 
   useEffect(() => {
@@ -3671,7 +3786,7 @@ export function PortsPanel(props: {
   ]);
 
   function openNetworkSurface(
-    surface: 'fbo' | 'wh' | 'demand' | 'buy' | 'staff',
+    surface: 'fbo' | 'wh' | 'demand' | 'charter' | 'buy' | 'staff',
     opts?: { hubIcao?: string; networkId?: string | null; portId?: string },
   ) {
     setSection('network');
@@ -4133,6 +4248,7 @@ export function PortsPanel(props: {
                 } else if (
                   networkSurface === 'buy' ||
                   networkSurface === 'demand' ||
+                  networkSurface === 'charter' ||
                   networkSurface === 'staff'
                 ) {
                   /* keep surface */
@@ -4446,6 +4562,18 @@ export function PortsPanel(props: {
                 <button
                   type="button"
                   className={
+                    networkSurface === 'charter'
+                      ? 'fbo-icao-chip active'
+                      : 'fbo-icao-chip'
+                  }
+                  disabled={props.busy || loading}
+                  onClick={() => openNetworkSurface('charter')}
+                >
+                  Charter ({port?.concession?.charterLobby?.rows.length ?? 0})
+                </button>
+                <button
+                  type="button"
+                  className={
                     networkSurface === 'buy'
                       ? 'fbo-icao-chip active'
                       : 'fbo-icao-chip'
@@ -4481,9 +4609,10 @@ export function PortsPanel(props: {
                   className="ports-network-assets"
                   nodes={filteredNetworkNodes}
                   selectedId={
-                    networkSurface === 'demand' ||
-                    networkSurface === 'buy' ||
-                    networkSurface === 'staff'
+                  networkSurface === 'demand' ||
+                  networkSurface === 'charter' ||
+                  networkSurface === 'buy' ||
+                  networkSurface === 'staff'
                       ? null
                       : selectedNetworkId
                   }
@@ -4604,6 +4733,42 @@ export function PortsPanel(props: {
                                   Dispatch here draws the tank before the airport price.
                                   Stocking flights are not paid.
                                 </p>
+                                {port.concession.charterLobby ? (
+                                  <div className="ports-charter-lobby">
+                                    <p className="ports-scout-title">Passenger lobby</p>
+                                    <p className="ports-jeta-qty">
+                                      {port.concession.charterLobby.waitingPax}
+                                      <span>
+                                        {' '}
+                                        / {port.concession.charterLobby.capacityPax}
+                                      </span>
+                                    </p>
+                                    <div
+                                      className="ports-charter-lobby-bar"
+                                      aria-hidden="true"
+                                    >
+                                      <span
+                                        style={{
+                                          width: `${
+                                            port.concession.charterLobby.capacityPax > 0
+                                              ? Math.min(
+                                                  100,
+                                                  (port.concession.charterLobby.waitingPax /
+                                                    port.concession.charterLobby.capacityPax) *
+                                                    100,
+                                                )
+                                              : 0
+                                          }%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <p className="muted ports-warehouse-hint">
+                                      P{port.concession.charterLobby.level} · people
+                                      arrive with the airport. Unflown groups leave
+                                      within a day.
+                                    </p>
+                                  </div>
+                                ) : null}
                                 {port.concession.jetATank.kg >
                                 port.concession.jetATank.capacityKg ? (
                                   <p className="muted ports-warehouse-hint">
@@ -4983,6 +5148,7 @@ export function PortsPanel(props: {
                                   ['haul', 'Haul'],
                                   ['demand', 'Demand'],
                                   ['bridge', 'Bridge'],
+                                  ['charter', 'Charter'],
                                 ] as const
                               ).map(([id, label]) => (
                                 <button
@@ -5068,7 +5234,9 @@ export function PortsPanel(props: {
                                           ? 'Haul'
                                           : row.kind === 'demand'
                                             ? 'Demand'
-                                            : 'Bridge'}
+                                            : row.kind === 'charter'
+                                              ? 'Charter'
+                                              : 'Bridge'}
                                       </td>
                                       <td>
                                         <span className="ports-scout-route">
@@ -5106,12 +5274,16 @@ export function PortsPanel(props: {
                                         </span>
                                       </td>
                                       <td>
-                                        {commodityLabel({
-                                          commodityId: row.commodityId,
-                                        })}
+                                        {row.kind === 'charter'
+                                          ? 'Passengers'
+                                          : commodityLabel({
+                                              commodityId: row.commodityId,
+                                            })}
                                       </td>
                                       <td>
-                                        {props.formatTonnes(row.kg)}
+                                        {row.kind === 'charter'
+                                          ? `${row.groupSize} pax`
+                                          : props.formatTonnes(row.kg)}
                                       </td>
                                       <td>
                                         {row.payUsd != null
@@ -5129,6 +5301,23 @@ export function PortsPanel(props: {
                                           : '—'}
                                       </td>
                                       <td>
+                                        {row.kind === 'charter' ? (
+                                          <button
+                                            type="button"
+                                            className="accept"
+                                            disabled={props.busy || loading}
+                                            title="Accept this group from the lobby"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              beginPortCharter(
+                                                row.destIcao,
+                                                row.originIcao,
+                                              );
+                                            }}
+                                          >
+                                            Accept
+                                          </button>
+                                        ) : (
                                         <button
                                           type="button"
                                           className="accept"
@@ -5164,6 +5353,7 @@ export function PortsPanel(props: {
                                         >
                                           Hold
                                         </button>
+                                        )}
                                       </td>
                                     </tr>
                                   ))}
@@ -6547,6 +6737,122 @@ export function PortsPanel(props: {
             </>
           ) : null}
 
+          {section === 'network' && networkSurface === 'charter' ? (
+            <div className="ports-demand-board">
+              <h3 className="ports-stage-title">
+                {port ? `Charter · ${port.name}` : 'Charter'}
+              </h3>
+              {port?.concession?.status !== 'yours' ? (
+                <p className="empty">
+                  Claim this Port FBO to open a passenger lobby.
+                </p>
+              ) : (port.concession.charterLobby?.rows.length ?? 0) === 0 ? (
+                <p className="empty">
+                  {port.concession.charterLobby
+                    ? `${port.concession.charterLobby.waitingPax} waiting · no destination in range yet.`
+                    : 'The lobby is empty.'}
+                </p>
+              ) : (
+                <>
+                  {charterPick ? (
+                    <div className="ports-demand-filters">
+                      <label className="ports-demand-origin-filter">
+                        <span>Aircraft at {port.concession.charterLobby?.rows[0]?.originIcao}</span>
+                        <select
+                          value={charterPick.aircraftId}
+                          aria-label="Aircraft for this charter"
+                          disabled={props.busy || loading}
+                          onChange={(e) =>
+                            setCharterPick({
+                              destIcao: charterPick.destIcao,
+                              aircraftId: e.target.value,
+                            })
+                          }
+                        >
+                          {props.fleet
+                            .filter(
+                              (aircraft) =>
+                                aircraft.status === 'parked' &&
+                                aircraft.locationIcao.trim().toUpperCase() ===
+                                  (
+                                    port.concession?.charterLobby?.rows[0]
+                                      ?.originIcao ?? ''
+                                  ).toUpperCase(),
+                            )
+                            .map((aircraft) => (
+                              <option key={aircraft.id} value={aircraft.id}>
+                                {aircraft.label}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        className="accept"
+                        disabled={props.busy || loading}
+                        onClick={() =>
+                          void onAcceptPortCharter(
+                            charterPick.destIcao,
+                            charterPick.aircraftId,
+                          )
+                        }
+                      >
+                        Accept {charterPick.destIcao}
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="table-wrap ports-demand-table-wrap">
+                    <table className="data-table ports-demand-table">
+                      <thead>
+                        <tr>
+                          <th>Route</th>
+                          <th>Pax</th>
+                          <th>Pay</th>
+                          <th>Nm</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {port.concession.charterLobby!.rows.map((row) => (
+                          <tr key={row.id}>
+                            <td>
+                              <button
+                                type="button"
+                                className="linkish"
+                                disabled={props.busy}
+                                onClick={() => {
+                                  setScoutFocusId(row.id);
+                                  props.onOpenAirport?.(row.destIcao);
+                                }}
+                              >
+                                {row.originIcao} → {row.destIcao}
+                              </button>
+                            </td>
+                            <td>{row.groupSize}</td>
+                            <td>{props.formatMoney(row.payUsd)}</td>
+                            <td className="muted">{row.distanceNm}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="accept"
+                                disabled={props.busy || loading}
+                                onClick={() =>
+                                  beginPortCharter(row.destIcao, row.originIcao)
+                                }
+                              >
+                                Accept
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
+
           {section === 'network' && networkSurface === 'demand' ? (
             <div className="ports-demand-board">
               <h3 className="ports-stage-title">
@@ -7056,6 +7362,9 @@ export function PortsPanel(props: {
                     : ''}
                   {' '}
                   (Demand / WH haul settle — not buys)
+                  {port.concession.upgrade?.flownPax != null
+                    ? ` · ${port.concession.upgrade.flownPax.toLocaleString()} pax flown`
+                    : ''}
                 </p>
                 <div className="confirm-actions">
                   <button

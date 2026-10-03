@@ -3117,6 +3117,8 @@ export type PortsSnapshot = {
         upgradeUsd: number;
         neededKg: number;
         shippedKg: number;
+        neededPax?: number;
+        flownPax?: number;
         fromLevel: number;
         toLevel: number;
       } | null;
@@ -3131,6 +3133,29 @@ export type PortsSnapshot = {
           distanceNm: number;
           sellableKg: number;
           unitUsd: number;
+        }>;
+      } | null;
+      charterLobby?: {
+        waitingPax: number;
+        capacityPax: number;
+        level: 1 | 2 | 3;
+        rows: Array<{
+          id: string;
+          originIcao: string;
+          destIcao: string;
+          destName: string;
+          groupSize: number;
+          baggageKg: number;
+          distanceNm: number;
+          payUsd: number;
+          attractPax: number;
+          tier: string;
+          urgency: string;
+          international: boolean;
+          originLat: number;
+          originLon: number;
+          destLat: number;
+          destLon: number;
         }>;
       } | null;
     };
@@ -3854,6 +3879,24 @@ export function postPortJetAHaul(opts: { orderId: string; aircraftId: string }) 
     missions: Mission[];
     ports: PortsSnapshot;
   }>('/api/ports/jet-a/haul', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+export function postPortCharterAccept(opts: {
+  portId: string;
+  destIcao: string;
+  aircraftId: string;
+  companyId?: string;
+}) {
+  return api<{
+    mission: Mission;
+    walletUsd: number;
+    fleet: PlayerAircraft[];
+    missions: Mission[];
+    ports: PortsSnapshot;
+  }>('/api/ports/charter/accept', {
     method: 'POST',
     body: JSON.stringify(opts),
   });

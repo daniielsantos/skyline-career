@@ -31,6 +31,10 @@ import type {
 
 export const CHARTER_MIN_DISTANCE_NM = 80;
 export const CHARTER_MAX_DISTANCE_NM = 2_000;
+/** Concession lobby caps. P3 uses the airport pool ceiling. */
+export const PORT_CHARTER_LOBBY_LIGHT = 12;
+export const PORT_CHARTER_LOBBY_MED = 48;
+export const PORT_CHARTER_DESK_LIMIT = 8;
 /** Soft upper bound for a single offer life (~26h, freight-like). */
 export const CHARTER_OFFER_LIFE_TICKS = TICKS_PER_DAY;
 /** Board TTL band — mirrors freight non-perishable lives (~18–26h) with a
@@ -149,6 +153,38 @@ function airportDemandWeight(airport: AirportTerminal): number {
   const level = clamp(Number(airport.level) || 1, 1, 5);
   const activity = clamp(Number(airport.activityScore) || 0, 0, 100);
   return tier * (0.8 + level * 0.12 + activity / 500);
+}
+
+export function portCharterLobbyCap(
+  level: 1 | 2 | 3,
+  airportCap: number,
+): number {
+  const cap = Math.max(1, Math.floor(airportCap));
+  if (level >= 3) return cap;
+  if (level === 2) return Math.min(cap, PORT_CHARTER_LOBBY_MED);
+  return Math.min(cap, PORT_CHARTER_LOBBY_LIGHT);
+}
+
+export function portCharterDripMult(level: 1 | 2 | 3): number {
+  if (level >= 3) return 1.5;
+  if (level === 2) return 1.25;
+  return 1;
+}
+
+/** Pickup hubs whose outbound charter queue belongs to a Port FBO lobby. */
+export function concessionCharterOriginLevels(
+  world: CareerEconomyWorld,
+): Map<string, 1 | 2 | 3> {
+  const map = new Map<string, 1 | 2 | 3>();
+  for (const row of world.portConcessions ?? []) {
+    if (row.leasePaidThroughTick <= world.tick) continue;
+    const icao = row.pickupIcao?.trim().toUpperCase();
+    if (!icao) continue;
+    const level: 1 | 2 | 3 = row.level === 2 || row.level === 3 ? row.level : 1;
+    const prev = map.get(icao);
+    if (prev == null || level > prev) map.set(icao, level);
+  }
+  return map;
 }
 
 function hubCapacityPax(airport: AirportTerminal): number {
@@ -605,19 +641,29 @@ export function ensureCharterEconomy(world: CareerEconomyWorld): boolean {
 export function tickCharterPools(world: CareerEconomyWorld): void {
   ensureCharterEconomy(world);
   const airports = activeAirports(world);
+  const ownedLobby = concessionCharterOriginLevels(world);
   const rng = mulberry32(hashSeed(`${world.seed}:charter-pools:${world.tick}`));
   for (const airport of airports) {
     const hub = hubFor(world, airport);
     const weight = airportDemandWeight(airport);
     const weather = regionalWeatherIndex(world, airport.region);
     const weatherBoost = weather === 'poor' ? 1.15 : weather === 'marginal' ? 1.05 : 1;
+    const lobbyLevel = ownedLobby.get(airport.icao.toUpperCase());
     // ~3× prior gain so majors can reach med/narrow band floors between forms.
-    const waitingGain = weight * (0.11 + rng() * 0.16) * weatherBoost;
+    let waitingGain = weight * (0.11 + rng() * 0.16) * weatherBoost;
+    if (lobbyLevel) waitingGain *= portCharterDripMult(lobbyLevel);
     const attractGain = weight * (0.09 + rng() * 0.14) * weatherBoost;
+    const waitingCap = lobbyLevel
+      ? portCharterLobbyCap(lobbyLevel, hub.capacityPax)
+      : hub.capacityPax;
+    // Owned lobby turns over in about a day. Other hubs keep the slow decay.
+    const waitingDecay = lobbyLevel
+      ? hub.waitingPax / TICKS_PER_DAY
+      : hub.waitingPax * 0.003;
     hub.waitingPax = clamp(
-      hub.waitingPax + waitingGain - hub.waitingPax * 0.003,
+      hub.waitingPax + waitingGain - waitingDecay,
       0,
-      hub.capacityPax,
+      waitingCap,
     );
     hub.attractPax = clamp(
       hub.attractPax + attractGain - hub.attractPax * 0.003,
@@ -626,9 +672,10 @@ export function tickCharterPools(world: CareerEconomyWorld): void {
     );
     // Soft floor ~20% capacity — continuous small-form drain otherwise keeps
     // min(waiting,attract) ≤12 forever and med/narrow bands never unlock.
+    // An owned lobby does not keep that floor: unflown people leave.
     const floor = Math.floor(hub.capacityPax * 0.2);
     if (floor >= 13) {
-      if (hub.waitingPax < floor) {
+      if (!lobbyLevel && hub.waitingPax < floor) {
         hub.waitingPax = Math.min(
           floor,
           hub.waitingPax + Math.max(0.8, (floor - hub.waitingPax) * 0.06),
@@ -676,6 +723,9 @@ export function formCharterOffersForTick(
   if (room <= 0) return 0;
 
   const airports = activeAirports(world);
+  const ownedLobbyOrigins = concessionCharterOriginLevels(world);
+  const originIsLobby = (icao: string) =>
+    ownedLobbyOrigins.has(icao.trim().toUpperCase());
   const byCountry = new Map<string, AirportTerminal[]>();
   for (const ap of airports) {
     const country = countryIdFromRegion(ap.region);
@@ -862,6 +912,7 @@ export function formCharterOffersForTick(
     international: boolean,
   ): boolean => {
     if (origin.icao === dest.icao) return false;
+    if (originIsLobby(origin.icao)) return false;
     const originCountry = countryIdFromRegion(origin.region);
     const destCountry = countryIdFromRegion(dest.region);
     if ((originCountry !== destCountry) !== international) return false;
@@ -967,6 +1018,7 @@ export function formCharterOffersForTick(
     const origin = byIcao.get(originIcao);
     const dest = byIcao.get(destIcao);
     if (!origin || !dest) continue;
+    if (originIsLobby(originIcao)) continue;
     const originCountry = countryIdFromRegion(origin.region);
     const destCountry = countryIdFromRegion(dest.region);
     if (!originCountry || !destCountry || originCountry === destCountry) {
@@ -1071,7 +1123,7 @@ export function formCharterOffersForTick(
       const local = byCountry.get(country) ?? [];
       const localOrigins = local
         .map((ap) => ({ ap, hub: hubFor(world, ap) }))
-        .filter((row) => row.hub.waitingPax >= 1)
+        .filter((row) => row.hub.waitingPax >= 1 && !originIsLobby(row.ap.icao))
         .sort(
           (a, b) =>
             b.hub.waitingPax - a.hub.waitingPax ||
@@ -1133,7 +1185,7 @@ export function formCharterOffersForTick(
       const localOrigins = rotatingHubSample(
         local
           .map((ap) => ({ ap, hub: hubFor(world, ap) }))
-          .filter((row) => row.hub.waitingPax >= 1)
+          .filter((row) => row.hub.waitingPax >= 1 && !originIsLobby(row.ap.icao))
           .sort(
             (a, b) =>
               b.hub.waitingPax - a.hub.waitingPax ||
@@ -1252,6 +1304,263 @@ function pruneCharterEconomy(world: CareerEconomyWorld): void {
         hub.attractPax > 0.05 ||
         hub.updatedAtTick >= world.tick - TICKS_PER_DAY * 7),
   );
+}
+
+export type PortCharterDeskRow = {
+  id: string;
+  originIcao: string;
+  destIcao: string;
+  destName: string;
+  groupSize: number;
+  baggageKg: number;
+  distanceNm: number;
+  payUsd: number;
+  attractPax: number;
+  tier: CharterTier;
+  urgency: CharterUrgency;
+  international: boolean;
+  originLat: number;
+  originLon: number;
+  destLat: number;
+  destLon: number;
+};
+
+export type PortCharterLobbyView = {
+  waitingPax: number;
+  capacityPax: number;
+  level: 1 | 2 | 3;
+  rows: PortCharterDeskRow[];
+};
+
+function portCharterGroupSize(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  destIcao: string,
+  waiting: number,
+  attract: number,
+): number {
+  const day = Math.floor(world.tick / TICKS_PER_DAY);
+  const rng = mulberry32(
+    hashSeed(
+      `${world.seed}:port-charter:${day}:${originIcao}:${destIcao}`,
+    ),
+  );
+  return pickCharterGroupSize(rng, waiting, attract);
+}
+
+/** Read the concession lobby and the destinations it can fly. Does not seed hubs. */
+export function listPortCharterDesk(
+  world: CareerEconomyWorld,
+  originIcao: string,
+  level: 1 | 2 | 3,
+): PortCharterLobbyView {
+  ensureCharterEconomy(world);
+  const originCode = originIcao.trim().toUpperCase();
+  const origin = activeAirports(world).find(
+    (ap) => ap.icao.toUpperCase() === originCode,
+  );
+  const airportCap = origin ? hubCapacityPax(origin) : PORT_CHARTER_LOBBY_LIGHT;
+  const capacityPax = portCharterLobbyCap(level, airportCap);
+  const hub = (world.charterHubs ?? []).find(
+    (row) => row.icao.toUpperCase() === originCode,
+  );
+  const waitingPax = Math.min(
+    capacityPax,
+    Math.max(0, Math.floor(hub?.waitingPax ?? 0)),
+  );
+  const rows: PortCharterDeskRow[] = [];
+  if (origin && waitingPax >= 1) {
+    const openOd = new Set(
+      (world.charterOffers ?? [])
+        .filter(
+          (offer) =>
+            offer.status === 'available' || offer.status === 'reserved',
+        )
+        .map((offer) => demandId(offer.originIcao, offer.destIcao)),
+    );
+    const candidates: PortCharterDeskRow[] = [];
+    for (const dest of activeAirports(world)) {
+      if (dest.icao.toUpperCase() === originCode) continue;
+      const distance = distanceNm(origin, dest);
+      if (
+        distance < CHARTER_MIN_DISTANCE_NM ||
+        distance > CHARTER_MAX_DISTANCE_NM
+      ) {
+        continue;
+      }
+      const od = demandId(origin.icao, dest.icao);
+      if (openOd.has(od)) continue;
+      const destHub = (world.charterHubs ?? []).find(
+        (row) => row.icao.toUpperCase() === dest.icao.toUpperCase(),
+      );
+      const attract = Math.max(0, Math.floor(destHub?.attractPax ?? 0));
+      if (attract < 1) continue;
+      const groupSize = portCharterGroupSize(
+        world,
+        origin.icao,
+        dest.icao,
+        waitingPax,
+        attract,
+      );
+      if (groupSize < 1) continue;
+      const international =
+        countryIdFromRegion(origin.region) !== countryIdFromRegion(dest.region);
+      const tierRng = mulberry32(
+        hashSeed(`${world.seed}:port-charter-tier:${od}:${Math.floor(world.tick / TICKS_PER_DAY)}`),
+      );
+      const tier = chooseTier(tierRng, attract);
+      const urgency = chooseUrgency(tierRng, attract);
+      candidates.push({
+        id: `port-charter:${origin.icao}:${dest.icao}`,
+        originIcao: origin.icao,
+        destIcao: dest.icao,
+        destName: dest.name,
+        groupSize,
+        baggageKg: charterBaggageKg(groupSize),
+        distanceNm: Math.round(distance),
+        payUsd: quoteCharterPayUsd({
+          distanceNm: distance,
+          groupSize,
+          urgency,
+          tier,
+          international,
+        }),
+        attractPax: attract,
+        tier,
+        urgency,
+        international,
+        originLat: origin.lat,
+        originLon: origin.lon,
+        destLat: dest.lat,
+        destLon: dest.lon,
+      });
+    }
+    candidates.sort(
+      (a, b) =>
+        b.attractPax - a.attractPax ||
+        b.payUsd - a.payUsd ||
+        a.destIcao.localeCompare(b.destIcao),
+    );
+    rows.push(...candidates.slice(0, PORT_CHARTER_DESK_LIMIT));
+  }
+  return { waitingPax, capacityPax, level, rows };
+}
+
+/**
+ * Carve one lobby group into an available offer. The caller reserves it
+ * in the same write so it never sits on the world board.
+ */
+export function takePortCharterOffer(
+  world: CareerEconomyWorld,
+  opts: { originIcao: string; destIcao: string; level: 1 | 2 | 3 },
+): CharterOffer {
+  ensureCharterEconomy(world);
+  const originIcao = opts.originIcao.trim().toUpperCase();
+  const destIcao = opts.destIcao.trim().toUpperCase();
+  const origin = activeAirports(world).find(
+    (ap) => ap.icao.toUpperCase() === originIcao,
+  );
+  const dest = activeAirports(world).find(
+    (ap) => ap.icao.toUpperCase() === destIcao,
+  );
+  if (!origin || !dest) throw new Error('Unknown charter airport');
+  const distance = distanceNm(origin, dest);
+  if (
+    distance < CHARTER_MIN_DISTANCE_NM ||
+    distance > CHARTER_MAX_DISTANCE_NM
+  ) {
+    throw new Error('Charter distance is outside 80–2,000 nm');
+  }
+  const od = demandId(origin.icao, dest.icao);
+  if (
+    world.charterOffers!.some(
+      (offer) =>
+        (offer.status === 'available' || offer.status === 'reserved') &&
+        demandId(offer.originIcao, offer.destIcao) === od,
+    )
+  ) {
+    throw new Error('That charter is already open');
+  }
+  const originHub = hubFor(world, origin);
+  const destHub = hubFor(world, dest);
+  const waiting = Math.min(
+    portCharterLobbyCap(opts.level, originHub.capacityPax),
+    Math.floor(originHub.waitingPax),
+  );
+  const attract = Math.floor(destHub.attractPax);
+  const groupSize = portCharterGroupSize(
+    world,
+    origin.icao,
+    dest.icao,
+    waiting,
+    attract,
+  );
+  if (groupSize < 1) {
+    throw new Error('Lobby does not have a group for that destination');
+  }
+  const demand = demandFor(world, origin, dest);
+  const offerRng = mulberry32(
+    hashSeed(`${world.seed}:port-charter-tier:${od}:${Math.floor(world.tick / TICKS_PER_DAY)}`),
+  );
+  const tier = chooseTier(offerRng, attract);
+  const urgency = chooseUrgency(offerRng, attract);
+  const life = offerLifeTicks(offerRng, urgency);
+  originHub.waitingPax = clamp(
+    originHub.waitingPax - groupSize,
+    0,
+    originHub.capacityPax,
+  );
+  destHub.attractPax = clamp(
+    destHub.attractPax - groupSize,
+    0,
+    destHub.capacityPax,
+  );
+  originHub.updatedAtTick = world.tick;
+  destHub.updatedAtTick = world.tick;
+  demand.pressure = clamp(demand.pressure + 1.5 + groupSize * 0.2, 0, 100);
+  demand.updatedAtTick = world.tick;
+  demand.lastOfferedDay = Math.floor(world.tick / TICKS_PER_DAY);
+  const createdAtTick = world.tick;
+  let expiresAtTick = createdAtTick + life;
+  const used = new Set(
+    world.charterOffers!.map((offer) => offer.expiresAtTick),
+  );
+  while (used.has(expiresAtTick)) expiresAtTick += 1;
+  const offer: CharterOffer = {
+    id: `charter-offer:port:${createdAtTick}:${origin.icao}:${dest.icao}`,
+    demandId: demand.id,
+    originIcao: origin.icao,
+    destIcao: dest.icao,
+    groupSize,
+    baggageKg: charterBaggageKg(groupSize),
+    distanceNm: Math.round(distance),
+    tier,
+    urgency,
+    international: demand.international,
+    payUsd: quoteCharterPayUsd({
+      distanceNm: distance,
+      groupSize,
+      urgency,
+      tier,
+      international: demand.international,
+    }),
+    createdAtTick,
+    expiresAtTick,
+    status: 'available',
+  };
+  world.charterOffers!.push(offer);
+  return offer;
+}
+
+/** Drop an offer that was taken but not reserved, and put the people back. */
+export function undoTakenCharterOffer(
+  world: CareerEconomyWorld,
+  offerId: string,
+): void {
+  const offer = world.charterOffers?.find((row) => row.id === offerId);
+  if (!offer || offer.status !== 'available') return;
+  offer.status = 'cancelled';
+  restoreOfferPax(world, offer);
 }
 
 /** Tick hook. Uses a charter-only seed and never consumes freight RNG. */

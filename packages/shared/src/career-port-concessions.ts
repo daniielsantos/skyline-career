@@ -70,6 +70,8 @@ export const PORT_P2_CAP_MULT = 1.35;
 export const PORT_P2_UPGRADE_USD = 220_000;
 /** Lifetime kg settled outbound through this port (operator) to unlock P2. */
 export const PORT_P2_THROUGHPUT_KG = 80_000;
+/** Passengers flown from this port. Either this or the kg gate opens P2. */
+export const PORT_P2_CHARTER_PAX = 400;
 export const PORT_P2_LEASE_LEVEL_MULT = 1.2;
 
 /** P3: faster restock + listing slot + mild inbound ETA. Same buy discount as P1. */
@@ -77,6 +79,8 @@ export const PORT_P3_RESTOCK_FRAC_PER_DAY = 0.11;
 export const PORT_P3_UPGRADE_USD = 280_000;
 /** Lifetime kg settled outbound through this port (operator) to unlock P3. */
 export const PORT_P3_THROUGHPUT_KG = 180_000;
+/** Passengers flown from this port. Either this or the kg gate opens P3. */
+export const PORT_P3_CHARTER_PAX = 1_200;
 export const PORT_P3_LEASE_LEVEL_MULT = 1.4;
 export const PORT_P3_EXTRA_LISTINGS = 1;
 export const PORT_P3_ETA_MULT = 0.78;
@@ -198,14 +202,17 @@ export function syncWorldPortConcessions(
   );
   const mine = live
     .filter((c) => touch.has(c.companyId))
-    .map(
-      (c): PortConcessionIndexRow => ({
+    .map((c): PortConcessionIndexRow => {
+      const port = getCareerPort(c.portId);
+      const pickupIcao = port?.pickupHubs[0]?.trim().toUpperCase();
+      return {
         portId: c.portId,
         companyId: c.companyId,
         leasePaidThroughTick: c.leasePaidThroughTick,
         level: c.level === 2 || c.level === 3 ? c.level : 1,
-      }),
-    );
+        ...(pickupIcao ? { pickupIcao } : {}),
+      };
+    });
   world.portConcessions = [...preserved, ...mine];
 }
 
@@ -538,7 +545,17 @@ function portLastRestockTick(world: CareerEconomyWorld, portId: string): number 
  * Economy-tick restock: one inbound ship per port per economy day.
  * Catch-up discharges missed ships (offline days). Does not spawn listings.
  */
+/** Fill pickup ICAO on the world index so the charter tick can see lobbies. */
+export function stampConcessionPickupIcaos(world: CareerEconomyWorld): void {
+  for (const row of world.portConcessions ?? []) {
+    const port = getCareerPort(row.portId);
+    const hub = port?.pickupHubs[0]?.trim().toUpperCase();
+    if (hub) row.pickupIcao = hub;
+  }
+}
+
 export function tickPortInboundShips(world: CareerEconomyWorld): void {
+  stampConcessionPickupIcaos(world);
   ensurePortInventories(world);
   if (!Array.isArray(world.portInboundShips)) {
     world.portInboundShips = [];
@@ -763,6 +780,8 @@ export type PortConcessionUpgradeGate = {
   upgradeUsd: number;
   neededKg: number;
   shippedKg: number;
+  neededPax: number;
+  flownPax: number;
   fromLevel: PortConcessionLevel;
   toLevel: PortConcessionLevel;
 };
@@ -1154,6 +1173,7 @@ export function evaluatePortConcessionUpgrade(
   const fromLevel: PortConcessionLevel =
     conc?.level === 2 || conc?.level === 3 ? conc.level : 1;
   const shippedKg = conc?.lifetimeThroughputKg ?? 0;
+  const flownPax = Math.max(0, Math.floor(conc?.lifetimeCharterPax ?? 0));
   const toLevel: PortConcessionLevel =
     fromLevel === 1 ? 2 : fromLevel === 2 ? 3 : 3;
   const upgradeUsd =
@@ -1168,12 +1188,18 @@ export function evaluatePortConcessionUpgrade(
       : fromLevel === 2
         ? PORT_P3_THROUGHPUT_KG
         : PORT_P3_THROUGHPUT_KG;
+  const neededPax =
+    fromLevel === 1
+      ? PORT_P2_CHARTER_PAX
+      : fromLevel === 2
+        ? PORT_P3_CHARTER_PAX
+        : PORT_P3_CHARTER_PAX;
   if (!port) reasons.push('Unknown port');
   if (!conc) reasons.push('No active Port FBO on this port');
   if (conc && fromLevel >= 3) reasons.push('Port is already at P3');
-  if (conc && fromLevel < 3 && shippedKg < neededKg) {
+  if (conc && fromLevel < 3 && shippedKg < neededKg && flownPax < neededPax) {
     reasons.push(
-      `Need ${neededKg.toLocaleString()} kg throughput at this port (have ${shippedKg.toLocaleString()})`,
+      `Need ${neededKg.toLocaleString()} kg throughput or ${neededPax.toLocaleString()} passengers flown at this port (have ${shippedKg.toLocaleString()} kg · ${flownPax.toLocaleString()} pax)`,
     );
   }
   if (upgradeUsd > 0 && state.walletUsd < upgradeUsd) {
@@ -1189,6 +1215,8 @@ export function evaluatePortConcessionUpgrade(
     upgradeUsd,
     neededKg,
     shippedKg,
+    neededPax,
+    flownPax,
     fromLevel,
     toLevel,
   };
@@ -1246,6 +1274,33 @@ export function tickPortConcessions(
     (c) => c.leasePaidThroughTick > world.tick,
   );
   return state.playerPortConcessions.length !== before.length;
+}
+
+/** Count a settled charter whose origin is this port's pickup hub. */
+export function creditPortCharterPassengers(
+  state: CareerMissionsState,
+  world: CareerEconomyWorld,
+  originIcao: string,
+  pax: number,
+): void {
+  const icao = originIcao.trim().toUpperCase();
+  if (!icao) return;
+  const add = Math.max(0, Math.floor(pax));
+  if (add <= 0) return;
+  const port = listCareerPorts().find((row) =>
+    row.pickupHubs.some((hub) => hub.trim().toUpperCase() === icao),
+  );
+  if (!port) return;
+  const op = findActivePortOperator(world, port.id);
+  if (!op) return;
+  const conc = ensurePlayerPortConcessions(state).find(
+    (c) =>
+      c.portId === op.portId &&
+      c.companyId === op.companyId &&
+      c.leasePaidThroughTick > world.tick,
+  );
+  if (!conc) return;
+  conc.lifetimeCharterPax = (conc.lifetimeCharterPax ?? 0) + add;
 }
 
 export function creditPortOperatorThroughput(

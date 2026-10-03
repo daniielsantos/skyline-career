@@ -59,6 +59,7 @@ Glance layout inspired by other career addons: **three pillars first**, money/sc
 
 - Não copiar radar/XP% do outro addon
 - Não retunar payout/score só por layout
+- **Score vs OnAir (2026-10-03):** não acrescentar beacon/strobo, luzes de taxi, “ligar o tracking com motor off”, flap/gear overspeed, nem IAS fixa no pouso. O % corta 5% do pay de electronics abaixo de 70 e trava clean de Cargo/Class Ops. Luzes e overspeed de flap/trem mentem por addon; IAS sem Vapp do OFP pune o C172 e o widebody com o mesmo número. IAS no toque já é amostrada e não entra na nota — deixar assim.
 - Briefing onboarding global (origin/board/map) = fora de escopo; My VA member brief = stepper em `VaMemberBriefCard` (ver `16-va-logistics.md`)
 
 ## Logbook list + detail (2026-09-23)

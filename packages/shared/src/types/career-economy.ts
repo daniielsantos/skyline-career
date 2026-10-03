@@ -1842,6 +1842,8 @@ export interface PortConcessionIndexRow {
   companyId: string;
   leasePaidThroughTick: number;
   level?: PortConcessionLevel;
+  /** Primary pickup hub. Stamped each tick so charter can skip this lobby. */
+  pickupIcao?: string;
 }
 
 /** Compact MP presence feed row (ring-buffer on the world). */
@@ -1870,6 +1872,8 @@ export interface PlayerPortConcession {
   leasePaidThroughTick: number;
   /** Cumulative kg settled outbound (Demand / WH haul) while under this operator. */
   lifetimeThroughputKg: number;
+  /** Passengers departed on charters that started at this port's pickup hub. */
+  lifetimeCharterPax?: number;
   /** Economy-day index (`floor(tick/96)`) for `throughputWindowKg[0]`. */
   throughputWindowDay?: number;
   /** Last 7 economy days of port throughput, `[today, yesterday, …]`. */

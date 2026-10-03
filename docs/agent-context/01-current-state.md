@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **888a0122** / desktop **0.3.457** shipped: Put the selected port name and lease on the top of the network map. Release: [v0.3.457](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.457).
+
+
 `main` **a8d319b0** / desktop **0.3.456** shipped: Keep Demand and Charter on the selected port instead of the company toolbar. Release: [v0.3.456](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.456).
 
 

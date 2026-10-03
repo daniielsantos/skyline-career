@@ -13404,7 +13404,9 @@ span.dispatch-route-hub-dest {
 }
 
 .ports-charter-lobby {
-  margin-top: 0.65rem;
+  flex: 0 0 auto;
+  max-width: 18rem;
+  margin: 0.15rem 0 0.85rem;
 }
 
 .ports-charter-lobby-bar {

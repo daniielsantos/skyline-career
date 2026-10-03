@@ -1,5 +1,13 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Linha do quadro desenha a rota no mapa** — clicar uma linha de Scout, Demand ou Charter marca a linha e traça origem → destino no mapa de cima. Segundo clique tira. Accept e Fly não desmarcam. A linha some se o pedido sai do quadro. Sem coordenada de origem ou destino, a linha não é inventada.
+
+Atualizado 2026-10-03: **Ports da sidebar e Ports da VA são o mesmo painel** — as duas montam `PortsPanel`. Sidebar = company da casa do piloto solo (`Yours`, acesso cheio). My VA = company da VA (`Company`), com o papel: dono gasta, dispatcher mexe no desk, piloto só lê. O que muda é de quem é a rede, o caixa e o gate. Mapa, desk, Demand, Charter e a grade dos quadros não ganham uma segunda tela. `embedded` na VA só tira o título “Ports & Demand” e põe o Refresh na faixa das abas.
+
+Atualizado 2026-10-03: **Scout, Demand e Charter na mesma grade** — os três quadros usam a mesma ordem: rota, distância, commodity (ícone pequeno e uma linha de detalhe), quantidade, pay, uma nota e o botão à direita. Kind do Scout e o preço máximo do Demand foram para baixo do nome da commodity. O ícone grande do charter desceu para o mesmo tamanho.
+
+Atualizado 2026-10-03: **Desk fica visível** — o chip Desk só era pintado fora do desk, então sumia ao clicar. Agora fica na linha, aceso, junto de Demand e Charter.
+
 Atualizado 2026-10-03: **Nome e Lease no topo do mapa** — no FBO, o nome do porto, o nível e o Lease saem da linha de Demand/Charter e ficam no canto superior do mapa, à esquerda do zoom. Sem mapa (quadro aberto a partir do armazém), o nome continua na linha das abas.
 
 Atualizado 2026-10-03: **Network sobe no lugar do Find** — a faixa do Find saiu, então o bloco Company network encosta nas abas e o mapa do porto desce de 30rem para 26rem. O desk (nome, tanque, quadro) sobe junto.

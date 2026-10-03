@@ -277,6 +277,20 @@ function charterUrgencyLabel(urgency: string | undefined): string | null {
   return null;
 }
 
+function PortBoardCols() {
+  return (
+    <colgroup>
+      <col className="c-route" />
+      <col className="c-dist" />
+      <col className="c-commodity" />
+      <col className="c-amount" />
+      <col className="c-pay" />
+      <col className="c-note" />
+      <col className="c-action" />
+    </colgroup>
+  );
+}
+
 function PortBoardRoute(props: {
   originIcao: string;
   destIcao: string;
@@ -3273,13 +3287,63 @@ export function PortsPanel(props: {
         destLon: demandRow.destLon,
       };
     }
+    const boardOrder = demand.find((o) => o.id === scoutFocusId);
+    if (boardOrder && port) {
+      const hubAt = (icao: string) => {
+        const code = icao.trim().toUpperCase();
+        if (!code) return null;
+        for (const p of mapPorts) {
+          const hub = (p.pickupHubDetails ?? []).find(
+            (h) => h.icao.trim().toUpperCase() === code,
+          );
+          if (
+            hub &&
+            Number.isFinite(hub.lat) &&
+            Number.isFinite(hub.lon)
+          ) {
+            return { lat: hub.lat, lon: hub.lon };
+          }
+        }
+        return null;
+      };
+      const desk = resolvePortDeskPickupHub(port.pickupHubs) ?? '';
+      const originIcao =
+        boardOrder.fuelHaul?.pickupIcao?.trim().toUpperCase() || desk;
+      const origin =
+        hubAt(originIcao) ??
+        (Number.isFinite(port.lat) && Number.isFinite(port.lon)
+          ? { lat: port.lat, lon: port.lon }
+          : null);
+      const destIcao = boardOrder.destIcao.trim().toUpperCase();
+      const dest =
+        boardOrder.destLat != null &&
+        boardOrder.destLon != null &&
+        Number.isFinite(boardOrder.destLat) &&
+        Number.isFinite(boardOrder.destLon)
+          ? { lat: boardOrder.destLat, lon: boardOrder.destLon }
+          : hubAt(destIcao);
+      if (origin && dest && originIcao && destIcao) {
+        return {
+          kind: 'demand' as const,
+          id: boardOrder.id,
+          originIcao,
+          destIcao,
+          originLat: origin.lat,
+          originLon: origin.lon,
+          destLat: dest.lat,
+          destLon: dest.lon,
+        };
+      }
+    }
     return null;
   }, [
     scoutFocusId,
     scoutHaulSuggestions,
     scoutSuggestions,
     scoutDemandSuggestions,
-    port?.concession?.charterLobby,
+    port,
+    demand,
+    mapPorts,
   ]);
 
   const scoutRouteLegs = useMemo(() => {
@@ -3440,6 +3504,18 @@ export function PortsPanel(props: {
     for (const s of scoutDemandSuggestions) ids.add(s.id);
     for (const s of scoutSuggestions) ids.add(s.id);
     for (const s of port?.concession?.charterLobby?.rows ?? []) ids.add(s.id);
+    if (port) {
+      const pid = port.id.trim().toUpperCase();
+      for (const o of demand) {
+        if (
+          o.remainingKg > 0 &&
+          (!o.status || o.status === 'open') &&
+          (o.portId?.trim().toUpperCase() ?? '') === pid
+        ) {
+          ids.add(o.id);
+        }
+      }
+    }
     // Do not auto-pick the first Scout row — route only after a click.
     if (scoutFocusId && !ids.has(scoutFocusId)) {
       setScoutFocusId(null);
@@ -3450,7 +3526,8 @@ export function PortsPanel(props: {
     scoutHaulSuggestions,
     scoutSuggestions,
     scoutDemandSuggestions,
-    port?.concession?.charterLobby,
+    port,
+    demand,
   ]);
 
   function focusScoutRow(id: string) {
@@ -4704,10 +4781,13 @@ export function PortsPanel(props: {
             networkSurface === 'charter') ? (
             port ? (
               <h3 className="ports-selected-name ports-stage-title">
-                {networkSurface !== 'fbo' ? (
-                  <button
+                <button
                     type="button"
-                    className="fbo-icao-chip"
+                    className={
+                      networkSurface === 'fbo'
+                        ? 'fbo-icao-chip active'
+                        : 'fbo-icao-chip'
+                    }
                     disabled={props.busy || loading}
                     onClick={() => {
                       const node = selectedNetworkNode;
@@ -4733,7 +4813,6 @@ export function PortsPanel(props: {
                   >
                     Desk
                   </button>
-                ) : null}
                 <button
                   type="button"
                   className={
@@ -5247,15 +5326,15 @@ export function PortsPanel(props: {
                             </div>
                           ) : (
                             <div className="table-wrap ports-scout-table-wrap">
-                              <table className="data-table ports-scout-table">
+                              <table className="data-table ports-scout-table ports-board-table">
+                                <PortBoardCols />
                                 <thead>
                                   <tr>
-                                    <th>Kind</th>
                                     <th>Route</th>
+                                    <th>Dist</th>
                                     <th>Commodity</th>
                                     <th>Mass</th>
                                     <th>Pay</th>
-                                    <th>Nm</th>
                                     <th title="Destination hub warehouse fill">
                                       Fill
                                     </th>
@@ -5273,13 +5352,6 @@ export function PortsPanel(props: {
                                       }
                                       onClick={() => focusScoutRow(row.id)}
                                     >
-                                      <td className="muted">
-                                        {row.kind === 'haul'
-                                          ? 'Haul'
-                                          : row.kind === 'demand'
-                                            ? 'Demand'
-                                            : 'Bridge'}
-                                      </td>
                                       <td>
                                         <span className="ports-scout-route">
                                           <button
@@ -5315,20 +5387,40 @@ export function PortsPanel(props: {
                                           </button>
                                         </span>
                                       </td>
+                                      <td className="muted">
+                                        {row.distanceNm > 0
+                                          ? `${row.distanceNm.toLocaleString()} nm`
+                                          : '—'}
+                                      </td>
                                       <td>
-                                        {commodityLabel({
-                                          commodityId: row.commodityId,
-                                        })}
+                                        <div className="commodity-cell">
+                                          <CommodityIcon
+                                            commodityId={row.commodityId}
+                                            size={28}
+                                            title={commodityLabel({
+                                              commodityId: row.commodityId,
+                                            })}
+                                          />
+                                          <div>
+                                            <strong>
+                                              {commodityLabel({
+                                                commodityId: row.commodityId,
+                                              })}
+                                            </strong>
+                                            <span className="charter-fare-label">
+                                              {row.kind === 'haul'
+                                                ? 'Haul'
+                                                : row.kind === 'demand'
+                                                  ? 'Demand'
+                                                  : 'Bridge'}
+                                            </span>
+                                          </div>
+                                        </div>
                                       </td>
                                       <td>{props.formatTonnes(row.kg)}</td>
                                       <td>
                                         {row.payUsd != null
                                           ? props.formatMoney(row.payUsd)
-                                          : '—'}
-                                      </td>
-                                      <td className="muted">
-                                        {row.distanceNm > 0
-                                          ? row.distanceNm
                                           : '—'}
                                       </td>
                                       <td className="muted">
@@ -6827,7 +6919,8 @@ export function PortsPanel(props: {
                     </div>
                   ) : null}
                   <div className="table-wrap ports-demand-table-wrap">
-                    <table className="data-table ports-demand-table">
+                    <table className="data-table ports-demand-table ports-board-table">
+                      <PortBoardCols />
                       <thead>
                         <tr>
                           <th aria-sort={charterAriaSort('route')}>
@@ -6868,17 +6961,17 @@ export function PortsPanel(props: {
                               title="Sort by pay"
                               onClick={() => toggleCharterSort('pay')}
                             >
-                              Total pay{' '}
-                              <span>{charterSortIndicator('pay')}</span>
+                              Pay <span>{charterSortIndicator('pay')}</span>
                             </button>
                           </th>
+                          <th />
                           <th />
                         </tr>
                       </thead>
                       <tbody>
                         {sortedCharterRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6}>
+                            <td colSpan={7}>
                               <p className="empty">
                                 {!port.concession.charterLobby
                                   ? 'The lobby is empty.'
@@ -6889,7 +6982,15 @@ export function PortsPanel(props: {
                         ) : (
                           pagedCharterRows.map((row) => {
                             return (
-                              <tr key={row.id}>
+                              <tr
+                                key={row.id}
+                                className={
+                                  scoutFocusId === row.id
+                                    ? 'ports-scout-tr is-selected'
+                                    : 'ports-scout-tr'
+                                }
+                                onClick={() => focusScoutRow(row.id)}
+                              >
                                 <td className="col-route">
                                   <PortBoardRoute
                                     originIcao={row.originIcao}
@@ -6916,7 +7017,7 @@ export function PortsPanel(props: {
                                   <div className="commodity-cell">
                                     <CommodityIcon
                                       commodityId="passengers"
-                                      size={52}
+                                      size={28}
                                       title="Passengers"
                                     />
                                     <div>
@@ -6932,17 +7033,19 @@ export function PortsPanel(props: {
                                 </td>
                                 <td>{row.groupSize}</td>
                                 <td>{props.formatMoney(row.payUsd)}</td>
+                                <td className="muted">—</td>
                                 <td>
                                   <button
                                     type="button"
                                     className="accept"
                                     disabled={props.busy || loading}
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       beginPortCharter(
                                         row.destIcao,
                                         row.originIcao,
-                                      )
-                                    }
+                                      );
+                                    }}
                                   >
                                     Accept
                                   </button>
@@ -7004,7 +7107,8 @@ export function PortsPanel(props: {
               ? (node: ReactNode) => createPortal(node, portBoardSlot)
               : (node: ReactNode) => node)(
             <div className="ports-demand-board">
-              <div className="ports-demand-filters">
+              <div className="ports-scout-head">
+                <p className="ports-scout-title">Demand</p>
                 <p className="ports-corridor-chip muted" aria-live="polite">
                   {port ? (
                     <>
@@ -7026,7 +7130,8 @@ export function PortsPanel(props: {
                 </p>
               </div>
               <div className="table-wrap ports-demand-table-wrap">
-                <table className="data-table ports-demand-table">
+                    <table className="data-table ports-demand-table ports-board-table">
+                  <PortBoardCols />
                   <thead>
                     <tr>
                       <th aria-sort={demandAriaSort('route')}>
@@ -7074,17 +7179,6 @@ export function PortsPanel(props: {
                           Wanted <span>{demandSortIndicator('wanted')}</span>
                         </button>
                       </th>
-                      <th aria-sort={demandAriaSort('price')}>
-                        <button
-                          type="button"
-                          className={`sort-header${demandSort.key === 'price' ? ' is-sorted' : ''}`}
-                          title="Sort by max unit price"
-                          onClick={() => toggleDemandSort('price')}
-                        >
-                          Max $/{unit}{' '}
-                          <span>{demandSortIndicator('price')}</span>
-                        </button>
-                      </th>
                       <th aria-sort={demandAriaSort('pay')}>
                         <button
                           type="button"
@@ -7092,7 +7186,7 @@ export function PortsPanel(props: {
                           title="Sort by total pay if you fill the remaining Wanted"
                           onClick={() => toggleDemandSort('pay')}
                         >
-                          Total pay <span>{demandSortIndicator('pay')}</span>
+                          Pay <span>{demandSortIndicator('pay')}</span>
                         </button>
                       </th>
                       <th aria-sort={demandAriaSort('expires')}>
@@ -7111,7 +7205,7 @@ export function PortsPanel(props: {
                   <tbody key={demandTableKey}>
                     {sortedDemand.length === 0 ? (
                       <tr>
-                        <td colSpan={8}>
+                        <td colSpan={7}>
                           <p className="empty">
                             {!port
                               ? 'Select a port.'
@@ -7127,16 +7221,18 @@ export function PortsPanel(props: {
                           o.commodityId,
                         );
                         const held = heldOrderIds.has(o.id);
+                        const selected = scoutFocusId === o.id;
                         return (
                         <tr
                           key={`${o.id}#${index}`}
-                          className={
-                            cargoLocked
-                              ? 'lot-locked'
-                              : held
-                                ? 'lot-locked'
-                                : undefined
-                          }
+                          className={[
+                            'ports-scout-tr',
+                            cargoLocked || held ? 'lot-locked' : '',
+                            selected ? 'is-selected' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ')}
+                          onClick={() => focusScoutRow(o.id)}
                         >
                           <td className="col-route">
                             <PortBoardRoute
@@ -7145,7 +7241,14 @@ export function PortsPanel(props: {
                               originName={demandOriginName}
                               destName={o.destName}
                               disabled={props.busy}
-                              onOpen={props.onOpenAirport}
+                              onOpen={
+                                props.onOpenAirport
+                                  ? (icao) => {
+                                      setScoutFocusId(o.id);
+                                      props.onOpenAirport?.(icao);
+                                    }
+                                  : undefined
+                              }
                             />
                           </td>
                           <td
@@ -7167,11 +7270,14 @@ export function PortsPanel(props: {
                             <div className="commodity-cell">
                               <CommodityIcon
                                 commodityId={o.commodityId}
-                                size={52}
+                                size={28}
                                 title={commodityLabel(o)}
                               />
                               <div>
                                 <strong>{commodityLabel(o)}</strong>
+                                <span className="charter-fare-label">
+                                  Max {formatUnitPrice(o.maxUnitPriceUsd)}/{unit}
+                                </span>
                                 {o.fuelHaul ? (
                                   <span className="muted">
                                     {' '}
@@ -7190,7 +7296,6 @@ export function PortsPanel(props: {
                             </div>
                           </td>
                           <td>{props.formatTonnes(o.remainingKg)}</td>
-                          <td>{formatUnitPrice(o.maxUnitPriceUsd)}</td>
                           <td
                             title={`Remaining ${props.formatTonnes(o.remainingKg)} × ${formatUnitPrice(o.maxUnitPriceUsd)}`}
                           >
@@ -7250,7 +7355,8 @@ export function PortsPanel(props: {
                                   )
                                 }
                                 title="Restricted haul. The fee is for the flight. Park at the pickup airport."
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   const parked = props.fleet.find(
                                     (aircraft) =>
                                       aircraft.status === 'parked' &&
@@ -7273,7 +7379,10 @@ export function PortsPanel(props: {
                                 type="button"
                                 className="accept"
                                 disabled={props.busy || loading}
-                                onClick={() => openAcceptModal(o)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openAcceptModal(o);
+                                }}
                               >
                                 Accept
                               </button>

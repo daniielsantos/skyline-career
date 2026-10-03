@@ -12139,6 +12139,37 @@ span.dispatch-route-hub-dest {
   display: none;
 }
 
+.ports-board-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.ports-board-table col.c-route { width: 18%; }
+.ports-board-table col.c-dist { width: 10%; }
+.ports-board-table col.c-commodity { width: 26%; }
+.ports-board-table col.c-amount { width: 11%; }
+.ports-board-table col.c-pay { width: 14%; }
+.ports-board-table col.c-note { width: 11%; }
+.ports-board-table col.c-action { width: 10%; }
+
+.ports-board-table th:last-child,
+.ports-board-table td:last-child {
+  text-align: right;
+}
+
+.ports-board-table .commodity-cell {
+  gap: 0.45rem;
+}
+
+.ports-scout-table.ports-board-table {
+  font-size: 0.82rem;
+}
+
+.ports-scout-table.ports-board-table .accept {
+  padding: 0.28rem 0.7rem;
+  font-size: 0.75rem;
+}
+
 .ports-demand-table {
   width: 100%;
 }

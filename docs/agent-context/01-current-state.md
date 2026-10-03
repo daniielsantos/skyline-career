@@ -1,4 +1,7 @@
-# Current state (2026-10-02)
+# Current state (2026-10-03)
+
+`main` **b3ecc4c5** / desktop **0.3.441** shipped: Open Ports without loading company history, and keep the map mounted. Release: [v0.3.441](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.441).
+
 
 `main` **89d10ac2** / desktop **0.3.440** shipped: Open Ports on the company network and load the catalog when that tab is opened. Release: [v0.3.440](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.440).
 

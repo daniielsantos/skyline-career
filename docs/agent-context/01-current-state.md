@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **6db6758f** / desktop **0.3.459** shipped: Draw the selected port board route on the map. Release: [v0.3.459](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.459).
+
+
 `main` **c1d6c6d9** / desktop **0.3.458** shipped: Bake MSFS runway geometry into the hub overrides. Release: [v0.3.458](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.458).
 
 

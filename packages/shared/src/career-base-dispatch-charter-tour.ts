@@ -5,8 +5,8 @@
  */
 
 import {
-  CHARTER_MAX_DISTANCE_NM,
   CHARTER_MIN_DISTANCE_NM,
+  charterMaxDistanceNm,
   isCharterEligibleAircraftClass,
 } from './career-charter.js';
 import { routeDistanceNm } from './career-economy.js';
@@ -257,7 +257,7 @@ export function listBaseDispatchCharterTours(
       o.status === 'available' &&
       world.tick < o.expiresAtTick &&
       o.distanceNm >= CHARTER_MIN_DISTANCE_NM &&
-      o.distanceNm <= CHARTER_MAX_DISTANCE_NM,
+      o.distanceNm <= charterMaxDistanceNm(),
   );
   if (openOffers.length === 0) return [];
 

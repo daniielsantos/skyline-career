@@ -1095,7 +1095,7 @@ function charterAircraftFit(
   const reasons: string[] = [];
   if (!isCharterEligibleAircraftClass(aircraft.aircraftClassId)) {
     reasons.push(
-      'Charter class required (GA, TP, light jet, medium piston, or narrowbody)',
+      'Charter class required (GA, TP, light jet, medium piston, narrowbody, or widebody)',
     );
   }
   if (!configuration || configuration.role !== 'passenger') {

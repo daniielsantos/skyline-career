@@ -30,7 +30,15 @@ import type {
 } from './types/career-economy.js';
 
 export const CHARTER_MIN_DISTANCE_NM = 80;
+/** Narrowbody shelf. The live board ceiling is {@link charterMaxDistanceNm}. */
 export const CHARTER_MAX_DISTANCE_NM = 2_000;
+/** Catalog wide range (A350 ULR). A shorter airframe still fails Fit on its own range. */
+export const CHARTER_WIDE_MAX_DISTANCE_NM = 9_000;
+/** Port desk rings. Far slots fold into mid until a wide charter class exists. */
+export const PORT_CHARTER_DESK_NEAR_NM = 500;
+export const PORT_CHARTER_DESK_NEAR_SLOTS = 3;
+export const PORT_CHARTER_DESK_MID_SLOTS = 3;
+export const PORT_CHARTER_DESK_FAR_SLOTS = 2;
 /** Concession lobby caps. P3 uses the airport pool ceiling. */
 export const PORT_CHARTER_LOBBY_LIGHT = 12;
 export const PORT_CHARTER_LOBBY_MED = 48;
@@ -46,10 +54,11 @@ export const CHARTER_DEMAND_RETENTION_DAYS = 45;
 export const CHARTER_DEAD_OFFER_RETENTION_TICKS = 48;
 export const CHARTER_BAGGAGE_KG_PER_PAX = 18;
 /**
- * Soft ceiling on formed group size — matches the largest narrow Market
- * `maxPaxSeats` (Fenix A321 = 220). Fit still gates by airframe seats.
+ * Soft ceiling on formed group size. Narrow band stays at the largest narrow
+ * Market cabin (230). The wide ceiling is the A340-600 (440 seats).
  */
-export const CHARTER_GROUP_SIZE_MAX = 230;
+export const CHARTER_NARROW_GROUP_MAX = 230;
+export const CHARTER_GROUP_SIZE_MAX = 440;
 /** Baggage kg ceiling = full narrow group × per-pax allowance. */
 export const CHARTER_BAGGAGE_MAX_KG =
   CHARTER_GROUP_SIZE_MAX * CHARTER_BAGGAGE_KG_PER_PAX;
@@ -72,9 +81,9 @@ export const CHARTER_WARM_QUOTA_PER_TICK = 48;
 /**
  * Classes that may accept charter offers.
  * Fit still gates by passenger config, seats, baggage, and range — so a
- * 2-seat GA only sees 1–2 pax groups while narrowbodies can take up to
- * {@link CHARTER_GROUP_SIZE_MAX}. Pure freighters in `narrow_freighter`
- * stay blocked without a passenger config.
+ * 2-seat GA only sees 1–2 pax groups while narrowbodies and widebodies can
+ * take up to {@link CHARTER_GROUP_SIZE_MAX}. Pure freighters in
+ * `narrow_freighter` / `wide_freighter` stay blocked without a passenger config.
  */
 export const CHARTER_ELIGIBLE_AIRCRAFT_CLASSES = [
   'light_ga',
@@ -82,6 +91,7 @@ export const CHARTER_ELIGIBLE_AIRCRAFT_CLASSES = [
   'light_jet',
   'medium_piston',
   'narrow_freighter',
+  'wide_freighter',
 ] as const;
 
 export type CharterEligibleAircraftClass =
@@ -95,8 +105,20 @@ export function isCharterEligibleAircraftClass(
     classId === 'light_turboprop' ||
     classId === 'light_jet' ||
     classId === 'medium_piston' ||
-    classId === 'narrow_freighter'
+    classId === 'narrow_freighter' ||
+    classId === 'wide_freighter'
   );
+}
+
+/** Board and pay ceiling. Wide opens the long ring; coefficients stay put. */
+export function charterMaxDistanceNm(): number {
+  return isCharterEligibleAircraftClass('wide_freighter')
+    ? CHARTER_WIDE_MAX_DISTANCE_NM
+    : CHARTER_MAX_DISTANCE_NM;
+}
+
+export function charterDistanceInRange(nm: number): boolean {
+  return nm >= CHARTER_MIN_DISTANCE_NM && nm <= charterMaxDistanceNm();
 }
 
 function hashSeed(value: string): number {
@@ -188,11 +210,11 @@ export function concessionCharterOriginLevels(
 }
 
 function hubCapacityPax(airport: AirportTerminal): number {
-  // Sized so majors can host a full narrow charter group; regionals/spokes
-  // still feed the light/med bands without starving pool turnover.
+  // Sized so a level-1 major can hold a full wide group (A340-600 = 440).
+  // Regionals and spokes stay in the light/med/narrow bands.
   const base =
     airport.hubTier === 'major'
-      ? 280
+      ? 500
       : airport.hubTier === 'regional'
         ? 160
         : 64;
@@ -358,7 +380,7 @@ export function quoteCharterPayUsd(opts: {
   international: boolean;
 }): number {
   const pax = charterPayPaxWeight(opts.groupSize);
-  const distance = clamp(opts.distanceNm, CHARTER_MIN_DISTANCE_NM, CHARTER_MAX_DISTANCE_NM);
+  const distance = clamp(opts.distanceNm, CHARTER_MIN_DISTANCE_NM, charterMaxDistanceNm());
   const urgencyMult = { normal: 1, priority: 1.22, urgent: 1.48 }[opts.urgency];
   const tierMult = { standard: 1, premium: 1.35, executive: 1.8 }[opts.tier];
   const internationalMult = opts.international ? 1.2 : 1;
@@ -375,6 +397,9 @@ export function quoteCharterPayUsd(opts: {
  * Banded group size so the shelf stays GA-friendly while still spawning
  * med-piston / narrow loads when Terminal pools allow.
  *
+ * Deep pools above a narrow cabin (avail > 230): a minority wide slice,
+ * then narrow, med, and light — a 400-seat group must be able to form
+ * without taking the shelf.
  * Deep pools (avail ≥ 49): mostly narrow, then med — otherwise continuous
  * 1–12 drains keep majors forever below the med/narrow thresholds.
  * Mid pools (13–48): prefer med. Shallow: light only.
@@ -393,7 +418,21 @@ export function pickCharterGroupSize(
   const roll = rng();
   let lo = 1;
   let hi = Math.min(12, avail);
-  if (avail >= 49) {
+  if (avail > CHARTER_NARROW_GROUP_MAX) {
+    if (roll < 0.18) {
+      lo = CHARTER_NARROW_GROUP_MAX + 1;
+      hi = avail;
+    } else if (roll < 0.58) {
+      lo = 49;
+      hi = CHARTER_NARROW_GROUP_MAX;
+    } else if (roll < 0.88) {
+      lo = 13;
+      hi = 48;
+    } else {
+      lo = 1;
+      hi = 12;
+    }
+  } else if (avail >= 49) {
     if (roll < 0.55) {
       lo = 49;
       hi = avail;
@@ -456,7 +495,7 @@ function normalizeOffer(raw: CharterOffer): CharterOffer | null {
       Number.isFinite(Number(raw.baggageKg)) && Number(raw.baggageKg) > 0
         ? clamp(Math.round(Number(raw.baggageKg)), 1, CHARTER_BAGGAGE_MAX_KG)
         : charterBaggageKg(groupSize),
-    distanceNm: clamp(Number(raw.distanceNm) || 0, 0, CHARTER_MAX_DISTANCE_NM),
+    distanceNm: clamp(Number(raw.distanceNm) || 0, 0, charterMaxDistanceNm()),
     payUsd: Math.max(0, Math.round(Number(raw.payUsd) || 0)),
     createdAtTick: Math.max(0, Math.floor(Number(raw.createdAtTick) || 0)),
     expiresAtTick: Math.max(0, Math.floor(Number(raw.expiresAtTick) || 0)),
@@ -917,7 +956,7 @@ export function formCharterOffersForTick(
     const destCountry = countryIdFromRegion(dest.region);
     if ((originCountry !== destCountry) !== international) return false;
     const distance = distanceNm(origin, dest);
-    if (distance < CHARTER_MIN_DISTANCE_NM || distance > CHARTER_MAX_DISTANCE_NM) {
+    if (!charterDistanceInRange(distance)) {
       return false;
     }
     const od = demandId(origin.icao, dest.icao);
@@ -1025,7 +1064,7 @@ export function formCharterOffersForTick(
       continue;
     }
     const nm = distanceNm(origin, dest);
-    if (nm < CHARTER_MIN_DISTANCE_NM || nm > CHARTER_MAX_DISTANCE_NM) {
+    if (!charterDistanceInRange(nm)) {
       continue;
     }
     if (openOd.has(demandId(originIcao, destIcao))) continue;
@@ -1079,7 +1118,7 @@ export function formCharterOffersForTick(
           const destCountry = countryIdFromRegion(destRow.ap.region);
           if (!destCountry || destCountry === originCountry) continue;
           const nm = distanceNm(originRow.ap, destRow.ap);
-          if (nm < CHARTER_MIN_DISTANCE_NM || nm > CHARTER_MAX_DISTANCE_NM) {
+          if (!charterDistanceInRange(nm)) {
             continue;
           }
           const od = demandId(originRow.ap.icao, destRow.ap.icao);
@@ -1150,9 +1189,7 @@ export function formCharterOffersForTick(
       const viableDests = localDests.filter((row) => {
         if (row.ap.icao === originRow.ap.icao) return false;
         const nm = distanceNm(originRow.ap, row.ap);
-        return (
-          nm >= CHARTER_MIN_DISTANCE_NM && nm <= CHARTER_MAX_DISTANCE_NM
-        );
+        return charterDistanceInRange(nm);
       });
       if (viableDests.length === 0) continue;
       const destSample = rotatingHubSample(
@@ -1349,6 +1386,58 @@ function portCharterGroupSize(
   return pickCharterGroupSize(rng, waiting, attract);
 }
 
+type PortCharterDeskHeat = {
+  distanceNm: number;
+  attractPax: number;
+  payUsd: number;
+  destIcao: string;
+};
+
+function portCharterDeskHeat(a: PortCharterDeskHeat, b: PortCharterDeskHeat): number {
+  return (
+    b.attractPax - a.attractPax ||
+    b.payUsd - a.payUsd ||
+    a.destIcao.localeCompare(b.destIcao)
+  );
+}
+
+/**
+ * Eight desk seats: 3 near (80–500), 3 mid (500–2,000), 2 far (above 2,000).
+ * A longer ring cannot take a shorter ring's seat. Unused far seats fold into mid
+ * so the desk does not show holes. Wide off → the 2 far seats are mid.
+ */
+export function pickPortCharterDeskRows<T extends PortCharterDeskHeat>(
+  candidates: readonly T[],
+  opts?: { wideRange?: boolean },
+): T[] {
+  const wideRange =
+    opts?.wideRange ?? isCharterEligibleAircraftClass('wide_freighter');
+  const nearMax = PORT_CHARTER_DESK_NEAR_NM;
+  const midMax = CHARTER_MAX_DISTANCE_NM;
+  const farMax = wideRange ? CHARTER_WIDE_MAX_DISTANCE_NM : midMax;
+  const near = candidates
+    .filter(
+      (row) =>
+        row.distanceNm >= CHARTER_MIN_DISTANCE_NM && row.distanceNm <= nearMax,
+    )
+    .sort(portCharterDeskHeat);
+  const mid = candidates
+    .filter((row) => row.distanceNm > nearMax && row.distanceNm <= midMax)
+    .sort(portCharterDeskHeat);
+  const far = wideRange
+    ? candidates
+        .filter((row) => row.distanceNm > midMax && row.distanceNm <= farMax)
+        .sort(portCharterDeskHeat)
+    : [];
+  const nearPick = near.slice(0, PORT_CHARTER_DESK_NEAR_SLOTS);
+  const farPick = far.slice(0, PORT_CHARTER_DESK_FAR_SLOTS);
+  const midSlots =
+    PORT_CHARTER_DESK_MID_SLOTS +
+    (PORT_CHARTER_DESK_FAR_SLOTS - farPick.length);
+  const midPick = mid.slice(0, midSlots);
+  return [...nearPick, ...midPick, ...farPick].sort(portCharterDeskHeat);
+}
+
 /** Read the concession lobby and the destinations it can fly. Does not seed hubs. */
 export function listPortCharterDesk(
   world: CareerEconomyWorld,
@@ -1383,10 +1472,7 @@ export function listPortCharterDesk(
     for (const dest of activeAirports(world)) {
       if (dest.icao.toUpperCase() === originCode) continue;
       const distance = distanceNm(origin, dest);
-      if (
-        distance < CHARTER_MIN_DISTANCE_NM ||
-        distance > CHARTER_MAX_DISTANCE_NM
-      ) {
+      if (!charterDistanceInRange(distance)) {
         continue;
       }
       const od = demandId(origin.icao, dest.icao);
@@ -1437,13 +1523,7 @@ export function listPortCharterDesk(
         destLon: dest.lon,
       });
     }
-    candidates.sort(
-      (a, b) =>
-        b.attractPax - a.attractPax ||
-        b.payUsd - a.payUsd ||
-        a.destIcao.localeCompare(b.destIcao),
-    );
-    rows.push(...candidates.slice(0, PORT_CHARTER_DESK_LIMIT));
+    rows.push(...pickPortCharterDeskRows(candidates));
   }
   return { waitingPax, capacityPax, level, rows };
 }
@@ -1467,11 +1547,9 @@ export function takePortCharterOffer(
   );
   if (!origin || !dest) throw new Error('Unknown charter airport');
   const distance = distanceNm(origin, dest);
-  if (
-    distance < CHARTER_MIN_DISTANCE_NM ||
-    distance > CHARTER_MAX_DISTANCE_NM
-  ) {
-    throw new Error('Charter distance is outside 80–2,000 nm');
+  if (!charterDistanceInRange(distance)) {
+    const maxNm = charterMaxDistanceNm().toLocaleString('en-US');
+    throw new Error(`Charter distance is outside 80–${maxNm} nm`);
   }
   const od = demandId(origin.icao, dest.icao);
   if (

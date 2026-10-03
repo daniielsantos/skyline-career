@@ -463,6 +463,43 @@ describe('career player airframes', () => {
     assert.equal(resolvePassengerCapacity(dual.typeId, 'passenger'), 112);
   });
 
+  it('stamps passenger configs on wide pax SKUs and keeps pure freighters cargo-only', () => {
+    const freighterOnly = new Set(['pmdg-777f', 'tfdi-md11f-family']);
+    const noSeatCatalog = new Set([
+      'inibuilds-a350-1000-default-cabin',
+      'inibuilds-a350-900-default-cabin',
+      'inibuilds-a350-900-ulr',
+    ]);
+    for (const airframe of listCareerPlayerAirframes('wide_freighter')) {
+      const pax = (airframe.configurations ?? []).filter(
+        isPassengerConfigurationEligible,
+      );
+      if (freighterOnly.has(airframe.typeId) || noSeatCatalog.has(airframe.typeId)) {
+        assert.equal(pax.length, 0, `${airframe.typeId} must stay out of charter`);
+        assert.equal(resolvePassengerCapacity(airframe.typeId, 'passenger'), 0);
+        continue;
+      }
+      assert.ok(pax.length > 0, `${airframe.typeId} missing passenger config`);
+      assert.equal(
+        Math.max(...pax.map((row) => row.passengerCapacity)),
+        airframe.maxPaxSeats,
+        airframe.typeId,
+      );
+      assert.ok(
+        pax.every(
+          (row) => row.baggageCapacityLb >= row.passengerCapacity * 55,
+        ),
+        airframe.typeId,
+      );
+    }
+    assert.equal(
+      resolvePassengerCapacity('toliss-toliss-a346-pro-preset-pax', 'passenger'),
+      440,
+    );
+    assert.equal(resolvePassengerCapacity('inibuilds-a300-600', 'cargo'), 0);
+    assert.equal(resolvePassengerCapacity('inibuilds-a300-600', 'passenger'), 256);
+  });
+
   it('summarizes cabin/charter layout for Market and Hangar cards', () => {
     const duke = resolveAirframeCabinSummary('blacksquare-b60-duke', 'light_ga');
     assert.equal(duke.passengerSeats, 5);

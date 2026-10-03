@@ -4,7 +4,11 @@ import {
   CHARTER_BOARD_MAX,
   CHARTER_BOARD_MIN,
   CHARTER_GROUP_SIZE_MAX,
+  CHARTER_NARROW_GROUP_MAX,
   CHARTER_MAX_DISTANCE_NM,
+  PORT_CHARTER_DESK_LIMIT,
+  charterMaxDistanceNm,
+  pickPortCharterDeskRows,
   CHARTER_WARM_QUOTA_PER_TICK,
   cancelCharterMission,
   charterBaggageKg,
@@ -113,7 +117,7 @@ describe('Charter economy', () => {
     );
     assert.ok(
       a.charterOffers!.every(
-        (offer) => offer.distanceNm > 0 && offer.distanceNm <= CHARTER_MAX_DISTANCE_NM,
+        (offer) => offer.distanceNm > 0 && offer.distanceNm <= charterMaxDistanceNm(),
       ),
     );
     assert.equal(generateDailyCharterOffers(a, 0), 0, 'full board must not dump again');
@@ -239,6 +243,23 @@ describe('Charter economy', () => {
       else counts.med += 1;
     }
     assert.ok(counts.med > counts.light, `med=${counts.med} light=${counts.light}`);
+  });
+
+  it('forms a wide group from a deep major pool without emptying the narrow shelf', () => {
+    const counts = { wide: 0, narrower: 0 };
+    let seed = 7;
+    const rng = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < 500; i += 1) {
+      const n = pickCharterGroupSize(rng, 440, 440);
+      assert.ok(n >= 1 && n <= 440);
+      if (n > CHARTER_NARROW_GROUP_MAX) counts.wide += 1;
+      else counts.narrower += 1;
+    }
+    assert.ok(counts.wide > 40, `wide=${counts.wide}`);
+    assert.ok(counts.narrower > counts.wide, `narrower=${counts.narrower} wide=${counts.wide}`);
   });
 
   it('forms a few offers from the regular economy tick without a daily dump', () => {
@@ -770,13 +791,82 @@ describe('Charter economy', () => {
     assert.ok(desk.waitingPax > 0);
   });
 
+  it('keeps the port charter desk from filling with long haul', () => {
+    const row = (dest: string, nm: number, attract: number, pay: number) => ({
+      destIcao: dest,
+      distanceNm: nm,
+      attractPax: attract,
+      payUsd: pay,
+    });
+    const far = [
+      row('AAAA', 4_200, 900, 80_000),
+      row('BBBB', 6_000, 880, 70_000),
+      row('CCCC', 3_100, 860, 60_000),
+      row('DDDD', 2_500, 840, 50_000),
+    ];
+    const mid = [
+      row('MMMM', 1_200, 100, 9_000),
+      row('NNNN', 800, 90, 8_000),
+      row('OOOO', 1_600, 80, 7_000),
+      row('PPPP', 900, 70, 6_000),
+      row('QQQQ', 1_100, 60, 5_000),
+      row('RRRR', 700, 50, 4_000),
+    ];
+    const near = [
+      row('NEAR', 220, 10, 1_000),
+      row('NERO', 400, 9, 900),
+      row('NERI', 180, 8, 800),
+      row('NERE', 300, 7, 700),
+    ];
+    const closed = pickPortCharterDeskRows([...far, ...mid, ...near], {
+      wideRange: false,
+    });
+    assert.equal(closed.length, PORT_CHARTER_DESK_LIMIT);
+    assert.equal(closed.filter((item) => item.distanceNm <= 500).length, 3);
+    assert.equal(closed.filter((item) => item.distanceNm > CHARTER_MAX_DISTANCE_NM).length, 0);
+    assert.equal(
+      closed.filter(
+        (item) => item.distanceNm > 500 && item.distanceNm <= CHARTER_MAX_DISTANCE_NM,
+      ).length,
+      5,
+    );
+
+    const open = pickPortCharterDeskRows([...far, ...mid, ...near], {
+      wideRange: true,
+    });
+    assert.equal(open.filter((item) => item.distanceNm > CHARTER_MAX_DISTANCE_NM).length, 2);
+    assert.equal(
+      open.filter(
+        (item) => item.distanceNm > 500 && item.distanceNm <= CHARTER_MAX_DISTANCE_NM,
+      ).length,
+      3,
+    );
+    assert.equal(open.filter((item) => item.distanceNm <= 500).length, 3);
+
+    const thinNear = pickPortCharterDeskRows(
+      [row('NEAR', 220, 10, 1_000), ...far, ...mid],
+      { wideRange: true },
+    );
+    assert.equal(thinNear.filter((item) => item.distanceNm <= 500).length, 1);
+    assert.equal(thinNear.filter((item) => item.distanceNm > CHARTER_MAX_DISTANCE_NM).length, 2);
+
+    const noFar = pickPortCharterDeskRows([...mid, ...near], { wideRange: true });
+    assert.equal(
+      noFar.filter(
+        (item) => item.distanceNm > 500 && item.distanceNm <= CHARTER_MAX_DISTANCE_NM,
+      ).length,
+      5,
+    );
+    assert.equal(noFar.filter((item) => item.distanceNm <= 500).length, 3);
+  });
+
   it('allows medium piston and narrowbody classes on the shared charter board', () => {
     assert.equal(isCharterEligibleAircraftClass('light_ga'), true);
     assert.equal(isCharterEligibleAircraftClass('light_turboprop'), true);
     assert.equal(isCharterEligibleAircraftClass('light_jet'), true);
     assert.equal(isCharterEligibleAircraftClass('medium_piston'), true);
     assert.equal(isCharterEligibleAircraftClass('narrow_freighter'), true);
-    assert.equal(isCharterEligibleAircraftClass('wide_freighter'), false);
+    assert.equal(isCharterEligibleAircraftClass('wide_freighter'), true);
   });
 
   it('drops old expired charter offers instead of keeping a 2-day corpse pile', () => {

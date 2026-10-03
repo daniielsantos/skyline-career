@@ -2395,7 +2395,32 @@
     "fuelCapacityKg": 54530,
     "maxRangeNm": 4000,
     "cruiseSpeedKt": 460,
-    "fuelBurnKgPerNm": 9.5
+    "fuelBurnKgPerNm": 9.5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 256,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 14080,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a300-600.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a300-600-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "inibuilds-a330-200",
@@ -2413,7 +2438,21 @@
     "fuelCapacityKg": 109176,
     "maxRangeNm": 7250,
     "cruiseSpeedKt": 470,
-    "fuelBurnKgPerNm": 8.5
+    "fuelBurnKgPerNm": 8.5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 257,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 14135,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a330-200.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "inibuilds-a330-300",
@@ -2431,7 +2470,21 @@
     "fuelCapacityKg": 76551,
     "maxRangeNm": 6350,
     "cruiseSpeedKt": 470,
-    "fuelBurnKgPerNm": 9
+    "fuelBurnKgPerNm": 9,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 291,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 16005,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a330-300.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "inibuilds-a340-300",
@@ -2455,7 +2508,43 @@
     "fuelCapacityKg": 113200,
     "maxRangeNm": 7000,
     "cruiseSpeedKt": 470,
-    "fuelBurnKgPerNm": 10
+    "fuelBurnKgPerNm": 10,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 279,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 15345,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a340-300.json"
+      },
+      {
+        "id": "vip",
+        "label": "VIP",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 279,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 15345,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a340-300-vip.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-a340-300-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "toliss-toliss-a346-pro-preset-pax",
@@ -2472,7 +2561,21 @@
     "fuelCapacityKg": 152024,
     "maxRangeNm": 6000,
     "cruiseSpeedKt": 490,
-    "fuelBurnKgPerNm": 12
+    "fuelBurnKgPerNm": 12,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 440,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 24200,
+        "rolesPackRelPath": "profiles/ofp/toliss-a346.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "inibuilds-a350-1000-default-cabin",
@@ -2536,7 +2639,21 @@
     "fuelCapacityKg": 154570,
     "maxRangeNm": 7000,
     "cruiseSpeedKt": 490,
-    "fuelBurnKgPerNm": 11.5
+    "fuelBurnKgPerNm": 11.5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 294,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 16170,
+        "rolesPackRelPath": "profiles/ofp/pmdg-777-pax.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "pmdg-777-200lr",
@@ -2555,7 +2672,21 @@
     "fuelCapacityKg": 145526,
     "maxRangeNm": 8000,
     "cruiseSpeedKt": 490,
-    "fuelBurnKgPerNm": 12
+    "fuelBurnKgPerNm": 12,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 297,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 16335,
+        "rolesPackRelPath": "profiles/ofp/pmdg-777-200lr-pax.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "pmdg-777-300er",
@@ -2574,7 +2705,21 @@
     "fuelCapacityKg": 145512,
     "maxRangeNm": 7000,
     "cruiseSpeedKt": 490,
-    "fuelBurnKgPerNm": 13
+    "fuelBurnKgPerNm": 13,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 370,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 20350,
+        "rolesPackRelPath": "profiles/ofp/pmdg-777-300er-pax.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "pmdg-777f",
@@ -2613,7 +2758,21 @@
     "fuelCapacityKg": 96904,
     "maxRangeNm": 5200,
     "cruiseSpeedKt": 520,
-    "fuelBurnKgPerNm": 11
+    "fuelBurnKgPerNm": 11,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 243,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 13365,
+        "rolesPackRelPath": "profiles/ofp/inibuilds-l1011-500.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
   },
   {
     "typeId": "tfdi-md11f-family",

@@ -16221,10 +16221,37 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
   margin-bottom: 0.3rem;
 }
 
-.ports-network-assets .va-company-network-map {
+.ports-network-assets .va-company-network-map-frame {
   margin-top: 0.35rem;
+}
+
+.ports-network-assets .va-company-network-map {
+  margin-top: 0;
   min-height: 20rem;
   height: 26rem;
+}
+
+.va-company-network-map-frame {
+  position: relative;
+}
+
+.va-company-network-map-header {
+  position: absolute;
+  z-index: 2;
+  top: 0.45rem;
+  right: 2.75rem;
+  left: 0.55rem;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.va-company-network-map-header .ports-stage-port {
+  margin-left: 0;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface, #121820) 90%, transparent);
+  pointer-events: auto;
 }
 
 .ports-network-detail {

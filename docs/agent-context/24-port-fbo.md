@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Nome e Lease no topo do mapa** — no FBO, o nome do porto, o nível e o Lease saem da linha de Demand/Charter e ficam no canto superior do mapa, à esquerda do zoom. Sem mapa (quadro aberto a partir do armazém), o nome continua na linha das abas.
+
 Atualizado 2026-10-03: **Network sobe no lugar do Find** — a faixa do Find saiu, então o bloco Company network encosta nas abas e o mapa do porto desce de 30rem para 26rem. O desk (nome, tanque, quadro) sobe junto.
 
 Atualizado 2026-10-03: **Buy warehouse e Ground staff ficam no Company network** — os dois chips vão para a direita do rótulo Company network. O Find saiu. Na linha de baixo, Desk, Demand e Charter ficam à esquerda; o nome do porto e o Lease vão para a direita.

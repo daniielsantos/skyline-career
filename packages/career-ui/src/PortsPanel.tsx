@@ -4225,6 +4225,59 @@ export function PortsPanel(props: {
     </>
   );
 
+  const portIdentityOnMap =
+    Boolean(port) &&
+    (networkSurface === 'fbo' ||
+      (embedPortBoards &&
+        (networkSurface === 'demand' || networkSurface === 'charter')));
+
+  const portStageIdentity = port ? (
+    <span className="ports-stage-port">
+      <span className="ports-selected-name-text">{port.name}</span>
+      <span
+        className={
+          port.concession?.status === 'yours'
+            ? 'tag ports-operator-badge ports-concession-status'
+            : port.concession?.status === 'held'
+              ? 'tag ports-concession-status'
+              : 'tag muted ports-concession-status'
+        }
+        title="Port FBO status"
+      >
+        {port.concession?.status === 'yours'
+          ? `Port FBO · P${port.concession.level ?? 1}`
+          : port.concession?.status === 'held'
+            ? 'Held'
+            : 'Vacant'}
+      </span>
+      <button
+        type="button"
+        className="action ghost ports-concession-open"
+        disabled={props.busy}
+        onClick={() => setConcessionOpen(true)}
+        title={
+          portLeaseDaysLeft != null
+            ? `Lease · ${portLeaseDaysLeft}d left`
+            : undefined
+        }
+      >
+        {port.concession?.status === 'yours'
+          ? canPortCapex
+            ? portLeaseDaysLeft != null
+              ? `Lease · ${portLeaseDaysLeft}d`
+              : 'Lease · Upgrade'
+            : portLeaseDaysLeft != null
+              ? `Lease · ${portLeaseDaysLeft}d`
+              : 'Details'
+          : port.concession?.status === 'held'
+            ? 'Details'
+            : canPortCapex
+              ? 'Claim'
+              : 'Details'}
+      </button>
+    </span>
+  ) : null;
+
   return (
     <section
       className={
@@ -4615,6 +4668,7 @@ export function PortsPanel(props: {
                 }
                 hideAllChip
                 headActions={companyNetworkChips}
+                mapHeader={portIdentityOnMap ? portStageIdentity : null}
                 highlightRoute={
                   networkSurface === 'fbo' ||
                   networkSurface === 'demand' ||
@@ -4711,50 +4765,7 @@ export function PortsPanel(props: {
                     {port.concession.charterLobby?.rows.length ?? 0})
                   </button>
                 ) : null}
-                <span className="ports-stage-port">
-                  <span className="ports-selected-name-text">{port.name}</span>
-                  <span
-                    className={
-                      port.concession?.status === 'yours'
-                        ? 'tag ports-operator-badge ports-concession-status'
-                        : port.concession?.status === 'held'
-                          ? 'tag ports-concession-status'
-                          : 'tag muted ports-concession-status'
-                    }
-                    title="Port FBO status"
-                  >
-                    {port.concession?.status === 'yours'
-                      ? `Port FBO · P${port.concession.level ?? 1}`
-                      : port.concession?.status === 'held'
-                        ? 'Held'
-                        : 'Vacant'}
-                  </span>
-                  <button
-                    type="button"
-                    className="action ghost ports-concession-open"
-                    disabled={props.busy}
-                    onClick={() => setConcessionOpen(true)}
-                    title={
-                      portLeaseDaysLeft != null
-                        ? `Lease · ${portLeaseDaysLeft}d left`
-                        : undefined
-                    }
-                  >
-                    {port.concession?.status === 'yours'
-                      ? canPortCapex
-                        ? portLeaseDaysLeft != null
-                          ? `Lease · ${portLeaseDaysLeft}d`
-                          : 'Lease · Upgrade'
-                        : portLeaseDaysLeft != null
-                          ? `Lease · ${portLeaseDaysLeft}d`
-                          : 'Details'
-                      : port.concession?.status === 'held'
-                        ? 'Details'
-                        : canPortCapex
-                          ? 'Claim'
-                          : 'Details'}
-                  </button>
-                </span>
+                {portIdentityOnMap ? null : portStageIdentity}
               </h3>
             ) : (
               <p className="ports-stage-title is-muted">

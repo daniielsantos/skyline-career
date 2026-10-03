@@ -37,6 +37,8 @@ type Props = {
   weightSystem?: WeightSystem;
   /** Ports: Buy warehouse and Ground staff, on the Company network row. */
   headActions?: ReactNode;
+  /** Ports: selected port name and lease, along the top of the map. */
+  mapHeader?: ReactNode;
 };
 
 function nodeRoomLine(
@@ -183,14 +185,19 @@ export function VaCompanyNetwork(props: Props) {
         </p>
       ) : null}
       {showMap && nodes.length > 0 ? (
-        <CompanyNetworkMap
-          className="va-company-network-map"
-          nodes={nodes}
-          selectedId={selectedId}
-          highlightRoute={props.highlightRoute ?? null}
-          corridorRing={props.corridorRing ?? null}
-          onSelectNode={(id) => onSelect(id)}
-        />
+        <div className="va-company-network-map-frame">
+          {props.mapHeader ? (
+            <div className="va-company-network-map-header">{props.mapHeader}</div>
+          ) : null}
+          <CompanyNetworkMap
+            className="va-company-network-map"
+            nodes={nodes}
+            selectedId={selectedId}
+            highlightRoute={props.highlightRoute ?? null}
+            corridorRing={props.corridorRing ?? null}
+            onSelectNode={(id) => onSelect(id)}
+          />
+        </div>
       ) : null}
     </div>
   );

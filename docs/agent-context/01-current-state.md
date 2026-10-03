@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **9b053386** / desktop **0.3.444** shipped: Open port charters in the manifest, with the lobby table laid out like Demand. Release: [v0.3.444](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.444).
+
+
 `main` **6dbf35c8** / desktop **0.3.443** shipped: Keep Scout on cargo and show the passenger lobby on the Charter board. Release: [v0.3.443](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.443).
 
 

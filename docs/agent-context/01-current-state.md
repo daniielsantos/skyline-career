@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **7b5eae6f** / desktop **0.3.453** shipped: Scale a port charter lobby with the company roster, up to four pilots. Release: [v0.3.453](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.453).
+
+
 `main` **c1979ec2** / desktop **0.3.452** shipped: Keep long-haul charters to a wide cabin so a light group cannot take them. Release: [v0.3.452](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.452).
 
 

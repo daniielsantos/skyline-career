@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **8684e7af** / desktop **0.3.447** shipped: Show the charter fare apart from the passenger count. Release: [v0.3.447](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.447).
+
+
 `main` **cd5c2f84** / desktop **0.3.446** shipped: Restore the open port charter manifest after the app restarts. Release: [v0.3.446](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.446).
 
 

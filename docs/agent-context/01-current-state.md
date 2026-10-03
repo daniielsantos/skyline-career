@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **c04cd3e0** / desktop **0.3.450** shipped: Reopen a port charter manifest from the airline hangar. Release: [v0.3.450](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.450).
+
+
 `main` **25e956dc** / desktop **0.3.449** shipped: Recognize the pilot's own reservation on the charter fit. Release: [v0.3.449](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.449).
 
 

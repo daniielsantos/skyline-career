@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **c1d6c6d9** / desktop **0.3.458** shipped: Bake MSFS runway geometry into the hub overrides. Release: [v0.3.458](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.458).
+
+
 `main` **888a0122** / desktop **0.3.457** shipped: Put the selected port name and lease on the top of the network map. Release: [v0.3.457](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.457).
 
 

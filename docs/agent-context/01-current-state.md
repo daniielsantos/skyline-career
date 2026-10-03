@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **6dbf35c8** / desktop **0.3.443** shipped: Keep Scout on cargo and show the passenger lobby on the Charter board. Release: [v0.3.443](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.443).
+
+
 `main` **e5266d16** / desktop **0.3.442** shipped: Add a passenger lobby and charter desk on the Port FBO. Release: [v0.3.442](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.442).
 
 

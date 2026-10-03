@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **cd5c2f84** / desktop **0.3.446** shipped: Restore the open port charter manifest after the app restarts. Release: [v0.3.446](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.446).
+
+
 `main` **5504829b** / desktop **0.3.445** shipped: Suggest the charter origin when repositioning the pilot from the manifest. Release: [v0.3.445](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.445).
 
 

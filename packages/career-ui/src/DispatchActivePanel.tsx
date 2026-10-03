@@ -1703,7 +1703,8 @@ export function DispatchActivePanel(props: {
                   : null,
               ] as Array<[string, string] | null>
             ).filter((item): item is [string, string] => item !== null);
-            const showEnRouteCapacityLeft = !isFerryLeg;
+            const isCharterLeg = mission.missionType === 'charter';
+            const showEnRouteCapacityLeft = !isFerryLeg && !isCharterLeg;
             const showEnRouteFuelUplift = Boolean(
               mission.fuelUplift &&
                 (mission.fuelUplift.costUsd > 0 ||
@@ -1901,10 +1902,11 @@ export function DispatchActivePanel(props: {
               })()
             );
 
+            const charterFare = charterFareLabel(mission.charterTier);
             const enRouteCargo = (
               <div className="dispatch-enroute-block">
                 <h3 className="dispatch-enroute-block-title">
-                  {isFerryLeg ? 'Ferry' : 'Cargo'}
+                  {isFerryLeg ? 'Ferry' : isCharterLeg ? 'Charter' : 'Cargo'}
                 </h3>
                 <dl
                   className="ofp-briefing-grid dispatch-enroute-metrics"
@@ -1916,6 +1918,14 @@ export function DispatchActivePanel(props: {
                       <dd>
                         Empty
                         <small>{cargoCommodityLabel}</small>
+                      </dd>
+                    </div>
+                  ) : isCharterLeg ? (
+                    <div>
+                      <dt>Baggage</dt>
+                      <dd>
+                        {formatMassExact(mission.baggageKg ?? 0, weightSystem)}
+                        {charterFare ? <small>{charterFare}</small> : null}
                       </dd>
                     </div>
                   ) : (

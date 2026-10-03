@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Charter no ar não mostra carga general** — sintoma = no voo, o bloco Cargo dizia Load 0,0 klb · general e Capacity left do porão. Causa = a missão guarda `commodityId: general` e `cargoKg: 0` para caber no dispatch de frete, e o painel en route lia esses campos. Fix = o bloco vira Charter, a célula mostra a bagagem (e a classe, se houver), e Capacity left sai. Pax continua na linha do OFP. Frete e ferry não mudam.
+
 Atualizado 2026-10-03: **Bloco Fixed manifest saiu do charter** — sintoma = a frase “não pode dividir, redimensionar ou juntar” repetia passageiros, bagagem e pay que os cards e o rodapé já mostram. Causa = o diálogo nasceu no molde do manifesto de carga, onde o grupo se monta. Fix = o bloco saiu de `CharterManifest.tsx`. Contagem, pay, fit e o título do diálogo ficam. A classe (executive) saiu junto; não foi para um card.
 
 Atualizado 2026-10-03: **Aba Ports com 502 logo depois do deploy 0.3.451** — sintoma = faixa `World API timed out (HTTP 502)` com o Port of Miami ainda na tela. O deploy da VPS fechou 19:13:49Z com health ok. Causa = o corpo não é JSON do career; é a página do Caddy quando o `world-api` não responde (troca do container, ou um refresh que caiu nesse buraco). O handler de `/api/ports`, se falhasse, devolveria JSON e outra frase. O card do Miami é o desk que o app já tinha; a faixa é o refresh seguinte. Sem ajuste de código. Health em 19:28Z respondeu 200.

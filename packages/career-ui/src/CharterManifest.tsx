@@ -204,15 +204,6 @@ export function CharterManifest(props: CharterManifestProps) {
         </div>
       </section>
 
-      <div className="staging-section charter-fixed-manifest">
-        <h3>Fixed manifest</h3>
-        <p>
-          {props.draft.offer.paxCount} passengers and {props.formatMass(props.draft.offer.baggageKg)} baggage.
-          Charters cannot be split, resized, or combined.
-        </p>
-        {props.draft.offer.reason ? <small>{props.draft.offer.reason}</small> : null}
-      </div>
-
       {fitError ? <p className="banner error">{fitError}</p> : null}
       {!fitLoading && fit && !fit.compatible ? (
         <p className="banner error">

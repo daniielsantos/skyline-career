@@ -1618,14 +1618,6 @@ table.terminal-charter-table td small {
   font-size: 1.05rem;
 }
 
-.charter-fixed-manifest p {
-  margin-bottom: 0.35rem;
-}
-
-.charter-fixed-manifest small {
-  color: var(--muted);
-}
-
 .charter-pax-facts {
   display: flex;
   flex-wrap: wrap;

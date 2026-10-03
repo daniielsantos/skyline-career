@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **25e956dc** / desktop **0.3.449** shipped: Recognize the pilot's own reservation on the charter fit. Release: [v0.3.449](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.449).
+
+
 `main` **956a22b7** / desktop **0.3.448** shipped: Score a charter aircraft on the hangar that owns it. Release: [v0.3.448](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.448).
 
 

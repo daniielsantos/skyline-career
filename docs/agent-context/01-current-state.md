@@ -1,5 +1,8 @@
 # Current state (2026-10-03)
 
+`main` **06e564d6** / desktop **0.3.455** shipped: Show charter baggage in flight instead of an empty general cargo load. Release: [v0.3.455](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.455).
+
+
 `main` **0ce208d7** / desktop **0.3.454** shipped: Drop the repeated fixed-manifest blurb from the charter dialog. Release: [v0.3.454](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.454).
 
 

@@ -4775,11 +4775,9 @@ export function App() {
           setVaChromeTitle(null);
         }
       } catch {
-        if (!cancelled) {
-          setMemberVaCompanyId(null);
-          setMemberVaIsOwner(false);
-          setVaMemberRouteCutPct(null);
-        }
+        // A failed refresh must not drop the airline id while the fleet
+        // stays on screen — Fit would then open the home hangar and
+        // report the tail as unknown.
       } finally {
         if (!cancelled) setVaOpsPrefetchGen((n) => n + 1);
       }
@@ -11604,8 +11602,21 @@ export function App() {
           aircraftId: draft.aircraftId,
           companyId: opsCompanyId,
         });
-        paintOpsMutationFleet(result.fleet, opsCompanyId);
-        if (vaOps) setVaSessionWallet(result.walletUsd);
+        const bookedCompanyId = result.companyId?.trim() || opsCompanyId;
+        const homeId =
+          homeCompanyIdRef.current?.trim() ||
+          homeCompanyId?.trim() ||
+          getStoredCompanyId()?.trim() ||
+          '';
+        const bookedOnAirline = Boolean(
+          bookedCompanyId && homeId && bookedCompanyId !== homeId,
+        );
+        if (bookedOnAirline) {
+          memberVaCompanyIdRef.current = bookedCompanyId;
+          setMemberVaCompanyId(bookedCompanyId);
+        }
+        paintOpsMutationFleet(result.fleet, bookedCompanyId);
+        if (vaOps || bookedOnAirline) setVaSessionWallet(result.walletUsd);
         else commitWallet(result.walletUsd);
         if (result.charterActiveTour !== undefined) {
           setCharterActiveTour(result.charterActiveTour ?? null);

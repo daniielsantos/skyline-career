@@ -63,6 +63,7 @@ import {
   reserveCharterOffer,
   takePortCharterOffer,
   undoTakenCharterOffer,
+  overlayLiveEconomyOntoPulseSnapshot,
   readCharterHubPoolView,
   isCharterEligibleAircraftClass,
   findOpenManifestForRoute,
@@ -852,6 +853,48 @@ function sendMissingStoreForAuth(
 const MARKET_LOT_LIMIT = 200;
 
 type MissionsFile = CareerMissionsState;
+
+/**
+ * Chrome company is often the pilot's home tenant while the selected tail
+ * lives on the airline. A fit/accept against the wrong hangar 404s
+ * "Unknown aircraft" before seats are checked. Prefer the requested company;
+ * if that fleet does not have the id, use another company this account belongs to.
+ */
+async function companyIdOwningAircraft(
+  req: import('node:http').IncomingMessage,
+  preferredCompanyId: string,
+  aircraftId: string,
+): Promise<string> {
+  const preferred = preferredCompanyId.trim();
+  const needle = aircraftId.trim();
+  if (!needle) return preferred;
+  const hasAircraft = (companyId: string) =>
+    withCareerRead(
+      (_world, missions) => Boolean(findPlayerAircraft(missions, needle)),
+      { companyId },
+    );
+  if (preferred && (await hasAircraft(preferred))) return preferred;
+  const session = authSessionFromRequest(req);
+  const seen = new Set<string>();
+  if (preferred) seen.add(preferred);
+  const candidates: string[] = [];
+  for (const company of session?.companies ?? []) {
+    const id = company.id?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    candidates.push(id);
+  }
+  for (const member of session?.memberships ?? []) {
+    const id = member.companyId?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    candidates.push(id);
+  }
+  for (const id of candidates) {
+    if (await hasAircraft(id)) return id;
+  }
+  return preferred;
+}
 
 async function loadMissions(opts?: {
   companyId?: string;
@@ -2734,6 +2777,12 @@ async function withCareerWrite<T>(
   if (deferred.pulseSnapshot) {
     const timing = opts?.catchUpTiming;
     const t0 = performance.now();
+    // Prepare can commit a port hold after this snapshot was cloned.
+    // Postgres re-reads RAM inside the revision lock; this covers the file store.
+    overlayLiveEconomyOntoPulseSnapshot(
+      deferred.pulseSnapshot,
+      activeStore.peekEconomyWorld(),
+    );
     await activeStore.saveEconomy(deferred.pulseSnapshot, {
       applyToRam: false,
     });
@@ -2760,7 +2809,9 @@ async function withCareerWrite<T>(
       if (order) await activeStore.persistDemandOrder(order);
     }
     if (slice.contractPilot) {
-      await activeStore.persistNpcLiveWorld(slice.world);
+      await activeStore.persistNpcLiveWorld(slice.world, {
+        fromDeferredSlice: true,
+      });
     }
   }
   return result;
@@ -8447,10 +8498,17 @@ export function createCareerApiServer(port = 8787) {
           Math.floor(Number(url.searchParams.get('page')) || 1),
         );
         // Query companyId wins over chrome header (VA tail while sticky-home).
-        const chartersCompanyId = companyIdFromRequest(
+        let chartersCompanyId = companyIdFromRequest(
           req,
           url.searchParams.get('companyId'),
         );
+        if (aircraftId) {
+          chartersCompanyId = await companyIdOwningAircraft(
+            req,
+            chartersCompanyId,
+            aircraftId,
+          );
+        }
         try {
           // Read-only board query — never tickCharterEconomy + full economy save here.
           // Sort/filter used withCareerWrite (default persist), which rewrote the whole
@@ -8727,7 +8785,11 @@ export function createCareerApiServer(port = 8787) {
         ) {
           return;
         }
-        const acceptCompanyId = companyIdFromRequest(req, body.companyId);
+        const acceptCompanyId = await companyIdOwningAircraft(
+          req,
+          companyIdFromRequest(req, body.companyId),
+          body.aircraftId.trim(),
+        );
         try {
           const charterActor = await resolveVaFleetActor(req, acceptCompanyId);
           const pilotStamp = await vaPilotMissionStamp(req, acceptCompanyId);
@@ -8846,6 +8908,7 @@ export function createCareerApiServer(port = 8787) {
                 walletUsd: missions.walletUsd,
                 fleet: withParkingRates(missions.fleet, world, missions),
                 charterActiveTour: charterActiveTourView(missions, world),
+                companyId: acceptCompanyId,
               };
             });
           }, { housekeeping: false, companyId: acceptCompanyId });

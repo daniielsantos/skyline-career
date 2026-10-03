@@ -23,6 +23,7 @@ import {
   readCharterHubPoolView,
   isCharterEligibleAircraftClass,
   listPortCharterDesk,
+  overlayLiveEconomyOntoPulseSnapshot,
   reserveCharterOffer,
   settleCharterMission,
   tickCharterEconomy,
@@ -31,6 +32,63 @@ import {
 } from './index.js';
 
 describe('Charter economy', () => {
+  it('keeps a charter hold that landed after the pulse snapshot was cloned', () => {
+    const snapshot = {
+      airports: [{ icao: 'KMIA' }],
+      charterOffers: [{ id: 'charter-offer:1', status: 'available' }],
+      charterHubs: [{ icao: 'KMIA', waitingPax: 40 }],
+      charterDemand: [{ id: 'd1', pressure: 1 }],
+      demandOrders: [{ id: 'order-old' }],
+      portListings: [{ id: 'listing-old' }],
+      portConcessions: [],
+      fuelHauls: [],
+    } as unknown as Parameters<typeof overlayLiveEconomyOntoPulseSnapshot>[0];
+    const live = {
+      airports: [{ icao: 'KMIA' }],
+      charterOffers: [
+        { id: 'charter-offer:1', status: 'available' },
+        { id: 'charter-offer:port:9:KMIA:MZBZ', status: 'available' },
+      ],
+      charterHubs: [{ icao: 'KMIA', waitingPax: 22 }],
+      charterDemand: [{ id: 'd1', pressure: 4 }],
+      demandOrders: [{ id: 'order-new' }],
+      portListings: [{ id: 'listing-new' }],
+      portConcessions: [{ portId: 'KMIA', companyId: 'co' }],
+      fuelHauls: [{ id: 'haul-1' }],
+    } as unknown as Parameters<typeof overlayLiveEconomyOntoPulseSnapshot>[1];
+    overlayLiveEconomyOntoPulseSnapshot(snapshot, live);
+    assert.equal(snapshot.charterOffers?.length, 2);
+    assert.equal(
+      snapshot.charterOffers?.some((row) => row.id.startsWith('charter-offer:port:')),
+      true,
+    );
+    assert.equal(snapshot.charterHubs?.[0]?.waitingPax, 22);
+    assert.equal(snapshot.charterDemand?.[0]?.pressure, 4);
+    assert.equal(snapshot.demandOrders?.[0]?.id, 'order-new');
+    assert.equal(snapshot.portListings?.[0]?.id, 'listing-new');
+    assert.equal(snapshot.portConcessions?.length, 1);
+    assert.equal(snapshot.fuelHauls?.[0]?.id, 'haul-1');
+    assert.equal(snapshot.tick, undefined);
+
+    const loaded = {
+      airports: [{ icao: 'KMIA' }],
+      charterOffers: [{ id: 'charter-offer:1', status: 'available' }],
+      charterHubs: [{ icao: 'KMIA', waitingPax: 40 }],
+      charterDemand: [{ id: 'd1', pressure: 1 }],
+      demandOrders: [{ id: 'order-old' }],
+    } as unknown as Parameters<typeof overlayLiveEconomyOntoPulseSnapshot>[0];
+    overlayLiveEconomyOntoPulseSnapshot(loaded, {
+      airports: [],
+      charterOffers: [],
+      charterHubs: [],
+      charterDemand: [],
+      demandOrders: [],
+    } as unknown as Parameters<typeof overlayLiveEconomyOntoPulseSnapshot>[1]);
+    assert.equal(loaded.charterOffers?.length, 1);
+    assert.equal(loaded.charterHubs?.[0]?.waitingPax, 40);
+    assert.equal(loaded.demandOrders?.[0]?.id, 'order-old');
+  });
+
   it('forms deterministic domestic and international offers from hub pools', () => {
     const a = createSeedEconomyWorld({ seed: 'charter-deterministic' });
     const b = createSeedEconomyWorld({ seed: 'charter-deterministic' });

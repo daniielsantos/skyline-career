@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { IcaoLink } from './IcaoLink';
 import {
   peekPortsDesk,
   portsDeskIsFresh,
@@ -242,8 +243,7 @@ function leaseDaysLeftFromTicks(
 }
 
 type DemandSortKey =
-  | 'country'
-  | 'dest'
+  | 'route'
   | 'dist'
   | 'commodity'
   | 'wanted'
@@ -253,33 +253,59 @@ type DemandSortKey =
 
 type DemandSort = { key: DemandSortKey; direction: 'asc' | 'desc' };
 
-type CharterSortKey = 'country' | 'dest' | 'dist' | 'pax' | 'pay';
+type CharterSortKey = 'route' | 'dist' | 'pax' | 'pay';
 
 type CharterSort = { key: CharterSortKey; direction: 'asc' | 'desc' };
 
-function demandCountryLabel(countryId: string | null | undefined): string {
-  const id = countryId?.trim().toUpperCase() ?? '';
-  if (!id) return '—';
-  switch (id) {
-    case 'BR':
-      return 'Brazil';
-    case 'US':
-      return 'USA';
-    case 'CA':
-      return 'Canada';
-    case 'MX':
-      return 'Mexico';
-    case 'AR':
-      return 'Argentina';
-    case 'CL':
-      return 'Chile';
-    default:
-      return id;
-  }
+function charterFareLabel(tier: string | undefined): string {
+  if (tier === 'executive') return 'Executive';
+  if (tier === 'premium') return 'Premium';
+  return 'Standard';
 }
 
-function demandDestCountryId(order: DemandOrderView): string {
-  return order.destCountryId?.trim().toUpperCase() ?? '';
+function charterUrgencyLabel(urgency: string | undefined): string | null {
+  if (urgency === 'urgent') return 'Urgent';
+  if (urgency === 'priority') return 'Priority';
+  return null;
+}
+
+function PortBoardRoute(props: {
+  originIcao: string;
+  destIcao: string;
+  originName?: string;
+  destName?: string;
+  disabled?: boolean;
+  onOpen?: (icao: string) => void;
+}) {
+  const origin = props.originIcao.trim().toUpperCase();
+  const dest = props.destIcao.trim().toUpperCase();
+  const open = props.onOpen ?? (() => undefined);
+  const locked = props.disabled || !props.onOpen;
+  return (
+    <div className="route">
+      {origin ? (
+        <IcaoLink
+          icao={origin}
+          name={props.originName}
+          disabled={locked}
+          onOpen={open}
+        />
+      ) : (
+        <span>—</span>
+      )}
+      <span className="arrow">→</span>
+      {dest ? (
+        <IcaoLink
+          icao={dest}
+          name={props.destName}
+          disabled={locked}
+          onOpen={open}
+        />
+      ) : (
+        <span>—</span>
+      )}
+    </div>
+  );
 }
 
 /** Wall-clock duration from economy hours; matches Freights board style. */
@@ -318,9 +344,7 @@ function demandSortValue(
   distNmById?: ReadonlyMap<string, number | null>,
 ): string | number {
   switch (key) {
-    case 'country':
-      return demandDestCountryId(order) || 'ZZ';
-    case 'dest':
+    case 'route':
       return order.destIcao.toUpperCase();
     case 'dist': {
       const n = distNmById?.get(order.id);
@@ -639,13 +663,11 @@ export function PortsPanel(props: {
     direction: 'asc',
   });
   const [demandPage, setDemandPage] = useState(1);
-  const [demandCountryFilter, setDemandCountryFilter] = useState('');
   const [charterSort, setCharterSort] = useState<CharterSort>({
     key: 'pay',
     direction: 'desc',
   });
   const [charterPage, setCharterPage] = useState(1);
-  const [charterCountryFilter, setCharterCountryFilter] = useState('');
 
   const unit = massUnitLabel(props.weightSystem);
 
@@ -4035,6 +4057,9 @@ export function PortsPanel(props: {
   }, [port, portDeskOrders]);
 
   const demandDeskPickupIcao = resolvePortDeskPickupHub(port?.pickupHubs);
+  const demandOriginName = (port?.pickupHubDetails ?? []).find(
+    (hub) => hub.icao.trim().toUpperCase() === (demandDeskPickupIcao ?? ''),
+  )?.name;
 
   const demandPortsForSwitcher = useMemo(() => {
     return snap?.ports ?? [];
@@ -4048,28 +4073,10 @@ export function PortsPanel(props: {
       seen.add(order.id);
       unique.push(order);
     }
-    const country = demandCountryFilter.trim().toUpperCase();
-    const filtered = country
-      ? unique.filter((o) => demandDestCountryId(o) === country)
-      : unique;
-    return filtered.sort((a, b) =>
+    return unique.sort((a, b) =>
       compareDemandOrders(a, b, demandSort, demandDistNmById),
     );
-  }, [
-    portDeskOrders,
-    demandSort,
-    demandCountryFilter,
-    demandDistNmById,
-  ]);
-
-  const demandCountryOptions = useMemo(() => {
-    const ids = new Set<string>();
-    for (const o of portDeskOrders) {
-      const id = demandDestCountryId(o);
-      if (id) ids.add(id);
-    }
-    return [...ids].sort((a, b) => a.localeCompare(b));
-  }, [portDeskOrders]);
+  }, [portDeskOrders, demandSort, demandDistNmById]);
 
   const demandPageCount = Math.max(
     1,
@@ -4080,7 +4087,7 @@ export function PortsPanel(props: {
     const start = (safeDemandPage - 1) * DEMAND_PAGE_SIZE;
     return sortedDemand.slice(start, start + DEMAND_PAGE_SIZE);
   }, [sortedDemand, safeDemandPage]);
-  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${demandCountryFilter}:${port?.id ?? ''}:${portCorridorLevel.level}:${sortedDemand.length}`;
+  const demandTableKey = `${safeDemandPage}:${demandSort.key}:${demandSort.direction}:${port?.id ?? ''}:${portCorridorLevel.level}:${sortedDemand.length}`;
 
   useEffect(() => {
     if (demandPage > demandPageCount) setDemandPage(demandPageCount);
@@ -4088,44 +4095,20 @@ export function PortsPanel(props: {
 
   useEffect(() => {
     setDemandPage(1);
-  }, [demandCountryFilter, port?.id, portCorridorLevel.level]);
-
-  useEffect(() => {
-    if (
-      demandCountryFilter &&
-      !demandCountryOptions.includes(demandCountryFilter)
-    ) {
-      setDemandCountryFilter('');
-    }
-  }, [demandCountryFilter, demandCountryOptions]);
+  }, [port?.id, portCorridorLevel.level]);
 
   const charterDeskRows = port?.concession?.charterLobby?.rows ?? [];
 
-  const charterCountryOptions = useMemo(() => {
-    const ids = new Set<string>();
-    for (const row of charterDeskRows) {
-      const id = row.destCountryId?.trim().toUpperCase() ?? '';
-      if (id) ids.add(id);
-    }
-    return [...ids].sort((a, b) => a.localeCompare(b));
-  }, [charterDeskRows]);
-
   const sortedCharterRows = useMemo(() => {
-    const country = charterCountryFilter.trim().toUpperCase();
-    const filtered = country
-      ? charterDeskRows.filter(
-          (row) => (row.destCountryId?.trim().toUpperCase() ?? '') === country,
-        )
-      : [...charterDeskRows];
+    const filtered = [...charterDeskRows];
     const dir = charterSort.direction === 'asc' ? 1 : -1;
     filtered.sort((a, b) => {
       let cmp = 0;
       switch (charterSort.key) {
-        case 'country':
-          cmp = (a.destCountryId ?? '').localeCompare(b.destCountryId ?? '');
-          break;
-        case 'dest':
-          cmp = a.destIcao.localeCompare(b.destIcao);
+        case 'route':
+          cmp = `${a.originIcao} ${a.destIcao}`.localeCompare(
+            `${b.originIcao} ${b.destIcao}`,
+          );
           break;
         case 'dist':
           cmp = a.distanceNm - b.distanceNm;
@@ -4141,7 +4124,7 @@ export function PortsPanel(props: {
       return cmp * dir;
     });
     return filtered;
-  }, [charterDeskRows, charterCountryFilter, charterSort]);
+  }, [charterDeskRows, charterSort]);
 
   const charterPageCount = Math.max(
     1,
@@ -4159,16 +4142,7 @@ export function PortsPanel(props: {
 
   useEffect(() => {
     setCharterPage(1);
-  }, [charterCountryFilter, port?.id]);
-
-  useEffect(() => {
-    if (
-      charterCountryFilter &&
-      !charterCountryOptions.includes(charterCountryFilter)
-    ) {
-      setCharterCountryFilter('');
-    }
-  }, [charterCountryFilter, charterCountryOptions]);
+  }, [port?.id]);
 
   function toggleDemandSort(key: DemandSortKey) {
     setDemandSort((current) => {
@@ -6777,48 +6751,14 @@ export function PortsPanel(props: {
                     <table className="data-table ports-demand-table">
                       <thead>
                         <tr>
-                          <th
-                            className="ports-demand-country-th"
-                            aria-sort={charterAriaSort('country')}
-                          >
-                            <div className="ports-demand-country-th-inner">
-                              <button
-                                type="button"
-                                className={`sort-header${charterSort.key === 'country' ? ' is-sorted' : ''}`}
-                                title="Sort by destination country"
-                                onClick={() => toggleCharterSort('country')}
-                              >
-                                Country{' '}
-                                <span>{charterSortIndicator('country')}</span>
-                              </button>
-                              <label className="ports-demand-country-filter ports-demand-country-filter-in-th">
-                                <select
-                                  value={charterCountryFilter}
-                                  aria-label="Filter charter by destination country"
-                                  disabled={props.busy || loading}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) =>
-                                    setCharterCountryFilter(e.target.value)
-                                  }
-                                >
-                                  <option value="">All</option>
-                                  {charterCountryOptions.map((id) => (
-                                    <option key={id} value={id}>
-                                      {id}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            </div>
-                          </th>
-                          <th aria-sort={charterAriaSort('dest')}>
+                          <th aria-sort={charterAriaSort('route')}>
                             <button
                               type="button"
-                              className={`sort-header${charterSort.key === 'dest' ? ' is-sorted' : ''}`}
-                              title="Sort by destination"
-                              onClick={() => toggleCharterSort('dest')}
+                              className={`sort-header${charterSort.key === 'route' ? ' is-sorted' : ''}`}
+                              title="Sort by route"
+                              onClick={() => toggleCharterSort('route')}
                             >
-                              Dest <span>{charterSortIndicator('dest')}</span>
+                              Route <span>{charterSortIndicator('route')}</span>
                             </button>
                           </th>
                           <th aria-sort={charterAriaSort('dist')}>
@@ -6859,41 +6799,33 @@ export function PortsPanel(props: {
                       <tbody>
                         {sortedCharterRows.length === 0 ? (
                           <tr>
-                            <td colSpan={7}>
+                            <td colSpan={6}>
                               <p className="empty">
                                 {!port.concession.charterLobby
                                   ? 'The lobby is empty.'
-                                  : charterCountryFilter
-                                    ? 'No charter in this country — clear the filter.'
-                                    : 'No destination in range yet.'}
+                                  : 'No destination in range yet.'}
                               </p>
                             </td>
                           </tr>
                         ) : (
                           pagedCharterRows.map((row) => {
-                            const countryId =
-                              row.destCountryId?.trim().toUpperCase() ?? '';
                             return (
                               <tr key={row.id}>
-                                <td
-                                  className="ports-demand-country-cell"
-                                  title={demandCountryLabel(countryId)}
-                                >
-                                  {countryId || '—'}
-                                </td>
-                                <td>
-                                  <button
-                                    type="button"
-                                    className="linkish"
+                                <td className="col-route">
+                                  <PortBoardRoute
+                                    originIcao={row.originIcao}
+                                    destIcao={row.destIcao}
+                                    destName={row.destName}
                                     disabled={props.busy}
-                                    title={row.destName?.trim() || row.destIcao}
-                                    onClick={() => {
-                                      setScoutFocusId(row.id);
-                                      props.onOpenAirport?.(row.destIcao);
-                                    }}
-                                  >
-                                    {row.destIcao}
-                                  </button>
+                                    onOpen={
+                                      props.onOpenAirport
+                                        ? (icao) => {
+                                            setScoutFocusId(row.id);
+                                            props.onOpenAirport?.(icao);
+                                          }
+                                        : undefined
+                                    }
+                                  />
                                 </td>
                                 <td
                                   className="muted"
@@ -6910,6 +6842,12 @@ export function PortsPanel(props: {
                                     />
                                     <div>
                                       <strong>Passengers</strong>
+                                      <span className="charter-fare-label">
+                                        {charterFareLabel(row.tier)}
+                                        {charterUrgencyLabel(row.urgency)
+                                          ? ` · ${charterUrgencyLabel(row.urgency)}`
+                                          : ''}
+                                      </span>
                                     </div>
                                   </div>
                                 </td>
@@ -7027,48 +6965,14 @@ export function PortsPanel(props: {
                 <table className="data-table ports-demand-table">
                   <thead>
                     <tr>
-                      <th
-                        className="ports-demand-country-th"
-                        aria-sort={demandAriaSort('country')}
-                      >
-                        <div className="ports-demand-country-th-inner">
-                          <button
-                            type="button"
-                            className={`sort-header${demandSort.key === 'country' ? ' is-sorted' : ''}`}
-                            title="Sort by destination country"
-                            onClick={() => toggleDemandSort('country')}
-                          >
-                            Country{' '}
-                            <span>{demandSortIndicator('country')}</span>
-                          </button>
-                          <label className="ports-demand-country-filter ports-demand-country-filter-in-th">
-                            <select
-                              value={demandCountryFilter}
-                              aria-label="Filter demand by destination country"
-                              disabled={props.busy || loading}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) =>
-                                setDemandCountryFilter(e.target.value)
-                              }
-                            >
-                              <option value="">All</option>
-                              {demandCountryOptions.map((id) => (
-                                <option key={id} value={id}>
-                                  {id}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      </th>
-                      <th aria-sort={demandAriaSort('dest')}>
+                      <th aria-sort={demandAriaSort('route')}>
                         <button
                           type="button"
-                          className={`sort-header${demandSort.key === 'dest' ? ' is-sorted' : ''}`}
-                          title="Sort by destination"
-                          onClick={() => toggleDemandSort('dest')}
+                          className={`sort-header${demandSort.key === 'route' ? ' is-sorted' : ''}`}
+                          title="Sort by route"
+                          onClick={() => toggleDemandSort('route')}
                         >
-                          Dest <span>{demandSortIndicator('dest')}</span>
+                          Route <span>{demandSortIndicator('route')}</span>
                         </button>
                       </th>
                       <th aria-sort={demandAriaSort('dist')}>
@@ -7143,15 +7047,13 @@ export function PortsPanel(props: {
                   <tbody key={demandTableKey}>
                     {sortedDemand.length === 0 ? (
                       <tr>
-                        <td colSpan={9}>
+                        <td colSpan={8}>
                           <p className="empty">
                             {!port
                               ? 'Select a port.'
                               : portDeskOrders.length === 0 && demand.length === 0
                                 ? 'No open Demand — check after a tick.'
-                                : demandCountryFilter
-                                  ? 'No Demand in this country — clear the filter.'
-                                  : 'No Demand on this desk yet.'}
+                                : 'No Demand on this desk yet.'}
                           </p>
                         </td>
                       </tr>
@@ -7160,7 +7062,6 @@ export function PortsPanel(props: {
                         const cargoLocked = isCargoOpsCommodityLocked(
                           o.commodityId,
                         );
-                        const countryId = demandDestCountryId(o);
                         const held = heldOrderIds.has(o.id);
                         return (
                         <tr
@@ -7173,24 +7074,15 @@ export function PortsPanel(props: {
                                 : undefined
                           }
                         >
-                          <td
-                            className="ports-demand-country-cell"
-                            title={demandCountryLabel(countryId)}
-                          >
-                            {countryId || '—'}
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="linkish"
+                          <td className="col-route">
+                            <PortBoardRoute
+                              originIcao={demandDeskPickupIcao ?? ''}
+                              destIcao={o.destIcao}
+                              originName={demandOriginName}
+                              destName={o.destName}
                               disabled={props.busy}
-                              title={o.destName?.trim() || o.destIcao}
-                              onClick={() =>
-                                props.onOpenAirport?.(o.destIcao)
-                              }
-                            >
-                              {o.destIcao}
-                            </button>
+                              onOpen={props.onOpenAirport}
+                            />
                           </td>
                           <td
                             className="muted"

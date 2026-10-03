@@ -39,9 +39,8 @@ export function CharterManifest(props: CharterManifestProps) {
     ? props.resolveOpsCompanyId?.(aircraft.id)
     : undefined;
   const origin = props.draft.offer.originIcao.trim().toUpperCase();
-  const atOrigin =
-    aircraft?.status === 'parked' &&
-    aircraft.locationIcao.trim().toUpperCase() === origin;
+  const aircraftHere = aircraft?.locationIcao.trim().toUpperCase() ?? '';
+  const atOrigin = aircraft?.status === 'parked' && aircraftHere === origin;
   const fit = props.draft.offer.fit;
   const updateBlocked = Boolean(props.clientUpdateRequiredMin);
   const valid = Boolean(
@@ -147,14 +146,15 @@ export function CharterManifest(props: CharterManifestProps) {
                 .map((item) => {
                   const isVa = props.vaAircraftIds?.has(item.id);
                   const prefix = isVa ? 'Airline' : 'Yours';
+                  const here = item.locationIcao.trim().toUpperCase();
                   const enRoute =
                     item.status === 'ferry' && item.npcFerry
                       ? `Line crew → ${item.npcFerry.destIcao}`
                       : item.status === 'ferry'
                         ? 'Line crew en route'
-                        : item.locationIcao === origin
+                        : here === origin
                           ? `@ ${origin}`
-                          : `ferry from ${item.locationIcao}`;
+                          : `ferry from ${here}`;
                   return (
                   <option
                     key={item.id}
@@ -170,7 +170,9 @@ export function CharterManifest(props: CharterManifestProps) {
           {aircraft && !atOrigin ? (
             <div className="staging-manifest-ferry">
               <p className="muted staging-manifest-ferry-hint">
-                {aircraft.label} is at {aircraft.locationIcao} — ferry to {origin} before accepting.
+                {aircraftHere === origin
+                  ? `${aircraft.label} is at ${origin} but is not parked.`
+                  : `${aircraft.label} is at ${aircraft.locationIcao.trim().toUpperCase()} — ferry to ${origin} before accepting.`}
               </p>
               <button
                 type="button"

@@ -16,6 +16,7 @@
  */
 
 import pg from 'pg';
+import { overlayLiveEconomyOntoPulseSnapshot } from './career-charter.js';
 import {
   AUTH_ONLINE_WINDOW_MS,
   AUTH_SESSION_TTL_MS,
@@ -2209,6 +2210,10 @@ export class PostgresCareerStore implements CareerStore {
           // advanced; lease holder already skips tip via persistRevisioned.
           applyToRam ? expected : undefined,
           lotDelta,
+          applyToRam
+            ? undefined
+            : (world) =>
+                overlayLiveEconomyOntoPulseSnapshot(world, this.ram),
         ),
       () => {
         if (applyToRam) {
@@ -2277,6 +2282,8 @@ export class PostgresCareerStore implements CareerStore {
           toSave,
           { lotDelta, airportIcaos },
           LOCAL_WORLD_ID,
+          undefined,
+          (world) => overlayLiveEconomyOntoPulseSnapshot(world, this.ram),
         ),
       () => {
         world.pendingHubEconomySamples = undefined;
@@ -2537,7 +2544,10 @@ export class PostgresCareerStore implements CareerStore {
       },
     );
   }
-  async persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void> {
+  async persistNpcLiveWorld(
+    world: CareerEconomyWorld,
+    opts?: { fromDeferredSlice?: boolean },
+  ): Promise<void> {
     await this.ready;
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
@@ -2550,10 +2560,34 @@ export class PostgresCareerStore implements CareerStore {
       toSave.pendingHubEconomySamples = world.pendingHubEconomySamples;
     }
     ensureHomeCountryId(toSave);
+    const keepCommandNpcs = opts?.fromDeferredSlice === true;
     await this.persistRevisioned(
       (expected) =>
-        persistNpcLiveToPg(this.pool, toSave, LOCAL_WORLD_ID, expected),
+        persistNpcLiveToPg(
+          this.pool,
+          toSave,
+          LOCAL_WORLD_ID,
+          expected,
+          keepCommandNpcs
+            ? (locked) => {
+                const npcs = locked.npcs;
+                const npcFlights = locked.npcFlights;
+                overlayLiveEconomyOntoPulseSnapshot(locked, this.ram);
+                locked.npcs = npcs;
+                locked.npcFlights = npcFlights;
+              }
+            : undefined,
+        ),
       () => {
+        const liveLoaded = (this.ram?.airports?.length ?? 0) > 0;
+        if (keepCommandNpcs && this.ram && liveLoaded) {
+          this.ram.npcs = toSave.npcs ?? [];
+          this.ram.npcFlights = toSave.npcFlights ?? [];
+          world.pendingHubEconomySamples = undefined;
+          this.lotSyncBaseline = null;
+          this.airportSyncBaseline = null;
+          return;
+        }
         this.ram = toSave;
         world.pendingHubEconomySamples = undefined;
         this.lotSyncBaseline = null;

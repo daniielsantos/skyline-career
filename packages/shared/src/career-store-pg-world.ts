@@ -2969,50 +2969,60 @@ export async function persistEconomyTablesToPg(
   worldId: string = LOCAL_WORLD_ID,
   expectedRevision?: bigint,
   lotDelta?: LotSyncDelta | null,
+  onRevisionLocked?: (world: CareerEconomyWorld) => void,
 ): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
-  const airports = world.airports ?? [];
-  const lots = world.lots ?? [];
-  const lotUpsertIds = lotDelta ? new Set(lotDelta.upsertIds) : null;
-  const inbound = world.inboundPending ?? [];
-  const { hubRows, stockRows } = airportTableRows(wid, airports);
-  const lotRows = lotTableRows(
-    wid,
-    lotUpsertIds ? lots.filter((lot) => lotUpsertIds.has(lot.id)) : lots,
-    airports,
-    sqlNum(world.tick),
-  );
-  const inboundRows = inboundTableRows(wid, inbound);
-  const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
-  const eventRows = economyEventTableRows(wid, world.events ?? []);
-  const npcRows = npcTableRows(wid, world.npcs ?? []);
-  const truckRows = fuelTruckTableRows(wid, world.fuelTrucks ?? []);
-  const haulRows = fuelHaulTableRows(wid, world.fuelHauls ?? []);
-  const demandRows = demandOrderTableRows(wid, world.demandOrders ?? []);
-  const listingRows = portListingTableRows(wid, world.portListings ?? []);
-  const invRows = portInventoryTableRows(wid, world.portInventories ?? []);
-  const concessionRows = portConcessionTableRows(
-    wid,
-    world.portConcessions ?? [],
-  );
-  const instanceRows = aircraftInstanceTableRows(
-    wid,
-    world.aircraftInstances ?? [],
-  );
-  const charterDemandRows = charterDemandTableRows(
-    wid,
-    world.charterDemand ?? [],
-  );
-  const charterHubRows = charterHubTableRows(wid, world.charterHubs ?? []);
-  const charterOfferRows = charterOfferTableRows(
-    wid,
-    world.charterOffers ?? [],
-    sqlNum(world.tick),
-  );
-
   return withTx(pool, async (client) => {
     await ensureWorldRow(client, wid);
     await lockEconomyRevision(client, wid, expectedRevision);
+    onRevisionLocked?.(world);
+    const airports = world.airports ?? [];
+    const lots = world.lots ?? [];
+    const liveLotIds = new Set(lots.map((lot) => lot.id));
+    const effectiveLotDelta = lotDelta
+      ? {
+          upsertIds: lotDelta.upsertIds,
+          deleteIds: lotDelta.deleteIds.filter((id) => !liveLotIds.has(id)),
+        }
+      : lotDelta;
+    const lotUpsertIds = effectiveLotDelta
+      ? new Set(effectiveLotDelta.upsertIds)
+      : null;
+    const inbound = world.inboundPending ?? [];
+    const { hubRows, stockRows } = airportTableRows(wid, airports);
+    const lotRows = lotTableRows(
+      wid,
+      lotUpsertIds ? lots.filter((lot) => lotUpsertIds.has(lot.id)) : lots,
+      airports,
+      sqlNum(world.tick),
+    );
+    const inboundRows = inboundTableRows(wid, inbound);
+    const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
+    const eventRows = economyEventTableRows(wid, world.events ?? []);
+    const npcRows = npcTableRows(wid, world.npcs ?? []);
+    const truckRows = fuelTruckTableRows(wid, world.fuelTrucks ?? []);
+    const haulRows = fuelHaulTableRows(wid, world.fuelHauls ?? []);
+    const demandRows = demandOrderTableRows(wid, world.demandOrders ?? []);
+    const listingRows = portListingTableRows(wid, world.portListings ?? []);
+    const invRows = portInventoryTableRows(wid, world.portInventories ?? []);
+    const concessionRows = portConcessionTableRows(
+      wid,
+      world.portConcessions ?? [],
+    );
+    const instanceRows = aircraftInstanceTableRows(
+      wid,
+      world.aircraftInstances ?? [],
+    );
+    const charterDemandRows = charterDemandTableRows(
+      wid,
+      world.charterDemand ?? [],
+    );
+    const charterHubRows = charterHubTableRows(wid, world.charterHubs ?? []);
+    const charterOfferRows = charterOfferTableRows(
+      wid,
+      world.charterOffers ?? [],
+      sqlNum(world.tick),
+    );
 
     const leftoverCols = economyMetaLeftoverColumnParams(world);
     await client.query(
@@ -3078,7 +3088,7 @@ export async function persistEconomyTablesToPg(
       );
     }
 
-    await syncLotsTableToPg(client, wid, lotRows, lotDelta);
+    await syncLotsTableToPg(client, wid, lotRows, effectiveLotDelta);
 
     await client.query(`DELETE FROM inbound_pending WHERE world_id = $1`, [wid]);
     if (inboundRows.length > 0) {
@@ -3279,30 +3289,44 @@ export async function persistArrivalPulseToPg(
   },
   worldId: string = LOCAL_WORLD_ID,
   expectedRevision?: bigint,
+  onRevisionLocked?: (world: CareerEconomyWorld) => void,
 ): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
   const icaoSet = new Set(
     opts.airportIcaos.map((code) => code.trim().toUpperCase()).filter(Boolean),
   );
-  const airports = (world.airports ?? []).filter((ap) =>
-    icaoSet.has(String(ap.icao ?? '').trim().toUpperCase()),
-  );
-  const { hubRows, stockRows } = airportTableRows(wid, airports);
-  const lotRows = lotTableRows(
-    wid,
-    world.lots ?? [],
-    world.airports ?? [],
-    sqlNum(world.tick),
-  );
-  const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], world.airports ?? []);
-  const npcRows = npcTableRows(wid, world.npcs ?? []);
-  const truckRows = fuelTruckTableRows(wid, world.fuelTrucks ?? []);
-  const haulRows = fuelHaulTableRows(wid, world.fuelHauls ?? []);
-  const icaoList = [...icaoSet];
 
   return withTx(pool, async (client) => {
     await ensureWorldRow(client, wid);
     await lockEconomyRevision(client, wid, expectedRevision);
+    onRevisionLocked?.(world);
+    const airports = (world.airports ?? []).filter((ap) =>
+      icaoSet.has(String(ap.icao ?? '').trim().toUpperCase()),
+    );
+    const lots = world.lots ?? [];
+    const liveLotIds = new Set(lots.map((lot) => lot.id));
+    const lotDelta = opts.lotDelta
+      ? {
+          upsertIds: opts.lotDelta.upsertIds,
+          deleteIds: opts.lotDelta.deleteIds.filter((id) => !liveLotIds.has(id)),
+        }
+      : opts.lotDelta;
+    const { hubRows, stockRows } = airportTableRows(wid, airports);
+    const lotRows = lotTableRows(
+      wid,
+      lots,
+      world.airports ?? [],
+      sqlNum(world.tick),
+    );
+    const npcFlightRows = npcFlightTableRows(
+      wid,
+      world.npcFlights ?? [],
+      world.airports ?? [],
+    );
+    const npcRows = npcTableRows(wid, world.npcs ?? []);
+    const truckRows = fuelTruckTableRows(wid, world.fuelTrucks ?? []);
+    const haulRows = fuelHaulTableRows(wid, world.fuelHauls ?? []);
+    const icaoList = [...icaoSet];
 
     const leftoverCols = economyMetaLeftoverColumnParams(world);
     await client.query(
@@ -3368,7 +3392,7 @@ export async function persistArrivalPulseToPg(
       }
     }
 
-    await syncLotsTableToPg(client, wid, lotRows, opts.lotDelta);
+    await syncLotsTableToPg(client, wid, lotRows, lotDelta);
 
     await client.query(`DELETE FROM npc_flights WHERE world_id = $1`, [wid]);
     if (npcFlightRows.length > 0) {
@@ -3756,23 +3780,25 @@ export async function persistNpcLiveToPg(
   world: CareerEconomyWorld,
   worldId: string = LOCAL_WORLD_ID,
   expectedRevision?: bigint,
+  onRevisionLocked?: (world: CareerEconomyWorld) => void,
 ): Promise<bigint> {
   const wid = worldId.trim() || LOCAL_WORLD_ID;
-  const airports = world.airports ?? [];
-  const lots = world.lots ?? [];
-  const inbound = world.inboundPending ?? [];
-  const { hubRows, stockRows } = airportTableRows(wid, airports);
-  const lotRows = lotTableRows(wid, lots, airports, sqlNum(world.tick));
-  const inboundRows = inboundTableRows(wid, inbound);
-  const npcRows = npcTableRows(wid, world.npcs ?? []);
-  const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
-  const instanceRows = aircraftInstanceTableRows(
-    wid,
-    world.aircraftInstances ?? [],
-  );
   return withTx(pool, async (client) => {
     await ensureWorldRow(client, wid);
     await lockEconomyRevision(client, wid, expectedRevision);
+    onRevisionLocked?.(world);
+    const airports = world.airports ?? [];
+    const lots = world.lots ?? [];
+    const inbound = world.inboundPending ?? [];
+    const { hubRows, stockRows } = airportTableRows(wid, airports);
+    const lotRows = lotTableRows(wid, lots, airports, sqlNum(world.tick));
+    const inboundRows = inboundTableRows(wid, inbound);
+    const npcRows = npcTableRows(wid, world.npcs ?? []);
+    const npcFlightRows = npcFlightTableRows(wid, world.npcFlights ?? [], airports);
+    const instanceRows = aircraftInstanceTableRows(
+      wid,
+      world.aircraftInstances ?? [],
+    );
     const leftoverCols = economyMetaLeftoverColumnParams(world);
     await client.query(
       `INSERT INTO economy_meta (

@@ -1914,6 +1914,7 @@ export function fetchCharters(opts: {
   if (opts.pageSize !== undefined) qs.set('pageSize', String(opts.pageSize));
   if (opts.sort?.trim()) qs.set('sort', opts.sort.trim());
   if (opts.offerId?.trim()) qs.set('offerId', opts.offerId.trim());
+  const companyId = opts.companyId?.trim();
   return api<{
     offers: CharterOfferView[];
     total: number;
@@ -1921,7 +1922,9 @@ export function fetchCharters(opts: {
     pageCount: number;
     tick: number;
     sort?: string;
-  }>(`/api/charters${qs.size ? `?${qs.toString()}` : ''}`);
+  }>(`/api/charters${qs.size ? `?${qs.toString()}` : ''}`, companyId
+    ? { headers: { 'X-Skyline-Company-Id': companyId } }
+    : undefined);
 }
 
 export function postCharterAccept(opts: {
@@ -1934,6 +1937,8 @@ export function postCharterAccept(opts: {
     walletUsd: number;
     fleet: PlayerAircraft[];
     charterActiveTour?: CharterActiveTourView | null;
+    /** Hangar the mission was booked on. May differ from the chrome company. */
+    companyId?: string;
   }>('/api/charters/accept', {
     method: 'POST',
     body: JSON.stringify(opts),

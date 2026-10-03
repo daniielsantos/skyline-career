@@ -1554,6 +1554,54 @@ export function takePortCharterOffer(
   return offer;
 }
 
+/**
+ * Tables a player command can commit after a pulse snapshot was cloned.
+ * The pulse save full-replaces these. Copy the live arrays so that save
+ * does not put the old rows back. Airports prove RAM is loaded: an empty
+ * live planet must not wipe a snapshot that already has hubs.
+ */
+const PULSE_SNAPSHOT_LIVE_KEYS = [
+  'airports',
+  'lots',
+  'inboundPending',
+  'npcFlights',
+  'npcs',
+  'events',
+  'fuelTrucks',
+  'fuelHauls',
+  'demandOrders',
+  'portListings',
+  'portInventories',
+  'portConcessions',
+  'aircraftInstances',
+  'charterOffers',
+  'charterHubs',
+  'charterDemand',
+] as const satisfies readonly (keyof CareerEconomyWorld)[];
+
+export function overlayLiveEconomyOntoPulseSnapshot(
+  snapshot: CareerEconomyWorld,
+  live: CareerEconomyWorld | null | undefined,
+): void {
+  if (!live) return;
+  const snapAirports = snapshot.airports?.length ?? 0;
+  const liveAirports = live.airports?.length ?? 0;
+  if (snapAirports > 0 && liveAirports === 0) return;
+  for (const key of PULSE_SNAPSHOT_LIVE_KEYS) {
+    const liveRows = live[key];
+    if (!Array.isArray(liveRows)) continue;
+    snapshot[key] = liveRows as never;
+  }
+}
+
+/** @deprecated Use {@link overlayLiveEconomyOntoPulseSnapshot}. */
+export function overlayLiveCharterOntoPulseSnapshot(
+  snapshot: CareerEconomyWorld,
+  live: CareerEconomyWorld | null | undefined,
+): void {
+  overlayLiveEconomyOntoPulseSnapshot(snapshot, live);
+}
+
 /** Drop an offer that was taken but not reserved, and put the people back. */
 export function undoTakenCharterOffer(
   world: CareerEconomyWorld,

@@ -3343,6 +3343,12 @@ th {
   white-space: nowrap;
 }
 
+.charter-fare-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
 .commodity-inline {
   display: inline-flex;
   align-items: center;
@@ -12154,13 +12160,27 @@ span.dispatch-route-hub-dest {
   white-space: normal;
 }
 
-.ports-demand-country-th-inner {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0.35rem;
-  min-width: 0;
+.ports-demand-table .route {
+  gap: 0.2rem 0.35rem;
+}
+
+.ports-demand-table .icao-link {
+  font-size: 1.05rem;
+}
+
+/* The wait ball is taken out of the flex row. Side padding already fits it,
+   so Accept does not grow and the other columns stay put. */
+.ports-demand-table .accept {
+  position: relative;
+  box-sizing: border-box;
+  padding-inline: calc(0.85rem + 0.85rem + 0.2rem);
+}
+
+.ports-demand-table button.accept[data-action-wait='1']:not(:has(.busy-spinner))::before {
+  position: absolute;
+  inset-inline-start: 0.42rem;
+  top: 50%;
+  margin: -0.425rem 0 0;
 }
 
 .ports-demand-filters {
@@ -12198,43 +12218,6 @@ span.dispatch-route-hub-dest {
   background: rgba(12, 12, 14, 0.65);
   color: inherit;
   font: inherit;
-}
-
-.ports-demand-country-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.86rem;
-}
-
-.ports-demand-country-filter-in-th {
-  flex: 0 0 auto;
-  width: auto;
-}
-
-.ports-demand-country-filter select {
-  min-width: 11rem;
-  padding: 0.35rem 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  background: rgba(12, 12, 14, 0.65);
-  color: inherit;
-  font: inherit;
-}
-
-.ports-demand-country-filter-in-th select {
-  min-width: 3.6rem;
-  width: auto;
-  max-width: 4.75rem;
-  padding: 0.2rem 0.3rem;
-  font-size: 0.76rem;
-  border-radius: 4px;
-}
-
-.ports-demand-country-cell {
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: rgba(240, 163, 90, 0.95);
 }
 
 .ports-yard-aging td {

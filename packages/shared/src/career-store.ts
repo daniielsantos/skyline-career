@@ -306,7 +306,10 @@ export interface CareerStore {
    * Contract-pilot / NPC live: lots, inbound, dirty airports, NPC roster +
    * flights — not port/demand ops tables.
    */
-  persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void>;
+  persistNpcLiveWorld(
+    world: CareerEconomyWorld,
+    opts?: { fromDeferredSlice?: boolean },
+  ): Promise<void>;
   /** Dealer pool rows only (F7); blob stub no longer holds instances. */
   persistAircraftPool(world: CareerEconomyWorld): Promise<void>;
   /**
@@ -1184,7 +1187,10 @@ class JsonCareerStore implements CareerStore {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
-  async persistNpcLiveWorld(_world: CareerEconomyWorld): Promise<void> {
+  async persistNpcLiveWorld(
+    _world: CareerEconomyWorld,
+    _opts?: { fromDeferredSlice?: boolean },
+  ): Promise<void> {
     if (this.ram) await this.saveEconomy(this.ram);
   }
 
@@ -2074,7 +2080,10 @@ class SqliteCareerStore implements CareerStore {
     this.lastInboundKey = inboundPersistKey(world);
   }
 
-  async persistNpcLiveWorld(world: CareerEconomyWorld): Promise<void> {
+  async persistNpcLiveWorld(
+    world: CareerEconomyWorld,
+    _opts?: { fromDeferredSlice?: boolean },
+  ): Promise<void> {
     const toSave = migrateEconomyWorld(world);
     toSave.lastBatchAtMs = world.lastBatchAtMs;
     toSave.lastSyncedAtMs = world.lastBatchAtMs;

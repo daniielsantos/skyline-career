@@ -137,6 +137,13 @@ function holdPositionOk(
   return !(position.lat === 0 && position.lon === 0);
 }
 
+function charterFareLabel(tier: string | undefined): string | null {
+  if (tier === 'executive') return 'Executive';
+  if (tier === 'premium') return 'Premium';
+  if (tier === 'standard') return 'Standard';
+  return null;
+}
+
 export function DispatchActivePanel(props: {
   mission: Mission;
   /** Other contracts on this aircraft. Their lots ride until their own stop. */
@@ -784,12 +791,24 @@ export function DispatchActivePanel(props: {
             ) : null}
           </div>
           {mission.missionType === 'charter' ? (
-            <p className="empty">
-              {mission.pax ?? 0} passenger{(mission.pax ?? 0) === 1 ? '' : 's'}
-              {' · '}
-              {formatMassExact(mission.baggageKg ?? 0, weightSystem)} baggage
-              {mission.reason?.trim() ? ` · ${mission.reason.trim()}` : ''}
-            </p>
+            <dl className="charter-pax-facts">
+              <div>
+                <dt>Group</dt>
+                <dd>{mission.pax ?? 0}</dd>
+              </div>
+              <div>
+                <dt>Baggage</dt>
+                <dd>
+                  {formatMassExact(mission.baggageKg ?? 0, weightSystem)}
+                </dd>
+              </div>
+              {charterFareLabel(mission.charterTier) ? (
+                <div>
+                  <dt>Fare</dt>
+                  <dd>{charterFareLabel(mission.charterTier)}</dd>
+                </div>
+              ) : null}
+            </dl>
           ) : aircraftCargoLines(mission, props.tripMissions).length > 0 ? (
             <CargoLotCards
               lots={aircraftCargoLines(mission, props.tripMissions)}

@@ -104,7 +104,9 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 ## Charter na concessão (shipped desktop 0.3.442, 2026-10-03)
 
-Atualizado 2026-10-03: **Manifesto some no update** — sintoma = atualizar o app na página do manifesto reabre em Freights sem o card. Causa = o card era só estado React; o grupo já estava no mundo (`charter-offer:port:`) e o quadro da Base esconde esse id. Fix = no boot, `GET /api/ports/charter/hold` reabre o card e volta ao Staging. Discard/Accept apagam o rascunho local.
+Atualizado 2026-10-03: **Linha Passengers do dispatch** — `executive` não é o tamanho do grupo. `chooseTier` sorteia standard / premium / executive com um viés da atração do destino; executive paga 1,8×. A linha do voo ativo colava `reason` (`Charter · executive · 59 pax`) depois da bagagem e repetia a contagem. Agora são três fatos: Group, Baggage, Fare.
+
+Atualizado 2026-10-03: **Hold do manifesto perdido** — sintoma = 0.3.446 reaberto com o world já no ar continua sem card. Causa = o prepare grava o `charter-offer:port:` e sai do lock; o pulse que já tinha clonado o mundo salva depois (`applyToRam: false`) e `syncCharterOffersTableToPg` apaga o id que não está no clone. O restart lê o Postgres sem o hold, então o GET devolve null. O mesmo save regrava `charter_hubs` do clone, então a fila do lobby volta. O card dessa abertura não tem o que restaurar.
 
 Atualizado 2026-10-03: **Reposicionamento sem origem do charter** — sintoma = depois do ferry, o modal Travel from SEGU não sugeria o hub de origem (KMIA). Causa = os atalhos do modal só liam Dispatch e missão aceita; o manifesto do charter fica em `charterManifest`. Fix = chip **Charter origin** com o ICAO do manifesto.
 

@@ -965,6 +965,34 @@ function blockReasonAnotherActiveFlight(
   return `Finish or cancel the ${route} flight on ${tail} before staging another`;
 }
 
+function charterHoldClientView(
+  world: CareerEconomyWorld,
+  offer: CharterOffer,
+) {
+  const airports = new Map(
+    world.airports.map((airport) => [airport.icao.toUpperCase(), airport]),
+  );
+  return {
+    id: offer.id,
+    originIcao: offer.originIcao,
+    destIcao: offer.destIcao,
+    originName: airports.get(offer.originIcao)?.name ?? offer.originIcao,
+    destName: airports.get(offer.destIcao)?.name ?? offer.destIcao,
+    paxCount: offer.groupSize,
+    baggageKg: offer.baggageKg,
+    payUsd: offer.payUsd,
+    basePayUsd: offer.payUsd,
+    urgency: offer.urgency === 'normal' ? ('normal' as const) : ('urgent' as const),
+    reason: `Charter · ${offer.tier} · ${offer.groupSize} pax`,
+    createdAtTick: offer.createdAtTick,
+    expiresAtTick: offer.expiresAtTick,
+    ticksRemaining: Math.max(0, offer.expiresAtTick - world.tick),
+    distanceNm: offer.distanceNm,
+    international: offer.international,
+    status: offer.status,
+  };
+}
+
 function charterAircraftFit(
   world: CareerEconomyWorld,
   missions: CareerMissionsState,
@@ -10192,6 +10220,31 @@ export function createCareerApiServer(port = 8787) {
         return;
       }
 
+      if (req.method === 'GET' && path === '/api/ports/charter/hold') {
+        const holdCompanyId = companyIdFromRequest(
+          req,
+          url.searchParams.get('companyId'),
+        );
+        try {
+          const held = await withCareerRead((world) => {
+            const offer = (world.charterOffers ?? [])
+              .filter(
+                (row) =>
+                  row.status === 'available' &&
+                  row.id.startsWith('charter-offer:port:') &&
+                  world.tick < row.expiresAtTick,
+              )
+              .sort((a, b) => b.createdAtTick - a.createdAtTick)[0];
+            return { offer: offer ? charterHoldClientView(world, offer) : null };
+          }, { companyId: holdCompanyId });
+          send(res, 200, held);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          send(res, 400, { error: message });
+        }
+        return;
+      }
+
       if (req.method === 'POST' && path === '/api/ports/charter/prepare') {
         const body = (await readBody(req)) as {
           portId?: string;
@@ -10223,29 +10276,8 @@ export function createCareerApiServer(port = 8787) {
               destIcao: body.destIcao!,
               level,
             });
-            const airports = new Map(
-              world.airports.map((airport) => [airport.icao.toUpperCase(), airport]),
-            );
             return {
-              offer: {
-                id: offer.id,
-                originIcao: offer.originIcao,
-                destIcao: offer.destIcao,
-                originName: airports.get(offer.originIcao)?.name ?? offer.originIcao,
-                destName: airports.get(offer.destIcao)?.name ?? offer.destIcao,
-                paxCount: offer.groupSize,
-                baggageKg: offer.baggageKg,
-                payUsd: offer.payUsd,
-                basePayUsd: offer.payUsd,
-                urgency: offer.urgency === 'normal' ? 'normal' : 'urgent',
-                reason: `Charter · ${offer.tier} · ${offer.groupSize} pax`,
-                createdAtTick: offer.createdAtTick,
-                expiresAtTick: offer.expiresAtTick,
-                ticksRemaining: Math.max(0, offer.expiresAtTick - world.tick),
-                distanceNm: offer.distanceNm,
-                international: offer.international,
-                status: offer.status,
-              },
+              offer: charterHoldClientView(world, offer),
               ports: portSnapshot(world, missions, {
                 viewerCompanyId: prepareCompanyId,
               }),

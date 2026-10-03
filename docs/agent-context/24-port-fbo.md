@@ -104,6 +104,8 @@ Você é **operador de porto / FBO de chão**: compra, guarda, despacha last-mil
 
 ## Charter na concessão (shipped desktop 0.3.442, 2026-10-03)
 
+Atualizado 2026-10-03: **Manifesto some no update** — sintoma = atualizar o app na página do manifesto reabre em Freights sem o card. Causa = o card era só estado React; o grupo já estava no mundo (`charter-offer:port:`) e o quadro da Base esconde esse id. Fix = no boot, `GET /api/ports/charter/hold` reabre o card e volta ao Staging. Discard/Accept apagam o rascunho local.
+
 Atualizado 2026-10-03: **Reposicionamento sem origem do charter** — sintoma = depois do ferry, o modal Travel from SEGU não sugeria o hub de origem (KMIA). Causa = os atalhos do modal só liam Dispatch e missão aceita; o manifesto do charter fica em `charterManifest`. Fix = chip **Charter origin** com o ICAO do manifesto.
 
 Atualizado 2026-10-03: **Charter do porto abre o manifesto** — sintoma = Accept exigia um avião já parado no hub e ia direto ao Dispatch, sem ferry. Causa = o desk reservava e criava a missão no mesmo clique. Fix = Accept chama `prepare` (trava o grupo fora do quadro da Base), abre o CharterManifest com Fit e ferry, e o Accept de lá usa o `/api/charters/accept`. Discard chama `release` e devolve a fila.

@@ -3888,6 +3888,14 @@ export function postPortJetAHaul(opts: { orderId: string; aircraftId: string }) 
   });
 }
 
+export function fetchPortCharterHold(opts: { companyId?: string } = {}) {
+  const qs = new URLSearchParams();
+  if (opts.companyId?.trim()) qs.set('companyId', opts.companyId.trim());
+  return api<{ offer: CharterOfferView | null }>(
+    `/api/ports/charter/hold${qs.size ? `?${qs.toString()}` : ''}`,
+  );
+}
+
 export function postPortCharterPrepare(opts: {
   portId: string;
   destIcao: string;

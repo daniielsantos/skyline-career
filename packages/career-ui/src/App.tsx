@@ -23,6 +23,7 @@ import {
   fetchSimBridgeStatus,
   postCancel,
   postCharterAccept,
+  fetchPortCharterHold,
   postPortCharterPrepare,
   postPortCharterRelease,
   postConfirmOfp,
@@ -256,6 +257,11 @@ import {
   writePersistedStagingDraft,
   shouldDiscardPersistedStagingDraft,
 } from './staging-draft-persist';
+import {
+  clearPersistedPortCharterManifest,
+  readPersistedPortCharterManifest,
+  writePersistedPortCharterManifest,
+} from './charter-manifest-persist';
 import { AirportNamesProvider, IcaoLink } from './IcaoLink';
 import { BusyBlock, BusyBoot, BusyChip, BusyStatus, TableSkeleton } from './Busy';
 import { CareerProfileManage, ProfileGate, ProfileGateLoading } from './ProfileGate';
@@ -4078,6 +4084,7 @@ export function App() {
   /** One-shot: reopen mid-flight → Dispatch so settle UI is visible. */
   const airborneResumeNavDoneRef = useRef(false);
   const stagingRestoreAttemptedRef = useRef<string | null>(null);
+  const portCharterRestoreAttemptedRef = useRef<string | null>(null);
   const [maxCargoKg, setMaxCargoKg] = useState<number | null>(null);
   /** Which fleet tail the live `maxCargoKg` belongs to — ignore stale C152=0 after switching to Duke. */
   const [maxCargoBoundAircraftId, setMaxCargoBoundAircraftId] = useState<
@@ -7162,6 +7169,77 @@ export function App() {
     staging,
     charterManifest,
     activeMission?.id,
+  ]);
+
+  // Port charter manifest is a world hold plus this card. An app update drops
+  // the React state; the group stays reserved until we reopen the card.
+  useEffect(() => {
+    if (
+      showProfileGate ||
+      !activeCareerProfile?.id ||
+      !careerReady ||
+      charterManifest ||
+      activeMission
+    ) {
+      return;
+    }
+    if (fleet.length === 0) return;
+    const restoreKey = `${activeCareerProfile.id}:${authAccountId ?? 'local'}`;
+    if (portCharterRestoreAttemptedRef.current === restoreKey) return;
+    portCharterRestoreAttemptedRef.current = restoreKey;
+    const profileId = activeCareerProfile.id;
+    const companyId =
+      homeCompanyId?.trim() || homeCompanyIdRef.current?.trim() || undefined;
+    let cancelled = false;
+    let done = false;
+    void fetchPortCharterHold({ companyId })
+      .then((held) => {
+        if (cancelled) return;
+        done = true;
+        if (!held.offer) return;
+        const saved = readPersistedPortCharterManifest(profileId, authAccountId);
+        const savedAircraft =
+          saved?.offerId === held.offer.id
+            ? fleet.find((item) => item.id === saved.aircraftId)
+            : undefined;
+        const origin = held.offer.originIcao.trim().toUpperCase();
+        const parkedAtOrigin = fleet.find(
+          (item) =>
+            item.status === 'parked' &&
+            item.locationIcao.trim().toUpperCase() === origin,
+        );
+        const parked = fleet.find((item) => item.status === 'parked');
+        const aircraft = savedAircraft ?? parkedAtOrigin ?? parked ?? fleet[0];
+        if (!aircraft) return;
+        portCharterCompanyRef.current = saved?.companyId || companyId;
+        setCharterManifest({ offer: held.offer, aircraftId: aircraft.id });
+        writePersistedPortCharterManifest(
+          profileId,
+          {
+            offerId: held.offer.id,
+            aircraftId: aircraft.id,
+            companyId: portCharterCompanyRef.current,
+          },
+          authAccountId,
+        );
+        goToTab('staging');
+      })
+      .catch(() => {
+        if (!cancelled) portCharterRestoreAttemptedRef.current = null;
+      });
+    return () => {
+      cancelled = true;
+      if (!done) portCharterRestoreAttemptedRef.current = null;
+    };
+  }, [
+    showProfileGate,
+    activeCareerProfile?.id,
+    authAccountId,
+    careerReady,
+    charterManifest,
+    activeMission,
+    fleet,
+    homeCompanyId,
   ]);
 
   useEffect(() => {
@@ -11413,6 +11491,17 @@ export function App() {
       companyId: args.companyId,
     });
     portCharterCompanyRef.current = args.companyId;
+    if (activeCareerProfile?.id) {
+      writePersistedPortCharterManifest(
+        activeCareerProfile.id,
+        {
+          offerId: prepared.offer.id,
+          aircraftId: aircraft.id,
+          companyId: args.companyId,
+        },
+        authAccountId,
+      );
+    }
     const restoreAirport = airportIcao
       ? { icao: airportIcao, section: terminalSection }
       : null;
@@ -11447,6 +11536,9 @@ export function App() {
         companyId: portCharterCompanyRef.current,
       });
       portCharterCompanyRef.current = undefined;
+      if (activeCareerProfile?.id) {
+        clearPersistedPortCharterManifest(activeCareerProfile.id, authAccountId);
+      }
       setCharterManifest(null);
     });
   }
@@ -11524,6 +11616,9 @@ export function App() {
         ]);
         setCharterManifest(null);
         portCharterCompanyRef.current = undefined;
+        if (activeCareerProfile?.id) {
+          clearPersistedPortCharterManifest(activeCareerProfile.id, authAccountId);
+        }
         setWatchAutoPaused(false);
         setSimbriefLaunchUrl(null);
         goToTab('staging');

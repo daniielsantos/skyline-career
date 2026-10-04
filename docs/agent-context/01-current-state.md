@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **0c8d2550** / desktop **0.3.475** shipped: Close a mid-route impact when the player opens the menu or repositions. Release: [v0.3.475](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.475).
+
+
 `main` **c771e2e1** / desktop **0.3.474** shipped: Keep the aircraft menu from freezing Preflight as if the flight were airborne. Release: [v0.3.474](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.474).
 
 

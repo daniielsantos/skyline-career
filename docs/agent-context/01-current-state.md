@@ -1,4 +1,7 @@
-# Current state (2026-10-03)
+# Current state (2026-10-04)
+
+`main` **d4dd8e91** / desktop **0.3.460** shipped: Draw the selected haul on the Hauls map and keep warehouse clicks on the port map. Release: [v0.3.460](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.460).
+
 
 `main` **6db6758f** / desktop **0.3.459** shipped: Draw the selected port board route on the map. Release: [v0.3.459](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.459).
 

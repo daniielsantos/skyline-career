@@ -201,8 +201,8 @@ export function AuthGate(props: {
         <button type="submit" className="action accept auth-gate-submit" disabled={busy}>
           {busy
             ? mode === 'login'
-              ? 'Signing in…'
-              : 'Creating account…'
+              ? 'Signing in'
+              : 'Creating account'
             : mode === 'login'
               ? 'Sign in'
               : 'Create account'}

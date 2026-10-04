@@ -431,7 +431,7 @@ export function PilotTravelDialog(props: {
               onClick={() => void submitTravel()}
             >
               {submitting
-                ? 'Traveling…'
+                ? 'Traveling'
                 : quote
                   ? `Travel · ${props.formatMoney(quote.costUsd)}`
                   : 'Travel'}

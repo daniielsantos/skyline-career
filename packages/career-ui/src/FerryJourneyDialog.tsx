@@ -280,7 +280,7 @@ export function FerryJourneyDialog(props: FerryJourneyDialogProps) {
               onClick={() => void flyNext()}
             >
               {flying
-                ? 'Ferrying…'
+                ? 'Ferrying'
                 : plan?.nextLeg
                   ? `Fly next leg · ${plan.nextLeg.from}→${plan.nextLeg.to}`
                   : 'Fly next leg'}

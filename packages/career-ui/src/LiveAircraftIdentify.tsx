@@ -65,7 +65,7 @@ export function LiveAircraftIdentify(props: Props) {
           void onIdentify();
         }}
       >
-        {busy ? 'Checking…' : 'In the sim'}
+        {busy ? 'Checking' : 'In the sim'}
       </button>
       {error ? (
         <p className="live-aircraft-identify-error" role="alert">

@@ -240,7 +240,7 @@ export function CharterManifest(props: CharterManifestProps) {
           onClick={() => void props.onAccept(props.draft)}
         >
           {props.busy
-            ? 'Accepting…'
+            ? 'Accepting'
             : updateBlocked
               ? 'Update required'
               : 'Accept & Dispatch'}

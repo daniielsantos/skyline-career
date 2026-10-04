@@ -522,7 +522,7 @@ export function PayloadLabPanel(props: {
           disabled={startDisabled}
           onClick={() => void onStart()}
         >
-          {working ? 'Starting…' : 'Start lab → Dispatch'}
+          {working ? 'Starting' : 'Start lab → Dispatch'}
         </button>
       </div>
     </section>

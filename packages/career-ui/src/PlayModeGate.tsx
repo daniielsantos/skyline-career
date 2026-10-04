@@ -130,7 +130,7 @@ export function PlayModeGate(props: {
         ) : null}
 
         <button type="submit" className="action primary" disabled={busy}>
-          {busy ? 'Starting…' : mode === 'mp' ? 'Join world' : 'Play offline'}
+          {busy ? 'Starting' : mode === 'mp' ? 'Join world' : 'Play offline'}
         </button>
       </form>
     </section>

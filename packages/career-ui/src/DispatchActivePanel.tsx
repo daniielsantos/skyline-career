@@ -445,7 +445,7 @@ export function DispatchActivePanel(props: {
             {busy ? (
               <>
                 <span className="busy-spinner busy-spinner-sm" aria-hidden="true" />
-                {mission.status === 'accepted' ? 'Opening…' : 'Re-opening…'}
+                {mission.status === 'accepted' ? 'Opening' : 'Re-opening'}
               </>
             ) : mission.status === 'accepted' ? (
               'Open SimBrief'
@@ -2149,9 +2149,9 @@ export function DispatchActivePanel(props: {
                               <strong>Airframe inject</strong>
                               <small>
                                 {injecting
-                                  ? 'Writing…'
+                                  ? 'Writing'
                                   : confirming
-                                    ? 'Checking…'
+                                    ? 'Checking'
                                   : injectFailed
                                     ? 'Failed · retry'
                                     : props.skylineInjectEnabled
@@ -2274,9 +2274,9 @@ export function DispatchActivePanel(props: {
                                   <strong>Airframe inject</strong>
                                   <small>
                                     {injecting
-                                      ? 'Writing…'
+                                      ? 'Writing'
                                       : confirming
-                                        ? 'Checking…'
+                                        ? 'Checking'
                                         : injectFailed
                                           ? 'Failed · retry'
                                           : props.skylineInjectEnabled
@@ -2590,7 +2590,7 @@ function JetAStockSlider(props: {
           disabled={disabled || !dirty || kg <= 0}
           onClick={() => void buy(Math.floor(kg))}
         >
-          {pending ? 'Buying…' : booked <= 0 ? 'Buy this load' : 'Update load'}
+          {pending ? 'Buying' : booked <= 0 ? 'Buy this load' : 'Update load'}
         </button>
       </div>
       {error ? <p className="muted">{error}</p> : null}

@@ -31,7 +31,7 @@ export function BusyButton(
 ) {
   const {
     busy = false,
-    busyLabel = 'Working…',
+    busyLabel = 'Working',
     children,
     className,
     disabled,

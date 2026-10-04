@@ -16469,7 +16469,7 @@ export function App() {
                                               }
                                             >
                                               {dispatchTourLoading
-                                                ? 'Searching…'
+                                                ? 'Searching'
                                                 : 'Search'}
                                             </button>
                                           </div>
@@ -16480,7 +16480,7 @@ export function App() {
                                     {dispatchTours.length === 0 ? (
                                         <p className="empty">
                                           {dispatchTourLoading
-                                            ? 'Searching…'
+                                            ? 'Searching'
                                             : mode !== 'fleet'
                                               ? 'Hire a Dispatcher above to unlock freight Search.'
                                               : 'Search for freights'}
@@ -16980,7 +16980,7 @@ export function App() {
                                                 }
                                               >
                                                 {dispatchTourLoading
-                                                  ? 'Searching…'
+                                                  ? 'Searching'
                                                   : 'Search'}
                                               </button>
                                             </div>
@@ -16991,7 +16991,7 @@ export function App() {
                                       {charterTours.length === 0 ? (
                                         <p className="empty">
                                           {dispatchTourLoading
-                                            ? 'Searching…'
+                                            ? 'Searching'
                                             : mode !== 'fleet'
                                               ? 'Hire a Dispatcher above to unlock charter Search.'
                                               : 'Search for charters'}
@@ -21223,7 +21223,7 @@ export function App() {
                           className="busy-spinner busy-spinner-sm"
                           aria-hidden="true"
                         />
-                        {staging.replaceManifest ? 'Saving…' : 'Accepting…'}
+                        {staging.replaceManifest ? 'Saving' : 'Accepting'}
                       </>
                     ) : clientUpdateBlock ? (
                       'Update required'

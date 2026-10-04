@@ -795,7 +795,7 @@ export function MarketListingCard(props: {
               props.onLease(listing.id, { deliver: deliver && canDeliver })
             }
           >
-            {props.busy ? 'Leasing…' : 'Lease'}
+            {props.busy ? 'Leasing' : 'Lease'}
           </button>
         ) : (
           <button
@@ -807,7 +807,7 @@ export function MarketListingCard(props: {
               props.onBuy(listing.id, { deliver: deliver && canDeliver })
             }
           >
-            {props.busy ? 'Buying…' : 'Buy'}
+            {props.busy ? 'Buying' : 'Buy'}
           </button>
         )}
       </div>

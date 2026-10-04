@@ -8131,7 +8131,7 @@ function PortBuyDialog(props: {
           <BusyButton
             className="accept"
             busy={props.busy}
-            busyLabel="Buying…"
+            busyLabel="Buying"
             disabled={!canConfirm}
             onClick={props.onConfirm}
           >
@@ -8337,7 +8337,7 @@ function ScoutHoldDialog(props: {
           <BusyButton
             className="action"
             busy={props.busy}
-            busyLabel="Holding…"
+            busyLabel="Holding"
             disabled={!canConfirm}
             onClick={() => props.onConfirm(kg)}
           >
@@ -8701,7 +8701,7 @@ function DemandAcceptDialog(props: {
             <BusyButton
               className="accept"
               busy={props.busy}
-              busyLabel="Holding…"
+              busyLabel="Holding"
               disabled={!canHold}
               onClick={props.onConfirmHold}
             >
@@ -8711,7 +8711,7 @@ function DemandAcceptDialog(props: {
             <BusyButton
               className="accept"
               busy={props.busy}
-              busyLabel="Starting…"
+              busyLabel="Starting"
               disabled={!canFly}
               title={
                 updateBlocked
@@ -8918,7 +8918,7 @@ function DemandDispatchHoldDialog(props: {
             className="accept"
             busy={props.busy}
             busyLabel={
-              props.mode === 'shuttle' && isBridge ? 'Launching…' : 'Starting…'
+              props.mode === 'shuttle' && isBridge ? 'Launching' : 'Starting'
             }
             disabled={!canConfirm}
             title={
@@ -9191,7 +9191,7 @@ function WarehouseBridgeDialog(props: {
           <BusyButton
             className="accept"
             busy={props.busy}
-            busyLabel={props.mode === 'hold' ? 'Holding…' : 'Starting…'}
+            busyLabel={props.mode === 'hold' ? 'Holding' : 'Starting'}
             disabled={!canConfirm}
             title={
               updateBlocked
@@ -9476,7 +9476,7 @@ function WarehouseHaulDialog(props: {
           <BusyButton
             className="accept"
             busy={props.busy}
-            busyLabel={props.mode === 'hold' ? 'Holding…' : 'Starting…'}
+            busyLabel={props.mode === 'hold' ? 'Holding' : 'Starting'}
             disabled={!canConfirm}
             title={
               updateBlocked

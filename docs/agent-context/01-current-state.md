@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **a0e520fe** / desktop **0.3.473** shipped: Paint the A340 profile CG envelope on En route instead of the sim's 0–50 limit. Release: [v0.3.473](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.473).
+
+
 `main` **6328cb39** / desktop **0.3.472** shipped: Hold a Demand destination until the cargo lands, and correct the A340 cruise burn and CG envelope. Release: [v0.3.472](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.472).
 
 

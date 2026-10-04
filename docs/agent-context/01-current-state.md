@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **5a201062** / desktop **0.3.463** shipped: Expect the A340-600 CDU import at 100 kg per passenger with empty holds. Release: [v0.3.463](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.463).
+
+
 `main` **e596fe1b** / desktop **0.3.462** shipped: Drop the trailing ellipsis from buttons that are already waiting. Release: [v0.3.462](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.462).
 
 

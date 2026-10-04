@@ -38,6 +38,14 @@ Atualizado 2026-09-24: **EN ROUTE live load scale-down** — tanks/stations/CG ~
 
 Atualizado 2026-09-24: **EN ROUTE live load polish** — tanks `--live-fuel-*` + Aircraft|Origin 50/50 (preflight intact).
 
+### EN ROUTE page scroll at 2K (2026-10-04) — diag
+
+**Sintoma:** Dispatch En route passava da dobra em 2560×1440 (e em 125% de escala, viewport CSS ~1152). OFP, lotes e o live load ficavam com vão largo; o mapa ia até 28rem.
+
+**Causa:** coluna `.dispatch-active-enroute` com `gap: 0.75rem`, card `gap/padding` 0.65rem, live `margin-top: 0.85rem`, tiles `min-height: 9.25rem`, fuel até 5.25rem, mapa `clamp(16rem, 42vh, 28rem)`.
+
+**Fix:** só CSS En route — gap da coluna 0.35rem, card mais justo, margem do live 0, tiles ~7.35rem, fuel até 3.85rem, mapa `clamp(10rem, 22vh, 14.5rem)`, lotes com menos padding. Preflight intacto.
+
 ### EN ROUTE live load too tall (2026-09-24) — diag
 
 **Sintoma:** faixa Fuel/Stations/CG dominava o painel EN ROUTE (OFP/Cargo miúdos em cima; blocos verdes “hero”).

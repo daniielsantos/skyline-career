@@ -1,5 +1,7 @@
 # Aircraft instance pool
 
+Atualizado 2026-10-03: **Deliver to abre desmarcado** — sintoma = o card de Airframes mostra Deliver to MZBZ, com o preço só da compra, e a caixa vazia. Causa = a caixa nasce no primeiro paint, quando a cotação ainda não chegou, e o estado não liga depois. Fix = a entrega vem marcada quando a cotação existe. Desmarcar continua valendo para aquela cotação.
+
 F0–F6 shipped. **F7 shipped (2026-09-19):** RAM claim-before-debit + `ownerCompanyId`; PG/SQLite `owner_company_id` + atomic claim (`SELECT FOR UPDATE` / `BEGIN IMMEDIATE`); buy/lease → 409 `aircraft_claimed`. Presence: [`27-mp-presence.md`](./27-mp-presence.md).
 
 **Dealer sell paid but the tail stayed in Hangar (2026-09-30):** sintoma = confirmou venda ao dealer, wallet subiu, o casco continuou no Hangar. Causa = o POST tira o avião e credita; o refresh do board (`aircraftMarket`) pinta `fleet` de novo. O wallet tem hold de 12s contra um GET velho; a frota não tinha, então o casco voltava e o dinheiro ficava. No SQLite o mapa de assinatura da frota era único para todas as companies: o pulse salvava outra company e a venda seguinte creditava sem `DELETE` do id vendido. Fix = refresh da venda não repinta frota (`preserveFleet`); o write descarta o id de novo antes do save; assinatura/chave de frota no SQLite é por company. Postgres já fazia replace da frota inteira.

@@ -12206,6 +12206,15 @@ span.dispatch-route-hub-dest {
   margin: -0.425rem 0 0;
 }
 
+/* Board Accept is narrow. Keep the wait ball in the row, beside the label. */
+.ports-board-table button.accept[data-action-wait='1']:not(:has(.busy-spinner))::before {
+  position: static;
+  inset: auto;
+  top: auto;
+  margin: 0 0.35rem 0 0;
+  vertical-align: -0.12em;
+}
+
 .ports-demand-filters {
   display: flex;
   flex-wrap: wrap;

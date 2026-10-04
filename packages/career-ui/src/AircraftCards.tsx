@@ -583,7 +583,13 @@ export function MarketListingCard(props: {
   const isYourLease = listing.source === 'player_lease';
   const isResale = listing.source === 'player_sale';
   const canDeliver = Boolean(props.delivery?.needed);
-  const [deliver, setDeliver] = useState(canDeliver);
+  const deliveryKey =
+    canDeliver && props.delivery
+      ? `${listing.id}|${props.delivery.deliverToIcao}|${props.delivery.distanceNm}`
+      : '';
+  // Quotes arrive after the card mounts. Default on for that quote unless the pilot turns it off.
+  const [deliveryOffKey, setDeliveryOffKey] = useState<string | null>(null);
+  const deliver = deliveryKey !== '' && deliveryOffKey !== deliveryKey;
   const deliveryFee =
     deliver && props.delivery?.needed ? props.delivery.deliveryFeeUsd : 0;
   const totalDue = listing.askingUsd + deliveryFee;
@@ -716,7 +722,9 @@ export function MarketListingCard(props: {
               type="checkbox"
               checked={deliver}
               disabled={props.busy}
-              onChange={(e) => setDeliver(e.target.checked)}
+              onChange={(e) =>
+                setDeliveryOffKey(e.target.checked ? null : deliveryKey)
+              }
             />
             <span>
               {isImport ? 'Import to' : 'Deliver to'} {props.delivery.deliverToIcao}

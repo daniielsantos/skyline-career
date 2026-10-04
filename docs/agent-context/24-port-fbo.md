@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Loading do Accept no quadro não cobre a palavra** — sintoma = a bolinha de espera sentava em cima de Accept no Charter (e no Demand). Causa = a bolinha ficou absoluta para o botão largo, e o quadro estreito tirou o espaço. Fix = no quadro a bolinha volta para a linha, ao lado do rótulo.
+
 Atualizado 2026-10-03: **Clique no armazém só foca o mapa** — sintoma = o card WH trocava a página pelo quadro de Demand ou pelo galpão. Causa = a seleção do armazém abria outra superfície e tirava o porto do mapa. Fix = o clique marca o WH e aproxima o mapa nesse pin. A página do porto fica. Segundo clique no mesmo card volta o foco para o FBO.
 
 Atualizado 2026-10-03: **Linha do quadro desenha a rota no mapa** — clicar uma linha de Scout, Demand ou Charter marca a linha e traça origem → destino no mapa de cima. Segundo clique tira. Accept e Fly não desmarcam. A linha some se o pedido sai do quadro. Sem coordenada de origem ou destino, a linha não é inventada.

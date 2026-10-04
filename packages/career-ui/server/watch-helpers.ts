@@ -3356,16 +3356,9 @@ export class CareerWatchSession {
           const prevCg = (
             prevVerification as { cg?: WatchLoadVerification['cg'] }
           ).cg;
-          if (
-            !this.pinnedCgEnvelope &&
-            prevCg &&
-            (prevCg.minMac !== undefined || prevCg.maxMac !== undefined)
-          ) {
-            this.pinnedCgEnvelope = {
-              ...(prevCg.minMac !== undefined ? { minMac: prevCg.minMac } : {}),
-              ...(prevCg.maxMac !== undefined ? { maxMac: prevCg.maxMac } : {}),
-            };
-          }
+          // Do not pin prevCg here. Dispatch often stored the sim's CG FWD/AFT
+          // LIMIT (ToLiss A340 reports 0–50). That pin blocked the profile
+          // envelope (−20–50) for the rest of the flight.
           // Publish fuel/payload first — soft CG below is capped so it cannot
           // freeze Loaded vs Due, and keeps Validate painted envelope.
           this.lastLoadVerification = {
@@ -3430,6 +3423,20 @@ export class CareerWatchSession {
                     }
                   } catch {
                     /* catalog/identity soft-fail — liveMac still useful */
+                  }
+                  if (
+                    !this.pinnedCgEnvelope &&
+                    prevCg &&
+                    (prevCg.minMac !== undefined || prevCg.maxMac !== undefined)
+                  ) {
+                    this.pinnedCgEnvelope = {
+                      ...(prevCg.minMac !== undefined
+                        ? { minMac: prevCg.minMac }
+                        : {}),
+                      ...(prevCg.maxMac !== undefined
+                        ? { maxMac: prevCg.maxMac }
+                        : {}),
+                    };
                   }
                 }
                 const minMac =

@@ -201,6 +201,113 @@ describe('stepCrashDetect', () => {
     }
   });
 
+  it('fails when the player repositions after a stop-class impact', () => {
+    let state = emptyCrashDetectState();
+    const ctx = { nearDest: false, simAlive: true };
+    let step = stepCrashDetect(
+      state,
+      base({ atMs: 1000, aglFt: 2500, groundSpeedKt: 160, gForce: 1.0 }),
+      ctx,
+    );
+    step = stepCrashDetect(
+      step.state,
+      base({
+        atMs: 1400,
+        aglFt: 8,
+        groundSpeedKt: 3,
+        gForce: 5.2,
+        verticalSpeedFpm: -5200,
+        onGround: true,
+      }),
+      ctx,
+    );
+    assert.equal(step.verdict, null);
+    step = stepCrashDetect(
+      step.state,
+      base({
+        atMs: 1800,
+        lat: -22.0,
+        lon: -45.0,
+        aglFt: 40,
+        groundSpeedKt: 0,
+        onGround: true,
+      }),
+      ctx,
+    );
+    assert.ok(step.verdict);
+    assert.equal(step.verdict!.confidence, 'high');
+  });
+
+  it('fails when the menu opens after a stop-class impact', () => {
+    let state = emptyCrashDetectState();
+    const ctx = { nearDest: false, simAlive: true };
+    let step = stepCrashDetect(
+      state,
+      base({ atMs: 1000, aglFt: 900, groundSpeedKt: 180 }),
+      ctx,
+    );
+    step = stepCrashDetect(
+      step.state,
+      base({
+        atMs: 1400,
+        aglFt: 6,
+        groundSpeedKt: 2,
+        gForce: 6,
+        verticalSpeedFpm: -6000,
+        onGround: true,
+      }),
+      ctx,
+    );
+    assert.equal(step.verdict, null);
+    step = stepCrashDetect(
+      step.state,
+      base({
+        atMs: 1700,
+        frozen: true,
+        aglFt: 6,
+        groundSpeedKt: 2,
+        onGround: true,
+      }),
+      ctx,
+    );
+    assert.ok(step.verdict);
+  });
+
+  it('does not fail a steep maneuver that is paused before any stop', () => {
+    let state = emptyCrashDetectState();
+    const ctx = { nearDest: false, simAlive: true };
+    let step = stepCrashDetect(
+      state,
+      base({ atMs: 1000, aglFt: 8000, groundSpeedKt: 220, gForce: 1 }),
+      ctx,
+    );
+    step = stepCrashDetect(
+      step.state,
+      base({
+        atMs: 1400,
+        aglFt: 7000,
+        groundSpeedKt: 200,
+        gForce: 5.4,
+        verticalSpeedFpm: -5000,
+      }),
+      ctx,
+    );
+    assert.equal(step.verdict, null);
+    step = stepCrashDetect(
+      step.state,
+      base({
+        atMs: 1800,
+        frozen: true,
+        aglFt: 7000,
+        groundSpeedKt: 200,
+        gForce: 1,
+        verticalSpeedFpm: 0,
+      }),
+      ctx,
+    );
+    assert.equal(step.verdict, null);
+  });
+
   it('stays silent while frozen', () => {
     let state = emptyCrashDetectState();
     const ctx = { nearDest: false, simAlive: true };

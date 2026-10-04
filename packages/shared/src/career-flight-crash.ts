@@ -153,6 +153,42 @@ function isDead(sample: CrashSample): boolean {
   return false;
 }
 
+function spikeKindCount(bits: number): number {
+  return (
+    (bits & CRASH_SPIKE_G ? 1 : 0) +
+    (bits & CRASH_SPIKE_VS ? 1 : 0) +
+    (bits & CRASH_SPIKE_AGL ? 1 : 0) +
+    (bits & CRASH_SPIKE_GS ? 1 : 0)
+  );
+}
+
+/** AGL slam or GS collapse — the aircraft already hit, not just a steep maneuver. */
+function impactQualified(state: CrashDetectState): boolean {
+  if (state.episodeAtMs == null) return false;
+  const stopped = (state.spikeBits & (CRASH_SPIKE_AGL | CRASH_SPIKE_GS)) !== 0;
+  return spikeKindCount(state.spikeBits) >= 2 && stopped;
+}
+
+function verdictFrom(
+  state: CrashDetectState,
+  boostPoll: boolean,
+): CrashDetectStep {
+  const reasonBits = reasonLabels(state.spikeBits);
+  const verdict: CrashVerdict = {
+    confidence: 'high',
+    reasonBits,
+    peakG: state.peakG,
+    peakAbsVs: state.peakAbsVs,
+    message:
+      'Flight ended — impact away from destination. Cargo lost; no payout.',
+  };
+  return {
+    state: { ...state, fired: true, episodeAtMs: null, deadTicks: 0 },
+    verdict,
+    boostPoll,
+  };
+}
+
 function reasonLabels(bits: number): string[] {
   const out: string[] = [];
   if (bits & CRASH_SPIKE_G) out.push('g_spike');
@@ -217,12 +253,7 @@ export function stepCrashDetect(
     ? { ...sample, frozen: false, groundSpeedKt: gsForDetect }
     : sample;
 
-  if (
-    !sample.sawAirborne ||
-    !ctx.simAlive ||
-    ctx.nearDest ||
-    (sample.frozen && !pauseStop)
-  ) {
+  if (!sample.sawAirborne || !ctx.simAlive || ctx.nearDest) {
     state = {
       ...emptyCrashDetectState(),
       fired: false,
@@ -236,6 +267,27 @@ export function stepCrashDetect(
     return { state, verdict: null, boostPoll };
   }
 
+  // The wreck is not going to sit for three polls. Menu or reposition
+  // after a real stop-class impact is the player leaving the crash.
+  if (sample.frozen && !pauseStop) {
+    if (impactQualified(state)) return verdictFrom(state, boostPoll);
+    state = {
+      ...emptyCrashDetectState(),
+      fired: false,
+      boostUntilMs: state.boostUntilMs,
+      lastLat: finite(sample.lat) ? sample.lat : null,
+      lastLon: finite(sample.lon) ? sample.lon : null,
+      lastAgl: finite(sample.aglFt) ? sample.aglFt : null,
+      lastGs: finite(sample.groundSpeedKt) ? sample.groundSpeedKt : null,
+      lastAtMs: nowMs,
+    };
+    return { state, verdict: null, boostPoll };
+  }
+
+  if (pauseStop && impactQualified(state)) {
+    return verdictFrom(state, boostPoll);
+  }
+
   if (
     finite(sample.lat) &&
     finite(sample.lon) &&
@@ -245,6 +297,7 @@ export function stepCrashDetect(
     const dLat = Math.abs(sample.lat - state.lastLat!);
     const dLon = Math.abs(sample.lon - state.lastLon!);
     if (dLat > CRASH_SLEW_DEG || dLon > CRASH_SLEW_DEG) {
+      if (impactQualified(state)) return verdictFrom(state, boostPoll);
       state = {
         ...emptyCrashDetectState(),
         boostUntilMs: state.boostUntilMs,

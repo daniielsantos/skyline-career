@@ -1,5 +1,11 @@
 # Flight debrief sheet (Dispatch)
 
+## FPM positivo no settle invertido (2026-10-04) — KMIA→SVSE +654
+
+**Sintoma:** acidente no pouso, settle de cabeça para baixo, pilar Landing `Heavy · +654 fpm`. Parece taxa de subida.
+
+**Causa:** o número é `PLANE TOUCHDOWN NORMAL VELOCITY` no eixo vertical do avião (para cima do teto), não a VS do mundo. De barriga para baixo o teto aponta para a pista, então a mesma descida sai positiva. A nota usa o módulo: +654 e −654 são Heavy (acima de 600). Não é bug de sinal. Não inverter o latch — um pouso normal continua negativo.
+
 ## FPM do pouso (2026-10-04) — KMIA→MGGT −755 e Heavy com G cheio
 
 **Sintoma:** pilar Landing `Heavy · −755 fpm`, barra Landing 14/26 (os 12 pontos de VS zerados), Entire flight 28/28. O G do toque ficou na faixa cheia, incompatível com um impacto de 755 ft/min.

@@ -2,6 +2,10 @@
 
 Atualizado 2026-09-27. **Fase 1 shipped (código):** detector próprio + poll boost + auto-fail confiança alta. Sem MSFS `Crashed`. Sem perguntar ao jogador. Sem write-off de casco.
 
+**2026-10-04 — KMIA→SVSE, pouso invertido, settle normal com payout.** Sintoma: jogador nunca viu o detector fechar um voo. O log local não tem nenhuma linha `impact fail`. Esse acidente foi na pista (RWY 11, 12 m do threshold, on pavement), dentro do raio de settle. `stepCrashDetect` zera o episódio quando `nearDest` — pouso no destino, mesmo de cabeça para baixo, não vira impacto.
+
+**2026-10-04 — três ticks parado não acontecem.** Sintoma: depois do impacto a pessoa abre o menu e reposiciona; não fica no wreck. Causa: menu (`frozen`) e slew apagavam o episódio, e o veredito ainda pedia 3 amostras paradas. Fix: se o episódio já tem parada de verdade (AGL slam ou GS collapse) e mais um spike, o menu ou o reposicionamento fecha o voo. Manobra íngreme (só G/VS) + ESC continua muda. Perto do destino continua sem fail.
+
 **2026-09-27 — teste KMIA→SYMD (737), manobra forte + montanha, nada falhou.** Sintoma: voo segue `in_flight`, sem debrief de impacto. Causa: curva inclinada com o avião ainda voando não é crash (voto de G só em ≥4,5). No impacto (~23:23Z) o poll chegou a 500 ms e em seguida o sim ficou `paused` com `movedNm` 0 e GS ainda ~289 kt. `stepCrashDetect` zerava o episódio em todo tick frozen, então os 3 ticks mortos nunca fechavam. Fix: pausa com o avião parado (`motionStopped`) e GS anterior ≥ 60 kt não apaga o episódio; a GS congelada conta como parada. Pausa em altitude (AGL alto, sem episódio) continua muda.
 
 ## O que já temos

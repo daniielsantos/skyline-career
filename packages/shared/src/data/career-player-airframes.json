@@ -2555,6 +2555,8 @@
     "simbriefAirframeMatch": "Aerosoft \\(MSFS\\) - A340-600 Pro \\(Standard Gross Weight\\)",
     "loadLayout": "pax_and_cargo",
     "maxPaxSeats": 440,
+    "efbPaxWeightLb": 220.462,
+    "efbImportOmitsBaggage": true,
     "oewKg": 185500,
     "mtowKg": 368000,
     "maxCargoKg": 56811,

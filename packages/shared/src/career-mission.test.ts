@@ -1441,6 +1441,45 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
     assert.equal(due, ofpCargoLb);
   });
 
+  it('A340-600 CDU import: 192 × 100 kg replaces OFP pax+bags', () => {
+    const ofpPayloadLb = 41_120;
+    const due = adjustPaxAndCargoDueForEfbPaxLb(
+      ofpPayloadLb,
+      {
+        typeId: 'toliss-toliss-a346-pro-preset-pax',
+        aircraftClassId: 'wide_freighter',
+        label: 'A340-600 PRO',
+        rolesPackRelPath: 'x',
+        simbriefIcao: 'A346',
+        simbriefAirframeMatch: 'Default',
+        loadLayout: 'pax_and_cargo',
+        maxPaxSeats: 440,
+        efbPaxWeightLb: 220.462,
+        efbImportOmitsBaggage: true,
+      },
+      { ofpPassengerCount: 192 },
+    );
+    assert.ok(Math.abs(due - 42_329) < 1);
+    const allotment = 192 * 230;
+    const withFreight = adjustPaxAndCargoDueForEfbPaxLb(
+      allotment + 10_000,
+      {
+        typeId: 'toliss-toliss-a346-pro-preset-pax',
+        aircraftClassId: 'wide_freighter',
+        label: 'A340-600 PRO',
+        rolesPackRelPath: 'x',
+        simbriefIcao: 'A346',
+        simbriefAirframeMatch: 'Default',
+        loadLayout: 'pax_and_cargo',
+        maxPaxSeats: 440,
+        efbPaxWeightLb: 220.462,
+        efbImportOmitsBaggage: true,
+      },
+      { ofpPassengerCount: 192 },
+    );
+    assert.ok(Math.abs(withFreight - (due + 10_000)) < 1);
+  });
+
   it('adds Fenix ~196 lb/pax vs SimBrief 175 on a 134-pax OFP', () => {
     const ofpPayloadLb = 30_768;
     const due = adjustPaxAndCargoDueForEfbPaxLb(ofpPayloadLb, {

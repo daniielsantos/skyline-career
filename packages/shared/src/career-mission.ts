@@ -4013,8 +4013,6 @@ export function adjustPaxAndCargoDueForEfbPaxLb(
   ) {
     return plannedPayloadLb;
   }
-  const delta = efb - SIMBRIEF_STANDARD_PAX_LB;
-  if (Math.abs(delta) < 0.5) return plannedPayloadLb;
   const ofpPax = opts?.ofpPassengerCount;
   if (
     typeof ofpPax === 'number' &&
@@ -4034,6 +4032,16 @@ export function adjustPaxAndCargoDueForEfbPaxLb(
             Math.round(plannedPayloadLb / SIMBRIEF_STANDARD_PAX_WITH_BAG_LB),
           ),
         );
+  if (airframe.efbImportOmitsBaggage) {
+    // Import replaced pax+bags with N × efb and left holds at 0. Freight
+    // above the 175+55 allotment stays on Due (the additive helper would
+    // keep the bags and overshoot).
+    const allotment = pax * SIMBRIEF_STANDARD_PAX_WITH_BAG_LB;
+    const extraFreight = Math.max(0, plannedPayloadLb - allotment);
+    return pax * efb + extraFreight;
+  }
+  const delta = efb - SIMBRIEF_STANDARD_PAX_LB;
+  if (Math.abs(delta) < 0.5) return plannedPayloadLb;
   return plannedPayloadLb + pax * delta;
 }
 

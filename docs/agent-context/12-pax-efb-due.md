@@ -49,7 +49,8 @@ Medir **depois** do Import/APPLY LOAD no EFB, com OFP confirmado.
 
 | Sintoma | Causa | Campo / fix | Como medir |
 |---------|--------|-------------|------------|
-| Sim ≈ EFB ZFW−OEW, **mais pesado** que Payload SimBrief; pax count EFB = OFP | EFB usa pax **mais pesado** que 175 lb | `efbPaxWeightLb` | `(Sim − cargo_holds) / pax_efb`. Neo V2: ~187. Due += pax × (efb − 175) |
+| Sim ≈ EFB ZFW−OEW, **mais pesado** que Payload SimBrief; pax count EFB = OFP; holds com a bagagem | EFB usa pax **mais pesado** que 175 lb e **mantém** as malas | `efbPaxWeightLb` | `(Sim − cargo_holds) / pax_efb`. Neo V2: ~187. Due += pax × (efb − 175) |
+| Sim = **N × 100 kg**; EFB pax = N; **FWD/AFT cargo 0**; DOW = Empty do load sheet | CDU import trocou o payload inteiro por N × 100 kg e **não** pôs as malas no porão | `efbPaxWeightLb` (220.462) **e** `efbImportOmitsBaggage` | Due = N × 100 kg. **Não** somar (220 − 175) × N em cima do payload (as malas já saíram) |
 | EFB pax **N**, estações clássicas somam **M×170** com M > N (fileiras 8/12 cheias) | SimConnect enche **slots** a mais | `simconnectCabinSeats` = M | Soma S_cabine / 170. F70: 80 vs OFP 70. Live − (M−maxPax)×170 |
 | Holds FWD+AFT **menores** que Bag/Cargo do OFP; cabine já no count certo | Tablet não cabe o freight | `simconnectCargoHoldMaxLb` = FWD+AFT live | F100: 5172+2612=7784 vs OFP 8940. Due clampa cargo ao teto |
 | Sim ≈ EFB ZFW−**Dry**; Due = Payload OFP; delta ≈ Empty_SB − Dry_EFB; ZFW live **bate** o OFP | SimBrief row **Default** (OEW alto) vs glass MSFS (OEW baixo). APPLY ZFW inchou estações | `simbriefAirframeMatch` → row vendor MSFS (ex. `iniBuilds (MSFS) - A330-200 GE`); `maxPaxSeats` = `airframe_passengers` dessa row | Empty OFP − Dry EFB. A330-200 Default: +~14.5k. **Não** usar `efbPaxWeightLb` / bias aqui |
@@ -120,6 +121,7 @@ LOAD OFP / IMPORT Maddog **duplicam** FWD+AFT+(bags). Família 82/83/88 = mesmo 
 | `inibuilds-a300-600` | 256 (GE/PW) | **A306** `iniBuilds (MSFS) - A300-600R GE/PW` — not Default. Freighter glass uses same engine row (no Preighter). Family packs pax/freighter |
 | `inibuilds-l1011-500` | 243 (Regular) | **L101** Regular / Pod Ferry — not Default. Engine Pod glass → Pod Ferry. Family packs Regular/Pod |
 | `inibuilds-a340-300` | 279 (Passenger) | **A343** Passenger / Preighter / VIP — not Default. Freighter glass → Preighter (0 pax). Family packs pax/freighter/VIP |
+| `toliss-toliss-a346-pro-preset-pax` | 440 | **2026-10-03 KMIA–MGGT charter, 192 pax.** Import pelo CDU: PYLD **42 329** (= 192 × 100 kg), FWD/AFT cargo **0**, DOW **408 957** = Empty do load sheet. OFP Payload **41 120** (corpos ~174 lb × 192 + bagagem **7 680**). Delta **+1 209** = corpos mais pesados (~+8 888) menos malas que o CDU não carregou (−7 680). Fuel 54 449 vs 54 845 passou. `efbPaxWeightLb: 220.462` + `efbImportOmitsBaggage` — Due = N × 100 kg (+ frete acima de 175+55/seat). Sem a flag, o helper somaria (220−175)×N em cima das malas e o Due iria a ~49.8k. |
 | `fenix-a320` | 180 | `simconnectEmptyPayloadBiasLb: 2591` — sem `efbPaxWeightLb` |
 | `fenix-a319` | 145 | SimBrief Default A319 Full=(145); was catalog 150 (2026-09-19 SB sync). `simconnectEmptyPayloadBiasLb: 2642` |
 | `fenix-a321` | 220 | SimBrief Default A321 Full=(220); was catalog 230 (2026-09-19 SB sync). `simconnectEmptyPayloadBiasLb: 2201`; 8 vidros CFM/IAE × SL/WF × TC/SC |

@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **08b9cb74** / desktop **0.3.465** shipped: Drop the Scout All tab and the corridor ring fill. Release: [v0.3.465](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.465).
+
+
 `main` **ecd1bb13** / desktop **0.3.464** shipped: Measure cruise burn from the fuel-total drop when engine flow is far below the plan. Release: [v0.3.464](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.464).
 
 

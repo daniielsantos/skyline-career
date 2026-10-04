@@ -87,6 +87,7 @@ import {
   getCommodity,
   getAirportRunways,
   evaluateRunwayTouchdown,
+  parseRunwayTouchdownSnapshot,
   hubTierOf,
   countFuelHaulsEnroute,
   hubLevelProfile,
@@ -4027,6 +4028,10 @@ export function createCareerApiServer(port = 8787) {
                     touchdownHeadingTrueDeg: td.headingTrueDeg,
                   }
                 : {}),
+              ...(() => {
+                const runwayTouch = watchSession.getCapturedRunwayTouch();
+                return runwayTouch ? { runwayTouch } : {};
+              })(),
             });
             await watchSession.stop();
           }
@@ -15860,6 +15865,7 @@ export function createCareerApiServer(port = 8787) {
           touchdownLat?: number;
           touchdownLon?: number;
           touchdownHeadingTrueDeg?: number;
+          runwayTouch?: unknown;
           nowMs?: number;
           cruiseCommit?: unknown;
         };
@@ -16020,14 +16026,18 @@ export function createCareerApiServer(port = 8787) {
             );
             if (!openMission) return { kind: 'missing' as const };
             const runwayTouch =
-              touchdownLat != null && touchdownLon != null
+              parseRunwayTouchdownSnapshot(
+                body.runwayTouch,
+                openMission.destIcao,
+              ) ??
+              (touchdownLat != null && touchdownLon != null
                 ? evaluateRunwayTouchdown(
                     openMission.destIcao,
                     touchdownLat,
                     touchdownLon,
                     touchdownHeadingTrueDeg,
                   )
-                : undefined;
+                : undefined);
             const executed = executeSettleFlight(world, missions, {
               missionId: body.missionId,
               companyId: settleCompanyId,

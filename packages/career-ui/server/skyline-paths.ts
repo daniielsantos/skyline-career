@@ -7,7 +7,7 @@
  *   SKYLINE_CAREER_DATA     — writable AppData career root (profiles.json, saves/)
  *   SKYLINE_UI_DIST         — Vite build output served by the API
  */
-import { access, cp, mkdir, rename, rm } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -101,13 +101,79 @@ async function seedSharedCareerAssets(
   await migrateLegacyHubOverridesFile(dataRoot);
 
   const ovDest = join(dataRoot, MSFS_HUB_OVERRIDES_FILENAME);
-  if (await pathExists(ovDest)) return;
-
   const ovSrcNext = join(seedRoot, MSFS_HUB_OVERRIDES_FILENAME);
   const ovSrcLegacy = join(seedRoot, MSFS_HUB_OVERRIDES_LEGACY_FILENAME);
-  if (await pathExists(ovSrcNext)) {
-    await cp(ovSrcNext, ovDest);
-  } else if (await pathExists(ovSrcLegacy)) {
-    await cp(ovSrcLegacy, ovDest);
+  const ovSrc = (await pathExists(ovSrcNext))
+    ? ovSrcNext
+    : (await pathExists(ovSrcLegacy))
+      ? ovSrcLegacy
+      : null;
+  if (!(await pathExists(ovDest))) {
+    if (ovSrc) await cp(ovSrc, ovDest);
+    return;
   }
+  // An existing AppData/VPS copy used to freeze the first seed. Facility
+  // strips captured later never replaced it, so the debrief kept projecting
+  // against the OurAirports threshold stored as the runway center.
+  if (ovSrc) await mergeFacilityRunwaysFromSeed(ovSrc, ovDest);
+}
+
+type HubOverrideRow = {
+  validatedAt?: string;
+  runways?: unknown[];
+  [key: string]: unknown;
+};
+
+function validatedAtMs(row: HubOverrideRow): number {
+  const t = Date.parse(typeof row.validatedAt === 'string' ? row.validatedAt : '');
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Copy facility strips onto an older override file. Never drops a newer local row. */
+export async function mergeFacilityRunwaysFromSeed(
+  seedPath: string,
+  destPath: string,
+): Promise<boolean> {
+  let seed: Record<string, HubOverrideRow>;
+  let dest: Record<string, HubOverrideRow>;
+  try {
+    seed = JSON.parse(await readFile(seedPath, 'utf8')) as Record<string, HubOverrideRow>;
+    dest = JSON.parse(await readFile(destPath, 'utf8')) as Record<string, HubOverrideRow>;
+  } catch {
+    return false;
+  }
+  if (!seed || typeof seed !== 'object' || !dest || typeof dest !== 'object') {
+    return false;
+  }
+  if (Array.isArray(seed) || Array.isArray(dest)) return false;
+  let changed = false;
+  for (const [icao, seedRow] of Object.entries(seed)) {
+    if (!seedRow || typeof seedRow !== 'object' || Array.isArray(seedRow)) continue;
+    const seedRunways = Array.isArray(seedRow.runways) ? seedRow.runways : [];
+    if (seedRunways.length === 0) continue;
+    const key = icao.trim().toUpperCase();
+    const prev = dest[key] ?? dest[icao];
+    if (!prev || typeof prev !== 'object' || Array.isArray(prev)) {
+      dest[key] = seedRow;
+      if (key !== icao) delete dest[icao];
+      changed = true;
+      continue;
+    }
+    const prevRunways = Array.isArray(prev.runways) ? prev.runways : [];
+    const seedNewer = validatedAtMs(seedRow) > validatedAtMs(prev);
+    if (prevRunways.length > 0 && !seedNewer) continue;
+    prev.runways = seedRunways;
+    if (seedNewer) {
+      if (typeof seedRow.validatedAt === 'string') prev.validatedAt = seedRow.validatedAt;
+      if (typeof seedRow.lat === 'number') prev.lat = seedRow.lat;
+      if (typeof seedRow.lon === 'number') prev.lon = seedRow.lon;
+      if (typeof seedRow.name === 'string') prev.name = seedRow.name;
+      if (typeof seedRow.source === 'string') prev.source = seedRow.source;
+    }
+    dest[key] = prev;
+    changed = true;
+  }
+  if (!changed) return false;
+  await writeFile(destPath, `${JSON.stringify(dest, null, 2)}\n`, 'utf8');
+  return true;
 }

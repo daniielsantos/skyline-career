@@ -9,6 +9,7 @@ import {
   resolveLiveCruiseFuelFlowKgPerHour,
   pushCruiseTick,
   parseCruiseSampleCommit,
+  cruiseStateFromPersistedCommit,
   applyCruiseSampleOverride,
   type CruiseTick,
 } from './cruise-sample.js';
@@ -288,6 +289,24 @@ describe('parseCruiseSampleCommit / applyCruiseSampleOverride', () => {
   it('rejects incomplete settle payloads', () => {
     assert.equal(parseCruiseSampleCommit(null), undefined);
     assert.equal(parseCruiseSampleCommit({ cruiseSpeedKt: 180 }), undefined);
+    assert.equal(cruiseStateFromPersistedCommit({ cruiseSpeedKt: 180 }), undefined);
+  });
+
+  it('restores a locked commit with an empty window', () => {
+    const state = cruiseStateFromPersistedCommit({
+      cruiseSpeedKt: 465,
+      cruiseFuelFlowKgPerHour: 9872,
+      fuelBurnKgPerNm: 21.23,
+      sampleCount: 36,
+      durationSec: 180,
+      committedAtMs: 1_700_000_000_000,
+    });
+    assert.ok(state);
+    assert.equal(state.window.length, 0);
+    const status = cruiseSampleStatus(state);
+    assert.equal(status.phase, 'locked');
+    assert.equal(status.fuelFlowKgPerHour, 9872);
+    assert.equal(status.tasKt, 465);
   });
 
   it('merges a valid commit onto company overrides by typeId', () => {

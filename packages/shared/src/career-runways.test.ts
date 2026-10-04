@@ -11,6 +11,7 @@ import {
   evaluateRunwayTouchdown,
   pickFirstContactCoords,
   formatRunwayTouchdownLine,
+  parseRunwayTouchdownSnapshot,
   isUsableRunwayCenter,
   headingDeltaDeg,
   type CareerRunway,
@@ -347,5 +348,29 @@ describe('null-island runway centers', () => {
   it('filters Null Island rows out of getAirportRunways', () => {
     assert.equal(isUsableRunwayCenter({ lat: 0, lon: 0 }), false);
     assert.equal(isUsableRunwayCenter({ lat: -27.13, lon: -52.66 }), true);
+  });
+
+  it('accepts a desktop runway snapshot only for the destination', () => {
+    const snap = {
+      lat: 14.57,
+      lon: -90.53,
+      icao: 'MGGT',
+      runwayIdent: '20',
+      runwayIdentReciprocal: '2',
+      lengthM: 2984,
+      widthM: 61,
+      headingTrueDeg: 197,
+      alongM: -1200,
+      lateralM: 7,
+      pastThresholdM: 292,
+      onPavement: true,
+      landingEnd: 'reciprocal',
+    };
+    assert.equal(parseRunwayTouchdownSnapshot(snap, 'MGGT')?.pastThresholdM, 292);
+    assert.equal(parseRunwayTouchdownSnapshot(snap, 'KMIA'), undefined);
+    assert.equal(
+      parseRunwayTouchdownSnapshot({ ...snap, pastThresholdM: 90_000 }, 'MGGT'),
+      undefined,
+    );
   });
 });

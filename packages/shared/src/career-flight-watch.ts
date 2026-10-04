@@ -562,6 +562,11 @@ export interface EvaluateMissionFlightOpts {
    * display-only phase still advances to climb/cruise.
    */
   prevSample?: FlightGroundSample | null;
+  /**
+   * Touchdown sink from `PLANE TOUCHDOWN NORMAL VELOCITY` (fpm), read when
+   * the latched position is this landing. Not the last airborne vertical speed.
+   */
+  touchdownFpm?: number;
 }
 
 const DEFAULT_DEPART_FROM: readonly MissionStatus[] = ['accepted', 'dispatched'];
@@ -1347,12 +1352,15 @@ export function evaluateMissionFlightTransition(
 
   if (touchedDown && (state.sawAirborne || nextState.sawAirborne)) {
     const nowMs = opts.nowMs ?? Date.now();
-    // Lock first-contact VS; later bounce touches must not overwrite.
+    // Lock the sim touchdown latch only. Last airborne VERTICAL SPEED is the
+    // glideslope (~700 fpm on a jet) and was scoring smooth flares as Heavy.
+    // Later bounces must not overwrite the first latch.
+    const latched =
+      typeof opts.touchdownFpm === 'number' && Number.isFinite(opts.touchdownFpm)
+        ? opts.touchdownFpm
+        : undefined;
     const landingFpm =
-      nextState.landingFpm ??
-      state.landingFpm ??
-      state.lastAirborneVsFpm ??
-      sample.verticalSpeedFpm;
+      nextState.landingFpm ?? state.landingFpm ?? latched;
     nextState = {
       ...nextState,
       airborneEndedAtMs: nextState.airborneEndedAtMs ?? nowMs,

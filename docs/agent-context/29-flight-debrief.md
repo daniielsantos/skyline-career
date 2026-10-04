@@ -1,5 +1,16 @@
 # Flight debrief sheet (Dispatch)
 
+## FPM do pouso (2026-10-04) — KMIA→MGGT −755 e Heavy com G cheio
+
+**Sintoma:** pilar Landing `Heavy · −755 fpm`, barra Landing 14/26 (os 12 pontos de VS zerados), Entire flight 28/28. O G do toque ficou na faixa cheia, incompatível com um impacto de 755 ft/min.
+
+**Causa:** no primeiro `SIM ON GROUND` o Watch gravava `lastAirborneVsFpm`. Num jato em rampa de 3° isso é ~700–800 ft/min de aproximação, não o toque. O latch `PLANE TOUCHDOWN NORMAL VELOCITY` (ft/s × 60) só entrava se esse campo ainda estivesse vazio, então o settle nunca o lia.
+
+**Fix:** a taxa do debrief e do score é só o latch, e só quando a posição travada é deste pouso (≤ 0,45 nm). Valor acima de 80 é tratado como ft/min já convertido. A VS da aproximação não preenche. Se o latch não chegar, o pilar fica sem amostra em vez de marcar Heavy.
+
+O resto do card aplica o que mede: envelope 4+4+4+4+6+6 = 28 (banco, pitch, G, IAS &lt; 250 abaixo de 10 000 ft, sem overspeed, sem stall); taxi 1+1 (GS no táxi, não na corrida); landing 12 VS + 10 G + 2 bounces + 1 trem + 1 flap. O score não corta o frete. O bônus de tempo no dinheiro é weather ops, separado da nota.
+
+
 Glance layout inspired by other career addons: **three pillars first**, money/score second. No invented XP multipliers.
 
 ## Settle double spinner (2026-09-24)

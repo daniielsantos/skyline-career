@@ -408,6 +408,75 @@ export function evaluateRunwayTouchdown(
   };
 }
 
+/**
+ * Accept a desktop-computed touchdown. The world catalog can still be the
+ * OurAirports strip (threshold stored as the center); the machine that flew
+ * already has the MSFS pavement.
+ */
+export function parseRunwayTouchdownSnapshot(
+  raw: unknown,
+  destIcao?: string,
+): RunwayTouchdownSnapshot | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const row = raw as Record<string, unknown>;
+  const lat = Number(row.lat);
+  const lon = Number(row.lon);
+  const lengthM = Number(row.lengthM);
+  const widthM = Number(row.widthM);
+  const headingTrueDeg = Number(row.headingTrueDeg);
+  const alongM = Number(row.alongM);
+  const lateralM = Number(row.lateralM);
+  const pastThresholdM = Number(row.pastThresholdM);
+  const runwayIdent =
+    typeof row.runwayIdent === 'string' ? row.runwayIdent.trim() : '';
+  const icao = typeof row.icao === 'string' ? row.icao.trim().toUpperCase() : '';
+  const landingEnd =
+    row.landingEnd === 'primary' || row.landingEnd === 'reciprocal'
+      ? row.landingEnd
+      : undefined;
+  if (!runwayIdent || !icao || !landingEnd) return undefined;
+  if (
+    destIcao &&
+    icao !== destIcao.trim().toUpperCase()
+  ) {
+    return undefined;
+  }
+  if (
+    ![lat, lon, lengthM, widthM, headingTrueDeg, alongM, lateralM, pastThresholdM].every(
+      (n) => Number.isFinite(n),
+    )
+  ) {
+    return undefined;
+  }
+  if (lat === 0 && lon === 0) return undefined;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return undefined;
+  if (lengthM < 5 || lengthM > 8_000 || widthM <= 0 || widthM > 200) return undefined;
+  if (Math.abs(pastThresholdM) > lengthM + 500) return undefined;
+  if (Math.abs(lateralM) > 2_000) return undefined;
+  const snap: RunwayTouchdownSnapshot = {
+    lat,
+    lon,
+    icao,
+    runwayIdent,
+    lengthM,
+    widthM,
+    headingTrueDeg,
+    alongM: Math.round(alongM),
+    lateralM: Math.round(lateralM),
+    pastThresholdM: Math.round(pastThresholdM),
+    onPavement: row.onPavement === true,
+    landingEnd,
+  };
+  if (
+    typeof row.runwayIdentReciprocal === 'string' &&
+    row.runwayIdentReciprocal.trim()
+  ) {
+    snap.runwayIdentReciprocal = row.runwayIdentReciprocal.trim();
+  }
+  if (typeof row.lighted === 'boolean') snap.lighted = row.lighted;
+  return snap;
+}
+
 /** Compact debrief line, e.g. `RWY 10L · 420 m past THR · on pavement`. */
 export function formatRunwayTouchdownLine(
   touch: RunwayTouchdownSnapshot | null | undefined,
@@ -441,7 +510,8 @@ export function formatRunwayTouchdownLine(
   return `RWY ${ident} · ${Math.round(thrLabel)} m past THR · ${side} · ${pavement} · ${lenKm}${light}`;
 }
 
-const MAX_SIM_TOUCHDOWN_NM = 0.45; // ~830 m — reject stale prior-landing latch
+/** Reject a touchdown latch left over from an earlier landing. */
+export const MAX_SIM_TOUCHDOWN_NM = 0.45; // ~830 m
 
 function usableCoord(
   pos: { lat: number; lon: number } | null | undefined,

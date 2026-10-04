@@ -95,4 +95,79 @@ describe('skyline-paths', () => {
       '{"legacy":true}\n',
     );
   });
+
+  it('fills a frozen override with a newer facility strip', async () => {
+    const seed = await mkdtemp(join(tmpdir(), 'skyline-seed-'));
+    const data = await mkdtemp(join(tmpdir(), 'skyline-data-'));
+    dirs.push(seed, data);
+
+    await writeFile(
+      join(seed, MSFS_HUB_OVERRIDES_FILENAME),
+      JSON.stringify({
+        MGGT: {
+          name: 'La Aurora Intl',
+          lat: 14.58327,
+          lon: -90.52747,
+          source: 'msfs_facility',
+          validatedAt: '2026-10-03',
+          runways: [
+            {
+              ident: '20',
+              identReciprocal: '2',
+              headingTrueDeg: 197.2,
+              lengthM: 2984,
+              widthM: 60.7,
+              lat: 14.58328,
+              lon: -90.52744,
+            },
+          ],
+        },
+        KEEP: {
+          name: 'newer local',
+          lat: 1,
+          lon: 2,
+          source: 'msfs_facility',
+          validatedAt: '2026-10-04',
+          runways: [{ ident: '09', headingTrueDeg: 90, lengthM: 2000, widthM: 30, lat: 1, lon: 2 }],
+        },
+      }),
+      'utf8',
+    );
+    await writeFile(
+      join(data, MSFS_HUB_OVERRIDES_FILENAME),
+      JSON.stringify({
+        MGGT: {
+          name: 'Guatemala City La Aurora',
+          lat: 14.58,
+          lon: -90.52,
+          source: 'msfs_facility',
+          validatedAt: '2026-09-05',
+        },
+        KEEP: {
+          name: 'newer local',
+          lat: 1,
+          lon: 2,
+          source: 'parked_sample',
+          validatedAt: '2026-10-04',
+          runways: [{ ident: '09', headingTrueDeg: 90, lengthM: 1800, widthM: 30, lat: 1, lon: 2 }],
+        },
+      }),
+      'utf8',
+    );
+
+    process.env.SKYLINE_CAREER_CONTENT = seed;
+    process.env.SKYLINE_CAREER_DATA = data;
+    await resolveCareerRoot();
+
+    const saved = JSON.parse(
+      await readFile(join(data, MSFS_HUB_OVERRIDES_FILENAME), 'utf8'),
+    ) as {
+      MGGT: { runways: Array<{ ident: string; lengthM: number }> };
+      KEEP: { runways: Array<{ lengthM: number }>; source: string };
+    };
+    assert.equal(saved.MGGT.runways[0]?.ident, '20');
+    assert.equal(saved.MGGT.runways[0]?.lengthM, 2984);
+    assert.equal(saved.KEEP.runways[0]?.lengthM, 1800);
+    assert.equal(saved.KEEP.source, 'parked_sample');
+  });
 });

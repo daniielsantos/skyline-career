@@ -347,6 +347,18 @@ export function pushFlightScoreSample(
   return next;
 }
 
+/**
+ * `PLANE TOUCHDOWN NORMAL VELOCITY` is feet/second. A host that ignores the
+ * unit returns fpm already — those values sit far above any real fps.
+ * 80 fps = 4800 fpm, past a survivable touchdown.
+ */
+export function touchdownNormalVelocityToFpm(raw: number): number | undefined {
+  if (!Number.isFinite(raw) || Math.abs(raw) < 0.05) return undefined;
+  const fpm = Math.abs(raw) <= 80 ? raw * 60 : raw;
+  if (!Number.isFinite(fpm) || Math.abs(fpm) > 4_000) return undefined;
+  return Math.round(fpm);
+}
+
 /** Graded landing VS points (abs fpm). Soft landings score higher. */
 export function scoreLandingVsPoints(vsFpm: number, maxPoints = 12): number {
   const abs = Math.abs(vsFpm);

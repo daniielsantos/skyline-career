@@ -35,6 +35,7 @@ import {
   stationWeightsDrifted,
   applyCruiseSampleOverride,
   type CruiseSampleCommit,
+  cruiseStateFromPersistedCommit,
   clampCruiseFuelFlowToCatalog,
   planningCruiseFuelFlowKgPerHour,
   resolveLiveCruiseFuelFlowKgPerHour,
@@ -43,6 +44,8 @@ import {
   pickStableLiveFuelLb,
   patchFlightScoreLandingVs,
   evaluateRunwayTouchdown,
+  MAX_SIM_TOUCHDOWN_NM,
+  touchdownNormalVelocityToFpm,
   pickFirstContactCoords,
   pushCruiseTick,
   pushFlightScoreSample,
@@ -312,6 +315,7 @@ export type WatchWorldMutations = {
     touchdownLat?: number;
     touchdownLon?: number;
     touchdownHeadingTrueDeg?: number;
+    runwayTouch?: RunwayTouchdownSnapshot;
     cruiseCommit?: CruiseSampleCommit;
   }) => Promise<boolean>;
 };
@@ -1410,33 +1414,32 @@ export async function probeLiveResidualFuelKg(pipeName?: string): Promise<number
 }
 
 /**
- * Best-effort landing rate (fpm). Prefers latched touchdown normal velocity
- * (fps → fpm); falls back to live VERTICAL SPEED when that is unavailable.
+ * Landing rate from the sim's touchdown latch only (fpm).
+ * Live VERTICAL SPEED is the approach sink and is not a substitute.
+ * When `plane` is passed, ignore a latch whose position is not this landing.
  */
 export async function readLiveLandingFpm(
   bridge: NamedPipeSimBridge,
+  plane?: { lat: number; lon: number } | null,
 ): Promise<number | undefined> {
+  if (
+    plane &&
+    Number.isFinite(plane.lat) &&
+    Number.isFinite(plane.lon)
+  ) {
+    const pos = await readLiveTouchdownPosition(bridge);
+    if (!pos) return undefined;
+    if (greatCircleDistanceNm(plane, pos) > MAX_SIM_TOUCHDOWN_NM) return undefined;
+  }
   try {
-    const tdFps = await bridge.readSimVar({
+    const raw = await bridge.readSimVar({
       name: 'PLANE TOUCHDOWN NORMAL VELOCITY',
       unit: 'feet per second',
     });
-    if (Number.isFinite(tdFps) && Math.abs(tdFps) > 0.05) {
-      return Math.round(tdFps * 60);
-    }
+    return touchdownNormalVelocityToFpm(raw);
   } catch {
-    /* fall through */
+    return undefined;
   }
-  try {
-    const vs = await bridge.readSimVar({
-      name: 'VERTICAL SPEED',
-      unit: 'feet per minute',
-    });
-    if (Number.isFinite(vs) && Math.abs(vs) > 5) return Math.round(vs);
-  } catch {
-    /* ignore */
-  }
-  return undefined;
 }
 
 /** Best-effort latched touchdown position (degrees). Soft-fail when missing. */
@@ -1613,6 +1616,7 @@ export class CareerWatchSession {
   /** Bumped on stop() so a late start open cannot resurrect after abort. */
   private startEpoch = 0;
   private missionId: string | null = null;
+  private destIcao: string | null = null;
   private missionStatus: string | null = null;
   private lastSample: (FlightGroundSample & {
     aglFt?: number;
@@ -1837,6 +1841,18 @@ export class CareerWatchSession {
     return undefined;
   }
 
+  /**
+   * Project the latched touchdown with this machine's runway catalog.
+   * World settle trusts this so a stale server strip cannot slide the marker
+   * half a runway down the pavement.
+   */
+  getCapturedRunwayTouch(): RunwayTouchdownSnapshot | undefined {
+    const td = this.getCapturedTouchdownPosition();
+    const dest = this.destIcao?.trim();
+    if (!td || !dest) return undefined;
+    return evaluateRunwayTouchdown(dest, td.lat, td.lon, td.headingTrueDeg);
+  }
+
   /** MX wear excess fuel ledger for settle (capture before stop()). */
   getCapturedMxFuelDrain(): {
     unsettledKg: number;
@@ -2037,6 +2053,7 @@ export class CareerWatchSession {
       pipeName: opts.pipeName,
     };
     this.missionId = opts.missionId;
+    this.destIcao = null;
     this.liveTrackCompanyId = opts.liveTrackCompanyId?.trim() || null;
     this.lastSample = null;
     this.playbackFrozen = false;
@@ -2107,16 +2124,19 @@ export class CareerWatchSession {
     });
     if (!loaded) {
       this.missionId = null;
+      this.destIcao = null;
       this.liveTrackCompanyId = null;
       throw new Error(`Unknown mission ${opts.missionId}`);
     }
     const { mission } = loaded;
     if (!['accepted', 'dispatched', 'in_flight'].includes(mission.status)) {
       this.missionId = null;
+      this.destIcao = null;
       this.liveTrackCompanyId = null;
       throw new Error(`Mission ${mission.id} is ${mission.status} — nothing to watch`);
     }
     this.missionStatus = mission.status;
+    this.destIcao = mission.destIcao;
     this.noteWallet(loaded.walletUsd);
     // Seed from last Validate; Watch re-evaluates on the ground each tick.
     this.originClearedForDepart =
@@ -2167,12 +2187,28 @@ export class CareerWatchSession {
     this.ofpExpectedRouteMs = resolveExpectedRouteMs(mission, {
       distanceNm: loaded.distanceNm,
     });
+    if (mission.status === 'in_flight') {
+      const restored = cruiseStateFromPersistedCommit(mission.cruiseSample);
+      if (restored?.committed) {
+        this.cruiseState = restored;
+        this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+        const tightenedMs = this.airTimeMsFromCruise(restored.committed);
+        if (tightenedMs != null) {
+          this.watchState = {
+            ...this.watchState,
+            expectedRouteMs: tightenedMs,
+          };
+          await this.persistAirborneClock();
+        }
+      }
+    }
     // Scrub stale airborne fields left on accepted/dispatched from a prior session.
     if (
       !resumeClock &&
       (mission.airborneAtMs != null ||
         mission.airborneElapsedMs != null ||
-        mission.expectedRouteMs != null)
+        mission.expectedRouteMs != null ||
+        mission.cruiseSample != null)
     ) {
       await this.cb.updateOpenMission(
         mission.id,
@@ -2187,7 +2223,8 @@ export class CareerWatchSession {
             openMission.airborneAtMs == null &&
             openMission.airborneElapsedMs == null &&
             openMission.expectedRouteMs == null &&
-            openMission.destRelocationBlocksSettle !== true
+            openMission.destRelocationBlocksSettle !== true &&
+            openMission.cruiseSample == null
           ) {
             return false;
           }
@@ -2196,6 +2233,7 @@ export class CareerWatchSession {
           delete cleaned.airborneElapsedMs;
           delete cleaned.expectedRouteMs;
           delete cleaned.destRelocationBlocksSettle;
+          delete cleaned.cruiseSample;
           freshMissions.missions[openIdx] = cleaned;
           return true;
         },
@@ -2226,6 +2264,7 @@ export class CareerWatchSession {
       });
     } catch (error) {
       this.missionId = null;
+      this.destIcao = null;
       this.missionStatus = null;
       this.lastError = formatIpcError(error);
       watchDebugLog('watch', 'start failed', { error: this.lastError });
@@ -2238,6 +2277,7 @@ export class CareerWatchSession {
         /* ignore */
       }
       this.missionId = null;
+      this.destIcao = null;
       this.missionStatus = null;
       watchDebugLog('watch', 'start aborted — stop won the race', {
         missionId: opts.missionId,
@@ -2346,6 +2386,7 @@ export class CareerWatchSession {
    */
   resetSession(): void {
     this.missionId = null;
+    this.destIcao = null;
     this.liveTrackCompanyId = null;
     this.missionStatus = null;
     this.watchState = createMissionFlightWatchState();
@@ -2487,6 +2528,95 @@ export class CareerWatchSession {
       );
     } catch (err) {
       watchDebugLog('watch', 'persist airborne clock failed', {
+        missionId: this.missionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Shorten the planned air time from a locked cruise TAS. Same floor as a
+   * live lock: never lengthen, never below 55% of the OFP plan.
+   */
+  private airTimeMsFromCruise(
+    commit: CruiseSampleCommit,
+    opts?: {
+      plannedMs?: number;
+      currentMs?: number;
+      distanceNm?: number;
+    },
+  ): number | undefined {
+    const plannedMs =
+      opts?.plannedMs ??
+      this.ofpExpectedRouteMs ??
+      this.watchState.expectedRouteMs;
+    const currentMs = opts?.currentMs ?? this.watchState.expectedRouteMs;
+    const routeNm = opts?.distanceNm ?? this.watchState.routeDistanceNm;
+    if (
+      typeof plannedMs !== 'number' ||
+      !(plannedMs > 0) ||
+      typeof routeNm !== 'number' ||
+      !(routeNm > 0)
+    ) {
+      return undefined;
+    }
+    const rebased = rebaseExpectedRouteMsFromCruise({
+      plannedExpectedRouteMs: plannedMs,
+      currentExpectedRouteMs: currentMs,
+      distanceNm: routeNm,
+      cruiseSpeedKt: commit.cruiseSpeedKt,
+    });
+    if (!rebased.changed) return undefined;
+    if (
+      typeof currentMs === 'number' &&
+      currentMs > 0 &&
+      rebased.expectedRouteMs >= currentMs
+    ) {
+      return undefined;
+    }
+    watchDebugLog('watch', 'cruise air-time rebase', {
+      missionId: this.missionId,
+      cruiseSpeedKt: commit.cruiseSpeedKt,
+      distanceNm: routeNm,
+      plannedMs,
+      estimatedMs: rebased.estimatedMs,
+      prevExpectedRouteMs: currentMs ?? null,
+      nextExpectedRouteMs: rebased.expectedRouteMs,
+    });
+    return rebased.expectedRouteMs;
+  }
+
+  /**
+   * Keep a locked cruise commit on the in-flight mission. A restart before
+   * landing restores the burn and the tightened air time. The aircraft card
+   * still updates only at settle.
+   */
+  private async persistCruiseSample(commit: CruiseSampleCommit): Promise<void> {
+    if (!this.missionId) return;
+    try {
+      await this.cb.updateOpenMission(
+        this.missionId,
+        async (freshMissions, openMission, openIdx) => {
+          if (openMission.status !== 'in_flight') return false;
+          const prev = cruiseStateFromPersistedCommit(openMission.cruiseSample);
+          if (
+            prev?.committed &&
+            prev.committed.committedAtMs === commit.committedAtMs &&
+            prev.committed.cruiseFuelFlowKgPerHour ===
+              commit.cruiseFuelFlowKgPerHour &&
+            prev.committed.cruiseSpeedKt === commit.cruiseSpeedKt
+          ) {
+            return false;
+          }
+          freshMissions.missions[openIdx] = {
+            ...openMission,
+            cruiseSample: commit,
+          };
+          return true;
+        },
+      );
+    } catch (err) {
+      watchDebugLog('watch', 'persist cruise sample failed', {
         missionId: this.missionId,
         error: err instanceof Error ? err.message : String(err),
       });
@@ -3789,6 +3919,27 @@ export class CareerWatchSession {
         this.watchState,
         transitionOpts,
       );
+      // First-contact sink is the sim latch, not the last airborne VS.
+      // Retry while it is still empty: the latch can land a frame late, and a
+      // previous flight's latch is rejected until the position matches.
+      if (
+        nextState.sawAirborne &&
+        sample.onGround === true &&
+        nextState.landingFpm == null &&
+        this.bridge &&
+        !this.pendingSimConnectReset &&
+        sample.position
+      ) {
+        try {
+          const latched = await readLiveLandingFpm(this.bridge, sample.position);
+          if (typeof latched === 'number') {
+            nextState = { ...nextState, landingFpm: latched };
+            this.watchState = nextState;
+          }
+        } catch {
+          /* next tick retries */
+        }
+      }
       // Pause / slew: transition ignores the sample, but still freeze the
       // airborne flight-time clock so menu time does not count.
       nextState = tickAirbornePlaybackClock(nextState, {
@@ -4051,6 +4202,9 @@ export class CareerWatchSession {
                 };
           this.cruiseState = pushed.state;
           this.cruiseStatus = cruiseSampleStatus(this.cruiseState);
+          if (pushed.justCommitted) {
+            await this.persistCruiseSample(pushed.justCommitted);
+          }
           if (
             this.cruiseStatus.phase === 'idle' &&
             this.cruiseState.window.length === 0
@@ -4081,43 +4235,17 @@ export class CareerWatchSession {
               nextState.routeDistanceNm ??
               distanceNm ??
               current.lastOfpCheck?.briefing?.distanceNm;
-            if (
-              typeof plannedMs === 'number' &&
-              plannedMs > 0 &&
-              typeof routeNm === 'number' &&
-              routeNm > 0
-            ) {
-              const rebased = rebaseExpectedRouteMsFromCruise({
-                plannedExpectedRouteMs: plannedMs,
-                currentExpectedRouteMs:
-                  nextState.expectedRouteMs ?? expectedRouteMs,
-                distanceNm: routeNm,
-                cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
-              });
-              if (rebased.changed) {
-                const prevExpected =
-                  nextState.expectedRouteMs ?? expectedRouteMs;
-                if (
-                  prevExpected == null ||
-                  !(prevExpected > 0) ||
-                  rebased.expectedRouteMs < prevExpected
-                ) {
-                  watchDebugLog('watch', 'cruise air-time rebase', {
-                    missionId: current.id,
-                    cruiseSpeedKt: cruiseCommit.cruiseSpeedKt,
-                    distanceNm: routeNm,
-                    plannedMs,
-                    estimatedMs: rebased.estimatedMs,
-                    prevExpectedRouteMs: prevExpected ?? null,
-                    nextExpectedRouteMs: rebased.expectedRouteMs,
-                  });
-                  this.watchState = {
-                    ...nextState,
-                    expectedRouteMs: rebased.expectedRouteMs,
-                  };
-                  nextState = this.watchState;
-                }
-              }
+            const tightenedMs = this.airTimeMsFromCruise(cruiseCommit, {
+              plannedMs: typeof plannedMs === 'number' ? plannedMs : undefined,
+              currentMs: nextState.expectedRouteMs ?? expectedRouteMs,
+              distanceNm: typeof routeNm === 'number' ? routeNm : undefined,
+            });
+            if (tightenedMs != null) {
+              this.watchState = {
+                ...nextState,
+                expectedRouteMs: tightenedMs,
+              };
+              nextState = this.watchState;
             }
           }
         } catch (cruiseErr) {
@@ -4664,17 +4792,14 @@ export class CareerWatchSession {
         } catch {
           residualFuelKg = undefined;
         }
-        // Prefer Watch first-contact VS; sim TOUCHDOWN latch often updates on
-        // later bounce touches and would erase the real landing rate.
+        // Latch only. A missing read stays missing — do not fill with the
+        // glideslope vertical speed still sitting on the last airborne tick.
         let landingFpm = this.watchState.landingFpm;
-        if (landingFpm == null) {
+        if (landingFpm == null && sample.position) {
           try {
-            const tdFps = await this.bridge.readSimVar({
-              name: 'PLANE TOUCHDOWN NORMAL VELOCITY',
-              unit: 'feet per second',
-            });
-            if (Number.isFinite(tdFps) && Math.abs(tdFps) > 0.05) {
-              landingFpm = Math.round(tdFps * 60);
+            const latched = await readLiveLandingFpm(this.bridge, sample.position);
+            if (typeof latched === 'number') {
+              landingFpm = latched;
               this.watchState = { ...this.watchState, landingFpm };
             }
           } catch {
@@ -4771,6 +4896,16 @@ export class CareerWatchSession {
               touchdownLat: touchdownLat ?? undefined,
               touchdownLon: touchdownLon ?? undefined,
               touchdownHeadingTrueDeg,
+              ...(touchdownLat != null && touchdownLon != null
+                ? {
+                    runwayTouch: evaluateRunwayTouchdown(
+                      current.destIcao,
+                      touchdownLat,
+                      touchdownLon,
+                      touchdownHeadingTrueDeg,
+                    ),
+                  }
+                : {}),
               ...(cruiseCommit ? { cruiseCommit } : {}),
             }).then(async (ok) => {
               if (!ok) return false;

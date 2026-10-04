@@ -1,5 +1,19 @@
 # Runway touchdown / debrief
 
+## Sintoma (2026-10-04) — KMIA→MGGT, toque na cabeceira 02, diagrama no meio
+
+Debrief `RWY 02 · 1751 m past THR · 7 m right · on pavement · lighted`, faixa `2.99 km · 60 m wide`. O ponto fica depois do meio (1751/2987 ≈ 59%). O piloto tocou na cabeceira da 02.
+
+## Causa
+
+Mesma geometria do MZBZ: `career-runways.json` guarda a cabeceira 02 (`14.5704, -90.531601`) como centro. `projectOntoRunway` soma `length/2` (~1.494 m). 1751 − 1494 ≈ 257 m depois da cabeceira real, zona de toque. Os 7 m à direita estão certos.
+
+A faixa do MSFS já está no PC (`ident 20`, centro `14.58328, -90.52744`, 2984×61 m, sem `lighted`). O settle online redesenha no world com o catálogo de lá. A cópia do world (e qualquer AppData antigo) não recebia faixas novas: o seed só copiava o arquivo se ele ainda não existia.
+
+## Fix
+
+No boot, faixas do seed entram na cópia local quando ela não tem pista, ou quando o seed é mais novo. Um row local mais novo não é trocado. O desktop manda `runwayTouch` já projetado na faixa do MSFS; o world usa esse snapshot se o ICAO for o destino. Este debrief já gravado não redesenha.
+
 ## Sintoma (2026-10-03) — KMIA→MZBZ, toque no começo da 07, diagrama na metade
 
 Debrief `RWY 07 · 1866 m past THR · 2 m right · on pavement · 2.95 km · lighted`. O ponto no desenho fica depois do meio (1866/2950 ≈ 63%). O piloto tocou no começo da 07.

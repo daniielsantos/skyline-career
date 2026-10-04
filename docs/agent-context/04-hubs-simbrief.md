@@ -1,5 +1,7 @@
 # Hubs / SimBrief allowlist
 
+Atualizado 2026-10-04: **Seed de faixa não ficava congelado** — KMIA→MGGT desenhou 1751 m past THR (meio da 02) porque o settle no world ainda usava OurAirports. A cabeceira estava gravada como centro; a faixa MSFS (2984 m, centro real) já estava no AppData local. O boot agora completa faixas em falta a partir do seed, e o desktop envia o `runwayTouch` projetado aqui. Detalhe em `25-runway-touchdown.md`.
+
 Atualizado 2026-10-03: **Pista do debrief vem do MSFS, não do OurAirports** — o desenho lê faixa capturada no Facilities (`msfs-hub-overrides.json` → `runways`). `getAirportRunways` já prefere isso. `career-runways.json` (OurAirports) só cobre o hub que ainda não tem faixa do sim. Não recolocar o centro com LE+HE do OurAirports.
 
 Captura com o MSFS aberto: 2357 dos 2368 hubs têm faixa do sim. MZBZ é 07/25, centro 17.53984,-88.30460, 2956 m (meio real). Sem faixa, e por isso ainda caem no OurAirports: EHGR, LEGA, LEGT, LEVD, LFOT, LFRH, LFTH, RKTU (o sim devolveu o aeroporto e nenhuma faixa usável) e KPBI, UTSB, UTSS (não estão no cenário local).

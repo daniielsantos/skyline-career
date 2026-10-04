@@ -456,6 +456,18 @@ export function mergeAirframePerfOverride(
   };
 }
 
+/**
+ * Locked commit saved on the in-flight mission. Empty window so a restart
+ * shows locked and settle can still apply it. A partial window is not restored.
+ */
+export function cruiseStateFromPersistedCommit(
+  raw: unknown,
+): CruiseSampleState | undefined {
+  const committed = parseCruiseSampleCommit(raw);
+  if (!committed) return undefined;
+  return { window: [], committed };
+}
+
 /** Validate a settle-body cruise commit from the desktop Watch. */
 export function parseCruiseSampleCommit(
   raw: unknown,

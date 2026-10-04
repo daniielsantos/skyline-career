@@ -8,7 +8,18 @@ import {
   pushFlightScoreSample,
   scoreLandingGPoints,
   scoreLandingVsPoints,
+  touchdownNormalVelocityToFpm,
 } from './career-flight-score.js';
+
+describe('touchdownNormalVelocityToFpm', () => {
+  it('converts feet per second and keeps an already-fpm reading', () => {
+    assert.equal(touchdownNormalVelocityToFpm(-3.5), -210);
+    assert.equal(touchdownNormalVelocityToFpm(-12.583), -755);
+    assert.equal(touchdownNormalVelocityToFpm(-755), -755);
+    assert.equal(touchdownNormalVelocityToFpm(0.02), undefined);
+    assert.equal(touchdownNormalVelocityToFpm(-9_000), undefined);
+  });
+});
 
 describe('scoreLandingVsPoints', () => {
   it('awards full points for soft landings', () => {

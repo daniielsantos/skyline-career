@@ -1276,7 +1276,7 @@ describe('evaluateMissionFlightTransition', () => {
     assert.equal(longBlocked.ratioRequired, 0.7);
   });
 
-  it('captures landing FPM from last airborne vertical speed', () => {
+  it('locks landing FPM from the touchdown latch, not the glideslope', () => {
     const plannedMs = 3_600_000;
     const nowMs = Date.now();
     let state = createMissionFlightWatchState({
@@ -1284,7 +1284,7 @@ describe('evaluateMissionFlightTransition', () => {
       lastOnGround: false,
       airborneAtMs: nowMs - plannedMs,
       expectedRouteMs: plannedMs,
-      lastAirborneVsFpm: -212.4,
+      lastAirborneVsFpm: -755,
     });
     const down = evaluateMissionFlightTransition(
       mission('in_flight'),
@@ -1295,9 +1295,21 @@ describe('evaluateMissionFlightTransition', () => {
         verticalSpeedFpm: 0,
       },
       state,
-      { destCoords: SBRF, nowMs },
+      { destCoords: SBRF, nowMs, touchdownFpm: -212.4 },
     );
     assert.equal(down.nextState.landingFpm, -212);
+    const approachOnly = evaluateMissionFlightTransition(
+      mission('in_flight'),
+      {
+        onGround: true,
+        enginesRunning: true,
+        position: { lat: SBRF.lat, lon: SBRF.lon },
+        verticalSpeedFpm: -755,
+      },
+      state,
+      { destCoords: SBRF, nowMs },
+    );
+    assert.equal(approachOnly.nextState.landingFpm, undefined);
     state = down.nextState;
 
     // Later parked sample must not overwrite the captured touchdown rate.
@@ -1362,7 +1374,8 @@ describe('evaluateMissionFlightTransition', () => {
       lastOnGround: false,
       airborneAtMs: nowMs - 60_000,
       expectedRouteMs: 3_600_000,
-      lastAirborneVsFpm: -420,
+      lastAirborneVsFpm: -755,
+      landingFpm: -180,
     });
 
     const first = evaluateMissionFlightTransition(
@@ -1373,9 +1386,9 @@ describe('evaluateMissionFlightTransition', () => {
         verticalSpeedFpm: -50,
       },
       state,
-      { nowMs },
+      { nowMs, touchdownFpm: -420 },
     );
-    assert.equal(first.nextState.landingFpm, -420);
+    assert.equal(first.nextState.landingFpm, -180);
     assert.ok(typeof first.nextState.airborneEndedAtMs === 'number');
     state = first.nextState;
 
@@ -1390,7 +1403,7 @@ describe('evaluateMissionFlightTransition', () => {
       state,
       { nowMs: nowMs + 1_000 },
     );
-    assert.equal(hop.nextState.landingFpm, -420);
+    assert.equal(hop.nextState.landingFpm, -180);
     assert.equal(hop.nextState.airborneEndedAtMs, first.nextState.airborneEndedAtMs);
     state = hop.nextState;
 
@@ -1404,7 +1417,7 @@ describe('evaluateMissionFlightTransition', () => {
       state,
       { nowMs: nowMs + 2_000 },
     );
-    assert.equal(second.nextState.landingFpm, -420);
+    assert.equal(second.nextState.landingFpm, -180);
     assert.equal(
       second.nextState.airborneEndedAtMs,
       first.nextState.airborneEndedAtMs,

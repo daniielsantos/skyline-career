@@ -1,6 +1,7 @@
 /** Skyline Career — local cargo logistics economy (Slice 1). */
 
 import type { FlightScoreSnapshot } from '../career-flight-score.js';
+import type { CruiseSampleCommit } from '../cruise-sample.js';
 import type { WeatherOpsSnapshot } from '../career-weather-ops.js';
 import type { RunwayTouchdownSnapshot } from '../career-runways.js';
 import type { OfpBriefingSummary, OfpLoadMethod } from './ofp-compliance.js';
@@ -947,6 +948,12 @@ export interface MissionIntent {
    * Missing on older saves.
    */
   destRelocationBlocksSettle?: boolean;
+  /**
+   * Locked cruise burn. Watch writes it when the stable window commits and
+   * reads it back after an app restart. The aircraft card still updates
+   * only at settle. A partial window is not stored.
+   */
+  cruiseSample?: CruiseSampleCommit;
   /**
    * Planned route duration (ms) stamped at airborne — OFP air time / distance
    * estimate. May tighten after stable cruise TAS rebase (floor 55% of OFP).

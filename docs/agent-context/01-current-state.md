@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **1a7e0cf6** / desktop **0.3.467** shipped: Make the port charter desk fixture satisfy the mission type. Release: [v0.3.467](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.467).
+
+
 `main` **cd249f5c** / desktop **0.3.466** shipped: Keep the cruise lock across a restart, draw the MSFS runway, and score the touchdown latch. Release: [v0.3.466](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.466).
 
 

@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **cd249f5c** / desktop **0.3.466** shipped: Keep the cruise lock across a restart, draw the MSFS runway, and score the touchdown latch. Release: [v0.3.466](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.466).
+
+
 `main` **08b9cb74** / desktop **0.3.465** shipped: Drop the Scout All tab and the corridor ring fill. Release: [v0.3.465](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.465).
 
 

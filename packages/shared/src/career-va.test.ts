@@ -1176,7 +1176,7 @@ describe('VA IH-2', () => {
         cargoKg: 0,
         payUsd: 12000,
         lots: [],
-      }) as MissionIntent;
+      }) as unknown as MissionIntent;
     state.missions = [
       row('port_live', 'charter-offer:port:10:KLAX:KMIA', 'in_flight'),
       row('market', 'charter-offer:10:0:KLAX:KSFO', 'in_flight'),

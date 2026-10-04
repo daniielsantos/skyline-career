@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **123560d9** / desktop **0.3.477** shipped: Let the En route map fill leftover height so Dispatch has no empty band at 2K. Release: [v0.3.477](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.477).
+
+
 `main` **39f612a5** / desktop **0.3.476** shipped: Tighten En route spacing so Dispatch fits a 2K screen without scrolling. Release: [v0.3.476](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.476).
 
 

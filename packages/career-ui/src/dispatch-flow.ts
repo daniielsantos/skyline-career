@@ -585,11 +585,29 @@ export function resolveLoadPath(
   return 'manual';
 }
 
+/**
+ * MSFS aircraft menu / variant reload: SIM ON GROUND is false and GS stays
+ * under the Watch depart kinematics floor (15 kt). Not a real flight.
+ */
+export function isMenuPhantomAirborne(
+  onGround: boolean | null | undefined,
+  groundSpeedKt: number | null | undefined,
+): boolean {
+  if (onGround !== false) return false;
+  return (
+    typeof groundSpeedKt === 'number' &&
+    Number.isFinite(groundSpeedKt) &&
+    groundSpeedKt < 15
+  );
+}
+
 /** Copy when Load has no lastPreflightCheck yet (EFB / inject / manual). */
 export function livePreflightWaitHint(input: {
   bootstrapError?: string | null;
   simBridgeConnected: boolean;
   onGround: boolean | null | undefined;
+  /** Probe/Watch GS. Zero while the aircraft menu is open. */
+  groundSpeedKt?: number | null;
   watchRunning: boolean;
   aircraftLabel: string;
   liveAircraftTitle?: string | null;
@@ -603,7 +621,10 @@ export function livePreflightWaitHint(input: {
   if (!input.simBridgeConnected) {
     return `SimBridge is offline — start the bridge, then load the ${input.aircraftLabel} at the origin.`;
   }
-  if (input.onGround === false) {
+  if (
+    input.onGround === false &&
+    !isMenuPhantomAirborne(input.onGround, input.groundSpeedKt)
+  ) {
     return 'MSFS reports airborne — Preflight only runs on the ground.';
   }
   const live = input.liveAircraftTitle?.trim();
@@ -765,6 +786,8 @@ export function dispatchStepStatusLine(input: {
   watchAutoStatus: 'idle' | 'waiting' | 'connecting' | 'blocked';
   /** Live Watch sample — used for post-landing settle hints. */
   watchOnGround?: boolean | null;
+  /** Live GS. Menu / aircraft select is ~0 while SIM ON GROUND is false. */
+  watchGroundSpeedKt?: number | null;
   watchEnginesRunning?: boolean | null;
   watchSawAirborne?: boolean;
   watchSettling?: boolean;
@@ -848,6 +871,7 @@ export function dispatchStepStatusLine(input: {
           bootstrapError: null,
           simBridgeConnected: input.simBridgeConnected,
           onGround: input.watchOnGround,
+          groundSpeedKt: input.watchGroundSpeedKt,
           watchRunning: input.watchRunning,
           aircraftLabel: 'aircraft',
         });
@@ -859,6 +883,7 @@ export function dispatchStepStatusLine(input: {
         bootstrapError: null,
         simBridgeConnected: input.simBridgeConnected,
         onGround: input.watchOnGround,
+        groundSpeedKt: input.watchGroundSpeedKt,
         watchRunning: input.watchRunning,
         aircraftLabel: 'aircraft',
       });

@@ -100,6 +100,14 @@ export function WatchStatusFooter(props: Props) {
     watchRunning && props.watch?.groundSpeedKt != null
       ? props.watch.groundSpeedKt
       : (props.simBridge?.groundSpeedKt ?? null);
+  const settleForThisFlight =
+    !props.activeMissionId ||
+    !props.watch?.missionId ||
+    props.watch.missionId === props.activeMissionId;
+  const showSettling =
+    settleForThisFlight &&
+    (Boolean(props.watch?.settling) ||
+      props.watch?.lastEvent?.type === 'settle');
   const stageDetail = (() => {
     const phaseLabel = formatWatchPhaseLabel(bridgePhase);
     const movingOnGround =
@@ -107,8 +115,10 @@ export function WatchStatusFooter(props: Props) {
       typeof bridgeGs === 'number' &&
       bridgeGs >= 5;
     if (watchRunning || stickyInFlight) {
-      if (props.watch?.settling) return 'Settling flight';
-      if (props.watch?.lastEvent?.type === 'settle') return 'Settling flight';
+      if (showSettling && props.watch?.settling) return 'Settling flight';
+      if (showSettling && props.watch?.lastEvent?.type === 'settle') {
+        return 'Settling flight';
+      }
       if (bridgePhase === 'taxi_in') return 'Taxi in';
       if (bridgePhase === 'taxi_out' || bridgePhase === 'taxi') {
         return phaseLabel !== '—' ? phaseLabel : 'Taxiing';
@@ -122,7 +132,11 @@ export function WatchStatusFooter(props: Props) {
       return 'Sampling…';
     }
     if (bridgePhase === 'taxi' || movingOnGround) return 'Taxiing';
-    if (bridgeOnGround === true) {
+    if (
+      bridgePhase === 'ground' ||
+      bridgePhase === 'ground+engines' ||
+      bridgeOnGround === true
+    ) {
       return bridgeEngines ? 'On ground · engines' : 'On ground';
     }
     if (bridgeOnGround === false) return 'Airborne';
@@ -136,7 +150,7 @@ export function WatchStatusFooter(props: Props) {
   const statusLabel =
     props.loadOfpAutoStatus === 'loading'
       ? 'INJECTING…'
-      : props.watch?.settling || props.watch?.lastEvent?.type === 'settle'
+      : showSettling
         ? 'SETTLING…'
         : watchPipeLive
         ? 'MSFS'
@@ -180,7 +194,7 @@ export function WatchStatusFooter(props: Props) {
           className={`watch-dot ${
             props.loadOfpAutoStatus === 'loading'
               ? 'checking'
-              : props.watch?.settling
+              : showSettling
                 ? 'checking'
                 : (watchRunning || stickyInFlight) && !watchPipeLive
                 ? 'checking'

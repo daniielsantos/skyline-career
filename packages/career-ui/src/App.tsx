@@ -410,6 +410,7 @@ import {
   formatLandingFpm,
   formatRunwayTouchdownDebriefLine,
   fuelAuthorizedForOfp,
+  isMenuPhantomAirborne,
   preflightBootstrapIsSoftRetry,
   resolveLoadPath,
   airborneResumeShouldOpenDispatch,
@@ -6272,6 +6273,15 @@ export function App() {
             if (!prev || !prev.running) return prev;
             return { ...prev, running: false };
           }
+          const activeId = activeMissionRef.current?.id;
+          if (
+            status.missionId &&
+            activeId &&
+            status.missionId !== activeId &&
+            !status.running
+          ) {
+            return null;
+          }
           const justSettled =
             Boolean(prev?.running) &&
             !status.running &&
@@ -7924,7 +7934,11 @@ export function App() {
       Boolean(username) &&
       Boolean(ofp?.ofpId) &&
       fuelOk &&
-      simBridge?.onGround !== false &&
+      (simBridge?.onGround !== false ||
+        isMenuPhantomAirborne(
+          simBridge?.onGround,
+          simBridge?.groundSpeedKt,
+        )) &&
       // Hold-off means we already dropped UI Watch; do not wait for a hung
       // server tick to finish before the first Preflight sample.
       (!watch?.running || holdWatchOffForPreflight) &&
@@ -8008,6 +8022,7 @@ export function App() {
     holdWatchOffForPreflight,
     loadOfpAutoStatus,
     simBridge?.onGround,
+    simBridge?.groundSpeedKt,
     simbriefUser,
     staging?.replaceManifest,
     tab,
@@ -8215,12 +8230,15 @@ export function App() {
         const status = await fetchWatchStatus();
         if (cancelled) return;
         if (
-          status.running &&
           status.missionId &&
           nextId &&
           status.missionId !== nextId
         ) {
+          // Settle already stopped Watch but kept lastEvent=settle for the
+          // debrief. A new flight must wipe that session or the footer stays
+          // SETTLING and the probe looks like the previous leg.
           await postWatchStop({ reset: true });
+          if (!cancelled) setWatch(null);
         }
       } catch {
         /* soft — auto-start will retry */
@@ -14137,6 +14155,10 @@ export function App() {
       watch?.running && watch.missionId === activeMission?.id
         ? watch.onGround
         : (simBridge?.onGround ?? null),
+    watchGroundSpeedKt:
+      watch?.running && watch.missionId === activeMission?.id
+        ? watch.groundSpeedKt
+        : (simBridge?.groundSpeedKt ?? null),
     watchEnginesRunning:
       watch?.running && watch.missionId === activeMission?.id
         ? watch.enginesRunning

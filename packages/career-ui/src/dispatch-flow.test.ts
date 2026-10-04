@@ -234,6 +234,32 @@ describe('livePreflightWaitHint', () => {
     );
   });
 
+  it('does not call the aircraft menu a flight', () => {
+    assert.doesNotMatch(
+      livePreflightWaitHint({
+        simBridgeConnected: true,
+        onGround: false,
+        groundSpeedKt: 0,
+        watchRunning: false,
+        aircraftLabel: '737 Max 8',
+      }),
+      /reports airborne/i,
+    );
+  });
+
+  it('still blocks a moving airborne sample', () => {
+    assert.match(
+      livePreflightWaitHint({
+        simBridgeConnected: true,
+        onGround: false,
+        groundSpeedKt: 180,
+        watchRunning: false,
+        aircraftLabel: '737 Max 8',
+      }),
+      /reports airborne/i,
+    );
+  });
+
   it('surfaces bootstrap errors', () => {
     assert.match(
       livePreflightWaitHint({

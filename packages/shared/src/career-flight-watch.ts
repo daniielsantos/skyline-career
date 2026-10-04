@@ -461,7 +461,19 @@ export function flightPhaseFromSample(
   sample: FlightGroundSample,
   prevPhase?: string | null,
 ): string {
-  if (!sample.onGround) return 'airborne';
+  if (!sample.onGround) {
+    // Aircraft-select menu reports SIM ON GROUND false while GS stays ~0.
+    // That is not a flight — same gate Watch uses before it will depart.
+    const gs = sample.groundSpeedKt;
+    if (
+      typeof gs === 'number' &&
+      Number.isFinite(gs) &&
+      gs < DEPART_KINEMATICS_GS_KT
+    ) {
+      return 'ground';
+    }
+    return 'airborne';
+  }
   const gs = sample.groundSpeedKt;
   const wasTaxi = prevPhase === 'taxi';
   const threshold = wasTaxi ? TAXI_GROUND_SPEED_EXIT_KT : TAXI_GROUND_SPEED_KT;

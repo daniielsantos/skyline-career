@@ -1485,6 +1485,22 @@ describe('flightPhaseFromSample', () => {
       flightPhaseFromSample({ onGround: false, enginesRunning: true }),
       'airborne',
     );
+    assert.equal(
+      flightPhaseFromSample({
+        onGround: false,
+        enginesRunning: false,
+        groundSpeedKt: 0,
+      }),
+      'ground',
+    );
+    assert.equal(
+      flightPhaseFromSample({
+        onGround: false,
+        enginesRunning: true,
+        groundSpeedKt: 40,
+      }),
+      'airborne',
+    );
   });
 
   it('reports taxi from ground speed even when enginesRunning is false', () => {

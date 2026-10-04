@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **6328cb39** / desktop **0.3.472** shipped: Hold a Demand destination until the cargo lands, and correct the A340 cruise burn and CG envelope. Release: [v0.3.472](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.472).
+
+
 `main` **36b9adb9** / desktop **0.3.471** shipped: Load Edit cargo holds from the airline that owns the aircraft. Release: [v0.3.471](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.471).
 
 

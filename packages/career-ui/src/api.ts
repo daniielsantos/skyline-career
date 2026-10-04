@@ -6034,13 +6034,18 @@ export function postVaRole(body: {
   });
 }
 
-export function fetchVaHauls() {
+export function fetchVaHauls(opts?: { companyId?: string }) {
+  const companyId = opts?.companyId?.trim();
   return api<{
     companyId: string;
     companyNetwork: VaCompanyNetworkNode[];
     openHolds: VaHaulHold[];
     activeMissions: VaHaulMission[];
-  }>('/api/va/hauls');
+  }>('/api/va/hauls', {
+    headers: companyId
+      ? { 'X-Skyline-Company-Id': companyId }
+      : undefined,
+  });
 }
 
 export function fetchVaRanking() {

@@ -1812,6 +1812,44 @@ function authSessionFromRequest(
   }
 }
 
+function requestCompanyHeader(
+  req: import('node:http').IncomingMessage,
+): string {
+  const headerRaw = req.headers['x-skyline-company-id'];
+  if (typeof headerRaw === 'string') return headerRaw.trim();
+  if (Array.isArray(headerRaw)) return String(headerRaw[0] ?? '').trim();
+  return '';
+}
+
+/**
+ * `companyIdFromRequest` drops a VA the account does not own: Postgres
+ * `vaGetMembership` is async and the sync check ignores the Promise, then
+ * the pick falls back to the home company. Desk holds and Add live on the
+ * airline file, so that rewrite returns an empty desk until Hauls switches
+ * the chrome header. Honor an explicit id once membership resolves.
+ */
+async function companyIdHonoringVaMembership(
+  req: import('node:http').IncomingMessage,
+  explicit?: string | null,
+): Promise<string> {
+  const requested = explicit?.trim() || requestCompanyHeader(req);
+  const fallback = companyIdFromRequest(req, explicit);
+  if (!requested || requested === fallback) return fallback;
+  if (!store || !isCareerAuthRequired() || !store.supportsAuth) return fallback;
+  const session = authSessionFromRequest(req);
+  if (!session) return fallback;
+  if (session.companies.some((c) => c.id === requested)) return requested;
+  try {
+    const membership = await Promise.resolve(
+      store.vaGetMembership(session.account.id, requested),
+    );
+    if (membership && membership.companyId) return requested;
+  } catch {
+    /* home company */
+  }
+  return fallback;
+}
+
 function companyIdFromRequest(
   req: import('node:http').IncomingMessage,
   bodyCompanyId?: string | null,
@@ -5404,7 +5442,7 @@ export function createCareerApiServer(port = 8787) {
           });
           return;
         }
-        const companyId = companyIdFromRequest(req);
+        const companyId = await companyIdHonoringVaMembership(req);
         if (!companyId) {
           send(res, 400, { error: 'companyId required' });
           return;
@@ -15758,7 +15796,10 @@ export function createCareerApiServer(port = 8787) {
           send(res, 400, { error: 'missionId and holdId required' });
           return;
         }
-        const tripCompanyId = companyIdFromRequest(req, body.companyId);
+        const tripCompanyId = await companyIdHonoringVaMembership(
+          req,
+          body.companyId,
+        );
         try {
           const peeked = await withCareerPeekRead((world, missions) => {
             const host = missions.missions.find((m) => m.id === body.missionId);

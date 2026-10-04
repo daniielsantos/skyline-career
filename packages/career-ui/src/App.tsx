@@ -6981,6 +6981,12 @@ export function App() {
   const [stagingJoinKg, setStagingJoinKg] = useState<Record<string, number>>(
     {},
   );
+  // Chrome can still be the home company while Dispatch shows the airline
+  // flight. Hauls was pinning that header. Resolve the tail's company here
+  // so the first Edit cargo asks the airline desk, once the VA fleet lands.
+  const deskHoldCompanyId = resolveOpsCompanyId(
+    staging?.aircraftId || activeMission?.aircraftId,
+  );
   useEffect(() => {
     const preparing = Boolean(staging?.deskHold);
     // Dispatched flights sit on Dispatch before Edit cargo. Load the desk
@@ -6996,7 +7002,7 @@ export function App() {
       return;
     }
     let cancel = false;
-    void fetchVaHauls()
+    void fetchVaHauls({ companyId: deskHoldCompanyId || undefined })
       .then((board) => {
         if (!cancel) setOpenDeskHolds(board.openHolds ?? []);
       })
@@ -7016,6 +7022,7 @@ export function App() {
     activeMission?.warehouseBridge,
     activeMission?.shipmentLotId,
     activeCompanyId,
+    deskHoldCompanyId,
   ]);
 
   // Independent SimBridge probe — does not require Watch to be running.

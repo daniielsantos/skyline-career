@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **39f612a5** / desktop **0.3.476** shipped: Tighten En route spacing so Dispatch fits a 2K screen without scrolling. Release: [v0.3.476](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.476).
+
+
 `main` **0c8d2550** / desktop **0.3.475** shipped: Close a mid-route impact when the player opens the menu or repositions. Release: [v0.3.475](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.475).
 
 

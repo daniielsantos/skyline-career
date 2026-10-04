@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **36b9adb9** / desktop **0.3.471** shipped: Load Edit cargo holds from the airline that owns the aircraft. Release: [v0.3.471](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.471).
+
+
 `main` **244e2664** / desktop **0.3.470** shipped: Load open desk holds on a dispatched flight before Edit cargo. Release: [v0.3.470](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.470).
 
 

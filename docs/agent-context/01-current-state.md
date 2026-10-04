@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **c771e2e1** / desktop **0.3.474** shipped: Keep the aircraft menu from freezing Preflight as if the flight were airborne. Release: [v0.3.474](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.474).
+
+
 `main` **a0e520fe** / desktop **0.3.473** shipped: Paint the A340 profile CG envelope on En route instead of the sim's 0–50 limit. Release: [v0.3.473](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.473).
 
 

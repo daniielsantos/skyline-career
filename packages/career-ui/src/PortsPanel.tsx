@@ -622,8 +622,8 @@ export function PortsPanel(props: {
   const [scoutFocusId, setScoutFocusId] = useState<string | null>(null);
   const [scoutFocusToken, setScoutFocusToken] = useState(0);
   const [scoutFilter, setScoutFilter] = useState<
-    'all' | 'haul' | 'demand' | 'bridge'
-  >('all');
+    'haul' | 'demand' | 'bridge'
+  >('haul');
   const [scoutBusy, setScoutBusy] = useState(false);
   const [scoutLoaded, setScoutLoaded] = useState(false);
   const [scoutHoldDraft, setScoutHoldDraft] = useState<
@@ -3487,9 +3487,7 @@ export function PortsPanel(props: {
         a.distanceNm - b.distanceNm ||
         a.id.localeCompare(b.id),
     );
-    const kindFiltered =
-      scoutFilter === 'all' ? rows : rows.filter((r) => r.kind === scoutFilter);
-    return kindFiltered;
+    return rows.filter((r) => r.kind === scoutFilter);
   }, [
     scoutHaulSuggestions,
     scoutDemandSuggestions,
@@ -5262,7 +5260,6 @@ export function PortsPanel(props: {
                             >
                               {(
                                 [
-                                  ['all', 'All'],
                                   ['haul', 'Haul'],
                                   ['demand', 'Demand'],
                                   ['bridge', 'Bridge'],
@@ -5292,22 +5289,18 @@ export function PortsPanel(props: {
                             </div>
                           ) : scoutMergedRows.length === 0 ? (
                             <div className="ports-scout-empty">
-                              {(scoutFilter !== 'all'
+                              {(holdsAtSelectedPort.length > 0
                                 ? [
-                                    `No ${scoutFilter} ideas right now — try All.`,
+                                    `${holdsAtSelectedPort.length} desk hold${
+                                      holdsAtSelectedPort.length === 1
+                                        ? ''
+                                        : 's'
+                                    } reserve free stock — open Hauls to fly, or Cancel a hold to reopen Scout.`,
                                   ]
-                                : holdsAtSelectedPort.length > 0
-                                  ? [
-                                      `${holdsAtSelectedPort.length} desk hold${
-                                        holdsAtSelectedPort.length === 1
-                                          ? ''
-                                          : 's'
-                                      } reserve free stock — open Hauls to fly, or Cancel a hold to reopen Scout.`,
-                                    ]
                                 : scoutEmptyHint && scoutEmptyHint.length > 0
                                   ? scoutEmptyHint
                                   : [
-                                      'No Scout ideas right now — check stock, Demand board, or wait for a tick.',
+                                      `No ${scoutFilter} ideas right now.`,
                                     ]
                               ).map((line) => (
                                 <p

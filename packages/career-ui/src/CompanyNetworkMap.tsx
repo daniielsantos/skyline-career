@@ -188,17 +188,7 @@ function upsertCorridorLayer(
   const existing = map.getSource(CORRIDOR_SOURCE) as GeoJSONSource | undefined;
   if (existing && typeof existing.setData === 'function') {
     existing.setData(data);
-    if (!map.getLayer(CORRIDOR_FILL)) {
-      map.addLayer({
-        id: CORRIDOR_FILL,
-        type: 'fill',
-        source: CORRIDOR_SOURCE,
-        paint: {
-          'fill-color': CORRIDOR_ACCENT,
-          'fill-opacity': 0.08,
-        },
-      });
-    }
+    if (map.getLayer(CORRIDOR_FILL)) map.removeLayer(CORRIDOR_FILL);
     if (!map.getLayer(CORRIDOR_LINE)) {
       map.addLayer({
         id: CORRIDOR_LINE,
@@ -212,14 +202,13 @@ function upsertCorridorLayer(
         },
       });
     }
-    // Keep disk under feeder / desk lines.
+    // Keep the ring under feeder / desk lines.
     const before =
       (map.getLayer(FEEDERS_LAYER) && FEEDERS_LAYER) ||
       (map.getLayer(DESK_LAYER) && DESK_LAYER) ||
       undefined;
     if (before) {
       try {
-        map.moveLayer(CORRIDOR_FILL, before);
         map.moveLayer(CORRIDOR_LINE, before);
       } catch {
         /* layer order optional */
@@ -231,15 +220,6 @@ function upsertCorridorLayer(
   if (map.getLayer(CORRIDOR_FILL)) map.removeLayer(CORRIDOR_FILL);
   if (map.getSource(CORRIDOR_SOURCE)) map.removeSource(CORRIDOR_SOURCE);
   map.addSource(CORRIDOR_SOURCE, { type: 'geojson', data });
-  map.addLayer({
-    id: CORRIDOR_FILL,
-    type: 'fill',
-    source: CORRIDOR_SOURCE,
-    paint: {
-      'fill-color': CORRIDOR_ACCENT,
-      'fill-opacity': 0.08,
-    },
-  });
   map.addLayer({
     id: CORRIDOR_LINE,
     type: 'line',
@@ -257,7 +237,6 @@ function upsertCorridorLayer(
     undefined;
   if (before) {
     try {
-      map.moveLayer(CORRIDOR_FILL, before);
       map.moveLayer(CORRIDOR_LINE, before);
     } catch {
       /* layer order optional */

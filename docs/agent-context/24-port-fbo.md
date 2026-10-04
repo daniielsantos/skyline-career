@@ -1,5 +1,9 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-04: **Anel do corredor sem fundo** — o disco do alcance no mapa do porto pintava um véu ciano por cima dos estados. O preenchimento saiu. Fica só a borda tracejada. O pin é o centro geográfico (cada ponto da borda está à mesma distância em nm). No Mercator o norte estica, então o meio visual do anel fica acima do FBO. Não recentrar o polígono na tela.
+
+Atualizado 2026-10-04: **Scout sem a aba All** — o quadro abria misturando Haul, Demand e Bridge. A aba All saiu. O Scout abre em Haul; Demand e Bridge continuam nos chips. Lista vazia não manda mais “try All”.
+
 Atualizado 2026-10-03: **Loading do Accept no quadro não cobre a palavra** — sintoma = a bolinha de espera sentava em cima de Accept no Charter (e no Demand). Causa = a bolinha ficou absoluta para o botão largo, e o quadro estreito tirou o espaço. Fix = no quadro a bolinha volta para a linha, ao lado do rótulo.
 
 Atualizado 2026-10-03: **Clique no armazém só foca o mapa** — sintoma = o card WH trocava a página pelo quadro de Demand ou pelo galpão. Causa = a seleção do armazém abria outra superfície e tirava o porto do mapa. Fix = o clique marca o WH e aproxima o mapa nesse pin. A página do porto fica. Segundo clique no mesmo card volta o foco para o FBO.

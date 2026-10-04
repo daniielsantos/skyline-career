@@ -21,7 +21,6 @@ import {
   fetchCargoLimit,
   formatClientUpdateRequiredLabel,
   formatClientUpdateCtaLabel,
-  postDemandAccept,
   postDemandHold,
   postDemandHoldCancel,
   postDemandDispatchHold,
@@ -92,8 +91,6 @@ import {
 } from './port-desk-pickup';
 import {
   demandOrderReachableFromOrigins,
-  previewDemandAcceptPull,
-  previewDemandInternationalRoute,
   warehouseFreeCommodityKgClient,
   greatCircleDistanceNm,
   formatPortCorridorReachLabel,
@@ -585,10 +582,6 @@ export function PortsPanel(props: {
   /** '' = off; else percent string e.g. '25'. */
   const [deskTargetFillPct, setDeskTargetFillPct] = useState('');
   const [amountText, setAmountText] = useState('1000');
-  const [acceptOrder, setAcceptOrder] = useState<DemandOrderView | null>(null);
-  const [acceptOrigin, setAcceptOrigin] = useState('');
-  const [acceptAircraftId, setAcceptAircraftId] = useState('');
-  const [acceptMode, setAcceptMode] = useState<'hold' | 'fly'>('hold');
   const [dispatchHold, setDispatchHold] = useState<PlayerDemandHoldView | null>(
     null,
   );
@@ -1325,221 +1318,6 @@ export function PortsPanel(props: {
     [warehouses?.warehouses, mapPorts],
   );
 
-  const acceptOriginOptions = useMemo(() => {
-    if (!acceptOrder) return [];
-    const dest = acceptOrder.destIcao.trim().toUpperCase();
-    const deskPortId = acceptOrder.portId?.trim().toUpperCase() ?? '';
-    const deskPort = deskPortId
-      ? snap?.ports.find((p) => p.id.trim().toUpperCase() === deskPortId)
-      : undefined;
-    const deskPickups = new Set(portDeskPickupHubList(deskPort?.pickupHubs));
-    const rows = (warehouses?.warehouses ?? [])
-      .filter((w) => {
-        const icao = w.icao.trim().toUpperCase();
-        if (icao === dest) return false;
-        if (deskPickups.size > 0 && !deskPickups.has(icao)) return false;
-        return true;
-      })
-      .map((w) => {
-        const lots = (warehouses?.stock ?? []).filter(
-          (s) =>
-            s.warehouseId === w.id &&
-            s.commodityId === acceptOrder.commodityId &&
-            s.kg > 0,
-        );
-        const stockKg = warehouseFreeCommodityKgClient(
-          lots.reduce((sum, s) => sum + s.kg, 0),
-          (warehouses?.demandHolds ?? [])
-            .filter(
-              (h) =>
-                h.warehouseId === w.id &&
-                h.commodityId === acceptOrder.commodityId,
-            )
-            .reduce((sum, h) => sum + h.kg, 0),
-        );
-        const costs = lots.map((s) => s.avgCostUsdPerKg);
-        const minCostUsdPerKg =
-          costs.length > 0 ? Math.min(...costs) : 0;
-        const maxCostUsdPerKg =
-          costs.length > 0 ? Math.max(...costs) : 0;
-        return {
-          icao: w.icao.trim().toUpperCase(),
-          warehouseId: w.id,
-          stockKg,
-          lotCount: lots.length,
-          minCostUsdPerKg,
-          maxCostUsdPerKg,
-          freeKg: w.freeKg,
-          usedKg: w.usedKg,
-          countryId: w.countryId ?? null,
-          lat: w.lat ?? null,
-          lon: w.lon ?? null,
-        };
-      });
-    return rows.sort((a, b) => {
-      if (a.stockKg > 0 !== b.stockKg > 0) return a.stockKg > 0 ? -1 : 1;
-      return a.icao.localeCompare(b.icao);
-    });
-  }, [acceptOrder, warehouses, snap?.ports]);
-
-  const acceptAircraftOptions = useMemo(() => {
-    if (!acceptOrigin) return [];
-    const hub = acceptOrigin.trim().toUpperCase();
-    return props.fleet.filter(
-      (a) =>
-        a.status === 'parked' &&
-        a.locationIcao.trim().toUpperCase() === hub,
-    );
-  }, [props.fleet, acceptOrigin]);
-
-  const selectedOriginStockKg =
-    acceptOriginOptions.find((o) => o.icao === acceptOrigin.trim().toUpperCase())
-      ?.stockKg ?? 0;
-
-  const acceptIntlPreview = useMemo(() => {
-    if (!acceptOrder || !acceptOrigin) return null;
-    const origin = acceptOrigin.trim().toUpperCase();
-    const originRow = acceptOriginOptions.find((o) => o.icao === origin);
-    return previewDemandInternationalRoute({
-      originIcao: origin,
-      destIcao: acceptOrder.destIcao,
-      originCountryId: originRow?.countryId,
-      destCountryId: acceptOrder.destCountryId,
-      pickupHubs: warehouses?.pickupHubs ?? [],
-    });
-  }, [
-    acceptOrder,
-    acceptOrigin,
-    acceptOriginOptions,
-    warehouses?.pickupHubs,
-  ]);
-
-  const acceptDistanceNm = useMemo(() => {
-    if (!acceptOrder || !acceptOrigin) return null;
-    const origin = acceptOrigin.trim().toUpperCase();
-    const originRow = acceptOriginOptions.find((o) => o.icao === origin);
-    const oLat = originRow?.lat;
-    const oLon = originRow?.lon;
-    const dLat = acceptOrder.destLat;
-    const dLon = acceptOrder.destLon;
-    if (
-      oLat == null ||
-      oLon == null ||
-      dLat == null ||
-      dLon == null ||
-      !Number.isFinite(oLat) ||
-      !Number.isFinite(oLon) ||
-      !Number.isFinite(dLat) ||
-      !Number.isFinite(dLon)
-    ) {
-      return null;
-    }
-    return greatCircleDistanceNm(
-      { lat: oLat, lon: oLon },
-      { lat: dLat, lon: dLon },
-    );
-  }, [acceptOrder, acceptOrigin, acceptOriginOptions]);
-
-  /** Route fuel+MTOW ops cap — matches server acceptDemandOrder / SimBrief prefill. */
-  const [acceptOpsMaxCargoKg, setAcceptOpsMaxCargoKg] = useState<number | null>(
-    null,
-  );
-  const acceptAircraft = useMemo(
-    () => props.fleet.find((a) => a.id === acceptAircraftId) ?? null,
-    [props.fleet, acceptAircraftId],
-  );
-  const acceptStructuralMaxKg = useMemo(() => {
-    if (!acceptAircraft) return 0;
-    return Math.max(0, props.resolveMaxCargoKg?.(acceptAircraft) ?? 0);
-  }, [acceptAircraft, props.resolveMaxCargoKg]);
-
-  useEffect(() => {
-    if (!acceptOrder || !acceptOrigin || !acceptAircraft) {
-      setAcceptOpsMaxCargoKg(null);
-      return;
-    }
-    let cancelled = false;
-    // Keep the last ops value while refetching — do not flash structural (that
-    // made Mass / payout jump every App re-render / economy tick).
-    void fetchCargoLimit(
-      acceptAircraft.aircraftClassId,
-      acceptDistanceNm ?? undefined,
-      acceptAircraft.airframeTypeId,
-      {
-        originIcao: acceptOrigin.trim().toUpperCase(),
-        destIcao: acceptOrder.destIcao,
-        aircraftId: acceptAircraft.id,
-      },
-    )
-      .then((limit) => {
-        if (!cancelled) {
-          setAcceptOpsMaxCargoKg(
-            Math.max(0, Math.floor(limit.operationalMaxCargoKg)),
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setAcceptOpsMaxCargoKg(acceptStructuralMaxKg);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    acceptOrder?.id,
-    acceptOrder?.destIcao,
-    acceptOrigin,
-    acceptAircraft?.id,
-    acceptAircraft?.aircraftClassId,
-    acceptAircraft?.airframeTypeId,
-    acceptDistanceNm,
-    acceptStructuralMaxKg,
-  ]);
-
-  const acceptPullPreview = useMemo(() => {
-    if (!acceptOrder || !acceptOrigin) return null;
-    const origin = acceptOrigin.trim().toUpperCase();
-    const originRow = acceptOriginOptions.find((o) => o.icao === origin);
-    if (!originRow || originRow.stockKg <= 0) return null;
-    const maxCargoKg =
-      acceptMode === 'hold'
-        ? originRow.stockKg
-        : acceptAircraft
-          ? Math.max(0, acceptOpsMaxCargoKg ?? acceptStructuralMaxKg)
-          : 0;
-    const lots = (warehouses?.stock ?? []).filter(
-      (s) =>
-        s.warehouseId === originRow.warehouseId &&
-        s.commodityId === acceptOrder.commodityId &&
-        s.kg > 0,
-    );
-    const deskMult = (() => {
-      const m = groundStaff?.byWarehouse[originRow.warehouseId]?.demandDeskMult;
-      return typeof m === 'number' && Number.isFinite(m) && m > 0 ? m : 1;
-    })();
-    const intlMult = acceptIntlPreview?.allowed
-      ? acceptIntlPreview.unitPriceMult
-      : 1;
-    return previewDemandAcceptPull({
-      remainingKg: acceptOrder.remainingKg,
-      stockKg: originRow.stockKg,
-      maxCargoKg,
-      maxUnitPriceUsd: acceptOrder.maxUnitPriceUsd,
-      unitPriceMult: intlMult * deskMult,
-      lots,
-    });
-  }, [
-    acceptOrder,
-    acceptOrigin,
-    acceptAircraft,
-    acceptOriginOptions,
-    acceptIntlPreview,
-    acceptOpsMaxCargoKg,
-    acceptStructuralMaxKg,
-    warehouses?.stock,
-    groundStaff,
-    acceptMode,
-  ]);
-
   function openBuyModal(listing: PortListingView) {
     if (isCargoOpsCommodityLocked(listing.commodityId)) {
       props.onToast?.(
@@ -1571,32 +1349,36 @@ export function PortsPanel(props: {
     closeBuyModal();
   }
 
-  function openAcceptModal(order: DemandOrderView) {
-    if (isCargoOpsCommodityLocked(order.commodityId)) {
-      props.onToast?.(
-        'fail',
-        `Cargo Ops: ${commodityLabel(order)} is locked — unlock it in Hangar → Cargo Ops`,
-      );
-      props.onOpenCargoOps?.();
-      return;
-    }
-    setAcceptOrder(order);
-    setAcceptMode('hold');
+  /** Warehouse the old Accept dialog preselected: desk pickup with this commodity. */
+  function demandDeskHoldOrigin(order: DemandOrderView): string | null {
     const dest = order.destIcao.trim().toUpperCase();
+    const deskPortId = order.portId?.trim().toUpperCase() ?? '';
+    const deskPort = deskPortId
+      ? snap?.ports.find((p) => p.id.trim().toUpperCase() === deskPortId)
+      : undefined;
+    const deskPickups = new Set(portDeskPickupHubList(deskPort?.pickupHubs));
     const origins = (warehouses?.warehouses ?? [])
-      .filter((w) => w.icao.trim().toUpperCase() !== dest)
+      .filter((w) => {
+        const icao = w.icao.trim().toUpperCase();
+        if (icao === dest) return false;
+        if (deskPickups.size > 0 && !deskPickups.has(icao)) return false;
+        return true;
+      })
       .map((w) => {
         const stockKg = warehouseFreeCommodityKgClient(
           (warehouses?.stock ?? [])
             .filter(
               (s) =>
-                s.warehouseId === w.id && s.commodityId === order.commodityId,
+                s.warehouseId === w.id &&
+                s.commodityId === order.commodityId &&
+                s.kg > 0,
             )
             .reduce((sum, s) => sum + s.kg, 0),
           (warehouses?.demandHolds ?? [])
             .filter(
               (h) =>
-                h.warehouseId === w.id && h.commodityId === order.commodityId,
+                h.warehouseId === w.id &&
+                h.commodityId === order.commodityId,
             )
             .reduce((sum, h) => sum + h.kg, 0),
         );
@@ -1606,24 +1388,51 @@ export function PortsPanel(props: {
         if (a.stockKg > 0 !== b.stockKg > 0) return a.stockKg > 0 ? -1 : 1;
         return a.icao.localeCompare(b.icao);
       });
-    const withStock = origins.find((o) => o.stockKg > 0);
-    const origin = withStock?.icao ?? origins[0]?.icao ?? '';
-    setAcceptOrigin(origin);
-    const aircraft = origin
-      ? props.fleet.filter(
-          (a) =>
-            a.status === 'parked' &&
-            a.locationIcao.trim().toUpperCase() === origin,
-        )
-      : [];
-    setAcceptAircraftId(aircraft[0]?.id ?? '');
+    return origins.find((o) => o.stockKg > 0)?.icao ?? null;
   }
 
-  function closeAcceptModal() {
-    setAcceptOrder(null);
-    setAcceptOrigin('');
-    setAcceptAircraftId('');
-    setAcceptMode('hold');
+  async function onAcceptDemand(order: DemandOrderView) {
+    if (props.busy || loading) return;
+    if (isCargoOpsCommodityLocked(order.commodityId)) {
+      props.onToast?.(
+        'fail',
+        `Cargo Ops: ${commodityLabel(order)} is locked — unlock it in Hangar → Cargo Ops`,
+      );
+      props.onOpenCargoOps?.();
+      return;
+    }
+    const origin = demandDeskHoldOrigin(order);
+    if (!origin) {
+      props.onToast?.(
+        'fail',
+        `No ${commodityLabel(order)} in a warehouse at this port`,
+      );
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await postDemandHold({
+        orderId: order.id,
+        originIcao: origin,
+      });
+      setWarehouses(result.warehouses);
+      setDemand(result.demand.orders);
+      props.onToast?.(
+        'ok',
+        `Held ${props.formatTonnes(result.kg)} ${result.hold.originIcao}→${result.hold.destIcao}${
+          props.embedded
+            ? ' — open Hauls to Prepare / Accept'
+            : ''
+        }`,
+      );
+    } catch (err) {
+      props.onToast?.(
+        'fail',
+        err instanceof Error ? err.message : String(err),
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function onConfirmBuy() {
@@ -2534,116 +2343,6 @@ export function PortsPanel(props: {
       props.onToast?.(
         'ok',
         `Abandoned ${props.formatTonnes(result.kg)} at ${result.hubIcao}`,
-      );
-    } catch (err) {
-      props.onToast?.(
-        'fail',
-        err instanceof Error ? err.message : String(err),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onConfirmAccept() {
-    if (
-      !acceptOrder ||
-      !acceptOrigin ||
-      !acceptAircraftId ||
-      props.busy ||
-      loading
-    ) {
-      return;
-    }
-    if (acceptIntlPreview && !acceptIntlPreview.allowed) {
-      props.onToast?.(
-        'fail',
-        acceptIntlPreview.blockReason ??
-          'International demand route is not allowed',
-      );
-      return;
-    }
-    if (isCargoOpsCommodityLocked(acceptOrder.commodityId)) {
-      props.onToast?.(
-        'fail',
-        `Cargo Ops: ${commodityLabel(acceptOrder)} is locked — unlock it in Hangar → Cargo Ops`,
-      );
-      props.onOpenCargoOps?.();
-      return;
-    }
-    if (props.clientUpdateRequiredMin) {
-      props.onToast?.(
-        'fail',
-        formatClientUpdateRequiredLabel(props.clientUpdateRequiredMin),
-      );
-      return;
-    }
-    setLoading(true);
-    try {
-      await props.ensureOpsCompany?.(acceptAircraftId);
-      const result = await postDemandAccept({
-        orderId: acceptOrder.id,
-        originIcao: acceptOrigin,
-        aircraftId: acceptAircraftId,
-        companyId: props.resolveOpsCompanyId?.(acceptAircraftId),
-      });
-      const vaTail = props.vaAircraftIds?.has(acceptAircraftId);
-      if (vaTail) {
-        props.onVaFleet?.(result.fleet);
-        props.onVaWallet?.(result.walletUsd);
-      } else {
-        props.onWallet?.(result.walletUsd);
-        props.onFleet?.(result.fleet);
-      }
-      props.onMissions?.(result.missions.slice().reverse());
-      setWarehouses(result.warehouses);
-      setDemand(result.demand.orders);
-      closeAcceptModal();
-      props.onToast?.(
-        'ok',
-        `Demand ${result.mission.originIcao}→${result.mission.destIcao} · ${props.formatTonnes(result.kg)} · ${props.formatMoney(result.payUsd)} · open Dispatch`,
-      );
-      props.onStaged?.(result.mission);
-    } catch (err) {
-      props.onToast?.(
-        'fail',
-        err instanceof Error ? err.message : String(err),
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onConfirmHold() {
-    if (!acceptOrder || !acceptOrigin || props.busy || loading) return;
-    if (acceptIntlPreview && !acceptIntlPreview.allowed) {
-      props.onToast?.(
-        'fail',
-        acceptIntlPreview.blockReason ??
-          'International demand route is not allowed',
-      );
-      return;
-    }
-    if (isCargoOpsCommodityLocked(acceptOrder.commodityId)) {
-      props.onToast?.(
-        'fail',
-        `Cargo Ops: ${commodityLabel(acceptOrder)} is locked — unlock it in Hangar → Cargo Ops`,
-      );
-      props.onOpenCargoOps?.();
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await postDemandHold({
-        orderId: acceptOrder.id,
-        originIcao: acceptOrigin,
-      });
-      setWarehouses(result.warehouses);
-      setDemand(result.demand.orders);
-      closeAcceptModal();
-      props.onToast?.(
-        'ok',
-        `Held ${props.formatTonnes(result.kg)} for ${result.hold.destIcao} at ${result.hold.originIcao}`,
       );
     } catch (err) {
       props.onToast?.(
@@ -7366,9 +7065,10 @@ export function PortsPanel(props: {
                                 type="button"
                                 className="accept"
                                 disabled={props.busy || loading}
+                                title="Hold this order at the port warehouse"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  openAcceptModal(o);
+                                  void onAcceptDemand(o);
                                 }}
                               >
                                 Accept
@@ -7702,52 +7402,6 @@ export function PortsPanel(props: {
             )}
           </div>
         </div>
-      ) : null}
-
-      {acceptOrder ? (
-        <DemandAcceptDialog
-          order={acceptOrder}
-          originIcao={acceptOrigin}
-          aircraftId={acceptAircraftId}
-          originOptions={acceptOriginOptions}
-          aircraftOptions={acceptAircraftOptions}
-          vaAircraftIds={props.vaAircraftIds}
-          selectedOriginStockKg={selectedOriginStockKg}
-          pullPreview={acceptPullPreview}
-          intlPreview={acceptIntlPreview}
-          demandDeskMult={(() => {
-            const wh = (warehouses?.warehouses ?? []).find(
-              (w) =>
-                w.icao.trim().toUpperCase() ===
-                acceptOrigin.trim().toUpperCase(),
-            );
-            return wh
-              ? groundStaff?.byWarehouse[wh.id]?.demandDeskMult
-              : undefined;
-          })()}
-          distanceNm={acceptDistanceNm}
-          mode={acceptMode}
-          busy={Boolean(props.busy || loading)}
-          formatTonnes={props.formatTonnes}
-          formatUnitPrice={formatUnitPrice}
-          formatMoney={props.formatMoney}
-          onOriginChange={(icao) => {
-            setAcceptOrigin(icao);
-            const aircraft = props.fleet.filter(
-              (a) =>
-                a.status === 'parked' &&
-                a.locationIcao.trim().toUpperCase() === icao.toUpperCase(),
-            );
-            setAcceptAircraftId(aircraft[0]?.id ?? '');
-          }}
-          onAircraftChange={setAcceptAircraftId}
-          onModeChange={setAcceptMode}
-          onCancel={closeAcceptModal}
-          onConfirmHold={() => void onConfirmHold()}
-          onConfirmFly={() => void onConfirmAccept()}
-          clientUpdateRequiredMin={props.clientUpdateRequiredMin}
-          onOpenUpdates={props.onOpenUpdates}
-        />
       ) : null}
 
       {dispatchHold ? (
@@ -8337,403 +7991,6 @@ function ScoutHoldDialog(props: {
             Hold {props.formatTonnes(kg)}
           </BusyButton>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function DemandAcceptDialog(props: {
-  order: DemandOrderView;
-  originIcao: string;
-  aircraftId: string;
-  originOptions: Array<{
-    icao: string;
-    warehouseId: string;
-    stockKg: number;
-    lotCount: number;
-    minCostUsdPerKg: number;
-    maxCostUsdPerKg: number;
-    freeKg: number;
-    usedKg: number;
-    countryId?: string | null;
-    lat?: number | null;
-    lon?: number | null;
-  }>;
-  aircraftOptions: PlayerAircraft[];
-  vaAircraftIds?: ReadonlySet<string>;
-  selectedOriginStockKg: number;
-  pullPreview: {
-    takeKg: number;
-    avgCostUsdPerKg: number;
-    costUsd: number;
-    payUsd: number;
-    marginUsd: number;
-    limitedBy: 'order' | 'stock' | 'aircraft';
-  } | null;
-  intlPreview: {
-    international: boolean;
-    allowed: boolean;
-    unitPriceMult: number;
-    blockReason: string | null;
-    originCountryId: string | null;
-    destCountryId: string | null;
-  } | null;
-  demandDeskMult?: number;
-  distanceNm: number | null;
-  mode: 'hold' | 'fly';
-  busy: boolean;
-  formatTonnes: (kg: number) => string;
-  formatUnitPrice: (usdPerKg: number) => string;
-  formatMoney: (n: number) => string;
-  onOriginChange: (icao: string) => void;
-  onAircraftChange: (id: string) => void;
-  onModeChange: (mode: 'hold' | 'fly') => void;
-  onCancel: () => void;
-  onConfirmHold: () => void;
-  onConfirmFly: () => void;
-  clientUpdateRequiredMin?: string | null;
-  onOpenUpdates?: () => void;
-}) {
-  const titleId = useId();
-  const bodyId = useId();
-  const onCancelRef = useRef(props.onCancel);
-  onCancelRef.current = props.onCancel;
-
-  const selectedOrigin = props.originIcao.trim().toUpperCase();
-  const hasUsableOrigin = props.selectedOriginStockKg > 0;
-  const intlOk = !props.intlPreview || props.intlPreview.allowed;
-  const canHold =
-    Boolean(selectedOrigin) && hasUsableOrigin && intlOk && !props.busy;
-  const updateBlocked = Boolean(props.clientUpdateRequiredMin);
-  const canFly =
-    canHold &&
-    Boolean(props.aircraftId) &&
-    props.aircraftOptions.length > 0 &&
-    !updateBlocked;
-  const preview = props.pullPreview;
-  const intl = props.intlPreview;
-  const deskMult =
-    typeof props.demandDeskMult === 'number' &&
-    Number.isFinite(props.demandDeskMult) &&
-    props.demandDeskMult > 0
-      ? props.demandDeskMult
-      : 1;
-  const effectiveUnit =
-    props.order.maxUnitPriceUsd *
-    (intl?.allowed && intl.unitPriceMult > 1 ? intl.unitPriceMult : 1) *
-    deskMult;
-  const limitedByLabel =
-    preview?.limitedBy === 'aircraft'
-      ? 'limited by aircraft cargo'
-      : preview?.limitedBy === 'stock'
-        ? 'limited by warehouse stock'
-        : preview?.limitedBy === 'order'
-          ? 'limited by order remaining'
-          : null;
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        if (props.busy) return;
-        onCancelRef.current();
-      }
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [props.busy]);
-
-  return (
-    <div
-      className="confirm-overlay"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (props.busy) return;
-        if (event.target === event.currentTarget) onCancelRef.current();
-      }}
-    >
-      <div
-        className="confirm-dialog demand-accept-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={bodyId}
-      >
-        <p className="confirm-kicker">Demand Board</p>
-        <h2 id={titleId} className="confirm-title">
-          Deliver to {props.order.destIcao}?
-        </h2>
-        <div id={bodyId} className="confirm-body">
-          <p>
-            {commodityLabel(props.order)} · up to{' '}
-            {props.formatTonnes(props.order.remainingKg)} ·{' '}
-            {props.formatUnitPrice(effectiveUnit)}
-            {intl?.international && intl.allowed ? (
-              <span className="demand-accept-intl-badge" title="Port-fed international">
-                {' '}
-                Intl ×{intl.unitPriceMult.toFixed(2)}
-              </span>
-            ) : null}
-            {deskMult > 1 ? (
-              <span className="muted" title="Demand desk perk">
-                {' '}
-                · {demandPayBoostLabel(deskMult)}
-              </span>
-            ) : null}
-          </p>
-          {props.distanceNm != null && Number.isFinite(props.distanceNm) ? (
-            <p className="demand-accept-hint">
-              Distance {selectedOrigin || 'WH'}→{props.order.destIcao}:{' '}
-              <strong>
-                {Number.isFinite(props.distanceNm)
-                  ? `${Math.round(props.distanceNm).toLocaleString()} nm`
-                  : '—'}
-              </strong>
-            </p>
-          ) : selectedOrigin ? (
-            <p className="demand-accept-hint">Distance unavailable for this route.</p>
-          ) : null}
-          {intl?.international && intl.allowed ? (
-            <p className="demand-accept-hint demand-accept-intl-hint">
-              International {intl.originCountryId}→{intl.destCountryId} from
-              port warehouse — pay includes intl premium.
-            </p>
-          ) : null}
-          {intl?.blockReason ? (
-            <p className="demand-accept-hint demand-accept-intl-block" role="alert">
-              {intl.blockReason}
-            </p>
-          ) : null}
-
-          <div className="demand-accept-section">
-            <span className="demand-accept-label">Action</span>
-            <div className="demand-accept-picks" role="listbox" aria-label="Hold or fly">
-              <button
-                type="button"
-                role="option"
-                aria-selected={props.mode === 'hold'}
-                className={`demand-accept-pick${props.mode === 'hold' ? ' is-active' : ''}`}
-                disabled={props.busy}
-                onClick={() => props.onModeChange('hold')}
-              >
-                <strong>Hold at WH</strong>
-                <span>Pledge stock, fly later</span>
-              </button>
-              <button
-                type="button"
-                role="option"
-                aria-selected={props.mode === 'fly'}
-                className={`demand-accept-pick${props.mode === 'fly' ? ' is-active' : ''}`}
-                disabled={props.busy}
-                onClick={() => props.onModeChange('fly')}
-              >
-                <strong>Fly now</strong>
-                <span>Needs parked aircraft</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="demand-accept-section">
-            <span className="demand-accept-label">From warehouse</span>
-            {props.originOptions.length === 0 ? (
-              <p className="demand-accept-hint">
-                No warehouses yet — buy one at a port pickup hub first.
-              </p>
-            ) : (
-              <div className="demand-accept-picks" role="listbox" aria-label="Warehouse origin">
-                {props.originOptions.map((o) => {
-                  const active = o.icao === selectedOrigin;
-                  const usable = o.stockKg > 0;
-                  return (
-                    <button
-                      key={o.warehouseId}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      className={`demand-accept-pick${active ? ' is-active' : ''}${usable ? '' : ' is-empty'}`}
-                      disabled={props.busy}
-                      onClick={() => props.onOriginChange(o.icao)}
-                    >
-                      <strong>
-                        {o.icao}
-                        {o.countryId ? (
-                          <span className="demand-accept-pick-country">
-                            {' '}
-                            {o.countryId}
-                          </span>
-                        ) : null}
-                      </strong>
-                      <span>
-                        {usable
-                          ? `${props.formatTonnes(o.stockKg)}${
-                              o.lotCount > 1 ? ` · ${o.lotCount} lots` : ''
-                            }`
-                          : `No ${commodityLabel(props.order).toLowerCase()}`}
-                      </span>
-                      {usable ? (
-                        <span>
-                          {o.minCostUsdPerKg === o.maxCostUsdPerKg
-                            ? props.formatUnitPrice(o.minCostUsdPerKg)
-                            : `${props.formatUnitPrice(o.minCostUsdPerKg)}–${props.formatUnitPrice(o.maxCostUsdPerKg)}`}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {props.mode === 'fly' ? (
-          <div className="demand-accept-section">
-            <span className="demand-accept-label">
-              Aircraft at {selectedOrigin || 'origin'}
-            </span>
-            {!selectedOrigin ? (
-              <p className="demand-accept-hint">Select a warehouse first.</p>
-            ) : props.aircraftOptions.length === 0 ? (
-              <p className="demand-accept-hint">
-                No parked aircraft at {selectedOrigin} — ferry one there.
-              </p>
-            ) : (
-              <div className="demand-accept-picks" role="listbox" aria-label="Aircraft">
-                {props.aircraftOptions.map((a) => {
-                  const active = a.id === props.aircraftId;
-                  const prefix = props.vaAircraftIds?.has(a.id)
-                    ? 'Airline · '
-                    : 'Yours · ';
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      className={`demand-accept-pick${active ? ' is-active' : ''}`}
-                      disabled={props.busy}
-                      onClick={() => props.onAircraftChange(a.id)}
-                    >
-                      <strong>
-                        {prefix}
-                        {a.label ?? a.id}
-                      </strong>
-                      <span>{a.locationIcao}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          ) : null}
-
-          {selectedOrigin && !hasUsableOrigin ? (
-            <p className="demand-accept-hint">
-              Store {commodityLabel(props.order).toLowerCase()} in{' '}
-              {selectedOrigin} before staging this demand.
-            </p>
-          ) : null}
-
-          {preview &&
-          hasUsableOrigin &&
-          (props.mode === 'hold' || props.aircraftId) ? (
-            <div className="demand-accept-pull" role="status">
-              <p className="demand-accept-pull-title">
-                Pull from {selectedOrigin}
-                {limitedByLabel ? ` · ${limitedByLabel}` : ''}
-              </p>
-              <dl className="demand-accept-pull-grid">
-                <div>
-                  <dt>Mass</dt>
-                  <dd>{props.formatTonnes(preview.takeKg)}</dd>
-                </div>
-                <div>
-                  <dt>Avg cost</dt>
-                  <dd>{props.formatUnitPrice(preview.avgCostUsdPerKg)}</dd>
-                </div>
-                <div>
-                  <dt>Stock cost</dt>
-                  <dd>{props.formatMoney(preview.costUsd)}</dd>
-                </div>
-                <div>
-                  <dt>Payout</dt>
-                  <dd>{props.formatMoney(preview.payUsd)}</dd>
-                </div>
-                <div>
-                  <dt>Margin</dt>
-                  <dd
-                    className={
-                      typeof preview.marginUsd === 'number' &&
-                      Number.isFinite(preview.marginUsd) &&
-                      preview.marginUsd >= 0
-                        ? 'demand-accept-margin-pos'
-                        : 'demand-accept-margin-neg'
-                    }
-                  >
-                    {Number.isFinite(preview.marginUsd)
-                      ? props.formatMoney(preview.marginUsd)
-                      : '—'}
-                  </dd>
-                </div>
-              </dl>
-              <p className="demand-accept-hint">
-                FIFO from warehouse lots at this hub — cost is the weighted
-                average of the piles that leave.
-              </p>
-            </div>
-          ) : null}
-        </div>
-        <div className="confirm-actions">
-          <button
-            type="button"
-            className="action ghost"
-            disabled={props.busy}
-            onClick={props.onCancel}
-          >
-            Cancel
-          </button>
-          {props.mode === 'hold' ? (
-            <BusyButton
-              className="accept"
-              busy={props.busy}
-              busyLabel="Holding"
-              disabled={!canHold}
-              onClick={props.onConfirmHold}
-            >
-              Hold at WH
-            </BusyButton>
-          ) : (
-            <BusyButton
-              className="accept"
-              busy={props.busy}
-              busyLabel="Starting"
-              disabled={!canFly}
-              title={
-                updateBlocked
-                  ? `Update required · v${props.clientUpdateRequiredMin}+`
-                  : undefined
-              }
-              onClick={props.onConfirmFly}
-            >
-              {updateBlocked ? formatClientUpdateCtaLabel() : 'Fly now'}
-            </BusyButton>
-          )}
-        </div>
-        {updateBlocked ? (
-          <p className="demand-accept-hint cargo-dialog-error">
-            Update required · v{props.clientUpdateRequiredMin}+
-            {props.onOpenUpdates ? (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  className="action ghost compact"
-                  onClick={() => props.onOpenUpdates?.()}
-                >
-                  Settings → Updates
-                </button>
-              </>
-            ) : null}
-          </p>
-        ) : null}
       </div>
     </div>
   );

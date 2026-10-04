@@ -5,6 +5,8 @@ import {
   cruiseSampleStatus,
   mergeAirframePerfOverride,
   clampCruiseFuelFlowToCatalog,
+  planningCruiseFuelFlowKgPerHour,
+  resolveLiveCruiseFuelFlowKgPerHour,
   pushCruiseTick,
   parseCruiseSampleCommit,
   applyCruiseSampleOverride,
@@ -184,6 +186,41 @@ describe('pushCruiseTick', () => {
     assert.equal(state.window.length, 1);
     assert.equal(cruiseSampleStatus(state, opts).elapsedMs, 0);
     assert.equal(state.window[0]!.fuelFlowKgPerHour, 1600);
+  });
+});
+
+describe('resolveLiveCruiseFuelFlowKgPerHour', () => {
+  it('drops an A340 PPH stub and uses the fuel-total drop', () => {
+    const planning = planningCruiseFuelFlowKgPerHour({
+      fuelBurnKgPerNm: 12,
+      cruiseSpeedKt: 465,
+    });
+    assert.equal(planning, 5_580);
+    // 602 lb/h on the chip is ~273 kg/h — engines 1–2 at ~300 lb/h each.
+    const flow = resolveLiveCruiseFuelFlowKgPerHour({
+      engineKgPerHour: 273,
+      weightDeltaKgPerHour: 8_165,
+      planningKgPerHour: planning,
+    });
+    assert.equal(flow, 8_165);
+    assert.equal(
+      resolveLiveCruiseFuelFlowKgPerHour({
+        engineKgPerHour: 273,
+        planningKgPerHour: planning,
+      }),
+      undefined,
+    );
+  });
+
+  it('keeps a piston SimVar that matches the planning burn', () => {
+    assert.equal(
+      resolveLiveCruiseFuelFlowKgPerHour({
+        engineKgPerHour: 37,
+        weightDeltaKgPerHour: 90,
+        planningKgPerHour: 35,
+      }),
+      37,
+    );
   });
 });
 

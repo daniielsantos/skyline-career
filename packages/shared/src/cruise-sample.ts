@@ -31,6 +31,76 @@ export const DEFAULT_CRUISE_EMA_ALPHA = 0.3;
 export const CRUISE_BURN_CATALOG_MIN_MULT = 0.5;
 export const CRUISE_BURN_CATALOG_MAX_MULT = 1.75;
 
+/**
+ * Planning cruise flow (kg/h). Explicit catalog kg/h wins; otherwise
+ * kg/nm × cruise TAS. Used to reject a SimVar stub (ToLiss A340 PPH ~300 lb/h
+ * per engine) before it locks the cruise chip.
+ */
+export function planningCruiseFuelFlowKgPerHour(opts: {
+  cruiseFuelFlowKgPerHour?: number;
+  fuelBurnKgPerNm?: number;
+  cruiseSpeedKt?: number;
+}): number | undefined {
+  const explicit = opts.cruiseFuelFlowKgPerHour;
+  if (
+    typeof explicit === 'number' &&
+    Number.isFinite(explicit) &&
+    explicit > 0
+  ) {
+    return explicit;
+  }
+  const burn = opts.fuelBurnKgPerNm;
+  const kt = opts.cruiseSpeedKt;
+  if (
+    typeof burn === 'number' &&
+    typeof kt === 'number' &&
+    Number.isFinite(burn) &&
+    Number.isFinite(kt) &&
+    burn > 0 &&
+    kt > 40
+  ) {
+    return Math.round(burn * kt * 10) / 10;
+  }
+  return undefined;
+}
+
+/**
+ * Keep a per-engine SimVar reading when it is at least half the planning
+ * burn. Below that (quadjet PPH stub, or only engines 1–2 of a 4-engine
+ * flow that is still far too small), use the FUEL TOTAL weight drop.
+ * Returns undefined when the SimVar is implausible and the tank delta is
+ * not ready yet — do not lock the stub.
+ */
+export function resolveLiveCruiseFuelFlowKgPerHour(opts: {
+  engineKgPerHour?: number;
+  weightDeltaKgPerHour?: number;
+  planningKgPerHour?: number;
+}): number | undefined {
+  const engine =
+    typeof opts.engineKgPerHour === 'number' &&
+    Number.isFinite(opts.engineKgPerHour) &&
+    opts.engineKgPerHour > 0
+      ? opts.engineKgPerHour
+      : undefined;
+  const delta =
+    typeof opts.weightDeltaKgPerHour === 'number' &&
+    Number.isFinite(opts.weightDeltaKgPerHour) &&
+    opts.weightDeltaKgPerHour > 0
+      ? opts.weightDeltaKgPerHour
+      : undefined;
+  const planning =
+    typeof opts.planningKgPerHour === 'number' &&
+    Number.isFinite(opts.planningKgPerHour) &&
+    opts.planningKgPerHour > 0
+      ? opts.planningKgPerHour
+      : undefined;
+  const enginePlausible =
+    engine != null &&
+    (planning == null || engine >= planning * CRUISE_BURN_CATALOG_MIN_MULT);
+  if (enginePlausible) return engine;
+  return delta;
+}
+
 /** Clamp a live cruise burn sample to a band around catalog kg/h. */
 export function clampCruiseFuelFlowToCatalog(
   liveKgPerHour: number,

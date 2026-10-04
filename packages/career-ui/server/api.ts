@@ -82,6 +82,7 @@ import {
   listStarterCareerPlayerAirframes,
   resolveAirframeFuelBurnKgPerNm,
   applyCruiseSampleOverride,
+  planningCruiseFuelFlowKgPerHour,
   parseCruiseSampleCommit,
   getCommodity,
   getAirportRunways,
@@ -16063,9 +16064,17 @@ export function createCareerApiServer(port = 8787) {
                 openMission.airframeTypeId,
                 cruiseCommit,
                 {
-                  catalogCruiseFuelFlowKgPerHour: findCareerPlayerAirframe(
-                    openMission.airframeTypeId,
-                  )?.cruiseFuelFlowKgPerHour,
+                  catalogCruiseFuelFlowKgPerHour: planningCruiseFuelFlowKgPerHour({
+                    cruiseFuelFlowKgPerHour: findCareerPlayerAirframe(
+                      openMission.airframeTypeId,
+                    )?.cruiseFuelFlowKgPerHour,
+                    fuelBurnKgPerNm: findCareerPlayerAirframe(
+                      openMission.airframeTypeId,
+                    )?.fuelBurnKgPerNm,
+                    cruiseSpeedKt: findCareerPlayerAirframe(
+                      openMission.airframeTypeId,
+                    )?.cruiseSpeedKt,
+                  }),
                 },
               );
             }

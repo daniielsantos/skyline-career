@@ -36,6 +36,8 @@ import {
   applyCruiseSampleOverride,
   type CruiseSampleCommit,
   clampCruiseFuelFlowToCatalog,
+  planningCruiseFuelFlowKgPerHour,
+  resolveLiveCruiseFuelFlowKgPerHour,
   DEFAULT_JET_A_LB_PER_GAL,
   pickFuelTankBreakdown,
   pickStableLiveFuelLb,
@@ -3964,16 +3966,16 @@ export class CareerWatchSession {
                   sample.indicatedAirspeedKt >= 40
                 ? Math.round(sample.indicatedAirspeedKt)
                 : await readLiveCruiseTasKt(this.bridge);
-          let fuelFlowKgPerHour =
+          const engineFlowKgPerHour =
             typeof sample.fuelFlowKgPerHour === 'number' &&
             Number.isFinite(sample.fuelFlowKgPerHour) &&
             sample.fuelFlowKgPerHour > 0
               ? sample.fuelFlowKgPerHour
               : undefined;
-          // Accu-Sim (Aerostar): classic ENG FUEL FLOW* stay 0 — derive burn from
-          // FUEL TOTAL QUANTITY WEIGHT drop between Watch ticks.
+          // Tank drop is the cruise burn when ENG FUEL FLOW PPH is a stub
+          // (ToLiss A340 ~300 lb/h per engine) or stays 0 (Accu-Sim).
+          let weightDeltaKgPerHour: number | undefined;
           if (
-            fuelFlowKgPerHour == null &&
             typeof sample.fuelTotalLb === 'number' &&
             Number.isFinite(sample.fuelTotalLb) &&
             sample.fuelTotalLb > 0
@@ -3982,7 +3984,7 @@ export class CareerWatchSession {
               this.cruiseFuelTotalLb != null &&
               this.cruiseFuelTotalAtMs != null
             ) {
-              fuelFlowKgPerHour = fuelFlowKgPerHourFromTotalWeightDelta({
+              weightDeltaKgPerHour = fuelFlowKgPerHourFromTotalWeightDelta({
                 prevLb: this.cruiseFuelTotalLb,
                 nextLb: sample.fuelTotalLb,
                 dtMs: nowMs - this.cruiseFuelTotalAtMs,
@@ -3991,11 +3993,29 @@ export class CareerWatchSession {
             this.cruiseFuelTotalLb = sample.fuelTotalLb;
             this.cruiseFuelTotalAtMs = nowMs;
           }
-          if (fuelFlowKgPerHour == null) {
+          const cruiseAirframe = current.airframeTypeId
+            ? findCareerPlayerAirframe(current.airframeTypeId)
+            : undefined;
+          const planningFlow = planningCruiseFuelFlowKgPerHour({
+            cruiseFuelFlowKgPerHour: cruiseAirframe?.cruiseFuelFlowKgPerHour,
+            fuelBurnKgPerNm: cruiseAirframe?.fuelBurnKgPerNm,
+            cruiseSpeedKt: tasKt ?? cruiseAirframe?.cruiseSpeedKt,
+          });
+          let fuelFlowKgPerHour = resolveLiveCruiseFuelFlowKgPerHour({
+            engineKgPerHour: engineFlowKgPerHour,
+            weightDeltaKgPerHour,
+            planningKgPerHour: planningFlow,
+          });
+          if (fuelFlowKgPerHour == null && engineFlowKgPerHour == null) {
             try {
-              fuelFlowKgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+              const probed = await sampleLiveCruiseFuelFlowKgPerHour(
                 this.bridge,
               );
+              fuelFlowKgPerHour = resolveLiveCruiseFuelFlowKgPerHour({
+                engineKgPerHour: probed,
+                weightDeltaKgPerHour,
+                planningKgPerHour: planningFlow,
+              });
             } catch (flowErr) {
               // Soft: flight sample already succeeded — don't tear down SimConnect
               // just because the optional full flow probe timed out.
@@ -4007,17 +4027,9 @@ export class CareerWatchSession {
             }
           }
           if (fuelFlowKgPerHour != null) {
-            const catalogFlow = current.airframeTypeId
-              ? findCareerPlayerAirframe(current.airframeTypeId)
-                  ?.cruiseFuelFlowKgPerHour
-              : undefined;
-            const overrideFlow = current.airframeTypeId
-              ? snap.missions.airframePerfOverrides?.[current.airframeTypeId]
-                  ?.cruiseFuelFlowKgPerHour
-              : undefined;
             fuelFlowKgPerHour = clampCruiseFuelFlowToCatalog(
               fuelFlowKgPerHour,
-              catalogFlow ?? overrideFlow,
+              planningFlow,
             );
           }
           const cruiseTick = {
@@ -4840,9 +4852,17 @@ export class CareerWatchSession {
               openMission.airframeTypeId,
               this.cruiseState.committed,
               {
-                catalogCruiseFuelFlowKgPerHour: findCareerPlayerAirframe(
-                  openMission.airframeTypeId,
-                )?.cruiseFuelFlowKgPerHour,
+                catalogCruiseFuelFlowKgPerHour: planningCruiseFuelFlowKgPerHour({
+                  cruiseFuelFlowKgPerHour: findCareerPlayerAirframe(
+                    openMission.airframeTypeId,
+                  )?.cruiseFuelFlowKgPerHour,
+                  fuelBurnKgPerNm: findCareerPlayerAirframe(
+                    openMission.airframeTypeId,
+                  )?.fuelBurnKgPerNm,
+                  cruiseSpeedKt: findCareerPlayerAirframe(
+                    openMission.airframeTypeId,
+                  )?.cruiseSpeedKt,
+                }),
               },
             );
             this.missionStatus = result.mission.status;

@@ -44,7 +44,7 @@ Atualizado 2026-09-24: **EN ROUTE live load polish** — tanks `--live-fuel-*` +
 
 **Causa:** coluna `.dispatch-active-enroute` com `gap: 0.75rem`, card `gap/padding` 0.65rem, live `margin-top: 0.85rem`, tiles `min-height: 9.25rem`, fuel até 5.25rem, mapa `clamp(16rem, 42vh, 28rem)`.
 
-**Fix:** só CSS En route — gap da coluna 0.35rem, card mais justo, margem do live 0, tiles ~7.35rem, fuel até 3.85rem, mapa `clamp(10rem, 22vh, 14.5rem)`, lotes com menos padding. Preflight intacto.
+**Fix:** só CSS En route — gap da coluna 0.35rem, card mais justo, margem do live 0, tiles ~7.35rem, fuel até 3.85rem, lotes com menos padding. O mapa não fica num clamp: a coluna enche a viewport e o mapa absorve a altura que sobra (`flex: 1`). Preflight intacto. Em janela mais baixa que o stack, a página ainda rola.
 
 ### EN ROUTE live load too tall (2026-09-24) — diag
 

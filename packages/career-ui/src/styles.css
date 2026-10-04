@@ -957,18 +957,19 @@ body {
   flex-direction: column;
 }
 
-/* EN ROUTE: centered stacked column — page scrolls in main-content */
+/* EN ROUTE: column fills the viewport. The map grows into leftover height; the page scrolls only if the stack is taller than the window. */
 .main-content:has(.dispatch-active-enroute) {
-  overflow: auto;
+  overflow: hidden;
   padding-top: 0.3rem;
   padding-bottom: 0.25rem;
 }
 
 .main-content:has(.dispatch-active-enroute) > .staging-panel {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  display: block;
-  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
   padding: 0.45rem 0.65rem;
 }
 
@@ -4417,13 +4418,13 @@ tr.lot-locked {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--dispatch-accent) 14%, transparent);
 }
 
-/* EN ROUTE: stacked map → OFP/cargo/live. Gaps stay tight so 1440p (2K) fits without page scroll. */
+/* EN ROUTE: stacked map → OFP/cargo/live. Lower blocks stay tight; the map takes the leftover height. */
 .dispatch-active-enroute {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: min-content;
   height: auto;
   max-height: none;
   overflow: visible;
@@ -4466,10 +4467,10 @@ tr.lot-locked {
 }
 
 .dispatch-active-enroute > .dispatch-route-map-card {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   margin: 0;
-  height: clamp(10rem, 22vh, 14.5rem);
-  min-height: 10rem;
+  height: auto;
+  min-height: 12rem;
 }
 
 .dispatch-active-enroute > .preflight-summary-card {
@@ -4707,8 +4708,9 @@ tr.lot-locked {
   }
 
   .dispatch-active-enroute > .dispatch-route-map-card {
-    height: 40vh;
-    min-height: 40vh;
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 10rem;
   }
 }
 

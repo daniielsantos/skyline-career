@@ -13368,12 +13368,13 @@ export function App() {
     }, { sync: { missions: true, airport: true } });
   }
 
-  function deskHoldsForTrip(originIcao: string, taken: Set<string>, skipIds: Set<string>) {
+  function deskHoldsForTrip(originIcao: string, skipIds: Set<string>) {
     const origin = originIcao.trim().toUpperCase();
     return openDeskHolds.filter((hold) => {
       if (skipIds.has(hold.id)) return false;
-      if (hold.originIcao.trim().toUpperCase() !== origin) return false;
-      return !taken.has(hold.destIcao.trim().toUpperCase());
+      // Same destination stacks onto that stop. A new desk hold for the
+      // flight's own dest must stay in the Add list.
+      return hold.originIcao.trim().toUpperCase() === origin;
     });
   }
 
@@ -20437,11 +20438,7 @@ export function App() {
                     const origin = staging.originIcao;
                     const lines = deskHoldLines(staging);
                     const skip = new Set(lines.map((line) => line.id));
-                    const others = deskHoldsForTrip(
-                      origin,
-                      new Set([staging.destIcao.toUpperCase()]),
-                      skip,
-                    );
+                    const others = deskHoldsForTrip(origin, skip);
                     const kindLabel = (kind: string | undefined) =>
                       kind === 'bridge'
                         ? 'Bridge'

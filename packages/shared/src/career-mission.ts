@@ -4033,12 +4033,12 @@ export function adjustPaxAndCargoDueForEfbPaxLb(
           ),
         );
   if (airframe.efbImportOmitsBaggage) {
-    // Import replaced pax+bags with N × efb and left holds at 0. Freight
-    // above the 175+55 allotment stays on Due (the additive helper would
-    // keep the bags and overshoot).
-    const allotment = pax * SIMBRIEF_STANDARD_PAX_WITH_BAG_LB;
-    const extraFreight = Math.max(0, plannedPayloadLb - allotment);
-    return pax * efb + extraFreight;
+    // CDU seats N × efb. When that is heavier than the load sheet (charter
+    // bags), holds go empty and PYLD becomes N × efb. When the sheet is
+    // heavier (cargo), the leftover stays in the holds and PYLD stays on
+    // the sheet — subtracting the 175+55 bags under-reads Due.
+    const seatLb = pax * efb;
+    return Math.max(seatLb, plannedPayloadLb);
   }
   const delta = efb - SIMBRIEF_STANDARD_PAX_LB;
   if (Math.abs(delta) < 0.5) return plannedPayloadLb;

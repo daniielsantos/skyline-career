@@ -103,14 +103,16 @@ export interface CareerPlayerAirframe {
   /**
    * iniBuilds A320neo V2 EFB uses ~187 lb/pax on APPLY LOAD vs SimBrief 175.
    * Loaded vs Due adds (efbPaxWeightLb − 175) × planned pax.
-   * With {@link efbImportOmitsBaggage}, Due replaces the whole pax+bag
-   * allotment with pax × this weight instead of adding the body delta.
+   * With {@link efbImportOmitsBaggage}, Due is the heavier of N × this
+   * weight and the load-sheet payload. A lighter sheet (charter bags) becomes
+   * N × this weight with empty holds. A heavier sheet (cargo) stays as-is.
    */
   efbPaxWeightLb?: number;
   /**
-   * CDU/EFB SimBrief import seats pax at {@link efbPaxWeightLb} and leaves
-   * the holds empty (bags from the load sheet are not applied). ToLiss
-   * A340-600 PRO: 100 kg/pax, FWD/AFT cargo 0.
+   * CDU/EFB SimBrief import seats pax at {@link efbPaxWeightLb}. Holds go
+   * empty only when that total is heavier than the load sheet (ToLiss
+   * A340-600 PRO charter: 100 kg/pax, FWD/AFT cargo 0). Cargo sheets heavier
+   * than N × 100 kg keep the leftover in the holds.
    */
   efbImportOmitsBaggage?: boolean;
   /** Optional real-airframe weights — prefer over SimBrief proxy for light GA caps. */

@@ -1460,9 +1460,10 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
       { ofpPassengerCount: 192 },
     );
     assert.ok(Math.abs(due - 42_329) < 1);
-    const allotment = 192 * 230;
-    const withFreight = adjustPaxAndCargoDueForEfbPaxLb(
-      allotment + 10_000,
+    // KMIA–SVSE demand: sheet 19,640 is heavier than 85 × 100 kg, so the
+    // CDU keeps PYLD on the sheet (FWD 360 + AFT 540) instead of 18,829.
+    const cargoDue = adjustPaxAndCargoDueForEfbPaxLb(
+      19_640,
       {
         typeId: 'toliss-toliss-a346-pro-preset-pax',
         aircraftClassId: 'wide_freighter',
@@ -1475,9 +1476,9 @@ describe('adjustPaxAndCargoDueForEfbPaxLb', () => {
         efbPaxWeightLb: 220.462,
         efbImportOmitsBaggage: true,
       },
-      { ofpPassengerCount: 192 },
+      { ofpPassengerCount: 85 },
     );
-    assert.ok(Math.abs(withFreight - (due + 10_000)) < 1);
+    assert.equal(cargoDue, 19_640);
   });
 
   it('adds Fenix ~196 lb/pax vs SimBrief 175 on a 134-pax OFP', () => {

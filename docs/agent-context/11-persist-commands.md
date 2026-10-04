@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-04: **Edit cargo escondia o Demand do mesmo destino** — sintoma = o voo KMIA→SVSE já tinha 4 lots; o Accept de outro Demand para SVSE foi para o Open desk e não apareceu no Edit cargo. Causa = a lista “Other holds” descartava qualquer hold cujo destino já era o do voo. O servidor já empilha esse lote no mesmo pouso. Fix = o Add lista todo hold ainda aberto na mesma origem, inclusive o destino que o voo já tem.
+
 Atualizado 2026-10-02: **Capacity left no En route ignorava a carga das escalas seguintes** — o Flight Plan já somava `throughLoads`. O tile do En route subtraía só `mission.cargoKg`. Fix = o espaço livre desconta também o que segue no avião.
 
 Atualizado 2026-10-02: **Desk mostrava a origem antiga de um contrato que segue no avião** — o Leave freight grava o hub novo só na perna que está valendo. O contrato que continua guarda a origem de onde a carga saiu, porque o cancel devolve para essa warehouse. Fix = a linha do Desk mostra a origem da perna que está valendo. A distância some nessa linha, porque o número gravado ainda é a rota antiga.

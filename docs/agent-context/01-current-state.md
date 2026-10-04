@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **e596fe1b** / desktop **0.3.462** shipped: Drop the trailing ellipsis from buttons that are already waiting. Release: [v0.3.462](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.462).
+
+
 `main` **52692401** / desktop **0.3.461** shipped: Mark airframe delivery by default and keep the Accept spinner beside the label. Release: [v0.3.461](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.461).
 
 

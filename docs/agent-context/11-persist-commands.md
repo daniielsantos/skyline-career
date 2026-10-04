@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-04: **Edit cargo no primeiro clique não tinha o Add** — sintoma = o app abriu no Dispatch despachado; Edit cargo mostrou os lots do voo e nenhum hold para adicionar. Depois de abrir Hauls e voltar, o Add apareceu. Causa = a lista só era pedida com o voo `accepted` ou com o editor já aberto, e um voo `dispatched` na tela inicial ficava com a lista vazia. Fix = o Dispatch de um voo de desk já busca os holds abertos.
+
 Atualizado 2026-10-04: **Edit cargo escondia o Demand do mesmo destino** — sintoma = o voo KMIA→SVSE já tinha 4 lots; o Accept de outro Demand para SVSE foi para o Open desk e não apareceu no Edit cargo. Causa = a lista “Other holds” descartava qualquer hold cujo destino já era o do voo. O servidor já empilha esse lote no mesmo pouso. Fix = o Add lista todo hold ainda aberto na mesma origem, inclusive o destino que o voo já tem.
 
 Atualizado 2026-10-02: **Capacity left no En route ignorava a carga das escalas seguintes** — o Flight Plan já somava `throughLoads`. O tile do En route subtraía só `mission.cargoKg`. Fix = o espaço livre desconta também o que segue no avião.

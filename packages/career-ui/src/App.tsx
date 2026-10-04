@@ -6983,9 +6983,15 @@ export function App() {
   );
   useEffect(() => {
     const preparing = Boolean(staging?.deskHold);
-    const accepted =
-      activeMission?.status === 'accepted' && !activeMission.throughHostId;
-    if (!preparing && !accepted) {
+    // Dispatched flights sit on Dispatch before Edit cargo. Load the desk
+    // then, not only after Hauls has been opened.
+    const deskFlight =
+      Boolean(activeMission) &&
+      !activeMission.throughHostId &&
+      (activeMission.status === 'accepted' ||
+        activeMission.status === 'dispatched') &&
+      deskEditKind(activeMission) != null;
+    if (!preparing && !deskFlight) {
       setOpenDeskHolds([]);
       return;
     }
@@ -7005,6 +7011,11 @@ export function App() {
     activeMission?.id,
     activeMission?.status,
     activeMission?.throughHostId,
+    activeMission?.demandOrderId,
+    activeMission?.warehouseHaul,
+    activeMission?.warehouseBridge,
+    activeMission?.shipmentLotId,
+    activeCompanyId,
   ]);
 
   // Independent SimBridge probe — does not require Watch to be running.

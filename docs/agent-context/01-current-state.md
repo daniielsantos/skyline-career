@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **110898d6** / desktop **0.3.469** shipped: Match A340 cargo Due to the load sheet and list same-destination holds in Edit cargo. Release: [v0.3.469](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.469).
+
+
 `main` **0daba0fb** / desktop **0.3.468** shipped: Hold a Demand board accept straight to the desk. Release: [v0.3.468](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.468).
 
 

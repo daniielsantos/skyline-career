@@ -12,6 +12,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import type { CompanyNetworkNode } from './company-network';
 import { companyNetworkMarkerElement } from './company-network-icons';
+import { greatCircleLine } from './DispatchRouteMap';
 import { routeEndpointMarkerEl } from './route-map-endpoint-marker';
 
 setWorkerUrl(maplibreWorkerUrl);
@@ -28,6 +29,16 @@ const DESK_LAYER = 'company-network-desk-route';
 const CORRIDOR_SOURCE = 'company-network-corridor';
 const CORRIDOR_FILL = 'company-network-corridor-fill';
 const CORRIDOR_LINE = 'company-network-corridor-line';
+const LIVE_TRAIL_SOURCE = 'company-network-live-trail';
+const LIVE_TRAIL_LAYER = 'company-network-live-trail';
+const LIVE_REMAIN_SOURCE = 'company-network-live-remain';
+const LIVE_REMAIN_LAYER = 'company-network-live-remain';
+const LIVE_AC_SOURCE = 'company-network-live-ac';
+const LIVE_AC_HALO = 'company-network-live-ac-halo';
+const LIVE_AC_DOT = 'company-network-live-ac-dot';
+const LIVE_TRAIL_COLOR = '#6ea8fe';
+const LIVE_REMAIN_COLOR = '#f0a35a';
+const LIVE_AC_COLOR = '#7dd3fc';
 
 type LineFeatureCollection = {
   type: 'FeatureCollection';
@@ -306,6 +317,35 @@ function corridorSignature(
   return `${ring.lat.toFixed(5)}:${ring.lon.toFixed(5)}:${Math.round(ring.radiusNm)}`;
 }
 
+function liveSignature(
+  live: CompanyNetworkLiveFlight | null | undefined,
+): string {
+  if (!live) return '';
+  if (
+    !hasCoords(live.originLat, live.originLon) ||
+    !hasCoords(live.destLat, live.destLon)
+  ) {
+    return '';
+  }
+  const last = live.trail[live.trail.length - 1];
+  const tip = live.aircraft;
+  return [
+    live.originIcao,
+    live.destIcao,
+    live.originLat.toFixed(3),
+    live.originLon.toFixed(3),
+    live.destLat.toFixed(3),
+    live.destLon.toFixed(3),
+    String(live.trail.length),
+    last ? `${last.lat.toFixed(3)},${last.lon.toFixed(3)}` : '',
+    tip ? `${tip.lat.toFixed(3)},${tip.lon.toFixed(3)}` : '',
+  ].join('|');
+}
+
+function usableFix(lat: number, lon: number): boolean {
+  return hasCoords(lat, lon) && !(lat === 0 && lon === 0);
+}
+
 export type CompanyNetworkMapRoute = {
   originIcao: string;
   destIcao: string;
@@ -322,6 +362,18 @@ export type CompanyNetworkCorridorRing = {
   radiusNm: number;
 };
 
+/** Active haul on the network map. Pins stay; this draws the flight on top. */
+export type CompanyNetworkLiveFlight = {
+  originIcao: string;
+  destIcao: string;
+  originLat: number;
+  originLon: number;
+  destLat: number;
+  destLon: number;
+  trail: Array<{ lat: number; lon: number }>;
+  aircraft: { lat: number; lon: number } | null;
+};
+
 type Props = {
   nodes: CompanyNetworkNode[];
   selectedId: string | null;
@@ -330,6 +382,8 @@ type Props = {
   highlightRoute?: CompanyNetworkMapRoute | null;
   /** Soft Demand corridor disk (centered on pickup hub). */
   corridorRing?: CompanyNetworkCorridorRing | null;
+  /** Selected active haul: flown trail, remaining leg, aircraft. */
+  liveFlight?: CompanyNetworkLiveFlight | null;
   className?: string;
 };
 
@@ -350,8 +404,14 @@ export function CompanyNetworkMap(props: Props) {
 
   const plotSig = useMemo(
     () =>
-      `${nodesSignature(props.nodes, props.selectedId)}#${routeSignature(props.highlightRoute)}#${corridorSignature(props.corridorRing)}`,
-    [props.nodes, props.selectedId, props.highlightRoute, props.corridorRing],
+      `${nodesSignature(props.nodes, props.selectedId)}#${routeSignature(props.highlightRoute)}#${corridorSignature(props.corridorRing)}#${liveSignature(props.liveFlight)}`,
+    [
+      props.nodes,
+      props.selectedId,
+      props.highlightRoute,
+      props.corridorRing,
+      props.liveFlight,
+    ],
   );
 
   useEffect(() => {
@@ -434,6 +494,21 @@ export function CompanyNetworkMap(props: Props) {
           }
           if (active.getSource(CORRIDOR_SOURCE)) {
             active.removeSource(CORRIDOR_SOURCE);
+          }
+          for (const layerId of [
+            LIVE_TRAIL_LAYER,
+            LIVE_REMAIN_LAYER,
+            LIVE_AC_HALO,
+            LIVE_AC_DOT,
+          ]) {
+            if (active.getLayer(layerId)) active.removeLayer(layerId);
+          }
+          for (const sourceId of [
+            LIVE_TRAIL_SOURCE,
+            LIVE_REMAIN_SOURCE,
+            LIVE_AC_SOURCE,
+          ]) {
+            if (active.getSource(sourceId)) active.removeSource(sourceId);
           }
         } catch {
           /* torn down */
@@ -670,11 +745,193 @@ export function CompanyNetworkMap(props: Props) {
       }
     }
 
+    const live = props.liveFlight;
+    const liveOk =
+      !!live &&
+      hasCoords(live.originLat, live.originLon) &&
+      hasCoords(live.destLat, live.destLon);
+    const liveTip =
+      liveOk && live.aircraft && usableFix(live.aircraft.lat, live.aircraft.lon)
+        ? live.aircraft
+        : liveOk
+          ? [...live.trail]
+              .reverse()
+              .find((p) => usableFix(p.lat, p.lon)) ?? null
+          : null;
+
+    try {
+      if (liveOk && live) {
+        const trailCoords: [number, number][] = live.trail
+          .filter((p) => usableFix(p.lat, p.lon))
+          .map((p) => [p.lon, p.lat]);
+        if (
+          liveTip &&
+          (trailCoords.length === 0 ||
+            trailCoords[trailCoords.length - 1]![0] !== liveTip.lon ||
+            trailCoords[trailCoords.length - 1]![1] !== liveTip.lat)
+        ) {
+          trailCoords.push([liveTip.lon, liveTip.lat]);
+        }
+        upsertLineLayer(
+          map,
+          LIVE_TRAIL_SOURCE,
+          LIVE_TRAIL_LAYER,
+          trailCoords.length >= 2
+            ? {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: { type: 'LineString', coordinates: trailCoords },
+                  },
+                ],
+              }
+            : emptyLineCollection(),
+          {
+            'line-color': LIVE_TRAIL_COLOR,
+            'line-width': 2.5,
+            'line-opacity': 0.92,
+          },
+        );
+        const remainFrom = liveTip ?? {
+          lat: live.originLat,
+          lon: live.originLon,
+        };
+        upsertLineLayer(
+          map,
+          LIVE_REMAIN_SOURCE,
+          LIVE_REMAIN_LAYER,
+          {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'LineString',
+                  coordinates: greatCircleLine(
+                    remainFrom,
+                    { lat: live.destLat, lon: live.destLon },
+                    48,
+                  ),
+                },
+              },
+            ],
+          },
+          {
+            'line-color': LIVE_REMAIN_COLOR,
+            'line-width': 2.4,
+            'line-opacity': 0.9,
+            'line-dasharray': [2, 2],
+          },
+        );
+        const acExisting = map.getSource(LIVE_AC_SOURCE) as
+          | GeoJSONSource
+          | undefined;
+        const acPoint = {
+          type: 'FeatureCollection' as const,
+          features: liveTip
+            ? [
+                {
+                  type: 'Feature' as const,
+                  properties: {},
+                  geometry: {
+                    type: 'Point' as const,
+                    coordinates: [liveTip.lon, liveTip.lat] as [number, number],
+                  },
+                },
+              ]
+            : [],
+        };
+        if (acExisting && typeof acExisting.setData === 'function') {
+          acExisting.setData(acPoint);
+        } else {
+          if (map.getLayer(LIVE_AC_DOT)) map.removeLayer(LIVE_AC_DOT);
+          if (map.getLayer(LIVE_AC_HALO)) map.removeLayer(LIVE_AC_HALO);
+          if (map.getSource(LIVE_AC_SOURCE)) map.removeSource(LIVE_AC_SOURCE);
+          map.addSource(LIVE_AC_SOURCE, { type: 'geojson', data: acPoint });
+          map.addLayer({
+            id: LIVE_AC_HALO,
+            type: 'circle',
+            source: LIVE_AC_SOURCE,
+            paint: {
+              'circle-radius': 11,
+              'circle-color': LIVE_AC_COLOR,
+              'circle-opacity': 0.28,
+            },
+          });
+          map.addLayer({
+            id: LIVE_AC_DOT,
+            type: 'circle',
+            source: LIVE_AC_SOURCE,
+            paint: {
+              'circle-radius': 6,
+              'circle-color': LIVE_AC_COLOR,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#0b0b0c',
+            },
+          });
+        }
+        for (const ep of [
+          {
+            icao: live.originIcao,
+            lat: live.originLat,
+            lon: live.originLon,
+            kind: 'dep' as const,
+          },
+          {
+            icao: live.destIcao,
+            lat: live.destLat,
+            lon: live.destLon,
+            kind: 'arr' as const,
+          },
+        ]) {
+          try {
+            markersRef.current.push(
+              new Marker({
+                element: routeEndpointMarkerEl(ep.icao, ep.kind),
+                anchor: 'bottom',
+              })
+                .setLngLat([ep.lon, ep.lat])
+                .addTo(map),
+            );
+          } catch {
+            /* map removed */
+          }
+        }
+      } else {
+        clearLineLayer(map, LIVE_TRAIL_SOURCE, LIVE_TRAIL_LAYER);
+        clearLineLayer(map, LIVE_REMAIN_SOURCE, LIVE_REMAIN_LAYER);
+        const acExisting = map.getSource(LIVE_AC_SOURCE) as
+          | GeoJSONSource
+          | undefined;
+        if (acExisting && typeof acExisting.setData === 'function') {
+          acExisting.setData({ type: 'FeatureCollection', features: [] });
+        }
+      }
+    } catch {
+      /* style not ready / map removed */
+    }
+
     const focusBounds = new LngLatBounds();
     let focusCount = 0;
     let focused = false;
+    const selectedNode = selectedId
+      ? plotNodes.find((n) => n.id === selectedId)
+      : undefined;
 
-    if (deskRouteOk) {
+    if (liveOk && live) {
+      focusBounds.extend([live.originLon, live.originLat]);
+      focusBounds.extend([live.destLon, live.destLat]);
+      if (liveTip) focusBounds.extend([liveTip.lon, liveTip.lat]);
+      focusCount = 2;
+      focused = true;
+    } else if (selectedNode?.kind === 'wh' && hasCoords(selectedNode.lat, selectedNode.lon)) {
+      focusBounds.extend([selectedNode.lon, selectedNode.lat]);
+      focusCount = 1;
+      focused = true;
+    } else if (deskRouteOk) {
       focusBounds.extend([deskRoute.originLon, deskRoute.originLat]);
       focusBounds.extend([deskRoute.destLon, deskRoute.destLat]);
       focusCount = 2;
@@ -694,7 +951,9 @@ export function CompanyNetworkMap(props: Props) {
       focused = Boolean(selectedId);
     }
 
-    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}|${routeKey}|${corridorKey}`;
+    const liveCameraKey =
+      liveOk && live ? `${live.originIcao}-${live.destIcao}` : 'none';
+    const cameraKey = `${mapGeneration}|${nodeKey}|${selectedId ?? 'all'}|${routeKey}|${corridorKey}|${liveCameraKey}`;
     if (cameraKey === fittedForRef.current || focusCount === 0) return;
     fittedForRef.current = cameraKey;
 

@@ -3753,47 +3753,42 @@ export function PortsPanel(props: {
     };
   }, [scoutRouteFocus]);
 
-  /** Soft Demand corridor disk on Network map when an FBO is selected (P1/P2). */
+  /** Soft Demand corridor disk on the desk map (P1/P2). Stays on the port when a warehouse pin is focused. */
   const networkCorridorRing = useMemo(() => {
-    if (networkSurface !== 'fbo') return null;
-    const fbo = selectedNetworkNode;
-    if (!fbo || fbo.kind !== 'fbo') return null;
-    const pid = (fbo.portId ?? '').trim().toUpperCase();
-    if (!pid) return null;
-    const portRow =
-      port?.id.trim().toUpperCase() === pid
-        ? port
-        : (snap?.ports ?? []).find((p) => p.id.trim().toUpperCase() === pid);
-    if (!portRow) return null;
+    if (networkSurface !== 'fbo' || !port) return null;
     const hubSet = new Set(
-      (portRow.pickupHubs ?? []).map((h) => h.trim().toUpperCase()),
+      (port.pickupHubs ?? []).map((h) => h.trim().toUpperCase()),
     );
     const tiers = (warehouses?.warehouses ?? [])
       .filter((w) => hubSet.has(w.icao.trim().toUpperCase()))
       .map((w) => w.tier);
     const { level } = resolveUiPortCorridorLevel({
-      concessionStatus: portRow.concession?.status,
-      concessionLevel: portRow.concession?.level,
+      concessionStatus: port.concession?.status,
+      concessionLevel: port.concession?.level,
       warehouseTiersAtPort: tiers,
     });
     const nm = corridorNmForLevel(level);
     if (nm == null) return null;
-    const hubIcao = fbo.primaryHubIcao.trim().toUpperCase();
+    const hubIcao = (
+      resolvePortDeskPickupHub(port.pickupHubs) ??
+      port.pickupHubs?.[0] ??
+      ''
+    )
+      .trim()
+      .toUpperCase();
     const wh = companyNetworkNodes.find(
       (n) => n.kind === 'wh' && n.primaryHubIcao === hubIcao,
     );
-    const lat = wh?.lat ?? fbo.lat;
-    const lon = wh?.lon ?? fbo.lon;
+    const fbo = companyNetworkNodes.find(
+      (n) =>
+        n.kind === 'fbo' &&
+        (n.portId ?? '').toUpperCase() === port.id.toUpperCase(),
+    );
+    const lat = wh?.lat ?? fbo?.lat ?? port.lat;
+    const lon = wh?.lon ?? fbo?.lon ?? port.lon;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
     return { lat, lon, radiusNm: nm };
-  }, [
-    networkSurface,
-    selectedNetworkNode,
-    port,
-    snap?.ports,
-    warehouses?.warehouses,
-    companyNetworkNodes,
-  ]);
+  }, [networkSurface, port, warehouses?.warehouses, companyNetworkNodes]);
 
   /** First buyable pickup on the catalog-selected port (onboarding path). */
   const catalogBuyWarehouseHub = useMemo(() => {
@@ -3890,13 +3885,30 @@ export function PortsPanel(props: {
   }
 
   function onSelectNetworkNode(id: string | null) {
-    setSelectedNetworkId(id);
     if (!id) {
+      const current = findNetworkNode(companyNetworkNodes, selectedNetworkId);
+      if (current?.kind === 'wh') {
+        const fbo = companyNetworkNodes.find(
+          (n) =>
+            n.kind === 'fbo' &&
+            (n.portId ?? '').toUpperCase() === (port?.id ?? '').toUpperCase(),
+        );
+        if (fbo) {
+          setSelectedNetworkId(fbo.id);
+          return;
+        }
+      }
+      setSelectedNetworkId(null);
       setNetworkSurface('wh');
       return;
     }
     const node = findNetworkNode(companyNetworkNodes, id);
     if (!node) return;
+    if (node.kind === 'wh') {
+      setSelectedNetworkId(node.id);
+      return;
+    }
+    setSelectedNetworkId(id);
     if (node.kind === 'fbo' && node.portId) {
       setPortId(node.portId);
       if (networkSurface !== 'demand' && networkSurface !== 'charter') {
@@ -3907,14 +3919,6 @@ export function PortsPanel(props: {
       if (pickup && ownedHubSet.has(pickup)) {
         setSelectedOwnedHubIcao(pickup);
       }
-      return;
-    }
-    if (node.kind === 'wh') {
-      openNetworkSurface(networkSurface === 'demand' ? 'demand' : 'wh', {
-        hubIcao: node.primaryHubIcao,
-        networkId: node.id,
-        portId: node.portId ?? undefined,
-      });
     }
   }
 
@@ -4266,8 +4270,7 @@ export function PortsPanel(props: {
   }
 
   const embedPortBoards =
-    port?.concession?.status === 'yours' &&
-    selectedNetworkNode?.kind !== 'wh';
+    port?.concession?.status === 'yours' && networkSurface !== 'wh';
 
   const companyNetworkChips = (
     <>
@@ -4790,15 +4793,6 @@ export function PortsPanel(props: {
                     }
                     disabled={props.busy || loading}
                     onClick={() => {
-                      const node = selectedNetworkNode;
-                      if (node?.kind === 'wh') {
-                        openNetworkSurface('wh', {
-                          hubIcao: node.primaryHubIcao,
-                          networkId: node.id,
-                          portId: node.portId ?? port.id,
-                        });
-                        return;
-                      }
                       const fbo = companyNetworkNodes.find(
                         (n) =>
                           n.kind === 'fbo' &&

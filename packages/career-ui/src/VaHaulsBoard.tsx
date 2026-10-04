@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HOURS_PER_TICK } from './economy-clock';
 import {
+  fetchVaFlightTrack,
   fetchVaHauls,
   postDemandDispatchHold,
   postDemandHoldCancel,
@@ -13,6 +14,7 @@ import {
   type PlayerAircraft,
   type VaCompanyNetworkNode,
   type VaHaulHold,
+  type VaFlightTrack,
   type VaHaulMission,
 } from './api';
 import { formatBoardMoney } from './board-money';
@@ -23,6 +25,8 @@ import {
   type CompanyNetworkNode,
 } from './company-network';
 import { VaCompanyNetwork } from './VaCompanyNetwork';
+import type { CompanyNetworkLiveFlight } from './CompanyNetworkMap';
+import { resolveAirportEndpoint } from './resolve-airport-endpoint';
 import { VaPortPathCard } from './VaPortPathCard';
 import { isOpsAircraftBoardSelectable } from './ops-fleet';
 import { formatMass, type WeightSystem } from './weight-units';
@@ -139,6 +143,80 @@ function formatHoldExpiresIn(
   };
 }
 
+const LIVE_PHASE_LABEL: Record<string, string> = {
+  ground: 'On ground',
+  taxi_out: 'Taxi out',
+  takeoff: 'Takeoff',
+  climb: 'Climb',
+  cruise: 'Cruise',
+  descent: 'Descent',
+  approach: 'Approach',
+  landing: 'Landing',
+  taxi_in: 'Taxi in',
+  taxi: 'Taxiing',
+  airborne: 'Airborne',
+  'ground+engines': 'On ground · engines',
+};
+
+function formatLivePhase(phase: string | null | undefined): string | null {
+  const key = phase?.trim() || '';
+  if (!key) return null;
+  return LIVE_PHASE_LABEL[key] ?? key.replace(/_/g, ' ');
+}
+
+function formatLiveAltFt(altFt: number | null | undefined): string | null {
+  if (typeof altFt !== 'number' || !Number.isFinite(altFt)) return null;
+  const rounded = Math.round(altFt);
+  if (rounded >= 10_000) return `FL${Math.round(rounded / 100)}`;
+  return `${rounded.toLocaleString()} ft`;
+}
+
+function haulProgressPct(
+  origin: { lat: number; lon: number },
+  dest: { lat: number; lon: number },
+  aircraft: { lat: number; lon: number },
+): number | null {
+  const nm = (
+    a: { lat: number; lon: number },
+    b: { lat: number; lon: number },
+  ) => {
+    const toR = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toR(b.lat - a.lat);
+    const dLon = toR(b.lon - a.lon);
+    const lat1 = toR(a.lat);
+    const lat2 = toR(b.lat);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    return 2 * 3440.065 * Math.asin(Math.min(1, Math.sqrt(h)));
+  };
+  const total = nm(origin, dest);
+  if (!(total > 0.05)) return null;
+  return Math.max(0, Math.min(100, Math.round((nm(origin, aircraft) / total) * 100)));
+}
+
+function networkHubFix(
+  nodes: CompanyNetworkNode[],
+  icao: string,
+): { lat: number; lon: number } | null {
+  const code = icao.trim().toUpperCase();
+  if (!code) return null;
+  const node = nodes.find(
+    (n) =>
+      n.primaryHubIcao.trim().toUpperCase() === code ||
+      n.hubIcaos.some((h) => h.trim().toUpperCase() === code),
+  );
+  if (
+    !node ||
+    !Number.isFinite(node.lat) ||
+    !Number.isFinite(node.lon) ||
+    (node.lat === 0 && node.lon === 0)
+  ) {
+    return null;
+  }
+  return { lat: node.lat, lon: node.lon };
+}
+
 function asNetworkNodes(
   nodes: VaCompanyNetworkNode[] | undefined,
 ): CompanyNetworkNode[] {
@@ -196,6 +274,14 @@ export function VaHaulsBoard(props: Props) {
   );
   const [networkFocusId, setNetworkFocusId] = useState<string | null>(null);
   const [selectedHoldId, setSelectedHoldId] = useState<string | null>(null);
+  const [selectedActiveId, setSelectedActiveId] = useState<string | null>(null);
+  const [haulLive, setHaulLive] = useState<{
+    missionId: string;
+    origin: { icao: string; lat: number; lon: number } | null;
+    dest: { icao: string; lat: number; lon: number } | null;
+    track: VaFlightTrack | null;
+    fresh: boolean;
+  } | null>(null);
   const mass = (kg: number) => formatMass(kg, props.weightSystem);
 
   const refresh = useCallback(async () => {
@@ -284,6 +370,197 @@ export function VaHaulsBoard(props: Props) {
       ),
     [active, focusNode, props.missions],
   );
+
+  const selectedActive = useMemo(
+    () => filteredActive.find((m) => m.id === selectedActiveId) ?? null,
+    [filteredActive, selectedActiveId],
+  );
+
+  useEffect(() => {
+    if (
+      selectedActiveId &&
+      !filteredActive.some((m) => m.id === selectedActiveId)
+    ) {
+      setSelectedActiveId(null);
+    }
+  }, [selectedActiveId, filteredActive]);
+
+  const selectedActiveOrigin = selectedActive
+    ? deskActiveOrigin(selectedActive, props.missions).icao
+    : '';
+  const selectedActiveDest = selectedActive
+    ? selectedActive.destIcao.trim().toUpperCase()
+    : '';
+  const selectedActiveAccount =
+    selectedActive?.pilotAccountId?.trim() ?? '';
+
+  useEffect(() => {
+    if (!selectedActive) {
+      setHaulLive(null);
+      return;
+    }
+    const missionId = selectedActive.id;
+    const originIcao = selectedActiveOrigin;
+    const destIcao = selectedActiveDest;
+    const accountId = selectedActiveAccount;
+    let cancelled = false;
+
+    async function load() {
+      let origin = networkHubFix(networkNodes, originIcao);
+      let dest = networkHubFix(networkNodes, destIcao);
+      let track: VaFlightTrack | null = null;
+      let fresh = false;
+      if (accountId) {
+        try {
+          const snap = await fetchVaFlightTrack({
+            companyId: props.companyId,
+            accountId,
+          });
+          if (cancelled) return;
+          if (snap.track && snap.track.missionId === missionId) {
+            track = snap.track;
+            fresh = Boolean(snap.fresh);
+          }
+          if (
+            snap.origin &&
+            snap.origin.icao.trim().toUpperCase() === originIcao &&
+            Number.isFinite(snap.origin.lat) &&
+            Number.isFinite(snap.origin.lon)
+          ) {
+            origin = { lat: snap.origin.lat, lon: snap.origin.lon };
+          }
+          if (
+            snap.dest &&
+            snap.dest.icao.trim().toUpperCase() === destIcao &&
+            Number.isFinite(snap.dest.lat) &&
+            Number.isFinite(snap.dest.lon)
+          ) {
+            dest = { lat: snap.dest.lat, lon: snap.dest.lon };
+          }
+        } catch {
+          /* route still draws from the hub list */
+        }
+      }
+      if (cancelled) return;
+      if (!origin || !dest) {
+        const [resolvedOrigin, resolvedDest] = await Promise.all([
+          origin
+            ? Promise.resolve(null)
+            : resolveAirportEndpoint(originIcao),
+          dest ? Promise.resolve(null) : resolveAirportEndpoint(destIcao),
+        ]);
+        if (cancelled) return;
+        if (!origin && resolvedOrigin) {
+          origin = { lat: resolvedOrigin.lat, lon: resolvedOrigin.lon };
+        }
+        if (!dest && resolvedDest) {
+          dest = { lat: resolvedDest.lat, lon: resolvedDest.lon };
+        }
+      }
+      if (cancelled) return;
+      setHaulLive({
+        missionId,
+        origin: origin ? { icao: originIcao, ...origin } : null,
+        dest: dest ? { icao: destIcao, ...dest } : null,
+        track,
+        fresh,
+      });
+    }
+
+    void load();
+    const id = window.setInterval(() => {
+      void load();
+    }, 5_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    selectedActive,
+    selectedActiveOrigin,
+    selectedActiveDest,
+    selectedActiveAccount,
+    networkNodes,
+    props.companyId,
+  ]);
+
+  const liveFlight = useMemo((): CompanyNetworkLiveFlight | null => {
+    if (!haulLive || haulLive.missionId !== selectedActiveId) return null;
+    const origin = haulLive.origin;
+    const dest = haulLive.dest;
+    if (!origin || !dest) return null;
+    const track = haulLive.track;
+    const trail = (track?.points ?? [])
+      .filter(
+        (p) =>
+          Number.isFinite(p.lat) &&
+          Number.isFinite(p.lon) &&
+          !(p.lat === 0 && p.lon === 0),
+      )
+      .map((p) => ({ lat: p.lat, lon: p.lon }));
+    const last = trail[trail.length - 1];
+    const trackLat = track?.lat;
+    const trackLon = track?.lon;
+    const aircraft = last
+      ? last
+      : typeof trackLat === 'number' &&
+          typeof trackLon === 'number' &&
+          Number.isFinite(trackLat) &&
+          Number.isFinite(trackLon) &&
+          !(trackLat === 0 && trackLon === 0)
+        ? { lat: trackLat, lon: trackLon }
+        : null;
+    return {
+      originIcao: origin.icao,
+      destIcao: dest.icao,
+      originLat: origin.lat,
+      originLon: origin.lon,
+      destLat: dest.lat,
+      destLon: dest.lon,
+      trail,
+      aircraft,
+    };
+  }, [haulLive, selectedActiveId]);
+
+  const liveStatus = useMemo(() => {
+    if (!selectedActive) return null;
+    if (!liveFlight) return { stale: false, text: 'Loading route…' };
+    const track = haulLive?.track ?? null;
+    const aircraft = liveFlight.aircraft;
+    const phase = formatLivePhase(track?.phase);
+    const alt = formatLiveAltFt(track?.altFt);
+    const gs =
+      typeof track?.gsKt === 'number' && Number.isFinite(track.gsKt)
+        ? `${Math.round(track.gsKt)} kt`
+        : null;
+    const pct =
+      aircraft != null
+        ? haulProgressPct(
+            { lat: liveFlight.originLat, lon: liveFlight.originLon },
+            { lat: liveFlight.destLat, lon: liveFlight.destLon },
+            aircraft,
+          )
+        : null;
+    const bits = [
+      phase,
+      alt,
+      gs,
+      pct != null ? `${pct}%` : null,
+    ].filter(Boolean);
+    if (!aircraft) {
+      return { stale: true, text: 'No live position' };
+    }
+    if (!haulLive?.fresh) {
+      return {
+        stale: true,
+        text: bits.length > 0 ? `Stale · ${bits.join(' · ')}` : 'Stale',
+      };
+    }
+    return {
+      stale: false,
+      text: bits.join(' · ') || `${liveFlight.originIcao} → ${liveFlight.destIcao}`,
+    };
+  }, [selectedActive, liveFlight, haulLive]);
 
   /** All parked VA tails — Prepare/Accept like Freights (ferry off-origin in Manifest). */
   const parkedFleet = useMemo(
@@ -556,10 +833,25 @@ export function VaHaulsBoard(props: Props) {
           selectedId={networkFocusId}
           onSelect={setNetworkFocusId}
           highlightRoute={selectedHoldRoute}
+          liveFlight={liveFlight}
           showMap={networkNodes.length > 1 || hasPortFbo}
           disabled={pageBusy}
           weightSystem={props.weightSystem}
         />
+      ) : null}
+
+      {liveStatus ? (
+        <p
+          className={
+            liveStatus.stale
+              ? 'va-hauls-live-status va-live-stale'
+              : 'va-hauls-live-status'
+          }
+          role="status"
+        >
+          {selectedActiveOrigin} → {selectedActiveDest}
+          {liveStatus.text ? ` · ${liveStatus.text}` : ''}
+        </p>
       ) : null}
 
       {error ? (
@@ -842,7 +1134,16 @@ export function VaHaulsBoard(props: Props) {
                   return (
                     <li
                       key={m.id}
-                      className="va-hauls-row va-hauls-row-active"
+                      className={
+                        selectedActiveId === m.id
+                          ? 'va-hauls-row va-hauls-row-active is-selected'
+                          : 'va-hauls-row va-hauls-row-active'
+                      }
+                      onClick={() =>
+                        setSelectedActiveId((prev) =>
+                          prev === m.id ? null : m.id,
+                        )
+                      }
                     >
                       <div className="va-hauls-row-id">
                         <strong className="va-hauls-route-od">

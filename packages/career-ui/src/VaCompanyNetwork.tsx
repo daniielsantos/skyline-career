@@ -6,6 +6,7 @@ import {
 import {
   CompanyNetworkMap,
   type CompanyNetworkCorridorRing,
+  type CompanyNetworkLiveFlight,
 } from './CompanyNetworkMap';
 import { NetworkChipIcon } from './company-network-icons';
 import { formatMass, type WeightSystem } from './weight-units';
@@ -28,6 +29,8 @@ type Props = {
   highlightRoute?: CompanyNetworkHighlightRoute | null;
   /** Demand corridor reach disk (Ports FBO selection; P3 open = omit). */
   corridorRing?: CompanyNetworkCorridorRing | null;
+  /** Selected active haul drawn on top of the network pins. */
+  liveFlight?: CompanyNetworkLiveFlight | null;
   /** Compact map of company assets (Hauls). Ports already has a full map. */
   showMap?: boolean;
   /** Hide the All chip (Ports uses explicit Demand / Buy actions). */
@@ -195,6 +198,7 @@ export function VaCompanyNetwork(props: Props) {
             selectedId={selectedId}
             highlightRoute={props.highlightRoute ?? null}
             corridorRing={props.corridorRing ?? null}
+            liveFlight={props.liveFlight ?? null}
             onSelectNode={(id) => onSelect(id)}
           />
         </div>

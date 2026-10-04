@@ -16482,11 +16482,16 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 
 .va-hauls-row-active {
   /* Same 3-column grid as Open desk (route | stats | aircraft). */
-  cursor: default;
+  cursor: pointer;
 }
 
 .va-hauls-row-active:hover {
-  border-color: var(--line);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+.va-hauls-live-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
 }
 
 .va-hauls-actions-readonly {

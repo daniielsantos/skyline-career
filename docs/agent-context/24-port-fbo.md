@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-03: **Clique no armazém só foca o mapa** — sintoma = o card WH trocava a página pelo quadro de Demand ou pelo galpão. Causa = a seleção do armazém abria outra superfície e tirava o porto do mapa. Fix = o clique marca o WH e aproxima o mapa nesse pin. A página do porto fica. Segundo clique no mesmo card volta o foco para o FBO.
+
 Atualizado 2026-10-03: **Linha do quadro desenha a rota no mapa** — clicar uma linha de Scout, Demand ou Charter marca a linha e traça origem → destino no mapa de cima. Segundo clique tira. Accept e Fly não desmarcam. A linha some se o pedido sai do quadro. Sem coordenada de origem ou destino, a linha não é inventada.
 
 Atualizado 2026-10-03: **Ports da sidebar e Ports da VA são o mesmo painel** — as duas montam `PortsPanel`. Sidebar = company da casa do piloto solo (`Yours`, acesso cheio). My VA = company da VA (`Company`), com o papel: dono gasta, dispatcher mexe no desk, piloto só lê. O que muda é de quem é a rede, o caixa e o gate. Mapa, desk, Demand, Charter e a grade dos quadros não ganham uma segunda tela. `embedded` na VA só tira o título “Ports & Demand” e põe o Refresh na faixa das abas.

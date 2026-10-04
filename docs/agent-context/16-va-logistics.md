@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-03: **Hauls desenha o voo ativo no mapa da rede** — clicar uma linha de Active marca a linha e, no mapa que já está na página, traça a rota, o rastro e a bolinha do piloto. Os pins da rede ficam. Segundo clique tira. A posição vem do mesmo `GET /api/va/flight-track` do Live da roster. Sem sample, a rota aparece e a linha diz que não há posição. Watch e o pipe não mudam.
+
 Atualizado 2026-10-02: **Scout Bridge e Auto haul ordenavam pelo kg** — um lote grande com o destino um centavo mais caro ficava na frente de um lote menor com um ganho grande. Fix = a nota é (preço do destino − preço da origem) × kg. A porteira continua: o destino tem de pagar mais. Distância só desempata. O Auto haul posta essa mesma lista, então pega o maior ganho primeiro.
 
 Atualizado 2026-10-02: **Back da sidebar perdia a aba do Crew** — abrir um terminal desmontava a página e a aba voltava para Hauls. Fix = a aba fica no App. O Back reabre a mesma (Roster, Hangar, Ports, Ledger, Logbook, Config).

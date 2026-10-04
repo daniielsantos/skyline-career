@@ -55,7 +55,12 @@ import {
   portJetATankCapacityKg,
 } from './career-port-jet-a.js';
 import { fuelTerminalSellableKg } from './career-fuel.js';
-import { demandSnapshot, ensureDemandOrders, expireDemandHolds } from './career-demand.js';
+import {
+  demandSnapshot,
+  ensureDemandOrders,
+  expireDemandHolds,
+  type DemandDeliveryWatch,
+} from './career-demand.js';
 import { expireTourLotSoftHolds } from './career-base-dispatch-tour.js';
 import { bindPortCorridorLookups } from './career-port-corridor.js';
 import { listPortCharterDesk } from './career-charter.js';
@@ -2877,6 +2882,11 @@ export function portSnapshot(
      */
     seedMarket?: boolean;
     /**
+     * All-company holds and flights. When set, a filled Demand order with
+     * nothing still carrying it is expired before spawn.
+     */
+    deliveryWatch?: DemandDeliveryWatch;
+    /**
      * `network` builds only ports the company operates or where it has a
      * warehouse. Catalog and the world buy-warehouse list use `full`.
      */
@@ -2979,6 +2989,7 @@ export function portSnapshot(
     ensurePortListings(world);
     ensureDemandOrders(world, {
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+      ...(opts?.deliveryWatch ? { deliveryWatch: opts.deliveryWatch } : {}),
     });
   }
   const listingsByPort = openPortListingsByPort(world);

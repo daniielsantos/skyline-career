@@ -67,9 +67,10 @@ export function planningCruiseFuelFlowKgPerHour(opts: {
 /**
  * Keep a per-engine SimVar reading when it is at least half the planning
  * burn. Below that (quadjet PPH stub, or only engines 1–2 of a 4-engine
- * flow that is still far too small), use the FUEL TOTAL weight drop.
- * Returns undefined when the SimVar is implausible and the tank delta is
- * not ready yet — do not lock the stub.
+ * flow that is still far too small), use the FUEL TOTAL weight drop when
+ * that drop is also at least half the plan. A weaker drop stays unset so
+ * the chip does not lock the catalog floor. The high side is still clamped
+ * by `clampCruiseFuelFlowToCatalog`.
  */
 export function resolveLiveCruiseFuelFlowKgPerHour(opts: {
   engineKgPerHour?: number;
@@ -94,10 +95,13 @@ export function resolveLiveCruiseFuelFlowKgPerHour(opts: {
     opts.planningKgPerHour > 0
       ? opts.planningKgPerHour
       : undefined;
+  const minPlausible =
+    planning != null ? planning * CRUISE_BURN_CATALOG_MIN_MULT : undefined;
   const enginePlausible =
-    engine != null &&
-    (planning == null || engine >= planning * CRUISE_BURN_CATALOG_MIN_MULT);
+    engine != null && (minPlausible == null || engine >= minPlausible);
   if (enginePlausible) return engine;
+  if (delta == null) return undefined;
+  if (minPlausible != null && delta < minPlausible) return undefined;
   return delta;
 }
 

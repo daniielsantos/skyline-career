@@ -1,5 +1,7 @@
 # Persist commands (MP-ready) — settle first
 
+Atualizado 2026-10-04: **typecheck do career-ui quebrou no CI** — sintoma = `App.tsx` ~6996, `activeMission` possibly undefined, e `deskEditKind` recusando `Mission | undefined`. Causa = `Boolean(activeMission)` não estreita o tipo. Fix = a checagem do voo de desk usa um `flight` local com `!= null`.
+
 Atualizado 2026-10-04: **Edit cargo no primeiro clique ainda não tinha o Add** — sintoma = no 0.3.470 o voo despachado já pedia os holds, mas a seção “Other holds” só aparecia depois de abrir Hauls e voltar. Causa = o Dispatch mostra o voo da companhia aérea (lista fundida) com o header ainda na company de casa. O pedido dos holds ia para a casa, cujo desk está vazio. Hauls troca o header para a airline e o mesmo pedido passa a achar o contrato. No world, um membro ainda perdia esse id: `companyIdFromRequest` ignora o `vaGetMembership` assíncrono e cai na casa. Fix = o Edit cargo pede os holds da company do avião, e esse GET (e o Add) respeitam a airline quando a conta é membro.
 
 Atualizado 2026-10-04: **Edit cargo no primeiro clique não tinha o Add** — sintoma = o app abriu no Dispatch despachado; Edit cargo mostrou os lots do voo e nenhum hold para adicionar. Depois de abrir Hauls e voltar, o Add apareceu. Causa = a lista só era pedida com o voo `accepted` ou com o editor já aberto, e um voo `dispatched` na tela inicial ficava com a lista vazia. Fix = o Dispatch de um voo de desk já busca os holds abertos.

@@ -6991,12 +6991,12 @@ export function App() {
     const preparing = Boolean(staging?.deskHold);
     // Dispatched flights sit on Dispatch before Edit cargo. Load the desk
     // then, not only after Hauls has been opened.
+    const flight = activeMission;
     const deskFlight =
-      Boolean(activeMission) &&
-      !activeMission.throughHostId &&
-      (activeMission.status === 'accepted' ||
-        activeMission.status === 'dispatched') &&
-      deskEditKind(activeMission) != null;
+      flight != null &&
+      !flight.throughHostId &&
+      (flight.status === 'accepted' || flight.status === 'dispatched') &&
+      deskEditKind(flight) != null;
     if (!preparing && !deskFlight) {
       setOpenDeskHolds([]);
       return;

@@ -419,6 +419,7 @@ Renda de frota extra = **você** usando mais caudas (ou VA pilots), não lease-o
 - Caps: max **8**; min **200 kg**; Port FBO on origin; score by pay − nm − fill.
 - API `POST /api/ports/scout` returns `haulSuggestions`; confirm `kind: 'haul'`.
 - Ports desk: **Hold Haul**. Player flies (not shuttle).
+- **Não** usar a trava do Demand (“até o pouso”). `alreadyHoldingHaul` esconde a linha só enquanto o hold está no desk (mesmo WH, destino e produto). No ar o hold some; se o terminal segue ≤40% e ainda há kg no WH, a sugestão volta. É o resto do seu estoque, não um contrato reimpresso. Scout Demand herda a trava porque só lista pedido aberto.
 
 ### Phase 9 — shipped (Port Scout Demand)
 

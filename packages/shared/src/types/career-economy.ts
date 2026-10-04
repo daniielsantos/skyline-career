@@ -1807,6 +1807,20 @@ export interface DemandOrder {
    * The unit price is the haul fee, not a Jet-A markup.
    */
   fuelHaul?: { pickupIcao: string };
+  /**
+   * Cargo for this buy-order is on a desk hold or an active flight.
+   * Persisted in payload_json. A board refresh drops it when nothing still
+   * references the order, so a filled row cannot hide the city forever.
+   */
+  deliveryClaim?: DemandDeliveryClaim;
+}
+
+/** Why a filled Demand order is still off the board. */
+export interface DemandDeliveryClaim {
+  /** Desk hold id, then the flight id once the hold is dispatched. */
+  refId: string;
+  /** While this is in the future the dest+commodity stays off the board. */
+  expiresAtTick: number;
 }
 
 /** Open factory catalog row at a real-world seaport. */

@@ -187,6 +187,7 @@ import {
   quoteWarehouseBuyUsd,
   ensureDemandOrders,
   localOperatorDemandCatchmentHubs,
+  type DemandDeliveryWatch,
   expireDemandHolds,
   demandSnapshot,
   acceptDemandOrder,
@@ -914,6 +915,44 @@ async function loadMissions(opts?: {
   return requireStore().loadMissions(opts);
 }
 
+/**
+ * Holds and flights for every company. `complete` is false when a company
+ * file could not be read — a partial list must not look like "nobody is
+ * flying this" and drop a live Demand claim. `current` is the in-memory
+ * file for this write, so a flight not saved yet still counts.
+ */
+async function loadDemandDeliveryWatch(
+  current?: MissionsFile,
+  currentCompanyId?: string,
+): Promise<DemandDeliveryWatch> {
+  const activeStore = requireStore();
+  let companies: Array<{ id?: string }> = [];
+  try {
+    const listed = await Promise.resolve(
+      activeStore.listWorldCompanies(LOCAL_WORLD_ID),
+    );
+    companies = Array.isArray(listed) ? listed : [];
+  } catch {
+    return { complete: false, states: current ? [current] : [] };
+  }
+  if (companies.length === 0) {
+    return { complete: false, states: current ? [current] : [] };
+  }
+  const states: MissionsFile[] = [];
+  if (current) states.push(current);
+  const skip = currentCompanyId?.trim();
+  for (const company of companies) {
+    const id = company.id?.trim();
+    if (!id || (skip && id === skip)) continue;
+    try {
+      states.push(await loadMissions({ companyId: id }));
+    } catch {
+      return { complete: false, states };
+    }
+  }
+  return { complete: true, states };
+}
+
 /** Enrich mission rows for Logbook (distance + concrete airframe name). */
 function withMissionClientView(
   world: CareerEconomyWorld,
@@ -1595,8 +1634,10 @@ async function loadEconomyUnlocked(opts?: {
       }
     }
     expireDemandHolds(missions, caught);
+    const deliveryWatch = await loadDemandDeliveryWatch(missions, deskCompanyId);
     ensureDemandOrders(caught, {
       operatorCatchmentHubs: localOperatorDemandCatchmentHubs(caught),
+      deliveryWatch,
     });
     await saveMissions(missions);
     await timedSave(() =>
@@ -9772,6 +9813,7 @@ export function createCareerApiServer(port = 8787) {
             world: CareerEconomyWorld,
             missions: MissionsFile,
             seedMarket: boolean,
+            deliveryWatch?: DemandDeliveryWatch,
           ) => {
             // Settle inbound only on the write/seed path — soft peek must not
             // mutate missions under the pulse without a lock.
@@ -9785,6 +9827,7 @@ export function createCareerApiServer(port = 8787) {
               alliedCompanyIds,
               seedMarket,
               scope: portsScope,
+              ...(deliveryWatch ? { deliveryWatch } : {}),
             });
             return {
               ...ports,
@@ -9814,7 +9857,13 @@ export function createCareerApiServer(port = 8787) {
           // ensurePortListings may expire/refill; persist those tables only so
           // buy can find the same listing IDs after reload.
           const result = await withCareerWrite(
-            (world, missions) => buildSnap(world, missions, true),
+            async (world, missions) => {
+              const deliveryWatch = await loadDemandDeliveryWatch(
+                missions,
+                portsCompanyId,
+              );
+              return buildSnap(world, missions, true, deliveryWatch);
+            },
             { persist: 'portMarket', companyId: portsCompanyId },
           );
           send(res, 200, result);
@@ -12571,10 +12620,15 @@ export function createCareerApiServer(port = 8787) {
         const demandCompanyId = companyIdFromRequest(req);
 
         try {
-          const result = await withCareerWrite((world, missions) => {
+          const result = await withCareerWrite(async (world, missions) => {
             expireDemandHolds(missions, world);
+            const deliveryWatch = await loadDemandDeliveryWatch(
+              missions,
+              demandCompanyId,
+            );
             ensureDemandOrders(world, {
               operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+              deliveryWatch,
             });
             const warehouses = playerWarehouseSnapshot(missions, world);
             return {
@@ -13256,8 +13310,13 @@ export function createCareerApiServer(port = 8787) {
           ensurePortInventoryRestock(world);
           ensurePortListings(world);
           expireDemandHolds(_missions, world);
+          const deliveryWatch = await loadDemandDeliveryWatch(
+            _missions,
+            tickCompanyId,
+          );
           ensureDemandOrders(world, {
             operatorCatchmentHubs: localOperatorDemandCatchmentHubs(world),
+            deliveryWatch,
           });
           const nowMs = Date.now();
           return {

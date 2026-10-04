@@ -134,6 +134,14 @@ export async function probeLiveFuelFlowSimVars(
  */
 export async function sampleLiveCruiseFuelFlowKgPerHour(
   bridge: NamedPipeSimBridge,
+  opts?: {
+    /**
+     * When set, skip a SimVar family whose total is below half this plan
+     * (ToLiss A340 `ENG FUEL FLOW PPH` ~300 lb/h per engine) and use the
+     * next family that covers the plan, including engines 3–4.
+     */
+    planningKgPerHour?: number;
+  },
 ): Promise<number | undefined> {
   const values = await bridge.readSimVars([
     ...CRUISE_ENGINE_META,
@@ -185,6 +193,54 @@ export async function sampleLiveCruiseFuelFlowKgPerHour(
       engines += 1;
     }
   };
+
+  const planning = opts?.planningKgPerHour;
+  if (
+    typeof planning === 'number' &&
+    Number.isFinite(planning) &&
+    planning > 0
+  ) {
+    const floorKg = planning * 0.5;
+    const pick = (requireCombustion: boolean): number | undefined => {
+      const totals = new Map<string, number>();
+      for (let i = 0; i < CRUISE_FLOW_BATCH.length; i += 1) {
+        const row = CRUISE_FLOW_BATCH[i]!;
+        if (row.engine < 1 || row.engine > maxEngines) continue;
+        if (
+          requireCombustion &&
+          combustionKnown &&
+          combustion[row.engine - 1] !== true
+        ) {
+          continue;
+        }
+        const raw = values[flowOffset + i];
+        if (
+          typeof raw !== 'number' ||
+          !Number.isFinite(raw) ||
+          !(raw > row.min) ||
+          raw > MAX_SANE_ENGINE_LB_PER_HOUR
+        ) {
+          continue;
+        }
+        const family = row.name.replace(/:\d+$/, '');
+        const lb = row.asGph ? raw * FALLBACK_LB_PER_GAL : raw;
+        totals.set(family, (totals.get(family) ?? 0) + lb);
+      }
+      let bestKg: number | undefined;
+      let bestDist = Infinity;
+      for (const lb of totals.values()) {
+        const kg = Math.round(lb * 0.45359237 * 10) / 10;
+        if (!(kg >= floorKg) || kg > MAX_SANE_TOTAL_KG_PER_HOUR) continue;
+        const dist = Math.abs(kg - planning);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestKg = kg;
+        }
+      }
+      return bestKg;
+    };
+    return pick(true) ?? (combustionKnown ? pick(false) : undefined);
+  }
 
   // Prefer combusting engines (drops ghost Eng2+ noise). If flags look wrong and
   // yield nothing, fall back to NUMBER OF ENGINES only so the cruise chip can live.

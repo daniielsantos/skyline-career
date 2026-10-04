@@ -22,6 +22,7 @@
 
 ## Notes
 
+- CG envelope is **−20 to 50% MAC** (ToLiss). The wizard pin was 0–50, so a live CG of about −19.8% painted outside the band. The card reads `CG PERCENT`; only the limits changed.
 - Load method: native-simbrief (no Skyline inject).
 - Fuel/payload write plans intentionally empty — load via addon EFB/tablet.
 - Use compare-ofp + Career Loaded vs Due for validation.

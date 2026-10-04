@@ -2264,9 +2264,43 @@ export function restoreDeskCargoLines(
     order.remainingKg = Math.min(order.wantedKg, order.remainingKg + kg);
     if (order.status === 'filled' && order.remainingKg > 0) {
       order.status = 'open';
+      delete order.deliveryClaim;
     }
   }
   return { storedKg, yardKg };
+}
+
+/**
+ * The buy-order was delivered or the cargo was lost. Drop the filled claim
+ * so a still-short dest can list that commodity again. Cancel reopens the
+ * order instead of calling this.
+ */
+function releaseDeliveredDemandOrder(
+  world: CareerEconomyWorld,
+  orderId: string | undefined,
+): void {
+  const id = orderId?.trim();
+  if (!id || !Array.isArray(world.demandOrders)) return;
+  const order = world.demandOrders.find((row) => row.id === id);
+  if (!order || order.status !== 'filled') return;
+  order.status = 'expired';
+  order.expiresAtTick = world.tick - 1_000;
+  delete order.deliveryClaim;
+}
+
+function deliveredDemandOrderId(
+  mission: MissionIntent,
+  line: MissionLotLine,
+): string | undefined {
+  const onLine = line.demandOrderId?.trim();
+  if (onLine) return onLine;
+  if (
+    line.shipmentLotId.startsWith('demand_') ||
+    (mission.lots.length === 1 && mission.demandOrderId)
+  ) {
+    return mission.demandOrderId?.trim() || undefined;
+  }
+  return undefined;
 }
 
 function restoreDeskCargoKg(
@@ -2501,6 +2535,13 @@ export function failMissionImpact(
     releaseAircraftOnCancel(opts.fleet, normalized);
   }
   clearPlayerInbound(world, normalized.id);
+  for (const line of normalized.lots) {
+    releaseDeliveredDemandOrder(
+      world,
+      line.demandOrderId ?? normalized.demandOrderId,
+    );
+  }
+  releaseDeliveredDemandOrder(world, normalized.demandOrderId);
   return {
     ...normalized,
     status: 'failed',
@@ -3211,6 +3252,10 @@ export function settleMission(
             demandOrderId: line.demandOrderId ?? working.demandOrderId,
           });
         }
+        releaseDeliveredDemandOrder(
+          world,
+          deliveredDemandOrderId(working, line),
+        );
         continue;
       }
       // Demand Board / WH haul: company warehouse cargo — fill dest only (no origin debit).
@@ -3272,6 +3317,10 @@ export function settleMission(
             demandOrderId: line.demandOrderId ?? working.demandOrderId,
           });
         }
+        releaseDeliveredDemandOrder(
+          world,
+          deliveredDemandOrderId(working, line),
+        );
         continue;
       }
       if (

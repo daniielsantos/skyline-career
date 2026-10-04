@@ -37,6 +37,7 @@ import {
   type CruiseSampleCommit,
   cruiseStateFromPersistedCommit,
   clampCruiseFuelFlowToCatalog,
+  CRUISE_BURN_CATALOG_MIN_MULT,
   planningCruiseFuelFlowKgPerHour,
   resolveLiveCruiseFuelFlowKgPerHour,
   DEFAULT_JET_A_LB_PER_GAL,
@@ -4117,7 +4118,7 @@ export class CareerWatchSession {
                   sample.indicatedAirspeedKt >= 40
                 ? Math.round(sample.indicatedAirspeedKt)
                 : await readLiveCruiseTasKt(this.bridge);
-          const engineFlowKgPerHour =
+          let engineFlowKgPerHour =
             typeof sample.fuelFlowKgPerHour === 'number' &&
             Number.isFinite(sample.fuelFlowKgPerHour) &&
             sample.fuelFlowKgPerHour > 0
@@ -4152,21 +4153,21 @@ export class CareerWatchSession {
             fuelBurnKgPerNm: cruiseAirframe?.fuelBurnKgPerNm,
             cruiseSpeedKt: tasKt ?? cruiseAirframe?.cruiseSpeedKt,
           });
-          let fuelFlowKgPerHour = resolveLiveCruiseFuelFlowKgPerHour({
-            engineKgPerHour: engineFlowKgPerHour,
-            weightDeltaKgPerHour,
-            planningKgPerHour: planningFlow,
-          });
-          if (fuelFlowKgPerHour == null && engineFlowKgPerHour == null) {
+          const engineCoversPlan =
+            engineFlowKgPerHour != null &&
+            (planningFlow == null ||
+              engineFlowKgPerHour >=
+                planningFlow * CRUISE_BURN_CATALOG_MIN_MULT);
+          // Flight batch only has engines 1–2. A quad whose PPH is a stub
+          // (or only half the burn) still needs engines 3–4 and TURB flow
+          // before the tank drop is allowed to stand in.
+          if (!engineCoversPlan) {
             try {
               const probed = await sampleLiveCruiseFuelFlowKgPerHour(
                 this.bridge,
+                { planningKgPerHour: planningFlow },
               );
-              fuelFlowKgPerHour = resolveLiveCruiseFuelFlowKgPerHour({
-                engineKgPerHour: probed,
-                weightDeltaKgPerHour,
-                planningKgPerHour: planningFlow,
-              });
+              if (probed != null) engineFlowKgPerHour = probed;
             } catch (flowErr) {
               // Soft: flight sample already succeeded — don't tear down SimConnect
               // just because the optional full flow probe timed out.
@@ -4177,6 +4178,11 @@ export class CareerWatchSession {
               });
             }
           }
+          let fuelFlowKgPerHour = resolveLiveCruiseFuelFlowKgPerHour({
+            engineKgPerHour: engineFlowKgPerHour,
+            weightDeltaKgPerHour,
+            planningKgPerHour: planningFlow,
+          });
           if (fuelFlowKgPerHour != null) {
             fuelFlowKgPerHour = clampCruiseFuelFlowToCatalog(
               fuelFlowKgPerHour,

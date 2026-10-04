@@ -144,7 +144,7 @@
     "envelopeSource": "calibrated-live",
     "toleranceMac": 0.5,
     "constraints": {
-      "minMac": 0,
+      "minMac": -20,
       "maxMac": 50
     }
   },

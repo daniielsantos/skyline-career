@@ -94,6 +94,29 @@ describe('sampleLiveCruiseFuelFlowKgPerHour', () => {
     assert.equal(kgPerHour, 59);
   });
 
+  it('skips an A340 PPH stub and sums TURB flow on all four engines', async () => {
+    const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
+      mockBridge({
+        'NUMBER OF ENGINES|number': 4,
+        'GENERAL ENG COMBUSTION:1|bool': 1,
+        'GENERAL ENG COMBUSTION:2|bool': 1,
+        'GENERAL ENG COMBUSTION:3|bool': 1,
+        'GENERAL ENG COMBUSTION:4|bool': 1,
+        'ENG FUEL FLOW PPH:1|pounds per hour': 300,
+        'ENG FUEL FLOW PPH:2|pounds per hour': 300,
+        'ENG FUEL FLOW PPH:3|pounds per hour': 300,
+        'ENG FUEL FLOW PPH:4|pounds per hour': 300,
+        'TURB ENG FUEL FLOW PPH:1|pounds per hour': 5_200,
+        'TURB ENG FUEL FLOW PPH:2|pounds per hour': 5_200,
+        'TURB ENG FUEL FLOW PPH:3|pounds per hour': 5_200,
+        'TURB ENG FUEL FLOW PPH:4|pounds per hour': 5_200,
+      }),
+      { planningKgPerHour: 5_580 },
+    );
+    // 20,800 lb/h → ~9,434.7 kg/h, not the 1,200 lb/h stub.
+    assert.equal(kgPerHour, 9_434.7);
+  });
+
   it('ignores insane batch garbage instead of painting a huge kg/h', async () => {
     const kgPerHour = await sampleLiveCruiseFuelFlowKgPerHour(
       mockBridge({

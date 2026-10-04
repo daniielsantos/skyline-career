@@ -84,6 +84,323 @@ function starveDemandHub(
 }
 
 describe('per-port Demand desk', () => {
+  it('does not reprint a commodity while that dest still has it filled', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-filled-hold' });
+    world.tick = 400;
+    fillAllDemandStock(world, 0.95);
+    starveDemandHub(world, 'SBCF', 'general');
+    const ap = airportByIcao(world, 'SBCF');
+    assert.ok(ap?.inventory.electronics);
+    ap!.inventory.electronics!.capacityKg = Math.max(
+      ap!.inventory.electronics!.capacityKg,
+      50_000,
+    );
+    ap!.inventory.electronics!.stockKg = Math.floor(
+      ap!.inventory.electronics!.capacityKg * 0.02,
+    );
+    world.demandOrders = [
+      {
+        id: 'demand_busy_elec',
+        portId: 'BRSSZ',
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+        wantedKg: 2_000,
+        remainingKg: 0,
+        maxUnitPriceUsd: 20,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 5_000,
+        status: 'filled',
+      },
+    ];
+
+    ensureDemandOrders(world);
+    assert.equal(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length,
+      0,
+    );
+    assert.equal(
+      world.demandOrders.filter(
+        (o) =>
+          o.destIcao === 'SBCF' &&
+          o.commodityId === 'electronics' &&
+          (o.status === 'open' || o.status === 'filled'),
+      ).length,
+      1,
+    );
+    assert.ok(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'general',
+      }).length >= 1,
+      'another commodity at the same dest can still list',
+    );
+
+    const held = world.demandOrders.find((o) => o.id === 'demand_busy_elec')!;
+    held.status = 'expired';
+    held.expiresAtTick = world.tick - 1_000;
+    ensureDemandOrders(world);
+    assert.ok(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length >= 1,
+      'electronics lists again after the claim is released',
+    );
+  });
+
+  it('releases a filled order that no hold or flight still carries', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-orphan-claim' });
+    world.tick = 400;
+    fillAllDemandStock(world, 0.95);
+    starveDemandHub(world, 'SBCF', 'general');
+    const ap = airportByIcao(world, 'SBCF');
+    assert.ok(ap?.inventory.electronics);
+    ap!.inventory.electronics!.capacityKg = Math.max(
+      ap!.inventory.electronics!.capacityKg,
+      50_000,
+    );
+    ap!.inventory.electronics!.stockKg = Math.floor(
+      ap!.inventory.electronics!.capacityKg * 0.02,
+    );
+    world.demandOrders = [
+      {
+        id: 'demand_orphan_elec',
+        portId: 'BRSSZ',
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+        wantedKg: 2_000,
+        remainingKg: 0,
+        maxUnitPriceUsd: 20,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 50_000,
+        status: 'filled',
+        deliveryClaim: { refId: 'dhold_gone', expiresAtTick: world.tick + 50_000 },
+      },
+    ];
+
+    ensureDemandOrders(world, {
+      deliveryWatch: { complete: true, states: [] },
+    });
+    const orphan = world.demandOrders.find((o) => o.id === 'demand_orphan_elec');
+    assert.ok(
+      orphan == null || orphan.status === 'expired',
+      'a filled order nobody is carrying is dropped',
+    );
+    assert.equal(orphan?.deliveryClaim, undefined);
+    assert.ok(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length >= 1,
+      'a filled order with no desk hold and no flight does not stay off the board',
+    );
+  });
+
+  it('keeps a filled commodity off the board while a flight still carries it', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-live-flight' });
+    world.tick = 800;
+    fillAllDemandStock(world, 0.95);
+    starveDemandHub(world, 'SBCF', 'electronics');
+    world.demandOrders = [
+      {
+        id: 'demand_live_elec',
+        portId: 'BRSSZ',
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+        wantedKg: 2_000,
+        remainingKg: 0,
+        maxUnitPriceUsd: 20,
+        arrivedAtTick: 1,
+        expiresAtTick: world.tick - 10,
+        status: 'filled',
+      },
+    ];
+
+    ensureDemandOrders(world, {
+      deliveryWatch: {
+        complete: true,
+        states: [
+          {
+            missions: [
+              {
+                id: 'msn_svse',
+                status: 'in_flight',
+                demandOrderId: 'demand_live_elec',
+                deadlineTick: world.tick - 10,
+                lots: [
+                  {
+                    demandOrderId: 'demand_live_elec',
+                    deadlineTick: world.tick - 10,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const live = world.demandOrders.find((o) => o.id === 'demand_live_elec');
+    assert.equal(live?.status, 'filled');
+    assert.ok(
+      (live?.deliveryClaim?.expiresAtTick ?? 0) > world.tick,
+      'an active flight refreshes the claim past the order TTL',
+    );
+    assert.equal(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length,
+      0,
+    );
+
+    world.demandOrders = [
+      {
+        ...live!,
+        status: 'filled',
+        expiresAtTick: world.tick - 10,
+        deliveryClaim: live!.deliveryClaim,
+      },
+    ];
+    ensureDemandOrders(world, {
+      deliveryWatch: {
+        complete: true,
+        states: [
+          {
+            missions: [
+              {
+                id: 'msn_svse',
+                status: 'settled',
+                demandOrderId: 'demand_live_elec',
+                deadlineTick: world.tick - 10,
+                lots: [
+                  {
+                    demandOrderId: 'demand_live_elec',
+                    deadlineTick: world.tick - 10,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const settled = world.demandOrders.find((o) => o.id === 'demand_live_elec');
+    assert.ok(
+      settled == null || settled.status === 'expired',
+      'a settled flight frees the order',
+    );
+    assert.ok(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length >= 1,
+      'a settled flight frees the city',
+    );
+  });
+
+  it('keeps a filled commodity off the board while the desk hold is still live', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-live-hold' });
+    world.tick = 800;
+    fillAllDemandStock(world, 0.95);
+    starveDemandHub(world, 'SBCF', 'electronics');
+    world.demandOrders = [
+      {
+        id: 'demand_held_elec',
+        portId: 'BRSSZ',
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+        wantedKg: 2_000,
+        remainingKg: 0,
+        maxUnitPriceUsd: 20,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 5_000,
+        status: 'filled',
+      },
+    ];
+    ensureDemandOrders(world, {
+      deliveryWatch: {
+        complete: true,
+        states: [
+          {
+            playerWarehouses: {
+              demandHolds: [
+                {
+                  id: 'dhold_live',
+                  kind: 'demand',
+                  orderId: 'demand_held_elec',
+                  expiresAtTick: world.tick + 100,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    assert.equal(
+      world.demandOrders.find((o) => o.id === 'demand_held_elec')?.status,
+      'filled',
+    );
+    assert.equal(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length,
+      0,
+    );
+  });
+
+  it('does not keep a city closed after the desk hold has already expired', () => {
+    const world = createSeedEconomyWorld({ seed: 'demand-dead-hold' });
+    world.tick = 800;
+    fillAllDemandStock(world, 0.95);
+    starveDemandHub(world, 'SBCF', 'electronics');
+    world.demandOrders = [
+      {
+        id: 'demand_dead_hold',
+        portId: 'BRSSZ',
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+        wantedKg: 2_000,
+        remainingKg: 0,
+        maxUnitPriceUsd: 20,
+        arrivedAtTick: world.tick,
+        expiresAtTick: world.tick + 5_000,
+        status: 'filled',
+        deliveryClaim: { refId: 'dhold_dead', expiresAtTick: world.tick + 5_000 },
+      },
+    ];
+    ensureDemandOrders(world, {
+      deliveryWatch: {
+        complete: true,
+        states: [
+          {
+            playerWarehouses: {
+              demandHolds: [
+                {
+                  id: 'dhold_dead',
+                  kind: 'demand',
+                  orderId: 'demand_dead_hold',
+                  expiresAtTick: world.tick - 1,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const dead = world.demandOrders.find((o) => o.id === 'demand_dead_hold');
+    assert.ok(dead == null || dead.status === 'expired');
+    assert.ok(
+      listOpenDemandOrders(world, {
+        destIcao: 'SBCF',
+        commodityId: 'electronics',
+      }).length >= 1,
+    );
+  });
+
   it('corridor ladder is 500 / 1800 / open', () => {
     assert.equal(corridorNmForLevel(1), 500);
     assert.equal(corridorNmForLevel(2), 1800);

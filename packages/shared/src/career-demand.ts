@@ -62,6 +62,7 @@ import {
   MAX_MANIFEST_LOTS,
   type CareerMissionsState,
   type CommodityId,
+  type DemandDeliveryClaim,
   type DemandOrder,
   type MissionIntent,
   type MissionLotLine,
@@ -524,6 +525,7 @@ function restoreDemandRemainingKg(
   order.remainingKg = Math.min(order.wantedKg, order.remainingKg + add);
   if (order.remainingKg > 0) {
     order.status = 'open';
+    delete order.deliveryClaim;
   }
 }
 
@@ -657,6 +659,7 @@ export function holdDemandOrder(
   if (order.remainingKg <= 0) {
     order.remainingKg = 0;
     order.status = 'filled';
+    stampDemandDeliveryClaim(order, hold.id, hold.expiresAtTick);
   }
 
   return { hold, order: { ...order }, kg };
@@ -826,6 +829,7 @@ export function dispatchDemandHold(
     vaFlight: opts.vaFlight,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
+  stampDemandDeliveryClaim(order, mission.id, mission.deadlineTick);
 
   return {
     mission,
@@ -1021,6 +1025,10 @@ export function dispatchDemandHolds(
     vaFlight: opts.vaFlight,
     actorIsVaOwner: opts.actorIsVaOwner,
   });
+  for (const line of lines) {
+    const claimed = (world.demandOrders ?? []).find((row) => row.id === line.orderId);
+    stampDemandDeliveryClaim(claimed, mission.id, mission.deadlineTick);
+  }
   const order = firstOrder ?? {
     id: lines[0]!.orderId,
     destIcao: dest,
@@ -1231,7 +1239,126 @@ export type EnsureDemandOrdersOpts = {
    * @deprecated Per-port desk spawn uses world.portConcessions; kept for call-site compat.
    */
   operatorCatchmentHubs?: readonly string[];
+  /**
+   * Every company's desk holds and flights. `complete` is required before a
+   * filled order with no live hold or flight can leave the board. Callers
+   * that only see one company omit this so they cannot drop another
+   * company's in-flight claim.
+   */
+  deliveryWatch?: DemandDeliveryWatch;
 };
+
+/** Desk holds and flights that still owe a filled Demand order. */
+export type DemandDeliveryWatch = {
+  complete: boolean;
+  states: readonly {
+    playerWarehouses?: {
+      demandHolds?: readonly {
+        id?: string;
+        kind?: string;
+        orderId?: string;
+        expiresAtTick?: number;
+      }[];
+    };
+    missions?: readonly {
+      id?: string;
+      status?: string;
+      demandOrderId?: string;
+      deadlineTick?: number;
+      lots?: readonly {
+        demandOrderId?: string;
+        deadlineTick?: number;
+      }[];
+    }[];
+  }[];
+};
+
+const DEMAND_CLAIM_GRACE_TICKS = TICKS_PER_DAY;
+const ACTIVE_DEMAND_MISSION_STATUS = new Set(['accepted', 'dispatched', 'in_flight']);
+
+function stampDemandDeliveryClaim(
+  order: DemandOrder | undefined,
+  refId: string,
+  untilTick: number,
+): void {
+  if (!order || order.status !== 'filled') return;
+  const until = Number.isFinite(untilTick) ? untilTick : 0;
+  const claim: DemandDeliveryClaim = {
+    refId: refId.trim() || order.id,
+    expiresAtTick: until + DEMAND_CLAIM_GRACE_TICKS,
+  };
+  order.deliveryClaim = claim;
+  // Keep the row past the original TTL while the hold or flight is still live.
+  // The mission deadline was copied at dispatch and does not follow this.
+  if (order.expiresAtTick < claim.expiresAtTick) {
+    order.expiresAtTick = claim.expiresAtTick;
+  }
+}
+
+function liveDemandDeliveryClaims(
+  watch: DemandDeliveryWatch,
+  tick: number,
+): Map<string, DemandDeliveryClaim> {
+  const out = new Map<string, DemandDeliveryClaim>();
+  const note = (orderId: string | undefined, refId: string, until: number) => {
+    const id = orderId?.trim();
+    if (!id) return;
+    const expiresAtTick =
+      Math.max(Number.isFinite(until) ? until : tick, tick) + DEMAND_CLAIM_GRACE_TICKS;
+    const prev = out.get(id);
+    if (prev && prev.expiresAtTick >= expiresAtTick) return;
+    out.set(id, { refId: refId.trim() || id, expiresAtTick });
+  };
+  for (const state of watch.states) {
+    for (const hold of state.playerWarehouses?.demandHolds ?? []) {
+      if ((hold.kind ?? 'demand') !== 'demand') continue;
+      if ((hold.expiresAtTick ?? 0) <= tick) continue;
+      note(hold.orderId, hold.id ?? '', hold.expiresAtTick ?? tick);
+    }
+    for (const mission of state.missions ?? []) {
+      if (!mission.status || !ACTIVE_DEMAND_MISSION_STATUS.has(mission.status)) continue;
+      const until = mission.deadlineTick ?? tick;
+      const refId = mission.id ?? '';
+      note(mission.demandOrderId, refId, until);
+      for (const line of mission.lots ?? []) {
+        note(line.demandOrderId, refId, line.deadlineTick ?? until);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Filled orders stay off the board only while a live hold or flight still
+ * carries them. Anything else is expired immediately so a missed settle
+ * cannot hide that city+commodity until the old TTL.
+ * An incomplete watch does not release: it may be missing another company.
+ */
+function reconcileDemandDeliveryClaims(
+  world: CareerEconomyWorld,
+  watch: DemandDeliveryWatch | undefined,
+): void {
+  if (!watch?.complete) return;
+  const live = liveDemandDeliveryClaims(watch, world.tick);
+  for (const order of world.demandOrders ?? []) {
+    if (order.fuelHaul || order.commodityId === 'fuel') continue;
+    if (order.status !== 'filled') {
+      delete order.deliveryClaim;
+      continue;
+    }
+    const claim = live.get(order.id);
+    if (claim) {
+      order.deliveryClaim = claim;
+      if (order.expiresAtTick < claim.expiresAtTick) {
+        order.expiresAtTick = claim.expiresAtTick;
+      }
+      continue;
+    }
+    order.status = 'expired';
+    order.expiresAtTick = world.tick - 1_000;
+    delete order.deliveryClaim;
+  }
+}
 
 /**
  * Port-pickup hubs with surplus fill for each demand commodity.
@@ -1292,6 +1419,31 @@ export function destInPortSurplusCorridor(
   return destNearAnyHub(destIcao, hubs, maxNm);
 }
 
+/**
+ * Dest + commodity already has an open buy-order, or a filled one that is
+ * still claimed. A live flight refreshes `deliveryClaim` past the order TTL.
+ * A filled row with no claim blocks only until `expiresAtTick`.
+ */
+function demandDestCommodityInProgress(
+  orders: readonly DemandOrder[],
+  destIcao: string,
+  commodityId: CommodityId,
+  tick: number,
+): boolean {
+  const dest = destIcao.trim().toUpperCase();
+  for (const order of orders) {
+    if (order.commodityId !== commodityId || order.fuelHaul) continue;
+    if (order.destIcao.trim().toUpperCase() !== dest) continue;
+    if (order.status === 'open' && order.remainingKg > 0 && order.expiresAtTick > tick) {
+      return true;
+    }
+    if (order.status !== 'filled') continue;
+    const claimUntil = order.deliveryClaim?.expiresAtTick ?? 0;
+    if (claimUntil > tick || order.expiresAtTick > tick) return true;
+  }
+  return false;
+}
+
 function portDeskCommodityOrder(
   world: CareerEconomyWorld,
   pickups: readonly string[],
@@ -1317,7 +1469,7 @@ function portDeskCommodityOrder(
 
 export function ensureDemandOrders(
   world: CareerEconomyWorld,
-  _opts: EnsureDemandOrdersOpts = {},
+  opts: EnsureDemandOrdersOpts = {},
 ): DemandOrder[] {
   if (!Array.isArray(world.demandOrders)) {
     world.demandOrders = [];
@@ -1341,6 +1493,8 @@ export function ensureDemandOrders(
       if (order.remainingKg <= 0) order.remainingKg = 0;
     }
   }
+
+  reconcileDemandDeliveryClaims(world, opts.deliveryWatch);
 
   const rng = mulberry32(hashSeed(`${world.seed}:demand:${world.tick}`));
 
@@ -1515,7 +1669,20 @@ export function ensureDemandOrders(
           if (hubSlots <= 0 || portSlots <= 0 || bandSlots <= 0) break;
           if (openGlobal() >= boardCap) break;
           if ((openByCountry.get(country) ?? 0) >= quota) break;
-          if (openHere.some((o) => o.commodityId === commodityId)) continue;
+          // One open contract per product per city, and a filled one still
+          // counts until it lands, is cancelled, or the flight is lost.
+          // Accept used to free the slot while dest stock stayed short, so
+          // the board reprinted the same commodity onto the same flight.
+          if (
+            demandDestCommodityInProgress(
+              orders,
+              icao,
+              commodityId,
+              world.tick,
+            )
+          ) {
+            continue;
+          }
 
           const pile = ap.inventory[commodityId];
           if (!pile || pile.capacityKg <= 0) continue;

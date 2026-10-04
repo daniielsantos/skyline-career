@@ -211,6 +211,15 @@ describe('resolveLiveCruiseFuelFlowKgPerHour', () => {
       }),
       undefined,
     );
+    assert.equal(
+      resolveLiveCruiseFuelFlowKgPerHour({
+        engineKgPerHour: 273,
+        weightDeltaKgPerHour: 800,
+        planningKgPerHour: planning,
+      }),
+      undefined,
+      'a tank drop below half the plan must not lock the catalog floor',
+    );
   });
 
   it('keeps a piston SimVar that matches the planning burn', () => {

@@ -88,6 +88,21 @@ export function clampMemberAirlineCutPct(raw: unknown): number {
 }
 
 /**
+ * Passenger group taken from this company's port lobby.
+ * Market-board charters use `charter-offer:<tick>:…` and stay off the desk.
+ * Not airline-desk labor — settle keeps the route cut.
+ */
+export function isPortCharterDeskMission(mission: {
+  missionType?: string;
+  charterOfferId?: string;
+}): boolean {
+  return (
+    mission.missionType === 'charter' &&
+    (mission.charterOfferId ?? '').startsWith('charter-offer:port:')
+  );
+}
+
+/**
  * Desk work on the VA tenant: Internal Haul fee, Demand board, Wide haul.
  * Freights/Charter market lots are market hire (route cut).
  */
@@ -741,7 +756,7 @@ export function listInternalHaulMissions(
   );
 }
 
-/** Active airline-desk missions (IH + Demand + Wide haul). */
+/** Active airline-desk missions (IH + Demand + Wide haul + port charter). */
 export function listAirlineDeskMissions(
   state: CareerMissionsState,
 ): MissionIntent[] {
@@ -750,7 +765,7 @@ export function listAirlineDeskMissions(
       m.status !== 'settled' &&
       m.status !== 'cancelled' &&
       m.status !== 'failed' &&
-      isVaAirlineLaborMission(m),
+      (isVaAirlineLaborMission(m) || isPortCharterDeskMission(m)),
   );
 }
 

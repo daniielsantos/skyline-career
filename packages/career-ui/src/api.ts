@@ -5712,11 +5712,14 @@ export type VaHaulHold = {
 
 export type VaHaulMission = {
   id: string;
-  kind?: 'bridge' | 'demand' | 'haul' | 'other';
+  kind?: 'bridge' | 'demand' | 'haul' | 'charter' | 'other';
   originIcao: string;
   destIcao: string;
   commodityId: string;
   cargoKg: number;
+  /** Port-lobby charter group. Cargo stays 0. */
+  pax?: number;
+  baggageKg?: number;
   payUsd: number;
   /** Lots on this contract. A merged stop has more than one. */
   lots?: Array<{ commodityId: string; cargoKg: number }>;

@@ -12,7 +12,9 @@ import {
   VA_MEMBER_CAP,
   canMutateVaPortDeskOps,
   isVaAirlineLaborMission,
+  isPortCharterDeskMission,
   isVaRankingMission,
+  listAirlineDeskMissions,
   listOpenAirlineDeskHolds,
   listOpenInternalHaulHolds,
   quoteMemberAirlineCutUsd,
@@ -33,6 +35,7 @@ import {
   holdDemandOrder,
 } from './career-demand.js';
 import { emptyMissionsStateV2, selectStarterHub } from './career-fleet.js';
+import type { MissionIntent } from './types/career-economy.js';
 import { createSeedEconomyWorld } from './career-economy.js';
 import { departMission, settleMission } from './career-mission.js';
 import { DatabaseSync } from 'node:sqlite';
@@ -1153,6 +1156,39 @@ describe('VA IH-2', () => {
     assert.equal(bridges.length, 1);
     const desk = listOpenAirlineDeskHolds(state);
     assert.equal(desk.length, 3);
+  });
+
+  it('active desk lists an in-progress port charter and skips the market board', () => {
+    const state = emptyMissionsStateV2();
+    const row = (
+      id: string,
+      charterOfferId: string,
+      status: MissionIntent['status'],
+    ): MissionIntent =>
+      ({
+        id,
+        missionType: 'charter',
+        charterOfferId,
+        status,
+        originIcao: 'KLAX',
+        destIcao: 'KMIA',
+        pax: 80,
+        cargoKg: 0,
+        payUsd: 12000,
+        lots: [],
+      }) as MissionIntent;
+    state.missions = [
+      row('port_live', 'charter-offer:port:10:KLAX:KMIA', 'in_flight'),
+      row('market', 'charter-offer:10:0:KLAX:KSFO', 'in_flight'),
+      row('port_done', 'charter-offer:port:9:KLAX:KSEA', 'settled'),
+    ];
+    const active = listAirlineDeskMissions(state);
+    assert.deepEqual(
+      active.map((m) => m.id),
+      ['port_live'],
+    );
+    assert.equal(isPortCharterDeskMission(active[0]!), true);
+    assert.equal(isVaAirlineLaborMission(active[0]!), false);
   });
 });
 describe('canMutateVaPortDeskOps', () => {

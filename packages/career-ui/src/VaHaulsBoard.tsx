@@ -41,6 +41,10 @@ function activeCargoLabel(
   row: VaHaulMission,
   full: Mission | undefined,
 ): string {
+  if (row.kind === 'charter') {
+    const pax = Math.max(0, Math.floor(row.pax ?? full?.pax ?? 0));
+    return pax > 0 ? `${pax.toLocaleString()} pax` : 'Passengers';
+  }
   const lots = (full?.lots ?? row.lots ?? []).filter((line) => line.cargoKg > 0);
   if (lots.length <= 1) {
     return commodityLabel(lots[0]?.commodityId ?? row.commodityId);
@@ -59,6 +63,14 @@ function holdKindLabel(kind: VaHaulHold['kind']): string {
   if (kind === 'bridge') return 'Bridge';
   if (kind === 'haul') return 'Wide haul';
   return 'Demand';
+}
+
+function activeKindLabel(kind: VaHaulMission['kind']): string {
+  if (kind === 'charter') return 'Charter';
+  if (kind === 'bridge') return 'Bridge';
+  if (kind === 'haul') return 'Wide haul';
+  if (kind === 'demand') return 'Demand';
+  return 'Flight';
 }
 
 function holdPayParts(hold: VaHaulHold): string | null {
@@ -1113,8 +1125,8 @@ export function VaHaulsBoard(props: Props) {
                   const origin = shown.icao;
                   const dest = m.destIcao.trim().toUpperCase();
                   const kind = m.kind ?? 'other';
-                  const kindLabel =
-                    kind === 'other' ? 'Flight' : holdKindLabel(kind);
+                  const kindLabel = activeKindLabel(kind);
+                  const charter = kind === 'charter';
                   const acf = m.aircraftId
                     ? props.fleet.find((a) => a.id === m.aircraftId)
                     : undefined;
@@ -1166,7 +1178,9 @@ export function VaHaulsBoard(props: Props) {
                         aria-label="Active flight details"
                       >
                         <div>
-                          <span className="va-stat-label">Cargo</span>
+                          <span className="va-stat-label">
+                            {charter ? 'Pax' : 'Cargo'}
+                          </span>
                           <span className="va-stat-value va-stat-cargo">
                             {activeCargoLabel(
                               m,
@@ -1175,9 +1189,15 @@ export function VaHaulsBoard(props: Props) {
                           </span>
                         </div>
                         <div>
-                          <span className="va-stat-label">Mass</span>
+                          <span className="va-stat-label">
+                            {charter ? 'Bag' : 'Mass'}
+                          </span>
                           <span className="va-stat-value">
-                            {mass(m.cargoKg)}
+                            {charter
+                              ? (m.baggageKg ?? 0) > 0
+                                ? mass(m.baggageKg ?? 0)
+                                : '—'
+                              : mass(m.cargoKg)}
                           </span>
                         </div>
                         <div>

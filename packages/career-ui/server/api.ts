@@ -207,6 +207,7 @@ import {
   quoteInternalHaulForRoute,
   listOpenAirlineDeskHolds,
   listAirlineDeskMissions,
+  isPortCharterDeskMission,
   isVaRankingMission,
   buildCompanyNetworkNodesFromState,
   buildPublicAirlineNetworkNodes,
@@ -5483,10 +5484,12 @@ export function createCareerApiServer(port = 8787) {
           }),
           activeMissions: active.map((m) => {
             const pilotAccountId = m.pilotAccountId?.trim() || undefined;
+            const portCharter = isPortCharterDeskMission(m);
             return {
               id: m.id,
-              kind:
-                m.warehouseBridge && m.internalHaul
+              kind: portCharter
+                ? 'charter'
+                : m.warehouseBridge && m.internalHaul
                   ? 'bridge'
                   : m.warehouseHaul
                     ? 'haul'
@@ -5497,6 +5500,12 @@ export function createCareerApiServer(port = 8787) {
               destIcao: m.destIcao,
               commodityId: m.commodityId,
               cargoKg: m.cargoKg,
+              ...(portCharter
+                ? {
+                    pax: Math.max(0, Math.floor(m.pax ?? 0)),
+                    baggageKg: Math.max(0, Math.floor(m.baggageKg ?? 0)),
+                  }
+                : {}),
               payUsd: m.payUsd,
               lots: (m.lots ?? [])
                 .filter((line) => line.cargoKg > 0)

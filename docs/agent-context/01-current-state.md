@@ -1,5 +1,8 @@
 # Current state (2026-10-04)
 
+`main` **0daba0fb** / desktop **0.3.468** shipped: Hold a Demand board accept straight to the desk. Release: [v0.3.468](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.468).
+
+
 `main` **1a7e0cf6** / desktop **0.3.467** shipped: Make the port charter desk fixture satisfy the mission type. Release: [v0.3.467](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.467).
 
 

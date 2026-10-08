@@ -1,5 +1,8 @@
 # Current state (2026-10-08)
 
+`main` **4858ef33** / desktop **0.3.479** shipped: Set the FSS E170 and E175 cabin to the SimBrief Dual Class 76 seats, and open the Lab on SBCT. Release: [v0.3.479](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.479).
+
+
 `main` **02f31380** / desktop **0.3.478** shipped: Add the FSS E-Jets to the Market on the FlightSim Studio SimBrief airframe, and keep the Hauls live status on the selected row. Release: [v0.3.478](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.478).
 
 

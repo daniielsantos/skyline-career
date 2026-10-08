@@ -1,4 +1,7 @@
-# Current state (2026-10-04)
+# Current state (2026-10-08)
+
+`main` **02f31380** / desktop **0.3.478** shipped: Add the FSS E-Jets to the Market on the FlightSim Studio SimBrief airframe, and keep the Hauls live status on the selected row. Release: [v0.3.478](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.478).
+
 
 `main` **123560d9** / desktop **0.3.477** shipped: Let the En route map fill leftover height so Dispatch has no empty band at 2K. Release: [v0.3.477](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.477).
 

@@ -1,5 +1,8 @@
 # Current state (2026-10-08)
 
+`main` **6462dd90** / desktop **0.3.480** shipped: Accept the FSS E175 SimBrief OFP code E75L as the same airframe as E175. Release: [v0.3.480](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.480).
+
+
 `main` **4858ef33** / desktop **0.3.479** shipped: Set the FSS E170 and E175 cabin to the SimBrief Dual Class 76 seats, and open the Lab on SBCT. Release: [v0.3.479](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.479).
 
 

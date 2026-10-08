@@ -3592,6 +3592,9 @@ export function PortsPanel(props: {
         );
         if (fbo) {
           setSelectedNetworkId(fbo.id);
+          setNetworkSurface('fbo');
+          setWhShelf('owned');
+          if (fbo.portId) setPortId(fbo.portId);
           return;
         }
       }
@@ -3602,7 +3605,15 @@ export function PortsPanel(props: {
     const node = findNetworkNode(companyNetworkNodes, id);
     if (!node) return;
     if (node.kind === 'wh') {
+      const code = node.primaryHubIcao.trim().toUpperCase();
       setSelectedNetworkId(node.id);
+      setNetworkSurface('wh');
+      setWhShelf('owned');
+      setSelectedBuyHubIcao(null);
+      setSelectedStockId(null);
+      setSelectedOwnedHubIcao(code);
+      const linkedPort = portForHub.get(code);
+      if (linkedPort) setPortId(linkedPort.id);
       return;
     }
     setSelectedNetworkId(id);

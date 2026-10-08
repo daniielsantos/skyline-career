@@ -1,5 +1,7 @@
 # Port FBO — chão, não ar
 
+Atualizado 2026-10-08: **Estoque da warehouse sumiu do clique** — sintoma = no Network, clicar o armazém não mostra as commodities; a lista IN STOCK só aparece se abrir Port catalog e voltar em Network com o WH já marcado. Causa = o clique de 2026-10-03 só gravava o pin e deixava `networkSurface` no FBO/Demand. A volta do catálogo caía no `else` e forçava `wh`. Fix = o clique no WH abre o galpão (`networkSurface` `wh`, hub daquele armazém). Segundo clique no mesmo card volta ao Desk do FBO.
+
 Atualizado 2026-10-04: **Accept do Demand ia para uma janela** — sintoma = Deliver to… pedia Hold at WH de novo, com margem e Fly now. Causa = o board já escolhe o armazém com o lote. Fix = Accept segura o pedido nesse armazém e manda para o Desk. Fly now fica no Prepare do Hauls. Jet-A continua no botão Fly. Sem estoque no porto, o aviso recusa antes do pedido.
 
 Atualizado 2026-10-04: **Anel do corredor sem fundo** — o disco do alcance no mapa do porto pintava um véu ciano por cima dos estados. O preenchimento saiu. Fica só a borda tracejada. O pin é o centro geográfico (cada ponto da borda está à mesma distância em nm). No Mercator o norte estica, então o meio visual do anel fica acima do FBO. Não recentrar o polígono na tela.

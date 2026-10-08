@@ -1,5 +1,7 @@
 # VA logistics — air bridge + desk automation
 
+Atualizado 2026-10-04: **Hauls não empurra o desk ao selecionar Active** — sintoma = a linha `CYZR → KMIA · Cruise · FL…` nascia acima de Open desk work e deslocava a lista. Causa = `va-hauls-live-status` era um bloco entre o mapa e o desk. Fix = a fase/FL/kt/% fica na própria linha Active selecionada. A rota já está nessa linha; o mapa continua com o traço.
+
 Atualizado 2026-10-04: **Charter do porto no Active** — sintoma = um grupo do lobby já aceito ou no ar não aparecia em Hauls → Active. Causa = a lista só tinha Internal Haul, Demand e Wide haul. Fix = missão `charter` com oferta `charter-offer:port:` entra nessa lista (Pax / Bag). O clique usa o mesmo mapa live da linha ativa. Charter do quadro mundial fica de fora. O corte de rota não muda: isto não é trabalho de mesa.
 
 Atualizado 2026-10-03: **Botão de espera sem reticências** — sintoma = Accept & Dispatch virava ACCEPTING…. Causa = o texto de espera carregava os três pontos, com a bolinha já no botão. Fix = o rótulo fica Accepting, Saving, Buying, e o mesmo nos outros botões de espera. Frases de status e placeholders continuam com reticências.

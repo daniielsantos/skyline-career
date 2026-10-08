@@ -149,6 +149,52 @@ describe('career player airframes', () => {
     );
   });
 
+  it('lists FSS E-Jets as Market SKUs on the FlightSim Studio SimBrief airframe', () => {
+    const e170 = findCareerPlayerAirframe('fss-embraer-e170');
+    const e175 = findCareerPlayerAirframe('fss-embraer-e175');
+    const e190 = findCareerPlayerAirframe('fss-embraer-e190');
+    const e195 = findCareerPlayerAirframe('fss-embraer-e195');
+    const fssDual = 'FlightSim Studio \\(MSFS\\) - Dual Class Configuration';
+    assert.equal(e170?.simbriefIcao, 'E170');
+    assert.equal(e175?.simbriefIcao, 'E175');
+    assert.equal(e190?.simbriefIcao, 'E190');
+    assert.equal(e195?.simbriefIcao, 'E195');
+    assert.equal(e170?.simbriefAirframeMatch, fssDual);
+    assert.equal(e175?.simbriefAirframeMatch, fssDual);
+    assert.equal(e190?.simbriefAirframeMatch, fssDual);
+    assert.equal(e195?.simbriefAirframeMatch, fssDual);
+    assert.equal(e170?.injectCapable, false);
+    assert.equal(e170?.loadLayout, 'pax_and_cargo');
+    assert.equal(e170?.maxPaxSeats, 70);
+    assert.equal(e175?.maxPaxSeats, 78);
+    assert.equal(e190?.maxPaxSeats, 96);
+    assert.equal(e195?.maxPaxSeats, 100);
+    assert.equal(e170?.label, 'Embraer E170');
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(e190!)].sort(),
+      [
+        'profiles/ofp/fss-embraer-e190-freighter.json',
+        'profiles/ofp/fss-embraer-e190.json',
+      ].sort(),
+    );
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(e195!)].sort(),
+      [
+        'profiles/ofp/fss-embraer-e195-freighter.json',
+        'profiles/ofp/fss-embraer-e195.json',
+      ].sort(),
+    );
+    assert.equal(
+      e190?.configurations?.find((c) => c.id === 'cargo')?.rolesPackRelPath,
+      'profiles/ofp/fss-embraer-e190-freighter.json',
+    );
+    assert.equal(
+      e195?.configurations?.find((c) => c.id === 'cargo')?.passengerCapacity,
+      0,
+    );
+    assert.equal(e190?.configurations?.find((c) => c.id === 'cargo')?.role, 'cargo');
+  });
+
   it('stages Synaptic A220-300 as pax_and_cargo with Synaptic/iniBuilds SimBrief airframe', () => {
     const a220 = findCareerPlayerAirframe('synaptic-a220-300');
     assert.equal(a220?.simbriefIcao, 'BCS3');

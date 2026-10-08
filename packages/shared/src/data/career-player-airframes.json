@@ -1772,6 +1772,168 @@
     "defaultConfigurationId": "passenger"
   },
   {
+    "typeId": "fss-embraer-e170",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Embraer E170",
+    "rolesPackRelPath": "profiles/ofp/fss-embraer-e170.json",
+    "simbriefIcao": "E170",
+    "simbriefAirframeMatch": "FlightSim Studio \\(MSFS\\) - Dual Class Configuration",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 70,
+    "oewKg": 21140,
+    "mtowKg": 38600,
+    "mzfwKg": 30140,
+    "maxCargoKg": 9000,
+    "fuelCapacityKg": 9399,
+    "maxRangeNm": 2150,
+    "cruiseSpeedKt": 430,
+    "fuelBurnKgPerNm": 3.4,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 70,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 3850,
+        "rolesPackRelPath": "profiles/ofp/fss-embraer-e170.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "fss-embraer-e175",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Embraer E175",
+    "rolesPackRelPath": "profiles/ofp/fss-embraer-e175.json",
+    "simbriefIcao": "E175",
+    "simbriefAirframeMatch": "FlightSim Studio \\(MSFS\\) - Dual Class Configuration",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 78,
+    "oewKg": 21810,
+    "mtowKg": 40370,
+    "mzfwKg": 31730,
+    "maxCargoKg": 9920,
+    "fuelCapacityKg": 9399,
+    "maxRangeNm": 2200,
+    "cruiseSpeedKt": 430,
+    "fuelBurnKgPerNm": 3.5,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 78,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 4290,
+        "rolesPackRelPath": "profiles/ofp/fss-embraer-e175.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "fss-embraer-e190",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Embraer E190",
+    "rolesPackRelPath": "profiles/ofp/fss-embraer-e190.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/fss-embraer-e190.json",
+      "profiles/ofp/fss-embraer-e190-freighter.json"
+    ],
+    "simbriefIcao": "E190",
+    "simbriefAirframeMatch": "FlightSim Studio \\(MSFS\\) - Dual Class Configuration",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 96,
+    "oewKg": 28080,
+    "mtowKg": 51800,
+    "mzfwKg": 40800,
+    "maxCargoKg": 12720,
+    "fuelCapacityKg": 13062,
+    "maxRangeNm": 2400,
+    "cruiseSpeedKt": 447,
+    "fuelBurnKgPerNm": 4,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 96,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 5280,
+        "rolesPackRelPath": "profiles/ofp/fss-embraer-e190.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/fss-embraer-e190-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "fss-embraer-e195",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Embraer E195",
+    "rolesPackRelPath": "profiles/ofp/fss-embraer-e195.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/fss-embraer-e195.json",
+      "profiles/ofp/fss-embraer-e195-freighter.json"
+    ],
+    "simbriefIcao": "E195",
+    "simbriefAirframeMatch": "FlightSim Studio \\(MSFS\\) - Dual Class Configuration",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 100,
+    "oewKg": 28683,
+    "mtowKg": 52290,
+    "mzfwKg": 42600,
+    "maxCargoKg": 13917,
+    "fuelCapacityKg": 13062,
+    "maxRangeNm": 2300,
+    "cruiseSpeedKt": 447,
+    "fuelBurnKgPerNm": 4.2,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 100,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 5500,
+        "rolesPackRelPath": "profiles/ofp/fss-embraer-e195.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/fss-embraer-e195-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
     "typeId": "microsoft-a320neo-v2",
     "aircraftClassId": "narrow_freighter",
     "label": "A320neo V2",

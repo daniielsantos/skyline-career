@@ -852,20 +852,6 @@ export function VaHaulsBoard(props: Props) {
         />
       ) : null}
 
-      {liveStatus ? (
-        <p
-          className={
-            liveStatus.stale
-              ? 'va-hauls-live-status va-live-stale'
-              : 'va-hauls-live-status'
-          }
-          role="status"
-        >
-          {selectedActiveOrigin} → {selectedActiveDest}
-          {liveStatus.text ? ` · ${liveStatus.text}` : ''}
-        </p>
-      ) : null}
-
       {error ? (
         <p className="error" role="alert">
           {error}
@@ -1241,6 +1227,18 @@ export function VaHaulsBoard(props: Props) {
                           </span>
                         </div>
                       </div>
+                      {selectedActiveId === m.id && liveStatus?.text ? (
+                        <p
+                          className={
+                            liveStatus.stale
+                              ? 'va-hauls-live-status va-live-stale'
+                              : 'va-hauls-live-status'
+                          }
+                          role="status"
+                        >
+                          {liveStatus.text}
+                        </p>
+                      ) : null}
                     </li>
                   );
                 })}

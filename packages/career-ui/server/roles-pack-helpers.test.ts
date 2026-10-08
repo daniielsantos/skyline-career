@@ -300,6 +300,38 @@ describe('resolveMissionRolesPack', () => {
   });
 });
 
+describe('resolveMissionRolesPack FSS E-Jets', () => {
+  it('picks Dual Class for passenger glass and Cargo for the freighter', async () => {
+    const pax = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/fss-embraer-e195.json',
+      liveTitle: 'FSS Embraer E195 AirLink',
+      airframeTypeId: 'fss-embraer-e195',
+      strictAirframeMatch: true,
+    });
+    assert.match(pax.path.replace(/\\/g, '/'), /fss-embraer-e195\.json$/);
+    assert.equal(
+      pax.pack.simbriefAirframeMatch,
+      'FlightSim Studio \\(MSFS\\) - Dual Class Configuration',
+    );
+    const cargo = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/fss-embraer-e190.json',
+      liveTitle: 'FSS Embraer E190 Freighter - DHL',
+      airframeTypeId: 'fss-embraer-e190',
+      strictAirframeMatch: true,
+    });
+    assert.match(
+      cargo.path.replace(/\\/g, '/'),
+      /fss-embraer-e190-freighter\.json$/,
+    );
+    assert.equal(
+      cargo.pack.simbriefAirframeMatch,
+      'FlightSim Studio \\(MSFS\\) - Cargo Configuration',
+    );
+  });
+});
+
 describe('resolveDispatchSimBriefParams', () => {
   it('uses P2 pack match when live title is EMB-110P2 under family SKU', async () => {
     const params = await resolveDispatchSimBriefParams({

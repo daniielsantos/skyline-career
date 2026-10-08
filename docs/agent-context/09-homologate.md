@@ -60,6 +60,10 @@ Não criar um `typeId` de catálogo por Highline/Passenger/Stol. Um SKU + um (ou
 | `inibuilds-l1011-500` | `wide_freighter` | Regular + Engine Pod packs (`familyRolesPackRelPaths`) | **L101** `iniBuilds (MSFS) - L1011-500 Regular` / `Pod Ferry` (not Default; Engine Pod glass → Pod Ferry) |
 | `inibuilds-a340-300` | `wide_freighter` | pax + freighter + VIP packs (`familyRolesPackRelPaths`) | **A343** Passenger / Preighter / VIP (not Default; Freighter glass → Preighter) |
 | `asobo-737-max-8-passengers` | `narrow_freighter` | Asobo + iFly MAX 8 / 8200 (`familyRolesPackRelPaths`) | **B38M** Default (Asobo); iFly live → `iFly (MSFS) - 737 MAX 8 - N Seats (LBS)` / `…8200 - 197 Seats (LBS)` |
+| `fss-embraer-e170` | `narrow_freighter` | `profiles/ofp/fss-embraer-e170.json` | **E170** `FlightSim Studio (MSFS) - Dual Class Configuration` (not Default) |
+| `fss-embraer-e175` | `narrow_freighter` | `profiles/ofp/fss-embraer-e175.json` | **E175** `FlightSim Studio (MSFS) - Dual Class Configuration` (not Default) |
+| `fss-embraer-e190` | `narrow_freighter` | pax + freighter (`familyRolesPackRelPaths`) | **E190** Dual Class / Cargo Configuration (not Default) |
+| `fss-embraer-e195` | `narrow_freighter` | pax + freighter (`familyRolesPackRelPaths`) | **E195** Dual Class / Cargo Configuration (not Default) |
 | `synaptic-a220-300` | `narrow_freighter` | `profiles/ofp/synaptic-a220-300.json` | **BCS3** `Synaptic / iniBuilds (MSFS) - A220-300` (not Default) |
 | `skyward-cessna-c680` | `light_jet` | `profiles/ofp/skyward-cessna-c680.json` | **C680** `Skyward Simulations (MSFS) - C680 Sovereign+` (not Default); passenger **`inject_verified`** + `efbPaxWeightLb: 210` / S14–S16 ghosts omitted |
 | `contrail-contrail-falcon-50` | `light_jet` | `profiles/ofp/contrail-contrail-falcon-50.json` | **FA50** `Contrail (MSFS) - Falcon 50B` (not Default); fuel = FUELSYSTEM 1–6 + panel SW off; engines off (@1.1.1) |
@@ -106,6 +110,8 @@ Homologação **não** é só cargo writetest. Se o SKU tem assentos (ou `loadLa
 Pure freighter SKUs (BCF, C-130, …): cargo-only — **não** inventar passenger stamp.
 
 Captura por jogador / fila de review (On Air–like): **não shipado**. Esboço em [`13-collaborative-homologation.md`](./13-collaborative-homologation.md).
+
+- **FSS E-Jets promote (2026-10-07):** sintoma = E170, E175 LW, E190, E190 Freighter, E195 e E195 Freighter homologados (native-simbrief, 6 stations, sem inject) ainda fora do Market, e o OFP cairia em Default. Fix = quatro SKUs `fss-embraer-e170/175/190/195`. E190 e E195 são família pax + cargo. SimBrief **E170/E175/E190/E195** usa `FlightSim Studio (MSFS) - Dual Class Configuration` no vidro de passageiros e `… Cargo Configuration` no freighter. Single Class e High Density existem no SimBrief e no EFB da FSS, mas não há vidro homologado separado — o OFP fica no Dual Class. Carga nativa continua no EFB. Arte de card ligada em `AIRFRAME_CARD_ART`: `embraer-e170.png`, `embraer-e175.png`, `embraer-e190.png`, `embraer-e195.png`. Freighter usa o PNG da família.
 
 - **Market labels Passengers/Pax (2026-09-26):** sintoma = Hangar/Market cards `CESSNA 208B PASSENGERS`, `TBM 930 Passengers`, `Boeing 737-800 PAX`, `A340-600 PRO Preset Pax`. Causa = top-level catalog `label` baked glass/cabin wording. Fix = short type names only; `refreshAircraftMarket` syncs `listing.label` from catalog; fleet already preferred `airframe.label` on normalize. typeIds / matchTitles / config `Passenger` intact.
 

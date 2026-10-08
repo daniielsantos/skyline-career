@@ -1,0 +1,52 @@
+{
+  "source": "simbrief",
+  "icao": "E170",
+  "ofpId": "fss-embraer-e170",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "FSS Embraer E170"
+  ],
+  "matchTitlePattern": "FSS Embraer E170",
+  "notes": [
+    "FSS Embraer E170 — native-simbrief (EFB/tablet load)",
+    "Market SKU: fss-embraer-e170 (narrow_freighter, pax_and_cargo)",
+    "Homologated: fss/fss-embraer-e170@1.0.0",
+    "SimBrief type E170 — FlightSim Studio (MSFS) - Dual Class Configuration (not Default)",
+    "loadMethod: native-simbrief; injectCapable: false",
+    "6 payload stations; fuel LEFT_MAIN / RIGHT_MAIN via FUELSYSTEM"
+  ],
+  "fuel": { "unit": "lb" },
+  "loadSheet": { "unit": "lb" },
+  "payload": {
+    "unit": "lb",
+    "stationRoles": {
+      "crewStations": [1, 2],
+      "passengerStations": [],
+      "baggageStations": [3, 4, 5, 6]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "E170",
+  "simbriefAirframeMatch": "FlightSim Studio \\(MSFS\\) - Dual Class Configuration",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "Station 1", "role": "crew" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "Station 2", "role": "crew" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "Station 3", "role": "baggage" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "Station 4", "role": "baggage" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Station 5", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Station 6", "role": "baggage" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 300,
+    "fuelPct": 0.03,
+    "payloadAbsLb": 800,
+    "weightAbsLb": 500,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

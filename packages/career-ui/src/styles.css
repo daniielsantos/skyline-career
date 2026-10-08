@@ -16510,8 +16510,11 @@ table.fbo-holds-table tbody tr.is-selected:hover td {
 }
 
 .va-hauls-live-status {
-  margin: 0.35rem 0 0;
-  font-size: 0.82rem;
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--muted);
 }
 
 .va-hauls-actions-readonly {

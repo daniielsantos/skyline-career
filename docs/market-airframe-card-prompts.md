@@ -1109,6 +1109,74 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## FlightSim Studio Embraer E170
+- **typeId:** `fss-embraer-e170`
+- **file:** `embraer-e170.png`
+
+```
+Stylized cartoon / clean vector illustration of a commercial Embraer E170 regional airliner, three-quarter side view parked facing left. This is an airliner, not a private jet.
+
+Keep the aircraft highly recognizable: short fat cylindrical fuselage (wider than a CRJ), about sixteen small square passenger windows in one continuous row, four-pane airliner cockpit windshield, low wing with tall blended winglets, TWO large turbofans hugged against the rear fuselage sides (no engines under the wings), T-tail with the horizontal stabilizer sitting on top of the vertical fin, retractable tricycle gear down. White fuselage, deep teal cheatline, plain tail. Must read as the shortest E-Jet at a glance — shorter than an E175, not a Challenger, not a CRJ, not an A220, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+no photorealism, no 3D render, no muddy textures, no watermark, no readable text, no invented logos, no airline branding, no people in focus, no cockpit interior, no HUD, no UI overlay
+```
+
+## FlightSim Studio Embraer E175
+- **typeId:** `fss-embraer-e175`
+- **file:** `embraer-e175.png`
+
+```
+Stylized cartoon / clean vector illustration of a commercial Embraer E175 regional airliner, three-quarter side view parked facing left. This is an airliner, not a private jet.
+
+Keep the aircraft highly recognizable: same E-Jet family as the E170 but one fuselage plug longer, about eighteen small square passenger windows, four-pane airliner cockpit windshield, fat cylindrical fuselage, low wing with tall blended winglets, TWO large turbofans hugged against the rear fuselage sides (no engines under the wings), T-tail, retractable tricycle gear down. White fuselage, thin amber cheatline, plain tail. Must read as an E175 — longer than an E170, clearly shorter than an E190, not a Challenger, not a CRJ, not an A220.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+no photorealism, no 3D render, no muddy textures, no watermark, no readable text, no invented logos, no airline branding, no people in focus, no cockpit interior, no HUD, no UI overlay
+```
+
+## FlightSim Studio Embraer E190
+- **typeId:** `fss-embraer-e190`
+- **file:** `embraer-e190.png`
+
+```
+Stylized cartoon / clean vector illustration of a commercial Embraer E190 regional airliner, three-quarter side view parked facing left. This is an airliner, not a private jet.
+
+Keep the aircraft highly recognizable: long airliner fuselage, about twenty-two small square passenger windows in one row, four-pane cockpit windshield, low wing with tall blended winglets, TWO large turbofans hugged against the rear fuselage sides (no engines under the wings), T-tail, retractable tricycle gear down. White fuselage, indigo cheatline, plain tail. Must read as an E190 — clearly longer than an E175, a bit shorter than an E195, not a Challenger, not a CRJ, not an A220, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+no photorealism, no 3D render, no muddy textures, no watermark, no readable text, no invented logos, no airline branding, no people in focus, no cockpit interior, no HUD, no UI overlay
+```
+
+## FlightSim Studio Embraer E195
+- **typeId:** `fss-embraer-e195`
+- **file:** `embraer-e195.png`
+
+```
+Stylized cartoon / clean vector illustration of a commercial Embraer E195 regional airliner, the longest E-Jet, three-quarter side view parked facing left. This is an airliner, not a private jet.
+
+Keep the aircraft highly recognizable: longest fuselage of the family, about twenty-six small square passenger windows, four-pane cockpit windshield, low wing with tall blended winglets, TWO large turbofans hugged against the rear fuselage sides (no engines under the wings), T-tail, retractable tricycle gear down. White fuselage, copper-orange cheatline, plain tail. Must read as an E195 — longer than an E190, not a Challenger, not a CRJ, not an A220, not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+no photorealism, no 3D render, no muddy textures, no watermark, no readable text, no invented logos, no airline branding, no people in focus, no cockpit interior, no HUD, no UI overlay
+```
+
 ## Synaptic / iniBuilds A220-300
 - **typeId:** `synaptic-a220-300`
 - **file:** `a220-300.png`

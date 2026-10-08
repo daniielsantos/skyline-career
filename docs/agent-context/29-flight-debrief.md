@@ -1,10 +1,16 @@
 # Flight debrief sheet (Dispatch)
 
+## FPM positivo num pouso normal (2026-10-04) — KLAX→CYZR +184 Butter
+
+**Sintoma:** debrief em pé, na pista, Butter `+184 fpm`. Antes o FPM do pouso aparecia negativo.
+
+**Causa:** o número antigo era a VS do mundo no primeiro `SIM ON GROUND` (descida = negativo) e pegava a rampa, não o toque. O debrief agora mostra só `PLANE TOUCHDOWN NORMAL VELOCITY` (ft/s × 60), com o sinal que o MSFS devolve. Neste settle o latch veio positivo (~3 ft/s → +184 fpm). A nota usa o módulo: +184 e −184 são Butter (até 200), por isso Landing 26/26. O +654 invertido do SVSE é o mesmo latch, não um sinal de “subida”. Não inverter no app — o SDK não define o positivo como descida.
+
 ## FPM positivo no settle invertido (2026-10-04) — KMIA→SVSE +654
 
 **Sintoma:** acidente no pouso, settle de cabeça para baixo, pilar Landing `Heavy · +654 fpm`. Parece taxa de subida.
 
-**Causa:** o número é `PLANE TOUCHDOWN NORMAL VELOCITY` no eixo vertical do avião (para cima do teto), não a VS do mundo. De barriga para baixo o teto aponta para a pista, então a mesma descida sai positiva. A nota usa o módulo: +654 e −654 são Heavy (acima de 600). Não é bug de sinal. Não inverter o latch — um pouso normal continua negativo.
+**Causa:** o número é `PLANE TOUCHDOWN NORMAL VELOCITY`, não a VS do mundo. A nota usa o módulo: +654 e −654 são Heavy (acima de 600). Não inverter o latch. O KLAX→CYZR +184 (Butter, avião em pé) mostra que o positivo não é exclusivo do settle invertido.
 
 ## FPM do pouso (2026-10-04) — KMIA→MGGT −755 e Heavy com G cheio
 

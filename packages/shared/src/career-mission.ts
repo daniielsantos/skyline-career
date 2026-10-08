@@ -3801,6 +3801,12 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
    */
   B77F: ['B77F', 'B77L'],
   /**
+   * FSS E175: SimBrief list key is E175, but the FSS row's OFP icaocode is E75L
+   * (ERJ-175LR). Dispatch still looks up E175. E170/E190/E195 print their list code.
+   */
+  E175: ['E175', 'E75L'],
+  E75L: ['E75L', 'E175'],
+  /**
    * C400 Corvalis: no COL4 in SimBrief — catalog dispatches as SR2T (Cirrus
    * SR22T proxy). OFP icaocode may print S22T (official) or SR22T (UI type).
    */

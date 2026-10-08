@@ -1748,6 +1748,18 @@ describe('compareMissionIntentToOfp', () => {
     }
   });
 
+  it('accepts FSS E175 SimBrief OFP ICAO E75L', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        airframeTypeId: 'fss-embraer-e175',
+        rolesPackRelPath: 'profiles/ofp/fss-embraer-e175.json',
+      }),
+      matchingOfp({ icao: 'E75L' }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('accepts PMDG 777F SimBrief OFP ICAO B77L (MSFS atc_model quirk)', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

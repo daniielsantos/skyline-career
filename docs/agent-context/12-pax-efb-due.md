@@ -35,6 +35,8 @@ mostra pax + bagagem no summary (não a seção vazia de cargo lots).
 
 **Fix:** `node scripts/audit-simbrief-max-pax.mjs` (dry-run) / `--sync` escreve `airframe_passengers` da row matched. `--include-fallback` só se quiser Default quando o match string falha (hoje: Bandeirante, F28). Re-auditar após mudar `simbriefAirframeMatch`.
 
+**E170 Lab (2026-10-08):** OFP 76 vs teto 70. A row FSS Dual Class é 76 (E175 também; a ficha tinha 78). O Dispatch já manda esse 76; o fail era só o `maxPaxSeats` escrito à mão.
+
 ## Unidades EFB (kg vs lb) — afeta o Sim, não o Due
 
 Skyline lê `PAYLOAD STATION WEIGHT` / fuel **sempre como pounds** (SDK). O Due vem do OFP já convertido para lb. O toggle **metric/imperial do Career UI** só muda o texto na tela.

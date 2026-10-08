@@ -78,7 +78,6 @@ type LabKind = 'freight' | 'charter';
 
 export function PayloadLabPanel(props: {
   busy: boolean;
-  homeHubIcao?: string | null;
   activeLabMission?: Mission | null;
   onOpenDispatch: () => void;
   onMissionsUpdated: (missions: Mission[]) => void;
@@ -88,8 +87,8 @@ export function PayloadLabPanel(props: {
   const [labKind, setLabKind] = useState<LabKind>('freight');
   const [cargoLb, setCargoLb] = useState(880);
   const [pax, setPax] = useState(4);
-  const [originIcao, setOriginIcao] = useState('SBGR');
-  const [destIcao, setDestIcao] = useState('SBSP');
+  const [originIcao, setOriginIcao] = useState('SBCT');
+  const [destIcao, setDestIcao] = useState('SBGR');
   const [textFilter, setTextFilter] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -141,11 +140,6 @@ export function PayloadLabPanel(props: {
       .then((data) => {
         if (cancelled) return;
         setOptions(data.options);
-        const home = props.homeHubIcao?.trim().toUpperCase();
-        if (home) {
-          setOriginIcao(home);
-          setDestIcao(home === 'SBGR' ? 'SBSP' : 'SBGR');
-        }
         const preferred =
           data.mission?.airframeTypeId ||
           data.options.find((o) => o.typeId.includes('c172'))?.typeId ||
@@ -185,7 +179,7 @@ export function PayloadLabPanel(props: {
     return () => {
       cancelled = true;
     };
-  }, [props.homeHubIcao]);
+  }, []);
 
   useEffect(() => {
     if (!selected) return;

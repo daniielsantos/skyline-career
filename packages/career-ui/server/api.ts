@@ -8255,8 +8255,8 @@ export function createCareerApiServer(port = 8787) {
             ? { pilotHomeCompanyId: labPilotFull.pilotHomeCompanyId }
             : {}),
         };
-        const originIcao = (body.originIcao ?? 'SBGR').trim().toUpperCase();
-        const destIcao = (body.destIcao ?? 'SBSP').trim().toUpperCase();
+        const originIcao = (body.originIcao ?? 'SBCT').trim().toUpperCase();
+        const destIcao = (body.destIcao ?? 'SBGR').trim().toUpperCase();
         try {
           const result = await withCareerWrite((world, missions) => {
             const started = startPayloadLabMission(world, missions, {

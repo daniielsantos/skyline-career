@@ -21486,7 +21486,6 @@ export function App() {
       ) : hubSelected && tab === 'lab' && devMode ? (
         <PayloadLabPanel
           busy={busy}
-          homeHubIcao={homeHubIcao}
           activeLabMission={
             missions.find(
               (m) =>

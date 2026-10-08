@@ -249,6 +249,8 @@ Harness **só** para OFP → inject → Due vs Sim. Reusa a UI do Dispatch/Prefl
 
 Charter Lab **não** cria offer/demand no mundo — cancel local; settle continua bloqueado. Inject: `airframe.injectCapable === true` **ou** config `inject_verified` (mesmo gate do board charter). Lista filtra SKUs sem seats.
 
+OD default **SBCT → SBGR**. Não segue o home hub (KMCO preenchia a origem). Um lab já ativo continua com a rota da missão.
+
 1. Escolhe **Freight | Charter** + SKU + payload/pax + OD  
 2. **Start lab → Dispatch**  
 3. Open SimBrief → Accept OFP → inject → Due vs Sim  

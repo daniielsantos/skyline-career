@@ -165,8 +165,8 @@ describe('career player airframes', () => {
     assert.equal(e195?.simbriefAirframeMatch, fssDual);
     assert.equal(e170?.injectCapable, false);
     assert.equal(e170?.loadLayout, 'pax_and_cargo');
-    assert.equal(e170?.maxPaxSeats, 70);
-    assert.equal(e175?.maxPaxSeats, 78);
+    assert.equal(e170?.maxPaxSeats, 76);
+    assert.equal(e175?.maxPaxSeats, 76);
     assert.equal(e190?.maxPaxSeats, 96);
     assert.equal(e195?.maxPaxSeats, 100);
     assert.equal(e170?.label, 'Embraer E170');

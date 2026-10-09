@@ -152,6 +152,45 @@ describe('career player airframes', () => {
     );
   });
 
+  it('lists FSLabs A321 ceo and neo apart from the Fenix A321 and the A321LR', () => {
+    const ceo = findCareerPlayerAirframe('fslabs-a321');
+    const neo = findCareerPlayerAirframe('fslabs-a321neo');
+    const fenix = findCareerPlayerAirframe('fenix-a321');
+    assert.equal(ceo?.label, 'Airbus A321');
+    assert.equal(neo?.label, 'Airbus A321neo');
+    assert.equal(ceo?.simbriefIcao, 'A321');
+    assert.equal(neo?.simbriefIcao, 'A21N');
+    assert.equal(
+      ceo?.simbriefAirframeMatch,
+      'FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)',
+    );
+    assert.equal(
+      neo?.simbriefAirframeMatch,
+      'FSLabs \\(MSFS\\) - A321-251NX LEAP-32 \\(0 ACT\\)',
+    );
+    assert.equal(ceo?.maxPaxSeats, 220);
+    assert.equal(neo?.maxPaxSeats, 239);
+    assert.equal(resolvePassengerCapacity('fslabs-a321', 'passenger'), 220);
+    assert.equal(resolvePassengerCapacity('fslabs-a321neo', 'passenger'), 235);
+    assert.equal(resolvePassengerCapacity('fslabs-a321neo', 'pw'), 239);
+    assert.equal(ceo?.fuelCapacityKg, 31256);
+    assert.notEqual(ceo?.rolesPackRelPath, fenix?.rolesPackRelPath);
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(ceo!)].sort(),
+      [
+        'profiles/ofp/fslabs-a321-211.json',
+        'profiles/ofp/fslabs-a321-231.json',
+      ].sort(),
+    );
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(neo!)].sort(),
+      [
+        'profiles/ofp/fslabs-a321-251n.json',
+        'profiles/ofp/fslabs-a321-271n.json',
+      ].sort(),
+    );
+  });
+
   it('lists the PMDG 737-700 passenger and BBJ families on their SimBrief rows', () => {
     const pax = findCareerPlayerAirframe('pmdg-737-pax-family');
     const bbj = findCareerPlayerAirframe('pmdg-737-bbj-family');

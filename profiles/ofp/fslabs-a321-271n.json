@@ -1,0 +1,35 @@
+{
+  "source": "simbrief",
+  "icao": "A21N",
+  "ofpId": "fslabs-a321-271n",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "FSLabs A321-271N - FSL",
+    "FSLabs A321-271N - FSL (SN-FSL)"
+  ],
+  "matchTitlePattern": "FSLabs\\s+A321-271N\\b",
+  "notes": [
+    "FSLabs A321-271N PW — same neo Market SKU as the LEAP -251N",
+    "Homologated monitor: fslabs/fslabs-a321-271n-fsl@1.0.0",
+    "The glass is titled 271N. SimBrief publishes that PW neo as A321-271NX PW1133G (0 ACT), 239 seats.",
+    "loadMethod: native-simbrief; injectCapable: false — load via the FSLabs EFB"
+  ],
+  "fuel": { "unit": "kg" },
+  "loadSheet": { "unit": "kg" },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      "crewStations": [1, 2]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A21N",
+  "simbriefAirframeMatch": "FSLabs \\(MSFS\\) - A321-271NX PW1133G \\(0 ACT\\)"
+}

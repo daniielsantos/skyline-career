@@ -2094,6 +2094,89 @@
     "defaultConfigurationId": "passenger"
   },
   {
+    "typeId": "fslabs-a321",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Airbus A321",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 220,
+    "rolesPackRelPath": "profiles/ofp/fslabs-a321-211.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/fslabs-a321-211.json",
+      "profiles/ofp/fslabs-a321-231.json"
+    ],
+    "simbriefIcao": "A321",
+    "simbriefAirframeMatch": "FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)",
+    "oewKg": 50288,
+    "mtowKg": 93500,
+    "maxCargoKg": 11548,
+    "fuelCapacityKg": 31256,
+    "maxRangeNm": 3200,
+    "cruiseSpeedKt": 450,
+    "fuelBurnKgPerNm": 5.8,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 220,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 12100,
+        "rolesPackRelPath": "profiles/ofp/fslabs-a321-211.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
+    "typeId": "fslabs-a321neo",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Airbus A321neo",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 239,
+    "rolesPackRelPath": "profiles/ofp/fslabs-a321-251n.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/fslabs-a321-251n.json",
+      "profiles/ofp/fslabs-a321-271n.json"
+    ],
+    "simbriefIcao": "A21N",
+    "simbriefAirframeMatch": "FSLabs \\(MSFS\\) - A321-251NX LEAP-32 \\(0 ACT\\)",
+    "oewKg": 50288,
+    "mtowKg": 93500,
+    "maxCargoKg": 11548,
+    "fuelCapacityKg": 31256,
+    "maxRangeNm": 3500,
+    "cruiseSpeedKt": 450,
+    "fuelBurnKgPerNm": 5.8,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "LEAP",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 235,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 12925,
+        "rolesPackRelPath": "profiles/ofp/fslabs-a321-251n.json"
+      },
+      {
+        "id": "pw",
+        "label": "PW",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 239,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 13145,
+        "rolesPackRelPath": "profiles/ofp/fslabs-a321-271n.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
     "typeId": "justflight-146-100",
     "aircraftClassId": "narrow_freighter",
     "label": "BAe 146-100",

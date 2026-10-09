@@ -200,6 +200,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (inibuildsA330) return inibuildsA330;
   const inibuildsA350 = inferIniBuildsA350SimBriefMatch(t);
   if (inibuildsA350) return inibuildsA350;
+  const fsLabsA321 = inferFsLabsA321SimBriefMatch(t);
+  if (fsLabsA321) return fsLabsA321;
   if (/\bA321LR\b/i.test(t) || /^A321$/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A321LR LEAP-1A';
   }
@@ -336,6 +338,8 @@ export function liveTitleMatchesMarketSku(
   if (id === 'fenix-a321') {
     return /FenixA321\s+(?:CFM|IAE)\s+(?:SL|WF)\s+(?:TC|SC)\b/i.test(t);
   }
+  if (id === 'fslabs-a321') return /FSLabs\s+A321-2(?:11|31)\b/i.test(t);
+  if (id === 'fslabs-a321neo') return /FSLabs\s+A321-2(?:51|71)N\b/i.test(t);
   if (id === 'fenix-a319') {
     return /FenixA319\s+(?:CFM|IAE)\s+(?:SL|WF)\s+(?:HD|SD)\b/i.test(t);
   }
@@ -548,6 +552,27 @@ function inferFenixA320SimBriefMatch(title: string): string | undefined {
 
 function inferFenixA319SimBriefMatch(title: string): string | undefined {
   return inferFenixCeoSimBriefMatch(title, 'A319');
+}
+
+/**
+ * FSLabs ceo stays on SimBrief list A321. Neo glasses are titled 251N/271N;
+ * SimBrief publishes them as 251NX LEAP-32 and 271NX PW1133G on list A21N.
+ * No SL/ACT token on the homologated title → the 0 ACT row.
+ */
+function inferFsLabsA321SimBriefMatch(title: string): string | undefined {
+  if (/FSLabs\s+A321-211\b/i.test(title)) {
+    return 'FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)';
+  }
+  if (/FSLabs\s+A321-231\b/i.test(title)) {
+    return 'FSLabs \\(MSFS\\) - A321-231 IAE \\(0 ACT\\)';
+  }
+  if (/FSLabs\s+A321-251N\b/i.test(title)) {
+    return 'FSLabs \\(MSFS\\) - A321-251NX LEAP-32 \\(0 ACT\\)';
+  }
+  if (/FSLabs\s+A321-271N\b/i.test(title)) {
+    return 'FSLabs \\(MSFS\\) - A321-271NX PW1133G \\(0 ACT\\)';
+  }
+  return undefined;
 }
 
 /** Fenix A321: WF → CFM/IAE row; SL → CFM/IAE (SL) row. TC/SC ignored (like A319 HD/SD). */

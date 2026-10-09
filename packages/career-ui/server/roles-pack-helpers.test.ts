@@ -300,6 +300,60 @@ describe('resolveMissionRolesPack', () => {
   });
 });
 
+describe('resolveMissionRolesPack FSLabs A321', () => {
+  it('picks the engine row and keeps Fenix on its own pack', async () => {
+    const cases = [
+      [
+        'FSLabs A321-211 - FSL (SX-FSL)',
+        'fslabs-a321',
+        'profiles/ofp/fslabs-a321-211.json',
+        /fslabs-a321-211\.json$/,
+        'FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)',
+      ],
+      [
+        'FSLabs A321-231 - FSL',
+        'fslabs-a321',
+        'profiles/ofp/fslabs-a321-211.json',
+        /fslabs-a321-231\.json$/,
+        'FSLabs \\(MSFS\\) - A321-231 IAE \\(0 ACT\\)',
+      ],
+      [
+        'FSLabs A321-251N - FSL (SN-FSL)',
+        'fslabs-a321neo',
+        'profiles/ofp/fslabs-a321-251n.json',
+        /fslabs-a321-251n\.json$/,
+        'FSLabs \\(MSFS\\) - A321-251NX LEAP-32 \\(0 ACT\\)',
+      ],
+      [
+        'FSLabs A321-271N - FSL',
+        'fslabs-a321neo',
+        'profiles/ofp/fslabs-a321-251n.json',
+        /fslabs-a321-271n\.json$/,
+        'FSLabs \\(MSFS\\) - A321-271NX PW1133G \\(0 ACT\\)',
+      ],
+    ] as const;
+    for (const [liveTitle, typeId, fallback, pathRe, match] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: fallback,
+        liveTitle,
+        airframeTypeId: typeId,
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+      assert.equal(roles.pack.simbriefAirframeMatch, match);
+    }
+    const fenix = await resolveMissionRolesPack({
+      repoRoot,
+      rolesPackRelPath: 'profiles/ofp/fenix-a321.json',
+      liveTitle: 'FenixA321 CFM SL TC',
+      airframeTypeId: 'fenix-a321',
+      strictAirframeMatch: true,
+    });
+    assert.match(fenix.path.replace(/\\/g, '/'), /fenix-a321\.json$/);
+  });
+});
+
 describe('resolveMissionRolesPack PMDG 737-700', () => {
   it('picks Dual Class, Single Class, or BBJ from the live title', async () => {
     const cases = [

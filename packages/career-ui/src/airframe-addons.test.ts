@@ -16,6 +16,9 @@ describe('airframe addons', () => {
     assert.deepEqual(listAirframeAddons('fss-embraer-e195'), [
       { publisher: 'FlightSim Studio' },
     ]);
+    assert.deepEqual(listAirframeAddons('fslabs-a321'), [
+      { publisher: 'FSLabs' },
+    ]);
   });
 
   it('lists Contrail Falcon 50 with product name', () => {

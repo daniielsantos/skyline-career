@@ -289,6 +289,8 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'fenix-a319': '/airframes/fenix-a319.png',
   'fenix-a320': '/airframes/fenix-a320.png',
   'fenix-a321': '/airframes/fenix-a321.png',
+  'fslabs-a321': '/airframes/fslabs-a321.png',
+  'fslabs-a321neo': '/airframes/fslabs-a321neo.png',
   'justflight-fokker-f28': '/airframes/fokker-f28.png',
   'justflight-f70': '/airframes/fokker-f70.png',
   'justflight-f100': '/airframes/fokker-f100.png',

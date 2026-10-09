@@ -424,6 +424,30 @@ describe('inferSimBriefAirframeMatchFromTitle', () => {
       inferSimBriefAirframeMatchFromTitle('FenixA321 CFM SL SC'),
       'Fenix Simulations \\(MSFS\\) - A321 CFM \\(SL\\)',
     );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FSLabs A321-211 - FSL (SX-FSL)'),
+      'FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FSLabs A321-231 - FSL'),
+      'FSLabs \\(MSFS\\) - A321-231 IAE \\(0 ACT\\)',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FSLabs A321-251N - FSL'),
+      'FSLabs \\(MSFS\\) - A321-251NX LEAP-32 \\(0 ACT\\)',
+    );
+    assert.equal(
+      inferSimBriefAirframeMatchFromTitle('FSLabs A321-271N - FSL'),
+      'FSLabs \\(MSFS\\) - A321-271NX PW1133G \\(0 ACT\\)',
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('FSLabs A321-251N - FSL', 'fslabs-a321neo'),
+      true,
+    );
+    assert.equal(
+      liveTitleMatchesMarketSku('FSLabs A321-211 - FSL', 'fenix-a321'),
+      false,
+    );
     assert.equal(liveTitleMatchesMarketSku('A321', 'microsoft-a321lr'), true);
     assert.equal(
       liveTitleMatchesMarketSku('FenixA321 IAE WF TC', 'microsoft-a321lr'),

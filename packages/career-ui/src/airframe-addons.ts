@@ -23,6 +23,7 @@ const PUBLISHER_BY_PREFIX: Array<{ prefix: string; publisher: string }> = [
   { prefix: 'leonardo', publisher: 'Leonardo' },
   { prefix: 'carenado', publisher: 'Carenado' },
   { prefix: 'fss', publisher: 'FlightSim Studio' },
+  { prefix: 'fslabs', publisher: 'FSLabs' },
   { prefix: 'fenix', publisher: 'Fenix Simulations' },
   { prefix: 'pmdg', publisher: 'PMDG' },
   { prefix: 'toliss', publisher: 'ToLiss' },

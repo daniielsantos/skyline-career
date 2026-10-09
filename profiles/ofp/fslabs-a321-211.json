@@ -1,0 +1,37 @@
+{
+  "source": "simbrief",
+  "icao": "A321",
+  "ofpId": "fslabs-a321-211",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "FSLabs A321-211 - FSL",
+    "FSLabs A321-211 - FSL (SX-FSL)"
+  ],
+  "matchTitlePattern": "FSLabs\\s+A321-211\\b",
+  "notes": [
+    "FSLabs A321-211 CFM — ceo family with the IAE -231",
+    "One Skyline Market SKU: fslabs-a321. Not the Fenix A321 and not the iniBuilds A321LR.",
+    "Homologated monitor: fslabs/fslabs-a321-211-fsl@1.0.0",
+    "SimBrief A321: FSLabs (MSFS) - A321-211 CFM (0 ACT). Sharklet and 1/2 ACT rows exist; this glass has no SL/ACT token.",
+    "Wizard discovery listed 24 unnamed stations. Compare treats 1–2 as crew and 3–24 as baggage until a named probe.",
+    "loadMethod: native-simbrief; injectCapable: false — load via the FSLabs EFB"
+  ],
+  "fuel": { "unit": "kg" },
+  "loadSheet": { "unit": "kg" },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      "crewStations": [1, 2]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A321",
+  "simbriefAirframeMatch": "FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)"
+}

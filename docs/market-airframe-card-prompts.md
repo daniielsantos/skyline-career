@@ -1013,6 +1013,38 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## FSLabs A321
+- **typeId:** `fslabs-a321`
+- **file:** `fslabs-a321.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A321ceo passenger airliner, three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: stretched A320-family fuselage (clearly longer than an A320), two underwing CFM/IAE-style engines, wingtip fences (ceo, not neo sharklets), conventional Airbus tail, long dense passenger window row, retractable gear down. White fuselage, dark green cheatline, plain tail. Must read as an A321ceo at a glance — longer than an A320, not an A321neo (no big neo nacelles, no sharklets), not a 737.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
+## FSLabs A321neo
+- **typeId:** `fslabs-a321neo`
+- **file:** `fslabs-a321neo.png`
+
+```
+Stylized cartoon / clean vector illustration of an Airbus A321neo passenger airliner, three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: stretched A320-family fuselage, two large neo engines under the wings, sharklets, conventional Airbus tail, long passenger window row, retractable gear down. White fuselage, teal cheatline, plain tail. Must read as an A321neo at a glance — sharklets and large neo nacelles essential. Longer than an A320neo, not an A321ceo with wingtip fences, not a 737 Max.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
 ## Microsoft A320neo V2
 - **typeId:** `microsoft-a320neo-v2`
 - **file:** `a320neo-v2.png`

@@ -30,6 +30,20 @@ describe('scaffold-roles PMDG 738 PAX', () => {
   });
 });
 
+describe('scaffold-roles FSLabs A321', () => {
+  it('keeps ceo and neo engines on their SimBrief rows', () => {
+    assert.equal(matchHeuristic('FSLabs A321-211 - FSL')?.id, 'fslabs-a321-211');
+    assert.equal(matchHeuristic('FSLabs A321-231 - FSL')?.id, 'fslabs-a321-231');
+    assert.equal(matchHeuristic('FSLabs A321-251N - FSL')?.marketTypeId, 'fslabs-a321neo');
+    assert.equal(matchHeuristic('FSLabs A321-271N - FSL')?.id, 'fslabs-a321-271n');
+    assert.equal(matchHeuristic('FenixA321 CFM SL TC')?.id, 'fenix-a321');
+    assert.match(
+      matchHeuristic('FSLabs A321-251N - FSL')?.simbriefAirframeMatch ?? '',
+      /251NX LEAP-32/,
+    );
+  });
+});
+
 describe('scaffold-roles PMDG 737-700', () => {
   it('keeps Two Class, Single Class, and BBJ on their own SimBrief rows', () => {
     assert.equal(matchHeuristic('737-700 PAX SSW TC')?.id, 'pmdg-737-pax');

@@ -1,0 +1,35 @@
+{
+  "source": "simbrief",
+  "icao": "A321",
+  "ofpId": "fslabs-a321-231",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "FSLabs A321-231 - FSL",
+    "FSLabs A321-231 - FSL (SX-FSL)"
+  ],
+  "matchTitlePattern": "FSLabs\\s+A321-231\\b",
+  "notes": [
+    "FSLabs A321-231 IAE — same ceo Market SKU as the CFM -211",
+    "Homologated monitor: fslabs/fslabs-a321-231-fsl@1.0.0",
+    "SimBrief A321: FSLabs (MSFS) - A321-231 IAE (0 ACT)",
+    "loadMethod: native-simbrief; injectCapable: false — load via the FSLabs EFB"
+  ],
+  "fuel": { "unit": "kg" },
+  "loadSheet": { "unit": "kg" },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [],
+      "baggageStations": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      "crewStations": [1, 2]
+    }
+  },
+  "liveSources": {
+    "fuel": ["classic", "mass-balance"],
+    "weights": ["classic-weights"],
+    "payload": ["classic-stations"]
+  },
+  "simbriefIcao": "A321",
+  "simbriefAirframeMatch": "FSLabs \\(MSFS\\) - A321-231 IAE \\(0 ACT\\)"
+}

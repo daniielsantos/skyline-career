@@ -118,6 +118,29 @@ const CLASSIC_LIGHT_LIVE_SOURCES: OfpLiveSources = {
   payload: ['classic-stations'],
 };
 
+const FSLABS_A321_LIVE_SOURCES: OfpLiveSources = {
+  fuel: ['classic', 'mass-balance'],
+  weights: ['classic-weights'],
+  payload: ['classic-stations'],
+};
+
+const FSLABS_A321_STATION_ROLES = {
+  passengerStations: [] as number[],
+  baggageStations: Array.from({ length: 22 }, (_, i) => i + 3),
+  crewStations: [1, 2],
+};
+
+const FSLABS_A321_STATION_MAP = [
+  { simVarIndex: 1, cfgIndex: 0, name: 'Station 1', role: 'crew' },
+  { simVarIndex: 2, cfgIndex: 1, name: 'Station 2', role: 'crew' },
+  ...Array.from({ length: 22 }, (_, i) => ({
+    simVarIndex: i + 3,
+    cfgIndex: i + 2,
+    name: `Station ${i + 3}`,
+    role: 'baggage',
+  })),
+];
+
 /** Known families where station roles are stable across liveries/cabin options. */
 export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
   {
@@ -1158,6 +1181,83 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'Fenix A320 family (CFM/IAE × SL/WF) — same 16-station layout',
       'Market SKU fenix-a320 (narrow_freighter, pax_and_cargo, 180 seats); SimBrief A320 Fenix CFM/IAE',
       'loadMethod: native-simbrief; injectCapable: false',
+    ],
+  },
+  {
+    id: 'fslabs-a321-211',
+    icao: 'A321',
+    titlePattern: /FSLabs\s+A321-211\b/i,
+    familyPackRel: 'fslabs-a321-211.json',
+    marketTypeId: 'fslabs-a321',
+    marketLabel: 'Airbus A321',
+    stationRoles: FSLABS_A321_STATION_ROLES,
+    liveSources: FSLABS_A321_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'A321',
+    simbriefAirframeMatch: 'FSLabs \\(MSFS\\) - A321-211 CFM \\(0 ACT\\)',
+    stationMap: FSLABS_A321_STATION_MAP,
+    notes: [
+      'FSLabs A321-211 CFM ceo',
+      'Market SKU fslabs-a321 — not Fenix, not A321LR',
+      'SimBrief: FSLabs (MSFS) - A321-211 CFM (0 ACT)',
+    ],
+  },
+  {
+    id: 'fslabs-a321-231',
+    icao: 'A321',
+    titlePattern: /FSLabs\s+A321-231\b/i,
+    familyPackRel: 'fslabs-a321-231.json',
+    marketTypeId: 'fslabs-a321',
+    marketLabel: 'Airbus A321',
+    stationRoles: FSLABS_A321_STATION_ROLES,
+    liveSources: FSLABS_A321_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'A321',
+    simbriefAirframeMatch: 'FSLabs \\(MSFS\\) - A321-231 IAE \\(0 ACT\\)',
+    stationMap: FSLABS_A321_STATION_MAP,
+    notes: [
+      'FSLabs A321-231 IAE ceo — same Market SKU as the CFM -211',
+      'SimBrief: FSLabs (MSFS) - A321-231 IAE (0 ACT)',
+    ],
+  },
+  {
+    id: 'fslabs-a321-251n',
+    icao: 'A21N',
+    titlePattern: /FSLabs\s+A321-251N\b/i,
+    familyPackRel: 'fslabs-a321-251n.json',
+    marketTypeId: 'fslabs-a321neo',
+    marketLabel: 'Airbus A321neo',
+    stationRoles: FSLABS_A321_STATION_ROLES,
+    liveSources: FSLABS_A321_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'A21N',
+    simbriefAirframeMatch: 'FSLabs \\(MSFS\\) - A321-251NX LEAP-32 \\(0 ACT\\)',
+    stationMap: FSLABS_A321_STATION_MAP,
+    notes: [
+      'FSLabs A321-251N — SimBrief row is A321-251NX LEAP-32 (0 ACT) on list A21N',
+      'Market SKU fslabs-a321neo',
+    ],
+  },
+  {
+    id: 'fslabs-a321-271n',
+    icao: 'A21N',
+    titlePattern: /FSLabs\s+A321-271N\b/i,
+    familyPackRel: 'fslabs-a321-271n.json',
+    marketTypeId: 'fslabs-a321neo',
+    marketLabel: 'Airbus A321neo',
+    stationRoles: FSLABS_A321_STATION_ROLES,
+    liveSources: FSLABS_A321_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'A21N',
+    simbriefAirframeMatch: 'FSLabs \\(MSFS\\) - A321-271NX PW1133G \\(0 ACT\\)',
+    stationMap: FSLABS_A321_STATION_MAP,
+    notes: [
+      'FSLabs A321-271N — SimBrief row is A321-271NX PW1133G (0 ACT) on list A21N',
+      'Same Market SKU as the LEAP -251N',
     ],
   },
   {

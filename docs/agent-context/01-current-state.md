@@ -1,5 +1,8 @@
 # Current state (2026-10-09)
 
+`main` **848d5182** / desktop **0.3.487** shipped: Add the Carenado CT210N to the Market on the SimBrief Bonanza B36TC proxy, with its card art. Release: [v0.3.487](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.487).
+
+
 `main` **0b018493** / desktop **0.3.486** shipped: Cap the FSS 727-100 freighter Due at the EFB station limit, and match 737 and E-Jet titles to their flight_model.cfg in the homologation wizard. Release: [v0.3.486](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.486).
 
 

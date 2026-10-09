@@ -1,5 +1,8 @@
 # Current state (2026-10-09)
 
+`main` **d6798165** / desktop **0.3.483** shipped: Add the FSLabs A321 and A321neo to the Market on the FSLabs SimBrief airframes. Release: [v0.3.483](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.483).
+
+
 `main` **18a3b0a8** / desktop **0.3.482** shipped: Add the PMDG 737-700 passenger, BBJ, and BDSF to the Market on their SimBrief airframes. Release: [v0.3.482](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.482).
 
 

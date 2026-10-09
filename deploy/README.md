@@ -23,6 +23,12 @@ Pi / `linux/arm64` staging and QEMU multi-arch builds are retired.
   "exporting to GitHub Actions Cache" is a known BuildKit/GHA hiccup, not a
   Dockerfile/app failure. `cache-from` / `cache-to` use `ignore-error=true` so
   a bad cache write does not fail the job after a successful image push.
+- **Docker Hub 429 (2026-10-09):** o release `v0.3.485` falhou duas vezes
+  ao puxar `node:22-bookworm-slim` (`429 Too Many Requests`). O app não
+  quebrou. O `Dockerfile.world` passou a usar o espelho
+  `public.ecr.aws/docker/library/node`. O deploy de produção dessa tag
+  precisa de um `workflow_dispatch` no commit do espelho — um rerun da
+  release continua no Dockerfile antigo.
 - Production creates a PostgreSQL custom-format dump before replacing the API.
 - `world-api` is the single writer: it owns HTTP commands and the background
   economy clock. A failed health check rolls the application image back, but

@@ -1,5 +1,8 @@
 # Current state (2026-10-09)
 
+`main` **0b018493** / desktop **0.3.486** shipped: Cap the FSS 727-100 freighter Due at the EFB station limit, and match 737 and E-Jet titles to their flight_model.cfg in the homologation wizard. Release: [v0.3.486](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.486).
+
+
 `main` **b6f3d2fe** / desktop **0.3.485** shipped: Add the FSS Boeing 727-100 passenger, Super 27, and freighter to the Market on the FlightSim Studio SimBrief airframes. Release: [v0.3.485](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.485).
 
 

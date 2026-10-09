@@ -207,6 +207,24 @@ CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphal
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## Cessna T210N
+- **typeId:** `carenado-carenado-aircraft-ct210n-std`
+- **file:** `ct210n.png`
+
+```
+Stylized cartoon / clean vector illustration of a Cessna T210N Turbo Centurion (CT210N), three-quarter side view parked facing left.
+
+Keep the aircraft highly recognizable: high-wing single piston with a cantilever wing and NO wing struts (that is the 210, not a 182 or 172), one engine on the nose with a three-blade propeller and spinner, retractable tricycle landing gear down, conventional empennage, longer six-seat cabin with a row of side windows, turbo Centurion cowl. Must read as a Cessna 210 Centurion at a glance — not a 182, not a 206 with struts, not a Caravan.
+
+PROPELLER (critical — do not omit): one three-blade propeller on the nose, clearly visible in three-quarter view — hub, blades, and spinner must be drawn; prop disc may be static (not motion-blurred). Never show a smooth closed nose cone with no propeller.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — light_ga: Bright clear blue sky, fluffy white clouds, asphalt GA apron with yellow taxi lines, small gray hangar, soft blue hills. Cool blue wash #6b8cae. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
+```
+
 ## DA50
 - **typeId:** `skyward-da50`
 - **file:** `da50.png`

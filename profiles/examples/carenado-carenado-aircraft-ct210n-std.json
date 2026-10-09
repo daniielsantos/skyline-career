@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "carenado-carenado-aircraft-ct210n-std",
+  "profileKey": "carenado/carenado-aircraft-ct210n-std",
+  "semver": "1.0.0",
+  "displayName": "carenado aircraft ct210n STD (MSFS 2024)",
+  "match": {
+    "fingerprint": "d82859fb8f6cb09bdfcaafcda40f1c0dda1a38319bdfb05ff36003b128b98e70",
+    "title": "carenado aircraft ct210n STD",
+    "publisher": "carenado",
+    "icao": "BT36",
+    "liveTitles": [
+      "carenado-aircraft-ct210n [STD]"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "Left Main",
+        "capacity": 45,
+        "readVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK LEFT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "Right Main",
+        "capacity": 45,
+        "readVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "readUnit": "gallons",
+        "writeVar": "FUEL TANK RIGHT MAIN QUANTITY",
+        "writeUnit": "gallons"
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK LEFT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{LEFT_MAIN} + 1.5"
+      },
+      {
+        "op": "simvar_set",
+        "var": "FUEL TANK RIGHT MAIN QUANTITY",
+        "unit": "gallons",
+        "valueExpr": "{RIGHT_MAIN} + 1.5"
+      },
+      {
+        "op": "delay",
+        "ms": 1000
+      }
+    ],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "FUEL TANK LEFT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 3,
+          "valueExpr": "{LEFT_MAIN}"
+        },
+        {
+          "var": "FUEL TANK RIGHT MAIN QUANTITY",
+          "unit": "gallons",
+          "tolerancePct": 3,
+          "valueExpr": "{RIGHT_MAIN}"
+        }
+      ]
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "PILOT",
+        "maxLoad": 750,
+        "arm": -9
+      },
+      {
+        "index": 2,
+        "name": "COPILOT",
+        "maxLoad": 750,
+        "arm": -9
+      },
+      {
+        "index": 3,
+        "name": "PASSENGER 01",
+        "maxLoad": 500,
+        "arm": -9
+      },
+      {
+        "index": 4,
+        "name": "PASSENGER 02",
+        "maxLoad": 500,
+        "arm": -9
+      },
+      {
+        "index": 5,
+        "name": "PASSENGER 03",
+        "maxLoad": 500,
+        "arm": -9.5
+      },
+      {
+        "index": 6,
+        "name": "PASSENGER 04",
+        "maxLoad": 500,
+        "arm": -9.5
+      },
+      {
+        "index": 7,
+        "name": "BAGGAGE",
+        "maxLoad": 500,
+        "arm": -9
+      }
+    ],
+    "writePlan": [
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:1",
+        "unit": "pounds",
+        "valueExpr": "{station_1}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:2",
+        "unit": "pounds",
+        "valueExpr": "{station_2}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:3",
+        "unit": "pounds",
+        "valueExpr": "{station_3}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:4",
+        "unit": "pounds",
+        "valueExpr": "{station_4}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:5",
+        "unit": "pounds",
+        "valueExpr": "{station_5}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:6",
+        "unit": "pounds",
+        "valueExpr": "{station_6}"
+      },
+      {
+        "op": "simvar_set",
+        "var": "PAYLOAD STATION WEIGHT:7",
+        "unit": "pounds",
+        "valueExpr": "{station_7}"
+      },
+      {
+        "op": "delay",
+        "ms": 400
+      }
+    ],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": [
+        {
+          "var": "PAYLOAD STATION WEIGHT:1",
+          "unit": "pounds",
+          "tolerancePct": 1,
+          "valueExpr": "{station_1}"
+        }
+      ]
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "simvar",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 100
+    },
+    "calibration": {
+      "observedMac": 8.146727830171585,
+      "calibratedAtIso": "2026-10-09T22:10:19.170Z",
+      "cfgPath": "C:\\Users\\daniel\\AppData\\Roaming\\Microsoft Flight Simulator 2024\\Packages\\Community2024\\carenado-aircraft-ct210n\\SimObjects\\Airplanes\\Carenado_CT210N\\common\\config\\flight_model.cfg",
+      "emptyWeightCgPosition": [
+        -8.7,
+        0,
+        0.5
+      ],
+      "sweep": {
+        "minObservedMac": 7.735483348369598,
+        "maxObservedMac": 8.484876900911331,
+        "payloadLb": 200,
+        "forwardStation": 7,
+        "aftStation": 5,
+        "usedStationArms": true,
+        "restored": true,
+        "sampledAtIso": "2026-10-09T22:10:28.172Z"
+      }
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: carenado aircraft ct210n STD.",
+    "ICAO type designator (catalog/SimBrief): BT36.",
+    "Fuel via classic FUEL TANK * from writetest (LEFT_MAIN, RIGHT_MAIN).",
+    "AUX deferred for v1.",
+    "Payload stations from writetest: 1, 2, 3, 4, 5, 6, 7.",
+    "Station maxLoad: cargo-split S1=750,S2=750,S3=500,S4=500,S5=500,S6=500,S7=500 (ceiling 1814 lb) (simbrief mzfw-oew)",
+    "Fuel residual floors (writetest): LEFT_MAIN ~1.5 gal, RIGHT_MAIN ~1.5 gal — inject redistributeAroundResidualFloors keeps OFP total.",
+    "Homologated with interactive wizard.",
+    "See profiles/notes/carenado-carenado-aircraft-ct210n-std.md"
+  ]
+}

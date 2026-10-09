@@ -268,6 +268,22 @@
     "defaultConfigurationId": "passenger"
   },
   {
+    "typeId": "carenado-carenado-aircraft-ct210n-std",
+    "aircraftClassId": "light_ga",
+    "label": "carenado aircraft ct210n STD",
+    "rolesPackRelPath": "profiles/ofp/carenado-carenado-aircraft-ct210n-std.json",
+    "simbriefIcao": "BT36",
+    "simbriefAirframeMatch": "Default",
+    "oewKg": 1045,
+    "mtowKg": 1814,
+    "maxCargoKg": 769,
+    "fuelCapacityKg": 245,
+    "maxRangeNm": 900,
+    "cruiseFuelFlowKgPerHour": 59,
+    "cruiseSpeedKt": 193,
+    "fuelBurnKgPerNm": 0.306
+  },
+  {
     "typeId": "asobo-c172sp-cargo",
     "aircraftClassId": "light_ga",
     "label": "Cessna 172SP",

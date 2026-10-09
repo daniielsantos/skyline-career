@@ -202,6 +202,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'asobo-c172sp-ifd-cargo': '/airframes/cessna-172.png',
   'asobo-c172sp-ifd-passengers': '/airframes/cessna-172.png',
   'asobo-cessna-c152': '/airframes/cessna-152.png',
+  'carenado-carenado-aircraft-ct210n-std': '/airframes/ct210n.png',
   'skyward-da50': '/airframes/da50.png',
   'justflight-just-flight-pa28-arrow-iii': '/airframes/pa28-arrow.png',
   'justflight-just-flight-pa28-warrior-ii': '/airframes/pa28-warrior.png',

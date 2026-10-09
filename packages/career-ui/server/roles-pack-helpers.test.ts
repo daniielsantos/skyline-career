@@ -354,6 +354,35 @@ describe('resolveMissionRolesPack FSLabs A321', () => {
   });
 });
 
+describe('resolveMissionRolesPack PMDG 737-600', () => {
+  it('picks Dual Class or Single Class on SimBrief B736', async () => {
+    const cases = [
+      [
+        '737-600 PAX TC',
+        /pmdg-736-pax\.json$/,
+        'PMDG \\(MSFS\\) - Dual Class',
+      ],
+      [
+        '737-600 PAX SC',
+        /pmdg-736-pax-sc\.json$/,
+        'PMDG \\(MSFS\\) - Single Class',
+      ],
+    ] as const;
+    for (const [liveTitle, pathRe, match] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: 'profiles/ofp/pmdg-736-pax.json',
+        liveTitle,
+        airframeTypeId: 'pmdg-736-pax-family',
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+      assert.equal(roles.pack.simbriefAirframeMatch, match);
+      assert.equal(roles.pack.simbriefIcao, 'B736');
+    }
+  });
+});
+
 describe('resolveMissionRolesPack PMDG 737-700', () => {
   it('picks Dual Class, Single Class, or BBJ from the live title', async () => {
     const cases = [

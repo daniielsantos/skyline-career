@@ -44,6 +44,17 @@ describe('scaffold-roles FSLabs A321', () => {
   });
 });
 
+describe('scaffold-roles PMDG 737-600', () => {
+  it('keeps Two Class and Single Class off the 737-700 family', () => {
+    assert.equal(matchHeuristic('737-600 PAX TC')?.id, 'pmdg-736-pax');
+    assert.equal(matchHeuristic('737-600 PAX SC')?.id, 'pmdg-736-pax-sc');
+    assert.equal(matchHeuristic('737-600 PAX TC')?.marketTypeId, 'pmdg-736-pax-family');
+    assert.equal(matchHeuristic('737-600 PAX SC')?.simbriefIcao, 'B736');
+    assert.match(matchHeuristic('737-600 PAX SC')?.simbriefAirframeMatch ?? '', /Single Class/);
+    assert.equal(matchHeuristic('737-700 PAX SSW TC')?.id, 'pmdg-737-pax');
+  });
+});
+
 describe('scaffold-roles PMDG 737-700', () => {
   it('keeps Two Class, Single Class, and BBJ on their own SimBrief rows', () => {
     assert.equal(matchHeuristic('737-700 PAX SSW TC')?.id, 'pmdg-737-pax');

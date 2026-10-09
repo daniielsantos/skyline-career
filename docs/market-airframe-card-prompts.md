@@ -1125,6 +1125,22 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## PMDG 737-600
+- **typeId:** `pmdg-736-pax-family`
+- **file:** `b736-pax.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 737-600 passenger airliner (B736), three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: shortest 737 Next Generation, stubby fuselage clearly shorter than a 737-700, two underwing engines, blended winglets, one continuous row of passenger windows, conventional 737 tail, retractable gear down. White fuselage, green cheatline, plain tail. Must read as a short 737-600 at a glance — shorter than a 737-700, not a 737-800, not a Max, not a freighter.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
 ## PMDG 737-700
 - **typeId:** `pmdg-737-pax-family`
 - **file:** `b737-pax.png`

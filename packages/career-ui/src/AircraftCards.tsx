@@ -304,6 +304,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'fss-embraer-e175': '/airframes/embraer-e175.png',
   'fss-embraer-e190': '/airframes/embraer-e190.png',
   'fss-embraer-e195': '/airframes/embraer-e195.png',
+  'pmdg-736-pax-family': '/airframes/b736-pax.png',
   'pmdg-737-pax-family': '/airframes/b737-pax.png',
   'pmdg-737-bbj-family': '/airframes/b737-bbj.png',
   'pmdg-737-bdsf-family': '/airframes/b737-bdsf.png',

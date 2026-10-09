@@ -2313,6 +2313,54 @@
     "defaultConfigurationId": "passenger"
   },
   {
+    "typeId": "pmdg-736-pax-family",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Boeing 737-600",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 114,
+    "rolesPackRelPath": "profiles/ofp/pmdg-736-pax.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/pmdg-736-pax.json",
+      "profiles/ofp/pmdg-736-pax-sc.json"
+    ],
+    "simbriefIcao": "B736",
+    "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Dual Class",
+    "oewKg": 37229,
+    "mtowKg": 65771,
+    "maxCargoKg": 5055,
+    "fuelCapacityKg": 20894,
+    "maxRangeNm": 3225,
+    "cruiseFuelFlowKgPerHour": 2400,
+    "cruiseSpeedKt": 430,
+    "fuelBurnKgPerNm": 5.581,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Two Class",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 112,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 6160,
+        "rolesPackRelPath": "profiles/ofp/pmdg-736-pax.json"
+      },
+      {
+        "id": "single",
+        "label": "Single Class",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 114,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 6270,
+        "rolesPackRelPath": "profiles/ofp/pmdg-736-pax-sc.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
     "typeId": "pmdg-737-pax-family",
     "aircraftClassId": "narrow_freighter",
     "label": "Boeing 737-700",

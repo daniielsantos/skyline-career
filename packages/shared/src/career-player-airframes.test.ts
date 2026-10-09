@@ -34,6 +34,7 @@ describe('career player airframes', () => {
       'blacksquare-b36tp-bonanza-professional',
       'blacksquare-b60-duke',
       'blacksquare-turbine-duke',
+      'pmdg-736-pax-family',
       'pmdg-737-pax-family',
       'pmdg-737-bbj-family',
       'pmdg-737-bdsf-family',
@@ -189,6 +190,18 @@ describe('career player airframes', () => {
         'profiles/ofp/fslabs-a321-271n.json',
       ].sort(),
     );
+  });
+
+  it('lists the PMDG 737-600 on SimBrief B736 Dual Class and Single Class', () => {
+    const pax = findCareerPlayerAirframe('pmdg-736-pax-family');
+    assert.equal(pax?.label, 'Boeing 737-600');
+    assert.equal(pax?.simbriefIcao, 'B736');
+    assert.equal(pax?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - Dual Class');
+    assert.equal(pax?.maxPaxSeats, 114);
+    assert.equal(pax?.fuelCapacityKg, 20894);
+    assert.equal(resolvePassengerCapacity('pmdg-736-pax-family', 'passenger'), 112);
+    assert.equal(resolvePassengerCapacity('pmdg-736-pax-family', 'single'), 114);
+    assert.notEqual(pax?.simbriefIcao, findCareerPlayerAirframe('pmdg-737-pax-family')?.simbriefIcao);
   });
 
   it('lists the PMDG 737-700 passenger and BBJ families on their SimBrief rows', () => {

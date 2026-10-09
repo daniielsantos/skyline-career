@@ -1,0 +1,60 @@
+{
+  "source": "simbrief",
+  "icao": "B736",
+  "ofpId": "pmdg-736-pax",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "737-600 PAX TC"
+  ],
+  "matchTitlePattern": "737-600\\s+PAX\\s+TC",
+  "notes": [
+    "PMDG 737-600 PAX Two Class — NG3 zone map shared with the 737-700/800",
+    "One Skyline Market SKU: pmdg-736-pax-family. Not the 737-700 (SimBrief list B736, not B737).",
+    "Homologated monitor: pmdg/737-600-pax-tc@1.0.0",
+    "SimBrief B736: PMDG (MSFS) - Dual Class — 112 seats. Single Class glass uses pmdg-736-pax-sc.json",
+    "Wizard discovery listed 31 unnamed stations. Compare uses the NG3 PaxZone map until a named probe.",
+    "loadMethod: native-simbrief; injectCapable: false — load via the PMDG EFB",
+    "liveSources: NG3 fuel + PMDG EFB LVars"
+  ],
+  "fuel": { "unit": "kg" },
+  "loadSheet": { "unit": "kg" },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [1, 2, 3, 4],
+      "baggageStations": [5, 6],
+      "crewStations": [7, 8, 9],
+      "serviceStations": [10, 11],
+      "averagePassengerWeight": 86.18
+    }
+  },
+  "liveSources": {
+    "fuel": ["pmdg-ng3", "classic"],
+    "weights": ["pmdg-efb-lvars"],
+    "payload": ["pmdg-efb", "classic-stations"]
+  },
+  "simbriefIcao": "B736",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Dual Class",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "PaxZone3", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "PaxZone4", "role": "passenger" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Fwd Cargo", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Aft Cargo", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Instructor", "role": "crew" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "fwd_gly", "role": "galley" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "aft_gly", "role": "galley" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

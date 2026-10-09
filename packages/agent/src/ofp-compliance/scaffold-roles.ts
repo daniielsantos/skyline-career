@@ -141,12 +141,12 @@ const FSLABS_A321_STATION_MAP = [
   })),
 ];
 
-function unnamedCrewThenBaggageMap(count: number) {
+function unnamedCrewThenBaggageMap(count: number, crewCount = 2) {
   return Array.from({ length: count }, (_, i) => ({
     simVarIndex: i + 1,
     cfgIndex: i,
     name: `Station ${i + 1}`,
-    role: i < 2 ? 'crew' : 'baggage',
+    role: i < crewCount ? 'crew' : 'baggage',
   }));
 }
 
@@ -246,15 +246,15 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
     marketLabel: 'Boeing 727-100',
     stationRoles: {
       passengerStations: [],
-      baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-      crewStations: [1, 2],
+      baggageStations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      crewStations: [1, 2, 3],
     },
     liveSources: FSS_727_LIVE_SOURCES,
     loadMethod: 'native-simbrief',
     injectCapable: false,
     simbriefIcao: 'B721',
     simbriefAirframeMatch: 'FlightSim Studio \\(MSFS\\) - B727-100 Freighter',
-    stationMap: unnamedCrewThenBaggageMap(19),
+    stationMap: unnamedCrewThenBaggageMap(19, 3),
     notes: [
       'FSS Boeing 727-100 Freighter',
       'Market SKU: fss-727-100',

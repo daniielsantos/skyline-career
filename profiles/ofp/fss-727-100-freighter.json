@@ -47,11 +47,11 @@
     "stationRoles": {
       "crewStations": [
         1,
-        2
+        2,
+        3
       ],
       "passengerStations": [],
       "baggageStations": [
-        3,
         4,
         5,
         6,
@@ -89,7 +89,7 @@
       "simVarIndex": 3,
       "cfgIndex": 2,
       "name": "Station 3",
-      "role": "baggage"
+      "role": "crew"
     },
     {
       "simVarIndex": 4,

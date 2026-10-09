@@ -1786,6 +1786,7 @@
     "injectCapable": false,
     "loadLayout": "pax_and_cargo",
     "maxPaxSeats": 125,
+    "simconnectCargoHoldMaxLb": 29400,
     "oewKg": 37072,
     "mtowKg": 73028,
     "mzfwKg": 54581,

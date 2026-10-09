@@ -3981,12 +3981,17 @@ export const SIMBRIEF_STANDARD_PAX_WITH_BAG_LB =
   SIMBRIEF_STANDARD_PAX_LB + SIMBRIEF_STANDARD_BAG_PER_PAX_LB;
 
 /**
- * JF EFB fills cargo holds up to {@link CareerPlayerAirframe.simconnectCargoHoldMaxLb}.
+ * EFB holds fill up to {@link CareerPlayerAirframe.simconnectCargoHoldMaxLb}.
  * SimBrief bag/cargo can exceed that; Loaded vs Due drops the overflow from Due.
+ *
+ * Passenger sheets subtract `maxPaxSeats × 175` before the hold cap (F100 / Phenom).
+ * A 727-100 freighter sheet (`passengerCount` 0) is all cargo: the FSS EFB slider
+ * stops at the station sum, so Due uses that cap with no phantom cabin.
  */
 export function clampPaxAndCargoDueToHoldsLb(
   plannedPayloadLb: number,
   airframe: CareerPlayerAirframe | undefined,
+  passengerCount?: number,
 ): number {
   if (
     !Number.isFinite(plannedPayloadLb) ||
@@ -4007,8 +4012,13 @@ export function clampPaxAndCargoDueToHoldsLb(
   ) {
     return plannedPayloadLb;
   }
-  const bodyLb = pax * SIMBRIEF_STANDARD_PAX_LB;
-  if (plannedPayloadLb <= bodyLb + 1) return plannedPayloadLb;
+  const freighterSheet =
+    airframe.typeId === 'fss-727-100' &&
+    typeof passengerCount === 'number' &&
+    Number.isFinite(passengerCount) &&
+    passengerCount <= 0;
+  const bodyLb = freighterSheet ? 0 : pax * SIMBRIEF_STANDARD_PAX_LB;
+  if (!freighterSheet && plannedPayloadLb <= bodyLb + 1) return plannedPayloadLb;
   const ofpCargoLb = plannedPayloadLb - bodyLb;
   if (ofpCargoLb <= holdMax) return plannedPayloadLb;
   return plannedPayloadLb - (ofpCargoLb - holdMax);

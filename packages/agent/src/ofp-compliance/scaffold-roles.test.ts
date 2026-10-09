@@ -49,6 +49,9 @@ describe('scaffold-roles FSS 727-100', () => {
     assert.equal(matchHeuristic('Boeing 727-100 - American Airlines')?.id, 'fss-727-100');
     assert.equal(matchHeuristic('Boeing Super 727-100 Passenger')?.id, 'fss-727-100-super');
     assert.equal(matchHeuristic('Boeing 727-100 Freighter')?.id, 'fss-727-100-freighter');
+    assert.deepEqual(matchHeuristic('Boeing 727-100 Freighter')?.stationRoles.crewStations, [
+      1, 2, 3,
+    ]);
     assert.equal(
       matchHeuristic('Boeing Super 727-100 Passenger')?.simbriefAirframeMatch,
       'FlightSim Studio \\(MSFS\\) - B727-100 Super 27',

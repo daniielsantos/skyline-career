@@ -1,5 +1,13 @@
 # pax_and_cargo — Loaded vs Due vs EFB
 
+## FSS 727-100F cargo cap (2026-10-09)
+
+**Sintoma:** Preflight SBCT→SBGR, 727-100 Freighter. Fuel bate. Payload Sim 29 430 lb vs Due 36 500 lb. Load sheet SimBrief: pax 0, cargo 36 500 lb (MZFW−OEW). EFB Weights CARGO 11 431 kg (só S4–S13); o campo CARGO do load é 13 336 kg.
+
+**Causa:** `Payloads100F.js` limita a carga a 7×3 300 lb (S7–S13) + 9×700 lb (S4–S6 e S14–S19) = **29 400 lb**. Cockpit é S1–S3 (máx 600 lb) e não entra nessa soma. O `flight_model.cfg` até cabe 36 500 lb com a tripulação, mas o EFB não coloca isso. O clamp antigo subtraía 125×175 antes do hold, então 36 500 lb não era cortado. A linha Weights CARGO ignora os pods S14–S19.
+
+**Fix:** `simconnectCargoHoldMaxLb: 29400` no SKU. Com OFP `passengerCount` 0, o Due do `fss-727-100` trata o payload inteiro como carga e corta em 29 400 lb. S3 (flight engineer) saiu de `baggageStations` no pack do freighter. `maxCargoKg` 17509 permanece (preço do passageiro). O OFP já aceito continua 36 500 lb no papel; o Due é que desce. Não capar o `cargo=` do próximo Dispatch: um contrato de ~16,5 t contra um OFP de ~13,3 t falha o Accept (tolerância under 5%).
+
 ## Station weights overlapping on Preflight (2026-09-30)
 
 **Sintoma:** no card Payload (stations) do Preflight, `27,378 lb` pinta em cima da estação vizinha. No En route os mesmos números cabem.

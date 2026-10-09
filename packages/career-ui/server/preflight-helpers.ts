@@ -519,29 +519,28 @@ export async function runMissionPreflight(
     // Match Watch: hold clamp (Phenom EFB bags stay in SimBrief math only) +
     // efbPaxWeightLb. Recompute from OFP — never stack on painted Due.
     const plannedPayloadLbRaw = plannedPayload?.plannedTotalLb;
+    const ofpPassengerCountForDue = resolveOfpPassengerCountForEfbDue({
+      missionPax: mission.pax,
+      ofpPassengerCount:
+        typeof ofp.loadSheet?.passengerCount === 'number'
+          ? ofp.loadSheet.passengerCount
+          : (ofp.payload?.stationRoles?.passengerStations?.length ?? 0) ===
+                0 &&
+              (ofp.payload?.stationRoles?.baggageStations?.length ?? 0) > 0
+            ? 0
+            : undefined,
+      loadLayout: careerAirframe?.loadLayout,
+    });
     const plannedPayloadLb =
       plannedPayloadLbRaw !== undefined
         ? adjustPaxAndCargoDueForEfbPaxLb(
             clampPaxAndCargoDueToHoldsLb(
               plannedPayloadLbRaw,
               careerAirframe,
+              ofpPassengerCountForDue,
             ),
             careerAirframe,
-            {
-              ofpPassengerCount: resolveOfpPassengerCountForEfbDue({
-                missionPax: mission.pax,
-                ofpPassengerCount:
-                  typeof ofp.loadSheet?.passengerCount === 'number'
-                    ? ofp.loadSheet.passengerCount
-                    : (ofp.payload?.stationRoles?.passengerStations?.length ??
-                          0) === 0 &&
-                        (ofp.payload?.stationRoles?.baggageStations?.length ??
-                          0) > 0
-                      ? 0
-                      : undefined,
-                loadLayout: careerAirframe?.loadLayout,
-              }),
-            },
+            { ofpPassengerCount: ofpPassengerCountForDue },
           )
         : undefined;
     const livePayloadLb = clearedStations

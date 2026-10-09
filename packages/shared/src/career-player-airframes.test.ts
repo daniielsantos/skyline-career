@@ -252,6 +252,7 @@ describe('career player airframes', () => {
       'FlightSim Studio \\(MSFS\\) - B727-100 Passenger',
     );
     assert.equal(airframe?.maxPaxSeats, 125);
+    assert.equal(airframe?.simconnectCargoHoldMaxLb, 29400);
     assert.equal(airframe?.fuelCapacityKg, 23340);
     assert.equal(resolvePassengerCapacity('fss-727-100', 'passenger'), 125);
     assert.equal(resolvePassengerCapacity('fss-727-100', 'cargo'), 0);

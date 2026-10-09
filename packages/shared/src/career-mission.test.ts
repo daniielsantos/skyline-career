@@ -1386,6 +1386,23 @@ describe('clampPaxAndCargoDueToHoldsLb', () => {
       7 * 175 + 463,
     );
   });
+
+  it('caps an FSS 727 freighter sheet at the EFB station sum', () => {
+    const airframe = {
+      typeId: 'fss-727-100',
+      aircraftClassId: 'narrow_freighter' as const,
+      label: 'Boeing 727-100',
+      rolesPackRelPath: 'x',
+      simbriefIcao: 'B721',
+      simbriefAirframeMatch: 'Default',
+      loadLayout: 'pax_and_cargo' as const,
+      maxPaxSeats: 125,
+      simconnectCargoHoldMaxLb: 29_400,
+    };
+    assert.equal(clampPaxAndCargoDueToHoldsLb(36_500, airframe, 0), 29_400);
+    assert.equal(clampPaxAndCargoDueToHoldsLb(20_000, airframe, 0), 20_000);
+    assert.equal(clampPaxAndCargoDueToHoldsLb(36_500, airframe), 36_500);
+  });
 });
 
 describe('adjustPaxAndCargoDueForEfbPaxLb', () => {

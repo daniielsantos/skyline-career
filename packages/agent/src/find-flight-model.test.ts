@@ -57,6 +57,37 @@ describe('titleSearchTokens / scorePathAgainstTokens', () => {
     assert.ok(pc24 > passive, 'player microsoft_pc24 must beat passive AI shell');
   });
 
+  it('keeps 737-600 numbers and the PMDG 736 package folder', () => {
+    const tokens = titleSearchTokens('737-600 PAX TC');
+    assert.ok(tokens.includes('737'));
+    assert.ok(tokens.includes('600'));
+    assert.ok(tokens.includes('736'));
+    assert.ok(!tokens.includes('600pax'));
+    const ng600 = scorePathAgainstTokens('pmdg-aircraft-736', tokens);
+    const ng700 = scorePathAgainstTokens('pmdg-aircraft-737', tokens);
+    const plane600 = scorePathAgainstTokens('PMDG 737-600', tokens);
+    const plane700 = scorePathAgainstTokens('PMDG 737-700', tokens);
+    assert.ok(ng600 > 0);
+    assert.ok(ng700 > 0);
+    assert.ok(plane600 > plane700);
+  });
+
+  it('keeps 737-700BDSF series numbers', () => {
+    const tokens = titleSearchTokens('737-700BDSF BW');
+    assert.ok(tokens.includes('737'));
+    assert.ok(tokens.includes('700'));
+  });
+
+  it('maps E175 onto the FSS e17x package folder', () => {
+    const tokens = titleSearchTokens('Embraer E175');
+    assert.ok(tokens.includes('e175'));
+    assert.ok(tokens.includes('e17x'));
+    const pkg = scorePathAgainstTokens('fss-aircraft-e17x', tokens);
+    const other = scorePathAgainstTokens('fss-aircraft-e19x', tokens);
+    assert.ok(pkg > 0);
+    assert.ok(pkg > other);
+  });
+
   it('maps BN2 Islander titles to Black Box package tokens', () => {
     const tokens = titleSearchTokens(
       'BN2 Islander - Cargo / Analogue / Tip Tanks',

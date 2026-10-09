@@ -3013,16 +3013,19 @@ export class CareerWatchSession {
           // plannedLb (efbPaxWeightLb is not idempotent if stacked).
           // Freight/haul keeps mission.pax=0 while Dispatch fills SimBrief seats
           // for EFB Import — use OFP passengerCount (or estimate), not mission 0.
+          const ofpPassengerCountForDue = resolveOfpPassengerCountForEfbDue({
+            missionPax: current.pax,
+            ofpPassengerCount: current.lastOfpCheck?.passengerCount,
+            loadLayout: airframe?.loadLayout,
+          });
           const plannedPayloadLb = adjustPaxAndCargoDueForEfbPaxLb(
-            clampPaxAndCargoDueToHoldsLb(ofpPayloadLb, airframe),
+            clampPaxAndCargoDueToHoldsLb(
+              ofpPayloadLb,
+              airframe,
+              ofpPassengerCountForDue,
+            ),
             airframe,
-            {
-              ofpPassengerCount: resolveOfpPassengerCountForEfbDue({
-                missionPax: current.pax,
-                ofpPassengerCount: current.lastOfpCheck?.passengerCount,
-                loadLayout: airframe?.loadLayout,
-              }),
-            },
+            { ofpPassengerCount: ofpPassengerCountForDue },
           );
           const liveCrewLb =
             adjustedPayload?.crewOnStations && stationsForCrew

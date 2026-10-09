@@ -250,12 +250,25 @@ export function titleSearchTokens(title: string): string[] {
     'asobo',
   ]);
   const tokens = raw.filter((t) => !stop.has(t) && !/^[nN]\d/.test(t));
-  // Glue model designators split by punctuation: "PC-24" → pc24, "C-408" → c408.
+  // Glue a short prefix + number: "PC-24" → pc24, "C-408" → c408.
+  // Do not glue "600 PAX" / "100 Freighter" — that fake token then dropped 737 and 727.
+  const gluedNumbers = new Set<string>();
   for (let i = 0; i < raw.length - 1; i++) {
     const a = raw[i]!;
     const b = raw[i + 1]!;
-    if (/^[a-z]+$/i.test(a) && /^\d{1,4}$/.test(b)) tokens.push(`${a}${b}`);
-    if (/^\d{1,4}$/.test(a) && /^[a-z]+$/i.test(b)) tokens.push(`${a}${b}`);
+    if (/^[a-z]{1,3}$/i.test(a) && /^\d{1,4}$/.test(b)) {
+      tokens.push(`${a}${b}`);
+      gluedNumbers.add(b);
+    }
+  }
+  // "737-700BDSF" survives as one token. Keep the bare series number for the folder.
+  for (const t of [...tokens]) {
+    const series = /^(\d{3})[a-z]+$/i.exec(t);
+    if (series?.[1]) tokens.push(series[1]);
+    const embraer = /^(e17[05]|e19[05])/i.exec(t);
+    if (embraer?.[1] && embraer[1].toLowerCase() !== t.toLowerCase()) {
+      tokens.push(embraer[1].toLowerCase());
+    }
   }
   // Common vendor shorthand seen in Community folder names.
   if (tokens.includes('black') && tokens.includes('square')) {
@@ -284,6 +297,15 @@ export function titleSearchTokens(title: string): string[] {
   if (tokens.includes('tip') && tokens.includes('tanks')) {
     tokens.push('tiptank', 'tiptanks');
   }
+  // PMDG package folders are 736/738/739, not the spoken 737-600/800/900.
+  if (tokens.includes('737')) {
+    if (tokens.includes('600')) tokens.push('736');
+    if (tokens.includes('800')) tokens.push('738');
+    if (tokens.includes('900')) tokens.push('739');
+  }
+  // FSS packages are fss-aircraft-e17x / e19x. The airplane folder is E170/E175/E190/E195.
+  if (tokens.some((t) => /^e17[05]/.test(t))) tokens.push('e17x');
+  if (tokens.some((t) => /^e19[05]/.test(t))) tokens.push('e19x');
 
   // Drop ambiguous fragments that collide across vendors once shorthand exists.
   // "black" alone matches both bksq-* and blackboxsimulation-*.
@@ -296,12 +318,10 @@ export function titleSearchTokens(title: string): string[] {
     drop.add('black');
     drop.add('box');
   }
-  // Bare "24" from "PC-24" matches every *2024* / *islander24* package — keep pc24 only.
-  const hasGluedModel = tokens.some((t) => /^[a-z]+\d+$/i.test(t) || /^\d+[a-z]+$/i.test(t));
-  if (hasGluedModel) {
-    for (const t of tokens) {
-      if (/^\d{2,4}$/.test(t)) drop.add(t);
-    }
+  // Bare "24" from "PC-24" matches every *2024* package. Drop only that glued number,
+  // not every other series number in the title (737-600 must keep 737 and 600).
+  for (const n of gluedNumbers) {
+    if (/^\d{2,4}$/.test(n)) drop.add(n);
   }
 
   return [...new Set(tokens.filter((t) => !drop.has(t)))];

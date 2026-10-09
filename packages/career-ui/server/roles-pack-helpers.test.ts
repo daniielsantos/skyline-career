@@ -300,6 +300,52 @@ describe('resolveMissionRolesPack', () => {
   });
 });
 
+describe('resolveMissionRolesPack PMDG 737-700', () => {
+  it('picks Dual Class, Single Class, or BBJ from the live title', async () => {
+    const cases = [
+      [
+        '737-700 PAX SSW TC',
+        'pmdg-737-pax-family',
+        'profiles/ofp/pmdg-737-pax.json',
+        /pmdg-737-pax\.json$/,
+        'PMDG \\(MSFS\\) - Dual Class',
+      ],
+      [
+        '737-700 PAX BW SC',
+        'pmdg-737-pax-family',
+        'profiles/ofp/pmdg-737-pax.json',
+        /pmdg-737-pax-sc\.json$/,
+        'PMDG \\(MSFS\\) - Single Class',
+      ],
+      [
+        '737-700 BBJ SSW',
+        'pmdg-737-bbj-family',
+        'profiles/ofp/pmdg-737-bbj.json',
+        /pmdg-737-bbj\.json$/,
+        'PMDG \\(MSFS\\) - 9 Aux Tanks',
+      ],
+      [
+        '737-700BDSF BW',
+        'pmdg-737-bdsf-family',
+        'profiles/ofp/pmdg-737-bdsf.json',
+        /pmdg-737-bdsf\.json$/,
+        'PMDG \\(MSFS\\) - BEDEK Special Freighter',
+      ],
+    ] as const;
+    for (const [liveTitle, typeId, fallback, pathRe, match] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: fallback,
+        liveTitle,
+        airframeTypeId: typeId,
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+      assert.equal(roles.pack.simbriefAirframeMatch, match);
+    }
+  });
+});
+
 describe('resolveMissionRolesPack FSS E-Jets', () => {
   it('picks Dual Class for passenger glass and Cargo for the freighter', async () => {
     const pax = await resolveMissionRolesPack({

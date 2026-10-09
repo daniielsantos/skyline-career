@@ -1,0 +1,66 @@
+{
+  "source": "simbrief",
+  "icao": "BBJ1",
+  "ofpId": "pmdg-737-bbj",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "737-700 BBJ SSW",
+    "737-700 BBJ BW"
+  ],
+  "matchTitlePattern": "737-700\\s+BBJ",
+  "notes": [
+    "PMDG 737-700 BBJ family (SSW / BW) — extra CENTER2 tank vs the passenger 737-700",
+    "One Skyline Market SKU: pmdg-737-bbj-family",
+    "Homologated monitors: pmdg/737-700-bbj-ssw@1.0.0, pmdg/737-700-bbj-bw@1.0.0",
+    "SimBrief list key BBJ1. The PMDG row prints OFP icaocode B737. Dispatch stays on BBJ1.",
+    "SimBrief row: PMDG (MSFS) - 9 Aux Tanks (30 seats). The only PMDG aux row. Homologated tanks are mains + center + CENTER2 1563 gal, not the full 9-aux fuel (71662 lb).",
+    "0 Aux Tanks matches the passenger fuel load and ignores CENTER2.",
+    "loadMethod: native-simbrief; injectCapable: false — load via the PMDG EFB",
+    "liveSources: NG3 fuel + PMDG EFB LVars"
+  ],
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg"
+  },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [1, 2, 3, 4],
+      "baggageStations": [5, 6],
+      "crewStations": [7, 8, 9],
+      "serviceStations": [10, 11],
+      "averagePassengerWeight": 86.18
+    }
+  },
+  "liveSources": {
+    "fuel": ["pmdg-ng3", "classic"],
+    "weights": ["pmdg-efb-lvars"],
+    "payload": ["pmdg-efb", "classic-stations"]
+  },
+  "simbriefIcao": "BBJ1",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - 9 Aux Tanks",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "PaxZone3", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "PaxZone4", "role": "passenger" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Fwd Cargo", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Aft Cargo", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Instructor", "role": "crew" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "fwd_gly", "role": "galley" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "aft_gly", "role": "galley" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

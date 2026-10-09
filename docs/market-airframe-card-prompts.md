@@ -1093,6 +1093,54 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## PMDG 737-700
+- **typeId:** `pmdg-737-pax-family`
+- **file:** `b737-pax.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 737-700 passenger airliner, three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: Boeing 737-700 Next Generation, SHORT fuselage (clearly shorter than a 737-800 — about one window-group less ahead of the wing), two CFM engines under the wings, blended winglets, one continuous row of small passenger windows, four-pane 737 cockpit windshield, conventional tail with the dorsal fin, retractable gear down. White fuselage, cobalt-blue cheatline, plain tail. Must read as a short passenger 737-700 at a glance — not a 737-800, not a 737 Max (no big chevron engines, no split-tip Max winglets), not a freighter (no cargo door).
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
+## PMDG 737-700 BBJ
+- **typeId:** `pmdg-737-bbj-family`
+- **file:** `b737-bbj.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 737-700 BBJ private jet, three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: short 737-700 BBJ fuselage (same short length as the passenger 737-700, not a stretched 737-800), two engines under the wings, blended winglets, conventional 737 tail, retractable gear down. VIP cabin: only a few widely spaced oval windows, dark navy fuselage with a thin gold cheatline, plain tail. Must read as a private 737 BBJ at a glance — not the airline 737-700 with a full window row, not a 737-800 BBJ2, not a freighter.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
+## PMDG 737-700 BDSF
+- **typeId:** `pmdg-737-bdsf-family`
+- **file:** `b737-bdsf.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 737-700 BDSF freighter, three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: short 737-700 Next Generation freighter (shorter fuselage than a 737-800), two engines under the wings, blended winglets, conventional 737 tail, retractable gear down. Large main-deck cargo door on the forward left fuselage, outlined in safety orange. Passenger windows plugged — almost no cabin windows. White fuselage, orange cheatline, plain tail. Must read as a short 737-700 freighter at a glance — cargo door is essential. Not a passenger 737-700, not a 737-800 BCF.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
 ## Asobo / iFly 737 Max 8
 - **typeId:** `asobo-737-max-8-passengers` (aliases: `ifly-737-max-8`, `ifly-737-max-8200`)
 - **file:** `737-max-8.png` (Market SKU; legacy hangar art also `ifly-737-max-8.png`)

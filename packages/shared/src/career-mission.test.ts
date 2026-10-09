@@ -1748,6 +1748,28 @@ describe('compareMissionIntentToOfp', () => {
     }
   });
 
+  it('accepts PMDG 737-700 BBJ SimBrief OFP ICAO B737', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        airframeTypeId: 'pmdg-737-bbj-family',
+        cargoKg: 1000,
+        rolesPackRelPath: 'profiles/ofp/pmdg-737-bbj.json',
+      }),
+      matchingOfp({
+        icao: 'B737',
+        loadSheet: {
+          unit: 'kg',
+          blockFuel: 10_000,
+          passengerCount: 0,
+          baggage: 1000,
+          payload: 1000,
+        },
+      }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('accepts FSS E175 SimBrief OFP ICAO E75L', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

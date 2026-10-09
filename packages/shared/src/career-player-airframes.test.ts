@@ -34,6 +34,9 @@ describe('career player airframes', () => {
       'blacksquare-b36tp-bonanza-professional',
       'blacksquare-b60-duke',
       'blacksquare-turbine-duke',
+      'pmdg-737-pax-family',
+      'pmdg-737-bbj-family',
+      'pmdg-737-bdsf-family',
       'pmdg-738-bcf-family',
       'pmdg-738-pax-family',
       'pmdg-738-bbj2-family',
@@ -145,6 +148,44 @@ describe('career player airframes', () => {
       [
         'profiles/ofp/justflight-146-300-freighter.json',
         'profiles/ofp/justflight-146-300.json',
+      ].sort(),
+    );
+  });
+
+  it('lists the PMDG 737-700 passenger and BBJ families on their SimBrief rows', () => {
+    const pax = findCareerPlayerAirframe('pmdg-737-pax-family');
+    const bbj = findCareerPlayerAirframe('pmdg-737-bbj-family');
+    assert.equal(pax?.label, 'Boeing 737-700');
+    assert.equal(bbj?.label, 'Boeing 737-700 BBJ');
+    assert.equal(pax?.injectCapable, false);
+    assert.equal(bbj?.injectCapable, false);
+    assert.equal(pax?.simbriefIcao, 'B737');
+    assert.equal(pax?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - Dual Class');
+    assert.equal(bbj?.simbriefIcao, 'BBJ1');
+    assert.equal(bbj?.simbriefAirframeMatch, 'PMDG \\(MSFS\\) - 9 Aux Tanks');
+    assert.equal(pax?.maxPaxSeats, 132);
+    assert.equal(resolvePassengerCapacity('pmdg-737-pax-family', 'passenger'), 124);
+    assert.equal(resolvePassengerCapacity('pmdg-737-pax-family', 'single'), 132);
+    assert.equal(resolvePassengerCapacity('pmdg-737-bbj-family', 'passenger'), 30);
+    assert.equal(pax?.fuelCapacityKg, 20894);
+    assert.equal(bbj?.fuelCapacityKg, 25644);
+    const bdsf = findCareerPlayerAirframe('pmdg-737-bdsf-family');
+    assert.equal(bdsf?.label, 'Boeing 737-700 BDSF');
+    assert.equal(bdsf?.injectCapable, false);
+    assert.equal(bdsf?.simbriefIcao, 'B737');
+    assert.equal(
+      bdsf?.simbriefAirframeMatch,
+      'PMDG \\(MSFS\\) - BEDEK Special Freighter',
+    );
+    assert.equal(bdsf?.maxCargoKg, 17764);
+    assert.equal(bdsf?.fuelCapacityKg, 20894);
+    assert.equal(bdsf?.loadLayout, undefined);
+    assert.equal(resolvePassengerCapacity('pmdg-737-bdsf-family', 'passenger'), 0);
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(pax!)].sort(),
+      [
+        'profiles/ofp/pmdg-737-pax.json',
+        'profiles/ofp/pmdg-737-pax-sc.json',
       ].sort(),
     );
   });
@@ -465,6 +506,7 @@ describe('career player airframes', () => {
     }
 
     const freighterOnly = new Set([
+      'pmdg-737-bdsf-family',
       'pmdg-738-bcf-family',
       'blackbird-c-130j-long-configuration',
     ]);

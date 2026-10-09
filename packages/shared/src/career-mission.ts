@@ -3807,6 +3807,12 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
   E175: ['E175', 'E75L'],
   E75L: ['E75L', 'E175'],
   /**
+   * PMDG 737-700 BBJ: SimBrief list key is BBJ1, but the PMDG row's OFP
+   * icaocode is B737. Dispatch still looks up BBJ1. Do not alias B737 back
+   * onto BBJ1 — the passenger 737-700 OFP also prints B737.
+   */
+  BBJ1: ['BBJ1', 'B737'],
+  /**
    * C400 Corvalis: no COL4 in SimBrief — catalog dispatches as SR2T (Cirrus
    * SR22T proxy). OFP icaocode may print S22T (official) or SR22T (UI type).
    */

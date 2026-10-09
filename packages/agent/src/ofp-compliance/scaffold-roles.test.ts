@@ -30,6 +30,26 @@ describe('scaffold-roles PMDG 738 PAX', () => {
   });
 });
 
+describe('scaffold-roles PMDG 737-700', () => {
+  it('keeps Two Class, Single Class, and BBJ on their own SimBrief rows', () => {
+    assert.equal(matchHeuristic('737-700 PAX SSW TC')?.id, 'pmdg-737-pax');
+    assert.equal(matchHeuristic('737-700 PAX BW SC')?.id, 'pmdg-737-pax-sc');
+    assert.equal(matchHeuristic('737-700 BBJ BW')?.id, 'pmdg-737-bbj');
+    assert.equal(matchHeuristic('737-700BDSF BW')?.id, 'pmdg-737-bdsf');
+    assert.equal(matchHeuristic('737-800 PAX SSW TC')?.id, 'pmdg-738-pax');
+    const sc = matchHeuristic('737-700 PAX SSW SC')!;
+    assert.equal(sc.marketTypeId, 'pmdg-737-pax-family');
+    assert.match(sc.simbriefAirframeMatch ?? '', /Single Class/);
+    const bbj = matchHeuristic('737-700 BBJ SSW')!;
+    assert.equal(bbj.simbriefIcao, 'BBJ1');
+    assert.match(bbj.simbriefAirframeMatch ?? '', /9 Aux Tanks/);
+    const bdsf = matchHeuristic('737-700BDSF BW')!;
+    assert.equal(bdsf.marketTypeId, 'pmdg-737-bdsf-family');
+    assert.match(bdsf.simbriefAirframeMatch ?? '', /BEDEK Special Freighter/);
+    assert.deepEqual(bdsf.stationRoles.passengerStations, []);
+  });
+});
+
 describe('scaffold-roles PMDG 738 BBJ2', () => {
   it('matches BBJ2 glass variants to their own family', () => {
     const h = matchHeuristic('737-800 BBJ2 SSW');

@@ -1,0 +1,64 @@
+{
+  "source": "simbrief",
+  "icao": "B737",
+  "ofpId": "pmdg-737-pax-sc",
+  "loadMethod": "native-simbrief",
+  "injectCapable": false,
+  "matchTitles": [
+    "737-700 PAX SSW SC",
+    "737-700 PAX BW SC"
+  ],
+  "matchTitlePattern": "737-700\\s+PAX\\s+\\S+\\s+SC",
+  "notes": [
+    "PMDG 737-700 PAX Single Class (SSW/BW · SC) — same NG3 zone map as Two Class",
+    "Same Market SKU as Two Class: pmdg-737-pax-family",
+    "Homologated monitors: pmdg/737-700-pax-ssw-sc@1.0.0, pmdg/737-700-pax-bw-sc@1.0.0",
+    "SimBrief B737: PMDG (MSFS) - Single Class — 132 seats",
+    "loadMethod: native-simbrief; injectCapable: false — load via the PMDG EFB",
+    "liveSources: NG3 fuel + PMDG EFB LVars"
+  ],
+  "fuel": {
+    "unit": "kg"
+  },
+  "loadSheet": {
+    "unit": "kg"
+  },
+  "payload": {
+    "unit": "kg",
+    "stationRoles": {
+      "passengerStations": [1, 2, 3, 4],
+      "baggageStations": [5, 6],
+      "crewStations": [7, 8, 9],
+      "serviceStations": [10, 11],
+      "averagePassengerWeight": 86.18
+    }
+  },
+  "liveSources": {
+    "fuel": ["pmdg-ng3", "classic"],
+    "weights": ["pmdg-efb-lvars"],
+    "payload": ["pmdg-efb", "classic-stations"]
+  },
+  "simbriefIcao": "B737",
+  "simbriefAirframeMatch": "PMDG \\(MSFS\\) - Single Class",
+  "stationMap": [
+    { "simVarIndex": 1, "cfgIndex": 0, "name": "PaxZone1", "role": "passenger" },
+    { "simVarIndex": 2, "cfgIndex": 1, "name": "PaxZone2", "role": "passenger" },
+    { "simVarIndex": 3, "cfgIndex": 2, "name": "PaxZone3", "role": "passenger" },
+    { "simVarIndex": 4, "cfgIndex": 3, "name": "PaxZone4", "role": "passenger" },
+    { "simVarIndex": 5, "cfgIndex": 4, "name": "Fwd Cargo", "role": "baggage" },
+    { "simVarIndex": 6, "cfgIndex": 5, "name": "Aft Cargo", "role": "baggage" },
+    { "simVarIndex": 7, "cfgIndex": 6, "name": "Pilot", "role": "crew" },
+    { "simVarIndex": 8, "cfgIndex": 7, "name": "Copilot", "role": "crew" },
+    { "simVarIndex": 9, "cfgIndex": 8, "name": "Instructor", "role": "crew" },
+    { "simVarIndex": 10, "cfgIndex": 9, "name": "fwd_gly", "role": "galley" },
+    { "simVarIndex": 11, "cfgIndex": 10, "name": "aft_gly", "role": "galley" }
+  ],
+  "tolerances": {
+    "fuelAbsLb": 200,
+    "fuelPct": 0.02,
+    "payloadAbsLb": 150,
+    "weightAbsLb": 300,
+    "passengerCountAbs": 2,
+    "maxFuelIncreaseLb": 0
+  }
+}

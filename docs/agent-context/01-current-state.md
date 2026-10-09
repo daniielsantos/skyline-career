@@ -1,5 +1,8 @@
 # Current state (2026-10-09)
 
+`main` **b6f3d2fe** / desktop **0.3.485** shipped: Add the FSS Boeing 727-100 passenger, Super 27, and freighter to the Market on the FlightSim Studio SimBrief airframes. Release: [v0.3.485](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.485).
+
+
 `main` **1db3cf5f** / desktop **0.3.484** shipped: Add the PMDG 737-600 to the Market on the SimBrief B736 Dual Class and Single Class airframes. Release: [v0.3.484](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.484).
 
 

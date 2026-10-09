@@ -1,4 +1,7 @@
-# Current state (2026-10-08)
+# Current state (2026-10-09)
+
+`main` **18a3b0a8** / desktop **0.3.482** shipped: Add the PMDG 737-700 passenger, BBJ, and BDSF to the Market on their SimBrief airframes. Release: [v0.3.482](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.482).
+
 
 `main` **4ec41cc0** / desktop **0.3.481** shipped: Open the warehouse stock page when a network warehouse is selected. Release: [v0.3.481](https://github.com/daniielsantos/skyline-career/releases/tag/v0.3.481).
 

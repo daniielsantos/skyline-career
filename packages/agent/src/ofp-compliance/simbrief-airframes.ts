@@ -202,6 +202,8 @@ export function inferSimBriefAirframeMatchFromTitle(
   if (inibuildsA350) return inibuildsA350;
   const fsLabsA321 = inferFsLabsA321SimBriefMatch(t);
   if (fsLabsA321) return fsLabsA321;
+  const fss727 = inferFss727SimBriefMatch(t);
+  if (fss727) return fss727;
   if (/\bA321LR\b/i.test(t) || /^A321$/i.test(t)) {
     return 'iniBuilds \\(MSFS\\) - A321LR LEAP-1A';
   }
@@ -340,6 +342,7 @@ export function liveTitleMatchesMarketSku(
   }
   if (id === 'fslabs-a321') return /FSLabs\s+A321-2(?:11|31)\b/i.test(t);
   if (id === 'fslabs-a321neo') return /FSLabs\s+A321-2(?:51|71)N\b/i.test(t);
+  if (id === 'fss-727-100') return /727-100\b/i.test(t);
   if (id === 'fenix-a319') {
     return /FenixA319\s+(?:CFM|IAE)\s+(?:SL|WF)\s+(?:HD|SD)\b/i.test(t);
   }
@@ -552,6 +555,24 @@ function inferFenixA320SimBriefMatch(title: string): string | undefined {
 
 function inferFenixA319SimBriefMatch(title: string): string | undefined {
   return inferFenixCeoSimBriefMatch(title, 'A319');
+}
+
+/**
+ * FSS 727-100 glasses share the SimBrief B721 list. Super 27 is not the
+ * passenger row; its OFP code is R721. Freighter is its own row. Never Default.
+ */
+function inferFss727SimBriefMatch(title: string): string | undefined {
+  if (!/727-100\b/i.test(title) || /727-200/i.test(title)) return undefined;
+  if (/freighter/i.test(title)) {
+    return 'FlightSim Studio \\(MSFS\\) - B727-100 Freighter';
+  }
+  if (/\bsuper\b/i.test(title)) {
+    return 'FlightSim Studio \\(MSFS\\) - B727-100 Super 27';
+  }
+  if (/boeing\s+727-100\b/i.test(title)) {
+    return 'FlightSim Studio \\(MSFS\\) - B727-100 Passenger';
+  }
+  return undefined;
 }
 
 /**

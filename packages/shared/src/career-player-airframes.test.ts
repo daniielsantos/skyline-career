@@ -35,6 +35,7 @@ describe('career player airframes', () => {
       'blacksquare-b60-duke',
       'blacksquare-turbine-duke',
       'pmdg-736-pax-family',
+      'fss-727-100',
       'pmdg-737-pax-family',
       'pmdg-737-bbj-family',
       'pmdg-737-bdsf-family',
@@ -238,6 +239,28 @@ describe('career player airframes', () => {
       [
         'profiles/ofp/pmdg-737-pax.json',
         'profiles/ofp/pmdg-737-pax-sc.json',
+      ].sort(),
+    );
+  });
+
+  it('lists the FSS 727-100 on the FlightSim Studio B721 rows', () => {
+    const airframe = findCareerPlayerAirframe('fss-727-100');
+    assert.equal(airframe?.label, 'Boeing 727-100');
+    assert.equal(airframe?.simbriefIcao, 'B721');
+    assert.equal(
+      airframe?.simbriefAirframeMatch,
+      'FlightSim Studio \\(MSFS\\) - B727-100 Passenger',
+    );
+    assert.equal(airframe?.maxPaxSeats, 125);
+    assert.equal(airframe?.fuelCapacityKg, 23340);
+    assert.equal(resolvePassengerCapacity('fss-727-100', 'passenger'), 125);
+    assert.equal(resolvePassengerCapacity('fss-727-100', 'cargo'), 0);
+    assert.deepEqual(
+      [...careerPlayerAirframePackPaths(airframe!)].sort(),
+      [
+        'profiles/ofp/fss-727-100-freighter.json',
+        'profiles/ofp/fss-727-100-super.json',
+        'profiles/ofp/fss-727-100.json',
       ].sort(),
     );
   });

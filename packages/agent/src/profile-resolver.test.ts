@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import type { AircraftProfile } from '@msfs-compat/shared';
 import { resolveProfile } from './profile-resolver.js';
 import type { LoadedProfile } from './profile-registry.js';
@@ -212,5 +215,38 @@ describe('resolveProfile NextGenSim Bandeirante variants', () => {
         result.reason === 'no_candidates' ||
         result.confidence < 0.7,
     );
+  });
+});
+
+describe('resolveProfile FSS 727', () => {
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
+  const catalog = [
+    'profiles/examples/fss-boeing-727-100.json',
+    'profiles/examples/fss-boeing-super-727-100.json',
+  ].map((path) => ({
+    path,
+    profile: JSON.parse(readFileSync(join(repoRoot, path), 'utf8')) as AircraftProfile,
+  }));
+
+  it('keeps Super 727-100 off the base 727-100 profile', () => {
+    const superGlass = resolveProfile(
+      { title: 'Boeing Super 727-100 Passenger', icao: 'B721' },
+      catalog,
+    );
+    assert.equal(superGlass.profile?.profileKey, 'fss/boeing-super-727-100');
+    assert.equal(superGlass.reason, 'exact_title');
+
+    const otherLivery = resolveProfile(
+      { title: 'Boeing Super 727-100 - Delta', icao: 'B721' },
+      catalog,
+    );
+    assert.equal(otherLivery.profile?.profileKey, 'fss/boeing-super-727-100');
+
+    const base = resolveProfile(
+      { title: 'Boeing 727-100 - American Airlines', icao: 'B721' },
+      catalog,
+    );
+    assert.equal(base.profile?.profileKey, 'fss/boeing-727-100');
+    assert.equal(base.reason, 'exact_title');
   });
 });

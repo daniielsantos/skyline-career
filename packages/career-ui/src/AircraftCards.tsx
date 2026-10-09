@@ -300,6 +300,7 @@ const AIRFRAME_CARD_ART: Record<string, string> = {
   'microsoft-a320neo-v2': '/airframes/a320neo-v2.png',
   'microsoft-a321lr': '/airframes/a321lr.png',
   'synaptic-a220-300': '/airframes/a220-300.png',
+  'fss-727-100': '/airframes/b727-100.png',
   'fss-embraer-e170': '/airframes/embraer-e170.png',
   'fss-embraer-e175': '/airframes/embraer-e175.png',
   'fss-embraer-e190': '/airframes/embraer-e190.png',

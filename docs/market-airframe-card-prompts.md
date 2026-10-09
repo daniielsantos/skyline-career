@@ -1125,6 +1125,22 @@ CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-i
 Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus.
 ```
 
+## FSS Boeing 727-100
+- **typeId:** `fss-727-100`
+- **file:** `b727-100.png`
+
+```
+Stylized cartoon / clean vector illustration of a Boeing 727-100 passenger airliner (B721), three-quarter side view parked facing left. Wide 16:9 market card.
+
+Keep the aircraft highly recognizable: short 727-100 fuselage, T-tail, three rear engines (two on the aft fuselage and one in the tail intake), passenger windows, retractable gear down. White fuselage, green cheatline, plain tail. Must read as a 727-100 at a glance — shorter than a 727-200, not a 737, not a freighter.
+
+Art style: modern comic / flat-shaded cartoon with bold clean outlines, saturated but realistic paint colors, soft cel shading, no photorealism, no 3D render look, no muddy textures. Friendly flight-sim market card aesthetic.
+
+CLASS SCENE KIT — narrow_freighter: Deep twilight / night cargo ramp, purple-indigo sky (#7a6a9a / #42385c), containers, floodlights. Soft ground shadow.
+
+Composition: aircraft large and centered for a wide market card banner. No text, no logos, no watermarks, no people in focus, no airline branding, no cockpit interior, no HUD.
+```
+
 ## PMDG 737-600
 - **typeId:** `pmdg-736-pax-family`
 - **file:** `b736-pax.png`

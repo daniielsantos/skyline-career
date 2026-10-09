@@ -44,6 +44,19 @@ describe('scaffold-roles FSLabs A321', () => {
   });
 });
 
+describe('scaffold-roles FSS 727-100', () => {
+  it('keeps Super 27 and the freighter off the passenger pack', () => {
+    assert.equal(matchHeuristic('Boeing 727-100 - American Airlines')?.id, 'fss-727-100');
+    assert.equal(matchHeuristic('Boeing Super 727-100 Passenger')?.id, 'fss-727-100-super');
+    assert.equal(matchHeuristic('Boeing 727-100 Freighter')?.id, 'fss-727-100-freighter');
+    assert.equal(
+      matchHeuristic('Boeing Super 727-100 Passenger')?.simbriefAirframeMatch,
+      'FlightSim Studio \\(MSFS\\) - B727-100 Super 27',
+    );
+    assert.equal(matchHeuristic('Boeing Super 727-100 Passenger')?.marketTypeId, 'fss-727-100');
+  });
+});
+
 describe('scaffold-roles PMDG 737-600', () => {
   it('keeps Two Class and Single Class off the 737-700 family', () => {
     assert.equal(matchHeuristic('737-600 PAX TC')?.id, 'pmdg-736-pax');

@@ -1782,6 +1782,18 @@ describe('compareMissionIntentToOfp', () => {
     assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
   });
 
+  it('accepts FSS 727 Super 27 SimBrief OFP ICAO R721', () => {
+    const check = compareMissionIntentToOfp(
+      baseMission({
+        airframeTypeId: 'fss-727-100',
+        rolesPackRelPath: 'profiles/ofp/fss-727-100-super.json',
+      }),
+      matchingOfp({ icao: 'R721' }),
+    );
+    assert.equal(check.verdict, 'pass');
+    assert.ok(!check.findings.some((f) => f.code === 'INTENT_AIRFRAME_MISMATCH'));
+  });
+
   it('accepts PMDG 777F SimBrief OFP ICAO B77L (MSFS atc_model quirk)', () => {
     const check = compareMissionIntentToOfp(
       baseMission({

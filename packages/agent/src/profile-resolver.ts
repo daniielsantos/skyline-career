@@ -69,17 +69,23 @@ function scoreProfile(
   const icao = norm(identity.icao ?? identity.atcModel);
   const profileIcao = norm(profile.match.icao);
 
+  // match.title is listed first. A shorter alias must not hide an exact liveTitles hit.
+  let bestTitle: { score: number; reason: string } | null = null;
   for (const profileTitle of titles) {
-    if (liveTitle && profileTitle && titlesMatchForCatalog(liveTitle, profileTitle)) {
-      const exact =
-        norm(normalizeAircraftTitle(liveTitle)) ===
-        norm(normalizeAircraftTitle(profileTitle));
-      return {
-        score: exact ? 1.0 : 0.9,
-        reason: exact ? 'exact_title' : 'title_alias',
-      };
+    if (!liveTitle || !profileTitle || !titlesMatchForCatalog(liveTitle, profileTitle)) {
+      continue;
     }
+    const exact =
+      norm(normalizeAircraftTitle(liveTitle)) ===
+      norm(normalizeAircraftTitle(profileTitle));
+    const scored = {
+      score: exact ? 1.0 : 0.9,
+      reason: exact ? 'exact_title' : 'title_alias',
+    };
+    if (!bestTitle || scored.score > bestTitle.score) bestTitle = scored;
+    if (scored.score === 1) break;
   }
+  if (bestTitle) return bestTitle;
 
   if (icao && profileIcao && icao === profileIcao) {
     // ICAO alone is a weak hint (many variants share E110). Do not boost on

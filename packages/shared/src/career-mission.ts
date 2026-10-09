@@ -3807,6 +3807,13 @@ const AIRFRAME_ICAO_ALIASES: Record<string, readonly string[]> = {
   E175: ['E175', 'E75L'],
   E75L: ['E75L', 'E175'],
   /**
+   * FSS 727-100 Super 27: the row lives on the SimBrief B721 list
+   * (FlightSim Studio - B727-100 Super 27) but the OFP icaocode is R721.
+   * Dispatch still looks up B721. Do not alias R722 (727-200 Super 27).
+   */
+  B721: ['B721', 'R721'],
+  R721: ['R721', 'B721'],
+  /**
    * PMDG 737-700 BBJ: SimBrief list key is BBJ1, but the PMDG row's OFP
    * icaocode is B737. Dispatch still looks up BBJ1. Do not alias B737 back
    * onto BBJ1 — the passenger 737-700 OFP also prints B737.

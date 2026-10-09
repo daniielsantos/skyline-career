@@ -411,6 +411,25 @@ describe('titlesMatchForCatalog', () => {
       true,
     );
   });
+
+  it('does not alias the FSS Super 727-100 onto the 727-100', () => {
+    assert.equal(
+      titlesMatchForCatalog('Boeing Super 727-100 Passenger', 'Boeing 727-100'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('Boeing 727-100 - American Airlines', 'Boeing Super 727-100'),
+      false,
+    );
+    assert.equal(
+      titlesMatchForCatalog('Boeing Super 727-100 Passenger', 'Boeing Super 727-100'),
+      true,
+    );
+    assert.equal(
+      titlesMatchForCatalog('Boeing 727-100 - American Airlines', 'Boeing 727-100'),
+      true,
+    );
+  });
 });
 
 describe('fingerprintFromProfile liveTitles', () => {

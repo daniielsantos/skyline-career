@@ -354,6 +354,9 @@ export function titlesMatchForCatalog(liveTitle: string, profileTitle: string): 
     // Duke / performance packages — Grand ≠ base B60; Turbine ≠ piston.
     'grand',
     'turbine',
+    // FSS 727 — "Boeing Super 727-100" must not alias onto "Boeing 727-100"
+    // (same tanks and station count; both score as a title alias).
+    'super',
     // Fenix A32x pack codes — wing fence / sharklet / seating density.
     // "… CFM WF SD" must not alias onto "… CFM SL HD" via shared model tokens.
     'wf',

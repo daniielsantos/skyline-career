@@ -354,6 +354,40 @@ describe('resolveMissionRolesPack FSLabs A321', () => {
   });
 });
 
+describe('resolveMissionRolesPack FSS 727-100', () => {
+  it('picks the FlightSim Studio passenger, Super 27, or freighter row', async () => {
+    const cases = [
+      [
+        'Boeing 727-100 - American Airlines',
+        /fss-727-100\.json$/,
+        'FlightSim Studio \\(MSFS\\) - B727-100 Passenger',
+      ],
+      [
+        'Boeing Super 727-100 Passenger',
+        /fss-727-100-super\.json$/,
+        'FlightSim Studio \\(MSFS\\) - B727-100 Super 27',
+      ],
+      [
+        'Boeing 727-100 Freighter',
+        /fss-727-100-freighter\.json$/,
+        'FlightSim Studio \\(MSFS\\) - B727-100 Freighter',
+      ],
+    ] as const;
+    for (const [liveTitle, pathRe, match] of cases) {
+      const roles = await resolveMissionRolesPack({
+        repoRoot,
+        rolesPackRelPath: 'profiles/ofp/fss-727-100.json',
+        liveTitle,
+        airframeTypeId: 'fss-727-100',
+        strictAirframeMatch: true,
+      });
+      assert.match(roles.path.replace(/\\/g, '/'), pathRe);
+      assert.equal(roles.pack.simbriefAirframeMatch, match);
+      assert.equal(roles.pack.simbriefIcao, 'B721');
+    }
+  });
+});
+
 describe('resolveMissionRolesPack PMDG 737-600', () => {
   it('picks Dual Class or Single Class on SimBrief B736', async () => {
     const cases = [

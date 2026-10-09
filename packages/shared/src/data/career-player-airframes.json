@@ -1772,6 +1772,56 @@
     "defaultConfigurationId": "passenger"
   },
   {
+    "typeId": "fss-727-100",
+    "aircraftClassId": "narrow_freighter",
+    "label": "Boeing 727-100",
+    "rolesPackRelPath": "profiles/ofp/fss-727-100.json",
+    "familyRolesPackRelPaths": [
+      "profiles/ofp/fss-727-100.json",
+      "profiles/ofp/fss-727-100-super.json",
+      "profiles/ofp/fss-727-100-freighter.json"
+    ],
+    "simbriefIcao": "B721",
+    "simbriefAirframeMatch": "FlightSim Studio \\(MSFS\\) - B727-100 Passenger",
+    "injectCapable": false,
+    "loadLayout": "pax_and_cargo",
+    "maxPaxSeats": 125,
+    "oewKg": 37072,
+    "mtowKg": 73028,
+    "mzfwKg": 54581,
+    "maxCargoKg": 17509,
+    "fuelCapacityKg": 23340,
+    "maxRangeNm": 2250,
+    "cruiseSpeedKt": 470,
+    "cruiseFuelFlowKgPerHour": 4500,
+    "fuelBurnKgPerNm": 9.574,
+    "configurations": [
+      {
+        "id": "passenger",
+        "label": "Passenger",
+        "role": "passenger",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 125,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 6875,
+        "rolesPackRelPath": "profiles/ofp/fss-727-100.json"
+      },
+      {
+        "id": "cargo",
+        "label": "Cargo",
+        "role": "cargo",
+        "certificationState": "dispatch_ready",
+        "passengerCapacity": 0,
+        "requiredCrew": 2,
+        "baggageAllowanceLbPerPassenger": 55,
+        "baggageCapacityLb": 0,
+        "rolesPackRelPath": "profiles/ofp/fss-727-100-freighter.json"
+      }
+    ],
+    "defaultConfigurationId": "passenger"
+  },
+  {
     "typeId": "fss-embraer-e170",
     "aircraftClassId": "narrow_freighter",
     "label": "Embraer E170",

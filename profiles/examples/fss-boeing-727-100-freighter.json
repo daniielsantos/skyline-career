@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "1.0.0",
+  "profileId": "fss-boeing-727-100-freighter",
+  "profileKey": "fss/boeing-727-100-freighter",
+  "semver": "1.0.0",
+  "displayName": "Boeing 727-100 Freighter (MSFS 2024)",
+  "match": {
+    "fingerprint": "9104a8063956cc19b6cf599fd281d20d5f37caf0c079fb21a33268a327d99c13",
+    "title": "Boeing 727-100 Freighter",
+    "publisher": "fss",
+    "icao": "B721",
+    "liveTitles": [
+      "Boeing 727-100 Freighter"
+    ]
+  },
+  "capabilities": [
+    "simconnect"
+  ],
+  "gating": {
+    "requireOnGround": true,
+    "requireEnginesOff": false,
+    "blockWhenPaused": true,
+    "blockWhenSlew": true,
+    "minSimRate": 0.9,
+    "maxSimRate": 1.1
+  },
+  "fuel": {
+    "strategy": "simconnect-direct",
+    "unit": "gallons",
+    "tanks": [
+      {
+        "id": "LEFT_MAIN",
+        "name": "FUELSYSTEM:1",
+        "capacity": 1793,
+        "readVar": "FUELSYSTEM TANK QUANTITY:1",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "RIGHT_MAIN",
+        "name": "FUELSYSTEM:2",
+        "capacity": 4094,
+        "readVar": "FUELSYSTEM TANK QUANTITY:2",
+        "readUnit": "gallons"
+      },
+      {
+        "id": "TANK_3",
+        "name": "FUELSYSTEM:3",
+        "capacity": 1793,
+        "readVar": "FUELSYSTEM TANK QUANTITY:3",
+        "readUnit": "gallons"
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 8000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "payload": {
+    "strategy": "station-writeback",
+    "stations": [
+      {
+        "index": 1,
+        "name": "Station 1",
+        "maxLoad": 500
+      },
+      {
+        "index": 2,
+        "name": "Station 2",
+        "maxLoad": 500
+      },
+      {
+        "index": 3,
+        "name": "Station 3",
+        "maxLoad": 500
+      },
+      {
+        "index": 4,
+        "name": "Station 4",
+        "maxLoad": 500
+      },
+      {
+        "index": 5,
+        "name": "Station 5",
+        "maxLoad": 500
+      },
+      {
+        "index": 6,
+        "name": "Station 6",
+        "maxLoad": 500
+      },
+      {
+        "index": 7,
+        "name": "Station 7",
+        "maxLoad": 500
+      },
+      {
+        "index": 8,
+        "name": "Station 8",
+        "maxLoad": 500
+      },
+      {
+        "index": 9,
+        "name": "Station 9",
+        "maxLoad": 500
+      },
+      {
+        "index": 10,
+        "name": "Station 10",
+        "maxLoad": 500
+      },
+      {
+        "index": 11,
+        "name": "Station 11",
+        "maxLoad": 500
+      },
+      {
+        "index": 12,
+        "name": "Station 12",
+        "maxLoad": 500
+      },
+      {
+        "index": 13,
+        "name": "Station 13",
+        "maxLoad": 500
+      },
+      {
+        "index": 14,
+        "name": "Station 14",
+        "maxLoad": 500
+      },
+      {
+        "index": 15,
+        "name": "Station 15",
+        "maxLoad": 500
+      },
+      {
+        "index": 16,
+        "name": "Station 16",
+        "maxLoad": 500
+      },
+      {
+        "index": 17,
+        "name": "Station 17",
+        "maxLoad": 500
+      },
+      {
+        "index": 18,
+        "name": "Station 18",
+        "maxLoad": 500
+      },
+      {
+        "index": 19,
+        "name": "Station 19",
+        "maxLoad": 500
+      }
+    ],
+    "writePlan": [],
+    "verify": {
+      "timeoutMs": 6000,
+      "pollIntervalMs": 250,
+      "checks": []
+    }
+  },
+  "cg": {
+    "readVar": "CG PERCENT",
+    "readUnit": "Percent over 100",
+    "envelopeSource": "calibrated-live",
+    "toleranceMac": 0.5,
+    "constraints": {
+      "minMac": 0,
+      "maxMac": 50
+    }
+  },
+  "fallback": {
+    "chain": [
+      "simconnect-direct"
+    ]
+  },
+  "notes": [
+    "Homologated via wizard: Boeing 727-100 Freighter.",
+    "ICAO type designator (catalog/SimBrief): B721.",
+    "Load method: native-simbrief (no Skyline inject).",
+    "Fuel/payload write plans intentionally empty — load via addon EFB/tablet.",
+    "Use compare-ofp + Career Loaded vs Due for validation.",
+    "See profiles/notes/fss-boeing-727-100-freighter.md"
+  ]
+}

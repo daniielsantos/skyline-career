@@ -141,6 +141,21 @@ const FSLABS_A321_STATION_MAP = [
   })),
 ];
 
+function unnamedCrewThenBaggageMap(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    simVarIndex: i + 1,
+    cfgIndex: i,
+    name: `Station ${i + 1}`,
+    role: i < 2 ? 'crew' : 'baggage',
+  }));
+}
+
+const FSS_727_LIVE_SOURCES: OfpLiveSources = {
+  fuel: ['classic', 'mass-balance'],
+  weights: ['classic-weights'],
+  payload: ['classic-stations'],
+};
+
 /** Known families where station roles are stable across liveries/cabin options. */
 export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
   {
@@ -220,6 +235,78 @@ export const OFP_ROLE_HEURISTICS: ScaffoldHeuristic[] = [
       'One Skyline Market SKU: pmdg-738-bbj2-family (enabled: false)',
       'loadMethod: native-simbrief; injectCapable: false',
       'liveSources: NG3 fuel + PMDG EFB LVars',
+    ],
+  },
+  {
+    id: 'fss-727-100-freighter',
+    icao: 'B721',
+    titlePattern: /727-100\s+Freighter/i,
+    familyPackRel: 'fss-727-100-freighter.json',
+    marketTypeId: 'fss-727-100',
+    marketLabel: 'Boeing 727-100',
+    stationRoles: {
+      passengerStations: [],
+      baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      crewStations: [1, 2],
+    },
+    liveSources: FSS_727_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'B721',
+    simbriefAirframeMatch: 'FlightSim Studio \\(MSFS\\) - B727-100 Freighter',
+    stationMap: unnamedCrewThenBaggageMap(19),
+    notes: [
+      'FSS Boeing 727-100 Freighter',
+      'Market SKU: fss-727-100',
+      'SimBrief B721: FlightSim Studio (MSFS) - B727-100 Freighter',
+    ],
+  },
+  {
+    id: 'fss-727-100-super',
+    icao: 'B721',
+    titlePattern: /Super\s+727-100/i,
+    familyPackRel: 'fss-727-100-super.json',
+    marketTypeId: 'fss-727-100',
+    marketLabel: 'Boeing 727-100',
+    stationRoles: {
+      passengerStations: [],
+      baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+      crewStations: [1, 2],
+    },
+    liveSources: FSS_727_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'B721',
+    simbriefAirframeMatch: 'FlightSim Studio \\(MSFS\\) - B727-100 Super 27',
+    stationMap: unnamedCrewThenBaggageMap(18),
+    notes: [
+      'FSS Boeing Super 727-100',
+      'Market SKU: fss-727-100',
+      'SimBrief B721: FlightSim Studio (MSFS) - B727-100 Super 27 (OFP ICAO R721)',
+    ],
+  },
+  {
+    id: 'fss-727-100',
+    icao: 'B721',
+    titlePattern: /Boeing\s+727-100(?!\s+Freighter)/i,
+    familyPackRel: 'fss-727-100.json',
+    marketTypeId: 'fss-727-100',
+    marketLabel: 'Boeing 727-100',
+    stationRoles: {
+      passengerStations: [],
+      baggageStations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+      crewStations: [1, 2],
+    },
+    liveSources: FSS_727_LIVE_SOURCES,
+    loadMethod: 'native-simbrief',
+    injectCapable: false,
+    simbriefIcao: 'B721',
+    simbriefAirframeMatch: 'FlightSim Studio \\(MSFS\\) - B727-100 Passenger',
+    stationMap: unnamedCrewThenBaggageMap(18),
+    notes: [
+      'FSS Boeing 727-100 passenger',
+      'Market SKU: fss-727-100',
+      'SimBrief B721: FlightSim Studio (MSFS) - B727-100 Passenger',
     ],
   },
   {
